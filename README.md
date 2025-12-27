@@ -1,114 +1,66 @@
-# Minimal Go HTTP server with routing, middleware, and graceful shutdown
+# Plumego — standard-library web toolkit
 
-## Overview
+Plumego is a small Go HTTP toolkit that keeps everything inside the standard library while still covering routing, middleware, graceful shutdown, WebSocket helpers, webhook plumbing, and static frontend hosting. It is designed to be embedded in your own `main` package rather than acting as a framework binary.
 
-A lightweight HTTP server skeleton built with the Go standard library.
-It includes dynamic routing, middleware, graceful shutdown, and environment-based configuration — ideal for quickly building simple APIs or learning HTTP server development.
+## Highlights
+- **Router with groups and params**: Trie-based matcher that supports `/:param` segments, route freezing, and middleware stacks per route/group.
+- **Middleware chain**: Logging, recovery, gzip, CORS, timeout, rate limiting, concurrency limits, body size limits, and auth helpers that wrap standard `http.Handler` values.
+- **Structured logging hooks**: Plug in a custom logger and collect metrics/traces via middleware hooks.
+- **Graceful lifecycle**: Environment loading, connection draining, readiness flags, and optional TLS/HTTP2 configuration with sane defaults.
+- **Optional services**: Built-in WebSocket hub with auth, in-process pub/sub with debug snapshots, inbound/outbound webhook routers, and static frontend mounting from disk or embedded assets.
 
-## Features
-
-* **Dynamic Routing**: Supports path parameters like `/hello/:name`
-* **Middleware System**: Built-in Logging and Auth middlewares, with support for custom extensions
-* **Graceful Shutdown**: Cleans up connections within 5 seconds after receiving an interrupt signal
-* **Logging**: Add glog logging library for structured logging
-* **Env Configuration**: Supports `.env` files (e.g., log level, etc.)
-* **Test Coverage**: Includes tests for routing, middleware, 404 handling, and more
-* **Developer Toolchain**: Comes with a `Makefile` and `dev.sh` script for easy build/run/test workflows
-* **Static Frontend Hosting**: Serve built Node/Next.js bundles directly from the Go server (flag: `-frontend-dir`, env: `FRONTEND_DIR`)
-
-## Getting Started
-
-### Requirements
-
-* Go 1.18+
-
-### Build & Run
-
-```bash
-# Using Makefile
-make run   # Build and start the server (default port: 8080)
-
-# Or using the dev.sh script
-./dev.sh run
-```
-
-### Custom Port
-
-```bash
-./plumego -addr :9090  # Start on port 9090
-```
-
-### Serve a built Node/Next.js frontend
-
-Point the server at a production build directory (for example `next export` output in `./web/out`):
-
-```bash
-./plumego -frontend-dir ./web/out
-# or
-FRONTEND_DIR=./web/out ./plumego
-```
-
-The `-frontend-dir` flag has the highest priority and overrides `FRONTEND_DIR`.
-
-All assets under the directory are served with SPA-style fallback to `index.html`, making it suitable for exported Next.js/Vite/React builds.
-
-To ship a single self-contained binary, copy your built frontend (the same `frontend-dir` contents) into `pkg/frontend/embedded/` before building:
-
-```bash
-cp -r ./web/out/* pkg/frontend/embedded/
-go build ./...
-./plumego  # mounts embedded assets when no frontend dir/env is provided
-```
-
-## Routing
-
-Register parameterized routes with `app.(Get|Post|Delete|Put)` (see `main.go` for examples):
+## Quick start
+Create a small `main.go` that wires routes and middleware, then boot the server:
 
 ```go
-app.Get("/hello/:name", func(w http.ResponseWriter, r *http.Request) {
-    params := router.ParamsFromContext(r.Context())
-    // Access params["name"]
-    fmt.Fprintf(w, `{"message":"Hello, %s!"}`, params["name"])
-})
+package main
 
-app.Get("/users/:id/posts/:postID", func(w http.ResponseWriter, r *http.Request) {
-    params := router.ParamsFromContext(r.Context())
-    // Access params["id"] and params["postID"]
-    fmt.Fprintf(w, `{"message":"User %s, Post %s"}`, params["id"], params["postID"])
-})
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego/core"
+)
+
+func main() {
+    app := core.New(
+        core.WithAddr(":8080"),
+        core.WithDebug(),
+    )
+
+    app.EnableRecovery()
+    app.EnableLogging()
+    app.EnableCORS()
+
+    app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+        w.Write([]byte("pong"))
+    })
+
+    if err := app.Boot(); err != nil {
+        log.Fatalf("server stopped: %v", err)
+    }
+}
 ```
 
-## Route Testing
-After starting the service, test the routes using curl:
-```bash
-curl http://localhost:8080/ping # pong
-curl http://localhost:8080/hello # {"message":"Hello, World!"}
-curl -H "X-Token: secret" http://localhost:8080/hello/Alice # {"message":"Hello, Alice!"}
-```
+## Configuration basics
+- Environment variables can be loaded from a `.env` file (default path `.env`; override with `core.WithEnvPath`).
+- Useful variables: `AUTH_TOKEN` (SimpleAuth middleware), `WS_SECRET` (WebSocket JWT signing secret), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
+- App defaults include 10 MiB body limit, 256 concurrent request limit with queueing, HTTP read/write timeouts, and a 5s graceful shutdown window. Override via the `core.With...` options.
 
-## Middleware
+## Key components
+- **Router**: Register handlers with `Get`, `Post`, etc., or context-aware variants (`GetCtx`) that expose a unified request context wrapper. Grouping lets you attach shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir`.
+- **Middleware**: Chain middlewares with `app.Use(...)` before boot; guardrails (body limit, concurrency limit) are injected automatically during setup. Recovery and logging helpers are available via `EnableRecovery` and `EnableLogging`.
+- **WebSocket hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint plus an optional broadcast endpoint guarded by a shared secret. Customize worker counts and queue sizes through `WebSocketConfig`.
+- **Pub/Sub + Webhooks**: Supply a `pubsub.PubSub` implementation to enable webhook fan-out. Outbound webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
+- **Health + readiness**: Lifecycle hooks mark readiness during startup/shutdown, and build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
 
-* **LoggingMiddleware**: Logs request duration (`[time] METHOD PATH (duration)`)
-* **AuthMiddleware**: Validates `X-Token` header
-* **CorsMiddleware**: Allow cross-domain requests
+## Development and testing
+- Install Go 1.24+ (matching `go.mod`).
+- Run tests: `go test ./...`
+- Format and lint using the Go toolchain as needed (`go fmt`, `go vet`).
 
-Combine middlewares (see `main.go` for usage):
-
-```go
-app.Use(app.Logging(), app.Auth())
-```
-
-## Testing
-
-```bash
-make test       # Run all tests
-make coverage   # Generate coverage report (outputs to coverage.html)
-```
-
-## Usage
-
-* **[English](docs/en/usage.md)**: Comprehensive guide with examples
-* **[中文](docs/cn/usage.md)**: 中文文档，包含详细的使用说明和示例
-
-## License
-MIT
+## Improvement ideas
+- Provide a reference `main` package (or example folder) that demonstrates WebSocket setup, webhook routes, and static frontend mounting end-to-end to reduce onboarding friction.
+- Add minimal HTTP examples for readiness/build info exposure so operators can plug Plumego into health check endpoints without re-implementing them.
+- Offer metrics/tracing adapters (Prometheus/OpenTelemetry) alongside the `middleware.MetricsCollector` and `Tracer` hooks to make observability plug-and-play.
+- Expand configuration docs to map every `AppConfig` field to environment variables or command-line flags for predictable deployments.
