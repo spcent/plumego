@@ -157,7 +157,6 @@ func (a *App) ConfigureWebSocketWithOptions(config WebSocketConfig) (*ws.Hub, er
 	}
 
 	comp.RegisterRoutes(a.router)
-	a.wsHub = comp.hub
 	a.components = append(a.components, comp)
 
 	return comp.hub, nil

@@ -151,8 +151,6 @@ func (a *App) startServer() error {
 
 	<-idleConnsClosed
 
-	a.stopWebSocketHub()
-
 	a.logger.Info("Server stopped gracefully", nil)
 	return err
 }
@@ -230,17 +228,6 @@ func (a *App) stopComponents(ctx context.Context) {
 			}
 			_ = comps[i].Stop(ctx)
 		}
-	})
-}
-
-func (a *App) stopWebSocketHub() {
-	a.wsStopOnce.Do(func() {
-		if a.wsHub == nil {
-			return
-		}
-		a.logger.Info("Stopping WebSocket hub", nil)
-		a.wsHub.Stop()
-		a.wsHub = nil
 	})
 }
 

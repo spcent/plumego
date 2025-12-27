@@ -7,7 +7,6 @@ import (
 
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	ws "github.com/spcent/plumego/net/websocket"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
 )
@@ -16,7 +15,6 @@ import (
 type App struct {
 	config        AppConfig            // Application configuration
 	router        *router.Router       // HTTP router
-	wsHub         *ws.Hub              // WebSocket hub
 	started       bool                 // Whether the app has started
 	envLoaded     bool                 // Whether environment variables have been loaded
 	httpServer    *http.Server         // HTTP server instance
@@ -36,7 +34,6 @@ type App struct {
 	startedComponents []Component
 	componentsMu      sync.Mutex
 	componentStopOnce sync.Once
-	wsStopOnce        sync.Once
 }
 
 // Option defines a function type for configuring the App.
