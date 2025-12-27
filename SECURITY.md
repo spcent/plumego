@@ -15,7 +15,7 @@ The following versions of this project are actively maintained and receive secur
 
 If you discover a security vulnerability, please follow these steps:
 
-1. **Contact**: Send an email to `spcent@foxmail.com` with the subject `[SECURITY] <brief description>`.  
+1. **Contact**: Add a github issue with the subject `[SECURITY] <brief description>`.  
 2. **Details**: Include a detailed description of the vulnerability, steps to reproduce, and any potential impact.  
 3. **Confidentiality**: Do **not** disclose the vulnerability publicly until a fix has been released.  
 
