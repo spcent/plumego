@@ -1,37 +1,59 @@
 # Router 模块
 
-**router** 提供基于前缀树的高性能匹配，支持路由分组、命名参数与中间件继承。
+**router** 提供基于前缀树的匹配，支持分组、路径参数和中间件继承，并保持与标准 `http.Handler` 兼容。
 
-## 职责
-- 通过 `Get`、`Post`、`Put`、`Patch`、`Delete`、`Options`、`Head` 以及对应的 `*Ctx` 变体注册 Handler。
-- 使用 `Group(prefix, ...middleware)` 复用路径前缀和中间件，保持边界清晰。
-- 在 `App.Boot()` 阶段冻结路由表，阻止晚注册导致的不一致。
+## Handler 形态
+- 标准 Handler：`Get`、`Post`、`Put`、`Patch`、`Delete`、`Options`、`Head`、`Any` 接受 `http.Handler`。
+- 函数辅助：`GetFunc`/`PostFunc` 等接受 `http.HandlerFunc`。
+- 上下文 Handler：`GetCtx`/`PostCtx` 等接受 `contract.CtxHandlerFunc`，自动解析路径参数和请求信息。
 
-## 使用策略
-- 优先采用 RESTful 路径，如 `GET /users/:id`、`POST /users`，便于文档与监控聚合。
-- 命名参数用 `:name`，全局通配符用 `*filepath`（适合静态资源与多级文档）。
-- 通过 `frontend.RegisterFromDir` 或嵌入式资源挂载前端到独立分组，隔离缓存与鉴权策略。
+## 路径模式
+- 静态：`/docs/index.html`
+- 参数：`/users/:id`、`/teams/:teamID/members/:id`
+- 通配：`/*filepath`（捕获剩余路径，用于静态资源或文档）
 
-## 中间件继承
-执行顺序为 **全局 → 分组 → 路由专属**。分组中追加的中间件会继承给子路由，适合区分公开与管理入口的安全策略。
+## 分组与中间件顺序
+中间件执行顺序为 **全局 → 分组 → 路由专属**。
 
-## 调试
-- 开启调试模式可在启动时输出 Method/Path 列表。
-- 在开发环境添加遍历 `router.Routes()` 的路由（如 `/debug/routes`）便于审计最终路由树。
-- `Boot()` 之后注册路由触发 panic，属于预期行为，务必调整初始化顺序而非吞掉异常。
-
-## 示例
 ```go
-api := app.Router().Group("/api")
-api.Use(middleware.NewConcurrencyLimiter(100))
-api.Get("/users/:id", userHandler)
-api.Post("/users", createUserHandler)
+api := app.Router().Group("/api", middleware.SimpleAuth("token"))
+api.Use(middleware.Timeout(2 * time.Second))
 
-assets := app.Router().Group("/docs")
-assets.Get("/*filepath", docsHandler)
+api.GetCtx("/users/:id", func(ctx *contract.Ctx) {
+    id := ctx.Param("id")
+    ctx.Text(http.StatusOK, "user="+id)
+})
+
+// 嵌套分组继承前缀与中间件。
+v1 := api.Group("/v1")
+v1.Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("pong")) })
 ```
 
+所有注册应在 `app.Boot()` 前完成；启动时路由会被冻结以避免遗漏。
+
+## 静态前端与通配
+为静态资源单独划分分组，方便隔离缓存策略或鉴权。
+
+```go
+assets := app.Router().Group("/docs")
+assets.Get("/*filepath", func(w http.ResponseWriter, r *http.Request) {
+    http.ServeFileFS(w, r, os.DirFS("./examples/docs"), path.Clean(r.URL.Path))
+})
+```
+
+若使用嵌入资源，可利用 `frontend` 辅助：
+
+```go
+// 将嵌入的 SPA 或文档站点挂载到 "/"。
+_ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"))
+```
+
+## 调试技巧
+- 打开 `core.WithDebug()` 可在启动时打印所有 method/path。
+- 本地诊断冲突时，可在开发路由中遍历 `router.Routes()` 输出结果。
+- 启动期的延迟注册 panic 属于预期行为，请调整初始化顺序而不是忽略。
+
 ## 代码位置
-- `router/router.go`：路由结构、节点匹配与分组逻辑。
-- `frontend/register.go`：静态目录或嵌入式前端的挂载助手。
-- `examples/reference/main.go`：API、指标、健康检查与前端路由的实战接线。
+- `router/router.go`：前缀树匹配、分组与辅助函数。
+- `frontend/register.go`：挂载磁盘目录或嵌入前端包的辅助方法。
+- `examples/reference/main.go`：API、指标、健康检查、文档和前端路由的实际接线。

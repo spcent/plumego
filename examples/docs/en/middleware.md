@@ -1,42 +1,52 @@
 # Middleware module
 
-The **middleware** package provides cross-cutting handlers for recovery, logging, CORS, compression, timeouts, rate/concurrency limits, body size enforcement, auth helpers, and metrics/tracing adapters.
+Plumego’s middleware wraps standard `http.Handler` values. Chain them globally with `app.Use(...)`, per group via `Group("/x", m1, m2)`, or per route using handler wrappers.
 
-## Responsibilities
-- Wrap standard `http.Handler` values; each middleware implements `func(http.Handler) http.Handler`.
-- Register global middleware with `app.Use(...)` before boot, or attach to groups/routes through the router API.
-- Provide pluggable collectors (`middleware.MetricsCollector`) and tracers (`middleware.Tracer`) for observability backends.
+## Built-in middleware
+- **Recovery**: `app.EnableRecovery()` catches panics, logs stack traces, returns JSON errors.
+- **Logging**: `app.EnableLogging()` records request/response metadata and plugs into metrics/tracing collectors provided through `core.WithMetricsCollector` and `core.WithTracer`.
+- **CORS**: `app.EnableCORS()` sets permissive defaults; customize with `middleware.NewCORS(options...)`.
+- **Gzip**: `middleware.Gzip()` compresses responses when clients send `Accept-Encoding: gzip`.
+- **Timeout**: `middleware.Timeout(duration)` enforces per-request deadlines.
+- **Body limit**: `middleware.BodyLimit(maxBytes, logger)` caps request size with a structured 413 response.
+- **Concurrency limit**: `middleware.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)` bounds parallel work and queueing.
+- **Rate limit**: `middleware.RateLimit(ratePerSecond, burst, cleanupInterval, maxIdle)` applies an IP-based token bucket.
+- **Auth helpers**: `middleware.SimpleAuth("token")` checks a bearer token header; `middleware.APIKey("X-API-Key", "secret")` validates custom headers.
 
-## Built-in options
-- **Recovery & logging**: enable via `app.EnableRecovery()` and `app.EnableLogging()`; logging injects request metadata and trace IDs when a tracer is configured.
-- **CORS**: `app.EnableCORS()` with sensible defaults; customize origins/headers in options or by wrapping your own handler.
-- **Guards**: concurrency limiter, queueing, timeouts, gzip, body size limit, and simple token auth (see `middleware/simple_auth.go`).
-- **Metrics**: attach Prometheus collector or OpenTelemetry tracer through `core.WithMetricsCollector` / `core.WithTracer`.
+Core wires protective defaults (body/concurrency limits) during setup. Call `app.Use(...)` for additional per-app chains; group-level middleware stacks are appended automatically.
 
-## Composition rules
-- Order matters: recovery/logging should wrap outer layers; tighter controls (timeouts, auth) can sit closer to handlers.
-- Group middleware is inherited by child routes, so prefer composing at boundary groups (e.g., `/api/admin`).
-- Avoid global mutable state; pass configuration via closures or constructor functions.
-
-## Custom middleware template
+## Composition examples
+### Global guardrail chain
 ```go
-func NewMaskingLogger() middleware.Middleware {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            // redact authorization header
-            r.Header.Del("Authorization")
-            next.ServeHTTP(w, r)
-        })
-    }
-}
+app.EnableRecovery()
+app.EnableLogging()
+app.Use(
+    middleware.Gzip(),
+    middleware.Timeout(3*time.Second),
+    middleware.ConcurrencyLimit(200, 400, 250*time.Millisecond, logger),
+)
 ```
-Register it with `app.Use(NewMaskingLogger())` or on a router group.
 
-## Troubleshooting
-- **Duplicate writes**: ensure your middleware respects `http.ResponseWriter` semantics; wrap once and avoid writing after `next.ServeHTTP` returns when status is final.
-- **Timeouts not firing**: verify the timeout middleware is placed before long-running handlers and that handlers propagate `context.Context` properly.
-- **Metrics missing**: confirm a collector/tracer is supplied during `core.New`; logging middleware emits spans only when a tracer is present.
+### Route-specific controls
+```go
+secured := app.Router().Group("/admin", middleware.SimpleAuth(os.Getenv("AUTH_TOKEN")))
+secured.Get("/stats", middleware.TimeoutFunc(1*time.Second)(func(w http.ResponseWriter, r *http.Request) {
+    w.Write([]byte("ok"))
+}))
+```
+
+### Using `contract.Ctx` helpers
+```go
+app.GetCtx("/echo/:msg", middleware.WrapCtx(middleware.Timeout(2*time.Second), func(ctx *contract.Ctx) {
+    ctx.JSON(http.StatusOK, map[string]any{"echo": ctx.Param("msg")})
+}))
+```
+
+## Operational notes
+- Chain order matters: loggers should typically wrap recoveries so panics include request metadata.
+- Avoid global state in custom middleware; share dependencies through closures or application-scoped singletons.
+- When enabling CORS or auth per group, keep public assets in a dedicated group to avoid unintended headers or auth checks.
 
 ## Where to look in the repo
-- `middleware` directory for concrete implementations (recovery, logging, cors, gzip, timeout, limiters, auth).
-- `examples/reference/main.go` for the default middleware stack used by the demo app.
+- `middleware/` directory for implementations (recovery, logging, gzip, CORS, timeout, body limit, rate limit, auth, concurrency control).
+- `examples/reference/main.go` for a realistic chain combining recovery, logging, CORS, and default safety limits.

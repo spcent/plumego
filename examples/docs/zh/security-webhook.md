@@ -1,41 +1,64 @@
 # Security 与 Webhook 模块
 
-**security** 与 Webhook 相关包负责入站签名校验和出站投递管理。
+Plumego 提供入站 webhook 校验、出站投递管理以及轻量鉴权工具。
 
-## 入站 Webhook
-- 通过 `core.WithWebhookIn` 配置密钥与限制（支持 GitHub、Stripe），可设置 `GitHubSecret`、`StripeSecret`、`StripeTolerance`、`MaxBodyBytes`、主题前缀等。
-- 请求会进行 HMAC 校验，失败时日志中会出现 `signature mismatch` 提示。
-- 通过 Pub/Sub 总线将有效事件发布到 `in.github.*`、`in.stripe.*` 等前缀，供下游消费。
+## 入站 webhook
+通过 `core.WithWebhookIn` 挂载 GitHub、Stripe 等受保护的接收端点。
 
-## 出站 Webhook
-- 使用 `core.WithWebhookOut` 启用目标管理与投递（触发 Token、基础路径、统计开关、默认分页限制）。
-- 组件会挂载 CRUD、触发、重放等 API；启用后将路由注册到应用。
-- 默认使用内存存储，可按需替换自定义存储以获得持久化能力。
-
-## 运维建议
-- 密钥不应写入仓库，使用 `GITHUB_WEBHOOK_SECRET`、`STRIPE_WEBHOOK_SECRET`、`WEBHOOK_TRIGGER_TOKEN` 等环境变量加载。
-- 合理设置 `MaxBodyBytes`，避免超大 Payload 消耗内存。
-- 将入站 Webhook、Pub/Sub 与 WebSocket 结合，可实现实时广播。
-
-## 接线示例
 ```go
-app := core.New(
-    core.WithWebhookIn(core.WebhookInConfig{
-        GitHubSecret:      os.Getenv("GITHUB_WEBHOOK_SECRET"),
-        StripeSecret:      os.Getenv("STRIPE_WEBHOOK_SECRET"),
-        MaxBodyBytes:      1 << 20,
-        StripeTolerance:   5 * time.Minute,
-        TopicPrefixGitHub: "in.github.",
-        TopicPrefixStripe: "in.stripe.",
-    }),
-    core.WithWebhookOut(core.WebhookOutConfig{
-        TriggerToken: os.Getenv("WEBHOOK_TRIGGER_TOKEN"),
-        BasePath:     "/webhooks",
-    }),
-)
+app := core.New(core.WithWebhookIn(core.WebhookInConfig{
+    Enabled:           true,
+    Pub:               bus, // 可选：将事件发布到进程内总线
+    GitHubSecret:      config.GetString("GITHUB_WEBHOOK_SECRET", "dev-github"),
+    StripeSecret:      config.GetString("STRIPE_WEBHOOK_SECRET", "whsec_dev"),
+    MaxBodyBytes:      1 << 20,
+    StripeTolerance:   5 * time.Minute,
+    TopicPrefixGitHub: "in.github.",
+    TopicPrefixStripe: "in.stripe.",
+}))
 ```
 
+- GitHub：基于共享密钥的 HMAC 签名校验。
+- Stripe：签名 + 时间容差校验。
+- 可选将事件发布到 Pub/Sub，以解耦处理流程。
+- `MaxBodyBytes` 防止超大请求体。
+
+## 出站 webhook
+`core.WithWebhookOut` 接入出站投递服务（示例使用内存存储，可通过 `webhookout.Service` 扩展）。
+
+```go
+store := webhookout.NewMemStore()
+svc := webhookout.NewService(store, webhookout.ConfigFromEnv())
+app := core.New(core.WithWebhookOut(core.WebhookOutConfig{
+    Enabled:          true,
+    Service:          svc,
+    TriggerToken:     config.GetString("WEBHOOK_TRIGGER_TOKEN", "dev-token"),
+    BasePath:         "/webhooks",
+    IncludeStats:     true,
+    DefaultPageLimit: 50,
+}))
+svc.Start(context.Background())
+defer svc.Stop()
+```
+
+能力概览：
+- `BasePath` 下提供 webhook 目标与密钥的 CRUD HTTP 接口。
+- 投递具备重试、重放与可选统计暴露。
+- Trigger Token 保护变更端点，可按需叠加鉴权/限流中间件。
+
+## 简易鉴权辅助
+- `middleware.SimpleAuth("token")`：校验 `Authorization: Bearer <token>`。
+- `middleware.APIKey(header, value)`：强制特定头部的 API Key。
+
+适用于管理后台或内部端点（如 metrics、webhook 管理），建议配合 TLS，并通过环境变量轮换密钥。
+
+## 运维提示
+- 避免在日志中输出 webhook 签名或密钥。
+- 入站处理保持快速；将事件发布到 Pub/Sub 或队列，避免阻塞 webhook 发送方。
+- 在启动阶段及早校验密钥配置，确保错误尽早暴露。
+
 ## 代码位置
-- `security/webhook`：签名校验与辅助方法。
-- `core/webhook_in.go`、`core/webhook_out.go`：组件接线与路由注册。
-- `env.example`：Webhook 相关环境变量名称。
+- `core/webhook.go`：入站配置接线。
+- `net/webhookout/`：出站投递服务、存储实现与 HTTP 处理器。
+- `middleware/auth.go`：Bearer/API-Key 辅助中间件。
+- `examples/reference/main.go`：入/出站 webhook 与 Pub/Sub 扇出的完整示例。

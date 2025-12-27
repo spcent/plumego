@@ -1,40 +1,51 @@
-# Metrics, tracing, and health modules
+# Metrics and Health modules
 
-Plumego ships with Prometheus/OpenTelemetry adapters and health endpoints so observability is on by default.
+Plumego ships with Prometheus/OpenTelemetry adapters and lightweight health probes so you can wire observability without extra boilerplate.
 
 ## Metrics and tracing
-- Create a collector with `metrics.NewPrometheusCollector(namespace)`; expose it via `collector.Handler()` (usually on `/metrics`).
-- Add tracing with `metrics.NewOpenTelemetryTracer(serviceName)`; it implements `middleware.Tracer` so the logging middleware can emit spans.
-- Pass the collector/tracer into `core.New` using `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
-- Logs include trace IDs when a tracer is configured, simplifying correlation.
+- **Prometheus**: `metrics.NewPrometheusCollector(namespace)` implements `middleware.MetricsCollector`. Expose it with `app.GetHandler("/metrics", prom.Handler())`.
+- **OpenTelemetry**: `metrics.NewOpenTelemetryTracer(serviceName)` implements `middleware.Tracer` and emits spans via the logging middleware.
+- Inject either into `core.New` using `core.WithMetricsCollector` and `core.WithTracer`; logging middleware will automatically record durations, status codes, and trace IDs.
 
-## Health endpoints
-- Use `health.ReadinessHandler()` and `health.BuildInfoHandler()` to expose `/health/ready` and `/health/build` routes.
-- Readiness reflects the `health.SetReady()` lifecycle hook triggered during `Boot()`; returns 503 until ready.
-- Build info returns version metadata populated via `health.BuildInfo` (can be set through `-ldflags`).
-
-## Component health integration
-Components can implement `Health() (name string, status health.HealthStatus)` so the app aggregates readiness/degradation states. Use typed statuses (`healthy`, `degraded`, `unhealthy`) instead of ad-hoc strings.
-
-## Example
 ```go
-collector := metrics.NewPrometheusCollector("plumego_example")
-tracer := metrics.NewOpenTelemetryTracer("plumego_example")
-app := core.New(
-    core.WithMetricsCollector(collector),
-    core.WithTracer(tracer),
-)
-app.Get("/metrics", collector.Handler().ServeHTTP)
-app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
-app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+prom := metrics.NewPrometheusCollector("plumego")
+tracer := metrics.NewOpenTelemetryTracer("my-service")
+app := core.New(core.WithMetricsCollector(prom), core.WithTracer(tracer))
+app.EnableLogging()
+app.GetHandler("/metrics", prom.Handler())
 ```
 
+## Health endpoints
+Two ready-to-serve handlers are available:
+
+```go
+app.GetHandler("/health/ready", health.ReadinessHandler())
+app.GetHandler("/health/build", health.BuildInfoHandler())
+```
+
+- `ReadinessHandler` returns 200 after boot flips the ready flag; returns 503 during startup/shutdown.
+- `BuildInfoHandler` surfaces `health.BuildInfo` (version, commit, build time) as JSON; set these fields via ldflags at build time.
+
+## Component health reporting
+Components can report structured health to feed readiness decisions or dashboards:
+
+```go
+func (w *worker) Health() (string, health.HealthStatus) {
+    if w.backlog.Load() > 1000 {
+        return "worker", health.Degraded
+    }
+    return "worker", health.Healthy
+}
+```
+
+`HealthStatus` is type-safe (`Healthy`, `Degraded`, `Unhealthy`), making it easy to summarize component states.
+
 ## Operational tips
-- Add labels or namespaces per deployment environment to separate dashboards.
-- Extend readiness checks to downstream dependencies (DB, cache) and respect context deadlines to avoid probe timeouts.
-- Combine latency and status-code histograms to craft SLO/error-budget panels.
+- Expose `/metrics` on an authenticated or internal path if your deployment requires it; the handler is plain `http.Handler` and can sit behind middleware.
+- Keep readiness checks fast—avoid downstream calls or large allocations.
+- Pair logging middleware with Prometheus/OTel collectors so every request gets correlated metrics and trace IDs automatically.
 
 ## Where to look in the repo
-- `metrics/prometheus.go` and `metrics/otel.go` for collectors and tracers.
-- `health/health.go` for readiness/build handlers and status definitions.
-- `examples/reference/main.go` for mounting metrics and health routes in a live app.
+- `metrics/prometheus.go` and `metrics/otel.go`: collector and tracer adapters.
+- `health/health.go`: readiness flag and status types; `health/http.go` for HTTP handlers.
+- `examples/reference/main.go`: mounting `/metrics`, `/health/ready`, `/health/build` in a real app.
