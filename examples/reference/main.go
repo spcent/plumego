@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/health"
@@ -52,8 +53,8 @@ func main() {
 		core.WithWebhookIn(core.WebhookInConfig{
 			Enabled:           true,
 			Pub:               bus,
-			GitHubSecret:      envOr("GITHUB_WEBHOOK_SECRET", "dev-github-secret"),
-			StripeSecret:      envOr("STRIPE_WEBHOOK_SECRET", "whsec_dev"),
+			GitHubSecret:      config.GetString("GITHUB_WEBHOOK_SECRET", "dev-github-secret"),
+			StripeSecret:      config.GetString("STRIPE_WEBHOOK_SECRET", "whsec_dev"),
 			MaxBodyBytes:      1 << 20,
 			StripeTolerance:   5 * time.Minute,
 			TopicPrefixGitHub: "in.github.",
@@ -62,7 +63,7 @@ func main() {
 		core.WithWebhookOut(core.WebhookOutConfig{
 			Enabled:          true,
 			Service:          webhookSvc,
-			TriggerToken:     envOr("WEBHOOK_TRIGGER_TOKEN", "dev-trigger"),
+			TriggerToken:     config.GetString("WEBHOOK_TRIGGER_TOKEN", "dev-trigger"),
 			BasePath:         "/webhooks",
 			IncludeStats:     true,
 			DefaultPageLimit: 50,
@@ -90,7 +91,7 @@ func main() {
 
 	// WebSocket hub with broadcast endpoint and simple echoing demo.
 	wsCfg := core.DefaultWebSocketConfig()
-	wsCfg.Secret = []byte(envOr("WS_SECRET", "dev-secret"))
+	wsCfg.Secret = []byte(config.GetString("WS_SECRET", "dev-secret"))
 	_, err := app.ConfigureWebSocketWithOptions(wsCfg)
 	if err != nil {
 		log.Fatalf("configure websocket: %v", err)
@@ -110,13 +111,6 @@ func main() {
 	if err := app.Boot(); err != nil {
 		log.Fatalf("server stopped: %v", err)
 	}
-}
-
-func envOr(key, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
-	}
-	return fallback
 }
 
 type docPage struct {
