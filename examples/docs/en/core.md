@@ -1,14 +1,8 @@
 # Core module
 
-The **core** package builds the HTTP application lifecycle. It wires routing, middleware, component startup/shutdown, WebSocket helpers, webhook services, and observability into a single `core.App`.
+The **core** package owns the HTTP server lifecycle. It wires routing, middleware, component startup/shutdown, WebSocket helpers, webhook services, observability, and graceful shutdown into a single `core.App` built on the Go standard library.
 
-## Responsibilities
-- Construct an app with `core.New` using functional options (address, debug toggle, metrics collector, tracer, Pub/Sub bus, WebSocket config, webhook settings).
-- Register routes and middleware before freezing the router on `Boot()`.
-- Drive component lifecycle via the `Component` interface (`RegisterRoutes`, `RegisterMiddleware`, `Start`, `Stop`, `Health`).
-- Manage environment loading (`core.WithEnvPath`), graceful shutdown, TLS/HTTP2 toggles, and default limits (body size, concurrency, queue depth, HTTP timeouts).
-
-## Minimal setup
+## Create and boot an app
 ```go
 app := core.New(
     core.WithAddr(":8080"),
@@ -16,30 +10,79 @@ app := core.New(
 )
 app.EnableRecovery()
 app.EnableLogging()
+app.EnableCORS()
+
+// Register routes _before_ Boot freezes the router.
 app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
     w.Write([]byte("pong"))
 })
+
 if err := app.Boot(); err != nil {
     log.Fatalf("server stopped: %v", err)
 }
 ```
 
-## Configuration checklist
-- **Address & shutdown**: override `:8080` with `core.WithAddr`; graceful shutdown drains inflight requests on SIGTERM and honors `ShutdownTimeout`.
-- **Limits**: defaults include 10 MiB body limit, 256 concurrency with queueing, HTTP read/write timeouts. Override with `core.WithMaxBodyBytes`, `core.WithMaxConcurrency`, `core.WithHTTPTimeouts`, or environment variables described in `env.example`.
-- **TLS/HTTP2**: enable TLS via `core.WithTLSConfig` or `AppConfig.TLS`; HTTP/2 can be disabled with `core.WithHTTP2(false)`.
-- **Components**: attach reusable capabilities with `core.WithComponent(...)`; built-ins include webhook services, Pub/Sub debug UI, WebSocket hub, and frontend serving.
-- **Observability**: plug `metrics.NewPrometheusCollector(namespace)` and `metrics.NewOpenTelemetryTracer(name)` through options so logging middleware emits metrics/traces automatically.
+## Configuration and defaults
+Most knobs map to `env.example` for deploy-time control.
 
-## Startup and safety notes
-- Call `Boot()` only after all routes and middleware are registered; late registrations panic because the router is frozen.
-- Copy long-running goroutines (webhook schedulers, pub/sub dispatchers) into components and align their `Start/Stop` with the app lifecycle.
-- In production, drop `WithDebug()` and control verbosity from your logger backend.
+- **Address & shutdown**: `core.WithAddr` overrides `:8080`. `ShutdownTimeout` drains inflight requests on SIGTERM (defaults to 5s).
+- **Limits**: 10 MiB body cap, 256 concurrent requests with queueing, HTTP read/write timeouts. Override via `core.WithMaxBodyBytes`, `core.WithMaxConcurrency`, `core.WithHTTPTimeouts`, or env vars.
+- **TLS / HTTP2**: enable with `core.WithTLSConfig` or `AppConfig.TLS`; disable HTTP/2 via `core.WithHTTP2(false)`.
+- **Env loading**: `core.WithEnvPath` controls the `.env` file location.
+- **Observability**: plug `metrics.NewPrometheusCollector` and `metrics.NewOpenTelemetryTracer` so the logging middleware emits metrics/traces automatically.
+- **Debug aids**: `WithDebug()` logs registered routes and relaxes some failure paths; disable in production.
 
-## Troubleshooting
-- **Port conflict**: double-check `WithAddr` and inspect listeners with `netstat -tnlp` inside the container.
-- **Missing secrets**: webhook signature errors typically mean `GITHUB_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_SECRET`, or `WS_SECRET` are absent; verify `.env` loading.
-- **Slow shutdown**: ensure handlers respect context cancellation; consider lowering `ShutdownTimeout` if pods hang during rolling updates.
+## Components and lifecycle hooks
+`core.App` can orchestrate components so long-running tasks stay aligned with server start/stop.
+
+```go
+type worker struct{ bus *pubsub.PubSub }
+func (w *worker) RegisterRoutes(r *router.Router) {}
+func (w *worker) RegisterMiddleware(m *middleware.Registry) {}
+func (w *worker) Start(ctx context.Context) error {
+    // subscribe to events after the HTTP server is ready
+    return w.bus.Subscribe("jobs.*", func(ctx context.Context, evt pubsub.Event) error {
+        // ...handle work...
+        return nil
+    })
+}
+func (w *worker) Stop(ctx context.Context) error { return nil }
+func (w *worker) Health() (string, health.HealthStatus) { return "worker", health.Healthy }
+
+app := core.New(core.WithComponent(&worker{bus: pubsub.New()}))
+```
+
+Built-in components include inbound webhook receivers, outbound webhook service, WebSocket hub registration, Pub/Sub debug UI, and frontend mounting helpers. Add them with `core.WithComponent` or through dedicated options such as `core.WithWebhookIn`, `core.WithWebhookOut`, and `core.ConfigureWebSocketWithOptions`.
+
+## Putting the pieces together (reference-style)
+```go
+bus := pubsub.New()
+prom := metrics.NewPrometheusCollector("plumego")
+tracer := metrics.NewOpenTelemetryTracer("plumego")
+
+app := core.New(
+    core.WithAddr(":8080"),
+    core.WithPubSub(bus),
+    core.WithMetricsCollector(prom),
+    core.WithTracer(tracer),
+    core.WithWebhookIn(core.WebhookInConfig{Enabled: true, Pub: bus}),
+    core.WithWebhookOut(core.WebhookOutConfig{Enabled: true, TriggerToken: "secret"}),
+)
+app.EnableRecovery()
+app.EnableLogging()
+
+app.GetHandler("/metrics", prom.Handler())
+app.GetHandler("/health/ready", health.ReadinessHandler())
+app.GetHandler("/health/build", health.BuildInfoHandler())
+_, _ = app.ConfigureWebSocketWithOptions(core.DefaultWebSocketConfig())
+
+if err := app.Boot(); err != nil { log.Fatal(err) }
+```
+
+## Safety and troubleshooting
+- Late route/middleware registration after `Boot()` panics by design—fix init order instead of suppressing it.
+- Keep handlers cancellation-aware so shutdown drains quickly; adjust `ShutdownTimeout` if orchestration needs shorter/longer drains.
+- Missing secrets for webhooks or WebSocket JWT signing are the most common startup errors; confirm `.env` was loaded.
 
 ## Where to look in the repo
 - `core/app.go`: `App` structure, options, and lifecycle wiring.

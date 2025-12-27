@@ -1,42 +1,52 @@
 # Middleware 模块
 
-**middleware** 提供恢复、结构化日志、CORS、压缩、超时、限流/限并发、请求体限制、认证助手以及指标/追踪适配器等跨切面能力。
+Plumego 的中间件与标准 `http.Handler` 兼容，可通过 `app.Use(...)` 全局注册，也可在分组 `Group("/x", m1, m2)` 或具体路由上包裹使用。
 
-## 职责
-- 以 `func(http.Handler) http.Handler` 包装标准 Handler；通过 `app.Use(...)` 全局注册，或在路由/分组上追加。
-- 提供 `middleware.MetricsCollector` 与 `middleware.Tracer` 接口，用于接入 Prometheus / OpenTelemetry。
-- 通过 `core.With...` 选项与 `app.EnableRecovery()`、`app.EnableLogging()` 等方式启用常用中间件。
+## 内置中间件
+- **恢复**：`app.EnableRecovery()` 捕获 panic，记录栈并返回结构化错误。
+- **日志**：`app.EnableLogging()` 采集请求/响应信息，与 `core.WithMetricsCollector`、`core.WithTracer` 注入的指标/追踪对接。
+- **CORS**：`app.EnableCORS()` 提供宽松默认值，可用 `middleware.NewCORS(options...)` 自定义。
+- **Gzip**：`middleware.Gzip()` 在客户端声明 `Accept-Encoding: gzip` 时压缩响应。
+- **超时**：`middleware.Timeout(duration)` 为单个请求设定截止时间。
+- **请求体限制**：`middleware.BodyLimit(maxBytes, logger)` 返回结构化的 413 响应。
+- **并发限制**：`middleware.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)` 控制并发与排队深度。
+- **限流**：`middleware.RateLimit(ratePerSecond, burst, cleanupInterval, maxIdle)` 基于 IP 的令牌桶实现。
+- **鉴权辅助**：`middleware.SimpleAuth("token")` 校验 Bearer Token；`middleware.APIKey("X-API-Key", "secret")` 校验自定义头。
 
-## 内置能力
-- **恢复 & 日志**：`app.EnableRecovery()`、`app.EnableLogging()`；当配置了 Tracer 时日志会带 TraceID。
-- **CORS**：`app.EnableCORS()` 默认开启安全的跨域策略，可按需自定义。
-- **防护**：并发/队列限制、超时、Gzip、体积限制、简单 Token 鉴权（见 `middleware/simple_auth.go`）。
-- **指标**：通过 `core.WithMetricsCollector`、`core.WithTracer` 注入 Prometheus 采集器和 OpenTelemetry Tracer。
+核心在初始化时会自动接入保护性的请求体/并发限制，可按需通过 `app.Use(...)` 或分组中间件追加链路。
 
-## 组合规则
-- 顺序敏感：恢复/日志适合放在最外层；超时、鉴权等靠近业务 Handler。
-- 分组中间件会被子路由继承，优先在边界分组（如 `/api/admin`）堆叠安全策略。
-- 避免可变全局变量，使用闭包或构造函数传递配置。
-
-## 自定义模板
+## 组合示例
+### 全局防护链
 ```go
-func NewMaskingLogger() middleware.Middleware {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            // 掩码敏感头
-            r.Header.Del("Authorization")
-            next.ServeHTTP(w, r)
-        })
-    }
-}
+app.EnableRecovery()
+app.EnableLogging()
+app.Use(
+    middleware.Gzip(),
+    middleware.Timeout(3*time.Second),
+    middleware.ConcurrencyLimit(200, 400, 250*time.Millisecond, logger),
+)
 ```
-通过 `app.Use(NewMaskingLogger())` 或分组注册即可生效。
 
-## 排查
-- **重复写响应**：遵循 `http.ResponseWriter` 语义，避免在 `next.ServeHTTP` 返回后再次写入已结束的响应。
-- **超时未生效**：确保超时中间件位于耗时 Handler 之前，并且 Handler 全程传播 `context`。
-- **缺少指标**：确认在 `core.New` 时传入了采集器/Tracer；日志中间件只有在有 Tracer 时才会发出 Span。
+### 路由级控制
+```go
+secured := app.Router().Group("/admin", middleware.SimpleAuth(os.Getenv("AUTH_TOKEN")))
+secured.Get("/stats", middleware.TimeoutFunc(1*time.Second)(func(w http.ResponseWriter, r *http.Request) {
+    w.Write([]byte("ok"))
+}))
+```
+
+### 使用 `contract.Ctx` 辅助
+```go
+app.GetCtx("/echo/:msg", middleware.WrapCtx(middleware.Timeout(2*time.Second), func(ctx *contract.Ctx) {
+    ctx.JSON(http.StatusOK, map[string]any{"echo": ctx.Param("msg")})
+}))
+```
+
+## 运维提示
+- 链路顺序很重要：通常建议日志包裹恢复，以便 panic 日志包含请求上下文。
+- 自定义中间件避免使用全局可变状态；依赖通过闭包或应用级单例传递。
+- 当在分组上启用 CORS/鉴权时，将公共静态资源置于独立分组以避免意外头部或鉴权校验。
 
 ## 代码位置
-- `middleware` 目录：恢复、日志、cors、gzip、timeout、限流、鉴权等实现。
-- `examples/reference/main.go`：演示默认中间件栈的实战用法。
+- `middleware/` 目录：恢复、日志、gzip、CORS、超时、体积限制、限流、鉴权、并发控制等实现。
+- `examples/reference/main.go`：结合恢复、日志、CORS 与默认安全限制的实际链路。

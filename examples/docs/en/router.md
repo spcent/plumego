@@ -1,37 +1,59 @@
 # Router module
 
-The **router** package implements a trie-based matcher with route groups, parameters, and middleware inheritance.
+The **router** package provides trie-based matching with groups, parameters, and middleware inheritance while staying compatible with standard `http.Handler` interfaces.
 
-## Responsibilities
-- Register HTTP handlers via `Get`, `Post`, `Put`, `Patch`, `Delete`, `Options`, `Head` and context-aware `*Ctx` variants.
-- Compose route groups with `Group(prefix, ...middleware)` to reuse prefixes and middleware stacks.
-- Freeze the routing table during `App.Boot()` to catch late registrations.
+## Handler shapes
+- Standard handlers: `Get`, `Post`, `Put`, `Patch`, `Delete`, `Options`, `Head`, `Any` accept `http.Handler` values.
+- Function helpers: `GetFunc`/`PostFunc`/etc accept `http.HandlerFunc`.
+- Context-aware handlers: `GetCtx`/`PostCtx`/etc accept `contract.CtxHandlerFunc` where path params and request metadata are already parsed.
 
-## Usage patterns
-- Prefer RESTful paths such as `GET /users/:id` and `POST /users` to keep dashboards and docs aligned.
-- Use `:name` for named parameters and `*filepath` for catch-alls (static assets, docs trees).
-- Mount static frontends through `frontend.RegisterFromDir` or embedded assets; attach them to a dedicated group.
+## Path patterns
+- Static: `/docs/index.html`
+- Parameters: `/users/:id`, `/teams/:teamID/members/:id`
+- Wildcards: `/*filepath` (capture the remainder for static assets or docs)
 
-## Middleware inheritance
-Middleware executes in order: **global → group → route-specific**. Group middleware is appended to the inherited stack, so admin or public surfaces can each have their own guards.
+## Grouping and middleware order
+Middleware runs **global → group → route-specific**.
 
-## Debugging
-- Enable debug mode to log registered method/path pairs during boot.
-- Add a development-only endpoint that iterates `router.Routes()` to expose the final tree.
-- Panics on registrations after `Boot()` are expected—fix initialization order instead of suppressing them.
-
-## Example
 ```go
-api := app.Router().Group("/api")
-api.Use(middleware.NewConcurrencyLimiter(100))
-api.Get("/users/:id", userHandler)
-api.Post("/users", createUserHandler)
+api := app.Router().Group("/api", middleware.SimpleAuth("token"))
+api.Use(middleware.Timeout(2 * time.Second))
 
-assets := app.Router().Group("/docs")
-assets.Get("/*filepath", docsHandler)
+api.GetCtx("/users/:id", func(ctx *contract.Ctx) {
+    id := ctx.Param("id")
+    ctx.Text(http.StatusOK, "user="+id)
+})
+
+// Nested groups inherit middleware and prefixes.
+v1 := api.Group("/v1")
+v1.Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("pong")) })
 ```
 
+Register everything before `app.Boot()`; the router is frozen during boot to prevent missing registrations.
+
+## Static frontends and catch-alls
+Mount static assets under their own group so cache headers or auth can be isolated.
+
+```go
+assets := app.Router().Group("/docs")
+assets.Get("/*filepath", func(w http.ResponseWriter, r *http.Request) {
+    http.ServeFileFS(w, r, os.DirFS("./examples/docs"), path.Clean(r.URL.Path))
+})
+```
+
+For embedded bundles, use the helpers in `frontend`:
+
+```go
+// Mount an embedded SPA or docs site at "/".
+_ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"))
+```
+
+## Debugging tools
+- Enable `core.WithDebug()` to log every method/path pair during boot.
+- Dump the routing table from `router.Routes()` in a development-only endpoint when diagnosing conflicts.
+- Late registrations that panic during boot are expected; fix initialization order instead of deferring registration.
+
 ## Where to look in the repo
-- `router/router.go`: router structure, node matching, and group handling.
+- `router/router.go`: trie matching, groups, and handler helpers.
 - `frontend/register.go`: helpers for mounting static directories or embedded frontend bundles.
-- `examples/reference/main.go`: real wiring of API, metrics, health, and frontend routes.
+- `examples/reference/main.go`: real wiring of API, metrics, health, docs, and frontend routes.
