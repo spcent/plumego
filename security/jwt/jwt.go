@@ -1,4 +1,4 @@
-package security
+package jwt
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +47,9 @@ var (
 	ErrTokenRevoked     = errors.New("token revoked")
 	ErrVersionMismatch  = errors.New("token version mismatch")
 	ErrUnknownKey       = errors.New("unknown signing key")
+	ErrMissingSubject   = errors.New("subject is required")
+	ErrInvalidIssuer    = errors.New("invalid issuer")
+	ErrInvalidAudience  = errors.New("invalid audience")
 )
 
 const (
@@ -89,6 +93,9 @@ type JWTConfig struct {
 	RefreshExpiration time.Duration
 	RotationInterval  time.Duration
 	Algorithm         Algorithm
+	ClockSkew         time.Duration // clock skew tolerance
+	AllowQueryToken   bool          // allow token in query parameter
+	DebugMode         bool          // debug mode (return detailed error messages)
 }
 
 // DefaultJWTConfig returns sane defaults.
@@ -101,6 +108,9 @@ func DefaultJWTConfig(secret []byte) JWTConfig {
 		RefreshExpiration: 7 * 24 * time.Hour,
 		RotationInterval:  24 * time.Hour,
 		Algorithm:         AlgorithmHS256,
+		ClockSkew:         5 * time.Second, // clock skew tolerance
+		AllowQueryToken:   false,           // allow token in query parameter
+		DebugMode:         false,           // debug mode (return detailed error messages)
 	}
 }
 
@@ -115,8 +125,10 @@ type JWTSigningKey struct {
 
 // TokenPair contains generated access and refresh tokens.
 type TokenPair struct {
-	AccessToken  string
-	RefreshToken string
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"` // expiration time in seconds
+	TokenType    string `json:"token_type"` // always "Bearer"
 }
 
 // JWTManager handles JWT token generation and verification.
@@ -124,9 +136,10 @@ type JWTManager struct {
 	config JWTConfig
 	store  *kvstore.KVStore
 
-	mu       sync.RWMutex
-	keyCache map[string]JWTSigningKey
-	active   string
+	mu           sync.RWMutex
+	keyCache     map[string]JWTSigningKey
+	versionCache map[string]int64 // version cache to reduce lock contention
+	active       string
 }
 
 // NewJWTManager creates a new JWT manager with the given configuration and backing store.
@@ -136,9 +149,10 @@ func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error
 	}
 
 	mgr := &JWTManager{
-		config:   config,
-		store:    store,
-		keyCache: make(map[string]JWTSigningKey),
+		config:       config,
+		store:        store,
+		keyCache:     make(map[string]JWTSigningKey),
+		versionCache: make(map[string]int64), // version cache to reduce lock contention
 	}
 
 	if err := mgr.loadKeys(); err != nil {
@@ -172,11 +186,11 @@ func (m *JWTManager) loadKeys() error {
 	}
 
 	if m.active == "" {
-		key, err := m.generateKey(m.config.Algorithm)
+		key, err := m.generateKeyUnsafe(m.config.Algorithm)
 		if err != nil {
 			return err
 		}
-		if err := m.persistKey(key); err != nil {
+		if err := m.persistKeyUnsafe(key); err != nil {
 			return err
 		}
 		m.active = key.ID
@@ -193,12 +207,17 @@ func (m *JWTManager) RotateKey() (JWTSigningKey, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	key, err := m.generateKey(m.config.Algorithm)
+	return m.rotateKeyUnsafe() // rotate key without lock contention
+}
+
+// rotateKeyUnsafe is the unsafe version of RotateKey, assuming the caller holds the lock.
+func (m *JWTManager) rotateKeyUnsafe() (JWTSigningKey, error) {
+	key, err := m.generateKeyUnsafe(m.config.Algorithm)
 	if err != nil {
 		return JWTSigningKey{}, err
 	}
 
-	if err := m.persistKey(key); err != nil {
+	if err := m.persistKeyUnsafe(key); err != nil {
 		return JWTSigningKey{}, err
 	}
 	m.active = key.ID
@@ -208,7 +227,8 @@ func (m *JWTManager) RotateKey() (JWTSigningKey, error) {
 	return key, nil
 }
 
-func (m *JWTManager) persistKey(key JWTSigningKey) error {
+// persistKeyUnsafe is the unsafe version of persistKeyUnsafe, assuming the caller holds the lock.
+func (m *JWTManager) persistKeyUnsafe(key JWTSigningKey) error {
 	encoded, err := json.Marshal(key)
 	if err != nil {
 		return err
@@ -220,7 +240,8 @@ func (m *JWTManager) persistKey(key JWTSigningKey) error {
 	return nil
 }
 
-func (m *JWTManager) generateKey(alg Algorithm) (JWTSigningKey, error) {
+// generateKeyUnsafe is the unsafe version of generateKeyUnsafe, assuming the caller holds the lock.
+func (m *JWTManager) generateKeyUnsafe(alg Algorithm) (JWTSigningKey, error) {
 	kid, err := randomID()
 	if err != nil {
 		return JWTSigningKey{}, err
@@ -259,19 +280,21 @@ func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityCla
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err := m.ensureRotationLocked(); err != nil {
+	// ensureRotationUnsafe ensures the key cache and version cache are up-to-date, avoiding deadlocks.
+	if err := m.ensureRotationUnsafe(); err != nil {
 		return TokenPair{}, err
 	}
+
 	activeKey, ok := m.keyCache[m.active]
 	if !ok {
 		return TokenPair{}, ErrUnknownKey
 	}
 
 	if identity.Subject == "" {
-		return TokenPair{}, errors.New("subject is required")
+		return TokenPair{}, ErrMissingSubject
 	}
 
-	version := m.getIdentityVersionLocked(identity.Subject)
+	version := m.getIdentityVersionUnsafe(identity.Subject)
 	identity.Version = version
 
 	now := time.Now().UTC()
@@ -284,7 +307,12 @@ func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityCla
 		return TokenPair{}, err
 	}
 
-	return TokenPair{AccessToken: access, RefreshToken: refresh}, nil
+	return TokenPair{
+		AccessToken:  access,
+		RefreshToken: refresh,
+		ExpiresIn:    int64(m.config.AccessExpiration.Seconds()),
+		TokenType:    "Bearer",
+	}, nil
 }
 
 func (m *JWTManager) buildToken(key JWTSigningKey, tokenType TokenType, identity IdentityClaims, authz AuthorizationClaims, now time.Time, ttl time.Duration) (string, error) {
@@ -314,13 +342,21 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 		return nil, err
 	}
 
+	// ensureRotationUnsafe ensures the key cache and version cache are up-to-date, avoiding deadlocks.
+	if err = m.ensureRotationUnsafe(); err != nil {
+		return nil, err
+	}
+
 	now := time.Now().Unix()
-	if claims.ExpiresAt > 0 && now > claims.ExpiresAt {
+	skew := int64(m.config.ClockSkew.Seconds())
+
+	if claims.ExpiresAt > 0 && now > claims.ExpiresAt+skew {
 		return nil, ErrTokenExpired
 	}
-	if claims.NotBefore > 0 && now < claims.NotBefore {
+	if claims.NotBefore > 0 && now < claims.NotBefore-skew {
 		return nil, ErrTokenNotYetValid
 	}
+
 	if expectedType != "" && claims.TokenType != expectedType {
 		return nil, ErrInvalidToken
 	}
@@ -347,7 +383,7 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 		return nil, ErrInvalidToken
 	}
 	var header map[string]any
-	if err := json.Unmarshal(headerJSON, &header); err != nil {
+	if err = json.Unmarshal(headerJSON, &header); err != nil {
 		return nil, ErrInvalidToken
 	}
 
@@ -378,10 +414,10 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 	}
 
 	if claims.Issuer != "" && m.config.Issuer != "" && claims.Issuer != m.config.Issuer {
-		return nil, ErrInvalidToken
+		return nil, ErrInvalidIssuer
 	}
 	if claims.Audience != "" && m.config.Audience != "" && claims.Audience != m.config.Audience {
-		return nil, ErrInvalidToken
+		return nil, ErrInvalidAudience
 	}
 
 	return &claims, nil
@@ -444,7 +480,8 @@ func signJWT(key JWTSigningKey, claims TokenClaims) (string, error) {
 	return signingInput + "." + sigPart, nil
 }
 
-func (m *JWTManager) ensureRotationLocked() error {
+// ensureRotationUnsafe is the unsafe version of ensureRotationUnsafe, assuming the caller holds the lock.
+func (m *JWTManager) ensureRotationUnsafe() error {
 	activeKey, ok := m.keyCache[m.active]
 	if !ok {
 		return ErrUnknownKey
@@ -453,7 +490,7 @@ func (m *JWTManager) ensureRotationLocked() error {
 		return nil
 	}
 	if time.Since(activeKey.CreatedAt) >= m.config.RotationInterval {
-		_, err := m.RotateKey()
+		_, err := m.rotateKeyUnsafe() // rotate key without lock contention
 		return err
 	}
 	return nil
@@ -483,28 +520,48 @@ func (m *JWTManager) IncrementIdentityVersion(subject string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	version := m.getIdentityVersionLocked(subject) + 1
-	payload := []byte(fmt.Sprintf("%d", version))
+	version := m.getIdentityVersionUnsafe(subject) + 1
+	payload := []byte(strconv.FormatInt(version, 10)) // use strconv instead of fmt.Sprintf
 	if err := m.store.Set(versionPrefix+subject, payload, 0); err != nil {
 		return err
 	}
+
+	// update cache
+	m.versionCache[subject] = version
 	return nil
 }
 
-func (m *JWTManager) getIdentityVersionLocked(subject string) int64 {
+// getIdentityVersionUnsafe is the unsafe version of getIdentityVersionUnsafe, assuming the caller holds the lock.
+func (m *JWTManager) getIdentityVersionUnsafe(subject string) int64 {
+	// check cache first
+	if v, ok := m.versionCache[subject]; ok {
+		return v
+	}
+
+	// read from store
 	raw, err := m.store.Get(versionPrefix + subject)
 	if err != nil {
 		return 0
 	}
-	var version int64
-	fmt.Sscanf(string(raw), "%d", &version)
+
+	// use strconv instead of fmt.Sscanf, and handle errors
+	version, err := strconv.ParseInt(string(raw), 10, 64)
+	if err != nil {
+		// corrupted data, return 0
+		return 0
+	}
+
+	// update cache
+	m.versionCache[subject] = version
 	return version
 }
 
+// matchIdentityVersion checks if the provided version matches the current version for the subject.
 func (m *JWTManager) matchIdentityVersion(subject string, version int64) bool {
 	m.mu.RLock()
-	current := m.getIdentityVersionLocked(subject)
-	m.mu.RUnlock()
+	defer m.mu.RUnlock()
+
+	current := m.getIdentityVersionUnsafe(subject)
 	return current == version
 }
 
@@ -512,16 +569,23 @@ func (m *JWTManager) matchIdentityVersion(subject string, version int64) bool {
 func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middleware {
 	return func(next middleware.Handler) middleware.Handler {
 		return middleware.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			token := extractBearerToken(r)
+			token := extractBearerToken(r, m.config.AllowQueryToken) // extract token from request
 			if token == "" {
 				http.Error(w, "missing authorization header", http.StatusUnauthorized)
 				return
 			}
+
 			claims, err := m.VerifyToken(r.Context(), token, expectedType)
 			if err != nil {
-				http.Error(w, "invalid token", http.StatusUnauthorized)
+				// return detailed error in debug mode
+				if m.config.DebugMode {
+					http.Error(w, fmt.Sprintf("token verification failed: %v", err), http.StatusUnauthorized)
+				} else {
+					http.Error(w, "invalid token", http.StatusUnauthorized)
+				}
 				return
 			}
+
 			ctx := context.WithValue(r.Context(), claimsContextKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -609,14 +673,20 @@ func GetClaimsFromContext(r *http.Request) (*TokenClaims, error) {
 	return claims, nil
 }
 
-func extractBearerToken(r *http.Request) string {
+// extractBearerToken extracts Bearer token, supporting configurable URL token
+func extractBearerToken(r *http.Request, allowQuery bool) string {
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
 		return strings.TrimSpace(authHeader[7:])
 	}
-	if token := r.URL.Query().Get("token"); token != "" {
-		return token
+
+	// only read from query parameters if explicitly allowed
+	if allowQuery {
+		if token := r.URL.Query().Get("token"); token != "" {
+			return token
+		}
 	}
+
 	return ""
 }
 
