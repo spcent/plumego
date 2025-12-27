@@ -18,9 +18,11 @@ type Component interface {
     RegisterMiddleware(m *middleware.Registry)
     Start(ctx context.Context) error
     Stop(ctx context.Context) error
-    Health() (name string, status any)
+    Health() (name string, status health.HealthStatus)
 }
 ```
+
+`HealthStatus` 使用限定的状态值（`healthy`、`degraded`、`unhealthy`）确保组件以结构化且类型安全的方式报告健康状况。
 
 在构造应用时使用 `core.WithComponent`（或 `WithComponents`）来添加功能。内置特性（Webhook 管理、入站 Webhook 接收器、PubSub 调试、WebSocket 辅助工具、前端服务）都可以作为组件挂载，因此示例可以只混合所需的部分。
 
