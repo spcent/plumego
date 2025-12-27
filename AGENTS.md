@@ -1,231 +1,398 @@
-# AGENTS.md — plumego (Best Practice)
+# AGENTS.md — plumego
 
-This document defines **strict operational guidance** for automated coding agents
-(Codex, Copilot, ChatGPT, etc.) working in this repository.
+This document provides **operational guidance for AI coding agents**
+(Copilot, Codex, Cursor, Claude Code, etc.) working in the `spcent/plumego`
+repository.
 
-The goal is to preserve this project as a **small, explicit, production-grade Go server**
-built on the **Go standard library only**, with predictable behavior and long-term maintainability.
+Its purpose is to ensure that any automated or semi-automated changes are:
+
+- Consistent with the existing codebase
+- Aligned with the project’s architectural philosophy
+- Safe, reviewable, and reversible
+- Compatible with Go’s standard library (`net/http`) design model
+
+This file is authoritative for agent behavior.
 
 ---
 
-## 1. Project overview
+## 1. Project Overview (Read First)
 
-* Repository: `spcent/plumego`
-* Language: Go (module-based; see `go.mod`)
-* Entry point: `main.go`
+**plumego** is a **lightweight Go web toolkit** built primarily on the Go
+standard library.
+It is designed to be **embedded into applications**, not used as a
+monolithic framework.
 
-Expected structure (verify locally):
+Core characteristics:
 
-* `handlers/` — HTTP handlers (request/response boundary only)
-* `pkg/` — reusable internal packages (router, middleware, auth, storage, etc.)
-* `docs/` — design notes, API contracts, operational docs
-* `scripts/` — dev / build / release helpers
-* `.github/workflows/` — CI workflows
-* `env.example` — environment variable template
-
-### Server purpose
-
-This server provides a **minimal but production-ready web runtime** built exclusively on the Go standard library.
-
-It is designed to support:
-
-* REST-style APIs
-* webhook receivers (verification + deduplication)
-* lightweight WebSocket-based real-time services
-* JWT-based authentication
-* in-process pub-sub
-* small local persistence for tokens, deduplication, and config
+- Standard library–first (`net/http`, `context`, `http.Handler`)
+- Explicit lifecycle (`core.New(...)` → configuration → `Boot()`)
+- Minimal dependencies
+- Composable router and middleware
+- Built-in support for:
+  - Routing and middleware chains
+  - Graceful startup / shutdown
+  - WebSocket helpers
+  - Webhook handling and verification
+  - In-process Pub/Sub
+  - Static frontend serving
+  - Lightweight internal KV storage
 
 **Non-goals**:
 
-* No full-stack framework
-* No ORM
-* No automatic schema generation
-* No reflection-heavy magic
-* No hidden background goroutines
-* No implicit global state
+- Replacing large Go frameworks (Gin, Echo, Fiber, etc.)
+- Introducing heavy dependency trees
+- Hiding or abstracting away `net/http`
+- Providing opinionated ORM, RPC, or persistence layers
+
+Agents must respect these boundaries.
 
 ---
 
-## 2. Golden rules (non-negotiable)
+## 2. Supported Go Environment
 
-1. **Minimal change radius**
+- Go version: defined by `go.mod`
+- The codebase assumes modern Go features (modules, context, embed, etc.)
 
-   * Fix the smallest possible surface.
-   * Do not refactor unrelated code to “clean things up”.
+Before making changes, agents should assume:
 
-2. **Explicit behavior**
-
-   * Control flow must be readable without tracing macros or codegen.
-   * Avoid clever abstractions.
-
-3. **No external dependencies**
-
-   * Do not add third-party packages unless explicitly instructed.
-   * `golang.org/x/*` counts as external unless approved.
-
-4. **Behavior changes require tests + docs**
-
-   * Any change affecting:
-
-     * HTTP status codes
-     * response payloads
-     * auth requirements
-     * routing
-       must update tests and documentation.
-
-5. **Security-first defaults**
-
-   * Never log secrets, tokens, Authorization headers, cookies, or user identifiers.
-   * Redact or hash where visibility is required.
-
-6. **Idiomatic Go**
-
-   * Error-first returns
-   * Context-aware APIs
-   * Small, cohesive packages
-   * No panic for expected runtime conditions
-
----
-
-## 3. Local setup & command discovery
-
-Agents **must not assume** commands.
-
-Required discovery process:
-
-1. Inspect `Makefile`:
-
-   ```sh
-   cat Makefile
-   ```
-2. Inspect CI workflows:
-
-   ```sh
-   ls .github/workflows
-   ```
-
-Only then may agents run:
-
-```sh
+```bash
 go test ./...
-go test -race ./...    # if CI budget allows
 go vet ./...
 gofmt -w .
 ```
 
-If canonical Make targets exist, prefer them:
-
-* `make test`
-* `make lint`
-* `make fmt`
-* `make run`
+must pass without errors.
 
 ---
 
-## 4. Code organization rules
+## 3. Repository Structure & Responsibilities
 
-### Handlers (`handlers/`)
+Agents **must not blur module boundaries**.
 
-Handlers must:
+### Core Directories
 
-* Parse and validate input
-* Call domain/service logic
-* Map errors to HTTP responses
+#### `core/`
 
-Handlers must NOT:
+Application core and lifecycle management.
 
-* Contain business logic
-* Perform persistence directly
-* Spawn goroutines without explicit lifecycle control
+Responsibilities:
 
-### Internal packages (`pkg/`)
+* Application construction (`core.New(...)`)
+* Global configuration wiring
+* Enabling built-in middleware (`EnableRecovery`, `EnableLogging`, `EnableCORS`, etc.)
+* Router registration
+* Server startup and graceful shutdown
+* `Boot()` execution flow
 
-* Packages must be cohesive and small
-* Avoid circular imports
-* Prefer concrete types internally
-* Use interfaces only at boundaries
-
-### Context usage
-
-* All request-scoped operations must accept `context.Context`
-* Respect cancellation and deadlines
-* `context.Value` is allowed **only** for request-scoped metadata
-  (e.g., request ID, auth claims)
+Public APIs in `core` are **high-stability**.
+Breaking changes here require strong justification and documentation.
 
 ---
 
-## 5. Error handling & HTTP responses
+#### `router/`
 
-* Do not panic for expected errors
-* Wrap errors explicitly:
+HTTP routing and request dispatch.
 
-  ```go
-  return fmt.Errorf("parse token: %w", err)
-  ```
-* Centralize HTTP error → status mapping where possible
-* Ensure JSON error responses are consistent across handlers
+Responsibilities:
 
----
+* Path matching
+* Route groups and prefixes
+* Path parameters (e.g. `/:id`)
+* Route-level and group-level middleware composition
+* Registration vs. frozen routing state
 
-## 6. Testing guidelines
-
-* Prefer table-driven tests
-* For HTTP:
-
-  * Use `net/http/httptest`
-  * Do not bind real ports in unit tests
-* Integration tests (if any):
-
-  * Must be clearly separated (e.g. build tags)
-
-### When behavior changes
-
-You must update:
-
-* Tests (new or modified)
-* Documentation:
-
-  * new routes
-  * env vars
-  * auth requirements
-  * scripts or Make targets
+Do **not** move routing logic into `core`.
 
 ---
 
-## 7. Security & safety checklist (mandatory before completion)
+#### `middleware/`
 
-Before submitting changes, agents must verify:
+HTTP middleware implementations.
 
-* [ ] No secrets or PII logged
-* [ ] Auth middleware applied where required
-* [ ] JSON / query / path input validated
-* [ ] Request size limits considered
-* [ ] Timeouts set on servers and outbound calls
-* [ ] No unsafe deserialization
-* [ ] No shell execution without justification
+Responsibilities:
 
----
+* Logging
+* Recovery / panic protection
+* CORS
+* Gzip / compression
+* Timeout
+* Rate limiting / concurrency limiting
+* Body size limits
+* Authentication helpers
 
-## 8. Required change summary (agent output format)
+Middleware must:
 
-Every change submission **must include**:
-
-* **Summary**: What changed
-* **Reason**: Why it was needed
-* **How to test**: Exact commands
-* **Risk**: What could break / compatibility notes
-
-If routing or middleware changed, explicitly list:
-
-* affected endpoints
-* auth changes
-* backward compatibility impact
+* Be composable
+* Follow `http.Handler` semantics
+* Avoid global mutable state unless explicitly documented
 
 ---
 
-## 9. Directory-specific rules
+#### `frontend/`
 
-Subdirectories may define stricter rules via `AGENTS.override.md`.
+Static frontend serving.
 
-Root rules always apply.
+Responsibilities:
+
+* Serving static files from disk or embedded assets
+* SPA / static site mounting
+* Safe defaults for caching and paths
+
+---
+
+#### `pubsub/`
+
+In-process publish/subscribe system.
+
+Responsibilities:
+
+* Internal event distribution
+* Webhook fan-out support
+* Lightweight event channels
+* Debug or inspection hooks (if present)
+
+This is **not** a distributed message queue.
+
+---
+
+#### `security/`
+
+Security-critical logic.
+
+Responsibilities:
+
+* Webhook signature verification
+* Token / secret validation
+* Cryptographic helpers
+* Authentication primitives
+
+Rules:
+
+* No secrets in logs
+* Fail closed
+* Prefer explicit verification APIs
+
+---
+
+#### `health/`
+
+Health and readiness signaling.
+
+Responsibilities:
+
+* Liveness / readiness indicators
+* Startup and shutdown state tracking
+* Health endpoints or internal probes
+
+---
+
+#### `log/`
+
+Logging abstraction and helpers.
+
+Responsibilities:
+
+* Structured logging adapters
+* Log levels and formatting
+* Integration points for middleware and core
+
+---
+
+#### `config/`
+
+Configuration loading.
+
+Responsibilities:
+
+* Environment variable parsing
+* `.env` file loading (if enabled)
+* Defaults and overrides
+* Explicit configuration errors
+
+Any new config must update `env.example`.
+
+---
+
+#### `store/kv/`
+
+Internal key-value storage.
+
+Responsibilities:
+
+* Lightweight persistence
+* Deduplication helpers
+* Webhook delivery state
+* Internal coordination
+
+Not a general database layer.
+
+---
+
+#### `net/`
+
+Network utilities.
+
+Responsibilities:
+
+* HTTP/network helpers
+* Timeout or connection wrappers
+* Standard-library–compatible extensions
+
+---
+
+#### `ipc/`
+
+Local inter-process or intra-process communication helpers.
+
+Responsibilities:
+
+* Internal signaling
+* Local control channels (if present)
+
+---
+
+#### `utils/`
+
+Small shared helpers.
+
+Rules:
+
+* No business logic
+* No cross-layer coupling
+* No hidden dependencies
+
+---
+
+## 4. Change Rules (Strict)
+
+### Compatibility Rules
+
+Agents **must**:
+
+* Preserve `net/http` compatibility
+* Avoid introducing incompatible abstractions
+* Keep handlers as `http.Handler` or `http.HandlerFunc`
+* Avoid hidden global side effects
+
+---
+
+### API Stability Rules
+
+* Public APIs in `core`, `router`, and `middleware` are stable by default
+* Breaking changes require:
+
+  * Clear motivation
+  * Migration notes
+  * Preferably backward compatibility
+
+---
+
+### Dependency Rules
+
+* New dependencies require strong justification
+* Prefer standard library solutions
+* No “utility” dependencies without necessity
+
+---
+
+## 5. Testing & Quality Gates
+
+Before submitting or generating patches, agents must ensure:
+
+```bash
+go test ./...
+go vet ./...
+gofmt -w .
+```
+
+Additional expectations:
+
+* Routing changes → route matching tests
+* Middleware changes → chain order and error path tests
+* Security changes → negative tests (invalid signature, invalid token)
+* Config changes → default and missing-value behavior tests
+
+---
+
+## 6. Common Agent Tasks
+
+### A. Adding a New Middleware
+
+1. Implement in `middleware/`
+2. Follow existing middleware signatures
+3. Avoid global state
+4. Add at least minimal tests
+5. If auto-enabled via `core`, provide a configuration toggle
+
+---
+
+### B. Modifying Routing Behavior
+
+1. Work exclusively in `router/`
+2. Preserve existing semantics
+3. Add tests for:
+
+   * Static routes
+   * Parameterized routes
+   * Group prefixes
+   * Middleware stacking order
+
+---
+
+### C. Adding Environment Configuration
+
+1. Add to `config/`
+2. Update `env.example`
+3. Document default behavior
+4. Fail fast on invalid critical config
+
+---
+
+### D. Webhook Enhancements
+
+1. Signature and verification logic belongs in `security/`
+2. Routing and dispatch belong in `core` or webhook-specific wiring
+3. Never log raw secrets or signatures
+4. Prefer explicit verification APIs
+
+---
+
+## 7. Documentation Synchronization Rules
+
+Agents **must update documentation** when changing:
+
+* Public APIs
+* Environment variables
+* Default limits (timeouts, body size, concurrency)
+* Security behavior
+* Startup or shutdown semantics
+
+Primary docs:
+
+* `README.md`
+* `README_CN.md`
+* `env.example`
+
+---
+
+## 8. Security & Disclosure
+
+* Follow `SECURITY.md` for vulnerability reporting
+* Never expose secrets in logs, issues, or PRs
+* Assume logs may be public or centralized
+
+---
+
+## 9. Recommended Agent Workflow
+
+1. Identify the correct module boundary
+2. Add or update tests first (or alongside changes)
+3. Make minimal, focused changes
+4. Run full test suite
+5. Ensure documentation parity
+6. Keep commits small and reversible
+
+---
+
+**plumego values clarity, restraint, and correctness over feature volume.
+Agents should optimize for maintainability, not cleverness.**
