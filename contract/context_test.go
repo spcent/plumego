@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	log "github.com/spcent/plumego/log"
 )
 
 func TestNewCtxPopulatesFields(t *testing.T) {
@@ -88,6 +90,7 @@ func TestBindJSONErrors(t *testing.T) {
 	}{
 		{name: "empty", body: "", wantMsg: "request body is empty"},
 		{name: "invalid", body: "{", wantMsg: "invalid JSON payload"},
+		{name: "extra", body: `{"name":"demo"} {}`, wantMsg: "unexpected extra JSON data"},
 	}
 
 	for _, tt := range tests {
@@ -108,5 +111,80 @@ func TestBindJSONErrors(t *testing.T) {
 				t.Fatalf("unexpected message: %s", bindErr.Message)
 			}
 		})
+	}
+}
+
+func TestParamsAndRequestContextHelpers(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(context.WithValue(context.Background(), ParamsContextKey{}, map[string]string{"id": "42"}))
+	if val, ok := Param(req, "id"); !ok || val != "42" {
+		t.Fatalf("unexpected Param lookup: %v %v", val, ok)
+	}
+
+	rc := RequestContextFrom(req.Context())
+	if rc.Params["id"] != "42" {
+		t.Fatalf("request context did not surface params")
+	}
+
+	if params := ParamsFromContext(context.Background()); params != nil {
+		t.Fatalf("expected nil params for empty context")
+	}
+}
+
+func TestBindErrorHelpers(t *testing.T) {
+	err := &BindError{Message: "oops", Err: errors.New("root")}
+	if err.Error() != "oops" {
+		t.Fatalf("unexpected error message: %s", err.Error())
+	}
+	if !errors.Is(err, err.Err) {
+		t.Fatalf("expected unwrap to work")
+	}
+
+	var nilErr *BindError
+	if nilErr.Error() != "" {
+		t.Fatalf("nil receiver should return empty string")
+	}
+	if nilErr.Unwrap() != nil {
+		t.Fatalf("nil receiver unwrap should be nil")
+	}
+}
+
+func TestCtxHelpers(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.1:1234"
+	ctx := NewCtx(httptest.NewRecorder(), req, map[string]string{"name": "demo"})
+
+	if val, ok := ctx.Param("name"); !ok || val != "demo" {
+		t.Fatalf("Param lookup failed")
+	}
+	if _, err := ctx.MustParam("missing"); err == nil {
+		t.Fatalf("MustParam should error on missing key")
+	}
+
+	// response helpers
+	if err := ctx.Text(http.StatusCreated, "hello"); err != nil {
+		t.Fatalf("text write failed: %v", err)
+	}
+	if err := ctx.Bytes(http.StatusOK, []byte("bin")); err != nil {
+		t.Fatalf("bytes write failed: %v", err)
+	}
+}
+
+func TestAdaptCtxHandler(t *testing.T) {
+	logger := log.NewGLogger()
+	called := false
+	h := AdaptCtxHandler(func(c *Ctx) {
+		called = true
+	}, logger)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if !called {
+		t.Fatalf("handler was not called")
+	}
+
+	if err := ValidateCtxHandler(nil); err == nil {
+		t.Fatalf("expected validation error for nil handler")
 	}
 }
