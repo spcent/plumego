@@ -9,6 +9,21 @@ Plumego is a small Go HTTP toolkit that keeps everything inside the standard lib
 - **Graceful lifecycle**: Environment loading, connection draining, readiness flags, and optional TLS/HTTP2 configuration with sane defaults.
 - **Optional services**: Built-in WebSocket hub with auth, in-process pub/sub with debug snapshots, inbound/outbound webhook routers, and static frontend mounting from disk or embedded assets.
 
+## Components
+`core.App` orchestrates pluggable components instead of hard-wiring features. A component can register routes, middleware, and lifecycle hooks:
+
+```
+type Component interface {
+    RegisterRoutes(r *router.Router)
+    RegisterMiddleware(m *middleware.Registry)
+    Start(ctx context.Context) error
+    Stop(ctx context.Context) error
+    Health() (name string, status any)
+}
+```
+
+Use `core.WithComponent` (or `WithComponents`) when constructing the app to add capabilities. Built-in features (webhook management, inbound webhook receivers, pubsub debugging, websocket helpers, and frontend serving) can all be mounted as components so examples can mix only what they need.
+
 ## Quick start
 Create a small `main.go` that wires routes and middleware, then boot the server:
 

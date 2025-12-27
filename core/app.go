@@ -2,11 +2,11 @@ package core
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/net/webhookin"
 	ws "github.com/spcent/plumego/net/websocket"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
@@ -14,23 +14,29 @@ import (
 
 // App represents the main application instance.
 type App struct {
-	config        AppConfig               // Application configuration
-	router        *router.Router          // HTTP router
-	wsHub         *ws.Hub                 // WebSocket hub
-	started       bool                    // Whether the app has started
-	envLoaded     bool                    // Whether environment variables have been loaded
-	httpServer    *http.Server            // HTTP server instance
-	middlewares   []middleware.Middleware // Stored middleware for all routes
-	handler       http.Handler            // Combined handler with middleware applied
-	connTracker   *connectionTracker      // Connection tracker for WebSocket
-	guardsApplied bool                    // Whether guards have been applied
+	config        AppConfig            // Application configuration
+	router        *router.Router       // HTTP router
+	wsHub         *ws.Hub              // WebSocket hub
+	started       bool                 // Whether the app has started
+	envLoaded     bool                 // Whether environment variables have been loaded
+	httpServer    *http.Server         // HTTP server instance
+	middlewareReg *middleware.Registry // Middleware registry for all routes
+	handler       http.Handler         // Combined handler with middleware applied
+	connTracker   *connectionTracker   // Connection tracker for WebSocket
+	guardsApplied bool                 // Whether guards have been applied
+	configFrozen  bool                 // Whether configuration has been frozen
 
 	logger           log.StructuredLogger
 	metricsCollector middleware.MetricsCollector
 	tracer           middleware.Tracer
 
-	pub              pubsub.PubSub
-	webhookInDeduper *webhookin.Deduper
+	pub pubsub.PubSub
+
+	components        []Component
+	startedComponents []Component
+	componentsMu      sync.Mutex
+	componentStopOnce sync.Once
+	wsStopOnce        sync.Once
 }
 
 // Option defines a function type for configuring the App.
@@ -57,8 +63,9 @@ func New(options ...Option) *App {
 			QueueDepth:        512,
 			QueueTimeout:      250 * time.Millisecond,
 		},
-		router: router.NewRouter(),
-		logger: log.NewGLogger(),
+		router:        router.NewRouter(),
+		middlewareReg: middleware.NewRegistry(),
+		logger:        log.NewGLogger(),
 	}
 
 	for _, opt := range options {

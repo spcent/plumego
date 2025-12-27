@@ -11,6 +11,21 @@
 - **测试覆盖**：包含路由匹配、中间件、404处理等核心功能测试
 - **开发工具链**：提供Makefile和dev.sh脚本简化构建/运行/测试流程
 
+## 组件化内核
+`core.App` 现在充当“编排器 + 生命周期容器”，通过组件（Component）挂载能力：
+
+```
+type Component interface {
+    RegisterRoutes(r *router.Router)
+    RegisterMiddleware(m *middleware.Registry)
+    Start(ctx context.Context) error
+    Stop(ctx context.Context) error
+    Health() (name string, status any)
+}
+```
+
+使用 `core.WithComponent`/`WithComponents` 组合不同能力，内置的 WebSocket、Pub/Sub 调试、入站/出站 Webhook、前端静态资源都可以作为组件按需挂载。
+
 ## 快速开始
 
 ### 环境要求

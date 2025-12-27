@@ -12,7 +12,11 @@ func (a *App) Use(middlewares ...middleware.Middleware) {
 		panic("cannot add middleware after app has started")
 	}
 
-	a.middlewares = append(a.middlewares, middlewares...)
+	if a.middlewareReg == nil {
+		a.middlewareReg = middleware.NewRegistry()
+	}
+
+	a.middlewareReg.Use(middlewares...)
 }
 
 func (a *App) applyGuardrails() {
@@ -36,7 +40,7 @@ func (a *App) applyGuardrails() {
 
 	if len(guards) > 0 {
 		// Hardening middleware should execute before user-specified middleware.
-		a.middlewares = append(guards, a.middlewares...)
+		a.middlewareReg.Prepend(guards...)
 	}
 
 	a.guardsApplied = true
@@ -44,7 +48,7 @@ func (a *App) applyGuardrails() {
 
 // buildHandler builds the combined handler with current middleware stack.
 func (a *App) buildHandler() {
-	chain := middleware.NewChain(a.middlewares...)
+	chain := middleware.NewChain(a.middlewareReg.Middlewares()...)
 	a.handler = chain.Apply(a.router)
 }
 
