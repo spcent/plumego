@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,6 +112,52 @@ func TestBindJSONErrors(t *testing.T) {
 				t.Fatalf("unexpected message: %s", bindErr.Message)
 			}
 		})
+	}
+}
+
+func TestBindAndValidateJSON(t *testing.T) {
+	body := bytes.NewBufferString(`{"email":"demo@example.com","password":"superpass","username":"demo"}`)
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
+
+	type payload struct {
+		Email    string `json:"email" validate:"required,email"`
+		Password string `json:"password" validate:"required,min=8"`
+		Username string `json:"username" validate:"required,min=3"`
+	}
+
+	var p payload
+	if err := ctx.BindAndValidateJSON(&p); err != nil {
+		t.Fatalf("expected successful bind+validate, got %v", err)
+	}
+
+	if p.Email == "" || p.Password == "" || p.Username == "" {
+		t.Fatalf("expected fields to be populated: %+v", p)
+	}
+}
+
+func TestBindAndValidateJSONErrors(t *testing.T) {
+	body := bytes.NewBufferString(`{"email":"invalid","password":"short","username":"de"}`)
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
+
+	type payload struct {
+		Email    string `json:"email" validate:"required,email"`
+		Password string `json:"password" validate:"required,min=8"`
+		Username string `json:"username" validate:"required,min=3"`
+	}
+
+	var p payload
+	err := ctx.BindAndValidateJSON(&p)
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+
+	var bindErr *BindError
+	if !errors.As(err, &bindErr) {
+		t.Fatalf("expected BindError, got %T", err)
+	}
+
+	if !strings.Contains(bindErr.Message, "Email") {
+		t.Fatalf("unexpected bind error message: %s", bindErr.Message)
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/validator"
 )
 
 // RequestContext contains request-scoped data that should be shared across middleware and handlers.
@@ -232,6 +233,19 @@ func (c *Ctx) BindJSON(dst any) error {
 	// Ensure no trailing data
 	if decoder.Decode(&struct{}{}) != io.EOF {
 		return &BindError{Status: http.StatusBadRequest, Message: "unexpected extra JSON data"}
+	}
+
+	return nil
+}
+
+// BindAndValidateJSON binds the request body to dst and validates it using struct tags.
+func (c *Ctx) BindAndValidateJSON(dst any) error {
+	if err := c.BindJSON(dst); err != nil {
+		return err
+	}
+
+	if err := validator.Validate(dst); err != nil {
+		return &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
 	}
 
 	return nil
