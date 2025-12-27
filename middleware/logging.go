@@ -2,12 +2,10 @@ package middleware
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
 	"net/http"
 	"time"
 
-	contract "github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/contract"
 	log "github.com/spcent/plumego/log"
 )
 
@@ -94,7 +92,7 @@ func ensureTraceID(r *http.Request) string {
 	if id := r.Header.Get("X-Request-ID"); id != "" {
 		return id
 	}
-	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Int63())
+	return log.NewTraceID()
 }
 
 type responseRecorder struct {

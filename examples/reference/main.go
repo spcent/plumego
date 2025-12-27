@@ -86,8 +86,8 @@ func main() {
 	_ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"))
 
 	// Minimal health endpoints for orchestration hooks.
-	app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
-	app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+	app.GetHandler("/health/ready", health.ReadinessHandler())
+	app.GetHandler("/health/build", health.BuildInfoHandler())
 
 	// WebSocket hub with broadcast endpoint and simple echoing demo.
 	wsCfg := core.DefaultWebSocketConfig()
@@ -106,7 +106,7 @@ func main() {
 	})
 
 	// Expose metrics for scraping.
-	app.Get("/metrics", prom.Handler().ServeHTTP)
+	app.GetHandler("/metrics", prom.Handler())
 
 	if err := app.Boot(); err != nil {
 		log.Fatalf("server stopped: %v", err)
