@@ -139,6 +139,26 @@ func WithLogger(logger log.StructuredLogger) Option {
 	}
 }
 
+// WithComponent mounts a Component into the application lifecycle.
+func WithComponent(component Component) Option {
+	return func(a *App) {
+		if component != nil {
+			a.components = append(a.components, component)
+		}
+	}
+}
+
+// WithComponents mounts multiple Components into the application lifecycle.
+func WithComponents(components ...Component) Option {
+	return func(a *App) {
+		for _, component := range components {
+			if component != nil {
+				a.components = append(a.components, component)
+			}
+		}
+	}
+}
+
 // WithMetricsCollector sets a metrics collector hook for observability middleware.
 func WithMetricsCollector(collector middleware.MetricsCollector) Option {
 	return func(a *App) {

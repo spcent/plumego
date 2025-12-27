@@ -1,44 +1,70 @@
 package core
 
 import (
+	"context"
 	"crypto/subtle"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware"
 	webhookout "github.com/spcent/plumego/net/webhookout"
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/utils/stringsx"
 )
 
-// ConfigureWebhookOut mounts outbound webhook management APIs.
-func (a *App) ConfigureWebhookOut() {
-	cfg := a.config.WebhookOut
-	if !cfg.Enabled || cfg.Service == nil {
+type webhookOutComponent struct {
+	cfg        WebhookOutConfig
+	routesOnce sync.Once
+}
+
+func newWebhookOutComponent(cfg WebhookOutConfig) Component {
+	return &webhookOutComponent{cfg: cfg}
+}
+
+func (c *webhookOutComponent) RegisterRoutes(r *router.Router) {
+	if !c.cfg.Enabled || c.cfg.Service == nil {
 		return
 	}
 
-	base := strings.TrimSpace(cfg.BasePath)
-	if base == "" {
-		base = "/webhooks"
-	}
+	c.routesOnce.Do(func() {
+		base := strings.TrimSpace(c.cfg.BasePath)
+		if base == "" {
+			base = "/webhooks"
+		}
 
-	svc := cfg.Service
-	router := a.Router()
+		svc := c.cfg.Service
 
-	router.PostCtx(base+"/targets", func(ctx *contract.Ctx) { a.webhookCreateTarget(ctx, svc) })
-	router.GetCtx(base+"/targets", func(ctx *contract.Ctx) { a.webhookListTargets(ctx, svc) })
-	router.GetCtx(base+"/targets/:id", func(ctx *contract.Ctx) { a.webhookGetTarget(ctx, svc) })
-	router.PatchCtx(base+"/targets/:id", func(ctx *contract.Ctx) { a.webhookPatchTarget(ctx, svc) })
-	router.PostCtx(base+"/targets/:id/enable", func(ctx *contract.Ctx) { a.webhookSetTargetEnabled(ctx, svc, true) })
-	router.PostCtx(base+"/targets/:id/disable", func(ctx *contract.Ctx) { a.webhookSetTargetEnabled(ctx, svc, false) })
+		r.PostCtx(base+"/targets", func(ctx *contract.Ctx) { webhookCreateTarget(ctx, svc) })
+		r.GetCtx(base+"/targets", func(ctx *contract.Ctx) { webhookListTargets(ctx, svc) })
+		r.GetCtx(base+"/targets/:id", func(ctx *contract.Ctx) { webhookGetTarget(ctx, svc) })
+		r.PatchCtx(base+"/targets/:id", func(ctx *contract.Ctx) { webhookPatchTarget(ctx, svc) })
+		r.PostCtx(base+"/targets/:id/enable", func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, true) })
+		r.PostCtx(base+"/targets/:id/disable", func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, false) })
 
-	router.PostCtx(base+"/events/:event", func(ctx *contract.Ctx) { a.webhookTriggerEvent(ctx, svc, cfg.TriggerToken, cfg.AllowEmptyToken) })
+		r.PostCtx(base+"/events/:event", func(ctx *contract.Ctx) {
+			webhookTriggerEvent(ctx, svc, c.cfg.TriggerToken, c.cfg.AllowEmptyToken)
+		})
 
-	router.GetCtx(base+"/deliveries", func(ctx *contract.Ctx) { a.webhookListDeliveries(ctx, svc, cfg.IncludeStats, cfg.DefaultPageLimit) })
-	router.GetCtx(base+"/deliveries/:id", func(ctx *contract.Ctx) { a.webhookGetDelivery(ctx, svc) })
-	router.PostCtx(base+"/deliveries/:id/replay", func(ctx *contract.Ctx) { a.webhookReplayDelivery(ctx, svc) })
+		r.GetCtx(base+"/deliveries", func(ctx *contract.Ctx) { webhookListDeliveries(ctx, svc, c.cfg.DefaultPageLimit) })
+		r.GetCtx(base+"/deliveries/:id", func(ctx *contract.Ctx) { webhookGetDelivery(ctx, svc) })
+		r.PostCtx(base+"/deliveries/:id/replay", func(ctx *contract.Ctx) { webhookReplayDelivery(ctx, svc) })
+	})
+}
+
+func (c *webhookOutComponent) RegisterMiddleware(_ *middleware.Registry) {}
+
+func (c *webhookOutComponent) Start(_ context.Context) error { return nil }
+
+func (c *webhookOutComponent) Stop(_ context.Context) error { return nil }
+
+func (c *webhookOutComponent) Health() (string, any) {
+	return "webhook_out", map[string]any{"enabled": c.cfg.Enabled}
 }
 
 type targetDTO struct {
@@ -61,7 +87,7 @@ type targetDTO struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-func (a *App) webhookCreateTarget(ctx *contract.Ctx, svc *webhookout.Service) {
+func webhookCreateTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	var req webhookout.Target
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.ErrorJSON(http.StatusBadRequest, "invalid_json", "invalid JSON payload", nil)
@@ -77,7 +103,7 @@ func (a *App) webhookCreateTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	ctx.JSON(http.StatusCreated, targetToDTO(t))
 }
 
-func (a *App) webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
+func webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
 	q := ctx.Query
 
 	var enabled *bool
@@ -104,7 +130,7 @@ func (a *App) webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
 	ctx.JSON(http.StatusOK, map[string]any{"items": out})
 }
 
-func (a *App) webhookGetTarget(ctx *contract.Ctx, svc *webhookout.Service) {
+func webhookGetTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
 		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
@@ -120,7 +146,7 @@ func (a *App) webhookGetTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	ctx.JSON(http.StatusOK, targetToDTO(t))
 }
 
-func (a *App) webhookPatchTarget(ctx *contract.Ctx, svc *webhookout.Service) {
+func webhookPatchTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
 		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
@@ -142,7 +168,7 @@ func (a *App) webhookPatchTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	ctx.JSON(http.StatusOK, targetToDTO(t))
 }
 
-func (a *App) webhookSetTargetEnabled(ctx *contract.Ctx, svc *webhookout.Service, enable bool) {
+func webhookSetTargetEnabled(ctx *contract.Ctx, svc *webhookout.Service, enable bool) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
 		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
@@ -162,7 +188,7 @@ func (a *App) webhookSetTargetEnabled(ctx *contract.Ctx, svc *webhookout.Service
 	ctx.JSON(http.StatusOK, targetToDTO(t))
 }
 
-func (a *App) webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, token string, allowEmpty bool) {
+func webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, token string, allowEmpty bool) {
 	event, ok := ctx.Param("event")
 	if !ok || strings.TrimSpace(event) == "" {
 		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "event is required", nil)
@@ -198,74 +224,91 @@ func (a *App) webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, to
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{"enqueued": enqueued})
+	ctx.JSON(http.StatusAccepted, map[string]any{
+		"enqueued": enqueued,
+		"event":    event,
+	})
 }
 
-func (a *App) webhookListDeliveries(ctx *contract.Ctx, svc *webhookout.Service, includeStats bool, defaultLimit int) {
+func webhookListDeliveries(ctx *contract.Ctx, svc *webhookout.Service, defaultLimit int) {
 	q := ctx.Query
 
 	limit := defaultLimit
-	if limit <= 0 {
-		limit = 25
-	}
-
 	if v := strings.TrimSpace(q.Get("limit")); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			limit = min(limit, p)
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			limit = parsed
 		}
 	}
 
-	status := strings.TrimSpace(q.Get("status"))
-	targetID := strings.TrimSpace(q.Get("target_id"))
-	event := strings.TrimSpace(q.Get("event"))
-
 	filter := webhookout.DeliveryFilter{Limit: limit, Cursor: strings.TrimSpace(q.Get("cursor"))}
-	if status != "" {
-		st := webhookout.DeliveryStatus(status)
-		filter.Status = &st
+
+	if v := strings.TrimSpace(q.Get("target_id")); v != "" {
+		filter.TargetID = &v
 	}
-	if targetID != "" {
-		filter.TargetID = &targetID
+	if v := strings.TrimSpace(q.Get("event")); v != "" {
+		filter.Event = &v
 	}
-	if event != "" {
-		filter.Event = &event
+	if v := strings.TrimSpace(q.Get("status")); v != "" {
+		status := webhookout.DeliveryStatus(v)
+		filter.Status = &status
 	}
-	if t, ok := parseRFC3339(q.Get("from")); ok {
-		filter.From = &t
+	if v := strings.TrimSpace(q.Get("from")); v != "" {
+		if ts, err := time.Parse(time.RFC3339, v); err == nil {
+			filter.From = &ts
+		}
 	}
-	if t, ok := parseRFC3339(q.Get("to")); ok {
-		filter.To = &t
+	if v := strings.TrimSpace(q.Get("to")); v != "" {
+		if ts, err := time.Parse(time.RFC3339, v); err == nil {
+			filter.To = &ts
+		}
 	}
 
-	ds, err := svc.ListDeliveries(ctx.R.Context(), filter)
+	deliveries, err := svc.ListDeliveries(ctx.R.Context(), filter)
 	if err != nil {
 		ctx.ErrorJSON(http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
 
-	for i := range ds {
-		ds[i].PayloadJSON = nil
+	type deliveryDTO struct {
+		ID           string                    `json:"id"`
+		TargetID     string                    `json:"target_id"`
+		EventID      string                    `json:"event_id"`
+		EventType    string                    `json:"event_type"`
+		Status       webhookout.DeliveryStatus `json:"status"`
+		Attempt      int                       `json:"attempt"`
+		NextAt       *time.Time                `json:"next_at,omitempty"`
+		LastHTTP     int                       `json:"last_http_status,omitempty"`
+		LastError    string                    `json:"last_error,omitempty"`
+		LastDuration int                       `json:"last_duration_ms,omitempty"`
+		LastResp     string                    `json:"last_resp_snippet,omitempty"`
+		CreatedAt    time.Time                 `json:"created_at"`
+		UpdatedAt    time.Time                 `json:"updated_at"`
 	}
 
-	nextCursor := ""
-	if len(ds) > 0 {
-		nextCursor = ds[len(ds)-1].ID
+	out := make([]deliveryDTO, 0, len(deliveries))
+	for _, d := range deliveries {
+		out = append(out, deliveryDTO{
+			ID:           d.ID,
+			TargetID:     d.TargetID,
+			EventID:      d.EventID,
+			EventType:    d.EventType,
+			Status:       d.Status,
+			Attempt:      d.Attempt,
+			NextAt:       d.NextAt,
+			LastHTTP:     d.LastHTTPStatus,
+			LastError:    d.LastError,
+			LastDuration: d.LastDurationMs,
+			LastResp:     d.LastRespSnippet,
+			CreatedAt:    d.CreatedAt,
+			UpdatedAt:    d.UpdatedAt,
+		})
 	}
 
-	resp := map[string]any{
-		"items":       ds,
-		"next_cursor": nextCursor,
-	}
-
-	includeStats = includeStats || strings.TrimSpace(q.Get("include_stats")) == "1"
-	if includeStats {
-		resp["stats"] = buildDeliveryStats(ds)
-	}
-
+	resp := map[string]any{"items": out}
 	ctx.JSON(http.StatusOK, resp)
 }
 
-func (a *App) webhookGetDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
+func webhookGetDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
 		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
@@ -278,13 +321,27 @@ func (a *App) webhookGetDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 		return
 	}
 
-	if !includePayload(ctx) {
-		d.PayloadJSON = nil
-	}
-	ctx.JSON(http.StatusOK, d)
+	payload := json.RawMessage(d.PayloadJSON)
+
+	ctx.JSON(http.StatusOK, map[string]any{
+		"id":                d.ID,
+		"target_id":         d.TargetID,
+		"event_id":          d.EventID,
+		"event_type":        d.EventType,
+		"status":            d.Status,
+		"attempt":           d.Attempt,
+		"next_at":           d.NextAt,
+		"last_http_status":  d.LastHTTPStatus,
+		"last_error":        d.LastError,
+		"last_duration_ms":  d.LastDurationMs,
+		"last_resp_snippet": d.LastRespSnippet,
+		"payload_json":      payload,
+		"created_at":        d.CreatedAt,
+		"updated_at":        d.UpdatedAt,
+	})
 }
 
-func (a *App) webhookReplayDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
+func webhookReplayDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
 		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
@@ -292,70 +349,47 @@ func (a *App) webhookReplayDelivery(ctx *contract.Ctx, svc *webhookout.Service) 
 	}
 
 	d, err := svc.ReplayDelivery(ctx.R.Context(), id)
+	if errors.Is(err, webhookout.ErrNotFound) {
+		ctx.ErrorJSON(http.StatusNotFound, "not_found", "delivery not found", nil)
+		return
+	}
 	if err != nil {
-		if err == webhookout.ErrNotFound {
-			ctx.ErrorJSON(http.StatusNotFound, "not_found", "delivery not found", nil)
-			return
-		}
 		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", err.Error(), nil)
 		return
 	}
 
-	if !includePayload(ctx) {
-		d.PayloadJSON = nil
-	}
-	ctx.JSON(http.StatusOK, d)
-}
-
-func includePayload(ctx *contract.Ctx) bool {
-	return strings.TrimSpace(ctx.Query.Get("include_payload")) == "1"
-}
-
-func parseRFC3339(v string) (time.Time, bool) {
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return time.Time{}, false
-	}
-	t, err := time.Parse(time.RFC3339, v)
-	if err != nil {
-		return time.Time{}, false
-	}
-	return t.UTC(), true
-}
-
-func buildDeliveryStats(ds []webhookout.Delivery) map[string]any {
-	by := map[string]int{}
-	for _, d := range ds {
-		by[string(d.Status)]++
-	}
-	return map[string]any{
-		"total":     len(ds),
-		"by_status": by,
-	}
+	ctx.JSON(http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID})
 }
 
 func targetToDTO(t webhookout.Target) targetDTO {
-	return targetDTO{
+	dto := targetDTO{
 		ID:            t.ID,
 		Name:          t.Name,
 		URL:           t.URL,
 		Events:        t.Events,
 		Enabled:       t.Enabled,
 		Headers:       t.Headers,
+		SecretMasked:  stringsx.MaskSecret(t.Secret),
+		CreatedAt:     t.CreatedAt,
+		UpdatedAt:     t.UpdatedAt,
 		TimeoutMs:     t.TimeoutMs,
 		MaxRetries:    t.MaxRetries,
 		BackoffBaseMs: t.BackoffBaseMs,
 		BackoffMaxMs:  t.BackoffMaxMs,
-		RetryOn429:    t.RetryOn429,
-		SecretMasked:  stringsx.MaskSecret(t.Secret),
-		CreatedAt:     t.CreatedAt,
-		UpdatedAt:     t.UpdatedAt,
 	}
+
+	if t.RetryOn429 != nil {
+		dto.RetryOn429 = t.RetryOn429
+	}
+
+	return dto
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+// ConfigureWebhookOut mounts outbound webhook management APIs.
+// It remains for backward compatibility but now mounts a component into the lifecycle.
+func (a *App) ConfigureWebhookOut() {
+	comp := newWebhookOutComponent(a.config.WebhookOut)
+	comp.RegisterRoutes(a.router)
+	comp.RegisterMiddleware(a.middlewareReg)
+	a.components = append(a.components, comp)
 }

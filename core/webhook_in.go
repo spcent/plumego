@@ -1,51 +1,72 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware"
 	webhookin "github.com/spcent/plumego/net/webhookin"
 	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/utils/jsonx"
 )
 
-// ConfigureWebhookIn mounts inbound webhook receivers for GitHub and Stripe.
-func (a *App) ConfigureWebhookIn() {
-	cfg := a.config.WebhookIn
-	if !cfg.Enabled {
-		return
-	}
-
-	pub := cfg.Pub
-	if pub == nil {
-		pub = a.pub
-	}
-	if pub == nil {
-		return
-	}
-
-	router := a.Router()
-
-	gitHubPath := strings.TrimSpace(cfg.GitHubPath)
-	if gitHubPath == "" {
-		gitHubPath = "/webhooks/github"
-	}
-	router.PostCtx(gitHubPath, func(ctx *contract.Ctx) { a.webhookInGitHub(ctx, pub, cfg) })
-
-	stripePath := strings.TrimSpace(cfg.StripePath)
-	if stripePath == "" {
-		stripePath = "/webhooks/stripe"
-	}
-	router.PostCtx(stripePath, func(ctx *contract.Ctx) { a.webhookInStripe(ctx, pub, cfg) })
+type webhookInComponent struct {
+	cfg        WebhookInConfig
+	pub        pubsub.PubSub
+	logger     log.StructuredLogger
+	deduper    *webhookin.Deduper
+	routesOnce sync.Once
 }
 
-func (a *App) webhookInGitHub(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookInConfig) {
-	secret := strings.TrimSpace(cfg.GitHubSecret)
+func newWebhookInComponent(cfg WebhookInConfig, fallbackPub pubsub.PubSub, logger log.StructuredLogger) Component {
+	pub := cfg.Pub
+	if pub == nil {
+		pub = fallbackPub
+	}
+
+	return &webhookInComponent{cfg: cfg, pub: pub, logger: logger}
+}
+
+func (c *webhookInComponent) RegisterRoutes(r *router.Router) {
+	if !c.cfg.Enabled || c.pub == nil {
+		return
+	}
+
+	c.routesOnce.Do(func() {
+		gitHubPath := strings.TrimSpace(c.cfg.GitHubPath)
+		if gitHubPath == "" {
+			gitHubPath = "/webhooks/github"
+		}
+		r.PostCtx(gitHubPath, func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) })
+
+		stripePath := strings.TrimSpace(c.cfg.StripePath)
+		if stripePath == "" {
+			stripePath = "/webhooks/stripe"
+		}
+		r.PostCtx(stripePath, func(ctx *contract.Ctx) { c.webhookInStripe(ctx) })
+	})
+}
+
+func (c *webhookInComponent) RegisterMiddleware(_ *middleware.Registry) {}
+
+func (c *webhookInComponent) Start(_ context.Context) error { return nil }
+
+func (c *webhookInComponent) Stop(_ context.Context) error { return nil }
+
+func (c *webhookInComponent) Health() (string, any) {
+	return "webhook_in", map[string]any{"enabled": c.cfg.Enabled}
+}
+
+func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
+	secret := strings.TrimSpace(c.cfg.GitHubSecret)
 	if secret == "" {
 		secret = strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET"))
 	}
@@ -54,7 +75,7 @@ func (a *App) webhookInGitHub(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 		return
 	}
 
-	maxBody := cfg.MaxBodyBytes
+	maxBody := c.cfg.MaxBodyBytes
 	if maxBody <= 0 {
 		maxBody = 1 << 20
 	}
@@ -73,7 +94,7 @@ func (a *App) webhookInGitHub(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 		delivery = "unknown"
 	}
 
-	d := a.ensureWebhookInDeduper(cfg)
+	d := c.ensureWebhookInDeduper()
 	if delivery != "unknown" && d.SeenBefore("github:"+delivery) {
 		ctx.JSON(http.StatusOK, map[string]any{
 			"ok":          true,
@@ -86,7 +107,7 @@ func (a *App) webhookInGitHub(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 		return
 	}
 
-	topicPrefix := strings.TrimSpace(cfg.TopicPrefixGitHub)
+	topicPrefix := strings.TrimSpace(c.cfg.TopicPrefixGitHub)
 	if topicPrefix == "" {
 		topicPrefix = "in.github."
 	}
@@ -107,10 +128,9 @@ func (a *App) webhookInGitHub(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 		},
 	}
 
-	err = pub.Publish(topic, msg)
+	err = c.pub.Publish(topic, msg)
 	if err != nil {
-		a.Logger().Error("Failed to publish GitHub event",
-			log.Fields{"error": err, "topic": topic, "event_id": delivery})
+		c.logger.Error("Failed to publish GitHub event", log.Fields{"error": err, "topic": topic, "event_id": delivery})
 	}
 
 	ctx.JSON(http.StatusOK, map[string]any{
@@ -125,8 +145,8 @@ func (a *App) webhookInGitHub(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 	})
 }
 
-func (a *App) webhookInStripe(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookInConfig) {
-	secret := strings.TrimSpace(cfg.StripeSecret)
+func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
+	secret := strings.TrimSpace(c.cfg.StripeSecret)
 	if secret == "" {
 		secret = strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))
 	}
@@ -135,11 +155,11 @@ func (a *App) webhookInStripe(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 		return
 	}
 
-	maxBody := cfg.MaxBodyBytes
+	maxBody := c.cfg.MaxBodyBytes
 	if maxBody <= 0 {
 		maxBody = 1 << 20
 	}
-	tol := cfg.StripeTolerance
+	tol := c.cfg.StripeTolerance
 	if tol <= 0 {
 		tol = 5 * time.Minute
 	}
@@ -159,7 +179,7 @@ func (a *App) webhookInStripe(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 		evtID = "unknown"
 	}
 
-	d := a.ensureWebhookInDeduper(cfg)
+	d := c.ensureWebhookInDeduper()
 	if evtID != "unknown" && d.SeenBefore("stripe:"+evtID) {
 		ctx.JSON(http.StatusOK, map[string]any{
 			"ok":         true,
@@ -172,7 +192,7 @@ func (a *App) webhookInStripe(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 		return
 	}
 
-	topicPrefix := strings.TrimSpace(cfg.TopicPrefixStripe)
+	topicPrefix := strings.TrimSpace(c.cfg.TopicPrefixStripe)
 	if topicPrefix == "" {
 		topicPrefix = "in.stripe."
 	}
@@ -193,10 +213,9 @@ func (a *App) webhookInStripe(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 		},
 	}
 
-	err = pub.Publish(topic, msg)
+	err = c.pub.Publish(topic, msg)
 	if err != nil {
-		a.Logger().Error("Failed to publish Stripe event",
-			log.Fields{"error": err, "topic": topic, "event_id": evtID})
+		c.logger.Error("Failed to publish Stripe event", log.Fields{"error": err, "topic": topic, "event_id": evtID})
 	}
 
 	ctx.JSON(http.StatusOK, map[string]any{
@@ -211,19 +230,19 @@ func (a *App) webhookInStripe(ctx *contract.Ctx, pub pubsub.PubSub, cfg WebhookI
 	})
 }
 
-func (a *App) ensureWebhookInDeduper(cfg WebhookInConfig) *webhookin.Deduper {
-	if cfg.Deduper != nil {
-		return cfg.Deduper
+func (c *webhookInComponent) ensureWebhookInDeduper() *webhookin.Deduper {
+	if c.cfg.Deduper != nil {
+		return c.cfg.Deduper
 	}
-	if a.webhookInDeduper != nil {
-		return a.webhookInDeduper
+	if c.deduper != nil {
+		return c.deduper
 	}
-	ttl := cfg.DedupTTL
+	ttl := c.cfg.DedupTTL
 	if ttl <= 0 {
 		ttl = 10 * time.Minute
 	}
-	a.webhookInDeduper = webhookin.NewDeduper(ttl)
-	return a.webhookInDeduper
+	c.deduper = webhookin.NewDeduper(ttl)
+	return c.deduper
 }
 
 // sanitizeTopicSuffix keeps topic safe and consistent.
@@ -248,4 +267,13 @@ func sanitizeTopicSuffix(s string) string {
 		}
 	}
 	return strings.ToLower(b.String())
+}
+
+// ConfigureWebhookIn mounts inbound webhook receivers for GitHub and Stripe.
+// It remains for backward compatibility but now mounts a component into the lifecycle.
+func (a *App) ConfigureWebhookIn() {
+	comp := newWebhookInComponent(a.config.WebhookIn, a.pub, a.logger)
+	comp.RegisterRoutes(a.router)
+	comp.RegisterMiddleware(a.middlewareReg)
+	a.components = append(a.components, comp)
 }

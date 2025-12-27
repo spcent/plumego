@@ -15,6 +15,7 @@ import (
 	"github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/health"
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware"
 )
 
 // Boot initializes and starts the server.
@@ -30,7 +31,7 @@ func (a *App) Boot() error {
 		return err
 	}
 
-	a.configureBuiltIns()
+	components := a.mountComponents()
 
 	if a.config.Debug {
 		os.Setenv("APP_DEBUG", "true")
@@ -40,17 +41,16 @@ func (a *App) Boot() error {
 		return err
 	}
 
+	if err := a.startComponents(context.Background(), components); err != nil {
+		return err
+	}
+
 	if err := a.startServer(); err != nil && err != http.ErrServerClosed {
+		a.stopComponents(context.Background())
 		return err
 	}
 
 	return nil
-}
-
-func (a *App) configureBuiltIns() {
-	a.ConfigurePubSub()
-	a.ConfigureWebhookOut()
-	a.ConfigureWebhookIn()
 }
 
 func (a *App) loadEnv() error {
@@ -127,6 +127,8 @@ func (a *App) startServer() error {
 		if err := a.httpServer.Shutdown(ctx); err != nil {
 			a.logger.Error("Server shutdown error", log.Fields{"error": err})
 		}
+
+		a.stopComponents(ctx)
 		close(idleConnsClosed)
 	}()
 
@@ -145,14 +147,11 @@ func (a *App) startServer() error {
 	}
 
 	health.SetNotReady("shutting down")
+	a.stopComponents(context.Background())
 
 	<-idleConnsClosed
 
-	if a.wsHub != nil {
-		a.logger.Info("Stopping WebSocket hub", nil)
-		a.wsHub.Stop()
-		a.wsHub = nil
-	}
+	a.stopWebSocketHub()
 
 	a.logger.Info("Server stopped gracefully", nil)
 	return err
@@ -169,6 +168,80 @@ func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *
 		interval = 500 * time.Millisecond
 	}
 	return &connectionTracker{logger: logger, interval: interval}
+}
+
+func (a *App) mountComponents() []Component {
+	comps := append([]Component{}, a.builtInComponents()...)
+	comps = append(comps, a.components...)
+
+	if a.middlewareReg == nil {
+		a.middlewareReg = middleware.NewRegistry()
+	}
+
+	for _, c := range comps {
+		if c == nil {
+			continue
+		}
+
+		c.RegisterMiddleware(a.middlewareReg)
+		c.RegisterRoutes(a.router)
+	}
+
+	a.router.Freeze()
+
+	return comps
+}
+
+func (a *App) startComponents(ctx context.Context, comps []Component) error {
+	a.componentsMu.Lock()
+	defer a.componentsMu.Unlock()
+
+	if len(comps) == 0 {
+		return nil
+	}
+
+	started := make([]Component, 0, len(comps))
+	for _, c := range comps {
+		if c == nil {
+			continue
+		}
+		if err := c.Start(ctx); err != nil {
+			for i := len(started) - 1; i >= 0; i-- {
+				_ = started[i].Stop(ctx)
+			}
+			return err
+		}
+		started = append(started, c)
+	}
+
+	a.startedComponents = started
+	return nil
+}
+
+func (a *App) stopComponents(ctx context.Context) {
+	a.componentStopOnce.Do(func() {
+		a.componentsMu.Lock()
+		comps := append([]Component{}, a.startedComponents...)
+		a.componentsMu.Unlock()
+
+		for i := len(comps) - 1; i >= 0; i-- {
+			if comps[i] == nil {
+				continue
+			}
+			_ = comps[i].Stop(ctx)
+		}
+	})
+}
+
+func (a *App) stopWebSocketHub() {
+	a.wsStopOnce.Do(func() {
+		if a.wsHub == nil {
+			return
+		}
+		a.logger.Info("Stopping WebSocket hub", nil)
+		a.wsHub.Stop()
+		a.wsHub = nil
+	})
 }
 
 func (t *connectionTracker) track(_ net.Conn, state http.ConnState) {
