@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/health"
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	ws "github.com/spcent/plumego/net/websocket"
@@ -127,8 +128,15 @@ func (c *webSocketComponent) Stop(_ context.Context) error {
 	return nil
 }
 
-func (c *webSocketComponent) Health() (string, any) {
-	return "websocket", map[string]any{"enabled": true}
+func (c *webSocketComponent) Health() (string, health.HealthStatus) {
+	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"broadcastEnabled": c.config.BroadcastEnabled}}
+
+	if c.hub == nil {
+		status.Status = health.StatusUnhealthy
+		status.Message = "hub not initialized"
+	}
+
+	return "websocket", status
 }
 
 // ConfigureWebSocket configures WebSocket support for the app.

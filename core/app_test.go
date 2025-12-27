@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
@@ -56,8 +57,8 @@ func (s *stubComponent) Stop(_ context.Context) error {
 	return nil
 }
 
-func (s *stubComponent) Health() (string, any) {
-	return "stub", map[string]any{"started": s.started, "stopped": s.stopped}
+func (s *stubComponent) Health() (string, health.HealthStatus) {
+	return "stub", health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"started": s.started, "stopped": s.stopped}}
 }
 
 func TestNewDefaults(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/frontend"
+	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
@@ -55,12 +56,16 @@ func (c *frontendComponent) Start(_ context.Context) error { return nil }
 
 func (c *frontendComponent) Stop(_ context.Context) error { return nil }
 
-func (c *frontendComponent) Health() (string, any) {
-	status := map[string]any{
-		"registered": c.result.registered,
+func (c *frontendComponent) Health() (string, health.HealthStatus) {
+	status := health.HealthStatus{
+		Status:  health.StatusHealthy,
+		Details: map[string]any{"registered": c.result.registered},
 	}
+
 	if c.result.err != nil {
-		status["error"] = c.result.err.Error()
+		status.Status = health.StatusUnhealthy
+		status.Message = c.result.err.Error()
+		status.Details["error"] = c.result.err.Error()
 	}
 
 	name := c.name

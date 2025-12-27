@@ -18,9 +18,12 @@ type Component interface {
     RegisterMiddleware(m *middleware.Registry)
     Start(ctx context.Context) error
     Stop(ctx context.Context) error
-    Health() (name string, status any)
+    Health() (name string, status health.HealthStatus)
 }
 ```
+
+`HealthStatus` uses typed states (`healthy`, `degraded`, `unhealthy`) so components report health in a structured, type-safe man
+ner.
 
 Use `core.WithComponent` (or `WithComponents`) when constructing the app to add capabilities. Built-in features (webhook management, inbound webhook receivers, pubsub debugging, websocket helpers, and frontend serving) can all be mounted as components so examples can mix only what they need.
 

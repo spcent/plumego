@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/health"
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	webhookin "github.com/spcent/plumego/net/webhookin"
@@ -61,8 +62,15 @@ func (c *webhookInComponent) Start(_ context.Context) error { return nil }
 
 func (c *webhookInComponent) Stop(_ context.Context) error { return nil }
 
-func (c *webhookInComponent) Health() (string, any) {
-	return "webhook_in", map[string]any{"enabled": c.cfg.Enabled}
+func (c *webhookInComponent) Health() (string, health.HealthStatus) {
+	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}
+
+	if !c.cfg.Enabled {
+		status.Status = health.StatusDegraded
+		status.Message = "component disabled"
+	}
+
+	return "webhook_in", status
 }
 
 func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {

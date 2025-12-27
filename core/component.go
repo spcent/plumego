@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
@@ -14,7 +15,7 @@ type Component interface {
 	RegisterMiddleware(m *middleware.Registry)
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
-	Health() (name string, status any)
+	Health() (name string, status health.HealthStatus)
 }
 
 // ComponentFunc is a helper that allows building Components from
@@ -24,7 +25,7 @@ type ComponentFunc struct {
 	RegisterMiddlewareFn func(m *middleware.Registry)
 	StartFn              func(ctx context.Context) error
 	StopFn               func(ctx context.Context) error
-	HealthFn             func() (string, any)
+	HealthFn             func() (string, health.HealthStatus)
 }
 
 func (c ComponentFunc) RegisterRoutes(r *router.Router) {
@@ -53,9 +54,9 @@ func (c ComponentFunc) Stop(ctx context.Context) error {
 	return c.StopFn(ctx)
 }
 
-func (c ComponentFunc) Health() (string, any) {
+func (c ComponentFunc) Health() (string, health.HealthStatus) {
 	if c.HealthFn == nil {
-		return "component", map[string]any{"status": "unknown"}
+		return "component", health.HealthStatus{Status: health.StatusDegraded, Message: "health check not provided"}
 	}
 	return c.HealthFn()
 }

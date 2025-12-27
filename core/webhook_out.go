@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	webhookout "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/router"
@@ -63,8 +64,15 @@ func (c *webhookOutComponent) Start(_ context.Context) error { return nil }
 
 func (c *webhookOutComponent) Stop(_ context.Context) error { return nil }
 
-func (c *webhookOutComponent) Health() (string, any) {
-	return "webhook_out", map[string]any{"enabled": c.cfg.Enabled}
+func (c *webhookOutComponent) Health() (string, health.HealthStatus) {
+	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}
+
+	if !c.cfg.Enabled {
+		status.Status = health.StatusDegraded
+		status.Message = "component disabled"
+	}
+
+	return "webhook_out", status
 }
 
 type targetDTO struct {

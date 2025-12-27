@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
@@ -61,6 +62,13 @@ func (c *pubSubDebugComponent) Start(_ context.Context) error { return nil }
 
 func (c *pubSubDebugComponent) Stop(_ context.Context) error { return nil }
 
-func (c *pubSubDebugComponent) Health() (string, any) {
-	return "pubsub_debug", map[string]any{"enabled": c.cfg.Enabled}
+func (c *pubSubDebugComponent) Health() (string, health.HealthStatus) {
+	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}
+
+	if !c.cfg.Enabled {
+		status.Status = health.StatusDegraded
+		status.Message = "component disabled"
+	}
+
+	return "pubsub_debug", status
 }
