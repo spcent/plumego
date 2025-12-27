@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Plumego reference</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    code { background: #f5f5f5; padding: 0.15rem 0.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Plumego reference app</h1>
+  <p>This is a tiny static bundle served by <code>frontend.RegisterFS</code>. Open the console to watch WebSocket echoes.</p>
+  <button id="connect">Connect WebSocket</button>
+  <script>
+    document.getElementById('connect').onclick = () => {
+      const ws = new WebSocket(`ws://${location.host}/ws`);
+      ws.onopen = () => ws.send('hello plumego');
+      ws.onmessage = (evt) => console.log('message:', evt.data);
+      ws.onclose = () => console.log('socket closed');
+    };
+  </script>
+</body>
+</html>

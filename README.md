@@ -54,13 +54,82 @@ func main() {
 - **Pub/Sub + Webhooks**: Supply a `pubsub.PubSub` implementation to enable webhook fan-out. Outbound webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
 - **Health + readiness**: Lifecycle hooks mark readiness during startup/shutdown, and build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
 
+## Reference application
+`examples/reference` is a ready-to-run `main` package that wires the common pieces together:
+
+- WebSocket hub configured with JWT secrets and broadcast endpoint
+- Inbound GitHub/Stripe webhooks that publish to the in-process pub/sub
+- Outbound webhook management backed by the memory store
+- Static frontend served from embedded assets
+- Prometheus metrics, OpenTelemetry tracing, and health endpoints mounted on the router
+
+Run it with:
+
+```bash
+go run ./examples/reference
+```
+
+## Health endpoints
+The `health` package now exposes HTTP handlers so you don’t have to reimplement readiness/build checks:
+
+```go
+app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+```
+
+`ReadinessHandler` returns 200 when `health.SetReady()` has been called (the boot lifecycle does this automatically) and 503 otherwise. `BuildInfoHandler` returns the current `health.BuildInfo` struct as JSON.
+
+## Observability adapters
+Plug the logging middleware into metrics/tracing backends without writing adapters yourself:
+
+- `metrics.NewPrometheusCollector(namespace)` implements `middleware.MetricsCollector` and exposes a `/metrics` handler via `collector.Handler()`.
+- `metrics.NewOpenTelemetryTracer(name)` implements `middleware.Tracer` and emits spans with HTTP metadata.
+
+Wire them into `core.New` using `core.WithMetricsCollector(...)` and `core.WithTracer(...)` as shown in `examples/reference`.
+
+## Configuration reference
+Load environment variables with `config.LoadEnv` and/or bind command-line flags; use the mapping below for predictable deploys.
+
+| AppConfig field | Default | Environment variable | Flag example |
+| --- | --- | --- | --- |
+| Addr | :8080 | APP_ADDR | --addr :8080 |
+| EnvFile | .env | APP_ENV_FILE | --env-file .env |
+| Debug | false | APP_DEBUG | --debug |
+| ShutdownTimeout | 5s | APP_SHUTDOWN_TIMEOUT_MS | --shutdown-timeout 5s |
+| ReadTimeout | 30s | APP_READ_TIMEOUT_MS | --read-timeout 30s |
+| ReadHeaderTimeout | 5s | APP_READ_HEADER_TIMEOUT_MS | --read-header-timeout 5s |
+| WriteTimeout | 30s | APP_WRITE_TIMEOUT_MS | --write-timeout 30s |
+| IdleTimeout | 60s | APP_IDLE_TIMEOUT_MS | --idle-timeout 60s |
+| MaxHeaderBytes | 1 MiB | APP_MAX_HEADER_BYTES | --max-header-bytes 1048576 |
+| EnableHTTP2 | true | APP_ENABLE_HTTP2 | --http2=false |
+| DrainInterval | 500ms | APP_DRAIN_INTERVAL_MS | --drain-interval 500ms |
+| MaxBodyBytes | 10 MiB | APP_MAX_BODY_BYTES | --max-body-bytes 10485760 |
+| MaxConcurrency | 256 | APP_MAX_CONCURRENCY | --max-concurrency 256 |
+| QueueDepth | 512 | APP_QUEUE_DEPTH | --queue-depth 512 |
+| QueueTimeout | 250ms | APP_QUEUE_TIMEOUT_MS | --queue-timeout 250ms |
+| TLS.Enabled | false | TLS_ENABLED | --tls |
+| TLS.CertFile | (empty) | TLS_CERT_FILE | --tls-cert /path/cert.pem |
+| TLS.KeyFile | (empty) | TLS_KEY_FILE | --tls-key /path/key.pem |
+| PubSub.Enabled | false | PUBSUB_DEBUG_ENABLED | --pubsub-debug |
+| PubSub.Path | /_debug/pubsub | PUBSUB_DEBUG_PATH | --pubsub-path /_debug/pubsub |
+| WebhookOut.TriggerToken | (empty) | WEBHOOK_TRIGGER_TOKEN | --webhook-trigger-token TOKEN |
+| WebhookOut.BasePath | /webhooks | (inherit) | --webhook-base /webhooks |
+| WebhookOut.IncludeStats | false | WEBHOOK_INCLUDE_STATS | --webhook-include-stats |
+| WebhookOut.DefaultPageLimit | 0 (no default) | WEBHOOK_DEFAULT_PAGE_LIMIT | --webhook-page-limit 50 |
+| WebhookIn.GitHubSecret | env or config | GITHUB_WEBHOOK_SECRET | --github-secret value |
+| WebhookIn.StripeSecret | env or config | STRIPE_WEBHOOK_SECRET | --stripe-secret value |
+| WebhookIn.MaxBodyBytes | 1 MiB | WEBHOOK_MAX_BODY_BYTES | --webhook-max-body 1048576 |
+| WebhookIn.StripeTolerance | 5m | WEBHOOK_STRIPE_TOLERANCE_MS | --stripe-tolerance 5m |
+| WebhookIn.TopicPrefixGitHub | in.github. | WEBHOOK_TOPIC_PREFIX_GITHUB | --github-topic-prefix in.github. |
+| WebhookIn.TopicPrefixStripe | in.stripe. | WEBHOOK_TOPIC_PREFIX_STRIPE | --stripe-topic-prefix in.stripe. |
+| WebSocket.Secret | env or config | WS_SECRET | --ws-secret value |
+| WebSocket.WSRoutePath | /ws | WS_ROUTE_PATH | --ws-route /ws |
+| WebSocket.BroadcastPath | /_admin/broadcast | WS_BROADCAST_PATH | --ws-broadcast /_admin/broadcast |
+| WebSocket.BroadcastEnabled | true | WS_BROADCAST_ENABLED | --ws-broadcast-enabled=false |
+
+Use the `config.Get*` helpers (see `config/env.go`) or Go’s `flag` package to translate these sources into an `AppConfig` before calling `core.New(...)`.
+
 ## Development and testing
 - Install Go 1.24+ (matching `go.mod`).
 - Run tests: `go test ./...`
 - Format and lint using the Go toolchain as needed (`go fmt`, `go vet`).
-
-## Improvement ideas
-- Provide a reference `main` package (or example folder) that demonstrates WebSocket setup, webhook routes, and static frontend mounting end-to-end to reduce onboarding friction.
-- Add minimal HTTP examples for readiness/build info exposure so operators can plug Plumego into health check endpoints without re-implementing them.
-- Offer metrics/tracing adapters (Prometheus/OpenTelemetry) alongside the `middleware.MetricsCollector` and `Tracer` hooks to make observability plug-and-play.
-- Expand configuration docs to map every `AppConfig` field to environment variables or command-line flags for predictable deployments.
