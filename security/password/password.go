@@ -3,7 +3,7 @@ package password
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
@@ -128,24 +128,19 @@ func CheckPassword(hashedPassword, password string) error {
 		return nil
 	}
 
-	legacy := deriveKeyLegacy(password, salt, cost)
-	if subtle.ConstantTimeCompare(expectedHash, legacy) == 1 {
-		return nil
-	}
-
 	return errors.New("password mismatch")
 }
 
 func deriveKey(password string, salt []byte, cost int) []byte {
-	return pbkdf2SHA256([]byte(password), salt, cost, sha256.Size)
+	return pbkdf2SHA512([]byte(password), salt, cost, 32)
 }
 
-func pbkdf2SHA256(password, salt []byte, iterations, keyLen int) []byte {
+func pbkdf2SHA512(password, salt []byte, iterations, keyLen int) []byte {
 	if iterations < 1 {
 		return nil
 	}
 
-	hLen := sha256.Size
+	hLen := sha512.Size
 	numBlocks := (keyLen + hLen - 1) / hLen
 	derived := make([]byte, 0, numBlocks*hLen)
 
@@ -158,7 +153,7 @@ func pbkdf2SHA256(password, salt []byte, iterations, keyLen int) []byte {
 }
 
 func pbkdf2Block(password, salt []byte, iterations, blockIndex int) []byte {
-	h := hmac.New(sha256.New, password)
+	h := hmac.New(sha512.New, password)
 	h.Write(salt)
 	h.Write([]byte{
 		byte(blockIndex >> 24),
@@ -172,7 +167,7 @@ func pbkdf2Block(password, salt []byte, iterations, blockIndex int) []byte {
 	copy(t, u)
 
 	for i := 1; i < iterations; i++ {
-		h = hmac.New(sha256.New, password)
+		h = hmac.New(sha512.New, password)
 		h.Write(u)
 		u = h.Sum(nil)
 		for j := range t {
@@ -181,20 +176,4 @@ func pbkdf2Block(password, salt []byte, iterations, blockIndex int) []byte {
 	}
 
 	return t
-}
-
-func deriveKeyLegacy(password string, salt []byte, cost int) []byte {
-	combined := append([]byte{}, salt...)
-	combined = append(combined, []byte(password)...)
-
-	sum := sha256.Sum256(combined)
-	derived := sum[:]
-
-	// Repeat hashing cost-1 additional times to increase work factor.
-	for i := 1; i < cost; i++ {
-		sum = sha256.Sum256(derived)
-		derived = sum[:]
-	}
-
-	return derived
 }
