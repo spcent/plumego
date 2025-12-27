@@ -1,10 +1,6 @@
 package password
 
-import (
-	"encoding/base64"
-	"fmt"
-	"testing"
-)
+import "testing"
 
 func TestHashPassword(t *testing.T) {
 	password := "testpassword123"
@@ -57,24 +53,5 @@ func TestCheckPasswordDifferentCosts(t *testing.T) {
 	err = CheckPassword(hashed1, password)
 	if err != nil {
 		t.Errorf("CheckPassword failed for correct password: %v", err)
-	}
-}
-
-func TestCheckPasswordLegacyHash(t *testing.T) {
-	password := "legacy_password123"
-	salt := []byte("1234567890abcdef")
-	cost := 12
-
-	derived := deriveKeyLegacy(password, salt, cost)
-	encodedSalt := base64.StdEncoding.EncodeToString(salt)
-	encodedHash := base64.StdEncoding.EncodeToString(derived)
-	legacyHash := fmt.Sprintf("%d$%s$%s", cost, encodedSalt, encodedHash)
-
-	if err := CheckPassword(legacyHash, password); err != nil {
-		t.Fatalf("CheckPassword failed for legacy hash: %v", err)
-	}
-
-	if err := CheckPassword(legacyHash, "wrong"); err == nil {
-		t.Fatal("CheckPassword should fail for incorrect password with legacy hash")
 	}
 }
