@@ -76,8 +76,11 @@ func (a *App) setupServer() error {
 		a.router.Print(os.Stdout)
 	}
 
-	a.applyGuardrails()
-	a.buildHandler()
+	a.ensureHandler()
+
+	if a.handler == nil {
+		return fmt.Errorf("handler not configured")
+	}
 
 	a.httpServer = &http.Server{
 		Addr:              a.config.Addr,

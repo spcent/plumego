@@ -20,6 +20,7 @@ type App struct {
 	httpServer    *http.Server         // HTTP server instance
 	middlewareReg *middleware.Registry // Middleware registry for all routes
 	handler       http.Handler         // Combined handler with middleware applied
+	handlerOnce   sync.Once            // Ensures handler initialization happens once
 	connTracker   *connectionTracker   // Connection tracker for WebSocket
 	guardsApplied bool                 // Whether guards have been applied
 	configFrozen  bool                 // Whether configuration has been frozen

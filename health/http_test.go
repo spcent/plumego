@@ -8,8 +8,8 @@ import (
 )
 
 func TestReadinessHandler(t *testing.T) {
-        t.Cleanup(func() { SetNotReady("starting") })
-        SetNotReady("booting")
+	t.Cleanup(func() { SetNotReady("starting") })
+	SetNotReady("booting")
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rr := httptest.NewRecorder()
 
