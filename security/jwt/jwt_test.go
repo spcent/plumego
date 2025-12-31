@@ -236,7 +236,7 @@ func TestClockSkewTolerance(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig(nil)
 	cfg.AccessExpiration = 1 * time.Second
-	cfg.ClockSkew = 2 * time.Second // allow 2 second clock skew
+	cfg.ClockSkew = time.Second // allow 1 second clock skew
 
 	mgr, err := NewJWTManager(store, cfg)
 	if err != nil {
@@ -246,7 +246,7 @@ func TestClockSkewTolerance(t *testing.T) {
 	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-skew"}, AuthorizationClaims{})
 
 	// wait for token expiration
-	time.Sleep(1100 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 
 	// verify token is valid within clock skew
 	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)

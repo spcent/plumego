@@ -60,6 +60,31 @@ func main() {
 }
 ```
 
+You can also embed **plumego** directly into a standard `net/http` server. `plumego.App`
+implements `http.Handler`, and context-aware handlers can use the unified `plumego.Context`:
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego"
+)
+
+func main() {
+    app := plumego.New()
+
+    app.GetCtx("/health", func(ctx *plumego.Context) {
+        ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
+    })
+
+    log.Println("server started at :8080")
+    log.Fatal(http.ListenAndServe(":8080", app))
+}
+```
+
 ## Configuration basics
 - Environment variables can be loaded from a `.env` file (default path `.env`; override with `core.WithEnvPath`).
 - Useful variables: `AUTH_TOKEN` (SimpleAuth middleware), `WS_SECRET` (WebSocket JWT signing secret), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
