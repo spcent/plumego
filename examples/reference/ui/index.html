@@ -1,24 +1,1529 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>Plumego reference</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plumego Reference - 优雅的 Go Web 框架演示</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; margin: 2rem; }
-    code { background: #f5f5f5; padding: 0.15rem 0.25rem; }
+    :root {
+      --primary-color: #6366f1;
+      --primary-dark: #4f46e5;
+      --secondary-color: #f59e0b;
+      --accent-color: #8b5cf6;
+      --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --surface: #ffffff;
+      --surface-dark: #1e293b;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --text-light: #94a3b8;
+      --border-color: #e2e8f0;
+      --success-color: #10b981;
+      --error-color: #ef4444;
+      --warning-color: #f59e0b;
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      --border-radius: 16px;
+      --border-radius-lg: 24px;
+      --glass-bg: rgba(255, 255, 255, 0.25);
+      --glass-border: rgba(255, 255, 255, 0.18);
+    }
+
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+      50% { box-shadow: 0 0 30px rgba(99, 102, 241, 0.6); }
+    }
+
+    @keyframes slideInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: var(--background);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: var(--border-radius-lg);
+      margin-top: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-xl);
+      border: 1px solid var(--glass-border);
+      animation: slideInUp 0.8s ease-out;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+      position: relative;
+    }
+
+    .logo {
+      font-size: 4rem;
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .title {
+      font-size: 3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+      animation: slideInUp 1s ease-out 0.2s both;
+    }
+
+    .subtitle {
+      font-size: 1.3rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      animation: slideInUp 1s ease-out 0.4s both;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border-radius: var(--border-radius);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--glass-border);
+      animation: slideInUp 1s ease-out 0.6s both;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .status-online {
+      background: var(--success-color);
+      box-shadow: 0 0 10px var(--success-color);
+    }
+
+    .status-offline {
+      background: var(--error-color);
+      box-shadow: 0 0 10px var(--error-color);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .feature-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border-radius: var(--border-radius);
+      padding: 2rem;
+      box-shadow: var(--shadow-lg);
+      transition: all 0.4s ease;
+      border: 1px solid var(--glass-border);
+      position: relative;
+      overflow: hidden;
+      animation: slideInUp 1s ease-out 0.8s both;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: var(--shadow-xl);
+      animation: pulse-glow 2s infinite;
+    }
+
+    .feature-card:hover::before {
+      left: 100%;
+    }
+
+    .feature-icon {
+      width: 4rem;
+      height: 4rem;
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .feature-card:hover .feature-icon {
+      transform: scale(1.1) rotate(5deg);
+      box-shadow: 0 12px 24px rgba(99, 102, 241, 0.4);
+    }
+
+    .feature-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+
+    .feature-description {
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+      color: white;
+      border: none;
+      padding: 0.875rem 1.75rem;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn:hover::before {
+      left: 100%;
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--secondary-color), #d97706);
+    }
+
+    .btn-secondary:hover {
+      box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
+    }
+
+    .websocket-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border-radius: var(--border-radius);
+      padding: 2rem;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--glass-border);
+      margin-bottom: 2rem;
+      animation: slideInUp 1s ease-out 1s both;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .websocket-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+      transition: left 0.6s ease;
+    }
+
+    .websocket-panel:hover::before {
+      left: 100%;
+    }
+
+    .websocket-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 25px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .connection-connected {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+      color: #065f46;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    }
+
+    .connection-connected i {
+      color: var(--success-color);
+      animation: pulse 2s infinite;
+    }
+
+    .connection-disconnected {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+      color: #991b1b;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+
+    .websocket-controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .input-group {
+      flex: 1;
+      min-width: 200px;
+      position: relative;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 0.875rem 1.25rem;
+      border: 2px solid var(--border-color);
+      border-radius: var(--border-radius);
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(5px);
+    }
+
+    .input-group input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(99, 102, 241, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .btn-icon {
+      padding: 0.875rem;
+      border-radius: var(--border-radius);
+      min-width: 48px;
+      justify-content: center;
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success-color), #059669);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, var(--error-color), #dc2626);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, var(--warning-color), #d97706);
+    }
+
+    .message-log {
+      background: var(--surface-dark);
+      color: #e2e8f0;
+      border-radius: var(--border-radius);
+      padding: 1.5rem;
+      height: 350px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .message-log::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .message-log::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+    }
+
+    .message-log::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      border-radius: 5px;
+    }
+
+    .log-entry {
+      margin-bottom: 0.75rem;
+      padding: 0.5rem 0;
+      border-left: 3px solid transparent;
+      padding-left: 1rem;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .log-entry:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      margin-left: -1rem;
+      margin-right: -1rem;
+      padding-left: 1.5rem;
+      padding-right: 1rem;
+    }
+
+    .log-timestamp {
+      color: var(--text-light);
+      font-size: 0.8rem;
+      margin-bottom: 0.25rem;
+      font-weight: 500;
+    }
+
+    .log-content {
+      margin-top: 0.25rem;
+      word-break: break-all;
+    }
+
+    .log-sent {
+      color: #34d399;
+      border-left-color: #34d399;
+    }
+
+    .log-received {
+      color: #60a5fa;
+      border-left-color: #60a5fa;
+    }
+
+    .log-error {
+      color: #f87171;
+      border-left-color: #f87171;
+    }
+
+    .log-info {
+      color: #a78bfa;
+      border-left-color: #a78bfa;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .stat-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border-radius: var(--border-radius);
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow);
+      transition: all 0.3s ease;
+      animation: slideInUp 1s ease-out 1.2s both;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .advanced-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border-radius: var(--border-radius);
+      padding: 2rem;
+      margin-top: 2rem;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow-lg);
+      animation: slideInUp 1s ease-out 1.4s both;
+    }
+
+    .panel-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .test-tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .tool-card {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: var(--border-radius);
+      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .tool-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .tool-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+
+    .tool-description {
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .api-test-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-label {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      padding: 0.75rem;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 80px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .response-display {
+      background: var(--surface-dark);
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .footer {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-top: 4rem;
+      padding: 2rem;
+      animation: slideInUp 1s ease-out 1.6s both;
+    }
+
+    .footer a {
+      color: var(--primary-color);
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .footer a:hover {
+      color: var(--accent-color);
+      text-decoration: underline;
+    }
+
+    /* 统计数据显示 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .stat-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border-radius: var(--border-radius);
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow);
+      transition: all 0.3s ease;
+      animation: slideInUp 1s ease-out 1.2s both;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 1200px) {
+      .container {
+        margin: 1rem;
+        padding: 1.5rem;
+      }
+      
+      .test-tools-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+        margin: 0.5rem;
+      }
+      
+      .title {
+        font-size: 2rem;
+      }
+      
+      .subtitle {
+        font-size: 1.1rem;
+      }
+      
+      .feature-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+      
+      .websocket-controls {
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      
+      .status-bar {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+      }
+      
+      .test-tools-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      
+      .tool-card {
+        padding: 1rem;
+      }
+      
+      .api-test-form {
+        gap: 0.75rem;
+      }
+      
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .input-group input {
+        font-size: 16px; /* 防止iOS缩放 */
+      }
+      
+      .message-log {
+        height: 250px;
+        font-size: 0.8rem;
+      }
+      
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+      }
+      
+      .stat-card {
+        padding: 1rem;
+      }
+      
+      .stat-value {
+        font-size: 1.5rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 0.75rem;
+        margin: 0.25rem;
+        border-radius: var(--border-radius);
+      }
+      
+      .title {
+        font-size: 1.75rem;
+      }
+      
+      .logo {
+        font-size: 3rem;
+      }
+      
+      .feature-card {
+        padding: 1.5rem;
+      }
+      
+      .feature-icon {
+        width: 3rem;
+        height: 3rem;
+        font-size: 1.25rem;
+      }
+      
+      .websocket-panel {
+        padding: 1.5rem;
+      }
+      
+      .advanced-panel {
+        padding: 1.5rem;
+      }
+      
+      .tool-card {
+        padding: 0.75rem;
+      }
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+      }
+      
+      .stat-value {
+        font-size: 1.25rem;
+      }
+    }
+
+    /* 深色模式支持 */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --surface: #1e293b;
+        --surface-dark: #0f172a;
+        --text-primary: #f1f5f9;
+        --text-secondary: #cbd5e1;
+        --text-light: #94a3b8;
+        --border-color: #334155;
+        --glass-bg: rgba(30, 41, 59, 0.8);
+        --glass-border: rgba(148, 163, 184, 0.2);
+      }
+      
+      body {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      }
+    }
+
+    /* 高对比度模式 */
+    @media (prefers-contrast: high) {
+      :root {
+        --shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.5);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+        --border-color: #000000;
+      }
+      
+      .btn {
+        border: 2px solid currentColor;
+      }
+    }
+
+    /* 减少动画模式 */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      
+      .float, .pulse-glow, .gradient {
+        animation: none !important;
+      }
+    }
+
+    /* 打印样式 */
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+      }
+      
+      .container {
+        box-shadow: none !important;
+        background: white !important;
+        margin: 0 !important;
+        padding: 1rem !important;
+      }
+      
+      .btn, .websocket-panel, .advanced-panel {
+        border: 1px solid #ccc !important;
+        background: white !important;
+      }
+      
+      .websocket-panel, .advanced-panel {
+        page-break-inside: avoid;
+        margin-bottom: 1rem !important;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Plumego reference app</h1>
-  <p>This is a tiny static bundle served by <code>frontend.RegisterFS</code>. Open the console to watch WebSocket echoes.</p>
-  <button id="connect">Connect WebSocket</button>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <i class="fas fa-feather"></i>
+      </div>
+      <h1 class="title">Plumego Reference</h1>
+      <p class="subtitle">优雅的 Go Web 框架演示平台 - 展示现代 Web 开发的最佳实践</p>
+    </header>
+
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="status-indicator status-online"></div>
+        <span>服务器运行正常</span>
+      </div>
+      <div class="status-item">
+        <span>端口: 8080</span>
+      </div>
+      <div class="status-item">
+        <span>文档: <a href="/docs" style="color: var(--primary-color); text-decoration: none;">/docs</a></span>
+      </div>
+      <div class="status-item">
+        <span>API: <a href="/hello" style="color: var(--primary-color); text-decoration: none;">/hello</a></span>
+      </div>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-book"></i>
+        </div>
+        <h3 class="feature-title">📚 交互式文档</h3>
+        <p class="feature-description">
+          探索 Plumego 框架的完整 API 文档，支持中英文切换，内容详尽且易于理解。
+        </p>
+        <a href="/docs" class="btn">
+          <i class="fas fa-arrow-right"></i> 浏览文档
+        </a>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-plug"></i>
+        </div>
+        <h3 class="feature-title">🔌 Webhook 管理</h3>
+        <p class="feature-description">
+          测试和验证 webhook 集成，支持 GitHub 和 Stripe，自动重试和状态监控。
+        </p>
+        <a href="/webhooks" class="btn btn-secondary">
+          <i class="fas fa-arrow-right"></i> Webhook 控制台
+        </a>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <h3 class="feature-title">📊 性能监控</h3>
+        <p class="feature-description">
+          实时查看应用性能指标、Prometheus 指标和健康状态。
+        </p>
+        <a href="/metrics" class="btn">
+          <i class="fas fa-arrow-right"></i> 查看指标
+        </a>
+      </div>
+    </div>
+
+    <div class="websocket-panel">
+      <div class="websocket-header">
+        <h3><i class="fas fa-broadcast-tower"></i> WebSocket 测试工具</h3>
+        <div class="connection-status connection-disconnected" id="connectionStatus">
+          <i class="fas fa-circle"></i>
+          <span>未连接</span>
+        </div>
+      </div>
+
+      <div class="websocket-controls">
+        <div class="input-group">
+          <input type="text" id="messageInput" placeholder="输入要发送的消息..." />
+        </div>
+        <button class="btn btn-success" onclick="sendMessage()" title="发送消息">
+          <i class="fas fa-paper-plane"></i> 发送
+        </button>
+        <button class="btn" onclick="connectWebSocket()" id="connectBtn" title="连接 WebSocket">
+          <i class="fas fa-plug"></i> 连接
+        </button>
+        <button class="btn btn-danger" onclick="disconnectWebSocket()" id="disconnectBtn" title="断开连接" style="display: none;">
+          <i class="fas fa-unlink"></i> 断开
+        </button>
+        <button class="btn btn-warning" onclick="clearLog()" title="清空日志">
+          <i class="fas fa-trash"></i> 清空
+        </button>
+      </div>
+
+      <div class="message-log" id="messageLog">
+        <div class="log-entry">
+          <div class="log-timestamp">系统</div>
+          <div class="log-content log-info">WebSocket 测试工具已就绪，点击"连接"开始测试...</div>
+        </div>
+      </div>
+      
+      <div class="stats-grid">
+         <div class="stat-card">
+           <div class="stat-value" id="sentCount">0</div>
+           <div class="stat-label">发送消息</div>
+         </div>
+         <div class="stat-card">
+           <div class="stat-value" id="receivedCount">0</div>
+           <div class="stat-label">接收消息</div>
+         </div>
+         <div class="stat-card">
+           <div class="stat-value" id="errorCount">0</div>
+           <div class="stat-label">错误次数</div>
+         </div>
+         <div class="stat-card">
+           <div class="stat-value" id="uptime">00:00</div>
+           <div class="stat-label">连接时间</div>
+         </div>
+       </div>
+    </div>
+
+    <div class="advanced-panel">
+      <h3 class="panel-title">
+        <i class="fas fa-tools"></i>
+        高级测试工具
+      </h3>
+      
+      <div class="test-tools-grid">
+        <div class="tool-card">
+          <h4 class="tool-title">
+            <i class="fas fa-flask"></i>
+            API 测试工具
+          </h4>
+          <p class="tool-description">
+            测试各种 API 端点，支持不同响应格式和参数配置。
+          </p>
+          
+          <form class="api-test-form" onsubmit="testAPI(event)">
+            <div class="form-group">
+              <label class="form-label">API 路径</label>
+              <select class="form-select" id="apiPath">
+                <option value="/hello">GET /hello</option>
+                <option value="/test/api">GET /test/api</option>
+                <option value="/test/pubsub">GET /test/pubsub</option>
+                <option value="/health/detailed">GET /health/detailed</option>
+                <option value="/metrics">GET /metrics</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">响应格式</label>
+              <select class="form-select" id="apiFormat">
+                <option value="json">JSON</option>
+                <option value="xml">XML</option>
+                <option value="csv">CSV</option>
+                <option value="plain">Plain Text</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">查询参数</label>
+              <input type="text" class="form-input" id="apiParams" placeholder="例如: format=json&delay=1s" />
+            </div>
+            
+            <button type="submit" class="btn">
+              <i class="fas fa-play"></i> 执行测试
+            </button>
+          </form>
+          
+          <div class="response-display" id="apiResponse" style="display: none;"></div>
+        </div>
+
+        <div class="tool-card">
+          <h4 class="tool-title">
+            <i class="fas fa-chart-line"></i>
+            性能监控
+          </h4>
+          <p class="tool-description">
+            实时监控系统性能和指标，查看应用状态。
+          </p>
+          
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <button class="btn" onclick="checkHealth()">
+              <i class="fas fa-heartbeat"></i> 健康检查
+            </button>
+            <button class="btn" onclick="loadMetrics()">
+              <i class="fas fa-chart-bar"></i> 加载指标
+            </button>
+          </div>
+          
+          <div class="response-display" id="healthMetrics" style="display: none;"></div>
+        </div>
+
+        <div class="tool-card">
+          <h4 class="tool-title">
+            <i class="fas fa-envelope"></i>
+            Webhook 测试
+          </h4>
+          <p class="tool-description">
+            测试 Webhook 功能，模拟不同类型的 Webhook 事件。
+          </p>
+          
+          <form class="api-test-form" onsubmit="testWebhook(event)">
+            <div class="form-group">
+              <label class="form-label">事件类型</label>
+              <select class="form-select" id="webhookType">
+                <option value="github">GitHub Webhook</option>
+                <option value="stripe">Stripe Webhook</option>
+                <option value="custom">自定义 Webhook</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">事件数据 (JSON)</label>
+              <textarea class="form-textarea" id="webhookData" placeholder='{"event": "test", "data": {}}'></textarea>
+            </div>
+            
+            <button type="submit" class="btn">
+              <i class="fas fa-paper-plane"></i> 发送 Webhook
+            </button>
+          </form>
+          
+          <div class="response-display" id="webhookResponse" style="display: none;"></div>
+        </div>
+
+        <div class="tool-card">
+          <h4 class="tool-title">
+            <i class="fas fa-satellite-dish"></i>
+            Pub/Sub 消息
+          </h4>
+          <p class="tool-description">
+            测试发布订阅系统，发送和接收消息。
+          </p>
+          
+          <form class="api-test-form" onsubmit="testPubSub(event)">
+            <div class="form-group">
+              <label class="form-label">主题名称</label>
+              <input type="text" class="form-input" id="pubSubTopic" placeholder="例如: test.topic" value="test.default" />
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">消息内容</label>
+              <textarea class="form-textarea" id="pubSubMessage" placeholder="输入要发布的消息内容..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn">
+              <i class="fas fa-broadcast-tower"></i> 发布消息
+            </button>
+          </form>
+          
+          <div class="response-display" id="pubSubResponse" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align: center; color: var(--text-secondary); margin-top: 3rem;">
+      <p>Powered by <strong style="color: var(--primary-color);">Plumego</strong> - 现代 Go Web 框架</p>
+      <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+        <a href="/docs" style="color: var(--primary-color); text-decoration: none;">文档</a> · 
+        <a href="/health/ready" style="color: var(--primary-color); text-decoration: none;">健康检查</a> · 
+        <a href="/health/build" style="color: var(--primary-color); text-decoration: none;">构建信息</a>
+      </p>
+    </div>
+  </div>
+
   <script>
-    document.getElementById('connect').onclick = () => {
-      const ws = new WebSocket(`ws://${location.host}/ws`);
-      ws.onopen = () => ws.send('hello plumego');
-      ws.onmessage = (evt) => console.log('message:', evt.data);
-      ws.onclose = () => console.log('socket closed');
+    let ws = null;
+    let connectionStartTime = null;
+    let stats = {
+      sent: 0,
+      received: 0,
+      errors: 0
     };
+
+    function updateConnectionStatus(connected) {
+      const statusEl = document.getElementById('connectionStatus');
+      if (connected) {
+        statusEl.className = 'connection-status connection-connected';
+        statusEl.innerHTML = '<i class="fas fa-circle"></i><span>已连接</span>';
+      } else {
+        statusEl.className = 'connection-status connection-disconnected';
+        statusEl.innerHTML = '<i class="fas fa-circle"></i><span>未连接</span>';
+      }
+    }
+
+    function addLog(message, type = 'info') {
+      const logEl = document.getElementById('messageLog');
+      const now = new Date();
+      const timestamp = now.toLocaleTimeString();
+      
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      
+      let contentClass = '';
+      switch (type) {
+        case 'sent': contentClass = 'log-sent'; stats.sent++; break;
+        case 'received': contentClass = 'log-received'; stats.received++; break;
+        case 'error': contentClass = 'log-error'; stats.errors++; break;
+      }
+      
+      entry.innerHTML = `
+        <div class="log-timestamp">${timestamp}</div>
+        <div class="log-content ${contentClass}">${message}</div>
+      `;
+      
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+      
+      updateStats();
+    }
+
+    function updateStats() {
+      document.getElementById('sentCount').textContent = stats.sent;
+      document.getElementById('receivedCount').textContent = stats.received;
+      document.getElementById('errorCount').textContent = stats.errors;
+    }
+
+    function updateUptime() {
+      if (connectionStartTime) {
+        const now = Date.now();
+        const diff = Math.floor((now - connectionStartTime) / 1000);
+        const minutes = Math.floor(diff / 60);
+        const seconds = diff % 60;
+        document.getElementById('uptime').textContent = 
+          `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+    }
+
+    function connectWebSocket() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        addLog('已经连接到 WebSocket', 'info');
+        return;
+      }
+
+      try {
+        ws = new WebSocket(`ws://${location.host}/ws`);
+        connectionStartTime = Date.now();
+        
+        addLog('正在连接 WebSocket...', 'info');
+        
+        // 更新按钮状态
+        document.getElementById('connectBtn').style.display = 'none';
+        document.getElementById('disconnectBtn').style.display = 'inline-flex';
+        
+        ws.onopen = function() {
+          updateConnectionStatus(true);
+          addLog('WebSocket 连接已建立', 'received');
+          // 发送自动连接测试消息
+          setTimeout(() => {
+            ws.send('hello plumego - 自动连接测试');
+          }, 500);
+        };
+
+        ws.onmessage = function(event) {
+          addLog(`接收: ${event.data}`, 'received');
+        };
+
+        ws.onclose = function(event) {
+          updateConnectionStatus(false);
+          addLog(`WebSocket 连接已关闭 (代码: ${event.code})`, 'error');
+          connectionStartTime = null;
+          // 恢复按钮状态
+          document.getElementById('connectBtn').style.display = 'inline-flex';
+          document.getElementById('disconnectBtn').style.display = 'none';
+        };
+
+        ws.onerror = function(error) {
+          addLog('WebSocket 发生错误', 'error');
+          console.error('WebSocket error:', error);
+        };
+      } catch (error) {
+        addLog(`连接失败: ${error.message}`, 'error');
+      }
+    }
+
+    function disconnectWebSocket() {
+      if (ws) {
+        ws.close();
+        ws = null;
+        updateConnectionStatus(false);
+        connectionStartTime = null;
+        // 恢复按钮状态
+        document.getElementById('connectBtn').style.display = 'inline-flex';
+        document.getElementById('disconnectBtn').style.display = 'none';
+      }
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      
+      if (!message) {
+        addLog('请输入要发送的消息', 'error');
+        return;
+      }
+      
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addLog('WebSocket 未连接', 'error');
+        return;
+      }
+      
+      ws.send(message);
+      addLog(`发送: ${message}`, 'sent');
+      input.value = '';
+    }
+
+    function clearLog() {
+      const logEl = document.getElementById('messageLog');
+      logEl.innerHTML = '<div class="log-entry"><div class="log-timestamp">系统</div><div class="log-content log-info">日志已清空</div></div>';
+      stats = { sent: 0, received: 0, errors: 0 };
+      updateStats();
+    }
+
+    // 高级测试功能
+    async function testAPI(event) {
+      event.preventDefault();
+      
+      const path = document.getElementById('apiPath').value;
+      const format = document.getElementById('apiFormat').value;
+      const params = document.getElementById('apiParams').value;
+      
+      const responseEl = document.getElementById('apiResponse');
+      responseEl.style.display = 'block';
+      responseEl.innerHTML = '<div style="color: var(--warning-color);">正在执行 API 测试...</div>';
+      
+      try {
+        let url = path;
+        if (params.trim()) {
+          url += (url.includes('?') ? '&' : '?') + params;
+        }
+        if (format && format !== 'json') {
+          url += (url.includes('?') ? '&' : '?') + `format=${format}`;
+        }
+        
+        const response = await fetch(url);
+        const contentType = response.headers.get('content-type') || '';
+        let data;
+        
+        if (contentType.includes('application/json')) {
+          data = await response.json();
+          responseEl.innerHTML = `<pre style="margin: 0; color: var(--success-color);">${JSON.stringify(data, null, 2)}</pre>`;
+        } else if (contentType.includes('text/')) {
+          data = await response.text();
+          responseEl.innerHTML = `<pre style="margin: 0; color: var(--text-secondary);">${data}</pre>`;
+        } else {
+          data = await response.blob();
+          responseEl.innerHTML = `<div style="color: var(--warning-color);">响应类型: ${contentType || 'unknown'}</div>`;
+        }
+        
+        addLog(`API 测试完成: ${path}`, 'info');
+      } catch (error) {
+        responseEl.innerHTML = `<div style="color: var(--error-color);">错误: ${error.message}</div>`;
+        addLog(`API 测试失败: ${error.message}`, 'error');
+      }
+    }
+
+    async function checkHealth() {
+      const responseEl = document.getElementById('healthMetrics');
+      responseEl.style.display = 'block';
+      responseEl.innerHTML = '<div style="color: var(--warning-color);">正在检查健康状态...</div>';
+      
+      try {
+        const response = await fetch('/health/detailed');
+        const data = await response.json();
+        
+        const healthStatus = data.status === 'healthy' ? '🟢 健康' : '🔴 异常';
+        const uptime = data.system?.uptime || '未知';
+        
+        responseEl.innerHTML = `
+          <div style="color: var(--success-color); font-weight: bold;">${healthStatus}</div>
+          <div style="margin-top: 0.5rem;">运行时间: ${uptime}</div>
+          <div>组件状态:</div>
+          <ul style="margin: 0.5rem 0;">
+            ${Object.entries(data.components || {}).map(([key, value]) => 
+              `<li style="color: ${value === 'enabled' ? 'var(--success-color)' : 'var(--error-color)'};">${key}: ${value}</li>`
+            ).join('')}
+          </ul>
+        `;
+        
+        addLog('健康检查完成', 'info');
+      } catch (error) {
+        responseEl.innerHTML = `<div style="color: var(--error-color);">健康检查失败: ${error.message}</div>`;
+        addLog(`健康检查失败: ${error.message}`, 'error');
+      }
+    }
+
+    async function loadMetrics() {
+      const responseEl = document.getElementById('healthMetrics');
+      responseEl.style.display = 'block';
+      responseEl.innerHTML = '<div style="color: var(--warning-color);">正在加载指标...</div>';
+      
+      try {
+        const response = await fetch('/metrics');
+        const data = await response.text();
+        
+        responseEl.innerHTML = `<pre style="margin: 0; color: var(--text-secondary); font-size: 0.75rem; max-height: 300px; overflow-y: auto;">${data}</pre>`;
+        addLog('指标加载完成', 'info');
+      } catch (error) {
+        responseEl.innerHTML = `<div style="color: var(--error-color);">指标加载失败: ${error.message}</div>`;
+        addLog(`指标加载失败: ${error.message}`, 'error');
+      }
+    }
+
+    async function testWebhook(event) {
+      event.preventDefault();
+      
+      const type = document.getElementById('webhookType').value;
+      const data = document.getElementById('webhookData').value;
+      
+      const responseEl = document.getElementById('webhookResponse');
+      responseEl.style.display = 'block';
+      responseEl.innerHTML = '<div style="color: var(--warning-color);">正在发送 Webhook...</div>';
+      
+      try {
+        let payload;
+        try {
+          payload = data.trim() ? JSON.parse(data) : {};
+        } catch (parseError) {
+          throw new Error('JSON 格式错误: ' + parseError.message);
+        }
+        
+        // 根据类型添加默认字段
+        if (type === 'github') {
+          payload = {
+            action: 'opened',
+            pull_request: {
+              id: 12345,
+              number: 1,
+              title: 'Test PR',
+              user: { login: 'testuser' }
+            },
+            repository: { full_name: 'test/repo' },
+            ...payload
+          };
+        } else if (type === 'stripe') {
+          payload = {
+            id: 'evt_test_webhook',
+            object: 'event',
+            type: 'test.event',
+            data: {
+              object: {
+                id: 'cus_test',
+                object: 'customer',
+                email: 'test@example.com'
+              }
+            },
+            ...payload
+          };
+        }
+        
+        const endpoint = type === 'github' ? '/webhooks/github' : 
+                        type === 'stripe' ? '/webhooks/stripe' : '/test/webhook';
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Plumego-Test-Tool/1.0'
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        const responseData = await response.json();
+        
+        responseEl.innerHTML = `
+          <div style="color: var(--success-color);">状态: ${response.status}</div>
+          <pre style="margin: 0.5rem 0 0 0; color: var(--text-secondary);">${JSON.stringify(responseData, null, 2)}</pre>
+        `;
+        
+        addLog(`Webhook 测试完成: ${type}`, 'info');
+      } catch (error) {
+        responseEl.innerHTML = `<div style="color: var(--error-color);">Webhook 测试失败: ${error.message}</div>`;
+        addLog(`Webhook 测试失败: ${error.message}`, 'error');
+      }
+    }
+
+    async function testPubSub(event) {
+      event.preventDefault();
+      
+      const topic = document.getElementById('pubSubTopic').value;
+      const message = document.getElementById('pubSubMessage').value;
+      
+      const responseEl = document.getElementById('pubSubResponse');
+      responseEl.style.display = 'block';
+      responseEl.innerHTML = '<div style="color: var(--warning-color);">正在发布消息...</div>';
+      
+      try {
+        if (!topic.trim()) {
+          throw new Error('主题名称不能为空');
+        }
+        
+        const url = `/test/pubsub?topic=${encodeURIComponent(topic)}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        responseEl.innerHTML = `
+          <div style="color: var(--success-color);">消息发布成功</div>
+          <div style="margin-top: 0.5rem;">主题: ${data.topic}</div>
+          <div>消息: ${data.message}</div>
+          <div>时间: ${data.timestamp}</div>
+        `;
+        
+        addLog(`Pub/Sub 消息已发布到主题: ${topic}`, 'info');
+        
+        // 清空输入
+        document.getElementById('pubSubMessage').value = '';
+      } catch (error) {
+        responseEl.innerHTML = `<div style="color: var(--error-color);">Pub/Sub 测试失败: ${error.message}</div>`;
+        addLog(`Pub/Sub 测试失败: ${error.message}`, 'error');
+      }
+    }
+
+    // 回车发送消息
+    document.getElementById('messageInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    // 自动更新运行时间
+    setInterval(updateUptime, 1000);
+
+    // 页面加载时自动连接
+    window.addEventListener('load', function() {
+      // 延迟连接确保页面完全加载
+      setTimeout(connectWebSocket, 1000);
+    });
   </script>
 </body>
 </html>
