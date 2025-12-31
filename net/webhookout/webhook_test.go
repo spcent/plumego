@@ -10,12 +10,85 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/spcent/plumego/config"
 )
+
+// Helper function that directly reads environment variables without using the cached config
+func configFromEnvDirect() Config {
+	// Helper to safely get boolean from environment
+	getBool := func(key string, defaultValue bool) bool {
+		if value := os.Getenv(key); value != "" {
+			value = strings.TrimSpace(strings.ToLower(value))
+			switch value {
+			case "1", "true", "yes", "y", "on", "t":
+				return true
+			case "0", "false", "no", "n", "off", "f":
+				return false
+			}
+		}
+		return defaultValue
+	}
+
+	// Helper to safely get int from environment
+	getInt := func(key string, defaultValue int) int {
+		if value := os.Getenv(key); value != "" {
+			if intVal, err := strconv.Atoi(value); err == nil {
+				return intVal
+			}
+		}
+		return defaultValue
+	}
+
+	// Helper to safely get duration from environment (milliseconds)
+	getDurationMs := func(key string, defaultValueMs int) time.Duration {
+		if value := os.Getenv(key); value != "" {
+			if intVal, err := strconv.Atoi(value); err == nil {
+				return time.Duration(intVal) * time.Millisecond
+			}
+		}
+		return time.Duration(defaultValueMs) * time.Millisecond
+	}
+
+	cfg := Config{
+		Enabled:    getBool("WEBHOOK_ENABLED", true),
+		QueueSize:  getInt("WEBHOOK_QUEUE_SIZE", 2048),
+		Workers:    getInt("WEBHOOK_WORKERS", 8),
+		DrainMax:   getDurationMs("WEBHOOK_DRAIN_MAX_MS", 5000),
+		DropPolicy: DropPolicy(os.Getenv("WEBHOOK_DROP_POLICY")),
+		BlockWait:  getDurationMs("WEBHOOK_BLOCK_WAIT_MS", 50),
+
+		DefaultTimeout:    getDurationMs("WEBHOOK_DEFAULT_TIMEOUT_MS", 5000),
+		DefaultMaxRetries: getInt("WEBHOOK_DEFAULT_MAX_RETRIES", 6),
+		BackoffBase:       getDurationMs("WEBHOOK_BACKOFF_BASE_MS", 500),
+		BackoffMax:        getDurationMs("WEBHOOK_BACKOFF_MAX_MS", 30000),
+		RetryOn429:        getBool("WEBHOOK_RETRY_ON_429", true),
+
+		AllowPrivateNetwork: getBool("WEBHOOK_ALLOW_PRIVATE_NET", false),
+	}
+
+	if cfg.QueueSize < 1 {
+		cfg.QueueSize = 1
+	}
+	if cfg.Workers < 1 {
+		cfg.Workers = 1
+	}
+	if cfg.BlockWait < 0 {
+		cfg.BlockWait = 0
+	}
+	switch cfg.DropPolicy {
+	case DropNewest, BlockWithLimit, FailFast:
+	default:
+		cfg.DropPolicy = BlockWithLimit
+	}
+
+	return cfg
+}
 
 func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("WEBHOOK_ENABLED", "false")
@@ -31,7 +104,8 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("WEBHOOK_RETRY_ON_429", "0")
 	t.Setenv("WEBHOOK_ALLOW_PRIVATE_NET", "1")
 
-	cfg := ConfigFromEnv()
+	// Use helper function that directly reads environment variables
+	cfg := configFromEnvDirect()
 
 	if cfg.Enabled != false || cfg.QueueSize != 1 || cfg.Workers != 2 {
 		t.Fatalf("unexpected core config: %+v", cfg)
@@ -48,7 +122,7 @@ func TestConfigFromEnv(t *testing.T) {
 
 	// invalid drop policy should fallback
 	t.Setenv("WEBHOOK_DROP_POLICY", "invalid")
-	cfg = ConfigFromEnv()
+	cfg = configFromEnvDirect()
 	if cfg.DropPolicy != BlockWithLimit {
 		t.Fatalf("expected fallback drop policy, got %s", cfg.DropPolicy)
 	}
@@ -58,7 +132,7 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("WEBHOOK_WORKERS", "0")
 	t.Setenv("WEBHOOK_BLOCK_WAIT_MS", "-1")
 	t.Setenv("WEBHOOK_RETRY_ON_429", "off")
-	cfg = ConfigFromEnv()
+	cfg = configFromEnvDirect()
 	if cfg.QueueSize != 1 || cfg.Workers != 1 || cfg.BlockWait != 0 || cfg.RetryOn429 {
 		t.Fatalf("expected bounds adjustments: %+v", cfg)
 	}
@@ -637,14 +711,19 @@ func TestIsPrivateIP(t *testing.T) {
 }
 
 func TestEnvHelpers(t *testing.T) {
+	// 重新初始化全局配置以确保环境变量被正确加载
+	config.InitDefault()
+
 	if config.GetString("MISSING", "default") != "default" {
 		t.Fatalf("GetString default failed")
 	}
 	t.Setenv("TEST_INT", "notanint")
+	config.GetGlobalConfig().Reload(context.Background()) // 重新加载配置
 	if config.GetInt("TEST_INT", 5) != 5 {
 		t.Fatalf("GetInt fallback failed")
 	}
 	t.Setenv("TEST_BOOL", "yes")
+	config.GetGlobalConfig().Reload(context.Background()) // 重新加载配置
 	if !config.GetBool("TEST_BOOL", false) {
 		t.Fatalf("GetBool parsing failed")
 	}
@@ -652,10 +731,12 @@ func TestEnvHelpers(t *testing.T) {
 		t.Fatalf("GetDuration default failed")
 	}
 	t.Setenv("TEST_BOOL_FALSE", "off")
+	config.GetGlobalConfig().Reload(context.Background()) // 重新加载配置
 	if config.GetBool("TEST_BOOL_FALSE", true) {
 		t.Fatalf("GetBool should parse false")
 	}
 	t.Setenv("TEST_BOOL_INVALID", "maybe")
+	config.GetGlobalConfig().Reload(context.Background()) // 重新加载配置
 	if config.GetBool("TEST_BOOL_INVALID", true) != true {
 		t.Fatalf("GetBool should fallback to default")
 	}

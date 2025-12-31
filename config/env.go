@@ -2,15 +2,23 @@ package config
 
 import (
 	"bufio"
+	"context"
 	"os"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
+// Global default config instance for backward compatibility
+var (
+	globalConfig = New()
+	mu           sync.RWMutex
+)
+
+// LoadEnvFile loads environment variables from a file
 // If overwrite=true, existing environment variables will be overwritten.
 // If overwrite=false, existing environment variables will not be overwritten.
-func LoadEnv(filepath string, overwrite bool) error {
+func LoadEnvFile(filepath string, overwrite bool) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return err
@@ -40,69 +48,108 @@ func LoadEnv(filepath string, overwrite bool) error {
 	return scanner.Err()
 }
 
+// LoadEnv loads environment variables from a file (backward compatibility alias)
+func LoadEnv(filepath string, overwrite bool) error {
+	return LoadEnvFile(filepath, overwrite)
+}
+
+// InitDefault initializes the global config with environment and file sources
+var initDefaultOnce sync.Once
+
+func InitDefault() error {
+	var initErr error
+	initDefaultOnce.Do(func() {
+		ctx := context.Background()
+		
+		// Add environment variable source
+		globalConfig.AddSource(NewEnvSource(""))
+		
+		// Try to load from common config files
+		configFiles := []string{
+			".env",
+			".env.local",
+			"config.env",
+			"config.json",
+		}
+		
+		for _, configFile := range configFiles {
+			if info, err := os.Stat(configFile); err == nil && !info.IsDir() {
+				switch {
+				case strings.HasSuffix(configFile, ".json"):
+					globalConfig.AddSource(NewFileSource(configFile, FormatJSON, true))
+				case strings.HasSuffix(configFile, ".env"):
+					globalConfig.AddSource(NewFileSource(configFile, FormatEnv, true))
+				}
+			}
+		}
+		
+		initErr = globalConfig.Load(ctx)
+	})
+	
+	return initErr
+}
+
+// GetGlobalConfig returns the global config instance
+func GetGlobalConfig() *Config {
+	mu.RLock()
+	defer mu.RUnlock()
+	return globalConfig
+}
+
 // GetString gets an environment variable as a string, returns default value if not found
 func GetString(key, defaultValue string) string {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return defaultValue
-	}
-	return value
+	return GetGlobalConfig().GetString(key, defaultValue)
 }
 
 // GetInt gets an environment variable as an integer, returns default value if not found or invalid
 func GetInt(key string, defaultValue int) int {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return defaultValue
-	}
-
-	intValue, err := strconv.Atoi(value)
-	if err != nil {
-		return defaultValue
-	}
-
-	return intValue
+	return GetGlobalConfig().GetInt(key, defaultValue)
 }
 
 // GetBool gets an environment variable as a boolean, returns default value if not found or invalid
 func GetBool(key string, defaultValue bool) bool {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return defaultValue
-	}
-
-	switch strings.ToLower(value) {
-	case "1", "true", "yes", "y", "on", "t":
-		return true
-	case "0", "false", "no", "n", "off", "f":
-		return false
-	default:
-		return defaultValue
-	}
+	return GetGlobalConfig().GetBool(key, defaultValue)
 }
 
 // GetFloat gets an environment variable as a float, returns default value if not found or invalid
 func GetFloat(key string, defaultValue float64) float64 {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return defaultValue
-	}
-
-	floatValue, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		return defaultValue
-	}
-
-	return floatValue
+	return GetGlobalConfig().GetFloat(key, defaultValue)
 }
 
 // GetDurationMs gets an environment variable representing milliseconds and returns a time.Duration.
 // Returns the default duration if not found or invalid.
 func GetDurationMs(key string, defaultValueMs int) time.Duration {
-	return time.Duration(GetInt(key, defaultValueMs)) * time.Millisecond
+	return GetGlobalConfig().GetDurationMs(key, defaultValueMs)
 }
 
 // Set sets an environment variable
 func Set(key, value string) {
 	os.Setenv(key, value)
+}
+
+// Type-safe global accessors with validation
+
+// GetStringSafe gets a validated string configuration value
+func GetStringSafe(key, defaultValue string, validators ...Validator) (string, error) {
+	return GetGlobalConfig().String(key, defaultValue, validators...)
+}
+
+// GetIntSafe gets a validated int configuration value
+func GetIntSafe(key string, defaultValue int, validators ...Validator) (int, error) {
+	return GetGlobalConfig().Int(key, defaultValue, validators...)
+}
+
+// GetBoolSafe gets a validated bool configuration value
+func GetBoolSafe(key string, defaultValue bool, validators ...Validator) (bool, error) {
+	return GetGlobalConfig().Bool(key, defaultValue, validators...)
+}
+
+// GetFloatSafe gets a validated float64 configuration value
+func GetFloatSafe(key string, defaultValue float64, validators ...Validator) (float64, error) {
+	return GetGlobalConfig().Float(key, defaultValue, validators...)
+}
+
+// GetDurationMsSafe gets a validated duration configuration value
+func GetDurationMsSafe(key string, defaultValueMs int, validators ...Validator) (time.Duration, error) {
+	return GetGlobalConfig().DurationMs(key, defaultValueMs, validators...)
 }

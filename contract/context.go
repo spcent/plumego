@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/spcent/plumego/log"
@@ -25,6 +26,17 @@ type RequestContext struct {
 
 type RequestContextKey struct{}
 
+// RequestConfig holds configuration for request processing.
+type RequestConfig struct {
+	MaxBodySize        int64
+	EnableBodyCache    bool
+	EnableCompression  bool
+	EnableCors         bool
+	EnableCorsHeaders  []string
+	CorsAllowedOrigins []string
+	RequestTimeout     time.Duration
+}
+
 // Ctx is a unified context object shared by handlers.
 // It exposes common request-scoped attributes and helper methods for writing responses.
 type Ctx struct {
@@ -37,10 +49,15 @@ type Ctx struct {
 	Logger   log.StructuredLogger
 	TraceID  string
 	Deadline time.Time
+	Config   *RequestConfig
 
-	bodyOnce sync.Once
-	body     []byte
-	bodyErr  error
+	// Request state tracking
+	startedAt          time.Time
+	bodySize           atomic.Int64
+	body               []byte
+	bodyErr            error
+	bodyReadOnce       sync.Once
+	compressionEnabled atomic.Bool
 }
 
 // BindError represents an error that occurred while binding a request body.
@@ -121,6 +138,15 @@ func NewCtx(w http.ResponseWriter, r *http.Request, params map[string]string) *C
 	return newCtxWithLogger(w, r, params, nil)
 }
 
+// DefaultRequestConfig provides sensible defaults for request processing.
+var DefaultRequestConfig = &RequestConfig{
+	MaxBodySize:       10 * 1024 * 1024, // 10MB
+	EnableBodyCache:   true,
+	EnableCompression: false,
+	EnableCors:        false,
+	RequestTimeout:    30 * time.Second,
+}
+
 // newCtxWithLogger allows injecting a logger while keeping NewCtx minimal for compatibility.
 func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]string, logger log.StructuredLogger) *Ctx {
 	if params == nil {
@@ -134,7 +160,14 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 		logger = log.NewGLogger()
 	}
 
-	return &Ctx{
+	// Detect compression
+	compressionEnabled := false
+	contentEncoding := strings.ToLower(r.Header.Get("Content-Encoding"))
+	if contentEncoding == "gzip" || contentEncoding == "deflate" {
+		compressionEnabled = true
+	}
+
+	ctx := &Ctx{
 		W:        w,
 		R:        r,
 		Params:   params,
@@ -144,7 +177,18 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 		Logger:   logger,
 		TraceID:  traceID,
 		Deadline: deadline,
+		Config:   DefaultRequestConfig,
+
+		startedAt:          time.Now(),
+		compressionEnabled: atomic.Bool{},
 	}
+
+	ctx.compressionEnabled.Store(compressionEnabled)
+	return ctx
+}
+
+func (c *Ctx) setCompressionEnabled(enabled bool) {
+	c.compressionEnabled.Store(enabled)
 }
 
 func (c *Ctx) ErrorJSON(status int, errCode string, message string, details map[string]any) error {
@@ -251,10 +295,26 @@ func (c *Ctx) BindAndValidateJSON(dst any) error {
 	return nil
 }
 
+// GetRequestDuration returns the time since the request started.
+func (c *Ctx) GetRequestDuration() time.Duration {
+	return time.Since(c.startedAt)
+}
+
+// IsCompressed returns whether the request body is compressed.
+func (c *Ctx) IsCompressed() bool {
+	return c.compressionEnabled.Load()
+}
+
+// GetBodySize returns the size of the request body.
+func (c *Ctx) GetBodySize() int64 {
+	return c.bodySize.Load()
+}
+
 func (c *Ctx) bodyBytes() ([]byte, error) {
-	c.bodyOnce.Do(func() {
+	c.bodyReadOnce.Do(func() {
 		c.body, c.bodyErr = io.ReadAll(c.R.Body)
 		if c.bodyErr == nil {
+			c.bodySize.Store(int64(len(c.body)))
 			c.R.Body = io.NopCloser(bytes.NewBuffer(c.body))
 		}
 	})
