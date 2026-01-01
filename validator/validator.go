@@ -288,7 +288,7 @@ func Max(max int64) Rule {
 				isNumeric = true
 			} else {
 				// For non-numeric strings, check length for backward compatibility
-				if utf8.RuneCountInString(v) > int(max) {
+				if int64(utf8.RuneCountInString(v)) > max {
 					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d characters", max)}
 				}
 				return nil
