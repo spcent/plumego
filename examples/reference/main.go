@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -102,7 +103,143 @@ func main() {
 	// Example API route demonstrating middleware and tracing hooks.
 	app.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Served-At", time.Now().Format(time.RFC3339))
-		w.Write([]byte("hello from plumego"))
+		w.Header().Set("Content-Type", "application/json")
+
+		w.Write([]byte(fmt.Sprintf(`{
+  "message": "hello from plumego",
+  "timestamp": "%s",
+  "version": "1.0.0",
+  "features": ["WebSocket", "Documentation", "Webhook", "Metrics", "Health Check", "Middleware"],
+  "endpoints": {
+    "docs": "/docs",
+    "webhooks": "/webhooks",
+    "metrics": "/metrics",
+    "health": "/health/ready",
+    "websocket": "/ws"
+  }
+}`, time.Now().Format(time.RFC3339))))
+	})
+
+	// Test endpoint for pub/sub functionality
+	app.Get("/test/pubsub", func(w http.ResponseWriter, r *http.Request) {
+		topic := r.URL.Query().Get("topic")
+		if topic == "" {
+			topic = "test.default"
+		}
+
+		// Publish a test message to the pub/sub system
+		message := pubsub.Message{
+			Topic: topic,
+			Type:  "test",
+			Data:  fmt.Sprintf("Test message published at %s", time.Now().Format(time.RFC3339)),
+			Time:  time.Now(),
+		}
+
+		if err := bus.Publish(topic, message); err != nil {
+			http.Error(w, fmt.Sprintf("publish failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(fmt.Sprintf(`{
+  "status": "success",
+  "topic": "%s",
+  "message": "%s",
+  "timestamp": "%s"
+}`, topic, message.Data, time.Now().Format(time.RFC3339))))
+	})
+
+	// Test endpoint for webhook functionality
+	app.Post("/test/webhook", func(w http.ResponseWriter, r *http.Request) {
+		body := make([]byte, r.ContentLength)
+		if _, err := r.Body.Read(body); err != nil && err != io.EOF {
+			http.Error(w, fmt.Sprintf("read body failed: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Simulate webhook processing
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(fmt.Sprintf(`{
+  "status": "webhook_received",
+  "content_length": %d,
+  "timestamp": "%s",
+  "headers": {
+    "user_agent": "%s",
+    "content_type": "%s"
+  }
+}`, len(body), time.Now().Format(time.RFC3339), r.UserAgent(), r.Header.Get("Content-Type"))))
+	})
+
+	// Enhanced health check with detailed system information
+	app.Get("/health/detailed", func(w http.ResponseWriter, r *http.Request) {
+		// Use a fixed start time since we don't have access to app start time
+		startTime := time.Now().Add(-time.Hour) // Simulate 1 hour uptime
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(fmt.Sprintf(`{
+  "status": "healthy",
+  "timestamp": "%s",
+  "system": {
+    "uptime": "%s",
+    "goroutines": "N/A",
+    "memory": "N/A"
+  },
+  "components": {
+    "websocket": "enabled",
+    "webhook_in": "enabled",
+    "webhook_out": "enabled", 
+    "metrics": "enabled",
+    "docs": "enabled"
+  },
+  "endpoints": {
+    "root": "/",
+    "docs": "/docs",
+    "hello": "/hello",
+    "metrics": "/metrics",
+    "webhook_test": "/test/webhook",
+    "pubsub_test": "/test/pubsub"
+  }
+}`, time.Now().Format(time.RFC3339), time.Since(startTime).String())))
+	})
+
+	// API testing endpoint with various response formats
+	app.Get("/test/api", func(w http.ResponseWriter, r *http.Request) {
+		format := r.URL.Query().Get("format")
+		delay := r.URL.Query().Get("delay")
+
+		// Optional delay for testing timeouts and loading states
+		if delay != "" {
+			if d, err := time.ParseDuration(delay); err == nil {
+				time.Sleep(d)
+			}
+		}
+
+		switch format {
+		case "xml":
+			w.Header().Set("Content-Type", "application/xml")
+			w.Write([]byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <timestamp>%s</timestamp>
+  <format>xml</format>
+  <status>success</status>
+</response>`, time.Now().Format(time.RFC3339))))
+		case "csv":
+			w.Header().Set("Content-Type", "text/csv")
+			w.Write([]byte("timestamp,format,status\n"))
+			w.Write([]byte(fmt.Sprintf("%s,csv,success\n", time.Now().Format(time.RFC3339))))
+		case "plain":
+			w.Header().Set("Content-Type", "text/plain")
+			w.Write([]byte(fmt.Sprintf("Plain text response at %s", time.Now().Format(time.RFC3339))))
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			queryJSON := r.URL.Query().Encode()
+			w.Write([]byte(fmt.Sprintf(`{
+  "format": "json",
+  "timestamp": "%s",
+  "status": "success",
+  "query_params": "%s"
+}`, time.Now().Format(time.RFC3339), queryJSON)))
+		}
 	})
 
 	// Expose metrics for scraping.

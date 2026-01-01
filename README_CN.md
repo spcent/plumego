@@ -59,6 +59,30 @@ func main() {
 }
 ```
 
+`plumego.App` 也实现了 `http.Handler`，可以直接挂载到标准库的服务器中。上下文处理器可以使用统一的 `plumego.Context`：
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego"
+)
+
+func main() {
+    app := plumego.New()
+
+    app.GetCtx("/health", func(ctx *plumego.Context) {
+        ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
+    })
+
+    log.Println("server started at :8080")
+    log.Fatal(http.ListenAndServe(":8080", app))
+}
+```
+
 ## 配置基础
 - 环境变量可以从 `.env` 文件加载（默认路径 `.env`；可通过 `core.WithEnvPath` 覆盖）。
 - 常用变量：`AUTH_TOKEN`（SimpleAuth 中间件）、`WS_SECRET`（WebSocket JWT 签名密钥）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。

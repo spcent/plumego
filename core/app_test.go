@@ -163,6 +163,34 @@ func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 	}
 }
 
+func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
+	app := New()
+
+	app.Use(func(next middleware.Handler) middleware.Handler {
+		return middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Lazy", "true")
+			next.ServeHTTP(w, r)
+		}))
+	})
+
+	app.Get("/hello", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("hi"))
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
+	rr := httptest.NewRecorder()
+
+	app.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-Lazy") != "true" {
+		t.Fatalf("expected middleware header to be set")
+	}
+}
+
 func TestLoadEnvFromFile(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "app_env")
 	if err != nil {
