@@ -8,6 +8,44 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+// StaticConfig holds configuration for static file serving
+type StaticConfig struct {
+	// Prefix is the URL prefix for serving static files
+	Prefix string
+
+	// Root is the directory path or filesystem to serve from
+	Root interface{} // Can be string (directory) or http.FileSystem
+}
+
+// normalizeStaticPrefix ensures the prefix always starts with "/"
+func normalizeStaticPrefix(prefix string) string {
+	if prefix == "" || prefix[0] != '/' {
+		return "/" + prefix
+	}
+	return prefix
+}
+
+// getFilePathFromRequest extracts and cleans the file path from request
+func getFilePathFromRequest(req *http.Request) (string, bool) {
+	relPath, ok := contract.Param(req, "filepath")
+	if !ok {
+		return "", false
+	}
+
+	// Clean the relative path to avoid directory traversal (e.g., "../../etc/passwd")
+	cleanPath := filepath.Clean(relPath)
+	return cleanPath, true
+}
+
+// handleStaticFileError provides consistent error handling for static file operations
+func handleStaticFileError(w http.ResponseWriter, req *http.Request, err error) bool {
+	if err != nil {
+		http.NotFound(w, req)
+		return true
+	}
+	return false
+}
+
 // Static registers a route that serves files from a local directory
 // under the given URL prefix.
 //
@@ -16,30 +54,12 @@ import (
 //	r.Static("/static", "./public")
 //	GET /static/js/app.js → ./public/js/app.js
 func (r *Router) Static(prefix, dir string) {
-	// Ensure prefix always starts with "/"
-	if prefix == "" || prefix[0] != '/' {
-		prefix = "/" + prefix
+	config := StaticConfig{
+		Prefix: normalizeStaticPrefix(prefix),
+		Root:   dir,
 	}
 
-	// Register a GET route with wildcard *filepath
-	r.GetFunc(prefix+"/*filepath", func(w http.ResponseWriter, req *http.Request) {
-		relPath, _ := contract.Param(req, "filepath")
-
-		// Clean the relative path to avoid directory traversal (e.g., "../../etc/passwd")
-		cleanPath := filepath.Clean(relPath)
-
-		// Construct the full path inside the given directory
-		fullPath := filepath.Join(dir, cleanPath)
-
-		// Check if the file exists
-		if _, err := os.Stat(fullPath); err != nil {
-			http.NotFound(w, req)
-			return
-		}
-
-		// Serve the file
-		http.ServeFile(w, req, fullPath)
-	})
+	r.registerStaticRoute(config, serveFromDirectory)
 }
 
 // StaticFS registers a route that serves files from a custom http.FileSystem.
@@ -54,26 +74,76 @@ func (r *Router) Static(prefix, dir string) {
 //	r.StaticFS("/assets", http.FS(public))
 //	GET /assets/index.html → served from embedded FS
 func (r *Router) StaticFS(prefix string, fs http.FileSystem) {
-	// Ensure prefix always starts with "/"
-	if prefix == "" || prefix[0] != '/' {
-		prefix = "/" + prefix
+	config := StaticConfig{
+		Prefix: normalizeStaticPrefix(prefix),
+		Root:   fs,
 	}
 
-	// Register a GET route with wildcard *filepath
-	r.GetFunc(prefix+"/*filepath", func(w http.ResponseWriter, req *http.Request) {
-		relPath, _ := contract.Param(req, "filepath")
+	r.registerStaticRoute(config, serveFromFileSystem)
+}
 
-		// Clean the relative path to avoid directory traversal
-		cleanPath := filepath.Clean(relPath)
+// serveFromDirectory serves files from a local directory
+func serveFromDirectory(w http.ResponseWriter, req *http.Request, root interface{}) bool {
+	dir, ok := root.(string)
+	if !ok {
+		return false
+	}
 
-		f, err := fs.Open(cleanPath)
-		if err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		defer f.Close()
+	cleanPath, ok := getFilePathFromRequest(req)
+	if !ok {
+		http.NotFound(w, req)
+		return true
+	}
 
-		// Use http.FileServer logic by stripping the prefix
-		http.FileServer(fs).ServeHTTP(w, req)
+	// Construct the full path inside the given directory
+	fullPath := filepath.Join(dir, cleanPath)
+
+	// Check if the file exists
+	if handleStaticFileError(w, req, checkFileExists(fullPath)) {
+		return true
+	}
+
+	// Serve the file
+	http.ServeFile(w, req, fullPath)
+	return true
+}
+
+// serveFromFileSystem serves files from a custom http.FileSystem
+func serveFromFileSystem(w http.ResponseWriter, req *http.Request, root interface{}) bool {
+	fs, ok := root.(http.FileSystem)
+	if !ok {
+		return false
+	}
+
+	cleanPath, ok := getFilePathFromRequest(req)
+	if !ok {
+		http.NotFound(w, req)
+		return true
+	}
+
+	// Try to open the file
+	f, err := fs.Open(cleanPath)
+	if handleStaticFileError(w, req, err) {
+		return true
+	}
+	defer f.Close()
+
+	// Use http.FileServer logic by stripping the prefix
+	http.FileServer(fs).ServeHTTP(w, req)
+	return true
+}
+
+// checkFileExists checks if a file exists and returns an error if it doesn't
+func checkFileExists(path string) error {
+	_, err := os.Stat(path)
+	return err
+}
+
+// registerStaticRoute is a generic function that registers static file routes
+func (r *Router) registerStaticRoute(config StaticConfig, handler func(http.ResponseWriter, *http.Request, interface{}) bool) {
+	routePath := config.Prefix + "/*filepath"
+
+	r.GetFunc(routePath, func(w http.ResponseWriter, req *http.Request) {
+		handler(w, req, config.Root)
 	})
 }

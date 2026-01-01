@@ -14,13 +14,14 @@ import (
 	"github.com/spcent/plumego/middleware"
 )
 
+// HTTP method constants
 const (
-	GET    = "GET"
-	POST   = "POST"
-	PUT    = "PUT"
-	DELETE = "DELETE"
-	PATCH  = "PATCH"
-	ANY    = "ANY"
+	GET    = "GET"    // HTTP GET method
+	POST   = "POST"   // HTTP POST method
+	PUT    = "PUT"    // HTTP PUT method
+	DELETE = "DELETE" // HTTP DELETE method
+	PATCH  = "PATCH"  // HTTP PATCH method
+	ANY    = "ANY"    // Any HTTP method
 )
 
 // Handler is an alias to the standard http.Handler for route handlers.
@@ -30,8 +31,45 @@ type Handler = http.Handler
 // HandlerFunc is an alias to the standard http.HandlerFunc for convenience.
 type HandlerFunc = http.HandlerFunc
 
+// RouteRegistrar defines an interface for objects that can register routes with a router
 type RouteRegistrar interface {
 	Register(r *Router)
+}
+
+// MiddlewareManager manages middleware chain for routes and groups
+type MiddlewareManager struct {
+	middlewares []middleware.Middleware
+	mu          sync.RWMutex
+}
+
+// NewMiddlewareManager creates a new middleware manager
+func NewMiddlewareManager() *MiddlewareManager {
+	return &MiddlewareManager{
+		middlewares: make([]middleware.Middleware, 0),
+	}
+}
+
+// AddMiddleware adds a middleware to the manager
+func (mm *MiddlewareManager) AddMiddleware(m middleware.Middleware) {
+	mm.mu.Lock()
+	defer mm.mu.Unlock()
+	mm.middlewares = append(mm.middlewares, m)
+}
+
+// GetMiddlewares returns a copy of all middlewares
+func (mm *MiddlewareManager) GetMiddlewares() []middleware.Middleware {
+	mm.mu.RLock()
+	defer mm.mu.RUnlock()
+	result := make([]middleware.Middleware, len(mm.middlewares))
+	copy(result, mm.middlewares)
+	return result
+}
+
+// MergeMiddlewares merges another middleware manager's middlewares
+func (mm *MiddlewareManager) MergeMiddlewares(other *MiddlewareManager) []middleware.Middleware {
+	combined := mm.GetMiddlewares()
+	otherMiddlewares := other.GetMiddlewares()
+	return append(combined, otherMiddlewares...)
 }
 
 // segment represents a path segment with type information
@@ -59,26 +97,28 @@ type route struct {
 	Path   string
 }
 
+// Router represents an HTTP router with path-based routing and middleware support
 type Router struct {
-	prefix      string                  // Group prefix
-	trees       map[string]*node        // Method -> root node
-	registrars  []RouteRegistrar        // Route registrars
-	routes      map[string][]route      // Registered routes
-	frozen      bool                    // Whether router is frozen
-	mu          sync.RWMutex            // Mutex for concurrent access
-	parent      *Router                 // Parent router for groups
-	middlewares []middleware.Middleware // Group-level middlewares
-	logger      log.StructuredLogger    // Logger for contextual handlers
+	prefix            string               // Group prefix
+	trees             map[string]*node     // Method -> root node
+	registrars        []RouteRegistrar     // Route registrars
+	routes            map[string][]route   // Registered routes
+	frozen            bool                 // Whether router is frozen
+	mu                sync.RWMutex         // Mutex for concurrent access
+	parent            *Router              // Parent router for groups
+	middlewareManager *MiddlewareManager   // Middleware management
+	logger            log.StructuredLogger // Logger for contextual handlers
 }
 
+// NewRouter creates a new Router instance with default configuration
 func NewRouter() *Router {
 	return &Router{
-		trees:       make(map[string]*node),
-		routes:      make(map[string][]route),
-		prefix:      "",
-		parent:      nil,
-		middlewares: []middleware.Middleware{},
-		logger:      log.NewGLogger(),
+		trees:             make(map[string]*node),
+		routes:            make(map[string][]route),
+		prefix:            "",
+		parent:            nil,
+		middlewareManager: NewMiddlewareManager(),
+		logger:            log.NewGLogger(),
 	}
 }
 
@@ -90,12 +130,14 @@ func (r *Router) SetLogger(logger log.StructuredLogger) {
 	r.logger = logger
 }
 
+// Freeze prevents the router from accepting new route registrations
 func (r *Router) Freeze() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.frozen = true
 }
 
+// Register adds route registrars to the router
 func (r *Router) Register(registrars ...RouteRegistrar) {
 	// Get unique registrars without holding the lock
 	// This prevents deadlock when reg.Register(r) calls back into AddRoute
@@ -103,48 +145,45 @@ func (r *Router) Register(registrars ...RouteRegistrar) {
 
 	r.mu.RLock()
 	seen := make(map[RouteRegistrar]bool)
-	for _, reg := range r.registrars {
-		seen[reg] = true
+	for _, registrar := range r.registrars {
+		seen[registrar] = true
 	}
 	r.mu.RUnlock()
 
 	// Find new registrars
-	for _, reg := range registrars {
-		if !seen[reg] {
-			newRegistrars = append(newRegistrars, reg)
-			seen[reg] = true
+	for _, registrar := range registrars {
+		if !seen[registrar] {
+			newRegistrars = append(newRegistrars, registrar)
+			seen[registrar] = true
 		}
 	}
 
 	// Register new registrars
-	for _, reg := range newRegistrars {
+	for _, registrar := range newRegistrars {
 		// Add to registrars list
 		r.mu.Lock()
-		r.registrars = append(r.registrars, reg)
+		r.registrars = append(r.registrars, registrar)
 		r.mu.Unlock()
 
 		// Call Register without holding the lock
-		// This allows reg.Register(r) to call AddRoute safely
-		reg.Register(r)
+		// This allows registrar.Register(r) to call AddRoute safely
+		registrar.Register(r)
 	}
 }
 
-// Group creates a new route group with the given prefix and inherits parent middlewares
+// Group creates a new router group with the given prefix
 func (r *Router) Group(prefix string) *Router {
 	// Create full prefix by combining with parent's prefix
 	fullPrefix := r.prefix + prefix
 
-	// Inherit middlewares from parent
-	inheritedMiddlewares := make([]middleware.Middleware, len(r.middlewares))
-	copy(inheritedMiddlewares, r.middlewares)
-
 	return &Router{
-		prefix:      fullPrefix,
-		trees:       r.trees,
-		routes:      r.routes,
-		frozen:      r.frozen,
-		parent:      r,
-		middlewares: inheritedMiddlewares,
+		prefix:            fullPrefix,
+		trees:             r.trees,
+		routes:            r.routes,
+		parent:            r,
+		frozen:            r.frozen,
+		middlewareManager: r.middlewareManager,
+		logger:            r.logger,
 	}
 }
 
@@ -181,7 +220,7 @@ func (r *Router) AddRoute(method, path string, handler Handler) {
 		return
 	}
 
-	segments := compileTemplate(fullPath)
+	segments := compilePathSegments(fullPath)
 	paramKeys := make([]string, 0, len(segments))
 
 	// Add each segment to the trie
@@ -222,27 +261,29 @@ func (r *Router) AddRoute(method, path string, handler Handler) {
 }
 
 func (r *Router) routeMiddlewares() []middleware.Middleware {
-	if r.parent == nil || len(r.middlewares) == 0 {
+	if r.parent == nil {
+		return r.middlewareManager.GetMiddlewares()
+	}
+
+	// Get middlewares from parent and current router
+	parentMiddlewares := r.parent.middlewareManager.GetMiddlewares()
+	currentMiddlewares := r.middlewareManager.GetMiddlewares()
+
+	// Return the difference (middlewares specific to current router)
+	if len(currentMiddlewares) <= len(parentMiddlewares) {
 		return nil
 	}
 
-	parentLen := len(r.parent.middlewares)
-	if parentLen >= len(r.middlewares) {
-		return nil
-	}
-
-	extra := make([]middleware.Middleware, len(r.middlewares)-parentLen)
-	copy(extra, r.middlewares[parentLen:])
+	extra := make([]middleware.Middleware, len(currentMiddlewares)-len(parentMiddlewares))
+	copy(extra, currentMiddlewares[len(parentMiddlewares):])
 	return extra
 }
 
 // Use adds middlewares to the router group
 func (r *Router) Use(middlewares ...middleware.Middleware) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	// Add middlewares to the group
-	r.middlewares = append(r.middlewares, middlewares...)
+	for _, middleware := range middlewares {
+		r.middlewareManager.AddMiddleware(middleware)
+	}
 }
 
 // findChild finds a child node with the given path segment
@@ -309,62 +350,105 @@ func (r *Router) addCtxRoute(method, path string, h contract.CtxHandlerFunc) {
 	r.AddRoute(method, path, contract.AdaptCtxHandler(h, r.logger))
 }
 
+// ServeHTTP implements http.Handler and handles incoming HTTP requests
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	method := req.Method
+	// Find appropriate route tree for the request method
+	tree, found := r.findRouteTree(req.Method)
+	if !found {
+		http.NotFound(w, req)
+		return
+	}
+
+	// Parse and normalize request path
+	path := r.normalizePath(req.URL.Path)
+
+	// Try to match route and handle request
+	r.handleRouteMatch(w, req, tree, path)
+}
+
+// findRouteTree finds the appropriate route tree for the given HTTP method
+func (r *Router) findRouteTree(method string) (*node, bool) {
 	tree := r.trees[method]
 	if tree == nil {
 		tree = r.trees[ANY]
 		if tree == nil {
-			http.NotFound(w, req)
-			return
+			return nil, false
 		}
 	}
+	return tree, true
+}
 
-	path := req.URL.Path
-	if path != "/" {
-		path = strings.Trim(path, "/")
-	}
-
-	// Handle root path specially
+// normalizePath normalizes the request path by trimming trailing slashes
+func (r *Router) normalizePath(path string) string {
 	if path == "/" || path == "" {
-		if tree.handler != nil {
-			// Apply middleware and serve request for root path
-			r.applyMiddlewareAndServe(w, req, nil, tree.handler, tree.middlewares)
-			return
-		}
-		http.NotFound(w, req)
+		return "/"
+	}
+	return strings.Trim(path, "/")
+}
+
+// handleRouteMatch processes the matched route and applies middleware
+func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree *node, path string) {
+	// Handle root path specially
+	if path == "/" {
+		r.handleRootRequest(w, req, tree)
 		return
 	}
 
+	// Perform route matching for non-root paths
 	parts := strings.Split(path, "/")
-	params := make(map[string]string)
+	matcher := NewRouteMatcher(tree)
+	result := matcher.Match(parts)
 
-	// Perform trie-based route matching and get handler, param values, and param keys
-	handler, paramValues, paramKeys, routeMiddlewares := r.matchRoute(tree, parts)
-	if handler == nil && method != ANY {
+	// Try ANY method if specific method didn't match
+	if result == nil && req.Method != ANY {
 		if anyTree := r.trees[ANY]; anyTree != nil {
-			handler, paramValues, paramKeys, routeMiddlewares = r.matchRoute(anyTree, parts)
+			anyMatcher := NewRouteMatcher(anyTree)
+			result = anyMatcher.Match(parts)
 		}
 	}
-	if handler == nil {
+
+	if result == nil {
 		http.NotFound(w, req)
 		return
 	}
 
-	// Assign parameter values to map
-	if len(paramValues) > 0 && len(paramKeys) > 0 {
-		for i, key := range paramKeys {
-			if i < len(paramValues) {
-				params[key] = paramValues[i]
-			}
-		}
+	// Build parameter map and serve request
+	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
+	r.applyMiddlewareAndServe(w, req, params, result.Handler, result.RouteMiddlewares)
+}
+
+// handleRootRequest handles requests to the root path "/"
+func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tree *node) {
+	if tree.handler != nil {
+		r.applyMiddlewareAndServe(w, req, nil, tree.handler, tree.middlewares)
+		return
+	}
+	http.NotFound(w, req)
+}
+
+// buildParamMap creates a parameter map from values and keys
+func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[string]string {
+	if paramValues == nil || paramKeys == nil {
+		return nil
+	}
+	if len(paramValues) == 0 || len(paramKeys) == 0 {
+		return nil
 	}
 
-	// Apply middleware and serve request
-	r.applyMiddlewareAndServe(w, req, params, handler, routeMiddlewares)
+	params := make(map[string]string)
+	minLen := len(paramValues)
+	if len(paramKeys) < minLen {
+		minLen = len(paramKeys)
+	}
+
+	for i := 0; i < minLen; i++ {
+		params[paramKeys[i]] = paramValues[i]
+	}
+
+	return params
 }
 
 // applyMiddlewareAndServe applies middleware chain to the handler and serves the request
@@ -392,7 +476,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 		reqWithParams = req.WithContext(ctx)
 	}
 
-	combined := append([]middleware.Middleware{}, r.middlewares...)
+	combined := append([]middleware.Middleware{}, r.middlewareManager.GetMiddlewares()...)
 	combined = append(combined, routeMiddlewares...)
 
 	if len(combined) == 0 {
@@ -405,96 +489,28 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	wrappedHandler.ServeHTTP(w, reqWithParams)
 }
 
-// matchRoute performs efficient trie-based route matching
-func (r *Router) matchRoute(root *node, parts []string) (Handler, []string, []string, []middleware.Middleware) {
-	current := root
-	paramValues := make([]string, 0, len(parts))
-
-	for i, part := range parts {
-		// Try to find exact match first
-		child := r.findChildForPath(current, part)
-		if child != nil {
-			current = child
-			continue
-		}
-
-		// Try param match
-		paramChild := r.findParamChild(current)
-		if paramChild != nil {
-			paramValues = append(paramValues, part)
-			current = paramChild
-			continue
-		}
-
-		// Try wildcard match
-		wildChild := r.findWildChild(current)
-		if wildChild != nil {
-			wildValue := strings.Join(parts[i:], "/")
-			paramValues = append(paramValues, wildValue)
-			current = wildChild
-			break
-		}
-
-		// No match found
-		return nil, nil, nil, nil
-	}
-
-	// Use the paramKeys stored in the node during route registration
-	return current.handler, paramValues, current.paramKeys, current.middlewares
-}
-
-// findChildForPath finds a child node that matches the given path segment
-func (r *Router) findChildForPath(parent *node, path string) *node {
-	// Check exact match first
-	for _, child := range parent.children {
-		if child.path == path {
-			return child
-		}
-	}
-	return nil
-}
-
-// findParamChild finds a param child node if exists
-func (r *Router) findParamChild(parent *node) *node {
-	for _, child := range parent.children {
-		if len(child.path) > 0 && child.path[0] == ':' {
-			return child
-		}
-	}
-	return nil
-}
-
-// findWildChild finds a wildcard child node if exists
-func (r *Router) findWildChild(parent *node) *node {
-	for _, child := range parent.children {
-		if len(child.path) > 0 && child.path[0] == '*' {
-			return child
-		}
-	}
-	return nil
-}
-
-func compileTemplate(path string) []segment {
+// compilePathSegments parses a URL path into route segments
+func compilePathSegments(path string) []segment {
 	if path == "/" {
 		return nil
 	}
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	segments := make([]segment, 0, len(parts))
-	for _, p := range parts {
-		if strings.HasPrefix(p, ":") {
+	for _, segmentPart := range parts {
+		if strings.HasPrefix(segmentPart, ":") {
 			segments = append(segments, segment{
-				raw:       p,
+				raw:       segmentPart,
 				isParam:   true,
-				paramName: p[1:],
+				paramName: segmentPart[1:],
 			})
-		} else if strings.HasPrefix(p, "*") {
+		} else if strings.HasPrefix(segmentPart, "*") {
 			segments = append(segments, segment{
-				raw:       p,
+				raw:       segmentPart,
 				isWild:    true,
-				paramName: p[1:],
+				paramName: segmentPart[1:],
 			})
 		} else {
-			segments = append(segments, segment{raw: p})
+			segments = append(segments, segment{raw: segmentPart})
 		}
 	}
 	return segments
@@ -502,20 +518,62 @@ func compileTemplate(path string) []segment {
 
 // --- Helper API ---
 
-func (r *Router) Get(path string, h Handler)    { r.AddRoute(GET, path, h) }
-func (r *Router) Post(path string, h Handler)   { r.AddRoute(POST, path, h) }
-func (r *Router) Put(path string, h Handler)    { r.AddRoute(PUT, path, h) }
-func (r *Router) Delete(path string, h Handler) { r.AddRoute(DELETE, path, h) }
-func (r *Router) Patch(path string, h Handler)  { r.AddRoute(PATCH, path, h) }
-func (r *Router) Any(path string, h Handler)    { r.AddRoute(ANY, path, h) }
+// addRoute is a generic method for registering routes
+func (r *Router) addRoute(method, path string, handler Handler) {
+	r.AddRoute(method, path, handler)
+}
+
+// HTTP method-specific route registration
+
+// Get registers a GET route with the given path and handler
+func (r *Router) Get(path string, handler Handler) { r.addRoute(GET, path, handler) }
+
+// Post registers a POST route with the given path and handler
+func (r *Router) Post(path string, handler Handler) { r.addRoute(POST, path, handler) }
+
+// Put registers a PUT route with the given path and handler
+func (r *Router) Put(path string, handler Handler) { r.addRoute(PUT, path, handler) }
+
+// Delete registers a DELETE route with the given path and handler
+func (r *Router) Delete(path string, handler Handler) { r.addRoute(DELETE, path, handler) }
+
+// Patch registers a PATCH route with the given path and handler
+func (r *Router) Patch(path string, handler Handler) { r.addRoute(PATCH, path, handler) }
+
+// Any registers a route that accepts any HTTP method with the given path and handler
+func (r *Router) Any(path string, handler Handler) { r.addRoute(ANY, path, handler) }
 
 // Context-aware handler registration helpers
-func (r *Router) GetCtx(path string, h contract.CtxHandlerFunc)    { r.addCtxRoute(GET, path, h) }
-func (r *Router) PostCtx(path string, h contract.CtxHandlerFunc)   { r.addCtxRoute(POST, path, h) }
-func (r *Router) PutCtx(path string, h contract.CtxHandlerFunc)    { r.addCtxRoute(PUT, path, h) }
-func (r *Router) DeleteCtx(path string, h contract.CtxHandlerFunc) { r.addCtxRoute(DELETE, path, h) }
-func (r *Router) PatchCtx(path string, h contract.CtxHandlerFunc)  { r.addCtxRoute(PATCH, path, h) }
-func (r *Router) AnyCtx(path string, h contract.CtxHandlerFunc)    { r.addCtxRoute(ANY, path, h) }
+
+// GetCtx registers a GET route with a context-aware handler
+func (r *Router) GetCtx(path string, handler contract.CtxHandlerFunc) {
+	r.addCtxRoute(GET, path, handler)
+}
+
+// PostCtx registers a POST route with a context-aware handler
+func (r *Router) PostCtx(path string, handler contract.CtxHandlerFunc) {
+	r.addCtxRoute(POST, path, handler)
+}
+
+// PutCtx registers a PUT route with a context-aware handler
+func (r *Router) PutCtx(path string, handler contract.CtxHandlerFunc) {
+	r.addCtxRoute(PUT, path, handler)
+}
+
+// DeleteCtx registers a DELETE route with a context-aware handler
+func (r *Router) DeleteCtx(path string, handler contract.CtxHandlerFunc) {
+	r.addCtxRoute(DELETE, path, handler)
+}
+
+// PatchCtx registers a PATCH route with a context-aware handler
+func (r *Router) PatchCtx(path string, handler contract.CtxHandlerFunc) {
+	r.addCtxRoute(PATCH, path, handler)
+}
+
+// AnyCtx registers a route that accepts any HTTP method with a context-aware handler
+func (r *Router) AnyCtx(path string, handler contract.CtxHandlerFunc) {
+	r.addCtxRoute(ANY, path, handler)
+}
 
 // HandleFunc registers a standard http.HandlerFunc for the given path and method
 func (r *Router) HandleFunc(method, path string, h http.HandlerFunc) {
@@ -575,21 +633,21 @@ func (r *Router) Print(w io.Writer) {
 	fmt.Fprintln(w, "Registered Routes:")
 
 	methods := make([]string, 0, len(r.routes))
-	for m := range r.routes {
-		methods = append(methods, m)
+	for method := range r.routes {
+		methods = append(methods, method)
 	}
 	sort.Strings(methods)
 
-	for _, m := range methods {
-		rs := r.routes[m]
-		sort.Slice(rs, func(i, j int) bool { return rs[i].Path < rs[j].Path })
+	for _, method := range methods {
+		routes := r.routes[method]
+		sort.Slice(routes, func(i, j int) bool { return routes[i].Path < routes[j].Path })
 
-		for _, rt := range rs {
-			label := rt.Path
-			if strings.Contains(rt.Path, "/*") {
+		for _, route := range routes {
+			label := route.Path
+			if strings.Contains(route.Path, "/*") {
 				label += "   [wildcard]"
 			}
-			fmt.Fprintf(w, "%-6s %s\n", rt.Method, label)
+			fmt.Fprintf(w, "%-6s %s\n", route.Method, label)
 		}
 	}
 }
