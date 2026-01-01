@@ -1,10 +1,87 @@
 package router
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 )
+
+// Response represents a standardized JSON response structure
+type Response struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+// ErrorResponse represents a standardized error response structure
+type ErrorResponse struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Details interface{} `json:"details,omitempty"`
+}
+
+// JSONWriter provides consistent JSON response writing
+type JSONWriter struct {
+	resourceName string
+}
+
+// NewJSONWriter creates a new JSON writer with resource name
+func NewJSONWriter(resourceName string) *JSONWriter {
+	return &JSONWriter{resourceName: resourceName}
+}
+
+// WriteJSON writes a standardized JSON response
+func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	response := Response{
+		Code:    status,
+		Message: http.StatusText(status),
+		Data:    data,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
+}
+
+// WriteError writes a standardized error response
+func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message string, details interface{}) {
+	resourceName := "resource"
+	if jw != nil && jw.resourceName != "" {
+		resourceName = jw.resourceName
+	}
+
+	// Log the error
+	log.Printf("Error for resource %s: %s (status: %d, details: %v)", resourceName, message, status, details)
+
+	// Return standardized error response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	errorResp := ErrorResponse{
+		Code:    status,
+		Message: message,
+		Details: details,
+	}
+
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		log.Printf("Failed to encode error response: %v", err)
+	}
+}
+
+// WriteNotImplemented writes a standardized "Not Implemented" response
+func (jw *JSONWriter) WriteNotImplemented(w http.ResponseWriter, method string) {
+	resourceName := "resource"
+	if jw != nil && jw.resourceName != "" {
+		resourceName = jw.resourceName
+	}
+
+	jw.WriteError(w, http.StatusNotImplemented, "Not Implemented",
+		fmt.Sprintf("The %s method is not implemented for the %s resource", method, resourceName))
+}
 
 // ResourceController defines the interface for RESTful resource controllers
 type ResourceController interface {
@@ -27,39 +104,47 @@ type ResourceController interface {
 
 // BaseResourceController provides a default implementation of ResourceController
 // All methods return "Not Implemented" error by default
-
 type BaseResourceController struct {
-	ResourceName string // Resource name used for response messages
+	ResourceName string      // Resource name used for response messages
+	jsonWriter   *JSONWriter // JSON writer for consistent responses
+}
+
+// NewBaseResourceController creates a new base resource controller with JSON writer
+func NewBaseResourceController(resourceName string) *BaseResourceController {
+	return &BaseResourceController{
+		ResourceName: resourceName,
+		jsonWriter:   NewJSONWriter(resourceName),
+	}
 }
 
 // Index handles GET /resource requests
 func (c *BaseResourceController) Index(w http.ResponseWriter, r *http.Request) {
-	c.notImplemented(w, r, "Index")
+	c.jsonWriter.WriteNotImplemented(w, "Index")
 }
 
 // Show handles GET /resource/:id requests
 func (c *BaseResourceController) Show(w http.ResponseWriter, r *http.Request) {
-	c.notImplemented(w, r, "Show")
+	c.jsonWriter.WriteNotImplemented(w, "Show")
 }
 
 // Create handles POST /resource requests
 func (c *BaseResourceController) Create(w http.ResponseWriter, r *http.Request) {
-	c.notImplemented(w, r, "Create")
+	c.jsonWriter.WriteNotImplemented(w, "Create")
 }
 
 // Update handles PUT /resource/:id requests
 func (c *BaseResourceController) Update(w http.ResponseWriter, r *http.Request) {
-	c.notImplemented(w, r, "Update")
+	c.jsonWriter.WriteNotImplemented(w, "Update")
 }
 
 // Delete handles DELETE /resource/:id requests
 func (c *BaseResourceController) Delete(w http.ResponseWriter, r *http.Request) {
-	c.notImplemented(w, r, "Delete")
+	c.jsonWriter.WriteNotImplemented(w, "Delete")
 }
 
 // Patch handles PATCH /resource/:id requests
 func (c *BaseResourceController) Patch(w http.ResponseWriter, r *http.Request) {
-	c.notImplemented(w, r, "Patch")
+	c.jsonWriter.WriteNotImplemented(w, "Patch")
 }
 
 // Options handles OPTIONS /resource requests for CORS and method negotiation
