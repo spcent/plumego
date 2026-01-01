@@ -236,7 +236,7 @@ func TestClockSkewTolerance(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig(nil)
 	cfg.AccessExpiration = 1 * time.Second
-	cfg.ClockSkew = 2 * time.Second // allow 2 second clock skew
+	cfg.ClockSkew = 1 * time.Second // allow 1 second clock skew
 
 	mgr, err := NewJWTManager(store, cfg)
 	if err != nil {
