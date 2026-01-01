@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html"
 	"html/template"
@@ -141,12 +142,23 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(fmt.Sprintf(`{
-  "status": "success",
-  "topic": "%s",
-  "message": "%s",
-  "timestamp": "%s"
-}`, topic, message.Data, time.Now().Format(time.RFC3339))))
+
+		resp := struct {
+			Status    string `json:"status"`
+			Topic     string `json:"topic"`
+			Message   string `json:"message"`
+			Timestamp string `json:"timestamp"`
+		}{
+			Status:    "success",
+			Topic:     topic,
+			Message:   message.Data,
+			Timestamp: time.Now().Format(time.RFC3339),
+		}
+
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, fmt.Sprintf("encode response failed: %v", err), http.StatusInternalServerError)
+			return
+		}
 	})
 
 	// Test endpoint for webhook functionality
@@ -159,15 +171,28 @@ func main() {
 
 		// Simulate webhook processing
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(fmt.Sprintf(`{
-  "status": "webhook_received",
-  "content_length": %d,
-  "timestamp": "%s",
-  "headers": {
-    "user_agent": "%s",
-    "content_type": "%s"
-  }
-}`, len(body), time.Now().Format(time.RFC3339), r.UserAgent(), r.Header.Get("Content-Type"))))
+
+		resp := struct {
+			Status        string `json:"status"`
+			ContentLength int    `json:"content_length"`
+			Timestamp     string `json:"timestamp"`
+			Headers       struct {
+				UserAgent   string `json:"user_agent"`
+				ContentType string `json:"content_type"`
+			} `json:"headers"`
+		}{
+			Status:        "webhook_received",
+			ContentLength: len(body),
+			Timestamp:     time.Now().Format(time.RFC3339),
+		}
+
+		resp.Headers.UserAgent = r.UserAgent()
+		resp.Headers.ContentType = r.Header.Get("Content-Type")
+
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, fmt.Sprintf("encode response failed: %v", err), http.StatusInternalServerError)
+			return
+		}
 	})
 
 	// Enhanced health check with detailed system information
@@ -233,12 +258,23 @@ func main() {
 		default:
 			w.Header().Set("Content-Type", "application/json")
 			queryJSON := r.URL.Query().Encode()
-			w.Write([]byte(fmt.Sprintf(`{
-  "format": "json",
-  "timestamp": "%s",
-  "status": "success",
-  "query_params": "%s"
-}`, time.Now().Format(time.RFC3339), queryJSON)))
+
+			resp := struct {
+				Format     string `json:"format"`
+				Timestamp  string `json:"timestamp"`
+				Status     string `json:"status"`
+				QueryParams string `json:"query_params"`
+			}{
+				Format:      "json",
+				Timestamp:   time.Now().Format(time.RFC3339),
+				Status:      "success",
+				QueryParams: queryJSON,
+			}
+
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				http.Error(w, fmt.Sprintf("encode response failed: %v", err), http.StatusInternalServerError)
+				return
+			}
 		}
 	})
 
