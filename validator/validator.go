@@ -219,7 +219,7 @@ func Min(min int64) Rule {
 				isNumeric = true
 			} else {
 				// For non-numeric strings, check length for backward compatibility
-				if utf8.RuneCountInString(v) < int(min) {
+				if utf8.RuneCountInString(v) < min {
 					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d characters", min)}
 				}
 				return nil
@@ -649,7 +649,7 @@ func (v *Validator) parseRule(spec string) Rule {
 	
 	switch ruleName {
 	case "min":
-		if val, err := strconv.ParseInt(param, 10, 64); err == nil {
+		if val, err := strconv.Atoi(param); err == nil {
 			rule = Min(val)
 		}
 	case "max":
