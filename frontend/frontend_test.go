@@ -57,7 +57,7 @@ func TestRegisterFromDir(t *testing.T) {
 			}
 
 			if tc.expectBody != "" && !strings.Contains(rec.Body.String(), tc.expectBody) {
-				t.Fatalf("unexpected body: %q", rec.Body.String())
+				t.Fatalf("unexpected body: %q, expected to contain: %q", rec.Body.String(), tc.expectBody)
 			}
 
 			if tc.name == "asset" {

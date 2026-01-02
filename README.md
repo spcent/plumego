@@ -27,6 +27,9 @@ ner.
 
 Use `core.WithComponent` (or `WithComponents`) when constructing the app to add capabilities. Built-in features (webhook management, inbound webhook receivers, pubsub debugging, websocket helpers, and frontend serving) can all be mounted as components so examples can mix only what they need.
 
+## Migration Notes
+- `plumego.ComponentFunc` re-export has been removed. Implement `core.Component` directly (see the interface above), or keep a local adapter type if you prefer functional hooks.
+
 ## Quick start
 Create a small `main.go` that wires routes and middleware, then boot the server:
 

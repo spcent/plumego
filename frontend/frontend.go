@@ -134,6 +134,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if path == "." {
 			path = h.indexFile
 		}
+		path = strings.ReplaceAll(path, "\\", "/")
 	}
 
 	if !h.serveIfExists(w, r, path) {
@@ -155,10 +156,15 @@ func (h *handler) serveIfExists(w http.ResponseWriter, r *http.Request, path str
 
 	if stat.IsDir() {
 		indexPath := filepath.Join(path, h.indexFile)
+		indexPath = strings.ReplaceAll(indexPath, "\\", "/")
 		return h.serveIfExists(w, r, indexPath)
 	}
 
-	if h.cacheControl != "" && filepath.Base(path) != h.indexFile {
+	base := path
+	if idx := strings.LastIndex(base, "/"); idx != -1 {
+		base = base[idx+1:]
+	}
+	if h.cacheControl != "" && base != h.indexFile {
 		w.Header().Set("Cache-Control", h.cacheControl)
 	}
 

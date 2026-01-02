@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -83,6 +84,69 @@ func TestBindJSON(t *testing.T) {
 	}
 }
 
+func TestBindJSONMaxBodySize(t *testing.T) {
+	body := bytes.NewBufferString(`{"name":"too-long"}`)
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
+	ctx.Config = &RequestConfig{
+		MaxBodySize:     10,
+		EnableBodyCache: true,
+	}
+
+	var payload map[string]any
+	err := ctx.BindJSON(&payload)
+	if err == nil {
+		t.Fatalf("expected error for body too large")
+	}
+
+	var bindErr *BindError
+	if !errors.As(err, &bindErr) {
+		t.Fatalf("expected BindError, got %T", err)
+	}
+
+	if bindErr.Status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status %d, got %d", http.StatusRequestEntityTooLarge, bindErr.Status)
+	}
+}
+
+func TestBindJSONBodyCacheToggle(t *testing.T) {
+	payloadBody := `{"name":"demo"}`
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(payloadBody)), nil)
+	ctx.Config = &RequestConfig{
+		EnableBodyCache: true,
+	}
+
+	var payload map[string]any
+	if err := ctx.BindJSON(&payload); err != nil {
+		t.Fatalf("expected bind to succeed, got %v", err)
+	}
+
+	cachedBody, err := io.ReadAll(ctx.R.Body)
+	if err != nil {
+		t.Fatalf("expected to read cached body, got %v", err)
+	}
+	if string(cachedBody) != payloadBody {
+		t.Fatalf("expected cached body to match payload")
+	}
+
+	ctxNoCache := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(payloadBody)), nil)
+	ctxNoCache.Config = &RequestConfig{
+		EnableBodyCache: false,
+	}
+
+	if err := ctxNoCache.BindJSON(&payload); err != nil {
+		t.Fatalf("expected bind to succeed, got %v", err)
+	}
+
+	uncachedBody, err := io.ReadAll(ctxNoCache.R.Body)
+	if err != nil {
+		t.Fatalf("expected to read body, got %v", err)
+	}
+	if len(uncachedBody) != 0 {
+		t.Fatalf("expected request body to be consumed when cache is disabled")
+	}
+}
+
 func TestBindJSONErrors(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -158,6 +222,28 @@ func TestBindAndValidateJSONErrors(t *testing.T) {
 
 	if !strings.Contains(bindErr.Message, "Email") {
 		t.Fatalf("unexpected bind error message: %s", bindErr.Message)
+	}
+}
+
+func TestNewCtxAppliesRequestTimeout(t *testing.T) {
+	originalConfig := DefaultRequestConfig
+	DefaultRequestConfig = &RequestConfig{
+		RequestTimeout: 50 * time.Millisecond,
+	}
+	t.Cleanup(func() {
+		DefaultRequestConfig = originalConfig
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	if ctx.Deadline.IsZero() {
+		t.Fatalf("expected deadline to be set from request timeout")
+	}
+
+	until := time.Until(ctx.Deadline)
+	if until <= 0 || until > 200*time.Millisecond {
+		t.Fatalf("expected deadline within timeout window, got %v", until)
 	}
 }
 

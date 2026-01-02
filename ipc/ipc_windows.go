@@ -32,6 +32,8 @@ const (
 	GENERIC_WRITE            = 0x40000000
 	OPEN_EXISTING            = 3
 	INVALID_HANDLE_VALUE     = ^uintptr(0)
+	errorPipeConnected       = syscall.Errno(535)
+	errorPipeClosing         = syscall.Errno(232)
 )
 
 // winServer implements Server for Windows using Named Pipes
@@ -40,6 +42,7 @@ type winServer struct {
 	config   *Config
 	mu       sync.RWMutex
 	closed   bool
+	next     syscall.Handle
 }
 
 // winClient implements Client for Windows
@@ -57,11 +60,16 @@ func newPlatformServer(addr string, config *Config) (Server, error) {
 	}
 
 	// Try named pipe first for local communication
-	if !strings.Contains(addr, ":") {
-		pipeName := fmt.Sprintf(`\\.\pipe\%s`, addr)
+	if isNamedPipeAddr(addr) || !strings.Contains(addr, ":") {
+		pipeName := normalizePipeAddr(addr)
+		handle, err := createNamedPipe(pipeName, config.BufferSize)
+		if err != nil {
+			return nil, err
+		}
 		server := &winServer{
 			pipeName: pipeName,
 			config:   config,
+			next:     handle,
 		}
 		return server, nil
 	}
@@ -97,6 +105,15 @@ func (s *tcpServer) AcceptWithContext(ctx context.Context) (Client, error) {
 		return nil, net.ErrClosed
 	}
 	s.mu.RUnlock()
+
+	if deadline, ok := ctx.Deadline(); ok {
+		if listener, ok := s.listener.(*net.TCPListener); ok {
+			if err := listener.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
+			defer listener.SetDeadline(time.Time{})
+		}
+	}
 
 	conn, err := s.listener.Accept()
 	if err != nil {
@@ -138,42 +155,46 @@ func (s *winServer) Accept() (Client, error) {
 }
 
 func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
-	s.mu.RLock()
+	s.mu.Lock()
 	if s.closed {
-		s.mu.RUnlock()
+		s.mu.Unlock()
 		return nil, net.ErrClosed
 	}
-	s.mu.RUnlock()
+	handle := s.next
+	s.next = 0
+	s.mu.Unlock()
 
-	pipeNamePtr, err := syscall.UTF16PtrFromString(s.pipeName)
-	if err != nil {
-		return nil, err
+	if handle == 0 {
+		var err error
+		handle, err = createNamedPipe(s.pipeName, s.config.BufferSize)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	handle, _, _ := procCreateNamedPipeW.Call(
-		uintptr(unsafe.Pointer(pipeNamePtr)),
-		PIPE_ACCESS_DUPLEX,
-		PIPE_TYPE_BYTE|PIPE_READMODE_BYTE|PIPE_WAIT,
-		PIPE_UNLIMITED_INSTANCES,
-		uintptr(s.config.BufferSize),
-		uintptr(s.config.BufferSize),
-		0,
-		0,
-	)
-
-	if handle == INVALID_HANDLE_VALUE {
-		return nil, fmt.Errorf("failed to create named pipe")
+	for {
+		if err := connectNamedPipeWithContext(ctx, handle); err != nil {
+			if err == errorPipeClosing {
+				go syscall.CloseHandle(handle)
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				handle, err = createNamedPipe(s.pipeName, s.config.BufferSize)
+				if err != nil {
+					return nil, err
+				}
+				continue
+			}
+			go syscall.CloseHandle(handle)
+			return nil, err
+		}
+		break
 	}
 
-	// Wait for client connection
-	ret, _, _ := procConnectNamedPipe.Call(handle, 0)
-	if ret == 0 {
-		syscall.CloseHandle(syscall.Handle(handle))
-		return nil, fmt.Errorf("failed to connect named pipe")
-	}
+	s.prepareNextHandle()
 
 	return &winClient{
-		handle: syscall.Handle(handle),
+		handle: handle,
 		config: s.config,
 	}, nil
 }
@@ -190,7 +211,10 @@ func (s *winServer) Close() error {
 		return nil
 	}
 	s.closed = true
-
+	if s.next != 0 {
+		_ = syscall.CloseHandle(s.next)
+		s.next = 0
+	}
 	return nil
 }
 
@@ -204,33 +228,16 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 	}
 
 	// Try named pipe first for local communication
-	if !strings.Contains(addr, ":") {
-		pipeName := fmt.Sprintf(`\\.\pipe\%s`, addr)
-
-		// Wait for pipe to become available
-		pipeNamePtr, err := syscall.UTF16PtrFromString(pipeName)
+	if isNamedPipeAddr(addr) || !strings.Contains(addr, ":") {
+		pipeName := normalizePipeAddr(addr)
+		handle, err := dialNamedPipe(ctx, pipeName, config.ConnectTimeout)
 		if err != nil {
 			return nil, err
 		}
-
-		procWaitNamedPipeW.Call(uintptr(unsafe.Pointer(pipeNamePtr)), uintptr(config.ConnectTimeout/time.Millisecond))
-
-		handle, err := syscall.CreateFile(
-			pipeNamePtr,
-			GENERIC_READ|GENERIC_WRITE,
-			0,
-			nil,
-			OPEN_EXISTING,
-			0,
-			0,
-		)
-
-		if err == nil {
-			return &winClient{
-				handle: handle,
-				config: config,
-			}, nil
-		}
+		return &winClient{
+			handle: handle,
+			config: config,
+		}, nil
 	}
 
 	// Fallback to TCP
@@ -247,6 +254,132 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 		conn:   conn,
 		config: config,
 	}, nil
+}
+
+func createNamedPipe(pipeName string, bufSize int) (syscall.Handle, error) {
+	pipeNamePtr, err := syscall.UTF16PtrFromString(pipeName)
+	if err != nil {
+		return 0, err
+	}
+
+	handle, _, _ := procCreateNamedPipeW.Call(
+		uintptr(unsafe.Pointer(pipeNamePtr)),
+		PIPE_ACCESS_DUPLEX,
+		PIPE_TYPE_BYTE|PIPE_READMODE_BYTE|PIPE_WAIT,
+		PIPE_UNLIMITED_INSTANCES,
+		uintptr(bufSize),
+		uintptr(bufSize),
+		0,
+		0,
+	)
+
+	if handle == INVALID_HANDLE_VALUE {
+		return 0, fmt.Errorf("failed to create named pipe")
+	}
+
+	return syscall.Handle(handle), nil
+}
+
+func connectNamedPipeWithContext(ctx context.Context, handle syscall.Handle) error {
+	done := make(chan error, 1)
+	go func() {
+		ret, _, err := procConnectNamedPipe.Call(uintptr(handle), 0)
+		if ret == 0 {
+			if err == errorPipeConnected {
+				done <- nil
+				return
+			}
+			if err != nil {
+				done <- err
+				return
+			}
+			done <- fmt.Errorf("failed to connect named pipe")
+			return
+		}
+		done <- nil
+	}()
+
+	select {
+	case <-ctx.Done():
+		go syscall.CloseHandle(handle)
+		return ctx.Err()
+	case err := <-done:
+		return err
+	}
+}
+
+func (s *winServer) prepareNextHandle() {
+	s.mu.RLock()
+	closed := s.closed
+	hasNext := s.next != 0
+	s.mu.RUnlock()
+	if closed || hasNext {
+		return
+	}
+
+	handle, err := createNamedPipe(s.pipeName, s.config.BufferSize)
+	if err != nil {
+		return
+	}
+
+	s.mu.Lock()
+	if s.closed || s.next != 0 {
+		s.mu.Unlock()
+		_ = syscall.CloseHandle(handle)
+		return
+	}
+	s.next = handle
+	s.mu.Unlock()
+}
+
+func isNamedPipeAddr(addr string) bool {
+	return strings.HasPrefix(addr, `\\.\pipe\`)
+}
+
+func normalizePipeAddr(addr string) string {
+	if isNamedPipeAddr(addr) {
+		return addr
+	}
+	return fmt.Sprintf(`\\.\pipe\%s`, addr)
+}
+
+func dialNamedPipe(ctx context.Context, pipeName string, timeout time.Duration) (syscall.Handle, error) {
+	pipeNamePtr, err := syscall.UTF16PtrFromString(pipeName)
+	if err != nil {
+		return 0, err
+	}
+
+	deadline := time.Now().Add(timeout)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
+	}
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return 0, fmt.Errorf("named pipe connect timeout")
+		}
+		procWaitNamedPipeW.Call(uintptr(unsafe.Pointer(pipeNamePtr)), uintptr(remaining/time.Millisecond))
+
+		handle, err := syscall.CreateFile(
+			pipeNamePtr,
+			GENERIC_READ|GENERIC_WRITE,
+			0,
+			nil,
+			OPEN_EXISTING,
+			0,
+			0,
+		)
+		if err == nil {
+			return handle, nil
+		}
+		if ctx.Err() != nil {
+			return 0, ctx.Err()
+		}
+		if time.Now().After(deadline) {
+			return 0, err
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func (c *winClient) Write(data []byte) (int, error) {

@@ -14,21 +14,21 @@ import (
 
 // ErrorResponse represents a standardized error response.
 type ErrorResponse struct {
-	Error       string    `json:"error"`
-	Code        string    `json:"code,omitempty"`
-	Message     string    `json:"message,omitempty"`
-	Timestamp   time.Time `json:"timestamp"`
-	RequestID   string    `json:"request_id,omitempty"`
-	StackTrace  string    `json:"stack_trace,omitempty"`
+	Error      string    `json:"error"`
+	Code       string    `json:"code,omitempty"`
+	Message    string    `json:"message,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
+	RequestID  string    `json:"request_id,omitempty"`
+	StackTrace string    `json:"stack_trace,omitempty"`
 }
 
 // HealthResponse represents a standardized health response.
 type HealthResponse struct {
-	HealthStatus    `json:",inline"`
-	ResponseTime    time.Duration         `json:"response_time"`
-	RequestID       string                `json:"request_id,omitempty"`
-	BuildInfo       BuildInfo             `json:"build_info,omitempty"`
-	Readiness       ReadinessStatus       `json:"readiness,omitempty"`
+	HealthStatus `json:",inline"`
+	ResponseTime time.Duration   `json:"response_time"`
+	RequestID    string          `json:"request_id,omitempty"`
+	BuildInfo    BuildInfo       `json:"build_info,omitempty"`
+	Readiness    ReadinessStatus `json:"readiness,omitempty"`
 }
 
 // HealthHandler creates a comprehensive health check handler with enhanced error handling.
@@ -36,7 +36,7 @@ func HealthHandler(manager *HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
 		requestID := extractRequestID(r)
-		
+
 		// Enhanced error handling with recovery
 		defer func() {
 			if rvr := recover(); rvr != nil {
@@ -46,7 +46,7 @@ func HealthHandler(manager *HealthManager) http.Handler {
 
 		// Validate request method
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			sendErrorResponse(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", 
+			sendErrorResponse(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED",
 				"Only GET and HEAD methods are allowed", requestID)
 			return
 		}
@@ -56,7 +56,7 @@ func HealthHandler(manager *HealthManager) http.Handler {
 		defer cancel()
 
 		var health HealthStatus
-		
+
 		// Use goroutine with channel for better timeout handling
 		done := make(chan bool, 1)
 		go func() {
@@ -71,16 +71,17 @@ func HealthHandler(manager *HealthManager) http.Handler {
 			// Health check completed successfully
 		case <-ctx.Done():
 			// Health check timed out
-			sendErrorResponse(w, http.StatusGatewayTimeout, "HEALTH_CHECK_TIMEOUT", 
+			sendErrorResponse(w, http.StatusGatewayTimeout, "HEALTH_CHECK_TIMEOUT",
 				"Health check timed out", requestID)
 			return
 		}
 
 		// Determine response code based on health status
 		code := http.StatusOK
-		if health.Status == StatusUnhealthy {
+		switch health.Status {
+		case StatusUnhealthy:
 			code = http.StatusServiceUnavailable
-		} else if health.Status == StatusDegraded {
+		case StatusDegraded:
 			code = http.StatusPartialContent
 		}
 
@@ -96,7 +97,7 @@ func HealthHandler(manager *HealthManager) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.WriteHeader(code)
-		
+
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			// Log encoding error but don't fail the request
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -112,7 +113,7 @@ func ComponentHealthHandler(manager *HealthManager, componentName string) http.H
 
 		// Check the specific component
 		_ = manager.CheckComponent(ctx, componentName)
-		
+
 		health, exists := manager.GetComponentHealth(componentName)
 		if !exists {
 			w.Header().Set("Content-Type", "application/json")
@@ -124,9 +125,10 @@ func ComponentHealthHandler(manager *HealthManager, componentName string) http.H
 		}
 
 		code := http.StatusOK
-		if health.Status == StatusUnhealthy {
+		switch health.Status {
+		case StatusUnhealthy:
 			code = http.StatusServiceUnavailable
-		} else if health.Status == StatusDegraded {
+		case StatusDegraded:
 			code = http.StatusPartialContent
 		}
 
@@ -168,14 +170,14 @@ func HealthHistoryExportHandler(manager *HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse query parameters for filtering and format
 		query := HealthHistoryQuery{}
-		
+
 		// Parse time range
 		if startTimeStr := r.URL.Query().Get("start_time"); startTimeStr != "" {
 			if startTime, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
 				query.StartTime = &startTime
 			}
 		}
-		
+
 		if endTimeStr := r.URL.Query().Get("end_time"); endTimeStr != "" {
 			if endTime, err := time.Parse(time.RFC3339, endTimeStr); err == nil {
 				query.EndTime = &endTime
@@ -224,7 +226,7 @@ func HealthHistoryExportHandler(manager *HealthManager) http.Handler {
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(result)
 		default:
-			sendErrorResponse(w, http.StatusBadRequest, "INVALID_FORMAT", 
+			sendErrorResponse(w, http.StatusBadRequest, "INVALID_FORMAT",
 				"Supported formats: json, csv", "")
 			return
 		}
@@ -235,13 +237,13 @@ func HealthHistoryExportHandler(manager *HealthManager) http.Handler {
 func exportHistoryToCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
-	
+
 	writer := csv.NewWriter(w)
-	
+
 	// Write header
 	header := []string{"Timestamp", "State", "Message", "Components", "Duration"}
 	_ = writer.Write(header)
-	
+
 	// Write data
 	for _, entry := range entries {
 		record := []string{
@@ -253,7 +255,7 @@ func exportHistoryToCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 		}
 		_ = writer.Write(record)
 	}
-	
+
 	writer.Flush()
 	if err := writer.Error(); err != nil {
 		http.Error(w, "Failed to write CSV", http.StatusInternalServerError)
@@ -304,9 +306,9 @@ func ReadinessHandlerWithManager(manager *HealthManager) http.Handler {
 		}
 
 		response := map[string]interface{}{
-			"ready":    overallHealth.Status.isReady(),
-			"status":   overallHealth.Status,
-			"message":  overallHealth.Message,
+			"ready":     overallHealth.Status.isReady(),
+			"status":    overallHealth.Status,
+			"message":   overallHealth.Message,
 			"timestamp": overallHealth.Timestamp,
 		}
 
@@ -378,28 +380,28 @@ func sendErrorResponse(w http.ResponseWriter, statusCode int, code, message, req
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.WriteHeader(statusCode)
-	
+
 	errorResp := ErrorResponse{
-		Error:      http.StatusText(statusCode),
-		Code:       code,
-		Message:    message,
-		Timestamp:  time.Now(),
-		RequestID:  requestID,
+		Error:     http.StatusText(statusCode),
+		Code:      code,
+		Message:   message,
+		Timestamp: time.Now(),
+		RequestID: requestID,
 	}
-	
+
 	if isDevelopment() {
 		errorResp.StackTrace = string(debug.Stack())
 	}
-	
+
 	_ = json.NewEncoder(w).Encode(errorResp)
 }
 
 // handlePanic handles panics in HTTP handlers gracefully.
-func handlePanic(w http.ResponseWriter, r *http.Request, panicValue interface{}, requestID string) {
+func handlePanic(w http.ResponseWriter, _ *http.Request, panicValue interface{}, requestID string) {
 	// Log the panic (in a real application, you'd use proper logging)
 	fmt.Printf("Panic in health handler: %v\nStack: %s\n", panicValue, debug.Stack())
-	
-	sendErrorResponse(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", 
+
+	sendErrorResponse(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR",
 		"Internal server error occurred", requestID)
 }
 

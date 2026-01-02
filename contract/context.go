@@ -58,6 +58,7 @@ type Ctx struct {
 	bodyErr            error
 	bodyReadOnce       sync.Once
 	compressionEnabled atomic.Bool
+	cancel             context.CancelFunc
 }
 
 // BindError represents an error that occurred while binding a request body.
@@ -66,6 +67,8 @@ type BindError struct {
 	Message string
 	Err     error
 }
+
+var errRequestBodyTooLarge = errors.New("request body too large")
 
 // Error implements the error interface.
 func (e *BindError) Error() string {
@@ -153,8 +156,21 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 		params = map[string]string{}
 	}
 
+	config := DefaultRequestConfig
+	if config == nil {
+		config = &RequestConfig{}
+	}
+
+	var cancel context.CancelFunc
+	deadline, hasDeadline := r.Context().Deadline()
+	if !hasDeadline && config.RequestTimeout > 0 {
+		timeoutCtx, cancelFunc := context.WithTimeout(r.Context(), config.RequestTimeout)
+		cancel = cancelFunc
+		r = r.WithContext(timeoutCtx)
+		deadline, _ = timeoutCtx.Deadline()
+	}
+
 	traceID := TraceIDFromContext(r.Context())
-	deadline, _ := r.Context().Deadline()
 
 	if logger == nil {
 		logger = log.NewGLogger()
@@ -177,18 +193,24 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 		Logger:   logger,
 		TraceID:  traceID,
 		Deadline: deadline,
-		Config:   DefaultRequestConfig,
+		Config:   config,
 
 		startedAt:          time.Now(),
 		compressionEnabled: atomic.Bool{},
+		cancel:             cancel,
 	}
 
 	ctx.compressionEnabled.Store(compressionEnabled)
 	return ctx
 }
 
-func (c *Ctx) setCompressionEnabled(enabled bool) {
-	c.compressionEnabled.Store(enabled)
+// Close releases any request-scoped resources owned by the context.
+func (c *Ctx) Close() {
+	if c == nil || c.cancel == nil {
+		return
+	}
+	c.cancel()
+	c.cancel = nil
 }
 
 func (c *Ctx) ErrorJSON(status int, errCode string, message string, details map[string]any) error {
@@ -259,6 +281,9 @@ func (c *Ctx) MustParam(key string) (string, error) {
 func (c *Ctx) BindJSON(dst any) error {
 	data, err := c.bodyBytes()
 	if err != nil {
+		if errors.Is(err, errRequestBodyTooLarge) {
+			return &BindError{Status: http.StatusRequestEntityTooLarge, Message: errRequestBodyTooLarge.Error(), Err: err}
+		}
 		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
 
@@ -312,10 +337,24 @@ func (c *Ctx) GetBodySize() int64 {
 
 func (c *Ctx) bodyBytes() ([]byte, error) {
 	c.bodyReadOnce.Do(func() {
-		c.body, c.bodyErr = io.ReadAll(c.R.Body)
+		reader := io.Reader(c.R.Body)
+		maxBodySize := int64(0)
+		if c.Config != nil && c.Config.MaxBodySize > 0 {
+			maxBodySize = c.Config.MaxBodySize
+			reader = io.LimitReader(reader, maxBodySize+1)
+		}
+
+		c.body, c.bodyErr = io.ReadAll(reader)
 		if c.bodyErr == nil {
+			if maxBodySize > 0 && int64(len(c.body)) > maxBodySize {
+				c.bodyErr = errRequestBodyTooLarge
+				c.body = nil
+				return
+			}
 			c.bodySize.Store(int64(len(c.body)))
-			c.R.Body = io.NopCloser(bytes.NewBuffer(c.body))
+			if c.Config == nil || c.Config.EnableBodyCache {
+				c.R.Body = io.NopCloser(bytes.NewBuffer(c.body))
+			}
 		}
 	})
 	return c.body, c.bodyErr
@@ -345,6 +384,7 @@ func AdaptCtxHandler(h CtxHandlerFunc, logger log.StructuredLogger) http.Handler
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := RequestContextFrom(r.Context())
 		ctx := newCtxWithLogger(w, r, rc.Params, logger)
+		defer ctx.Close()
 		h(ctx)
 	})
 }

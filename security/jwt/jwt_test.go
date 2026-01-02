@@ -20,6 +20,9 @@ func newTestStore(t *testing.T) *kvstore.KVStore {
 	if err != nil {
 		t.Fatalf("failed to create kv store: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
 	return store
 }
 

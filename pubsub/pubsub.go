@@ -15,6 +15,7 @@ type subscriber struct {
 	opts   SubOptions
 	closed atomic.Bool
 	once   sync.Once
+	mu     sync.Mutex
 
 	// back-reference
 	ps *InProcPubSub
@@ -24,11 +25,14 @@ func (s *subscriber) C() <-chan Message { return s.ch }
 
 func (s *subscriber) Cancel() {
 	s.once.Do(func() {
+		s.mu.Lock()
 		if s.closed.Swap(true) {
+			s.mu.Unlock()
 			return
 		}
-		s.ps.removeSubscriber(s.topic, s.id)
 		close(s.ch)
+		s.mu.Unlock()
+		s.ps.removeSubscriber(s.topic, s.id)
 	})
 }
 
@@ -171,19 +175,29 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 	if s.closed.Load() {
 		return
 	}
+	s.mu.Lock()
+	if s.closed.Load() {
+		s.mu.Unlock()
+		return
+	}
 
+	cancelSub := false
 	switch s.opts.Policy {
 	case DropOldest:
 		// Try non-blocking send; if full, evict one oldest then try again.
 		select {
 		case s.ch <- msg:
 			ps.metrics.incDelivered(s.topic)
-			return
 		default:
 			// channel full -> drop oldest by reading one
+			dropped := false
 			select {
 			case <-s.ch:
+				dropped = true
 			default:
+			}
+			if dropped {
+				ps.metrics.incDropped(s.topic, DropOldest)
 			}
 			select {
 			case s.ch <- msg:
@@ -193,8 +207,6 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 				ps.metrics.incDropped(s.topic, DropOldest)
 			}
 		}
-		ps.metrics.incDropped(s.topic, DropOldest)
-		return
 
 	case DropNewest:
 		select {
@@ -203,7 +215,6 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 		default:
 			ps.metrics.incDropped(s.topic, DropNewest)
 		}
-		return
 
 	case BlockWithTimeout:
 		to := s.opts.BlockTimeout
@@ -219,7 +230,6 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 		case <-ctx.Done():
 			ps.metrics.incDropped(s.topic, BlockWithTimeout)
 		}
-		return
 
 	case CloseSubscriber:
 		select {
@@ -228,9 +238,8 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 		default:
 			// slow consumer -> close subscription
 			ps.metrics.incDropped(s.topic, CloseSubscriber)
-			s.Cancel()
+			cancelSub = true
 		}
-		return
 
 	default:
 		// safe default: DropOldest
@@ -238,9 +247,14 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 		case s.ch <- msg:
 			ps.metrics.incDelivered(s.topic)
 		default:
+			dropped := false
 			select {
 			case <-s.ch:
+				dropped = true
 			default:
+			}
+			if dropped {
+				ps.metrics.incDropped(s.topic, DropOldest)
 			}
 			select {
 			case s.ch <- msg:
@@ -248,8 +262,12 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 			default:
 				ps.metrics.incDropped(s.topic, DropOldest)
 			}
-			ps.metrics.incDropped(s.topic, DropOldest)
 		}
+	}
+
+	s.mu.Unlock()
+	if cancelSub {
+		s.Cancel()
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 
 // HealthMetrics contains various health-related metrics.
 type HealthMetrics struct {
-	mu               sync.RWMutex
 	startTime        time.Time
 	lastCheckTime    time.Time
 	checkCount       int64
@@ -20,34 +19,34 @@ type HealthMetrics struct {
 
 // ComponentMetrics tracks metrics for individual components.
 type ComponentMetrics struct {
-	Name           string                 `json:"name"`
-	CheckCount     int64                  `json:"check_count"`
-	SuccessCount   int64                  `json:"success_count"`
-	FailureCount   int64                  `json:"failure_count"`
-	AverageLatency time.Duration          `json:"average_latency"`
-	MinLatency     time.Duration          `json:"min_latency"`
-	MaxLatency     time.Duration          `json:"max_latency"`
-	LastCheckTime  time.Time              `json:"last_check_time"`
-	LastStatus     HealthState            `json:"last_status"`
-	RecentHistory  []HealthCheckRecord    `json:"recent_history,omitempty"` // 最近检查记录
-	HealthTrend    HealthTrend            `json:"health_trend,omitempty"`   // 健康趋势
+	Name           string              `json:"name"`
+	CheckCount     int64               `json:"check_count"`
+	SuccessCount   int64               `json:"success_count"`
+	FailureCount   int64               `json:"failure_count"`
+	AverageLatency time.Duration       `json:"average_latency"`
+	MinLatency     time.Duration       `json:"min_latency"`
+	MaxLatency     time.Duration       `json:"max_latency"`
+	LastCheckTime  time.Time           `json:"last_check_time"`
+	LastStatus     HealthState         `json:"last_status"`
+	RecentHistory  []HealthCheckRecord `json:"recent_history,omitempty"`
+	HealthTrend    HealthTrend         `json:"health_trend,omitempty"`
 }
 
 // HealthCheckRecord represents a single health check execution record.
 type HealthCheckRecord struct {
-	Timestamp      time.Time   `json:"timestamp"`
-	Duration       time.Duration `json:"duration"`
-	Success        bool        `json:"success"`
-	Status         HealthState `json:"status"`
-	ErrorMessage   string      `json:"error_message,omitempty"`
+	Timestamp    time.Time     `json:"timestamp"`
+	Duration     time.Duration `json:"duration"`
+	Success      bool          `json:"success"`
+	Status       HealthState   `json:"status"`
+	ErrorMessage string        `json:"error_message,omitempty"`
 }
 
 // HealthTrend represents the health trend analysis.
 type HealthTrend struct {
-	Direction      TrendDirection `json:"direction"`      // improving/declining/stable
-	Stability      float64        `json:"stability"`      // 0.0-1.0, higher is more stable
-	RecentSuccess  float64        `json:"recent_success"` // 最近成功率
-	TrendScore     float64        `json:"trend_score"`    // -1.0到1.0，负数表示恶化
+	Direction     TrendDirection `json:"direction"`      // improving/declining/stable
+	Stability     float64        `json:"stability"`      // 0.0-1.0, higher is more stable
+	RecentSuccess float64        `json:"recent_success"` // 最近成功率
+	TrendScore    float64        `json:"trend_score"`    // -1.0到1.0，负数表示恶化
 }
 
 // TrendDirection represents the direction of health trend.
@@ -64,14 +63,14 @@ func (cm *ComponentMetrics) GetRecentSuccessRate() float64 {
 	if len(cm.RecentHistory) == 0 {
 		return 0.0
 	}
-	
+
 	successCount := 0
 	for _, record := range cm.RecentHistory {
 		if record.Success {
 			successCount++
 		}
 	}
-	
+
 	return float64(successCount) / float64(len(cm.RecentHistory))
 }
 
@@ -86,7 +85,7 @@ type MetricsCollector struct {
 func NewMetricsCollector(manager *HealthManager) *MetricsCollector {
 	return &MetricsCollector{
 		metrics: &HealthMetrics{
-			startTime:         time.Now(),
+			startTime:        time.Now(),
 			componentMetrics: make(map[string]*ComponentMetrics),
 		},
 		collector: manager,
@@ -110,12 +109,12 @@ func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Dura
 	// Update component metrics
 	if _, exists := mc.metrics.componentMetrics[componentName]; !exists {
 		mc.metrics.componentMetrics[componentName] = &ComponentMetrics{
-			Name:           componentName,
-			MinLatency:     duration,
-			MaxLatency:     duration,
-			LastStatus:     status,
-			LastCheckTime:  time.Now(),
-			RecentHistory:  make([]HealthCheckRecord, 0, 10), // 保留最近10次检查
+			Name:          componentName,
+			MinLatency:    duration,
+			MaxLatency:    duration,
+			LastStatus:    status,
+			LastCheckTime: time.Now(),
+			RecentHistory: make([]HealthCheckRecord, 0, 10), // 保留最近10次检查
 		}
 	}
 
@@ -148,12 +147,12 @@ func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Dura
 
 	// Add to recent history (keep only last 10 records)
 	record := HealthCheckRecord{
-		Timestamp:     time.Now(),
-		Duration:      duration,
-		Success:       success,
-		Status:        status,
+		Timestamp: time.Now(),
+		Duration:  duration,
+		Success:   success,
+		Status:    status,
 	}
-	
+
 	// Append new record
 	comp.RecentHistory = append(comp.RecentHistory, record)
 	if len(comp.RecentHistory) > 10 {
@@ -168,22 +167,22 @@ func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Dura
 func (mc *MetricsCollector) updateHealthTrend(comp *ComponentMetrics) {
 	if len(comp.RecentHistory) < 3 {
 		comp.HealthTrend = HealthTrend{
-			Direction:      TrendStable,
-			Stability:      1.0,
-			RecentSuccess:  comp.GetRecentSuccessRate(),
-			TrendScore:     0.0,
+			Direction:     TrendStable,
+			Stability:     1.0,
+			RecentSuccess: comp.GetRecentSuccessRate(),
+			TrendScore:    0.0,
 		}
 		return
 	}
 
 	// Calculate recent success rate
 	recentSuccess := comp.GetRecentSuccessRate()
-	
+
 	// Calculate trend by comparing recent vs older results
 	var recentGood, olderGood int
 	recentCount := len(comp.RecentHistory)
 	halfPoint := recentCount / 2
-	
+
 	for i, record := range comp.RecentHistory {
 		if i >= halfPoint {
 			if record.Success {
@@ -195,12 +194,12 @@ func (mc *MetricsCollector) updateHealthTrend(comp *ComponentMetrics) {
 			}
 		}
 	}
-	
+
 	recentRate := float64(recentGood) / float64(halfPoint)
-	olderRate := float64(olderGood) / float64(recentCount - halfPoint)
-	
+	olderRate := float64(olderGood) / float64(recentCount-halfPoint)
+
 	trendScore := recentRate - olderRate
-	
+
 	var direction TrendDirection
 	if trendScore > 0.1 {
 		direction = TrendImproving
@@ -209,15 +208,15 @@ func (mc *MetricsCollector) updateHealthTrend(comp *ComponentMetrics) {
 	} else {
 		direction = TrendStable
 	}
-	
+
 	// Calculate stability (inverse of variance in success/failure)
 	stability := mc.calculateStability(comp.RecentHistory)
-	
+
 	comp.HealthTrend = HealthTrend{
-		Direction:      direction,
-		Stability:      stability,
-		RecentSuccess:  recentSuccess,
-		TrendScore:     trendScore,
+		Direction:     direction,
+		Stability:     stability,
+		RecentSuccess: recentSuccess,
+		TrendScore:    trendScore,
 	}
 }
 
@@ -226,14 +225,14 @@ func (mc *MetricsCollector) calculateStability(history []HealthCheckRecord) floa
 	if len(history) < 2 {
 		return 1.0
 	}
-	
+
 	successCount := 0
 	for _, record := range history {
 		if record.Success {
 			successCount++
 		}
 	}
-	
+
 	// Higher stability when success rate is consistent (either high or low but stable)
 	successRate := float64(successCount) / float64(len(history))
 	if successRate >= 0.8 || successRate <= 0.2 {
@@ -250,8 +249,14 @@ func (mc *MetricsCollector) GetMetrics() HealthMetrics {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
-	// Return a copy to prevent external modification
-	metricsCopy := *mc.metrics
+	// Return a copy to prevent external modification without copying the mutex.
+	metricsCopy := HealthMetrics{
+		startTime:     mc.metrics.startTime,
+		lastCheckTime: mc.metrics.lastCheckTime,
+		checkCount:    mc.metrics.checkCount,
+		successCount:  mc.metrics.successCount,
+		failureCount:  mc.metrics.failureCount,
+	}
 	metricsCopy.componentMetrics = make(map[string]*ComponentMetrics, len(mc.metrics.componentMetrics))
 	for name, comp := range mc.metrics.componentMetrics {
 		compCopy := *comp
@@ -291,9 +296,14 @@ func (mc *MetricsCollector) GetSuccessRate() float64 {
 // GetUptime returns the application uptime.
 func (mc *MetricsCollector) GetUptime() time.Duration {
 	mc.mu.RLock()
-	defer mc.mu.RUnlock()
+	start := mc.metrics.startTime
+	mc.mu.RUnlock()
 
-	return time.Since(mc.metrics.startTime)
+	uptime := time.Since(start)
+	if uptime <= 0 {
+		return time.Nanosecond
+	}
+	return uptime
 }
 
 // Reset resets all metrics.
@@ -302,18 +312,18 @@ func (mc *MetricsCollector) Reset() {
 	defer mc.mu.Unlock()
 
 	mc.metrics = &HealthMetrics{
-		startTime:         time.Now(),
+		startTime:        time.Now(),
 		componentMetrics: make(map[string]*ComponentMetrics),
 	}
 }
 
 // HealthReport provides a comprehensive health report with metrics.
 type HealthReport struct {
-	HealthStatus   HealthStatus    `json:"health_status"`
-	Metrics        HealthMetrics   `json:"metrics"`
-	Readiness      ReadinessStatus `json:"readiness"`
-	BuildInfo      BuildInfo       `json:"build_info"`
-	Components     []string        `json:"components"`
+	HealthStatus HealthStatus    `json:"health_status"`
+	Metrics      HealthMetrics   `json:"metrics"`
+	Readiness    ReadinessStatus `json:"readiness"`
+	BuildInfo    BuildInfo       `json:"build_info"`
+	Components   []string        `json:"components"`
 }
 
 // GenerateReport generates a comprehensive health report.
@@ -329,11 +339,11 @@ func (mc *MetricsCollector) GenerateReport() HealthReport {
 	}
 
 	return HealthReport{
-		HealthStatus:   overallHealth,
-		Metrics:        mc.GetMetrics(),
-		Readiness:      readiness,
-		BuildInfo:      buildInfo,
-		Components:     components,
+		HealthStatus: overallHealth,
+		Metrics:      mc.GetMetrics(),
+		Readiness:    readiness,
+		BuildInfo:    buildInfo,
+		Components:   components,
 	}
 }
 
@@ -354,9 +364,10 @@ func HealthReportHandler(collector *MetricsCollector) http.Handler {
 		report := collector.GenerateReport()
 
 		code := http.StatusOK
-		if report.HealthStatus.Status == StatusUnhealthy {
+		switch report.HealthStatus.Status {
+		case StatusUnhealthy:
 			code = http.StatusServiceUnavailable
-		} else if report.HealthStatus.Status == StatusDegraded {
+		case StatusDegraded:
 			code = http.StatusPartialContent
 		}
 

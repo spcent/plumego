@@ -21,9 +21,6 @@ type ContextHandlerFunc = contract.CtxHandlerFunc
 // Component hooks into routing, middleware, and lifecycle events.
 type Component = core.Component
 
-// ComponentFunc is a helper implementation of Component.
-type ComponentFunc = core.ComponentFunc
-
 // TLSConfig re-exports the TLS settings for App configuration.
 type TLSConfig = core.TLSConfig
 

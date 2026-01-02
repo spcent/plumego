@@ -44,34 +44,34 @@ type ErrorType string
 
 const (
 	// Validation errors
-	ErrTypeValidation      ErrorType = "validation_error"
-	ErrTypeRequired        ErrorType = "required_field_missing"
-	ErrTypeInvalidFormat   ErrorType = "invalid_format"
-	ErrTypeOutOfRange      ErrorType = "value_out_of_range"
-	ErrTypeDuplicate       ErrorType = "duplicate_value"
-	
+	ErrTypeValidation    ErrorType = "validation_error"
+	ErrTypeRequired      ErrorType = "required_field_missing"
+	ErrTypeInvalidFormat ErrorType = "invalid_format"
+	ErrTypeOutOfRange    ErrorType = "value_out_of_range"
+	ErrTypeDuplicate     ErrorType = "duplicate_value"
+
 	// Authentication/Authorization errors
-	ErrTypeUnauthorized     ErrorType = "unauthorized"
-	ErrTypeForbidden        ErrorType = "forbidden"
-	ErrTypeInvalidToken     ErrorType = "invalid_token"
-	ErrTypeExpiredToken     ErrorType = "expired_token"
-	
+	ErrTypeUnauthorized ErrorType = "unauthorized"
+	ErrTypeForbidden    ErrorType = "forbidden"
+	ErrTypeInvalidToken ErrorType = "invalid_token"
+	ErrTypeExpiredToken ErrorType = "expired_token"
+
 	// Resource errors
-	ErrTypeNotFound       ErrorType = "resource_not_found"
-	ErrTypeConflict       ErrorType = "resource_conflict"
-	ErrTypeAlreadyExists  ErrorType = "resource_already_exists"
-	ErrTypeGone           ErrorType = "resource_gone"
-	
+	ErrTypeNotFound      ErrorType = "resource_not_found"
+	ErrTypeConflict      ErrorType = "resource_conflict"
+	ErrTypeAlreadyExists ErrorType = "resource_already_exists"
+	ErrTypeGone          ErrorType = "resource_gone"
+
 	// System errors
-	ErrTypeInternal      ErrorType = "internal_error"
-	ErrTypeUnavailable   ErrorType = "service_unavailable"
-	ErrTypeTimeout       ErrorType = "timeout"
-	ErrTypeRateLimited   ErrorType = "rate_limited"
-	ErrTypeMaintenance   ErrorType = "maintenance_mode"
-	
+	ErrTypeInternal    ErrorType = "internal_error"
+	ErrTypeUnavailable ErrorType = "service_unavailable"
+	ErrTypeTimeout     ErrorType = "timeout"
+	ErrTypeRateLimited ErrorType = "rate_limited"
+	ErrTypeMaintenance ErrorType = "maintenance_mode"
+
 	// Business logic errors
-	ErrTypeInvalidState ErrorType = "invalid_state"
-	ErrTypeInsufficientFunds ErrorType = "insufficient_funds"
+	ErrTypeInvalidState        ErrorType = "invalid_state"
+	ErrTypeInsufficientFunds   ErrorType = "insufficient_funds"
 	ErrTypeOperationNotAllowed ErrorType = "operation_not_allowed"
 )
 
@@ -108,8 +108,10 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) {
 		}
 	}
 
-	if r != nil {
-		err.TraceID = TraceIDFromContext(r.Context())
+	if err.TraceID == "" && r != nil {
+		if traceID := TraceIDFromContext(r.Context()); traceID != "" {
+			err.TraceID = traceID
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -154,9 +156,9 @@ type ErrorBuilder struct {
 func NewErrorBuilder() *ErrorBuilder {
 	return &ErrorBuilder{
 		err: APIError{
-			Status:    http.StatusInternalServerError,
-			Category:  CategoryServer,
-			Details:   make(map[string]any),
+			Status:   http.StatusInternalServerError,
+			Category: CategoryServer,
+			Details:  make(map[string]any),
 		},
 	}
 }
@@ -311,8 +313,8 @@ func (ec *ErrorChain) HasCategory(category ErrorCategory) bool {
 
 // IsTimeoutError checks if the error chain contains timeout errors.
 func (ec *ErrorChain) IsTimeoutError() bool {
-	return ec.HasCategory(CategoryTimeout) || 
-		   ec.HasErrorType(ErrTypeTimeout)
+	return ec.HasCategory(CategoryTimeout) ||
+		ec.HasErrorType(ErrTypeTimeout)
 }
 
 // HasErrorType checks if any error in the chain has the given error type.
@@ -461,7 +463,7 @@ func HTTPStatusFromCategory(category ErrorCategory) int {
 // ParseErrorFromResponse attempts to parse an APIError from an HTTP response.
 func ParseErrorFromResponse(resp *http.Response) (APIError, error) {
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode < 400 {
 		return APIError{}, fmt.Errorf("no error in successful response")
 	}
@@ -493,24 +495,24 @@ func IsServerError(err APIError) bool {
 func IsRetryableError(err APIError) bool {
 	// Retryable status codes: 408, 429, 500, 502, 503, 504
 	retryableCodes := []int{408, 429, 500, 502, 503, 504}
-	
+
 	for _, code := range retryableCodes {
 		if err.Status == code {
 			return true
 		}
 	}
-	
+
 	// Also retry if it's a timeout error
 	return err.Category == CategoryTimeout
 }
 
 // ErrorMetrics represents metrics for error tracking and monitoring.
 type ErrorMetrics struct {
-	TotalErrors    int64              `json:"total_errors"`
-	ByCategory     map[ErrorCategory]int64 `json:"by_category"`
-	ByType         map[ErrorType]int64     `json:"by_type"`
-	ByStatus       map[int]int64            `json:"by_status"`
-	LastErrorTime  time.Time           `json:"last_error_time"`
+	TotalErrors   int64                   `json:"total_errors"`
+	ByCategory    map[ErrorCategory]int64 `json:"by_category"`
+	ByType        map[ErrorType]int64     `json:"by_type"`
+	ByStatus      map[int]int64           `json:"by_status"`
+	LastErrorTime time.Time               `json:"last_error_time"`
 }
 
 // NewErrorMetrics creates a new ErrorMetrics instance.
@@ -527,10 +529,10 @@ func (em *ErrorMetrics) RecordError(err APIError) {
 	em.TotalErrors++
 	em.ByCategory[err.Category]++
 	em.ByStatus[err.Status]++
-	
+
 	if errorType, ok := err.Details["type"].(ErrorType); ok {
 		em.ByType[errorType]++
 	}
-	
+
 	em.LastErrorTime = time.Now()
 }
