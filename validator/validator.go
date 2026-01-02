@@ -72,7 +72,7 @@ func NewRuleRegistry() *RuleRegistry {
 	registry := &RuleRegistry{
 		rules: make(map[string]Rule),
 	}
-	
+
 	// Register built-in rules
 	registry.Register("required", Required())
 	registry.Register("email", Email())
@@ -86,7 +86,7 @@ func NewRuleRegistry() *RuleRegistry {
 	registry.Register("url", URL())
 	registry.Register("phone", Phone())
 	registry.Register("regex", Regex(""))
-	
+
 	return registry
 }
 
@@ -110,26 +110,28 @@ func (r *RuleRegistry) Get(name string) (Rule, bool) {
 // Required ensures the value is non-nil and non-empty
 func Required() Rule {
 	return RuleFunc(func(value any) *ValidationError {
-		switch v := value.(type) {
-		case nil:
+		if value == nil {
 			return &ValidationError{Code: "required", Message: "field is required"}
-		case string:
-			if strings.TrimSpace(v) == "" {
+		}
+
+		rv := reflect.ValueOf(value)
+		if rv.Kind() == reflect.Ptr {
+			if rv.IsNil() {
 				return &ValidationError{Code: "required", Message: "field is required"}
 			}
-		case []interface{}:
-			if len(v) == 0 {
+			rv = rv.Elem()
+		}
+
+		switch rv.Kind() {
+		case reflect.String:
+			if strings.TrimSpace(rv.String()) == "" {
 				return &ValidationError{Code: "required", Message: "field is required"}
 			}
-		case map[string]interface{}:
-			if len(v) == 0 {
+		case reflect.Slice, reflect.Map, reflect.Array, reflect.Chan:
+			if rv.Len() == 0 {
 				return &ValidationError{Code: "required", Message: "field is required"}
 			}
 		default:
-			rv := reflect.ValueOf(value)
-			if rv.Kind() == reflect.Ptr && rv.IsNil() {
-				return &ValidationError{Code: "required", Message: "field is required"}
-			}
 			if rv.IsZero() {
 				return &ValidationError{Code: "required", Message: "field is required"}
 			}
@@ -141,26 +143,26 @@ func Required() Rule {
 // Email performs email format validation
 func Email() Rule {
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	
+
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
-			return &ValidationError{Code: "email", Message: "must be a valid email"}
+			return nil
 		}
 
 		str, ok := value.(string)
 		if !ok {
 			return &ValidationError{Code: "email", Message: "must be a string"}
 		}
-		
+
 		str = strings.TrimSpace(str)
 		if str == "" {
-			return &ValidationError{Code: "email", Message: "cannot be empty"}
+			return nil
 		}
-		
+
 		if !emailRegex.MatchString(str) {
 			return &ValidationError{Code: "email", Message: "invalid email format"}
 		}
-		
+
 		return nil
 	})
 }
@@ -171,65 +173,93 @@ func Min(min int64) Rule {
 		if value == nil {
 			return nil // Skip validation for nil values unless required
 		}
-		
-		// Try numeric validation first
-		var num int64
-		var isNumeric bool
-		
+
 		switch v := value.(type) {
 		case int:
-			num = int64(v)
-			isNumeric = true
+			if int64(v) < min {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case int8:
-			num = int64(v)
-			isNumeric = true
+			if int64(v) < min {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case int16:
-			num = int64(v)
-			isNumeric = true
+			if int64(v) < min {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case int32:
-			num = int64(v)
-			isNumeric = true
+			if int64(v) < min {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case int64:
-			num = v
-			isNumeric = true
+			if v < min {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case uint:
-			num = int64(v)
-			isNumeric = true
+			if min > 0 && uint64(v) < uint64(min) {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case uint8:
-			num = int64(v)
-			isNumeric = true
+			if min > 0 && uint64(v) < uint64(min) {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case uint16:
-			num = int64(v)
-			isNumeric = true
+			if min > 0 && uint64(v) < uint64(min) {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case uint32:
-			num = int64(v)
-			isNumeric = true
+			if min > 0 && uint64(v) < uint64(min) {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case uint64:
-			num = int64(v)
-			isNumeric = true
+			if min > 0 && v < uint64(min) {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case float32:
-			num = int64(v)
-			isNumeric = true
+			if float64(v) < float64(min) {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case float64:
-			num = int64(v)
-			isNumeric = true
+			if v < float64(min) {
+				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+			}
+			return nil
 		case string:
-			if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
-				num = parsed
-				isNumeric = true
-			} else {
-				// For non-numeric strings, check length for backward compatibility
-				if utf8.RuneCountInString(v) < min {
-					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d characters", min)}
+			trimmed := strings.TrimSpace(v)
+			if parsed, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+				if parsed < min {
+					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
 				}
 				return nil
+			} else if parsed, err := strconv.ParseUint(trimmed, 10, 64); err == nil {
+				if min > 0 && parsed < uint64(min) {
+					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				}
+				return nil
+			} else if parsed, err := strconv.ParseFloat(trimmed, 64); err == nil {
+				if parsed < float64(min) {
+					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				}
+				return nil
+			} else {
+				// For non-numeric strings, check length for backward compatibility
+				if int64(utf8.RuneCountInString(v)) < min {
+					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d characters", min)}
+				}
 			}
 		}
-		
-		if isNumeric && num < min {
-			return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
-		}
-		
+
 		return nil
 	})
 }
@@ -240,65 +270,108 @@ func Max(max int64) Rule {
 		if value == nil {
 			return nil
 		}
-		
-		// Try numeric validation first
-		var num int64
-		var isNumeric bool
-		
+
 		switch v := value.(type) {
 		case int:
-			num = int64(v)
-			isNumeric = true
+			if int64(v) > max {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case int8:
-			num = int64(v)
-			isNumeric = true
+			if int64(v) > max {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case int16:
-			num = int64(v)
-			isNumeric = true
+			if int64(v) > max {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case int32:
-			num = int64(v)
-			isNumeric = true
+			if int64(v) > max {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case int64:
-			num = v
-			isNumeric = true
+			if v > max {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case uint:
-			num = int64(v)
-			isNumeric = true
+			if max < 0 {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			if uint64(v) > uint64(max) {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case uint8:
-			num = int64(v)
-			isNumeric = true
+			if max < 0 {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			if uint64(v) > uint64(max) {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case uint16:
-			num = int64(v)
-			isNumeric = true
+			if max < 0 {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			if uint64(v) > uint64(max) {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case uint32:
-			num = int64(v)
-			isNumeric = true
+			if max < 0 {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			if uint64(v) > uint64(max) {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case uint64:
-			num = int64(v)
-			isNumeric = true
+			if max < 0 {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			if v > uint64(max) {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case float32:
-			num = int64(v)
-			isNumeric = true
+			if float64(v) > float64(max) {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case float64:
-			num = int64(v)
-			isNumeric = true
+			if v > float64(max) {
+				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+			}
+			return nil
 		case string:
-			if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
-				num = parsed
-				isNumeric = true
+			trimmed := strings.TrimSpace(v)
+			if parsed, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+				if parsed > max {
+					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				}
+				return nil
+			} else if parsed, err := strconv.ParseUint(trimmed, 10, 64); err == nil {
+				if max < 0 || parsed > uint64(max) {
+					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				}
+				return nil
+			} else if parsed, err := strconv.ParseFloat(trimmed, 64); err == nil {
+				if parsed > float64(max) {
+					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				}
+				return nil
 			} else {
 				// For non-numeric strings, check length for backward compatibility
 				if int64(utf8.RuneCountInString(v)) > max {
 					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d characters", max)}
 				}
-				return nil
 			}
 		}
-		
-		if isNumeric && num > max {
-			return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
-		}
-		
+
 		return nil
 	})
 }
@@ -309,16 +382,16 @@ func MinLength(min int) Rule {
 		if value == nil {
 			return nil
 		}
-		
+
 		str, ok := value.(string)
 		if !ok {
 			return nil
 		}
-		
+
 		if utf8.RuneCountInString(str) < min {
 			return &ValidationError{Code: "minLength", Message: fmt.Sprintf("must be at least %d characters", min)}
 		}
-		
+
 		return nil
 	})
 }
@@ -329,16 +402,16 @@ func MaxLength(max int) Rule {
 		if value == nil {
 			return nil
 		}
-		
+
 		str, ok := value.(string)
 		if !ok {
 			return nil
 		}
-		
+
 		if utf8.RuneCountInString(str) > max {
 			return &ValidationError{Code: "maxLength", Message: fmt.Sprintf("must be at most %d characters", max)}
 		}
-		
+
 		return nil
 	})
 }
@@ -349,20 +422,20 @@ func Numeric() Rule {
 		if value == nil {
 			return nil
 		}
-		
+
 		str, ok := value.(string)
 		if !ok {
 			return &ValidationError{Code: "numeric", Message: "must be a string"}
 		}
-		
+
 		if str == "" {
 			return nil
 		}
-		
+
 		if _, err := strconv.ParseFloat(str, 64); err != nil {
-			return &ValidationError{Code: "numeric", Message: "must contain only digits"}
+			return &ValidationError{Code: "numeric", Message: "must be a valid number"}
 		}
-		
+
 		return nil
 	})
 }
@@ -370,25 +443,25 @@ func Numeric() Rule {
 // Alpha validates that string contains only alphabetic characters
 func Alpha() Rule {
 	alphaRegex := regexp.MustCompile(`^[a-zA-Z]+$`)
-	
+
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
 		}
-		
+
 		str, ok := value.(string)
 		if !ok {
 			return &ValidationError{Code: "alpha", Message: "must be a string"}
 		}
-		
+
 		if str == "" {
 			return nil
 		}
-		
+
 		if !alphaRegex.MatchString(str) {
 			return &ValidationError{Code: "alpha", Message: "must contain only alphabetic characters"}
 		}
-		
+
 		return nil
 	})
 }
@@ -396,25 +469,25 @@ func Alpha() Rule {
 // AlphaNum validates that string contains only alphanumeric characters
 func AlphaNum() Rule {
 	alphaNumRegex := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
-	
+
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
 		}
-		
+
 		str, ok := value.(string)
 		if !ok {
 			return &ValidationError{Code: "alphaNum", Message: "must be a string"}
 		}
-		
+
 		if str == "" {
 			return nil
 		}
-		
+
 		if !alphaNumRegex.MatchString(str) {
 			return &ValidationError{Code: "alphaNum", Message: "must contain only alphanumeric characters"}
 		}
-		
+
 		return nil
 	})
 }
@@ -425,20 +498,20 @@ func URL() Rule {
 		if value == nil {
 			return nil
 		}
-		
+
 		str, ok := value.(string)
 		if !ok {
 			return &ValidationError{Code: "url", Message: "must be a string"}
 		}
-		
+
 		if str == "" {
 			return nil
 		}
-		
+
 		if _, err := url.ParseRequestURI(str); err != nil {
 			return &ValidationError{Code: "url", Message: "must be a valid URL"}
 		}
-		
+
 		return nil
 	})
 }
@@ -446,28 +519,28 @@ func URL() Rule {
 // Phone validates that string is a valid phone number (basic validation)
 func Phone() Rule {
 	phoneRegex := regexp.MustCompile(`^\+?[1-9]\d{1,14}$`)
-	
+
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
 		}
-		
+
 		str, ok := value.(string)
 		if !ok {
 			return &ValidationError{Code: "phone", Message: "must be a string"}
 		}
-		
+
 		if str == "" {
 			return nil
 		}
-		
+
 		// Remove common phone number characters
 		cleaned := regexp.MustCompile(`[\s\-\(\)\.]`).ReplaceAllString(str, "")
-		
+
 		if !phoneRegex.MatchString(cleaned) {
 			return &ValidationError{Code: "phone", Message: "must be a valid phone number"}
 		}
-		
+
 		return nil
 	})
 }
@@ -480,27 +553,27 @@ func Regex(pattern string) Rule {
 			return nil
 		})
 	}
-	
+
 	regex := regexp.MustCompile(pattern)
-	
+
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
 		}
-		
+
 		str, ok := value.(string)
 		if !ok {
 			return &ValidationError{Code: "regex", Message: "must be a string"}
 		}
-		
+
 		if str == "" {
 			return nil
 		}
-		
+
 		if !regex.MatchString(str) {
 			return &ValidationError{Code: "regex", Message: "does not match required pattern"}
 		}
-		
+
 		return nil
 	})
 }
@@ -517,7 +590,7 @@ func NewValidator(registry *RuleRegistry) *Validator {
 	if registry == nil {
 		registry = DefaultRuleRegistry
 	}
-	
+
 	return &Validator{
 		registry: registry,
 		cache:    make(map[string][][]Rule),
@@ -547,14 +620,14 @@ func (v *Validator) Validate(data any) error {
 	}
 
 	var validationErrors FieldErrors
-	
+
 	// Cache key based on struct type and tag content
 	cacheKey := v.getCacheKey(typ)
-	
+
 	v.mu.RLock()
 	rules, exists := v.cache[cacheKey]
 	v.mu.RUnlock()
-	
+
 	if !exists {
 		v.mu.Lock()
 		// Double check pattern for thread safety
@@ -569,7 +642,7 @@ func (v *Validator) Validate(data any) error {
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
 		fieldType := typ.Field(i)
-		
+
 		if !fieldType.IsExported() {
 			continue
 		}
@@ -605,32 +678,32 @@ func (v *Validator) getCacheKey(typ reflect.Type) string {
 // parseValidationRules parses validation rules from struct tags
 func (v *Validator) parseValidationRules(typ reflect.Type) [][]Rule {
 	rules := make([][]Rule, typ.NumField())
-	
+
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
 		tag := field.Tag.Get("validate")
-		
+
 		if tag == "" {
 			continue
 		}
-		
+
 		ruleSpecs := strings.Split(tag, ",")
 		fieldRules := make([]Rule, 0, len(ruleSpecs))
-		
+
 		for _, spec := range ruleSpecs {
 			spec = strings.TrimSpace(spec)
 			if spec == "" {
 				continue
 			}
-			
+
 			if rule := v.parseRule(spec); rule != nil {
 				fieldRules = append(fieldRules, rule)
 			}
 		}
-		
+
 		rules[i] = fieldRules
 	}
-	
+
 	return rules
 }
 
@@ -639,18 +712,18 @@ func (v *Validator) parseRule(spec string) Rule {
 	// Handle parameterized rules like min=10, max=100, regex=^[A-Z]+$
 	parts := strings.SplitN(spec, "=", 2)
 	ruleName := strings.TrimSpace(parts[0])
-	
+
 	var rule Rule
 	var param string
-	
+
 	if len(parts) == 2 {
 		param = strings.TrimSpace(parts[1])
 	}
-	
+
 	switch ruleName {
 	case "min":
 		if val, err := strconv.Atoi(param); err == nil {
-			rule = Min(val)
+			rule = Min(int64(val))
 		}
 	case "max":
 		if val, err := strconv.ParseInt(param, 10, 64); err == nil {
@@ -672,7 +745,7 @@ func (v *Validator) parseRule(spec string) Rule {
 			rule = registeredRule
 		}
 	}
-	
+
 	return rule
 }
 

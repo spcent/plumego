@@ -151,7 +151,7 @@ func main() {
 		}{
 			Status:    "success",
 			Topic:     topic,
-			Message:   message.Data,
+			Message:   fmt.Sprint(message.Data),
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
 
@@ -163,9 +163,14 @@ func main() {
 
 	// Test endpoint for webhook functionality
 	app.Post("/test/webhook", func(w http.ResponseWriter, r *http.Request) {
-		body := make([]byte, r.ContentLength)
-		if _, err := r.Body.Read(body); err != nil && err != io.EOF {
+		const maxWebhookBody = int64(1 << 20)
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxWebhookBody+1))
+		if err != nil {
 			http.Error(w, fmt.Sprintf("read body failed: %v", err), http.StatusBadRequest)
+			return
+		}
+		if int64(len(body)) > maxWebhookBody {
+			http.Error(w, "body too large", http.StatusRequestEntityTooLarge)
 			return
 		}
 
@@ -235,7 +240,15 @@ func main() {
 		// Optional delay for testing timeouts and loading states
 		if delay != "" {
 			if d, err := time.ParseDuration(delay); err == nil {
-				time.Sleep(d)
+				const maxDelay = 2 * time.Second
+				if d > maxDelay {
+					d = maxDelay
+				}
+				select {
+				case <-time.After(d):
+				case <-r.Context().Done():
+					return
+				}
 			}
 		}
 
@@ -260,9 +273,9 @@ func main() {
 			queryJSON := r.URL.Query().Encode()
 
 			resp := struct {
-				Format     string `json:"format"`
-				Timestamp  string `json:"timestamp"`
-				Status     string `json:"status"`
+				Format      string `json:"format"`
+				Timestamp   string `json:"timestamp"`
+				Status      string `json:"status"`
 				QueryParams string `json:"query_params"`
 			}{
 				Format:      "json",
@@ -377,11 +390,15 @@ func extractTitle(f fs.FS, filePath string) string {
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "#") {
 			return strings.TrimLeft(line, "# ")
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 	}
 	return strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 }
@@ -519,6 +536,7 @@ func (d *docSite) renderPage(w http.ResponseWriter, data docTemplateData) {
 
 func markdownToHTML(md string) template.HTML {
 	scanner := bufio.NewScanner(strings.NewReader(md))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	var b strings.Builder
 	inList := false
 	inCode := false

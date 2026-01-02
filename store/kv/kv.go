@@ -641,12 +641,15 @@ func (kv *KVStore) Snapshot() error {
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot: %w", err)
 	}
-	defer file.Close()
+	cleanup := func() {
+		_ = file.Close()
+		_ = os.Remove(tempPath)
+	}
 
 	var writer io.Writer = file
+	var gzWriter *gzip.Writer
 	if kv.opts.EnableCompression {
-		gzWriter := gzip.NewWriter(file)
-		defer gzWriter.Close()
+		gzWriter = gzip.NewWriter(file)
 		writer = gzWriter
 	}
 
@@ -659,6 +662,7 @@ func (kv *KVStore) Snapshot() error {
 		"created": time.Now(),
 	}
 	if err := encoder.Encode(header); err != nil {
+		cleanup()
 		return err
 	}
 
@@ -670,6 +674,7 @@ func (kv *KVStore) Snapshot() error {
 			if entry.ExpireAt.IsZero() || now.Before(entry.ExpireAt) {
 				if err := encoder.Encode(entry); err != nil {
 					shard.mu.RUnlock()
+					cleanup()
 					return err
 				}
 			}
@@ -677,7 +682,22 @@ func (kv *KVStore) Snapshot() error {
 		shard.mu.RUnlock()
 	}
 
-	file.Sync()
+	if gzWriter != nil {
+		if err := gzWriter.Close(); err != nil {
+			cleanup()
+			return err
+		}
+	}
+
+	if err := file.Sync(); err != nil {
+		cleanup()
+		return err
+	}
+
+	if err := file.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
 
 	// Atomic replace
 	if err := os.Rename(tempPath, snapshotPath); err != nil {

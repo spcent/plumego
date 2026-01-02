@@ -63,7 +63,10 @@ func (c *pubSubDebugComponent) Start(_ context.Context) error { return nil }
 func (c *pubSubDebugComponent) Stop(_ context.Context) error { return nil }
 
 func (c *pubSubDebugComponent) Health() (string, health.HealthStatus) {
-	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}
+	status := health.HealthStatus{
+		Status:  health.StatusHealthy,
+		Details: map[string]any{"enabled": c.cfg.Enabled},
+	}
 
 	if !c.cfg.Enabled {
 		status.Status = health.StatusDegraded

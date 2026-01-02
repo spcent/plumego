@@ -728,7 +728,7 @@ func BenchmarkLargeWrite(b *testing.B) {
 
 func getTestAddr() string {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("test_socket_%d_%d", os.Getpid(), time.Now().UnixNano())
+		return "127.0.0.1:0"
 	}
 	return filepath.Join(os.TempDir(), fmt.Sprintf("test_socket_%d_%d", os.Getpid(), time.Now().UnixNano()))
 }
@@ -766,7 +766,7 @@ func setupTestPairB(b *testing.B) (Server, Client) {
 
 func getTestAddrB() string {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("bench_socket_%d_%d", os.Getpid(), time.Now().UnixNano())
+		return "127.0.0.1:0"
 	}
 	return filepath.Join(os.TempDir(), fmt.Sprintf("bench_socket_%d_%d", os.Getpid(), time.Now().UnixNano()))
 }

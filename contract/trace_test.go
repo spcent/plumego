@@ -249,6 +249,40 @@ func TestStartChildSpanWithNilParent(t *testing.T) {
 	}
 }
 
+type stubSampler struct {
+	sampled bool
+}
+
+func (s stubSampler) ShouldSample(traceID TraceID) bool {
+	return s.sampled
+}
+
+func TestStartChildSpanRespectsSampling(t *testing.T) {
+	tracer := NewTracer(DefaultTracerConfig())
+	tracer.sampler = stubSampler{sampled: false}
+
+	ctx, parentSpan := tracer.StartTrace(context.Background(), "parent")
+	parentCtx := TraceContextFromContext(ctx)
+	if parentCtx == nil {
+		t.Fatalf("expected parent trace context")
+	}
+	if parentCtx.Sampled {
+		t.Fatalf("expected parent span to be unsampled")
+	}
+
+	childCtx, _ := tracer.StartChildSpan(ctx, parentSpan, "child")
+	childTraceCtx := TraceContextFromContext(childCtx)
+	if childTraceCtx == nil {
+		t.Fatalf("expected child trace context")
+	}
+	if childTraceCtx.Sampled {
+		t.Fatalf("expected child span to be unsampled")
+	}
+	if childTraceCtx.Flags&TraceFlagsSampled != 0 {
+		t.Fatalf("expected sampled flag to be cleared")
+	}
+}
+
 func TestRecordSpanEvent(t *testing.T) {
 	config := DefaultTracerConfig()
 	tracer := NewTracer(config)
