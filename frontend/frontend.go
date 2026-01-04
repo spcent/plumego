@@ -2,8 +2,10 @@ package frontend
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -58,10 +60,17 @@ func WithCacheControl(header string) Option {
 func RegisterFromDir(r *router.Router, dir string, opts ...Option) error {
 	info, err := os.Stat(dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("frontend directory %q: %w", dir, err)
 	}
 	if !info.IsDir() {
-		return errors.New("frontend path is not a directory")
+		return fmt.Errorf("frontend path %q is not a directory", dir)
+	}
+
+	// Verify directory is readable
+	if f, err := os.Open(dir); err != nil {
+		return fmt.Errorf("frontend directory %q not readable: %w", dir, err)
+	} else {
+		f.Close()
 	}
 
 	return RegisterFS(r, http.Dir(dir), opts...)
@@ -70,46 +79,90 @@ func RegisterFromDir(r *router.Router, dir string, opts ...Option) error {
 // RegisterFS mounts a frontend bundle served from the provided http.FileSystem.
 // This is suitable for go:embed bundles using http.FS.
 func RegisterFS(r *router.Router, fsys http.FileSystem, opts ...Option) error {
+	if fsys == nil {
+		return errors.New("filesystem cannot be nil")
+	}
+
 	cfg := &Config{Prefix: "/", IndexFile: defaultIndex}
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
-	if cfg.Prefix == "" {
-		cfg.Prefix = "/"
+	// Validate and normalize prefix
+	cleanedPrefix, err := normalizePrefix(cfg.Prefix)
+	if err != nil {
+		return fmt.Errorf("invalid prefix %q: %w", cfg.Prefix, err)
 	}
 
-	cleaned := cfg.Prefix
-	if !strings.HasPrefix(cleaned, "/") {
-		cleaned = "/" + cleaned
+	// Validate index file
+	indexFile := strings.TrimSpace(cfg.IndexFile)
+	if indexFile == "" {
+		indexFile = defaultIndex
 	}
-	cleaned = strings.TrimRight(cleaned, "/")
+	if strings.Contains(indexFile, "/") || strings.Contains(indexFile, "\\") {
+		return fmt.Errorf("index file %q cannot contain path separators", cfg.IndexFile)
+	}
+
+	// Create handler
+	h := &handler{
+		fs:           fsys,
+		prefix:       cleanedPrefix,
+		indexFile:    indexFile,
+		cacheControl: strings.TrimSpace(cfg.CacheControl),
+	}
+
+	// Register routes based on prefix
+	if cleanedPrefix == "/" {
+		// Root prefix - register root first, then catch-all
+		// This ensures root path "/" gets handled correctly
+		r.Any("/", h)
+		r.Any("/*filepath", h)
+	} else {
+		// Non-root prefix - register prefix catch-all and prefix itself
+		pattern := cleanedPrefix + "/*filepath"
+		r.AnyFunc(pattern, h.ServeHTTP)
+		r.AnyFunc(cleanedPrefix, h.ServeHTTP)
+	}
+
+	return nil
+}
+
+// normalizePrefix validates and normalizes the URL prefix
+func normalizePrefix(prefix string) (string, error) {
+	if prefix == "" {
+		return "/", nil
+	}
+
+	// Trim whitespace
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		return "/", nil
+	}
+
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+
+	// Check for path traversal and current directory references BEFORE cleaning
+	if strings.Contains(prefix, "..") || strings.Contains(prefix, "/./") || strings.HasSuffix(prefix, "/.") {
+		return "", fmt.Errorf("prefix contains path traversal elements")
+	}
+
+	// Clean the path using path.Clean (not filepath.Clean for URL paths)
+	cleaned := path.Clean(prefix)
+
+	// Check again after cleaning (path.Clean might introduce ..)
+	if strings.Contains(cleaned, "..") {
+		return "", fmt.Errorf("prefix contains path traversal elements")
+	}
+
+	// Remove trailing slash except for root
+	cleaned = strings.TrimSuffix(cleaned, "/")
 	if cleaned == "" {
 		cleaned = "/"
 	}
 
-	h := &handler{
-		fs:           fsys,
-		prefix:       cleaned,
-		indexFile:    cfg.IndexFile,
-		cacheControl: cfg.CacheControl,
-	}
-
-	pattern := cleaned + "/*filepath"
-	if cleaned == "/" {
-		pattern = "/*filepath"
-	}
-
-	r.AnyFunc(pattern, h.ServeHTTP)
-	if cleaned == "/" {
-		r.AnyFunc("/", h.ServeHTTP)
-	}
-	if cleaned != "/" {
-		// Ensure the bare prefix also routes to the handler (e.g. /app → /app/index.html).
-		r.AnyFunc(cleaned, h.ServeHTTP)
-	}
-
-	return nil
+	return cleaned, nil
 }
 
 type handler struct {
@@ -125,25 +178,63 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := strings.TrimPrefix(r.URL.Path, h.prefix)
-	if path == "" || path == "/" {
-		path = h.indexFile
-	} else {
-		path = strings.TrimPrefix(path, "/")
-		path = filepath.Clean(path)
-		if path == "." {
-			path = h.indexFile
+	requestPath := r.URL.Path
+
+	// Handle root path
+	if requestPath == "/" {
+		if h.prefix == "/" {
+			h.serveFile(w, r, h.indexFile)
+			return
 		}
-		path = strings.ReplaceAll(path, "\\", "/")
+		// If we have a non-root prefix, root path should not be handled here
+		http.NotFound(w, r)
+		return
 	}
 
-	if !h.serveIfExists(w, r, path) {
-		h.serveIfExists(w, r, h.indexFile)
+	// Handle exact prefix match (e.g. /app)
+	if requestPath == h.prefix {
+		h.serveFile(w, r, h.indexFile)
+		return
+	}
+
+	// For non-root prefix, ensure path starts with prefix
+	if h.prefix != "/" && !strings.HasPrefix(requestPath, h.prefix+"/") {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Extract relative path
+	var relativePath string
+	if h.prefix == "/" {
+		relativePath = strings.TrimPrefix(requestPath, "/")
+	} else {
+		relativePath = strings.TrimPrefix(requestPath, h.prefix+"/")
+	}
+
+	// If relative path is empty after trimming, serve index
+	if relativePath == "" {
+		h.serveFile(w, r, h.indexFile)
+		return
+	}
+
+	// Clean the path to prevent directory traversal
+	cleanedPath := path.Clean(relativePath)
+	if cleanedPath == "." || cleanedPath == ".." || strings.Contains(cleanedPath, "..") {
+		h.serveFile(w, r, h.indexFile)
+		return
+	}
+
+	// Convert to slash-separated path for consistency
+	filePath := filepath.ToSlash(cleanedPath)
+
+	// Try to serve the requested file, fall back to index
+	if !h.serveFile(w, r, filePath) {
+		h.serveFile(w, r, h.indexFile)
 	}
 }
 
-func (h *handler) serveIfExists(w http.ResponseWriter, r *http.Request, path string) bool {
-	f, err := h.fs.Open(path)
+func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath string) bool {
+	f, err := h.fs.Open(filePath)
 	if err != nil {
 		return false
 	}
@@ -155,19 +246,27 @@ func (h *handler) serveIfExists(w http.ResponseWriter, r *http.Request, path str
 	}
 
 	if stat.IsDir() {
-		indexPath := filepath.Join(path, h.indexFile)
-		indexPath = strings.ReplaceAll(indexPath, "\\", "/")
-		return h.serveIfExists(w, r, indexPath)
+		// Try to serve index file from directory
+		indexPath := path.Join(filePath, h.indexFile)
+		return h.serveFile(w, r, indexPath)
 	}
 
-	base := path
-	if idx := strings.LastIndex(base, "/"); idx != -1 {
-		base = base[idx+1:]
-	}
-	if h.cacheControl != "" && base != h.indexFile {
+	// Apply cache control if configured and not index file
+	if h.cacheControl != "" && !isIndexFile(filePath, h.indexFile) {
 		w.Header().Set("Cache-Control", h.cacheControl)
 	}
 
-	http.ServeContent(w, r, path, stat.ModTime(), f)
+	// Use http.ServeContent for proper content serving
+	http.ServeContent(w, r, path.Base(filePath), stat.ModTime(), f)
 	return true
+}
+
+// isIndexFile checks if the given path is the index file
+func isIndexFile(filePath, indexFile string) bool {
+	// Normalize both paths for comparison
+	cleanPath := path.Clean(filePath)
+	cleanIndex := path.Clean(indexFile)
+
+	// Check if path ends with index file
+	return cleanPath == cleanIndex || strings.HasSuffix(cleanPath, "/"+cleanIndex)
 }
