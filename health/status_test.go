@@ -3,7 +3,10 @@ package health
 import "testing"
 
 func TestBuildInfoAndReadiness(t *testing.T) {
-	// default readiness set in init
+	// Reset readiness to ensure clean test
+	SetNotReady("test-reset")
+
+	// default readiness should be not ready
 	status := GetReadiness()
 	if status.Ready {
 		t.Fatalf("expected default not ready status")

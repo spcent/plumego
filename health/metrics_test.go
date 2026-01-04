@@ -8,9 +8,17 @@ import (
 )
 
 func TestMetricsCollector(t *testing.T) {
-	manager := NewHealthManager()
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
 	collector := NewMetricsCollector(manager)
-	
+
 	// Register a component
 	mock := &MockChecker{name: "test", healthy: true}
 	manager.RegisterComponent(mock)
@@ -21,7 +29,7 @@ func TestMetricsCollector(t *testing.T) {
 	collector.RecordCheck("test", 15*time.Millisecond, true, StatusHealthy)
 
 	metrics := collector.GetMetrics()
-	
+
 	if metrics.checkCount != 3 {
 		t.Fatalf("expected check count 3, got %d", metrics.checkCount)
 	}
@@ -58,7 +66,15 @@ func TestMetricsCollector(t *testing.T) {
 }
 
 func TestGetSuccessRate(t *testing.T) {
-	manager := NewHealthManager()
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
 	collector := NewMetricsCollector(manager)
 
 	// No checks yet
@@ -80,7 +96,15 @@ func TestGetSuccessRate(t *testing.T) {
 }
 
 func TestGetUptime(t *testing.T) {
-	manager := NewHealthManager()
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
 	collector := NewMetricsCollector(manager)
 
 	// Should have some uptime
@@ -98,7 +122,15 @@ func TestGetUptime(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	manager := NewHealthManager()
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
 	collector := NewMetricsCollector(manager)
 
 	// Add some data
@@ -124,13 +156,21 @@ func TestReset(t *testing.T) {
 }
 
 func TestGenerateReport(t *testing.T) {
-	manager := NewHealthManager()
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
 	collector := NewMetricsCollector(manager)
 
 	// Register components
 	mock1 := &MockChecker{name: "comp1", healthy: true}
 	mock2 := &MockChecker{name: "comp2", healthy: false}
-	
+
 	manager.RegisterComponent(mock1)
 	manager.RegisterComponent(mock2)
 
@@ -162,7 +202,15 @@ func TestGenerateReport(t *testing.T) {
 }
 
 func TestMetricsHandler(t *testing.T) {
-	manager := NewHealthManager()
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
 	collector := NewMetricsCollector(manager)
 
 	// Add some test data
@@ -183,7 +231,15 @@ func TestMetricsHandler(t *testing.T) {
 }
 
 func TestHealthReportHandler(t *testing.T) {
-	manager := NewHealthManager()
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
 	collector := NewMetricsCollector(manager)
 
 	// Register a healthy component

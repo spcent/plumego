@@ -42,12 +42,20 @@ func (e MockError) Error() string {
 }
 
 func TestHealthHandler(t *testing.T) {
-	manager := NewHealthManager()
-	
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
 	// Register a healthy component
 	mockHealthy := &MockChecker{name: "healthy", healthy: true}
 	manager.RegisterComponent(mockHealthy)
-	
+
 	// Register an unhealthy component
 	mockUnhealthy := &MockChecker{name: "unhealthy", healthy: false}
 	manager.RegisterComponent(mockUnhealthy)
@@ -72,8 +80,16 @@ func TestHealthHandler(t *testing.T) {
 }
 
 func TestComponentHealthHandler(t *testing.T) {
-	manager := NewHealthManager()
-	
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
 	mockHealthy := &MockChecker{name: "healthy", healthy: true}
 	manager.RegisterComponent(mockHealthy)
 
@@ -108,11 +124,19 @@ func TestComponentHealthHandler(t *testing.T) {
 }
 
 func TestAllComponentsHealthHandler(t *testing.T) {
-	manager := NewHealthManager()
-	
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
 	mock1 := &MockChecker{name: "component1", healthy: true}
 	mock2 := &MockChecker{name: "component2", healthy: false}
-	
+
 	manager.RegisterComponent(mock1)
 	manager.RegisterComponent(mock2)
 
@@ -144,8 +168,17 @@ func TestAllComponentsHealthHandler(t *testing.T) {
 }
 
 func TestHealthHistoryHandler(t *testing.T) {
-	manager := NewHealthManager()
-	
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+		EnableHistory:      true, // Enable history for this test
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
 	mock := &MockChecker{name: "test", healthy: true}
 	manager.RegisterComponent(mock)
 
@@ -188,11 +221,19 @@ func TestLiveHandler(t *testing.T) {
 }
 
 func TestComponentsListHandler(t *testing.T) {
-	manager := NewHealthManager()
-	
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
 	mock1 := &MockChecker{name: "comp1", healthy: true}
 	mock2 := &MockChecker{name: "comp2", healthy: true}
-	
+
 	manager.RegisterComponent(mock1)
 	manager.RegisterComponent(mock2)
 
@@ -226,8 +267,16 @@ func TestComponentsListHandler(t *testing.T) {
 }
 
 func TestReadinessHandlerWithManager(t *testing.T) {
-	manager := NewHealthManager()
-	
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
 	// Register a healthy component
 	mockHealthy := &MockChecker{name: "healthy", healthy: true}
 	manager.RegisterComponent(mockHealthy)
@@ -252,50 +301,50 @@ func TestReadinessHandlerWithManager(t *testing.T) {
 }
 
 func TestReadinessHandler(t *testing.T) {
-        t.Cleanup(func() { SetNotReady("starting") })
-        SetNotReady("booting")
-        req := httptest.NewRequest(http.MethodGet, "/ready", nil)
-        rr := httptest.NewRecorder()
+	t.Cleanup(func() { SetNotReady("starting") })
+	SetNotReady("booting")
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	rr := httptest.NewRecorder()
 
-        ReadinessHandler().ServeHTTP(rr, req)
+	ReadinessHandler().ServeHTTP(rr, req)
 
-        if rr.Code != http.StatusServiceUnavailable {
-                t.Fatalf("expected 503 when not ready, got %d", rr.Code)
-        }
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when not ready, got %d", rr.Code)
+	}
 
-        var payload ReadinessStatus
-        if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
-                t.Fatalf("failed to decode body: %v", err)
-        }
-        if payload.Ready {
-                t.Fatalf("expected ready=false, got true")
-        }
+	var payload ReadinessStatus
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if payload.Ready {
+		t.Fatalf("expected ready=false, got true")
+	}
 
-        SetReady()
-        rr = httptest.NewRecorder()
-        ReadinessHandler().ServeHTTP(rr, req)
-        if rr.Code != http.StatusOK {
-                t.Fatalf("expected 200 when ready, got %d", rr.Code)
-        }
+	SetReady()
+	rr = httptest.NewRecorder()
+	ReadinessHandler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 when ready, got %d", rr.Code)
+	}
 }
 
 func TestBuildInfoHandler(t *testing.T) {
-        req := httptest.NewRequest(http.MethodGet, "/build", nil)
-        rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/build", nil)
+	rr := httptest.NewRecorder()
 
-        BuildInfoHandler().ServeHTTP(rr, req)
+	BuildInfoHandler().ServeHTTP(rr, req)
 
-        if rr.Code != http.StatusOK {
-                t.Fatalf("unexpected status: %d", rr.Code)
-        }
+	if rr.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", rr.Code)
+	}
 
-        var info BuildInfo
-        if err := json.Unmarshal(rr.Body.Bytes(), &info); err != nil {
-                t.Fatalf("failed to decode body: %v", err)
-        }
-        if info.Version == "" {
-                t.Fatalf("version should be populated from defaults")
-        }
+	var info BuildInfo
+	if err := json.Unmarshal(rr.Body.Bytes(), &info); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if info.Version == "" {
+		t.Fatalf("version should be populated from defaults")
+	}
 }
 
 func TestHealthStateIsReady(t *testing.T) {

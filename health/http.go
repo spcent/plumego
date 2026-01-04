@@ -32,7 +32,7 @@ type HealthResponse struct {
 }
 
 // HealthHandler creates a comprehensive health check handler with enhanced error handling.
-func HealthHandler(manager *HealthManager) http.Handler {
+func HealthHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
 		requestID := extractRequestID(r)
@@ -61,8 +61,7 @@ func HealthHandler(manager *HealthManager) http.Handler {
 		done := make(chan bool, 1)
 		go func() {
 			defer func() { done <- true }()
-			manager.CheckAllComponents(ctx)
-			health = manager.GetOverallHealth()
+			health = manager.CheckAllComponents(ctx)
 		}()
 
 		// Wait for completion or timeout
@@ -106,7 +105,7 @@ func HealthHandler(manager *HealthManager) http.Handler {
 }
 
 // ComponentHealthHandler creates a handler for checking specific component health.
-func ComponentHealthHandler(manager *HealthManager, componentName string) http.Handler {
+func ComponentHealthHandler(manager HealthManager, componentName string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
@@ -139,7 +138,7 @@ func ComponentHealthHandler(manager *HealthManager, componentName string) http.H
 }
 
 // AllComponentsHealthHandler creates a handler for checking all components health.
-func AllComponentsHealthHandler(manager *HealthManager) http.Handler {
+func AllComponentsHealthHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
@@ -155,7 +154,7 @@ func AllComponentsHealthHandler(manager *HealthManager) http.Handler {
 }
 
 // HealthHistoryHandler creates a handler that returns health check history.
-func HealthHistoryHandler(manager *HealthManager) http.Handler {
+func HealthHistoryHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		history := manager.GetHealthHistory()
 
@@ -166,7 +165,7 @@ func HealthHistoryHandler(manager *HealthManager) http.Handler {
 }
 
 // HealthHistoryExportHandler creates a handler that exports health check history in various formats.
-func HealthHistoryExportHandler(manager *HealthManager) http.Handler {
+func HealthHistoryExportHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse query parameters for filtering and format
 		query := HealthHistoryQuery{}
@@ -263,7 +262,7 @@ func exportHistoryToCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 }
 
 // HealthHistoryStatsHandler returns statistics about health history.
-func HealthHistoryStatsHandler(manager *HealthManager) http.Handler {
+func HealthHistoryStatsHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		stats := manager.GetHealthHistoryStats()
 
@@ -291,14 +290,13 @@ func ReadinessHandler() http.Handler {
 
 // ReadinessHandlerWithManager exposes the current readiness state based on component health.
 // It returns HTTP 200 when ready and 503 otherwise.
-func ReadinessHandlerWithManager(manager *HealthManager) http.Handler {
+func ReadinessHandlerWithManager(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
 		// Perform health check
-		manager.CheckAllComponents(ctx)
-		overallHealth := manager.GetOverallHealth()
+		overallHealth := manager.CheckAllComponents(ctx)
 
 		code := http.StatusOK
 		if !overallHealth.Status.isReady() {
@@ -336,7 +334,7 @@ func LiveHandler() http.Handler {
 }
 
 // ComponentsListHandler creates a handler that lists all registered components.
-func ComponentsListHandler(manager *HealthManager) http.Handler {
+func ComponentsListHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		allHealth := manager.GetAllHealth()
 		components := make([]string, 0, len(allHealth))

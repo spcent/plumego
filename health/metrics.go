@@ -78,11 +78,11 @@ func (cm *ComponentMetrics) GetRecentSuccessRate() float64 {
 type MetricsCollector struct {
 	mu        sync.RWMutex
 	metrics   *HealthMetrics
-	collector *HealthManager
+	collector HealthManager
 }
 
 // NewMetricsCollector creates a new metrics collector.
-func NewMetricsCollector(manager *HealthManager) *MetricsCollector {
+func NewMetricsCollector(manager HealthManager) *MetricsCollector {
 	return &MetricsCollector{
 		metrics: &HealthMetrics{
 			startTime:        time.Now(),
