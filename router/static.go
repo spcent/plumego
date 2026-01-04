@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spcent/plumego/contract"
 )
@@ -19,7 +20,11 @@ type StaticConfig struct {
 
 // normalizeStaticPrefix ensures the prefix always starts with "/"
 func normalizeStaticPrefix(prefix string) string {
-	if prefix == "" || prefix[0] != '/' {
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		return "/"
+	}
+	if prefix[0] != '/' {
 		return "/" + prefix
 	}
 	return prefix
@@ -34,6 +39,12 @@ func getFilePathFromRequest(req *http.Request) (string, bool) {
 
 	// Clean the relative path to avoid directory traversal (e.g., "../../etc/passwd")
 	cleanPath := filepath.Clean(relPath)
+
+	// Additional security check: ensure the cleaned path doesn't contain ".."
+	if strings.Contains(cleanPath, "..") {
+		return "", false
+	}
+
 	return cleanPath, true
 }
 

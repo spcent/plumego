@@ -543,6 +543,12 @@ func (r *Router) Patch(path string, handler Handler) { r.addRoute(PATCH, path, h
 // Any registers a route that accepts any HTTP method with the given path and handler
 func (r *Router) Any(path string, handler Handler) { r.addRoute(ANY, path, handler) }
 
+// Options registers an OPTIONS route with the given path and handler
+func (r *Router) Options(path string, handler Handler) { r.addRoute("OPTIONS", path, handler) }
+
+// Head registers a HEAD route with the given path and handler
+func (r *Router) Head(path string, handler Handler) { r.addRoute("HEAD", path, handler) }
+
 // Context-aware handler registration helpers
 
 // GetCtx registers a GET route with a context-aware handler
@@ -625,6 +631,10 @@ func (r *Router) Resource(path string, c ResourceController) {
 	r.Put(path+"/:id", http.HandlerFunc(c.Update))
 	r.Delete(path+"/:id", http.HandlerFunc(c.Delete))
 	r.Patch(path+"/:id", http.HandlerFunc(c.Patch))
+	r.Options(path, http.HandlerFunc(c.Options))
+	r.Options(path+"/:id", http.HandlerFunc(c.Options))
+	r.Head(path, http.HandlerFunc(c.Head))
+	r.Head(path+"/:id", http.HandlerFunc(c.Head))
 }
 
 // Print prints all registered routes grouped by method.

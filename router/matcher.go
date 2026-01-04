@@ -28,11 +28,11 @@ type MatchResult struct {
 
 // Match performs route matching against the given path parts
 func (rm *RouteMatcher) Match(parts []string) *MatchResult {
-	current := rm.root
-	if current == nil {
+	if rm.root == nil {
 		return nil
 	}
 
+	current := rm.root
 	paramValues := make([]string, 0, len(parts))
 
 	for i, pathSegment := range parts {
@@ -77,7 +77,25 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 
 // findChildForPath finds a child node that matches the given path segment
 func (rm *RouteMatcher) findChildForPath(parent *node, path string) *node {
-	// Check exact match first
+	// Use indices for faster lookup when available
+	if len(parent.indices) > 0 {
+		// Check if the first character of path exists in indices
+		firstChar := path[0]
+		for i := 0; i < len(parent.indices); i++ {
+			if parent.indices[i] == firstChar {
+				// Found potential match, check the child
+				for _, child := range parent.children {
+					if child.path == path {
+						return child
+					}
+				}
+				break
+			}
+		}
+		return nil
+	}
+
+	// Fallback to linear search
 	for _, child := range parent.children {
 		if child.path == path {
 			return child

@@ -3,7 +3,6 @@ package router
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 )
 
@@ -43,20 +42,13 @@ func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data interfac
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Failed to encode JSON response: %v", err)
+		// Log error but don't break the response flow
+		fmt.Printf("Failed to encode JSON response: %v\n", err)
 	}
 }
 
 // WriteError writes a standardized error response
 func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message string, details interface{}) {
-	resourceName := "resource"
-	if jw != nil && jw.resourceName != "" {
-		resourceName = jw.resourceName
-	}
-
-	// Log the error
-	log.Printf("Error for resource %s: %s (status: %d, details: %v)", resourceName, message, status, details)
-
 	// Return standardized error response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -68,7 +60,7 @@ func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message stri
 	}
 
 	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
-		log.Printf("Failed to encode error response: %v", err)
+		fmt.Printf("Failed to encode error response: %v\n", err)
 	}
 }
 
@@ -97,7 +89,7 @@ type ResourceController interface {
 	Options(http.ResponseWriter, *http.Request) // OPTIONS /resource
 	Head(http.ResponseWriter, *http.Request)    // HEAD /resource
 
-	// Batch operations
+	// Batch operations (optional)
 	BatchCreate(http.ResponseWriter, *http.Request) // POST /resource/batch
 	BatchDelete(http.ResponseWriter, *http.Request) // DELETE /resource/batch
 }
@@ -151,7 +143,8 @@ func (c *BaseResourceController) Patch(w http.ResponseWriter, r *http.Request) {
 func (c *BaseResourceController) Options(w http.ResponseWriter, r *http.Request) {
 	// Set default CORS headers
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+	w.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -163,34 +156,20 @@ func (c *BaseResourceController) Head(w http.ResponseWriter, r *http.Request) {
 
 // BatchCreate handles batch creation of resources
 func (c *BaseResourceController) BatchCreate(w http.ResponseWriter, r *http.Request) {
-	c.notImplemented(w, r, "BatchCreate")
+	c.jsonWriter.WriteNotImplemented(w, "BatchCreate")
 }
 
 // BatchDelete handles batch deletion of resources
 func (c *BaseResourceController) BatchDelete(w http.ResponseWriter, r *http.Request) {
-	c.notImplemented(w, r, "BatchDelete")
+	c.jsonWriter.WriteNotImplemented(w, "BatchDelete")
 }
 
 // JSON is a helper method to write JSON responses
 func (c *BaseResourceController) JSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	w.Write([]byte(fmt.Sprintf(`{"code": %d, "message": "%s", "data": %v}`, status, http.StatusText(status), data)))
+	c.jsonWriter.WriteJSON(w, status, data)
 }
 
 // Error is a helper method to write standardized error responses
 func (c *BaseResourceController) Error(w http.ResponseWriter, status int, message string, details any) {
-	// Log the error
-	log.Printf("Error for resource %s: %s (status: %d, details: %v)", c.ResourceName, message, status, details)
-
-	// Return standardized error response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	w.Write([]byte(fmt.Sprintf(`{"code": %d, "message": "%s", "details": %v}`, status, message, details)))
-}
-
-// notImplemented is a helper method to return a standardized "Not Implemented" response
-func (c *BaseResourceController) notImplemented(w http.ResponseWriter, _ *http.Request, method string) {
-	c.Error(w, http.StatusNotImplemented, "Not Implemented",
-		fmt.Sprintf("The %s method is not implemented for the %s resource", method, c.ResourceName))
+	c.jsonWriter.WriteError(w, status, message, details)
 }
