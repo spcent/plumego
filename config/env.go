@@ -11,8 +11,10 @@ import (
 
 // Global default config instance for backward compatibility
 var (
-	globalConfig = New()
-	mu           sync.RWMutex
+	globalConfig   *Config
+	globalConfigMu sync.RWMutex
+	globalInitOnce sync.Once
+	globalInitErr  error
 )
 
 // LoadEnvFile loads environment variables from a file
@@ -54,16 +56,19 @@ func LoadEnv(filepath string, overwrite bool) error {
 }
 
 // InitDefault initializes the global config with environment and file sources
-var initDefaultOnce sync.Once
-
 func InitDefault() error {
-	var initErr error
-	initDefaultOnce.Do(func() {
+	globalInitOnce.Do(func() {
+		globalConfigMu.Lock()
+		defer globalConfigMu.Unlock()
+
+		// Create new config instance
+		globalConfig = New()
+
 		ctx := context.Background()
-		
+
 		// Add environment variable source
 		globalConfig.AddSource(NewEnvSource(""))
-		
+
 		// Try to load from common config files
 		configFiles := []string{
 			".env",
@@ -71,7 +76,7 @@ func InitDefault() error {
 			"config.env",
 			"config.json",
 		}
-		
+
 		for _, configFile := range configFiles {
 			if info, err := os.Stat(configFile); err == nil && !info.IsDir() {
 				switch {
@@ -82,18 +87,38 @@ func InitDefault() error {
 				}
 			}
 		}
-		
-		initErr = globalConfig.Load(ctx)
+
+		globalInitErr = globalConfig.Load(ctx)
 	})
-	
-	return initErr
+
+	return globalInitErr
 }
 
 // GetGlobalConfig returns the global config instance
 func GetGlobalConfig() *Config {
-	mu.RLock()
-	defer mu.RUnlock()
+	globalConfigMu.RLock()
+	defer globalConfigMu.RUnlock()
+
+	if globalConfig == nil {
+		// Auto-initialize if not already done
+		if err := InitDefault(); err != nil {
+			// Return empty config on error
+			return New()
+		}
+		return globalConfig
+	}
+
 	return globalConfig
+}
+
+// SetGlobalConfig allows setting a custom global config instance
+// This is primarily useful for testing
+func SetGlobalConfig(config *Config) {
+	globalConfigMu.Lock()
+	defer globalConfigMu.Unlock()
+	globalConfig = config
+	// Reset the init once to allow re-initialization
+	globalInitOnce = sync.Once{}
 }
 
 // GetString gets an environment variable as a string, returns default value if not found
@@ -122,9 +147,20 @@ func GetDurationMs(key string, defaultValueMs int) time.Duration {
 	return GetGlobalConfig().GetDurationMs(key, defaultValueMs)
 }
 
-// Set sets an environment variable
-func Set(key, value string) {
+// Set sets an environment variable and reloads the global config
+func Set(key, value string) error {
 	os.Setenv(key, value)
+
+	// Reload global config to pick up the change
+	globalConfigMu.RLock()
+	defer globalConfigMu.RUnlock()
+
+	if globalConfig != nil {
+		ctx := context.Background()
+		return globalConfig.Load(ctx)
+	}
+
+	return nil
 }
 
 // Type-safe global accessors with validation

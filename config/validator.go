@@ -29,7 +29,22 @@ func (r *Required) Validate(value any, key string) error {
 		return fmt.Errorf("config %s is required and cannot be empty", key)
 	}
 
-	if str, ok := toString(value); ok && strings.TrimSpace(str) == "" {
+	// Convert to string for checking
+	var strValue string
+	switch v := value.(type) {
+	case string:
+		strValue = v
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		strValue = fmt.Sprintf("%d", v)
+	case float32, float64:
+		strValue = fmt.Sprintf("%g", v)
+	case bool:
+		strValue = strconv.FormatBool(v)
+	default:
+		strValue = fmt.Sprintf("%v", v)
+	}
+
+	if strings.TrimSpace(strValue) == "" {
 		return fmt.Errorf("config %s is required and cannot be empty", key)
 	}
 
@@ -46,10 +61,9 @@ type MinLength struct {
 }
 
 func (m *MinLength) Validate(value any, key string) error {
-	if str, ok := toString(value); ok {
-		if utf8.RuneCountInString(str) < m.Min {
-			return fmt.Errorf("config %s must be at least %d characters, got %d", key, m.Min, utf8.RuneCountInString(str))
-		}
+	str := configToString(value)
+	if utf8.RuneCountInString(str) < m.Min {
+		return fmt.Errorf("config %s must be at least %d characters, got %d", key, m.Min, utf8.RuneCountInString(str))
 	}
 	return nil
 }
@@ -64,10 +78,9 @@ type MaxLength struct {
 }
 
 func (m *MaxLength) Validate(value any, key string) error {
-	if str, ok := toString(value); ok {
-		if utf8.RuneCountInString(str) > m.Max {
-			return fmt.Errorf("config %s must be at most %d characters, got %d", key, m.Max, utf8.RuneCountInString(str))
-		}
+	str := configToString(value)
+	if utf8.RuneCountInString(str) > m.Max {
+		return fmt.Errorf("config %s must be at most %d characters, got %d", key, m.Max, utf8.RuneCountInString(str))
 	}
 	return nil
 }
@@ -98,10 +111,9 @@ func (p *Pattern) Validate(value any, key string) error {
 		return err
 	}
 
-	if str, ok := toString(value); ok {
-		if !p.regex.MatchString(str) {
-			return fmt.Errorf("config %s must match pattern %s, got %s", key, p.Pattern, str)
-		}
+	str := configToString(value)
+	if !p.regex.MatchString(str) {
+		return fmt.Errorf("config %s must match pattern %s, got %s", key, p.Pattern, str)
 	}
 	return nil
 }
@@ -114,20 +126,19 @@ func (p *Pattern) Name() string {
 type URL struct{}
 
 func (u *URL) Validate(value any, key string) error {
-	if str, ok := toString(value); ok {
-		if str == "" {
-			return nil // Empty string is allowed (can use default)
+	str := configToString(value)
+	if str == "" {
+		return nil // Empty string is allowed (can use default)
+	}
+	if parsed, err := url.Parse(str); err != nil {
+		return fmt.Errorf("config %s must be a valid URL, got %s: %w", key, str, err)
+	} else {
+		// Check that URL has both scheme and host
+		if parsed.Scheme == "" {
+			return fmt.Errorf("config %s must be a valid URL with scheme (e.g., http://, https://), got %s", key, str)
 		}
-		if parsed, err := url.Parse(str); err != nil {
-			return fmt.Errorf("config %s must be a valid URL, got %s: %w", key, str, err)
-		} else {
-			// Check that URL has both scheme and host
-			if parsed.Scheme == "" {
-				return fmt.Errorf("config %s must be a valid URL with scheme (e.g., http://, https://), got %s", key, str)
-			}
-			if parsed.Host == "" {
-				return fmt.Errorf("config %s must be a valid URL with host, got %s", key, str)
-			}
+		if parsed.Host == "" {
+			return fmt.Errorf("config %s must be a valid URL with host, got %s", key, str)
 		}
 	}
 	return nil
@@ -144,10 +155,12 @@ type Range struct {
 }
 
 func (r *Range) Validate(value any, key string) error {
-	if num, err := toFloat64(value); err == nil {
-		if num < r.Min || num > r.Max {
-			return fmt.Errorf("config %s must be between %g and %g, got %g", key, r.Min, r.Max, num)
-		}
+	num, err := configToFloat64(value)
+	if err != nil {
+		return err
+	}
+	if num < r.Min || num > r.Max {
+		return fmt.Errorf("config %s must be between %g and %g, got %g", key, r.Min, r.Max, num)
 	}
 	return nil
 }
@@ -162,15 +175,13 @@ type OneOf struct {
 }
 
 func (o *OneOf) Validate(value any, key string) error {
-	if str, ok := toString(value); ok {
-		for _, allowed := range o.Values {
-			if str == allowed {
-				return nil
-			}
+	str := configToString(value)
+	for _, allowed := range o.Values {
+		if str == allowed {
+			return nil
 		}
-		return fmt.Errorf("config %s must be one of %v, got %s", key, o.Values, str)
 	}
-	return nil
+	return fmt.Errorf("config %s must be one of %v, got %s", key, o.Values, str)
 }
 
 func (o *OneOf) Name() string {
@@ -309,34 +320,35 @@ func (c *Config) DurationMs(key string, defaultValueMs int, validators ...Valida
 	return value, nil
 }
 
-// toString converts any value to string
-func toString(value any) (string, bool) {
+// configToString converts any value to string (helper for validators)
+func configToString(value any) string {
 	if value == nil {
-		return "", false
+		return ""
 	}
 
 	switch v := value.(type) {
 	case string:
-		return v, true
+		return v
 	case int, int8, int16, int32, int64:
-		return fmt.Sprintf("%d", v), true
+		return fmt.Sprintf("%d", v)
 	case uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", v), true
+		return fmt.Sprintf("%d", v)
 	case float32, float64:
-		return fmt.Sprintf("%g", v), true
+		return fmt.Sprintf("%g", v)
 	case bool:
-		return strconv.FormatBool(v), true
+		return strconv.FormatBool(v)
 	case time.Time:
-		return v.Format(time.RFC3339), true
+		return v.Format(time.RFC3339)
 	default:
-		return fmt.Sprintf("%v", v), true
+		return fmt.Sprintf("%v", v)
 	}
 }
 
-// toFloat64 converts any value to float64
-func toFloat64(value any) (float64, error) {
-	if str, ok := toString(value); ok {
-		return strconv.ParseFloat(str, 64)
+// configToFloat64 converts any value to float64 (helper for validators)
+func configToFloat64(value any) (float64, error) {
+	str := configToString(value)
+	if str == "" {
+		return 0, fmt.Errorf("cannot convert empty value to float64")
 	}
-	return 0, fmt.Errorf("cannot convert to float64")
+	return strconv.ParseFloat(str, 64)
 }

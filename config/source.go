@@ -37,10 +37,8 @@ func (e *EnvSource) Load(ctx context.Context) (map[string]any, error) {
 			key = strings.TrimPrefix(key, e.prefix)
 		}
 
-		// Only convert to snake_case if prefix is not empty (for namespaced configs)
-		if e.prefix != "" {
-			key = toSnakeCase(key)
-		}
+		// Always convert to snake_case for consistency
+		key = toSnakeCase(key)
 
 		data[key] = value
 	}
@@ -53,24 +51,10 @@ func (e *EnvSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan er
 	updates := make(chan map[string]any, 1)
 	errs := make(chan error, 1)
 
-	go func() {
-		defer close(updates)
-		defer close(errs)
-
-		// Environment variables don't change during runtime in most cases
-		// This is a placeholder for future implementation
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				// Could implement polling here if needed
-			}
-		}
-	}()
+	// Environment variables don't typically change during runtime
+	// Return closed channels to indicate no updates
+	close(updates)
+	close(errs)
 
 	return updates, errs
 }
@@ -90,11 +74,14 @@ func (e *EnvSource) parseEnvVar(env string) (key, value string) {
 	key = strings.TrimSpace(parts[0])
 	value = strings.TrimSpace(parts[1])
 
-	// Only trim quotes if the value is properly quoted
-	if len(value) >= 2 &&
-		(value[0] == '"' || value[0] == '\'') &&
-		(value[len(value)-1] == value[0]) {
-		value = value[1 : len(value)-1]
+	// Handle quoted values with proper escaping
+	if len(value) >= 2 {
+		quote := value[0]
+		if (quote == '"' || quote == '\'') && value[len(value)-1] == quote {
+			value = value[1 : len(value)-1]
+			// Handle escaped characters
+			value = strings.ReplaceAll(value, fmt.Sprintf("\\%c", quote), string(quote))
+		}
 	}
 
 	return key, value
@@ -106,12 +93,12 @@ type FileSource struct {
 	format   string
 	watch    bool
 	lastData map[string]any
+	lastMod  time.Time
 }
 
 // Format constants
 const (
 	FormatJSON = "json"
-	FormatYAML = "yaml"
 	FormatTOML = "toml"
 	FormatEnv  = "env"
 )
@@ -133,6 +120,9 @@ func (f *FileSource) Load(ctx context.Context) (map[string]any, error) {
 	}
 
 	f.lastData = data
+	if info, err := os.Stat(f.path); err == nil {
+		f.lastMod = info.ModTime()
+	}
 	return data, nil
 }
 
@@ -152,11 +142,6 @@ func (f *FileSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan e
 		defer close(updates)
 		defer close(errs)
 
-		var lastModTime time.Time
-		if info, err := os.Stat(f.path); err == nil {
-			lastModTime = info.ModTime()
-		}
-
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 
@@ -166,7 +151,7 @@ func (f *FileSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan e
 				return
 			case <-ticker.C:
 				if info, err := os.Stat(f.path); err == nil {
-					if info.ModTime().After(lastModTime) {
+					if info.ModTime().After(f.lastMod) {
 						data, err := f.loadFile()
 						if err != nil {
 							errs <- fmt.Errorf("failed to load updated file: %w", err)
@@ -176,10 +161,15 @@ func (f *FileSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan e
 						// Only send update if data actually changed
 						if !mapsEqual(f.lastData, data) {
 							f.lastData = data
-							updates <- data
+							f.lastMod = info.ModTime()
+							select {
+							case updates <- data:
+							case <-ctx.Done():
+								return
+							}
+						} else {
+							f.lastMod = info.ModTime()
 						}
-
-						lastModTime = info.ModTime()
 					}
 				}
 			}
@@ -206,6 +196,8 @@ func (f *FileSource) loadFile() (map[string]any, error) {
 		return f.loadJSON(content)
 	case FormatEnv:
 		return f.loadEnvFile(content)
+	case FormatTOML:
+		return nil, fmt.Errorf("TOML format not yet implemented: %s", f.format)
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", f.format)
 	}
@@ -260,7 +252,8 @@ func mapsEqual(a, b map[string]any) bool {
 			return false
 		}
 
-		if fmt.Sprintf("%v", valueA) != fmt.Sprintf("%v", valueB) {
+		// Type-aware comparison
+		if !valuesEqual(valueA, valueB) {
 			return false
 		}
 	}
@@ -268,14 +261,4 @@ func mapsEqual(a, b map[string]any) bool {
 	return true
 }
 
-// toSnakeCase converts CamelCase to snake_case
-func toSnakeCase(s string) string {
-	var result []rune
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			result = append(result, '_')
-		}
-		result = append(result, r)
-	}
-	return strings.ToLower(string(result))
-}
+// toSnakeCase function is now defined in config.go

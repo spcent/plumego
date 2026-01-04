@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -211,6 +212,7 @@ func TestTypeSafeAccessors(t *testing.T) {
 	os.Setenv("TEST_FLOAT", "3.14")
 	os.Setenv("TEST_DURATION", "1000")
 
+	// Add environment source with empty prefix to load all env vars
 	cfg.AddSource(NewEnvSource(""))
 
 	err := cfg.Load(ctx)
@@ -219,10 +221,22 @@ func TestTypeSafeAccessors(t *testing.T) {
 	}
 
 	// Verify that environment variables are loaded
-	t.Logf("Loaded config data: %v", cfg.GetAll())
+	allConfig := cfg.GetAll()
+	t.Logf("Loaded config data: %v", allConfig)
+
+	// Check if test variables exist
+	if _, exists := allConfig["test_string"]; !exists {
+		t.Logf("Available keys: %v", func() []string {
+			keys := make([]string, 0, len(allConfig))
+			for k := range allConfig {
+				keys = append(keys, k)
+			}
+			return keys
+		}())
+	}
 
 	// Test String accessor
-	result, err := cfg.String("TEST_STRING", "default", &Required{})
+	result, err := cfg.String("test_string", "default", &Required{})
 	if err != nil {
 		t.Errorf("String accessor should not return error: %v", err)
 	}
@@ -231,7 +245,7 @@ func TestTypeSafeAccessors(t *testing.T) {
 	}
 
 	// Test Int accessor
-	resultInt, err := cfg.Int("TEST_INT", 0, &Range{Min: 0, Max: 1000})
+	resultInt, err := cfg.Int("test_int", 0, &Range{Min: 0, Max: 1000})
 	if err != nil {
 		t.Errorf("Int accessor should not return error: %v", err)
 	}
@@ -240,7 +254,7 @@ func TestTypeSafeAccessors(t *testing.T) {
 	}
 
 	// Test Bool accessor
-	resultBool, err := cfg.Bool("TEST_BOOL", false)
+	resultBool, err := cfg.Bool("test_bool", false)
 	if err != nil {
 		t.Errorf("Bool accessor should not return error: %v", err)
 	}
@@ -249,7 +263,7 @@ func TestTypeSafeAccessors(t *testing.T) {
 	}
 
 	// Test Float accessor
-	resultFloat, err := cfg.Float("TEST_FLOAT", 0.0)
+	resultFloat, err := cfg.Float("test_float", 0.0)
 	if err != nil {
 		t.Errorf("Float accessor should not return error: %v", err)
 	}
@@ -258,7 +272,7 @@ func TestTypeSafeAccessors(t *testing.T) {
 	}
 
 	// Test Duration accessor
-	resultDuration, err := cfg.DurationMs("TEST_DURATION", 0)
+	resultDuration, err := cfg.DurationMs("test_duration", 0)
 	if err != nil {
 		t.Errorf("Duration accessor should not return error: %v", err)
 	}
@@ -269,6 +283,30 @@ func TestTypeSafeAccessors(t *testing.T) {
 
 // TestGlobalFunctions tests global helper functions
 func TestGlobalFunctions(t *testing.T) {
+	// Save original env vars
+	origGlobalTest := os.Getenv("GLOBAL_TEST")
+	origGlobalInt := os.Getenv("GLOBAL_INT")
+
+	// Clean up after test
+	defer func() {
+		if origGlobalTest != "" {
+			os.Setenv("GLOBAL_TEST", origGlobalTest)
+		} else {
+			os.Unsetenv("GLOBAL_TEST")
+		}
+		if origGlobalInt != "" {
+			os.Setenv("GLOBAL_INT", origGlobalInt)
+		} else {
+			os.Unsetenv("GLOBAL_INT")
+		}
+	}()
+
+	// Clear any existing global config
+	SetGlobalConfig(nil)
+
+	// Reset init once for testing
+	globalInitOnce = sync.Once{}
+
 	// Set up test environment
 	os.Setenv("GLOBAL_TEST", "global_value")
 	os.Setenv("GLOBAL_INT", "123")
@@ -280,16 +318,18 @@ func TestGlobalFunctions(t *testing.T) {
 	}
 
 	// Test global accessors
-	if GetString("GLOBAL_TEST", "") != "global_value" {
-		t.Error("Global GetString should return correct value")
+	result := GetString("global_test", "")
+	if result != "global_value" {
+		t.Errorf("Global GetString should return correct value, got '%s'", result)
 	}
 
-	if GetInt("GLOBAL_INT", 0) != 123 {
-		t.Error("Global GetInt should return correct value")
+	resultInt := GetInt("global_int", 0)
+	if resultInt != 123 {
+		t.Errorf("Global GetInt should return correct value, got %d", resultInt)
 	}
 
 	// Test global safe accessors
-	value, err := GetStringSafe("GLOBAL_TEST", "", &Required{})
+	value, err := GetStringSafe("global_test", "", &Required{})
 	if err != nil {
 		t.Errorf("Global GetStringSafe should not return error: %v", err)
 	}
@@ -318,10 +358,10 @@ func TestConfigUnmarshal(t *testing.T) {
 
 	// Define test struct
 	type AppConfig struct {
-		AppName        string `config:"APP_NAME"`
-		AppVersion     string `config:"APP_VERSION"`
-		DebugMode      bool   `config:"DEBUG_MODE"`
-		MaxConnections int    `config:"MAX_CONNECTIONS"`
+		AppName        string `config:"app_name"`
+		AppVersion     string `config:"app_version"`
+		DebugMode      bool   `config:"debug_mode"`
+		MaxConnections int    `config:"max_connections"`
 	}
 
 	var config AppConfig

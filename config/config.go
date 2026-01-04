@@ -28,6 +28,7 @@ type Config struct {
 	watchers map[string][]chan map[string]any
 	ctx      context.Context
 	cancel   context.CancelFunc
+	watchWg  sync.WaitGroup // WaitGroup for watcher goroutines
 }
 
 // New creates a new Config instance
@@ -111,12 +112,37 @@ func (c *Config) GetInt(key string, defaultValue int) int {
 
 // GetBool retrieves a configuration value as bool
 func (c *Config) GetBool(key string, defaultValue bool) bool {
-	value := c.Get(key)
-	if value == "" {
-		return defaultValue
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// Try exact key first
+	if value, exists := c.data[key]; exists {
+		if str := c.toString(value); str != "" {
+			return parseBool(str, defaultValue)
+		}
 	}
 
-	// Trim whitespace before checking
+	// Try snake_case version
+	snakeKey := toSnakeCase(key)
+	if value, exists := c.data[snakeKey]; exists {
+		if str := c.toString(value); str != "" {
+			return parseBool(str, defaultValue)
+		}
+	}
+
+	// Try uppercase version
+	upperKey := strings.ToUpper(key)
+	if value, exists := c.data[upperKey]; exists {
+		if str := c.toString(value); str != "" {
+			return parseBool(str, defaultValue)
+		}
+	}
+
+	return defaultValue
+}
+
+// parseBool parses a string to bool
+func parseBool(value string, defaultValue bool) bool {
 	value = strings.TrimSpace(value)
 	switch strings.ToLower(value) {
 	case "1", "true", "yes", "y", "on", "t":
@@ -163,7 +189,8 @@ func (c *Config) GetAll() map[string]any {
 }
 
 // Watch registers a callback for configuration changes
-func (c *Config) Watch(key string, callback func(newValue map[string]any)) error {
+// Returns a function to stop watching
+func (c *Config) Watch(key string, callback func(newValue map[string]any)) (func(), error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -175,7 +202,9 @@ func (c *Config) Watch(key string, callback func(newValue map[string]any)) error
 	c.watchers[key] = append(c.watchers[key], ch)
 
 	// Start a goroutine to listen for changes
+	c.watchWg.Add(1)
 	go func() {
+		defer c.watchWg.Done()
 		for {
 			select {
 			case <-c.ctx.Done():
@@ -186,12 +215,30 @@ func (c *Config) Watch(key string, callback func(newValue map[string]any)) error
 		}
 	}()
 
-	return nil
+	// Return stop function
+	stop := func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		// Remove channel from watchers
+		if watchers, exists := c.watchers[key]; exists {
+			for i, w := range watchers {
+				if w == ch {
+					c.watchers[key] = append(watchers[:i], watchers[i+1:]...)
+					close(ch)
+					break
+				}
+			}
+		}
+	}
+
+	return stop, nil
 }
 
 // WatchKey registers a callback for changes to a specific configuration key
-func (c *Config) WatchKey(key string, callback func(oldValue, newValue any)) error {
-	return c.Watch(key, func(newData map[string]any) {
+// Returns a function to stop watching
+func (c *Config) WatchKey(key string, callback func(oldValue, newValue any)) (func(), error) {
+	stop, err := c.Watch(key, func(newData map[string]any) {
 		c.mu.RLock()
 		oldValue := c.data[key]
 		c.mu.RUnlock()
@@ -199,6 +246,7 @@ func (c *Config) WatchKey(key string, callback func(oldValue, newValue any)) err
 		newValue := newData[key]
 		callback(oldValue, newValue)
 	})
+	return stop, err
 }
 
 // StartWatchers starts watching all configured sources for changes
@@ -209,16 +257,22 @@ func (c *Config) StartWatchers(ctx context.Context) error {
 	for _, source := range c.sources {
 		updates, errs := source.Watch(ctx)
 
+		c.watchWg.Add(1)
 		go func(src Source) {
+			defer c.watchWg.Done()
 			for {
 				select {
 				case <-ctx.Done():
 					return
 				case update := <-updates:
-					c.handleSourceUpdate(src.Name(), update)
+					if update != nil {
+						c.handleSourceUpdate(src.Name(), update)
+					}
 				case err := <-errs:
-					// Log error but continue watching
-					fmt.Printf("Watch error from source %s: %v\n", src.Name(), err)
+					if err != nil {
+						// Log error but continue watching
+						fmt.Printf("Watch error from source %s: %v\n", src.Name(), err)
+					}
 				}
 			}
 		}(source)
@@ -228,7 +282,7 @@ func (c *Config) StartWatchers(ctx context.Context) error {
 }
 
 // handleSourceUpdate handles configuration updates from a source
-func (c *Config) handleSourceUpdate(sourceName string, newData map[string]any) {
+func (c *Config) handleSourceUpdate(_ string, newData map[string]any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -279,6 +333,13 @@ func (c *Config) Reload(ctx context.Context) error {
 	return c.Load(ctx)
 }
 
+// Close stops all watchers and releases resources
+func (c *Config) Close() error {
+	c.cancel()
+	c.watchWg.Wait() // Wait for all watcher goroutines to finish
+	return nil
+}
+
 // valuesEqual compares two values for equality
 func valuesEqual(a, b any) bool {
 	if a == nil && b == nil {
@@ -288,18 +349,36 @@ func valuesEqual(a, b any) bool {
 		return false
 	}
 
-	// Convert to strings for comparison
-	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
-}
+	// Type-aware comparison
+	switch av := a.(type) {
+	case string:
+		if bv, ok := b.(string); ok {
+			return av == bv
+		}
+	case int:
+		if bv, ok := b.(int); ok {
+			return av == bv
+		}
+	case float64:
+		if bv, ok := b.(float64); ok {
+			return av == bv
+		}
+	case bool:
+		if bv, ok := b.(bool); ok {
+			return av == bv
+		}
+	}
 
-// Close stops all watchers and releases resources
-func (c *Config) Close() error {
-	c.cancel()
-	return nil
+	// Fallback to string comparison for complex types
+	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
 }
 
 // toString converts any value to string
 func (c *Config) toString(value any) string {
+	if value == nil {
+		return ""
+	}
+
 	switch v := value.(type) {
 	case string:
 		return v
@@ -392,4 +471,23 @@ func (c *Config) setField(fieldValue reflect.Value, value any) error {
 	}
 
 	return nil
+}
+
+// toSnakeCase converts CamelCase to snake_case
+func toSnakeCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var result []rune
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			// Check if previous character is not uppercase
+			if i > 0 && s[i-1] >= 'a' && s[i-1] <= 'z' {
+				result = append(result, '_')
+			}
+		}
+		result = append(result, r)
+	}
+	return strings.ToLower(string(result))
 }
