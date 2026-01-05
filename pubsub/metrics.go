@@ -5,10 +5,12 @@ import (
 	"sync/atomic"
 )
 
+// MetricsSnapshot provides a consistent view of all metrics.
 type MetricsSnapshot struct {
 	Topics map[string]TopicMetrics `json:"topics"`
 }
 
+// TopicMetrics contains metrics for a single topic.
 type TopicMetrics struct {
 	PublishTotal     uint64            `json:"publish_total"`
 	DeliveredTotal   uint64            `json:"delivered_total"`
@@ -16,20 +18,28 @@ type TopicMetrics struct {
 	SubscribersGauge int               `json:"subscribers"`
 }
 
+// metrics manages pubsub metrics with lock-free operations.
 type metrics struct {
-	// topic -> *topicMetrics
-	topics sync.Map
+	topics sync.Map // map[string]*topicMetrics
 }
 
+// topicMetrics holds atomic counters for a topic.
 type topicMetrics struct {
 	publishTotal   atomic.Uint64
 	deliveredTotal atomic.Uint64
 	subsGauge      atomic.Int64
-
-	// policyName -> atomic counter (uint64)
-	dropped sync.Map
+	dropped        sync.Map // map[string]*atomic.Uint64
 }
 
+// policyNames converts policy to string (cached for performance).
+var policyNames = map[BackpressurePolicy]string{
+	DropOldest:       "drop_oldest",
+	DropNewest:       "drop_newest",
+	BlockWithTimeout: "block_with_timeout",
+	CloseSubscriber:  "close_subscriber",
+}
+
+// ensureTopic gets or creates topic metrics.
 func (m *metrics) ensureTopic(topic string) *topicMetrics {
 	if v, ok := m.topics.Load(topic); ok {
 		return v.(*topicMetrics)
@@ -39,25 +49,38 @@ func (m *metrics) ensureTopic(topic string) *topicMetrics {
 	return actual.(*topicMetrics)
 }
 
+// incPublish increments publish counter.
 func (m *metrics) incPublish(topic string) {
 	m.ensureTopic(topic).publishTotal.Add(1)
 }
 
+// incDelivered increments delivered counter.
 func (m *metrics) incDelivered(topic string) {
 	m.ensureTopic(topic).deliveredTotal.Add(1)
 }
 
+// addSubs modifies subscriber count (can be negative).
 func (m *metrics) addSubs(topic string, delta int64) {
 	m.ensureTopic(topic).subsGauge.Add(delta)
 }
 
+// incDropped increments dropped counter for a policy.
 func (m *metrics) incDropped(topic string, policy BackpressurePolicy) {
 	tm := m.ensureTopic(topic)
 	key := policyName(policy)
+
+	// Fast path: try existing key
+	if v, ok := tm.dropped.Load(key); ok {
+		v.(*atomic.Uint64).Add(1)
+		return
+	}
+
+	// Slow path: create if not exists
 	v, _ := tm.dropped.LoadOrStore(key, new(atomic.Uint64))
 	v.(*atomic.Uint64).Add(1)
 }
 
+// Snapshot creates a consistent snapshot of all metrics.
 func (m *metrics) Snapshot() MetricsSnapshot {
 	out := MetricsSnapshot{Topics: map[string]TopicMetrics{}}
 
@@ -83,17 +106,10 @@ func (m *metrics) Snapshot() MetricsSnapshot {
 	return out
 }
 
+// policyName converts policy to human-readable string.
 func policyName(p BackpressurePolicy) string {
-	switch p {
-	case DropOldest:
-		return "drop_oldest"
-	case DropNewest:
-		return "drop_newest"
-	case BlockWithTimeout:
-		return "block_with_timeout"
-	case CloseSubscriber:
-		return "close_subscriber"
-	default:
-		return "unknown"
+	if name, ok := policyNames[p]; ok {
+		return name
 	}
+	return "unknown"
 }

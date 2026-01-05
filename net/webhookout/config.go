@@ -1,38 +1,66 @@
 package webhookout
 
 import (
+	"errors"
 	"time"
 
 	"github.com/spcent/plumego/config"
 )
 
+// DropPolicy defines the queue overflow behavior.
 type DropPolicy string
 
 const (
-	DropNewest     DropPolicy = "drop_newest"
+	// DropNewest drops the newest task when queue is full
+	DropNewest DropPolicy = "drop_newest"
+	// BlockWithLimit blocks on enqueue with timeout when queue is full
 	BlockWithLimit DropPolicy = "block_timeout"
-	FailFast       DropPolicy = "fail_fast"
+	// FailFast immediately returns error when queue is full
+	FailFast DropPolicy = "fail_fast"
 )
 
+// Config holds webhook delivery service configuration.
 type Config struct {
+	// Service control
 	Enabled bool
 
+	// Queue and workers
 	QueueSize  int
 	Workers    int
 	DrainMax   time.Duration
 	DropPolicy DropPolicy
 	BlockWait  time.Duration
 
+	// Retry and timeout
 	DefaultTimeout    time.Duration
 	DefaultMaxRetries int
 	BackoffBase       time.Duration
 	BackoffMax        time.Duration
 	RetryOn429        bool
 
-	// For safety (recommended)
+	// Security
 	AllowPrivateNetwork bool
 }
 
+// DefaultConfig returns production-ready defaults.
+func DefaultConfig() Config {
+	return Config{
+		Enabled:             true,
+		QueueSize:           2048,
+		Workers:             8,
+		DrainMax:            5 * time.Second,
+		DropPolicy:          BlockWithLimit,
+		BlockWait:           50 * time.Millisecond,
+		DefaultTimeout:      5 * time.Second,
+		DefaultMaxRetries:   6,
+		BackoffBase:         500 * time.Millisecond,
+		BackoffMax:          30 * time.Second,
+		RetryOn429:          true,
+		AllowPrivateNetwork: false,
+	}
+}
+
+// ConfigFromEnv creates config from environment variables.
 func ConfigFromEnv() Config {
 	cfg := Config{
 		Enabled:    config.GetBool("WEBHOOK_ENABLED", true),
@@ -51,6 +79,7 @@ func ConfigFromEnv() Config {
 		AllowPrivateNetwork: config.GetBool("WEBHOOK_ALLOW_PRIVATE_NET", false),
 	}
 
+	// Validate and apply defaults
 	if cfg.QueueSize < 1 {
 		cfg.QueueSize = 1
 	}
@@ -60,10 +89,48 @@ func ConfigFromEnv() Config {
 	if cfg.BlockWait < 0 {
 		cfg.BlockWait = 0
 	}
+	if cfg.BackoffBase <= 0 {
+		cfg.BackoffBase = 500 * time.Millisecond
+	}
+	if cfg.BackoffMax <= 0 {
+		cfg.BackoffMax = 30 * time.Second
+	}
+	if cfg.DrainMax <= 0 {
+		cfg.DrainMax = 5 * time.Second
+	}
+
+	// Validate drop policy
 	switch cfg.DropPolicy {
 	case DropNewest, BlockWithLimit, FailFast:
 	default:
 		cfg.DropPolicy = BlockWithLimit
 	}
+
 	return cfg
+}
+
+// Validate checks if configuration is valid.
+func (c Config) Validate() error {
+	if c.QueueSize < 1 {
+		return errors.New("queue_size must be at least 1")
+	}
+	if c.Workers < 1 {
+		return errors.New("workers must be at least 1")
+	}
+	if c.DefaultTimeout <= 0 {
+		return errors.New("default_timeout must be positive")
+	}
+	if c.DefaultMaxRetries < 0 {
+		return errors.New("default_max_retries cannot be negative")
+	}
+	if c.BackoffBase <= 0 {
+		return errors.New("backoff_base must be positive")
+	}
+	if c.BackoffMax <= 0 {
+		return errors.New("backoff_max must be positive")
+	}
+	if c.BackoffBase > c.BackoffMax {
+		return errors.New("backoff_base cannot be greater than backoff_max")
+	}
+	return nil
 }

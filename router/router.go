@@ -165,42 +165,6 @@ func NewRouterWithCache(cacheSize int) *Router {
 	return NewRouter(WithCache(cacheSize))
 }
 
-// getCacheKey generates a cache key for route matching
-func (r *Router) getCacheKey(method, path string) string {
-	return method + ":" + path
-}
-
-// getCachedResult retrieves a cached route match result
-func (r *Router) getCachedResult(key string) *MatchResult {
-	if !r.enableCache || r.routeCache == nil {
-		return nil
-	}
-
-	result, exists := r.routeCache[key]
-	if exists {
-		return result
-	}
-	return nil
-}
-
-// cacheResult stores a route match result in cache
-func (r *Router) cacheResult(key string, result *MatchResult) {
-	if !r.enableCache || r.routeCache == nil || result == nil {
-		return
-	}
-
-	// Simple cache eviction strategy: if at capacity, remove oldest entry
-	if len(r.routeCache) >= r.cacheSize {
-		// Find an entry to evict (first one we find)
-		for k := range r.routeCache {
-			delete(r.routeCache, k)
-			break
-		}
-	}
-
-	r.routeCache[key] = result
-}
-
 // SetLogger configures the logger used by context-aware handlers.
 func (r *Router) SetLogger(logger log.StructuredLogger) {
 	r.mu.Lock()

@@ -1,4 +1,4 @@
-package httpclient
+package http
 
 import (
 	"bytes"
@@ -57,12 +57,20 @@ func (p CompositeRetryPolicy) ShouldRetry(resp *http.Response, err error, attemp
 	return false
 }
 
+// AlwaysRetryPolicy retries on any error.
+type AlwaysRetryPolicy struct{}
+
+func (p AlwaysRetryPolicy) ShouldRetry(resp *http.Response, err error, attempt int) bool {
+	return err != nil || (resp != nil && resp.StatusCode >= 500)
+}
+
 // Middleware defines a function that wraps request execution.
 type Middleware func(next RoundTripperFunc) RoundTripperFunc
 
 // RoundTripperFunc is a functional form of http.RoundTripper-like function.
 type RoundTripperFunc func(req *http.Request) (*http.Response, error)
 
+// Logging middleware logs request duration and results.
 func Logging(next RoundTripperFunc) RoundTripperFunc {
 	return func(req *http.Request) (*http.Response, error) {
 		start := time.Now()
@@ -77,8 +85,19 @@ func Logging(next RoundTripperFunc) RoundTripperFunc {
 	}
 }
 
-// HttpClient is a wrapper around http.Client with retry, timeout, and backoff support.
-type HttpClient struct {
+// Metrics middleware can be extended to collect metrics.
+func Metrics(next RoundTripperFunc) RoundTripperFunc {
+	return func(req *http.Request) (*http.Response, error) {
+		start := time.Now()
+		resp, err := next(req)
+		// In production, you would send metrics to your monitoring system
+		_ = start // placeholder for metrics
+		return resp, err
+	}
+}
+
+// Client is a wrapper around http.Client with retry, timeout, and backoff support.
+type Client struct {
 	client         *http.Client
 	retryCount     int
 	retryWait      time.Duration
@@ -88,52 +107,60 @@ type HttpClient struct {
 	middlewares    []Middleware
 }
 
-// Option defines a functional option for HttpClient
-type Option func(*HttpClient)
+// Option defines a functional option for Client
+type Option func(*Client)
 
 // WithTimeout sets the client timeout.
 func WithTimeout(timeout time.Duration) Option {
-	return func(hc *HttpClient) {
-		hc.client.Timeout = timeout
-		hc.defaultTimeout = timeout
+	return func(c *Client) {
+		c.client.Timeout = timeout
+		c.defaultTimeout = timeout
 	}
 }
 
 // WithRetryCount sets the maximum retry attempts.
 func WithRetryCount(count int) Option {
-	return func(hc *HttpClient) {
-		hc.retryCount = count
+	return func(c *Client) {
+		c.retryCount = count
 	}
 }
 
 // WithRetryWait sets the base retry wait duration.
 func WithRetryWait(wait time.Duration) Option {
-	return func(hc *HttpClient) {
-		hc.retryWait = wait
+	return func(c *Client) {
+		c.retryWait = wait
 	}
 }
 
 // WithMaxRetryWait sets the maximum retry wait duration.
 func WithMaxRetryWait(max time.Duration) Option {
-	return func(hc *HttpClient) {
-		hc.maxRetryWait = max
+	return func(c *Client) {
+		c.maxRetryWait = max
 	}
 }
 
 // WithRetryPolicy sets a custom retry policy.
 func WithRetryPolicy(policy RetryPolicy) Option {
-	return func(hc *HttpClient) {
-		hc.retryPolicy = policy
+	return func(c *Client) {
+		c.retryPolicy = policy
 	}
 }
 
+// WithMiddleware adds middleware to the client.
 func WithMiddleware(mw Middleware) Option {
-	return func(hc *HttpClient) { hc.middlewares = append(hc.middlewares, mw) }
+	return func(c *Client) { c.middlewares = append(c.middlewares, mw) }
 }
 
-// New creates a new HttpClient with provided options.
-func New(opts ...Option) *HttpClient {
-	hc := &HttpClient{
+// WithTransport sets a custom transport.
+func WithTransport(transport http.RoundTripper) Option {
+	return func(c *Client) {
+		c.client.Transport = transport
+	}
+}
+
+// New creates a new Client with provided options.
+func New(opts ...Option) *Client {
+	c := &Client{
 		client: &http.Client{
 			Timeout: 3 * time.Second,
 		},
@@ -144,12 +171,13 @@ func New(opts ...Option) *HttpClient {
 		defaultTimeout: 3 * time.Second,
 	}
 	for _, opt := range opts {
-		opt(hc)
+		opt(c)
 	}
 
-	return hc
+	return c
 }
 
+// requestConfig holds per-request configuration.
 type requestConfig struct {
 	retryCount  *int
 	retryPolicy RetryPolicy
@@ -157,18 +185,25 @@ type requestConfig struct {
 	headers     map[string]string
 }
 
+// RequestOption defines a functional option for individual requests.
 type RequestOption func(*requestConfig)
 
+// WithRequestTimeout sets timeout for a specific request.
 func WithRequestTimeout(timeout time.Duration) RequestOption {
 	return func(c *requestConfig) { c.timeout = &timeout }
 }
+
+// WithRequestRetryCount sets retry count for a specific request.
 func WithRequestRetryCount(count int) RequestOption {
 	return func(c *requestConfig) { c.retryCount = &count }
 }
+
+// WithRequestRetryPolicy sets retry policy for a specific request.
 func WithRequestRetryPolicy(p RetryPolicy) RequestOption {
 	return func(c *requestConfig) { c.retryPolicy = p }
 }
 
+// WithHeader adds a header to the request.
 func WithHeader(key, val string) RequestOption {
 	return func(cfg *requestConfig) {
 		cfg.headers[key] = val
@@ -206,11 +241,11 @@ func backoffWithJitter(base time.Duration, attempt int, max time.Duration) time.
 }
 
 // doRequest executes an HTTP request with retry and policy control.
-func (hc *HttpClient) doRequest(req *http.Request, opts ...RequestOption) (*http.Response, error) {
+func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Response, error) {
 	cfg := &requestConfig{
-		retryCount:  &hc.retryCount,
-		retryPolicy: hc.retryPolicy,
-		timeout:     &hc.defaultTimeout,
+		retryCount:  &c.retryCount,
+		retryPolicy: c.retryPolicy,
+		timeout:     &c.defaultTimeout,
 		headers:     make(map[string]string),
 	}
 	for _, opt := range opts {
@@ -227,22 +262,22 @@ func (hc *HttpClient) doRequest(req *http.Request, opts ...RequestOption) (*http
 	req = req.WithContext(ctx)
 
 	// build middleware chain
-	final := hc.do(cfg)
-	for i := len(hc.middlewares) - 1; i >= 0; i-- {
-		final = hc.middlewares[i](final)
+	final := c.do(cfg)
+	for i := len(c.middlewares) - 1; i >= 0; i-- {
+		final = c.middlewares[i](final)
 	}
 
 	return final(req)
 }
 
 // do executes an HTTP request with retry logic.
-func (hc *HttpClient) do(cfg *requestConfig) RoundTripperFunc {
+func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 	return func(req *http.Request) (*http.Response, error) {
 		var lastErr error
 		var resp *http.Response
 
 		for i := 0; i <= *cfg.retryCount; i++ {
-			resp, lastErr = hc.client.Do(req)
+			resp, lastErr = c.client.Do(req)
 			if lastErr == nil && (resp.StatusCode < 500) {
 				// success
 				return resp, nil
@@ -252,20 +287,20 @@ func (hc *HttpClient) do(cfg *requestConfig) RoundTripperFunc {
 				break
 			}
 
-			time.Sleep(backoffWithJitter(hc.retryWait, i, hc.maxRetryWait))
+			time.Sleep(backoffWithJitter(c.retryWait, i, c.maxRetryWait))
 		}
 		return resp, lastErr
 	}
 }
 
 // Get performs a GET request.
-func (hc *HttpClient) Get(ctx context.Context, url string, opts ...RequestOption) ([]byte, error) {
+func (c *Client) Get(ctx context.Context, url string, opts ...RequestOption) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := hc.doRequest(req, opts...)
+	resp, err := c.doRequest(req, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -275,14 +310,14 @@ func (hc *HttpClient) Get(ctx context.Context, url string, opts ...RequestOption
 }
 
 // Post performs a POST request.
-func (hc *HttpClient) Post(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
+func (c *Client) Post(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", contentType)
-	resp, err := hc.doRequest(req, opts...)
+	resp, err := c.doRequest(req, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -295,10 +330,51 @@ func (hc *HttpClient) Post(ctx context.Context, url string, body []byte, content
 }
 
 // PostJson performs a POST request with JSON body.
-func (hc *HttpClient) PostJson(ctx context.Context, url string, data any, opts ...RequestOption) ([]byte, error) {
+func (c *Client) PostJson(ctx context.Context, url string, data any, opts ...RequestOption) ([]byte, error) {
 	body, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
-	return hc.Post(ctx, url, body, "application/json", opts...)
+	return c.Post(ctx, url, body, "application/json", opts...)
+}
+
+// Put performs a PUT request.
+func (c *Client) Put(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", contentType)
+	resp, err := c.doRequest(req, opts...)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, errors.New("http error: " + resp.Status)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
+// Delete performs a DELETE request.
+func (c *Client) Delete(ctx context.Context, url string, opts ...RequestOption) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.doRequest(req, opts...)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
+}
+
+// Do performs a custom request.
+func (c *Client) Do(req *http.Request, opts ...RequestOption) (*http.Response, error) {
+	return c.doRequest(req, opts...)
 }
