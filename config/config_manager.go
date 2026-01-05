@@ -1,0 +1,615 @@
+package config
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	log "github.com/spcent/plumego/log"
+)
+
+// Source represents a configuration source
+type Source interface {
+	Load(ctx context.Context) (map[string]any, error)
+	Watch(ctx context.Context) (<-chan map[string]any, <-chan error)
+	Name() string
+}
+
+// ConfigManager manages application configuration with dependency injection
+type ConfigManager struct {
+	sources  []Source
+	data     map[string]any
+	mu       sync.RWMutex
+	watchers map[string][]WatcherCallback
+	ctx      context.Context
+	cancel   context.CancelFunc
+	watchWg  sync.WaitGroup
+	logger   log.StructuredLogger
+}
+
+// Type-safe configuration access methods
+
+// String returns a type-safe string configuration
+func (cm *ConfigManager) String(key string, defaultValue string, validators ...Validator) (string, error) {
+	value := cm.GetString(key, defaultValue)
+
+	for _, validator := range validators {
+		if err := validator.Validate(value, key); err != nil {
+			return defaultValue, err
+		}
+	}
+
+	return value, nil
+}
+
+// Int returns a type-safe int configuration
+func (cm *ConfigManager) Int(key string, defaultValue int, validators ...Validator) (int, error) {
+	value := cm.GetInt(key, defaultValue)
+
+	// Add range validator for numeric values if none specified
+	hasRangeValidator := false
+	for _, validator := range validators {
+		if _, ok := validator.(*Range); ok {
+			hasRangeValidator = true
+			break
+		}
+	}
+
+	if !hasRangeValidator {
+		// Add default range validator to prevent overflow
+		validators = append(validators, &Range{Min: -2147483648, Max: 2147483647})
+	}
+
+	for _, validator := range validators {
+		if err := validator.Validate(value, key); err != nil {
+			return defaultValue, err
+		}
+	}
+
+	return value, nil
+}
+
+// Bool returns a type-safe bool configuration
+func (cm *ConfigManager) Bool(key string, defaultValue bool, validators ...Validator) (bool, error) {
+	value := cm.GetBool(key, defaultValue)
+
+	for _, validator := range validators {
+		if err := validator.Validate(value, key); err != nil {
+			return defaultValue, err
+		}
+	}
+
+	return value, nil
+}
+
+// Float returns a type-safe float64 configuration
+func (cm *ConfigManager) Float(key string, defaultValue float64, validators ...Validator) (float64, error) {
+	value := cm.GetFloat(key, defaultValue)
+
+	for _, validator := range validators {
+		if err := validator.Validate(value, key); err != nil {
+			return defaultValue, err
+		}
+	}
+
+	return value, nil
+}
+
+// DurationMs returns a type-safe time.Duration configuration
+func (cm *ConfigManager) DurationMs(key string, defaultValueMs int, validators ...Validator) (time.Duration, error) {
+	value := cm.GetDurationMs(key, defaultValueMs)
+
+	// Convert to int for validation
+	intValue := int(value.Milliseconds())
+
+	for _, validator := range validators {
+		if err := validator.Validate(intValue, key); err != nil {
+			return time.Duration(defaultValueMs) * time.Millisecond, err
+		}
+	}
+
+	return value, nil
+}
+
+// WatcherCallback represents a configuration change callback
+type WatcherCallback func(oldValue, newValue any)
+
+// NewConfigManager creates a new ConfigManager instance
+func NewConfigManager(logger log.StructuredLogger) *ConfigManager {
+	ctx, cancel := context.WithCancel(context.Background())
+	if logger == nil {
+		logger = log.NewGLogger()
+	}
+	return &ConfigManager{
+		sources:  make([]Source, 0),
+		data:     make(map[string]any),
+		watchers: make(map[string][]WatcherCallback),
+		ctx:      ctx,
+		cancel:   cancel,
+		logger:   logger,
+	}
+}
+
+// AddSource adds a configuration source
+func (cm *ConfigManager) AddSource(source Source) error {
+	if source == nil {
+		return errors.New("source cannot be nil")
+	}
+
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.ctx.Err() != nil {
+		return errors.New("config manager is closed")
+	}
+
+	cm.sources = append(cm.sources, source)
+	return nil
+}
+
+// Load loads configuration from all sources
+func (cm *ConfigManager) Load(ctx context.Context) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.ctx.Err() != nil {
+		return errors.New("config manager is closed")
+	}
+
+	// Clear existing data
+	cm.data = make(map[string]any)
+
+	// Load from all sources
+	for _, source := range cm.sources {
+		sourceData, err := source.Load(ctx)
+		if err != nil {
+			cm.logger.Error("Failed to load configuration", log.Fields{
+				"source": source.Name(),
+				"error":  err,
+			})
+			return fmt.Errorf("failed to load from source %s: %w", source.Name(), err)
+		}
+
+		// Merge data (later sources override earlier ones)
+		for key, value := range sourceData {
+			cm.data[key] = value
+		}
+
+		cm.logger.Info("Loaded configuration", log.Fields{
+			"source": source.Name(),
+			"keys":   len(sourceData),
+		})
+	}
+
+	return nil
+}
+
+// Get retrieves a configuration value as string
+func (cm *ConfigManager) Get(key string) string {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	if value, exists := cm.data[key]; exists {
+		return cm.toString(value)
+	}
+	return ""
+}
+
+// GetString retrieves a configuration value as string with default
+func (cm *ConfigManager) GetString(key, defaultValue string) string {
+	value := cm.Get(key)
+	if value == "" {
+		return defaultValue
+	}
+	return strings.TrimSpace(value)
+}
+
+// GetInt retrieves a configuration value as int
+func (cm *ConfigManager) GetInt(key string, defaultValue int) int {
+	value := cm.Get(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	value = strings.TrimSpace(value)
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		cm.logger.Warn("Invalid integer configuration", log.Fields{
+			"key":     key,
+			"value":   value,
+			"default": defaultValue,
+		})
+		return defaultValue
+	}
+	return intValue
+}
+
+// GetBool retrieves a configuration value as bool
+func (cm *ConfigManager) GetBool(key string, defaultValue bool) bool {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	// Try exact key first
+	if value, exists := cm.data[key]; exists {
+		if str := cm.toString(value); str != "" {
+			return parseBool(str, defaultValue)
+		}
+	}
+
+	// Try snake_case version
+	snakeKey := toSnakeCase(key)
+	if value, exists := cm.data[snakeKey]; exists {
+		if str := cm.toString(value); str != "" {
+			return parseBool(str, defaultValue)
+		}
+	}
+
+	// Try uppercase version
+	upperKey := strings.ToUpper(key)
+	if value, exists := cm.data[upperKey]; exists {
+		if str := cm.toString(value); str != "" {
+			return parseBool(str, defaultValue)
+		}
+	}
+
+	return defaultValue
+}
+
+// GetFloat retrieves a configuration value as float64
+func (cm *ConfigManager) GetFloat(key string, defaultValue float64) float64 {
+	value := cm.Get(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	value = strings.TrimSpace(value)
+	floatValue, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		cm.logger.Warn("Invalid float configuration", log.Fields{
+			"key":     key,
+			"value":   value,
+			"default": defaultValue,
+		})
+		return defaultValue
+	}
+	return floatValue
+}
+
+// GetDurationMs retrieves a configuration value as time.Duration (milliseconds)
+func (cm *ConfigManager) GetDurationMs(key string, defaultValueMs int) time.Duration {
+	return time.Duration(cm.GetInt(key, defaultValueMs)) * time.Millisecond
+}
+
+// GetAll returns all configuration as a map
+func (cm *ConfigManager) GetAll() map[string]any {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	// Create a copy to prevent external modification
+	result := make(map[string]any, len(cm.data))
+	for key, value := range cm.data {
+		result[key] = value
+	}
+	return result
+}
+
+// Watch registers a callback for configuration changes to a specific key
+func (cm *ConfigManager) Watch(key string, callback WatcherCallback) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.ctx.Err() != nil {
+		return errors.New("config manager is closed")
+	}
+
+	if _, exists := cm.watchers[key]; !exists {
+		cm.watchers[key] = make([]WatcherCallback, 0)
+	}
+
+	cm.watchers[key] = append(cm.watchers[key], callback)
+	return nil
+}
+
+// WatchGlobal registers a callback for any configuration change
+func (cm *ConfigManager) WatchGlobal(callback WatcherCallback) error {
+	return cm.Watch("*", callback)
+}
+
+// StartWatchers starts watching all configured sources for changes
+func (cm *ConfigManager) StartWatchers(ctx context.Context) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.ctx.Err() != nil {
+		return errors.New("config manager is closed")
+	}
+
+	for _, source := range cm.sources {
+		updates, errs := source.Watch(ctx)
+
+		cm.watchWg.Add(1)
+		go func(src Source) {
+			defer cm.watchWg.Done()
+			for {
+				select {
+				case <-cm.ctx.Done():
+					return
+				case update := <-updates:
+					if update != nil {
+						cm.handleSourceUpdate(src.Name(), update)
+					}
+				case err := <-errs:
+					if err != nil {
+						cm.logger.Error("Watch error", log.Fields{
+							"source": src.Name(),
+							"error":  err,
+						})
+					}
+				}
+			}
+		}(source)
+	}
+
+	return nil
+}
+
+// handleSourceUpdate handles configuration updates from a source
+func (cm *ConfigManager) handleSourceUpdate(sourceName string, newData map[string]any) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	// Detect changes
+	changes := make(map[string]struct{})
+	for key, newValue := range newData {
+		oldValue, exists := cm.data[key]
+		if !exists || !valuesEqual(oldValue, newValue) {
+			changes[key] = struct{}{}
+		}
+	}
+
+	// Update data
+	for key, value := range newData {
+		cm.data[key] = value
+	}
+
+	// Notify watchers
+	if len(changes) > 0 {
+		cm.notifyWatchers(changes, newData)
+		cm.logger.Info("Configuration updated", log.Fields{
+			"source":  sourceName,
+			"changes": len(changes),
+		})
+	}
+}
+
+// notifyWatchers notifies all registered watchers of configuration changes
+func (cm *ConfigManager) notifyWatchers(changes map[string]struct{}, newData map[string]any) {
+	for key := range changes {
+		if watchers, exists := cm.watchers[key]; exists {
+			for _, callback := range watchers {
+				// Get old value
+				cm.mu.RLock()
+				oldValue := cm.data[key]
+				cm.mu.RUnlock()
+
+				// Call callback (avoid holding lock during callback)
+				go func(cb WatcherCallback, old, new any) {
+					defer func() {
+						if r := recover(); r != nil {
+							cm.logger.Error("Watcher callback panicked", log.Fields{
+								"error": r,
+							})
+						}
+					}()
+					cb(old, new)
+				}(callback, oldValue, newData[key])
+			}
+		}
+	}
+
+	// Notify global watchers
+	if watchers, exists := cm.watchers["*"]; exists {
+		for _, callback := range watchers {
+			go func(cb WatcherCallback, data map[string]any) {
+				defer func() {
+					if r := recover(); r != nil {
+						cm.logger.Error("Global watcher callback panicked", log.Fields{
+							"error": r,
+						})
+					}
+				}()
+				cb(nil, data)
+			}(callback, newData)
+		}
+	}
+}
+
+// Reload reloads configuration from all sources
+func (cm *ConfigManager) Reload(ctx context.Context) error {
+	return cm.Load(ctx)
+}
+
+// Close stops all watchers and releases resources
+func (cm *ConfigManager) Close() error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.ctx.Err() != nil {
+		return nil
+	}
+
+	cm.cancel()
+	cm.watchWg.Wait() // Wait for all watcher goroutines to finish
+	cm.logger.Info("Config manager closed", nil)
+	return nil
+}
+
+// Unmarshal populates a struct with configuration values
+func (cm *ConfigManager) Unmarshal(dst any) error {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	val := reflect.ValueOf(dst)
+	if val.Kind() != reflect.Ptr || val.IsNil() {
+		return fmt.Errorf("dst must be a non-nil pointer")
+	}
+
+	val = val.Elem()
+	typ := val.Type()
+
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		fieldValue := val.Field(i)
+
+		if !fieldValue.CanSet() {
+			continue
+		}
+
+		// Get configuration key from tag or field name
+		key := field.Tag.Get("config")
+		if key == "" {
+			key = strings.ToUpper(field.Name)
+		}
+
+		if value, exists := cm.data[key]; exists {
+			if err := cm.setField(fieldValue, value); err != nil {
+				return fmt.Errorf("failed to set field %s: %w", field.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// setField sets a field value based on its type
+func (cm *ConfigManager) setField(fieldValue reflect.Value, value any) error {
+	switch fieldValue.Kind() {
+	case reflect.String:
+		fieldValue.SetString(cm.toString(value))
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		intValue, err := strconv.ParseInt(cm.toString(value), 10, 64)
+		if err != nil {
+			return err
+		}
+		fieldValue.SetInt(intValue)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		uintValue, err := strconv.ParseUint(cm.toString(value), 10, 64)
+		if err != nil {
+			return err
+		}
+		fieldValue.SetUint(uintValue)
+	case reflect.Float32, reflect.Float64:
+		floatValue, err := strconv.ParseFloat(cm.toString(value), 64)
+		if err != nil {
+			return err
+		}
+		fieldValue.SetFloat(floatValue)
+	case reflect.Bool:
+		switch strings.ToLower(cm.toString(value)) {
+		case "1", "true", "yes", "y", "on", "t":
+			fieldValue.SetBool(true)
+		case "0", "false", "no", "n", "off", "f":
+			fieldValue.SetBool(false)
+		default:
+			return fmt.Errorf("invalid boolean value: %s", cm.toString(value))
+		}
+	default:
+		return fmt.Errorf("unsupported field type: %v", fieldValue.Kind())
+	}
+
+	return nil
+}
+
+// toString converts any value to string
+func (cm *ConfigManager) toString(value any) string {
+	if value == nil {
+		return ""
+	}
+
+	switch v := value.(type) {
+	case string:
+		return v
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v)
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v)
+	case float32, float64:
+		return fmt.Sprintf("%g", v)
+	case bool:
+		return strconv.FormatBool(v)
+	case time.Time:
+		return v.Format(time.RFC3339)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+// valuesEqual compares two values for equality
+func valuesEqual(a, b any) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Type-aware comparison
+	switch av := a.(type) {
+	case string:
+		if bv, ok := b.(string); ok {
+			return av == bv
+		}
+	case int:
+		if bv, ok := b.(int); ok {
+			return av == bv
+		}
+	case float64:
+		if bv, ok := b.(float64); ok {
+			return av == bv
+		}
+	case bool:
+		if bv, ok := b.(bool); ok {
+			return av == bv
+		}
+	}
+
+	// Fallback to string comparison for complex types
+	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
+}
+
+// parseBool parses a string to bool
+func parseBool(value string, defaultValue bool) bool {
+	value = strings.TrimSpace(value)
+	switch strings.ToLower(value) {
+	case "1", "true", "yes", "y", "on", "t":
+		return true
+	case "0", "false", "no", "n", "off", "f":
+		return false
+	default:
+		return defaultValue
+	}
+}
+
+// toSnakeCase converts CamelCase to snake_case
+func toSnakeCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var result []rune
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			// Check if previous character is not uppercase
+			if i > 0 && s[i-1] >= 'a' && s[i-1] <= 'z' {
+				result = append(result, '_')
+			}
+		}
+		result = append(result, r)
+	}
+	return strings.ToLower(string(result))
+}

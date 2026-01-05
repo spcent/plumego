@@ -5,16 +5,24 @@ import "reflect"
 func (a *App) builtInComponents() []Component {
 	var comps []Component
 
-	if a.config.PubSub.Enabled && !a.hasComponentType((*pubSubDebugComponent)(nil)) {
-		comps = append(comps, newPubSubDebugComponent(a.config.PubSub, a.pub))
+	a.mu.RLock()
+	pubSubConfig := a.config.PubSub
+	webhookOutConfig := a.config.WebhookOut
+	webhookInConfig := a.config.WebhookIn
+	pub := a.pub
+	logger := a.logger
+	a.mu.RUnlock()
+
+	if pubSubConfig.Enabled && !a.hasComponentType((*pubSubDebugComponent)(nil)) {
+		comps = append(comps, newPubSubDebugComponent(pubSubConfig, pub))
 	}
 
-	if a.config.WebhookOut.Enabled && !a.hasComponentType((*webhookOutComponent)(nil)) {
-		comps = append(comps, newWebhookOutComponent(a.config.WebhookOut))
+	if webhookOutConfig.Enabled && !a.hasComponentType((*webhookOutComponent)(nil)) {
+		comps = append(comps, newWebhookOutComponent(webhookOutConfig))
 	}
 
-	if a.config.WebhookIn.Enabled && !a.hasComponentType((*webhookInComponent)(nil)) {
-		comps = append(comps, newWebhookInComponent(a.config.WebhookIn, a.pub, a.logger))
+	if webhookInConfig.Enabled && !a.hasComponentType((*webhookInComponent)(nil)) {
+		comps = append(comps, newWebhookInComponent(webhookInConfig, pub, logger))
 	}
 
 	return comps

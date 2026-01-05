@@ -33,7 +33,11 @@ func (a *App) Boot() error {
 
 	components := a.mountComponents()
 
-	if a.config.Debug {
+	a.mu.RLock()
+	debug := a.config.Debug
+	a.mu.RUnlock()
+
+	if debug {
 		os.Setenv("APP_DEBUG", "true")
 	}
 
@@ -54,58 +58,93 @@ func (a *App) Boot() error {
 }
 
 func (a *App) loadEnv() error {
-	if a.envLoaded || a.config.EnvFile == "" {
+	a.mu.RLock()
+	envFile := a.config.EnvFile
+	a.mu.RUnlock()
+
+	if a.envLoaded || envFile == "" {
 		return nil
 	}
 
-	if _, err := os.Stat(a.config.EnvFile); err == nil {
-		a.logger.Info("Load .env file", log.Fields{"path": a.config.EnvFile})
-		err := config.LoadEnv(a.config.EnvFile, true)
+	if _, err := os.Stat(envFile); err == nil {
+		a.logger.Info("Load .env file", log.Fields{"path": envFile})
+		err := config.LoadEnv(envFile, true)
 		if err != nil {
 			a.logger.Error("Load .env failed", log.Fields{"error": err})
 			return err
 		}
 	}
 
+	a.mu.Lock()
 	a.envLoaded = true
+	a.mu.Unlock()
 	return nil
 }
 
 func (a *App) setupServer() error {
-	if os.Getenv("APP_DEBUG") == "true" {
-		a.router.Print(os.Stdout)
+	a.mu.RLock()
+	debug := a.config.Debug
+	addr := a.config.Addr
+	readTimeout := a.config.ReadTimeout
+	readHeaderTimeout := a.config.ReadHeaderTimeout
+	writeTimeout := a.config.WriteTimeout
+	idleTimeout := a.config.IdleTimeout
+	maxHeaderBytes := a.config.MaxHeaderBytes
+	drainInterval := a.config.DrainInterval
+	enableHTTP2 := a.config.EnableHTTP2
+	a.mu.RUnlock()
+
+	if debug {
+		os.Setenv("APP_DEBUG", "true")
 	}
 
 	a.ensureHandler()
 
-	if a.handler == nil {
+	a.mu.RLock()
+	handler := a.handler
+	a.mu.RUnlock()
+
+	if handler == nil {
 		return fmt.Errorf("handler not configured")
 	}
 
+	a.mu.Lock()
 	a.httpServer = &http.Server{
-		Addr:              a.config.Addr,
-		Handler:           a.handler,
-		ReadTimeout:       a.config.ReadTimeout,
-		ReadHeaderTimeout: a.config.ReadHeaderTimeout,
-		WriteTimeout:      a.config.WriteTimeout,
-		IdleTimeout:       a.config.IdleTimeout,
-		MaxHeaderBytes:    a.config.MaxHeaderBytes,
+		Addr:              addr,
+		Handler:           handler,
+		ReadTimeout:       readTimeout,
+		ReadHeaderTimeout: readHeaderTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    maxHeaderBytes,
 	}
 
-	a.connTracker = newConnectionTracker(a.logger, a.config.DrainInterval)
+	a.connTracker = newConnectionTracker(a.logger, drainInterval)
 	a.httpServer.ConnState = a.connTracker.track
 
-	if !a.config.EnableHTTP2 {
+	if !enableHTTP2 {
 		a.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))
 	}
+	a.mu.Unlock()
 
 	return nil
 }
 
 func (a *App) startServer() error {
+	a.mu.Lock()
 	a.started = true
+	a.mu.Unlock()
 
 	health.SetReady()
+
+	// Get configuration for server startup
+	a.mu.RLock()
+	tlsEnabled := a.config.TLS.Enabled
+	tlsCertFile := a.config.TLS.CertFile
+	tlsKeyFile := a.config.TLS.KeyFile
+	addr := a.config.Addr
+	httpServer := a.httpServer
+	a.mu.RUnlock()
 
 	idleConnsClosed := make(chan struct{})
 	go func() {
@@ -116,37 +155,44 @@ func (a *App) startServer() error {
 		health.SetNotReady("draining connections")
 		a.logger.Info("SIGTERM received, shutting down", nil)
 
-		timeout := a.config.ShutdownTimeout
-		if timeout <= 0 {
-			timeout = 5 * time.Second
+		a.mu.RLock()
+		shutdownTimeout := a.config.ShutdownTimeout
+		httpServer := a.httpServer
+		connTracker := a.connTracker
+		a.mu.RUnlock()
+
+		if shutdownTimeout <= 0 {
+			shutdownTimeout = 5 * time.Second
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 
-		if a.connTracker != nil {
-			go a.connTracker.drain(ctx)
+		if connTracker != nil {
+			go connTracker.drain(ctx)
 		}
 
-		if err := a.httpServer.Shutdown(ctx); err != nil {
-			a.logger.Error("Server shutdown error", log.Fields{"error": err})
+		if httpServer != nil {
+			if err := httpServer.Shutdown(ctx); err != nil {
+				a.logger.Error("Server shutdown error", log.Fields{"error": err})
+			}
 		}
 
 		a.stopComponents(ctx)
 		close(idleConnsClosed)
 	}()
 
-	a.logger.Info("Server running", log.Fields{"addr": a.config.Addr})
+	a.logger.Info("Server running", log.Fields{"addr": addr})
 
 	var err error
-	if a.config.TLS.Enabled {
-		if a.config.TLS.CertFile == "" || a.config.TLS.KeyFile == "" {
+	if tlsEnabled {
+		if tlsCertFile == "" || tlsKeyFile == "" {
 			a.logger.Error("TLS enabled but certificate or key file not provided", nil)
 			return fmt.Errorf("TLS enabled but certificate or key file not provided")
 		}
-		a.logger.Info("HTTPS enabled", log.Fields{"cert": a.config.TLS.CertFile})
-		err = a.httpServer.ListenAndServeTLS(a.config.TLS.CertFile, a.config.TLS.KeyFile)
+		a.logger.Info("HTTPS enabled", log.Fields{"cert": tlsCertFile})
+		err = httpServer.ListenAndServeTLS(tlsCertFile, tlsKeyFile)
 	} else {
-		err = a.httpServer.ListenAndServe()
+		err = httpServer.ListenAndServe()
 	}
 
 	health.SetNotReady("shutting down")
@@ -194,8 +240,8 @@ func (a *App) mountComponents() []Component {
 }
 
 func (a *App) startComponents(ctx context.Context, comps []Component) error {
-	a.componentsMu.Lock()
-	defer a.componentsMu.Unlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
 	if len(comps) == 0 {
 		return nil
@@ -221,9 +267,9 @@ func (a *App) startComponents(ctx context.Context, comps []Component) error {
 
 func (a *App) stopComponents(ctx context.Context) {
 	a.componentStopOnce.Do(func() {
-		a.componentsMu.Lock()
+		a.mu.Lock()
 		comps := append([]Component{}, a.startedComponents...)
-		a.componentsMu.Unlock()
+		a.mu.Unlock()
 
 		for i := len(comps) - 1; i >= 0; i-- {
 			if comps[i] == nil {

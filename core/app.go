@@ -13,27 +13,33 @@ import (
 
 // App represents the main application instance.
 type App struct {
-	config        AppConfig            // Application configuration
+	// Core components (immutable after construction)
+	config        *AppConfig           // Application configuration
 	router        *router.Router       // HTTP router
-	started       bool                 // Whether the app has started
-	envLoaded     bool                 // Whether environment variables have been loaded
-	httpServer    *http.Server         // HTTP server instance
 	middlewareReg *middleware.Registry // Middleware registry for all routes
-	handler       http.Handler         // Combined handler with middleware applied
-	handlerOnce   sync.Once            // Ensures handler initialization happens once
-	connTracker   *connectionTracker   // Connection tracker for WebSocket
-	guardsApplied bool                 // Whether guards have been applied
-	configFrozen  bool                 // Whether configuration has been frozen
+	logger        log.StructuredLogger // Logger instance
 
-	logger           log.StructuredLogger
+	// Runtime state (protected by mutex)
+	mu            sync.RWMutex
+	started       bool // Whether the app has started
+	envLoaded     bool // Whether environment variables have been loaded
+	guardsApplied bool // Whether guards have been applied
+	configFrozen  bool // Whether configuration has been frozen
+
+	// Server components
+	httpServer  *http.Server       // HTTP server instance
+	connTracker *connectionTracker // Connection tracker for WebSocket
+	handler     http.Handler       // Combined handler with middleware applied
+	handlerOnce sync.Once          // Ensures handler initialization happens once
+
+	// Optional components
 	metricsCollector middleware.MetricsCollector
 	tracer           middleware.Tracer
+	pub              pubsub.PubSub
 
-	pub pubsub.PubSub
-
+	// Component management
 	components        []Component
 	startedComponents []Component
-	componentsMu      sync.Mutex
 	componentStopOnce sync.Once
 }
 
@@ -42,25 +48,27 @@ type Option func(*App)
 
 // New creates a new App instance with the provided options.
 func New(options ...Option) *App {
+	defaultConfig := &AppConfig{
+		Addr:              ":8080",
+		EnvFile:           ".env",
+		TLS:               TLSConfig{Enabled: false},
+		Debug:             false,
+		ShutdownTimeout:   5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1 MiB
+		EnableHTTP2:       true,
+		DrainInterval:     500 * time.Millisecond,
+		MaxBodyBytes:      10 << 20, // 10 MiB
+		MaxConcurrency:    256,
+		QueueDepth:        512,
+		QueueTimeout:      250 * time.Millisecond,
+	}
+
 	app := &App{
-		config: AppConfig{
-			Addr:              ":8080",
-			EnvFile:           ".env",
-			TLS:               TLSConfig{Enabled: false},
-			Debug:             false,
-			ShutdownTimeout:   5 * time.Second,
-			ReadTimeout:       30 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
-			WriteTimeout:      30 * time.Second,
-			IdleTimeout:       60 * time.Second,
-			MaxHeaderBytes:    1 << 20, // 1 MiB
-			EnableHTTP2:       true,
-			DrainInterval:     500 * time.Millisecond,
-			MaxBodyBytes:      10 << 20, // 10 MiB
-			MaxConcurrency:    256,
-			QueueDepth:        512,
-			QueueTimeout:      250 * time.Millisecond,
-		},
+		config:        defaultConfig,
 		router:        router.NewRouter(),
 		middlewareReg: middleware.NewRegistry(),
 		logger:        log.NewGLogger(),

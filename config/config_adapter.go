@@ -7,11 +7,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/spcent/plumego/log"
 )
 
 // Global default config instance for backward compatibility
 var (
-	globalConfig   *Config
+	globalConfig   *ConfigManager
 	globalConfigMu sync.RWMutex
 	globalInitOnce sync.Once
 	globalInitErr  error
@@ -62,7 +64,8 @@ func InitDefault() error {
 		defer globalConfigMu.Unlock()
 
 		// Create new config instance
-		globalConfig = New()
+		logger := log.NewGLogger()
+		globalConfig = NewConfigManager(logger)
 
 		ctx := context.Background()
 
@@ -95,7 +98,7 @@ func InitDefault() error {
 }
 
 // GetGlobalConfig returns the global config instance
-func GetGlobalConfig() *Config {
+func GetGlobalConfig() *ConfigManager {
 	globalConfigMu.RLock()
 	defer globalConfigMu.RUnlock()
 
@@ -103,7 +106,8 @@ func GetGlobalConfig() *Config {
 		// Auto-initialize if not already done
 		if err := InitDefault(); err != nil {
 			// Return empty config on error
-			return New()
+			logger := log.NewGLogger()
+			return NewConfigManager(logger)
 		}
 		return globalConfig
 	}
@@ -113,7 +117,7 @@ func GetGlobalConfig() *Config {
 
 // SetGlobalConfig allows setting a custom global config instance
 // This is primarily useful for testing
-func SetGlobalConfig(config *Config) {
+func SetGlobalConfig(config *ConfigManager) {
 	globalConfigMu.Lock()
 	defer globalConfigMu.Unlock()
 	globalConfig = config
