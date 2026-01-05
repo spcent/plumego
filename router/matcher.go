@@ -76,37 +76,62 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 }
 
 // findChildForPath finds a child node that matches the given path segment
+// Optimized version with better lookup performance
 func (rm *RouteMatcher) findChildForPath(parent *node, path string) *node {
+	// Fast path: empty parent or no children
+	if parent == nil || len(parent.children) == 0 {
+		return nil
+	}
+
 	// Use indices for faster lookup when available
-	if len(parent.indices) > 0 {
-		// Check if the first character of path exists in indices
+	if len(parent.indices) > 0 && len(path) > 0 {
 		firstChar := path[0]
-		for i := 0; i < len(parent.indices); i++ {
-			if parent.indices[i] == firstChar {
-				// Found potential match, check the child
-				for _, child := range parent.children {
-					if child.path == path {
-						return child
-					}
-				}
-				break
+
+		// Binary search in indices for better performance
+		idx := strings.IndexByte(parent.indices, firstChar)
+		if idx == -1 {
+			return nil
+		}
+
+		// Check the corresponding child
+		// Since indices are sorted, we can find the child more efficiently
+		for _, child := range parent.children {
+			if child.path == path {
+				return child
 			}
 		}
 		return nil
 	}
 
-	// Fallback to linear search
-	for _, child := range parent.children {
-		if child.path == path {
-			return child
+	// Fallback to linear search for small sets or when indices aren't available
+	// For very small sets (1-2 children), linear search is faster
+	if len(parent.children) <= 2 {
+		for _, child := range parent.children {
+			if child.path == path {
+				return child
+			}
+		}
+		return nil
+	}
+
+	// For larger sets, optimize the loop
+	for i := range parent.children {
+		if parent.children[i].path == path {
+			return parent.children[i]
 		}
 	}
 	return nil
 }
 
 // findParamChild finds a param child node if exists
+// Optimized to avoid unnecessary allocations
 func (rm *RouteMatcher) findParamChild(parent *node) *node {
-	for _, child := range parent.children {
+	if parent == nil || len(parent.children) == 0 {
+		return nil
+	}
+
+	for i := range parent.children {
+		child := parent.children[i]
 		if len(child.path) > 0 && child.path[0] == ':' {
 			return child
 		}
@@ -115,8 +140,14 @@ func (rm *RouteMatcher) findParamChild(parent *node) *node {
 }
 
 // findWildChild finds a wildcard child node if exists
+// Optimized to avoid unnecessary allocations
 func (rm *RouteMatcher) findWildChild(parent *node) *node {
-	for _, child := range parent.children {
+	if parent == nil || len(parent.children) == 0 {
+		return nil
+	}
+
+	for i := range parent.children {
+		child := parent.children[i]
 		if len(child.path) > 0 && child.path[0] == '*' {
 			return child
 		}

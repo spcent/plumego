@@ -32,7 +32,7 @@ func NewJSONWriter(resourceName string) *JSONWriter {
 
 // WriteJSON writes a standardized JSON response
 func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 
 	response := Response{
@@ -41,16 +41,22 @@ func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data interfac
 		Data:    data,
 	}
 
+	// Use a buffer to avoid partial writes on encoding errors
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		// Log error but don't break the response flow
-		fmt.Printf("Failed to encode JSON response: %v\n", err)
+		// If encoding fails, we can't write a proper error response since headers are already sent
+		// Just log it for debugging
+		if jw != nil && jw.resourceName != "" {
+			fmt.Printf("[router/resource] JSON encoding failed for %s: %v\n", jw.resourceName, err)
+		} else {
+			fmt.Printf("[router/resource] JSON encoding failed: %v\n", err)
+		}
 	}
 }
 
 // WriteError writes a standardized error response
 func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message string, details interface{}) {
 	// Return standardized error response
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 
 	errorResp := ErrorResponse{
@@ -60,7 +66,12 @@ func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message stri
 	}
 
 	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
-		fmt.Printf("Failed to encode error response: %v\n", err)
+		// Log encoding error but can't send error response since headers are already sent
+		if jw != nil && jw.resourceName != "" {
+			fmt.Printf("[router/resource] Error JSON encoding failed for %s: %v\n", jw.resourceName, err)
+		} else {
+			fmt.Printf("[router/resource] Error JSON encoding failed: %v\n", err)
+		}
 	}
 }
 

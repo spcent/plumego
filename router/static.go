@@ -37,11 +37,32 @@ func getFilePathFromRequest(req *http.Request) (string, bool) {
 		return "", false
 	}
 
+	// Security: reject empty paths
+	if relPath == "" {
+		return "", false
+	}
+
+	// Security: reject paths with null bytes
+	if strings.Contains(relPath, "\x00") {
+		return "", false
+	}
+
 	// Clean the relative path to avoid directory traversal (e.g., "../../etc/passwd")
 	cleanPath := filepath.Clean(relPath)
 
-	// Additional security check: ensure the cleaned path doesn't contain ".."
+	// Additional security checks
+	// 1. Ensure the cleaned path doesn't contain ".."
 	if strings.Contains(cleanPath, "..") {
+		return "", false
+	}
+
+	// 2. Reject absolute paths
+	if filepath.IsAbs(cleanPath) {
+		return "", false
+	}
+
+	// 3. Reject paths starting with "/" (shouldn't happen after Clean, but be safe)
+	if strings.HasPrefix(cleanPath, "/") {
 		return "", false
 	}
 

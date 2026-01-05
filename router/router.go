@@ -108,18 +108,97 @@ type Router struct {
 	parent            *Router              // Parent router for groups
 	middlewareManager *MiddlewareManager   // Middleware management
 	logger            log.StructuredLogger // Logger for contextual handlers
+
+	// Performance optimization: cache for frequently accessed routes
+	routeCache  map[string]*MatchResult // Cache for route matches
+	cacheSize   int                     // Maximum cache size
+	enableCache bool                    // Whether route caching is enabled
+}
+
+// RouterOption defines a function type for router configuration options
+type RouterOption func(*Router)
+
+// WithCache enables route caching for improved performance
+func WithCache(size int) RouterOption {
+	return func(r *Router) {
+		if size > 0 {
+			r.enableCache = true
+			r.cacheSize = size
+			r.routeCache = make(map[string]*MatchResult, size)
+		}
+	}
+}
+
+// WithLogger sets a custom logger for the router
+func WithLogger(logger log.StructuredLogger) RouterOption {
+	return func(r *Router) {
+		if logger != nil {
+			r.logger = logger
+		}
+	}
 }
 
 // NewRouter creates a new Router instance with default configuration
-func NewRouter() *Router {
-	return &Router{
+func NewRouter(opts ...RouterOption) *Router {
+	r := &Router{
 		trees:             make(map[string]*node),
 		routes:            make(map[string][]route),
 		prefix:            "",
 		parent:            nil,
 		middlewareManager: NewMiddlewareManager(),
 		logger:            log.NewGLogger(),
+		enableCache:       false,
+		routeCache:        nil,
+		cacheSize:         0,
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
+}
+
+// NewRouterWithCache creates a new Router instance with caching enabled
+func NewRouterWithCache(cacheSize int) *Router {
+	return NewRouter(WithCache(cacheSize))
+}
+
+// getCacheKey generates a cache key for route matching
+func (r *Router) getCacheKey(method, path string) string {
+	return method + ":" + path
+}
+
+// getCachedResult retrieves a cached route match result
+func (r *Router) getCachedResult(key string) *MatchResult {
+	if !r.enableCache || r.routeCache == nil {
+		return nil
+	}
+
+	result, exists := r.routeCache[key]
+	if exists {
+		return result
+	}
+	return nil
+}
+
+// cacheResult stores a route match result in cache
+func (r *Router) cacheResult(key string, result *MatchResult) {
+	if !r.enableCache || r.routeCache == nil || result == nil {
+		return
+	}
+
+	// Simple cache eviction strategy: if at capacity, remove oldest entry
+	if len(r.routeCache) >= r.cacheSize {
+		// Find an entry to evict (first one we find)
+		for k := range r.routeCache {
+			delete(r.routeCache, k)
+			break
+		}
+	}
+
+	r.routeCache[key] = result
 }
 
 // SetLogger configures the logger used by context-aware handlers.
