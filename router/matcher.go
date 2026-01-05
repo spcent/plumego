@@ -2,8 +2,6 @@ package router
 
 import (
 	"strings"
-
-	"github.com/spcent/plumego/middleware"
 )
 
 // RouteMatcher performs efficient trie-based route matching
@@ -16,14 +14,6 @@ func NewRouteMatcher(root *node) *RouteMatcher {
 	return &RouteMatcher{
 		root: root,
 	}
-}
-
-// MatchResult represents the result of route matching
-type MatchResult struct {
-	Handler          Handler
-	ParamValues      []string
-	ParamKeys        []string
-	RouteMiddlewares []middleware.Middleware
 }
 
 // Match performs route matching against the given path parts
@@ -67,11 +57,16 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 	}
 
 	// Use the paramKeys stored in the node during route registration
+	// Convert middleware slice to interface{} slice
+	mws := make([]interface{}, len(current.middlewares))
+	for i, m := range current.middlewares {
+		mws[i] = m
+	}
 	return &MatchResult{
 		Handler:          current.handler,
 		ParamValues:      paramValues,
 		ParamKeys:        current.paramKeys,
-		RouteMiddlewares: current.middlewares,
+		RouteMiddlewares: mws,
 	}
 }
 

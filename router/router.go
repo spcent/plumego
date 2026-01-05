@@ -99,15 +99,18 @@ type route struct {
 
 // Router represents an HTTP router with path-based routing and middleware support
 type Router struct {
-	prefix            string               // Group prefix
-	trees             map[string]*node     // Method -> root node
-	registrars        []RouteRegistrar     // Route registrars
-	routes            map[string][]route   // Registered routes
-	frozen            bool                 // Whether router is frozen
-	mu                sync.RWMutex         // Mutex for concurrent access
-	parent            *Router              // Parent router for groups
-	middlewareManager *MiddlewareManager   // Middleware management
-	logger            log.StructuredLogger // Logger for contextual handlers
+	prefix            string                      // Group prefix
+	trees             map[string]*node            // Method -> root node
+	registrars        []RouteRegistrar            // Route registrars
+	routes            map[string][]route          // Registered routes
+	frozen            bool                        // Whether router is frozen
+	mu                sync.RWMutex                // Mutex for concurrent access
+	parent            *Router                     // Parent router for groups
+	middlewareManager *MiddlewareManager          // Middleware management
+	logger            log.StructuredLogger        // Logger for contextual handlers
+	routeCache        *RouteCache                 // Route matching cache
+	radixTree         *RadixTree                  // Radix tree for efficient routing
+	routeValidations  map[string]*RouteValidation // Route parameter validations
 }
 
 // RouterOption defines a function type for router configuration options
@@ -131,6 +134,7 @@ func NewRouter(opts ...RouterOption) *Router {
 		parent:            nil,
 		middlewareManager: NewMiddlewareManager(),
 		logger:            log.NewGLogger(),
+		routeValidations:  make(map[string]*RouteValidation),
 	}
 
 	// Apply options
@@ -434,15 +438,31 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 		return
 	}
 
-	// Build parameter map and serve request
+	// Build parameter map
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
+
+	// Validate parameters if validations are registered
+	// Use the full path with prefix for validation lookup
+	fullPath := r.prefix + path
+	if params != nil {
+		if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	r.applyMiddlewareAndServe(w, req, params, result.Handler, result.RouteMiddlewares)
 }
 
 // handleRootRequest handles requests to the root path "/"
 func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tree *node) {
 	if tree.handler != nil {
-		r.applyMiddlewareAndServe(w, req, nil, tree.handler, tree.middlewares)
+		// Convert middleware slice to interface{} slice
+		mws := make([]interface{}, len(tree.middlewares))
+		for i, m := range tree.middlewares {
+			mws[i] = m
+		}
+		r.applyMiddlewareAndServe(w, req, nil, tree.handler, mws)
 		return
 	}
 	http.NotFound(w, req)
@@ -471,7 +491,7 @@ func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[str
 }
 
 // applyMiddlewareAndServe applies middleware chain to the handler and serves the request
-func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, handler Handler, routeMiddlewares []middleware.Middleware) {
+func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, handler Handler, routeMiddlewares []interface{}) {
 	reqWithParams := req
 	ctx := req.Context()
 
@@ -495,8 +515,15 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 		reqWithParams = req.WithContext(ctx)
 	}
 
-	combined := append([]middleware.Middleware{}, r.middlewareManager.GetMiddlewares()...)
-	combined = append(combined, routeMiddlewares...)
+	// Convert interface{} slice to middleware.Middleware slice
+	combined := make([]middleware.Middleware, 0, len(r.middlewareManager.GetMiddlewares())+len(routeMiddlewares))
+	combined = append(combined, r.middlewareManager.GetMiddlewares()...)
+
+	for _, m := range routeMiddlewares {
+		if mw, ok := m.(middleware.Middleware); ok {
+			combined = append(combined, mw)
+		}
+	}
 
 	if len(combined) == 0 {
 		handler.ServeHTTP(w, reqWithParams)
