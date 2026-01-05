@@ -6,12 +6,12 @@ import (
 	"time"
 )
 
-// TestPubSub_Performance 测试优化后的性能
+// TestPubSub_Performance tests optimized performance
 func TestPubSub_Performance(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	// 创建多个订阅者
+	// Create multiple subscribers
 	const numSubs = 10
 	const numMsgs = 1000
 
@@ -27,7 +27,7 @@ func TestPubSub_Performance(t *testing.T) {
 		subs[i] = sub
 	}
 
-	// 测量发布性能
+	// Measure publishing performance
 	start := time.Now()
 	var wg sync.WaitGroup
 	for i := 0; i < numMsgs; i++ {
@@ -43,7 +43,7 @@ func TestPubSub_Performance(t *testing.T) {
 	wg.Wait()
 	duration := time.Since(start)
 
-	// 验证所有订阅者都收到消息
+	// Verify all subscribers received messages
 	for i, sub := range subs {
 		received := 0
 		// Give more time for all messages to be delivered
@@ -68,7 +68,7 @@ func TestPubSub_Performance(t *testing.T) {
 		numMsgs, numSubs, duration, float64(numMsgs)/duration.Seconds())
 }
 
-// TestPubSub_ConcurrentSubscribers 测试并发订阅者管理
+// TestPubSub_ConcurrentSubscribers tests concurrent subscriber management
 func TestPubSub_ConcurrentSubscribers(t *testing.T) {
 	ps := New()
 	defer ps.Close()
@@ -76,13 +76,13 @@ func TestPubSub_ConcurrentSubscribers(t *testing.T) {
 	const numGoroutines = 50
 	var wg sync.WaitGroup
 
-	// 并发订阅和取消
+	// Concurrent subscribe and cancel
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 
-			// 订阅
+			// Subscribe
 			sub, err := ps.Subscribe("concurrent", SubOptions{
 				BufferSize: 10,
 				Policy:     DropNewest,
@@ -92,15 +92,15 @@ func TestPubSub_ConcurrentSubscribers(t *testing.T) {
 				return
 			}
 
-			// 短暂接收
+			// Briefly receive
 			time.Sleep(10 * time.Millisecond)
 
-			// 取消
+			// Cancel
 			sub.Cancel()
 		}(i)
 	}
 
-	// 并发发布
+	// Concurrent publishing
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(id int) {
@@ -112,14 +112,14 @@ func TestPubSub_ConcurrentSubscribers(t *testing.T) {
 
 	wg.Wait()
 
-	// 验证最终状态
+	// Verify final state
 	count := ps.GetSubscriberCount("concurrent")
 	if count != 0 {
 		t.Errorf("Expected 0 subscribers, got %d", count)
 	}
 }
 
-// TestPubSub_DifferentPolicies 测试不同背压策略
+// TestPubSub_DifferentPolicies tests different backpressure policies
 func TestPubSub_DifferentPolicies(t *testing.T) {
 	ps := New()
 	defer ps.Close()
@@ -176,7 +176,7 @@ func TestPubSub_DifferentPolicies(t *testing.T) {
 	}
 }
 
-// TestPubSub_ListOperations 测试列表操作
+// TestPubSub_ListOperations tests list operations
 func TestPubSub_ListOperations(t *testing.T) {
 	ps := New()
 	defer ps.Close()
@@ -211,7 +211,7 @@ func TestPubSub_ListOperations(t *testing.T) {
 	}
 }
 
-// TestPubSub_ErrorHandling 测试错误处理
+// TestPubSub_ErrorHandling tests error handling
 func TestPubSub_ErrorHandling(t *testing.T) {
 	ps := New()
 	defer ps.Close()
@@ -242,7 +242,7 @@ func TestPubSub_ErrorHandling(t *testing.T) {
 	}
 }
 
-// TestPubSub_MetricsAccuracy 测试指标准确性
+// TestPubSub_MetricsAccuracy tests metric accuracy
 func TestPubSub_MetricsAccuracy(t *testing.T) {
 	ps := New()
 	defer ps.Close()
@@ -287,7 +287,7 @@ func TestPubSub_MetricsAccuracy(t *testing.T) {
 		tm.PublishTotal, tm.DeliveredTotal, totalDropped, tm.SubscribersGauge)
 }
 
-// TestPubSub_RapidSubscribeCancel 测试快速订阅/取消
+// TestPubSub_RapidSubscribeCancel tests rapid subscribe/cancel
 func TestPubSub_RapidSubscribeCancel(t *testing.T) {
 	ps := New()
 	defer ps.Close()
@@ -313,7 +313,7 @@ func TestPubSub_RapidSubscribeCancel(t *testing.T) {
 	}
 }
 
-// TestPubSub_PressureHandling 测试压力处理
+// TestPubSub_PressureHandling tests pressure handling
 func TestPubSub_PressureHandling(t *testing.T) {
 	ps := New()
 	defer ps.Close()

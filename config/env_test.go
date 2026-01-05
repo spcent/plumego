@@ -100,41 +100,41 @@ func TestLoadEnvFileNotFound(t *testing.T) {
 }
 
 func TestGetHelpers(t *testing.T) {
-	// 创建自定义配置实例
+	// Create custom config instance
 	cfg := New()
 
-	// 添加环境变量源
+	// Add environment variable source
 	envSource := NewEnvSource("")
 	cfg.AddSource(envSource)
 
-	// 加载配置
+	// Load configuration
 	ctx := context.Background()
 	err := cfg.Load(ctx)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// 测试缺省值
+	// Test default value
 	if got := cfg.GetString("MISSING", "default"); got != "default" {
 		t.Fatalf("GetString default fallback failed: %q", got)
 	}
 
-	// 设置环境变量
+	// Set environment variable
 	os.Setenv("TEST_STRING", "  spaced ")
 	defer os.Unsetenv("TEST_STRING")
 
-	// 重新加载配置以获取新的环境变量
+	// Reload configuration to get new environment variables
 	err = cfg.Load(ctx)
 	if err != nil {
 		t.Fatalf("Failed to reload config: %v", err)
 	}
 
-	// 测试字符串
+	// Test string
 	if got := cfg.GetString("test_string", "default"); got != "spaced" {
 		t.Fatalf("GetString should trim whitespace, got %q", got)
 	}
 
-	// 测试整数
+	// Test integer
 	os.Setenv("TEST_INT", "notanint")
 	defer os.Unsetenv("TEST_INT")
 	cfg.Load(ctx)
@@ -147,7 +147,7 @@ func TestGetHelpers(t *testing.T) {
 		t.Fatalf("GetInt should parse trimmed integer, got %d", got)
 	}
 
-	// 测试布尔值
+	// Test boolean
 	os.Setenv("TEST_BOOL_TRUE", "yes")
 	defer os.Unsetenv("TEST_BOOL_TRUE")
 	cfg.Load(ctx)
@@ -167,7 +167,7 @@ func TestGetHelpers(t *testing.T) {
 		t.Fatalf("GetBool should fallback to default on invalid input")
 	}
 
-	// 测试浮点数
+	// Test float
 	os.Setenv("TEST_FLOAT", " 1.5 ")
 	defer os.Unsetenv("TEST_FLOAT")
 	cfg.Load(ctx)
@@ -175,7 +175,7 @@ func TestGetHelpers(t *testing.T) {
 		t.Fatalf("GetFloat should parse trimmed float, got %f", got)
 	}
 
-	// 测试持续时间
+	// Test duration
 	os.Setenv("TEST_DURATION_MS", " 10 ")
 	defer os.Unsetenv("TEST_DURATION_MS")
 	cfg.Load(ctx)

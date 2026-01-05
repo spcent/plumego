@@ -415,7 +415,7 @@ func TestFileSource(t *testing.T) {
 		t.Fatalf("FileSource Load failed: %v", err)
 	}
 
-	// 检查server_port（JSON中的数字会被解析为float64）
+	// Check server_port (numbers in JSON are parsed as float64)
 	serverPort, ok := data["server_port"].(float64)
 	if !ok || int(serverPort) != 8080 {
 		t.Errorf("Expected server_port 8080, got %v (type: %T)", data["server_port"], data["server_port"])
@@ -423,13 +423,13 @@ func TestFileSource(t *testing.T) {
 		t.Logf("server_port correctly loaded: %v", int(serverPort))
 	}
 
-	// 检查database_url
+	// Check database_url
 	databaseURL, ok := data["database_url"].(string)
 	if !ok || databaseURL != "postgres://localhost:5432/test" {
 		t.Errorf("Expected database_url 'postgres://localhost:5432/test', got %v", data["database_url"])
 	}
 
-	// 检查enable_ssl
+	// Check enable_ssl
 	enableSSL, ok := data["enable_ssl"].(bool)
 	if !ok || enableSSL != false {
 		t.Errorf("Expected enable_ssl false, got %v", data["enable_ssl"])

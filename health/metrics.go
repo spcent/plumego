@@ -45,8 +45,8 @@ type HealthCheckRecord struct {
 type HealthTrend struct {
 	Direction     TrendDirection `json:"direction"`      // improving/declining/stable
 	Stability     float64        `json:"stability"`      // 0.0-1.0, higher is more stable
-	RecentSuccess float64        `json:"recent_success"` // 最近成功率
-	TrendScore    float64        `json:"trend_score"`    // -1.0到1.0，负数表示恶化
+	RecentSuccess float64        `json:"recent_success"` // Recent success rate
+	TrendScore    float64        `json:"trend_score"`    // -1.0 to 1.0, negative means deteriorating
 }
 
 // TrendDirection represents the direction of health trend.
@@ -114,7 +114,7 @@ func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Dura
 			MaxLatency:    duration,
 			LastStatus:    status,
 			LastCheckTime: time.Now(),
-			RecentHistory: make([]HealthCheckRecord, 0, 10), // 保留最近10次检查
+			RecentHistory: make([]HealthCheckRecord, 0, 10), // Keep last 10 checks
 		}
 	}
 

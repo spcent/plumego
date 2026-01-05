@@ -427,7 +427,7 @@ func (d *docSite) handler() http.HandlerFunc {
 }
 
 func (d *docSite) renderIndex(w http.ResponseWriter, lang string) {
-	content := markdownToHTML("# Documentation\n选择左侧导航以浏览各模块，或直接访问 /docs/{lang}/{module}。\n\nSelect a language and module on the left to start reading.")
+	content := markdownToHTML("# Documentation\nSelect a language and module on the left to start reading, or directly access /docs/{lang}/{module}.\n\nUse the navigation on the left to browse modules by language.")
 	d.renderPage(w, docTemplateData{
 		Title:        "Plumego Docs",
 		Lang:         lang,

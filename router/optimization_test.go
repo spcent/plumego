@@ -9,9 +9,9 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-// BenchmarkOptimizedRouteMatching 测试优化后的路由匹配性能
+// BenchmarkOptimizedRouteMatching tests optimized route matching performance
 func BenchmarkOptimizedRouteMatching(b *testing.B) {
-	// 测试不同复杂度的路由
+	// Test routes of different complexities
 	tests := []struct {
 		name   string
 		routes []struct{ method, path string }
@@ -49,14 +49,14 @@ func BenchmarkOptimizedRouteMatching(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			r := NewRouter()
 
-			// 注册路由
+			// Register routes
 			for _, route := range tt.routes {
 				r.AddRoute(route.method, route.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusOK)
 				}))
 			}
 
-			// 创建测试请求
+			// Create test requests
 			var testPaths []string
 			switch tt.name {
 			case "Simple Static Routes":
@@ -78,11 +78,11 @@ func BenchmarkOptimizedRouteMatching(b *testing.B) {
 	}
 }
 
-// TestOptimizedMatcher 测试优化后的匹配器
+// TestOptimizedMatcher tests the optimized matcher
 func TestOptimizedMatcher(t *testing.T) {
 	r := NewRouter()
 
-	// 注册各种类型的路由
+	// Register various types of routes
 	r.GetFunc("/static/path", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("static"))
 	})
@@ -128,7 +128,7 @@ func TestOptimizedMatcher(t *testing.T) {
 	}
 }
 
-// TestSecurityEnhancements 测试安全增强
+// TestSecurityEnhancements tests security enhancements
 func TestSecurityEnhancements(t *testing.T) {
 	r := NewRouter()
 	r.Static("/static", t.TempDir())
@@ -158,7 +158,7 @@ func TestSecurityEnhancements(t *testing.T) {
 	}
 }
 
-// TestConcurrentSafety 测试并发安全性
+// TestConcurrentSafety tests concurrent safety
 func TestConcurrentSafety(t *testing.T) {
 	r := NewRouter()
 

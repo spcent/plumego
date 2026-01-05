@@ -51,6 +51,9 @@ type Entry struct {
 	ExpireAt time.Time `json:"expire_at"`
 	Size     int64     `json:"size"`
 	Version  int64     `json:"version"`
+	// LRU chain pointers (not serialized)
+	Prev *Entry `json:"-"`
+	Next *Entry `json:"-"`
 }
 
 // WALEntry represents a Write-Ahead Log entry
@@ -76,7 +79,7 @@ type Options struct {
 	CloseTimeout      time.Duration `json:"close_timeout"`
 }
 
-// Shard represents a single data shard
+// Shard represents a single data shard with optimized locking
 type Shard struct {
 	mu      sync.RWMutex
 	data    map[string]*Entry
@@ -484,24 +487,24 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 
 	shard := kv.getShard(key)
 
-	// First, try with read lock for non-modifying operations
+	// Optimized: reduce lock contention by checking without lock first
+	// Use read lock for existence check
 	shard.mu.RLock()
 	entry, exists := shard.data[key]
 
-	// Check if key exists and is not expired
+	// Check if key exists
 	if !exists {
 		shard.mu.RUnlock()
 		atomic.AddInt64(&kv.misses, 1)
 		return nil, ErrKeyNotFound
 	}
 
-	// Check expiration (read-only check first)
-	isExpired := !entry.ExpireAt.IsZero() && time.Now().After(entry.ExpireAt)
-	if isExpired {
+	// Check expiration (fast path)
+	if !entry.ExpireAt.IsZero() && time.Now().After(entry.ExpireAt) {
 		shard.mu.RUnlock()
 		// Need write lock to delete expired entry
 		shard.mu.Lock()
-		// Recheck existence and expiration under write lock
+		// Recheck under write lock
 		if e, exists := shard.data[key]; exists {
 			if !e.ExpireAt.IsZero() && time.Now().After(e.ExpireAt) {
 				kv.deleteFromShard(shard, key, e)
@@ -515,16 +518,14 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 		return nil, ErrKeyExpired
 	}
 
-	// For LRU update, we need write lock
-	// Create defensive copy first under read lock
+	// Create defensive copy while holding read lock
 	valueCopy := append([]byte(nil), entry.Value...)
 	shard.mu.RUnlock()
 
-	// Acquire write lock for LRU update
+	// Update LRU with minimal lock time
 	shard.mu.Lock()
-	// Recheck existence (could have been deleted by another goroutine)
+	// Recheck existence and expiration under write lock
 	if e, exists := shard.data[key]; exists {
-		// Recheck expiration
 		if !e.ExpireAt.IsZero() && time.Now().After(e.ExpireAt) {
 			shard.mu.Unlock()
 			atomic.AddInt64(&kv.misses, 1)

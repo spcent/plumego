@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// BenchmarkJSONMarshalWithoutPool 测试没有对象池的JSON序列化
+// BenchmarkJSONMarshalWithoutPool tests JSON serialization without object pool
 func BenchmarkJSONMarshalWithoutPool(b *testing.B) {
 	data := map[string]any{
 		"id":   12345,
@@ -22,7 +22,7 @@ func BenchmarkJSONMarshalWithoutPool(b *testing.B) {
 	}
 }
 
-// BenchmarkJSONMarshalWithPool 测试使用对象池的JSON序列化
+// BenchmarkJSONMarshalWithPool tests JSON serialization with object pool
 func BenchmarkJSONMarshalWithPool(b *testing.B) {
 	data := map[string]any{
 		"id":   12345,
@@ -39,7 +39,7 @@ func BenchmarkJSONMarshalWithPool(b *testing.B) {
 	}
 }
 
-// BenchmarkJSONUnmarshalWithoutPool 测试没有对象池的JSON反序列化
+// BenchmarkJSONUnmarshalWithoutPool tests JSON deserialization without object pool
 func BenchmarkJSONUnmarshalWithoutPool(b *testing.B) {
 	data := []byte(`{"id":12345,"name":"test","data":{"key":"value"}}`)
 
@@ -52,7 +52,7 @@ func BenchmarkJSONUnmarshalWithoutPool(b *testing.B) {
 	}
 }
 
-// BenchmarkJSONUnmarshalWithPool 测试使用对象池的JSON反序列化
+// BenchmarkJSONUnmarshalWithPool tests JSON deserialization with object pool
 func BenchmarkJSONUnmarshalWithPool(b *testing.B) {
 	data := []byte(`{"id":12345,"name":"test","data":{"key":"value"}}`)
 
@@ -65,26 +65,26 @@ func BenchmarkJSONUnmarshalWithPool(b *testing.B) {
 	}
 }
 
-// BenchmarkFieldStringWithoutPool 测试没有对象池的字段提取
+// BenchmarkFieldStringWithoutPool tests field extraction without object pool
 func BenchmarkFieldStringWithoutPool(b *testing.B) {
 	data := []byte(`{"id":12345,"name":"test","data":{"key":"value"}}`)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// 模拟原始实现
+		// Simulate original implementation
 		var m map[string]any
 		json.Unmarshal(data, &m)
 		_ = m["name"].(string)
 	}
 }
 
-// BenchmarkFieldStringWithPool 测试使用对象池的字段提取
+// BenchmarkFieldStringWithPool tests field extraction with object pool
 func BenchmarkFieldStringWithPool(b *testing.B) {
 	data := []byte(`{"id":12345,"name":"test","data":{"key":"value"}}`)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// 使用池化的map来模拟字段提取
+		// Use pooled map to simulate field extraction
 		m := GetMap()
 		if err := json.Unmarshal(data, &m); err == nil {
 			if v, ok := m["name"].(string); ok {
@@ -95,7 +95,7 @@ func BenchmarkFieldStringWithPool(b *testing.B) {
 	}
 }
 
-// BenchmarkMapAllocation 测试map分配频率
+// BenchmarkMapAllocation tests map allocation frequency
 func BenchmarkMapAllocation(b *testing.B) {
 	b.Run("WithoutPool", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -116,13 +116,13 @@ func BenchmarkMapAllocation(b *testing.B) {
 	})
 }
 
-// BenchmarkBufferAllocation 测试buffer分配频率
+// BenchmarkBufferAllocation tests buffer allocation frequency
 func BenchmarkBufferAllocation(b *testing.B) {
 	data := map[string]any{"id": 123, "name": "test"}
 
 	b.Run("WithoutPool", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			// 每次都创建新的buffer
+			// Always create new buffer
 			_, _ = json.Marshal(data)
 		}
 	})

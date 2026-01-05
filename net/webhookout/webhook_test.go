@@ -711,10 +711,10 @@ func TestIsPrivateIP(t *testing.T) {
 }
 
 func TestEnvHelpers(t *testing.T) {
-	// 重新初始化全局配置以确保环境变量被正确加载
+	// Reinitialize global configuration to ensure environment variables are loaded correctly
 	config.SetGlobalConfig(nil)
 
-	// 手动创建配置并添加环境源
+	// Manually create configuration and add environment source
 	cfg := config.New()
 	cfg.AddSource(config.NewEnvSource(""))
 	config.SetGlobalConfig(cfg)
@@ -723,7 +723,7 @@ func TestEnvHelpers(t *testing.T) {
 		t.Fatalf("GetString default failed")
 	}
 
-	// 测试整数解析
+	// Test integer parsing
 	t.Setenv("TEST_INT", "notanint")
 	ctx := context.Background()
 	cfg.Load(ctx)
@@ -731,7 +731,7 @@ func TestEnvHelpers(t *testing.T) {
 		t.Fatalf("GetInt fallback failed")
 	}
 
-	// 测试布尔解析
+	// Test boolean parsing
 	t.Setenv("TEST_BOOL", "yes")
 	cfg.Load(ctx)
 	if !config.GetBool("TEST_BOOL", false) {
@@ -742,14 +742,14 @@ func TestEnvHelpers(t *testing.T) {
 		t.Fatalf("GetDuration default failed")
 	}
 
-	// 测试布尔false解析
+	// Test boolean false parsing
 	t.Setenv("TEST_BOOL_FALSE", "off")
 	cfg.Load(ctx)
 	if config.GetBool("TEST_BOOL_FALSE", true) {
 		t.Fatalf("GetBool should parse false")
 	}
 
-	// 测试无效布尔值
+	// Test invalid boolean value
 	t.Setenv("TEST_BOOL_INVALID", "maybe")
 	cfg.Load(ctx)
 	if config.GetBool("TEST_BOOL_INVALID", true) != true {
