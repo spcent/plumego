@@ -1,11 +1,17 @@
 package jsonx
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/spcent/plumego/utils/pool"
+)
 
 // FieldString extracts a top-level string field from JSON (best-effort).
 // Returns "" if missing, invalid JSON, or not a string.
 func FieldString(raw []byte, key string) string {
-	var m map[string]any
+	m := pool.GetMap()
+	defer pool.PutMap(m)
+
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return ""
 	}
@@ -20,7 +26,9 @@ func FieldString(raw []byte, key string) string {
 // FieldBool extracts a top-level bool field from JSON (best-effort).
 // Returns false if missing/invalid/not bool.
 func FieldBool(raw []byte, key string) bool {
-	var m map[string]any
+	m := pool.GetMap()
+	defer pool.PutMap(m)
+
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return false
 	}
@@ -35,7 +43,9 @@ func FieldBool(raw []byte, key string) bool {
 // PathString extracts a nested string field: m[objKey][fieldKey] (best-effort).
 // Returns "" if missing, invalid JSON, or type mismatch.
 func PathString(raw []byte, objKey, fieldKey string) string {
-	var m map[string]any
+	m := pool.GetMap()
+	defer pool.PutMap(m)
+
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return ""
 	}

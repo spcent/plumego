@@ -15,6 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/spcent/plumego/utils/pool"
 )
 
 var (
@@ -887,7 +889,18 @@ func (kv *KVStore) logDelete(key string) {
 }
 
 func (kv *KVStore) encodeWALEntry(entry WALEntry) ([]byte, error) {
-	return json.Marshal(entry)
+	// Use pooled buffer for encoding to reduce allocations
+	buf := pool.GetBuffer()
+	defer pool.PutBuffer(buf)
+
+	if err := json.NewEncoder(buf).Encode(entry); err != nil {
+		return nil, err
+	}
+
+	// Return a copy of the bytes
+	result := make([]byte, buf.Len())
+	copy(result, buf.Bytes())
+	return result, nil
 }
 
 func (kv *KVStore) calculateCRC(entry WALEntry) uint32 {
