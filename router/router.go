@@ -108,26 +108,10 @@ type Router struct {
 	parent            *Router              // Parent router for groups
 	middlewareManager *MiddlewareManager   // Middleware management
 	logger            log.StructuredLogger // Logger for contextual handlers
-
-	// Performance optimization: cache for frequently accessed routes
-	routeCache  map[string]*MatchResult // Cache for route matches
-	cacheSize   int                     // Maximum cache size
-	enableCache bool                    // Whether route caching is enabled
 }
 
 // RouterOption defines a function type for router configuration options
 type RouterOption func(*Router)
-
-// WithCache enables route caching for improved performance
-func WithCache(size int) RouterOption {
-	return func(r *Router) {
-		if size > 0 {
-			r.enableCache = true
-			r.cacheSize = size
-			r.routeCache = make(map[string]*MatchResult, size)
-		}
-	}
-}
 
 // WithLogger sets a custom logger for the router
 func WithLogger(logger log.StructuredLogger) RouterOption {
@@ -147,9 +131,6 @@ func NewRouter(opts ...RouterOption) *Router {
 		parent:            nil,
 		middlewareManager: NewMiddlewareManager(),
 		logger:            log.NewGLogger(),
-		enableCache:       false,
-		routeCache:        nil,
-		cacheSize:         0,
 	}
 
 	// Apply options
@@ -158,11 +139,6 @@ func NewRouter(opts ...RouterOption) *Router {
 	}
 
 	return r
-}
-
-// NewRouterWithCache creates a new Router instance with caching enabled
-func NewRouterWithCache(cacheSize int) *Router {
-	return NewRouter(WithCache(cacheSize))
 }
 
 // SetLogger configures the logger used by context-aware handlers.

@@ -78,47 +78,6 @@ func BenchmarkOptimizedRouteMatching(b *testing.B) {
 	}
 }
 
-// BenchmarkWithCaching 测试带缓存的路由性能
-func BenchmarkWithCaching(b *testing.B) {
-	b.Run("WithoutCache", func(b *testing.B) {
-		r := NewRouter()
-		// Register routes only once
-		for i := 0; i < 10; i++ {
-			path := fmt.Sprintf("/api/v%d/users/:id", i)
-			r.Get(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			}))
-		}
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			path := fmt.Sprintf("/api/v%d/users/%d", i%10, i)
-			req := httptest.NewRequest("GET", path, nil)
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, req)
-		}
-	})
-
-	b.Run("WithCache", func(b *testing.B) {
-		r := NewRouterWithCache(100)
-		// Register routes only once
-		for i := 0; i < 10; i++ {
-			path := fmt.Sprintf("/api/v%d/users/:id", i)
-			r.Get(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			}))
-		}
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			path := fmt.Sprintf("/api/v%d/users/%d", i%10, i)
-			req := httptest.NewRequest("GET", path, nil)
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, req)
-		}
-	})
-}
-
 // TestOptimizedMatcher 测试优化后的匹配器
 func TestOptimizedMatcher(t *testing.T) {
 	r := NewRouter()
@@ -196,30 +155,6 @@ func TestSecurityEnhancements(t *testing.T) {
 				t.Errorf("path %s: expected status %d, got %d", tt.path, tt.expectStatus, rec.Code)
 			}
 		})
-	}
-}
-
-// TestRouterOptions 测试路由器选项
-func TestRouterOptions(t *testing.T) {
-	// Test default router
-	r1 := NewRouter()
-	if r1.enableCache {
-		t.Error("default router should not have caching enabled")
-	}
-
-	// Test router with cache
-	r2 := NewRouterWithCache(50)
-	if !r2.enableCache {
-		t.Error("router with cache should have caching enabled")
-	}
-	if r2.cacheSize != 50 {
-		t.Errorf("expected cache size 50, got %d", r2.cacheSize)
-	}
-
-	// Test custom logger
-	r3 := NewRouter(WithCache(10))
-	if !r3.enableCache {
-		t.Error("router should have caching enabled")
 	}
 }
 
