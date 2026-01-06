@@ -34,6 +34,18 @@ func (a *App) applyGuardrails() {
 
 	var guards []middleware.Middleware
 
+	if a.config.EnableSecurityHeaders {
+		guards = append(guards, middleware.SecurityHeaders(a.config.SecurityHeadersPolicy))
+	}
+
+	if a.config.EnableAbuseGuard {
+		cfg := middleware.DefaultAbuseGuardConfig()
+		if a.config.AbuseGuardConfig != nil {
+			cfg = *a.config.AbuseGuardConfig
+		}
+		guards = append(guards, middleware.AbuseGuard(cfg))
+	}
+
 	if a.config.MaxBodyBytes > 0 {
 		guards = append(guards, middleware.BodyLimit(a.config.MaxBodyBytes, a.logger))
 	}

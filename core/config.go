@@ -3,9 +3,11 @@ package core
 import (
 	"time"
 
+	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/net/webhookin"
 	webhook "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/security/headers"
 )
 
 // TLSConfig defines TLS configuration.
@@ -71,6 +73,11 @@ type AppConfig struct {
 	MaxConcurrency    int           // Maximum number of concurrent requests being served
 	QueueDepth        int           // Maximum number of requests allowed to queue while waiting for a worker
 	QueueTimeout      time.Duration // Maximum time a request can wait in the queue
+	// Security guardrails
+	EnableSecurityHeaders bool
+	SecurityHeadersPolicy *headers.Policy
+	EnableAbuseGuard      bool
+	AbuseGuardConfig      *middleware.AbuseGuardConfig
 
 	PubSub     PubSubConfig     // PubSub configuration
 	WebhookOut WebhookOutConfig // Webhook outbound configuration

@@ -4,7 +4,8 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
-- **中间件链**：日志、恢复、gzip、CORS、超时、限流、并发限制、请求体大小限制，以及认证辅助工具，全部包装标准 `http.Handler`。
+- **中间件链**：日志、恢复、gzip、CORS、超时、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。
+- **安全辅助**：JWT + 密码工具、安全头策略、输入安全校验与基础防滥用组件，便于进行安全基线加固。
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
 - **优雅生命周期**：环境变量加载、连接排水、就绪标志，以及可选的 TLS/HTTP2 配置，带有合理默认值。
 - **可选服务**：内置带认证的 WebSocket 中心、进程内 Pub/Sub（带调试快照）、入站/出站 Webhook 路由器，以及从磁盘或嵌入资源提供静态前端。
@@ -90,10 +91,11 @@ func main() {
 - 环境变量可以从 `.env` 文件加载（默认路径 `.env`；可通过 `core.WithEnvPath` 覆盖）。
 - 常用变量：`AUTH_TOKEN`（SimpleAuth 中间件）、`WS_SECRET`（WebSocket JWT 签名密钥）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - 应用默认包括 10 MiB 请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5 秒优雅关闭窗口。可通过 `core.With...` 选项覆盖。
+- 安全基线默认启用（安全头 + 防滥用中间件）。防滥用默认每客户端 100 req/s，突发 200。可通过 `core.WithSecurityHeadersEnabled`、`core.WithSecurityHeadersPolicy`、`core.WithAbuseGuardEnabled`、`core.WithAbuseGuardConfig` 关闭或调整。
 
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载。
-- **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（请求体限制、并发限制）会在设置期间自动注入。恢复和日志辅助工具通过 `EnableRecovery` 和 `EnableLogging` 启用。
+- **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（安全头、防滥用、请求体限制、并发限制）会在设置期间自动注入。恢复和日志辅助工具通过 `EnableRecovery` 和 `EnableLogging` 启用。
 - **WebSocket 中心**：`ConfigureWebSocket()` 挂载受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `WebSocketConfig` 自定义工作线程数和队列大小。
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。

@@ -13,6 +13,7 @@ import (
 	webhookout "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/security/headers"
 )
 
 func TestWithRouter(t *testing.T) {
@@ -92,6 +93,54 @@ func TestWithMaxBodyBytes(t *testing.T) {
 	opt(app)
 	if app.config.MaxBodyBytes != bytes {
 		t.Errorf("expected max body bytes to be %d, got %d", bytes, app.config.MaxBodyBytes)
+	}
+}
+
+func TestWithSecurityHeadersEnabled(t *testing.T) {
+	app := &App{config: &AppConfig{}}
+	opt := WithSecurityHeadersEnabled(false)
+	opt(app)
+	if app.config.EnableSecurityHeaders {
+		t.Errorf("expected security headers to be disabled")
+	}
+}
+
+func TestWithSecurityHeadersPolicy(t *testing.T) {
+	app := &App{config: &AppConfig{}}
+	policy := headers.StrictPolicy()
+	opt := WithSecurityHeadersPolicy(&policy)
+	opt(app)
+	if app.config.SecurityHeadersPolicy == nil {
+		t.Errorf("expected security headers policy to be set")
+	}
+	if !app.config.EnableSecurityHeaders {
+		t.Errorf("expected security headers to be enabled")
+	}
+}
+
+func TestWithAbuseGuardEnabled(t *testing.T) {
+	app := &App{config: &AppConfig{}}
+	opt := WithAbuseGuardEnabled(false)
+	opt(app)
+	if app.config.EnableAbuseGuard {
+		t.Errorf("expected abuse guard to be disabled")
+	}
+}
+
+func TestWithAbuseGuardConfig(t *testing.T) {
+	app := &App{config: &AppConfig{}}
+	cfg := middleware.DefaultAbuseGuardConfig()
+	cfg.Rate = 10
+	opt := WithAbuseGuardConfig(cfg)
+	opt(app)
+	if app.config.AbuseGuardConfig == nil {
+		t.Fatalf("expected abuse guard config to be set")
+	}
+	if app.config.AbuseGuardConfig.Rate != 10 {
+		t.Errorf("expected abuse guard rate to be 10, got %v", app.config.AbuseGuardConfig.Rate)
+	}
+	if !app.config.EnableAbuseGuard {
+		t.Errorf("expected abuse guard to be enabled")
 	}
 }
 

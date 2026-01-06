@@ -43,27 +43,31 @@ func New(options ...Option) *App {
 
 // Re-export common configuration helpers for convenience.
 var (
-	WithRouter            = core.WithRouter
-	WithAddr              = core.WithAddr
-	WithEnvPath           = core.WithEnvPath
-	WithShutdownTimeout   = core.WithShutdownTimeout
-	WithServerTimeouts    = core.WithServerTimeouts
-	WithMaxHeaderBytes    = core.WithMaxHeaderBytes
-	WithMaxBodyBytes      = core.WithMaxBodyBytes
-	WithPubSub            = core.WithPubSub
-	WithPubSubDebug       = core.WithPubSubDebug
-	WithWebhookOut        = core.WithWebhookOut
-	WithWebhookIn         = core.WithWebhookIn
-	WithConcurrencyLimits = core.WithConcurrencyLimits
-	WithHTTP2             = core.WithHTTP2
-	WithTLS               = core.WithTLS
-	WithTLSConfig         = core.WithTLSConfig
-	WithDebug             = core.WithDebug
-	WithLogger            = core.WithLogger
-	WithComponent         = core.WithComponent
-	WithComponents        = core.WithComponents
-	WithMetricsCollector  = core.WithMetricsCollector
-	WithTracer            = core.WithTracer
+	WithRouter                 = core.WithRouter
+	WithAddr                   = core.WithAddr
+	WithEnvPath                = core.WithEnvPath
+	WithShutdownTimeout        = core.WithShutdownTimeout
+	WithServerTimeouts         = core.WithServerTimeouts
+	WithMaxHeaderBytes         = core.WithMaxHeaderBytes
+	WithMaxBodyBytes           = core.WithMaxBodyBytes
+	WithSecurityHeadersEnabled = core.WithSecurityHeadersEnabled
+	WithSecurityHeadersPolicy  = core.WithSecurityHeadersPolicy
+	WithAbuseGuardEnabled      = core.WithAbuseGuardEnabled
+	WithAbuseGuardConfig       = core.WithAbuseGuardConfig
+	WithPubSub                 = core.WithPubSub
+	WithPubSubDebug            = core.WithPubSubDebug
+	WithWebhookOut             = core.WithWebhookOut
+	WithWebhookIn              = core.WithWebhookIn
+	WithConcurrencyLimits      = core.WithConcurrencyLimits
+	WithHTTP2                  = core.WithHTTP2
+	WithTLS                    = core.WithTLS
+	WithTLSConfig              = core.WithTLSConfig
+	WithDebug                  = core.WithDebug
+	WithLogger                 = core.WithLogger
+	WithComponent              = core.WithComponent
+	WithComponents             = core.WithComponents
+	WithMetricsCollector       = core.WithMetricsCollector
+	WithTracer                 = core.WithTracer
 )
 
 // DefaultWebSocketConfig exposes the default WebSocket settings.

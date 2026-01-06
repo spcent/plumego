@@ -7,6 +7,7 @@ import (
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/security/headers"
 )
 
 // WithRouter sets the router for the App.
@@ -58,6 +59,36 @@ func WithMaxHeaderBytes(bytes int) Option {
 func WithMaxBodyBytes(bytes int64) Option {
 	return func(a *App) {
 		a.config.MaxBodyBytes = bytes
+	}
+}
+
+// WithSecurityHeadersEnabled toggles default security header injection.
+func WithSecurityHeadersEnabled(enabled bool) Option {
+	return func(a *App) {
+		a.config.EnableSecurityHeaders = enabled
+	}
+}
+
+// WithSecurityHeadersPolicy sets a custom security header policy.
+func WithSecurityHeadersPolicy(policy *headers.Policy) Option {
+	return func(a *App) {
+		a.config.SecurityHeadersPolicy = policy
+		a.config.EnableSecurityHeaders = true
+	}
+}
+
+// WithAbuseGuardEnabled toggles the abuse guard middleware.
+func WithAbuseGuardEnabled(enabled bool) Option {
+	return func(a *App) {
+		a.config.EnableAbuseGuard = enabled
+	}
+}
+
+// WithAbuseGuardConfig customizes the abuse guard middleware.
+func WithAbuseGuardConfig(cfg middleware.AbuseGuardConfig) Option {
+	return func(a *App) {
+		a.config.AbuseGuardConfig = &cfg
+		a.config.EnableAbuseGuard = true
 	}
 }
 
