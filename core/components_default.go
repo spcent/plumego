@@ -9,9 +9,14 @@ func (a *App) builtInComponents() []Component {
 	pubSubConfig := a.config.PubSub
 	webhookOutConfig := a.config.WebhookOut
 	webhookInConfig := a.config.WebhookIn
+	debug := a.config.Debug
 	pub := a.pub
 	logger := a.logger
 	a.mu.RUnlock()
+
+	if debug && !a.hasComponentType((*devToolsComponent)(nil)) {
+		comps = append(comps, newDevToolsComponent(a))
+	}
 
 	if pubSubConfig.Enabled && !a.hasComponentType((*pubSubDebugComponent)(nil)) {
 		comps = append(comps, newPubSubDebugComponent(pubSubConfig, pub))

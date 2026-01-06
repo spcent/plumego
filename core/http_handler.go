@@ -14,10 +14,23 @@ func (a *App) ensureHandler() {
 			a.router.SetLogger(a.logger)
 		}
 
+		a.ensureComponents()
 		a.applyGuardrails()
 		a.router.Freeze()
 		a.buildHandler()
 	})
+}
+
+func (a *App) ensureComponents() {
+	a.mu.RLock()
+	mounted := a.componentsMounted
+	a.mu.RUnlock()
+
+	if mounted {
+		return
+	}
+
+	a.mountComponents()
 }
 
 // ServeHTTP allows App to be used directly with net/http servers.

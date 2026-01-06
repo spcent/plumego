@@ -41,6 +41,7 @@ type App struct {
 	components        []Component
 	startedComponents []Component
 	componentStopOnce sync.Once
+	componentsMounted bool
 }
 
 // Option defines a function type for configuring the App.

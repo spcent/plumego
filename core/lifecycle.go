@@ -182,6 +182,14 @@ func (a *App) startServer() error {
 	}()
 
 	a.logger.Info("Server running", log.Fields{"addr": addr})
+	if a.config.Debug {
+		a.logger.Info("Debug mode enabled", log.Fields{
+			"routes":     devToolsRoutesPath,
+			"middleware": devToolsMiddlewarePath,
+			"config":     devToolsConfigPath,
+			"reload":     devToolsReloadPath,
+		})
+	}
 
 	var err error
 	if tlsEnabled {
@@ -235,6 +243,9 @@ func (a *App) mountComponents() []Component {
 	}
 
 	a.router.Freeze()
+	a.mu.Lock()
+	a.componentsMounted = true
+	a.mu.Unlock()
 
 	return comps
 }

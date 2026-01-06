@@ -253,6 +253,14 @@ func TestBuiltInComponents(t *testing.T) {
 		t.Errorf("Expected 0 built-in components, got %d", len(components))
 	}
 
+	// Test with debug enabled
+	app.config.Debug = true
+	components = app.builtInComponents()
+	if len(components) != 1 {
+		t.Errorf("Expected 1 built-in component with debug, got %d", len(components))
+	}
+	app.config.Debug = false
+
 	// Test with pubsub debug enabled
 	app.config.PubSub.Enabled = true
 	app.config.PubSub.Path = "/debug"

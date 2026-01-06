@@ -34,6 +34,12 @@ func (a *App) applyGuardrails() {
 
 	var guards []middleware.Middleware
 
+	if a.config.Debug {
+		cfg := middleware.DefaultDebugErrorConfig()
+		cfg.NotFoundHint = devToolsRoutesPath
+		guards = append(guards, middleware.DebugErrors(cfg))
+	}
+
 	if a.config.EnableSecurityHeaders {
 		guards = append(guards, middleware.SecurityHeaders(a.config.SecurityHeadersPolicy))
 	}
