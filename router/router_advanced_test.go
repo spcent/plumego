@@ -161,14 +161,11 @@ func TestRouteConflict(t *testing.T) {
 	r := NewRouter()
 	r.GetFunc("/test", func(w http.ResponseWriter, r *http.Request) {})
 
-	// Should panic on duplicate
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("expected panic on duplicate route")
-		}
-	}()
-
-	r.GetFunc("/test", func(w http.ResponseWriter, r *http.Request) {})
+	// Should return error on duplicate
+	err := r.AddRoute("GET", "/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	if err == nil {
+		t.Errorf("expected error on duplicate route")
+	}
 }
 
 // TestRouterGroupNesting tests nested groups

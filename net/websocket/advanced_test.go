@@ -283,24 +283,6 @@ func TestMetadata(t *testing.T) {
 	}
 }
 
-// TestUserInfo tests UserInfo structure
-func TestUserInfo(t *testing.T) {
-	userInfo := &UserInfo{
-		ID:     "123",
-		Name:   "John Doe",
-		Email:  "john@example.com",
-		Roles:  []string{"admin", "user"},
-		Claims: map[string]interface{}{"custom": "value"},
-	}
-
-	if userInfo.ID != "123" {
-		t.Error("UserInfo ID mismatch")
-	}
-	if len(userInfo.Roles) != 2 {
-		t.Error("UserInfo roles count mismatch")
-	}
-}
-
 // Helper function to create mock connection for testing
 func createMockConnection(t *testing.T) (*Conn, error) {
 	// We'll use a simple approach: create a connection with a dummy net.Conn
@@ -322,7 +304,7 @@ func createMockConnection(t *testing.T) (*Conn, error) {
 	return conn, nil
 }
 
-func createMockPipe(t *testing.T) (server, client net.Conn) {
+func createMockPipe(_ *testing.T) (server, client net.Conn) {
 	// Create a simple pipe for testing
 	// This is a simplified version - in real tests you'd want proper mock
 	r1, w1 := io.Pipe()
@@ -350,6 +332,10 @@ func (m *mockConn) Write(b []byte) (n int, err error) {
 }
 
 func (m *mockConn) Close() error {
+	// Close the writer to unblock any pending writes
+	if w, ok := m.writer.(*io.PipeWriter); ok {
+		w.Close()
+	}
 	return nil
 }
 

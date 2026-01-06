@@ -70,8 +70,8 @@ type Conn struct {
 func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
 	cc := &Conn{
 		conn:          c,
-		br:            bufio.NewReaderSize(c, 8192),
-		bw:            bufio.NewWriterSize(c, 8192),
+		br:            bufio.NewReaderSize(c, defaultBufSize),
+		bw:            bufio.NewWriterSize(c, defaultBufSize),
 		sendQueue:     make(chan Outbound, queueSize),
 		sendQueueSize: queueSize,
 		sendTimeout:   sendTimeout,

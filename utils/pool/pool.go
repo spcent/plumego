@@ -92,7 +92,8 @@ func JSONUnmarshal(data []byte, v any) error {
 		tempMap := GetMap()
 		defer PutMap(tempMap)
 
-		if err := json.Unmarshal(data, tempMap); err != nil {
+		// json.Unmarshal needs a pointer, so we pass &tempMap
+		if err := json.Unmarshal(data, &tempMap); err != nil {
 			return err
 		}
 
@@ -112,7 +113,8 @@ func ExtractField(data []byte, key string) (any, error) {
 	tempMap := GetMap()
 	defer PutMap(tempMap)
 
-	if err := json.Unmarshal(data, tempMap); err != nil {
+	// json.Unmarshal needs a pointer, so we pass &tempMap
+	if err := json.Unmarshal(data, &tempMap); err != nil {
 		return nil, err
 	}
 

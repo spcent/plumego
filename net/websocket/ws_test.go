@@ -39,7 +39,7 @@ func TestJWTAndRoomAuth(t *testing.T) {
 	}
 }
 
-func startTestServer(t *testing.T) (*http.Server, string) {
+func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	workerCount := 4
 	jobQueueSize := 1024
 	sendQueueSize := 64
@@ -59,7 +59,7 @@ func startTestServer(t *testing.T) (*http.Server, string) {
 		t.Fatal(err)
 	}
 	go server.Serve(ln)
-	return server, "http://" + ln.Addr().String()
+	return server, hub, "http://" + ln.Addr().String()
 }
 
 // minimal WS client helper that performs handshake and basic send/receive frames
@@ -220,8 +220,9 @@ func (c *testWSClient) readFrame() (byte, bool, []byte, error) {
 }
 
 func TestSimpleEchoAndRoom(t *testing.T) {
-	server, base := startTestServer(t)
+	server, hub, base := startTestServer(t)
 	defer server.Close()
+	defer hub.Stop()
 
 	// create token to pass JWT verification; server expects secret "testsecret"
 	secret := []byte("testsecret")

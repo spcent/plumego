@@ -1,15 +1,22 @@
 package core
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 )
 
 // Use adds middleware to the application's middleware chain.
-func (a *App) Use(middlewares ...middleware.Middleware) {
+func (a *App) Use(middlewares ...middleware.Middleware) error {
 	if a.started {
-		panic("cannot add middleware after app has started")
+		return contract.WrapError(
+			fmt.Errorf("cannot add middleware after app has started"),
+			"use_middleware",
+			"core",
+			nil,
+		)
 	}
 
 	if a.middlewareReg == nil {
@@ -17,6 +24,7 @@ func (a *App) Use(middlewares ...middleware.Middleware) {
 	}
 
 	a.middlewareReg.Use(middlewares...)
+	return nil
 }
 
 func (a *App) applyGuardrails() {

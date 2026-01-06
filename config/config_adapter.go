@@ -67,7 +67,9 @@ func InitDefault() error {
 		logger := log.NewGLogger()
 		globalConfig = NewConfigManager(logger)
 
-		ctx := context.Background()
+		// Use timeout context to prevent hanging
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
 		// Add environment variable source
 		globalConfig.AddSource(NewEnvSource(""))
@@ -82,6 +84,15 @@ func InitDefault() error {
 
 		for _, configFile := range configFiles {
 			if info, err := os.Stat(configFile); err == nil && !info.IsDir() {
+				// Skip large files to avoid timeout
+				if info.Size() > 1024*1024 { // 1MB limit
+					logger.Warn("Skipping large config file", log.Fields{
+						"file": configFile,
+						"size": info.Size(),
+					})
+					continue
+				}
+
 				switch {
 				case strings.HasSuffix(configFile, ".json"):
 					globalConfig.AddSource(NewFileSource(configFile, FormatJSON, true))

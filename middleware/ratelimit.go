@@ -374,7 +374,7 @@ func (rl *RateLimiter) updateMaxConcurrent(newMax int64) {
 			case <-rl.sem:
 				newSem <- struct{}{}
 			default:
-				break
+				return
 			}
 		}
 	}()

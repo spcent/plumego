@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Handler defines the standard HTTP handler interface
@@ -10,12 +13,10 @@ type Handler http.Handler
 
 // Middleware defines a function that wraps an http.Handler to add functionality
 // This is the primary middleware type, compatible with http.Handler
-
 type Middleware func(Handler) Handler
 
 // FuncMiddleware defines a middleware that works with http.HandlerFunc
 // This type is provided for convenience when working with function handlers
-
 type FuncMiddleware func(http.HandlerFunc) http.HandlerFunc
 
 // Deprecated: UseFuncMiddleware is deprecated, use FromFuncMiddleware instead
@@ -96,7 +97,7 @@ func FromHTTPHandlerMiddleware(mw func(http.Handler) http.Handler) Middleware {
 
 // Apply applies middlewares to a Handler
 // This is a generic version that works with both Middleware and FuncMiddleware
-func Apply(h any, m ...any) Handler {
+func Apply(h any, m ...any) (Handler, error) {
 	// Convert h to Handler
 	var handler Handler
 	switch v := h.(type) {
@@ -107,29 +108,69 @@ func Apply(h any, m ...any) Handler {
 		// Handle http.Handler type
 		handler = Handler(v)
 	default:
-		panic("invalid handler type")
+		return nil, contract.WrapError(
+			fmt.Errorf("invalid handler type: %T", h),
+			"apply_middleware",
+			"middleware",
+			nil,
+		)
 	}
 
 	// Apply middlewares
 	for i := len(m) - 1; i >= 0; i-- {
 		mw := m[i]
+
+		// Check the type of middleware using reflection for flexibility
+		// Handle different function signatures
 		switch v := mw.(type) {
 		case Middleware:
+			// Apply Middleware
 			handler = v(handler)
 		case FuncMiddleware:
-			// Convert Handler to http.HandlerFunc, apply FuncMiddleware, then convert back
-			hf := func(w http.ResponseWriter, r *http.Request) {
-				handler.ServeHTTP(w, r)
-			}
+			// Convert to http.HandlerFunc, apply FuncMiddleware, then convert back
+			currentHandler := handler
+			hf := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				currentHandler.ServeHTTP(w, r)
+			})
 			hf = v(hf)
-			// Convert back to http.Handler first, then to Handler
-			handler = Handler(http.HandlerFunc(hf))
+			handler = Handler(hf)
+		case func(http.HandlerFunc) http.HandlerFunc:
+			// Handle function literal - same as FuncMiddleware
+			currentHandler := handler
+			hf := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				currentHandler.ServeHTTP(w, r)
+			})
+			hf = v(hf)
+			handler = Handler(hf)
 		default:
-			panic("invalid middleware type")
+			// Try to handle as a generic function signature
+			// This handles cases where the type might be slightly different
+			fnType := fmt.Sprintf("%T", mw)
+			if fnType == "func(middleware.Handler) middleware.Handler" ||
+				fnType == "func(Handler) Handler" {
+				// Convert to the expected signature
+				if mware, ok := mw.(func(Handler) Handler); ok {
+					handler = mware(handler)
+				} else {
+					return nil, contract.WrapError(
+						fmt.Errorf("invalid middleware type: %T", mw),
+						"apply_middleware",
+						"middleware",
+						nil,
+					)
+				}
+			} else {
+				return nil, contract.WrapError(
+					fmt.Errorf("invalid middleware type: %T", mw),
+					"apply_middleware",
+					"middleware",
+					nil,
+				)
+			}
 		}
 	}
 
-	return handler
+	return handler, nil
 }
 
 // ApplyFunc applies middlewares to a http.HandlerFunc

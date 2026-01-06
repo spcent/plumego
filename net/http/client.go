@@ -289,6 +289,12 @@ func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 
 			time.Sleep(backoffWithJitter(c.retryWait, i, c.maxRetryWait))
 		}
+
+		// If we exhausted retries and still have a bad status, return an error
+		if lastErr == nil && resp != nil && resp.StatusCode >= 500 {
+			return resp, errors.New("http error: " + resp.Status)
+		}
+
 		return resp, lastErr
 	}
 }

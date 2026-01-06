@@ -239,13 +239,10 @@ func TestUseAfterStartPanics(t *testing.T) {
 	app := New()
 	app.started = true
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic when adding middleware after start")
-		}
-	}()
-
-	app.Use(func(next middleware.Handler) middleware.Handler { return next })
+	err := app.Use(func(next middleware.Handler) middleware.Handler { return next })
+	if err == nil {
+		t.Fatalf("expected error when adding middleware after start")
+	}
 }
 
 func TestConfigureWebSocketRequiresSecret(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/spcent/plumego/log"
@@ -83,6 +84,11 @@ type APIError struct {
 	Category ErrorCategory  `json:"category"`
 	TraceID  string         `json:"trace_id,omitempty"`
 	Details  map[string]any `json:"details,omitempty"`
+}
+
+// Error implements the error interface for APIError
+func (e APIError) Error() string {
+	return e.Message
 }
 
 // ErrorResponse wraps the error payload for consistent JSON responses.
@@ -513,6 +519,246 @@ type ErrorMetrics struct {
 	ByType        map[ErrorType]int64     `json:"by_type"`
 	ByStatus      map[int]int64           `json:"by_status"`
 	LastErrorTime time.Time               `json:"last_error_time"`
+}
+
+// ErrorContext represents contextual information for error wrapping
+type ErrorContext struct {
+	Operation string         `json:"operation"`
+	Module    string         `json:"module"`
+	Params    map[string]any `json:"params,omitempty"`
+}
+
+// WrappedErrorWithContext represents an error with full context
+type WrappedErrorWithContext struct {
+	Err     error        `json:"error"`
+	Context ErrorContext `json:"context"`
+	Message string       `json:"message"`
+	When    time.Time    `json:"when"`
+}
+
+// Error implements the error interface
+func (w *WrappedErrorWithContext) Error() string {
+	if w.Message != "" {
+		return w.Message
+	}
+	if w.Err != nil {
+		return w.Err.Error()
+	}
+	return "unknown error"
+}
+
+// Unwrap returns the underlying error for errors.Is/As support
+func (w *WrappedErrorWithContext) Unwrap() error {
+	return w.Err
+}
+
+// NewWrappedError creates a new wrapped error with context
+func NewWrappedError(err error, operation, module string, params map[string]any) *WrappedErrorWithContext {
+	return &WrappedErrorWithContext{
+		Err: err,
+		Context: ErrorContext{
+			Operation: operation,
+			Module:    module,
+			Params:    params,
+		},
+		When: time.Now(),
+	}
+}
+
+// WrapError wraps an existing error with additional context
+func WrapError(err error, operation, module string, params map[string]any) error {
+	if err == nil {
+		return nil
+	}
+
+	// If already wrapped, add to the chain
+	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
+		// Add operation to existing context if not set
+		if wrapped.Context.Operation == "" && operation != "" {
+			wrapped.Context.Operation = operation
+		}
+		if wrapped.Context.Module == "" && module != "" {
+			wrapped.Context.Module = module
+		}
+		// Merge params
+		if params != nil {
+			if wrapped.Context.Params == nil {
+				wrapped.Context.Params = make(map[string]any)
+			}
+			for k, v := range params {
+				wrapped.Context.Params[k] = v
+			}
+		}
+		return wrapped
+	}
+
+	return NewWrappedError(err, operation, module, params)
+}
+
+// WrapErrorf creates a wrapped error with a formatted message
+func WrapErrorf(err error, format string, args ...any) error {
+	if err == nil {
+		return nil
+	}
+	message := fmt.Sprintf(format, args...)
+	return &WrappedErrorWithContext{
+		Err:     err,
+		Message: message,
+		When:    time.Now(),
+	}
+}
+
+// IsRetryable checks if an error is retryable based on its type and context
+func IsRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check if it's an APIError directly
+	if apiErr, ok := err.(APIError); ok {
+		return IsRetryableError(apiErr)
+	}
+
+	// Check if it's a wrapped error with APIError
+	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
+		// Check if wrapped error is an APIError by checking if it has Status field
+		if apiErr, ok := wrapped.Err.(APIError); ok {
+			return IsRetryableError(apiErr)
+		}
+		// Recursively check wrapped errors
+		return IsRetryable(wrapped.Err)
+	}
+
+	// Network errors are typically retryable
+	if netErr, ok := err.(interface{ Temporary() bool }); ok {
+		return netErr.Temporary()
+	}
+
+	if netErr, ok := err.(interface{ Timeout() bool }); ok {
+		return netErr.Timeout()
+	}
+
+	return false
+}
+
+// GetErrorDetails extracts detailed information from an error
+func GetErrorDetails(err error) map[string]any {
+	if err == nil {
+		return nil
+	}
+
+	details := make(map[string]any)
+
+	// Handle WrappedErrorWithContext
+	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
+		details["message"] = wrapped.Error()
+		details["when"] = wrapped.When
+		if wrapped.Context.Operation != "" {
+			details["operation"] = wrapped.Context.Operation
+		}
+		if wrapped.Context.Module != "" {
+			details["module"] = wrapped.Context.Module
+		}
+		if len(wrapped.Context.Params) > 0 {
+			details["params"] = wrapped.Context.Params
+		}
+		// Recursively get details from wrapped error
+		if wrapped.Err != nil {
+			details["wrapped_error"] = GetErrorDetails(wrapped.Err)
+		}
+		return details
+	}
+
+	// Handle APIError (which is a struct, not an error interface)
+	// We check for the type by looking at the struct fields
+	if apiErr, ok := err.(APIError); ok {
+		details["status"] = apiErr.Status
+		details["code"] = apiErr.Code
+		details["category"] = apiErr.Category
+		details["message"] = apiErr.Message
+		if len(apiErr.Details) > 0 {
+			details["details"] = apiErr.Details
+		}
+		if apiErr.TraceID != "" {
+			details["trace_id"] = apiErr.TraceID
+		}
+		return details
+	}
+
+	// Basic error information
+	details["message"] = err.Error()
+	details["type"] = fmt.Sprintf("%T", err)
+
+	return details
+}
+
+// FormatError formats an error for logging with full context
+func FormatError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	details := GetErrorDetails(err)
+
+	// Simple string representation for logging
+	var parts []string
+	if msg, ok := details["message"].(string); ok {
+		parts = append(parts, msg)
+	}
+	if op, ok := details["operation"].(string); ok {
+		parts = append(parts, fmt.Sprintf("op=%s", op))
+	}
+	if mod, ok := details["module"].(string); ok {
+		parts = append(parts, fmt.Sprintf("module=%s", mod))
+	}
+	if status, ok := details["status"].(int); ok {
+		parts = append(parts, fmt.Sprintf("status=%d", status))
+	}
+	if code, ok := details["code"].(string); ok {
+		parts = append(parts, fmt.Sprintf("code=%s", code))
+	}
+
+	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
+}
+
+// PanicToError converts a panic to an error (for recovery)
+func PanicToError(r any) error {
+	if r == nil {
+		return nil
+	}
+
+	switch v := r.(type) {
+	case error:
+		return WrapError(v, "panic_recovery", "recovery", nil)
+	case string:
+		return fmt.Errorf("panic: %s", v)
+	default:
+		return fmt.Errorf("panic: %v", v)
+	}
+}
+
+// Must wraps a function that returns an error and panics if it fails
+// This is useful for initialization code where errors should be fatal
+func Must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+// Must1 wraps a function that returns (T, error) and panics if it fails
+func Must1[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// Must2 wraps a function that returns (T1, T2, error) and panics if it fails
+func Must2[T1, T2 any](v1 T1, v2 T2, err error) (T1, T2) {
+	if err != nil {
+		panic(err)
+	}
+	return v1, v2
 }
 
 // NewErrorMetrics creates a new ErrorMetrics instance.

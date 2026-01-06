@@ -211,12 +211,20 @@ func (r *Router) Group(prefix string) *Router {
 }
 
 // AddRoute adds a route to the router with the given method, path and handler
-func (r *Router) AddRoute(method, path string, handler Handler) {
+func (r *Router) AddRoute(method, path string, handler Handler) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if r.frozen {
-		panic("router is frozen, cannot add route after freeze")
+		return contract.WrapError(
+			fmt.Errorf("router is frozen, cannot add route after freeze"),
+			"add_route",
+			"router",
+			map[string]any{
+				"method": method,
+				"path":   path,
+			},
+		)
 	}
 
 	// Combine with group prefix
@@ -235,12 +243,20 @@ func (r *Router) AddRoute(method, path string, handler Handler) {
 	// Start with root path
 	if fullPath == "/" {
 		if current.handler != nil {
-			panic("duplicate route registration: " + method + " /")
+			return contract.WrapError(
+				fmt.Errorf("duplicate route registration: %s /", method),
+				"add_route",
+				"router",
+				map[string]any{
+					"method": method,
+					"path":   fullPath,
+				},
+			)
 		}
 		current.handler = handler
 		current.fullPath = fullPath
 		r.routes[method] = append(r.routes[method], route{Method: method, Path: fullPath})
-		return
+		return nil
 	}
 
 	segments := compilePathSegments(fullPath)
@@ -273,7 +289,15 @@ func (r *Router) AddRoute(method, path string, handler Handler) {
 
 	// Set handler for the final node
 	if current.handler != nil {
-		panic("duplicate route registration: " + method + " " + fullPath)
+		return contract.WrapError(
+			fmt.Errorf("duplicate route registration: %s %s", method, fullPath),
+			"add_route",
+			"router",
+			map[string]any{
+				"method": method,
+				"path":   fullPath,
+			},
+		)
 	}
 	current.handler = handler
 	current.paramKeys = paramKeys
@@ -281,6 +305,7 @@ func (r *Router) AddRoute(method, path string, handler Handler) {
 	current.middlewares = r.routeMiddlewares()
 
 	r.routes[method] = append(r.routes[method], route{Method: method, Path: fullPath})
+	return nil
 }
 
 func (r *Router) routeMiddlewares() []middleware.Middleware {
@@ -365,12 +390,15 @@ func (r *Router) insertChild(parent *node, child *node) {
 	parent.children = append(parent.children[:i], append([]*node{child}, parent.children[i:]...)...)
 }
 
-func (r *Router) addCtxRoute(method, path string, h contract.CtxHandlerFunc) {
+func (r *Router) addCtxRoute(method, path string, h contract.CtxHandlerFunc) error {
 	if err := contract.ValidateCtxHandler(h); err != nil {
-		panic(err.Error())
+		return contract.WrapError(err, "add_ctx_route", "router", map[string]any{
+			"method": method,
+			"path":   path,
+		})
 	}
 
-	r.AddRoute(method, path, contract.AdaptCtxHandler(h, r.logger))
+	return r.AddRoute(method, path, contract.AdaptCtxHandler(h, r.logger))
 }
 
 // ServeHTTP implements http.Handler and handles incoming HTTP requests

@@ -321,13 +321,10 @@ func TestRouterFreeze(t *testing.T) {
 	r.Get("/ping", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	r.Freeze()
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("expected panic when adding route after freeze")
-		}
-	}()
-
-	r.Get("/panic", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	err := r.AddRoute("GET", "/panic", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	if err == nil {
+		t.Errorf("expected error when adding route after freeze")
+	}
 }
 
 func TestRouterCtxHandler(t *testing.T) {
