@@ -200,12 +200,31 @@ func (r *Router) pathMatchesPattern(path, pattern string, params map[string]stri
 	pathParts := strings.Split(strings.Trim(path, "/"), "/")
 	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
 
-	if len(pathParts) != len(patternParts) {
+	wildIndex := -1
+	for i, part := range patternParts {
+		if strings.HasPrefix(part, "*") {
+			wildIndex = i
+			break
+		}
+	}
+
+	if wildIndex == -1 {
+		if len(pathParts) != len(patternParts) {
+			return false
+		}
+	} else if len(pathParts) < wildIndex+1 {
 		return false
 	}
 
 	// Check each part
 	for i, patternPart := range patternParts {
+		if strings.HasPrefix(patternPart, "*") {
+			return true
+		}
+		if i >= len(pathParts) {
+			return false
+		}
+
 		pathPart := pathParts[i]
 
 		if strings.HasPrefix(patternPart, ":") {

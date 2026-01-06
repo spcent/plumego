@@ -207,6 +207,7 @@ func (r *Router) Group(prefix string) *Router {
 		frozen:            r.frozen,
 		middlewareManager: r.middlewareManager,
 		logger:            r.logger,
+		routeValidations:  r.routeValidations,
 	}
 }
 
