@@ -7,6 +7,7 @@ This directory contains production-ready networking utilities built with Go stan
 ```
 net/
 ├── http/           # HTTP client with retry, middleware, and backoff
+├── mq/             # Message broker adapters (in-proc + hooks)
 ├── webhookin/      # Incoming webhook verification (GitHub, Stripe)
 ├── webhookout/     # Outgoing webhook delivery system
 └── websocket/      # WebSocket server (modular architecture)
@@ -91,6 +92,27 @@ client := http.New(
     http.WithMiddleware(AuthMiddleware),
     http.WithMiddleware(http.Metrics),
 )
+```
+
+## Message Queue (`net/mq`)
+
+### Features
+- **In-Process Broker**: Lightweight adapter around `pubsub.PubSub`
+- **Panic Recovery**: Safe guards around publish/subscribe/close
+- **Metrics Hooks**: Observe broker activity and timing
+
+### Quick Start
+
+```go
+import "github.com/spcent/plumego/net/mq"
+
+broker := mq.NewInProcBroker(nil)
+defer broker.Close()
+
+sub, _ := broker.Subscribe(context.Background(), "events", mq.DefaultSubOptions())
+defer sub.Cancel()
+
+_ = broker.Publish(context.Background(), "events", mq.Message{ID: "1", Data: "payload"})
 ```
 
 ## Webhook In (`net/webhookin`)

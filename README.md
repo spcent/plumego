@@ -6,6 +6,7 @@ Plumego is a lightweight Go HTTP toolkit built entirely on the standard library.
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
 - **Middleware Chain**: Logging, recovery, gzip, CORS, timeout, rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.
 - **Security Helpers**: JWT + password utilities, security header policies, input-safety helpers, and abuse guard primitives for baseline hardening.
+- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and message queues.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
 - **Optional Services**: Built-in authenticated WebSocket hub, in-process Pub/Sub (with debug snapshots), inbound/outbound webhook routers, and static frontend serving from disk or embedded resources.
