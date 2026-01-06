@@ -258,7 +258,7 @@ func TestResourceControllerAdvanced(t *testing.T) {
 		t.Errorf("Show should return 501, got %d", rec.Code)
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}

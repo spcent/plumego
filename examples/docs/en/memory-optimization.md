@@ -29,21 +29,21 @@ Created three core object pools:
 ```go
 // JSON Buffer Pool - for JSON encoding/decoding
 var JSONBufferPool = &sync.Pool{
-    New: func() interface{} {
+    New: func() any {
         return bytes.NewBuffer(make([]byte, 0, 1024)) // Pre-allocate 1KB
     },
 }
 
 // Map Pool - for temporary map operations
 var MapPool = &sync.Pool{
-    New: func() interface{} {
+    New: func() any {
         return make(map[string]any, 16) // Pre-allocate 16 fields
     },
 }
 
 // Byte Slice Pool - for byte slice operations
 var ByteSlicePool = &sync.Pool{
-    New: func() interface{} {
+    New: func() any {
         return make([]byte, 0, 512) // Pre-allocate 512 bytes
     },
 }

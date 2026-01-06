@@ -101,7 +101,7 @@ type HealthManager interface {
 	GetOverallHealth() HealthStatus
 	GetHealthHistory() []HealthHistoryEntry
 	QueryHealthHistory(query HealthHistoryQuery) HealthHistoryQueryResult
-	GetHealthHistoryStats() map[string]interface{}
+	GetHealthHistoryStats() map[string]any
 	SetConfig(config HealthCheckConfig) error
 	GetConfig() HealthCheckConfig
 	ForceCleanup()
@@ -620,12 +620,12 @@ func (hm *healthManager) QueryHealthHistory(query HealthHistoryQuery) HealthHist
 }
 
 // GetHealthHistoryStats returns statistics about the health history.
-func (hm *healthManager) GetHealthHistoryStats() map[string]interface{} {
+func (hm *healthManager) GetHealthHistoryStats() map[string]any {
 	hm.mu.RLock()
 	defer hm.mu.RUnlock()
 
 	if len(hm.history) == 0 {
-		return map[string]interface{}{
+		return map[string]any{
 			"total_entries":    0,
 			"oldest_entry":     nil,
 			"newest_entry":     nil,
@@ -643,7 +643,7 @@ func (hm *healthManager) GetHealthHistoryStats() map[string]interface{} {
 	oldestEntry := hm.history[0]
 	newestEntry := hm.history[len(hm.history)-1]
 
-	return map[string]interface{}{
+	return map[string]any{
 		"total_entries":    len(hm.history),
 		"oldest_entry":     oldestEntry,
 		"newest_entry":     newestEntry,

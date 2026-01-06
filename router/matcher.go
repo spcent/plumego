@@ -57,8 +57,8 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 	}
 
 	// Use the paramKeys stored in the node during route registration
-	// Convert middleware slice to interface{} slice
-	mws := make([]interface{}, len(current.middlewares))
+	// Convert middleware slice to any slice
+	mws := make([]any, len(current.middlewares))
 	for i, m := range current.middlewares {
 		mws[i] = m
 	}

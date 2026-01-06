@@ -659,7 +659,7 @@ func (kv *KVStore) Snapshot() error {
 	encoder := json.NewEncoder(writer)
 
 	// Write header
-	header := map[string]interface{}{
+	header := map[string]any{
 		"magic":   magicNumber,
 		"version": version,
 		"created": time.Now(),
@@ -769,7 +769,7 @@ func (kv *KVStore) loadSnapshot() error {
 	decoder := json.NewDecoder(reader)
 
 	// Read header
-	var header map[string]interface{}
+	var header map[string]any
 	if err := decoder.Decode(&header); err != nil {
 		return err
 	}

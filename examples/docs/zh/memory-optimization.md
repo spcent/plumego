@@ -29,21 +29,21 @@
 ```go
 // JSON Buffer Pool - 用于 JSON 编码/解码
 var JSONBufferPool = &sync.Pool{
-    New: func() interface{} {
+    New: func() any {
         return bytes.NewBuffer(make([]byte, 0, 1024)) // 预分配 1KB
     },
 }
 
 // Map Pool - 用于临时 map 操作
 var MapPool = &sync.Pool{
-    New: func() interface{} {
+    New: func() any {
         return make(map[string]any, 16) // 预分配 16 个字段
     },
 }
 
 // Byte Slice Pool - 用于字节切片操作
 var ByteSlicePool = &sync.Pool{
-    New: func() interface{} {
+    New: func() any {
         return make([]byte, 0, 512) // 预分配 512 字节
     },
 }

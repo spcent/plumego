@@ -28,11 +28,11 @@ type Outbound struct {
 
 // UserInfo stores authenticated user information
 type UserInfo struct {
-	ID     string                 `json:"id"`
-	Name   string                 `json:"name"`
-	Email  string                 `json:"email"`
-	Roles  []string               `json:"roles"`
-	Claims map[string]interface{} `json:"claims"`
+	ID     string         `json:"id"`
+	Name   string         `json:"name"`
+	Email  string         `json:"email"`
+	Roles  []string       `json:"roles"`
+	Claims map[string]any `json:"claims"`
 }
 
 // Conn is a websocket connection wrapper with stream API and bounded queue send.
@@ -63,7 +63,7 @@ type Conn struct {
 	UserInfo *UserInfo
 
 	// Connection metadata
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 // NewConn creates a Conn after handshake
@@ -80,7 +80,7 @@ func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior Send
 		readLimit:     16 << 20, // 16MB
 		pingPeriod:    defaultPingPeriod,
 		pongWait:      defaultPongWait,
-		Metadata:      make(map[string]interface{}),
+		Metadata:      make(map[string]any),
 	}
 	atomic.StoreInt64(&cc.lastPong, time.Now().UnixNano())
 	// start writer pump

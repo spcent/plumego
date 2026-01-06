@@ -60,7 +60,7 @@ func (c *Conn) WriteBinary(data []byte) error {
 }
 
 // WriteJSON serializes and sends a JSON message
-func (c *Conn) WriteJSON(v interface{}) error {
+func (c *Conn) WriteJSON(v any) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return err

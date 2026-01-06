@@ -8,21 +8,21 @@ import (
 
 // JSONBufferPool provides a pool of bytes.Buffer for JSON encoding/decoding
 var JSONBufferPool = &sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return bytes.NewBuffer(make([]byte, 0, 1024)) // Pre-allocate 1KB
 	},
 }
 
 // MapPool provides a pool of map[string]any for temporary JSON operations
 var MapPool = &sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return make(map[string]any, 16) // Pre-allocate for 16 fields
 	},
 }
 
 // ByteSlicePool provides a pool of []byte for temporary operations
 var ByteSlicePool = &sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return make([]byte, 0, 512) // Pre-allocate 512 bytes
 	},
 }

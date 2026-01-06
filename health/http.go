@@ -303,7 +303,7 @@ func ReadinessHandlerWithManager(manager HealthManager) http.Handler {
 			code = http.StatusServiceUnavailable
 		}
 
-		response := map[string]interface{}{
+		response := map[string]any{
 			"ready":     overallHealth.Status.isReady(),
 			"status":    overallHealth.Status,
 			"message":   overallHealth.Message,
@@ -342,7 +342,7 @@ func ComponentsListHandler(manager HealthManager) http.Handler {
 			components = append(components, name)
 		}
 
-		response := map[string]interface{}{
+		response := map[string]any{
 			"components": components,
 			"count":      len(components),
 		}
@@ -395,7 +395,7 @@ func sendErrorResponse(w http.ResponseWriter, statusCode int, code, message, req
 }
 
 // handlePanic handles panics in HTTP handlers gracefully.
-func handlePanic(w http.ResponseWriter, _ *http.Request, panicValue interface{}, requestID string) {
+func handlePanic(w http.ResponseWriter, _ *http.Request, panicValue any, requestID string) {
 	// Log the panic (in a real application, you'd use proper logging)
 	fmt.Printf("Panic in health handler: %v\nStack: %s\n", panicValue, debug.Stack())
 

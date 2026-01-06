@@ -8,16 +8,16 @@ import (
 
 // Response represents a standardized JSON response structure
 type Response struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    any    `json:"data,omitempty"`
 }
 
 // ErrorResponse represents a standardized error response structure
 type ErrorResponse struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Details interface{} `json:"details,omitempty"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Details any    `json:"details,omitempty"`
 }
 
 // JSONWriter provides consistent JSON response writing
@@ -31,7 +31,7 @@ func NewJSONWriter(resourceName string) *JSONWriter {
 }
 
 // WriteJSON writes a standardized JSON response
-func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data interface{}) {
+func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 
@@ -54,7 +54,7 @@ func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data interfac
 }
 
 // WriteError writes a standardized error response
-func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message string, details interface{}) {
+func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message string, details any) {
 	// Return standardized error response
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

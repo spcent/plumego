@@ -51,7 +51,7 @@ func TestWriteJSON(t *testing.T) {
 	mockConn, _ := createMockConnection(t)
 	defer mockConn.Close()
 
-	testData := map[string]interface{}{
+	testData := map[string]any{
 		"message": "hello",
 		"count":   42,
 		"nested": map[string]string{

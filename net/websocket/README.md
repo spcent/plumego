@@ -122,7 +122,7 @@ conn.WriteText("Hello World")
 conn.WriteBinary([]byte{0x01, 0x02, 0x03})
 
 // JSON message
-data := map[string]interface{}{
+data := map[string]any{
     "type": "message",
     "content": "Hello",
 }

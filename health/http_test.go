@@ -246,12 +246,12 @@ func TestComponentsListHandler(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
 
-	components, ok := response["components"].([]interface{})
+	components, ok := response["components"].([]any)
 	if !ok {
 		t.Fatalf("components field not found or not an array")
 	}
@@ -290,7 +290,7 @@ func TestReadinessHandlerWithManager(t *testing.T) {
 		t.Fatalf("expected 200 when ready, got %d", rr.Code)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}

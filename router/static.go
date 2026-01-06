@@ -15,7 +15,7 @@ type StaticConfig struct {
 	Prefix string
 
 	// Root is the directory path or filesystem to serve from
-	Root interface{} // Can be string (directory) or http.FileSystem
+	Root any // Can be string (directory) or http.FileSystem
 }
 
 // normalizeStaticPrefix ensures the prefix always starts with "/"
@@ -115,7 +115,7 @@ func (r *Router) StaticFS(prefix string, fs http.FileSystem) {
 }
 
 // serveFromDirectory serves files from a local directory
-func serveFromDirectory(w http.ResponseWriter, req *http.Request, root interface{}) bool {
+func serveFromDirectory(w http.ResponseWriter, req *http.Request, root any) bool {
 	dir, ok := root.(string)
 	if !ok {
 		return false
@@ -141,7 +141,7 @@ func serveFromDirectory(w http.ResponseWriter, req *http.Request, root interface
 }
 
 // serveFromFileSystem serves files from a custom http.FileSystem
-func serveFromFileSystem(w http.ResponseWriter, req *http.Request, root interface{}) bool {
+func serveFromFileSystem(w http.ResponseWriter, req *http.Request, root any) bool {
 	fs, ok := root.(http.FileSystem)
 	if !ok {
 		return false
@@ -172,7 +172,7 @@ func checkFileExists(path string) error {
 }
 
 // registerStaticRoute is a generic function that registers static file routes
-func (r *Router) registerStaticRoute(config StaticConfig, handler func(http.ResponseWriter, *http.Request, interface{}) bool) {
+func (r *Router) registerStaticRoute(config StaticConfig, handler func(http.ResponseWriter, *http.Request, any) bool) {
 	routePath := config.Prefix + "/*filepath"
 
 	r.GetFunc(routePath, func(w http.ResponseWriter, req *http.Request) {

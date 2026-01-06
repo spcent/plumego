@@ -285,10 +285,10 @@ type mockTracer struct{}
 func (m *mockTracer) Start(ctx context.Context, r *http.Request) (context.Context, middleware.TraceSpan) {
 	return ctx, &mockSpan{}
 }
-func (m *mockTracer) StartSpan(name string) interface{}                      { return nil }
-func (m *mockTracer) EndSpan(span interface{}, err error)                    {}
-func (m *mockTracer) SetTag(span interface{}, key string, value interface{}) {}
-func (m *mockTracer) Log(span interface{}, fields map[string]interface{})    {}
+func (m *mockTracer) StartSpan(name string) any              { return nil }
+func (m *mockTracer) EndSpan(span any, err error)            {}
+func (m *mockTracer) SetTag(span any, key string, value any) {}
+func (m *mockTracer) Log(span any, fields map[string]any)    {}
 
 type mockSpan struct{}
 

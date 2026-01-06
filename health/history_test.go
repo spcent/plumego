@@ -228,7 +228,7 @@ func TestHealthHistoryStatsHandler(t *testing.T) {
 	}
 
 	// Verify stats structure
-	var stats map[string]interface{}
+	var stats map[string]any
 	if err := json.Unmarshal(rr.Body.Bytes(), &stats); err != nil {
 		t.Fatalf("failed to unmarshal stats response: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestHealthHistoryStatsHandler(t *testing.T) {
 		t.Fatalf("expected total_entries to be 4, got %v", total)
 	}
 
-	if entriesByState, ok := stats["entries_by_state"].(map[string]interface{}); ok {
+	if entriesByState, ok := stats["entries_by_state"].(map[string]any); ok {
 		if healthy := entriesByState[string(StatusHealthy)]; healthy != float64(2) {
 			t.Fatalf("expected 2 healthy entries, got %v", healthy)
 		}

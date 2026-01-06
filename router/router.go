@@ -485,8 +485,8 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 // handleRootRequest handles requests to the root path "/"
 func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tree *node) {
 	if tree.handler != nil {
-		// Convert middleware slice to interface{} slice
-		mws := make([]interface{}, len(tree.middlewares))
+		// Convert middleware slice to any slice
+		mws := make([]any, len(tree.middlewares))
 		for i, m := range tree.middlewares {
 			mws[i] = m
 		}
@@ -519,7 +519,7 @@ func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[str
 }
 
 // applyMiddlewareAndServe applies middleware chain to the handler and serves the request
-func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, handler Handler, routeMiddlewares []interface{}) {
+func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, handler Handler, routeMiddlewares []any) {
 	reqWithParams := req
 	ctx := req.Context()
 
@@ -543,7 +543,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 		reqWithParams = req.WithContext(ctx)
 	}
 
-	// Convert interface{} slice to middleware.Middleware slice
+	// Convert any slice to middleware.Middleware slice
 	combined := make([]middleware.Middleware, 0, len(r.middlewareManager.GetMiddlewares())+len(routeMiddlewares))
 	combined = append(combined, r.middlewareManager.GetMiddlewares()...)
 
