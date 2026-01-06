@@ -98,6 +98,38 @@ func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Contex
 	return ctx, t.span
 }
 
+type spanContextSpan struct {
+	traceID   string
+	spanID    string
+	endedWith RequestMetrics
+	ended     bool
+}
+
+func (s *spanContextSpan) End(metrics RequestMetrics) {
+	s.endedWith = metrics
+	s.ended = true
+}
+
+func (s *spanContextSpan) TraceID() string {
+	return s.traceID
+}
+
+func (s *spanContextSpan) SpanID() string {
+	return s.spanID
+}
+
+type spanContextTracer struct {
+	span *spanContextSpan
+}
+
+func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan) {
+	t.span = &spanContextSpan{
+		traceID: "trace-ctx",
+		spanID:  "span-123",
+	}
+	return ctx, t.span
+}
+
 func TestLoggingAddsStructuredFields(t *testing.T) {
 	logger := newStubLogger()
 	metrics := &stubMetrics{}
@@ -208,6 +240,39 @@ func TestLoggingUsesUpdatedContextForTracer(t *testing.T) {
 
 	if tracer.received != "ctx-trace" {
 		t.Fatalf("tracer should receive trace id from context, got %q", tracer.received)
+	}
+}
+
+func TestLoggingAddsSpanID(t *testing.T) {
+	logger := newStubLogger()
+	tracer := &spanContextTracer{}
+
+	middleware := Logging(logger, nil, tracer)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tc := contract.TraceContextFromContext(r.Context())
+		if tc == nil || tc.SpanID == "" {
+			t.Fatalf("expected span context to be available")
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/span", nil)
+	req.Header.Set("X-Request-ID", "trace-ctx")
+	rec := httptest.NewRecorder()
+
+	middleware(handler).ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("X-Span-ID"); got != "span-123" {
+		t.Fatalf("expected span id header to be set, got %q", got)
+	}
+
+	if len(*logger.entries) == 0 {
+		t.Fatalf("expected log entry to be recorded")
+	}
+
+	if (*logger.entries)[0].fields["span_id"] != "span-123" {
+		t.Fatalf("expected span id field to be logged, got %v", (*logger.entries)[0].fields["span_id"])
 	}
 }
 

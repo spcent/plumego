@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -90,8 +91,11 @@ func TestOpenTelemetryTracerWithParent(t *testing.T) {
 	if len(spans) != 1 {
 		t.Fatalf("expected one span, got %d", len(spans))
 	}
-	if spans[0].ParentSpanID != "parent-trace-id" {
-		t.Fatalf("expected parent trace ID to be set, got: %s", spans[0].ParentSpanID)
+	if spans[0].TraceID != "parent-trace-id" {
+		t.Fatalf("expected trace ID to be sourced from header, got: %s", spans[0].TraceID)
+	}
+	if spans[0].Attributes["parent.trace_id"] != "parent-trace-id" {
+		t.Fatalf("expected parent trace attribute to be set, got: %s", spans[0].Attributes["parent.trace_id"])
 	}
 }
 
@@ -176,6 +180,33 @@ func TestOpenTelemetryTracerConcurrency(t *testing.T) {
 	spans := tracer.Spans()
 	if len(spans) != 10 {
 		t.Fatalf("expected 10 spans, got %d", len(spans))
+	}
+}
+
+func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
+	tracer := NewOpenTelemetryTracer("plumego-test")
+
+	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
+	ctx := context.WithValue(context.Background(), contract.TraceIDKey{}, "trace-ctx")
+	ctx, span := tracer.Start(ctx, req)
+
+	spanCtx, ok := span.(interface {
+		TraceID() string
+		SpanID() string
+	})
+	if !ok {
+		t.Fatalf("expected span to expose context identifiers")
+	}
+	if spanCtx.TraceID() != "trace-ctx" {
+		t.Fatalf("expected trace id from context, got %s", spanCtx.TraceID())
+	}
+
+	traceCtx := contract.TraceContextFromContext(ctx)
+	if traceCtx == nil || string(traceCtx.TraceID) != "trace-ctx" {
+		t.Fatalf("expected trace context to be set from context")
+	}
+	if traceCtx.SpanID == "" {
+		t.Fatalf("expected span id in trace context")
 	}
 }
 

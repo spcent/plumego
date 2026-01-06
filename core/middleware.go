@@ -80,7 +80,20 @@ func (a *App) buildHandler() {
 
 // EnableLogging enables the logging middleware.
 func (a *App) EnableLogging() {
-	a.Use(middleware.Logging(a.logger, a.metricsCollector, a.tracer))
+	_ = a.enableLogging()
+}
+
+func (a *App) enableLogging() error {
+	if a.loggingEnabled {
+		return nil
+	}
+
+	if err := a.Use(middleware.Logging(a.logger, a.metricsCollector, a.tracer)); err != nil {
+		return err
+	}
+
+	a.loggingEnabled = true
+	return nil
 }
 
 // EnableAuth enables the auth middleware.

@@ -36,6 +36,15 @@ type WebhookInConfig = core.WebhookInConfig
 // WebSocketConfig defines the WebSocket hub configuration.
 type WebSocketConfig = core.WebSocketConfig
 
+// MetricsConfig configures built-in metrics wiring.
+type MetricsConfig = core.MetricsConfig
+
+// TracingConfig configures built-in tracing wiring.
+type TracingConfig = core.TracingConfig
+
+// ObservabilityConfig bundles metrics + tracing settings.
+type ObservabilityConfig = core.ObservabilityConfig
+
 // New creates a new App instance.
 func New(options ...Option) *App {
 	return core.New(options...)
@@ -72,3 +81,12 @@ var (
 
 // DefaultWebSocketConfig exposes the default WebSocket settings.
 var DefaultWebSocketConfig = core.DefaultWebSocketConfig
+
+// DefaultMetricsConfig exposes default metrics settings.
+var DefaultMetricsConfig = core.DefaultMetricsConfig
+
+// DefaultTracingConfig exposes default tracing settings.
+var DefaultTracingConfig = core.DefaultTracingConfig
+
+// DefaultObservabilityConfig exposes default observability settings.
+var DefaultObservabilityConfig = core.DefaultObservabilityConfig

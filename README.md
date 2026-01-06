@@ -135,6 +135,20 @@ No need to write your own adapters to hook logging middleware into metrics/traci
 
 As shown in `examples/reference`, wire them into `core.New` using `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
 
+To enable a built-in Prometheus endpoint and OpenTelemetry-style tracer in one call:
+
+```go
+obs := core.DefaultObservabilityConfig()
+obs.Metrics.Enabled = true
+obs.Tracing.Enabled = true
+
+if err := app.ConfigureObservability(obs); err != nil {
+    log.Fatal(err)
+}
+```
+
+When tracing is enabled, logs include `trace_id` and `span_id`, and responses include `X-Span-ID` for correlation.
+
 ## Configuration Reference
 Use `config.LoadEnv` to load environment variables, or bind command-line flags; use the table below for predictable deployments.
 

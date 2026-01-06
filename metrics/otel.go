@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -55,7 +56,14 @@ func NewOpenTelemetryTracer(name string) *OpenTelemetryTracer {
 func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (context.Context, middleware.TraceSpan) {
 	// Generate simple span and trace IDs
 	spanID := generateSpanID()
-	traceID := generateTraceID()
+	traceID := contract.TraceIDFromContext(ctx)
+	if traceID == "" {
+		if headerTraceID := r.Header.Get("X-Trace-ID"); headerTraceID != "" {
+			traceID = headerTraceID
+		} else {
+			traceID = generateTraceID()
+		}
+	}
 
 	handle := &spanHandle{
 		tracer:    t,
@@ -75,11 +83,28 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 		},
 	}
 
-	// Check for parent trace ID in headers
+	// Track parent span when trace context is available.
+	parentSpanID := ""
+	if parent := contract.TraceContextFromContext(ctx); parent != nil && parent.SpanID != "" {
+		parentSpanID = string(parent.SpanID)
+		handle.parentID = parentSpanID
+		handle.attrs["parent.span_id"] = parentSpanID
+	}
+
+	// Preserve parent trace ID from inbound headers for compatibility.
 	if parentID := r.Header.Get("X-Trace-ID"); parentID != "" {
-		handle.parentID = parentID
 		handle.attrs["parent.trace_id"] = parentID
 	}
+
+	traceCtx := contract.TraceContext{
+		TraceID: contract.TraceID(traceID),
+		SpanID:  contract.SpanID(spanID),
+	}
+	if parentSpanID != "" {
+		parentID := contract.SpanID(parentSpanID)
+		traceCtx.ParentSpanID = &parentID
+	}
+	ctx = contract.ContextWithTraceContext(ctx, traceCtx)
 
 	return ctx, handle
 }
@@ -167,6 +192,14 @@ func (s *spanHandle) End(metrics middleware.RequestMetrics) {
 		TraceID:       s.traceID,
 		ParentSpanID:  s.parentID,
 	})
+}
+
+func (s *spanHandle) TraceID() string {
+	return s.traceID
+}
+
+func (s *spanHandle) SpanID() string {
+	return s.spanID
 }
 
 // SpanID and TraceID generation (simple implementation)

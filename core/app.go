@@ -36,6 +36,7 @@ type App struct {
 	metricsCollector middleware.MetricsCollector
 	tracer           middleware.Tracer
 	pub              pubsub.PubSub
+	loggingEnabled   bool
 
 	// Component management
 	components        []Component

@@ -135,6 +135,20 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 
 如 `examples/reference` 所示，使用 `core.WithMetricsCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`。
 
+如果希望一键启用 Prometheus 指标与 OpenTelemetry 风格追踪：
+
+```go
+obs := core.DefaultObservabilityConfig()
+obs.Metrics.Enabled = true
+obs.Tracing.Enabled = true
+
+if err := app.ConfigureObservability(obs); err != nil {
+    log.Fatal(err)
+}
+```
+
+开启追踪后日志会包含 `trace_id` 与 `span_id`，响应中也会回传 `X-Span-ID` 便于关联。
+
 ## 配置参考
 使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；使用下表实现可预测的部署。
 
