@@ -99,6 +99,11 @@ func TestBasicLogging(t *testing.T) {
 			expected: "test info message",
 		},
 		{
+			name:     "Infoln",
+			logFunc:  func() { Infoln("test", "info", "message") },
+			expected: "test info message",
+		},
+		{
 			name:     "Warning",
 			logFunc:  func() { Warning("test warning message") },
 			expected: "test warning message",
@@ -109,6 +114,11 @@ func TestBasicLogging(t *testing.T) {
 			expected: "test warning message",
 		},
 		{
+			name:     "Warningln",
+			logFunc:  func() { Warningln("test", "warning", "message") },
+			expected: "test warning message",
+		},
+		{
 			name:     "Error",
 			logFunc:  func() { Error("test error message") },
 			expected: "test error message",
@@ -116,6 +126,11 @@ func TestBasicLogging(t *testing.T) {
 		{
 			name:     "Errorf",
 			logFunc:  func() { Errorf("test %s message", "error") },
+			expected: "test error message",
+		},
+		{
+			name:     "Errorln",
+			logFunc:  func() { Errorln("test", "error", "message") },
 			expected: "test error message",
 		},
 	}
@@ -607,6 +622,90 @@ func BenchmarkConcurrentLogging(b *testing.B) {
 	})
 }
 
+// BenchmarkBufferPoolEffectiveness demonstrates the memory optimization from using sync.Pool
+func BenchmarkBufferPoolEffectiveness(b *testing.B) {
+	resetGlobalLogger()
+	std.SetOutput(io.Discard)
+
+	// This benchmark measures the allocation rate when logging
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		Info("benchmark message for buffer pool effectiveness test")
+	}
+}
+
+// BenchmarkBufferPoolWithLargeMessages demonstrates buffer pool benefits with large messages
+func BenchmarkBufferPoolWithLargeMessages(b *testing.B) {
+	resetGlobalLogger()
+	std.SetOutput(io.Discard)
+
+	largeMessage := strings.Repeat("x", 1000)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		Info(largeMessage)
+	}
+}
+
+// TestLnMethodFormatting ensures *ln methods correctly format arguments with spaces
+func TestLnMethodFormatting(t *testing.T) {
+	resetGlobalLogger()
+
+	tests := []struct {
+		name     string
+		logFunc  func()
+		args     []any
+		expected string
+	}{
+		{
+			name:     "Infoln with multiple strings",
+			logFunc:  func() { Infoln("hello", "world", "test") },
+			args:     []any{"hello", "world", "test"},
+			expected: "hello world test",
+		},
+		{
+			name:     "Warningln with mixed types",
+			logFunc:  func() { Warningln("count:", 42, "status:", true) },
+			args:     []any{"count:", 42, "status:", true},
+			expected: "count: 42 status: true",
+		},
+		{
+			name:     "Errorln with numbers",
+			logFunc:  func() { Errorln(1, 2, 3, "sum") },
+			args:     []any{1, 2, 3, "sum"},
+			expected: "1 2 3 sum",
+		},
+		{
+			name:     "Infoln with zero arguments",
+			logFunc:  func() { Infoln() },
+			args:     []any{},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := captureOutput(tt.logFunc)
+
+			// Check that the formatted output is present
+			if !strings.Contains(output, tt.expected) {
+				t.Errorf("%s: Expected output to contain %q, got %q", tt.name, tt.expected, output)
+			}
+
+			// For non-empty expected strings, ensure there's a newline at the end
+			if tt.expected != "" {
+				if !strings.HasSuffix(strings.TrimRight(output, "\n"), tt.expected) {
+					t.Errorf("%s: Expected output to end with %q, got %q", tt.name, tt.expected, output)
+				}
+			}
+		})
+	}
+}
+
 // TestEdgeCases covers edge scenarios
 func TestEdgeCases(t *testing.T) {
 	resetGlobalLogger()
@@ -663,4 +762,173 @@ func TestErrorHandling(t *testing.T) {
 	if validCount != 1 {
 		t.Error("Should parse only valid vmodule patterns")
 	}
+}
+
+// TestLogRotation validates log rotation functionality
+func TestLogRotation(t *testing.T) {
+	resetGlobalLogger()
+
+	tempDir := createTempDir(t)
+	defer cleanupTempDir(t, tempDir)
+
+	// Configure log directory and rotation settings
+	std.logDir = tempDir
+	std.program = "testapp"
+	std.SetRotationConfig(RotationConfig{
+		MaxSize:    1, // 1MB max size
+		MaxAge:     30,
+		MaxBackups: 5,
+	})
+
+	// Initialize log files
+	err := std.initLogFiles()
+	if err != nil {
+		t.Fatalf("Failed to initialize log files: %v", err)
+	}
+	defer std.Close()
+
+	// Write enough data to trigger rotation
+	message := strings.Repeat("x", 500000) // 500KB message
+	for i := 0; i < 5; i++ {               // Write 2.5MB total
+		Info(message)
+	}
+	std.Flush()
+
+	// Get all log files
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to read temp dir: %v", err)
+	}
+
+	// Count log files (should be more than 1 due to rotation)
+	infoLogFiles := 0
+	for _, file := range files {
+		if strings.Contains(file.Name(), "INFO") && strings.HasSuffix(file.Name(), ".log") {
+			infoLogFiles++
+		}
+	}
+
+	if infoLogFiles < 2 {
+		t.Errorf("Expected at least 2 INFO log files after rotation, got %d", infoLogFiles)
+	}
+
+	// Check that currentSize was reset after rotation
+	std.mu.RLock()
+	currentSize := std.currentSize[INFO]
+	std.mu.RUnlock()
+
+	if currentSize > int64(std.rotationConfig.MaxSize)*1024*1024 {
+		t.Errorf("Current log size %d should be less than max size %d after rotation",
+			currentSize, int64(std.rotationConfig.MaxSize)*1024*1024)
+	}
+}
+
+// TestRotationConfig verifies rotation configuration is applied correctly
+func TestRotationConfig(t *testing.T) {
+	resetGlobalLogger()
+
+	// Set initial rotation config
+	std.SetRotationConfig(RotationConfig{
+		MaxSize:    10,
+		MaxAge:     7,
+		MaxBackups: 3,
+	})
+
+	std.mu.RLock()
+	config := std.rotationConfig
+	std.mu.RUnlock()
+
+	if config.MaxSize != 10 {
+		t.Errorf("Expected MaxSize 10, got %d", config.MaxSize)
+	}
+	if config.MaxAge != 7 {
+		t.Errorf("Expected MaxAge 7, got %d", config.MaxAge)
+	}
+	if config.MaxBackups != 3 {
+		t.Errorf("Expected MaxBackups 3, got %d", config.MaxBackups)
+	}
+
+	// Update rotation config
+	std.SetRotationConfig(RotationConfig{
+		MaxSize:    20,
+		MaxAge:     14,
+		MaxBackups: 5,
+	})
+
+	std.mu.RLock()
+	config = std.rotationConfig
+	std.mu.RUnlock()
+
+	if config.MaxSize != 20 {
+		t.Errorf("Expected MaxSize 20 after update, got %d", config.MaxSize)
+	}
+	if config.MaxAge != 14 {
+		t.Errorf("Expected MaxAge 14 after update, got %d", config.MaxAge)
+	}
+	if config.MaxBackups != 5 {
+		t.Errorf("Expected MaxBackups 5 after update, got %d", config.MaxBackups)
+	}
+}
+
+// TestClose validates that the Close() method correctly closes log files and cleans up resources
+func TestClose(t *testing.T) {
+	resetGlobalLogger()
+
+	// Configure file logging
+	tempDir := createTempDir(t)
+	defer cleanupTempDir(t, tempDir)
+
+	std.logDir = tempDir
+	std.program = "testapp"
+
+	// Initialize log files
+	err := std.initLogFiles()
+	if err != nil {
+		t.Fatalf("Failed to initialize log files: %v", err)
+	}
+
+	// Write some logs to ensure files are active
+	Info("test message before close")
+	Warning("test warning before close")
+	Error("test error before close")
+
+	// Verify log files are open
+	std.mu.RLock()
+	openFiles := len(std.logFiles)
+	std.mu.RUnlock()
+
+	if openFiles == 0 {
+		t.Error("Expected log files to be open before Close()")
+	}
+
+	// Close the logger
+	std.Close()
+
+	// Verify log files are closed and removed from map
+	std.mu.RLock()
+	closedFiles := len(std.logFiles)
+	std.mu.RUnlock()
+
+	if closedFiles != 0 {
+		t.Errorf("Expected no open log files after Close(), got %d", closedFiles)
+	}
+
+	// Try to log after close - should not panic but may not write to files
+	defer func() {
+		if r := recover(); r != nil {
+			t.Error("Logging after Close() should not panic")
+		}
+	}()
+
+	Info("test message after close")
+
+	// Reopen and log again to ensure we can still use the logger after close
+	err = std.initLogFiles()
+	if err != nil {
+		t.Fatalf("Failed to reinitialize log files after Close(): %v", err)
+	}
+
+	Info("test message after reopen")
+	std.Flush()
+	std.Close()
 }

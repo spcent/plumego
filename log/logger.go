@@ -66,6 +66,7 @@ func (l *gLogger) WithFields(fields Fields) StructuredLogger {
 }
 
 func (l *gLogger) Debug(msg string, fields Fields) {
+	// Check if debug logging is enabled
 	if !V(1) {
 		return
 	}

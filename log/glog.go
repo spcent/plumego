@@ -34,9 +34,22 @@ var (
 	logBacktraceAt  = flag.String("log_backtrace_at", "", "when logging hits line file:N, emit a stack trace")
 )
 
+// logBufferPool is used to recycle log buffers to reduce memory allocations
+var logBufferPool = sync.Pool{
+	New: func() any {
+		return make([]byte, 0, 1024) // Preallocate 1KB buffer
+	},
+}
+
 type vmodulePattern struct {
 	pattern string
 	level   int
+}
+
+type RotationConfig struct {
+	MaxSize    int // Maximum size in MB before rotation
+	MaxAge     int // Maximum days to retain old log files
+	MaxBackups int // Maximum number of old log files to retain
 }
 
 type Logger struct {
@@ -51,6 +64,8 @@ type Logger struct {
 	logFiles        map[Level]*os.File
 	logDir          string
 	program         string
+	rotationConfig  RotationConfig
+	currentSize     map[Level]int64
 }
 
 var std = New()
@@ -63,6 +78,7 @@ func New() *Logger {
 		alsoToStderr: false,
 		verbosity:    0,
 		logFiles:     make(map[Level]*os.File),
+		currentSize:  make(map[Level]int64),
 		program:      filepath.Base(os.Args[0]),
 	}
 }
@@ -127,7 +143,9 @@ func (l *Logger) initLogFiles() error {
 		linkName := fmt.Sprintf("%s.%s", l.program, levelNames[level])
 		linkPath := filepath.Join(l.logDir, linkName)
 		os.Remove(linkPath)
-		os.Symlink(filename, linkPath)
+		if err := os.Symlink(filename, linkPath); err != nil {
+			return fmt.Errorf("failed to create symlink %s: %w", linkPath, err)
+		}
 	}
 
 	return nil
@@ -177,20 +195,25 @@ func (l *Logger) shouldLogBacktrace(file string, line int) bool {
 	return target == l.logBacktraceAt
 }
 
-func (l *Logger) formatHeader(level Level, file string, line int) string {
-	now := time.Now()
+func (l *Logger) formatHeader(level Level, file string, line int) []byte {
+	buf := logBufferPool.Get().([]byte)
+	buf = buf[:0] // Reset buffer to empty
 
+	now := time.Now()
 	if idx := strings.LastIndex(file, "/"); idx >= 0 {
 		file = file[idx+1:]
 	}
 
-	return fmt.Sprintf("%s%02d%02d %02d:%02d:%02d.%06d %7d [%s:%d] ",
-		levelNames[level][0:1], // Get the first letter
+	// Build header using buffer
+	buf = append(buf, levelNames[level][0]) // First letter of level
+	buf = append(buf, fmt.Sprintf("%02d%02d %02d:%02d:%02d.%06d %7d [%s:%d] ",
 		now.Month(), now.Day(),
 		now.Hour(), now.Minute(), now.Second(),
 		now.Nanosecond()/1000,
 		os.Getpid(),
-		file, line)
+		file, line)...)
+
+	return buf
 }
 
 func (l *Logger) getLogWriter(level Level) io.Writer {
@@ -224,65 +247,107 @@ func (l *Logger) getLogWriter(level Level) io.Writer {
 }
 
 func (l *Logger) log(level Level, calldepth int, args ...any) {
+	// First check if we should log at this level to avoid unnecessary work
 	l.mu.RLock()
-	if level < l.level {
-		l.mu.RUnlock()
-		return
-	}
+	shouldLog := level >= l.level
 	l.mu.RUnlock()
 
+	if !shouldLog {
+		return
+	}
+
+	// Get caller information
 	_, file, line, ok := runtime.Caller(calldepth)
 	if !ok {
 		file = "???"
 		line = 1
 	}
 
+	// Format header and message
 	header := l.formatHeader(level, file, line)
 	message := fmt.Sprint(args...)
-	logLine := header + message + "\n"
+	logLine := append(header, message...)
+	logLine = append(logLine, '\n')
 
+	// Get writer and write log
+	l.mu.RLock()
 	writer := l.getLogWriter(level)
-	fmt.Fprint(writer, logLine)
+	shouldBacktrace := l.shouldLogBacktrace(file, line)
+	l.mu.RUnlock()
 
-	if l.shouldLogBacktrace(file, line) {
+	fmt.Fprint(writer, string(logLine))
+
+	// Return buffer to pool
+	logBufferPool.Put(header[:0])
+
+	// Check if log file needs rotation
+	if l.logDir != "" {
+		l.checkLogRotation(level, int64(len(logLine)))
+	}
+
+	// Handle backtrace if needed
+	if shouldBacktrace {
 		stack := make([]byte, 4096)
 		stack = stack[:runtime.Stack(stack, false)]
 		fmt.Fprint(writer, string(stack))
 	}
 
+	// Handle fatal errors
 	if level == FATAL {
+		l.Flush()
 		os.Exit(1)
 	}
 }
 
 func (l *Logger) logf(level Level, calldepth int, format string, args ...any) {
+	// First check if we should log at this level to avoid unnecessary work
 	l.mu.RLock()
-	if level < l.level {
-		l.mu.RUnlock()
-		return
-	}
+	shouldLog := level >= l.level
 	l.mu.RUnlock()
 
+	if !shouldLog {
+		return
+	}
+
+	// Get caller information
 	_, file, line, ok := runtime.Caller(calldepth)
 	if !ok {
 		file = "???"
 		line = 1
 	}
 
+	// Format header and message
 	header := l.formatHeader(level, file, line)
 	message := fmt.Sprintf(format, args...)
-	logLine := header + message + "\n"
+	logLine := append(header, message...)
+	logLine = append(logLine, '\n')
 
+	// Get writer and write log
+	l.mu.RLock()
 	writer := l.getLogWriter(level)
-	fmt.Fprint(writer, logLine)
+	shouldBacktrace := l.shouldLogBacktrace(file, line)
+	l.mu.RUnlock()
 
-	if l.shouldLogBacktrace(file, line) {
+	fmt.Fprint(writer, string(logLine))
+
+	// Return buffer to pool
+	logBufferPool.Put(header[:0])
+
+	// Check if log file needs rotation
+	if l.logDir != "" {
+		l.checkLogRotation(level, int64(len(logLine)))
+	}
+
+	// Handle backtrace if needed
+	if shouldBacktrace {
 		stack := make([]byte, 4096)
 		stack = stack[:runtime.Stack(stack, false)]
 		fmt.Fprint(writer, string(stack))
 	}
 
+	// Handle fatal errors
 	if level == FATAL {
+		l.Flush()
 		os.Exit(1)
 	}
 }
@@ -327,7 +392,7 @@ func (l *Logger) Infof(format string, args ...any) {
 }
 
 func (l *Logger) Infoln(args ...any) {
-	l.log(INFO, 2, args...)
+	l.log(INFO, 2, fmt.Sprintln(args...))
 }
 
 func (l *Logger) Warning(args ...any) {
@@ -339,7 +404,7 @@ func (l *Logger) Warningf(format string, args ...any) {
 }
 
 func (l *Logger) Warningln(args ...any) {
-	l.log(WARNING, 2, args...)
+	l.log(WARNING, 2, fmt.Sprintln(args...))
 }
 
 func (l *Logger) Error(args ...any) {
@@ -351,7 +416,7 @@ func (l *Logger) Errorf(format string, args ...any) {
 }
 
 func (l *Logger) Errorln(args ...any) {
-	l.log(ERROR, 2, args...)
+	l.log(ERROR, 2, fmt.Sprintln(args...))
 }
 
 func (l *Logger) Fatal(args ...any) {
@@ -363,7 +428,7 @@ func (l *Logger) Fatalf(format string, args ...any) {
 }
 
 func (l *Logger) Fatalln(args ...any) {
-	l.log(FATAL, 2, args...)
+	l.log(FATAL, 2, fmt.Sprintln(args...))
 }
 
 func (l *Logger) VLog(level int, args ...any) {
@@ -389,6 +454,73 @@ func (l *Logger) Flush() {
 	}
 }
 
+// checkLogRotation checks if the log file needs rotation based on size
+func (l *Logger) checkLogRotation(level Level, logSize int64) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	config := l.rotationConfig
+	if config.MaxSize <= 0 {
+		return nil
+	}
+
+	l.currentSize[level] += logSize
+	if l.currentSize[level] < int64(config.MaxSize)*1024*1024 {
+		return nil
+	}
+
+	// Reset current size and rotate log file
+	l.currentSize[level] = 0
+	return l.rotateLogFile(level)
+}
+
+// rotateLogFile rotates the log file for the given level
+func (l *Logger) rotateLogFile(level Level) error {
+	// Close the current log file
+	if file, ok := l.logFiles[level]; ok {
+		file.Close()
+	}
+
+	// Generate new log filename with timestamp
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "unknown"
+	}
+
+	pid := os.Getpid()
+	now := time.Now()
+
+	filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
+		l.program, hostname, levelNames[level],
+		now.Year(), now.Month(), now.Day(),
+		now.Hour(), now.Minute(), now.Second(), pid)
+
+	logPath := filepath.Join(l.logDir, filename)
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+
+	// Update log file map
+	l.logFiles[level] = file
+
+	// Update symlink
+	linkName := fmt.Sprintf("%s.%s", l.program, levelNames[level])
+	linkPath := filepath.Join(l.logDir, linkName)
+	os.Remove(linkPath)            // Ignore error
+	os.Symlink(filename, linkPath) // Ignore error for backward compatibility
+
+	return nil
+}
+
+// SetRotationConfig sets the log rotation configuration
+func (l *Logger) SetRotationConfig(config RotationConfig) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.rotationConfig = config
+}
+
+// Close closes all log files and releases resources
 func (l *Logger) Close() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -414,7 +546,7 @@ func Infof(format string, args ...any) {
 }
 
 func Infoln(args ...any) {
-	std.log(INFO, 2, args...)
+	std.log(INFO, 2, fmt.Sprintln(args...))
 }
 
 func Warning(args ...any) {
@@ -426,7 +558,7 @@ func Warningf(format string, args ...any) {
 }
 
 func Warningln(args ...any) {
-	std.log(WARNING, 2, args...)
+	std.log(WARNING, 2, fmt.Sprintln(args...))
 }
 
 func Error(args ...any) {
@@ -438,7 +570,7 @@ func Errorf(format string, args ...any) {
 }
 
 func Errorln(args ...any) {
-	std.log(ERROR, 2, args...)
+	std.log(ERROR, 2, fmt.Sprintln(args...))
 }
 
 func Fatal(args ...any) {
@@ -450,7 +582,7 @@ func Fatalf(format string, args ...any) {
 }
 
 func Fatalln(args ...any) {
-	std.log(FATAL, 2, args...)
+	std.log(FATAL, 2, fmt.Sprintln(args...))
 }
 
 func VLog(level int, args ...any) {
@@ -484,6 +616,6 @@ type logWriter struct {
 
 func (w *logWriter) Write(p []byte) (n int, err error) {
 	msg := strings.TrimRight(string(p), "\n")
-	std.log(w.level, 4, msg)
+	std.log(w.level, 3, msg) // Adjust calldepth to 3 for correct caller info
 	return len(p), nil
 }
