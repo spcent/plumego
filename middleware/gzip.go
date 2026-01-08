@@ -8,7 +8,7 @@ import (
 
 // Gzip compresses HTTP responses when the client supports it via Accept-Encoding.
 func Gzip() Middleware {
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 				next.ServeHTTP(w, r)

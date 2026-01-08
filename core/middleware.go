@@ -110,12 +110,10 @@ func (a *App) EnableRateLimit(rate float64, capacity int) {
 
 // EnableCORS enables the CORS middleware.
 func (a *App) EnableCORS() {
-	// Convert CORS middleware from func(http.Handler) http.Handler to middleware.Middleware.
-	a.Use(middleware.FromHTTPHandlerMiddleware(middleware.CORS))
+	a.Use(middleware.CORS)
 }
 
 // EnableRecovery enables the recovery middleware.
 func (a *App) EnableRecovery() {
-	// Convert http.Handler middleware to Middleware type.
-	a.Use(middleware.FromHTTPHandlerMiddleware(middleware.RecoveryMiddleware))
+	a.Use(middleware.RecoveryMiddleware)
 }

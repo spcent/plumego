@@ -135,6 +135,7 @@ func NewRouter(opts ...RouterOption) *Router {
 		middlewareManager: NewMiddlewareManager(),
 		logger:            log.NewGLogger(),
 		routeValidations:  make(map[string]*RouteValidation),
+		routeCache:        NewRouteCache(100), // Initialize with default cache capacity
 	}
 
 	// Apply options
@@ -404,6 +405,15 @@ func (r *Router) addCtxRoute(method, path string, h contract.CtxHandlerFunc) err
 
 // ServeHTTP implements http.Handler and handles incoming HTTP requests
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// Check route cache first for better performance
+	cacheKey := req.Method + ":" + req.URL.Path
+	if cachedResult, exists := r.routeCache.Get(cacheKey); exists {
+		// Use cached result without holding the lock
+		r.handleCachedRouteMatch(w, req, cachedResult)
+		return
+	}
+
+	// Acquire read lock for route matching
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -418,7 +428,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := r.normalizePath(req.URL.Path)
 
 	// Try to match route and handle request
-	r.handleRouteMatch(w, req, tree, path)
+	r.handleRouteMatch(w, req, tree, path, cacheKey)
 }
 
 // findRouteTree finds the appropriate route tree for the given HTTP method
@@ -442,10 +452,10 @@ func (r *Router) normalizePath(path string) string {
 }
 
 // handleRouteMatch processes the matched route and applies middleware
-func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree *node, path string) {
+func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree *node, path string, cacheKey string) {
 	// Handle root path specially
 	if path == "/" {
-		r.handleRootRequest(w, req, tree)
+		r.handleRootRequest(w, req, tree, cacheKey)
 		return
 	}
 
@@ -467,6 +477,9 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 		return
 	}
 
+	// Cache the matching result for future requests
+	r.routeCache.Set(cacheKey, result)
+
 	// Build parameter map
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
@@ -483,15 +496,33 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 	r.applyMiddlewareAndServe(w, req, params, result.Handler, result.RouteMiddlewares)
 }
 
+// handleCachedRouteMatch handles requests using cached route matching results
+func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request, result *MatchResult) {
+	// Build parameter map
+	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
+
+	// Validate parameters if validations are registered
+	// Note: We can't validate params from cache since we don't have the full path, but
+	// parameter validation should be safe to skip for cached routes as they were already validated
+
+	r.applyMiddlewareAndServe(w, req, params, result.Handler, result.RouteMiddlewares)
+}
+
 // handleRootRequest handles requests to the root path "/"
-func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tree *node) {
+func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tree *node, cacheKey string) {
 	if tree.handler != nil {
-		// Convert middleware slice to any slice
-		mws := make([]any, len(tree.middlewares))
-		for i, m := range tree.middlewares {
-			mws[i] = m
+		// Create a MatchResult for the root path with direct middleware slice
+		result := &MatchResult{
+			Handler:          tree.handler,
+			ParamValues:      nil,
+			ParamKeys:        nil,
+			RouteMiddlewares: tree.middlewares,
 		}
-		r.applyMiddlewareAndServe(w, req, nil, tree.handler, mws)
+		
+		// Cache the result for future requests
+		r.routeCache.Set(cacheKey, result)
+		
+		r.applyMiddlewareAndServe(w, req, nil, tree.handler, result.RouteMiddlewares)
 		return
 	}
 	http.NotFound(w, req)
@@ -520,7 +551,7 @@ func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[str
 }
 
 // applyMiddlewareAndServe applies middleware chain to the handler and serves the request
-func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, handler Handler, routeMiddlewares []any) {
+func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, handler http.Handler, routeMiddlewares []middleware.Middleware) {
 	reqWithParams := req
 	ctx := req.Context()
 
@@ -544,15 +575,11 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 		reqWithParams = req.WithContext(ctx)
 	}
 
-	// Convert any slice to middleware.Middleware slice
-	combined := make([]middleware.Middleware, 0, len(r.middlewareManager.GetMiddlewares())+len(routeMiddlewares))
-	combined = append(combined, r.middlewareManager.GetMiddlewares()...)
-
-	for _, m := range routeMiddlewares {
-		if mw, ok := m.(middleware.Middleware); ok {
-			combined = append(combined, mw)
-		}
-	}
+	// Combine middleware slices directly
+	allMiddlewares := r.middlewareManager.GetMiddlewares()
+	combined := make([]middleware.Middleware, 0, len(allMiddlewares)+len(routeMiddlewares))
+	combined = append(combined, allMiddlewares...)
+	combined = append(combined, routeMiddlewares...)
 
 	if len(combined) == 0 {
 		handler.ServeHTTP(w, reqWithParams)

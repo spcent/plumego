@@ -11,6 +11,7 @@ import (
 )
 
 type frontendComponent struct {
+	BaseComponent
 	register func(r *router.Router) error
 	name     string
 	result   struct {

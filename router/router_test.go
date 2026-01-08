@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
 )
 
 func TestBasicRoutes(t *testing.T) {
@@ -292,11 +291,11 @@ func TestRouteGroupMiddlewares(t *testing.T) {
 	r := NewRouter()
 
 	api := r.Group("/api")
-	api.Use(func(next middleware.Handler) middleware.Handler {
-		return middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Group", "api")
 			next.ServeHTTP(w, r)
-		}))
+		})
 	})
 
 	api.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {

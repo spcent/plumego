@@ -40,7 +40,7 @@ func DebugErrors(config DebugErrorConfig) Middleware {
 		cfg.IncludeQuery = false
 	}
 
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if shouldSkipDebugErrors(r) {
 				next.ServeHTTP(w, r)

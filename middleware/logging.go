@@ -43,7 +43,7 @@ type Tracer interface {
 
 // Logging provides request logging with structured fields and optional metrics/tracing hooks.
 func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Tracer) Middleware {
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := ensureTraceID(r)
 			ctx := context.WithValue(r.Context(), contract.TraceIDKey{}, traceID)

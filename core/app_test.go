@@ -16,6 +16,7 @@ import (
 )
 
 type stubComponent struct {
+	BaseComponent
 	path           string
 	middlewareName string
 	started        bool
@@ -39,11 +40,11 @@ func (s *stubComponent) RegisterMiddleware(reg *middleware.Registry) {
 		return
 	}
 
-	reg.Use(func(next middleware.Handler) middleware.Handler {
-		return middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	reg.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Component", s.middlewareName)
 			next.ServeHTTP(w, r)
-		}))
+		})
 	})
 }
 
@@ -122,11 +123,11 @@ func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 		w.Write([]byte("mux"))
 	})
 
-	app.Use(func(next middleware.Handler) middleware.Handler {
-		return middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	app.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Test", "applied")
 			next.ServeHTTP(w, r)
-		}))
+		})
 	})
 
 	if err := app.setupServer(); err != nil {
@@ -166,11 +167,11 @@ func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 	app := New()
 
-	app.Use(func(next middleware.Handler) middleware.Handler {
-		return middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	app.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Lazy", "true")
 			next.ServeHTTP(w, r)
-		}))
+		})
 	})
 
 	app.Get("/hello", func(w http.ResponseWriter, _ *http.Request) {
@@ -216,7 +217,7 @@ func TestSetupServerBuildsHTTPServer(t *testing.T) {
 	app := New(WithAddr(":5555"))
 
 	// add middleware to ensure chain builds without panic
-	app.Use(func(next middleware.Handler) middleware.Handler {
+	app.Use(func(next http.Handler) http.Handler {
 		return next
 	})
 
@@ -239,7 +240,7 @@ func TestUseAfterStartPanics(t *testing.T) {
 	app := New()
 	app.started = true
 
-	err := app.Use(func(next middleware.Handler) middleware.Handler { return next })
+	err := app.Use(func(next http.Handler) http.Handler { return next })
 	if err == nil {
 		t.Fatalf("expected error when adding middleware after start")
 	}

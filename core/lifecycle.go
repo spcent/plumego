@@ -3,11 +3,13 @@ package core
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -226,18 +228,46 @@ func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *
 }
 
 func (a *App) mountComponents() []Component {
-	comps := append([]Component{}, a.builtInComponents()...)
-	comps = append(comps, a.components...)
+	// Get all components (built-in + custom)
+	comps := append([]Component{}, a.builtInComponents()...) 
+	comps = append(comps, a.components...) 
 
 	if a.middlewareReg == nil {
 		a.middlewareReg = middleware.NewRegistry()
 	}
 
+	// 1. Register all components in DI container
 	for _, c := range comps {
 		if c == nil {
 			continue
 		}
+		a.diContainer.Register(c)
+	}
 
+	// 2. Inject dependencies into all components
+	for _, c := range comps {
+		if c == nil {
+			continue
+		}
+		if err := a.diContainer.Inject(c); err != nil {
+			a.logger.Error("Failed to inject dependencies", log.Fields{"component": reflect.TypeOf(c).String(), "error": err})
+			continue
+		}
+	}
+
+	// 3. Sort components based on dependencies
+	sortedComps, err := a.sortComponentsByDependencies(comps)
+	if err != nil {
+		a.logger.Error("Failed to sort components", log.Fields{"error": err})
+		// Fallback to original order if sorting fails
+		sortedComps = comps
+	}
+
+	// 4. Register middleware and routes for sorted components
+	for _, c := range sortedComps {
+		if c == nil {
+			continue
+		}
 		c.RegisterMiddleware(a.middlewareReg)
 		c.RegisterRoutes(a.router)
 	}
@@ -247,7 +277,7 @@ func (a *App) mountComponents() []Component {
 	a.componentsMounted = true
 	a.mu.Unlock()
 
-	return comps
+	return sortedComps
 }
 
 func (a *App) startComponents(ctx context.Context, comps []Component) error {
@@ -317,4 +347,90 @@ func (t *connectionTracker) drain(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// sortComponentsByDependencies sorts components topologically based on their dependencies.
+// It ensures that dependent components are started before their dependencies and stopped after.
+func (a *App) sortComponentsByDependencies(components []Component) ([]Component, error) {
+	if len(components) == 0 {
+		return components, nil
+	}
+
+	// Create a map of component types to components
+	typeToComponent := make(map[reflect.Type]Component)
+	for _, comp := range components {
+		if comp != nil {
+			typeToComponent[reflect.TypeOf(comp)] = comp
+		}
+	}
+
+	// Helper function to get all dependencies including transitive dependencies
+	getAllDependencies := func(comp Component) ([]Component, error) {
+		if comp == nil {
+			return nil, nil
+		}
+		visited := make(map[reflect.Type]bool)
+		var result []Component
+
+		var dfs func(depType reflect.Type) error
+		dfs = func(depType reflect.Type) error {
+			if visited[depType] {
+				return errors.New("circular dependency detected")
+			}
+			visited[depType] = true
+
+			if depComp, exists := typeToComponent[depType]; exists && depComp != nil {
+				// Add this dependency
+				result = append(result, depComp)
+
+				// Recursively get its dependencies
+				for _, subDepType := range depComp.Dependencies() {
+					if err := dfs(subDepType); err != nil {
+						return err
+					}
+				}
+			}
+
+			visited[depType] = false
+			return nil
+		}
+
+		// Start with the component's direct dependencies
+		for _, depType := range comp.Dependencies() {
+			if err := dfs(depType); err != nil {
+				return nil, err
+			}
+		}
+
+		return result, nil
+	}
+
+	// Collect all components with their dependencies in the correct order
+	visited := make(map[Component]bool)
+	var sortedComponents []Component
+
+	// Process each component
+	for _, comp := range components {
+		if comp != nil && !visited[comp] {
+			// Get all dependencies for this component
+			dependencies, err := getAllDependencies(comp)
+			if err != nil {
+				return nil, err
+			}
+
+			// Add dependencies to sorted list (if not already present)
+			for _, dep := range dependencies {
+				if dep != nil && !visited[dep] {
+					sortedComponents = append(sortedComponents, dep)
+					visited[dep] = true
+				}
+			}
+
+			// Add the component itself
+			sortedComponents = append(sortedComponents, comp)
+			visited[comp] = true
+		}
+	}
+
+	return sortedComponents, nil
 }

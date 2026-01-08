@@ -312,7 +312,9 @@ func TestWithTracer(t *testing.T) {
 }
 
 // Mock implementations for testing
-type mockComponent struct{}
+type mockComponent struct{
+	BaseComponent
+}
 
 func (m *mockComponent) RegisterRoutes(r *router.Router)             {}
 func (m *mockComponent) RegisterMiddleware(reg *middleware.Registry) {}

@@ -16,7 +16,7 @@ var errRequestTooLarge = errors.New("request body too large")
 // surfaces a structured error to the client instead of the default plaintext
 // response from http.MaxBytesReader.
 func BodyLimit(maxBytes int64, logger log.StructuredLogger) Middleware {
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if maxBytes <= 0 {
 				next.ServeHTTP(w, r)
@@ -102,7 +102,7 @@ func (l *limitedBodyReader) fail() (int, error) {
 // enter the queue within the configured timeout receive a 503 response.
 func ConcurrencyLimit(maxConcurrent, queueDepth int, queueTimeout time.Duration, logger log.StructuredLogger) Middleware {
 	if maxConcurrent <= 0 {
-		return func(next Handler) Handler { return next }
+		return func(next http.Handler) http.Handler { return next }
 	}
 
 	if queueDepth < maxConcurrent {
@@ -112,7 +112,7 @@ func ConcurrencyLimit(maxConcurrent, queueDepth int, queueTimeout time.Duration,
 	sem := make(chan struct{}, maxConcurrent)
 	queue := make(chan struct{}, queueDepth)
 
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			timeout := queueTimeout
 			if timeout <= 0 {

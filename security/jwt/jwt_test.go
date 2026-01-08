@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/middleware"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
@@ -508,7 +507,7 @@ func TestJWTAuthenticatorMiddleware(t *testing.T) {
 
 	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-mw"}, AuthorizationClaims{Roles: []string{"user"}})
 
-	handler := middleware.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, err := GetClaimsFromContext(r)
 		if err != nil {
 			t.Errorf("failed to get claims from context: %v", err)
@@ -559,10 +558,10 @@ func TestJWTAuthenticatorMiddleware(t *testing.T) {
 // ========== Authorization Middleware Test ==========
 
 func TestAuthorizeMiddleware(t *testing.T) {
-	handler := middleware.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("success"))
 	})
-
 	policy := AuthZPolicy{
 		AllRoles: []string{"admin"},
 	}
@@ -610,7 +609,7 @@ func TestDebugMode(t *testing.T) {
 	cfg.DebugMode = true
 	mgr, _ := NewJWTManager(store, cfg)
 
-	handler := middleware.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 

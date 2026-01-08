@@ -49,6 +49,7 @@ func DefaultWebSocketConfig() WebSocketConfig {
 }
 
 type webSocketComponent struct {
+	BaseComponent
 	config WebSocketConfig
 	debug  bool
 	logger log.StructuredLogger

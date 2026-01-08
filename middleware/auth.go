@@ -75,7 +75,7 @@ func Auth(next http.HandlerFunc) http.HandlerFunc {
 
 // FromAuthMiddleware converts an AuthMiddleware to a Middleware
 func FromAuthMiddleware(am AuthMiddleware) Middleware {
-	return func(h Handler) Handler {
-		return Handler(am.Authenticate(http.Handler(h)))
+	return func(h http.Handler) http.Handler {
+		return am.Authenticate(h)
 	}
 }

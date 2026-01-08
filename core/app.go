@@ -43,6 +43,9 @@ type App struct {
 	startedComponents []Component
 	componentStopOnce sync.Once
 	componentsMounted bool
+	
+	// Dependency injection container
+	diContainer       *DIContainer
 }
 
 // Option defines a function type for configuring the App.
@@ -76,6 +79,7 @@ func New(options ...Option) *App {
 		router:        router.NewRouter(),
 		middlewareReg: middleware.NewRegistry(),
 		logger:        log.NewGLogger(),
+		diContainer:   NewDIContainer(),
 	}
 
 	for _, opt := range options {
@@ -86,7 +90,25 @@ func New(options ...Option) *App {
 		app.router.SetLogger(app.logger)
 	}
 
+	// Register core services in DI container
+	app.registerCoreServices()
+
 	return app
+}
+
+// registerCoreServices registers core application services in the DI container.
+func (a *App) registerCoreServices() {
+	// Register app instance
+	a.diContainer.Register(a)
+	
+	// Register router
+	a.diContainer.Register(a.router)
+	
+	// Register middleware registry
+	a.diContainer.Register(a.middlewareReg)
+	
+	// Register logger
+	a.diContainer.Register(a.logger)
 }
 
 // Router returns the underlying router for advanced configuration.

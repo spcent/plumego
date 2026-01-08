@@ -20,7 +20,7 @@ func SecurityHeaders(policy *headers.Policy) Middleware {
 		}
 	}
 
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			effective.Apply(w, r)
 			next.ServeHTTP(w, r)

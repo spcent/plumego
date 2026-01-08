@@ -26,6 +26,7 @@ const (
 )
 
 type devToolsComponent struct {
+	BaseComponent
 	app     *App
 	debug   bool
 	logger  log.StructuredLogger

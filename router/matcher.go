@@ -56,17 +56,12 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 		return nil
 	}
 
-	// Use the paramKeys stored in the node during route registration
-	// Convert middleware slice to any slice
-	mws := make([]any, len(current.middlewares))
-	for i, m := range current.middlewares {
-		mws[i] = m
-	}
+	// Return match result with direct middleware slice
 	return &MatchResult{
 		Handler:          current.handler,
 		ParamValues:      paramValues,
 		ParamKeys:        current.paramKeys,
-		RouteMiddlewares: mws,
+		RouteMiddlewares: current.middlewares,
 	}
 }
 

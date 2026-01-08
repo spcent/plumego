@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
 )
 
 // TestAdvancedRouteMatching tests complex route matching scenarios
@@ -81,27 +80,27 @@ func TestMiddlewareChain(t *testing.T) {
 	var order []string
 
 	// Global middleware
-	r.Use(func(next middleware.Handler) middleware.Handler {
-		return middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			order = append(order, "global-1")
 			next.ServeHTTP(w, r)
-		}))
+		})
 	})
 
-	r.Use(func(next middleware.Handler) middleware.Handler {
-		return middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			order = append(order, "global-2")
 			next.ServeHTTP(w, r)
-		}))
+		})
 	})
 
 	// Group middleware
 	api := r.Group("/api")
-	api.Use(func(next middleware.Handler) middleware.Handler {
-		return middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	api.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			order = append(order, "api")
 			next.ServeHTTP(w, r)
-		}))
+		})
 	})
 
 	api.GetFunc("/test", func(w http.ResponseWriter, r *http.Request) {

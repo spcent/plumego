@@ -76,7 +76,7 @@ func AbuseGuard(config AbuseGuardConfig) Middleware {
 		})
 	}
 
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if config.Skip != nil && config.Skip(r) {
 				next.ServeHTTP(w, r)

@@ -148,7 +148,7 @@ func NewRateLimiter(config RateLimiterConfig) *RateLimiter {
 
 // Middleware creates the middleware
 func (rl *RateLimiter) Middleware() Middleware {
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rl.handleRequest(w, r, next)
 		})
@@ -156,7 +156,7 @@ func (rl *RateLimiter) Middleware() Middleware {
 }
 
 // handleRequest processes a single request
-func (rl *RateLimiter) handleRequest(w http.ResponseWriter, r *http.Request, next Handler) {
+func (rl *RateLimiter) handleRequest(w http.ResponseWriter, r *http.Request, next http.Handler) {
 	// Atomically increment total requests
 	atomic.AddInt64(&rl.totalRequests, 1)
 
@@ -540,7 +540,7 @@ func RateLimit(rate float64, capacity int, cleanupInterval, maxIdleTime time.Dur
 	limiter := NewRateLimiterLegacy(rate, capacity, cleanupInterval, maxIdleTime)
 	go limiter.cleanup()
 
-	return func(next Handler) Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := r.RemoteAddr
 			if !limiter.Allow(ip) {
@@ -554,13 +554,13 @@ func RateLimit(rate float64, capacity int, cleanupInterval, maxIdleTime time.Dur
 	}
 }
 
-// RateLimitFunc creates a FuncMiddleware version of RateLimit (legacy)
-func RateLimitFunc(rate float64, capacity int, cleanupInterval, maxIdleTime time.Duration) FuncMiddleware {
+// RateLimitFunc creates a Middleware version of RateLimit (legacy)
+func RateLimitFunc(rate float64, capacity int, cleanupInterval, maxIdleTime time.Duration) Middleware {
 	limiter := NewRateLimiterLegacy(rate, capacity, cleanupInterval, maxIdleTime)
 	go limiter.cleanup()
 
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := r.RemoteAddr
 			if !limiter.Allow(ip) {
 				w.Header().Set("Content-Type", "application/json")
@@ -568,7 +568,7 @@ func RateLimitFunc(rate float64, capacity int, cleanupInterval, maxIdleTime time
 				w.Write([]byte(`{"error":"Too many requests, please try again later"}`))
 				return
 			}
-			next(w, r)
-		}
+			next.ServeHTTP(w, r)
+		})
 	}
 }

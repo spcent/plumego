@@ -3,20 +3,22 @@ package router
 import (
 	"strings"
 	"sync"
+
+	"github.com/spcent/plumego/middleware"
 )
 
 // RadixNode represents a node in the radix tree
 type RadixNode struct {
-	path        string       // Path segment
-	fullPath    string       // Full path for this node
-	indices     string       // Child indices (first char of each child path)
-	children    []*RadixNode // Child nodes
-	handler     Handler      // Handler for this node
-	paramKeys   []string     // Parameter keys
-	priority    int          // Priority for node ordering
-	middlewares []any        // Route-specific middlewares (using any to avoid import)
-	isParam     bool         // Whether this is a parameter node
-	isWild      bool         // Whether this is a wildcard node
+	path        string                  // Path segment
+	fullPath    string                  // Full path for this node
+	indices     string                  // Child indices (first char of each child path)
+	children    []*RadixNode            // Child nodes
+	handler     Handler                 // Handler for this node
+	paramKeys   []string                // Parameter keys
+	priority    int                     // Priority for node ordering
+	middlewares []middleware.Middleware // Route-specific middlewares
+	isParam     bool                    // Whether this is a parameter node
+	isWild      bool                    // Whether this is a wildcard node
 }
 
 // RadixTree implements an efficient radix tree router
@@ -33,7 +35,7 @@ func NewRadixTree() *RadixTree {
 }
 
 // Insert adds a route to the radix tree
-func (rt *RadixTree) Insert(method, path string, handler Handler, paramKeys []string, middlewares []any) {
+func (rt *RadixTree) Insert(method, path string, handler Handler, paramKeys []string, middlewares []middleware.Middleware) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 
@@ -101,7 +103,7 @@ func (rt *RadixTree) Find(method, path string) *MatchResult {
 				Handler:          root.handler,
 				ParamValues:      nil,
 				ParamKeys:        root.paramKeys,
-				RouteMiddlewares: convertToMiddlewareSlice(root.middlewares),
+				RouteMiddlewares: root.middlewares,
 			}
 		}
 		return nil
@@ -119,7 +121,7 @@ func (rt *RadixTree) matchRecursive(node *RadixNode, parts []string, idx int, pa
 				Handler:          node.handler,
 				ParamValues:      paramValues,
 				ParamKeys:        paramKeys,
-				RouteMiddlewares: convertToMiddlewareSlice(node.middlewares),
+				RouteMiddlewares: node.middlewares,
 			}
 		}
 		return nil
@@ -161,7 +163,7 @@ func (rt *RadixTree) matchRecursive(node *RadixNode, parts []string, idx int, pa
 					Handler:          child.handler,
 					ParamValues:      newParamValues,
 					ParamKeys:        newParamKeys,
-					RouteMiddlewares: convertToMiddlewareSlice(child.middlewares),
+					RouteMiddlewares: child.middlewares,
 				}
 			}
 		}
@@ -255,9 +257,4 @@ func (rt *RadixTree) GetRoot(method string) *RadixNode {
 	rt.mu.RLock()
 	defer rt.mu.RUnlock()
 	return rt.root[method]
-}
-
-// convertToMiddlewareSlice converts []any to []middleware.Middleware
-func convertToMiddlewareSlice(interfaces []any) []any {
-	return interfaces
 }

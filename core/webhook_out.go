@@ -20,6 +20,7 @@ import (
 )
 
 type webhookOutComponent struct {
+	BaseComponent
 	cfg        WebhookOutConfig
 	routesOnce sync.Once
 }

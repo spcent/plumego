@@ -211,22 +211,50 @@ func (cm *ConfigManager) GetString(key, defaultValue string) string {
 
 // GetInt retrieves a configuration value as int
 func (cm *ConfigManager) GetInt(key string, defaultValue int) int {
-	value := cm.Get(key)
-	if value == "" {
-		return defaultValue
-	}
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
 
-	value = strings.TrimSpace(value)
-	intValue, err := strconv.Atoi(value)
-	if err != nil {
-		cm.logger.Warn("Invalid integer configuration", log.Fields{
-			"key":     key,
-			"value":   value,
-			"default": defaultValue,
-		})
-		return defaultValue
+	if value, exists := cm.data[key]; exists {
+		// Direct type assertion first for better performance
+		switch v := value.(type) {
+		case int:
+			return v
+		case int8:
+			return int(v)
+		case int16:
+			return int(v)
+		case int32:
+			return int(v)
+		case int64:
+			return int(v)
+		case uint:
+			return int(v)
+		case uint8:
+			return int(v)
+		case uint16:
+			return int(v)
+		case uint32:
+			return int(v)
+		case uint64:
+			return int(v)
+		case float32:
+			return int(v)
+		case float64:
+			return int(v)
+		case bool:
+			if v {
+				return 1
+			}
+			return 0
+		case string:
+			if v := strings.TrimSpace(v); v != "" {
+				if intValue, err := strconv.Atoi(v); err == nil {
+					return intValue
+				}
+			}
+		}
 	}
-	return intValue
+	return defaultValue
 }
 
 // GetBool retrieves a configuration value as bool
@@ -234,26 +262,46 @@ func (cm *ConfigManager) GetBool(key string, defaultValue bool) bool {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
+	// Helper function to convert value to bool
+	convertToBool := func(value any) (bool, bool) {
+		// Direct type assertion first for better performance
+		switch v := value.(type) {
+		case bool:
+			return v, true
+		case int, int8, int16, int32, int64:
+			return v != 0, true
+		case uint, uint8, uint16, uint32, uint64:
+			return v != 0, true
+		case float32, float64:
+			return v != 0, true
+		case string:
+			if v := strings.TrimSpace(v); v != "" {
+				return parseBool(v, defaultValue), true
+			}
+		}
+		return defaultValue, false
+	}
+
 	// Try exact key first
 	if value, exists := cm.data[key]; exists {
-		if str := cm.toString(value); str != "" {
-			return parseBool(str, defaultValue)
+		if boolValue, ok := convertToBool(value); ok {
+			return boolValue
 		}
 	}
 
 	// Try snake_case version
 	snakeKey := toSnakeCase(key)
 	if value, exists := cm.data[snakeKey]; exists {
-		if str := cm.toString(value); str != "" {
-			return parseBool(str, defaultValue)
+		if boolValue, ok := convertToBool(value); ok {
+			return boolValue
 		}
 	}
 
 	// Try uppercase version
 	upperKey := strings.ToUpper(key)
 	if value, exists := cm.data[upperKey]; exists {
-		if str := cm.toString(value); str != "" {
-			return parseBool(str, defaultValue)
+		if boolValue, ok := convertToBool(value); ok {
+			return boolValue
 		}
 	}
 
@@ -262,22 +310,50 @@ func (cm *ConfigManager) GetBool(key string, defaultValue bool) bool {
 
 // GetFloat retrieves a configuration value as float64
 func (cm *ConfigManager) GetFloat(key string, defaultValue float64) float64 {
-	value := cm.Get(key)
-	if value == "" {
-		return defaultValue
-	}
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
 
-	value = strings.TrimSpace(value)
-	floatValue, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		cm.logger.Warn("Invalid float configuration", log.Fields{
-			"key":     key,
-			"value":   value,
-			"default": defaultValue,
-		})
-		return defaultValue
+	if value, exists := cm.data[key]; exists {
+		// Direct type assertion first for better performance
+		switch v := value.(type) {
+		case float32:
+			return float64(v)
+		case float64:
+			return v
+		case int:
+			return float64(v)
+		case int8:
+			return float64(v)
+		case int16:
+			return float64(v)
+		case int32:
+			return float64(v)
+		case int64:
+			return float64(v)
+		case uint:
+			return float64(v)
+		case uint8:
+			return float64(v)
+		case uint16:
+			return float64(v)
+		case uint32:
+			return float64(v)
+		case uint64:
+			return float64(v)
+		case bool:
+			if v {
+				return 1.0
+			}
+			return 0.0
+		case string:
+			if v := strings.TrimSpace(v); v != "" {
+				if floatValue, err := strconv.ParseFloat(v, 64); err == nil {
+					return floatValue
+				}
+			}
+		}
 	}
-	return floatValue
+	return defaultValue
 }
 
 // GetDurationMs retrieves a configuration value as time.Duration (milliseconds)
@@ -534,17 +610,36 @@ func (cm *ConfigManager) toString(value any) string {
 	switch v := value.(type) {
 	case string:
 		return v
-	case int, int8, int16, int32, int64:
-		return fmt.Sprintf("%d", v)
-	case uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", v)
-	case float32, float64:
-		return fmt.Sprintf("%g", v)
+	case int:
+		return strconv.Itoa(v)
+	case int8:
+		return strconv.FormatInt(int64(v), 10)
+	case int16:
+		return strconv.FormatInt(int64(v), 10)
+	case int32:
+		return strconv.FormatInt(int64(v), 10)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case uint:
+		return strconv.FormatUint(uint64(v), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(v), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(v), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(v), 10)
+	case uint64:
+		return strconv.FormatUint(v, 10)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'g', -1, 32)
+	case float64:
+		return strconv.FormatFloat(v, 'g', -1, 64)
 	case bool:
 		return strconv.FormatBool(v)
 	case time.Time:
 		return v.Format(time.RFC3339)
 	default:
+		// Fallback to fmt.Sprintf for complex types
 		return fmt.Sprintf("%v", v)
 	}
 }

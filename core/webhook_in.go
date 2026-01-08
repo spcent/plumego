@@ -20,6 +20,7 @@ import (
 )
 
 type webhookInComponent struct {
+	BaseComponent
 	cfg        WebhookInConfig
 	pub        pubsub.PubSub
 	logger     log.StructuredLogger

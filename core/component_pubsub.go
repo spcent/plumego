@@ -14,6 +14,7 @@ import (
 )
 
 type pubSubDebugComponent struct {
+	BaseComponent
 	cfg        PubSubConfig
 	defaultPub pubsub.PubSub
 	routesOnce sync.Once

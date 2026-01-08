@@ -567,8 +567,8 @@ func (m *JWTManager) matchIdentityVersion(subject string, version int64) bool {
 
 // JWTAuthenticator returns a middleware that verifies JWT tokens and stores claims in context.
 func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middleware {
-	return func(next middleware.Handler) middleware.Handler {
-		return middleware.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := extractBearerToken(r, m.config.AllowQueryToken) // extract token from request
 			if token == "" {
 				http.Error(w, "missing authorization header", http.StatusUnauthorized)
@@ -602,8 +602,8 @@ type AuthZPolicy struct {
 
 // AuthorizeMiddleware enforces authorization based on claims stored by JWTAuthenticator.
 func AuthorizeMiddleware(policy AuthZPolicy) middleware.Middleware {
-	return func(next middleware.Handler) middleware.Handler {
-		return middleware.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			raw := r.Context().Value(claimsContextKey)
 			claims, ok := raw.(*TokenClaims)
 			if !ok {
