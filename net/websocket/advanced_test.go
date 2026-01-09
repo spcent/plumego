@@ -137,6 +137,44 @@ func TestHubOperations(t *testing.T) {
 	}
 }
 
+func TestHubConnectionLimits(t *testing.T) {
+	hub := NewHubWithConfig(HubConfig{
+		WorkerCount:        1,
+		JobQueueSize:       10,
+		MaxConnections:     2,
+		MaxRoomConnections: 1,
+	})
+	defer hub.Stop()
+
+	conn1, _ := createMockConnection(t)
+	conn2, _ := createMockConnection(t)
+	conn3, _ := createMockConnection(t)
+	defer conn1.Close()
+	defer conn2.Close()
+	defer conn3.Close()
+
+	if err := hub.TryJoin("room", conn1); err != nil {
+		t.Fatalf("unexpected join error: %v", err)
+	}
+
+	if err := hub.TryJoin("room", conn2); err != ErrRoomFull {
+		t.Fatalf("expected room full error, got %v", err)
+	}
+
+	if err := hub.TryJoin("room2", conn2); err != nil {
+		t.Fatalf("unexpected join error: %v", err)
+	}
+
+	if err := hub.TryJoin("room3", conn3); err != ErrHubFull {
+		t.Fatalf("expected hub full error, got %v", err)
+	}
+
+	metrics := hub.Metrics()
+	if metrics.AcceptedTotal != 2 || metrics.RejectedTotal != 2 {
+		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+}
+
 // TestBroadcast tests Hub broadcast functionality
 func TestBroadcast(t *testing.T) {
 	hub := NewHub(2, 10)

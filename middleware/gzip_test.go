@@ -78,3 +78,44 @@ func TestGzipMiddleware_PassthroughWhenNotAccepted(t *testing.T) {
 		t.Fatalf("unexpected body: %q", rr.Body.String())
 	}
 }
+
+func TestGzipMiddleware_SkipsUpgrade(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}
+
+	wrapped := ApplyFunc(handler, Gzip())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	rr := httptest.NewRecorder()
+
+	wrapped(rr, req)
+
+	if rr.Header().Get("Content-Encoding") != "" {
+		t.Fatalf("expected no content encoding on upgrade, got %q", rr.Header().Get("Content-Encoding"))
+	}
+}
+
+func TestGzipMiddleware_SkipsEventStream(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}
+
+	wrapped := ApplyFunc(handler, Gzip())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set("Accept", "text/event-stream")
+	rr := httptest.NewRecorder()
+
+	wrapped(rr, req)
+
+	if rr.Header().Get("Content-Encoding") != "" {
+		t.Fatalf("expected no content encoding for event stream, got %q", rr.Header().Get("Content-Encoding"))
+	}
+}

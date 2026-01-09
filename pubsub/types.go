@@ -55,6 +55,13 @@ type PubSub interface {
 	Close() error
 }
 
+// PatternPubSub extends PubSub with pattern subscriptions.
+type PatternPubSub interface {
+	PubSub
+	// SubscribePattern creates a new subscription to a topic pattern.
+	SubscribePattern(pattern string, opts SubOptions) (Subscription, error)
+}
+
 // DefaultSubOptions returns production-ready default options.
 func DefaultSubOptions() SubOptions {
 	return SubOptions{

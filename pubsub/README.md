@@ -6,6 +6,7 @@ A high-performance, lock-free in-memory publish-subscribe system with configurab
 
 - **Lock-Free Performance**: Optimized with RWMutex and atomic operations
 - **Multiple Backpressure Policies**: Handle slow subscribers gracefully
+- **Pattern Subscriptions**: Subscribe with glob patterns like `user.*`
 - **Rich Metrics**: Real-time observability with atomic counters
 - **Concurrent Safe**: Thread-safe operations for high concurrency
 - **Zero Dependencies**: Pure Go standard library
@@ -129,6 +130,9 @@ topics := ps.ListTopics()
 
 // Count subscribers
 count := ps.GetSubscriberCount("events")
+
+// Subscribe to a pattern
+sub, _ := ps.SubscribePattern("user.*", pubsub.DefaultSubOptions())
 
 // Get metrics snapshot
 snapshot := ps.Snapshot()

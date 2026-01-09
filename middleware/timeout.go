@@ -2,24 +2,41 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 )
 
+const defaultTimeoutMaxBytes = 10 << 20
+
+// TimeoutConfig customizes timeout middleware behavior.
+type TimeoutConfig struct {
+	Timeout        time.Duration
+	MaxBufferBytes int
+}
+
 // Timeout creates a middleware that enforces a maximum duration for a request.
 // If the downstream handler does not complete before the deadline, the request
 // context is canceled and a 504 Gateway Timeout response is returned.
 func Timeout(d time.Duration) Middleware {
+	return TimeoutWithConfig(TimeoutConfig{
+		Timeout:        d,
+		MaxBufferBytes: defaultTimeoutMaxBytes,
+	})
+}
+
+// TimeoutWithConfig creates a timeout middleware with explicit configuration.
+func TimeoutWithConfig(cfg TimeoutConfig) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx, cancel := context.WithTimeout(r.Context(), d)
+			ctx, cancel := context.WithTimeout(r.Context(), cfg.Timeout)
 			defer cancel()
 
 			r = r.WithContext(ctx)
 
-			tw := newTimeoutResponseWriter(ctx)
+			tw := newTimeoutResponseWriter(ctx, cfg.MaxBufferBytes)
 			done := make(chan struct{})
 
 			go func() {
@@ -29,6 +46,10 @@ func Timeout(d time.Duration) Middleware {
 
 			select {
 			case <-done:
+				if tw.Overflowed() {
+					http.Error(w, "response exceeded buffer limit", http.StatusInternalServerError)
+					return
+				}
 				tw.WriteTo(w)
 			case <-ctx.Done():
 				contract.WriteError(w, r, contract.APIError{
@@ -42,18 +63,21 @@ func Timeout(d time.Duration) Middleware {
 	}
 }
 
-func newTimeoutResponseWriter(ctx context.Context) *timeoutResponseWriter {
+func newTimeoutResponseWriter(ctx context.Context, maxBytes int) *timeoutResponseWriter {
 	return &timeoutResponseWriter{
-		header: http.Header{},
-		ctx:    ctx,
+		header:   http.Header{},
+		ctx:      ctx,
+		maxBytes: maxBytes,
 	}
 }
 
 type timeoutResponseWriter struct {
-	header http.Header
-	body   []byte
-	status int
-	ctx    context.Context
+	header   http.Header
+	body     []byte
+	status   int
+	ctx      context.Context
+	maxBytes int
+	overflow bool
 }
 
 func (w *timeoutResponseWriter) Header() http.Header {
@@ -73,8 +97,17 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 	default:
 	}
 
+	if w.overflow {
+		return 0, errors.New("response exceeded buffer limit")
+	}
+
 	if w.status == 0 {
 		w.status = http.StatusOK
+	}
+
+	if w.maxBytes > 0 && len(w.body)+len(p) > w.maxBytes {
+		w.overflow = true
+		return 0, errors.New("response exceeded buffer limit")
 	}
 
 	w.body = append(w.body, p...)
@@ -95,4 +128,8 @@ func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
 
 	dst.WriteHeader(status)
 	_, _ = dst.Write(w.body)
+}
+
+func (w *timeoutResponseWriter) Overflowed() bool {
+	return w.overflow
 }

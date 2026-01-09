@@ -189,6 +189,49 @@ func (cm *ConfigManager) Load(ctx context.Context) error {
 	return nil
 }
 
+// LoadBestEffort loads configuration from all sources, skipping failures.
+// It returns an error only if all sources fail.
+func (cm *ConfigManager) LoadBestEffort(ctx context.Context) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.ctx.Err() != nil {
+		return errors.New("config manager is closed")
+	}
+
+	cm.data = make(map[string]any)
+	loaded := 0
+	var lastErr error
+
+	for _, source := range cm.sources {
+		sourceData, err := source.Load(ctx)
+		if err != nil {
+			lastErr = err
+			cm.logger.Error("Failed to load configuration", log.Fields{
+				"source": source.Name(),
+				"error":  err,
+			})
+			continue
+		}
+
+		loaded++
+		for key, value := range sourceData {
+			cm.data[key] = value
+		}
+
+		cm.logger.Info("Loaded configuration", log.Fields{
+			"source": source.Name(),
+			"keys":   len(sourceData),
+		})
+	}
+
+	if loaded == 0 && lastErr != nil {
+		return fmt.Errorf("failed to load any configuration sources: %w", lastErr)
+	}
+
+	return nil
+}
+
 // Get retrieves a configuration value as string
 func (cm *ConfigManager) Get(key string) string {
 	cm.mu.RLock()
@@ -409,17 +452,25 @@ func (cm *ConfigManager) StartWatchers(ctx context.Context) error {
 		updates, errs := source.Watch(ctx)
 
 		cm.watchWg.Add(1)
-		go func(src Source) {
+		go func(src Source, updates <-chan map[string]any, errs <-chan error) {
 			defer cm.watchWg.Done()
-			for {
+			for updates != nil || errs != nil {
 				select {
 				case <-cm.ctx.Done():
 					return
-				case update := <-updates:
+				case update, ok := <-updates:
+					if !ok {
+						updates = nil
+						continue
+					}
 					if update != nil {
 						cm.handleSourceUpdate(src.Name(), update)
 					}
-				case err := <-errs:
+				case err, ok := <-errs:
+					if !ok {
+						errs = nil
+						continue
+					}
 					if err != nil {
 						cm.logger.Error("Watch error", log.Fields{
 							"source": src.Name(),
@@ -428,7 +479,7 @@ func (cm *ConfigManager) StartWatchers(ctx context.Context) error {
 					}
 				}
 			}
-		}(source)
+		}(source, updates, errs)
 	}
 
 	return nil
@@ -437,14 +488,20 @@ func (cm *ConfigManager) StartWatchers(ctx context.Context) error {
 // handleSourceUpdate handles configuration updates from a source
 func (cm *ConfigManager) handleSourceUpdate(sourceName string, newData map[string]any) {
 	cm.mu.Lock()
-	defer cm.mu.Unlock()
+
+	if len(newData) == 0 {
+		cm.mu.Unlock()
+		return
+	}
 
 	// Detect changes
 	changes := make(map[string]struct{})
+	oldValues := make(map[string]any)
 	for key, newValue := range newData {
 		oldValue, exists := cm.data[key]
 		if !exists || !valuesEqual(oldValue, newValue) {
 			changes[key] = struct{}{}
+			oldValues[key] = oldValue
 		}
 	}
 
@@ -455,59 +512,96 @@ func (cm *ConfigManager) handleSourceUpdate(sourceName string, newData map[strin
 
 	// Notify watchers
 	if len(changes) > 0 {
-		cm.notifyWatchers(changes, newData)
+		keyWatchers := make(map[string][]WatcherCallback, len(changes))
+		for key := range changes {
+			if watchers, exists := cm.watchers[key]; exists && len(watchers) > 0 {
+				copied := make([]WatcherCallback, len(watchers))
+				copy(copied, watchers)
+				keyWatchers[key] = copied
+			}
+		}
+
+		globalWatchers := append([]WatcherCallback(nil), cm.watchers["*"]...)
+
+		cm.mu.Unlock()
+
+		cm.notifyWatchers(changes, oldValues, newData, keyWatchers, globalWatchers)
 		cm.logger.Info("Configuration updated", log.Fields{
 			"source":  sourceName,
 			"changes": len(changes),
 		})
+		return
 	}
+
+	cm.mu.Unlock()
 }
 
 // notifyWatchers notifies all registered watchers of configuration changes
-func (cm *ConfigManager) notifyWatchers(changes map[string]struct{}, newData map[string]any) {
+func (cm *ConfigManager) notifyWatchers(changes map[string]struct{}, oldValues map[string]any, newData map[string]any, keyWatchers map[string][]WatcherCallback, globalWatchers []WatcherCallback) {
 	for key := range changes {
-		if watchers, exists := cm.watchers[key]; exists {
-			for _, callback := range watchers {
-				// Get old value
-				cm.mu.RLock()
-				oldValue := cm.data[key]
-				cm.mu.RUnlock()
+		watchers := keyWatchers[key]
+		if len(watchers) == 0 {
+			continue
+		}
+		oldValue := oldValues[key]
+		newValue := newData[key]
 
-				// Call callback (avoid holding lock during callback)
-				go func(cb WatcherCallback, old, new any) {
-					defer func() {
-						if r := recover(); r != nil {
-							cm.logger.Error("Watcher callback panicked", log.Fields{
-								"error": r,
-							})
-						}
-					}()
-					cb(old, new)
-				}(callback, oldValue, newData[key])
-			}
+		for _, callback := range watchers {
+			cm.callWatcher(callback, oldValue, newValue)
 		}
 	}
 
 	// Notify global watchers
-	if watchers, exists := cm.watchers["*"]; exists {
-		for _, callback := range watchers {
-			go func(cb WatcherCallback, data map[string]any) {
-				defer func() {
-					if r := recover(); r != nil {
-						cm.logger.Error("Global watcher callback panicked", log.Fields{
-							"error": r,
-						})
-					}
-				}()
-				cb(nil, data)
-			}(callback, newData)
-		}
+	if len(globalWatchers) == 0 {
+		return
 	}
+
+	dataSnapshot := make(map[string]any, len(newData))
+	for key, value := range newData {
+		dataSnapshot[key] = value
+	}
+
+	for _, callback := range globalWatchers {
+		cm.callWatcher(callback, nil, dataSnapshot)
+	}
+}
+
+func (cm *ConfigManager) callWatcher(callback WatcherCallback, old, new any) {
+	defer func() {
+		if r := recover(); r != nil {
+			cm.logger.Error("Watcher callback panicked", log.Fields{
+				"error": r,
+			})
+		}
+	}()
+	callback(old, new)
 }
 
 // Reload reloads configuration from all sources
 func (cm *ConfigManager) Reload(ctx context.Context) error {
 	return cm.Load(ctx)
+}
+
+// ReloadWithValidation reloads configuration and validates before committing.
+func (cm *ConfigManager) ReloadWithValidation(ctx context.Context, validate func(map[string]any) error) error {
+	if validate == nil {
+		return cm.Reload(ctx)
+	}
+
+	snapshot := cm.GetAll()
+	if err := cm.Load(ctx); err != nil {
+		return err
+	}
+
+	data := cm.GetAll()
+	if err := validate(data); err != nil {
+		cm.mu.Lock()
+		cm.data = snapshot
+		cm.mu.Unlock()
+		return err
+	}
+
+	return nil
 }
 
 // Close stops all watchers and releases resources
@@ -535,8 +629,16 @@ func (cm *ConfigManager) Unmarshal(dst any) error {
 		return fmt.Errorf("dst must be a non-nil pointer")
 	}
 
-	val = val.Elem()
+	return cm.unmarshalValue(val.Elem())
+}
+
+func (cm *ConfigManager) unmarshalValue(val reflect.Value) error {
+	if val.Kind() != reflect.Struct {
+		return fmt.Errorf("dst must point to a struct")
+	}
+
 	typ := val.Type()
+	timeType := reflect.TypeOf(time.Time{})
 
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
@@ -546,13 +648,30 @@ func (cm *ConfigManager) Unmarshal(dst any) error {
 			continue
 		}
 
+		if fieldValue.Kind() == reflect.Struct && fieldValue.Type() != timeType {
+			if err := cm.unmarshalValue(fieldValue); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if fieldValue.Kind() == reflect.Ptr && fieldValue.Type().Elem().Kind() == reflect.Struct && fieldValue.Type().Elem() != timeType {
+			if fieldValue.IsNil() {
+				fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
+			}
+			if err := cm.unmarshalValue(fieldValue.Elem()); err != nil {
+				return err
+			}
+			continue
+		}
+
 		// Get configuration key from tag or field name
 		key := field.Tag.Get("config")
 		if key == "" {
-			key = strings.ToUpper(field.Name)
+			key = field.Name
 		}
 
-		if value, exists := cm.data[key]; exists {
+		if value, exists := cm.lookupConfigValue(key); exists {
 			if err := cm.setField(fieldValue, value); err != nil {
 				return fmt.Errorf("failed to set field %s: %w", field.Name, err)
 			}
@@ -560,6 +679,34 @@ func (cm *ConfigManager) Unmarshal(dst any) error {
 	}
 
 	return nil
+}
+
+func (cm *ConfigManager) lookupConfigValue(key string) (any, bool) {
+	if value, exists := cm.data[key]; exists {
+		return value, true
+	}
+
+	snake := toSnakeCase(key)
+	if value, exists := cm.data[snake]; exists {
+		return value, true
+	}
+
+	upper := strings.ToUpper(key)
+	if value, exists := cm.data[upper]; exists {
+		return value, true
+	}
+
+	upperSnake := strings.ToUpper(snake)
+	if value, exists := cm.data[upperSnake]; exists {
+		return value, true
+	}
+
+	lower := strings.ToLower(key)
+	if value, exists := cm.data[lower]; exists {
+		return value, true
+	}
+
+	return nil, false
 }
 
 // setField sets a field value based on its type

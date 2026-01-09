@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -70,6 +71,14 @@ func (c *DIContainer) Resolve(serviceType reflect.Type) (interface{}, error) {
 		return service, nil
 	}
 
+	if serviceType.Kind() == reflect.Interface {
+		if service, err := c.resolveAssignable(serviceType); err == nil {
+			return service, nil
+		} else {
+			return nil, err
+		}
+	}
+
 	return nil, errors.New("service not found: " + serviceType.String())
 }
 
@@ -97,10 +106,14 @@ func (c *DIContainer) Inject(instance interface{}) error {
 		field := structType.Field(i)
 		fieldVal := structVal.Field(i)
 
-		// Check if field has inject tag
-		if injectTag := field.Tag.Get("inject"); injectTag != "" {
+		injectTag, ok := field.Tag.Lookup("inject")
+		if ok {
 			// Check if field is exportable
 			if !fieldVal.CanSet() {
+				continue
+			}
+
+			if injectTag == "-" {
 				continue
 			}
 
@@ -109,17 +122,11 @@ func (c *DIContainer) Inject(instance interface{}) error {
 			var err error
 
 			if injectTag != "" {
-				// Try to resolve by type name if tag is specified
-				// This is a simplified implementation, in a real DI container we might
-				// support named dependencies with more sophisticated tag parsing
-				if depType, ok := parseTypeName(injectTag); ok {
-					dep, err = c.Resolve(depType)
-				} else {
-					// Fallback to field type
+				dep, err = c.resolveByName(injectTag)
+				if err != nil {
 					dep, err = c.Resolve(field.Type)
 				}
 			} else {
-				// Resolve by field type
 				dep, err = c.Resolve(field.Type)
 			}
 
@@ -128,19 +135,84 @@ func (c *DIContainer) Inject(instance interface{}) error {
 			}
 
 			// Set the field value
-			fieldVal.Set(reflect.ValueOf(dep))
+			depVal := reflect.ValueOf(dep)
+			if depVal.Type().AssignableTo(field.Type) {
+				fieldVal.Set(depVal)
+				continue
+			}
+
+			if depVal.Kind() == reflect.Ptr && !depVal.IsNil() && depVal.Elem().Type().AssignableTo(field.Type) {
+				fieldVal.Set(depVal.Elem())
+				continue
+			}
+
+			return fmt.Errorf("cannot assign dependency %s to field %s", depVal.Type(), field.Type)
 		}
 	}
 
 	return nil
 }
 
-// Helper function to parse type name (simplified)
-func parseTypeName(name string) (reflect.Type, bool) {
-	// This is a simplified implementation. In a real DI container,
-	// we would have a more sophisticated type name parsing mechanism.
-	// For now, we just return false to fallback to field type.
-	return nil, false
+func (c *DIContainer) resolveByName(name string) (interface{}, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var match interface{}
+	for t, service := range c.services {
+		if t.Name() == name || t.String() == name {
+			if match == nil {
+				match = service
+				continue
+			}
+			if servicesEqual(match, service) {
+				continue
+			}
+			return nil, fmt.Errorf("multiple services match name: %s", name)
+		}
+	}
+
+	if match == nil {
+		return nil, errors.New("service not found: " + name)
+	}
+	return match, nil
+}
+
+func (c *DIContainer) resolveAssignable(serviceType reflect.Type) (interface{}, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var match interface{}
+	for t, service := range c.services {
+		if t.AssignableTo(serviceType) {
+			if match == nil {
+				match = service
+				continue
+			}
+			if servicesEqual(match, service) {
+				continue
+			}
+			return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
+		}
+	}
+
+	if match == nil {
+		return nil, errors.New("service not found: " + serviceType.String())
+	}
+	return match, nil
+}
+
+func servicesEqual(a, b interface{}) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+
+	ta := reflect.TypeOf(a)
+	tb := reflect.TypeOf(b)
+	if ta != tb || !ta.Comparable() || !tb.Comparable() {
+		return false
+	}
+
+	return a == b
 }
 
 // Clear removes all services from the container.

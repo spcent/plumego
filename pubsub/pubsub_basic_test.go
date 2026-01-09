@@ -59,3 +59,36 @@ func TestPubSub_CancelStopsDelivery(t *testing.T) {
 		t.Fatalf("expected channel closed")
 	}
 }
+
+func TestPubSub_PatternSubscription(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	sub, err := ps.SubscribePattern("user.*", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe pattern: %v", err)
+	}
+	defer sub.Cancel()
+
+	if err := ps.Publish("user.created", Message{ID: "m1"}); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	select {
+	case got := <-sub.C():
+		if got.Topic != "user.created" {
+			t.Fatalf("unexpected topic: %s", got.Topic)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("pattern subscriber timeout")
+	}
+}
+
+func TestPubSub_InvalidPattern(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	if _, err := ps.SubscribePattern("[", DefaultSubOptions()); err != ErrInvalidPattern {
+		t.Fatalf("expected ErrInvalidPattern, got %v", err)
+	}
+}

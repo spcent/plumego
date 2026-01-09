@@ -10,6 +10,15 @@ import (
 func Gzip() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			connection := strings.ToLower(r.Header.Get("Connection"))
+			if strings.Contains(connection, "upgrade") || r.Header.Get("Upgrade") != "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+				next.ServeHTTP(w, r)
+				return
+			}
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 				next.ServeHTTP(w, r)
 				return

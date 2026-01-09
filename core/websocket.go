@@ -20,15 +20,17 @@ import (
 
 // WebSocketConfig defines the configuration for WebSocket.
 type WebSocketConfig struct {
-	WorkerCount      int             // Number of worker goroutines
-	JobQueueSize     int             // Size of the job queue
-	SendQueueSize    int             // Size of the send queue per connection
-	SendTimeout      time.Duration   // Timeout for sending messages
-	SendBehavior     ws.SendBehavior // Behavior when queue is full or timeout occurs
-	Secret           []byte          // Secret key for JWT authentication
-	WSRoutePath      string          // Path for WebSocket connection
-	BroadcastPath    string          // Path for broadcasting messages
-	BroadcastEnabled bool            // Enable broadcast endpoint when true
+	WorkerCount        int             // Number of worker goroutines
+	JobQueueSize       int             // Size of the job queue
+	SendQueueSize      int             // Size of the send queue per connection
+	SendTimeout        time.Duration   // Timeout for sending messages
+	SendBehavior       ws.SendBehavior // Behavior when queue is full or timeout occurs
+	Secret             []byte          // Secret key for JWT authentication
+	WSRoutePath        string          // Path for WebSocket connection
+	BroadcastPath      string          // Path for broadcasting messages
+	BroadcastEnabled   bool            // Enable broadcast endpoint when true
+	MaxConnections     int             // Maximum total connections (0 = unlimited)
+	MaxRoomConnections int             // Maximum connections per room (0 = unlimited)
 }
 
 // DefaultWebSocketConfig returns default WebSocket configuration.
@@ -36,15 +38,17 @@ func DefaultWebSocketConfig() WebSocketConfig {
 	secret := []byte(os.Getenv("WS_SECRET"))
 
 	return WebSocketConfig{
-		WorkerCount:      16,
-		JobQueueSize:     4096,
-		SendQueueSize:    256,
-		SendTimeout:      200 * time.Millisecond,
-		SendBehavior:     ws.SendBlock,
-		Secret:           secret,
-		WSRoutePath:      "/ws",
-		BroadcastPath:    "/_admin/broadcast",
-		BroadcastEnabled: true,
+		WorkerCount:        16,
+		JobQueueSize:       4096,
+		SendQueueSize:      256,
+		SendTimeout:        200 * time.Millisecond,
+		SendBehavior:       ws.SendBlock,
+		Secret:             secret,
+		WSRoutePath:        "/ws",
+		BroadcastPath:      "/_admin/broadcast",
+		BroadcastEnabled:   true,
+		MaxConnections:     0,
+		MaxRoomConnections: 0,
 	}
 }
 
@@ -58,12 +62,19 @@ type webSocketComponent struct {
 	routesOnce sync.Once
 }
 
+const minWebSocketSecretLen = 32
+
 func newWebSocketComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*webSocketComponent, error) {
-	if len(cfg.Secret) == 0 {
-		return nil, fmt.Errorf("websocket secret is required")
+	if len(cfg.Secret) < minWebSocketSecretLen {
+		return nil, fmt.Errorf("websocket secret must be at least %d bytes", minWebSocketSecretLen)
 	}
 
-	hub := ws.NewHub(cfg.WorkerCount, cfg.JobQueueSize)
+	hub := ws.NewHubWithConfig(ws.HubConfig{
+		WorkerCount:        cfg.WorkerCount,
+		JobQueueSize:       cfg.JobQueueSize,
+		MaxConnections:     cfg.MaxConnections,
+		MaxRoomConnections: cfg.MaxRoomConnections,
+	})
 
 	return &webSocketComponent{
 		config: cfg,

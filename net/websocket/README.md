@@ -14,6 +14,8 @@ A production-ready WebSocket server implementation using only Go standard librar
 ### Advanced Features
 - **Per-Connection Queues**: Bounded send queues with configurable behavior
 - **Hub with Rooms**: Topic-based broadcasting with worker pool
+- **Connection Limits**: Cap total or per-room connections
+- **Hub Metrics**: Accepted/rejected counters with snapshots
 - **Authentication**: Room passwords and HS256 JWT verification
 - **User Information**: Extract and store user claims from JWT
 - **Connection Metadata**: Custom data storage per connection
@@ -170,6 +172,14 @@ for {
 ```go
 hub := websocket.NewHub(4, 1024)
 
+// Or configure limits and metrics
+hub = websocket.NewHubWithConfig(websocket.HubConfig{
+    WorkerCount:        4,
+    JobQueueSize:       1024,
+    MaxConnections:     1000,
+    MaxRoomConnections: 200,
+})
+
 // Join room
 hub.Join("chat", conn)
 
@@ -183,6 +193,9 @@ hub.RemoveConn(conn)
 count := hub.GetRoomCount("chat")
 total := hub.GetTotalCount()
 rooms := hub.GetRooms()
+
+// Metrics snapshot
+metrics := hub.Metrics()
 ```
 
 ### Broadcasting

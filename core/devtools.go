@@ -20,6 +20,7 @@ import (
 const (
 	devToolsBasePath       = "/_debug"
 	devToolsRoutesPath     = devToolsBasePath + "/routes"
+	devToolsRoutesJSONPath = devToolsBasePath + "/routes.json"
 	devToolsMiddlewarePath = devToolsBasePath + "/middleware"
 	devToolsConfigPath     = devToolsBasePath + "/config"
 	devToolsReloadPath     = devToolsBasePath + "/reload"
@@ -60,6 +61,14 @@ func (c *devToolsComponent) RegisterRoutes(r *router.Router) {
 	r.Get(devToolsRoutesPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		r.Print(w)
+	}))
+
+	r.Get(devToolsRoutesJSONPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		payload := map[string]any{
+			"routes": r.Routes(),
+		}
+		_ = json.NewEncoder(w).Encode(payload)
 	}))
 
 	r.Get(devToolsMiddlewarePath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

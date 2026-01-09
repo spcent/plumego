@@ -21,6 +21,7 @@ net/
 - **Timeout Control**: Global and per-request timeouts
 - **Multiple Policies**: Timeout, status code, composite policies
 - **HTTP Methods**: GET, POST, PUT, DELETE with JSON support
+- **Consistent Errors**: GET/POST/PUT/DELETE return errors on non-2xx responses
 
 ### Quick Start
 
@@ -32,6 +33,9 @@ client := http.New(
     http.WithTimeout(5 * time.Second),
     http.WithRetryCount(3),
     http.WithRetryPolicy(http.StatusCodeRetryPolicy{Codes: []int{500, 502, 503}}),
+    http.WithRetryCheck(func(req *http.Request) bool {
+        return req.Method == http.MethodGet || req.Method == http.MethodPut || req.Method == http.MethodDelete
+    }),
     http.WithMiddleware(http.Logging),
 )
 

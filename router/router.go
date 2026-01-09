@@ -109,12 +109,30 @@ type Router struct {
 	middlewareManager *MiddlewareManager          // Middleware management
 	logger            log.StructuredLogger        // Logger for contextual handlers
 	routeCache        *RouteCache                 // Route matching cache
-	radixTree         *RadixTree                  // Radix tree for efficient routing
 	routeValidations  map[string]*RouteValidation // Route parameter validations
+	validationIndex   map[string][]validationEntry
+	routeMeta         map[string]RouteMeta
 }
 
 // RouterOption defines a function type for router configuration options
 type RouterOption func(*Router)
+
+// RouteOption defines an option for route metadata.
+type RouteOption func(*RouteMeta)
+
+// WithRouteName sets a route name.
+func WithRouteName(name string) RouteOption {
+	return func(meta *RouteMeta) {
+		meta.Name = name
+	}
+}
+
+// WithRouteTags sets route tags.
+func WithRouteTags(tags ...string) RouteOption {
+	return func(meta *RouteMeta) {
+		meta.Tags = append([]string(nil), tags...)
+	}
+}
 
 // WithLogger sets a custom logger for the router
 func WithLogger(logger log.StructuredLogger) RouterOption {
@@ -135,6 +153,8 @@ func NewRouter(opts ...RouterOption) *Router {
 		middlewareManager: NewMiddlewareManager(),
 		logger:            log.NewGLogger(),
 		routeValidations:  make(map[string]*RouteValidation),
+		validationIndex:   make(map[string][]validationEntry),
+		routeMeta:         make(map[string]RouteMeta),
 		routeCache:        NewRouteCache(100), // Initialize with default cache capacity
 	}
 
@@ -206,9 +226,11 @@ func (r *Router) Group(prefix string) *Router {
 		routes:            r.routes,
 		parent:            r,
 		frozen:            r.frozen,
-		middlewareManager: r.middlewareManager,
+		middlewareManager: NewMiddlewareManager(),
 		logger:            r.logger,
 		routeValidations:  r.routeValidations,
+		validationIndex:   r.validationIndex,
+		routeMeta:         r.routeMeta,
 	}
 }
 
@@ -230,7 +252,7 @@ func (r *Router) AddRoute(method, path string, handler Handler) error {
 	}
 
 	// Combine with group prefix
-	fullPath := r.prefix + strings.TrimRight(path, "/")
+	fullPath := r.fullPath(path)
 	if fullPath == "" {
 		fullPath = "/"
 	}
@@ -310,23 +332,91 @@ func (r *Router) AddRoute(method, path string, handler Handler) error {
 	return nil
 }
 
-func (r *Router) routeMiddlewares() []middleware.Middleware {
-	if r.parent == nil {
-		return r.middlewareManager.GetMiddlewares()
+// AddRouteWithOptions adds a route and attaches metadata options.
+func (r *Router) AddRouteWithOptions(method, path string, handler Handler, opts ...RouteOption) error {
+	if err := r.AddRoute(method, path, handler); err != nil {
+		return err
+	}
+	if len(opts) == 0 {
+		return nil
+	}
+	meta := RouteMeta{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&meta)
+		}
+	}
+	r.SetRouteMeta(method, path, meta)
+	return nil
+}
+
+// SetRouteMeta sets metadata for a route.
+func (r *Router) SetRouteMeta(method, path string, meta RouteMeta) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.routeMeta == nil {
+		r.routeMeta = make(map[string]RouteMeta)
+	}
+	key := r.routeKey(method, path)
+	r.routeMeta[key] = meta
+}
+
+// Routes returns a snapshot of all registered routes with metadata.
+func (r *Router) Routes() []RouteInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	infos := make([]RouteInfo, 0)
+	for _, routes := range r.routes {
+		for _, entry := range routes {
+			key := entry.Method + " " + entry.Path
+			meta := r.routeMeta[key]
+			infos = append(infos, RouteInfo{
+				Method: entry.Method,
+				Path:   entry.Path,
+				Meta:   meta,
+			})
+		}
 	}
 
-	// Get middlewares from parent and current router
-	parentMiddlewares := r.parent.middlewareManager.GetMiddlewares()
-	currentMiddlewares := r.middlewareManager.GetMiddlewares()
+	sort.Slice(infos, func(i, j int) bool {
+		if infos[i].Method == infos[j].Method {
+			return infos[i].Path < infos[j].Path
+		}
+		return infos[i].Method < infos[j].Method
+	})
 
-	// Return the difference (middlewares specific to current router)
-	if len(currentMiddlewares) <= len(parentMiddlewares) {
+	return infos
+}
+
+func (r *Router) routeMiddlewares() []middleware.Middleware {
+	if r.parent == nil {
 		return nil
 	}
 
-	extra := make([]middleware.Middleware, len(currentMiddlewares)-len(parentMiddlewares))
-	copy(extra, currentMiddlewares[len(parentMiddlewares):])
-	return extra
+	var layers [][]middleware.Middleware
+	for current := r; current != nil && current.parent != nil; current = current.parent {
+		mws := current.middlewareManager.GetMiddlewares()
+		if len(mws) > 0 {
+			layers = append(layers, mws)
+		}
+	}
+
+	if len(layers) == 0 {
+		return nil
+	}
+
+	total := 0
+	for i := len(layers) - 1; i >= 0; i-- {
+		total += len(layers[i])
+	}
+
+	combined := make([]middleware.Middleware, 0, total)
+	for i := len(layers) - 1; i >= 0; i-- {
+		combined = append(combined, layers[i]...)
+	}
+
+	return combined
 }
 
 // Use adds middlewares to the router group
@@ -403,10 +493,22 @@ func (r *Router) addCtxRoute(method, path string, h contract.CtxHandlerFunc) err
 	return r.AddRoute(method, path, contract.AdaptCtxHandler(h, r.logger))
 }
 
+func (r *Router) routeKey(method, path string) string {
+	return method + " " + r.fullPath(path)
+}
+
+func (r *Router) fullPath(path string) string {
+	fullPath := r.prefix + strings.TrimRight(path, "/")
+	if fullPath == "" {
+		return "/"
+	}
+	return fullPath
+}
+
 // ServeHTTP implements http.Handler and handles incoming HTTP requests
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Check route cache first for better performance
-	cacheKey := req.Method + ":" + req.URL.Path
+	cacheKey := req.Method + ":" + req.Host + ":" + req.URL.Path
 	if cachedResult, exists := r.routeCache.Get(cacheKey); exists {
 		// Use cached result without holding the lock
 		r.handleCachedRouteMatch(w, req, cachedResult)
@@ -477,9 +579,6 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 		return
 	}
 
-	// Cache the matching result for future requests
-	r.routeCache.Set(cacheKey, result)
-
 	// Build parameter map
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
@@ -493,6 +592,9 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 		}
 	}
 
+	// Cache the matching result for future requests
+	r.routeCache.Set(cacheKey, result)
+
 	r.applyMiddlewareAndServe(w, req, params, result.Handler, result.RouteMiddlewares)
 }
 
@@ -502,8 +604,14 @@ func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
 	// Validate parameters if validations are registered
-	// Note: We can't validate params from cache since we don't have the full path, but
-	// parameter validation should be safe to skip for cached routes as they were already validated
+	if params != nil {
+		path := r.normalizePath(req.URL.Path)
+		fullPath := r.prefix + path
+		if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 
 	r.applyMiddlewareAndServe(w, req, params, result.Handler, result.RouteMiddlewares)
 }
@@ -518,10 +626,10 @@ func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tre
 			ParamKeys:        nil,
 			RouteMiddlewares: tree.middlewares,
 		}
-		
+
 		// Cache the result for future requests
 		r.routeCache.Set(cacheKey, result)
-		
+
 		r.applyMiddlewareAndServe(w, req, nil, tree.handler, result.RouteMiddlewares)
 		return
 	}
@@ -691,6 +799,11 @@ func (r *Router) HandleFunc(method, path string, h http.HandlerFunc) {
 // Handle registers a standard http.Handler for the given path and method
 func (r *Router) Handle(method, path string, h http.Handler) {
 	r.AddRoute(method, path, h)
+}
+
+// HandleWithOptions registers a standard http.Handler for the given path and method with metadata.
+func (r *Router) HandleWithOptions(method, path string, h http.Handler, opts ...RouteOption) {
+	_ = r.AddRouteWithOptions(method, path, h, opts...)
 }
 
 // GetFunc registers a GET route with a standard http.HandlerFunc

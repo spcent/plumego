@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -10,16 +11,22 @@ import (
 
 // subscriber represents a subscription to a topic.
 type subscriber struct {
-	id     uint64
-	topic  string
-	ch     chan Message
-	opts   SubOptions
-	closed atomic.Bool
-	once   sync.Once
-	mu     sync.Mutex
+	id      uint64
+	topic   string
+	ch      chan Message
+	opts    SubOptions
+	closed  atomic.Bool
+	once    sync.Once
+	mu      sync.Mutex
+	pattern bool
 
 	// back-reference to parent
 	ps *InProcPubSub
+}
+
+type patternSnapshot struct {
+	pattern string
+	subs    []*subscriber
 }
 
 // C returns the receive-only message channel.
@@ -35,14 +42,15 @@ func (s *subscriber) Cancel() {
 		}
 		close(s.ch)
 		s.mu.Unlock()
-		s.ps.removeSubscriber(s.topic, s.id)
+		s.ps.removeSubscriber(s.topic, s.id, s.pattern)
 	})
 }
 
 // InProcPubSub is an in-memory pubsub implementation.
 type InProcPubSub struct {
-	mu     sync.RWMutex
-	topics map[string]map[uint64]*subscriber
+	mu       sync.RWMutex
+	topics   map[string]map[uint64]*subscriber
+	patterns map[string]map[uint64]*subscriber
 
 	closed atomic.Bool
 	nextID atomic.Uint64
@@ -53,7 +61,8 @@ type InProcPubSub struct {
 // New creates a new InProcPubSub instance.
 func New() *InProcPubSub {
 	ps := &InProcPubSub{
-		topics: make(map[string]map[uint64]*subscriber),
+		topics:   make(map[string]map[uint64]*subscriber),
+		patterns: make(map[string]map[uint64]*subscriber),
 	}
 	ps.nextID.Store(0)
 	return ps
@@ -73,8 +82,14 @@ func (ps *InProcPubSub) Close() error {
 			all = append(all, s)
 		}
 	}
+	for _, subs := range ps.patterns {
+		for _, s := range subs {
+			all = append(all, s)
+		}
+	}
 	// Clear map to reject further deliveries
 	ps.topics = make(map[string]map[uint64]*subscriber)
+	ps.patterns = make(map[string]map[uint64]*subscriber)
 	ps.mu.Unlock()
 
 	// Cancel subscribers without holding lock
@@ -126,6 +141,51 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 	return sub, nil
 }
 
+// SubscribePattern creates a new subscription to a topic pattern.
+func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
+	if ps.closed.Load() {
+		return nil, ErrSubscribeToClosed
+	}
+
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return nil, ErrInvalidPattern
+	}
+	if _, err := path.Match(pattern, "probe"); err != nil {
+		return nil, ErrInvalidPattern
+	}
+
+	opts = normalizeSubOptions(opts)
+	if opts.BufferSize < 1 {
+		return nil, ErrBufferTooSmall
+	}
+
+	id := ps.nextID.Add(1)
+	sub := &subscriber{
+		id:      id,
+		topic:   pattern,
+		ch:      make(chan Message, opts.BufferSize),
+		opts:    opts,
+		ps:      ps,
+		pattern: true,
+	}
+
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	if ps.closed.Load() {
+		return nil, ErrSubscribeToClosed
+	}
+
+	if ps.patterns[pattern] == nil {
+		ps.patterns[pattern] = make(map[uint64]*subscriber)
+	}
+	ps.patterns[pattern][id] = sub
+	ps.metrics.addSubs(pattern, 1)
+
+	return sub, nil
+}
+
 // Publish sends a message to a topic.
 func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 	if ps.closed.Load() {
@@ -148,21 +208,47 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 	// Snapshot subscribers under RLock
 	ps.mu.RLock()
 	subsMap := ps.topics[topic]
-	if len(subsMap) == 0 {
-		ps.mu.RUnlock()
-		return nil
+	var subs []*subscriber
+	if len(subsMap) > 0 {
+		// Create a snapshot to avoid holding lock during delivery
+		subs = make([]*subscriber, 0, len(subsMap))
+		for _, s := range subsMap {
+			subs = append(subs, s)
+		}
 	}
 
-	// Create a snapshot to avoid holding lock during delivery
-	subs := make([]*subscriber, 0, len(subsMap))
-	for _, s := range subsMap {
-		subs = append(subs, s)
+	var patterns []patternSnapshot
+	if len(ps.patterns) > 0 {
+		patterns = make([]patternSnapshot, 0, len(ps.patterns))
+		for pattern, subMap := range ps.patterns {
+			if len(subMap) == 0 {
+				continue
+			}
+			snapshot := make([]*subscriber, 0, len(subMap))
+			for _, s := range subMap {
+				snapshot = append(snapshot, s)
+			}
+			patterns = append(patterns, patternSnapshot{
+				pattern: pattern,
+				subs:    snapshot,
+			})
+		}
 	}
 	ps.mu.RUnlock()
 
 	// Deliver to each subscriber
 	for _, s := range subs {
 		ps.deliver(s, msg)
+	}
+
+	if len(patterns) > 0 {
+		for _, entry := range patterns {
+			if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+				for _, s := range entry.subs {
+					ps.deliver(s, msg)
+				}
+			}
+		}
 	}
 
 	return nil
@@ -185,6 +271,18 @@ func (ps *InProcPubSub) GetSubscriberCount(topic string) int {
 	return len(subs)
 }
 
+// GetPatternSubscriberCount returns the number of subscribers for a pattern.
+func (ps *InProcPubSub) GetPatternSubscriberCount(pattern string) int {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+
+	subs := ps.patterns[pattern]
+	if subs == nil {
+		return 0
+	}
+	return len(subs)
+}
+
 // ListTopics returns all active topics.
 func (ps *InProcPubSub) ListTopics() []string {
 	ps.mu.RLock()
@@ -197,12 +295,29 @@ func (ps *InProcPubSub) ListTopics() []string {
 	return topics
 }
 
+// ListPatterns returns all active subscription patterns.
+func (ps *InProcPubSub) ListPatterns() []string {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+
+	patterns := make([]string, 0, len(ps.patterns))
+	for pattern := range ps.patterns {
+		patterns = append(patterns, pattern)
+	}
+	return patterns
+}
+
 // removeSubscriber removes subscription from topic map; safe for concurrent Cancel/Close.
-func (ps *InProcPubSub) removeSubscriber(topic string, id uint64) {
+func (ps *InProcPubSub) removeSubscriber(topic string, id uint64, pattern bool) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	subs := ps.topics[topic]
+	var subs map[uint64]*subscriber
+	if pattern {
+		subs = ps.patterns[topic]
+	} else {
+		subs = ps.topics[topic]
+	}
 	if subs == nil {
 		return
 	}
@@ -213,12 +328,21 @@ func (ps *InProcPubSub) removeSubscriber(topic string, id uint64) {
 	}
 
 	if len(subs) == 0 {
-		delete(ps.topics, topic)
+		if pattern {
+			delete(ps.patterns, topic)
+		} else {
+			delete(ps.topics, topic)
+		}
 	}
 }
 
 // deliver handles message delivery to a subscriber with backpressure policy.
 func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
+	metricTopic := s.topic
+	if s.pattern {
+		metricTopic = msg.Topic
+	}
+
 	// Fast path: check if closed without lock
 	if s.closed.Load() {
 		return
@@ -234,16 +358,16 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 
 	switch s.opts.Policy {
 	case DropOldest:
-		cancelSub = ps.deliverDropOldest(s, msg)
+		cancelSub = ps.deliverDropOldest(s, msg, metricTopic)
 	case DropNewest:
-		cancelSub = ps.deliverDropNewest(s, msg)
+		cancelSub = ps.deliverDropNewest(s, msg, metricTopic)
 	case BlockWithTimeout:
-		cancelSub = ps.deliverBlockWithTimeout(s, msg)
+		cancelSub = ps.deliverBlockWithTimeout(s, msg, metricTopic)
 	case CloseSubscriber:
-		cancelSub = ps.deliverCloseSubscriber(s, msg)
+		cancelSub = ps.deliverCloseSubscriber(s, msg, metricTopic)
 	default:
 		// Safe default: DropOldest
-		cancelSub = ps.deliverDropOldest(s, msg)
+		cancelSub = ps.deliverDropOldest(s, msg, metricTopic)
 	}
 
 	s.mu.Unlock()
@@ -255,16 +379,16 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 }
 
 // deliverDropOldest drops the oldest message if buffer is full.
-func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message) bool {
+func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopic string) bool {
 	select {
 	case s.ch <- msg:
-		ps.metrics.incDelivered(s.topic)
+		ps.metrics.incDelivered(metricTopic)
 		return false
 	default:
 		// Buffer full, drop oldest
 		select {
 		case <-s.ch:
-			ps.metrics.incDropped(s.topic, DropOldest)
+			ps.metrics.incDropped(metricTopic, DropOldest)
 		default:
 			// Shouldn't happen, but safe
 		}
@@ -272,29 +396,29 @@ func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message) bool {
 		// Try again
 		select {
 		case s.ch <- msg:
-			ps.metrics.incDelivered(s.topic)
+			ps.metrics.incDelivered(metricTopic)
 		default:
 			// Still full after dropping one, drop this message
-			ps.metrics.incDropped(s.topic, DropOldest)
+			ps.metrics.incDropped(metricTopic, DropOldest)
 		}
 		return false
 	}
 }
 
 // deliverDropNewest drops the newest message if buffer is full.
-func (ps *InProcPubSub) deliverDropNewest(s *subscriber, msg Message) bool {
+func (ps *InProcPubSub) deliverDropNewest(s *subscriber, msg Message, metricTopic string) bool {
 	select {
 	case s.ch <- msg:
-		ps.metrics.incDelivered(s.topic)
+		ps.metrics.incDelivered(metricTopic)
 		return false
 	default:
-		ps.metrics.incDropped(s.topic, DropNewest)
+		ps.metrics.incDropped(metricTopic, DropNewest)
 		return false
 	}
 }
 
 // deliverBlockWithTimeout blocks until timeout or success.
-func (ps *InProcPubSub) deliverBlockWithTimeout(s *subscriber, msg Message) bool {
+func (ps *InProcPubSub) deliverBlockWithTimeout(s *subscriber, msg Message, metricTopic string) bool {
 	timeout := s.opts.BlockTimeout
 	if timeout <= 0 {
 		timeout = 50 * time.Millisecond
@@ -305,22 +429,22 @@ func (ps *InProcPubSub) deliverBlockWithTimeout(s *subscriber, msg Message) bool
 
 	select {
 	case s.ch <- msg:
-		ps.metrics.incDelivered(s.topic)
+		ps.metrics.incDelivered(metricTopic)
 		return false
 	case <-ctx.Done():
-		ps.metrics.incDropped(s.topic, BlockWithTimeout)
+		ps.metrics.incDropped(metricTopic, BlockWithTimeout)
 		return false
 	}
 }
 
 // deliverCloseSubscriber closes the subscription if buffer is full.
-func (ps *InProcPubSub) deliverCloseSubscriber(s *subscriber, msg Message) bool {
+func (ps *InProcPubSub) deliverCloseSubscriber(s *subscriber, msg Message, metricTopic string) bool {
 	select {
 	case s.ch <- msg:
-		ps.metrics.incDelivered(s.topic)
+		ps.metrics.incDelivered(metricTopic)
 		return false
 	default:
-		ps.metrics.incDropped(s.topic, CloseSubscriber)
+		ps.metrics.incDropped(metricTopic, CloseSubscriber)
 		return true // signal to cancel subscription
 	}
 }

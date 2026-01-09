@@ -4,7 +4,7 @@ Plumego is a lightweight Go HTTP toolkit built entirely on the standard library.
 
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
-- **Middleware Chain**: Logging, recovery, gzip, CORS, timeout, rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.
+- **Middleware Chain**: Logging, recovery, gzip, CORS, timeout (buffers up to 10 MiB by default), rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.
 - **Security Helpers**: JWT + password utilities, security header policies, input-safety helpers, and abuse guard primitives for baseline hardening.
 - **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and message queues.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
@@ -90,7 +90,7 @@ func main() {
 
 ## Configuration Basics
 - Environment variables can be loaded from a `.env` file (default path `.env`; override via `core.WithEnvPath`).
-- Common variables: `AUTH_TOKEN` (SimpleAuth middleware), `WS_SECRET` (WebSocket JWT signing key), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
+- Common variables: `AUTH_TOKEN` (SimpleAuth middleware), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - The app defaults to a 10 MiB request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5-second graceful shutdown window. Override via `core.With...` options.
 - Security guardrails (security headers + abuse guard) are enabled by default. Abuse guard defaults to 100 req/s with a burst of 200 per client. Disable or tune via `core.WithSecurityHeadersEnabled`, `core.WithSecurityHeadersPolicy`, `core.WithAbuseGuardEnabled`, and `core.WithAbuseGuardConfig`.
 - Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, reload), friendly JSON error output, and `.env` hot reload.
@@ -150,7 +150,7 @@ if err := app.ConfigureObservability(obs); err != nil {
 When tracing is enabled, logs include `trace_id` and `span_id`, and responses include `X-Span-ID` for correlation.
 
 ## Configuration Reference
-Use `config.LoadEnv` to load environment variables, or bind command-line flags; use the table below for predictable deployments.
+Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Use the table below for predictable deployments.
 
 | AppConfig Field          | Default        | Environment Variable           | Flag Example                     |
 |--------------------------|----------------|--------------------------------|----------------------------------|
@@ -188,6 +188,8 @@ Use `config.LoadEnv` to load environment variables, or bind command-line flags; 
 | WebSocket.WSRoutePath    | /ws            | WS_ROUTE_PATH                 | --ws-route /ws                  |
 | WebSocket.BroadcastPath  | /_admin/broadcast | WS_BROADCAST_PATH          | --ws-broadcast /_admin/broadcast|
 | WebSocket.BroadcastEnabled| true           | WS_BROADCAST_ENABLED          | --ws-broadcast-enabled=false    |
+| WebSocket.MaxConnections | 0 (unlimited)  | (config only)                 | -                               |
+| WebSocket.MaxRoomConnections | 0 (unlimited) | (config only)               | -                               |
 
 Use `config.Get*` helpers (see `config/env.go`) or Go's `flag` package to transform these sources into an `AppConfig`, then call `core.New(...)`.
 

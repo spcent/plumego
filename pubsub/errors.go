@@ -20,6 +20,9 @@ var (
 
 	// ErrSubscribeToClosed is returned when subscribing to a closed pubsub
 	ErrSubscribeToClosed = errors.New("cannot subscribe to closed pubsub")
+
+	// ErrInvalidPattern is returned for invalid subscription patterns
+	ErrInvalidPattern = errors.New("invalid pattern")
 )
 
 // IsClosedError checks if error is related to closed pubsub

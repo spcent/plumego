@@ -105,6 +105,7 @@ type Client struct {
 	retryPolicy    RetryPolicy
 	defaultTimeout time.Duration
 	middlewares    []Middleware
+	retryCheck     func(*http.Request) bool
 }
 
 // Option defines a functional option for Client
@@ -146,6 +147,14 @@ func WithRetryPolicy(policy RetryPolicy) Option {
 	}
 }
 
+// WithRetryCheck limits retries based on request attributes.
+// Returning false disables retries for the given request.
+func WithRetryCheck(check func(*http.Request) bool) Option {
+	return func(c *Client) {
+		c.retryCheck = check
+	}
+}
+
 // WithMiddleware adds middleware to the client.
 func WithMiddleware(mw Middleware) Option {
 	return func(c *Client) { c.middlewares = append(c.middlewares, mw) }
@@ -183,6 +192,7 @@ type requestConfig struct {
 	retryPolicy RetryPolicy
 	timeout     *time.Duration
 	headers     map[string]string
+	retryCheck  func(*http.Request) bool
 }
 
 // RequestOption defines a functional option for individual requests.
@@ -201,6 +211,11 @@ func WithRequestRetryCount(count int) RequestOption {
 // WithRequestRetryPolicy sets retry policy for a specific request.
 func WithRequestRetryPolicy(p RetryPolicy) RequestOption {
 	return func(c *requestConfig) { c.retryPolicy = p }
+}
+
+// WithRequestRetryCheck limits retries for a specific request.
+func WithRequestRetryCheck(check func(*http.Request) bool) RequestOption {
+	return func(c *requestConfig) { c.retryCheck = check }
 }
 
 // WithHeader adds a header to the request.
@@ -247,9 +262,15 @@ func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Resp
 		retryPolicy: c.retryPolicy,
 		timeout:     &c.defaultTimeout,
 		headers:     make(map[string]string),
+		retryCheck:  c.retryCheck,
 	}
 	for _, opt := range opts {
 		opt(cfg)
+	}
+
+	if cfg.retryCheck != nil && !cfg.retryCheck(req) {
+		noRetry := 0
+		cfg.retryCount = &noRetry
 	}
 
 	// apply headers
@@ -257,9 +278,9 @@ func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Resp
 		req.Header.Set(k, v)
 	}
 
-	ctx, cancel := context.WithTimeout(req.Context(), *cfg.timeout)
-	defer cancel()
-	req = req.WithContext(ctx)
+	if err := ensureReplayableBody(req, cfg.retryCount); err != nil {
+		return nil, err
+	}
 
 	// build middleware chain
 	final := c.do(cfg)
@@ -270,32 +291,108 @@ func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Resp
 	return final(req)
 }
 
+type cancelingBody struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (c *cancelingBody) Close() error {
+	err := c.ReadCloser.Close()
+	c.cancel()
+	return err
+}
+
+func ensureReplayableBody(req *http.Request, retryCount *int) error {
+	if req == nil || req.Body == nil || req.GetBody != nil {
+		return nil
+	}
+	if retryCount == nil || *retryCount <= 0 {
+		return nil
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+	_ = req.Body.Close()
+
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(body)), nil
+	}
+
+	return nil
+}
+
+func cloneRequest(req *http.Request, ctx context.Context) (*http.Request, error) {
+	cloned := req.Clone(ctx)
+
+	if req.Body == nil {
+		return cloned, nil
+	}
+
+	if req.GetBody != nil {
+		body, err := req.GetBody()
+		if err != nil {
+			return nil, err
+		}
+		cloned.Body = body
+		return cloned, nil
+	}
+
+	cloned.Body = req.Body
+	return cloned, nil
+}
+
 // do executes an HTTP request with retry logic.
 func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 	return func(req *http.Request) (*http.Response, error) {
-		var lastErr error
-		var resp *http.Response
+		retryCount := 0
+		if cfg.retryCount != nil {
+			retryCount = *cfg.retryCount
+		}
 
-		for i := 0; i <= *cfg.retryCount; i++ {
-			resp, lastErr = c.client.Do(req)
-			if lastErr == nil && (resp.StatusCode < 500) {
-				// success
+		for i := 0; i <= retryCount; i++ {
+			ctx, cancel := context.WithTimeout(req.Context(), *cfg.timeout)
+			attemptReq, err := cloneRequest(req, ctx)
+			if err != nil {
+				cancel()
+				return nil, err
+			}
+
+			resp, reqErr := c.client.Do(attemptReq)
+			if reqErr == nil && (resp.StatusCode < 500) {
+				if resp != nil && resp.Body != nil {
+					resp.Body = &cancelingBody{ReadCloser: resp.Body, cancel: cancel}
+				} else {
+					cancel()
+				}
 				return resp, nil
 			}
 
-			if cfg.retryPolicy == nil || !cfg.retryPolicy.ShouldRetry(resp, lastErr, i) {
-				break
+			shouldRetry := cfg.retryPolicy != nil && cfg.retryPolicy.ShouldRetry(resp, reqErr, i)
+			if !shouldRetry || i == retryCount {
+				if reqErr == nil && resp != nil && resp.StatusCode >= 500 {
+					reqErr = errors.New("http error: " + resp.Status)
+				}
+				if resp != nil && resp.Body != nil {
+					resp.Body = &cancelingBody{ReadCloser: resp.Body, cancel: cancel}
+				} else {
+					cancel()
+				}
+				return resp, reqErr
 			}
+
+			if resp != nil && resp.Body != nil {
+				_, _ = io.Copy(io.Discard, resp.Body)
+				_ = resp.Body.Close()
+			}
+			cancel()
 
 			time.Sleep(backoffWithJitter(c.retryWait, i, c.maxRetryWait))
 		}
 
-		// If we exhausted retries and still have a bad status, return an error
-		if lastErr == nil && resp != nil && resp.StatusCode >= 500 {
-			return resp, errors.New("http error: " + resp.Status)
-		}
-
-		return resp, lastErr
+		return nil, errors.New("http error: retries exhausted")
 	}
 }
 
@@ -311,6 +408,9 @@ func (c *Client) Get(ctx context.Context, url string, opts ...RequestOption) ([]
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, errors.New("http error: " + resp.Status)
+	}
 
 	return io.ReadAll(resp.Body)
 }
@@ -376,6 +476,9 @@ func (c *Client) Delete(ctx context.Context, url string, opts ...RequestOption) 
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, errors.New("http error: " + resp.Status)
+	}
 
 	return io.ReadAll(resp.Body)
 }

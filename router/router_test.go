@@ -314,6 +314,42 @@ func TestRouteGroupMiddlewares(t *testing.T) {
 	}
 }
 
+func TestRouteGroupMiddlewareIsolation(t *testing.T) {
+	r := NewRouter()
+
+	api := r.Group("/api")
+	api.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Group", "api")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	api.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("pong"))
+	})
+
+	r.GetFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+
+	req := httptest.NewRequest("GET", "/api/ping", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Header().Get("X-Group") != "api" {
+		t.Errorf("expected group middleware on /api/ping")
+	}
+
+	req = httptest.NewRequest("GET", "/status", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Header().Get("X-Group") != "" {
+		t.Errorf("expected group middleware not to run on /status")
+	}
+}
+
 func TestRouterFreeze(t *testing.T) {
 	r := NewRouter()
 
@@ -323,6 +359,30 @@ func TestRouterFreeze(t *testing.T) {
 	err := r.AddRoute("GET", "/panic", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	if err == nil {
 		t.Errorf("expected error when adding route after freeze")
+	}
+}
+
+func TestRouteMetadata(t *testing.T) {
+	r := NewRouter()
+
+	err := r.AddRouteWithOptions("GET", "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}), WithRouteName("ping"), WithRouteTags("health", "status"))
+	if err != nil {
+		t.Fatalf("add route failed: %v", err)
+	}
+
+	routes := r.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+
+	route := routes[0]
+	if route.Meta.Name != "ping" {
+		t.Fatalf("expected name 'ping', got %q", route.Meta.Name)
+	}
+	if len(route.Meta.Tags) != 2 || route.Meta.Tags[0] != "health" {
+		t.Fatalf("unexpected tags: %v", route.Meta.Tags)
 	}
 }
 

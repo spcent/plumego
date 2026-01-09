@@ -263,7 +263,7 @@ func TestConfigureWebSocketLoadsEnvFile(t *testing.T) {
 	}
 	defer os.Remove(tmpFile.Name())
 
-	if _, err := tmpFile.WriteString("WS_SECRET=from_env\n"); err != nil {
+	if _, err := tmpFile.WriteString("WS_SECRET=from_env_with_32_bytes_secret_value!!\n"); err != nil {
 		t.Fatalf("failed to write env file: %v", err)
 	}
 	tmpFile.Close()
@@ -315,7 +315,7 @@ func TestStartComponentsStopsOnError(t *testing.T) {
 }
 
 func TestBroadcastAuthAndToggle(t *testing.T) {
-	secret := []byte("super-secret")
+	secret := []byte("super-secret-with-32-bytes-minimum!")
 
 	// Non-debug mode requires authorization
 	config := DefaultWebSocketConfig()

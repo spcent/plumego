@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"bufio"
 	"context"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -287,4 +290,91 @@ func BenchmarkLogging(b *testing.B) {
 		rec := httptest.NewRecorder()
 		middleware(handler).ServeHTTP(rec, req)
 	}
+}
+
+type hijackWriter struct {
+	header   http.Header
+	hijacked bool
+}
+
+func (w *hijackWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *hijackWriter) WriteHeader(_ int) {}
+
+func (w *hijackWriter) Write(p []byte) (int, error) { return len(p), nil }
+
+func (w *hijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	w.hijacked = true
+	return nil, nil, errors.New("hijack")
+}
+
+func TestLoggingPreservesHijacker(t *testing.T) {
+	logger := newStubLogger()
+	middleware := Logging(logger, nil, nil)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatalf("expected Hijacker support")
+		}
+		_, _, _ = hj.Hijack()
+		w.WriteHeader(http.StatusSwitchingProtocols)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	rec := &hijackWriter{}
+	middleware(handler).ServeHTTP(rec, req)
+
+	if !rec.hijacked {
+		t.Fatalf("expected hijack to be forwarded to underlying writer")
+	}
+}
+
+type closeNotifyWriter struct {
+	header http.Header
+	ch     chan bool
+}
+
+func (w *closeNotifyWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *closeNotifyWriter) WriteHeader(_ int) {}
+
+func (w *closeNotifyWriter) Write(p []byte) (int, error) { return len(p), nil }
+
+func (w *closeNotifyWriter) CloseNotify() <-chan bool {
+	if w.ch == nil {
+		w.ch = make(chan bool, 1)
+		w.ch <- true
+		close(w.ch)
+	}
+	return w.ch
+}
+
+func TestLoggingPreservesCloseNotifier(t *testing.T) {
+	logger := newStubLogger()
+	middleware := Logging(logger, nil, nil)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		notifier, ok := w.(http.CloseNotifier)
+		if !ok {
+			t.Fatalf("expected CloseNotifier support")
+		}
+		ch := notifier.CloseNotify()
+		if ch == nil {
+			t.Fatalf("expected CloseNotify channel")
+		}
+		<-ch
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/close", nil)
+	rec := &closeNotifyWriter{}
+	middleware(handler).ServeHTTP(rec, req)
 }

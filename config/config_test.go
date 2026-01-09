@@ -3,12 +3,36 @@ package config
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 )
+
+type stubSource struct {
+	name string
+	data map[string]any
+	err  error
+}
+
+func (s *stubSource) Load(context.Context) (map[string]any, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.data, nil
+}
+
+func (s *stubSource) Watch(context.Context) (<-chan map[string]any, <-chan error) {
+	updates := make(chan map[string]any)
+	errs := make(chan error)
+	close(updates)
+	close(errs)
+	return updates, errs
+}
+
+func (s *stubSource) Name() string { return s.name }
 
 // TestConfigBasic tests basic Config functionality
 func TestConfigBasic(t *testing.T) {
@@ -182,6 +206,104 @@ func TestValidatorRange(t *testing.T) {
 	// Test with value above range
 	if err := v.Validate(101, "test"); err == nil {
 		t.Error("Range validator should reject value above range")
+	}
+}
+
+func TestConfigUnmarshalNestedStruct(t *testing.T) {
+	cfg := New()
+	cfg.data = map[string]any{
+		"app_name":      "demo",
+		"db_host":       "localhost",
+		"db_port":       "5432",
+		"cache_enabled": "true",
+	}
+
+	type dbConfig struct {
+		Host string `config:"db_host"`
+		Port int    `config:"db_port"`
+	}
+
+	type cacheConfig struct {
+		Enabled bool `config:"cache_enabled"`
+	}
+
+	type appConfig struct {
+		AppName string `config:"app_name"`
+		DB      dbConfig
+		Cache   *cacheConfig
+	}
+
+	var target appConfig
+	if err := cfg.Unmarshal(&target); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if target.AppName != "demo" {
+		t.Fatalf("unexpected app name: %s", target.AppName)
+	}
+	if target.DB.Host != "localhost" || target.DB.Port != 5432 {
+		t.Fatalf("unexpected db config: %+v", target.DB)
+	}
+	if target.Cache == nil || target.Cache.Enabled != true {
+		t.Fatalf("unexpected cache config: %#v", target.Cache)
+	}
+}
+
+func TestLoadBestEffort(t *testing.T) {
+	cfg := New()
+	cfg.AddSource(&stubSource{name: "bad", err: errors.New("boom")})
+	cfg.AddSource(&stubSource{name: "ok", data: map[string]any{"app_name": "demo"}})
+
+	if err := cfg.LoadBestEffort(context.Background()); err != nil {
+		t.Fatalf("expected best effort load to succeed, got %v", err)
+	}
+
+	if got := cfg.GetString("app_name", ""); got != "demo" {
+		t.Fatalf("unexpected value: %q", got)
+	}
+}
+
+func TestLoadBestEffortAllFail(t *testing.T) {
+	cfg := New()
+	cfg.AddSource(&stubSource{name: "bad1", err: errors.New("boom1")})
+	cfg.AddSource(&stubSource{name: "bad2", err: errors.New("boom2")})
+
+	if err := cfg.LoadBestEffort(context.Background()); err == nil {
+		t.Fatalf("expected error when all sources fail")
+	}
+}
+
+func TestReloadWithValidation(t *testing.T) {
+	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
+	cfg := New()
+	cfg.AddSource(source)
+
+	if err := cfg.Load(context.Background()); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	source.data = map[string]any{"value": "bad"}
+	err := cfg.ReloadWithValidation(context.Background(), func(data map[string]any) error {
+		if data["value"] == "bad" {
+			return errors.New("invalid config")
+		}
+		return nil
+	})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+	if got := cfg.GetString("value", ""); got != "ok" {
+		t.Fatalf("expected rollback to previous value, got %q", got)
+	}
+
+	source.data = map[string]any{"value": "good"}
+	if err := cfg.ReloadWithValidation(context.Background(), func(data map[string]any) error {
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+	if got := cfg.GetString("value", ""); got != "good" {
+		t.Fatalf("expected updated value, got %q", got)
 	}
 }
 

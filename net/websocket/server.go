@@ -65,6 +65,14 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *sim
 		http.Error(w, "forbidden: bad room password", http.StatusForbidden)
 		return
 	}
+	if err := hub.CanJoin(room); err != nil {
+		status := http.StatusServiceUnavailable
+		if errors.Is(err, ErrRoomFull) {
+			status = http.StatusTooManyRequests
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
 	// check token if present
 	token := ""
 	var userInfo *UserInfo
@@ -115,7 +123,10 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *sim
 	c.bw = bufio.NewWriterSize(conn, 8192)
 
 	// register in hub
-	hub.Join(room, c)
+	if err := hub.TryJoin(room, c); err != nil {
+		conn.Close()
+		return
+	}
 	// cleanup on close
 	go func() {
 		<-c.closeC

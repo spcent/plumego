@@ -4,7 +4,7 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
-- **中间件链**：日志、恢复、gzip、CORS、超时、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。
+- **中间件链**：日志、恢复、gzip、CORS、超时（默认缓冲上限 10 MiB）、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。
 - **安全辅助**：JWT + 密码工具、安全头策略、输入安全校验与基础防滥用组件，便于进行安全基线加固。
 - **集成扩展**：提供 `database/sql`、Redis 缓存与消息队列的轻量适配器/扩展点。
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
@@ -90,7 +90,7 @@ func main() {
 
 ## 配置基础
 - 环境变量可以从 `.env` 文件加载（默认路径 `.env`；可通过 `core.WithEnvPath` 覆盖）。
-- 常用变量：`AUTH_TOKEN`（SimpleAuth 中间件）、`WS_SECRET`（WebSocket JWT 签名密钥）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
+- 常用变量：`AUTH_TOKEN`（SimpleAuth 中间件）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - 应用默认包括 10 MiB 请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5 秒优雅关闭窗口。可通过 `core.With...` 选项覆盖。
 - 安全基线默认启用（安全头 + 防滥用中间件）。防滥用默认每客户端 100 req/s，突发 200。可通过 `core.WithSecurityHeadersEnabled`、`core.WithSecurityHeadersPolicy`、`core.WithAbuseGuardEnabled`、`core.WithAbuseGuardConfig` 关闭或调整。
 - Debug 模式（`core.WithDebug`）默认开启 `/_debug` 调试端点（路由表、Middleware、配置快照、手动重载）、友好 JSON 错误输出，以及 `.env` 热加载。
@@ -150,7 +150,7 @@ if err := app.ConfigureObservability(obs); err != nil {
 开启追踪后日志会包含 `trace_id` 与 `span_id`，响应中也会回传 `X-Span-ID` 便于关联。
 
 ## 配置参考
-使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；使用下表实现可预测的部署。
+使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；`config.ConfigManager` 也提供 `LoadBestEffort` 用于跳过可选配置源失败，并提供 `ReloadWithValidation` 做事务式热加载；使用下表实现可预测的部署。
 
 | AppConfig 字段             | 默认值          | 环境变量                       | Flag 示例                          |
 |----------------------------|-----------------|--------------------------------|------------------------------------|
@@ -188,6 +188,8 @@ if err := app.ConfigureObservability(obs); err != nil {
 | WebSocket.WSRoutePath      | /ws            | WS_ROUTE_PATH                 | --ws-route /ws                    |
 | WebSocket.BroadcastPath    | /_admin/broadcast | WS_BROADCAST_PATH          | --ws-broadcast /_admin/broadcast |
 | WebSocket.BroadcastEnabled | true           | WS_BROADCAST_ENABLED          | --ws-broadcast-enabled=false      |
+| WebSocket.MaxConnections   | 0 (unlimited)  | (config only)                 | -                                 |
+| WebSocket.MaxRoomConnections | 0 (unlimited) | (config only)                | -                                 |
 
 使用 `config.Get*` 辅助函数（参见 `config/env.go`）或 Go 的 `flag` 包，将这些来源转换为 `AppConfig`，然后调用 `core.New(...)`。
 

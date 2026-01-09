@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -130,6 +131,18 @@ func TestPostErrorsPropagate(t *testing.T) {
 	}
 }
 
+func TestGetErrorsPropagate(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+
+	client := New()
+	if _, err := client.Get(context.Background(), srv.URL); err == nil {
+		t.Fatalf("expected http error on non-2xx status")
+	}
+}
+
 func TestTimeoutRetryPolicy(t *testing.T) {
 	client := New(WithRetryCount(1), WithRetryWait(1*time.Millisecond), WithMaxRetryWait(2*time.Millisecond))
 	// replace transport to simulate timeout errors
@@ -141,6 +154,78 @@ func TestTimeoutRetryPolicy(t *testing.T) {
 	_, err := client.doRequest(req)
 	if err == nil || !isTimeoutError(err) {
 		t.Fatalf("expected timeout error propagation, got %v", err)
+	}
+}
+
+func TestRetryReplaysBody(t *testing.T) {
+	var mu sync.Mutex
+	bodies := make([]string, 0, 2)
+	calls := int32(0)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+
+		mu.Lock()
+		bodies = append(bodies, string(body))
+		mu.Unlock()
+
+		if atomic.AddInt32(&calls, 1) == 1 {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	client := New(
+		WithRetryCount(1),
+		WithRetryWait(1*time.Millisecond),
+		WithRetryPolicy(StatusCodeRetryPolicy{Codes: []int{http.StatusInternalServerError}}),
+	)
+
+	_, err := client.Post(context.Background(), server.URL, []byte("hello"), "text/plain")
+	if err != nil {
+		t.Fatalf("post failed: %v", err)
+	}
+
+	if atomic.LoadInt32(&calls) != 2 {
+		t.Fatalf("expected 2 attempts, got %d", calls)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(bodies) != 2 {
+		t.Fatalf("expected 2 bodies, got %d", len(bodies))
+	}
+	if bodies[0] != "hello" || bodies[1] != "hello" {
+		t.Fatalf("unexpected bodies: %v", bodies)
+	}
+}
+
+func TestRetryCheckDisablesRetries(t *testing.T) {
+	calls := int32(0)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+
+	client := New(
+		WithRetryCount(3),
+		WithRetryPolicy(StatusCodeRetryPolicy{Codes: []int{http.StatusInternalServerError}}),
+		WithRetryCheck(func(req *http.Request) bool {
+			return req.Method == http.MethodGet
+		}),
+	)
+
+	_, err := client.Post(context.Background(), server.URL, []byte("demo"), "text/plain")
+	if err == nil {
+		t.Fatalf("expected error on server response")
+	}
+
+	if atomic.LoadInt32(&calls) != 1 {
+		t.Fatalf("expected 1 attempt, got %d", calls)
 	}
 }
 

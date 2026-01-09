@@ -60,3 +60,30 @@ func TestRouteValidationWildcard(t *testing.T) {
 		t.Fatalf("expected 200 for valid wildcard param, got %d", rec.Code)
 	}
 }
+
+func TestRouteValidationCache(t *testing.T) {
+	r := NewRouter()
+
+	validation := NewRouteValidation().AddParam("id", PositiveIntValidator)
+	r.AddValidation(http.MethodGet, "/users/:id", validation)
+
+	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/users/abc", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid param, got %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/users/abc", nil)
+	rec = httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 on cached invalid param, got %d", rec.Code)
+	}
+}

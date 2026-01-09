@@ -26,6 +26,31 @@ func TestDevToolsRoutesEndpoint(t *testing.T) {
 	}
 }
 
+func TestDevToolsRoutesJSONEndpoint(t *testing.T) {
+	app := New(WithDebug())
+	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, devToolsRoutesJSONPath, nil)
+	resp := httptest.NewRecorder()
+	app.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode payload: %v", err)
+	}
+
+	routes, ok := payload["routes"].([]any)
+	if !ok || len(routes) == 0 {
+		t.Fatalf("expected routes array, got %#v", payload["routes"])
+	}
+}
+
 func TestDevToolsConfigEndpoint(t *testing.T) {
 	app := New(WithDebug())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {

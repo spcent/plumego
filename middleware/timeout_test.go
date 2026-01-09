@@ -75,3 +75,24 @@ func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 		t.Fatalf("header not propagated")
 	}
 }
+
+func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("toolarge"))
+	}
+
+	wrapped := ApplyFunc(handler, TimeoutWithConfig(TimeoutConfig{
+		Timeout:        500 * time.Millisecond,
+		MaxBufferBytes: 4,
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+}
