@@ -7,52 +7,208 @@ import (
 )
 
 // Gzip compresses HTTP responses when the client supports it via Accept-Encoding.
+// It intelligently skips compression for:
+// - WebSocket upgrades
+// - Server-Sent Events (SSE)
+// - Already compressed content
+// - Binary content (images, videos, etc.)
+// - Large streaming responses (to avoid memory spikes)
 func Gzip() Middleware {
+	return GzipWithConfig(GzipConfig{
+		MaxBufferBytes: 10 << 20, // 10MB max buffer
+	})
+}
+
+// GzipConfig configures Gzip middleware behavior.
+type GzipConfig struct {
+	// MaxBufferBytes is the maximum response size to buffer for compression
+	// Responses larger than this will bypass compression to avoid memory spikes
+	MaxBufferBytes int
+}
+
+// GzipWithConfig creates a Gzip middleware with custom configuration.
+func GzipWithConfig(cfg GzipConfig) Middleware {
+	if cfg.MaxBufferBytes <= 0 {
+		cfg.MaxBufferBytes = 10 << 20
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			connection := strings.ToLower(r.Header.Get("Connection"))
-			if strings.Contains(connection, "upgrade") || r.Header.Get("Upgrade") != "" {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
-				next.ServeHTTP(w, r)
-				return
-			}
+			// Skip if client doesn't support gzip
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			w.Header().Add("Vary", "Accept-Encoding")
-			w.Header().Set("Content-Encoding", "gzip")
+			// Skip WebSocket upgrades
+			connection := strings.ToLower(r.Header.Get("Connection"))
+			if strings.Contains(connection, "upgrade") || r.Header.Get("Upgrade") != "" {
+				next.ServeHTTP(w, r)
+				return
+			}
 
-			gz := gzip.NewWriter(w)
-			defer gz.Close()
+			// Skip SSE (Server-Sent Events)
+			accept := r.Header.Get("Accept")
+			if strings.Contains(accept, "text/event-stream") {
+				next.ServeHTTP(w, r)
+				return
+			}
 
+			// Create wrapper
 			gw := &gzipResponseWriter{
 				ResponseWriter: w,
-				writer:         gz,
+				cfg:            cfg,
 			}
 
 			next.ServeHTTP(gw, r)
+
+			// Finalize compression if used
+			if gw.compressionUsed && gw.gz != nil {
+				gw.gz.Close()
+			}
 		})
 	}
 }
 
 type gzipResponseWriter struct {
 	http.ResponseWriter
-	writer *gzip.Writer
+	cfg             GzipConfig
+	gz              *gzip.Writer
+	compressionUsed bool
+	wroteHeader     bool
+	bodyBuffer      []byte
+}
+
+func (w *gzipResponseWriter) Header() http.Header {
+	return w.ResponseWriter.Header()
 }
 
 func (w *gzipResponseWriter) WriteHeader(statusCode int) {
-	w.Header().Del("Content-Length")
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+
+	// Determine if we should compress
+	shouldCompress := w.shouldCompress(statusCode)
+
+	if !shouldCompress {
+		w.compressionUsed = false
+		w.ResponseWriter.WriteHeader(statusCode)
+		return
+	}
+
+	// Start buffering
+	w.bodyBuffer = make([]byte, 0, 1024) // Start with small buffer
+	w.compressionUsed = true
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func (w *gzipResponseWriter) Write(p []byte) (int, error) {
-	if w.Header().Get("Content-Type") == "" {
-		w.Header().Set("Content-Type", http.DetectContentType(p))
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
 	}
-	return w.writer.Write(p)
+
+	// If not compressing, write directly
+	if !w.compressionUsed {
+		return w.ResponseWriter.Write(p)
+	}
+
+	// Buffer the data
+	w.bodyBuffer = append(w.bodyBuffer, p...)
+
+	// If buffer exceeds max, switch to bypass mode
+	if len(w.bodyBuffer) > w.cfg.MaxBufferBytes {
+		// Write buffered data as-is (no compression)
+		w.compressionUsed = false
+
+		// Remove compression headers
+		w.Header().Del("Content-Encoding")
+
+		// Write buffered data
+		n, err := w.ResponseWriter.Write(w.bodyBuffer)
+		if err != nil {
+			return 0, err
+		}
+
+		// Clear buffer
+		w.bodyBuffer = nil
+
+		return n, nil
+	}
+
+	// If we have enough data, start compressing
+	if w.gz == nil && len(w.bodyBuffer) > 0 {
+		// Update headers for compression
+		w.Header().Del("Content-Length")
+		w.Header().Add("Vary", "Accept-Encoding")
+		w.Header().Set("Content-Encoding", "gzip")
+
+		w.gz = gzip.NewWriter(w.ResponseWriter)
+
+		// Write buffered data
+		if _, err := w.gz.Write(w.bodyBuffer); err != nil {
+			return 0, err
+		}
+
+		// Clear buffer
+		w.bodyBuffer = nil
+		return len(p), nil
+	}
+
+	// Already compressing
+	if w.gz != nil {
+		return w.gz.Write(p)
+	}
+
+	return len(p), nil
+}
+
+func (w *gzipResponseWriter) shouldCompress(statusCode int) bool {
+	// Don't compress error responses
+	if statusCode >= 400 {
+		return false
+	}
+
+	// Check content type
+	contentType := w.Header().Get("Content-Type")
+	if contentType == "" {
+		return false
+	}
+
+	// Skip already compressed content
+	if w.Header().Get("Content-Encoding") != "" {
+		return false
+	}
+
+	// Skip streaming content types
+	lowerContentType := strings.ToLower(contentType)
+	if strings.Contains(lowerContentType, "stream") ||
+		strings.Contains(lowerContentType, "event-stream") ||
+		strings.Contains(lowerContentType, "websocket") {
+		return false
+	}
+
+	// Skip binary content
+	compressedTypes := []string{
+		"image/", "video/", "audio/",
+		"application/zip", "application/gzip",
+		"application/pdf", "application/octet-stream",
+	}
+	for _, ct := range compressedTypes {
+		if strings.HasPrefix(lowerContentType, ct) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (w *gzipResponseWriter) Flush() {
+	if w.gz != nil {
+		w.gz.Flush()
+	}
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
