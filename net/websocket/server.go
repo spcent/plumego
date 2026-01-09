@@ -41,15 +41,7 @@ func headerContains(h http.Header, key, val string) bool {
 // room password from ?room_password= param.
 // onConn will be called when Conn is ready.
 func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *simpleRoomAuth, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
-	// Validate WebSocket key
-	key := r.Header.Get("Sec-WebSocket-Key")
-	if err := ValidateWebSocketKey(key); err != nil {
-		metricsMutex.Lock()
-		securityMetrics.InvalidWebSocketKeys++
-		metricsMutex.Unlock()
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	// Basic HTTP validation first
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -58,8 +50,18 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *sim
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+
+	// Validate WebSocket key
+	key := r.Header.Get("Sec-WebSocket-Key")
 	if key == "" {
 		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := ValidateWebSocketKey(key); err != nil {
+		metricsMutex.Lock()
+		securityMetrics.InvalidWebSocketKeys++
+		metricsMutex.Unlock()
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	// auth: room and JWT
