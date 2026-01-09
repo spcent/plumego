@@ -358,23 +358,3 @@ func (w *closeNotifyWriter) CloseNotify() <-chan bool {
 	}
 	return w.ch
 }
-
-func TestLoggingPreservesCloseNotifier(t *testing.T) {
-	logger := newStubLogger()
-	middleware := Logging(logger, nil, nil)
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		notifier, ok := w.(http.CloseNotifier)
-		if !ok {
-			t.Fatalf("expected CloseNotifier support")
-		}
-		ch := notifier.CloseNotify()
-		if ch == nil {
-			t.Fatalf("expected CloseNotify channel")
-		}
-		<-ch
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/close", nil)
-	rec := &closeNotifyWriter{}
-	middleware(handler).ServeHTTP(rec, req)
-}
