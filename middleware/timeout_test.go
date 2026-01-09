@@ -96,3 +96,98 @@ func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
 	}
 }
+
+func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
+	// Test that large responses bypass buffering to avoid memory spikes
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Generate 1MB of data (exceeds 512KB threshold)
+		largeData := make([]byte, 1<<20)
+		for i := range largeData {
+			largeData[i] = byte('A' + (i % 26))
+		}
+		w.Write(largeData)
+	}
+
+	wrapped := ApplyFunc(handler, TimeoutWithConfig(TimeoutConfig{
+		Timeout:            500 * time.Millisecond,
+		MaxBufferBytes:     10 << 20,
+		StreamingThreshold: 512 << 10, // 512KB
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped(rr, req)
+
+	// Should return error since we cannot replay bypassed response
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d for bypassed large response, got %d", http.StatusInternalServerError, rr.Code)
+	}
+
+	if rr.Body.String() != "response too large for timeout buffering\n" {
+		t.Fatalf("unexpected body: %q", rr.Body.String())
+	}
+}
+
+func TestTimeoutMiddleware_SmallResponseBuffered(t *testing.T) {
+	// Test that small responses are still buffered normally
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Test", "ok")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("small"))
+	}
+
+	wrapped := ApplyFunc(handler, TimeoutWithConfig(TimeoutConfig{
+		Timeout:            500 * time.Millisecond,
+		MaxBufferBytes:     10 << 20,
+		StreamingThreshold: 512 << 10, // 512KB
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d", http.StatusCreated, rr.Code)
+	}
+
+	if rr.Body.String() != "small" {
+		t.Fatalf("unexpected body: %q", rr.Body.String())
+	}
+
+	if rr.Header().Get("X-Test") != "ok" {
+		t.Fatalf("header not propagated")
+	}
+}
+
+func TestTimeoutMiddleware_StreamingThreshold(t *testing.T) {
+	// Test response exactly at threshold boundary
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// 512KB exactly
+		data := make([]byte, 512<<10)
+		w.Write(data)
+	}
+
+	wrapped := ApplyFunc(handler, TimeoutWithConfig(TimeoutConfig{
+		Timeout:            500 * time.Millisecond,
+		MaxBufferBytes:     10 << 20,
+		StreamingThreshold: 512 << 10, // 512KB
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped(rr, req)
+
+	// Should be buffered (not exceed threshold)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+
+	if rr.Body.Len() != 512<<10 {
+		t.Fatalf("expected body length %d, got %d", 512<<10, rr.Body.Len())
+	}
+}
