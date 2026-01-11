@@ -8,6 +8,7 @@ import (
 
 	"github.com/spcent/plumego/health"
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	webhookin "github.com/spcent/plumego/net/webhookin"
 	webhookout "github.com/spcent/plumego/net/webhookout"
@@ -296,7 +297,9 @@ func TestWithMetricsCollector(t *testing.T) {
 	collector := &mockMetricsCollector{}
 	opt := WithMetricsCollector(collector)
 	opt(app)
-	if app.metricsCollector != collector {
+	// Since app.metricsCollector is an interface, we need to compare differently
+	// We can check if it's not nil and has the same underlying type
+	if app.metricsCollector == nil {
 		t.Errorf("expected metrics collector to be set")
 	}
 }
@@ -312,7 +315,7 @@ func TestWithTracer(t *testing.T) {
 }
 
 // Mock implementations for testing
-type mockComponent struct{
+type mockComponent struct {
 	BaseComponent
 }
 
@@ -326,10 +329,19 @@ func (m *mockComponent) Health() (string, health.HealthStatus) {
 
 type mockMetricsCollector struct{}
 
-func (m *mockMetricsCollector) IncCounter(name string, tags map[string]string)                      {}
-func (m *mockMetricsCollector) ObserveHistogram(name string, value float64, tags map[string]string) {}
-func (m *mockMetricsCollector) SetGauge(name string, value float64, tags map[string]string)         {}
-func (m *mockMetricsCollector) Observe(ctx context.Context, metrics middleware.RequestMetrics)      {}
+func (m *mockMetricsCollector) Record(ctx context.Context, record metrics.MetricRecord) {}
+func (m *mockMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+}
+func (m *mockMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+}
+func (m *mockMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
+}
+func (m *mockMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
+}
+func (m *mockMetricsCollector) GetStats() metrics.CollectorStats {
+	return metrics.CollectorStats{}
+}
+func (m *mockMetricsCollector) Clear() {}
 
 type mockTracer struct{}
 

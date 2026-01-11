@@ -23,8 +23,16 @@ type RequestMetrics struct {
 }
 
 // MetricsCollector can be plugged into the logging middleware to export metrics.
+// This interface is maintained for backward compatibility but new code should use
+// the unified metrics.MetricsCollector interface
 type MetricsCollector interface {
 	Observe(ctx context.Context, metrics RequestMetrics)
+}
+
+// UnifiedMetricsCollector is an adapter that allows the unified metrics.MetricsCollector
+// to be used with the logging middleware
+type UnifiedMetricsCollector interface {
+	ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
 }
 
 // TraceSpan represents a started tracing span.
@@ -188,13 +196,4 @@ func (r *responseRecorder) Push(target string, opts *http.PushOptions) error {
 		return pusher.Push(target, opts)
 	}
 	return http.ErrNotSupported
-}
-
-func (r *responseRecorder) CloseNotify() <-chan bool {
-	if notifier, ok := r.ResponseWriter.(http.CloseNotifier); ok {
-		return notifier.CloseNotify()
-	}
-	ch := make(chan bool)
-	close(ch)
-	return ch
 }

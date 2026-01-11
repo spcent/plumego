@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/utils/pool"
 )
 
@@ -120,6 +121,9 @@ type KVStore struct {
 
 	// State
 	closed int32
+
+	// Unified metrics collector
+	collector metrics.MetricsCollector
 }
 
 // Stats provides runtime statistics
@@ -957,4 +961,22 @@ func Default() (*KVStore, error) {
 		MaxMemoryMB:       200,
 		EnableCompression: true,
 	})
+}
+
+// SetMetricsCollector sets the unified metrics collector
+func (kv *KVStore) SetMetricsCollector(collector metrics.MetricsCollector) {
+	kv.collector = collector
+}
+
+// GetMetricsCollector returns the current metrics collector
+func (kv *KVStore) GetMetricsCollector() metrics.MetricsCollector {
+	return kv.collector
+}
+
+// recordMetrics records metrics using the unified collector
+func (kv *KVStore) recordMetrics(operation, key string, duration time.Duration, err error, hit bool) {
+	if kv.collector != nil {
+		ctx := context.Background()
+		kv.collector.ObserveKV(ctx, operation, key, duration, err, hit)
+	}
 }

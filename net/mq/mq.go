@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/pubsub"
 )
 
@@ -38,9 +39,8 @@ type Metrics struct {
 }
 
 // MetricsCollector can be plugged into the broker to observe activity.
-type MetricsCollector interface {
-	Observe(ctx context.Context, metrics Metrics)
-}
+// This is now an alias for the unified metrics collector
+type MetricsCollector = metrics.MetricsCollector
 
 // PanicHandler is invoked when a broker operation panics.
 type PanicHandler func(ctx context.Context, op Operation, recovered any)
@@ -192,13 +192,7 @@ func (b *InProcBroker) observe(ctx context.Context, op Operation, topic string, 
 		return
 	}
 
-	metrics := Metrics{
-		Operation: op,
-		Topic:     topic,
-		Duration:  time.Since(start),
-		Err:       err,
-		Panic:     panicked,
-	}
+	duration := time.Since(start)
 
 	func() {
 		defer func() {
@@ -206,6 +200,7 @@ func (b *InProcBroker) observe(ctx context.Context, op Operation, topic string, 
 				b.panicHandler(ctx, OpMetrics, recovered)
 			}
 		}()
-		b.metrics.Observe(ctx, metrics)
+		// Use the unified interface
+		b.metrics.ObserveMQ(ctx, string(op), topic, duration, err, panicked)
 	}()
 }

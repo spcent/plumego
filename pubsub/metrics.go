@@ -18,8 +18,8 @@ type TopicMetrics struct {
 	SubscribersGauge int               `json:"subscribers"`
 }
 
-// metrics manages pubsub metrics with lock-free operations.
-type metrics struct {
+// metricsPubSub manages pubsub metricsPubSub with lock-free operations.
+type metricsPubSub struct {
 	topics sync.Map // map[string]*topicMetrics
 }
 
@@ -40,7 +40,7 @@ var policyNames = map[BackpressurePolicy]string{
 }
 
 // ensureTopic gets or creates topic metrics.
-func (m *metrics) ensureTopic(topic string) *topicMetrics {
+func (m *metricsPubSub) ensureTopic(topic string) *topicMetrics {
 	if v, ok := m.topics.Load(topic); ok {
 		return v.(*topicMetrics)
 	}
@@ -50,22 +50,22 @@ func (m *metrics) ensureTopic(topic string) *topicMetrics {
 }
 
 // incPublish increments publish counter.
-func (m *metrics) incPublish(topic string) {
+func (m *metricsPubSub) incPublish(topic string) {
 	m.ensureTopic(topic).publishTotal.Add(1)
 }
 
 // incDelivered increments delivered counter.
-func (m *metrics) incDelivered(topic string) {
+func (m *metricsPubSub) incDelivered(topic string) {
 	m.ensureTopic(topic).deliveredTotal.Add(1)
 }
 
 // addSubs modifies subscriber count (can be negative).
-func (m *metrics) addSubs(topic string, delta int64) {
+func (m *metricsPubSub) addSubs(topic string, delta int64) {
 	m.ensureTopic(topic).subsGauge.Add(delta)
 }
 
 // incDropped increments dropped counter for a policy.
-func (m *metrics) incDropped(topic string, policy BackpressurePolicy) {
+func (m *metricsPubSub) incDropped(topic string, policy BackpressurePolicy) {
 	tm := m.ensureTopic(topic)
 	key := policyName(policy)
 
@@ -81,7 +81,7 @@ func (m *metrics) incDropped(topic string, policy BackpressurePolicy) {
 }
 
 // Snapshot creates a consistent snapshot of all metrics.
-func (m *metrics) Snapshot() MetricsSnapshot {
+func (m *metricsPubSub) Snapshot() MetricsSnapshot {
 	out := MetricsSnapshot{Topics: map[string]TopicMetrics{}}
 
 	m.topics.Range(func(k, v any) bool {

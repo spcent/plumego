@@ -15,13 +15,13 @@ type user struct {
 }
 
 type advancedUser struct {
-	Email     string `validate:"required,email"`
-	Phone     string `validate:"phone"`
-	Website   string `validate:"url"`
-	Age       int    `validate:"min=18,max=100"`
-	Username  string `validate:"required,alphaNum"`
-	Code      string `validate:"regex=^[A-Z]{3}$"`
-	Score     string `validate:"numeric"`
+	Email    string `validate:"required,email"`
+	Phone    string `validate:"phone"`
+	Website  string `validate:"url"`
+	Age      int    `validate:"min=18,max=100"`
+	Username string `validate:"required,alphaNum"`
+	Code     string `validate:"regex=^[A-Z]{3}$"`
+	Score    string `validate:"numeric"`
 }
 
 func TestValidateSuccess(t *testing.T) {
@@ -167,22 +167,22 @@ func TestAdvancedValidationRules(t *testing.T) {
 func TestValidationErrorStructure(t *testing.T) {
 	u := user{Email: "invalid-email", Password: "short", Username: "a"}
 	err := Validate(u)
-	
+
 	if err == nil {
 		t.Fatalf("expected validation error")
 	}
-	
+
 	// Check if it's a FieldErrors type
 	fieldErrors, ok := err.(FieldErrors)
 	if !ok {
 		t.Fatalf("expected FieldErrors type, got %T", err)
 	}
-	
+
 	errors := fieldErrors.Errors()
 	if len(errors) == 0 {
 		t.Fatalf("expected field errors")
 	}
-	
+
 	// Check error structure
 	for _, e := range errors {
 		if e.Field == "" {
@@ -207,23 +207,23 @@ func TestCustomRuleRegistration(t *testing.T) {
 		}
 		return nil
 	})
-	
+
 	// Create registry and register custom rule
 	registry := NewRuleRegistry()
 	registry.Register("forbidden", customRule)
-	
+
 	validator := NewValidator(registry)
-	
+
 	type testStruct struct {
 		Name string `validate:"forbidden"`
 	}
-	
+
 	// Test valid value
 	ts := testStruct{Name: "allowed"}
 	if err := validator.Validate(ts); err != nil {
 		t.Fatalf("expected validation success, got: %v", err)
 	}
-	
+
 	// Test forbidden value
 	ts.Name = "forbidden"
 	if err := validator.Validate(ts); err == nil {
@@ -260,14 +260,14 @@ func TestPointerHandling(t *testing.T) {
 		Email    *string `validate:"required,email"`
 		Password *string `validate:"required,min=8"`
 	}
-	
+
 	// Test with nil pointers
 	ps := pointerStruct{}
 	err := Validate(ps)
 	if err == nil {
 		t.Fatalf("expected validation error for nil pointers")
 	}
-	
+
 	// Test with valid values
 	email := "test@example.com"
 	password := "validpass"
@@ -275,7 +275,7 @@ func TestPointerHandling(t *testing.T) {
 	if err := Validate(ps); err != nil {
 		t.Fatalf("expected validation success, got: %v", err)
 	}
-	
+
 	// Test with invalid email
 	ps.Email = &email
 	ps.Password = &password
@@ -292,7 +292,7 @@ func TestEmptyAndWhitespaceHandling(t *testing.T) {
 		Email    string `validate:"required,email"`
 		Username string `validate:"required,minLength=3"`
 	}
-	
+
 	// Test with whitespace-only values
 	ws := whitespaceStruct{
 		Email:    "   ",
@@ -310,17 +310,17 @@ func TestNumericStringValidation(t *testing.T) {
 		Score  string `validate:"numeric"`
 		Height int64  `validate:"min=100,max=300"`
 	}
-	
+
 	ns := numericStruct{
 		Age:    25,
 		Score:  "95.5",
 		Height: 175,
 	}
-	
+
 	if err := Validate(ns); err != nil {
 		t.Fatalf("expected validation success, got: %v", err)
 	}
-	
+
 	// Test invalid numeric string
 	ns.Score = "not-a-number"
 	err := Validate(ns)

@@ -1,22 +1,22 @@
-# WebSocket 安全性优化总结
+# WebSocket Security Optimization Summary
 
-## 问题分析
+## Problem Analysis
 
-### 1. WebSocket 密钥校验强度问题
+### 1. WebSocket Key Validation Strength Issue
 
-**原始问题**：
-- JWT Secret 只做非空校验，没有长度/强度要求
-- Room Passwords 使用 `password.HashPassword()`，但 `SetRoomPassword()` 没有强度验证
-- Sec-WebSocket-Key 只检查存在性，没有验证格式
+**Original Problems**:
+- JWT Secret only checks for non-empty, no length/strength requirements
+- Room Passwords use `password.HashPassword()`, but `SetRoomPassword()` has no strength validation
+- Sec-WebSocket-Key only checks existence, no format validation
 
-**安全风险**：
-- 弱 JWT Secret 可能被暴力破解
-- 弱 Room Password 容易被猜测
-- 无效的 WebSocket Key 可能导致协议错误
+**Security Risks**:
+- Weak JWT Secret could be brute-forced
+- Weak Room Password easily guessed
+- Invalid WebSocket Key could cause protocol errors
 
-### 2. 广播接口 debug/生产逻辑混合问题
+### 2. Broadcast Debug/Production Logic Mixing Issue
 
-**原始问题**：
+**Original Problem**:
 ```go
 func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
     // ...
@@ -24,54 +24,54 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
         select {
         case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
         default:
-            // 静默丢弃消息，无日志，无监控
+            // Silent message drop, no logs, no monitoring
         }
     }
 }
 ```
 
-**问题**：
-- 生产环境消息丢失无感知
-- 无法监控广播队列状态
-- 缺少错误处理策略
+**Problems**:
+- Production message loss goes unnoticed
+- Cannot monitor broadcast queue status
+- Missing error handling strategy
 
-## 解决方案
+## Solution
 
-### 1. 安全配置验证 (`security.go`)
+### 1. Security Configuration Validation (`security.go`)
 
-#### SecurityConfig 结构
+#### SecurityConfig Structure
 ```go
 type SecurityConfig struct {
-    JWTSecret               []byte  // JWT 密钥，最小 32 字节
-    MinJWTSecretLength      int     // 强制最小长度
+    JWTSecret               []byte  // JWT key, minimum 32 bytes
+    MinJWTSecretLength      int     // Enforce minimum length
     RoomPasswordConfig      password.PasswordStrengthConfig
-    EnforcePasswordStrength bool    // 是否强制密码强度
-    MaxMessageSize          int64   // 消息大小限制
-    EnableDebugLogging      bool    // 调试日志开关
-    RejectOnQueueFull       bool    // 队列满时行为
-    MaxConnectionRate       int     // 连接速率限制
-    EnableMetrics           bool    // 指标收集
+    EnforcePasswordStrength bool    // Enforce password strength
+    MaxMessageSize          int64   // Message size limit
+    EnableDebugLogging      bool    // Debug log switch
+    RejectOnQueueFull       bool    // Queue full behavior
+    MaxConnectionRate       int     // Connection rate limit
+    EnableMetrics           bool    // Metrics collection
 }
 ```
 
-#### 核心验证函数
+#### Core Validation Functions
 
-**ValidateSecurityConfig**：
-- 验证 JWT Secret 长度 ≥ 32 字节
-- 警告常见弱模式（"secret", "password", "123456"）
-- 返回明确错误信息
+**ValidateSecurityConfig**:
+- Validates JWT Secret length ≥ 32 bytes
+- Warns about common weak patterns ("secret", "password", "123456")
+- Returns explicit error messages
 
-**ValidateWebSocketKey**：
-- 验证 Sec-WebSocket-Key 为有效 Base64
-- 验证解码后长度为 16 字节
-- 防止协议错误
+**ValidateWebSocketKey**:
+- Validates Sec-WebSocket-Key is valid Base64
+- Validates decoded length is 16 bytes
+- Prevents protocol errors
 
-**ValidateRoomPassword**：
-- 集成密码强度检查
-- 支持强制/警告模式
-- 使用 `password.ValidatePasswordStrength`
+**ValidateRoomPassword**:
+- Integrates password strength checking
+- Supports enforcement/warning modes
+- Uses `password.ValidatePasswordStrength`
 
-### 2. 安全增强的认证 (`SecureRoomAuth`)
+### 2. Enhanced Authentication (`SecureRoomAuth`)
 
 ```go
 type SecureRoomAuth struct {
@@ -80,43 +80,43 @@ type SecureRoomAuth struct {
 }
 ```
 
-**功能**：
-- `SetRoomPassword()`：自动验证密码强度
-- `VerifyJWT()`：记录验证失败和成功指标
-- 支持安全指标收集
+**Features**:
+- `SetRoomPassword()`: Automatically validates password strength
+- `VerifyJWT()`: Records validation failures and success metrics
+- Supports security metrics collection
 
-### 3. Hub 生产级改进 (`hub.go`)
+### 3. Hub Production-Grade Improvements (`hub.go`)
 
-#### HubConfig 扩展
+#### HubConfig Extension
 ```go
 type HubConfig struct {
-    // 原有字段
+    // Original fields
     WorkerCount        int
     JobQueueSize       int
     MaxConnections     int
     MaxRoomConnections int
     
-    // 新增生产配置
+    // New production config
     EnableDebugLogging    bool
     EnableMetrics         bool
-    RejectOnQueueFull     bool  // 关键改进
+    RejectOnQueueFull     bool  // Key improvement
     MaxConnectionRate     int
     EnableSecurityMetrics bool
 }
 ```
 
-#### 广播逻辑改进
+#### Broadcast Logic Improvements
 
-**原始行为**：
+**Original Behavior**:
 ```go
 select {
 case h.jobQueue <- job:
 default:
-    // 静默丢弃
+    // Silent drop
 }
 ```
 
-**改进后**：
+**Improved**:
 ```go
 select {
 case h.jobQueue <- job:
@@ -124,38 +124,38 @@ case h.jobQueue <- job:
 default:
     dropped++
     if h.config.RejectOnQueueFull {
-        // 生产模式：记录日志和指标
+        // Production mode: log and metrics
         h.logger.Printf("Broadcast queue full: dropped message")
         h.recordSecurityEvent("broadcast_queue_full", ...)
     }
-    // 调试模式：静默丢弃（兼容原行为）
+    // Debug mode: silent drop (compatible with original)
 }
 ```
 
-**优势**：
-- ✅ 生产环境可观测性
-- ✅ 可配置的错误处理策略
-- ✅ 安全指标自动收集
+**Advantages**:
+- ✅ Production environment observability
+- ✅ Configurable error handling strategy
+- ✅ Automatic security metrics collection
 
-### 4. Server 集成安全验证 (`server.go`)
+### 4. Server Integration Security Validation (`server.go`)
 
-在 `ServeWSWithAuth` 中新增：
+Added to `ServeWSWithAuth`:
 ```go
-// 1. 验证 WebSocket Key
+// 1. Validate WebSocket Key
 if err := ValidateWebSocketKey(key); err != nil {
     securityMetrics.InvalidWebSocketKeys++
     http.Error(w, err.Error(), http.StatusBadRequest)
     return
 }
 
-// 2. 增强认证错误处理
+// 2. Enhanced authentication error handling
 if !auth.CheckRoomPassword(room, roomPwd) {
     securityMetrics.RejectedConnections++
     http.Error(w, "forbidden: bad room password", http.StatusForbidden)
     return
 }
 
-// 3. JWT 成功认证计数
+// 3. JWT success authentication count
 if token != "" {
     payload, err := auth.VerifyJWT(token)
     if err != nil {
@@ -166,9 +166,9 @@ if token != "" {
 }
 ```
 
-### 5. 安全指标系统
+### 5. Security Metrics System
 
-#### SecurityMetrics 结构
+#### SecurityMetrics Structure
 ```go
 type SecurityMetrics struct {
     InvalidJWTSecrets         uint64
@@ -180,37 +180,37 @@ type SecurityMetrics struct {
 }
 ```
 
-#### 指标收集点
-- JWT 验证失败 → `InvalidJWTSecrets`
-- 弱密码设置 → `WeakRoomPasswords`
-- 无效 WebSocket Key → `InvalidWebSocketKeys`
-- 广播队列满 → `BroadcastQueueFull`
-- 连接被拒绝 → `RejectedConnections`
-- 认证成功 → `SuccessfulAuthentications`
+#### Metric Collection Points
+- JWT validation failure → `InvalidJWTSecrets`
+- Weak password setting → `WeakRoomPasswords`
+- Invalid WebSocket Key → `InvalidWebSocketKeys`
+- Broadcast queue full → `BroadcastQueueFull`
+- Connection rejected → `RejectedConnections`
+- Authentication success → `SuccessfulAuthentications`
 
-## 使用示例
+## Usage Examples
 
-### 1. 创建安全 Hub
+### 1. Create Secure Hub
 
 ```go
-// 生成安全密钥
+// Generate secure key
 secret, _ := GenerateSecureSecret(32)
 
-// 配置安全设置
+// Configure security settings
 securityCfg := SecurityConfig{
     JWTSecret:               secret,
     MinJWTSecretLength:      32,
     EnforcePasswordStrength: true,
     RoomPasswordConfig:      password.DefaultPasswordStrengthConfig(),
-    EnableDebugLogging:      false, // 生产环境关闭
-    RejectOnQueueFull:       true,  // 生产环境拒绝
+    EnableDebugLogging:      false, // Production off
+    RejectOnQueueFull:       true,  // Production reject
     EnableMetrics:           true,
 }
 
-// 创建安全认证
+// Create secure auth
 auth, err := NewSecureRoomAuth(secret, securityCfg)
 
-// 创建 Hub
+// Create Hub
 hubCfg := HubConfig{
     WorkerCount:           4,
     JobQueueSize:          1024,
@@ -224,28 +224,28 @@ hubCfg := HubConfig{
 hub := NewHubWithConfig(hubCfg)
 ```
 
-### 2. 设置安全密码
+### 2. Set Secure Password
 
 ```go
-// ✅ 正确：强密码
+// ✅ Correct: Strong password
 err := auth.SetRoomPassword("admin", "SecureP@ssw0rd123!")
 
-// ❌ 错误：弱密码（会被拒绝）
+// ❌ Error: Weak password (will be rejected)
 err = auth.SetRoomPassword("admin", "weak")
-// 返回: ErrWeakRoomPassword
+// Returns: ErrWeakRoomPassword
 ```
 
-### 3. 监控安全指标
+### 3. Monitor Security Metrics
 
 ```go
-// 获取安全指标
+// Get security metrics
 metrics := GetSecurityMetrics()
 fmt.Printf("Invalid JWT: %d\n", metrics.InvalidJWTSecrets)
 fmt.Printf("Weak Passwords: %d\n", metrics.WeakRoomPasswords)
 fmt.Printf("Broadcast Queue Full: %d\n", metrics.BroadcastQueueFull)
 ```
 
-### 4. 集成到 HTTP 服务器
+### 4. Integrate into HTTP Server
 
 ```go
 http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -253,101 +253,101 @@ http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 })
 ```
 
-## 性能影响
+## Performance Impact
 
-### 内存使用
-- **安全指标**：额外 ~100 字节（可忽略）
-- **配置验证**：启动时一次，无运行时开销
-- **WebSocket Key 验证**：Base64 解码 + 长度检查，< 1μs
+### Memory Usage
+- **Security metrics**: Additional ~100 bytes (negligible)
+- **Configuration validation**: Once at startup, no runtime overhead
+- **WebSocket Key validation**: Base64 decode + length check, < 1μs
 
-### CPU 使用
-- **密码强度检查**：O(n) 遍历，n = 密码长度
-- **JWT 验证**：HMAC-SHA256，与原实现相同
-- **广播监控**：原子操作 + 通道写入，< 100ns
+### CPU Usage
+- **Password strength check**: O(n) traversal, n = password length
+- **JWT validation**: HMAC-SHA256, same as original
+- **Broadcast monitoring**: Atomic operation + channel write, < 100ns
 
-### 吞吐量
-- **广播队列满**：可配置拒绝或静默丢弃
-- **生产模式**：额外日志开销 ~1-2%
-- **调试模式**：与原实现性能相同
+### Throughput
+- **Broadcast queue full**: Configurable reject or silent drop
+- **Production mode**: Additional logging overhead ~1-2%
+- **Debug mode**: Same performance as original
 
-## 迁移指南
+## Migration Guide
 
-### 从原实现迁移
+### From Original Implementation
 
-1. **替换认证创建**：
+1. **Replace auth creation**:
 ```go
-// 原
+// Original
 auth := websocket.NewSimpleRoomAuth(secret)
 
-// 新
+// New
 cfg := SecurityConfig{JWTSecret: secret}
 auth, _ := websocket.NewSecureRoomAuth(secret, cfg)
 ```
 
-2. **更新 Hub 配置**：
+2. **Update Hub config**:
 ```go
-// 原
+// Original
 hub := websocket.NewHub(4, 1024)
 
-// 新
+// New
 cfg := HubConfig{
     WorkerCount:  4,
     JobQueueSize: 1024,
-    // ... 其他配置
+    // ... other configs
 }
 hub := websocket.NewHubWithConfig(cfg)
 ```
 
-3. **添加安全验证**：
+3. **Add security validation**:
 ```go
-// 在 ServeWSWithAuth 前添加
+// Before ServeWSWithAuth
 if err := websocket.ValidateWebSocketKey(key); err != nil {
     return
 }
 ```
 
-### 配置建议
+### Configuration Recommendations
 
-#### 开发环境
+#### Development Environment
 ```go
 EnableDebugLogging: true,
-RejectOnQueueFull:  false, // 兼容原行为
+RejectOnQueueFull:  false, // Compatible with original
 ```
 
-#### 生产环境
+#### Production Environment
 ```go
 EnableDebugLogging: false,
-RejectOnQueueFull:  true,  // 严格模式
+RejectOnQueueFull:  true,  // Strict mode
 EnableMetrics:      true,
 ```
 
-## 测试覆盖
+## Test Coverage
 
-新增测试：
-- ✅ `TestValidateSecurityConfig` - 配置验证
-- ✅ `TestValidateWebSocketKey` - WebSocket Key 验证
-- ✅ `TestValidateRoomPassword` - 密码强度验证
-- ✅ `TestSecureRoomAuth` - 安全认证功能
-- ✅ `TestSecurityMetrics` - 指标收集
-- ✅ `TestHubSecurityIntegration` - Hub 集成
-- ✅ `TestHubBroadcastWithSecurity` - 广播监控
-- ✅ `TestHubConnectionLimitsSecurity` - 连接限制
+New tests:
+- ✅ `TestValidateSecurityConfig` - Configuration validation
+- ✅ `TestValidateWebSocketKey` - WebSocket Key validation
+- ✅ `TestValidateRoomPassword` - Password strength validation
+- ✅ `TestSecureRoomAuth` - Secure authentication features
+- ✅ `TestSecurityMetrics` - Metrics collection
+- ✅ `TestHubSecurityIntegration` - Hub integration
+- ✅ `TestHubBroadcastWithSecurity` - Broadcast monitoring
+- ✅ `TestHubConnectionLimitsSecurity` - Connection limits
 
-## 总结
+## Summary
 
-### 安全性提升
-1. ✅ **密钥强度**：强制 32 字节最小长度
-2. ✅ **密码策略**：支持可配置强度要求
-3. ✅ **协议验证**：WebSocket Key 格式检查
-4. ✅ **可观测性**：全面的安全指标收集
-5. ✅ **错误处理**：生产级广播队列管理
+### Security Enhancements
+1. ✅ **Key Strength**: Enforces 32-byte minimum length
+2. ✅ **Password Policy**: Configurable strength requirements
+3. ✅ **Protocol Validation**: WebSocket Key format checking
+4. ✅ **Observability**: Comprehensive security metrics collection
+5. ✅ **Error Handling**: Production-grade queue management
 
-### 兼容性
-- ✅ **API 兼容**：现有代码无需修改
-- ✅ **性能兼容**：开销可忽略
-- ✅ **行为兼容**：调试模式保持原行为
+### Compatibility
+- ✅ **API Compatible**: Existing code requires no changes
+- ✅ **Performance Compatible**: Negligible overhead
+- ✅ **Behavior Compatible**: Debug mode maintains original behavior
 
-### 生产就绪
-- ✅ **配置化**：所有安全特性可开关
-- ✅ **可观测**：指标、日志、事件
-- ✅ **可扩展**：易于添加新规则
+### Production Ready
+- ✅ **Configurable**: All security features can be toggled
+- ✅ **Observable**: Metrics, logs, events
+- ✅ **Extensible**: Easy to add new rules

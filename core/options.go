@@ -4,6 +4,7 @@ import (
 	"time"
 
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
@@ -191,7 +192,7 @@ func WithComponents(components ...Component) Option {
 }
 
 // WithMetricsCollector sets a metrics collector hook for observability middleware.
-func WithMetricsCollector(collector middleware.MetricsCollector) Option {
+func WithMetricsCollector(collector metrics.MetricsCollector) Option {
 	return func(a *App) {
 		a.metricsCollector = collector
 	}

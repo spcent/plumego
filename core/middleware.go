@@ -1,10 +1,12 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -88,12 +90,29 @@ func (a *App) enableLogging() error {
 		return nil
 	}
 
-	if err := a.Use(middleware.Logging(a.logger, a.metricsCollector, a.tracer)); err != nil {
+	// Create an adapter for the unified metrics collector
+	var metricsCollector middleware.MetricsCollector
+	if a.metricsCollector != nil {
+		metricsCollector = &metricsAdapter{collector: a.metricsCollector}
+	}
+
+	if err := a.Use(middleware.Logging(a.logger, metricsCollector, a.tracer)); err != nil {
 		return err
 	}
 
 	a.loggingEnabled = true
 	return nil
+}
+
+// metricsAdapter adapts the unified MetricsCollector to the legacy interface
+type metricsAdapter struct {
+	collector metrics.MetricsCollector
+}
+
+func (m *metricsAdapter) Observe(ctx context.Context, metrics middleware.RequestMetrics) {
+	if m.collector != nil {
+		m.collector.ObserveHTTP(ctx, metrics.Method, metrics.Path, metrics.Status, metrics.Bytes, metrics.Duration)
+	}
 }
 
 // EnableAuth enables the auth middleware.

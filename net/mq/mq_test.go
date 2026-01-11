@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/pubsub"
 )
 
@@ -113,9 +114,42 @@ type metricsCollector struct {
 	count int
 }
 
-func (m *metricsCollector) Observe(ctx context.Context, metrics Metrics) {
+func (m *metricsCollector) Record(ctx context.Context, record metrics.MetricRecord) {
+	// Not used in this test
+}
+
+func (m *metricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	// Not used in this test
+}
+
+func (m *metricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+	// Not used in this test
+}
+
+func (m *metricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.last = metrics
+	m.last = Metrics{
+		Operation: Operation(operation),
+		Topic:     topic,
+		Duration:  duration,
+		Err:       err,
+		Panic:     panicked,
+	}
 	m.count++
+}
+
+func (m *metricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
+	// Not used in this test
+}
+
+func (m *metricsCollector) GetStats() metrics.CollectorStats {
+	return metrics.CollectorStats{}
+}
+
+func (m *metricsCollector) Clear() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.count = 0
+	m.last = Metrics{}
 }

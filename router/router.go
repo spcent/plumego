@@ -11,6 +11,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -40,6 +41,7 @@ type RouteRegistrar interface {
 type MiddlewareManager struct {
 	middlewares []middleware.Middleware
 	mu          sync.RWMutex
+	metrics     metrics.MetricsCollector // Unified metrics collector
 }
 
 // NewMiddlewareManager creates a new middleware manager
@@ -424,6 +426,20 @@ func (r *Router) Use(middlewares ...middleware.Middleware) {
 	for _, middleware := range middlewares {
 		r.middlewareManager.AddMiddleware(middleware)
 	}
+}
+
+// SetMetricsCollector sets the unified metrics collector for the router
+func (r *Router) SetMetricsCollector(collector metrics.MetricsCollector) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.middlewareManager.metrics = collector
+}
+
+// GetMetricsCollector returns the current metrics collector
+func (r *Router) GetMetricsCollector() metrics.MetricsCollector {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.middlewareManager.metrics
 }
 
 // findChild finds a child node with the given path segment

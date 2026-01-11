@@ -25,7 +25,7 @@ type latencyStats struct {
 	max   float64
 }
 
-// PrometheusCollector implements middleware.MetricsCollector without third-party dependencies.
+// PrometheusCollector implements MetricsCollector without third-party dependencies.
 // It exposes a text-based metrics handler compatible with Prometheus exposition format.
 type PrometheusCollector struct {
 	namespace string
@@ -35,6 +35,9 @@ type PrometheusCollector struct {
 	requests  map[labelKey]uint64
 	durations map[labelKey]latencyStats
 	startTime time.Time
+
+	// Base collector for unified interface
+	base *BaseMetricsCollector
 }
 
 // NewPrometheusCollector constructs an in-memory collector with the provided namespace.
@@ -60,8 +63,8 @@ func (p *PrometheusCollector) WithMaxMemory(max int) *PrometheusCollector {
 }
 
 // Observe records a single HTTP request metric set.
-func (p *PrometheusCollector) Observe(_ context.Context, metrics middleware.RequestMetrics) {
-	key := labelKey{metrics.Method, metrics.Path, strconv.Itoa(metrics.Status)}
+func (p *PrometheusCollector) Observe(_ context.Context, m middleware.RequestMetrics) {
+	key := labelKey{m.Method, m.Path, strconv.Itoa(m.Status)}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -73,7 +76,7 @@ func (p *PrometheusCollector) Observe(_ context.Context, metrics middleware.Requ
 
 	p.requests[key]++
 
-	duration := metrics.Duration.Seconds()
+	duration := m.Duration.Seconds()
 	stats := p.durations[key]
 	stats.count++
 	stats.sum += duration
@@ -182,6 +185,76 @@ func (p *PrometheusCollector) Clear() {
 	p.startTime = time.Now()
 }
 
+// Record implements the unified MetricsCollector interface
+func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
+	// For HTTP requests, use the existing Prometheus format
+	if record.Type == MetricHTTPRequest {
+		if statusStr, ok := record.Labels["status"]; ok {
+			if status, err := strconv.Atoi(statusStr); err == nil {
+				if method, ok := record.Labels["method"]; ok {
+					if path, ok := record.Labels["path"]; ok {
+						metrics := middleware.RequestMetrics{
+							Method:    method,
+							Path:      path,
+							Status:    status,
+							Bytes:     0,
+							Duration:  record.Duration,
+							TraceID:   "",
+							UserAgent: "",
+						}
+						p.Observe(ctx, metrics)
+						return
+					}
+				}
+			}
+		}
+	}
+
+	// For other metric types, use the base collector
+	if p.base == nil {
+		p.base = NewBaseMetricsCollector()
+	}
+	p.base.Record(ctx, record)
+}
+
+// ObserveHTTP implements the unified MetricsCollector interface
+func (p *PrometheusCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	metrics := middleware.RequestMetrics{
+		Method:    method,
+		Path:      path,
+		Status:    status,
+		Bytes:     bytes,
+		Duration:  duration,
+		TraceID:   "",
+		UserAgent: "",
+	}
+	p.Observe(ctx, metrics)
+}
+
+// ObservePubSub implements the unified MetricsCollector interface
+func (p *PrometheusCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+	if p.base == nil {
+		p.base = NewBaseMetricsCollector()
+	}
+	p.base.ObservePubSub(ctx, operation, topic, duration, err)
+}
+
+// ObserveMQ implements the unified MetricsCollector interface
+func (p *PrometheusCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
+	if p.base == nil {
+		p.base = NewBaseMetricsCollector()
+	}
+	p.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
+}
+
+// ObserveKV implements the unified MetricsCollector interface
+func (p *PrometheusCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
+	if p.base == nil {
+		p.base = NewBaseMetricsCollector()
+	}
+	p.base.ObserveKV(ctx, operation, key, duration, err, hit)
+}
+
 func (p *PrometheusCollector) snapshot() (map[labelKey]uint64, map[labelKey]latencyStats, time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -240,12 +313,4 @@ func sortedKeys[T any](m map[labelKey]T) []labelKey {
 		return keys[i].status < keys[j].status
 	})
 	return keys
-}
-
-// CollectorStats provides statistics about the collector.
-type CollectorStats struct {
-	Series         int       `json:"series"`
-	TotalRequests  uint64    `json:"total_requests"`
-	AverageLatency float64   `json:"average_latency"`
-	StartTime      time.Time `json:"start_time"`
 }

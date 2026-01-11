@@ -229,8 +229,8 @@ func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *
 
 func (a *App) mountComponents() []Component {
 	// Get all components (built-in + custom)
-	comps := append([]Component{}, a.builtInComponents()...) 
-	comps = append(comps, a.components...) 
+	comps := append([]Component{}, a.builtInComponents()...)
+	comps = append(comps, a.components...)
 
 	if a.middlewareReg == nil {
 		a.middlewareReg = middleware.NewRegistry()

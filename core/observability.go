@@ -16,7 +16,7 @@ type MetricsConfig struct {
 	Path      string
 	Namespace string
 	MaxSeries int
-	Collector middleware.MetricsCollector
+	Collector metrics.MetricsCollector
 	Handler   http.Handler
 }
 

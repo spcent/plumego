@@ -41,6 +41,9 @@ type OpenTelemetryTracer struct {
 
 	mu    sync.RWMutex
 	spans []Span
+
+	// Base collector for unified interface
+	base *BaseMetricsCollector
 }
 
 // NewOpenTelemetryTracer creates a tracer with the given instrumentation name.
@@ -119,8 +122,8 @@ func (t *OpenTelemetryTracer) Spans() []Span {
 	return spans
 }
 
-// GetStats returns statistics about collected spans.
-func (t *OpenTelemetryTracer) GetStats() SpanStats {
+// GetSpanStats returns statistics about collected spans.
+func (t *OpenTelemetryTracer) GetSpanStats() SpanStats {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -139,13 +142,6 @@ func (t *OpenTelemetryTracer) GetStats() SpanStats {
 	}
 
 	return stats
-}
-
-// Clear clears all collected spans.
-func (t *OpenTelemetryTracer) Clear() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.spans = t.spans[:0]
 }
 
 func (t *OpenTelemetryTracer) record(span Span) {
@@ -233,4 +229,81 @@ type SpanStats struct {
 	ErrorSpans      int
 	TotalDuration   time.Duration
 	AverageDuration time.Duration
+}
+
+// Record implements the unified MetricsCollector interface
+func (t *OpenTelemetryTracer) Record(ctx context.Context, record MetricRecord) {
+	if t.base == nil {
+		t.base = NewBaseMetricsCollector()
+	}
+	t.base.Record(ctx, record)
+}
+
+// ObserveHTTP implements the unified MetricsCollector interface
+func (t *OpenTelemetryTracer) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	if t.base == nil {
+		t.base = NewBaseMetricsCollector()
+	}
+	t.base.ObserveHTTP(ctx, method, path, status, bytes, duration)
+}
+
+// ObservePubSub implements the unified MetricsCollector interface
+func (t *OpenTelemetryTracer) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+	if t.base == nil {
+		t.base = NewBaseMetricsCollector()
+	}
+	t.base.ObservePubSub(ctx, operation, topic, duration, err)
+}
+
+// ObserveMQ implements the unified MetricsCollector interface
+func (t *OpenTelemetryTracer) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
+	if t.base == nil {
+		t.base = NewBaseMetricsCollector()
+	}
+	t.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
+}
+
+// ObserveKV implements the unified MetricsCollector interface
+func (t *OpenTelemetryTracer) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
+	if t.base == nil {
+		t.base = NewBaseMetricsCollector()
+	}
+	t.base.ObserveKV(ctx, operation, key, duration, err, hit)
+}
+
+// GetStats implements the unified MetricsCollector interface
+// This method returns span statistics
+func (t *OpenTelemetryTracer) GetStats() CollectorStats {
+	spanStats := t.GetSpanStats()
+
+	return CollectorStats{
+		TotalSpans:      spanStats.TotalSpans,
+		ErrorSpans:      spanStats.ErrorSpans,
+		TotalDuration:   spanStats.TotalDuration,
+		AverageDuration: spanStats.AverageDuration,
+		// Include base collector stats if available
+		TotalRecords: func() int64 {
+			if t.base != nil {
+				return t.base.GetStats().TotalRecords
+			}
+			return 0
+		}(),
+		ErrorRecords: func() int64 {
+			if t.base != nil {
+				return t.base.GetStats().ErrorRecords
+			}
+			return 0
+		}(),
+	}
+}
+
+// Clear implements the unified MetricsCollector interface
+func (t *OpenTelemetryTracer) Clear() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.spans = t.spans[:0]
+
+	if t.base != nil {
+		t.base.Clear()
+	}
 }

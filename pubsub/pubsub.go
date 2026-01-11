@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/spcent/plumego/metrics"
 )
 
 // subscriber represents a subscription to a topic.
@@ -55,7 +57,8 @@ type InProcPubSub struct {
 	closed atomic.Bool
 	nextID atomic.Uint64
 
-	metrics metrics
+	metrics   metricsPubSub
+	collector metrics.MetricsCollector // Unified metrics collector
 }
 
 // New creates a new InProcPubSub instance.
@@ -473,4 +476,26 @@ func normalizeSubOptions(opts SubOptions) SubOptions {
 // Snapshot exposes observability metrics.
 func (ps *InProcPubSub) Snapshot() MetricsSnapshot {
 	return ps.metrics.Snapshot()
+}
+
+// SetMetricsCollector sets the unified metrics collector
+func (ps *InProcPubSub) SetMetricsCollector(collector metrics.MetricsCollector) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.collector = collector
+}
+
+// GetMetricsCollector returns the current metrics collector
+func (ps *InProcPubSub) GetMetricsCollector() metrics.MetricsCollector {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.collector
+}
+
+// recordMetrics records metrics using the unified collector
+func (ps *InProcPubSub) recordMetrics(operation, topic string, duration time.Duration, err error) {
+	if ps.collector != nil {
+		ctx := context.Background()
+		ps.collector.ObservePubSub(ctx, operation, topic, duration, err)
+	}
 }

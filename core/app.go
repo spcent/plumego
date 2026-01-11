@@ -6,6 +6,7 @@ import (
 	"time"
 
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
@@ -33,7 +34,7 @@ type App struct {
 	handlerOnce sync.Once          // Ensures handler initialization happens once
 
 	// Optional components
-	metricsCollector middleware.MetricsCollector
+	metricsCollector metrics.MetricsCollector
 	tracer           middleware.Tracer
 	pub              pubsub.PubSub
 	loggingEnabled   bool
@@ -43,9 +44,9 @@ type App struct {
 	startedComponents []Component
 	componentStopOnce sync.Once
 	componentsMounted bool
-	
+
 	// Dependency injection container
-	diContainer       *DIContainer
+	diContainer *DIContainer
 }
 
 // Option defines a function type for configuring the App.
@@ -100,13 +101,13 @@ func New(options ...Option) *App {
 func (a *App) registerCoreServices() {
 	// Register app instance
 	a.diContainer.Register(a)
-	
+
 	// Register router
 	a.diContainer.Register(a.router)
-	
+
 	// Register middleware registry
 	a.diContainer.Register(a.middlewareReg)
-	
+
 	// Register logger
 	a.diContainer.Register(a.logger)
 }
