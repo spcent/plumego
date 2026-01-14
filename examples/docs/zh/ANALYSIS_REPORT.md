@@ -22,7 +22,7 @@ func (c *DIContainer) Resolve(serviceType reflect.Type) (interface{}, error) {
     if c.isResolving(serviceType) {
         return nil, errors.New("circular dependency detected")
     }
-    
+
     // Mark as resolving
     c.markAsResolving(serviceType)
     defer c.markAsResolved(serviceType)

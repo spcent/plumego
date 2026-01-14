@@ -330,31 +330,61 @@ func (kv *KVStore) cleaner() {
 
 func (kv *KVStore) cleanExpired() {
 	now := time.Now()
+	// Sample size per shard per cycle
+	// We use a randomized sampling strategy similar to Redis to avoid O(N) scans
+	const sampleSize = 20
 
 	for _, shard := range kv.shards {
-		var expired []string
+		// Loop until the percentage of expired keys is low
+		for {
+			var expired []string
+			checkedCount := 0
+			expiredCount := 0
 
-		shard.mu.RLock()
-		for key, entry := range shard.data {
-			if !entry.ExpireAt.IsZero() && now.After(entry.ExpireAt) {
-				expired = append(expired, key)
-			}
-		}
-		shard.mu.RUnlock()
-
-		if len(expired) > 0 {
-			shard.mu.Lock()
-			for _, key := range expired {
-				if entry, exists := shard.data[key]; exists {
-					if !entry.ExpireAt.IsZero() && now.After(entry.ExpireAt) {
-						kv.deleteFromShard(shard, key, entry)
-						if !kv.opts.ReadOnly {
-							kv.logDelete(key)
-						}
+			shard.mu.RLock()
+			for key, entry := range shard.data {
+				if !entry.ExpireAt.IsZero() {
+					if now.After(entry.ExpireAt) {
+						expired = append(expired, key)
+						expiredCount++
+					}
+					checkedCount++
+					if checkedCount >= sampleSize {
+						break
 					}
 				}
 			}
-			shard.mu.Unlock()
+			shard.mu.RUnlock()
+
+			if len(expired) > 0 {
+				shard.mu.Lock()
+				for _, key := range expired {
+					if entry, exists := shard.data[key]; exists {
+						// Double check expiration under write lock
+						if !entry.ExpireAt.IsZero() && now.After(entry.ExpireAt) {
+							kv.deleteFromShard(shard, key, entry)
+							if !kv.opts.ReadOnly {
+								kv.logDelete(key)
+							}
+						}
+					}
+				}
+				shard.mu.Unlock()
+			}
+
+			// If we didn't check enough keys (shard is small or has few items with TTL), stop
+			if checkedCount < sampleSize {
+				break
+			}
+
+			// If less than 25% of checked keys were expired, we assume the shard is mostly clean
+			// and move to the next shard.
+			if float64(expiredCount)/float64(checkedCount) < 0.25 {
+				break
+			}
+
+			// Add a yield to prevent starving other goroutines during heavy cleanup
+			// runtime.Gosched() could be used, or just relying on the lock release/acquire cycle
 		}
 	}
 }
@@ -527,18 +557,22 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 	shard.mu.RUnlock()
 
 	// Update LRU with minimal lock time
-	shard.mu.Lock()
-	// Recheck existence and expiration under write lock
-	if e, exists := shard.data[key]; exists {
-		if !e.ExpireAt.IsZero() && time.Now().After(e.ExpireAt) {
-			shard.mu.Unlock()
-			atomic.AddInt64(&kv.misses, 1)
-			return nil, ErrKeyExpired
+	// Use TryLock to avoid blocking readers if contention is high.
+	// If we can't get the lock immediately, we skip the LRU update.
+	// This trades LRU accuracy for read throughput under high concurrency.
+	if shard.mu.TryLock() {
+		// Recheck existence and expiration under write lock
+		if e, exists := shard.data[key]; exists {
+			if !e.ExpireAt.IsZero() && time.Now().After(e.ExpireAt) {
+				shard.mu.Unlock()
+				atomic.AddInt64(&kv.misses, 1)
+				return nil, ErrKeyExpired
+			}
+			// Move to front (LRU)
+			kv.moveToFront(shard, e)
 		}
-		// Move to front (LRU)
-		kv.moveToFront(shard, e)
+		shard.mu.Unlock()
 	}
-	shard.mu.Unlock()
 
 	atomic.AddInt64(&kv.hits, 1)
 	return valueCopy, nil
@@ -873,8 +907,8 @@ func (kv *KVStore) logSet(key string, value []byte, expireAt time.Time, version 
 
 	select {
 	case kv.logChan <- entry:
-	default:
-		// Channel full, drop entry (or implement backpressure)
+	case <-kv.ctx.Done():
+		// Store closed, stop trying to log
 	}
 }
 
@@ -888,8 +922,8 @@ func (kv *KVStore) logDelete(key string) {
 
 	select {
 	case kv.logChan <- entry:
-	default:
-		// Channel full, drop entry
+	case <-kv.ctx.Done():
+		// Store closed, stop trying to log
 	}
 }
 

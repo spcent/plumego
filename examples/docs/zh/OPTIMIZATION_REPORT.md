@@ -17,7 +17,7 @@
 // 原始 Get 方法的问题
 func (kv *KVStore) Get(key string) ([]byte, error) {
     shard := kv.getShard(key)
-    
+
     shard.mu.RLock()  // 获取读锁
     entry, exists := shard.data[key]
     // ... 检查过期 ...

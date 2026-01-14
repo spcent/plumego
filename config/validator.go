@@ -8,12 +8,143 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Validator interface for configuration validation
 type Validator interface {
 	Validate(value any, key string) error
 	Name() string
+}
+
+// ConfigSchemaEntry represents a configuration field with its metadata
+type ConfigSchemaEntry struct {
+	Key         string
+	Type        string
+	Required    bool
+	Default     any
+	Description string
+	Validators  []Validator
+}
+
+// ConfigSchemaManager manages configuration schemas with validation and documentation
+type ConfigSchemaManager struct {
+	schemas map[string]ConfigSchemaEntry
+}
+
+// NewConfigSchemaManager creates a new configuration schema manager
+func NewConfigSchemaManager() *ConfigSchemaManager {
+	return &ConfigSchemaManager{
+		schemas: make(map[string]ConfigSchemaEntry),
+	}
+}
+
+// Register adds a configuration field schema
+func (csm *ConfigSchemaManager) Register(key string, entry ConfigSchemaEntry) {
+	entry.Key = key
+	csm.schemas[key] = entry
+}
+
+// ValidateAll validates all configuration against registered schemas
+func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.StructuredError {
+	var errors []contract.StructuredError
+
+	for key, schema := range csm.schemas {
+		value, exists := config[key]
+
+		// Check required fields
+		if schema.Required && !exists {
+			errors = append(errors, contract.NewStructuredError(
+				contract.ErrConfigMissingRequired,
+				fmt.Sprintf("required configuration '%s' is missing", key),
+				nil,
+			).WithField(key, nil))
+			continue
+		}
+
+		// Apply default if missing
+		if !exists && schema.Default != nil {
+			config[key] = schema.Default
+			continue
+		}
+
+		// Run validators
+		if exists {
+			for _, validator := range schema.Validators {
+				if err := validator.Validate(value, key); err != nil {
+					// Convert to structured error
+					structuredErr := contract.NewStructuredError(
+						contract.ErrConfigValidationFailed,
+						err.Error(),
+						nil,
+					).WithField(key, value)
+					errors = append(errors, structuredErr)
+				}
+			}
+		}
+	}
+
+	return errors
+}
+
+// GenerateDocumentation generates markdown documentation for all schemas
+func (csm *ConfigSchemaManager) GenerateDocumentation() string {
+	var builder strings.Builder
+	builder.WriteString("# Configuration Documentation\n\n")
+	builder.WriteString("| Key | Type | Required | Default | Description | Validators |\n")
+	builder.WriteString("|-----|------|----------|---------|-------------|------------|\n")
+
+	for _, schema := range csm.schemas {
+		defaultStr := "nil"
+		if schema.Default != nil {
+			defaultStr = fmt.Sprintf("%v", schema.Default)
+		}
+		requiredStr := "No"
+		if schema.Required {
+			requiredStr = "Yes"
+		}
+
+		validatorNames := make([]string, 0, len(schema.Validators))
+		for _, v := range schema.Validators {
+			validatorNames = append(validatorNames, v.Name())
+		}
+		validatorStr := strings.Join(validatorNames, ", ")
+		if validatorStr == "" {
+			validatorStr = "-"
+		}
+
+		builder.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
+			schema.Key, schema.Type, requiredStr, defaultStr, schema.Description, validatorStr))
+	}
+
+	return builder.String()
+}
+
+// GetSchema returns the schema for a specific key
+func (csm *ConfigSchemaManager) GetSchema(key string) (ConfigSchemaEntry, bool) {
+	schema, exists := csm.schemas[key]
+	return schema, exists
+}
+
+// ListSchemas returns all registered schemas
+func (csm *ConfigSchemaManager) ListSchemas() []ConfigSchemaEntry {
+	schemas := make([]ConfigSchemaEntry, 0, len(csm.schemas))
+	for _, schema := range csm.schemas {
+		schemas = append(schemas, schema)
+	}
+	return schemas
+}
+
+// ValidateAndApplyDefaults validates configuration and applies defaults
+func (csm *ConfigSchemaManager) ValidateAndApplyDefaults(config map[string]any) (map[string]any, []contract.StructuredError) {
+	result := make(map[string]any)
+	for k, v := range config {
+		result[k] = v
+	}
+
+	errors := csm.ValidateAll(result)
+	return result, errors
 }
 
 // Required validator ensures a value is not empty
