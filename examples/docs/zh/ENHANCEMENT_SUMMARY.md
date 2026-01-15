@@ -2,7 +2,7 @@
 
 ## 任务完成情况
 
-✅ **所有任务已完成** - Plumego 项目已经成功增强，使其对 AI Agent 更加友好。
+**所有任务已完成** - Plumego 项目已经成功增强，使其对 AI Agent 更加友好。
 
 ## 已完成的改进工作
 
@@ -148,7 +148,7 @@ import "github.com/spcent/plumego"
 func main() {
     // 创建增强 Plumego 实例
     plum := plumego.NewEnhancedPlumego()
-    
+
     // 注册配置模式
     plum.RegisterConfigSchema("server.port", config.ConfigSchemaEntry{
         Type:        "int",
@@ -157,7 +157,7 @@ func main() {
         Required:    true,
         Validator:   config.IntRangeValidator(1, 65535),
     })
-    
+
     // 注册组件
     type DatabaseService struct{}
     dbService := &DatabaseService{}

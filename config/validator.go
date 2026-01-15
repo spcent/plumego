@@ -47,19 +47,22 @@ func (csm *ConfigSchemaManager) Register(key string, entry ConfigSchemaEntry) {
 }
 
 // ValidateAll validates all configuration against registered schemas
-func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.StructuredError {
-	var errors []contract.StructuredError
+func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.APIError {
+	var errors []contract.APIError
 
 	for key, schema := range csm.schemas {
 		value, exists := config[key]
 
 		// Check required fields
 		if schema.Required && !exists {
-			errors = append(errors, contract.NewStructuredError(
-				contract.ErrConfigMissingRequired,
-				fmt.Sprintf("required configuration '%s' is missing", key),
-				nil,
-			).WithField(key, nil))
+			errors = append(errors, contract.NewErrorBuilder().
+				Status(400).
+				Category(contract.CategoryValidation).
+				Type(contract.ErrTypeRequired).
+				Code("CONFIG_REQUIRED").
+				Message(fmt.Sprintf("required configuration '%s' is missing", key)).
+				Detail("key", key).
+				Build())
 			continue
 		}
 
@@ -73,13 +76,17 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.St
 		if exists {
 			for _, validator := range schema.Validators {
 				if err := validator.Validate(value, key); err != nil {
-					// Convert to structured error
-					structuredErr := contract.NewStructuredError(
-						contract.ErrConfigValidationFailed,
-						err.Error(),
-						nil,
-					).WithField(key, value)
-					errors = append(errors, structuredErr)
+					// Convert to APIError
+					apiErr := contract.NewErrorBuilder().
+						Status(400).
+						Category(contract.CategoryValidation).
+						Type(contract.ErrTypeValidation).
+						Code("CONFIG_VALIDATION_FAILED").
+						Message(err.Error()).
+						Detail("key", key).
+						Detail("value", value).
+						Build()
+					errors = append(errors, apiErr)
 				}
 			}
 		}
@@ -137,7 +144,7 @@ func (csm *ConfigSchemaManager) ListSchemas() []ConfigSchemaEntry {
 }
 
 // ValidateAndApplyDefaults validates configuration and applies defaults
-func (csm *ConfigSchemaManager) ValidateAndApplyDefaults(config map[string]any) (map[string]any, []contract.StructuredError) {
+func (csm *ConfigSchemaManager) ValidateAndApplyDefaults(config map[string]any) (map[string]any, []contract.APIError) {
 	result := make(map[string]any)
 	for k, v := range config {
 		result[k] = v
