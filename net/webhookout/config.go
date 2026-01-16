@@ -8,41 +8,96 @@ import (
 )
 
 // DropPolicy defines the queue overflow behavior.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	config := webhookout.Config{
+//		DropPolicy: webhookout.BlockWithLimit,
+//		BlockWait:  100 * time.Millisecond,
+//	}
 type DropPolicy string
 
 const (
-	// DropNewest drops the newest task when queue is full
+	// DropNewest drops the newest task when queue is full.
+	// Use this when you want to prioritize older tasks.
 	DropNewest DropPolicy = "drop_newest"
-	// BlockWithLimit blocks on enqueue with timeout when queue is full
+
+	// BlockWithLimit blocks on enqueue with timeout when queue is full.
+	// Use this when you want to wait for queue space.
 	BlockWithLimit DropPolicy = "block_timeout"
-	// FailFast immediately returns error when queue is full
+
+	// FailFast immediately returns error when queue is full.
+	// Use this when you want to fail fast and handle errors upstream.
 	FailFast DropPolicy = "fail_fast"
 )
 
 // Config holds webhook delivery service configuration.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	config := webhookout.Config{
+//		Enabled:             true,
+//		QueueSize:           4096,
+//		Workers:             16,
+//		DrainMax:            10 * time.Second,
+//		DropPolicy:          webhookout.BlockWithLimit,
+//		BlockWait:           100 * time.Millisecond,
+//		DefaultTimeout:      10 * time.Second,
+//		DefaultMaxRetries:   8,
+//		BackoffBase:         1 * time.Second,
+//		BackoffMax:          60 * time.Second,
+//		RetryOn429:          true,
+//		AllowPrivateNetwork: false,
+//	}
 type Config struct {
-	// Service control
+	// Enabled determines if the webhook service is active
 	Enabled bool
 
-	// Queue and workers
-	QueueSize  int
-	Workers    int
-	DrainMax   time.Duration
+	// QueueSize is the size of the delivery queue
+	QueueSize int
+
+	// Workers is the number of worker goroutines
+	Workers int
+
+	// DrainMax is the maximum time to wait for queue drain on shutdown
+	DrainMax time.Duration
+
+	// DropPolicy defines behavior when queue is full
 	DropPolicy DropPolicy
-	BlockWait  time.Duration
 
-	// Retry and timeout
-	DefaultTimeout    time.Duration
+	// BlockWait is the maximum time to block when queue is full
+	BlockWait time.Duration
+
+	// DefaultTimeout is the default HTTP request timeout
+	DefaultTimeout time.Duration
+
+	// DefaultMaxRetries is the default maximum number of retry attempts
 	DefaultMaxRetries int
-	BackoffBase       time.Duration
-	BackoffMax        time.Duration
-	RetryOn429        bool
 
-	// Security
+	// BackoffBase is the base delay for exponential backoff
+	BackoffBase time.Duration
+
+	// BackoffMax is the maximum delay for exponential backoff
+	BackoffMax time.Duration
+
+	// RetryOn429 determines if 429 (Too Many Requests) responses should be retried
+	RetryOn429 bool
+
+	// AllowPrivateNetwork determines if webhooks can be sent to private network addresses
 	AllowPrivateNetwork bool
 }
 
 // DefaultConfig returns production-ready defaults.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	config := webhookout.DefaultConfig()
 func DefaultConfig() Config {
 	return Config{
 		Enabled:             true,
@@ -61,6 +116,12 @@ func DefaultConfig() Config {
 }
 
 // ConfigFromEnv creates config from environment variables.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	config := webhookout.ConfigFromEnv()
 func ConfigFromEnv() Config {
 	cfg := Config{
 		Enabled:    config.GetBool("WEBHOOK_ENABLED", true),
@@ -110,6 +171,15 @@ func ConfigFromEnv() Config {
 }
 
 // Validate checks if configuration is valid.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	config := webhookout.DefaultConfig()
+//	if err := config.Validate(); err != nil {
+//		// Handle invalid configuration
+//	}
 func (c Config) Validate() error {
 	if c.QueueSize < 1 {
 		return errors.New("queue_size must be at least 1")

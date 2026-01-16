@@ -12,21 +12,63 @@ import (
 )
 
 // SendBehavior determines behavior on enqueue timeout / full queue.
+//
+// SendBehavior controls how the connection handles message sending when the
+// send queue is full or a timeout occurs.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	// Block until space available (default)
+//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//
+//	// Drop message when queue full
+//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
+//
+//	// Close connection when queue full
+//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendClose)
 type SendBehavior int
 
 const (
-	SendBlock SendBehavior = iota // Block until space available (can still timeout if context used)
-	SendDrop                      // Drop message when queue full
-	SendClose                     // Close connection when queue full
+	// SendBlock blocks until space is available in the queue.
+	// Can still timeout if context is used.
+	SendBlock SendBehavior = iota
+
+	// SendDrop drops the message when the queue is full.
+	SendDrop
+
+	// SendClose closes the connection when the queue is full.
+	SendClose
 )
 
-// Outbound is an internal message for sending
+// Outbound is an internal message for sending.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	msg := websocket.Outbound{
+//		Op:   websocket.OpcodeText,
+//		Data: []byte("Hello, World!"),
+//	}
 type Outbound struct {
 	Op   byte
 	Data []byte
 }
 
-// UserInfo stores authenticated user information
+// UserInfo stores authenticated user information.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	userInfo := websocket.UserInfo{
+//		ID:    "user-123",
+//		Name:  "John Doe",
+//		Email: "john@example.com",
+//		Roles: []string{"admin", "user"},
+//	}
 type UserInfo struct {
 	ID     string         `json:"id"`
 	Name   string         `json:"name"`
@@ -36,6 +78,40 @@ type UserInfo struct {
 }
 
 // Conn is a websocket connection wrapper with stream API and bounded queue send.
+//
+// Conn provides a production-ready WebSocket connection with:
+//   - Bounded send queue with configurable behavior
+//   - Ping/pong heartbeat monitoring
+//   - Read message size limits
+//   - User authentication support
+//   - Connection metadata storage
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	// Create connection with blocking send
+//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	defer conn.Close()
+//
+//	// Send a message
+//	err := conn.WriteMessage(websocket.OpcodeText, []byte("Hello"))
+//
+//	// Read messages
+//	for {
+//		op, data, err := conn.ReadMessage()
+//		if err != nil {
+//			break
+//		}
+//		// Process message
+//	}
+//
+//	// Set user info after authentication
+//	conn.UserInfo = &websocket.UserInfo{
+//		ID:    "user-123",
+//		Name:  "John Doe",
+//		Roles: []string{"admin"},
+//	}
 type Conn struct {
 	conn net.Conn
 	br   *bufio.Reader
@@ -66,7 +142,18 @@ type Conn struct {
 	Metadata map[string]any
 }
 
-// NewConn creates a Conn after handshake
+// NewConn creates a Conn after handshake.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	// Create connection with blocking send
+//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	defer conn.Close()
+//
+//	// Create connection with drop behavior
+//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
 func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
 	cc := &Conn{
 		conn:          c,

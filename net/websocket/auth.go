@@ -14,13 +14,36 @@ import (
 	"github.com/spcent/plumego/security/password"
 )
 
-// simpleRoomAuth stores metadata about rooms (password)
+// simpleRoomAuth stores metadata about rooms (password).
+//
+// This is a simple room authentication implementation that uses password-based
+// authentication for room access. It stores hashed passwords for each room.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth.SetRoomPassword("chat-room", "my-secret-password")
+//
+//	// Check if password is correct
+//	if auth.CheckRoomPassword("chat-room", "my-secret-password") {
+//		// Allow access
+//	}
 type simpleRoomAuth struct {
 	roomPasswords map[string]string // room -> password (hashed)
 	mu            sync.RWMutex
 	jwtSecret     []byte // HMAC secret for HS256
 }
 
+// NewSimpleRoomAuth creates a new simple room authentication instance.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	secret := []byte("my-jwt-secret")
+//	auth := websocket.NewSimpleRoomAuth(secret)
 func NewSimpleRoomAuth(secret []byte) *simpleRoomAuth {
 	return &simpleRoomAuth{
 		roomPasswords: make(map[string]string),
@@ -28,6 +51,15 @@ func NewSimpleRoomAuth(secret []byte) *simpleRoomAuth {
 	}
 }
 
+// SetRoomPassword sets the password for a room.
+// The password is hashed before storing for security.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth.SetRoomPassword("chat-room", "my-secret-password")
 func (s *simpleRoomAuth) SetRoomPassword(room, pwd string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

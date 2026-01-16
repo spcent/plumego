@@ -17,9 +17,39 @@ const (
 )
 
 // TimeoutConfig customizes timeout middleware behavior.
+//
+// Timeout middleware enforces a maximum duration for request processing.
+// If the downstream handler does not complete before the deadline, the request
+// context is canceled and a 504 Gateway Timeout response is returned.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	// Simple timeout
+//	handler := middleware.Timeout(5 * time.Second)(myHandler)
+//
+//	// With custom configuration
+//	config := middleware.TimeoutConfig{
+//		Timeout:            10 * time.Second,
+//		MaxBufferBytes:     5 << 20,      // 5MB max buffer
+//		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
+//	}
+//	handler := middleware.TimeoutWithConfig(config)(myHandler)
+//
+// The middleware buffers responses to allow timeout enforcement, but switches to
+// bypass mode for large/streaming responses to avoid memory spikes.
+//
+// When a timeout occurs, it returns a 504 Gateway Timeout response with a
+// structured error message.
 type TimeoutConfig struct {
-	Timeout        time.Duration
+	// Timeout is the maximum duration for request processing
+	Timeout time.Duration
+
+	// MaxBufferBytes is the maximum response size to buffer for timeout enforcement
+	// Responses larger than this will bypass buffering
 	MaxBufferBytes int
+
 	// StreamingThreshold specifies when to bypass buffering for large/streaming responses
 	StreamingThreshold int
 }
@@ -27,6 +57,12 @@ type TimeoutConfig struct {
 // Timeout creates a middleware that enforces a maximum duration for a request.
 // If the downstream handler does not complete before the deadline, the request
 // context is canceled and a 504 Gateway Timeout response is returned.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	handler := middleware.Timeout(5 * time.Second)(myHandler)
 func Timeout(d time.Duration) Middleware {
 	return TimeoutWithConfig(TimeoutConfig{
 		Timeout:            d,
@@ -36,6 +72,17 @@ func Timeout(d time.Duration) Middleware {
 }
 
 // TimeoutWithConfig creates a timeout middleware with explicit configuration.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	config := middleware.TimeoutConfig{
+//		Timeout:            10 * time.Second,
+//		MaxBufferBytes:     5 << 20,      // 5MB max buffer
+//		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
+//	}
+//	handler := middleware.TimeoutWithConfig(config)(myHandler)
 func TimeoutWithConfig(cfg TimeoutConfig) Middleware {
 	// Ensure reasonable defaults
 	if cfg.MaxBufferBytes <= 0 {

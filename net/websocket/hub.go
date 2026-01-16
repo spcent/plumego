@@ -15,7 +15,34 @@ type hubJob struct {
 	data []byte
 }
 
-// Hub manages rooms and broadcast
+// Hub manages rooms and broadcast.
+//
+// Hub provides a production-ready WebSocket hub with:
+//   - Room-based message broadcasting
+//   - Worker pool for concurrent message delivery
+//   - Connection limits (total and per-room)
+//   - Metrics collection
+//   - Security event monitoring
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	// Create hub with 4 workers and 1024 job queue size
+//	hub := websocket.NewHub(4, 1024)
+//	defer hub.Stop()
+//
+//	// Join a connection to a room
+//	err := hub.TryJoin("chat-room", conn)
+//	if err != nil {
+//		// Handle capacity limits
+//	}
+//
+//	// Broadcast to a room
+//	hub.BroadcastRoom("chat-room", websocket.OpcodeText, []byte("Hello"))
+//
+//	// Get metrics
+//	metrics := hub.Metrics()
 type Hub struct {
 	rooms map[string]map[*Conn]struct{}
 	mu    sync.RWMutex
@@ -41,7 +68,18 @@ type Hub struct {
 	securityEvents chan SecurityEvent
 }
 
-// SecurityEvent represents a security-related event
+// SecurityEvent represents a security-related event.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	event := websocket.SecurityEvent{
+//		Timestamp: time.Now(),
+//		Type:      "hub_full",
+//		Details:   map[string]any{"room": "chat", "total": 1000},
+//		Severity:  "warning",
+//	}
 type SecurityEvent struct {
 	Timestamp time.Time
 	Type      string
@@ -49,26 +87,65 @@ type SecurityEvent struct {
 	Severity  string // "info", "warning", "error"
 }
 
-// HubConfig configures a hub instance with production features
+// HubConfig configures a hub instance with production features.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	config := websocket.HubConfig{
+//		WorkerCount:            4,
+//		JobQueueSize:           1024,
+//		MaxConnections:         10000,
+//		MaxRoomConnections:     100,
+//		EnableDebugLogging:     true,
+//		EnableMetrics:          true,
+//		RejectOnQueueFull:      true,
+//		MaxConnectionRate:      100, // 100 connections per second
+//		EnableSecurityMetrics:  true,
+//	}
+//	hub := websocket.NewHubWithConfig(config)
 type HubConfig struct {
-	WorkerCount        int
-	JobQueueSize       int
-	MaxConnections     int
+	// WorkerCount is the number of worker goroutines for message delivery
+	WorkerCount int
+
+	// JobQueueSize is the size of the job queue
+	JobQueueSize int
+
+	// MaxConnections is the maximum total connections allowed
+	MaxConnections int
+
+	// MaxRoomConnections is the maximum connections per room
 	MaxRoomConnections int
 
-	// Production settings
+	// EnableDebugLogging enables detailed logging for debugging
 	EnableDebugLogging bool
-	EnableMetrics      bool
-	RejectOnQueueFull  bool // true: reject, false: drop (default)
 
-	// Rate limiting
-	MaxConnectionRate int // connections per second
+	// EnableMetrics enables metrics collection
+	EnableMetrics bool
 
-	// Security
+	// RejectOnQueueFull determines behavior when broadcast queue is full
+	// true: reject message and log error
+	// false: drop message silently
+	RejectOnQueueFull bool
+
+	// MaxConnectionRate limits new connections per second
+	// 0 means no limit
+	MaxConnectionRate int
+
+	// EnableSecurityMetrics enables security metrics collection
 	EnableSecurityMetrics bool
 }
 
 // HubMetrics describes hub connection metrics.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	metrics := hub.Metrics()
+//	fmt.Printf("Active: %d, Rooms: %d\n", metrics.ActiveConnections, metrics.Rooms)
 type HubMetrics struct {
 	ActiveConnections  int    `json:"active_connections"`
 	Rooms              int    `json:"rooms"`
@@ -83,6 +160,14 @@ var (
 	ErrRoomFull = errors.New("websocket room at capacity")
 )
 
+// NewHub creates a new WebSocket hub with default configuration.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	defer hub.Stop()
 func NewHub(workerCount int, jobQueueSize int) *Hub {
 	return NewHubWithConfig(HubConfig{
 		WorkerCount:  workerCount,
@@ -90,6 +175,25 @@ func NewHub(workerCount int, jobQueueSize int) *Hub {
 	})
 }
 
+// NewHubWithConfig creates a new WebSocket hub with custom configuration.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	config := websocket.HubConfig{
+//		WorkerCount:            8,
+//		JobQueueSize:           2048,
+//		MaxConnections:         50000,
+//		MaxRoomConnections:     500,
+//		EnableDebugLogging:     true,
+//		EnableMetrics:          true,
+//		RejectOnQueueFull:      true,
+//		MaxConnectionRate:      200,
+//		EnableSecurityMetrics:  true,
+//	}
+//	hub := websocket.NewHubWithConfig(config)
+//	defer hub.Stop()
 func NewHubWithConfig(cfg HubConfig) *Hub {
 	// Validate configuration
 	if cfg.WorkerCount <= 0 {
@@ -182,6 +286,19 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 	}
 }
 
+// Stop gracefully shuts down the hub.
+//
+// This method:
+//   - Closes the job queue to stop accepting new jobs
+//   - Waits for all workers to finish processing remaining jobs
+//   - Closes all security event channels
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	defer hub.Stop()
 func (h *Hub) Stop() {
 	close(h.quit)
 	close(h.jobQueue)
@@ -189,6 +306,24 @@ func (h *Hub) Stop() {
 }
 
 // TryJoin registers a connection in a room when limits allow it.
+//
+// Returns ErrHubFull if the hub has reached its maximum connection limit.
+// Returns ErrRoomFull if the room has reached its maximum connection limit.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	conn := websocket.NewConn(...)
+//	err := hub.TryJoin("chat-room", conn)
+//	if err != nil {
+//		if errors.Is(err, websocket.ErrHubFull) {
+//			// Hub is at capacity
+//		} else if errors.Is(err, websocket.ErrRoomFull) {
+//			// Room is at capacity
+//		}
+//	}
 func (h *Hub) TryJoin(room string, c *Conn) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -246,6 +381,19 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 }
 
 // CanJoin checks if a room can accept another connection.
+//
+// This is useful for pre-checking capacity before attempting to join.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	if err := hub.CanJoin("chat-room"); err != nil {
+//		// Room is full
+//		return
+//	}
+//	// Room has capacity, proceed with join
 func (h *Hub) CanJoin(room string) error {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -270,11 +418,30 @@ func (h *Hub) CanJoin(room string) error {
 }
 
 // Join room (ignores capacity limits).
+//
+// This method is useful when you want to bypass capacity checks.
+// Use with caution as it can lead to resource exhaustion.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	conn := websocket.NewConn(...)
+//	hub.Join("admin-room", conn) // Bypass capacity limits
 func (h *Hub) Join(room string, c *Conn) {
 	_ = h.TryJoin(room, c)
 }
 
 // Metrics returns a snapshot of hub metrics.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	metrics := hub.Metrics()
+//	fmt.Printf("Active connections: %d\n", metrics.ActiveConnections)
 func (h *Hub) Metrics() HubMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -295,7 +462,17 @@ func (h *Hub) Metrics() HubMetrics {
 	}
 }
 
-// Leave room
+// Leave room.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	conn := websocket.NewConn(...)
+//	hub.TryJoin("chat-room", conn)
+//	// ... handle connection ...
+//	hub.Leave("chat-room", conn)
 func (h *Hub) Leave(room string, c *Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -307,7 +484,20 @@ func (h *Hub) Leave(room string, c *Conn) {
 	}
 }
 
-// RemoveConn from all rooms
+// RemoveConn from all rooms.
+//
+// This is useful when a connection is closed and needs to be cleaned up from all rooms.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	conn := websocket.NewConn(...)
+//	hub.TryJoin("chat-room", conn)
+//	hub.TryJoin("notifications-room", conn)
+//	// Connection closed, remove from all rooms
+//	hub.RemoveConn(conn)
 func (h *Hub) RemoveConn(c *Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -322,6 +512,19 @@ func (h *Hub) RemoveConn(c *Conn) {
 }
 
 // BroadcastRoom enqueues jobs to jobQueue for workers to send.
+//
+// This method is thread-safe and can be called concurrently from multiple goroutines.
+// Messages are delivered asynchronously via the worker pool.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	// Broadcast text message to all users in chat-room
+//	hub.BroadcastRoom("chat-room", websocket.OpcodeText, []byte("Hello everyone!"))
+//	// Broadcast binary data
+//	hub.BroadcastRoom("chat-room", websocket.OpcodeBinary, []byte{0x01, 0x02, 0x03})
 func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 	h.mu.RLock()
 	rs, ok := h.rooms[room]
@@ -366,7 +569,18 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 	}
 }
 
-// BroadcastAll broadcasts to all clients
+// BroadcastAll broadcasts to all clients.
+//
+// This is useful for system-wide announcements or notifications.
+// Use with caution as it can generate significant network traffic.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	// Send system-wide notification
+//	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
 	h.mu.RLock()
 	var conns []*Conn
@@ -410,7 +624,15 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 	}
 }
 
-// GetRoomCount returns the number of connections in a room
+// GetRoomCount returns the number of connections in a room.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	count := hub.GetRoomCount("chat-room")
+//	fmt.Printf("Chat room has %d connections\n", count)
 func (h *Hub) GetRoomCount(room string) int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -420,7 +642,15 @@ func (h *Hub) GetRoomCount(room string) int {
 	return 0
 }
 
-// GetTotalCount returns the total number of connections
+// GetTotalCount returns the total number of connections.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	total := hub.GetTotalCount()
+//	fmt.Printf("Total connections: %d\n", total)
 func (h *Hub) GetTotalCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -431,7 +661,17 @@ func (h *Hub) GetTotalCount() int {
 	return count
 }
 
-// GetRooms returns a list of all room names
+// GetRooms returns a list of all room names.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub := websocket.NewHub(4, 1024)
+//	rooms := hub.GetRooms()
+//	for _, room := range rooms {
+//		fmt.Printf("Room: %s, Connections: %d\n", room, hub.GetRoomCount(room))
+//	}
 func (h *Hub) GetRooms() []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

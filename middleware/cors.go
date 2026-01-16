@@ -7,13 +7,49 @@ import (
 	"time"
 )
 
+// CORSOptions configures Cross-Origin Resource Sharing (CORS) behavior.
+//
+// CORS allows web applications to control which origins can access their resources.
+// This is essential for web APIs that are consumed by frontend applications hosted
+// on different domains.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	opts := middleware.CORSOptions{
+//		AllowedOrigins:   []string{"https://example.com", "https://app.example.com"},
+//		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+//		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Request-ID"},
+//		AllowCredentials: true,
+//		MaxAge:           24 * time.Hour, // Cache preflight responses for 24 hours
+//	}
+//	handler := middleware.CORSWithOptions(opts, myHandlerFunc)
 type CORSOptions struct {
-	AllowedOrigins   []string // e.g. []string{"https://example.com", "https://foo.com"} or []string{"*"}
-	AllowedMethods   []string // e.g. []string{"GET","POST","PUT","DELETE","OPTIONS"}
-	AllowedHeaders   []string // e.g. []string{"Content-Type","Authorization"}
+	// AllowedOrigins specifies which origins are allowed to access the resource.
+	// Use []string{"*"} to allow all origins (not recommended for production).
+	// Example: []string{"https://example.com", "https://app.example.com"}
+	AllowedOrigins []string
+
+	// AllowedMethods specifies which HTTP methods are allowed.
+	// Example: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	AllowedMethods []string
+
+	// AllowedHeaders specifies which HTTP headers are allowed in requests.
+	// Example: []string{"Content-Type", "Authorization", "X-Request-ID"}
+	AllowedHeaders []string
+
+	// AllowCredentials indicates whether credentials (cookies, HTTP authentication)
+	// can be included in cross-origin requests.
 	AllowCredentials bool
-	ExposeHeaders    []string
-	MaxAge           time.Duration // e.g. time.Hour * 24
+
+	// ExposeHeaders specifies which response headers are exposed to the client.
+	// Example: []string{"X-Request-ID", "X-RateLimit-Remaining"}
+	ExposeHeaders []string
+
+	// MaxAge specifies how long the browser should cache preflight responses.
+	// Example: 24 * time.Hour
+	MaxAge time.Duration
 }
 
 // contains helper (case-sensitive for origins)
@@ -34,6 +70,23 @@ func joinOrDefault(slice []string, def string) string {
 	return strings.Join(slice, ", ")
 }
 
+// CORS provides basic CORS support with wildcard origin.
+//
+// This middleware allows all origins and provides basic CORS headers.
+// For production use, consider using CORSWithOptions with specific origins.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	handler := middleware.CORS(myHandler)
+//
+// The middleware sets the following headers:
+//   - Access-Control-Allow-Origin: *
+//   - Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+//   - Access-Control-Allow-Headers: Content-Type, Authorization
+//
+// For OPTIONS requests, it returns a 204 No Content response.
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -47,6 +100,32 @@ func CORS(next http.Handler) http.Handler {
 	})
 }
 
+// CORSWithOptions provides configurable CORS support.
+//
+// This middleware allows you to specify which origins, methods, and headers are allowed.
+// It properly handles preflight OPTIONS requests and respects credentials.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	opts := middleware.CORSOptions{
+//		AllowedOrigins:   []string{"https://example.com"},
+//		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+//		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+//		AllowCredentials: true,
+//		MaxAge:           24 * time.Hour,
+//	}
+//	handler := middleware.CORSWithOptions(opts, myHandlerFunc)
+//
+// The middleware handles both simple requests and preflight requests:
+//   - Simple requests: Adds CORS headers and forwards to next handler
+//   - Preflight requests (OPTIONS): Returns 204 No Content with CORS headers
+//
+// Security considerations:
+//   - When AllowCredentials is true, Access-Control-Allow-Origin cannot be "*"
+//     and will echo the request's Origin header instead
+//   - Use specific origins instead of "*" in production
 func CORSWithOptions(opts CORSOptions, next http.HandlerFunc) http.HandlerFunc {
 	// provide sensible defaults
 	if len(opts.AllowedMethods) == 0 {

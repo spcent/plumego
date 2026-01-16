@@ -10,27 +10,106 @@ import (
 )
 
 // HSTSOptions configures Strict-Transport-Security.
+//
+// HSTS (HTTP Strict Transport Security) forces browsers to use HTTPS for all
+// future requests to the domain, preventing SSL stripping attacks.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/headers"
+//
+//	hsts := headers.HSTSOptions{
+//		MaxAge:            365 * 24 * time.Hour, // 1 year
+//		IncludeSubDomains: true,
+//		Preload:           true,
+//	}
+//	policy := headers.Policy{
+//		StrictTransportSecurity: &hsts,
+//	}
 type HSTSOptions struct {
-	MaxAge            time.Duration
+	// MaxAge is the duration (in seconds) that the browser should remember
+	// to only use HTTPS for this domain
+	MaxAge time.Duration
+
+	// IncludeSubDomains indicates whether the HSTS policy applies to all subdomains
 	IncludeSubDomains bool
-	Preload           bool
+
+	// Preload indicates whether the domain can be included in browser HSTS preload lists
+	Preload bool
 }
 
 // Policy defines security headers that should be applied to responses.
+//
+// Policy configures various security headers to protect against common web
+// vulnerabilities such as clickjacking, XSS, MIME sniffing, and more.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/headers"
+//
+//	policy := headers.Policy{
+//		FrameOptions:          "DENY",
+//		ContentTypeOptions:    "nosniff",
+//		ReferrerPolicy:        "strict-origin-when-cross-origin",
+//		ContentSecurityPolicy: "default-src 'self'",
+//	}
+//
+// The policy can be applied using the Apply method:
+//
+//	policy.Apply(w, r)
 type Policy struct {
-	FrameOptions              string
-	ContentTypeOptions        string
-	ReferrerPolicy            string
-	PermissionsPolicy         string
-	ContentSecurityPolicy     string
-	CrossOriginOpenerPolicy   string
+	// FrameOptions controls whether the page can be displayed in a frame
+	// Values: DENY, SAMEORIGIN
+	FrameOptions string
+
+	// ContentTypeOptions prevents MIME sniffing attacks
+	// Values: nosniff
+	ContentTypeOptions string
+
+	// ReferrerPolicy controls how much referrer information is sent
+	// Values: no-referrer, strict-origin-when-cross-origin, etc.
+	ReferrerPolicy string
+
+	// PermissionsPolicy controls browser features and capabilities
+	// Values: geolocation=(), camera=(), microphone=(), etc.
+	PermissionsPolicy string
+
+	// ContentSecurityPolicy controls which resources can be loaded
+	// Values: default-src 'self', script-src 'self' 'unsafe-inline', etc.
+	ContentSecurityPolicy string
+
+	// CrossOriginOpenerPolicy controls cross-origin opener isolation
+	// Values: same-origin, same-origin-allow-popups, unsafe-none
+	CrossOriginOpenerPolicy string
+
+	// CrossOriginResourcePolicy controls which resources can be loaded
+	// Values: same-site, same-origin, cross-origin
 	CrossOriginResourcePolicy string
+
+	// CrossOriginEmbedderPolicy controls cross-origin embedding
+	// Values: require-corp, unsafe-none
 	CrossOriginEmbedderPolicy string
-	StrictTransportSecurity   *HSTSOptions
-	Additional                map[string]string
+
+	// StrictTransportSecurity configures HSTS
+	StrictTransportSecurity *HSTSOptions
+
+	// Additional allows custom security headers
+	Additional map[string]string
 }
 
 // DefaultPolicy returns a baseline header policy with safe defaults.
+//
+// The default policy includes:
+//   - X-Frame-Options: SAMEORIGIN (prevents clickjacking)
+//   - X-Content-Type-Options: nosniff (prevents MIME sniffing)
+//   - Referrer-Policy: strict-origin-when-cross-origin
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/headers"
+//
+//	policy := headers.DefaultPolicy()
+//	policy.Apply(w, r)
 func DefaultPolicy() Policy {
 	return Policy{
 		FrameOptions:       "SAMEORIGIN",
@@ -40,6 +119,23 @@ func DefaultPolicy() Policy {
 }
 
 // StrictPolicy returns a hardened policy suitable for locked-down deployments.
+//
+// The strict policy includes:
+//   - X-Frame-Options: DENY (prevents all framing)
+//   - X-Content-Type-Options: nosniff
+//   - Referrer-Policy: no-referrer
+//   - Permissions-Policy: geolocation=(), camera=(), microphone=()
+//   - Cross-Origin-Opener-Policy: same-origin
+//   - Cross-Origin-Resource-Policy: same-origin
+//   - Cross-Origin-Embedder-Policy: require-corp
+//   - Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/headers"
+//
+//	policy := headers.StrictPolicy()
+//	policy.Apply(w, r)
 func StrictPolicy() Policy {
 	return Policy{
 		FrameOptions:              "DENY",
@@ -58,6 +154,13 @@ func StrictPolicy() Policy {
 }
 
 // Apply attaches the configured headers to the response.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/headers"
+//
+//	policy := headers.DefaultPolicy()
+//	policy.Apply(w, r)
 func (p Policy) Apply(w http.ResponseWriter, r *http.Request) {
 	headers := w.Header()
 	setHeader(headers, "X-Frame-Options", p.FrameOptions)

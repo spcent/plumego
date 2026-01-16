@@ -8,11 +8,31 @@ import (
 
 // Gzip compresses HTTP responses when the client supports it via Accept-Encoding.
 // It intelligently skips compression for:
-// - WebSocket upgrades
-// - Server-Sent Events (SSE)
-// - Already compressed content
-// - Binary content (images, videos, etc.)
-// - Large streaming responses (to avoid memory spikes)
+//   - WebSocket upgrades
+//   - Server-Sent Events (SSE)
+//   - Already compressed content
+//   - Binary content (images, videos, etc.)
+//   - Large streaming responses (to avoid memory spikes)
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	// Use default configuration
+//	handler := middleware.Gzip()(myHandler)
+//
+//	// Or with custom configuration
+//	config := middleware.GzipConfig{
+//		MaxBufferBytes: 5 << 20, // 5MB max buffer
+//	}
+//	handler := middleware.GzipWithConfig(config)(myHandler)
+//
+// The middleware adds the following headers:
+//   - Content-Encoding: gzip (when compression is used)
+//   - Vary: Accept-Encoding (to indicate response varies by encoding)
+//
+// Note: Compression is skipped for error responses (status >= 400) to avoid
+// compressing small error messages that don't benefit from compression.
 func Gzip() Middleware {
 	return GzipWithConfig(GzipConfig{
 		MaxBufferBytes: 10 << 20, // 10MB max buffer
@@ -20,9 +40,19 @@ func Gzip() Middleware {
 }
 
 // GzipConfig configures Gzip middleware behavior.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	config := middleware.GzipConfig{
+//		MaxBufferBytes: 5 << 20, // 5MB max buffer
+//	}
+//	handler := middleware.GzipWithConfig(config)(myHandler)
 type GzipConfig struct {
-	// MaxBufferBytes is the maximum response size to buffer for compression
-	// Responses larger than this will bypass compression to avoid memory spikes
+	// MaxBufferBytes is the maximum response size to buffer for compression.
+	// Responses larger than this will bypass compression to avoid memory spikes.
+	// Default: 10MB (10 << 20)
 	MaxBufferBytes int
 }
 

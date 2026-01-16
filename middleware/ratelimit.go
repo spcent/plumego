@@ -10,7 +10,51 @@ import (
 	log "github.com/spcent/plumego/log"
 )
 
-// RateLimiter provides intelligent concurrency control with backpressure, monitoring, and dynamic adjustment
+// RateLimiter provides intelligent concurrency control with backpressure, monitoring, and dynamic adjustment.
+//
+// RateLimiter is an advanced concurrency limiter that uses a semaphore-based approach to limit
+// the number of concurrent requests. It also supports queueing with timeout, dynamic adjustment
+// based on system pressure, and comprehensive metrics collection.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	config := middleware.RateLimiterConfig{
+//		MaxConcurrent:  100,          // Maximum 100 concurrent requests
+//		QueueDepth:     200,          // Queue depth of 200
+//		QueueTimeout:   1 * time.Second, // 1 second timeout for queue
+//		AdjustInterval: 10 * time.Second, // Adjust concurrency every 10 seconds
+//		MinConcurrent:  50,           // Minimum 50 concurrent requests
+//		MaxConcurrentLimit: 200,      // Maximum 200 concurrent requests (for dynamic adjustment)
+//		WindowSize:     10,           // Pressure sampling window size
+//		Logger:         middleware.NewGLogger(),
+//	}
+//
+//	limiter := middleware.NewRateLimiter(config)
+//	handler := limiter.Middleware()(myHandler)
+//
+// The limiter provides the following features:
+//   - Concurrency limiting using a semaphore
+//   - Request queueing with timeout
+//   - Dynamic adjustment based on system pressure
+//   - Comprehensive metrics collection
+//   - Backpressure mechanism
+//
+// Pressure levels:
+//   - PressureLow: System is underutilized, can increase concurrency
+//   - PressureNormal: System is operating normally
+//   - PressureHigh: System is under high load, should decrease concurrency
+//   - PressureCritical: System is critically overloaded, must decrease concurrency
+//
+// Metrics:
+//   - CurrentConcurrent: Number of currently processing requests
+//   - CurrentQueue: Number of requests waiting in queue
+//   - TotalRequests: Total number of requests received
+//   - AcceptedRequests: Number of requests accepted and processed
+//   - RejectedRequests: Number of requests rejected (queue full)
+//   - TimeoutRequests: Number of requests that timed out waiting for worker
+//   - PressureLevel: Current system pressure level
 type RateLimiter struct {
 	// Configuration parameters
 	maxConcurrent      int64         // Maximum concurrent requests

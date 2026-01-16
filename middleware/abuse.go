@@ -14,16 +14,52 @@ import (
 )
 
 // AbuseGuardConfig configures the abuse guard middleware.
+//
+// AbuseGuard provides per-key rate limiting to defend against abuse attacks.
+// It uses a token bucket algorithm to limit the rate of requests from each client.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	config := middleware.AbuseGuardConfig{
+//		Rate:            10.0,      // 10 requests per second
+//		Capacity:        100,       // Burst capacity of 100 requests
+//		CleanupInterval: time.Minute, // Clean up idle entries every minute
+//		MaxIdle:         5 * time.Minute, // Remove entries idle for 5 minutes
+//		KeyFunc:         middleware.ClientIPKey, // Use client IP as key
+//	}
+//	handler := middleware.AbuseGuard(config)(myHandler)
 type AbuseGuardConfig struct {
-	Rate            float64
-	Capacity        int
+	// Rate is the number of requests per second allowed per key
+	Rate float64
+
+	// Capacity is the maximum burst size (number of tokens in the bucket)
+	Capacity int
+
+	// CleanupInterval is how often to clean up idle entries
 	CleanupInterval time.Duration
-	MaxIdle         time.Duration
-	Limiter         *abuse.Limiter
-	KeyFunc         func(*http.Request) string
-	Skip            func(*http.Request) bool
-	IncludeHeaders  *bool
-	Logger          log.StructuredLogger
+
+	// MaxIdle is the maximum time an entry can be idle before being removed
+	MaxIdle time.Duration
+
+	// Limiter is a custom limiter instance (optional)
+	Limiter *abuse.Limiter
+
+	// KeyFunc extracts a rate limiting key from the request (e.g., client IP)
+	// Default: clientIPKey (uses X-Forwarded-For, X-Real-IP, or RemoteAddr)
+	KeyFunc func(*http.Request) string
+
+	// Skip determines whether to skip rate limiting for a request
+	// Useful for whitelisting certain clients or endpoints
+	Skip func(*http.Request) bool
+
+	// IncludeHeaders controls whether to include rate limit headers in responses
+	// Default: true
+	IncludeHeaders *bool
+
+	// Logger is used for logging rate limit violations
+	Logger log.StructuredLogger
 }
 
 // DefaultAbuseGuardConfig returns baseline settings for abuse protection.
@@ -40,6 +76,32 @@ func DefaultAbuseGuardConfig() AbuseGuardConfig {
 }
 
 // AbuseGuard applies per-key rate limiting to defend against abuse.
+//
+// AbuseGuard uses a token bucket algorithm to limit the rate of requests from each client.
+// It tracks requests per key (default: client IP) and rejects requests when the limit is exceeded.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	// Create middleware with default settings
+//	handler := middleware.AbuseGuard(middleware.DefaultAbuseGuardConfig())(myHandler)
+//
+//	// Or with custom configuration
+//	config := middleware.AbuseGuardConfig{
+//		Rate:     5.0,  // 5 requests per second
+//		Capacity: 10,   // Burst capacity of 10
+//	}
+//	handler := middleware.AbuseGuard(config)(myHandler)
+//
+// The middleware adds the following headers to responses:
+//   - X-RateLimit-Limit: The maximum number of requests allowed
+//   - X-RateLimit-Remaining: The number of requests remaining in the current window
+//   - X-RateLimit-Reset: The Unix timestamp when the rate limit resets
+//   - Retry-After: The number of seconds to wait before retrying (when rate limited)
+//
+// When a request is rate limited, it returns a 429 Too Many Requests response with
+// a structured error message containing the limit details.
 func AbuseGuard(config AbuseGuardConfig) Middleware {
 	defaults := DefaultAbuseGuardConfig()
 	includeHeaders := true

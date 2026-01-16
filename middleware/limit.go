@@ -15,6 +15,23 @@ var errRequestTooLarge = errors.New("request body too large")
 // BodyLimit enforces a maximum request body size using a protective reader that
 // surfaces a structured error to the client instead of the default plaintext
 // response from http.MaxBytesReader.
+//
+// This middleware is useful for preventing denial-of-service attacks that send
+// large request bodies to exhaust server resources.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	// Limit request body to 10MB
+//	handler := middleware.BodyLimit(10<<20, nil)(myHandler)
+//
+//	// With logging
+//	logger := middleware.NewGLogger()
+//	handler := middleware.BodyLimit(10<<20, logger)(myHandler)
+//
+// When a request body exceeds the limit, it returns a 413 Request Entity Too Large
+// response with a structured error message containing the limit details.
 func BodyLimit(maxBytes int64, logger log.StructuredLogger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

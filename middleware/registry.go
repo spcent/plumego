@@ -4,7 +4,33 @@ package middleware
 //
 // Components can use the Registry to contribute middleware to the
 // application pipeline without needing to know how the chain is
-// assembled.
+// assembled. This is useful for modular applications where different
+// components need to add their own middleware.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	registry := middleware.NewRegistry()
+//
+//	// Add middleware in registration order
+//	registry.Use(middleware.Logging)
+//	registry.Use(middleware.Recovery)
+//	registry.Use(middleware.CORS)
+//
+//	// Prepend middleware (executes first)
+//	registry.Prepend(middleware.SecurityHeaders)
+//
+//	// Get all middleware
+//	middlewares := registry.Middlewares()
+//
+//	// Apply to handler
+//	handler := middleware.Apply(myHandler, middlewares...)
+//
+// Middleware execution order:
+//   - Prepend() adds middleware to the beginning (executes first)
+//   - Use() adds middleware to the end (executes last)
+//   - When applied, middlewares execute in reverse order (last added runs first)
 type Registry struct {
 	middlewares []Middleware
 }
@@ -15,6 +41,15 @@ func NewRegistry() *Registry {
 }
 
 // Use appends middleware to the end of the registry.
+// The middleware will execute after any previously registered middleware.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	registry := middleware.NewRegistry()
+//	registry.Use(middleware.Logging)
+//	registry.Use(middleware.Recovery)
 func (r *Registry) Use(middlewares ...Middleware) {
 	if r == nil {
 		return
@@ -26,6 +61,14 @@ func (r *Registry) Use(middlewares ...Middleware) {
 // Prepend inserts middleware at the start of the registry.
 // The provided middleware will execute before any previously
 // registered middleware.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	registry := middleware.NewRegistry()
+//	registry.Use(middleware.Logging)
+//	registry.Prepend(middleware.SecurityHeaders) // Executes first
 func (r *Registry) Prepend(middlewares ...Middleware) {
 	if r == nil || len(middlewares) == 0 {
 		return
@@ -40,6 +83,17 @@ func (r *Registry) Prepend(middlewares ...Middleware) {
 
 // Middlewares returns a copy of the registered middleware slice to
 // prevent callers from mutating internal state.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	registry := middleware.NewRegistry()
+//	registry.Use(middleware.Logging)
+//	registry.Use(middleware.Recovery)
+//
+//	middlewares := registry.Middlewares()
+//	handler := middleware.Apply(myHandler, middlewares...)
 func (r *Registry) Middlewares() []Middleware {
 	if r == nil {
 		return nil

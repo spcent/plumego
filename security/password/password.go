@@ -13,16 +13,59 @@ import (
 	"unicode"
 )
 
-// PasswordStrengthConfig defines the configuration for password strength validation
+// PasswordStrengthConfig defines the configuration for password strength validation.
+//
+// This configuration allows you to specify the minimum requirements for passwords
+// to ensure they meet security standards.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/password"
+//
+//	config := password.PasswordStrengthConfig{
+//		MinLength:        12,
+//		RequireUppercase: true,
+//		RequireLowercase: true,
+//		RequireDigit:     true,
+//		RequireSpecial:   true,
+//	}
+//	if !password.ValidatePasswordStrength("MySecurePass123!", config) {
+//		// Password doesn't meet requirements
+//	}
 type PasswordStrengthConfig struct {
-	MinLength        int  // Minimum password length
-	RequireUppercase bool // Whether password requires uppercase letters
-	RequireLowercase bool // Whether password requires lowercase letters
-	RequireDigit     bool // Whether password requires digits
-	RequireSpecial   bool // Whether password requires special characters
+	// MinLength is the minimum password length
+	MinLength int
+
+	// RequireUppercase requires at least one uppercase letter
+	RequireUppercase bool
+
+	// RequireLowercase requires at least one lowercase letter
+	RequireLowercase bool
+
+	// RequireDigit requires at least one digit
+	RequireDigit bool
+
+	// RequireSpecial requires at least one special character
+	RequireSpecial bool
 }
 
-// DefaultPasswordStrengthConfig returns the default password strength configuration
+// DefaultPasswordStrengthConfig returns the default password strength configuration.
+//
+// Defaults:
+//   - MinLength: 8
+//   - RequireUppercase: true
+//   - RequireLowercase: true
+//   - RequireDigit: true
+//   - RequireSpecial: false
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/password"
+//
+//	config := password.DefaultPasswordStrengthConfig()
+//	if !password.ValidatePasswordStrength("MySecurePass123", config) {
+//		// Password doesn't meet requirements
+//	}
 func DefaultPasswordStrengthConfig() PasswordStrengthConfig {
 	return PasswordStrengthConfig{
 		MinLength:        8,
@@ -33,7 +76,16 @@ func DefaultPasswordStrengthConfig() PasswordStrengthConfig {
 	}
 }
 
-// ValidatePasswordStrength checks if the password meets the required strength criteria
+// ValidatePasswordStrength checks if the password meets the required strength criteria.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/password"
+//
+//	config := password.DefaultPasswordStrengthConfig()
+//	if !password.ValidatePasswordStrength("MySecurePass123", config) {
+//		// Password doesn't meet requirements
+//	}
 func ValidatePasswordStrength(password string, config PasswordStrengthConfig) bool {
 	if len(password) < config.MinLength {
 		return false

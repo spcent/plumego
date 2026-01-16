@@ -9,11 +9,37 @@ import (
 )
 
 // DebugErrorConfig controls how debug error responses are formatted.
+//
+// This middleware is useful during development to provide detailed error information.
+// It replaces empty or plain text error responses with structured JSON error messages.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	config := middleware.DebugErrorConfig{
+//		IncludeRequest: true,  // Include request method and path
+//		IncludeQuery:   true,  // Include query parameters
+//		IncludeBody:    false, // Don't include response body (security)
+//		NotFoundHint:   "Try /api/v1/users", // Hint for 404 errors
+//	}
+//	handler := middleware.DebugErrors(config)(myHandler)
+//
+// Security note: This middleware should only be used in development environments.
+// In production, consider using a proper error logging and monitoring system.
 type DebugErrorConfig struct {
+	// IncludeRequest controls whether to include request method and path in error details
 	IncludeRequest bool
-	IncludeQuery   bool
-	IncludeBody    bool
-	NotFoundHint   string
+
+	// IncludeQuery controls whether to include query parameters in error details
+	IncludeQuery bool
+
+	// IncludeBody controls whether to include response body in error details
+	// Note: This may expose sensitive information, use with caution
+	IncludeBody bool
+
+	// NotFoundHint provides a hint message for 404 errors
+	NotFoundHint string
 }
 
 // DefaultDebugErrorConfig returns a safe default for debug errors.
@@ -25,6 +51,45 @@ func DefaultDebugErrorConfig() DebugErrorConfig {
 }
 
 // DebugErrors replaces empty/plain error responses with structured JSON.
+//
+// This middleware intercepts error responses and replaces them with structured JSON
+// error messages containing additional debugging information.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//
+//	// Use default configuration
+//	handler := middleware.DebugErrors(middleware.DefaultDebugErrorConfig())(myHandler)
+//
+//	// Or with custom configuration
+//	config := middleware.DebugErrorConfig{
+//		IncludeRequest: true,
+//		IncludeQuery:   true,
+//		NotFoundHint:   "Try /api/v1/users",
+//	}
+//	handler := middleware.DebugErrors(config)(myHandler)
+//
+// The middleware skips debugging for:
+//   - WebSocket connections
+//   - Server-Sent Events (SSE)
+//   - CONNECT requests
+//   - Responses with non-plain-text content types
+//
+// Error response format:
+//
+//	{
+//	  "status": 404,
+//	  "code": "not_found",
+//	  "message": "Not Found",
+//	  "category": "client",
+//	  "details": {
+//	    "method": "GET",
+//	    "path": "/api/missing",
+//	    "query": "param=value",
+//	    "hint": "Try /api/v1/users"
+//	  }
+//	}
 func DebugErrors(config DebugErrorConfig) Middleware {
 	cfg := DefaultDebugErrorConfig()
 	if config.NotFoundHint != "" {

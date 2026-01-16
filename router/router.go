@@ -15,50 +15,134 @@ import (
 	"github.com/spcent/plumego/middleware"
 )
 
-// HTTP method constants
+// HTTP method constants define standard HTTP methods for route registration.
+// These constants are used when registering routes to specify which HTTP method
+// the route should respond to.
+//
+// Example:
+//
+//	router.Get("/users", handler)        // GET /users
+//	router.Post("/users", handler)       // POST /users
+//	router.Put("/users/:id", handler)    // PUT /users/:id
+//	router.Delete("/users/:id", handler) // DELETE /users/:id
+//	router.Any("/health", handler)       // All HTTP methods
 const (
-	GET    = "GET"    // HTTP GET method
-	POST   = "POST"   // HTTP POST method
-	PUT    = "PUT"    // HTTP PUT method
-	DELETE = "DELETE" // HTTP DELETE method
-	PATCH  = "PATCH"  // HTTP PATCH method
-	ANY    = "ANY"    // Any HTTP method
+	GET    = "GET"    // HTTP GET method - retrieve resources
+	POST   = "POST"   // HTTP POST method - create resources
+	PUT    = "PUT"    // HTTP PUT method - update/replace resources
+	DELETE = "DELETE" // HTTP DELETE method - remove resources
+	PATCH  = "PATCH"  // HTTP PATCH method - partial updates
+	ANY    = "ANY"    // Any HTTP method - catch-all route
 )
 
 // Handler is an alias to the standard http.Handler for route handlers.
-// Use HandlerFunc when registering inline functions.
+// This type is used for all route handler registrations in the router.
+//
+// Example:
+//
+//	import "net/http"
+//
+//	func myHandler(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Hello, World!"))
+//	}
+//
+//	router.Get("/hello", http.HandlerFunc(myHandler))
+//
+// Use HandlerFunc when registering inline functions for better readability.
 type Handler = http.Handler
 
 // HandlerFunc is an alias to the standard http.HandlerFunc for convenience.
+// This is the most common way to register simple route handlers.
+//
+// Example:
+//
+//	router.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Hello, World!"))
+//	})
 type HandlerFunc = http.HandlerFunc
 
-// RouteRegistrar defines an interface for objects that can register routes with a router
+// RouteRegistrar defines an interface for objects that can register routes with a router.
+// This interface enables modular route registration and is commonly used for
+// organizing routes by feature or domain.
+//
+// Example:
+//
+//	type UserRoutes struct{}
+//
+//	func (ur *UserRoutes) Register(r *router.Router) {
+//	    r.Get("/users", ur.ListUsers)
+//	    r.Post("/users", ur.CreateUser)
+//	    r.Get("/users/:id", ur.GetUser)
+//	}
+//
+//	func main() {
+//	    r := router.NewRouter()
+//	    r.Register(&UserRoutes{})
+//	}
 type RouteRegistrar interface {
 	Register(r *Router)
 }
 
-// MiddlewareManager manages middleware chain for routes and groups
+// MiddlewareManager manages middleware chain for routes and groups.
+// It provides thread-safe middleware registration and retrieval operations.
+// Middleware is applied in the order they are added, creating a processing chain
+// that each request passes through before reaching the final handler.
+//
+// Example:
+//
+//	manager := NewMiddlewareManager()
+//	manager.AddMiddleware(middleware.Logging())
+//	manager.AddMiddleware(middleware.Recovery())
+//
+//	// Middleware will be executed in order: Logging -> Recovery -> Handler
 type MiddlewareManager struct {
 	middlewares []middleware.Middleware
 	mu          sync.RWMutex
-	metrics     metrics.MetricsCollector // Unified metrics collector
+	metrics     metrics.MetricsCollector // Unified metrics collector for monitoring
 }
 
-// NewMiddlewareManager creates a new middleware manager
+// NewMiddlewareManager creates a new middleware manager with an empty middleware chain.
+// The manager is ready to accept middleware registrations immediately after creation.
+//
+// Example:
+//
+//	manager := NewMiddlewareManager()
+//	manager.AddMiddleware(middleware.Logging())
 func NewMiddlewareManager() *MiddlewareManager {
 	return &MiddlewareManager{
 		middlewares: make([]middleware.Middleware, 0),
 	}
 }
 
-// AddMiddleware adds a middleware to the manager
+// AddMiddleware adds a middleware to the manager.
+// The middleware will be executed in the order it was added.
+// Thread-safe for concurrent access.
+//
+// Parameters:
+//   - m: The middleware function to add
+//
+// Example:
+//
+//	manager := NewMiddlewareManager()
+//	manager.AddMiddleware(middleware.Logging())
+//	manager.AddMiddleware(middleware.Recovery())
 func (mm *MiddlewareManager) AddMiddleware(m middleware.Middleware) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 	mm.middlewares = append(mm.middlewares, m)
 }
 
-// GetMiddlewares returns a copy of all middlewares
+// GetMiddlewares returns a copy of all middlewares in the manager.
+// The returned slice is a copy, so modifications to it won't affect the manager.
+// Thread-safe for concurrent access.
+//
+// Returns:
+//   - []middleware.Middleware: A copy of all registered middlewares
+//
+// Example:
+//
+//	middlewares := manager.GetMiddlewares()
+//	fmt.Printf("Registered middlewares: %d\n", len(middlewares))
 func (mm *MiddlewareManager) GetMiddlewares() []middleware.Middleware {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
@@ -67,7 +151,26 @@ func (mm *MiddlewareManager) GetMiddlewares() []middleware.Middleware {
 	return result
 }
 
-// MergeMiddlewares merges another middleware manager's middlewares
+// MergeMiddlewares merges another middleware manager's middlewares with this manager's middlewares.
+// The combined middleware chain will execute this manager's middlewares first,
+// followed by the other manager's middlewares.
+//
+// Parameters:
+//   - other: The other MiddlewareManager to merge with
+//
+// Returns:
+//   - []middleware.Middleware: Combined middleware chain
+//
+// Example:
+//
+//	parentManager := NewMiddlewareManager()
+//	parentManager.AddMiddleware(middleware.Logging())
+//
+//	childManager := NewMiddlewareManager()
+//	childManager.AddMiddleware(middleware.Recovery())
+//
+//	combined := parentManager.MergeMiddlewares(childManager)
+//	// combined will be: [Logging, Recovery]
 func (mm *MiddlewareManager) MergeMiddlewares(other *MiddlewareManager) []middleware.Middleware {
 	combined := mm.GetMiddlewares()
 	otherMiddlewares := other.GetMiddlewares()
@@ -99,44 +202,114 @@ type route struct {
 	Path   string
 }
 
-// Router represents an HTTP router with path-based routing and middleware support
+// Router represents an HTTP router with path-based routing and middleware support.
+// It implements the http.Handler interface, making it compatible with any Go HTTP server.
+//
+// Features:
+//   - Path-based routing with support for parameters and wildcards
+//   - Middleware chain support for request processing
+//   - Route grouping with shared prefixes and middleware
+//   - Route caching for improved performance
+//   - Route metadata for documentation and API generation
+//   - Thread-safe concurrent access
+//
+// Example:
+//
+//	r := router.NewRouter()
+//	r.Get("/users", listUsersHandler)
+//	r.Post("/users", createUserHandler)
+//
+//	// Group routes with shared prefix
+//	api := r.Group("/api/v1")
+//	api.Get("/users", listUsersHandler)
+//	api.Get("/users/:id", getUserHandler)
+//
+//	// Start HTTP server
+//	http.ListenAndServe(":8080", r)
 type Router struct {
-	prefix            string                      // Group prefix
-	trees             map[string]*node            // Method -> root node
-	registrars        []RouteRegistrar            // Route registrars
-	routes            map[string][]route          // Registered routes
-	frozen            bool                        // Whether router is frozen
+	prefix            string                      // Group prefix for route grouping
+	trees             map[string]*node            // Method -> root node (Radix tree)
+	registrars        []RouteRegistrar            // Route registrars for modular registration
+	routes            map[string][]route          // Registered routes for debugging
+	frozen            bool                        // Whether router is frozen (no new routes)
 	mu                sync.RWMutex                // Mutex for concurrent access
 	parent            *Router                     // Parent router for groups
 	middlewareManager *MiddlewareManager          // Middleware management
 	logger            log.StructuredLogger        // Logger for contextual handlers
-	routeCache        *RouteCache                 // Route matching cache
+	routeCache        *RouteCache                 // Route matching cache for performance
 	routeValidations  map[string]*RouteValidation // Route parameter validations
 	validationIndex   map[string][]validationEntry
 	routeMeta         map[string]RouteMeta
 }
 
-// RouterOption defines a function type for router configuration options
+// RouterOption defines a function type for router configuration options.
+// This functional option pattern allows flexible router configuration without
+// requiring a complex configuration struct.
+//
+// Example:
+//
+//	r := router.NewRouter(
+//	    router.WithLogger(customLogger),
+//	    router.WithMetricsCollector(metricsCollector),
+//	)
 type RouterOption func(*Router)
 
 // RouteOption defines an option for route metadata.
+// This functional option pattern allows attaching metadata to routes for
+// documentation, API generation, and other purposes.
+//
+// Example:
+//
+//	r.Get("/users", handler,
+//	    router.WithRouteName("list_users"),
+//	    router.WithRouteTags("users", "api"),
+//	)
 type RouteOption func(*RouteMeta)
 
-// WithRouteName sets a route name.
+// WithRouteName sets a route name for documentation and API generation.
+// Route names should be unique and descriptive.
+//
+// Parameters:
+//   - name: The name to assign to the route
+//
+// Example:
+//
+//	r.Get("/users", handler, router.WithRouteName("list_users"))
 func WithRouteName(name string) RouteOption {
 	return func(meta *RouteMeta) {
 		meta.Name = name
 	}
 }
 
-// WithRouteTags sets route tags.
+// WithRouteTags sets route tags for categorization and filtering.
+// Tags are useful for organizing routes by feature, domain, or API version.
+//
+// Parameters:
+//   - tags: Variable number of tag strings
+//
+// Example:
+//
+//	r.Get("/users", handler,
+//	    router.WithRouteTags("users", "api", "v1"),
+//	)
 func WithRouteTags(tags ...string) RouteOption {
 	return func(meta *RouteMeta) {
 		meta.Tags = append([]string(nil), tags...)
 	}
 }
 
-// WithLogger sets a custom logger for the router
+// WithLogger sets a custom logger for the router.
+// The logger is used for request logging and error reporting.
+//
+// Parameters:
+//   - logger: A structured logger implementation
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/log"
+//
+//	customLogger := log.NewGLogger()
+//	r := router.NewRouter(router.WithLogger(customLogger))
 func WithLogger(logger log.StructuredLogger) RouterOption {
 	return func(r *Router) {
 		if logger != nil {
@@ -145,7 +318,26 @@ func WithLogger(logger log.StructuredLogger) RouterOption {
 	}
 }
 
-// NewRouter creates a new Router instance with default configuration
+// NewRouter creates a new Router instance with default configuration.
+// The router is ready to accept route registrations immediately after creation.
+//
+// Parameters:
+//   - opts: Optional router configuration options
+//
+// Returns:
+//   - *Router: A new router instance
+//
+// Example:
+//
+//	r := router.NewRouter()
+//	r.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Hello, World!"))
+//	})
+//
+//	// With options
+//	r := router.NewRouter(
+//	    router.WithLogger(customLogger),
+//	)
 func NewRouter(opts ...RouterOption) *Router {
 	r := &Router{
 		trees:             make(map[string]*node),
@@ -169,6 +361,15 @@ func NewRouter(opts ...RouterOption) *Router {
 }
 
 // SetLogger configures the logger used by context-aware handlers.
+// This method is thread-safe and can be called at any time.
+//
+// Parameters:
+//   - logger: The structured logger to use
+//
+// Example:
+//
+//	r := router.NewRouter()
+//	r.SetLogger(customLogger)
 func (r *Router) SetLogger(logger log.StructuredLogger) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -176,14 +377,39 @@ func (r *Router) SetLogger(logger log.StructuredLogger) {
 	r.logger = logger
 }
 
-// Freeze prevents the router from accepting new route registrations
+// Freeze prevents the router from accepting new route registrations.
+// This is useful for ensuring route stability after initialization and
+// for detecting accidental route registrations after startup.
+//
+// Example:
+//
+//	r := router.NewRouter()
+//	r.Get("/users", handler)
+//	r.Freeze() // No more routes can be added
 func (r *Router) Freeze() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.frozen = true
 }
 
-// Register adds route registrars to the router
+// Register adds route registrars to the router.
+// This enables modular route registration where different components
+// can register their own routes.
+//
+// Parameters:
+//   - registrars: One or more RouteRegistrar implementations
+//
+// Example:
+//
+//	type UserRoutes struct{}
+//
+//	func (ur *UserRoutes) Register(r *router.Router) {
+//	    r.Get("/users", ur.ListUsers)
+//	    r.Post("/users", ur.CreateUser)
+//	}
+//
+//	r := router.NewRouter()
+//	r.Register(&UserRoutes{})
 func (r *Router) Register(registrars ...RouteRegistrar) {
 	// Get unique registrars without holding the lock
 	// This prevents deadlock when reg.Register(r) calls back into AddRoute
@@ -217,7 +443,29 @@ func (r *Router) Register(registrars ...RouteRegistrar) {
 	}
 }
 
-// Group creates a new router group with the given prefix
+// Group creates a new router group with the given prefix.
+// Groups allow you to share a common path prefix and middleware across multiple routes.
+// Child groups inherit the parent's prefix and can add their own middleware.
+//
+// Parameters:
+//   - prefix: The path prefix for the group (e.g., "/api/v1")
+//
+// Returns:
+//   - *Router: A new router group
+//
+// Example:
+//
+//	r := router.NewRouter()
+//
+//	// Create API group with shared prefix
+//	api := r.Group("/api/v1")
+//	api.Get("/users", listUsersHandler)
+//	api.Get("/users/:id", getUserHandler)
+//
+//	// Create admin group with additional middleware
+//	admin := api.Group("/admin")
+//	admin.Use(middleware.AuthRequired())
+//	admin.Get("/dashboard", dashboardHandler)
 func (r *Router) Group(prefix string) *Router {
 	// Create full prefix by combining with parent's prefix
 	fullPrefix := r.prefix + prefix
@@ -236,7 +484,29 @@ func (r *Router) Group(prefix string) *Router {
 	}
 }
 
-// AddRoute adds a route to the router with the given method, path and handler
+// AddRoute adds a route to the router with the given method, path and handler.
+// This is the core method for route registration. Routes are stored in a Radix tree
+// for efficient matching. Path parameters are denoted with ":" (e.g., "/users/:id")
+// and wildcards with "*" (e.g., "/files/*path").
+//
+// Parameters:
+//   - method: HTTP method (GET, POST, PUT, DELETE, PATCH, ANY)
+//   - path: URL path (can include parameters)
+//   - handler: HTTP handler for the route
+//
+// Returns:
+//   - error: Error if route registration fails (duplicate, frozen, etc.)
+//
+// Example:
+//
+//	r := router.NewRouter()
+//	r.AddRoute("GET", "/users", listUsersHandler)
+//	r.AddRoute("GET", "/users/:id", getUserHandler)
+//	r.AddRoute("GET", "/files/*path", fileHandler)
+//
+//	// Or use convenience methods
+//	r.Get("/users", listUsersHandler)
+//	r.Get("/users/:id", getUserHandler)
 func (r *Router) AddRoute(method, path string, handler Handler) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -335,6 +605,26 @@ func (r *Router) AddRoute(method, path string, handler Handler) error {
 }
 
 // AddRouteWithOptions adds a route and attaches metadata options.
+// This method combines route registration with metadata attachment in a single call.
+//
+// Parameters:
+//   - method: HTTP method
+//   - path: URL path
+//   - handler: HTTP handler
+//   - opts: Route metadata options
+//
+// Returns:
+//   - error: Error if route registration fails
+//
+// Example:
+//
+//	r.AddRouteWithOptions(
+//	    "GET",
+//	    "/users",
+//	    listUsersHandler,
+//	    router.WithRouteName("list_users"),
+//	    router.WithRouteTags("users", "api"),
+//	)
 func (r *Router) AddRouteWithOptions(method, path string, handler Handler, opts ...RouteOption) error {
 	if err := r.AddRoute(method, path, handler); err != nil {
 		return err
@@ -353,6 +643,21 @@ func (r *Router) AddRouteWithOptions(method, path string, handler Handler, opts 
 }
 
 // SetRouteMeta sets metadata for a route.
+// This is useful for attaching documentation, tags, or other metadata to routes
+// for API generation, documentation, or monitoring purposes.
+//
+// Parameters:
+//   - method: HTTP method
+//   - path: URL path
+//   - meta: Route metadata
+//
+// Example:
+//
+//	meta := RouteMeta{
+//	    Name: "list_users",
+//	    Tags: []string{"users", "api"},
+//	}
+//	r.SetRouteMeta("GET", "/users", meta)
 func (r *Router) SetRouteMeta(method, path string, meta RouteMeta) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -364,6 +669,18 @@ func (r *Router) SetRouteMeta(method, path string, meta RouteMeta) {
 }
 
 // Routes returns a snapshot of all registered routes with metadata.
+// This method is useful for debugging, documentation generation, and monitoring.
+// The returned slice is sorted by method and path for consistent output.
+//
+// Returns:
+//   - []RouteInfo: List of all registered routes with metadata
+//
+// Example:
+//
+//	routes := r.Routes()
+//	for _, route := range routes {
+//	    fmt.Printf("%s %s %v\n", route.Method, route.Path, route.Meta.Tags)
+//	}
 func (r *Router) Routes() []RouteInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -421,21 +738,59 @@ func (r *Router) routeMiddlewares() []middleware.Middleware {
 	return combined
 }
 
-// Use adds middlewares to the router group
+// Use adds middlewares to the router group.
+// Middlewares are applied in the order they are added and will be executed
+// for all routes registered in this group and its children.
+//
+// Parameters:
+//   - middlewares: One or more middleware functions
+//
+// Example:
+//
+//	r := router.NewRouter()
+//	r.Use(middleware.Logging())
+//	r.Use(middleware.Recovery())
+//
+//	// All routes in this group will have logging and recovery middleware
+//	api := r.Group("/api")
+//	api.Get("/users", handler) // Logging -> Recovery -> Handler
 func (r *Router) Use(middlewares ...middleware.Middleware) {
 	for _, middleware := range middlewares {
 		r.middlewareManager.AddMiddleware(middleware)
 	}
 }
 
-// SetMetricsCollector sets the unified metrics collector for the router
+// SetMetricsCollector sets the unified metrics collector for the router.
+// The metrics collector is used to track route performance, request counts,
+// and other metrics for monitoring and observability.
+//
+// Parameters:
+//   - collector: Metrics collector implementation
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	prometheusCollector := metrics.NewPrometheusCollector()
+//	r.SetMetricsCollector(prometheusCollector)
 func (r *Router) SetMetricsCollector(collector metrics.MetricsCollector) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.middlewareManager.metrics = collector
 }
 
-// GetMetricsCollector returns the current metrics collector
+// GetMetricsCollector returns the current metrics collector.
+// Returns nil if no metrics collector has been set.
+//
+// Returns:
+//   - metrics.MetricsCollector: The current metrics collector or nil
+//
+// Example:
+//
+//	collector := r.GetMetricsCollector()
+//	if collector != nil {
+//	    collector.IncrementCounter("route_requests", map[string]string{"route": "/users"})
+//	}
 func (r *Router) GetMetricsCollector() metrics.MetricsCollector {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -521,7 +876,24 @@ func (r *Router) fullPath(path string) string {
 	return fullPath
 }
 
-// ServeHTTP implements http.Handler and handles incoming HTTP requests
+// ServeHTTP implements http.Handler and handles incoming HTTP requests.
+// This method is the entry point for all HTTP requests and performs route matching,
+// parameter extraction, validation, and middleware execution.
+//
+// Parameters:
+//   - w: HTTP response writer
+//   - req: HTTP request
+//
+// Example:
+//
+//	r := router.NewRouter()
+//	r.Get("/users", listUsersHandler)
+//
+//	// Start HTTP server
+//	http.ListenAndServe(":8080", r)
+//
+//	// Or use with other handlers
+//	http.Handle("/", r)
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Check route cache first for better performance
 	cacheKey := req.Method + ":" + req.Host + ":" + req.URL.Path
@@ -750,109 +1122,393 @@ func (r *Router) addRoute(method, path string, handler Handler) {
 }
 
 // HTTP method-specific route registration
+// These convenience methods provide a fluent API for route registration.
 
-// Get registers a GET route with the given path and handler
+// Get registers a GET route with the given path and handler.
+// GET requests are used to retrieve resources.
+//
+// Parameters:
+//   - path: URL path (can include parameters like "/users/:id")
+//   - handler: HTTP handler
+//
+// Example:
+//
+//	r.Get("/users", listUsersHandler)
+//	r.Get("/users/:id", getUserHandler)
 func (r *Router) Get(path string, handler Handler) { r.addRoute(GET, path, handler) }
 
-// Post registers a POST route with the given path and handler
+// Post registers a POST route with the given path and handler.
+// POST requests are used to create new resources.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: HTTP handler
+//
+// Example:
+//
+//	r.Post("/users", createUserHandler)
 func (r *Router) Post(path string, handler Handler) { r.addRoute(POST, path, handler) }
 
-// Put registers a PUT route with the given path and handler
+// Put registers a PUT route with the given path and handler.
+// PUT requests are used to replace existing resources.
+//
+// Parameters:
+//   - path: URL path (typically includes resource ID like "/users/:id")
+//   - handler: HTTP handler
+//
+// Example:
+//
+//	r.Put("/users/:id", updateUserHandler)
 func (r *Router) Put(path string, handler Handler) { r.addRoute(PUT, path, handler) }
 
-// Delete registers a DELETE route with the given path and handler
+// Delete registers a DELETE route with the given path and handler.
+// DELETE requests are used to remove resources.
+//
+// Parameters:
+//   - path: URL path (typically includes resource ID like "/users/:id")
+//   - handler: HTTP handler
+//
+// Example:
+//
+//	r.Delete("/users/:id", deleteUserHandler)
 func (r *Router) Delete(path string, handler Handler) { r.addRoute(DELETE, path, handler) }
 
-// Patch registers a PATCH route with the given path and handler
+// Patch registers a PATCH route with the given path and handler.
+// PATCH requests are used for partial updates to resources.
+//
+// Parameters:
+//   - path: URL path (typically includes resource ID like "/users/:id")
+//   - handler: HTTP handler
+//
+// Example:
+//
+//	r.Patch("/users/:id", patchUserHandler)
 func (r *Router) Patch(path string, handler Handler) { r.addRoute(PATCH, path, handler) }
 
-// Any registers a route that accepts any HTTP method with the given path and handler
+// Any registers a route that accepts any HTTP method with the given path and handler.
+// This is useful for catch-all routes or when you want to handle all methods the same way.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: HTTP handler
+//
+// Example:
+//
+//	r.Any("/health", healthCheckHandler) // Handles GET, POST, PUT, etc.
 func (r *Router) Any(path string, handler Handler) { r.addRoute(ANY, path, handler) }
 
-// Options registers an OPTIONS route with the given path and handler
+// Options registers an OPTIONS route with the given path and handler.
+// OPTIONS requests are used to describe communication options for the target resource.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: HTTP handler
+//
+// Example:
+//
+//	r.Options("/users", optionsHandler)
 func (r *Router) Options(path string, handler Handler) { r.addRoute("OPTIONS", path, handler) }
 
-// Head registers a HEAD route with the given path and handler
+// Head registers a HEAD route with the given path and handler.
+// HEAD requests are identical to GET requests but without the response body.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: HTTP handler
+//
+// Example:
+//
+//	r.Head("/users", headHandler)
 func (r *Router) Head(path string, handler Handler) { r.addRoute("HEAD", path, handler) }
 
 // Context-aware handler registration helpers
+// These methods register routes with context-aware handlers that receive
+// a request context and can access route parameters and other request-scoped data.
 
-// GetCtx registers a GET route with a context-aware handler
+// GetCtx registers a GET route with a context-aware handler.
+// Context-aware handlers provide direct access to request context and parameters.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: Context-aware handler function
+//
+// Example:
+//
+//	r.GetCtx("/users/:id", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+//	    params := router.ParamsFromContext(ctx)
+//	    userID := params["id"]
+//	    // Handle request...
+//	    return nil
+//	})
 func (r *Router) GetCtx(path string, handler contract.CtxHandlerFunc) {
 	r.addCtxRoute(GET, path, handler)
 }
 
-// PostCtx registers a POST route with a context-aware handler
+// PostCtx registers a POST route with a context-aware handler.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: Context-aware handler function
+//
+// Example:
+//
+//	r.PostCtx("/users", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+//	    // Handle request...
+//	    return nil
+//	})
 func (r *Router) PostCtx(path string, handler contract.CtxHandlerFunc) {
 	r.addCtxRoute(POST, path, handler)
 }
 
-// PutCtx registers a PUT route with a context-aware handler
+// PutCtx registers a PUT route with a context-aware handler.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: Context-aware handler function
+//
+// Example:
+//
+//	r.PutCtx("/users/:id", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+//	    params := router.ParamsFromContext(ctx)
+//	    userID := params["id"]
+//	    // Handle request...
+//	    return nil
+//	})
 func (r *Router) PutCtx(path string, handler contract.CtxHandlerFunc) {
 	r.addCtxRoute(PUT, path, handler)
 }
 
-// DeleteCtx registers a DELETE route with a context-aware handler
+// DeleteCtx registers a DELETE route with a context-aware handler.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: Context-aware handler function
+//
+// Example:
+//
+//	r.DeleteCtx("/users/:id", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+//	    params := router.ParamsFromContext(ctx)
+//	    userID := params["id"]
+//	    // Handle request...
+//	    return nil
+//	})
 func (r *Router) DeleteCtx(path string, handler contract.CtxHandlerFunc) {
 	r.addCtxRoute(DELETE, path, handler)
 }
 
-// PatchCtx registers a PATCH route with a context-aware handler
+// PatchCtx registers a PATCH route with a context-aware handler.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: Context-aware handler function
+//
+// Example:
+//
+//	r.PatchCtx("/users/:id", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+//	    params := router.ParamsFromContext(ctx)
+//	    userID := params["id"]
+//	    // Handle request...
+//	    return nil
+//	})
 func (r *Router) PatchCtx(path string, handler contract.CtxHandlerFunc) {
 	r.addCtxRoute(PATCH, path, handler)
 }
 
-// AnyCtx registers a route that accepts any HTTP method with a context-aware handler
+// AnyCtx registers a route that accepts any HTTP method with a context-aware handler.
+//
+// Parameters:
+//   - path: URL path
+//   - handler: Context-aware handler function
+//
+// Example:
+//
+//	r.AnyCtx("/webhook", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+//	    // Handle webhook from any method...
+//	    return nil
+//	})
 func (r *Router) AnyCtx(path string, handler contract.CtxHandlerFunc) {
 	r.addCtxRoute(ANY, path, handler)
 }
 
-// HandleFunc registers a standard http.HandlerFunc for the given path and method
+// HandleFunc registers a standard http.HandlerFunc for the given path and method.
+// This is a convenience method that wraps AddRoute for http.HandlerFunc.
+//
+// Parameters:
+//   - method: HTTP method
+//   - path: URL path
+//   - h: Standard http.HandlerFunc
+//
+// Example:
+//
+//	r.HandleFunc("GET", "/users", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Hello"))
+//	})
 func (r *Router) HandleFunc(method, path string, h http.HandlerFunc) {
 	r.AddRoute(method, path, h)
 }
 
-// Handle registers a standard http.Handler for the given path and method
+// Handle registers a standard http.Handler for the given path and method.
+// This is a convenience method that wraps AddRoute for http.Handler.
+//
+// Parameters:
+//   - method: HTTP method
+//   - path: URL path
+//   - h: Standard http.Handler
+//
+// Example:
+//
+//	r.Handle("GET", "/users", http.HandlerFunc(myHandler))
 func (r *Router) Handle(method, path string, h http.Handler) {
 	r.AddRoute(method, path, h)
 }
 
 // HandleWithOptions registers a standard http.Handler for the given path and method with metadata.
+// This method combines route registration with metadata attachment.
+//
+// Parameters:
+//   - method: HTTP method
+//   - path: URL path
+//   - h: Standard http.Handler
+//   - opts: Route metadata options
+//
+// Example:
+//
+//	r.HandleWithOptions(
+//	    "GET",
+//	    "/users",
+//	    http.HandlerFunc(myHandler),
+//	    router.WithRouteName("list_users"),
+//	)
 func (r *Router) HandleWithOptions(method, path string, h http.Handler, opts ...RouteOption) {
 	_ = r.AddRouteWithOptions(method, path, h, opts...)
 }
 
-// GetFunc registers a GET route with a standard http.HandlerFunc
+// GetFunc registers a GET route with a standard http.HandlerFunc.
+// This is a convenience method combining Get and HandleFunc.
+//
+// Parameters:
+//   - path: URL path
+//   - h: Standard http.HandlerFunc
+//
+// Example:
+//
+//	r.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Hello"))
+//	})
 func (r *Router) GetFunc(path string, h http.HandlerFunc) {
 	r.HandleFunc(GET, path, h)
 }
 
-// PostFunc registers a POST route with a standard http.HandlerFunc
+// PostFunc registers a POST route with a standard http.HandlerFunc.
+//
+// Parameters:
+//   - path: URL path
+//   - h: Standard http.HandlerFunc
+//
+// Example:
+//
+//	r.PostFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Created"))
+//	})
 func (r *Router) PostFunc(path string, h http.HandlerFunc) {
 	r.HandleFunc(POST, path, h)
 }
 
-// PutFunc registers a PUT route with a standard http.HandlerFunc
+// PutFunc registers a PUT route with a standard http.HandlerFunc.
+//
+// Parameters:
+//   - path: URL path
+//   - h: Standard http.HandlerFunc
+//
+// Example:
+//
+//	r.PutFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Updated"))
+//	})
 func (r *Router) PutFunc(path string, h http.HandlerFunc) {
 	r.HandleFunc(PUT, path, h)
 }
 
-// DeleteFunc registers a DELETE route with a standard http.HandlerFunc
+// DeleteFunc registers a DELETE route with a standard http.HandlerFunc.
+//
+// Parameters:
+//   - path: URL path
+//   - h: Standard http.HandlerFunc
+//
+// Example:
+//
+//	r.DeleteFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Deleted"))
+//	})
 func (r *Router) DeleteFunc(path string, h http.HandlerFunc) {
 	r.HandleFunc(DELETE, path, h)
 }
 
-// PatchFunc registers a PATCH route with a standard http.HandlerFunc
+// PatchFunc registers a PATCH route with a standard http.HandlerFunc.
+//
+// Parameters:
+//   - path: URL path
+//   - h: Standard http.HandlerFunc
+//
+// Example:
+//
+//	r.PatchFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Patched"))
+//	})
 func (r *Router) PatchFunc(path string, h http.HandlerFunc) {
 	r.HandleFunc(PATCH, path, h)
 }
 
-// AnyFunc registers a route for any HTTP method with a standard http.HandlerFunc
+// AnyFunc registers a route for any HTTP method with a standard http.HandlerFunc.
+//
+// Parameters:
+//   - path: URL path
+//   - h: Standard http.HandlerFunc
+//
+// Example:
+//
+//	r.AnyFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
+//	    w.Write([]byte("Webhook received"))
+//	})
 func (r *Router) AnyFunc(path string, h http.HandlerFunc) {
 	r.HandleFunc(ANY, path, h)
 }
 
-// Resource REST-style routes
+// Resource registers REST-style routes for a resource.
+// This method automatically creates standard REST endpoints for a resource controller.
+//
+// Parameters:
+//   - path: Base path for the resource (e.g., "/users")
+//   - c: ResourceController implementation
+//
+// Example:
+//
+//	type UserController struct{}
+//
+//	func (uc *UserController) Index(w http.ResponseWriter, r *http.Request) {
+//	    // List all users
+//	}
+//
+//	func (uc *UserController) Show(w http.ResponseWriter, r *http.Request) {
+//	    // Get specific user
+//	}
+//
+//	// ... implement other methods
+//
+//	r := router.NewRouter()
+//	r.Resource("/users", &UserController{})
+//
+// This creates the following routes:
+//   - GET    /users          -> Index
+//   - POST   /users          -> Create
+//   - GET    /users/:id      -> Show
+//   - PUT    /users/:id      -> Update
+//   - DELETE /users/:id      -> Delete
+//   - PATCH  /users/:id      -> Patch
+//   - OPTIONS /users         -> Options
+//   - OPTIONS /users/:id     -> Options
+//   - HEAD   /users          -> Head
+//   - HEAD   /users/:id      -> Head
 func (r *Router) Resource(path string, c ResourceController) {
 	path = strings.TrimSuffix(path, "/")
 
@@ -869,7 +1525,26 @@ func (r *Router) Resource(path string, c ResourceController) {
 }
 
 // Print prints all registered routes grouped by method.
-// Wildcard routes are marked specially.
+// Wildcard routes are marked specially. This is useful for debugging and
+// understanding the routing structure.
+//
+// Parameters:
+//   - w: io.Writer to write the output to
+//
+// Example:
+//
+//	r := router.NewRouter()
+//	r.Get("/users", handler)
+//	r.Get("/files/*path", fileHandler)
+//
+//	// Print to stdout
+//	r.Print(os.Stdout)
+//
+// Output:
+//
+//	Registered Routes:
+//	GET    /users
+//	GET    /files/*path   [wildcard]
 func (r *Router) Print(w io.Writer) {
 	fmt.Fprintln(w, "Registered Routes:")
 

@@ -27,6 +27,26 @@ type latencyStats struct {
 
 // PrometheusCollector implements MetricsCollector without third-party dependencies.
 // It exposes a text-based metrics handler compatible with Prometheus exposition format.
+//
+// This collector is designed for production use with:
+//   - Memory-efficient metric storage
+//   - Automatic eviction of old metrics
+//   - Prometheus-compatible output format
+//   - No external dependencies
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	collector := metrics.NewPrometheusCollector("myapp")
+//	defer collector.Clear()
+//
+//	// Use in HTTP middleware
+//	mux := http.NewServeMux()
+//	mux.Handle("/metrics", collector.Handler())
+//
+//	// Record metrics
+//	collector.ObserveHTTP(context.Background(), "GET", "/api/users", 200, 100, 50*time.Millisecond)
 type PrometheusCollector struct {
 	namespace string
 	maxMemory int // Maximum number of metric series to store
@@ -42,6 +62,12 @@ type PrometheusCollector struct {
 
 // NewPrometheusCollector constructs an in-memory collector with the provided namespace.
 // An empty namespace defaults to "plumego".
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	collector := metrics.NewPrometheusCollector("myapp")
 func NewPrometheusCollector(namespace string) *PrometheusCollector {
 	if namespace == "" {
 		namespace = "plumego"
@@ -57,12 +83,33 @@ func NewPrometheusCollector(namespace string) *PrometheusCollector {
 
 // WithMaxMemory sets the maximum number of unique metric series to store.
 // When exceeded, oldest entries are evicted.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	collector := metrics.NewPrometheusCollector("myapp").
+//		WithMaxMemory(50000)
 func (p *PrometheusCollector) WithMaxMemory(max int) *PrometheusCollector {
 	p.maxMemory = max
 	return p
 }
 
 // Observe records a single HTTP request metric set.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//	import "github.com/spcent/plumego/middleware"
+//
+//	collector := metrics.NewPrometheusCollector("myapp")
+//	collector.Observe(context.Background(), middleware.RequestMetrics{
+//		Method:   "GET",
+//		Path:     "/api/users",
+//		Status:   200,
+//		Bytes:    100,
+//		Duration: 50 * time.Millisecond,
+//	})
 func (p *PrometheusCollector) Observe(_ context.Context, m middleware.RequestMetrics) {
 	key := labelKey{m.Method, m.Path, strconv.Itoa(m.Status)}
 
@@ -93,6 +140,17 @@ func (p *PrometheusCollector) Observe(_ context.Context, m middleware.RequestMet
 }
 
 // Handler returns an HTTP handler that emits the current metrics snapshot.
+//
+// This handler exposes metrics in Prometheus exposition format (text/plain).
+// The endpoint can be scraped by Prometheus or viewed directly in a browser.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	collector := metrics.NewPrometheusCollector("myapp")
+//	http.Handle("/metrics", collector.Handler())
+//	http.ListenAndServe(":8080", nil)
 func (p *PrometheusCollector) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests, durations, uptime := p.snapshot()
@@ -146,6 +204,15 @@ func (p *PrometheusCollector) Handler() http.Handler {
 }
 
 // GetStats returns statistics about the collected metrics.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	collector := metrics.NewPrometheusCollector("myapp")
+//	// ... use collector ...
+//	stats := collector.GetStats()
+//	fmt.Printf("Total requests: %d, Average latency: %.3f\n", stats.TotalRequests, stats.AverageLatency)
 func (p *PrometheusCollector) GetStats() CollectorStats {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -176,6 +243,14 @@ func (p *PrometheusCollector) GetStats() CollectorStats {
 }
 
 // Clear resets all collected metrics.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	collector := metrics.NewPrometheusCollector("myapp")
+//	// ... use collector ...
+//	collector.Clear()
 func (p *PrometheusCollector) Clear() {
 	p.mu.Lock()
 	defer p.mu.Unlock()

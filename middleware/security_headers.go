@@ -7,7 +7,35 @@ import (
 )
 
 // SecurityHeaders applies a security header policy to responses.
-// When policy is nil, headers.DefaultPolicy() is used.
+//
+// This middleware adds security-related HTTP headers to responses to protect
+// against common web vulnerabilities such as XSS, clickjacking, and MIME sniffing.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/middleware"
+//	import "github.com/spcent/plumego/security/headers"
+//
+//	// Use default security policy
+//	handler := middleware.SecurityHeaders(nil)(myHandler)
+//
+//	// Or with custom policy
+//	policy := &headers.Policy{
+//		FrameOptions: "DENY",
+//		XSSProtection: "1; mode=block",
+//		ContentTypeOptions: "nosniff",
+//	}
+//	handler := middleware.SecurityHeaders(policy)(myHandler)
+//
+// The default policy includes:
+//   - X-Frame-Options: DENY (prevents clickjacking)
+//   - X-Content-Type-Options: nosniff (prevents MIME sniffing)
+//   - X-XSS-Protection: 1; mode=block (enables XSS protection)
+//   - Referrer-Policy: strict-origin-when-cross-origin
+//   - Content-Security-Policy: default-src 'self'
+//
+// Note: This middleware should be applied early in the middleware chain
+// to ensure security headers are set for all responses.
 func SecurityHeaders(policy *headers.Policy) Middleware {
 	effective := headers.DefaultPolicy()
 	if policy != nil {

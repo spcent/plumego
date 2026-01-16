@@ -49,6 +49,36 @@ func (s *subscriber) Cancel() {
 }
 
 // InProcPubSub is an in-memory pubsub implementation.
+//
+// This is a lightweight, in-process publish/subscribe system designed for:
+//   - Event-driven architectures
+//   - WebSocket fan-out scenarios
+//   - Internal service communication
+//   - Webhook event distribution
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	// Create a pubsub instance
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	// Subscribe to a topic
+//	sub, err := ps.Subscribe("user.created", pubsub.SubOptions{
+//		BufferSize: 16,
+//		Policy:     pubsub.DropOldest,
+//	})
+//	if err != nil {
+//		// Handle error
+//	}
+//	defer sub.Cancel()
+//
+//	// Publish a message
+//	msg := pubsub.Message{
+//		Data: map[string]any{"user_id": "123", "email": "user@example.com"},
+//	}
+//	err = ps.Publish("user.created", msg)
 type InProcPubSub struct {
 	mu       sync.RWMutex
 	topics   map[string]map[uint64]*subscriber
@@ -62,6 +92,13 @@ type InProcPubSub struct {
 }
 
 // New creates a new InProcPubSub instance.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
 func New() *InProcPubSub {
 	ps := &InProcPubSub{
 		topics:   make(map[string]map[uint64]*subscriber),
@@ -72,6 +109,19 @@ func New() *InProcPubSub {
 }
 
 // Close shuts down the pubsub system.
+//
+// This method:
+//   - Marks the pubsub as closed
+//   - Cancels all active subscriptions
+//   - Cleans up all resources
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	// ... use pubsub ...
+//	ps.Close()
 func (ps *InProcPubSub) Close() error {
 	if ps.closed.Swap(true) {
 		return nil
@@ -104,6 +154,28 @@ func (ps *InProcPubSub) Close() error {
 }
 
 // Subscribe creates a new subscription to a topic.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	sub, err := ps.Subscribe("user.created", pubsub.SubOptions{
+//		BufferSize: 16,
+//		Policy:     pubsub.DropOldest,
+//	})
+//	if err != nil {
+//		// Handle error
+//	}
+//	defer sub.Cancel()
+//
+//	// Receive messages
+//	for msg := range sub.C() {
+//		// Process message
+//		fmt.Printf("Received: %v\n", msg.Data)
+//	}
 func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, error) {
 	if ps.closed.Load() {
 		return nil, ErrSubscribeToClosed
@@ -145,6 +217,33 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 }
 
 // SubscribePattern creates a new subscription to a topic pattern.
+//
+// Patterns use filepath.Match syntax:
+//   - "*" matches any sequence of non-separator characters
+//   - "?" matches any single non-separator character
+//   - "[...]" matches any character in the bracket expression
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	// Subscribe to all user events
+//	sub, err := ps.SubscribePattern("user.*", pubsub.SubOptions{
+//		BufferSize: 16,
+//		Policy:     pubsub.DropOldest,
+//	})
+//	if err != nil {
+//		// Handle error
+//	}
+//	defer sub.Cancel()
+//
+//	// Will receive messages from:
+//	// - user.created
+//	// - user.updated
+//	// - user.deleted
 func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
 	if ps.closed.Load() {
 		return nil, ErrSubscribeToClosed
@@ -190,6 +289,31 @@ func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subsc
 }
 
 // Publish sends a message to a topic.
+//
+// This method:
+//   - Validates the topic
+//   - Fills message metadata (topic, timestamp)
+//   - Delivers to all subscribers (including pattern matches)
+//   - Handles backpressure according to subscriber policy
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	msg := pubsub.Message{
+//		Data: map[string]any{
+//			"user_id": "123",
+//			"email":   "user@example.com",
+//		},
+//	}
+//
+//	err := ps.Publish("user.created", msg)
+//	if err != nil {
+//		// Handle error
+//	}
 func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 	if ps.closed.Load() {
 		return ErrPublishToClosed
@@ -258,11 +382,35 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 }
 
 // PublishAsync publishes without waiting for delivery results (fire-and-forget).
+//
+// This is a convenience method that calls Publish. The delivery is still
+// guaranteed to be attempted, but this method returns immediately without
+// waiting for delivery confirmation.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	// Fire-and-forget publish
+//	err := ps.PublishAsync("user.created", msg)
 func (ps *InProcPubSub) PublishAsync(topic string, msg Message) error {
 	return ps.Publish(topic, msg)
 }
 
 // GetSubscriberCount returns the number of subscribers for a topic.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	count := ps.GetSubscriberCount("user.created")
+//	fmt.Printf("Topic has %d subscribers\n", count)
 func (ps *InProcPubSub) GetSubscriberCount(topic string) int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -275,6 +423,16 @@ func (ps *InProcPubSub) GetSubscriberCount(topic string) int {
 }
 
 // GetPatternSubscriberCount returns the number of subscribers for a pattern.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	count := ps.GetPatternSubscriberCount("user.*")
+//	fmt.Printf("Pattern has %d subscribers\n", count)
 func (ps *InProcPubSub) GetPatternSubscriberCount(pattern string) int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -287,6 +445,18 @@ func (ps *InProcPubSub) GetPatternSubscriberCount(pattern string) int {
 }
 
 // ListTopics returns all active topics.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	topics := ps.ListTopics()
+//	for _, topic := range topics {
+//		fmt.Printf("Topic: %s, Subscribers: %d\n", topic, ps.GetSubscriberCount(topic))
+//	}
 func (ps *InProcPubSub) ListTopics() []string {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -299,6 +469,18 @@ func (ps *InProcPubSub) ListTopics() []string {
 }
 
 // ListPatterns returns all active subscription patterns.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	patterns := ps.ListPatterns()
+//	for _, pattern := range patterns {
+//		fmt.Printf("Pattern: %s, Subscribers: %d\n", pattern, ps.GetPatternSubscriberCount(pattern))
+//	}
 func (ps *InProcPubSub) ListPatterns() []string {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -474,25 +656,55 @@ func normalizeSubOptions(opts SubOptions) SubOptions {
 }
 
 // Snapshot exposes observability metrics.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	snapshot := ps.Snapshot()
+//	fmt.Printf("Total messages: %d\n", snapshot.TotalPublished)
 func (ps *InProcPubSub) Snapshot() MetricsSnapshot {
 	return ps.metrics.Snapshot()
 }
 
-// SetMetricsCollector sets the unified metrics collector
+// SetMetricsCollector sets the unified metrics collector.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//	import "github.com/spcent/plumego/metrics"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	collector := metrics.NewPrometheusCollector()
+//	ps.SetMetricsCollector(collector)
 func (ps *InProcPubSub) SetMetricsCollector(collector metrics.MetricsCollector) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	ps.collector = collector
 }
 
-// GetMetricsCollector returns the current metrics collector
+// GetMetricsCollector returns the current metrics collector.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	collector := ps.GetMetricsCollector()
 func (ps *InProcPubSub) GetMetricsCollector() metrics.MetricsCollector {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	return ps.collector
 }
 
-// recordMetrics records metrics using the unified collector
+// recordMetrics records metrics using the unified collector.
 func (ps *InProcPubSub) recordMetrics(operation, topic string, duration time.Duration, err error) {
 	if ps.collector != nil {
 		ctx := context.Background()

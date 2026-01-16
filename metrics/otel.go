@@ -13,16 +13,49 @@ import (
 )
 
 // Span captures finalized tracing data for inspection or export.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	span := metrics.Span{
+//		Name:       "http.request",
+//		TraceID:    "trace-123",
+//		SpanID:     "span-456",
+//		Status:     "OK",
+//		Duration:   100 * time.Millisecond,
+//		Attributes: map[string]string{
+//			"http.method": "GET",
+//			"http.route":  "/api/users",
+//		},
+//	}
 type Span struct {
-	Name          string            `json:"name"`
-	Attributes    map[string]string `json:"attributes,omitempty"`
-	Status        string            `json:"status"`
-	StatusMessage string            `json:"status_message,omitempty"`
-	Duration      time.Duration     `json:"duration,omitempty"`
-	Timestamp     time.Time         `json:"timestamp"`
-	ParentSpanID  string            `json:"parent_span_id,omitempty"`
-	SpanID        string            `json:"span_id"`
-	TraceID       string            `json:"trace_id"`
+	// Name is the name of the span
+	Name string `json:"name"`
+
+	// Attributes are key-value pairs associated with the span
+	Attributes map[string]string `json:"attributes,omitempty"`
+
+	// Status is the status of the span (OK, ERROR, etc.)
+	Status string `json:"status"`
+
+	// StatusMessage provides additional context for the status
+	StatusMessage string `json:"status_message,omitempty"`
+
+	// Duration is the duration of the span
+	Duration time.Duration `json:"duration,omitempty"`
+
+	// Timestamp is when the span started
+	Timestamp time.Time `json:"timestamp"`
+
+	// ParentSpanID is the ID of the parent span
+	ParentSpanID string `json:"parent_span_id,omitempty"`
+
+	// SpanID is the unique identifier for this span
+	SpanID string `json:"span_id"`
+
+	// TraceID is the unique identifier for this trace
+	TraceID string `json:"trace_id"`
 }
 
 type spanHandle struct {
@@ -36,6 +69,32 @@ type spanHandle struct {
 }
 
 // OpenTelemetryTracer implements middleware.Tracer without external dependencies.
+//
+// This tracer provides OpenTelemetry-compatible tracing without requiring
+// external dependencies. It's designed for:
+//   - HTTP request tracing
+//   - Distributed tracing
+//   - Performance monitoring
+//   - Error tracking
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	tracer := metrics.NewOpenTelemetryTracer("my-service")
+//	defer tracer.Clear()
+//
+//	// Use in HTTP middleware
+//	mux := http.NewServeMux()
+//	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+//		ctx, span := tracer.Start(context.Background(), r)
+//		defer span.End(metrics.RequestMetrics{
+//			Status:  http.StatusOK,
+//			Bytes:   100,
+//			TraceID: span.TraceID(),
+//		})
+//		// ... handle request ...
+//	})
 type OpenTelemetryTracer struct {
 	name string
 
@@ -48,6 +107,12 @@ type OpenTelemetryTracer struct {
 
 // NewOpenTelemetryTracer creates a tracer with the given instrumentation name.
 // An empty name defaults to the plumego metrics namespace.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	tracer := metrics.NewOpenTelemetryTracer("my-service")
 func NewOpenTelemetryTracer(name string) *OpenTelemetryTracer {
 	if name == "" {
 		name = "github.com/spcent/plumego/metrics"
@@ -56,6 +121,24 @@ func NewOpenTelemetryTracer(name string) *OpenTelemetryTracer {
 }
 
 // Start begins a new span for the incoming request.
+//
+// This method:
+//   - Generates a unique span ID and trace ID
+//   - Extracts trace context from headers or context
+//   - Creates a span with HTTP-specific attributes
+//   - Returns a context with the trace information
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	tracer := metrics.NewOpenTelemetryTracer("my-service")
+//	ctx, span := tracer.Start(context.Background(), r)
+//	defer span.End(metrics.RequestMetrics{
+//		Status:  http.StatusOK,
+//		Bytes:   100,
+//		TraceID: span.TraceID(),
+//	})
 func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (context.Context, middleware.TraceSpan) {
 	// Generate simple span and trace IDs
 	spanID := generateSpanID()
@@ -113,6 +196,17 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 }
 
 // Spans returns a copy of completed spans.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	tracer := metrics.NewOpenTelemetryTracer("my-service")
+//	// ... use tracer ...
+//	spans := tracer.Spans()
+//	for _, span := range spans {
+//		fmt.Printf("Span: %s, Duration: %v\n", span.Name, span.Duration)
+//	}
 func (t *OpenTelemetryTracer) Spans() []Span {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -123,6 +217,15 @@ func (t *OpenTelemetryTracer) Spans() []Span {
 }
 
 // GetSpanStats returns statistics about collected spans.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	tracer := metrics.NewOpenTelemetryTracer("my-service")
+//	// ... use tracer ...
+//	stats := tracer.GetSpanStats()
+//	fmt.Printf("Total spans: %d, Error spans: %d\n", stats.TotalSpans, stats.ErrorSpans)
 func (t *OpenTelemetryTracer) GetSpanStats() SpanStats {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -151,6 +254,22 @@ func (t *OpenTelemetryTracer) record(span Span) {
 }
 
 // End finalizes the span and records its metrics attributes.
+//
+// This method:
+//   - Calculates the span duration
+//   - Adds HTTP-specific attributes
+//   - Determines the span status based on HTTP status code
+//   - Records the span for later inspection
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	span.End(metrics.RequestMetrics{
+//		Status:  http.StatusOK,
+//		Bytes:   100,
+//		TraceID: span.TraceID(),
+//	})
 func (s *spanHandle) End(metrics middleware.RequestMetrics) {
 	duration := time.Since(s.startTime)
 
@@ -190,10 +309,12 @@ func (s *spanHandle) End(metrics middleware.RequestMetrics) {
 	})
 }
 
+// TraceID returns the trace ID of the span.
 func (s *spanHandle) TraceID() string {
 	return s.traceID
 }
 
+// SpanID returns the span ID of the span.
 func (s *spanHandle) SpanID() string {
 	return s.spanID
 }
@@ -224,6 +345,15 @@ func generateTraceID() string {
 }
 
 // SpanStats provides statistics about collected spans.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	tracer := metrics.NewOpenTelemetryTracer("my-service")
+//	// ... use tracer ...
+//	stats := tracer.GetSpanStats()
+//	fmt.Printf("Average duration: %v\n", stats.AverageDuration)
 type SpanStats struct {
 	TotalSpans      int
 	ErrorSpans      int

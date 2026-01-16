@@ -22,6 +22,17 @@ import (
 )
 
 // TokenType represents the semantic purpose of a JWT.
+//
+// JWTs can serve different purposes in an authentication system:
+//   - Access tokens: Short-lived tokens for API access
+//   - Refresh tokens: Long-lived tokens for obtaining new access tokens
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	// Verify an access token
+//	claims, err := manager.VerifyToken(ctx, token, jwt.TokenTypeAccess)
 type TokenType string
 
 const (
@@ -32,6 +43,17 @@ const (
 )
 
 // Algorithm represents a supported signing algorithm.
+//
+// Supported algorithms:
+//   - HS256: HMAC with SHA-256 (symmetric, uses shared secret)
+//   - EdDSA: Ed25519 (asymmetric, uses public/private key pair)
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	config := jwt.DefaultJWTConfig(secret)
+//	config.Algorithm = jwt.AlgorithmEdDSA
 type Algorithm string
 
 const (
@@ -60,18 +82,56 @@ const (
 )
 
 // IdentityClaims captures authentication (who the subject is).
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	identity := jwt.IdentityClaims{
+//		Subject: "user-123",
+//		Version: 1,
+//	}
 type IdentityClaims struct {
 	Subject string `json:"sub"`
 	Version int64  `json:"ver"`
 }
 
 // AuthorizationClaims captures authorization data (what the subject can do).
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	authz := jwt.AuthorizationClaims{
+//		Roles:       []string{"admin", "user"},
+//		Permissions: []string{"read:users", "write:users"},
+//	}
 type AuthorizationClaims struct {
 	Roles       []string `json:"roles,omitempty"`
 	Permissions []string `json:"permissions,omitempty"`
 }
 
 // TokenClaims represents a full JWT payload.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	claims := jwt.TokenClaims{
+//		TokenID:   "token-123",
+//		TokenType: jwt.TokenTypeAccess,
+//		Identity: jwt.IdentityClaims{
+//			Subject: "user-123",
+//			Version: 1,
+//		},
+//		Authorization: jwt.AuthorizationClaims{
+//			Roles: []string{"admin"},
+//		},
+//		Issuer:    "plumego",
+//		Audience:  "plumego-client",
+//		IssuedAt:  time.Now().Unix(),
+//		ExpiresAt: time.Now().Add(15 * time.Minute).Unix(),
+//	}
 type TokenClaims struct {
 	TokenID       string              `json:"jti"`
 	TokenType     TokenType           `json:"token_type"`
@@ -86,19 +146,64 @@ type TokenClaims struct {
 }
 
 // JWTConfig holds JWT configuration.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	config := jwt.DefaultJWTConfig(secret)
+//	config.Issuer = "my-app"
+//	config.AccessExpiration = 15 * time.Minute
+//	config.RefreshExpiration = 7 * 24 * time.Hour
+//	config.Algorithm = jwt.AlgorithmHS256
 type JWTConfig struct {
-	Issuer            string
-	Audience          string
-	AccessExpiration  time.Duration
+	// Issuer is the JWT issuer (iss claim)
+	Issuer string
+
+	// Audience is the JWT audience (aud claim)
+	Audience string
+
+	// AccessExpiration is the lifetime of access tokens
+	AccessExpiration time.Duration
+
+	// RefreshExpiration is the lifetime of refresh tokens
 	RefreshExpiration time.Duration
-	RotationInterval  time.Duration
-	Algorithm         Algorithm
-	ClockSkew         time.Duration // clock skew tolerance
-	AllowQueryToken   bool          // allow token in query parameter
-	DebugMode         bool          // debug mode (return detailed error messages)
+
+	// RotationInterval is how often to rotate signing keys
+	RotationInterval time.Duration
+
+	// Algorithm is the signing algorithm
+	Algorithm Algorithm
+
+	// ClockSkew is the tolerance for clock skew
+	ClockSkew time.Duration
+
+	// AllowQueryToken allows tokens in URL query parameters (not recommended)
+	AllowQueryToken bool
+
+	// DebugMode returns detailed error messages (for development only)
+	DebugMode bool
 }
 
 // DefaultJWTConfig returns sane defaults.
+//
+// Defaults:
+//   - Issuer: "plumego"
+//   - Audience: "plumego-client"
+//   - AccessExpiration: 15 minutes
+//   - RefreshExpiration: 7 days
+//   - RotationInterval: 24 hours
+//   - Algorithm: HS256
+//   - ClockSkew: 5 seconds
+//   - AllowQueryToken: false
+//   - DebugMode: false
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	secret := []byte("my-secret-key")
+//	config := jwt.DefaultJWTConfig(secret)
 func DefaultJWTConfig(secret []byte) JWTConfig {
 	_ = secret // kept for API compatibility
 	return JWTConfig{
@@ -115,6 +220,17 @@ func DefaultJWTConfig(secret []byte) JWTConfig {
 }
 
 // JWTSigningKey represents a signing key with metadata.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	key := jwt.JWTSigningKey{
+//		ID:        "key-123",
+//		Algorithm: jwt.AlgorithmHS256,
+//		Secret:    []byte("my-secret-key"),
+//		CreatedAt: time.Now(),
+//	}
 type JWTSigningKey struct {
 	ID        string    `json:"id"`
 	Algorithm Algorithm `json:"alg"`
@@ -124,6 +240,16 @@ type JWTSigningKey struct {
 }
 
 // TokenPair contains generated access and refresh tokens.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	pair, err := manager.GenerateTokenPair(ctx, identity, authz)
+//	if err != nil {
+//		// handle error
+//	}
+//	// Send pair.AccessToken and pair.RefreshToken to client
 type TokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -132,6 +258,36 @@ type TokenPair struct {
 }
 
 // JWTManager handles JWT token generation and verification.
+//
+// JWTManager provides a complete JWT authentication system with:
+//   - Token generation (access and refresh tokens)
+//   - Token verification and validation
+//   - Key rotation
+//   - Token revocation
+//   - Identity versioning for instant invalidation
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//	import "github.com/spcent/plumego/store/kv"
+//
+//	store := kv.New()
+//	config := jwt.DefaultJWTConfig(secret)
+//	manager, err := jwt.NewJWTManager(store, config)
+//	if err != nil {
+//		// handle error
+//	}
+//
+//	// Generate token pair
+//	identity := jwt.IdentityClaims{Subject: "user-123"}
+//	authz := jwt.AuthorizationClaims{Roles: []string{"admin"}}
+//	pair, err := manager.GenerateTokenPair(ctx, identity, authz)
+//
+//	// Verify token
+//	claims, err := manager.VerifyToken(ctx, pair.AccessToken, jwt.TokenTypeAccess)
+//
+//	// Use as middleware
+//	handler := manager.JWTAuthenticator(jwt.TokenTypeAccess)(myHandler)
 type JWTManager struct {
 	config JWTConfig
 	store  *kvstore.KVStore
@@ -143,6 +299,20 @@ type JWTManager struct {
 }
 
 // NewJWTManager creates a new JWT manager with the given configuration and backing store.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//	import "github.com/spcent/plumego/store/kv"
+//
+//	store := kv.New()
+//	secret := []byte("my-secret-key")
+//	config := jwt.DefaultJWTConfig(secret)
+//	manager, err := jwt.NewJWTManager(store, config)
+//	if err != nil {
+//		// handle error
+//	}
+//	defer manager.Stop()
 func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error) {
 	if store == nil {
 		return nil, errors.New("kv store is required")

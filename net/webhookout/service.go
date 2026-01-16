@@ -19,15 +19,55 @@ import (
 	"encoding/hex"
 )
 
+// Metrics tracks webhook delivery statistics.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	service := webhookout.NewService(store, config)
+//	metrics := service.Metrics()
+//	fmt.Printf("Enqueued: %d, SentOK: %d\n", metrics.Enqueued, metrics.SentOK)
 type Metrics struct {
+	// Enqueued is the number of deliveries enqueued
 	Enqueued uint64
-	Dropped  uint64
-	SentOK   uint64
+
+	// Dropped is the number of deliveries dropped due to queue overflow
+	Dropped uint64
+
+	// SentOK is the number of deliveries sent successfully
+	SentOK uint64
+
+	// SentFail is the number of deliveries that failed
 	SentFail uint64
-	Retried  uint64
-	Dead     uint64
+
+	// Retried is the number of deliveries that were retried
+	Retried uint64
+
+	// Dead is the number of deliveries that are dead (too many failures)
+	Dead uint64
 }
 
+// Service manages webhook delivery with retry logic and queue management.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	store := webhookout.NewMemoryStore()
+//	config := webhookout.DefaultConfig()
+//	service := webhookout.NewService(store, config)
+//	defer service.Stop()
+//
+//	// Start the service
+//	go service.Start(context.Background())
+//
+//	// Trigger an event
+//	event := webhookout.Event{
+//		Type: "payment.success",
+//		Data: map[string]any{"amount": 100.00},
+//	}
+//	count, err := service.TriggerEvent(context.Background(), event)
 type Service struct {
 	cfg   Config
 	store Store
@@ -44,6 +84,15 @@ type Service struct {
 	metrics Metrics
 }
 
+// NewService creates a new webhook delivery service.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	store := webhookout.NewMemoryStore()
+//	config := webhookout.DefaultConfig()
+//	service := webhookout.NewService(store, config)
 func NewService(store Store, cfg Config) *Service {
 	q := NewQueue(cfg.QueueSize, cfg.DropPolicy, cfg.BlockWait)
 	s := &Service{
@@ -56,6 +105,25 @@ func NewService(store Store, cfg Config) *Service {
 	return s
 }
 
+// Start starts the webhook delivery service.
+//
+// This method:
+//   - Starts the delay scheduler for retry logic
+//   - Starts worker goroutines for processing deliveries
+//   - Runs until the context is cancelled
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	store := webhookout.NewMemoryStore()
+//	config := webhookout.DefaultConfig()
+//	service := webhookout.NewService(store, config)
+//
+//	ctx, cancel := context.WithCancel(context.Background())
+//	defer cancel()
+//
+//	go service.Start(ctx)
 func (s *Service) Start(ctx context.Context) {
 	if !s.cfg.Enabled {
 		return
@@ -83,6 +151,27 @@ func (s *Service) Start(ctx context.Context) {
 	}
 }
 
+// Stop gracefully stops the webhook delivery service.
+//
+// This method:
+//   - Cancels all worker goroutines
+//   - Waits for the queue to drain (up to DrainMax)
+//   - Stops the delay scheduler
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	store := webhookout.NewMemoryStore()
+//	config := webhookout.DefaultConfig()
+//	service := webhookout.NewService(store, config)
+//
+//	ctx, cancel := context.WithCancel(context.Background())
+//	go service.Start(ctx)
+//
+//	// ... use service ...
+//
+//	service.Stop()
 func (s *Service) Stop() {
 	if !s.running.Swap(false) {
 		return
@@ -104,8 +193,34 @@ func (s *Service) Stop() {
 	}
 }
 
+// Metrics returns the current delivery metrics.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	store := webhookout.NewMemoryStore()
+//	config := webhookout.DefaultConfig()
+//	service := webhookout.NewService(store, config)
+//
+//	metrics := service.Metrics()
+//	fmt.Printf("Enqueued: %d, SentOK: %d\n", metrics.Enqueued, metrics.SentOK)
 func (s *Service) Metrics() Metrics { return s.metrics }
 
+// CreateTarget creates a new webhook target.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	target := webhookout.Target{
+//		Name:    "Payment Service",
+//		URL:     "https://api.example.com/webhooks",
+//		Secret:  "secret-key-here",
+//		Events:  []string{"payment.success", "payment.failed"},
+//		Enabled: true,
+//	}
+//	created, err := service.CreateTarget(context.Background(), target)
 func (s *Service) CreateTarget(ctx context.Context, t Target) (Target, error) {
 	if err := validateTarget(t); err != nil {
 		return Target{}, err
@@ -133,6 +248,17 @@ func (s *Service) CreateTarget(ctx context.Context, t Target) (Target, error) {
 	return s.store.CreateTarget(ctx, t)
 }
 
+// UpdateTarget updates an existing webhook target.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	enabled := false
+//	patch := webhookout.TargetPatch{
+//		Enabled: &enabled,
+//	}
+//	updated, err := service.UpdateTarget(context.Background(), "target-123", patch)
 func (s *Service) UpdateTarget(ctx context.Context, id string, patch TargetPatch) (Target, error) {
 	// validate URL if set
 	if patch.URL != nil {
@@ -149,21 +275,74 @@ func (s *Service) UpdateTarget(ctx context.Context, id string, patch TargetPatch
 	return s.store.UpdateTarget(ctx, id, patch)
 }
 
+// GetTarget retrieves a webhook target by ID.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	target, ok := service.GetTarget(context.Background(), "target-123")
+//	if !ok {
+//		// Target not found
+//	}
 func (s *Service) GetTarget(ctx context.Context, id string) (Target, bool) {
 	return s.store.GetTarget(ctx, id)
 }
 
+// ListTargets lists webhook targets matching the filter.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	enabled := true
+//	filter := webhookout.TargetFilter{
+//		Enabled: &enabled,
+//		Event:   "payment.success",
+//	}
+//	targets, err := service.ListTargets(context.Background(), filter)
 func (s *Service) ListTargets(ctx context.Context, f TargetFilter) ([]Target, error) {
 	return s.store.ListTargets(ctx, f)
 }
 
+// GetDelivery retrieves a webhook delivery by ID.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	delivery, ok := service.GetDelivery(context.Background(), "del-123")
+//	if !ok {
+//		// Delivery not found
+//	}
 func (s *Service) GetDelivery(ctx context.Context, id string) (Delivery, bool) {
 	return s.store.GetDelivery(ctx, id)
 }
 
+// ListDeliveries lists webhook deliveries matching the filter.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	filter := webhookout.DeliveryFilter{
+//		Limit: 100,
+//	}
+//	deliveries, err := service.ListDeliveries(context.Background(), filter)
 func (s *Service) ListDeliveries(ctx context.Context, f DeliveryFilter) ([]Delivery, error) {
 	return s.store.ListDeliveries(ctx, f)
 }
+
+// ReplayDelivery replays a failed delivery by creating a new delivery with the same payload.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	newDelivery, err := service.ReplayDelivery(context.Background(), "del-123")
+//	if err != nil {
+//		// Handle error
+//	}
 func (s *Service) ReplayDelivery(ctx context.Context, deliveryID string) (Delivery, error) {
 	d, ok := s.store.GetDelivery(ctx, deliveryID)
 	if !ok {
@@ -203,6 +382,7 @@ func (s *Service) ReplayDelivery(ctx context.Context, deliveryID string) (Delive
 	return newD, nil
 }
 
+// rewriteDeliveryIDInPayload updates the delivery_id in the payload metadata.
 func rewriteDeliveryIDInPayload(raw []byte, newDeliveryID string) ([]byte, error) {
 	// payload schema:
 	// { id, type, occurred_at, data, meta: { delivery_id, ... } }
@@ -219,6 +399,31 @@ func rewriteDeliveryIDInPayload(raw []byte, newDeliveryID string) ([]byte, error
 	return json.Marshal(m)
 }
 
+// TriggerEvent triggers a webhook event to all subscribed targets.
+//
+// This is the main method for sending webhooks. It:
+//   - Creates an event with a unique ID
+//   - Finds all enabled targets subscribed to this event type
+//   - Creates a delivery for each target
+//   - Enqueues the delivery for processing
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/webhookout"
+//
+//	event := webhookout.Event{
+//		Type: "payment.success",
+//		Data: map[string]any{
+//			"amount":     100.00,
+//			"currency":   "USD",
+//			"customer_id": "cust-456",
+//		},
+//	}
+//	count, err := service.TriggerEvent(context.Background(), event)
+//	if err != nil {
+//		// Handle error
+//	}
+//	fmt.Printf("Delivered to %d targets\n", count)
 func (s *Service) TriggerEvent(ctx context.Context, e Event) (int, error) {
 	if strings.TrimSpace(e.Type) == "" {
 		return 0, errors.New("event type required")
@@ -277,6 +482,7 @@ func (s *Service) TriggerEvent(ctx context.Context, e Event) (int, error) {
 	return count, nil
 }
 
+// mergeMeta merges two metadata maps.
 func mergeMeta(a, b map[string]any) map[string]any {
 	out := map[string]any{}
 	for k, v := range a {
@@ -288,6 +494,7 @@ func mergeMeta(a, b map[string]any) map[string]any {
 	return out
 }
 
+// enqueue adds a task to the delivery queue.
 func (s *Service) enqueue(ctx context.Context, t Task) error {
 	if !s.cfg.Enabled {
 		return errors.New("webhook disabled")
@@ -299,6 +506,7 @@ func (s *Service) enqueue(ctx context.Context, t Task) error {
 	return err
 }
 
+// workerLoop processes tasks from the delivery queue.
 func (s *Service) workerLoop(ctx context.Context) {
 	for {
 		select {
@@ -313,6 +521,7 @@ func (s *Service) workerLoop(ctx context.Context) {
 	}
 }
 
+// handleTask processes a single delivery task.
 func (s *Service) handleTask(ctx context.Context, t Task) {
 	d, ok := s.store.GetDelivery(ctx, t.DeliveryID)
 	if !ok {
@@ -404,6 +613,7 @@ func (s *Service) handleTask(ctx context.Context, t Task) {
 	_, _ = s.store.UpdateDelivery(ctx, d.ID, patch)
 }
 
+// sendOnce sends a single webhook delivery.
 func (s *Service) sendOnce(ctx context.Context, target Target, d Delivery, raw []byte, attempt int) (int, string, error) {
 	// SSRF check
 	if err := validateURL(target.URL, s.cfg.AllowPrivateNetwork); err != nil {
@@ -453,6 +663,7 @@ func (s *Service) sendOnce(ctx context.Context, target Target, d Delivery, raw [
 	return resp.StatusCode, snippet, nil
 }
 
+// validateTarget validates a webhook target configuration.
 func validateTarget(t Target) error {
 	if strings.TrimSpace(t.Name) == "" {
 		return errors.New("name required")
@@ -466,6 +677,7 @@ func validateTarget(t Target) error {
 	return validateURL(t.URL, false) // strict by default; allow override at service-level update
 }
 
+// validateURL validates a webhook URL and checks for private network addresses.
 func validateURL(raw string, allowPrivate bool) error {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
@@ -498,6 +710,7 @@ func validateURL(raw string, allowPrivate bool) error {
 	return nil
 }
 
+// isPrivateIP checks if an IP address is in a private range.
 func isPrivateIP(ip net.IP) bool {
 	// IPv4 private ranges + loopback + link-local
 	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
@@ -524,6 +737,7 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
+// ms converts milliseconds to duration, using default if value is <= 0.
 func ms(v int, def time.Duration) time.Duration {
 	if v <= 0 {
 		return def
@@ -531,8 +745,10 @@ func ms(v int, def time.Duration) time.Duration {
 	return time.Duration(v) * time.Millisecond
 }
 
+// boolPtr returns a pointer to a bool value.
 func boolPtr(v bool) *bool { return &v }
 
+// newID generates a random ID.
 func newID() string {
 	var b [16]byte
 	_, _ = rand.Read(b[:])
