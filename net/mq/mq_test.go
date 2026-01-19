@@ -211,6 +211,168 @@ func TestInProcBrokerLongTopic(t *testing.T) {
 	}
 }
 
+func TestInProcBrokerHealthCheck(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Subscribe to a topic
+	sub, err := broker.Subscribe(context.Background(), "health-test", SubOptions{BufferSize: 1})
+	if err != nil {
+		t.Fatalf("subscribe error: %v", err)
+	}
+	defer sub.Cancel()
+
+	// Publish a message
+	if err := broker.Publish(context.Background(), "health-test", Message{ID: "test-1"}); err != nil {
+		t.Fatalf("publish error: %v", err)
+	}
+
+	// Check health
+	status := broker.HealthCheck()
+	if status.Status != "healthy" {
+		t.Fatalf("expected status 'healthy', got %q", status.Status)
+	}
+	if status.TotalTopics != 1 {
+		t.Fatalf("expected 1 topic, got %d", status.TotalTopics)
+	}
+	if status.TotalSubs != 1 {
+		t.Fatalf("expected 1 subscriber, got %d", status.TotalSubs)
+	}
+	if status.Uptime == "" {
+		t.Fatalf("expected non-empty uptime")
+	}
+	if status.Metrics.TotalPublished != 1 {
+		t.Fatalf("expected 1 published message, got %d", status.Metrics.TotalPublished)
+	}
+}
+
+func TestInProcBrokerConfig(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Get default config
+	cfg := broker.GetConfig()
+	if !cfg.EnableHealthCheck {
+		t.Fatalf("expected EnableHealthCheck to be true by default")
+	}
+	if cfg.DefaultBufferSize != 16 {
+		t.Fatalf("expected DefaultBufferSize to be 16 by default, got %d", cfg.DefaultBufferSize)
+	}
+
+	// Update config
+	newCfg := DefaultConfig()
+	newCfg.DefaultBufferSize = 32
+	newCfg.EnableMetrics = false
+	if err := broker.UpdateConfig(newCfg); err != nil {
+		t.Fatalf("update config error: %v", err)
+	}
+
+	// Verify updated config
+	updatedCfg := broker.GetConfig()
+	if updatedCfg.DefaultBufferSize != 32 {
+		t.Fatalf("expected DefaultBufferSize to be 32, got %d", updatedCfg.DefaultBufferSize)
+	}
+	if updatedCfg.EnableMetrics != false {
+		t.Fatalf("expected EnableMetrics to be false")
+	}
+
+	// Test invalid config
+	invalidCfg := DefaultConfig()
+	invalidCfg.DefaultBufferSize = 0
+	if err := broker.UpdateConfig(invalidCfg); err == nil {
+		t.Fatalf("expected error for invalid config")
+	}
+}
+
+func TestInProcBrokerPublishBatch(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Subscribe
+	sub, err := broker.Subscribe(context.Background(), "batch-topic", SubOptions{BufferSize: 10})
+	if err != nil {
+		t.Fatalf("subscribe error: %v", err)
+	}
+	defer sub.Cancel()
+
+	// Create batch of messages
+	messages := []Message{
+		{ID: "msg-1", Data: "data-1"},
+		{ID: "msg-2", Data: "data-2"},
+		{ID: "msg-3", Data: "data-3"},
+	}
+
+	// Publish batch
+	if err := broker.PublishBatch(context.Background(), "batch-topic", messages); err != nil {
+		t.Fatalf("publish batch error: %v", err)
+	}
+
+	// Verify all messages received
+	received := 0
+	timeout := time.After(1 * time.Second)
+	for {
+		select {
+		case <-sub.C():
+			received++
+			if received == len(messages) {
+				return
+			}
+		case <-timeout:
+			t.Fatalf("timeout waiting for messages, received %d out of %d", received, len(messages))
+		}
+	}
+}
+
+func TestInProcBrokerSubscribeBatch(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Subscribe to multiple topics
+	topics := []string{"topic-1", "topic-2", "topic-3"}
+	subs, err := broker.SubscribeBatch(context.Background(), topics, SubOptions{BufferSize: 5})
+	if err != nil {
+		t.Fatalf("subscribe batch error: %v", err)
+	}
+	if len(subs) != len(topics) {
+		t.Fatalf("expected %d subscriptions, got %d", len(topics), len(subs))
+	}
+
+	// Verify each subscription works
+	for i, sub := range subs {
+		if err := broker.Publish(context.Background(), topics[i], Message{ID: fmt.Sprintf("test-%d", i)}); err != nil {
+			t.Fatalf("publish error: %v", err)
+		}
+		select {
+		case msg := <-sub.C():
+			if msg.ID != fmt.Sprintf("test-%d", i) {
+				t.Fatalf("expected message ID test-%d, got %s", i, msg.ID)
+			}
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("timeout waiting for message on topic %s", topics[i])
+		}
+	}
+
+	// Clean up subscriptions
+	for _, sub := range subs {
+		sub.Cancel()
+	}
+}
+
+func TestInProcBrokerInvalidConfig(t *testing.T) {
+	// Test invalid config during creation
+	invalidCfg := DefaultConfig()
+	invalidCfg.DefaultBufferSize = 0
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("expected panic for invalid config")
+		}
+	}()
+
+	// This should panic
+	_ = NewInProcBroker(pubsub.New(), WithConfig(invalidCfg))
+}
+
 type panicPubSub struct{}
 
 func (p panicPubSub) Publish(topic string, msg pubsub.Message) error {
