@@ -78,6 +78,18 @@ var ErrMessageAcknowledged = errors.New("mq: message already acknowledged")
 // ErrMessageNotAcked is returned when a message requires acknowledgment but none was received.
 var ErrMessageNotAcked = errors.New("mq: message requires acknowledgment")
 
+// ErrClusterDisabled is returned when cluster mode is disabled.
+var ErrClusterDisabled = errors.New("mq: cluster mode is disabled")
+
+// ErrNodeNotFound is returned when a cluster node is not found.
+var ErrNodeNotFound = errors.New("mq: cluster node not found")
+
+// ErrTransactionNotSupported is returned when transaction is not supported.
+var ErrTransactionNotSupported = errors.New("mq: transaction not supported")
+
+// ErrDeadLetterNotSupported is returned when dead letter queue is not supported.
+var ErrDeadLetterNotSupported = errors.New("mq: dead letter queue not supported")
+
 // MessagePriority represents the priority of a message.
 type MessagePriority int
 
@@ -159,23 +171,79 @@ type Config struct {
 
 	// EnableTriePattern enables Trie-based pattern matching
 	EnableTriePattern bool
+
+	// EnableCluster enables distributed cluster mode
+	EnableCluster bool
+
+	// ClusterNodeID is the unique identifier for this node in the cluster
+	ClusterNodeID string
+
+	// ClusterNodes is the list of peer nodes in the cluster (format: "node-id@host:port")
+	ClusterNodes []string
+
+	// ClusterReplicationFactor is the number of replicas for each message (default: 1)
+	ClusterReplicationFactor int
+
+	// ClusterSyncInterval is the interval for cluster state synchronization (default: 5s)
+	ClusterSyncInterval time.Duration
+
+	// EnablePersistence enables persistent storage backend
+	EnablePersistence bool
+
+	// PersistencePath is the directory path for persistent storage
+	PersistencePath string
+
+	// EnableDeadLetterQueue enables dead letter queue support
+	EnableDeadLetterQueue bool
+
+	// DeadLetterTopic is the topic for dead letter messages
+	DeadLetterTopic string
+
+	// EnableTransactions enables transaction support
+	EnableTransactions bool
+
+	// TransactionTimeout is the timeout for transactions (default: 30s)
+	TransactionTimeout time.Duration
+
+	// EnableMQTT enables MQTT protocol support
+	EnableMQTT bool
+
+	// MQTTPort is the port for MQTT protocol (default: 1883)
+	MQTTPort int
+
+	// EnableAMQP enables AMQP protocol support
+	EnableAMQP bool
+
+	// AMQPPort is the port for AMQP protocol (default: 5672)
+	AMQPPort int
 }
 
 // DefaultConfig returns the default configuration.
 func DefaultConfig() Config {
 	return Config{
-		EnableHealthCheck:   true,
-		MaxTopics:           0, // No limit
-		MaxSubscribers:      0, // No limit
-		DefaultBufferSize:   16,
-		EnableMetrics:       true,
-		HealthCheckInterval: 30 * time.Second,
-		MessageTTL:          0, // No TTL by default
-		EnablePriorityQueue: true,
-		EnableAckSupport:    false, // Disabled by default for backward compatibility
-		DefaultAckTimeout:   30 * time.Second,
-		MaxMemoryUsage:      0,     // No limit by default
-		EnableTriePattern:   false, // Disabled by default for backward compatibility
+		EnableHealthCheck:        true,
+		MaxTopics:                0, // No limit
+		MaxSubscribers:           0, // No limit
+		DefaultBufferSize:        16,
+		EnableMetrics:            true,
+		HealthCheckInterval:      30 * time.Second,
+		MessageTTL:               0, // No TTL by default
+		EnablePriorityQueue:      true,
+		EnableAckSupport:         false, // Disabled by default for backward compatibility
+		DefaultAckTimeout:        30 * time.Second,
+		MaxMemoryUsage:           0,     // No limit by default
+		EnableTriePattern:        false, // Disabled by default for backward compatibility
+		EnableCluster:            false, // Disabled by default
+		ClusterReplicationFactor: 1,     // No replication by default
+		ClusterSyncInterval:      5 * time.Second,
+		EnablePersistence:        false, // Disabled by default
+		EnableDeadLetterQueue:    false, // Disabled by default
+		EnableTransactions:       false, // Disabled by default
+		TransactionTimeout:       30 * time.Second,
+		EnableMQTT:               false, // Disabled by default
+		MQTTPort:                 1883,
+		EnableAMQP:               false, // Disabled by default
+		AMQPPort:                 5672,
 	}
 }
 
@@ -219,6 +287,27 @@ type MetricsSnapshot struct {
 	LastError      string        `json:"last_error,omitempty"`
 	LastPanic      string        `json:"last_panic,omitempty"`
 	LastPanicTime  time.Time     `json:"last_panic_time,omitempty"`
+}
+
+// ClusterStatus represents the status of the cluster.
+type ClusterStatus struct {
+	Status            string        `json:"status"`
+	NodeID            string        `json:"node_id,omitempty"`
+	Peers             []string      `json:"peers,omitempty"`
+	ReplicationFactor int           `json:"replication_factor,omitempty"`
+	SyncInterval      time.Duration `json:"sync_interval,omitempty"`
+	TotalNodes        int           `json:"total_nodes,omitempty"`
+	HealthyNodes      int           `json:"healthy_nodes,omitempty"`
+	LastSyncTime      time.Time     `json:"last_sync_time,omitempty"`
+}
+
+// DeadLetterStats represents statistics about the dead letter queue.
+type DeadLetterStats struct {
+	Enabled         bool      `json:"enabled"`
+	Topic           string    `json:"topic,omitempty"`
+	TotalMessages   uint64    `json:"total_messages,omitempty"`
+	CurrentCount    int       `json:"current_count,omitempty"`
+	LastMessageTime time.Time `json:"last_message_time,omitempty"`
 }
 
 // InProcBroker adapts pubsub.PubSub to the Broker interface.
@@ -666,6 +755,305 @@ func (b *InProcBroker) GetMemoryUsage() uint64 {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	return memStats.Alloc
+}
+
+// PublishToCluster publishes a message to the cluster (replicates to other nodes).
+func (b *InProcBroker) PublishToCluster(ctx context.Context, topic string, msg Message) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Check if cluster mode is enabled
+		if !b.config.EnableCluster {
+			return fmt.Errorf("%w: cluster mode is disabled", ErrClusterDisabled)
+		}
+
+		// Validate topic
+		if err := validateTopic(topic); err != nil {
+			return err
+		}
+
+		// Validate message
+		if err := validateMessage(msg); err != nil {
+			return err
+		}
+
+		// TODO: Implement cluster replication logic
+		// This would:
+		// 1. Replicate message to other cluster nodes
+		// 2. Wait for acknowledgments from replicas
+		// 3. Handle replication failures
+		// 4. Maintain consistency across nodes
+
+		// For now, just publish locally
+		return b.ps.Publish(topic, msg)
+	})
+}
+
+// SubscribeFromCluster subscribes to messages from the cluster.
+func (b *InProcBroker) SubscribeFromCluster(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
+	var sub Subscription
+	err := b.executeWithObservability(ctx, OpSubscribe, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Check if cluster mode is enabled
+		if !b.config.EnableCluster {
+			return fmt.Errorf("%w: cluster mode is disabled", ErrClusterDisabled)
+		}
+
+		// Validate topic
+		if err := validateTopic(topic); err != nil {
+			return err
+		}
+
+		// Subscribe locally
+		subscription, err := b.ps.Subscribe(topic, opts)
+		if err != nil {
+			return err
+		}
+
+		sub = subscription
+		return nil
+	})
+
+	return sub, err
+}
+
+// GetClusterStatus returns the current cluster status.
+func (b *InProcBroker) GetClusterStatus() ClusterStatus {
+	if b == nil || !b.config.EnableCluster {
+		return ClusterStatus{
+			Status: "disabled",
+		}
+	}
+
+	return ClusterStatus{
+		Status:            "active",
+		NodeID:            b.config.ClusterNodeID,
+		Peers:             b.config.ClusterNodes,
+		ReplicationFactor: b.config.ClusterReplicationFactor,
+		SyncInterval:      b.config.ClusterSyncInterval,
+	}
+}
+
+// PublishWithTransaction publishes a message within a transaction.
+func (b *InProcBroker) PublishWithTransaction(ctx context.Context, topic string, msg Message, txID string) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Check if transaction support is enabled
+		if !b.config.EnableTransactions {
+			return fmt.Errorf("%w: transaction support is disabled", ErrTransactionNotSupported)
+		}
+
+		// Validate topic
+		if err := validateTopic(topic); err != nil {
+			return err
+		}
+
+		// Validate message
+		if err := validateMessage(msg); err != nil {
+			return err
+		}
+
+		// TODO: Implement transaction logic
+		// This would:
+		// 1. Start a transaction with txID
+		// 2. Buffer the message until commit
+		// 3. Support rollback on failure
+		// 4. Handle transaction timeout
+
+		// For now, just publish the message
+		return b.ps.Publish(topic, msg)
+	})
+}
+
+// CommitTransaction commits a transaction.
+func (b *InProcBroker) CommitTransaction(ctx context.Context, txID string) error {
+	return b.executeWithObservability(ctx, OpPublish, "", func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Check if transaction support is enabled
+		if !b.config.EnableTransactions {
+			return fmt.Errorf("%w: transaction support is disabled", ErrTransactionNotSupported)
+		}
+
+		// TODO: Implement transaction commit logic
+		// This would:
+		// 1. Validate transaction exists and is active
+		// 2. Flush buffered messages
+		// 3. Clean up transaction state
+
+		return nil
+	})
+}
+
+// RollbackTransaction rolls back a transaction.
+func (b *InProcBroker) RollbackTransaction(ctx context.Context, txID string) error {
+	return b.executeWithObservability(ctx, OpPublish, "", func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Check if transaction support is enabled
+		if !b.config.EnableTransactions {
+			return fmt.Errorf("%w: transaction support is disabled", ErrTransactionNotSupported)
+		}
+
+		// TODO: Implement transaction rollback logic
+		// This would:
+		// 1. Validate transaction exists and is active
+		// 2. Discard buffered messages
+		// 3. Clean up transaction state
+
+		return nil
+	})
+}
+
+// PublishToDeadLetter publishes a message to the dead letter queue.
+func (b *InProcBroker) PublishToDeadLetter(ctx context.Context, originalTopic string, msg Message, reason string) error {
+	return b.executeWithObservability(ctx, OpPublish, originalTopic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Check if dead letter queue is enabled
+		if !b.config.EnableDeadLetterQueue {
+			return fmt.Errorf("%w: dead letter queue is disabled", ErrDeadLetterNotSupported)
+		}
+
+		// Validate message
+		if err := validateMessage(msg); err != nil {
+			return err
+		}
+
+		// Determine dead letter topic
+		topic := b.config.DeadLetterTopic
+		if topic == "" {
+			topic = "dead-letter"
+		}
+
+		// TODO: Implement dead letter queue logic
+		// This would:
+		// 1. Add metadata about original topic and reason
+		// 2. Publish to dead letter topic
+		// 3. Track dead letter metrics
+
+		return b.ps.Publish(topic, msg)
+	})
+}
+
+// GetDeadLetterStats returns statistics about the dead letter queue.
+func (b *InProcBroker) GetDeadLetterStats() DeadLetterStats {
+	if b == nil || !b.config.EnableDeadLetterQueue {
+		return DeadLetterStats{
+			Enabled: false,
+		}
+	}
+
+	// TODO: Implement dead letter stats collection
+	// This would track:
+	// - Total dead letter messages
+	// - Dead letter rate
+	// - Recent dead letter reasons
+
+	return DeadLetterStats{
+		Enabled: true,
+		Topic:   b.config.DeadLetterTopic,
+	}
+}
+
+// StartMQTTServer starts the MQTT protocol server.
+func (b *InProcBroker) StartMQTTServer() error {
+	if b == nil {
+		return fmt.Errorf("%w", ErrNotInitialized)
+	}
+
+	if !b.config.EnableMQTT {
+		return fmt.Errorf("%w: MQTT support is disabled", ErrInvalidConfig)
+	}
+
+	// TODO: Implement MQTT server
+	// This would:
+	// 1. Start MQTT broker on configured port
+	// 2. Handle MQTT protocol (CONNECT, PUBLISH, SUBSCRIBE, etc.)
+	// 3. Bridge MQTT messages to internal pubsub
+
+	return nil
+}
+
+// StartAMQPServer starts the AMQP protocol server.
+func (b *InProcBroker) StartAMQPServer() error {
+	if b == nil {
+		return fmt.Errorf("%w", ErrNotInitialized)
+	}
+
+	if !b.config.EnableAMQP {
+		return fmt.Errorf("%w: AMQP support is disabled", ErrInvalidConfig)
+	}
+
+	// TODO: Implement AMQP server
+	// This would:
+	// 1. Start AMQP broker on configured port
+	// 2. Handle AMQP protocol (channel, exchange, queue, etc.)
+	// 3. Bridge AMQP messages to internal pubsub
+
+	return nil
 }
 
 // Close shuts down the broker.

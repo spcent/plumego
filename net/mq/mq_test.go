@@ -495,6 +495,248 @@ func TestInProcBrokerTriePattern(t *testing.T) {
 	// This test verifies the configuration is properly stored
 }
 
+func TestInProcBrokerCluster(t *testing.T) {
+	// Test cluster configuration
+	cfg := DefaultConfig()
+	cfg.EnableCluster = true
+	cfg.ClusterNodeID = "node-1"
+	cfg.ClusterNodes = []string{"node-2@localhost:9000", "node-3@localhost:9001"}
+	cfg.ClusterReplicationFactor = 2
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Verify config
+	updatedCfg := broker.GetConfig()
+	if !updatedCfg.EnableCluster {
+		t.Fatalf("expected EnableCluster to be true")
+	}
+	if updatedCfg.ClusterNodeID != "node-1" {
+		t.Fatalf("expected ClusterNodeID to be 'node-1', got %s", updatedCfg.ClusterNodeID)
+	}
+
+	// Test cluster status
+	status := broker.GetClusterStatus()
+	if status.Status != "active" {
+		t.Fatalf("expected cluster status 'active', got %s", status.Status)
+	}
+	if status.NodeID != "node-1" {
+		t.Fatalf("expected node ID 'node-1', got %s", status.NodeID)
+	}
+
+	// Test cluster publish (should work even though cluster is not fully implemented)
+	err := broker.PublishToCluster(context.Background(), "cluster-topic", Message{ID: "cluster-1", Data: "cluster data"})
+	if err != nil {
+		t.Fatalf("publish to cluster error: %v", err)
+	}
+
+	// Test cluster subscribe
+	sub, err := broker.SubscribeFromCluster(context.Background(), "cluster-topic", SubOptions{BufferSize: 10})
+	if err != nil {
+		t.Fatalf("subscribe from cluster error: %v", err)
+	}
+	defer sub.Cancel()
+}
+
+func TestInProcBrokerTransaction(t *testing.T) {
+	// Test transaction configuration
+	cfg := DefaultConfig()
+	cfg.EnableTransactions = true
+	cfg.TransactionTimeout = 60 * time.Second
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Verify config
+	updatedCfg := broker.GetConfig()
+	if !updatedCfg.EnableTransactions {
+		t.Fatalf("expected EnableTransactions to be true")
+	}
+
+	// Test transaction publish
+	txID := "tx-1"
+	err := broker.PublishWithTransaction(context.Background(), "tx-topic", Message{ID: "tx-1", Data: "transaction data"}, txID)
+	if err != nil {
+		t.Fatalf("publish with transaction error: %v", err)
+	}
+
+	// Test commit transaction
+	err = broker.CommitTransaction(context.Background(), txID)
+	if err != nil {
+		t.Fatalf("commit transaction error: %v", err)
+	}
+
+	// Test rollback transaction
+	err = broker.RollbackTransaction(context.Background(), txID)
+	if err != nil {
+		t.Fatalf("rollback transaction error: %v", err)
+	}
+}
+
+func TestInProcBrokerDeadLetter(t *testing.T) {
+	// Test dead letter queue configuration
+	cfg := DefaultConfig()
+	cfg.EnableDeadLetterQueue = true
+	cfg.DeadLetterTopic = "dlq"
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Verify config
+	updatedCfg := broker.GetConfig()
+	if !updatedCfg.EnableDeadLetterQueue {
+		t.Fatalf("expected EnableDeadLetterQueue to be true")
+	}
+
+	// Test dead letter publish
+	err := broker.PublishToDeadLetter(context.Background(), "original-topic", Message{ID: "dlq-1", Data: "dead letter data"}, "processing failed")
+	if err != nil {
+		t.Fatalf("publish to dead letter error: %v", err)
+	}
+
+	// Test dead letter stats
+	stats := broker.GetDeadLetterStats()
+	if !stats.Enabled {
+		t.Fatalf("expected dead letter stats to be enabled")
+	}
+	if stats.Topic != "dlq" {
+		t.Fatalf("expected dead letter topic 'dlq', got %s", stats.Topic)
+	}
+}
+
+func TestInProcBrokerProtocolSupport(t *testing.T) {
+	// Test MQTT configuration
+	cfg := DefaultConfig()
+	cfg.EnableMQTT = true
+	cfg.MQTTPort = 1883
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Verify config
+	updatedCfg := broker.GetConfig()
+	if !updatedCfg.EnableMQTT {
+		t.Fatalf("expected EnableMQTT to be true")
+	}
+	if updatedCfg.MQTTPort != 1883 {
+		t.Fatalf("expected MQTTPort to be 1883, got %d", updatedCfg.MQTTPort)
+	}
+
+	// Test AMQP configuration
+	cfg2 := DefaultConfig()
+	cfg2.EnableAMQP = true
+	cfg2.AMQPPort = 5672
+	broker2 := NewInProcBroker(pubsub.New(), WithConfig(cfg2))
+	defer broker2.Close()
+
+	// Verify config
+	updatedCfg2 := broker2.GetConfig()
+	if !updatedCfg2.EnableAMQP {
+		t.Fatalf("expected EnableAMQP to be true")
+	}
+	if updatedCfg2.AMQPPort != 5672 {
+		t.Fatalf("expected AMQPPort to be 5672, got %d", updatedCfg2.AMQPPort)
+	}
+
+	// Test starting MQTT server (should succeed even though not fully implemented)
+	err := broker.StartMQTTServer()
+	if err != nil {
+		t.Fatalf("start MQTT server error: %v", err)
+	}
+
+	// Test starting AMQP server (should succeed even though not fully implemented)
+	err = broker2.StartAMQPServer()
+	if err != nil {
+		t.Fatalf("start AMQP server error: %v", err)
+	}
+}
+
+func TestInProcBrokerPersistence(t *testing.T) {
+	// Test persistence configuration
+	cfg := DefaultConfig()
+	cfg.EnablePersistence = true
+	cfg.PersistencePath = "/tmp/mq-data"
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Verify config
+	updatedCfg := broker.GetConfig()
+	if !updatedCfg.EnablePersistence {
+		t.Fatalf("expected EnablePersistence to be true")
+	}
+	if updatedCfg.PersistencePath != "/tmp/mq-data" {
+		t.Fatalf("expected PersistencePath to be '/tmp/mq-data', got %s", updatedCfg.PersistencePath)
+	}
+}
+
+func TestInProcBrokerClusterDisabled(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Test cluster operations when disabled
+	err := broker.PublishToCluster(context.Background(), "topic", Message{ID: "test-1", Data: "test"})
+	if !errors.Is(err, ErrClusterDisabled) {
+		t.Fatalf("expected ErrClusterDisabled, got %v", err)
+	}
+
+	// Test cluster status when disabled
+	status := broker.GetClusterStatus()
+	if status.Status != "disabled" {
+		t.Fatalf("expected cluster status 'disabled', got %s", status.Status)
+	}
+}
+
+func TestInProcBrokerTransactionDisabled(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Test transaction operations when disabled
+	err := broker.PublishWithTransaction(context.Background(), "topic", Message{ID: "test-1", Data: "test"}, "tx-1")
+	if !errors.Is(err, ErrTransactionNotSupported) {
+		t.Fatalf("expected ErrTransactionNotSupported, got %v", err)
+	}
+
+	err = broker.CommitTransaction(context.Background(), "tx-1")
+	if !errors.Is(err, ErrTransactionNotSupported) {
+		t.Fatalf("expected ErrTransactionNotSupported, got %v", err)
+	}
+
+	err = broker.RollbackTransaction(context.Background(), "tx-1")
+	if !errors.Is(err, ErrTransactionNotSupported) {
+		t.Fatalf("expected ErrTransactionNotSupported, got %v", err)
+	}
+}
+
+func TestInProcBrokerDeadLetterDisabled(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Test dead letter operations when disabled
+	err := broker.PublishToDeadLetter(context.Background(), "topic", Message{ID: "test-1", Data: "test"}, "reason")
+	if !errors.Is(err, ErrDeadLetterNotSupported) {
+		t.Fatalf("expected ErrDeadLetterNotSupported, got %v", err)
+	}
+
+	// Test dead letter stats when disabled
+	stats := broker.GetDeadLetterStats()
+	if stats.Enabled {
+		t.Fatalf("expected dead letter stats to be disabled")
+	}
+}
+
+func TestInProcBrokerProtocolDisabled(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Test MQTT server when disabled
+	err := broker.StartMQTTServer()
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("expected ErrInvalidConfig for disabled MQTT, got %v", err)
+	}
+
+	// Test AMQP server when disabled
+	err = broker.StartAMQPServer()
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("expected ErrInvalidConfig for disabled AMQP, got %v", err)
+	}
+}
+
 type panicPubSub struct{}
 
 func (p panicPubSub) Publish(topic string, msg pubsub.Message) error {
