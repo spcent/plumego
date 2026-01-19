@@ -3,6 +3,8 @@ package mq
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -60,7 +62,7 @@ func TestInProcBrokerPanicRecovery(t *testing.T) {
 		}
 	}))
 
-	err := broker.Publish(context.Background(), "topic", Message{})
+	err := broker.Publish(context.Background(), "topic", Message{ID: "test-1"})
 	if !errors.Is(err, ErrRecoveredPanic) {
 		t.Fatalf("expected ErrRecoveredPanic, got %v", err)
 	}
@@ -74,7 +76,7 @@ func TestInProcBrokerMetrics(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithMetricsCollector(collector))
 	defer broker.Close()
 
-	if err := broker.Publish(context.Background(), "topic", Message{}); err != nil {
+	if err := broker.Publish(context.Background(), "topic", Message{ID: "test-1"}); err != nil {
 		t.Fatalf("unexpected publish error: %v", err)
 	}
 
@@ -91,6 +93,121 @@ func TestInProcBrokerMetrics(t *testing.T) {
 	}
 	if collector.last.Panic {
 		t.Fatalf("did not expect panic flag")
+	}
+}
+
+func TestInProcBrokerValidation(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Test empty topic
+	err := broker.Publish(context.Background(), "  ", Message{ID: "test-1"})
+	if !errors.Is(err, ErrInvalidTopic) {
+		t.Fatalf("expected ErrInvalidTopic for empty topic, got %v", err)
+	}
+
+	// Test invalid message (missing ID)
+	err = broker.Publish(context.Background(), "topic", Message{})
+	if !errors.Is(err, ErrNilMessage) {
+		t.Fatalf("expected ErrNilMessage for missing ID, got %v", err)
+	}
+
+	// Test nil broker
+	var nilBroker *InProcBroker
+	err = nilBroker.Publish(context.Background(), "topic", Message{ID: "test-1"})
+	if !errors.Is(err, ErrNotInitialized) {
+		t.Fatalf("expected ErrNotInitialized for nil broker, got %v", err)
+	}
+
+	// Test empty topic for subscribe
+	_, err = broker.Subscribe(context.Background(), "  ", SubOptions{})
+	if !errors.Is(err, ErrInvalidTopic) {
+		t.Fatalf("expected ErrInvalidTopic for empty topic in subscribe, got %v", err)
+	}
+}
+
+func TestInProcBrokerConcurrent(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Subscribe with larger buffer
+	sub, err := broker.Subscribe(context.Background(), "topic", SubOptions{BufferSize: 1000})
+	if err != nil {
+		t.Fatalf("subscribe error: %v", err)
+	}
+	defer sub.Cancel()
+
+	// Concurrent publishers
+	var wg sync.WaitGroup
+	numPublishers := 5
+	messagesPerPublisher := 50
+
+	wg.Add(numPublishers)
+	for i := 0; i < numPublishers; i++ {
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < messagesPerPublisher; j++ {
+				msg := Message{
+					ID:   fmt.Sprintf("msg-%d-%d", id, j),
+					Data: fmt.Sprintf("data-%d-%d", id, j),
+				}
+				if err := broker.Publish(context.Background(), "topic", msg); err != nil {
+					t.Errorf("publish error: %v", err)
+					return
+				}
+			}
+		}(i)
+	}
+
+	// Wait for all publishers to finish
+	wg.Wait()
+
+	// Verify all messages were received
+	expectedTotal := numPublishers * messagesPerPublisher
+	received := 0
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case <-sub.C():
+			received++
+			if received == expectedTotal {
+				return
+			}
+		case <-timeout:
+			t.Fatalf("timeout waiting for messages, received %d out of %d", received, expectedTotal)
+		}
+	}
+}
+
+func TestInProcBrokerIdempotentClose(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+
+	// First close
+	if err := broker.Close(); err != nil {
+		t.Fatalf("first close error: %v", err)
+	}
+
+	// Second close should be idempotent
+	if err := broker.Close(); err != nil {
+		t.Fatalf("second close should be idempotent, got error: %v", err)
+	}
+
+	// Third close should also be idempotent
+	if err := broker.Close(); err != nil {
+		t.Fatalf("third close should be idempotent, got error: %v", err)
+	}
+}
+
+func TestInProcBrokerLongTopic(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Create a topic longer than 1024 characters
+	longTopic := strings.Repeat("a", 1025)
+
+	err := broker.Publish(context.Background(), longTopic, Message{ID: "test-1"})
+	if !errors.Is(err, ErrInvalidTopic) {
+		t.Fatalf("expected ErrInvalidTopic for long topic, got %v", err)
 	}
 }
 

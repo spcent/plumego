@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/metrics"
@@ -48,6 +49,15 @@ type PanicHandler func(ctx context.Context, op Operation, recovered any)
 // ErrRecoveredPanic is returned when a broker operation recovers from panic.
 var ErrRecoveredPanic = errors.New("mq: panic recovered")
 
+// ErrNotInitialized is returned when the broker is not properly initialized.
+var ErrNotInitialized = errors.New("mq: broker not initialized")
+
+// ErrInvalidTopic is returned when a topic is invalid.
+var ErrInvalidTopic = errors.New("mq: invalid topic")
+
+// ErrNilMessage is returned when attempting to publish a nil message.
+var ErrNilMessage = errors.New("mq: message cannot be nil")
+
 // Broker defines the interface for message queue backends.
 type Broker interface {
 	Publish(ctx context.Context, topic string, msg Message) error
@@ -79,6 +89,26 @@ func WithPanicHandler(handler PanicHandler) Option {
 	}
 }
 
+// validateTopic checks if a topic is valid.
+func validateTopic(topic string) error {
+	topic = strings.TrimSpace(topic)
+	if topic == "" {
+		return fmt.Errorf("%w: cannot be empty", ErrInvalidTopic)
+	}
+	if len(topic) > 1024 {
+		return fmt.Errorf("%w: topic too long (max 1024 characters)", ErrInvalidTopic)
+	}
+	return nil
+}
+
+// validateMessage checks if a message is valid.
+func validateMessage(msg Message) error {
+	if msg.ID == "" {
+		return fmt.Errorf("%w: ID is required", ErrNilMessage)
+	}
+	return nil
+}
+
 // NewInProcBroker wraps the in-process pubsub implementation.
 func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
 	if ps == nil {
@@ -93,72 +123,98 @@ func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
 	return broker
 }
 
-// Publish sends a message to a topic.
-func (b *InProcBroker) Publish(ctx context.Context, topic string, msg Message) (err error) {
+// executeWithObservability wraps an operation with observability logic.
+func (b *InProcBroker) executeWithObservability(
+	ctx context.Context,
+	op Operation,
+	topic string,
+	fn func() error,
+) (err error) {
 	start := time.Now()
 	panicked := false
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			panicked = true
-			err = b.handlePanic(ctx, OpPublish, recovered)
+			err = b.handlePanic(ctx, op, recovered)
 		}
-		b.observe(ctx, OpPublish, topic, start, err, panicked)
+		b.observe(ctx, op, topic, start, err, panicked)
 	}()
+	return fn()
+}
 
-	if ctx != nil {
-		if err := ctx.Err(); err != nil {
+// Publish sends a message to a topic.
+func (b *InProcBroker) Publish(ctx context.Context, topic string, msg Message) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Validate topic
+		if err := validateTopic(topic); err != nil {
 			return err
 		}
-	}
 
-	if b == nil || b.ps == nil {
-		return errors.New("mq: broker not initialized")
-	}
+		// Validate message
+		if err := validateMessage(msg); err != nil {
+			return err
+		}
 
-	return b.ps.Publish(topic, msg)
+		return b.ps.Publish(topic, msg)
+	})
 }
 
 // Subscribe registers a subscription for a topic.
 func (b *InProcBroker) Subscribe(ctx context.Context, topic string, opts SubOptions) (sub Subscription, err error) {
-	start := time.Now()
-	panicked := false
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			panicked = true
-			err = b.handlePanic(ctx, OpSubscribe, recovered)
+	err = b.executeWithObservability(ctx, OpSubscribe, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 		}
-		b.observe(ctx, OpSubscribe, topic, start, err, panicked)
-	}()
 
-	if ctx != nil {
-		if err := ctx.Err(); err != nil {
-			return nil, err
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
 		}
-	}
 
-	if b == nil || b.ps == nil {
-		return nil, errors.New("mq: broker not initialized")
-	}
+		// Validate topic
+		if err := validateTopic(topic); err != nil {
+			return err
+		}
 
-	return b.ps.Subscribe(topic, opts)
+		// Subscribe
+		var subscription Subscription
+		subscription, err = b.ps.Subscribe(topic, opts)
+		if err != nil {
+			return err
+		}
+
+		// Store subscription for return
+		sub = subscription
+		return nil
+	})
+
+	return sub, err
 }
 
 // Close shuts down the broker.
-func (b *InProcBroker) Close() (err error) {
-	start := time.Now()
-	panicked := false
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			panicked = true
-			err = b.handlePanic(context.Background(), OpClose, recovered)
+func (b *InProcBroker) Close() error {
+	return b.executeWithObservability(context.Background(), OpClose, "", func() error {
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return nil // Close is idempotent
 		}
-		b.observe(context.Background(), OpClose, "", start, err, panicked)
-	}()
-
-	if b == nil || b.ps == nil {
-		return nil
-	}
-	return b.ps.Close()
+		return b.ps.Close()
+	})
 }
 
 // DefaultSubOptions exposes the default subscription settings.
