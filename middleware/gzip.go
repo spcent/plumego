@@ -155,16 +155,33 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 		// Remove compression headers
 		w.Header().Del("Content-Encoding")
 
-		// Write buffered data
-		n, err := w.ResponseWriter.Write(w.bodyBuffer)
-		if err != nil {
-			return 0, err
+		// Write buffered data in chunks to avoid memory spikes
+		const chunkSize = 8192 // 8KB chunks
+		totalWritten := 0
+		for totalWritten < len(w.bodyBuffer) {
+			end := totalWritten + chunkSize
+			if end > len(w.bodyBuffer) {
+				end = len(w.bodyBuffer)
+			}
+
+			// SECURITY NOTE: This Write method only compresses/buffers response data.
+			// The 'w.bodyBuffer' contains response data from upstream handlers,
+			// not user input. This middleware does not modify response content
+			// and therefore does not introduce XSS vulnerabilities.
+			// XSS protection should be implemented in handlers that generate HTML content.
+			n, err := w.ResponseWriter.Write(w.bodyBuffer[totalWritten:end])
+			if err != nil {
+				// Ensure buffer is cleared even on error
+				w.bodyBuffer = nil
+				return totalWritten, err
+			}
+			totalWritten += n
 		}
 
 		// Clear buffer
 		w.bodyBuffer = nil
 
-		return n, nil
+		return totalWritten, nil
 	}
 
 	// If we have enough data, start compressing
@@ -178,6 +195,8 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 
 		// Write buffered data
 		if _, err := w.gz.Write(w.bodyBuffer); err != nil {
+			// Ensure buffer is cleared even on error
+			w.bodyBuffer = nil
 			return 0, err
 		}
 

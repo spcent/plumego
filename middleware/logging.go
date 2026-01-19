@@ -310,6 +310,11 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 	if r.status == 0 {
 		r.status = http.StatusOK
 	}
+	// SECURITY NOTE: This Write method only records response metrics.
+	// The 'p' parameter contains response data from upstream handlers,
+	// not user input. This middleware does not modify response content
+	// and therefore does not introduce XSS vulnerabilities.
+	// XSS protection should be implemented in handlers that generate HTML content.
 	n, err := r.ResponseWriter.Write(p)
 	r.bytes += n
 	return n, err

@@ -335,3 +335,90 @@ func TestGzip_EmptyResponse(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rr.Code)
 	}
 }
+
+func TestGzip_ChunkedWrite(t *testing.T) {
+	// Test that large responses that exceed max buffer are written in chunks
+	// Create a response larger than the default 10MB buffer
+	largeData := strings.Repeat("X", 11<<20) // 11MB
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(largeData))
+	}
+
+	// Use a custom config with a small max buffer to trigger chunked writing
+	cfg := GzipConfig{MaxBufferBytes: 1 << 20} // 1MB max buffer
+	wrapped := ApplyFunc(handler, GzipWithConfig(cfg))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+
+	// Should not compress because response exceeds max buffer
+	if rr.Header().Get("Content-Encoding") == "gzip" {
+		t.Fatalf("should not compress large response that exceeds max buffer")
+	}
+
+	// Verify the full data was written
+	if rr.Body.Len() != len(largeData) {
+		t.Fatalf("expected %d bytes, got %d", len(largeData), rr.Body.Len())
+	}
+
+	// Verify content integrity
+	if !bytes.Equal(rr.Body.Bytes(), []byte(largeData)) {
+		t.Fatalf("data integrity check failed")
+	}
+}
+
+func TestGzip_ErrorHandling(t *testing.T) {
+	// Test error handling when writing buffered data fails
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		// Write data that will exceed max buffer
+		w.Write([]byte(strings.Repeat("A", 11<<20))) // 11MB
+	}
+
+	// Use a custom config with a small max buffer
+	cfg := GzipConfig{MaxBufferBytes: 1 << 20} // 1MB max buffer
+	wrapped := ApplyFunc(handler, GzipWithConfig(cfg))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	// Use a custom ResponseWriter that simulates write errors
+	rr := httptest.NewRecorder()
+
+	// Wrap the recorder to simulate write errors after a certain amount of data
+	errorWriter := &errorSimulatingWriter{
+		ResponseWriter: rr,
+		failAfter:      1 << 20, // Fail after 1MB
+	}
+
+	wrapped(errorWriter, req)
+
+	// The handler should handle the error gracefully
+	// We're mainly testing that the error doesn't cause a panic
+}
+
+// errorSimulatingWriter simulates write errors for testing
+type errorSimulatingWriter struct {
+	http.ResponseWriter
+	failAfter int
+	written   int
+}
+
+func (w *errorSimulatingWriter) Write(p []byte) (int, error) {
+	if w.written+len(p) > w.failAfter {
+		return 0, io.ErrUnexpectedEOF
+	}
+	w.written += len(p)
+	return w.ResponseWriter.Write(p)
+}
