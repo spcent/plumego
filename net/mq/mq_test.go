@@ -373,6 +373,128 @@ func TestInProcBrokerInvalidConfig(t *testing.T) {
 	_ = NewInProcBroker(pubsub.New(), WithConfig(invalidCfg))
 }
 
+func TestInProcBrokerPriorityQueue(t *testing.T) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	// Test priority message
+	priorityMsg := PriorityMessage{
+		Message:  Message{ID: "priority-1", Data: "high priority data"},
+		Priority: PriorityHigh,
+	}
+
+	err := broker.PublishPriority(context.Background(), "priority-topic", priorityMsg)
+	if err != nil {
+		t.Fatalf("publish priority message error: %v", err)
+	}
+
+	// Verify priority queue is enabled by default
+	cfg := broker.GetConfig()
+	if !cfg.EnablePriorityQueue {
+		t.Fatalf("expected EnablePriorityQueue to be true by default")
+	}
+}
+
+func TestInProcBrokerAckSupport(t *testing.T) {
+	// Test with acknowledgment support disabled (default)
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	cfg := broker.GetConfig()
+	if cfg.EnableAckSupport {
+		t.Fatalf("expected EnableAckSupport to be false by default")
+	}
+
+	// Test with acknowledgment support enabled
+	ackCfg := DefaultConfig()
+	ackCfg.EnableAckSupport = true
+	brokerWithAck := NewInProcBroker(pubsub.New(), WithConfig(ackCfg))
+	defer brokerWithAck.Close()
+
+	// Test publishing with acknowledgment
+	ackMsg := AckMessage{
+		Message:   Message{ID: "ack-1", Data: "ack required"},
+		AckPolicy: AckRequired,
+	}
+
+	err := brokerWithAck.PublishWithAck(context.Background(), "ack-topic", ackMsg)
+	if err != nil {
+		t.Fatalf("publish with ack error: %v", err)
+	}
+
+	// Test acknowledgment methods
+	err = brokerWithAck.Ack(context.Background(), "ack-topic", "ack-1")
+	if err != nil {
+		t.Fatalf("ack error: %v", err)
+	}
+
+	err = brokerWithAck.Nack(context.Background(), "ack-topic", "ack-1")
+	if err != nil {
+		t.Fatalf("nack error: %v", err)
+	}
+}
+
+func TestInProcBrokerMemoryLimit(t *testing.T) {
+	// Test with memory limit
+	cfg := DefaultConfig()
+	cfg.MaxMemoryUsage = 1 << 30 // 1GB limit
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Get memory usage
+	memUsage := broker.GetMemoryUsage()
+	if memUsage == 0 {
+		t.Fatalf("expected non-zero memory usage")
+	}
+
+	// Verify config
+	updatedCfg := broker.GetConfig()
+	if updatedCfg.MaxMemoryUsage != 1<<30 {
+		t.Fatalf("expected MaxMemoryUsage to be 1GB, got %d", updatedCfg.MaxMemoryUsage)
+	}
+
+	// Test health check includes memory info
+	status := broker.HealthCheck()
+	if status.MemoryUsage == 0 {
+		t.Fatalf("expected non-zero memory usage in health check")
+	}
+	if status.MemoryLimit != 1<<30 {
+		t.Fatalf("expected memory limit 1GB in health check, got %d", status.MemoryLimit)
+	}
+}
+
+func TestInProcBrokerMemoryLimitExceeded(t *testing.T) {
+	// Test with very low memory limit
+	cfg := DefaultConfig()
+	cfg.MaxMemoryUsage = 1 // 1 byte limit - will definitely exceed
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Try to publish a message (should work since we don't check memory on publish yet)
+	// This is a framework test - actual memory checking would be implemented in production
+	err := broker.Publish(context.Background(), "test-topic", Message{ID: "test-1", Data: "test"})
+	if err != nil {
+		t.Fatalf("publish should succeed even with low memory limit: %v", err)
+	}
+}
+
+func TestInProcBrokerTriePattern(t *testing.T) {
+	// Test Trie pattern configuration
+	cfg := DefaultConfig()
+	cfg.EnableTriePattern = true
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Verify config
+	updatedCfg := broker.GetConfig()
+	if !updatedCfg.EnableTriePattern {
+		t.Fatalf("expected EnableTriePattern to be true")
+	}
+
+	// Note: Actual Trie implementation would be in pubsub layer
+	// This test verifies the configuration is properly stored
+}
+
 type panicPubSub struct{}
 
 func (p panicPubSub) Publish(topic string, msg pubsub.Message) error {

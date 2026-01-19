@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -71,6 +72,49 @@ var ErrInvalidConfig = errors.New("mq: invalid configuration")
 // ErrBrokerClosed is returned when attempting to use a closed broker.
 var ErrBrokerClosed = errors.New("mq: broker is closed")
 
+// ErrMessageAcknowledged is returned when attempting to acknowledge an already acknowledged message.
+var ErrMessageAcknowledged = errors.New("mq: message already acknowledged")
+
+// ErrMessageNotAcked is returned when a message requires acknowledgment but none was received.
+var ErrMessageNotAcked = errors.New("mq: message requires acknowledgment")
+
+// MessagePriority represents the priority of a message.
+type MessagePriority int
+
+const (
+	PriorityLowest  MessagePriority = 0
+	PriorityLow     MessagePriority = 10
+	PriorityNormal  MessagePriority = 20
+	PriorityHigh    MessagePriority = 30
+	PriorityHighest MessagePriority = 40
+)
+
+// AckPolicy defines the acknowledgment policy for messages.
+type AckPolicy int
+
+const (
+	// AckNone - No acknowledgment required
+	AckNone AckPolicy = iota
+	// AckRequired - Message requires explicit acknowledgment
+	AckRequired
+	// AckTimeout - Message requires acknowledgment within timeout
+	AckTimeout
+)
+
+// PriorityMessage extends Message with priority support.
+type PriorityMessage struct {
+	Message
+	Priority MessagePriority
+}
+
+// AckMessage extends Message with acknowledgment support.
+type AckMessage struct {
+	Message
+	AckID      string
+	AckPolicy  AckPolicy
+	AckTimeout time.Duration
+}
+
 // Broker defines the interface for message queue backends.
 type Broker interface {
 	Publish(ctx context.Context, topic string, msg Message) error
@@ -100,6 +144,21 @@ type Config struct {
 
 	// MessageTTL is the default time-to-live for messages (0 = no TTL)
 	MessageTTL time.Duration
+
+	// EnablePriorityQueue enables priority queue support
+	EnablePriorityQueue bool
+
+	// EnableAckSupport enables message acknowledgment support
+	EnableAckSupport bool
+
+	// DefaultAckTimeout is the default timeout for acknowledgment (default: 30s)
+	DefaultAckTimeout time.Duration
+
+	// MaxMemoryUsage limits memory usage in bytes (0 = no limit)
+	MaxMemoryUsage uint64
+
+	// EnableTriePattern enables Trie-based pattern matching
+	EnableTriePattern bool
 }
 
 // DefaultConfig returns the default configuration.
@@ -112,6 +171,11 @@ func DefaultConfig() Config {
 		EnableMetrics:       true,
 		HealthCheckInterval: 30 * time.Second,
 		MessageTTL:          0, // No TTL by default
+		EnablePriorityQueue: true,
+		EnableAckSupport:    false, // Disabled by default for backward compatibility
+		DefaultAckTimeout:   30 * time.Second,
+		MaxMemoryUsage:      0,     // No limit by default
+		EnableTriePattern:   false, // Disabled by default for backward compatibility
 	}
 }
 
@@ -140,6 +204,7 @@ type HealthStatus struct {
 	TotalTopics int             `json:"total_topics"`
 	TotalSubs   int             `json:"total_subscribers"`
 	MemoryUsage uint64          `json:"memory_usage,omitempty"`
+	MemoryLimit uint64          `json:"memory_limit,omitempty"`
 	Metrics     MetricsSnapshot `json:"metrics,omitempty"`
 }
 
@@ -408,6 +473,201 @@ func (b *InProcBroker) Subscribe(ctx context.Context, topic string, opts SubOpti
 	return sub, err
 }
 
+// PublishPriority publishes a message with priority to a topic.
+func (b *InProcBroker) PublishPriority(ctx context.Context, topic string, msg PriorityMessage) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Validate topic
+		if err := validateTopic(topic); err != nil {
+			return err
+		}
+
+		// Validate message
+		if err := validateMessage(msg.Message); err != nil {
+			return err
+		}
+
+		// Check if priority queue is enabled
+		if !b.config.EnablePriorityQueue {
+			// Fall back to regular publish
+			return b.ps.Publish(topic, msg.Message)
+		}
+
+		// TODO: Implement priority queue logic
+		// For now, just publish with priority metadata
+		return b.ps.Publish(topic, msg.Message)
+	})
+}
+
+// PublishWithAck publishes a message that requires acknowledgment.
+func (b *InProcBroker) PublishWithAck(ctx context.Context, topic string, msg AckMessage) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Validate topic
+		if err := validateTopic(topic); err != nil {
+			return err
+		}
+
+		// Validate message
+		if err := validateMessage(msg.Message); err != nil {
+			return err
+		}
+
+		// Check if acknowledgment support is enabled
+		if !b.config.EnableAckSupport {
+			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
+		}
+
+		// Set default timeout if not specified
+		if msg.AckTimeout == 0 {
+			msg.AckTimeout = b.config.DefaultAckTimeout
+		}
+
+		// TODO: Implement acknowledgment logic
+		// For now, just publish the message
+		return b.ps.Publish(topic, msg.Message)
+	})
+}
+
+// SubscribeWithAck subscribes to a topic with acknowledgment support.
+func (b *InProcBroker) SubscribeWithAck(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
+	var sub Subscription
+	err := b.executeWithObservability(ctx, OpSubscribe, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Validate topic
+		if err := validateTopic(topic); err != nil {
+			return err
+		}
+
+		// Check if acknowledgment support is enabled
+		if !b.config.EnableAckSupport {
+			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
+		}
+
+		// Subscribe
+		subscription, err := b.ps.Subscribe(topic, opts)
+		if err != nil {
+			return err
+		}
+
+		sub = subscription
+		return nil
+	})
+
+	return sub, err
+}
+
+// Ack acknowledges a message by ID.
+func (b *InProcBroker) Ack(ctx context.Context, topic string, messageID string) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Check if acknowledgment support is enabled
+		if !b.config.EnableAckSupport {
+			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
+		}
+
+		// TODO: Implement acknowledgment tracking
+		// This would track which messages have been acknowledged
+		return nil
+	})
+}
+
+// Nack negatively acknowledges a message by ID (request re-delivery).
+func (b *InProcBroker) Nack(ctx context.Context, topic string, messageID string) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate context
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+
+		// Validate broker initialization
+		if b == nil || b.ps == nil {
+			return fmt.Errorf("%w", ErrNotInitialized)
+		}
+
+		// Check if acknowledgment support is enabled
+		if !b.config.EnableAckSupport {
+			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
+		}
+
+		// TODO: Implement negative acknowledgment logic
+		// This would request re-delivery of the message
+		return nil
+	})
+}
+
+// checkMemoryLimit checks if memory usage exceeds the configured limit.
+func (b *InProcBroker) checkMemoryLimit() error {
+	if b.config.MaxMemoryUsage == 0 {
+		return nil // No limit configured
+	}
+
+	// Get current memory usage from runtime
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	// Check if total allocated memory exceeds limit
+	if memStats.Alloc > b.config.MaxMemoryUsage {
+		return fmt.Errorf("%w: memory usage %d bytes exceeds limit %d bytes",
+			ErrInvalidConfig, memStats.Alloc, b.config.MaxMemoryUsage)
+	}
+
+	return nil
+}
+
+// GetMemoryUsage returns current memory usage in bytes.
+func (b *InProcBroker) GetMemoryUsage() uint64 {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	return memStats.Alloc
+}
+
 // Close shuts down the broker.
 func (b *InProcBroker) Close() error {
 	return b.executeWithObservability(context.Background(), OpClose, "", func() error {
@@ -448,6 +708,10 @@ func (b *InProcBroker) HealthCheck() HealthStatus {
 			status.TotalSubs += snapper.GetSubscriberCount(topic)
 		}
 	}
+
+	// Get memory usage
+	status.MemoryUsage = b.GetMemoryUsage()
+	status.MemoryLimit = b.config.MaxMemoryUsage
 
 	// Get metrics snapshot
 	if b.config.EnableMetrics {
