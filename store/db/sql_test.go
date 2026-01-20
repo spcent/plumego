@@ -37,6 +37,16 @@ func TestConfigValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "negative query timeout",
+			config:  Config{Driver: "driver", DSN: "dsn", QueryTimeout: -1},
+			wantErr: true,
+		},
+		{
+			name:    "negative transaction timeout",
+			config:  Config{Driver: "driver", DSN: "dsn", TransactionTimeout: -1},
+			wantErr: true,
+		},
+		{
 			name:    "valid",
 			config:  Config{Driver: "driver", DSN: "dsn", MaxOpenConns: 5},
 			wantErr: false,
@@ -47,6 +57,32 @@ func TestConfigValidate(t *testing.T) {
 		if err := tc.config.Validate(); (err != nil) != tc.wantErr {
 			t.Fatalf("%s: Validate() error = %v", tc.name, err)
 		}
+	}
+}
+
+func TestDefaultConfig(t *testing.T) {
+	config := DefaultConfig("mysql", "user:pass@tcp(localhost:3306)/db")
+
+	if config.Driver != "mysql" {
+		t.Fatalf("expected driver mysql, got %s", config.Driver)
+	}
+	if config.DSN != "user:pass@tcp(localhost:3306)/db" {
+		t.Fatalf("expected DSN, got %s", config.DSN)
+	}
+	if config.MaxOpenConns != 10 {
+		t.Fatalf("expected MaxOpenConns 10, got %d", config.MaxOpenConns)
+	}
+	if config.MaxIdleConns != 5 {
+		t.Fatalf("expected MaxIdleConns 5, got %d", config.MaxIdleConns)
+	}
+	if config.PingTimeout != 5*time.Second {
+		t.Fatalf("expected PingTimeout 5s, got %v", config.PingTimeout)
+	}
+	if config.QueryTimeout != 30*time.Second {
+		t.Fatalf("expected QueryTimeout 30s, got %v", config.QueryTimeout)
+	}
+	if config.TransactionTimeout != 60*time.Second {
+		t.Fatalf("expected TransactionTimeout 60s, got %v", config.TransactionTimeout)
 	}
 }
 
@@ -75,11 +111,339 @@ func TestOpenWithPing(t *testing.T) {
 	}, func(driver, dsn string) (*sql.DB, error) {
 		return sql.OpenDB(connector), nil
 	})
-	if err == nil || !errors.Is(err, pingErr) {
-		t.Fatalf("expected ping error, got %v", err)
+	if err == nil || !errors.Is(err, ErrPingFailed) {
+		t.Fatalf("expected ErrPingFailed, got %v", err)
 	}
 }
 
+func TestOpenWithRetry(t *testing.T) {
+	// Test successful retry
+	connector := &stubConnector{conn: &stubConn{}}
+
+	db, err := OpenWithRetry(
+		Config{Driver: "stub", DSN: "dsn", PingTimeout: 10 * time.Millisecond},
+		func(driver, dsn string) (*sql.DB, error) {
+			return sql.OpenDB(connector), nil
+		},
+		3,
+		10*time.Millisecond,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if db == nil {
+		t.Fatal("expected database connection")
+	}
+	db.Close()
+}
+
+func TestOpenWithRetryFailure(t *testing.T) {
+	// Test retry failure
+	pingErr := errors.New("ping failed")
+	connector := &stubConnector{conn: &stubConn{pingErr: pingErr}}
+
+	_, err := OpenWithRetry(
+		Config{Driver: "stub", DSN: "dsn", PingTimeout: 10 * time.Millisecond},
+		func(driver, dsn string) (*sql.DB, error) {
+			return sql.OpenDB(connector), nil
+		},
+		2,
+		10*time.Millisecond,
+	)
+	if err == nil || !errors.Is(err, ErrConnectionFailed) {
+		t.Fatalf("expected ErrConnectionFailed, got %v", err)
+	}
+}
+
+func TestExecContext(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	_, err := ExecContext(ctx, db, "INSERT INTO test VALUES (?)", 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecContextNilDB(t *testing.T) {
+	_, err := ExecContext(context.Background(), nil, "INSERT INTO test VALUES (?)", 1)
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+}
+
+func TestQueryContext(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	rows, err := QueryContext(ctx, db, "SELECT * FROM test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rows == nil {
+		t.Fatal("expected rows")
+	}
+	rows.Close()
+}
+
+func TestQueryContextNilDB(t *testing.T) {
+	_, err := QueryContext(context.Background(), nil, "SELECT * FROM test")
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+}
+
+func TestQueryRowContext(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	if row == nil {
+		t.Fatal("expected row")
+	}
+}
+
+func TestQueryRowContextNilDB(t *testing.T) {
+	row := QueryRowContext(context.Background(), nil, "SELECT * FROM test WHERE id = ?", 1)
+	if row != nil {
+		t.Fatal("expected nil row")
+	}
+}
+
+func TestWithTimeout(t *testing.T) {
+	ctx := context.Background()
+
+	// Test with timeout
+	timeoutCtx, cancel := WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+
+	select {
+	case <-timeoutCtx.Done():
+		t.Fatal("context should not be done immediately")
+	default:
+		// Expected
+	}
+
+	// Test with zero timeout
+	noTimeoutCtx, cancel2 := WithTimeout(ctx, 0)
+	defer cancel2()
+
+	if noTimeoutCtx == nil {
+		t.Fatal("expected context")
+	}
+}
+
+func TestWithTransaction(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	err := WithTransaction(ctx, db, nil, func(tx *sql.Tx) error {
+		// Simulate transaction work
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWithTransactionNilDB(t *testing.T) {
+	err := WithTransaction(context.Background(), nil, nil, func(tx *sql.Tx) error {
+		return nil
+	})
+	if err == nil || !errors.Is(err, ErrTransactionFailed) {
+		t.Fatalf("expected ErrTransactionFailed, got %v", err)
+	}
+}
+
+func TestWithTransactionError(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	txErr := errors.New("transaction error")
+	err := WithTransaction(ctx, db, nil, func(tx *sql.Tx) error {
+		return txErr
+	})
+	if err == nil || !errors.Is(err, ErrTransactionFailed) {
+		t.Fatalf("expected ErrTransactionFailed, got %v", err)
+	}
+}
+
+func TestScanRow(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+
+	var id int
+	err := ScanRow(row, &id)
+	// The stub returns no rows, so we expect ErrNoRows
+	if err != nil && !errors.Is(err, ErrNoRows) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestScanRowNil(t *testing.T) {
+	err := ScanRow(nil, nil)
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+}
+
+func TestScanRows(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	rows, err := QueryContext(ctx, db, "SELECT * FROM test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	scanFunc := func(rows *sql.Rows) (int, error) {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return 0, err
+		}
+		return id, nil
+	}
+
+	results, err := ScanRows(rows, scanFunc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The stub returns no rows, so results should be nil or empty slice
+	// Since rows.Next() returns false immediately, results will be nil
+	if results == nil {
+		// This is expected when no rows are returned
+		return
+	}
+	// Empty slice is also acceptable
+	if len(results) != 0 {
+		t.Fatalf("expected empty results, got %d", len(results))
+	}
+}
+
+func TestScanRowsNil(t *testing.T) {
+	_, err := ScanRows(nil, func(rows *sql.Rows) (int, error) {
+		return 0, nil
+	})
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+}
+
+func TestPing(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	err := Ping(ctx, db, 10*time.Second)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPingNilDB(t *testing.T) {
+	err := Ping(context.Background(), nil, 10*time.Second)
+	if err == nil || !errors.Is(err, ErrPingFailed) {
+		t.Fatalf("expected ErrPingFailed, got %v", err)
+	}
+}
+
+func TestPingWithTimeout(t *testing.T) {
+	pingErr := errors.New("ping failed")
+	connector := &stubConnector{conn: &stubConn{pingErr: pingErr}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	err := Ping(ctx, db, 10*time.Millisecond)
+	if err == nil || !errors.Is(err, ErrPingFailed) {
+		t.Fatalf("expected ErrPingFailed, got %v", err)
+	}
+}
+
+func TestHealthCheck(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	health, err := HealthCheck(ctx, db, 10*time.Second)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if health.Status != "healthy" {
+		t.Fatalf("expected status healthy, got %s", health.Status)
+	}
+	if health.Latency == 0 {
+		t.Fatal("expected non-zero latency")
+	}
+}
+
+func TestHealthCheckNilDB(t *testing.T) {
+	_, err := HealthCheck(context.Background(), nil, 10*time.Second)
+	if err == nil || !errors.Is(err, ErrPingFailed) {
+		t.Fatalf("expected ErrPingFailed, got %v", err)
+	}
+}
+
+func TestHealthCheckUnhealthy(t *testing.T) {
+	pingErr := errors.New("ping failed")
+	connector := &stubConnector{conn: &stubConn{pingErr: pingErr}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	health, err := HealthCheck(ctx, db, 10*time.Millisecond)
+	if err == nil || !errors.Is(err, ErrPingFailed) {
+		t.Fatalf("expected ErrPingFailed, got %v", err)
+	}
+	if health.Status != "unhealthy" {
+		t.Fatalf("expected status unhealthy, got %s", health.Status)
+	}
+	if health.Error == "" {
+		t.Fatal("expected error message")
+	}
+}
+
+func TestQueryRow(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ctx := context.Background()
+	row, err := QueryRow(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if row == nil {
+		t.Fatal("expected row")
+	}
+}
+
+func TestQueryRowNilDB(t *testing.T) {
+	_, err := QueryRow(context.Background(), nil, "SELECT * FROM test WHERE id = ?", 1)
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+}
+
+// Stub implementations for testing
 type stubConnector struct {
 	conn *stubConn
 }
