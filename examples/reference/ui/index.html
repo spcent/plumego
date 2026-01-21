@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plumego Reference - 现代 Go Web 框架演示</title>
+  <title>Plumego Reference - Modern Go Web Framework Demo</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -15,22 +15,22 @@
         <i class="fas fa-feather"></i>
       </div>
       <h1 class="title">Plumego Reference</h1>
-      <p class="subtitle">现代 Go Web 框架演示平台 - 展示优雅的架构设计</p>
+      <p class="subtitle">Modern Go Web Framework Demo Platform - Showcasing Elegant Architecture Design</p>
     </header>
 
     <!-- Status Bar -->
     <div class="status-bar">
       <div class="status-item">
         <div class="status-indicator status-online"></div>
-        <span>服务器运行正常</span>
+        <span>Server Running Normally</span>
       </div>
       <div class="status-item">
         <i class="fas fa-plug"></i>
-        <span>端口: 8080</span>
+        <span>Port: 8080</span>
       </div>
       <div class="status-item">
         <i class="fas fa-book"></i>
-        <a href="/docs" style="color: var(--primary); text-decoration: none;">文档: /docs</a>
+        <a href="/docs" style="color: var(--primary); text-decoration: none;">Docs: /docs</a>
       </div>
       <div class="status-item">
         <i class="fas fa-code"></i>
@@ -44,12 +44,12 @@
         <div class="feature-icon">
           <i class="fas fa-book"></i>
         </div>
-        <h3 class="feature-title">📚 交互式文档</h3>
+        <h3 class="feature-title">📚 Interactive Documentation</h3>
         <p class="feature-description">
-          探索 Plumego 框架的完整 API 文档，支持中英文切换，内容详尽且易于理解。
+          Explore the complete API documentation of the Plumego framework, supporting bilingual switching with comprehensive and easy-to-understand content.
         </p>
         <a href="/docs" class="btn">
-          <i class="fas fa-arrow-right"></i> 浏览文档
+          <i class="fas fa-arrow-right"></i> Browse Docs
         </a>
       </div>
 
@@ -57,12 +57,12 @@
         <div class="feature-icon">
           <i class="fas fa-plug"></i>
         </div>
-        <h3 class="feature-title">🔌 Webhook 管理</h3>
+        <h3 class="feature-title">🔌 Webhook Management</h3>
         <p class="feature-description">
-          测试和验证 webhook 集成，支持 GitHub 和 Stripe，自动重试和状态监控。
+          Test and verify webhook integration, supporting GitHub and Stripe with automatic retry and status monitoring.
         </p>
         <a href="/webhooks" class="btn btn-secondary">
-          <i class="fas fa-arrow-right"></i> Webhook 控制台
+          <i class="fas fa-arrow-right"></i> Webhook Console
         </a>
       </div>
 
@@ -70,12 +70,12 @@
         <div class="feature-icon">
           <i class="fas fa-chart-line"></i>
         </div>
-        <h3 class="feature-title">📊 性能监控</h3>
+        <h3 class="feature-title">📊 Performance Monitoring</h3>
         <p class="feature-description">
-          实时查看应用性能指标、Prometheus 指标和健康状态。
+          Real-time view of application performance metrics, Prometheus metrics, and health status.
         </p>
         <a href="/metrics" class="btn">
-          <i class="fas fa-arrow-right"></i> 查看指标
+          <i class="fas fa-arrow-right"></i> View Metrics
         </a>
       </div>
     </div>
@@ -85,53 +85,53 @@
       <div class="panel-header">
         <h3 class="panel-title">
           <i class="fas fa-broadcast-tower"></i>
-          WebSocket 实时通信
+          WebSocket Real-time Communication
         </h3>
         <div class="connection-status connection-disconnected" id="connectionStatus">
           <i class="fas fa-circle"></i>
-          <span>未连接</span>
+          <span>Disconnected</span>
         </div>
       </div>
 
       <div class="input-group">
-        <input type="text" id="messageInput" placeholder="输入消息，按 Enter 发送..." />
-        <button class="btn btn-success" onclick="sendMessage()" title="发送消息">
-          <i class="fas fa-paper-plane"></i> 发送
+        <input type="text" id="messageInput" placeholder="Enter message, press Enter to send..." />
+        <button class="btn btn-success" onclick="sendMessage()" title="Send Message">
+          <i class="fas fa-paper-plane"></i> Send
         </button>
-        <button class="btn" onclick="connectWebSocket()" id="connectBtn" title="连接 WebSocket">
-          <i class="fas fa-plug"></i> 连接
+        <button class="btn" onclick="connectWebSocket()" id="connectBtn" title="Connect WebSocket">
+          <i class="fas fa-plug"></i> Connect
         </button>
-        <button class="btn btn-danger" onclick="disconnectWebSocket()" id="disconnectBtn" style="display: none;" title="断开连接">
-          <i class="fas fa-unlink"></i> 断开
+        <button class="btn btn-danger" onclick="disconnectWebSocket()" id="disconnectBtn" style="display: none;" title="Disconnect">
+          <i class="fas fa-unlink"></i> Disconnect
         </button>
-        <button class="btn btn-warning" onclick="clearLog()" title="清空日志">
-          <i class="fas fa-trash"></i> 清空
+        <button class="btn btn-warning" onclick="clearLog()" title="Clear Log">
+          <i class="fas fa-trash"></i> Clear
         </button>
       </div>
 
       <div class="message-log" id="messageLog">
         <div class="log-entry">
-          <div class="log-timestamp">系统</div>
-          <div class="log-content log-info">WebSocket 测试工具已就绪，点击"连接"开始测试...</div>
+          <div class="log-timestamp">System</div>
+          <div class="log-content log-info">WebSocket test tool is ready, click "Connect" to start testing...</div>
         </div>
       </div>
       
       <div class="stats-grid">
          <div class="stat-card">
            <div class="stat-value" id="sentCount">0</div>
-           <div class="stat-label">发送消息</div>
+           <div class="stat-label">Sent Messages</div>
          </div>
          <div class="stat-card">
            <div class="stat-value" id="receivedCount">0</div>
-           <div class="stat-label">接收消息</div>
+           <div class="stat-label">Received Messages</div>
          </div>
          <div class="stat-card">
            <div class="stat-value" id="errorCount">0</div>
-           <div class="stat-label">错误次数</div>
+           <div class="stat-label">Error Count</div>
          </div>
          <div class="stat-card">
            <div class="stat-value" id="uptime">00:00</div>
-           <div class="stat-label">连接时间</div>
+           <div class="stat-label">Connection Time</div>
          </div>
        </div>
     </div>
@@ -140,7 +140,7 @@
     <div class="card">
       <h3 class="panel-title">
         <i class="fas fa-tools"></i>
-        高级测试工具
+        Advanced Testing Tools
       </h3>
       
       <div class="test-tools-grid">
@@ -148,15 +148,15 @@
         <div class="tool-card">
           <h4 class="tool-title">
             <i class="fas fa-flask"></i>
-            API 测试工具
+            API Testing Tool
           </h4>
           <p class="tool-description">
-            测试各种 API 端点，支持不同响应格式和参数配置。
+            Test various API endpoints, supporting different response formats and parameter configurations.
           </p>
           
           <form onsubmit="testAPI(event)">
             <div class="form-group">
-              <label class="form-label">API 路径</label>
+              <label class="form-label">API Path</label>
               <select class="form-select" id="apiPath">
                 <option value="/api/hello">GET /api/hello</option>
                 <option value="/api/test">GET /api/test</option>
@@ -168,7 +168,7 @@
             </div>
             
             <div class="form-group">
-              <label class="form-label">响应格式</label>
+              <label class="form-label">Response Format</label>
               <select class="form-select" id="apiFormat">
                 <option value="json">JSON</option>
                 <option value="xml">XML</option>
@@ -178,12 +178,12 @@
             </div>
             
             <div class="form-group">
-              <label class="form-label">查询参数</label>
-              <input type="text" class="form-input" id="apiParams" placeholder="例如: format=json&delay=1s" />
+              <label class="form-label">Query Parameters</label>
+              <input type="text" class="form-input" id="apiParams" placeholder="e.g., format=json&delay=1s" />
             </div>
             
             <button type="submit" class="btn">
-              <i class="fas fa-play"></i> 执行测试
+              <i class="fas fa-play"></i> Execute Test
             </button>
           </form>
           
@@ -194,18 +194,18 @@
         <div class="tool-card">
           <h4 class="tool-title">
             <i class="fas fa-chart-line"></i>
-            性能监控
+            Performance Monitor
           </h4>
           <p class="tool-description">
-            实时监控系统性能和指标，查看应用状态。
+            Real-time monitoring of system performance and metrics, view application status.
           </p>
           
           <div class="btn-group">
             <button class="btn" onclick="checkHealth()">
-              <i class="fas fa-heartbeat"></i> 健康检查
+              <i class="fas fa-heartbeat"></i> Health Check
             </button>
             <button class="btn" onclick="loadMetrics()">
-              <i class="fas fa-chart-bar"></i> 加载指标
+              <i class="fas fa-chart-bar"></i> Load Metrics
             </button>
           </div>
           
@@ -216,29 +216,29 @@
         <div class="tool-card">
           <h4 class="tool-title">
             <i class="fas fa-envelope"></i>
-            Webhook 测试
+            Webhook Testing
           </h4>
           <p class="tool-description">
-            测试 Webhook 功能，模拟不同类型的 Webhook 事件。
+            Test Webhook functionality, simulate different types of Webhook events.
           </p>
           
           <form onsubmit="testWebhook(event)">
             <div class="form-group">
-              <label class="form-label">事件类型</label>
+              <label class="form-label">Event Type</label>
               <select class="form-select" id="webhookType">
                 <option value="github">GitHub Webhook</option>
                 <option value="stripe">Stripe Webhook</option>
-                <option value="custom">自定义 Webhook</option>
+                <option value="custom">Custom Webhook</option>
               </select>
             </div>
             
             <div class="form-group">
-              <label class="form-label">事件数据 (JSON)</label>
+              <label class="form-label">Event Data (JSON)</label>
               <textarea class="form-textarea" id="webhookData" placeholder='{"event": "test", "data": {}}'></textarea>
             </div>
             
             <button type="submit" class="btn">
-              <i class="fas fa-paper-plane"></i> 发送 Webhook
+              <i class="fas fa-paper-plane"></i> Send Webhook
             </button>
           </form>
           
@@ -249,25 +249,25 @@
         <div class="tool-card">
           <h4 class="tool-title">
             <i class="fas fa-satellite-dish"></i>
-            Pub/Sub 消息
+            Pub/Sub Messages
           </h4>
           <p class="tool-description">
-            测试发布订阅系统，发送和接收消息。
+            Test publish-subscribe system, send and receive messages.
           </p>
           
           <form onsubmit="testPubSub(event)">
             <div class="form-group">
-              <label class="form-label">主题名称</label>
-              <input type="text" class="form-input" id="pubSubTopic" placeholder="例如: test.topic" value="test.default" />
+              <label class="form-label">Topic Name</label>
+              <input type="text" class="form-input" id="pubSubTopic" placeholder="e.g., test.topic" value="test.default" />
             </div>
             
             <div class="form-group">
-              <label class="form-label">消息内容</label>
-              <textarea class="form-textarea" id="pubSubMessage" placeholder="输入要发布的消息内容..."></textarea>
+              <label class="form-label">Message Content</label>
+              <textarea class="form-textarea" id="pubSubMessage" placeholder="Enter message content to publish..."></textarea>
             </div>
             
             <button type="submit" class="btn">
-              <i class="fas fa-broadcast-tower"></i> 发布消息
+              <i class="fas fa-broadcast-tower"></i> Publish Message
             </button>
           </form>
           
@@ -278,12 +278,12 @@
 
     <!-- Footer -->
     <div class="footer">
-      <p>Powered by <strong style="color: white;">Plumego</strong> - 现代 Go Web 框架</p>
+      <p>Powered by <strong style="color: white;">Plumego</strong> - Modern Go Web Framework</p>
       <p style="margin-top: 0.5rem;">
-        <a href="/docs">文档</a> · 
-        <a href="/health/ready">健康检查</a> · 
-        <a href="/health/build">构建信息</a> · 
-        <a href="/api/status">系统状态</a>
+        <a href="/docs">Docs</a> · 
+        <a href="/health/ready">Health Check</a> · 
+        <a href="/health/build">Build Info</a> · 
+        <a href="/api/status">System Status</a>
       </p>
     </div>
   </div>
