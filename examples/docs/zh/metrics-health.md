@@ -10,8 +10,7 @@ Plumego 自带 Prometheus / OpenTelemetry 适配器和轻量健康探针，免�
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
 tracer := metrics.NewOpenTelemetryTracer("my-service")
-app := core.New(core.WithMetricsCollector(prom), core.WithTracer(tracer))
-app.EnableLogging()
+app := core.New(core.WithMetricsCollector(prom), core.WithTracer(tracer), core.WithLogging())
 app.GetHandler("/metrics", prom.Handler())
 ```
 

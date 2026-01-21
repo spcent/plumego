@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -80,28 +81,27 @@ func (a *App) buildHandler() {
 	a.handler = chain.Apply(a.router)
 }
 
-// EnableLogging enables the logging middleware.
-func (a *App) EnableLogging() {
-	_ = a.enableLogging()
-}
-
 func (a *App) enableLogging() error {
 	if a.loggingEnabled {
 		return nil
 	}
 
-	// Create an adapter for the unified metrics collector
-	var metricsCollector middleware.MetricsCollector
-	if a.metricsCollector != nil {
-		metricsCollector = &metricsAdapter{collector: a.metricsCollector}
-	}
-
-	if err := a.Use(middleware.Logging(a.logger, metricsCollector, a.tracer)); err != nil {
+	if err := a.Use(a.loggingMiddleware()); err != nil {
 		return err
 	}
 
 	a.loggingEnabled = true
 	return nil
+}
+
+func (a *App) loggingMiddleware() middleware.Middleware {
+	return func(next http.Handler) http.Handler {
+		var metricsCollector middleware.MetricsCollector
+		if a.metricsCollector != nil {
+			metricsCollector = &metricsAdapter{collector: a.metricsCollector}
+		}
+		return middleware.Logging(a.logger, metricsCollector, a.tracer)(next)
+	}
 }
 
 // metricsAdapter adapts the unified MetricsCollector to the legacy interface
@@ -127,12 +127,46 @@ func (a *App) EnableRateLimit(rate float64, capacity int) {
 	a.Use(middleware.RateLimit(rate, capacity, time.Minute, 5*time.Minute))
 }
 
-// EnableCORS enables the CORS middleware.
-func (a *App) EnableCORS() {
-	a.Use(middleware.CORS)
+func (a *App) enableRecovery() error {
+	if a.recoveryEnabled {
+		return nil
+	}
+
+	if err := a.Use(middleware.RecoveryMiddleware); err != nil {
+		return err
+	}
+
+	a.recoveryEnabled = true
+	return nil
 }
 
-// EnableRecovery enables the recovery middleware.
-func (a *App) EnableRecovery() {
-	a.Use(middleware.RecoveryMiddleware)
+func (a *App) enableCORS(opts *middleware.CORSOptions) error {
+	if opts != nil {
+		cfg := *opts
+		a.corsOptions = &cfg
+	} else {
+		a.corsOptions = nil
+	}
+
+	if a.corsEnabled {
+		return nil
+	}
+
+	if err := a.Use(a.corsMiddleware()); err != nil {
+		return err
+	}
+
+	a.corsEnabled = true
+	return nil
+}
+
+func (a *App) corsMiddleware() middleware.Middleware {
+	return func(next http.Handler) http.Handler {
+		if a.corsOptions == nil {
+			return middleware.CORS(next)
+		}
+		return middleware.FromFuncMiddleware(func(next http.HandlerFunc) http.HandlerFunc {
+			return middleware.CORSWithOptions(*a.corsOptions, next)
+		})(next)
+	}
 }

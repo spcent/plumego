@@ -3,9 +3,9 @@
 Plumego’s middleware wraps standard `http.Handler` values. Chain them globally with `app.Use(...)`, per group via `Group("/x", m1, m2)`, or per route using handler wrappers.
 
 ## Built-in middleware
-- **Recovery**: `app.EnableRecovery()` catches panics, logs stack traces, returns JSON errors.
-- **Logging**: `app.EnableLogging()` records request/response metadata and plugs into metrics/tracing collectors provided through `core.WithMetricsCollector` and `core.WithTracer`.
-- **CORS**: `app.EnableCORS()` sets permissive defaults; customize with `middleware.NewCORS(options...)`.
+- **Recovery**: `core.WithRecovery()` catches panics, logs stack traces, returns JSON errors.
+- **Logging**: `core.WithLogging()` records request/response metadata and plugs into metrics/tracing collectors provided through `core.WithMetricsCollector` and `core.WithTracer`.
+- **CORS**: `core.WithCORS()` sets permissive defaults; customize with `core.WithCORSOptions(...)` or `middleware.CORSWithOptions(...)`.
 - **Gzip**: `middleware.Gzip()` compresses responses when clients send `Accept-Encoding: gzip`.
 - **Timeout**: `middleware.Timeout(duration)` enforces per-request deadlines.
 - **Body limit**: `middleware.BodyLimit(maxBytes, logger)` caps request size with a structured 413 response.
@@ -18,8 +18,7 @@ Core wires protective defaults (body/concurrency limits) during setup. Call `app
 ## Composition examples
 ### Global guardrail chain
 ```go
-app.EnableRecovery()
-app.EnableLogging()
+app := core.New(core.WithRecovery(), core.WithLogging())
 app.Use(
     middleware.Gzip(),
     middleware.Timeout(3*time.Second),

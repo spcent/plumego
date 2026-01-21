@@ -97,6 +97,52 @@ func TestWithMaxBodyBytes(t *testing.T) {
 	}
 }
 
+func TestWithRecovery(t *testing.T) {
+	app := &App{}
+	opt := WithRecovery()
+	opt(app)
+	if !app.recoveryEnabled {
+		t.Errorf("expected recovery middleware to be enabled")
+	}
+}
+
+func TestWithLogging(t *testing.T) {
+	app := &App{}
+	opt := WithLogging()
+	opt(app)
+	if !app.loggingEnabled {
+		t.Errorf("expected logging middleware to be enabled")
+	}
+}
+
+func TestWithCORS(t *testing.T) {
+	app := &App{}
+	opt := WithCORS()
+	opt(app)
+	if !app.corsEnabled {
+		t.Errorf("expected CORS middleware to be enabled")
+	}
+	if app.corsOptions != nil {
+		t.Errorf("expected default CORS options to be nil")
+	}
+}
+
+func TestWithCORSOptions(t *testing.T) {
+	app := &App{}
+	opts := middleware.CORSOptions{AllowedOrigins: []string{"https://example.com"}}
+	opt := WithCORSOptions(opts)
+	opt(app)
+	if !app.corsEnabled {
+		t.Errorf("expected CORS middleware to be enabled")
+	}
+	if app.corsOptions == nil || len(app.corsOptions.AllowedOrigins) != 1 {
+		t.Fatalf("expected CORS options to be set")
+	}
+	if app.corsOptions.AllowedOrigins[0] != "https://example.com" {
+		t.Errorf("unexpected allowed origin: %s", app.corsOptions.AllowedOrigins[0])
+	}
+}
+
 func TestWithSecurityHeadersEnabled(t *testing.T) {
 	app := &App{config: &AppConfig{}}
 	opt := WithSecurityHeadersEnabled(false)

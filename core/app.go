@@ -38,6 +38,9 @@ type App struct {
 	tracer           middleware.Tracer
 	pub              pubsub.PubSub
 	loggingEnabled   bool
+	recoveryEnabled  bool
+	corsEnabled      bool
+	corsOptions      *middleware.CORSOptions
 
 	// Component management
 	components        []Component

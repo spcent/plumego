@@ -79,7 +79,7 @@ Responsibilities:
 
 * Application construction (`core.New(...)`)
 * Global configuration wiring
-* Enabling built-in middleware (`EnableRecovery`, `EnableLogging`, `EnableCORS`, etc.)
+* Enabling built-in middleware (`WithRecovery`, `WithLogging`, `WithCORS`, etc.)
 * Router registration
 * Server startup and graceful shutdown
 * `Boot()` execution flow

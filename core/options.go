@@ -63,6 +63,34 @@ func WithMaxBodyBytes(bytes int64) Option {
 	}
 }
 
+// WithRecovery enables the recovery middleware.
+func WithRecovery() Option {
+	return func(a *App) {
+		_ = a.enableRecovery()
+	}
+}
+
+// WithLogging enables the logging middleware.
+func WithLogging() Option {
+	return func(a *App) {
+		_ = a.enableLogging()
+	}
+}
+
+// WithCORS enables the default CORS middleware.
+func WithCORS() Option {
+	return func(a *App) {
+		_ = a.enableCORS(nil)
+	}
+}
+
+// WithCORSOptions enables CORS with custom options.
+func WithCORSOptions(opts middleware.CORSOptions) Option {
+	return func(a *App) {
+		_ = a.enableCORS(&opts)
+	}
+}
+
 // WithSecurityHeadersEnabled toggles default security header injection.
 func WithSecurityHeadersEnabled(enabled bool) Option {
 	return func(a *App) {

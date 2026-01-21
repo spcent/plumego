@@ -10,8 +10,7 @@ Plumego ships with Prometheus/OpenTelemetry adapters and lightweight health prob
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
 tracer := metrics.NewOpenTelemetryTracer("my-service")
-app := core.New(core.WithMetricsCollector(prom), core.WithTracer(tracer))
-app.EnableLogging()
+app := core.New(core.WithMetricsCollector(prom), core.WithTracer(tracer), core.WithLogging())
 app.GetHandler("/metrics", prom.Handler())
 ```
 

@@ -3,9 +3,9 @@
 Plumego 的中间件与标准 `http.Handler` 兼容，可通过 `app.Use(...)` 全局注册，也可在分组 `Group("/x", m1, m2)` 或具体路由上包裹使用。
 
 ## 内置中间件
-- **恢复**：`app.EnableRecovery()` 捕获 panic，记录栈并返回结构化错误。
-- **日志**：`app.EnableLogging()` 采集请求/响应信息，与 `core.WithMetricsCollector`、`core.WithTracer` 注入的指标/追踪对接。
-- **CORS**：`app.EnableCORS()` 提供宽松默认值，可用 `middleware.NewCORS(options...)` 自定义。
+- **恢复**：`core.WithRecovery()` 捕获 panic，记录栈并返回结构化错误。
+- **日志**：`core.WithLogging()` 采集请求/响应信息，与 `core.WithMetricsCollector`、`core.WithTracer` 注入的指标/追踪对接。
+- **CORS**：`core.WithCORS()` 提供宽松默认值，可用 `core.WithCORSOptions(...)` 或 `middleware.CORSWithOptions(...)` 自定义。
 - **Gzip**：`middleware.Gzip()` 在客户端声明 `Accept-Encoding: gzip` 时压缩响应。
 - **超时**：`middleware.Timeout(duration)` 为单个请求设定截止时间。
 - **请求体限制**：`middleware.BodyLimit(maxBytes, logger)` 返回结构化的 413 响应。
@@ -18,8 +18,7 @@ Plumego 的中间件与标准 `http.Handler` 兼容，可通过 `app.Use(...)` �
 ## 组合示例
 ### 全局防护链
 ```go
-app.EnableRecovery()
-app.EnableLogging()
+app := core.New(core.WithRecovery(), core.WithLogging())
 app.Use(
     middleware.Gzip(),
     middleware.Timeout(3*time.Second),

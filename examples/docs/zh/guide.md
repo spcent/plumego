@@ -46,11 +46,10 @@ func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
+        core.WithRecovery(),
+        core.WithLogging(),
+        core.WithCORS(),
     )
-
-    app.EnableRecovery()
-    app.EnableLogging()
-    app.EnableCORS()
 
     app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
@@ -93,7 +92,7 @@ func main() {
 
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载。
-- **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（请求体限制、并发限制）会在设置期间自动注入。恢复和日志辅助工具通过 `EnableRecovery` 和 `EnableLogging` 启用。
+- **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（请求体限制、并发限制）会在设置期间自动注入。恢复/日志/CORS 辅助工具通过 `core.WithRecovery`、`core.WithLogging`、`core.WithCORS` 启用。
 - **WebSocket 中心**：`ConfigureWebSocket()` 挂载受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `WebSocketConfig` 自定义工作线程数和队列大小。
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。

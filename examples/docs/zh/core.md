@@ -7,10 +7,10 @@
 app := core.New(
     core.WithAddr(":8080"),
     core.WithDebug(),
+    core.WithRecovery(),
+    core.WithLogging(),
+    core.WithCORS(),
 )
-app.EnableRecovery()
-app.EnableLogging()
-app.EnableCORS()
 
 // 在 Boot 冻结路由前完成注册。
 app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
@@ -64,11 +64,11 @@ app := core.New(
     core.WithPubSub(bus),
     core.WithMetricsCollector(prom),
     core.WithTracer(tracer),
+    core.WithRecovery(),
+    core.WithLogging(),
     core.WithWebhookIn(core.WebhookInConfig{Enabled: true, Pub: bus}),
     core.WithWebhookOut(core.WebhookOutConfig{Enabled: true, TriggerToken: "secret"}),
 )
-app.EnableRecovery()
-app.EnableLogging()
 
 app.GetHandler("/metrics", prom.Handler())
 app.GetHandler("/health/ready", health.ReadinessHandler())

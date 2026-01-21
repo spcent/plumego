@@ -46,11 +46,10 @@ func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
+        core.WithRecovery(),
+        core.WithLogging(),
+        core.WithCORS(),
     )
-
-    app.EnableRecovery()
-    app.EnableLogging()
-    app.EnableCORS()
 
     app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
@@ -93,7 +92,7 @@ func main() {
 
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, etc., or the context-aware variants (`GetCtx`) that expose a unified request context wrapper. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir`.
-- **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (body size limits, concurrency limits) are auto-injected during setup. Recovery and logging helpers are enabled via `EnableRecovery` and `EnableLogging`.
+- **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (body size limits, concurrency limits) are auto-injected during setup. Recovery/logging/CORS helpers are enabled via `core.WithRecovery`, `core.WithLogging`, and `core.WithCORS`.
 - **WebSocket Hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint, plus an optional broadcast endpoint (protected by a shared secret). Customize worker count and queue size via `WebSocketConfig`.
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.

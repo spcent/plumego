@@ -87,6 +87,9 @@ func NewAppContext(cfg Config) (*AppContext, error) {
 	app := core.New(
 		core.WithAddr(cfg.Addr),
 		core.WithDebug(),
+		core.WithRecovery(),
+		core.WithLogging(),
+		core.WithCORS(),
 		core.WithPubSub(bus),
 		core.WithMetricsCollector(prom),
 		core.WithTracer(tracer),
@@ -109,11 +112,6 @@ func NewAppContext(cfg Config) (*AppContext, error) {
 			DefaultPageLimit: 50,
 		}),
 	)
-
-	// Enable standard middleware
-	app.EnableRecovery()
-	app.EnableLogging()
-	app.EnableCORS()
 
 	// Load documentation site
 	var docSite *DocSite
