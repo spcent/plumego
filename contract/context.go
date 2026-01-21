@@ -396,20 +396,30 @@ func (c *Ctx) bodyBytes() ([]byte, error) {
 		maxBodySize := int64(0)
 		if c.Config != nil && c.Config.MaxBodySize > 0 {
 			maxBodySize = c.Config.MaxBodySize
-			reader = io.LimitReader(reader, maxBodySize+1)
+			if c.W != nil {
+				reader = http.MaxBytesReader(c.W, c.R.Body, maxBodySize)
+			} else {
+				reader = io.LimitReader(reader, maxBodySize+1)
+			}
 		}
 
 		c.body, c.bodyErr = io.ReadAll(reader)
-		if c.bodyErr == nil {
-			if maxBodySize > 0 && int64(len(c.body)) > maxBodySize {
+		if c.bodyErr != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(c.bodyErr, &maxErr) {
 				c.bodyErr = ErrRequestBodyTooLarge
 				c.body = nil
-				return
 			}
-			c.bodySize.Store(int64(len(c.body)))
-			if c.Config == nil || c.Config.EnableBodyCache {
-				c.R.Body = io.NopCloser(bytes.NewBuffer(c.body))
-			}
+			return
+		}
+		if maxBodySize > 0 && int64(len(c.body)) > maxBodySize {
+			c.bodyErr = ErrRequestBodyTooLarge
+			c.body = nil
+			return
+		}
+		c.bodySize.Store(int64(len(c.body)))
+		if c.Config == nil || c.Config.EnableBodyCache {
+			c.R.Body = io.NopCloser(bytes.NewBuffer(c.body))
 		}
 	})
 	return c.body, c.bodyErr
