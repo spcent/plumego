@@ -24,8 +24,8 @@ const (
 type DIRegistration struct {
 	Type      reflect.Type
 	Lifecycle DILifecycle
-	Factory   func(*DIContainer) interface{}
-	Instance  interface{}
+	Factory   func(*DIContainer) any
+	Instance  any
 }
 
 // DIContainer is a thread-safe dependency injection container.
@@ -43,7 +43,7 @@ type DIRegistration struct {
 //
 //	container := core.NewDIContainer()
 //	container.Register(&DatabaseService{})
-//	container.RegisterFactory(reflect.TypeOf((*CacheService)(nil)), func(c *core.DIContainer) interface{} {
+//	container.RegisterFactory(reflect.TypeOf((*CacheService)(nil)), func(c *core.DIContainer) any {
 //	    return NewRedisCache(c)
 //	})
 //
@@ -75,7 +75,7 @@ func NewDIContainer() *DIContainer {
 // Example:
 //
 //	container.Register(&DatabaseService{Connection: conn})
-func (c *DIContainer) Register(service interface{}) {
+func (c *DIContainer) Register(service any) {
 	if service == nil {
 		return
 	}
@@ -111,12 +111,12 @@ func (c *DIContainer) Register(service interface{}) {
 //
 //	container.RegisterFactory(
 //	    reflect.TypeOf((*CacheService)(nil)),
-//	    func(c *DIContainer) interface{} {
+//	    func(c *DIContainer) any {
 //	        return NewRedisCache(c)
 //	    },
 //	    Singleton,
 //	)
-func (c *DIContainer) RegisterFactory(serviceType reflect.Type, factory func(*DIContainer) interface{}, lifecycle DILifecycle) {
+func (c *DIContainer) RegisterFactory(serviceType reflect.Type, factory func(*DIContainer) any, lifecycle DILifecycle) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -136,7 +136,7 @@ func (c *DIContainer) RegisterFactory(serviceType reflect.Type, factory func(*DI
 //   - serviceType: The type to resolve
 //
 // Returns:
-//   - interface{}: The resolved service instance
+//   - any: The resolved service instance
 //   - error: Error if resolution fails
 //
 // Example:
@@ -147,7 +147,7 @@ func (c *DIContainer) RegisterFactory(serviceType reflect.Type, factory func(*DI
 //	    return err
 //	}
 //	db = service.(*DatabaseService)
-func (c *DIContainer) Resolve(serviceType reflect.Type) (interface{}, error) {
+func (c *DIContainer) Resolve(serviceType reflect.Type) (any, error) {
 	c.mu.RLock()
 
 	// Check for circular dependencies
@@ -181,7 +181,7 @@ func (c *DIContainer) Resolve(serviceType reflect.Type) (interface{}, error) {
 	c.mu.Unlock()
 
 	// Create new instance
-	var instance interface{}
+	var instance any
 	var err error
 
 	if registration.Factory != nil {
@@ -214,7 +214,7 @@ func (c *DIContainer) Resolve(serviceType reflect.Type) (interface{}, error) {
 
 // createInstance creates a new instance using reflection.
 // It attempts to call the constructor and inject dependencies.
-func (c *DIContainer) createInstance(serviceType reflect.Type) (interface{}, error) {
+func (c *DIContainer) createInstance(serviceType reflect.Type) (any, error) {
 	if serviceType.Kind() == reflect.Ptr {
 		// Create pointer to new instance
 		elemType := serviceType.Elem()
@@ -252,7 +252,7 @@ func (c *DIContainer) createInstance(serviceType reflect.Type) (interface{}, err
 //	if err := container.Inject(service); err != nil {
 //	    return err
 //	}
-func (c *DIContainer) Inject(instance interface{}) error {
+func (c *DIContainer) Inject(instance any) error {
 	if instance == nil {
 		return nil
 	}
@@ -286,7 +286,7 @@ func (c *DIContainer) Inject(instance interface{}) error {
 			}
 
 			// Resolve the dependency
-			var dep interface{}
+			var dep any
 			var err error
 
 			if injectTag != "" {
@@ -322,11 +322,11 @@ func (c *DIContainer) Inject(instance interface{}) error {
 }
 
 // resolveByName resolves a service by its name or type name.
-func (c *DIContainer) resolveByName(name string) (interface{}, error) {
+func (c *DIContainer) resolveByName(name string) (any, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	var match interface{}
+	var match any
 	for t, registration := range c.services {
 		if t.Name() == name || t.String() == name {
 			if match == nil {
@@ -347,11 +347,11 @@ func (c *DIContainer) resolveByName(name string) (interface{}, error) {
 }
 
 // resolveAssignable resolves a service that implements an interface.
-func (c *DIContainer) resolveAssignable(serviceType reflect.Type) (interface{}, error) {
+func (c *DIContainer) resolveAssignable(serviceType reflect.Type) (any, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	var match interface{}
+	var match any
 	for _, registration := range c.services {
 		if registration.Instance != nil {
 			instanceType := reflect.TypeOf(registration.Instance)
@@ -375,7 +375,7 @@ func (c *DIContainer) resolveAssignable(serviceType reflect.Type) (interface{}, 
 }
 
 // servicesEqual checks if two service instances are equal.
-func servicesEqual(a, b interface{}) bool {
+func servicesEqual(a, b any) bool {
 	if a == nil || b == nil {
 		return a == b
 	}

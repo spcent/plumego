@@ -65,7 +65,7 @@
 ```go
 container.RegisterFactory(
     reflect.TypeOf((*CacheService)(nil)),
-    func(c *core.DIContainer) interface{} {
+    func(c *core.DIContainer) any {
         return NewRedisCache(c)
     },
     Singleton,

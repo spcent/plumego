@@ -221,7 +221,7 @@ rule := validator.MaxMapKeys(10)
 #### Object - 对象验证
 ```go
 type Data struct {
-    Value interface{} `validate:"object"`
+    Value any `validate:"object"`
 }
 
 // 支持struct和map
@@ -318,7 +318,7 @@ rule := validator.MaxLengthBytes(100)
 #### CustomRule - 自定义验证规则
 ```go
 // 创建自定义验证规则
-rule := validator.CustomRule("even", func(value interface{}) bool {
+rule := validator.CustomRule("even", func(value any) bool {
     if i, ok := value.(int); ok {
         return i%2 == 0
     }
@@ -498,7 +498,7 @@ type Product struct {
 
 func main() {
     // 创建自定义验证规则：价格必须是偶数
-    evenPriceRule := validator.CustomRule("evenPrice", func(value interface{}) bool {
+    evenPriceRule := validator.CustomRule("evenPrice", func(value any) bool {
         if f, ok := value.(float64); ok {
             return int(f)%2 == 0
         }

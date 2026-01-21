@@ -10,7 +10,7 @@ import (
 func TestInt(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid int", 42, false},
@@ -44,7 +44,7 @@ func TestInt(t *testing.T) {
 func TestFloat(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid float32", float32(3.14), false},
@@ -70,7 +70,7 @@ func TestFloat(t *testing.T) {
 func TestBool(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid bool true", true, false},
@@ -99,7 +99,7 @@ func TestBool(t *testing.T) {
 func TestUUID(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid UUID", "550e8400-e29b-41d4-a716-446655440000", false},
@@ -124,7 +124,7 @@ func TestUUID(t *testing.T) {
 func TestIPv4(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid IPv4", "192.168.1.1", false},
@@ -150,7 +150,7 @@ func TestIPv4(t *testing.T) {
 func TestIPv6(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid IPv6", "2001:db8::1", false},
@@ -176,7 +176,7 @@ func TestIPv6(t *testing.T) {
 func TestIP(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid IPv4", "192.168.1.1", false},
@@ -201,7 +201,7 @@ func TestIP(t *testing.T) {
 func TestMAC(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid MAC with colon", "00:1A:2B:3C:4D:5E", false},
@@ -226,7 +226,7 @@ func TestMAC(t *testing.T) {
 func TestHex(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid hex lowercase", "abc123", false},
@@ -252,7 +252,7 @@ func TestHex(t *testing.T) {
 func TestBase64(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid base64", "SGVsbG8gV29ybGQ=", false},
@@ -277,7 +277,7 @@ func TestBase64(t *testing.T) {
 func TestDate(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid date", "2024-01-15", false},
@@ -303,7 +303,7 @@ func TestDate(t *testing.T) {
 func TestTime(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid time with seconds", "12:34:56", false},
@@ -328,7 +328,7 @@ func TestTime(t *testing.T) {
 func TestDateTime(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid datetime", "2024-01-15 12:34:56", false},
@@ -353,7 +353,7 @@ func TestDateTime(t *testing.T) {
 func TestArray(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid slice", []int{1, 2, 3}, false},
@@ -381,7 +381,7 @@ func TestObject(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid struct", TestStruct{Name: "test"}, false},
@@ -405,7 +405,7 @@ func TestObject(t *testing.T) {
 func TestRange(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid int in range", 5, false},
@@ -430,7 +430,7 @@ func TestRange(t *testing.T) {
 func TestMinFloat(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid float above min", 3.14, false},
@@ -454,7 +454,7 @@ func TestMinFloat(t *testing.T) {
 func TestMaxFloat(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid float below max", 3.14, false},
@@ -478,7 +478,7 @@ func TestMaxFloat(t *testing.T) {
 func TestRangeFloat(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid float in range", 3.14, false},
@@ -503,7 +503,7 @@ func TestRangeFloat(t *testing.T) {
 func TestEmailList(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid email list", "test@example.com,admin@example.com", false},
@@ -528,7 +528,7 @@ func TestEmailList(t *testing.T) {
 func TestURLList(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid URL list", "https://example.com,https://google.com", false},
@@ -553,7 +553,7 @@ func TestURLList(t *testing.T) {
 func TestOneOf(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid value", "admin", false},
@@ -577,7 +577,7 @@ func TestOneOf(t *testing.T) {
 func TestNotEmpty(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid non-empty string", "hello", false},
@@ -600,7 +600,7 @@ func TestNotEmpty(t *testing.T) {
 func TestNotZero(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid non-zero int", 42, false},
@@ -625,7 +625,7 @@ func TestNotZero(t *testing.T) {
 func TestAfterDate(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid date after", "2024-01-15", false},
@@ -650,7 +650,7 @@ func TestAfterDate(t *testing.T) {
 func TestBeforeDate(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid date before", "2023-12-31", false},
@@ -675,7 +675,7 @@ func TestBeforeDate(t *testing.T) {
 func TestContains(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid contains", "hello world", false},
@@ -699,7 +699,7 @@ func TestContains(t *testing.T) {
 func TestHasPrefix(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid prefix", "hello world", false},
@@ -723,7 +723,7 @@ func TestHasPrefix(t *testing.T) {
 func TestHasSuffix(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid suffix", "hello world", false},
@@ -747,7 +747,7 @@ func TestHasSuffix(t *testing.T) {
 func TestMinItems(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid slice with enough items", []int{1, 2, 3}, false},
@@ -770,7 +770,7 @@ func TestMinItems(t *testing.T) {
 func TestMaxItems(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid slice with few items", []int{1, 2}, false},
@@ -793,7 +793,7 @@ func TestMaxItems(t *testing.T) {
 func TestUnique(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid unique slice", []int{1, 2, 3}, false},
@@ -816,7 +816,7 @@ func TestUnique(t *testing.T) {
 func TestMinMapKeys(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid map with enough keys", map[string]int{"a": 1, "b": 2}, false},
@@ -839,7 +839,7 @@ func TestMinMapKeys(t *testing.T) {
 func TestMaxMapKeys(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid map with few keys", map[string]int{"a": 1}, false},
@@ -862,7 +862,7 @@ func TestMaxMapKeys(t *testing.T) {
 func TestCustomRule(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid custom rule", 5, false},
@@ -872,7 +872,7 @@ func TestCustomRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := CustomRule("even", func(v interface{}) bool {
+			rule := CustomRule("even", func(v any) bool {
 				if i, ok := v.(int); ok {
 					return i >= 5
 				}
@@ -890,7 +890,7 @@ func TestCustomRule(t *testing.T) {
 func TestOptional(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		wantError bool
 	}{
 		{"valid required value", "hello", false},

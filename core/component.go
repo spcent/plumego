@@ -25,6 +25,12 @@ type Component interface {
 // with empty dependencies list and health check.
 type BaseComponent struct{}
 
+// RegisterRoutes implements Component.RegisterRoutes
+func (b *BaseComponent) RegisterRoutes(r *router.Router) {}
+
+// RegisterMiddleware implements Component.RegisterMiddleware
+func (b *BaseComponent) RegisterMiddleware(m *middleware.Registry) {}
+
 // Dependencies implements Component.Dependencies
 func (b *BaseComponent) Dependencies() []reflect.Type {
 	return nil

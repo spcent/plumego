@@ -17,7 +17,7 @@
 ### 代码改进建议
 ```go
 // 实现循环依赖检测
-func (c *DIContainer) Resolve(serviceType reflect.Type) (interface{}, error) {
+func (c *DIContainer) Resolve(serviceType reflect.Type) (any, error) {
     // Check if already resolving to detect cycles
     if c.isResolving(serviceType) {
         return nil, errors.New("circular dependency detected")
@@ -31,11 +31,11 @@ func (c *DIContainer) Resolve(serviceType reflect.Type) (interface{}, error) {
 }
 
 // 添加命名依赖支持
-func (c *DIContainer) RegisterNamed(name string, service interface{}) {
+func (c *DIContainer) RegisterNamed(name string, service any) {
     // Implementation...
 }
 
-func (c *DIContainer) ResolveNamed(name string, serviceType reflect.Type) (interface{}, error) {
+func (c *DIContainer) ResolveNamed(name string, serviceType reflect.Type) (any, error) {
     // Implementation...
 }
 ```

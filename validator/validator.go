@@ -1805,7 +1805,7 @@ func Unique() Rule {
 			return nil
 		}
 
-		seen := make(map[interface{}]bool)
+		seen := make(map[any]bool)
 		for i := 0; i < rv.Len(); i++ {
 			elem := rv.Index(i).Interface()
 			if seen[elem] {

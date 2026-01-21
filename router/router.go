@@ -188,6 +188,7 @@ type segment struct {
 // node represents a node in the prefix trie
 type node struct {
 	path        string                  // path segment
+	paramName   string                  // param or wildcard name for this segment
 	fullPath    string                  // full path for this node (only set for nodes with handlers)
 	indices     string                  // string of child path starts (optimized for lookup)
 	children    []*node                 // child nodes
@@ -560,21 +561,75 @@ func (r *Router) AddRoute(method, path string, handler Handler) error {
 
 	// Add each segment to the trie
 	for _, seg := range segments {
-		// Get segment value
-		segValue := seg.raw
 		if seg.isParam {
-			segValue = ":"
 			paramKeys = append(paramKeys, seg.paramName)
-		} else if seg.isWild {
-			segValue = "*"
-			paramKeys = append(paramKeys, seg.paramName)
+			child := r.findParamChild(current)
+			if child != nil {
+				if child.paramName == "" {
+					child.paramName = seg.paramName
+				} else if child.paramName != seg.paramName {
+					return contract.WrapError(
+						fmt.Errorf("route conflict: parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName),
+						"add_route",
+						"router",
+						map[string]any{
+							"method": method,
+							"path":   fullPath,
+						},
+					)
+				}
+				current = child
+				current.priority++
+				continue
+			}
+
+			child = &node{
+				path:      ":",
+				paramName: seg.paramName,
+			}
+			r.insertChild(current, child)
+			current = child
+			current.priority++
+			continue
 		}
 
-		// Find or create child node
-		child := r.findChild(current, segValue)
+		if seg.isWild {
+			paramKeys = append(paramKeys, seg.paramName)
+			child := r.findWildChild(current)
+			if child != nil {
+				if child.paramName == "" {
+					child.paramName = seg.paramName
+				} else if child.paramName != seg.paramName {
+					return contract.WrapError(
+						fmt.Errorf("route conflict: wildcard parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName),
+						"add_route",
+						"router",
+						map[string]any{
+							"method": method,
+							"path":   fullPath,
+						},
+					)
+				}
+				current = child
+				current.priority++
+				continue
+			}
+
+			child = &node{
+				path:      "*",
+				paramName: seg.paramName,
+			}
+			r.insertChild(current, child)
+			current = child
+			current.priority++
+			continue
+		}
+
+		// Find or create static child node
+		child := r.findChild(current, seg.raw)
 		if child == nil {
 			child = &node{
-				path: segValue,
+				path: seg.raw,
 			}
 			r.insertChild(current, child)
 		}
@@ -803,19 +858,13 @@ func (r *Router) findChild(parent *node, path string) *node {
 	if len(path) == 1 {
 		switch path {
 		case ":":
-			// Check for param child
-			for _, child := range parent.children {
-				if len(child.path) > 0 && child.path[0] == ':' {
-					return child
-				}
-			}
+			// Check for param child - return nil to indicate no existing param child found
+			// This forces creation of a new param child node
+			return nil
 		case "*":
-			// Check for wild child
-			for _, child := range parent.children {
-				if len(child.path) > 0 && child.path[0] == '*' {
-					return child
-				}
-			}
+			// Check for wild child - return nil to indicate no existing wild child found
+			// This forces creation of a new wild child node
+			return nil
 		default:
 			// Check for exact match
 			for _, child := range parent.children {
@@ -833,6 +882,30 @@ func (r *Router) findChild(parent *node, path string) *node {
 		}
 	}
 
+	return nil
+}
+
+func (r *Router) findParamChild(parent *node) *node {
+	if parent == nil || len(parent.children) == 0 {
+		return nil
+	}
+	for _, child := range parent.children {
+		if len(child.path) > 0 && child.path[0] == ':' {
+			return child
+		}
+	}
+	return nil
+}
+
+func (r *Router) findWildChild(parent *node) *node {
+	if parent == nil || len(parent.children) == 0 {
+		return nil
+	}
+	for _, child := range parent.children {
+		if len(child.path) > 0 && child.path[0] == '*' {
+			return child
+		}
+	}
 	return nil
 }
 
