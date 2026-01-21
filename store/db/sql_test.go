@@ -155,6 +155,25 @@ func TestOpenWithRetryFailure(t *testing.T) {
 	}
 }
 
+func TestOpenWithRetryInvalidConfig(t *testing.T) {
+	calls := 0
+	_, err := OpenWithRetry(
+		Config{Driver: "", DSN: ""},
+		func(driver, dsn string) (*sql.DB, error) {
+			calls++
+			return nil, errors.New("unexpected open")
+		},
+		3,
+		10*time.Millisecond,
+	)
+	if err == nil || !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("expected ErrInvalidConfig, got %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("expected open not to be called, got %d", calls)
+	}
+}
+
 func TestExecContext(t *testing.T) {
 	connector := &stubConnector{conn: &stubConn{}}
 	db := sql.OpenDB(connector)
@@ -443,6 +462,35 @@ func TestQueryRowNilDB(t *testing.T) {
 	}
 }
 
+func TestQueryRowStrictNoRows(t *testing.T) {
+	db := sql.OpenDB(&rowsConnector{rows: &fixedRows{cols: []string{"id"}}})
+	defer db.Close()
+
+	err := QueryRowStrict(context.Background(), db, "SELECT id FROM test", func(rows *sql.Rows) error {
+		var id int
+		return rows.Scan(&id)
+	})
+	if err == nil || !errors.Is(err, ErrNoRows) {
+		t.Fatalf("expected ErrNoRows, got %v", err)
+	}
+}
+
+func TestQueryRowStrictMultipleRows(t *testing.T) {
+	db := sql.OpenDB(&rowsConnector{rows: &fixedRows{
+		cols:   []string{"id"},
+		values: [][]driver.Value{{1}, {2}},
+	}})
+	defer db.Close()
+
+	err := QueryRowStrict(context.Background(), db, "SELECT id FROM test", func(rows *sql.Rows) error {
+		var id int
+		return rows.Scan(&id)
+	})
+	if err == nil || !errors.Is(err, ErrMultipleRows) {
+		t.Fatalf("expected ErrMultipleRows, got %v", err)
+	}
+}
+
 // Stub implementations for testing
 type stubConnector struct {
 	conn *stubConn
@@ -532,4 +580,85 @@ func (r stubRows) Close() error {
 
 func (r stubRows) Next(dest []driver.Value) error {
 	return io.EOF
+}
+
+type rowsConnector struct {
+	rows driver.Rows
+}
+
+func (c *rowsConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	return &rowsConn{rows: c.rows}, nil
+}
+
+func (c *rowsConnector) Driver() driver.Driver {
+	return rowsDriver{}
+}
+
+type rowsDriver struct{}
+
+func (d rowsDriver) Open(name string) (driver.Conn, error) {
+	return nil, errors.New("not supported")
+}
+
+type rowsConn struct {
+	rows driver.Rows
+}
+
+func (c *rowsConn) Prepare(query string) (driver.Stmt, error) {
+	return rowsStmt{rows: c.rows}, nil
+}
+
+func (c *rowsConn) Close() error {
+	return nil
+}
+
+func (c *rowsConn) Begin() (driver.Tx, error) {
+	return stubTx{}, nil
+}
+
+func (c *rowsConn) Ping(ctx context.Context) error {
+	return nil
+}
+
+type rowsStmt struct {
+	rows driver.Rows
+}
+
+func (s rowsStmt) Close() error {
+	return nil
+}
+
+func (s rowsStmt) NumInput() int {
+	return -1
+}
+
+func (s rowsStmt) Exec(args []driver.Value) (driver.Result, error) {
+	return stubResult{}, nil
+}
+
+func (s rowsStmt) Query(args []driver.Value) (driver.Rows, error) {
+	return s.rows, nil
+}
+
+type fixedRows struct {
+	cols   []string
+	values [][]driver.Value
+	idx    int
+}
+
+func (r *fixedRows) Columns() []string {
+	return r.cols
+}
+
+func (r *fixedRows) Close() error {
+	return nil
+}
+
+func (r *fixedRows) Next(dest []driver.Value) error {
+	if r.idx >= len(r.values) {
+		return io.EOF
+	}
+	copy(dest, r.values[r.idx])
+	r.idx++
+	return nil
 }

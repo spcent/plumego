@@ -130,7 +130,7 @@ func Open(config Config) (*sql.DB, error) {
 // OpenWith opens a database connection with an injected opener.
 func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
+		return nil, err
 	}
 	if open == nil {
 		return nil, fmt.Errorf("%w: open function is required", ErrInvalidConfig)
@@ -167,6 +167,9 @@ func OpenWithRetry(config Config, open OpenFunc, maxRetries int, retryDelay time
 		db, err := OpenWith(config, open)
 		if err == nil {
 			return db, nil
+		}
+		if errors.Is(err, ErrInvalidConfig) {
+			return nil, err
 		}
 
 		lastErr = err
@@ -207,6 +210,9 @@ func ExecContext(ctx context.Context, db DB, query string, args ...any) (sql.Res
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
 
+	ctx, cancel := withQueryTimeout(ctx, db)
+	defer cancel()
+
 	return db.ExecContext(ctx, query, args...)
 }
 
@@ -216,6 +222,9 @@ func QueryContext(ctx context.Context, db DB, query string, args ...any) (*sql.R
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
 
+	ctx, cancel := withQueryTimeout(ctx, db)
+	defer cancel()
+
 	return db.QueryContext(ctx, query, args...)
 }
 
@@ -224,6 +233,9 @@ func QueryRowContext(ctx context.Context, db DB, query string, args ...any) *sql
 	if db == nil {
 		return nil
 	}
+
+	ctx, cancel := withQueryTimeout(ctx, db)
+	defer cancel()
 
 	return db.QueryRowContext(ctx, query, args...)
 }
@@ -243,6 +255,9 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 	if db == nil {
 		return fmt.Errorf("%w: database is nil", ErrTransactionFailed)
 	}
+
+	ctx, cancel := withTransactionTimeout(ctx, db)
+	defer cancel()
 
 	tx, err := db.BeginTx(ctx, txOpts)
 	if err != nil {
@@ -270,24 +285,56 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 	return nil
 }
 
-// QueryRow executes a query and expects a single row.
-// Returns ErrNoRows if no rows are returned.
-// Returns ErrMultipleRows if multiple rows are returned.
+// QueryRow executes a query and returns the first row.
+// Use QueryRowStrict when you need single-row enforcement.
 func QueryRow(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error) {
 	if db == nil {
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
 
-	// Create a context with timeout if configured
-	if config, ok := db.(interface{ GetConfig() Config }); ok {
-		if config.GetConfig().QueryTimeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, config.GetConfig().QueryTimeout)
-			defer cancel()
-		}
-	}
+	ctx, cancel := withQueryTimeout(ctx, db)
+	defer cancel()
 
 	return db.QueryRowContext(ctx, query, args...), nil
+}
+
+// QueryRowStrict executes a query and enforces single-row semantics.
+// Returns ErrNoRows if no rows are returned.
+// Returns ErrMultipleRows if multiple rows are returned.
+func QueryRowStrict(ctx context.Context, db DB, query string, scan func(*sql.Rows) error, args ...any) error {
+	if db == nil {
+		return fmt.Errorf("%w: database is nil", ErrQueryFailed)
+	}
+	if scan == nil {
+		return fmt.Errorf("%w: scan function is nil", ErrQueryFailed)
+	}
+
+	rows, err := QueryContext(ctx, db, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("%w: %v", ErrQueryFailed, err)
+		}
+		return fmt.Errorf("%w: %v", ErrNoRows, sql.ErrNoRows)
+	}
+
+	if err := scan(rows); err != nil {
+		return err
+	}
+
+	if rows.Next() {
+		return ErrMultipleRows
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("%w: %v", ErrQueryFailed, err)
+	}
+
+	return nil
 }
 
 // ScanRow is a helper function to scan a single row into a destination.
@@ -401,4 +448,31 @@ type HealthStatus struct {
 // GetConfig is a helper interface for databases that can expose their configuration.
 type GetConfig interface {
 	GetConfig() Config
+}
+
+func withQueryTimeout(ctx context.Context, db DB) (context.Context, context.CancelFunc) {
+	config, ok := getConfig(db)
+	if !ok || config.QueryTimeout <= 0 {
+		return ctx, func() {}
+	}
+	return WithTimeout(ctx, config.QueryTimeout)
+}
+
+func withTransactionTimeout(ctx context.Context, db DB) (context.Context, context.CancelFunc) {
+	config, ok := getConfig(db)
+	if !ok || config.TransactionTimeout <= 0 {
+		return ctx, func() {}
+	}
+	return WithTimeout(ctx, config.TransactionTimeout)
+}
+
+func getConfig(db DB) (Config, bool) {
+	if db == nil {
+		return Config{}, false
+	}
+	cfg, ok := db.(GetConfig)
+	if !ok {
+		return Config{}, false
+	}
+	return cfg.GetConfig(), true
 }
