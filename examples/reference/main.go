@@ -148,6 +148,15 @@ func (ctx *AppContext) RegisterRoutes() error {
 		return fmt.Errorf("failed to register frontend: %w", err)
 	}
 
+	// Register static files (CSS, JS) under /static path
+	staticSubFS, err := fs.Sub(staticFS, "ui/static")
+	if err != nil {
+		return fmt.Errorf("failed to get static subdirectory: %w", err)
+	}
+	if err := frontend.RegisterFS(ctx.App.Router(), http.FS(staticSubFS), frontend.WithPrefix("/static")); err != nil {
+		return fmt.Errorf("failed to register static files: %w", err)
+	}
+
 	// Register health endpoints
 	ctx.App.GetHandler("/health/ready", health.ReadinessHandler())
 	ctx.App.GetHandler("/health/build", health.BuildInfoHandler())
