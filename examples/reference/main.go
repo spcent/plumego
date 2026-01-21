@@ -391,6 +391,7 @@ type DocSite struct {
 	fs          fs.FS
 	nav         map[string][]DocPage
 	defaultLang string
+	template    *template.Template
 }
 
 // DocPage represents a documentation page
@@ -413,7 +414,8 @@ func NewDocSite() (*DocSite, error) {
 		return nil, fmt.Errorf("build docs nav: %w", err)
 	}
 
-	defaultLang := "zh"
+	// Default to English
+	defaultLang := "en"
 	if _, ok := nav[defaultLang]; !ok {
 		for lang := range nav {
 			defaultLang = lang
@@ -421,10 +423,23 @@ func NewDocSite() (*DocSite, error) {
 		}
 	}
 
+	// Load template from embedded filesystem
+	tmplPath := filepath.Join("ui", "templates", "docs.html")
+	tmplContent, err := fs.ReadFile(staticFS, tmplPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read template file: %w", err)
+	}
+
+	tmpl, err := template.New("docs").Parse(string(tmplContent))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+
 	return &DocSite{
 		fs:          f,
 		nav:         nav,
 		defaultLang: defaultLang,
+		template:    tmpl,
 	}, nil
 }
 
@@ -583,7 +598,7 @@ func (d *DocSite) languages() []string {
 // renderPage renders the documentation page template
 func (d *DocSite) renderPage(w http.ResponseWriter, data docTemplateData) {
 	buf := &bytes.Buffer{}
-	if err := docTemplate.Execute(buf, data); err != nil {
+	if err := d.template.Execute(buf, data); err != nil {
 		http.Error(w, fmt.Sprintf("render docs: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -600,247 +615,6 @@ type docTemplateData struct {
 	Navigation   map[string][]DocPage
 	LanguageList []string
 }
-
-// docTemplate is the HTML template for documentation pages
-var docTemplate = template.Must(template.New("docs").Parse(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{.Title}} | Plumego Docs</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; 
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-      min-height: 100vh; 
-      color: #161616; 
-    }
-    .container { 
-      display: flex; 
-      height: 100vh; 
-      background: rgba(255, 255, 255, 0.95); 
-      backdrop-filter: blur(10px); 
-      margin: 2rem; 
-      border-radius: 24px; 
-      overflow: hidden; 
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); 
-    }
-    nav { 
-      width: 280px; 
-      background: #ffffff; 
-      border-right: 1px solid #e5e7eb; 
-      padding: 24px 16px; 
-      overflow-y: auto; 
-    }
-    nav h1 { 
-      font-size: 20px; 
-      margin: 0 0 20px 12px; 
-      color: #111827; 
-      font-weight: 700; 
-    }
-    nav h2 { 
-      font-size: 12px; 
-      margin: 20px 0 8px 12px; 
-      text-transform: uppercase; 
-      letter-spacing: 0.08em; 
-      color: #6b7280; 
-      font-weight: 600; 
-    }
-    nav ul { 
-      list-style: none; 
-      padding: 0 0 0 12px; 
-      margin: 0; 
-    }
-    nav li { 
-      margin: 4px 0; 
-    }
-    nav a { 
-      color: #0f172a; 
-      text-decoration: none; 
-      font-size: 14px; 
-      padding: 8px 12px; 
-      display: block; 
-      border-radius: 8px; 
-      transition: all 0.2s ease; 
-      font-weight: 500; 
-    }
-    nav a:hover { 
-      background: #f1f5f9; 
-      color: #4f46e5; 
-    }
-    nav a.active { 
-      background: linear-gradient(135deg, #6366f1, #8b5cf6); 
-      color: #ffffff; 
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); 
-    }
-    main { 
-      flex: 1; 
-      padding: 40px; 
-      overflow-y: auto; 
-      background: #fafafa; 
-    }
-    main h1 { 
-      font-size: 32px; 
-      color: #111827; 
-      margin-bottom: 24px; 
-      font-weight: 800; 
-      background: linear-gradient(135deg, #111827, #374151); 
-      -webkit-background-clip: text; 
-      -webkit-text-fill-color: transparent; 
-    }
-    main h2 { 
-      font-size: 24px; 
-      color: #111827; 
-      margin: 32px 0 16px; 
-      font-weight: 700; 
-      border-bottom: 2px solid #e5e7eb; 
-      padding-bottom: 8px; 
-    }
-    main h3 { 
-      font-size: 18px; 
-      color: #374151; 
-      margin: 24px 0 12px; 
-      font-weight: 600; 
-    }
-    main p { 
-      line-height: 1.7; 
-      color: #4b5563; 
-      margin-bottom: 16px; 
-    }
-    main ul { 
-      padding-left: 24px; 
-      margin-bottom: 16px; 
-    }
-    main li { 
-      margin: 8px 0; 
-      color: #4b5563; 
-      line-height: 1.6; 
-    }
-    main pre { 
-      background: #1e293b; 
-      color: #e2e8f0; 
-      padding: 16px; 
-      border-radius: 12px; 
-      overflow-x: auto; 
-      margin: 16px 0; 
-      font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; 
-      font-size: 14px; 
-      line-height: 1.5; 
-      border: 1px solid #334155; 
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
-    }
-    main code { 
-      font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; 
-      background: #f3f4f6; 
-      padding: 2px 6px; 
-      border-radius: 4px; 
-      font-size: 14px; 
-      color: #dc2626; 
-    }
-    main pre code { 
-      background: none; 
-      padding: 0; 
-      color: inherit; 
-    }
-    main a { 
-      color: #4f46e5; 
-      text-decoration: none; 
-      font-weight: 600; 
-      transition: all 0.2s ease; 
-    }
-    main a:hover { 
-      color: #7c3aed; 
-      text-decoration: underline; 
-    }
-    main blockquote { 
-      border-left: 4px solid #6366f1; 
-      padding-left: 16px; 
-      margin: 16px 0; 
-      color: #6b7280; 
-      font-style: italic; 
-      background: #f9fafb; 
-      padding: 12px 16px; 
-      border-radius: 0 8px 8px 0; 
-    }
-    .header-bar { 
-      background: linear-gradient(135deg, #6366f1, #8b5cf6); 
-      color: white; 
-      padding: 16px 24px; 
-      margin: -40px -40px 24px -40px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: space-between; 
-    }
-    .header-bar h2 { 
-      margin: 0; 
-      font-size: 18px; 
-      font-weight: 700; 
-      border: none; 
-      color: white; 
-    }
-    .back-link { 
-      color: white; 
-      text-decoration: none; 
-      font-size: 14px; 
-      font-weight: 600; 
-      padding: 8px 12px; 
-      background: rgba(255, 255, 255, 0.2); 
-      border-radius: 6px; 
-      transition: all 0.2s ease; 
-    }
-    .back-link:hover { 
-      background: rgba(255, 255, 255, 0.3); 
-      text-decoration: none; 
-    }
-    @media (max-width: 768px) { 
-      .container { 
-        margin: 0; 
-        border-radius: 0; 
-        flex-direction: column; 
-      }
-      nav { 
-        width: 100%; 
-        height: auto; 
-        max-height: 200px; 
-        border-right: none; 
-        border-bottom: 1px solid #e5e7eb; 
-      }
-      main { 
-        padding: 24px; 
-      }
-      .header-bar { 
-        margin: -24px -24px 16px -24px; 
-        padding: 12px 16px; 
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <nav>
-      <h1>📚 Plumego Docs</h1>
-      {{range .LanguageList}}
-        <h2>{{.}}</h2>
-        <ul>
-          {{range $page := index $.Navigation .}}
-            <li><a class="{{if and (eq $.Lang $page.Lang) (eq $.CurrentSlug $page.Slug)}}active{{end}}" href="/docs/{{$page.Lang}}/{{$page.Slug}}">{{$page.Title}}</a></li>
-          {{end}}
-        </ul>
-      {{end}}
-    </nav>
-    <main>
-      {{if .CurrentSlug}}
-        <div class="header-bar">
-          <h2>{{.Title}}</h2>
-          <a href="/docs/{{.Lang}}" class="back-link">← Back to Index</a>
-        </div>
-      {{end}}
-      {{.Content}}
-    </main>
-  </div>
-</body>
-</html>`))
 
 // markdownToHTML converts markdown to HTML (simplified)
 func markdownToHTML(md string) template.HTML {
