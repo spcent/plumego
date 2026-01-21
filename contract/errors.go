@@ -467,7 +467,11 @@ func HTTPStatusFromCategory(category ErrorCategory) int {
 }
 
 // ParseErrorFromResponse attempts to parse an APIError from an HTTP response.
+// Note: this closes resp.Body.
 func ParseErrorFromResponse(resp *http.Response) (APIError, error) {
+	if resp == nil || resp.Body == nil {
+		return APIError{}, fmt.Errorf("response is nil")
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 400 {
@@ -614,6 +618,21 @@ func IsRetryable(err error) bool {
 		return false
 	}
 
+	if chain, ok := err.(*ErrorChain); ok {
+		if chain.IsTimeoutError() {
+			return true
+		}
+		if latest := chain.Latest(); latest != nil && latest.Error != nil {
+			if IsRetryable(latest.Error) {
+				return true
+			}
+		}
+		if root := chain.Root(); root != nil {
+			return IsRetryable(root)
+		}
+		return false
+	}
+
 	// Check if it's an APIError directly
 	if apiErr, ok := err.(APIError); ok {
 		return IsRetryableError(apiErr)
@@ -648,6 +667,34 @@ func GetErrorDetails(err error) map[string]any {
 	}
 
 	details := make(map[string]any)
+
+	if chain, ok := err.(*ErrorChain); ok {
+		details["message"] = chain.Error()
+		details["timestamp"] = chain.timestamp
+		if root := chain.Root(); root != nil {
+			details["root"] = GetErrorDetails(root)
+		}
+		if len(chain.errors) > 0 {
+			entries := make([]map[string]any, 0, len(chain.errors))
+			for _, wrapped := range chain.errors {
+				entry := map[string]any{
+					"message":  wrapped.Message,
+					"category": wrapped.Category,
+					"type":     wrapped.Type,
+					"when":     wrapped.Timestamp,
+				}
+				if len(wrapped.Context) > 0 {
+					entry["context"] = wrapped.Context
+				}
+				if wrapped.Error != nil {
+					entry["error"] = wrapped.Error.Error()
+				}
+				entries = append(entries, entry)
+			}
+			details["chain"] = entries
+		}
+		return details
+	}
 
 	// Handle WrappedErrorWithContext
 	if wrapped, ok := err.(*WrappedErrorWithContext); ok {

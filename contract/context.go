@@ -30,13 +30,10 @@ type RequestContextKey struct{}
 
 // RequestConfig holds configuration for request processing.
 type RequestConfig struct {
-	MaxBodySize        int64
-	EnableBodyCache    bool
-	EnableCompression  bool
-	EnableCors         bool
-	EnableCorsHeaders  []string
-	CorsAllowedOrigins []string
-	RequestTimeout     time.Duration
+	MaxBodySize       int64
+	EnableBodyCache   bool
+	EnableCompression bool
+	RequestTimeout    time.Duration
 }
 
 // Ctx is a unified context object shared by handlers.
@@ -100,6 +97,9 @@ var (
 
 	// ErrHandlerNil is returned when a handler is nil.
 	ErrHandlerNil = errors.New("handler cannot be nil")
+
+	// ErrInvalidChunkSize is returned when a streaming chunk size is invalid.
+	ErrInvalidChunkSize = errors.New("invalid chunk size")
 
 	// ErrContextNil is returned when a context is nil.
 	ErrContextNil = errors.New("context cannot be nil")
@@ -190,8 +190,15 @@ var DefaultRequestConfig = &RequestConfig{
 	MaxBodySize:       10 * 1024 * 1024, // 10MB
 	EnableBodyCache:   true,
 	EnableCompression: false,
-	EnableCors:        false,
 	RequestTimeout:    30 * time.Second,
+}
+
+func defaultRequestConfig() *RequestConfig {
+	if DefaultRequestConfig == nil {
+		return &RequestConfig{}
+	}
+	cfg := *DefaultRequestConfig
+	return &cfg
 }
 
 // newCtxWithLogger allows injecting a logger while keeping NewCtx minimal for compatibility.
@@ -200,10 +207,7 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 		params = map[string]string{}
 	}
 
-	config := DefaultRequestConfig
-	if config == nil {
-		config = &RequestConfig{}
-	}
+	config := defaultRequestConfig()
 
 	var cancel context.CancelFunc
 	deadline, hasDeadline := r.Context().Deadline()
@@ -222,9 +226,11 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 
 	// Detect compression
 	compressionEnabled := false
-	contentEncoding := strings.ToLower(r.Header.Get("Content-Encoding"))
-	if contentEncoding == "gzip" || contentEncoding == "deflate" {
-		compressionEnabled = true
+	if config.EnableCompression {
+		contentEncoding := strings.ToLower(r.Header.Get("Content-Encoding"))
+		if contentEncoding == "gzip" || contentEncoding == "deflate" {
+			compressionEnabled = true
+		}
 	}
 
 	ctx := &Ctx{
@@ -511,6 +517,45 @@ func (sw *SSEWriter) Write(event SSEEvent) error {
 	return nil
 }
 
+func (c *Ctx) streamContext() context.Context {
+	if c == nil || c.R == nil {
+		return context.Background()
+	}
+	return c.R.Context()
+}
+
+func checkStreamContext(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+	if ctx == nil {
+		time.Sleep(delay)
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func validateChunkSize(chunkSize int) error {
+	if chunkSize <= 0 {
+		return ErrInvalidChunkSize
+	}
+	return nil
+}
+
 // RespondWithSSE starts a Server-Sent Events response.
 // Returns an SSEWriter for sending events, or nil if SSE is not supported.
 func (c *Ctx) RespondWithSSE() *SSEWriter {
@@ -530,11 +575,18 @@ func (c *Ctx) RespondWithEventSource() *SSEWriter {
 
 // StreamJSON streams JSON data line by line.
 func (c *Ctx) StreamJSON(items []any) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	c.W.Header().Set("Content-Type", "application/x-ndjson")
 	c.W.WriteHeader(http.StatusOK)
 
 	encoder := json.NewEncoder(c.W)
 	for _, item := range items {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		if err := encoder.Encode(item); err != nil {
 			return err
 		}
@@ -548,10 +600,17 @@ func (c *Ctx) StreamJSON(items []any) error {
 
 // StreamText streams text data line by line.
 func (c *Ctx) StreamText(lines []string) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	c.W.WriteHeader(http.StatusOK)
 
 	for _, line := range lines {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
 			return err
 		}
@@ -565,11 +624,21 @@ func (c *Ctx) StreamText(lines []string) error {
 
 // StreamBinary streams binary data in chunks.
 func (c *Ctx) StreamBinary(reader io.Reader, chunkSize int) error {
+	if err := validateChunkSize(chunkSize); err != nil {
+		return err
+	}
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	c.W.Header().Set("Content-Type", "application/octet-stream")
 	c.W.WriteHeader(http.StatusOK)
 
 	buf := make([]byte, chunkSize)
 	for {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		n, err := reader.Read(buf)
 		if err != nil {
 			if err == io.EOF {
@@ -579,6 +648,9 @@ func (c *Ctx) StreamBinary(reader io.Reader, chunkSize int) error {
 		}
 
 		if n > 0 {
+			if err := checkStreamContext(ctx); err != nil {
+				return err
+			}
 			if _, err := c.W.Write(buf[:n]); err != nil {
 				return err
 			}
@@ -593,62 +665,99 @@ func (c *Ctx) StreamBinary(reader io.Reader, chunkSize int) error {
 
 // StreamJSONWithChannel streams JSON data from a channel.
 func (c *Ctx) StreamJSONWithChannel(itemChan <-chan any) error {
-	c.W.Header().Set("Content-Type", "application/x-ndjson")
-	c.W.WriteHeader(http.StatusOK)
-
-	encoder := json.NewEncoder(c.W)
-	for item := range itemChan {
-		if err := encoder.Encode(item); err != nil {
-			return err
-		}
-		if f, ok := c.W.(http.Flusher); ok {
-			f.Flush()
-		}
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
 	}
-
-	return nil
-}
-
-// StreamTextWithChannel streams text data from a channel.
-func (c *Ctx) StreamTextWithChannel(lineChan <-chan string) error {
-	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	c.W.WriteHeader(http.StatusOK)
-
-	for line := range lineChan {
-		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
-			return err
-		}
-		if f, ok := c.W.(http.Flusher); ok {
-			f.Flush()
-		}
-	}
-
-	return nil
-}
-
-// StreamSSEWithChannel streams Server-Sent Events from a channel.
-func (c *Ctx) StreamSSEWithChannel(eventChan <-chan SSEEvent) error {
-	sseWriter := c.RespondWithSSE()
-	if sseWriter == nil {
-		return errors.New("SSE not supported")
-	}
-
-	for event := range eventChan {
-		if err := sseWriter.Write(event); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// StreamJSONWithGenerator streams JSON data using a generator function.
-func (c *Ctx) StreamJSONWithGenerator(generator func() (any, error)) error {
 	c.W.Header().Set("Content-Type", "application/x-ndjson")
 	c.W.WriteHeader(http.StatusOK)
 
 	encoder := json.NewEncoder(c.W)
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case item, ok := <-itemChan:
+			if !ok {
+				return nil
+			}
+			if err := encoder.Encode(item); err != nil {
+				return err
+			}
+			if f, ok := c.W.(http.Flusher); ok {
+				f.Flush()
+			}
+		}
+	}
+}
+
+// StreamTextWithChannel streams text data from a channel.
+func (c *Ctx) StreamTextWithChannel(lineChan <-chan string) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
+	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	c.W.WriteHeader(http.StatusOK)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case line, ok := <-lineChan:
+			if !ok {
+				return nil
+			}
+			if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
+				return err
+			}
+			if f, ok := c.W.(http.Flusher); ok {
+				f.Flush()
+			}
+		}
+	}
+}
+
+// StreamSSEWithChannel streams Server-Sent Events from a channel.
+func (c *Ctx) StreamSSEWithChannel(eventChan <-chan SSEEvent) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
+	sseWriter := c.RespondWithSSE()
+	if sseWriter == nil {
+		return errors.New("SSE not supported")
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-eventChan:
+			if !ok {
+				return nil
+			}
+			if err := sseWriter.Write(event); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// StreamJSONWithGenerator streams JSON data using a generator function.
+func (c *Ctx) StreamJSONWithGenerator(generator func() (any, error)) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
+	c.W.Header().Set("Content-Type", "application/x-ndjson")
+	c.W.WriteHeader(http.StatusOK)
+
+	encoder := json.NewEncoder(c.W)
+	for {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		item, err := generator()
 		if err != nil {
 			if err == io.EOF {
@@ -670,10 +779,17 @@ func (c *Ctx) StreamJSONWithGenerator(generator func() (any, error)) error {
 
 // StreamTextWithGenerator streams text data using a generator function.
 func (c *Ctx) StreamTextWithGenerator(generator func() (string, error)) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	c.W.WriteHeader(http.StatusOK)
 
 	for {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		line, err := generator()
 		if err != nil {
 			if err == io.EOF {
@@ -695,12 +811,19 @@ func (c *Ctx) StreamTextWithGenerator(generator func() (string, error)) error {
 
 // StreamSSEWithGenerator streams Server-Sent Events using a generator function.
 func (c *Ctx) StreamSSEWithGenerator(generator func() (SSEEvent, error)) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	sseWriter := c.RespondWithSSE()
 	if sseWriter == nil {
 		return errors.New("SSE not supported")
 	}
 
 	for {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		event, err := generator()
 		if err != nil {
 			if err == io.EOF {
@@ -751,11 +874,21 @@ func (c *Ctx) WriteEventSource(event SSEEvent) error {
 
 // StreamJSONChunked streams JSON data in chunks with custom chunk size.
 func (c *Ctx) StreamJSONChunked(items []any, chunkSize int) error {
+	if err := validateChunkSize(chunkSize); err != nil {
+		return err
+	}
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	c.W.Header().Set("Content-Type", "application/x-ndjson")
 	c.W.WriteHeader(http.StatusOK)
 
 	encoder := json.NewEncoder(c.W)
 	for i, item := range items {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		if err := encoder.Encode(item); err != nil {
 			return err
 		}
@@ -778,10 +911,20 @@ func (c *Ctx) StreamJSONChunked(items []any, chunkSize int) error {
 
 // StreamTextChunked streams text data in chunks with custom chunk size.
 func (c *Ctx) StreamTextChunked(lines []string, chunkSize int) error {
+	if err := validateChunkSize(chunkSize); err != nil {
+		return err
+	}
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	c.W.WriteHeader(http.StatusOK)
 
 	for i, line := range lines {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
 			return err
 		}
@@ -804,12 +947,22 @@ func (c *Ctx) StreamTextChunked(lines []string, chunkSize int) error {
 
 // StreamSSEChunked streams Server-Sent Events in chunks with custom chunk size.
 func (c *Ctx) StreamSSEChunked(events []SSEEvent, chunkSize int) error {
+	if err := validateChunkSize(chunkSize); err != nil {
+		return err
+	}
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	sseWriter := c.RespondWithSSE()
 	if sseWriter == nil {
 		return errors.New("SSE not supported")
 	}
 
 	for i, event := range events {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		if err := sseWriter.Write(event); err != nil {
 			return err
 		}
@@ -832,6 +985,10 @@ func (c *Ctx) StreamSSEChunked(events []SSEEvent, chunkSize int) error {
 
 // StreamJSONWithRetry streams JSON data with retry logic on error.
 func (c *Ctx) StreamJSONWithRetry(generator func() (any, error), maxRetries int, retryDelay time.Duration) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	c.W.Header().Set("Content-Type", "application/x-ndjson")
 	c.W.WriteHeader(http.StatusOK)
 
@@ -839,13 +996,18 @@ func (c *Ctx) StreamJSONWithRetry(generator func() (any, error), maxRetries int,
 	retries := 0
 
 	for {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		item, err := generator()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			if retries < maxRetries {
-				time.Sleep(retryDelay)
+				if err := sleepWithContext(ctx, retryDelay); err != nil {
+					return err
+				}
 				retries++
 				continue
 			}
@@ -867,19 +1029,28 @@ func (c *Ctx) StreamJSONWithRetry(generator func() (any, error), maxRetries int,
 
 // StreamTextWithRetry streams text data with retry logic on error.
 func (c *Ctx) StreamTextWithRetry(generator func() (string, error), maxRetries int, retryDelay time.Duration) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	c.W.WriteHeader(http.StatusOK)
 
 	retries := 0
 
 	for {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		line, err := generator()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			if retries < maxRetries {
-				time.Sleep(retryDelay)
+				if err := sleepWithContext(ctx, retryDelay); err != nil {
+					return err
+				}
 				retries++
 				continue
 			}
@@ -901,6 +1072,10 @@ func (c *Ctx) StreamTextWithRetry(generator func() (string, error), maxRetries i
 
 // StreamSSEWithRetry streams Server-Sent Events with retry logic on error.
 func (c *Ctx) StreamSSEWithRetry(generator func() (SSEEvent, error), maxRetries int, retryDelay time.Duration) error {
+	ctx := c.streamContext()
+	if err := checkStreamContext(ctx); err != nil {
+		return err
+	}
 	sseWriter := c.RespondWithSSE()
 	if sseWriter == nil {
 		return errors.New("SSE not supported")
@@ -909,13 +1084,18 @@ func (c *Ctx) StreamSSEWithRetry(generator func() (SSEEvent, error), maxRetries 
 	retries := 0
 
 	for {
+		if err := checkStreamContext(ctx); err != nil {
+			return err
+		}
 		event, err := generator()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			if retries < maxRetries {
-				time.Sleep(retryDelay)
+				if err := sleepWithContext(ctx, retryDelay); err != nil {
+					return err
+				}
 				retries++
 				continue
 			}

@@ -3,6 +3,7 @@ package contract
 import (
 	"net/http"
 	"runtime/debug"
+	"sync/atomic"
 
 	log "github.com/spcent/plumego/log"
 )
@@ -89,6 +90,16 @@ func (eh *ErrorHandler) ToAPIError(err error) APIError {
 func (eh *ErrorHandler) toAPIError(err error) APIError {
 	if err == nil {
 		return NewInternalError("unknown error")
+	}
+
+	if chain, ok := err.(*ErrorChain); ok {
+		if latest := chain.Latest(); latest != nil && latest.Error != nil {
+			return eh.toAPIError(latest.Error)
+		}
+		if root := chain.Root(); root != nil {
+			return eh.toAPIError(root)
+		}
+		return NewInternalError(chain.Error())
 	}
 
 	// Handle APIError directly
@@ -255,7 +266,7 @@ func SafeExecuteWithResult[T any](fn func() (T, error), operation, module string
 	defer func() {
 		if r := recover(); r != nil {
 			// Log panic but don't return it since we can't change the signature
-			if eh := NewErrorHandler(nil); eh != nil {
+			if eh := getGlobalErrorHandler(); eh != nil {
 				eh.HandlePanic(r)
 			}
 		}
@@ -269,26 +280,39 @@ func SafeExecuteWithResult[T any](fn func() (T, error), operation, module string
 }
 
 // Global error handler instance
-var globalErrorHandler = NewErrorHandler(nil)
+var globalErrorHandler atomic.Value
+
+func init() {
+	globalErrorHandler.Store(NewErrorHandler(nil))
+}
+
+func getGlobalErrorHandler() *ErrorHandler {
+	if handler, ok := globalErrorHandler.Load().(*ErrorHandler); ok && handler != nil {
+		return handler
+	}
+	handler := NewErrorHandler(nil)
+	globalErrorHandler.Store(handler)
+	return handler
+}
 
 // SetGlobalErrorHandler sets the global error handler
 func SetGlobalErrorHandler(logger log.StructuredLogger) {
-	globalErrorHandler = NewErrorHandler(logger)
+	globalErrorHandler.Store(NewErrorHandler(logger))
 }
 
 // Global helper functions
 
 // WrapGlobal wraps an error with context using the global error handler
 func WrapGlobal(err error, operation, module string, params map[string]any) error {
-	return globalErrorHandler.Wrap(err, operation, module, params)
+	return getGlobalErrorHandler().Wrap(err, operation, module, params)
 }
 
 // HandleGlobal handles an error using the global error handler
 func HandleGlobal(w http.ResponseWriter, r *http.Request, err error, operation, module string, params map[string]any) {
-	globalErrorHandler.Handle(w, r, err, operation, module, params)
+	getGlobalErrorHandler().Handle(w, r, err, operation, module, params)
 }
 
 // ToAPIErrorGlobal converts an error to APIError using the global error handler
 func ToAPIErrorGlobal(err error) APIError {
-	return globalErrorHandler.ToAPIError(err)
+	return getGlobalErrorHandler().ToAPIError(err)
 }

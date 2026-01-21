@@ -124,6 +124,13 @@ func TestIsRetryable(t *testing.T) {
 	if !IsRetryable(netErr) {
 		t.Fatal("temporary network error should be retryable")
 	}
+
+	// Test error chain with timeout
+	chain := NewErrorChain(errors.New("root"))
+	chain.Add(errors.New("timeout"), "timeout", CategoryTimeout, ErrTypeTimeout)
+	if !IsRetryable(chain) {
+		t.Fatal("timeout error chain should be retryable")
+	}
 }
 
 // TestGetErrorDetails tests error details extraction
@@ -149,6 +156,26 @@ func TestGetErrorDetails(t *testing.T) {
 	details = GetErrorDetails(stdErr)
 	if details["message"] != "standard error" {
 		t.Fatalf("expected standard error message, got %v", details["message"])
+	}
+}
+
+func TestGetErrorDetailsWithErrorChain(t *testing.T) {
+	chain := NewErrorChain(errors.New("root error"))
+	chain.Add(errors.New("validation error"), "validation failed", CategoryValidation, ErrTypeValidation).
+		AddContext("field", "email")
+
+	details := GetErrorDetails(chain)
+	if details["message"] == nil {
+		t.Fatalf("expected message in error chain details")
+	}
+
+	entries, ok := details["chain"].([]map[string]any)
+	if !ok || len(entries) != 1 {
+		t.Fatalf("expected chain entry in details, got %v", details["chain"])
+	}
+
+	if entries[0]["category"] != CategoryValidation {
+		t.Fatalf("expected category in chain details")
 	}
 }
 

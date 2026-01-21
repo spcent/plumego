@@ -321,3 +321,19 @@ func TestAdaptCtxHandler(t *testing.T) {
 		t.Fatalf("expected validation error for nil handler")
 	}
 }
+
+func TestStreamChunkSizeValidation(t *testing.T) {
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
+
+	if err := ctx.StreamBinary(strings.NewReader("data"), 0); !errors.Is(err, ErrInvalidChunkSize) {
+		t.Fatalf("expected invalid chunk size error, got %v", err)
+	}
+
+	if err := ctx.StreamJSONChunked([]any{map[string]string{"a": "b"}}, 0); !errors.Is(err, ErrInvalidChunkSize) {
+		t.Fatalf("expected invalid chunk size error, got %v", err)
+	}
+
+	if err := ctx.StreamTextChunked([]string{"line"}, -1); !errors.Is(err, ErrInvalidChunkSize) {
+		t.Fatalf("expected invalid chunk size error, got %v", err)
+	}
+}

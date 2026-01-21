@@ -200,6 +200,14 @@ func TestGetRequestDuration(t *testing.T) {
 }
 
 func TestIsCompressed(t *testing.T) {
+	originalConfig := DefaultRequestConfig
+	config := defaultRequestConfig()
+	config.EnableCompression = true
+	DefaultRequestConfig = config
+	t.Cleanup(func() {
+		DefaultRequestConfig = originalConfig
+	})
+
 	tests := []struct {
 		name            string
 		contentEncoding string
@@ -447,6 +455,14 @@ func TestBindErrorUnwrap(t *testing.T) {
 }
 
 func TestCtxCompression(t *testing.T) {
+	originalConfig := DefaultRequestConfig
+	config := defaultRequestConfig()
+	config.EnableCompression = true
+	DefaultRequestConfig = config
+	t.Cleanup(func() {
+		DefaultRequestConfig = originalConfig
+	})
+
 	// Test with gzip
 	r := httptest.NewRequest("POST", "/test", nil)
 	r.Header.Set("Content-Encoding", "gzip")

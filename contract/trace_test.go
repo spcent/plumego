@@ -388,6 +388,39 @@ func TestSimpleTraceCollector(t *testing.T) {
 	}
 }
 
+func TestSimpleTraceCollectorMaxAge(t *testing.T) {
+	collector := NewSimpleTraceCollector()
+	collector.SetMaxAge(50 * time.Millisecond)
+
+	expired := time.Now().Add(-time.Second)
+	expiredTrace := &Trace{
+		ID:         "expired-trace",
+		RootSpanID: "root-span-id",
+		StartTime:  expired,
+		EndTime:    &expired,
+		Spans:      []*Span{},
+		Attributes: make(map[string]any),
+	}
+	collector.Collect(expiredTrace)
+
+	if _, exists := collector.GetTrace("expired-trace"); exists {
+		t.Fatalf("expected expired trace to be pruned")
+	}
+
+	active := &Trace{
+		ID:         "active-trace",
+		RootSpanID: "root-span-id",
+		StartTime:  time.Now(),
+		Spans:      []*Span{},
+		Attributes: make(map[string]any),
+	}
+	collector.Collect(active)
+
+	if _, exists := collector.GetTrace("active-trace"); !exists {
+		t.Fatalf("expected active trace to be retained")
+	}
+}
+
 func TestProbabilitySampler(t *testing.T) {
 	sampler := NewProbabilitySampler(0.5) // 50% sampling rate
 
@@ -517,6 +550,28 @@ func TestTracerGetTraceStatistics(t *testing.T) {
 
 	if stats.AverageDuration <= 0 {
 		t.Fatalf("expected positive average duration")
+	}
+}
+
+func TestTracerMaxSpansPerTrace(t *testing.T) {
+	config := DefaultTracerConfig()
+	config.SamplingRate = 1.0
+	config.MaxSpansPerTrace = 1
+
+	tracer := NewTracer(config)
+
+	ctx, root := tracer.StartTrace(context.Background(), "root")
+	_, child := tracer.StartChildSpan(ctx, root, "child")
+
+	tracer.EndSpan(child)
+	tracer.EndSpan(root)
+
+	trace, exists := tracer.collector.GetTrace(root.TraceID)
+	if !exists {
+		t.Fatalf("expected trace to be collected")
+	}
+	if len(trace.Spans) != 1 {
+		t.Fatalf("expected 1 span collected, got %d", len(trace.Spans))
 	}
 }
 

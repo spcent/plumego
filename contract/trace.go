@@ -155,6 +155,7 @@ type TraceCollector interface {
 type SimpleTraceCollector struct {
 	mu     sync.RWMutex
 	traces map[TraceID]*Trace
+	maxAge time.Duration
 }
 
 // NewSimpleTraceCollector creates a new simple trace collector.
@@ -164,21 +165,31 @@ func NewSimpleTraceCollector() *SimpleTraceCollector {
 	}
 }
 
+// SetMaxAge configures how long completed traces are retained.
+func (c *SimpleTraceCollector) SetMaxAge(maxAge time.Duration) {
+	c.mu.Lock()
+	c.maxAge = maxAge
+	c.pruneLocked(time.Now())
+	c.mu.Unlock()
+}
+
 // Collect stores a trace.
 func (c *SimpleTraceCollector) Collect(trace *Trace) {
 	if trace == nil {
 		return
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.traces[trace.ID] = copyTrace(trace)
+	c.pruneLocked(time.Now())
+	c.mu.Unlock()
 }
 
 // GetTrace retrieves a trace by ID.
 func (c *SimpleTraceCollector) GetTrace(traceID TraceID) (*Trace, bool) {
-	c.mu.RLock()
+	c.mu.Lock()
+	c.pruneLocked(time.Now())
 	trace, exists := c.traces[traceID]
-	c.mu.RUnlock()
+	c.mu.Unlock()
 	if !exists {
 		return nil, false
 	}
@@ -187,12 +198,13 @@ func (c *SimpleTraceCollector) GetTrace(traceID TraceID) (*Trace, bool) {
 
 // GetTraces retrieves traces matching the filter.
 func (c *SimpleTraceCollector) GetTraces(filter TraceFilter) []*Trace {
-	c.mu.RLock()
+	c.mu.Lock()
+	c.pruneLocked(time.Now())
 	traces := make([]*Trace, 0, len(c.traces))
 	for _, trace := range c.traces {
 		traces = append(traces, copyTrace(trace))
 	}
-	c.mu.RUnlock()
+	c.mu.Unlock()
 
 	if filter == nil {
 		return traces
@@ -205,6 +217,26 @@ func (c *SimpleTraceCollector) GetTraces(filter TraceFilter) []*Trace {
 		}
 	}
 	return result
+}
+
+func (c *SimpleTraceCollector) pruneLocked(now time.Time) {
+	if c.maxAge <= 0 {
+		return
+	}
+	cutoff := now.Add(-c.maxAge)
+	for id, trace := range c.traces {
+		if trace == nil {
+			delete(c.traces, id)
+			continue
+		}
+		timestamp := trace.StartTime
+		if trace.EndTime != nil {
+			timestamp = *trace.EndTime
+		}
+		if timestamp.Before(cutoff) {
+			delete(c.traces, id)
+		}
+	}
 }
 
 // TraceFilter is a function that filters traces.
@@ -269,13 +301,17 @@ func DefaultTracerConfig() TracerConfig {
 
 // NewTracer creates a new tracer with the given configuration.
 func NewTracer(config TracerConfig) *Tracer {
-	return &Tracer{
+	tracer := &Tracer{
 		generator:   NewRandomIDGenerator(),
 		collector:   NewSimpleTraceCollector(),
 		sampler:     NewProbabilitySampler(config.SamplingRate),
 		config:      config,
 		activeSpans: make(map[SpanID]*Span),
 	}
+	if collector, ok := tracer.collector.(*SimpleTraceCollector); ok {
+		collector.SetMaxAge(config.MaxTraceAge)
+	}
+	return tracer
 }
 
 // StartTrace starts a new trace.
@@ -319,9 +355,11 @@ func (t *Tracer) StartTrace(ctx context.Context, name string, options ...TraceOp
 
 	if spanContext.Sampled {
 		spanContext.Flags |= TraceFlagsSampled
-		// Add the root span to the trace
-		trace.Spans = append(trace.Spans, span)
-		t.collector.Collect(trace)
+		if t.canAddSpan(trace) {
+			// Add the root span to the trace
+			trace.Spans = append(trace.Spans, span)
+			t.collector.Collect(trace)
+		}
 	}
 
 	ctx = ContextWithTraceContext(ctx, spanContext)
@@ -386,7 +424,9 @@ func (t *Tracer) StartChildSpan(ctx context.Context, parentSpan *Span, name stri
 	// Add the child span to the existing trace
 	if sampled {
 		if trace, exists := t.collector.GetTrace(parentSpan.TraceID); exists {
-			trace.Spans = append(trace.Spans, span)
+			if t.canAddSpan(trace) {
+				trace.Spans = append(trace.Spans, span)
+			}
 			t.collector.Collect(trace)
 		}
 	}
@@ -422,7 +462,7 @@ func (t *Tracer) EndSpan(span *Span, options ...SpanOption) {
 
 	// Update the trace if it's sampled
 	if trace, exists := t.collector.GetTrace(span.TraceID); exists {
-		trace = mergeSpanIntoTrace(trace, span)
+		trace = mergeSpanIntoTrace(trace, span, t.config.MaxSpansPerTrace)
 
 		// Check if this was the root span and if so, mark the trace as completed
 		if span.ID == trace.RootSpanID {
@@ -698,11 +738,21 @@ func (t *Tracer) updateCollectedSpan(span *Span) {
 	if !exists {
 		return
 	}
-	trace = mergeSpanIntoTrace(trace, span)
+	trace = mergeSpanIntoTrace(trace, span, t.config.MaxSpansPerTrace)
 	t.collector.Collect(trace)
 }
 
-func mergeSpanIntoTrace(trace *Trace, span *Span) *Trace {
+func (t *Tracer) canAddSpan(trace *Trace) bool {
+	if trace == nil {
+		return false
+	}
+	if t.config.MaxSpansPerTrace <= 0 {
+		return true
+	}
+	return len(trace.Spans) < t.config.MaxSpansPerTrace
+}
+
+func mergeSpanIntoTrace(trace *Trace, span *Span, maxSpans int) *Trace {
 	if trace == nil || span == nil {
 		return trace
 	}
@@ -711,6 +761,9 @@ func mergeSpanIntoTrace(trace *Trace, span *Span) *Trace {
 			trace.Spans[i] = copySpan(span)
 			return trace
 		}
+	}
+	if maxSpans > 0 && len(trace.Spans) >= maxSpans {
+		return trace
 	}
 	trace.Spans = append(trace.Spans, copySpan(span))
 	return trace
