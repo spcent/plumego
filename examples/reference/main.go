@@ -32,212 +32,215 @@ import (
 //go:embed ui/*
 var staticFS embed.FS
 
-func main() {
-	// Optional in-process pub/sub powers inbound webhook fan-out and WebSocket broadcasts.
+// AppContext holds application-wide dependencies and configuration
+type AppContext struct {
+	App        *core.App
+	Bus        *pubsub.InProcPubSub
+	WebhookSvc *webhookout.Service
+	Prom       *metrics.PrometheusCollector
+	Tracer     *metrics.OpenTelemetryTracer
+	DocSite    *DocSite
+}
+
+// Config holds all application configuration
+type Config struct {
+	Addr           string
+	WSecret        string
+	GitHubSecret   string
+	StripeSecret   string
+	WebhookToken   string
+	EnableDocs     bool
+	EnableMetrics  bool
+	EnableWebhooks bool
+}
+
+// LoadConfig loads configuration from environment
+func LoadConfig() Config {
+	return Config{
+		Addr:           config.GetString("ADDR", ":8080"),
+		WSecret:        config.GetString("WS_SECRET", "dev-secret"),
+		GitHubSecret:   config.GetString("GITHUB_WEBHOOK_SECRET", "dev-github-secret"),
+		StripeSecret:   config.GetString("STRIPE_WEBHOOK_SECRET", "whsec_dev"),
+		WebhookToken:   config.GetString("WEBHOOK_TRIGGER_TOKEN", "dev-trigger"),
+		EnableDocs:     config.GetBool("ENABLE_DOCS", true),
+		EnableMetrics:  config.GetBool("ENABLE_METRICS", true),
+		EnableWebhooks: config.GetBool("ENABLE_WEBHOOKS", true),
+	}
+}
+
+// NewAppContext creates and initializes the application context
+func NewAppContext(cfg Config) (*AppContext, error) {
+	// Initialize in-process pub/sub bus
 	bus := pubsub.New()
 
-	// Outbound webhook management runs alongside the HTTP server.
+	// Initialize webhook service
 	webhookStore := webhookout.NewMemStore()
 	webhookCfg := webhookout.ConfigFromEnv()
-	webhookCfg.Enabled = true
+	webhookCfg.Enabled = cfg.EnableWebhooks
 	webhookSvc := webhookout.NewService(webhookStore, webhookCfg)
 
-	// Prometheus + OpenTelemetry hooks plugged into logging middleware.
-	prom := metrics.NewPrometheusCollector("plumego_example")
-	tracer := metrics.NewOpenTelemetryTracer("plumego-example")
+	// Initialize metrics
+	prom := metrics.NewPrometheusCollector("plumego_reference")
+	tracer := metrics.NewOpenTelemetryTracer("plumego-reference")
 
+	// Create core application
 	app := core.New(
-		core.WithAddr(":8080"),
+		core.WithAddr(cfg.Addr),
 		core.WithDebug(),
 		core.WithPubSub(bus),
 		core.WithMetricsCollector(prom),
 		core.WithTracer(tracer),
 		core.WithWebhookIn(core.WebhookInConfig{
-			Enabled:           true,
+			Enabled:           cfg.EnableWebhooks,
 			Pub:               bus,
-			GitHubSecret:      config.GetString("GITHUB_WEBHOOK_SECRET", "dev-github-secret"),
-			StripeSecret:      config.GetString("STRIPE_WEBHOOK_SECRET", "whsec_dev"),
+			GitHubSecret:      cfg.GitHubSecret,
+			StripeSecret:      cfg.StripeSecret,
 			MaxBodyBytes:      1 << 20,
 			StripeTolerance:   5 * time.Minute,
 			TopicPrefixGitHub: "in.github.",
 			TopicPrefixStripe: "in.stripe.",
 		}),
 		core.WithWebhookOut(core.WebhookOutConfig{
-			Enabled:          true,
+			Enabled:          cfg.EnableWebhooks,
 			Service:          webhookSvc,
-			TriggerToken:     config.GetString("WEBHOOK_TRIGGER_TOKEN", "dev-trigger"),
+			TriggerToken:     cfg.WebhookToken,
 			BasePath:         "/webhooks",
 			IncludeStats:     true,
 			DefaultPageLimit: 50,
 		}),
 	)
 
+	// Enable standard middleware
 	app.EnableRecovery()
 	app.EnableLogging()
 	app.EnableCORS()
 
-	docSite, docErr := loadDocSite()
-	if docErr != nil {
-		log.Printf("docs disabled: %v", docErr)
-	} else {
-		app.Get("/docs", docSite.handler())
-		app.Get("/docs/*path", docSite.handler())
+	// Load documentation site
+	var docSite *DocSite
+	if cfg.EnableDocs {
+		if ds, err := NewDocSite(); err == nil {
+			docSite = ds
+		} else {
+			log.Printf("docs disabled: %v", err)
+		}
 	}
 
-	// Static frontend served from the embedded UI folder.
-	_ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"))
+	return &AppContext{
+		App:        app,
+		Bus:        bus,
+		WebhookSvc: webhookSvc,
+		Prom:       prom,
+		Tracer:     tracer,
+		DocSite:    docSite,
+	}, nil
+}
 
-	// Minimal health endpoints for orchestration hooks.
-	app.GetHandler("/health/ready", health.ReadinessHandler())
-	app.GetHandler("/health/build", health.BuildInfoHandler())
+// RegisterRoutes registers all application routes
+func (ctx *AppContext) RegisterRoutes() error {
+	// Register documentation routes
+	if ctx.DocSite != nil {
+		ctx.App.Get("/docs", ctx.DocSite.Handler())
+		ctx.App.Get("/docs/*path", ctx.DocSite.Handler())
+	}
 
-	// WebSocket hub with broadcast endpoint and simple echoing demo.
+	// Register static frontend
+	if err := frontend.RegisterFS(ctx.App.Router(), http.FS(staticFS), frontend.WithPrefix("/")); err != nil {
+		return fmt.Errorf("failed to register frontend: %w", err)
+	}
+
+	// Register health endpoints
+	ctx.App.GetHandler("/health/ready", health.ReadinessHandler())
+	ctx.App.GetHandler("/health/build", health.BuildInfoHandler())
+
+	// Configure WebSocket
 	wsCfg := core.DefaultWebSocketConfig()
 	wsCfg.Secret = []byte(config.GetString("WS_SECRET", "dev-secret"))
-	_, err := app.ConfigureWebSocketWithOptions(wsCfg)
-	if err != nil {
-		log.Fatalf("configure websocket: %v", err)
+	if _, err := ctx.App.ConfigureWebSocketWithOptions(wsCfg); err != nil {
+		return fmt.Errorf("failed to configure websocket: %w", err)
 	}
-	webhookSvc.Start(context.Background())
-	defer webhookSvc.Stop()
 
-	// Example API route demonstrating middleware and tracing hooks.
-	app.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Served-At", time.Now().Format(time.RFC3339))
-		w.Header().Set("Content-Type", "application/json")
+	// Register API endpoints
+	ctx.registerAPIEndpoints()
 
-		w.Write([]byte(fmt.Sprintf(`{
-  "message": "hello from plumego",
-  "timestamp": "%s",
-  "version": "1.0.0",
-  "features": ["WebSocket", "Documentation", "Webhook", "Metrics", "Health Check", "Middleware"],
-  "endpoints": {
-    "docs": "/docs",
-    "webhooks": "/webhooks",
-    "metrics": "/metrics",
-    "health": "/health/ready",
-    "websocket": "/ws"
-  }
-}`, time.Now().Format(time.RFC3339))))
+	// Register test endpoints
+	ctx.registerTestEndpoints()
+
+	// Register metrics endpoint
+	if ctx.Prom != nil {
+		ctx.App.GetHandler("/metrics", ctx.Prom.Handler())
+	}
+
+	return nil
+}
+
+// registerAPIEndpoints registers core API endpoints
+func (ctx *AppContext) registerAPIEndpoints() {
+	// Hello endpoint - demonstrates basic API response
+	ctx.App.Get("/api/hello", func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]any{
+			"message":   "hello from plumego reference",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"version":   "1.0.0",
+			"features": []string{
+				"WebSocket",
+				"Documentation",
+				"Webhook",
+				"Metrics",
+				"Health Check",
+				"Middleware",
+				"Pub/Sub",
+			},
+			"endpoints": map[string]string{
+				"docs":      "/docs",
+				"webhooks":  "/webhooks",
+				"metrics":   "/metrics",
+				"health":    "/health/ready",
+				"websocket": "/ws",
+				"api":       "/api",
+			},
+		}
+		ctx.writeJSON(w, response)
 	})
 
-	// Test endpoint for pub/sub functionality
-	app.Get("/test/pubsub", func(w http.ResponseWriter, r *http.Request) {
-		topic := r.URL.Query().Get("topic")
-		if topic == "" {
-			topic = "test.default"
-		}
-
-		// Publish a test message to the pub/sub system
-		message := pubsub.Message{
-			Topic: topic,
-			Type:  "test",
-			Data:  fmt.Sprintf("Test message published at %s", time.Now().Format(time.RFC3339)),
-			Time:  time.Now(),
-		}
-
-		if err := bus.Publish(topic, message); err != nil {
-			http.Error(w, fmt.Sprintf("publish failed: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		resp := struct {
-			Status    string `json:"status"`
-			Topic     string `json:"topic"`
-			Message   string `json:"message"`
-			Timestamp string `json:"timestamp"`
-		}{
-			Status:    "success",
-			Topic:     topic,
-			Message:   fmt.Sprint(message.Data),
-			Timestamp: time.Now().Format(time.RFC3339),
-		}
-
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			http.Error(w, fmt.Sprintf("encode response failed: %v", err), http.StatusInternalServerError)
-			return
-		}
-	})
-
-	// Test endpoint for webhook functionality
-	app.Post("/test/webhook", func(w http.ResponseWriter, r *http.Request) {
-		const maxWebhookBody = int64(1 << 20)
-		body, err := io.ReadAll(io.LimitReader(r.Body, maxWebhookBody+1))
-		if err != nil {
-			http.Error(w, fmt.Sprintf("read body failed: %v", err), http.StatusBadRequest)
-			return
-		}
-		if int64(len(body)) > maxWebhookBody {
-			http.Error(w, "body too large", http.StatusRequestEntityTooLarge)
-			return
-		}
-
-		// Simulate webhook processing
-		w.Header().Set("Content-Type", "application/json")
-
-		resp := struct {
-			Status        string `json:"status"`
-			ContentLength int    `json:"content_length"`
-			Timestamp     string `json:"timestamp"`
-			Headers       struct {
-				UserAgent   string `json:"user_agent"`
-				ContentType string `json:"content_type"`
-			} `json:"headers"`
-		}{
-			Status:        "webhook_received",
-			ContentLength: len(body),
-			Timestamp:     time.Now().Format(time.RFC3339),
-		}
-
-		resp.Headers.UserAgent = r.UserAgent()
-		resp.Headers.ContentType = r.Header.Get("Content-Type")
-
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			http.Error(w, fmt.Sprintf("encode response failed: %v", err), http.StatusInternalServerError)
-			return
-		}
-	})
-
-	// Enhanced health check with detailed system information
-	app.Get("/health/detailed", func(w http.ResponseWriter, r *http.Request) {
-		// Use a fixed start time since we don't have access to app start time
+	// Status endpoint - returns comprehensive system status
+	ctx.App.Get("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now().Add(-time.Hour) // Simulate 1 hour uptime
 
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(fmt.Sprintf(`{
-  "status": "healthy",
-  "timestamp": "%s",
-  "system": {
-    "uptime": "%s",
-    "goroutines": "N/A",
-    "memory": "N/A"
-  },
-  "components": {
-    "websocket": "enabled",
-    "webhook_in": "enabled",
-    "webhook_out": "enabled", 
-    "metrics": "enabled",
-    "docs": "enabled"
-  },
-  "endpoints": {
-    "root": "/",
-    "docs": "/docs",
-    "hello": "/hello",
-    "metrics": "/metrics",
-    "webhook_test": "/test/webhook",
-    "pubsub_test": "/test/pubsub"
-  }
-}`, time.Now().Format(time.RFC3339), time.Since(startTime).String())))
+		response := map[string]any{
+			"status":  "healthy",
+			"service": "plumego-reference",
+			"version": "1.0.0",
+			"system": map[string]any{
+				"uptime":     time.Since(startTime).String(),
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"go_version": "1.21+",
+			},
+			"components": map[string]any{
+				"websocket":   "enabled",
+				"webhook_in":  "enabled",
+				"webhook_out": "enabled",
+				"metrics":     "enabled",
+				"docs":        "enabled",
+				"pubsub":      "enabled",
+			},
+			"endpoints": map[string]string{
+				"root":      "/",
+				"docs":      "/docs",
+				"api":       "/api",
+				"metrics":   "/metrics",
+				"health":    "/health/ready",
+				"websocket": "/ws",
+			},
+		}
+		ctx.writeJSON(w, response)
 	})
 
-	// API testing endpoint with various response formats
-	app.Get("/test/api", func(w http.ResponseWriter, r *http.Request) {
+	// API test endpoint with multiple response formats
+	ctx.App.Get("/api/test", func(w http.ResponseWriter, r *http.Request) {
 		format := r.URL.Query().Get("format")
 		delay := r.URL.Query().Get("delay")
 
-		// Optional delay for testing timeouts and loading states
+		// Optional delay for testing
 		if delay != "" {
 			if d, err := time.ParseDuration(delay); err == nil {
 				const maxDelay = 2 * time.Second
@@ -269,58 +272,138 @@ func main() {
 			w.Header().Set("Content-Type", "text/plain")
 			w.Write([]byte(fmt.Sprintf("Plain text response at %s", time.Now().Format(time.RFC3339))))
 		default:
-			w.Header().Set("Content-Type", "application/json")
-			queryJSON := r.URL.Query().Encode()
-
-			resp := struct {
-				Format      string `json:"format"`
-				Timestamp   string `json:"timestamp"`
-				Status      string `json:"status"`
-				QueryParams string `json:"query_params"`
-			}{
-				Format:      "json",
-				Timestamp:   time.Now().Format(time.RFC3339),
-				Status:      "success",
-				QueryParams: queryJSON,
+			response := map[string]any{
+				"format":       "json",
+				"timestamp":    time.Now().Format(time.RFC3339),
+				"status":       "success",
+				"query_params": r.URL.Query().Encode(),
 			}
-
-			if err := json.NewEncoder(w).Encode(resp); err != nil {
-				http.Error(w, fmt.Sprintf("encode response failed: %v", err), http.StatusInternalServerError)
-				return
-			}
+			ctx.writeJSON(w, response)
 		}
 	})
+}
 
-	// Expose metrics for scraping.
-	app.GetHandler("/metrics", prom.Handler())
+// registerTestEndpoints registers test and demo endpoints
+func (ctx *AppContext) registerTestEndpoints() {
+	// Pub/Sub test endpoint
+	ctx.App.Get("/test/pubsub", func(w http.ResponseWriter, r *http.Request) {
+		topic := r.URL.Query().Get("topic")
+		if topic == "" {
+			topic = "test.default"
+		}
 
-	if err := app.Boot(); err != nil {
-		log.Fatalf("server stopped: %v", err)
+		message := pubsub.Message{
+			Topic: topic,
+			Type:  "test",
+			Data:  fmt.Sprintf("Test message published at %s", time.Now().Format(time.RFC3339)),
+			Time:  time.Now(),
+		}
+
+		if err := ctx.Bus.Publish(topic, message); err != nil {
+			ctx.writeError(w, http.StatusInternalServerError, "publish failed", err)
+			return
+		}
+
+		ctx.writeJSON(w, map[string]any{
+			"status":    "success",
+			"topic":     topic,
+			"message":   fmt.Sprint(message.Data),
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
+	})
+
+	// Webhook test endpoint
+	ctx.App.Post("/test/webhook", func(w http.ResponseWriter, r *http.Request) {
+		const maxWebhookBody = int64(1 << 20)
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxWebhookBody+1))
+		if err != nil {
+			ctx.writeError(w, http.StatusBadRequest, "read body failed", err)
+			return
+		}
+		if int64(len(body)) > maxWebhookBody {
+			ctx.writeError(w, http.StatusRequestEntityTooLarge, "body too large", nil)
+			return
+		}
+
+		ctx.writeJSON(w, map[string]any{
+			"status":         "webhook_received",
+			"content_length": len(body),
+			"timestamp":      time.Now().Format(time.RFC3339),
+			"headers": map[string]string{
+				"user_agent":   r.UserAgent(),
+				"content_type": r.Header.Get("Content-Type"),
+			},
+		})
+	})
+}
+
+// writeJSON writes a JSON response
+func (ctx *AppContext) writeJSON(w http.ResponseWriter, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("failed to encode JSON response: %v", err)
 	}
 }
 
-type docPage struct {
+// writeError writes an error response
+func (ctx *AppContext) writeError(w http.ResponseWriter, status int, message string, err error) {
+	response := map[string]any{
+		"status":  "error",
+		"message": message,
+	}
+	if err != nil {
+		response["error"] = err.Error()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if encodeErr := json.NewEncoder(w).Encode(response); encodeErr != nil {
+		log.Printf("failed to encode error response: %v", encodeErr)
+	}
+}
+
+// Start starts the application
+func (ctx *AppContext) Start() error {
+	// Start webhook service
+	if ctx.WebhookSvc != nil {
+		ctx.WebhookSvc.Start(context.Background())
+		defer ctx.WebhookSvc.Stop()
+	}
+
+	// Boot the application
+	if err := ctx.App.Boot(); err != nil {
+		return fmt.Errorf("server stopped: %w", err)
+	}
+
+	return nil
+}
+
+// DocSite represents a documentation site
+type DocSite struct {
+	fs          fs.FS
+	nav         map[string][]DocPage
+	defaultLang string
+}
+
+// DocPage represents a documentation page
+type DocPage struct {
 	Lang  string
 	Slug  string
 	Title string
 }
 
-type docSite struct {
-	fs          fs.FS
-	nav         map[string][]docPage
-	defaultLang string
-}
-
-func loadDocSite() (*docSite, error) {
+// NewDocSite creates a new documentation site
+func NewDocSite() (*DocSite, error) {
 	path := locateDocsPath()
 	if path == "" {
 		return nil, fmt.Errorf("docs directory not found")
 	}
+
 	f := os.DirFS(path)
 	nav, err := buildDocNav(f)
 	if err != nil {
 		return nil, fmt.Errorf("build docs nav: %w", err)
 	}
+
 	defaultLang := "zh"
 	if _, ok := nav[defaultLang]; !ok {
 		for lang := range nav {
@@ -328,9 +411,15 @@ func loadDocSite() (*docSite, error) {
 			break
 		}
 	}
-	return &docSite{fs: f, nav: nav, defaultLang: defaultLang}, nil
+
+	return &DocSite{
+		fs:          f,
+		nav:         nav,
+		defaultLang: defaultLang,
+	}, nil
 }
 
+// locateDocsPath finds the documentation directory
 func locateDocsPath() string {
 	candidates := []string{}
 	if cwd, err := os.Getwd(); err == nil {
@@ -355,12 +444,14 @@ func locateDocsPath() string {
 	return ""
 }
 
-func buildDocNav(f fs.FS) (map[string][]docPage, error) {
-	nav := make(map[string][]docPage)
+// buildDocNav builds the documentation navigation
+func buildDocNav(f fs.FS) (map[string][]DocPage, error) {
+	nav := make(map[string][]DocPage)
 	langs, err := fs.ReadDir(f, ".")
 	if err != nil {
 		return nil, err
 	}
+
 	for _, langEntry := range langs {
 		if !langEntry.IsDir() {
 			continue
@@ -376,19 +467,21 @@ func buildDocNav(f fs.FS) (map[string][]docPage, error) {
 			}
 			slug := strings.TrimSuffix(file.Name(), filepath.Ext(file.Name()))
 			title := extractTitle(f, path.Join(lang, file.Name()))
-			nav[lang] = append(nav[lang], docPage{Lang: lang, Slug: slug, Title: title})
+			nav[lang] = append(nav[lang], DocPage{Lang: lang, Slug: slug, Title: title})
 		}
 		sort.Slice(nav[lang], func(i, j int) bool { return nav[lang][i].Title < nav[lang][j].Title })
 	}
 	return nav, nil
 }
 
+// extractTitle extracts the title from a markdown file
 func extractTitle(f fs.FS, filePath string) string {
 	file, err := f.Open(filePath)
 	if err != nil {
 		return filePath
 	}
 	defer file.Close()
+
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -403,7 +496,8 @@ func extractTitle(f fs.FS, filePath string) string {
 	return strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 }
 
-func (d *docSite) handler() http.HandlerFunc {
+// Handler returns the HTTP handler for the documentation site
+func (d *DocSite) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		lang := d.defaultLang
 		slug := ""
@@ -426,7 +520,8 @@ func (d *docSite) handler() http.HandlerFunc {
 	}
 }
 
-func (d *docSite) renderIndex(w http.ResponseWriter, lang string) {
+// renderIndex renders the documentation index
+func (d *DocSite) renderIndex(w http.ResponseWriter, lang string) {
 	content := markdownToHTML("# Documentation\nSelect a language and module on the left to start reading, or directly access /docs/{lang}/{module}.\n\nUse the navigation on the left to browse modules by language.")
 	d.renderPage(w, docTemplateData{
 		Title:        "Plumego Docs",
@@ -438,7 +533,8 @@ func (d *docSite) renderIndex(w http.ResponseWriter, lang string) {
 	})
 }
 
-func (d *docSite) renderDoc(w http.ResponseWriter, r *http.Request, lang, slug string) {
+// renderDoc renders a specific documentation page
+func (d *DocSite) renderDoc(w http.ResponseWriter, r *http.Request, lang, slug string) {
 	filePath := path.Join(lang, slug+".md")
 	data, err := fs.ReadFile(d.fs, filePath)
 	if err != nil {
@@ -465,7 +561,8 @@ func (d *docSite) renderDoc(w http.ResponseWriter, r *http.Request, lang, slug s
 	})
 }
 
-func (d *docSite) languages() []string {
+// languages returns the list of available languages
+func (d *DocSite) languages() []string {
 	langs := make([]string, 0, len(d.nav))
 	for lang := range d.nav {
 		langs = append(langs, lang)
@@ -474,57 +571,8 @@ func (d *docSite) languages() []string {
 	return langs
 }
 
-type docTemplateData struct {
-	Title        string
-	Lang         string
-	CurrentSlug  string
-	Content      template.HTML
-	Navigation   map[string][]docPage
-	LanguageList []string
-}
-
-var docTemplate = template.Must(template.New("docs").Parse(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{.Title}} | Plumego Docs</title>
-  <style>
-    body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 0; display: flex; background: #f7f7f8; color: #161616; }
-    nav { width: 280px; background: #ffffff; border-right: 1px solid #e5e7eb; padding: 24px 16px; box-sizing: border-box; height: 100vh; overflow-y: auto; }
-    nav h1 { font-size: 18px; margin: 0 0 12px 12px; }
-    nav h2 { font-size: 14px; margin: 16px 0 8px 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
-    nav ul { list-style: none; padding: 0 0 0 12px; margin: 0; }
-    nav li { margin: 6px 0; }
-    nav a { color: #0f172a; text-decoration: none; font-size: 14px; padding: 6px 8px; display: inline-block; border-radius: 6px; }
-    nav a.active { background: #0ea5e9; color: #ffffff; }
-    main { flex: 1; padding: 32px; overflow-y: auto; }
-    main h1, main h2, main h3 { color: #111827; }
-    main p { line-height: 1.6; }
-    main pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
-    main code { font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
-    main ul { padding-left: 20px; }
-  </style>
-</head>
-<body>
-  <nav>
-    <h1>Plumego Docs</h1>
-    {{range .LanguageList}}
-      <h2>{{.}}</h2>
-      <ul>
-        {{range $page := index $.Navigation .}}
-          <li><a class="{{if and (eq $.Lang $page.Lang) (eq $.CurrentSlug $page.Slug)}}active{{end}}" href="/docs/{{$page.Lang}}/{{$page.Slug}}">{{$page.Title}}</a></li>
-        {{end}}
-      </ul>
-    {{end}}
-  </nav>
-  <main>
-    {{.Content}}
-  </main>
-</body>
-</html>`))
-
-func (d *docSite) renderPage(w http.ResponseWriter, data docTemplateData) {
+// renderPage renders the documentation page template
+func (d *DocSite) renderPage(w http.ResponseWriter, data docTemplateData) {
 	buf := &bytes.Buffer{}
 	if err := docTemplate.Execute(buf, data); err != nil {
 		http.Error(w, fmt.Sprintf("render docs: %v", err), http.StatusInternalServerError)
@@ -534,6 +582,258 @@ func (d *docSite) renderPage(w http.ResponseWriter, data docTemplateData) {
 	w.Write(buf.Bytes())
 }
 
+// docTemplateData represents the data for the documentation template
+type docTemplateData struct {
+	Title        string
+	Lang         string
+	CurrentSlug  string
+	Content      template.HTML
+	Navigation   map[string][]DocPage
+	LanguageList []string
+}
+
+// docTemplate is the HTML template for documentation pages
+var docTemplate = template.Must(template.New("docs").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{.Title}} | Plumego Docs</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      min-height: 100vh; 
+      color: #161616; 
+    }
+    .container { 
+      display: flex; 
+      height: 100vh; 
+      background: rgba(255, 255, 255, 0.95); 
+      backdrop-filter: blur(10px); 
+      margin: 2rem; 
+      border-radius: 24px; 
+      overflow: hidden; 
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); 
+    }
+    nav { 
+      width: 280px; 
+      background: #ffffff; 
+      border-right: 1px solid #e5e7eb; 
+      padding: 24px 16px; 
+      overflow-y: auto; 
+    }
+    nav h1 { 
+      font-size: 20px; 
+      margin: 0 0 20px 12px; 
+      color: #111827; 
+      font-weight: 700; 
+    }
+    nav h2 { 
+      font-size: 12px; 
+      margin: 20px 0 8px 12px; 
+      text-transform: uppercase; 
+      letter-spacing: 0.08em; 
+      color: #6b7280; 
+      font-weight: 600; 
+    }
+    nav ul { 
+      list-style: none; 
+      padding: 0 0 0 12px; 
+      margin: 0; 
+    }
+    nav li { 
+      margin: 4px 0; 
+    }
+    nav a { 
+      color: #0f172a; 
+      text-decoration: none; 
+      font-size: 14px; 
+      padding: 8px 12px; 
+      display: block; 
+      border-radius: 8px; 
+      transition: all 0.2s ease; 
+      font-weight: 500; 
+    }
+    nav a:hover { 
+      background: #f1f5f9; 
+      color: #4f46e5; 
+    }
+    nav a.active { 
+      background: linear-gradient(135deg, #6366f1, #8b5cf6); 
+      color: #ffffff; 
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); 
+    }
+    main { 
+      flex: 1; 
+      padding: 40px; 
+      overflow-y: auto; 
+      background: #fafafa; 
+    }
+    main h1 { 
+      font-size: 32px; 
+      color: #111827; 
+      margin-bottom: 24px; 
+      font-weight: 800; 
+      background: linear-gradient(135deg, #111827, #374151); 
+      -webkit-background-clip: text; 
+      -webkit-text-fill-color: transparent; 
+    }
+    main h2 { 
+      font-size: 24px; 
+      color: #111827; 
+      margin: 32px 0 16px; 
+      font-weight: 700; 
+      border-bottom: 2px solid #e5e7eb; 
+      padding-bottom: 8px; 
+    }
+    main h3 { 
+      font-size: 18px; 
+      color: #374151; 
+      margin: 24px 0 12px; 
+      font-weight: 600; 
+    }
+    main p { 
+      line-height: 1.7; 
+      color: #4b5563; 
+      margin-bottom: 16px; 
+    }
+    main ul { 
+      padding-left: 24px; 
+      margin-bottom: 16px; 
+    }
+    main li { 
+      margin: 8px 0; 
+      color: #4b5563; 
+      line-height: 1.6; 
+    }
+    main pre { 
+      background: #1e293b; 
+      color: #e2e8f0; 
+      padding: 16px; 
+      border-radius: 12px; 
+      overflow-x: auto; 
+      margin: 16px 0; 
+      font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; 
+      font-size: 14px; 
+      line-height: 1.5; 
+      border: 1px solid #334155; 
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+    }
+    main code { 
+      font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; 
+      background: #f3f4f6; 
+      padding: 2px 6px; 
+      border-radius: 4px; 
+      font-size: 14px; 
+      color: #dc2626; 
+    }
+    main pre code { 
+      background: none; 
+      padding: 0; 
+      color: inherit; 
+    }
+    main a { 
+      color: #4f46e5; 
+      text-decoration: none; 
+      font-weight: 600; 
+      transition: all 0.2s ease; 
+    }
+    main a:hover { 
+      color: #7c3aed; 
+      text-decoration: underline; 
+    }
+    main blockquote { 
+      border-left: 4px solid #6366f1; 
+      padding-left: 16px; 
+      margin: 16px 0; 
+      color: #6b7280; 
+      font-style: italic; 
+      background: #f9fafb; 
+      padding: 12px 16px; 
+      border-radius: 0 8px 8px 0; 
+    }
+    .header-bar { 
+      background: linear-gradient(135deg, #6366f1, #8b5cf6); 
+      color: white; 
+      padding: 16px 24px; 
+      margin: -40px -40px 24px -40px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+    }
+    .header-bar h2 { 
+      margin: 0; 
+      font-size: 18px; 
+      font-weight: 700; 
+      border: none; 
+      color: white; 
+    }
+    .back-link { 
+      color: white; 
+      text-decoration: none; 
+      font-size: 14px; 
+      font-weight: 600; 
+      padding: 8px 12px; 
+      background: rgba(255, 255, 255, 0.2); 
+      border-radius: 6px; 
+      transition: all 0.2s ease; 
+    }
+    .back-link:hover { 
+      background: rgba(255, 255, 255, 0.3); 
+      text-decoration: none; 
+    }
+    @media (max-width: 768px) { 
+      .container { 
+        margin: 0; 
+        border-radius: 0; 
+        flex-direction: column; 
+      }
+      nav { 
+        width: 100%; 
+        height: auto; 
+        max-height: 200px; 
+        border-right: none; 
+        border-bottom: 1px solid #e5e7eb; 
+      }
+      main { 
+        padding: 24px; 
+      }
+      .header-bar { 
+        margin: -24px -24px 16px -24px; 
+        padding: 12px 16px; 
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <h1>📚 Plumego Docs</h1>
+      {{range .LanguageList}}
+        <h2>{{.}}</h2>
+        <ul>
+          {{range $page := index $.Navigation .}}
+            <li><a class="{{if and (eq $.Lang $page.Lang) (eq $.CurrentSlug $page.Slug)}}active{{end}}" href="/docs/{{$page.Lang}}/{{$page.Slug}}">{{$page.Title}}</a></li>
+          {{end}}
+        </ul>
+      {{end}}
+    </nav>
+    <main>
+      {{if .CurrentSlug}}
+        <div class="header-bar">
+          <h2>{{.Title}}</h2>
+          <a href="/docs/{{.Lang}}" class="back-link">← Back to Index</a>
+        </div>
+      {{end}}
+      {{.Content}}
+    </main>
+  </div>
+</body>
+</html>`))
+
+// markdownToHTML converts markdown to HTML (simplified)
 func markdownToHTML(md string) template.HTML {
 	scanner := bufio.NewScanner(strings.NewReader(md))
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -591,4 +891,26 @@ func markdownToHTML(md string) template.HTML {
 		b.WriteString("</code></pre>")
 	}
 	return template.HTML(b.String())
+}
+
+func main() {
+	// Load configuration
+	cfg := LoadConfig()
+
+	// Initialize application context
+	appCtx, err := NewAppContext(cfg)
+	if err != nil {
+		log.Fatalf("failed to initialize app: %v", err)
+	}
+
+	// Register routes
+	if err := appCtx.RegisterRoutes(); err != nil {
+		log.Fatalf("failed to register routes: %v", err)
+	}
+
+	// Start the application
+	log.Printf("Starting Plumego Reference on %s", cfg.Addr)
+	if err := appCtx.Start(); err != nil {
+		log.Fatalf("server stopped: %v", err)
+	}
 }
