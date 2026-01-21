@@ -62,6 +62,7 @@ func TestLimiterCleanup(t *testing.T) {
 	limiter := NewLimiter(Config{
 		Rate:            1,
 		Capacity:        1,
+		Shards:          1,
 		Now:             clock.Now,
 		CleanupInterval: time.Hour,
 		MaxIdle:         time.Minute,
@@ -69,15 +70,15 @@ func TestLimiterCleanup(t *testing.T) {
 	defer limiter.Stop()
 
 	limiter.Allow("client")
-	if len(limiter.buckets) != 1 {
-		t.Fatalf("expected 1 bucket, got %d", len(limiter.buckets))
+	if countBuckets(limiter) != 1 {
+		t.Fatalf("expected 1 bucket, got %d", countBuckets(limiter))
 	}
 
 	clock.Advance(2 * time.Minute)
 	limiter.cleanup(clock.Now())
 
-	if len(limiter.buckets) != 0 {
-		t.Fatalf("expected buckets to be cleaned up, got %d", len(limiter.buckets))
+	if countBuckets(limiter) != 0 {
+		t.Fatalf("expected buckets to be cleaned up, got %d", countBuckets(limiter))
 	}
 }
 
@@ -93,8 +94,56 @@ func TestLimiterUnknownKey(t *testing.T) {
 	defer limiter.Stop()
 
 	limiter.Allow("")
-	if _, ok := limiter.buckets["unknown"]; !ok {
+	if countBuckets(limiter) != 1 {
+		t.Fatalf("expected 1 bucket after unknown key")
+	}
+	shard := limiter.shardFor("unknown")
+	if _, ok := shard.buckets["unknown"]; !ok {
 		t.Fatalf("expected empty key to map to unknown bucket")
+	}
+}
+
+func TestLimiterClockRollback(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	limiter := NewLimiter(Config{
+		Rate:     1,
+		Capacity: 2,
+		Shards:   1,
+		Now:      clock.Now,
+	})
+	defer limiter.Stop()
+
+	decision := limiter.Allow("client")
+	if !decision.Allowed {
+		t.Fatalf("expected first request to be allowed")
+	}
+
+	clock.Advance(-time.Second)
+	decision = limiter.Allow("client")
+	if !decision.Allowed {
+		t.Fatalf("expected request to be allowed after clock rollback")
+	}
+	if decision.Remaining != 0 {
+		t.Fatalf("expected remaining 0, got %d", decision.Remaining)
+	}
+}
+
+func TestLimiterMaxEntriesEviction(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	limiter := NewLimiter(Config{
+		Rate:       1,
+		Capacity:   1,
+		MaxEntries: 1,
+		Shards:     1,
+		Now:        clock.Now,
+	})
+	defer limiter.Stop()
+
+	limiter.Allow("client-a")
+	limiter.Allow("client-b")
+
+	if countBuckets(limiter) != 1 {
+		t.Fatalf("expected at most 1 bucket, got %d", countBuckets(limiter))
 	}
 }
 
@@ -114,4 +163,12 @@ func BenchmarkLimiterAllow(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		limiter.Allow("client")
 	}
+}
+
+func countBuckets(l *Limiter) int {
+	total := 0
+	for i := range l.shards {
+		total += len(l.shards[i].buckets)
+	}
+	return total
 }

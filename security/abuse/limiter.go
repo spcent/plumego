@@ -3,6 +3,7 @@ package abuse
 import (
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -11,6 +12,8 @@ const (
 	defaultCapacity        = 200
 	defaultCleanupInterval = time.Minute
 	defaultMaxIdle         = 5 * time.Minute
+	defaultMaxEntries      = 100000
+	defaultShards          = 16
 )
 
 // Config controls the per-key limiter behavior.
@@ -39,11 +42,17 @@ type Config struct {
 	// Capacity is the maximum burst size (number of tokens in the bucket)
 	Capacity int
 
+	// MaxEntries is the maximum number of tracked keys before eviction kicks in
+	MaxEntries int
+
 	// CleanupInterval is how often to clean up idle entries
 	CleanupInterval time.Duration
 
 	// MaxIdle is the maximum time an entry can be idle before being removed
 	MaxIdle time.Duration
+
+	// Shards is the number of lock shards for buckets
+	Shards int
 
 	// Now is a function that returns the current time (for testing)
 	Now func() time.Time
@@ -103,17 +112,23 @@ type Decision struct {
 // The limiter automatically cleans up idle entries to prevent memory leaks.
 // Call Stop() when done to clean up resources.
 type Limiter struct {
-	mu              sync.Mutex
-	buckets         map[string]*bucket
+	shards          []limiterShard
 	rate            float64
 	capacity        float64
 	cleanupInterval time.Duration
 	maxIdle         time.Duration
+	maxEntries      int
 	now             func() time.Time
 	stopCh          chan struct{}
 	stoppedCh       chan struct{}
 	startOnce       sync.Once
 	stopOnce        sync.Once
+	bucketCount     atomic.Int64
+}
+
+type limiterShard struct {
+	mu      sync.Mutex
+	buckets map[string]*bucket
 }
 
 type bucket struct {
@@ -127,8 +142,10 @@ func DefaultConfig() Config {
 	return Config{
 		Rate:            defaultRate,
 		Capacity:        defaultCapacity,
+		MaxEntries:      defaultMaxEntries,
 		CleanupInterval: defaultCleanupInterval,
 		MaxIdle:         defaultMaxIdle,
+		Shards:          defaultShards,
 	}
 }
 
@@ -153,25 +170,35 @@ func NewLimiter(config Config) *Limiter {
 	if config.Capacity <= 0 {
 		config.Capacity = defaults.Capacity
 	}
+	if config.MaxEntries <= 0 {
+		config.MaxEntries = defaults.MaxEntries
+	}
 	if config.CleanupInterval <= 0 {
 		config.CleanupInterval = defaults.CleanupInterval
 	}
 	if config.MaxIdle <= 0 {
 		config.MaxIdle = defaults.MaxIdle
 	}
+	if config.Shards <= 0 {
+		config.Shards = defaults.Shards
+	}
 	if config.Now == nil {
 		config.Now = time.Now
 	}
 
 	limiter := &Limiter{
-		buckets:         make(map[string]*bucket),
+		shards:          make([]limiterShard, config.Shards),
 		rate:            config.Rate,
 		capacity:        float64(config.Capacity),
 		cleanupInterval: config.CleanupInterval,
 		maxIdle:         config.MaxIdle,
+		maxEntries:      config.MaxEntries,
 		now:             config.Now,
 		stopCh:          make(chan struct{}),
 		stoppedCh:       make(chan struct{}),
+	}
+	for i := range limiter.shards {
+		limiter.shards[i].buckets = make(map[string]*bucket)
 	}
 
 	limiter.startCleanup()
@@ -186,18 +213,29 @@ func (l *Limiter) Allow(key string) Decision {
 	}
 
 	now := l.now()
-	l.mu.Lock()
-	b, ok := l.buckets[key]
+	if l.maxEntries > 0 && l.bucketCount.Load() >= int64(l.maxEntries) {
+		l.evictOldestGlobal()
+	}
+	shard := l.shardFor(key)
+	shard.mu.Lock()
+	b, ok := shard.buckets[key]
 	if !ok {
+		if l.maxEntries > 0 && l.bucketCount.Load() >= int64(l.maxEntries) {
+			l.evictOldestLocked(shard)
+		}
 		b = &bucket{
 			tokens:     l.capacity,
 			lastRefill: now,
 			lastAccess: now,
 		}
-		l.buckets[key] = b
+		shard.buckets[key] = b
+		l.bucketCount.Add(1)
 	}
 
 	elapsed := now.Sub(b.lastRefill).Seconds()
+	if elapsed < 0 {
+		elapsed = 0
+	}
 	b.tokens = math.Min(l.capacity, b.tokens+elapsed*l.rate)
 	b.lastRefill = now
 	b.lastAccess = now
@@ -217,7 +255,7 @@ func (l *Limiter) Allow(key string) Decision {
 		if need < 0 {
 			need = 0
 		}
-		decision.RetryAfter = time.Duration(need / l.rate * float64(time.Second))
+		decision.RetryAfter = durationFromSeconds(need / l.rate)
 	}
 
 	if l.rate > 0 {
@@ -225,10 +263,10 @@ func (l *Limiter) Allow(key string) Decision {
 		if missing < 0 {
 			missing = 0
 		}
-		decision.Reset = now.Add(time.Duration(missing / l.rate * float64(time.Second)))
+		decision.Reset = now.Add(durationFromSeconds(missing / l.rate))
 	}
 
-	l.mu.Unlock()
+	shard.mu.Unlock()
 	return decision
 }
 
@@ -262,12 +300,97 @@ func (l *Limiter) cleanupLoop() {
 }
 
 func (l *Limiter) cleanup(now time.Time) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	for i := range l.shards {
+		shard := &l.shards[i]
+		shard.mu.Lock()
+		for key, b := range shard.buckets {
+			if now.Sub(b.lastAccess) > l.maxIdle {
+				delete(shard.buckets, key)
+				l.bucketCount.Add(-1)
+			}
+		}
+		shard.mu.Unlock()
+	}
+}
 
-	for key, b := range l.buckets {
-		if now.Sub(b.lastAccess) > l.maxIdle {
-			delete(l.buckets, key)
+func (l *Limiter) shardFor(key string) *limiterShard {
+	if len(l.shards) == 1 {
+		return &l.shards[0]
+	}
+	idx := fnv32a(key) % uint32(len(l.shards))
+	return &l.shards[idx]
+}
+
+func (l *Limiter) evictOldestLocked(shard *limiterShard) {
+	var oldestKey string
+	var oldestTime time.Time
+	first := true
+	for key, b := range shard.buckets {
+		if first || b.lastAccess.Before(oldestTime) {
+			oldestKey = key
+			oldestTime = b.lastAccess
+			first = false
 		}
 	}
+	if oldestKey != "" {
+		delete(shard.buckets, oldestKey)
+		l.bucketCount.Add(-1)
+	}
+}
+
+func (l *Limiter) evictOldestGlobal() {
+	var oldestShard *limiterShard
+	var oldestKey string
+	var oldestTime time.Time
+	first := true
+
+	for i := range l.shards {
+		shard := &l.shards[i]
+		shard.mu.Lock()
+		for key, b := range shard.buckets {
+			if first || b.lastAccess.Before(oldestTime) {
+				oldestKey = key
+				oldestTime = b.lastAccess
+				oldestShard = shard
+				first = false
+			}
+		}
+		shard.mu.Unlock()
+	}
+
+	if oldestShard == nil || oldestKey == "" {
+		return
+	}
+
+	oldestShard.mu.Lock()
+	if _, ok := oldestShard.buckets[oldestKey]; ok {
+		delete(oldestShard.buckets, oldestKey)
+		l.bucketCount.Add(-1)
+	}
+	oldestShard.mu.Unlock()
+}
+
+func durationFromSeconds(seconds float64) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	const maxDuration = time.Duration(1<<63 - 1)
+	maxSeconds := float64(maxDuration) / float64(time.Second)
+	if seconds > maxSeconds {
+		return maxDuration
+	}
+	return time.Duration(seconds * float64(time.Second))
+}
+
+func fnv32a(key string) uint32 {
+	const (
+		offset32 = 2166136261
+		prime32  = 16777619
+	)
+	hash := uint32(offset32)
+	for i := 0; i < len(key); i++ {
+		hash ^= uint32(key[i])
+		hash *= prime32
+	}
+	return hash
 }

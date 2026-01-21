@@ -91,7 +91,7 @@ func main() {
 - Environment variables can be loaded from a `.env` file (default path `.env`; override via `core.WithEnvPath`).
 - Common variables: `AUTH_TOKEN` (SimpleAuth middleware), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - The app defaults to a 10 MiB request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5-second graceful shutdown window. Override via `core.With...` options.
-- Security guardrails (security headers + abuse guard) are enabled by default. Abuse guard defaults to 100 req/s with a burst of 200 per client. Disable or tune via `core.WithSecurityHeadersEnabled`, `core.WithSecurityHeadersPolicy`, `core.WithAbuseGuardEnabled`, and `core.WithAbuseGuardConfig`.
+- Security guardrails (security headers + abuse guard) are enabled by default. Abuse guard defaults to 100 req/s with a burst of 200 per client and tracks up to 100k active keys. Disable or tune via `core.WithSecurityHeadersEnabled`, `core.WithSecurityHeadersPolicy`, `core.WithAbuseGuardEnabled`, and `core.WithAbuseGuardConfig`.
 - Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, reload), friendly JSON error output, and `.env` hot reload.
 
 ## Key Components

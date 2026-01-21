@@ -37,11 +37,17 @@ type AbuseGuardConfig struct {
 	// Capacity is the maximum burst size (number of tokens in the bucket)
 	Capacity int
 
+	// MaxEntries is the maximum number of tracked keys before eviction kicks in
+	MaxEntries int
+
 	// CleanupInterval is how often to clean up idle entries
 	CleanupInterval time.Duration
 
 	// MaxIdle is the maximum time an entry can be idle before being removed
 	MaxIdle time.Duration
+
+	// Shards is the number of lock shards for buckets
+	Shards int
 
 	// Limiter is a custom limiter instance (optional)
 	Limiter *abuse.Limiter
@@ -69,8 +75,10 @@ func DefaultAbuseGuardConfig() AbuseGuardConfig {
 	return AbuseGuardConfig{
 		Rate:            defaults.Rate,
 		Capacity:        defaults.Capacity,
+		MaxEntries:      defaults.MaxEntries,
 		CleanupInterval: defaults.CleanupInterval,
 		MaxIdle:         defaults.MaxIdle,
+		Shards:          defaults.Shards,
 		IncludeHeaders:  &includeHeaders,
 	}
 }
@@ -115,11 +123,17 @@ func AbuseGuard(config AbuseGuardConfig) Middleware {
 	if config.Capacity <= 0 {
 		config.Capacity = defaults.Capacity
 	}
+	if config.MaxEntries <= 0 {
+		config.MaxEntries = defaults.MaxEntries
+	}
 	if config.CleanupInterval <= 0 {
 		config.CleanupInterval = defaults.CleanupInterval
 	}
 	if config.MaxIdle <= 0 {
 		config.MaxIdle = defaults.MaxIdle
+	}
+	if config.Shards <= 0 {
+		config.Shards = defaults.Shards
 	}
 	if config.KeyFunc == nil {
 		config.KeyFunc = clientIPKey
@@ -133,8 +147,10 @@ func AbuseGuard(config AbuseGuardConfig) Middleware {
 		limiter = abuse.NewLimiter(abuse.Config{
 			Rate:            config.Rate,
 			Capacity:        config.Capacity,
+			MaxEntries:      config.MaxEntries,
 			CleanupInterval: config.CleanupInterval,
 			MaxIdle:         config.MaxIdle,
+			Shards:          config.Shards,
 		})
 	}
 
