@@ -45,7 +45,14 @@ For embedded bundles, use the helpers in `frontend`:
 
 ```go
 // Mount an embedded SPA or docs site at "/".
-_ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"))
+_ = frontend.RegisterFS(
+    app.Router(),
+    http.FS(staticFS),
+    frontend.WithPrefix("/"),
+    frontend.WithCacheControl("public, max-age=31536000"),
+    frontend.WithIndexCacheControl("no-cache"),
+    frontend.WithFallback(true),
+)
 ```
 
 ## Debugging tools
@@ -55,5 +62,5 @@ _ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"
 
 ## Where to look in the repo
 - `router/router.go`: trie matching, groups, and handler helpers.
-- `frontend/register.go`: helpers for mounting static directories or embedded frontend bundles.
+- `frontend/frontend.go`: helpers for mounting static directories or embedded frontend bundles.
 - `examples/reference/main.go`: real wiring of API, metrics, health, docs, and frontend routes.

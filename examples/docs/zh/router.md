@@ -45,7 +45,14 @@ assets.Get("/*filepath", func(w http.ResponseWriter, r *http.Request) {
 
 ```go
 // 将嵌入的 SPA 或文档站点挂载到 "/"。
-_ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"))
+_ = frontend.RegisterFS(
+    app.Router(),
+    http.FS(staticFS),
+    frontend.WithPrefix("/"),
+    frontend.WithCacheControl("public, max-age=31536000"),
+    frontend.WithIndexCacheControl("no-cache"),
+    frontend.WithFallback(true),
+)
 ```
 
 ## 调试技巧
@@ -55,5 +62,5 @@ _ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"
 
 ## 代码位置
 - `router/router.go`：前缀树匹配、分组与辅助函数。
-- `frontend/register.go`：挂载磁盘目录或嵌入前端包的辅助方法。
+- `frontend/frontend.go`：挂载磁盘目录或嵌入前端包的辅助方法。
 - `examples/reference/main.go`：API、指标、健康检查、文档和前端路由的实际接线。

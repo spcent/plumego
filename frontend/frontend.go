@@ -26,8 +26,17 @@ type Config struct {
 	// does not exist (SPA-style routing).
 	IndexFile string
 
-	// CacheControl optionally sets a Cache-Control header on successful responses.
+	// CacheControl optionally sets a Cache-Control header on successful asset responses.
 	CacheControl string
+
+	// IndexCacheControl optionally sets Cache-Control for index responses.
+	IndexCacheControl string
+
+	// Fallback controls whether missing assets fall back to IndexFile (SPA mode).
+	Fallback bool
+
+	// Headers are applied to every successful file response.
+	Headers map[string]string
 }
 
 // Option mutates a Config.
@@ -51,6 +60,27 @@ func WithIndex(name string) Option {
 func WithCacheControl(header string) Option {
 	return func(cfg *Config) {
 		cfg.CacheControl = header
+	}
+}
+
+// WithIndexCacheControl sets the Cache-Control header for index responses.
+func WithIndexCacheControl(header string) Option {
+	return func(cfg *Config) {
+		cfg.IndexCacheControl = header
+	}
+}
+
+// WithFallback enables or disables SPA fallback to the index file.
+func WithFallback(enabled bool) Option {
+	return func(cfg *Config) {
+		cfg.Fallback = enabled
+	}
+}
+
+// WithHeaders applies additional headers to every successful file response.
+func WithHeaders(headers map[string]string) Option {
+	return func(cfg *Config) {
+		cfg.Headers = copyHeaders(headers)
 	}
 }
 
@@ -79,11 +109,18 @@ func RegisterFromDir(r *router.Router, dir string, opts ...Option) error {
 // RegisterFS mounts a frontend bundle served from the provided http.FileSystem.
 // This is suitable for go:embed bundles using http.FS.
 func RegisterFS(r *router.Router, fsys http.FileSystem, opts ...Option) error {
+	if r == nil {
+		return errors.New("router cannot be nil")
+	}
 	if fsys == nil {
 		return errors.New("filesystem cannot be nil")
 	}
 
-	cfg := &Config{Prefix: "/", IndexFile: defaultIndex}
+	cfg := &Config{
+		Prefix:    "/",
+		IndexFile: defaultIndex,
+		Fallback:  true,
+	}
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -109,19 +146,30 @@ func RegisterFS(r *router.Router, fsys http.FileSystem, opts ...Option) error {
 		prefix:       cleanedPrefix,
 		indexFile:    indexFile,
 		cacheControl: strings.TrimSpace(cfg.CacheControl),
+		indexCache:   strings.TrimSpace(cfg.IndexCacheControl),
+		fallback:     cfg.Fallback,
+		headers:      copyHeaders(cfg.Headers),
 	}
 
 	// Register routes based on prefix
 	if cleanedPrefix == "/" {
 		// Root prefix - register root first, then catch-all
 		// This ensures root path "/" gets handled correctly
-		r.Any("/", h)
-		r.Any("/*filepath", h)
+		if err := r.AddRoute(router.ANY, "/", h); err != nil {
+			return err
+		}
+		if err := r.AddRoute(router.ANY, "/*filepath", h); err != nil {
+			return err
+		}
 	} else {
 		// Non-root prefix - register prefix catch-all and prefix itself
 		pattern := cleanedPrefix + "/*filepath"
-		r.AnyFunc(pattern, h.ServeHTTP)
-		r.AnyFunc(cleanedPrefix, h.ServeHTTP)
+		if err := r.AddRoute(router.ANY, pattern, h); err != nil {
+			return err
+		}
+		if err := r.AddRoute(router.ANY, cleanedPrefix, h); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -170,6 +218,9 @@ type handler struct {
 	prefix       string
 	indexFile    string
 	cacheControl string
+	indexCache   string
+	headers      map[string]string
+	fallback     bool
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +234,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Handle root path
 	if requestPath == "/" {
 		if h.prefix == "/" {
-			h.serveFile(w, r, h.indexFile)
+			if !h.serveFile(w, r, h.indexFile) {
+				http.NotFound(w, r)
+			}
 			return
 		}
 		// If we have a non-root prefix, root path should not be handled here
@@ -193,7 +246,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Handle exact prefix match (e.g. /app)
 	if requestPath == h.prefix {
-		h.serveFile(w, r, h.indexFile)
+		if !h.serveFile(w, r, h.indexFile) {
+			http.NotFound(w, r)
+		}
 		return
 	}
 
@@ -213,14 +268,22 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// If relative path is empty after trimming, serve index
 	if relativePath == "" {
-		h.serveFile(w, r, h.indexFile)
+		if !h.serveFile(w, r, h.indexFile) {
+			http.NotFound(w, r)
+		}
 		return
 	}
 
 	// Clean the path to prevent directory traversal
 	cleanedPath := path.Clean(relativePath)
 	if cleanedPath == "." || cleanedPath == ".." || strings.Contains(cleanedPath, "..") {
-		h.serveFile(w, r, h.indexFile)
+		if h.fallback {
+			if !h.serveFile(w, r, h.indexFile) {
+				http.NotFound(w, r)
+			}
+			return
+		}
+		http.NotFound(w, r)
 		return
 	}
 
@@ -229,7 +292,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Try to serve the requested file, fall back to index
 	if !h.serveFile(w, r, filePath) {
-		h.serveFile(w, r, h.indexFile)
+		if h.fallback {
+			if !h.serveFile(w, r, h.indexFile) {
+				http.NotFound(w, r)
+			}
+			return
+		}
+		http.NotFound(w, r)
 	}
 }
 
@@ -251,14 +320,32 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath str
 		return h.serveFile(w, r, indexPath)
 	}
 
-	// Apply cache control if configured and not index file
-	if h.cacheControl != "" && !isIndexFile(filePath, h.indexFile) {
+	h.applyHeaders(w)
+
+	// Apply cache control if configured
+	if isIndexFile(filePath, h.indexFile) {
+		if h.indexCache != "" {
+			w.Header().Set("Cache-Control", h.indexCache)
+		}
+	} else if h.cacheControl != "" {
 		w.Header().Set("Cache-Control", h.cacheControl)
 	}
 
 	// Use http.ServeContent for proper content serving
 	http.ServeContent(w, r, path.Base(filePath), stat.ModTime(), f)
 	return true
+}
+
+func (h *handler) applyHeaders(w http.ResponseWriter) {
+	if len(h.headers) == 0 {
+		return
+	}
+	for key, value := range h.headers {
+		if key == "" {
+			continue
+		}
+		w.Header().Set(key, value)
+	}
 }
 
 // isIndexFile checks if the given path is the index file
@@ -269,4 +356,22 @@ func isIndexFile(filePath, indexFile string) bool {
 
 	// Check if path ends with index file
 	return cleanPath == cleanIndex || strings.HasSuffix(cleanPath, "/"+cleanIndex)
+}
+
+func copyHeaders(headers map[string]string) map[string]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	copied := make(map[string]string, len(headers))
+	for key, value := range headers {
+		cleanKey := http.CanonicalHeaderKey(strings.TrimSpace(key))
+		if cleanKey == "" {
+			continue
+		}
+		copied[cleanKey] = strings.TrimSpace(value)
+	}
+	if len(copied) == 0 {
+		return nil
+	}
+	return copied
 }
