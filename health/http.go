@@ -1,7 +1,6 @@
 package health
 
 import (
-	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -10,6 +9,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+)
+
+const (
+	healthHandlerTimeout       = 10 * time.Second
+	componentHealthTimeout     = 5 * time.Second
+	allComponentsHealthTimeout = 15 * time.Second
+	readinessHandlerTimeout    = 5 * time.Second
 )
 
 // ErrorResponse represents a standardized error response.
@@ -51,8 +57,14 @@ func HealthHandler(manager HealthManager) http.Handler {
 			return
 		}
 
+		if manager == nil {
+			sendErrorResponse(w, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
+				"Health manager is not configured", requestID)
+			return
+		}
+
 		// Perform health check with timeout
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
 		defer cancel()
 
 		var health HealthStatus
@@ -107,7 +119,13 @@ func HealthHandler(manager HealthManager) http.Handler {
 // ComponentHealthHandler creates a handler for checking specific component health.
 func ComponentHealthHandler(manager HealthManager, componentName string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		if manager == nil {
+			sendErrorResponse(w, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
+				"Health manager is not configured", "")
+			return
+		}
+
+		ctx, cancel := withCheckTimeout(r.Context(), componentHealthTimeout)
 		defer cancel()
 
 		// Check the specific component
@@ -140,7 +158,13 @@ func ComponentHealthHandler(manager HealthManager, componentName string) http.Ha
 // AllComponentsHealthHandler creates a handler for checking all components health.
 func AllComponentsHealthHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		if manager == nil {
+			sendErrorResponse(w, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
+				"Health manager is not configured", "")
+			return
+		}
+
+		ctx, cancel := withCheckTimeout(r.Context(), allComponentsHealthTimeout)
 		defer cancel()
 
 		// Check all components
@@ -156,6 +180,12 @@ func AllComponentsHealthHandler(manager HealthManager) http.Handler {
 // HealthHistoryHandler creates a handler that returns health check history.
 func HealthHistoryHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if manager == nil {
+			sendErrorResponse(w, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
+				"Health manager is not configured", "")
+			return
+		}
+
 		history := manager.GetHealthHistory()
 
 		w.Header().Set("Content-Type", "application/json")
@@ -167,6 +197,12 @@ func HealthHistoryHandler(manager HealthManager) http.Handler {
 // HealthHistoryExportHandler creates a handler that exports health check history in various formats.
 func HealthHistoryExportHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if manager == nil {
+			sendErrorResponse(w, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
+				"Health manager is not configured", "")
+			return
+		}
+
 		// Parse query parameters for filtering and format
 		query := HealthHistoryQuery{}
 
@@ -264,6 +300,12 @@ func exportHistoryToCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 // HealthHistoryStatsHandler returns statistics about health history.
 func HealthHistoryStatsHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if manager == nil {
+			sendErrorResponse(w, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
+				"Health manager is not configured", "")
+			return
+		}
+
 		stats := manager.GetHealthHistoryStats()
 
 		w.Header().Set("Content-Type", "application/json")
@@ -292,7 +334,13 @@ func ReadinessHandler() http.Handler {
 // It returns HTTP 200 when ready and 503 otherwise.
 func ReadinessHandlerWithManager(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		if manager == nil {
+			sendErrorResponse(w, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
+				"Health manager is not configured", "")
+			return
+		}
+
+		ctx, cancel := withCheckTimeout(r.Context(), readinessHandlerTimeout)
 		defer cancel()
 
 		// Perform health check
@@ -336,6 +384,12 @@ func LiveHandler() http.Handler {
 // ComponentsListHandler creates a handler that lists all registered components.
 func ComponentsListHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if manager == nil {
+			sendErrorResponse(w, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
+				"Health manager is not configured", "")
+			return
+		}
+
 		allHealth := manager.GetAllHealth()
 		components := make([]string, 0, len(allHealth))
 		for name := range allHealth {

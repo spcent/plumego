@@ -30,16 +30,16 @@ func TestMetricsCollector(t *testing.T) {
 
 	metrics := collector.GetMetrics()
 
-	if metrics.checkCount != 3 {
-		t.Fatalf("expected check count 3, got %d", metrics.checkCount)
+	if metrics.CheckCount != 3 {
+		t.Fatalf("expected check count 3, got %d", metrics.CheckCount)
 	}
 
-	if metrics.successCount != 2 {
-		t.Fatalf("expected success count 2, got %d", metrics.successCount)
+	if metrics.SuccessCount != 2 {
+		t.Fatalf("expected success count 2, got %d", metrics.SuccessCount)
 	}
 
-	if metrics.failureCount != 1 {
-		t.Fatalf("expected failure count 1, got %d", metrics.failureCount)
+	if metrics.FailureCount != 1 {
+		t.Fatalf("expected failure count 1, got %d", metrics.FailureCount)
 	}
 
 	// Check component metrics
@@ -62,6 +62,80 @@ func TestMetricsCollector(t *testing.T) {
 
 	if compMetrics.MaxLatency != 20*time.Millisecond {
 		t.Fatalf("expected max latency 20ms, got %v", compMetrics.MaxLatency)
+	}
+}
+
+func TestMetricsCollectorAttachment(t *testing.T) {
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	collector := NewMetricsCollector(manager)
+
+	mock := &MockChecker{name: "attached", healthy: true}
+	if err := manager.RegisterComponent(mock); err != nil {
+		t.Fatalf("failed to register component: %v", err)
+	}
+
+	if err := manager.CheckComponent(context.Background(), "attached"); err != nil {
+		t.Fatalf("expected check to succeed, got %v", err)
+	}
+
+	metrics := collector.GetMetrics()
+	if metrics.CheckCount != 1 {
+		t.Fatalf("expected check count 1, got %d", metrics.CheckCount)
+	}
+	if compMetrics, ok := metrics.ComponentMetrics["attached"]; !ok || compMetrics.CheckCount != 1 {
+		t.Fatalf("expected component metrics to be recorded")
+	}
+}
+
+func TestMetricsCopyIsolation(t *testing.T) {
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	collector := NewMetricsCollector(manager)
+
+	collector.RecordCheck("test", 10*time.Millisecond, true, StatusHealthy)
+
+	metrics := collector.GetMetrics()
+	metrics.CheckCount = 42
+	if metrics.ComponentMetrics["test"] == nil {
+		t.Fatalf("expected component metrics to exist")
+	}
+	metrics.ComponentMetrics["test"].CheckCount = 7
+	metrics.ComponentMetrics["test"].RecentHistory = nil
+
+	metricsAfter := collector.GetMetrics()
+	if metricsAfter.CheckCount != 1 {
+		t.Fatalf("expected check count to remain 1, got %d", metricsAfter.CheckCount)
+	}
+	if metricsAfter.ComponentMetrics["test"].CheckCount != 1 {
+		t.Fatalf("expected component check count to remain 1, got %d", metricsAfter.ComponentMetrics["test"].CheckCount)
+	}
+	if len(metricsAfter.ComponentMetrics["test"].RecentHistory) != 1 {
+		t.Fatalf("expected recent history to be preserved")
+	}
+
+	compCopy, ok := collector.GetComponentMetrics("test")
+	if !ok {
+		t.Fatalf("expected component metrics copy")
+	}
+	compCopy.CheckCount = 99
+	compAfter, ok := collector.GetComponentMetrics("test")
+	if !ok || compAfter.CheckCount != 1 {
+		t.Fatalf("expected component metrics to be immutable")
 	}
 }
 
@@ -138,7 +212,7 @@ func TestReset(t *testing.T) {
 	collector.RecordCheck("comp2", time.Millisecond, false, StatusUnhealthy)
 
 	metrics := collector.GetMetrics()
-	if metrics.checkCount == 0 {
+	if metrics.CheckCount == 0 {
 		t.Fatalf("expected some check count before reset")
 	}
 
@@ -146,12 +220,12 @@ func TestReset(t *testing.T) {
 	collector.Reset()
 
 	metrics = collector.GetMetrics()
-	if metrics.checkCount != 0 {
-		t.Fatalf("expected check count 0 after reset, got %d", metrics.checkCount)
+	if metrics.CheckCount != 0 {
+		t.Fatalf("expected check count 0 after reset, got %d", metrics.CheckCount)
 	}
 
-	if len(metrics.componentMetrics) != 0 {
-		t.Fatalf("expected no component metrics after reset, got %d", len(metrics.componentMetrics))
+	if len(metrics.ComponentMetrics) != 0 {
+		t.Fatalf("expected no component metrics after reset, got %d", len(metrics.ComponentMetrics))
 	}
 }
 
@@ -196,8 +270,8 @@ func TestGenerateReport(t *testing.T) {
 		t.Fatalf("expected overall status to be unhealthy, got %v", report.HealthStatus.Status)
 	}
 
-	if report.Metrics.checkCount != 2 {
-		t.Fatalf("expected 2 checks in metrics, got %d", report.Metrics.checkCount)
+	if report.Metrics.CheckCount != 2 {
+		t.Fatalf("expected 2 checks in metrics, got %d", report.Metrics.CheckCount)
 	}
 }
 

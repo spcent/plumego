@@ -25,6 +25,18 @@ app.GetHandler("/health/build", health.BuildInfoHandler())
 - `ReadinessHandler` returns 200 after boot flips the ready flag; returns 503 during startup/shutdown.
 - `BuildInfoHandler` surfaces `health.BuildInfo` (version, commit, build time) as JSON; set these fields via ldflags at build time.
 
+## Health metrics
+Attach a collector to a `HealthManager` to expose structured health metrics:
+
+```go
+manager, _ := health.NewHealthManager(health.HealthCheckConfig{})
+collector := health.NewMetricsCollector(manager) // auto-attaches
+app.GetHandler("/health/metrics", health.MetricsHandler(collector))
+```
+
+- If you construct a collector separately, call `health.AttachMetrics(manager, collector)` to wire it in.
+- `HealthMetrics` includes `check_count`, `success_count`, `failure_count`, and per-component metrics in JSON.
+
 ## Component health reporting
 Components can report structured health to feed readiness decisions or dashboards:
 

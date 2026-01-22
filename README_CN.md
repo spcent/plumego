@@ -28,9 +28,6 @@ type Component interface {
 
 在构造应用时使用 `core.WithComponent`（或 `WithComponents`）来添加功能。内置特性（Webhook 管理、入站 Webhook 接收器、PubSub 调试、WebSocket 辅助工具、前端服务）都可以作为组件挂载，因此示例可以只混合所需的部分。
 
-## Migration Notes
-- `plumego.ComponentFunc` re-export has been removed. Implement `core.Component` directly (see the interface above), or keep a local adapter type if you prefer functional hooks.
-
 ## 快速开始
 创建一个小型 `main.go`，连接路由和中间件，然后启动服务器：
 

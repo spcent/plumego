@@ -2,6 +2,7 @@ package health
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -9,12 +10,12 @@ import (
 
 // HealthMetrics contains various health-related metrics.
 type HealthMetrics struct {
-	startTime        time.Time
-	lastCheckTime    time.Time
-	checkCount       int64
-	successCount     int64
-	failureCount     int64
-	componentMetrics map[string]*ComponentMetrics
+	StartTime        time.Time                    `json:"start_time"`
+	LastCheckTime    time.Time                    `json:"last_check_time"`
+	CheckCount       int64                        `json:"check_count"`
+	SuccessCount     int64                        `json:"success_count"`
+	FailureCount     int64                        `json:"failure_count"`
+	ComponentMetrics map[string]*ComponentMetrics `json:"component_metrics"`
 }
 
 // ComponentMetrics tracks metrics for individual components.
@@ -83,32 +84,66 @@ type MetricsCollector struct {
 
 // NewMetricsCollector creates a new metrics collector.
 func NewMetricsCollector(manager HealthManager) *MetricsCollector {
-	return &MetricsCollector{
+	collector := &MetricsCollector{
 		metrics: &HealthMetrics{
-			startTime:        time.Now(),
-			componentMetrics: make(map[string]*ComponentMetrics),
+			StartTime:        time.Now(),
+			ComponentMetrics: make(map[string]*ComponentMetrics),
 		},
 		collector: manager,
 	}
+	if manager != nil {
+		_ = AttachMetrics(manager, collector)
+	}
+	return collector
+}
+
+// AttachMetrics attaches a metrics collector to a health manager when supported.
+func AttachMetrics(manager HealthManager, collector *MetricsCollector) error {
+	if manager == nil {
+		return errors.New("manager cannot be nil")
+	}
+	if collector == nil {
+		return errors.New("collector cannot be nil")
+	}
+
+	hm, ok := manager.(*healthManager)
+	if !ok {
+		return errors.New("manager does not support metrics attachment")
+	}
+
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+	if hm.closed {
+		return errManagerClosed
+	}
+
+	hm.metrics = collector
+	collector.collector = manager
+	return nil
 }
 
 // RecordCheck records a health check execution with enhanced metrics collection.
 func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Duration, success bool, status HealthState) {
+	mc.RecordCheckWithError(componentName, duration, success, status, nil)
+}
+
+// RecordCheckWithError records a health check execution including error details.
+func (mc *MetricsCollector) RecordCheckWithError(componentName string, duration time.Duration, success bool, status HealthState, err error) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
-	mc.metrics.checkCount++
-	mc.metrics.lastCheckTime = time.Now()
+	mc.metrics.CheckCount++
+	mc.metrics.LastCheckTime = time.Now()
 
 	if success {
-		mc.metrics.successCount++
+		mc.metrics.SuccessCount++
 	} else {
-		mc.metrics.failureCount++
+		mc.metrics.FailureCount++
 	}
 
 	// Update component metrics
-	if _, exists := mc.metrics.componentMetrics[componentName]; !exists {
-		mc.metrics.componentMetrics[componentName] = &ComponentMetrics{
+	if _, exists := mc.metrics.ComponentMetrics[componentName]; !exists {
+		mc.metrics.ComponentMetrics[componentName] = &ComponentMetrics{
 			Name:          componentName,
 			MinLatency:    duration,
 			MaxLatency:    duration,
@@ -118,7 +153,7 @@ func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Dura
 		}
 	}
 
-	comp := mc.metrics.componentMetrics[componentName]
+	comp := mc.metrics.ComponentMetrics[componentName]
 	comp.CheckCount++
 	comp.LastCheckTime = time.Now()
 	comp.LastStatus = status
@@ -151,6 +186,9 @@ func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Dura
 		Duration:  duration,
 		Success:   success,
 		Status:    status,
+	}
+	if err != nil {
+		record.ErrorMessage = err.Error()
 	}
 
 	// Append new record
@@ -251,16 +289,17 @@ func (mc *MetricsCollector) GetMetrics() HealthMetrics {
 
 	// Return a copy to prevent external modification without copying the mutex.
 	metricsCopy := HealthMetrics{
-		startTime:     mc.metrics.startTime,
-		lastCheckTime: mc.metrics.lastCheckTime,
-		checkCount:    mc.metrics.checkCount,
-		successCount:  mc.metrics.successCount,
-		failureCount:  mc.metrics.failureCount,
+		StartTime:     mc.metrics.StartTime,
+		LastCheckTime: mc.metrics.LastCheckTime,
+		CheckCount:    mc.metrics.CheckCount,
+		SuccessCount:  mc.metrics.SuccessCount,
+		FailureCount:  mc.metrics.FailureCount,
 	}
-	metricsCopy.componentMetrics = make(map[string]*ComponentMetrics, len(mc.metrics.componentMetrics))
-	for name, comp := range mc.metrics.componentMetrics {
+	metricsCopy.ComponentMetrics = make(map[string]*ComponentMetrics, len(mc.metrics.ComponentMetrics))
+	for name, comp := range mc.metrics.ComponentMetrics {
 		compCopy := *comp
-		metricsCopy.componentMetrics[name] = &compCopy
+		compCopy.RecentHistory = append([]HealthCheckRecord(nil), comp.RecentHistory...)
+		metricsCopy.ComponentMetrics[name] = &compCopy
 	}
 
 	return metricsCopy
@@ -271,13 +310,14 @@ func (mc *MetricsCollector) GetComponentMetrics(componentName string) (*Componen
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
-	metrics, exists := mc.metrics.componentMetrics[componentName]
+	metrics, exists := mc.metrics.ComponentMetrics[componentName]
 	if !exists {
 		return nil, false
 	}
 
 	// Return a copy to prevent external modification
 	metricsCopy := *metrics
+	metricsCopy.RecentHistory = append([]HealthCheckRecord(nil), metrics.RecentHistory...)
 	return &metricsCopy, true
 }
 
@@ -286,17 +326,17 @@ func (mc *MetricsCollector) GetSuccessRate() float64 {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
-	if mc.metrics.checkCount == 0 {
+	if mc.metrics.CheckCount == 0 {
 		return 0.0
 	}
 
-	return float64(mc.metrics.successCount) / float64(mc.metrics.checkCount) * 100
+	return float64(mc.metrics.SuccessCount) / float64(mc.metrics.CheckCount) * 100
 }
 
 // GetUptime returns the application uptime.
 func (mc *MetricsCollector) GetUptime() time.Duration {
 	mc.mu.RLock()
-	start := mc.metrics.startTime
+	start := mc.metrics.StartTime
 	mc.mu.RUnlock()
 
 	uptime := time.Since(start)
@@ -312,8 +352,8 @@ func (mc *MetricsCollector) Reset() {
 	defer mc.mu.Unlock()
 
 	mc.metrics = &HealthMetrics{
-		startTime:        time.Now(),
-		componentMetrics: make(map[string]*ComponentMetrics),
+		StartTime:        time.Now(),
+		ComponentMetrics: make(map[string]*ComponentMetrics),
 	}
 }
 

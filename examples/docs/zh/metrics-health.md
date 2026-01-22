@@ -25,6 +25,18 @@ app.GetHandler("/health/build", health.BuildInfoHandler())
 - `ReadinessHandler` 在启动完成后返回 200，启动/关闭阶段返回 503。
 - `BuildInfoHandler` 以 JSON 形式暴露 `health.BuildInfo`（版本、提交、构建时间）；可通过 ldflags 注入。
 
+## 健康指标
+为 `HealthManager` 绑定指标采集器后，可输出结构化健康指标：
+
+```go
+manager, _ := health.NewHealthManager(health.HealthCheckConfig{})
+collector := health.NewMetricsCollector(manager) // 自动绑定
+app.GetHandler("/health/metrics", health.MetricsHandler(collector))
+```
+
+- 若采集器与管理器分开创建，可调用 `health.AttachMetrics(manager, collector)` 手动绑定。
+- `HealthMetrics` 会输出 `check_count`、`success_count`、`failure_count` 以及按组件拆分的指标。
+
 ## 组件健康上报
 组件可报告结构化健康状态，便于就绪决策与看板展示：
 
