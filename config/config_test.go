@@ -56,6 +56,29 @@ func TestConfigBasic(t *testing.T) {
 	}
 }
 
+func TestGetBoolNumericValues(t *testing.T) {
+	cfg := New()
+	cfg.data = map[string]any{
+		"int_zero":   int8(0),
+		"int_one":    int16(1),
+		"float_zero": float32(0),
+		"float_one":  float64(2.5),
+	}
+
+	if cfg.GetBool("int_zero", true) {
+		t.Error("expected int_zero to be false")
+	}
+	if !cfg.GetBool("int_one", false) {
+		t.Error("expected int_one to be true")
+	}
+	if cfg.GetBool("float_zero", true) {
+		t.Error("expected float_zero to be false")
+	}
+	if !cfg.GetBool("float_one", false) {
+		t.Error("expected float_one to be true")
+	}
+}
+
 // TestConfigWithData tests Config with actual data
 func TestConfigWithData(t *testing.T) {
 	cfg := New()

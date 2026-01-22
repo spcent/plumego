@@ -111,19 +111,30 @@ func InitDefault() error {
 // GetGlobalConfig returns the global config instance
 func GetGlobalConfig() *ConfigManager {
 	globalConfigMu.RLock()
-	defer globalConfigMu.RUnlock()
+	cfg := globalConfig
+	globalConfigMu.RUnlock()
 
-	if globalConfig == nil {
-		// Auto-initialize if not already done
-		if err := InitDefault(); err != nil {
-			// Return empty config on error
-			logger := log.NewGLogger()
-			return NewConfigManager(logger)
-		}
-		return globalConfig
+	if cfg != nil {
+		return cfg
 	}
 
-	return globalConfig
+	// Auto-initialize if not already done
+	if err := InitDefault(); err != nil {
+		// Return empty config on error
+		logger := log.NewGLogger()
+		return NewConfigManager(logger)
+	}
+
+	globalConfigMu.RLock()
+	cfg = globalConfig
+	globalConfigMu.RUnlock()
+
+	if cfg == nil {
+		logger := log.NewGLogger()
+		return NewConfigManager(logger)
+	}
+
+	return cfg
 }
 
 // SetGlobalConfig allows setting a custom global config instance
@@ -132,6 +143,7 @@ func SetGlobalConfig(config *ConfigManager) {
 	globalConfigMu.Lock()
 	defer globalConfigMu.Unlock()
 	globalConfig = config
+	globalInitErr = nil
 	// Reset the init once to allow re-initialization
 	globalInitOnce = sync.Once{}
 }
