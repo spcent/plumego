@@ -192,6 +192,26 @@ func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 	}
 }
 
+func TestUseAfterServeHTTPReturnsError(t *testing.T) {
+	app := New()
+
+	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	rr := httptest.NewRecorder()
+	app.ServeHTTP(rr, req)
+
+	if err := app.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r)
+		})
+	}); err == nil {
+		t.Fatalf("expected error when adding middleware after handler is built")
+	}
+}
+
 func TestLoadEnvFromFile(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "app_env")
 	if err != nil {

@@ -397,8 +397,18 @@ func targetToDTO(t webhookout.Target) targetDTO {
 // ConfigureWebhookOut mounts outbound webhook management APIs.
 // It remains for backward compatibility but now mounts a component into the lifecycle.
 func (a *App) ConfigureWebhookOut() {
-	comp := newWebhookOutComponent(a.config.WebhookOut)
-	comp.RegisterRoutes(a.router)
-	comp.RegisterMiddleware(a.middlewareReg)
+	if err := a.ensureMutable("configure_webhook_out", "configure webhook out"); err != nil {
+		a.logError("ConfigureWebhookOut failed", err, nil)
+		return
+	}
+
+	cfg := a.configSnapshot()
+
+	comp := newWebhookOutComponent(cfg.WebhookOut)
+	comp.RegisterRoutes(a.ensureRouter())
+	comp.RegisterMiddleware(a.ensureMiddlewareRegistry())
+
+	a.mu.Lock()
 	a.components = append(a.components, comp)
+	a.mu.Unlock()
 }

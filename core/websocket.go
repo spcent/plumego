@@ -163,13 +163,25 @@ func (a *App) ConfigureWebSocket() (*ws.Hub, error) {
 
 // ConfigureWebSocketWithOptions configures WebSocket support with custom options.
 func (a *App) ConfigureWebSocketWithOptions(config WebSocketConfig) (*ws.Hub, error) {
-	comp, err := newWebSocketComponent(config, a.config.Debug, a.logger)
+	if err := a.ensureMutable("configure_websocket", "configure websocket"); err != nil {
+		return nil, err
+	}
+
+	cfg := a.configSnapshot()
+	a.mu.RLock()
+	logger := a.logger
+	a.mu.RUnlock()
+
+	comp, err := newWebSocketComponent(config, cfg.Debug, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	comp.RegisterRoutes(a.router)
+	comp.RegisterRoutes(a.ensureRouter())
+
+	a.mu.Lock()
 	a.components = append(a.components, comp)
+	a.mu.Unlock()
 
 	return comp.hub, nil
 }

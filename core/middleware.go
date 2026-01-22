@@ -2,87 +2,95 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/spcent/plumego/contract"
+	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 )
 
 // Use adds middleware to the application's middleware chain.
 func (a *App) Use(middlewares ...middleware.Middleware) error {
-	if a.started {
-		return contract.WrapError(
-			fmt.Errorf("cannot add middleware after app has started"),
-			"use_middleware",
-			"core",
-			nil,
-		)
+	if err := a.ensureMutable("use_middleware", "add middleware"); err != nil {
+		return err
 	}
 
-	if a.middlewareReg == nil {
-		a.middlewareReg = middleware.NewRegistry()
-	}
-
-	a.middlewareReg.Use(middlewares...)
+	reg := a.ensureMiddlewareRegistry()
+	reg.Use(middlewares...)
 	return nil
 }
 
 func (a *App) applyGuardrails() {
+	a.mu.Lock()
 	if a.guardsApplied {
+		a.mu.Unlock()
 		return
 	}
+	a.guardsApplied = true
+	a.mu.Unlock()
 
 	var guards []middleware.Middleware
 
-	if a.config.Debug {
+	cfg := a.configSnapshot()
+	a.mu.RLock()
+	logger := a.logger
+	a.mu.RUnlock()
+
+	if cfg.Debug {
 		cfg := middleware.DefaultDebugErrorConfig()
 		cfg.NotFoundHint = devToolsRoutesPath
 		guards = append(guards, middleware.DebugErrors(cfg))
 	}
 
-	if a.config.EnableSecurityHeaders {
-		guards = append(guards, middleware.SecurityHeaders(a.config.SecurityHeadersPolicy))
+	if cfg.EnableSecurityHeaders {
+		guards = append(guards, middleware.SecurityHeaders(cfg.SecurityHeadersPolicy))
 	}
 
-	if a.config.EnableAbuseGuard {
-		cfg := middleware.DefaultAbuseGuardConfig()
-		if a.config.AbuseGuardConfig != nil {
-			cfg = *a.config.AbuseGuardConfig
+	if cfg.EnableAbuseGuard {
+		guardCfg := middleware.DefaultAbuseGuardConfig()
+		if cfg.AbuseGuardConfig != nil {
+			guardCfg = *cfg.AbuseGuardConfig
 		}
-		guards = append(guards, middleware.AbuseGuard(cfg))
+		guards = append(guards, middleware.AbuseGuard(guardCfg))
 	}
 
-	if a.config.MaxBodyBytes > 0 {
-		guards = append(guards, middleware.BodyLimit(a.config.MaxBodyBytes, a.logger))
+	if cfg.MaxBodyBytes > 0 {
+		guards = append(guards, middleware.BodyLimit(cfg.MaxBodyBytes, logger))
 	}
 
-	if a.config.MaxConcurrency > 0 {
+	if cfg.MaxConcurrency > 0 {
 		guards = append(guards, middleware.ConcurrencyLimit(
-			a.config.MaxConcurrency,
-			a.config.QueueDepth,
-			a.config.QueueTimeout,
-			a.logger))
+			cfg.MaxConcurrency,
+			cfg.QueueDepth,
+			cfg.QueueTimeout,
+			logger))
 	}
 
 	if len(guards) > 0 {
 		// Hardening middleware should execute before user-specified middleware.
-		a.middlewareReg.Prepend(guards...)
+		reg := a.ensureMiddlewareRegistry()
+		reg.Prepend(guards...)
 	}
-
-	a.guardsApplied = true
 }
 
 // buildHandler builds the combined handler with current middleware stack.
 func (a *App) buildHandler() {
-	chain := middleware.NewChain(a.middlewareReg.Middlewares()...)
-	a.handler = chain.Apply(a.router)
+	reg := a.ensureMiddlewareRegistry()
+	r := a.ensureRouter()
+	chain := middleware.NewChain(reg.Middlewares()...)
+	handler := chain.Apply(r)
+
+	a.mu.Lock()
+	a.handler = handler
+	a.mu.Unlock()
 }
 
 func (a *App) enableLogging() error {
-	if a.loggingEnabled {
+	a.mu.RLock()
+	enabled := a.loggingEnabled
+	a.mu.RUnlock()
+	if enabled {
 		return nil
 	}
 
@@ -90,17 +98,25 @@ func (a *App) enableLogging() error {
 		return err
 	}
 
+	a.mu.Lock()
 	a.loggingEnabled = true
+	a.mu.Unlock()
 	return nil
 }
 
 func (a *App) loggingMiddleware() middleware.Middleware {
 	return func(next http.Handler) http.Handler {
+		a.mu.RLock()
+		logger := a.logger
+		collector := a.metricsCollector
+		tracer := a.tracer
+		a.mu.RUnlock()
+
 		var metricsCollector middleware.MetricsCollector
-		if a.metricsCollector != nil {
-			metricsCollector = &metricsAdapter{collector: a.metricsCollector}
+		if collector != nil {
+			metricsCollector = &metricsAdapter{collector: collector}
 		}
-		return middleware.Logging(a.logger, metricsCollector, a.tracer)(next)
+		return middleware.Logging(logger, metricsCollector, tracer)(next)
 	}
 }
 
@@ -117,18 +133,25 @@ func (m *metricsAdapter) Observe(ctx context.Context, metrics middleware.Request
 
 // EnableAuth enables the auth middleware.
 func (a *App) EnableAuth() {
-	a.Use(middleware.FromFuncMiddleware(middleware.Auth))
+	if err := a.Use(middleware.FromFuncMiddleware(middleware.Auth)); err != nil {
+		a.logError("EnableAuth failed", err, nil)
+	}
 }
 
 // EnableRateLimit enables the rate limiting middleware with the given configuration.
 // rate: requests per second.
 // capacity: maximum burst size.
 func (a *App) EnableRateLimit(rate float64, capacity int) {
-	a.Use(middleware.RateLimit(rate, capacity, time.Minute, 5*time.Minute))
+	if err := a.Use(middleware.RateLimit(rate, capacity, time.Minute, 5*time.Minute)); err != nil {
+		a.logError("EnableRateLimit failed", err, log.Fields{"rate": rate, "capacity": capacity})
+	}
 }
 
 func (a *App) enableRecovery() error {
-	if a.recoveryEnabled {
+	a.mu.RLock()
+	enabled := a.recoveryEnabled
+	a.mu.RUnlock()
+	if enabled {
 		return nil
 	}
 
@@ -136,19 +159,28 @@ func (a *App) enableRecovery() error {
 		return err
 	}
 
+	a.mu.Lock()
 	a.recoveryEnabled = true
+	a.mu.Unlock()
 	return nil
 }
 
 func (a *App) enableCORS(opts *middleware.CORSOptions) error {
-	if opts != nil {
-		cfg := *opts
-		a.corsOptions = &cfg
-	} else {
-		a.corsOptions = nil
+	if err := a.ensureMutable("enable_cors", "enable CORS"); err != nil {
+		return err
 	}
 
-	if a.corsEnabled {
+	var cfg *middleware.CORSOptions
+	if opts != nil {
+		copy := *opts
+		cfg = &copy
+	}
+
+	a.mu.Lock()
+	a.corsOptions = cfg
+	enabled := a.corsEnabled
+	a.mu.Unlock()
+	if enabled {
 		return nil
 	}
 
@@ -156,17 +188,23 @@ func (a *App) enableCORS(opts *middleware.CORSOptions) error {
 		return err
 	}
 
+	a.mu.Lock()
 	a.corsEnabled = true
+	a.mu.Unlock()
 	return nil
 }
 
 func (a *App) corsMiddleware() middleware.Middleware {
 	return func(next http.Handler) http.Handler {
-		if a.corsOptions == nil {
+		a.mu.RLock()
+		opts := a.corsOptions
+		a.mu.RUnlock()
+
+		if opts == nil {
 			return middleware.CORS(next)
 		}
 		return middleware.FromFuncMiddleware(func(next http.HandlerFunc) http.HandlerFunc {
-			return middleware.CORSWithOptions(*a.corsOptions, next)
+			return middleware.CORSWithOptions(*opts, next)
 		})(next)
 	}
 }

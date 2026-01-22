@@ -1,22 +1,17 @@
 package core
 
-import (
-	"net/http"
-
-	"github.com/spcent/plumego/router"
-)
+import "net/http"
 
 // ensureHandler lazily builds the application's handler chain so App can satisfy http.Handler.
 func (a *App) ensureHandler() {
 	a.handlerOnce.Do(func() {
-		if a.router == nil {
-			a.router = router.NewRouter()
-			a.router.SetLogger(a.logger)
-		}
-
+		a.freezeConfig()
+		r := a.ensureRouter()
 		a.ensureComponents()
 		a.applyGuardrails()
-		a.router.Freeze()
+		if r != nil {
+			r.Freeze()
+		}
 		a.buildHandler()
 	})
 }
@@ -37,10 +32,14 @@ func (a *App) ensureComponents() {
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.ensureHandler()
 
-	if a.handler == nil {
+	a.mu.RLock()
+	handler := a.handler
+	a.mu.RUnlock()
+
+	if handler == nil {
 		http.Error(w, "handler not configured", http.StatusServiceUnavailable)
 		return
 	}
 
-	a.handler.ServeHTTP(w, r)
+	handler.ServeHTTP(w, r)
 }

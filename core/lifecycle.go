@@ -61,10 +61,14 @@ func (a *App) Boot() error {
 
 func (a *App) loadEnv() error {
 	a.mu.RLock()
-	envFile := a.config.EnvFile
+	envFile := ""
+	if a.config != nil {
+		envFile = a.config.EnvFile
+	}
+	loaded := a.envLoaded
 	a.mu.RUnlock()
 
-	if a.envLoaded || envFile == "" {
+	if loaded || envFile == "" {
 		return nil
 	}
 

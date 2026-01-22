@@ -281,8 +281,23 @@ func sanitizeTopicSuffix(s string) string {
 // ConfigureWebhookIn mounts inbound webhook receivers for GitHub and Stripe.
 // It remains for backward compatibility but now mounts a component into the lifecycle.
 func (a *App) ConfigureWebhookIn() {
-	comp := newWebhookInComponent(a.config.WebhookIn, a.pub, a.logger)
-	comp.RegisterRoutes(a.router)
-	comp.RegisterMiddleware(a.middlewareReg)
+	if err := a.ensureMutable("configure_webhook_in", "configure webhook in"); err != nil {
+		a.logError("ConfigureWebhookIn failed", err, nil)
+		return
+	}
+
+	cfg := a.configSnapshot()
+
+	a.mu.RLock()
+	pub := a.pub
+	logger := a.logger
+	a.mu.RUnlock()
+
+	comp := newWebhookInComponent(cfg.WebhookIn, pub, logger)
+	comp.RegisterRoutes(a.ensureRouter())
+	comp.RegisterMiddleware(a.ensureMiddlewareRegistry())
+
+	a.mu.Lock()
 	a.components = append(a.components, comp)
+	a.mu.Unlock()
 }
