@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -148,6 +149,7 @@ func (l *Logger) initLogFiles() error {
 		}
 	}
 
+	cleanupOldLogs(l.logDir, l.program, l.rotationConfig, currentLogFiles(l.logFiles))
 	return nil
 }
 
@@ -219,7 +221,7 @@ func (l *Logger) formatHeader(level Level, file string, line int) []byte {
 func (l *Logger) getLogWriter(level Level) io.Writer {
 	var writers []io.Writer
 	if l.toStderr {
-		return os.Stderr
+		return l.stderrWriter()
 	}
 
 	if l.logDir != "" && l.logFiles[level] != nil {
@@ -232,11 +234,11 @@ func (l *Logger) getLogWriter(level Level) io.Writer {
 	}
 
 	if l.alsoToStderr {
-		writers = append(writers, os.Stderr)
+		writers = append(writers, l.stderrWriter())
 	}
 
 	if len(writers) == 0 {
-		writers = append(writers, os.Stderr)
+		writers = append(writers, l.stderrWriter())
 	}
 
 	if len(writers) == 1 {
@@ -244,6 +246,13 @@ func (l *Logger) getLogWriter(level Level) io.Writer {
 	}
 
 	return io.MultiWriter(writers...)
+}
+
+func (l *Logger) stderrWriter() io.Writer {
+	if l.output != nil {
+		return l.output
+	}
+	return os.Stderr
 }
 
 func (l *Logger) log(level Level, calldepth int, args ...any) {
@@ -361,6 +370,9 @@ func (l *Logger) SetLevel(level Level) {
 func (l *Logger) SetOutput(w io.Writer) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if w == nil {
+		w = os.Stderr
+	}
 	l.output = w
 }
 
@@ -457,21 +469,32 @@ func (l *Logger) Flush() {
 // checkLogRotation checks if the log file needs rotation based on size
 func (l *Logger) checkLogRotation(level Level, logSize int64) error {
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	config := l.rotationConfig
 	if config.MaxSize <= 0 {
+		l.mu.Unlock()
 		return nil
 	}
 
 	l.currentSize[level] += logSize
 	if l.currentSize[level] < int64(config.MaxSize)*1024*1024 {
+		l.mu.Unlock()
 		return nil
 	}
 
 	// Reset current size and rotate log file
 	l.currentSize[level] = 0
-	return l.rotateLogFile(level)
+	err := l.rotateLogFile(level)
+	logDir := l.logDir
+	program := l.program
+	current := currentLogFiles(l.logFiles)
+	l.mu.Unlock()
+
+	if err != nil {
+		return err
+	}
+
+	cleanupOldLogs(logDir, program, config, current)
+	return nil
 }
 
 // rotateLogFile rotates the log file for the given level
@@ -511,6 +534,108 @@ func (l *Logger) rotateLogFile(level Level) error {
 	os.Symlink(filename, linkPath) // Ignore error for backward compatibility
 
 	return nil
+}
+
+type logFileInfo struct {
+	name    string
+	path    string
+	modTime time.Time
+}
+
+func currentLogFiles(files map[Level]*os.File) map[string]struct{} {
+	current := make(map[string]struct{}, len(files))
+	for _, file := range files {
+		if file == nil {
+			continue
+		}
+		current[filepath.Base(file.Name())] = struct{}{}
+	}
+	return current
+}
+
+func cleanupOldLogs(logDir, program string, config RotationConfig, current map[string]struct{}) {
+	if logDir == "" {
+		return
+	}
+	if config.MaxAge <= 0 && config.MaxBackups <= 0 {
+		return
+	}
+
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		return
+	}
+
+	now := time.Now()
+	perLevel := make(map[Level][]logFileInfo)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+
+		name := entry.Name()
+		if _, ok := current[name]; ok {
+			continue
+		}
+		if !strings.HasSuffix(name, ".log") {
+			continue
+		}
+		if !strings.HasPrefix(name, program+".") {
+			continue
+		}
+
+		level, ok := levelFromFilename(name)
+		if !ok {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		if config.MaxAge > 0 {
+			maxAge := time.Duration(config.MaxAge) * 24 * time.Hour
+			if now.Sub(info.ModTime()) > maxAge {
+				_ = os.Remove(filepath.Join(logDir, name))
+				continue
+			}
+		}
+
+		if config.MaxBackups > 0 {
+			perLevel[level] = append(perLevel[level], logFileInfo{
+				name:    name,
+				path:    filepath.Join(logDir, name),
+				modTime: info.ModTime(),
+			})
+		}
+	}
+
+	if config.MaxBackups <= 0 {
+		return
+	}
+
+	for _, files := range perLevel {
+		sort.Slice(files, func(i, j int) bool {
+			return files[i].modTime.After(files[j].modTime)
+		})
+		for i := config.MaxBackups; i < len(files); i++ {
+			_ = os.Remove(files[i].path)
+		}
+	}
+}
+
+func levelFromFilename(name string) (Level, bool) {
+	for level := INFO; level <= ERROR; level++ {
+		if strings.Contains(name, "."+levelNames[level]+".") {
+			return level, true
+		}
+	}
+	return INFO, false
 }
 
 // SetRotationConfig sets the log rotation configuration

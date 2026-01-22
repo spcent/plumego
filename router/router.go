@@ -1094,6 +1094,19 @@ func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tre
 		r.applyMiddlewareAndServe(w, req, nil, tree.handler, result.RouteMiddlewares)
 		return
 	}
+	if req.Method != ANY {
+		if anyTree := r.trees[ANY]; anyTree != nil && anyTree.handler != nil {
+			result := &MatchResult{
+				Handler:          anyTree.handler,
+				ParamValues:      nil,
+				ParamKeys:        nil,
+				RouteMiddlewares: anyTree.middlewares,
+			}
+			r.routeCache.Set(cacheKey, result)
+			r.applyMiddlewareAndServe(w, req, nil, anyTree.handler, result.RouteMiddlewares)
+			return
+		}
+	}
 	http.NotFound(w, req)
 }
 

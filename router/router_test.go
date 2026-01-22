@@ -199,6 +199,26 @@ func TestAnyRoute(t *testing.T) {
 	}
 }
 
+func TestAnyRootFallback(t *testing.T) {
+	r := NewRouter()
+
+	r.GetFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("docs"))
+	})
+
+	r.Any("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("home"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if got := strings.TrimSpace(w.Body.String()); got != "home" {
+		t.Fatalf("expected any root to match, got %q", got)
+	}
+}
+
 func TestPrintRoutes(t *testing.T) {
 	// Reset global r
 	r := NewRouter()

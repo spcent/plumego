@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Webhook Management - Plumego Reference</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="container">
+    {{template "siteHeader" .}}
+
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="status-indicator status-online"></div>
+        <span>Webhook Service Ready</span>
+      </div>
+      <div class="status-item">
+        <i class="fas fa-route"></i>
+        <span>Base Path: /webhooks</span>
+      </div>
+      <div class="status-item">
+        <i class="fas fa-arrow-left"></i>
+        <a href="/" style="color: var(--primary); text-decoration: none;">Back to Home</a>
+      </div>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-bullseye"></i>
+        </div>
+        <h3 class="feature-title">Targets</h3>
+        <p class="feature-description">
+          Manage outbound webhook targets and delivery settings.
+        </p>
+        <div class="btn-group">
+          <a class="btn" href="/webhooks/targets">
+            <i class="fas fa-list"></i> List Targets
+          </a>
+          <a class="btn btn-secondary" href="/docs">
+            <i class="fas fa-book"></i> Docs
+          </a>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-paper-plane"></i>
+        </div>
+        <h3 class="feature-title">Trigger Events</h3>
+        <p class="feature-description">
+          Trigger outbound webhook events with a signed token.
+        </p>
+        <div class="btn-group">
+          <a class="btn btn-success" href="/webhooks/events/test.event">
+            <i class="fas fa-bolt"></i> Trigger Sample
+          </a>
+          <a class="btn btn-warning" href="/test/webhook">
+            <i class="fas fa-flask"></i> Local Test
+          </a>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-boxes-stacked"></i>
+        </div>
+        <h3 class="feature-title">Deliveries</h3>
+        <p class="feature-description">
+          Inspect delivery history and replay failed events.
+        </p>
+        <div class="btn-group">
+          <a class="btn" href="/webhooks/deliveries">
+            <i class="fas fa-history"></i> View Deliveries
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="panel-title">
+        <i class="fas fa-terminal"></i>
+        Quick Reference
+      </h3>
+      <div class="test-tools-grid">
+        <div class="tool-card">
+          <h4 class="tool-title">
+            <i class="fas fa-link"></i>
+            Core Endpoints
+          </h4>
+          <p class="tool-description">
+            Use these endpoints to configure and trigger outbound webhooks.
+          </p>
+          <div class="response-display show">
+GET /webhooks/targets
+POST /webhooks/targets
+PATCH /webhooks/targets/:id
+POST /webhooks/targets/:id/enable
+POST /webhooks/targets/:id/disable
+POST /webhooks/events/:event
+GET /webhooks/deliveries
+GET /webhooks/deliveries/:id
+POST /webhooks/deliveries/:id/replay
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <h4 class="tool-title">
+            <i class="fas fa-shield"></i>
+            Security Notes
+          </h4>
+          <p class="tool-description">
+            Keep tokens and signatures safe and avoid logging secrets.
+          </p>
+          <ul class="text-muted">
+            <li>Set WEBHOOK_TRIGGER_TOKEN in env for event triggers.</li>
+            <li>GitHub/Stripe signatures are verified in webhook ingress.</li>
+            <li>Rotate secrets regularly for production use.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    {{template "siteFooter" .}}
+  </div>
+</body>
+</html>

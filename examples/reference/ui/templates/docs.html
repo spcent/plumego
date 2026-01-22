@@ -35,17 +35,45 @@
       color: #111827; 
       font-weight: 700; 
     }
-    nav h2 { 
+    nav details { 
+      margin: 12px 0; 
+      border-radius: 10px; 
+      overflow: hidden; 
+      border: 1px solid transparent; 
+    }
+    nav details[open] { 
+      border-color: #e5e7eb; 
+      background: #fafafa; 
+    }
+    nav summary { 
+      list-style: none; 
       font-size: 12px; 
-      margin: 20px 0 8px 12px; 
+      margin: 0; 
+      padding: 12px 12px; 
       text-transform: uppercase; 
       letter-spacing: 0.08em; 
       color: #6b7280; 
-      font-weight: 600; 
+      font-weight: 700; 
+      cursor: pointer; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+    }
+    nav summary::-webkit-details-marker { 
+      display: none; 
+    }
+    nav summary::after { 
+      content: "▾"; 
+      font-size: 12px; 
+      color: #9ca3af; 
+      transition: transform 0.2s ease; 
+    }
+    nav details:not([open]) summary::after { 
+      transform: rotate(-90deg); 
     }
     nav ul { 
       list-style: none; 
-      padding: 0 0 0 12px; 
+      padding: 0 0 8px 12px; 
       margin: 0; 
     }
     nav li { 
@@ -159,6 +187,38 @@
       padding: 12px 16px; 
       border-radius: 0 8px 8px 0; 
     }
+    main table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin: 16px 0 24px; 
+      font-size: 14px; 
+      background: #ffffff; 
+      border: 1px solid #e5e7eb; 
+      border-radius: 12px; 
+      overflow: hidden; 
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06); 
+    }
+    main thead th { 
+      text-align: left; 
+      padding: 12px 14px; 
+      background: #f3f4f6; 
+      color: #111827; 
+      font-weight: 700; 
+      border-bottom: 1px solid #e5e7eb; 
+    }
+    main tbody td { 
+      text-align: left; 
+      padding: 10px 14px; 
+      vertical-align: top; 
+      border-bottom: 1px solid #eef2f7; 
+      color: #374151; 
+    }
+    main tbody tr:nth-child(even) { 
+      background: #f9fafb; 
+    }
+    main tbody tr:last-child td { 
+      border-bottom: none; 
+    }
     .header-bar { 
       background: linear-gradient(135deg, #6366f1, #8b5cf6); 
       color: white; 
@@ -217,12 +277,14 @@
     <nav>
       <h1>📚 Plumego Docs</h1>
       {{range .LanguageList}}
-        <h2>{{.}}</h2>
-        <ul>
-          {{range $page := index $.Navigation .}}
-            <li><a class="{{if and (eq $.Lang $page.Lang) (eq $.CurrentSlug $page.Slug)}}active{{end}}" href="/docs/{{$page.Lang}}/{{$page.Slug}}">{{$page.Title}}</a></li>
-          {{end}}
-        </ul>
+        <details {{if eq $.Lang .}}open{{end}}>
+          <summary>{{.}}</summary>
+          <ul>
+            {{range $page := index $.Navigation .}}
+              <li><a class="{{if and (eq $.Lang $page.Lang) (eq $.CurrentSlug $page.Slug)}}active{{end}}" href="/docs/{{$page.Lang}}/{{$page.Slug}}">{{$page.Title}}</a></li>
+            {{end}}
+          </ul>
+        </details>
       {{end}}
     </nav>
     <main>

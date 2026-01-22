@@ -1,0 +1,25 @@
+{{define "siteHeader"}}
+<header class="header">
+  <div class="logo">
+    <i class="{{.Header.IconClass}}"></i>
+  </div>
+  <h1 class="title">{{.Header.Title}}</h1>
+  {{if .Header.Subtitle}}
+  <p class="subtitle">{{.Header.Subtitle}}</p>
+  {{end}}
+</header>
+{{end}}
+
+{{define "siteFooter"}}
+<div class="footer">
+  <p>Powered by <a href="https://github.com/spcent/plumego"><strong style="color: white;">Plumego</strong></a> - Modern Go Web Framework</p>
+  {{if .FooterLinks}}
+  <p style="margin-top: 0.5rem;">
+    {{- range $i, $link := .FooterLinks -}}
+      {{- if $i }} · {{ end -}}
+      <a href="{{$link.Href}}">{{$link.Label}}</a>
+    {{- end -}}
+  </p>
+  {{end}}
+</div>
+{{end}}
