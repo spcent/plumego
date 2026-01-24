@@ -219,6 +219,61 @@
     main tbody tr:last-child td { 
       border-bottom: none; 
     }
+    .health-banner { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      background: #ffffff; 
+      border: 1px solid #e5e7eb; 
+      border-radius: 10px; 
+      padding: 10px 14px; 
+      margin: 0 0 20px; 
+      font-size: 13px; 
+      color: #374151; 
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06); 
+    }
+    .health-dot { 
+      width: 10px; 
+      height: 10px; 
+      border-radius: 50%; 
+      background: #9ca3af; 
+      box-shadow: 0 0 0 4px rgba(156, 163, 175, 0.15); 
+    }
+    .health-banner.ok .health-dot { 
+      background: #10b981; 
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2); 
+    }
+    .health-banner.warn .health-dot { 
+      background: #f59e0b; 
+      box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2); 
+    }
+    .health-banner.err .health-dot { 
+      background: #ef4444; 
+      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2); 
+    }
+    .health-link { 
+      margin-left: auto; 
+      font-weight: 600; 
+      color: #4f46e5; 
+      text-decoration: none; 
+    }
+    .health-link:hover { 
+      text-decoration: underline; 
+    }
+    .footer { 
+      text-align: center; 
+      color: #6b7280; 
+      margin: 24px 0 8px; 
+      font-size: 13px; 
+    }
+    .footer a { 
+      color: #4f46e5; 
+      text-decoration: none; 
+      font-weight: 600; 
+    }
+    .footer a:hover { 
+      text-decoration: underline; 
+    }
     .header-bar { 
       background: linear-gradient(135deg, #6366f1, #8b5cf6); 
       color: white; 
@@ -294,8 +349,57 @@
           <a href="/docs/{{.Lang}}" class="back-link">← Back to Index</a>
         </div>
       {{end}}
+      <div class="health-banner" id="healthBanner">
+        <span class="health-dot" id="healthDot"></span>
+        <span class="health-text" id="healthText">Checking readiness...</span>
+        <a class="health-link" href="/health/ready">/health/ready</a>
+      </div>
       {{.Content}}
     </main>
+    {{template "siteFooter" .}}
   </div>
+  <script>
+    (function () {
+      var banner = document.getElementById("healthBanner");
+      var text = document.getElementById("healthText");
+      if (!banner || !text) {
+        return;
+      }
+
+      function setStatus(state, message) {
+        banner.classList.remove("ok", "warn", "err");
+        if (state) {
+          banner.classList.add(state);
+        }
+        text.textContent = message;
+      }
+
+      function refresh() {
+        fetch("/health/ready", { headers: { "Accept": "application/json" } })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              return { ok: res.ok, body: body };
+            });
+          })
+          .then(function (payload) {
+            if (payload.body && payload.body.ready === true) {
+              setStatus("ok", "Ready: service is accepting traffic");
+              return;
+            }
+            if (payload.body && payload.body.ready === false) {
+              setStatus("warn", "Not ready: " + (payload.body.reason || "startup"));
+              return;
+            }
+            setStatus(payload.ok ? "warn" : "err", "Readiness status unavailable");
+          })
+          .catch(function () {
+            setStatus("err", "Failed to fetch readiness status");
+          });
+      }
+
+      refresh();
+      setInterval(refresh, 15000);
+    })();
+  </script>
 </body>
 </html>

@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"context"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -37,6 +39,17 @@ const (
 
 // MetricLabels represents key-value labels for metrics
 type MetricLabels map[string]string
+
+const (
+	labelMethod    = "method"
+	labelPath      = "path"
+	labelStatus    = "status"
+	labelOperation = "operation"
+	labelTopic     = "topic"
+	labelKVKey     = "key"
+	labelPanicked  = "panicked"
+	labelHit       = "hit"
+)
 
 // MetricRecord represents a single metric record
 type MetricRecord struct {
@@ -93,8 +106,10 @@ type CollectorStats struct {
 
 // BaseMetricsCollector provides a base implementation for metrics collectors
 type BaseMetricsCollector struct {
-	records []MetricRecord
-	stats   CollectorStats
+	mu         sync.RWMutex
+	records    []MetricRecord
+	stats      CollectorStats
+	maxRecords int
 }
 
 // NewBaseMetricsCollector creates a new base metrics collector
@@ -108,10 +123,40 @@ func NewBaseMetricsCollector() *BaseMetricsCollector {
 	}
 }
 
+// WithMaxRecords limits how many records are retained in memory.
+// A non-positive value disables the limit.
+func (b *BaseMetricsCollector) WithMaxRecords(max int) *BaseMetricsCollector {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if max <= 0 {
+		b.maxRecords = 0
+		return b
+	}
+
+	b.maxRecords = max
+	if len(b.records) > max {
+		b.records = b.records[len(b.records)-max:]
+	}
+	return b
+}
+
 // Record implements the MetricsCollector interface
 func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.ensureInitializedLocked()
+
 	if record.Timestamp.IsZero() {
 		record.Timestamp = time.Now()
+	}
+
+	if len(record.Labels) > 0 {
+		record.Labels = cloneLabels(record.Labels)
+	}
+
+	if b.maxRecords > 0 && len(b.records) >= b.maxRecords {
+		b.records = b.records[1:]
 	}
 
 	b.records = append(b.records, record)
@@ -130,9 +175,9 @@ func (b *BaseMetricsCollector) ObserveHTTP(ctx context.Context, method, path str
 		Name:  "http_request",
 		Value: float64(duration.Milliseconds()),
 		Labels: MetricLabels{
-			"method": method,
-			"path":   path,
-			"status": string(rune(status)),
+			labelMethod: method,
+			labelPath:   path,
+			labelStatus: strconv.Itoa(status),
 		},
 		Duration: duration,
 	}
@@ -160,8 +205,8 @@ func (b *BaseMetricsCollector) ObservePubSub(ctx context.Context, operation, top
 		Name:  "pubsub_" + operation,
 		Value: float64(duration.Milliseconds()),
 		Labels: MetricLabels{
-			"operation": operation,
-			"topic":     topic,
+			labelOperation: operation,
+			labelTopic:     topic,
 		},
 		Duration: duration,
 		Error:    err,
@@ -190,9 +235,9 @@ func (b *BaseMetricsCollector) ObserveMQ(ctx context.Context, operation, topic s
 		Name:  "mq_" + operation,
 		Value: float64(duration.Milliseconds()),
 		Labels: MetricLabels{
-			"operation": operation,
-			"topic":     topic,
-			"panicked":  map[bool]string{true: "true", false: "false"}[panicked],
+			labelOperation: operation,
+			labelTopic:     topic,
+			labelPanicked:  boolLabel(panicked),
 		},
 		Duration: duration,
 		Error:    err,
@@ -219,11 +264,11 @@ func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key str
 	}
 
 	labels := MetricLabels{
-		"operation": operation,
-		"hit":       map[bool]string{true: "true", false: "false"}[hit],
+		labelOperation: operation,
+		labelHit:       boolLabel(hit),
 	}
 	if key != "" {
-		labels["key"] = key
+		labels[labelKVKey] = key
 	}
 
 	record := MetricRecord{
@@ -258,11 +303,22 @@ func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key str
 
 // GetStats returns current statistics
 func (b *BaseMetricsCollector) GetStats() CollectorStats {
-	return b.stats
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	stats := b.stats
+	if stats.TypeBreakdown != nil {
+		stats.TypeBreakdown = cloneBreakdown(stats.TypeBreakdown)
+	}
+	return stats
 }
 
 // Clear resets all metrics
 func (b *BaseMetricsCollector) Clear() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.ensureInitializedLocked()
+
 	b.records = b.records[:0]
 	b.stats = CollectorStats{
 		StartTime:     time.Now(),
@@ -272,7 +328,56 @@ func (b *BaseMetricsCollector) Clear() {
 
 // GetRecords returns a copy of all records (for testing or advanced collectors)
 func (b *BaseMetricsCollector) GetRecords() []MetricRecord {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
 	result := make([]MetricRecord, len(b.records))
-	copy(result, b.records)
+	for i, record := range b.records {
+		if len(record.Labels) > 0 {
+			record.Labels = cloneLabels(record.Labels)
+		}
+		result[i] = record
+	}
+	return result
+}
+
+func (b *BaseMetricsCollector) ensureInitializedLocked() {
+	if b.stats.TypeBreakdown == nil {
+		b.stats.TypeBreakdown = make(map[MetricType]int64)
+	}
+	if b.stats.StartTime.IsZero() {
+		b.stats.StartTime = time.Now()
+	}
+	if b.records == nil {
+		b.records = make([]MetricRecord, 0, 1000)
+	}
+}
+
+func boolLabel(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
+}
+
+func cloneLabels(labels MetricLabels) MetricLabels {
+	if len(labels) == 0 {
+		return nil
+	}
+	result := make(MetricLabels, len(labels))
+	for key, value := range labels {
+		result[key] = value
+	}
+	return result
+}
+
+func cloneBreakdown(breakdown map[MetricType]int64) map[MetricType]int64 {
+	if len(breakdown) == 0 {
+		return nil
+	}
+	result := make(map[MetricType]int64, len(breakdown))
+	for key, value := range breakdown {
+		result[key] = value
+	}
 	return result
 }

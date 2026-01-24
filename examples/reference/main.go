@@ -151,12 +151,7 @@ func (ctx *AppContext) RegisterRoutes() error {
 		return fmt.Errorf("failed to parse page templates: %w", err)
 	}
 
-	footerLinks := []PageLink{
-		{Href: "/docs", Label: "Docs"},
-		{Href: "/health/ready", Label: "Health Check"},
-		{Href: "/health/build", Label: "Build Info"},
-		{Href: "/api/status", Label: "System Status"},
-	}
+	footerLinks := defaultFooterLinks()
 
 	homeData := PageData{
 		Header: PageHeader{
@@ -479,6 +474,15 @@ type PageData struct {
 	FooterLinks []PageLink
 }
 
+func defaultFooterLinks() []PageLink {
+	return []PageLink{
+		{Href: "/docs", Label: "Docs"},
+		{Href: "/health/ready", Label: "Health Check"},
+		{Href: "/health/build", Label: "Build Info"},
+		{Href: "/api/status", Label: "System Status"},
+	}
+}
+
 // NewDocSite creates a new documentation site
 func NewDocSite() (*DocSite, error) {
 	path := locateDocsPath()
@@ -501,16 +505,12 @@ func NewDocSite() (*DocSite, error) {
 		}
 	}
 
-	// Load template from embedded filesystem
-	tmplPath := filepath.Join("ui", "templates", "docs.html")
-	tmplContent, err := fs.ReadFile(staticFS, tmplPath)
+	tmpl, err := template.ParseFS(staticFS,
+		"ui/templates/docs.html",
+		"ui/templates/partials.html",
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read template file: %w", err)
-	}
-
-	tmpl, err := template.New("docs").Parse(string(tmplContent))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
+		return nil, fmt.Errorf("failed to parse docs template: %w", err)
 	}
 
 	return &DocSite{
@@ -675,8 +675,11 @@ func (d *DocSite) languages() []string {
 
 // renderPage renders the documentation page template
 func (d *DocSite) renderPage(w http.ResponseWriter, data docTemplateData) {
+	if len(data.FooterLinks) == 0 {
+		data.FooterLinks = defaultFooterLinks()
+	}
 	buf := &bytes.Buffer{}
-	if err := d.template.Execute(buf, data); err != nil {
+	if err := d.template.ExecuteTemplate(buf, "docs.html", data); err != nil {
 		http.Error(w, fmt.Sprintf("render docs: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -692,6 +695,7 @@ type docTemplateData struct {
 	Content      template.HTML
 	Navigation   map[string][]DocPage
 	LanguageList []string
+	FooterLinks  []PageLink
 }
 
 // markdownToHTML converts markdown to HTML (simplified)

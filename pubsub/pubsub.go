@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -177,18 +178,27 @@ func (ps *InProcPubSub) Close() error {
 //		fmt.Printf("Received: %v\n", msg.Data)
 //	}
 func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, error) {
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics("subscribe", topic, time.Since(start), err)
+	}()
+
 	if ps.closed.Load() {
-		return nil, ErrSubscribeToClosed
+		err = ErrSubscribeToClosed
+		return nil, err
 	}
 
 	topic = strings.TrimSpace(topic)
 	if topic == "" {
-		return nil, ErrInvalidTopic
+		err = ErrInvalidTopic
+		return nil, err
 	}
 
 	opts = normalizeSubOptions(opts)
 	if opts.BufferSize < 1 {
-		return nil, ErrBufferTooSmall
+		err = ErrBufferTooSmall
+		return nil, err
 	}
 
 	id := ps.nextID.Add(1)
@@ -204,7 +214,8 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 	defer ps.mu.Unlock()
 
 	if ps.closed.Load() {
-		return nil, ErrSubscribeToClosed
+		err = ErrSubscribeToClosed
+		return nil, err
 	}
 
 	if ps.topics[topic] == nil {
@@ -245,21 +256,31 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 //	// - user.updated
 //	// - user.deleted
 func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics("subscribe", pattern, time.Since(start), err)
+	}()
+
 	if ps.closed.Load() {
-		return nil, ErrSubscribeToClosed
+		err = ErrSubscribeToClosed
+		return nil, err
 	}
 
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
-		return nil, ErrInvalidPattern
+		err = ErrInvalidPattern
+		return nil, err
 	}
 	if _, err := path.Match(pattern, "probe"); err != nil {
-		return nil, ErrInvalidPattern
+		err = ErrInvalidPattern
+		return nil, err
 	}
 
 	opts = normalizeSubOptions(opts)
 	if opts.BufferSize < 1 {
-		return nil, ErrBufferTooSmall
+		err = ErrBufferTooSmall
+		return nil, err
 	}
 
 	id := ps.nextID.Add(1)
@@ -276,7 +297,8 @@ func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subsc
 	defer ps.mu.Unlock()
 
 	if ps.closed.Load() {
-		return nil, ErrSubscribeToClosed
+		err = ErrSubscribeToClosed
+		return nil, err
 	}
 
 	if ps.patterns[pattern] == nil {
@@ -315,13 +337,21 @@ func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subsc
 //		// Handle error
 //	}
 func (ps *InProcPubSub) Publish(topic string, msg Message) error {
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics("publish", topic, time.Since(start), err)
+	}()
+
 	if ps.closed.Load() {
-		return ErrPublishToClosed
+		err = ErrPublishToClosed
+		return err
 	}
 
 	topic = strings.TrimSpace(topic)
 	if topic == "" {
-		return ErrInvalidTopic
+		err = ErrInvalidTopic
+		return err
 	}
 
 	// Fill message metadata (immutable copy)
@@ -465,6 +495,7 @@ func (ps *InProcPubSub) ListTopics() []string {
 	for topic := range ps.topics {
 		topics = append(topics, topic)
 	}
+	sort.Strings(topics)
 	return topics
 }
 
@@ -489,6 +520,7 @@ func (ps *InProcPubSub) ListPatterns() []string {
 	for pattern := range ps.patterns {
 		patterns = append(patterns, pattern)
 	}
+	sort.Strings(patterns)
 	return patterns
 }
 
@@ -706,8 +738,12 @@ func (ps *InProcPubSub) GetMetricsCollector() metrics.MetricsCollector {
 
 // recordMetrics records metrics using the unified collector.
 func (ps *InProcPubSub) recordMetrics(operation, topic string, duration time.Duration, err error) {
-	if ps.collector != nil {
-		ctx := context.Background()
-		ps.collector.ObservePubSub(ctx, operation, topic, duration, err)
+	ps.mu.RLock()
+	collector := ps.collector
+	ps.mu.RUnlock()
+	if collector == nil {
+		return
 	}
+	ctx := context.Background()
+	collector.ObservePubSub(ctx, operation, topic, duration, err)
 }
