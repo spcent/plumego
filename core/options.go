@@ -219,6 +219,26 @@ func WithComponents(components ...Component) Option {
 	}
 }
 
+// WithRunner registers a background runner in the application lifecycle.
+func WithRunner(runner Runner) Option {
+	return func(a *App) {
+		if runner != nil {
+			a.runners = append(a.runners, runner)
+		}
+	}
+}
+
+// WithRunners registers multiple background runners.
+func WithRunners(runners ...Runner) Option {
+	return func(a *App) {
+		for _, runner := range runners {
+			if runner != nil {
+				a.runners = append(a.runners, runner)
+			}
+		}
+	}
+}
+
 // WithMetricsCollector sets a metrics collector hook for observability middleware.
 func WithMetricsCollector(collector metrics.MetricsCollector) Option {
 	return func(a *App) {

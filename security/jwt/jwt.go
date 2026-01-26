@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
@@ -757,6 +758,9 @@ func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middlew
 			}
 
 			ctx := context.WithValue(r.Context(), claimsContextKey, claims)
+			if principal := PrincipalFromClaims(claims); principal != nil {
+				ctx = contract.ContextWithPrincipal(ctx, principal)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

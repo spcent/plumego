@@ -98,6 +98,32 @@ func main() {
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。
 
+## 后台 Runner
+使用最小生命周期接口注册后台任务：
+
+```go
+type Runner interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
+app.Register(myRunner)
+```
+
+Runner 会在 HTTP server 启动前启动，并在优雅关闭时停止。
+
+## 认证契约
+Plumego 通过 `contract` 中的接口将认证、授权、会话校验分离，推荐用中间件组合：
+
+```go
+chain := middleware.NewChain().
+	Use(middleware.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
+	Use(middleware.SessionCheck(sessionStore, sessionValidator)).
+	Use(middleware.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
+```
+
+`security/jwt` 提供契约适配器（`jwtManager.Authenticator`、`jwt.PolicyAuthorizer`、`jwt.PermissionAuthorizer`），以保持存储与策略实现的解耦。
+
 ## 参考应用
 `examples/reference` 是一个开箱即用的 `main` 包，整合了常用组件：
 

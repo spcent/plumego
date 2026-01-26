@@ -48,6 +48,10 @@ type App struct {
 	componentStopOnce sync.Once
 	componentsMounted bool
 
+	runners        []Runner
+	startedRunners []Runner
+	runnerStopOnce sync.Once
+
 	// Dependency injection container
 	diContainer *DIContainer
 }

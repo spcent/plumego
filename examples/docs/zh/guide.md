@@ -94,6 +94,13 @@ func main() {
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。
 
+## 契约文档
+- 路由契约： [router-contract.md](router-contract.md)
+- 中间件契约： [middleware-contract.md](middleware-contract.md)
+- 生命周期契约： [lifecycle-contract.md](lifecycle-contract.md)
+- 可观测性契约： [observability-contract.md](observability-contract.md)
+- 配置契约： [config-contract.md](config-contract.md)
+
 ## 参考应用
 `examples/reference` 是一个开箱即用的 `main` 包，整合了常用组件：
 

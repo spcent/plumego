@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
@@ -733,6 +734,62 @@ func BenchmarkGenerateTokenPairEdDSA(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mgr.GenerateTokenPair(context.Background(), identity, authz)
+	}
+}
+
+// ========== Contract Adapter Test ==========
+
+func TestContractAuthenticator(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig(nil)
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-contract"}, AuthorizationClaims{Roles: []string{"user"}})
+
+	authenticator := mgr.Authenticator(TokenTypeAccess)
+	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+	req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+
+	principal, err := authenticator.Authenticate(req)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if principal == nil || principal.Subject != "user-contract" {
+		t.Fatalf("unexpected principal: %#v", principal)
+	}
+	if len(principal.Roles) != 1 || principal.Roles[0] != "user" {
+		t.Fatalf("unexpected roles: %#v", principal.Roles)
+	}
+}
+
+func TestContractAuthenticatorMissingToken(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig(nil)
+	mgr, _ := NewJWTManager(store, cfg)
+
+	authenticator := mgr.Authenticator(TokenTypeAccess)
+	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+
+	_, err := authenticator.Authenticate(req)
+	if err != contract.ErrUnauthenticated {
+		t.Fatalf("expected ErrUnauthenticated, got %v", err)
+	}
+}
+
+func TestPolicyAuthorizer(t *testing.T) {
+	authorizer := PolicyAuthorizer{Policy: AuthZPolicy{AllRoles: []string{"admin"}}}
+	principal := &contract.Principal{Roles: []string{"admin"}}
+
+	if err := authorizer.Authorize(principal, "", ""); err != nil {
+		t.Fatalf("expected authorized, got %v", err)
+	}
+
+	principal.Roles = []string{"user"}
+	if err := authorizer.Authorize(principal, "", ""); err != contract.ErrUnauthorized {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
 	}
 }
 

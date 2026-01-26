@@ -338,6 +338,30 @@ func TestWithComponents(t *testing.T) {
 	}
 }
 
+func TestWithRunner(t *testing.T) {
+	app := &App{}
+	runner := &mockRunner{}
+	opt := WithRunner(runner)
+	opt(app)
+	if len(app.runners) != 1 {
+		t.Errorf("expected 1 runner, got %d", len(app.runners))
+	}
+	if app.runners[0] != runner {
+		t.Errorf("expected runner to be set")
+	}
+}
+
+func TestWithRunners(t *testing.T) {
+	app := &App{}
+	r1 := &mockRunner{}
+	r2 := &mockRunner{}
+	opt := WithRunners(r1, r2)
+	opt(app)
+	if len(app.runners) != 2 {
+		t.Errorf("expected 2 runners, got %d", len(app.runners))
+	}
+}
+
 func TestWithMetricsCollector(t *testing.T) {
 	app := &App{}
 	collector := &mockMetricsCollector{}
@@ -372,6 +396,11 @@ func (m *mockComponent) Stop(ctx context.Context) error              { return ni
 func (m *mockComponent) Health() (string, health.HealthStatus) {
 	return "mock", health.HealthStatus{Status: health.StatusHealthy}
 }
+
+type mockRunner struct{}
+
+func (m *mockRunner) Start(ctx context.Context) error { return nil }
+func (m *mockRunner) Stop(ctx context.Context) error  { return nil }
 
 type mockMetricsCollector struct{}
 

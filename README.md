@@ -98,6 +98,32 @@ func main() {
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
 
+## Background Runners
+Register background tasks with a minimal lifecycle interface:
+
+```go
+type Runner interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
+app.Register(myRunner)
+```
+
+Runners start before the HTTP server and stop during graceful shutdown.
+
+## Auth Contracts
+Plumego keeps authentication, authorization, and session validation separate through interfaces in `contract`. Compose them with middleware rather than relying on framework magic:
+
+```go
+chain := middleware.NewChain().
+	Use(middleware.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
+	Use(middleware.SessionCheck(sessionStore, sessionValidator)).
+	Use(middleware.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
+```
+
+The `security/jwt` package provides adapters (`jwtManager.Authenticator`, `jwt.PolicyAuthorizer`, `jwt.PermissionAuthorizer`) that implement these contracts while keeping your own storage and policy engines decoupled.
+
 ## Reference App
 `examples/reference` is an out-of-the-box `main` package that integrates common components:
 

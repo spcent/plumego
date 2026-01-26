@@ -94,6 +94,13 @@ func main() {
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
 
+## Contracts
+- Router contract: [router-contract.md](router-contract.md)
+- Middleware contract: [middleware-contract.md](middleware-contract.md)
+- Lifecycle contract: [lifecycle-contract.md](lifecycle-contract.md)
+- Observability contract: [observability-contract.md](observability-contract.md)
+- Config contract: [config-contract.md](config-contract.md)
+
 ## Reference App
 `examples/reference` is an out-of-the-box `main` package that integrates common components:
 
