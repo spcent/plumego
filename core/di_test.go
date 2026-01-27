@@ -1,6 +1,10 @@
 package core
 
-import "testing"
+import (
+	"reflect"
+	"sync"
+	"testing"
+)
 
 type diService interface {
 	Name() string
@@ -65,5 +69,39 @@ func TestDIInjectValueFromPointer(t *testing.T) {
 
 	if target.Dep.name != "value" {
 		t.Fatalf("unexpected injected value: %s", target.Dep.name)
+	}
+}
+
+func TestDIResolveConcurrentSameType(t *testing.T) {
+	c := NewDIContainer()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+
+	c.RegisterFactory(reflect.TypeOf(&diImpl{}), func(c *DIContainer) any {
+		once.Do(func() { close(started) })
+		<-release
+		return &diImpl{name: "ok"}
+	}, Transient)
+
+	results := make(chan error, 2)
+	go func() {
+		_, err := c.Resolve(reflect.TypeOf(&diImpl{}))
+		results <- err
+	}()
+
+	<-started
+	go func() {
+		_, err := c.Resolve(reflect.TypeOf(&diImpl{}))
+		results <- err
+	}()
+
+	close(release)
+
+	for i := 0; i < 2; i++ {
+		if err := <-results; err != nil {
+			t.Fatalf("concurrent resolve failed: %v", err)
+		}
 	}
 }

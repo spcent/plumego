@@ -112,7 +112,10 @@ type BaseMetricsCollector struct {
 	maxRecords int
 }
 
-// NewBaseMetricsCollector creates a new base metrics collector
+const defaultMaxRecords = 10000
+
+// NewBaseMetricsCollector creates a new base metrics collector.
+// It retains up to defaultMaxRecords records unless overridden by WithMaxRecords.
 func NewBaseMetricsCollector() *BaseMetricsCollector {
 	return &BaseMetricsCollector{
 		records: make([]MetricRecord, 0, 1000),
@@ -120,6 +123,7 @@ func NewBaseMetricsCollector() *BaseMetricsCollector {
 			StartTime:     time.Now(),
 			TypeBreakdown: make(map[MetricType]int64),
 		},
+		maxRecords: defaultMaxRecords,
 	}
 }
 

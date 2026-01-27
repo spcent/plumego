@@ -1,3 +1,7 @@
+// Package mq provides an in-process message broker.
+//
+// Experimental: this module includes incomplete features (see TODOs) and may change
+// without notice. Avoid production use until the TODOs are fully implemented.
 package mq
 
 import (

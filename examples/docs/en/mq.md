@@ -4,6 +4,8 @@
 
 This document describes the improvements made to the `net/mq` module as part of the P0 priority refactoring effort.
 
+> Status: **Experimental**. The `net/mq` module includes unfinished features (see TODOs in `net/mq/mq.go`) and may change without notice. Avoid production use until those TODOs are completed.
+
 ## Changes Made
 
 ### 1. Error Handling Improvements

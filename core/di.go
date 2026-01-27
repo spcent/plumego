@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -52,18 +53,72 @@ type DIRegistration struct {
 //	    // handle error
 //	}
 type DIContainer struct {
-	mu              sync.RWMutex
-	services        map[reflect.Type]DIRegistration
-	resolutionStack []reflect.Type // For circular dependency detection
+	mu       sync.RWMutex
+	services map[reflect.Type]DIRegistration
+
+	stackMu sync.Mutex
+	stacks  map[uint64][]reflect.Type // Per-goroutine resolution stack
 }
 
 // NewDIContainer creates a new dependency injection container.
 // The container is initialized with no services and is ready for registration.
 func NewDIContainer() *DIContainer {
 	return &DIContainer{
-		services:        make(map[reflect.Type]DIRegistration),
-		resolutionStack: make([]reflect.Type, 0),
+		services: make(map[reflect.Type]DIRegistration),
+		stacks:   make(map[uint64][]reflect.Type),
 	}
+}
+
+// currentGoroutineID returns the numeric ID of the current goroutine.
+// This is used only for scoping resolution stacks to a single goroutine.
+func currentGoroutineID() uint64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	const prefix = "goroutine "
+	if n <= len(prefix) {
+		return 0
+	}
+
+	var id uint64
+	for i := len(prefix); i < n; i++ {
+		b := buf[i]
+		if b < '0' || b > '9' {
+			break
+		}
+		id = id*10 + uint64(b-'0')
+	}
+	return id
+}
+
+func (c *DIContainer) pushResolve(gid uint64, serviceType reflect.Type) error {
+	c.stackMu.Lock()
+	defer c.stackMu.Unlock()
+
+	stack := c.stacks[gid]
+	for _, t := range stack {
+		if t == serviceType {
+			return fmt.Errorf("circular dependency detected: %s", serviceType.String())
+		}
+	}
+
+	c.stacks[gid] = append(stack, serviceType)
+	return nil
+}
+
+func (c *DIContainer) popResolve(gid uint64) {
+	c.stackMu.Lock()
+	defer c.stackMu.Unlock()
+
+	stack := c.stacks[gid]
+	if len(stack) == 0 {
+		return
+	}
+	stack = stack[:len(stack)-1]
+	if len(stack) == 0 {
+		delete(c.stacks, gid)
+		return
+	}
+	c.stacks[gid] = stack
 }
 
 // Register registers a service instance in the container with singleton lifecycle.
@@ -148,17 +203,13 @@ func (c *DIContainer) RegisterFactory(serviceType reflect.Type, factory func(*DI
 //	}
 //	db = service.(*DatabaseService)
 func (c *DIContainer) Resolve(serviceType reflect.Type) (any, error) {
-	c.mu.RLock()
-
-	// Check for circular dependencies
-	for _, t := range c.resolutionStack {
-		if t == serviceType {
-			c.mu.RUnlock()
-			return nil, fmt.Errorf("circular dependency detected: %s", serviceType.String())
-		}
+	gid := currentGoroutineID()
+	if err := c.pushResolve(gid, serviceType); err != nil {
+		return nil, err
 	}
+	defer c.popResolve(gid)
 
-	// Check if service is already registered
+	c.mu.RLock()
 	registration, exists := c.services[serviceType]
 	c.mu.RUnlock()
 
@@ -175,11 +226,6 @@ func (c *DIContainer) Resolve(serviceType reflect.Type) (any, error) {
 		return registration.Instance, nil
 	}
 
-	// Add to resolution stack for circular dependency detection
-	c.mu.Lock()
-	c.resolutionStack = append(c.resolutionStack, serviceType)
-	c.mu.Unlock()
-
 	// Create new instance
 	var instance any
 	var err error
@@ -187,17 +233,13 @@ func (c *DIContainer) Resolve(serviceType reflect.Type) (any, error) {
 	if registration.Factory != nil {
 		// Use factory function
 		instance = registration.Factory(c)
-	} else {
-		// Try to create instance using reflection
-		instance, err = c.createInstance(serviceType)
-		if err != nil {
-			// Remove from resolution stack
-			c.mu.Lock()
-			c.resolutionStack = c.resolutionStack[:len(c.resolutionStack)-1]
-			c.mu.Unlock()
-			return nil, err
+		} else {
+			// Try to create instance using reflection
+			instance, err = c.createInstance(serviceType)
+			if err != nil {
+				return nil, err
+			}
 		}
-	}
 
 	// Register instance based on lifecycle
 	c.mu.Lock()
@@ -205,8 +247,6 @@ func (c *DIContainer) Resolve(serviceType reflect.Type) (any, error) {
 		registration.Instance = instance
 		c.services[serviceType] = registration
 	}
-	// Remove from resolution stack
-	c.resolutionStack = c.resolutionStack[:len(c.resolutionStack)-1]
 	c.mu.Unlock()
 
 	return instance, nil
@@ -395,7 +435,9 @@ func (c *DIContainer) Clear() {
 	defer c.mu.Unlock()
 
 	c.services = make(map[reflect.Type]DIRegistration)
-	c.resolutionStack = make([]reflect.Type, 0)
+	c.stackMu.Lock()
+	c.stacks = make(map[uint64][]reflect.Type)
+	c.stackMu.Unlock()
 }
 
 // GetRegistrations returns a list of all registered services.

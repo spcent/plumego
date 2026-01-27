@@ -257,15 +257,15 @@ func TestResourceControllerAdvanced(t *testing.T) {
 		t.Errorf("Show should return 501, got %d", rec.Code)
 	}
 
-	var resp map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
+		var resp contract.ErrorResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
 
-	if resp["code"].(float64) != 501 {
-		t.Errorf("expected code 501, got %v", resp["code"])
+		if resp.Error.Code != http.StatusText(http.StatusNotImplemented) {
+			t.Errorf("expected code %q, got %q", http.StatusText(http.StatusNotImplemented), resp.Error.Code)
+		}
 	}
-}
 
 // TestStaticFileSecurity tests security features of static file serving
 func TestStaticFileSecurity(t *testing.T) {

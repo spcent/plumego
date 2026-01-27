@@ -56,6 +56,7 @@ func (w *worker) Health() (string, health.HealthStatus) {
 - Expose `/metrics` on an authenticated or internal path if your deployment requires it; the handler is plain `http.Handler` and can sit behind middleware.
 - Keep readiness checks fast—avoid downstream calls or large allocations.
 - Pair logging middleware with Prometheus/OTel collectors so every request gets correlated metrics and trace IDs automatically.
+- `metrics.NewBaseMetricsCollector()` retains up to 10k records by default; call `WithMaxRecords(n)` to tune or `WithMaxRecords(0)` to disable retention.
 
 ## Where to look in the repo
 - `metrics/prometheus.go` and `metrics/otel.go`: collector and tracer adapters.

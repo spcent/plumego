@@ -33,8 +33,8 @@ func NewRouteCache(capacity int) *RouteCache {
 
 // Get retrieves a cached route match result
 func (rc *RouteCache) Get(key string) (*MatchResult, bool) {
-	rc.mu.RLock()
-	defer rc.mu.RUnlock()
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
 
 	element, exists := rc.cache[key]
 	if !exists {
