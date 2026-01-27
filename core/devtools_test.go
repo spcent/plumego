@@ -45,9 +45,13 @@ func TestDevToolsRoutesJSONEndpoint(t *testing.T) {
 		t.Fatalf("failed to decode payload: %v", err)
 	}
 
-	routes, ok := payload["routes"].([]any)
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected data object, got %#v", payload["data"])
+	}
+	routes, ok := data["routes"].([]any)
 	if !ok || len(routes) == 0 {
-		t.Fatalf("expected routes array, got %#v", payload["routes"])
+		t.Fatalf("expected routes array, got %#v", data["routes"])
 	}
 }
 
@@ -69,8 +73,12 @@ func TestDevToolsConfigEndpoint(t *testing.T) {
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode config payload: %v", err)
 	}
-	if debug, ok := payload["debug"].(bool); !ok || !debug {
-		t.Fatalf("expected debug true, got %#v", payload["debug"])
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected data object, got %#v", payload["data"])
+	}
+	if debug, ok := data["debug"].(bool); !ok || !debug {
+		t.Fatalf("expected debug true, got %#v", data["debug"])
 	}
 }
 

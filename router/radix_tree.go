@@ -174,11 +174,13 @@ func (rt *RadixTree) Find(method, path string) *MatchResult {
 	defer rt.mu.RUnlock()
 
 	root := rt.root[method]
+	routeMethod := method
 	if root == nil {
 		root = rt.root[ANY]
 		if root == nil {
 			return nil
 		}
+		routeMethod = ANY
 	}
 
 	if path == "/" {
@@ -188,13 +190,19 @@ func (rt *RadixTree) Find(method, path string) *MatchResult {
 				ParamValues:      nil,
 				ParamKeys:        root.paramKeys,
 				RouteMiddlewares: root.middlewares,
+				RoutePattern:     root.fullPath,
+				RouteMethod:      routeMethod,
 			}
 		}
 		return nil
 	}
 
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	return rt.matchRecursive(root, parts, 0, nil, nil)
+	result := rt.matchRecursive(root, parts, 0, nil, nil)
+	if result != nil {
+		result.RouteMethod = routeMethod
+	}
+	return result
 }
 
 // matchRecursive performs recursive matching in the radix tree.
@@ -218,6 +226,7 @@ func (rt *RadixTree) matchRecursive(node *RadixNode, parts []string, idx int, pa
 				ParamValues:      paramValues,
 				ParamKeys:        paramKeys,
 				RouteMiddlewares: node.middlewares,
+				RoutePattern:     node.fullPath,
 			}
 		}
 		return nil
@@ -260,6 +269,7 @@ func (rt *RadixTree) matchRecursive(node *RadixNode, parts []string, idx int, pa
 					ParamValues:      newParamValues,
 					ParamKeys:        newParamKeys,
 					RouteMiddlewares: child.middlewares,
+					RoutePattern:     child.fullPath,
 				}
 			}
 		}

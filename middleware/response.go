@@ -1,8 +1,9 @@
 package middleware
 
 import (
-	"encoding/json"
 	"net/http"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Response represents a standardized JSON response structure.
@@ -20,6 +21,8 @@ import (
 //		Data: map[string]string{"user": "john"},
 //	}
 //	middleware.JSON(w, http.StatusOK, response)
+//
+// Deprecated: use contract.Response or contract.WriteResponse instead.
 type Response struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`
@@ -49,8 +52,7 @@ type Response struct {
 //
 // Note: This function ignores encoding errors. For production use,
 // consider handling errors appropriately.
+// Deprecated: use contract.WriteJSON or contract.WriteResponse instead.
 func JSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(data)
+	_ = contract.WriteJSON(w, status, data)
 }

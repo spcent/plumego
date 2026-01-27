@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -335,6 +336,64 @@ func TestWithComponents(t *testing.T) {
 	opt(app)
 	if len(app.components) != 2 {
 		t.Errorf("expected 2 components, got %d", len(app.components))
+	}
+}
+
+func TestWithRequestID(t *testing.T) {
+	app := New(WithRequestID())
+	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Header().Get("X-Request-ID") == "" {
+		t.Fatalf("expected X-Request-ID to be set")
+	}
+}
+
+func TestWithRecommendedMiddleware(t *testing.T) {
+	app := New(WithRecommendedMiddleware())
+	if !app.requestIDEnabled {
+		t.Fatalf("expected request id to be enabled")
+	}
+	if !app.loggingEnabled {
+		t.Fatalf("expected logging to be enabled")
+	}
+	if !app.recoveryEnabled {
+		t.Fatalf("expected recovery to be enabled")
+	}
+
+	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Header().Get("X-Request-ID") == "" {
+		t.Fatalf("expected X-Request-ID to be set")
+	}
+}
+
+func TestWithMethodNotAllowed(t *testing.T) {
+	app := New(WithMethodNotAllowed(true))
+	app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/only", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+	if rec.Header().Get("Allow") != http.MethodGet {
+		t.Fatalf("expected Allow header to include GET")
 	}
 }
 

@@ -17,7 +17,7 @@
 - 若该方法树不存在，回退到 `ANY` 树。
 - 若方法树未命中，会再次尝试 `ANY` 树。
 - 仍未命中则返回 `404 Not Found`。
-- Router 不产生 `405 Method Not Allowed`；方法不匹配会返回 `404`（除非 `ANY` 命中）。
+- `405 Method Not Allowed` 默认关闭，可通过 `router.WithMethodNotAllowed(true)` 启用并返回 `Allow`。
 
 ## 路径归一化
 - 使用 `req.URL.Path` 原始值（不做 URL 解码）。
@@ -26,13 +26,25 @@
 - 内部重复 `/` 不会被归一化（例如 `/a//b` 按原样匹配，通常无法命中 `/a/:id`）。
 
 ## 参数提取
-- 参数值来自原始路径段（Router 不做 URL 解码）。
+- 参数值来自 `req.URL.Path`（Router 不做额外解码）。
+- `net/http` 会对 `URL.Path` 做百分号解码（例如 `%20` 会变成空格）。
 - 参数 key 按路由定义顺序生成。
 - 若出现重复参数 key，后者会覆盖前者。
 - 通配参数包含 `/`（例如 `/files/*path` → `path = "a/b/c.txt"`）。
+- `%2F` 会被 `net/http` 解码为 `/`，因此单段参数不会命中；通配参数会捕获剩余路径（`a/b`）。
 - 参数注入到请求上下文：
   - `contract.ParamsContextKey`（params map）
   - `contract.RequestContextKey`（RequestContext 中含 Params）
+- Router 参数会覆盖请求上下文中已有的同名参数。
+- 命中路由后，Router 还会写入：
+  - `RequestContext.RoutePattern`（命中的路由模式）
+  - `RequestContext.RouteName`（如果设置）
+
+## 缓存行为
+- Router 使用“规范化后的 path”作为缓存 key（非根路径会去掉多余斜杠与末尾斜杠）。
+- 缓存 key 会包含请求 method 与 host。
+- 当 middleware 注册发生变化时，缓存会失效（middleware version 增长）。
+- 缓存仅是性能优化，不改变匹配语义。
 
 ## 中间件顺序（Router 级）
 - 全局中间件（`router.Use`）先执行。

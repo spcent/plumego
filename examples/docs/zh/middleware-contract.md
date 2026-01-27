@@ -20,6 +20,7 @@
 - 必须保留 `context.Context`，允许附加请求级数据。
 - 推荐使用 `contract` 中定义的标准 key（如 `ContextWithPrincipal`）。
 - 除非文档声明，禁止使用全局可变状态。
+- 中间件注册应在启动阶段完成，Registry 本身不保证并发安全。
 
 ## 响应行为
 - 中间件调用 `next` 后不应再次写 header/body，除非明确负责响应。

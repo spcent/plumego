@@ -24,6 +24,7 @@ app.GetHandler("/health/build", health.BuildInfoHandler())
 
 - `ReadinessHandler` 在启动完成后返回 200，启动/关闭阶段返回 503。
 - `BuildInfoHandler` 以 JSON 形式暴露 `health.BuildInfo`（版本、提交、构建时间）；可通过 ldflags 注入。
+- 错误响应使用 contract 统一错误结构（`contract.APIError`），并在可用时包含 `trace_id`。
 
 ## 健康指标
 为 `HealthManager` 绑定指标采集器后，可输出结构化健康指标：

@@ -24,6 +24,7 @@ app.GetHandler("/health/build", health.BuildInfoHandler())
 
 - `ReadinessHandler` returns 200 after boot flips the ready flag; returns 503 during startup/shutdown.
 - `BuildInfoHandler` surfaces `health.BuildInfo` (version, commit, build time) as JSON; set these fields via ldflags at build time.
+- Error responses use the contract error envelope (`contract.APIError`) with consistent `trace_id` when available.
 
 ## Health metrics
 Attach a collector to a `HealthManager` to expose structured health metrics:

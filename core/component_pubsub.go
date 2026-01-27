@@ -41,18 +41,18 @@ func (c *pubSubDebugComponent) RegisterRoutes(r *router.Router) {
 
 		r.GetCtx(path, func(ctx *contract.Ctx) {
 			if pub == nil {
-				ctx.ErrorJSON(http.StatusInternalServerError, "missing_pubsub", "pubsub is not configured", nil)
+				writeContractError(ctx, http.StatusInternalServerError, "missing_pubsub", "pubsub is not configured")
 				return
 			}
 
 			type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
 
 			if ps, ok := pub.(snapshoter); ok {
-				ctx.JSON(http.StatusOK, ps.Snapshot())
+				writeContractResponse(ctx, http.StatusOK, ps.Snapshot())
 				return
 			}
 
-			ctx.ErrorJSON(http.StatusNotImplemented, "not_supported", "pubsub snapshot not supported by this implementation", nil)
+			writeContractError(ctx, http.StatusNotImplemented, "not_supported", "pubsub snapshot not supported by this implementation")
 		})
 	})
 }

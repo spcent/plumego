@@ -38,6 +38,7 @@ type App struct {
 	tracer           middleware.Tracer
 	pub              pubsub.PubSub
 	loggingEnabled   bool
+	requestIDEnabled bool
 	recoveryEnabled  bool
 	corsEnabled      bool
 	corsOptions      *middleware.CORSOptions
@@ -51,6 +52,9 @@ type App struct {
 	runners        []Runner
 	startedRunners []Runner
 	runnerStopOnce sync.Once
+
+	shutdownHooks []ShutdownHook
+	shutdownOnce  sync.Once
 
 	// Dependency injection container
 	diContainer *DIContainer

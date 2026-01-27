@@ -5,6 +5,7 @@ Plumego 的中间件与标准 `http.Handler` 兼容，可通过 `app.Use(...)` �
 ## 内置中间件
 - **恢复**：`core.WithRecovery()` 捕获 panic，记录栈并返回结构化错误。
 - **日志**：`core.WithLogging()` 采集请求/响应信息，与 `core.WithMetricsCollector`、`core.WithTracer` 注入的指标/追踪对接。
+- **Request ID**：`middleware.RequestID()` 注入 `X-Request-ID` 并写入 context 以便关联日志。
 - **CORS**：`core.WithCORS()` 提供宽松默认值，可用 `core.WithCORSOptions(...)` 或 `middleware.CORSWithOptions(...)` 自定义。
 - **Gzip**：`middleware.Gzip()` 在客户端声明 `Accept-Encoding: gzip` 时压缩响应。
 - **超时**：`middleware.Timeout(duration)` 为单个请求设定截止时间。
@@ -37,7 +38,7 @@ secured.Get("/stats", middleware.TimeoutFunc(1*time.Second)(func(w http.Response
 ### 使用 `contract.Ctx` 辅助
 ```go
 app.GetCtx("/echo/:msg", middleware.WrapCtx(middleware.Timeout(2*time.Second), func(ctx *contract.Ctx) {
-    ctx.JSON(http.StatusOK, map[string]any{"echo": ctx.Param("msg")})
+    _ = ctx.Response(http.StatusOK, map[string]any{"echo": ctx.Param("msg")}, nil)
 }))
 ```
 

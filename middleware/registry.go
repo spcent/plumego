@@ -7,6 +7,9 @@ package middleware
 // assembled. This is useful for modular applications where different
 // components need to add their own middleware.
 //
+// Registry is not goroutine-safe; register middleware during startup
+// before the HTTP server begins serving requests.
+//
 // Example:
 //
 //	import "github.com/spcent/plumego/middleware"

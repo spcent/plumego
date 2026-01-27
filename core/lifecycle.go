@@ -59,6 +59,7 @@ func (a *App) Boot() error {
 	if err := a.startServer(); err != nil && err != http.ErrServerClosed {
 		a.stopRunners(context.Background())
 		a.stopComponents(context.Background())
+		a.runShutdownHooks(context.Background())
 		return err
 	}
 
@@ -191,6 +192,7 @@ func (a *App) startServer() error {
 
 		a.stopRunners(ctx)
 		a.stopComponents(ctx)
+		a.runShutdownHooks(ctx)
 		close(idleConnsClosed)
 	}()
 
@@ -219,6 +221,7 @@ func (a *App) startServer() error {
 	health.SetNotReady("shutting down")
 	a.stopRunners(context.Background())
 	a.stopComponents(context.Background())
+	a.runShutdownHooks(context.Background())
 
 	<-idleConnsClosed
 

@@ -99,17 +99,17 @@ type targetDTO struct {
 func webhookCreateTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	var req webhookout.Target
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.ErrorJSON(http.StatusBadRequest, "invalid_json", "invalid JSON payload", nil)
+		writeContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	t, err := svc.CreateTarget(ctx.R.Context(), req)
 	if err != nil {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", err.Error(), nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, targetToDTO(t))
+	writeContractResponse(ctx, http.StatusCreated, targetToDTO(t))
 }
 
 func webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
@@ -127,7 +127,7 @@ func webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
 		Event:   event,
 	})
 	if err != nil {
-		ctx.ErrorJSON(http.StatusInternalServerError, "store_error", err.Error(), nil)
+		writeContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
 		return
 	}
 
@@ -136,71 +136,71 @@ func webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
 		out = append(out, targetToDTO(t))
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{"items": out})
+	writeContractResponse(ctx, http.StatusOK, map[string]any{"items": out})
 }
 
 func webhookGetTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	t, ok := svc.GetTarget(ctx.R.Context(), id)
 	if !ok {
-		ctx.ErrorJSON(http.StatusNotFound, "not_found", "target not found", nil)
+		writeContractError(ctx, http.StatusNotFound, "not_found", "target not found")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, targetToDTO(t))
+	writeContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookPatchTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	var req webhookout.TargetPatch
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.ErrorJSON(http.StatusBadRequest, "invalid_json", "invalid JSON payload", nil)
+		writeContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, req)
 	if err != nil {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", err.Error(), nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, targetToDTO(t))
+	writeContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookSetTargetEnabled(ctx *contract.Ctx, svc *webhookout.Service, enable bool) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, webhookout.TargetPatch{Enabled: &enable})
 	if err != nil {
 		if err == webhookout.ErrNotFound {
-			ctx.ErrorJSON(http.StatusNotFound, "not_found", "target not found", nil)
+			writeContractError(ctx, http.StatusNotFound, "not_found", "target not found")
 			return
 		}
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", err.Error(), nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, targetToDTO(t))
+	writeContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, token string, allowEmpty bool) {
 	event, ok := ctx.Param("event")
 	if !ok || strings.TrimSpace(event) == "" {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "event is required", nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", "event is required")
 		return
 	}
 
@@ -210,11 +210,11 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, token strin
 	}
 
 	if token == "" && !allowEmpty {
-		ctx.ErrorJSON(http.StatusForbidden, "forbidden", "triggering is disabled", nil)
+		writeContractError(ctx, http.StatusForbidden, "forbidden", "triggering is disabled")
 		return
 	}
 	if token != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-		ctx.ErrorJSON(http.StatusUnauthorized, "unauthorized", "invalid trigger token", nil)
+		writeContractError(ctx, http.StatusUnauthorized, "unauthorized", "invalid trigger token")
 		return
 	}
 
@@ -223,17 +223,17 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, token strin
 		Meta map[string]any `json:"meta"`
 	}
 	if err := ctx.BindJSON(&payload); err != nil {
-		ctx.ErrorJSON(http.StatusBadRequest, "invalid_json", "invalid JSON payload", nil)
+		writeContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	enqueued, err := svc.TriggerEvent(ctx.R.Context(), webhookout.Event{Type: event, Data: payload.Data, Meta: payload.Meta})
 	if err != nil {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", err.Error(), nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusAccepted, map[string]any{
+	writeContractResponse(ctx, http.StatusAccepted, map[string]any{
 		"enqueued": enqueued,
 		"event":    event,
 	})
@@ -274,7 +274,7 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *webhookout.Service, defaultLi
 
 	deliveries, err := svc.ListDeliveries(ctx.R.Context(), filter)
 	if err != nil {
-		ctx.ErrorJSON(http.StatusInternalServerError, "store_error", err.Error(), nil)
+		writeContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
 		return
 	}
 
@@ -314,25 +314,25 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *webhookout.Service, defaultLi
 	}
 
 	resp := map[string]any{"items": out}
-	ctx.JSON(http.StatusOK, resp)
+	writeContractResponse(ctx, http.StatusOK, resp)
 }
 
 func webhookGetDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	d, ok := svc.GetDelivery(ctx.R.Context(), id)
 	if !ok {
-		ctx.ErrorJSON(http.StatusNotFound, "not_found", "delivery not found", nil)
+		writeContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
 		return
 	}
 
 	payload := json.RawMessage(d.PayloadJSON)
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	writeContractResponse(ctx, http.StatusOK, map[string]any{
 		"id":                d.ID,
 		"target_id":         d.TargetID,
 		"event_id":          d.EventID,
@@ -353,21 +353,21 @@ func webhookGetDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 func webhookReplayDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", "id is required", nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	d, err := svc.ReplayDelivery(ctx.R.Context(), id)
 	if errors.Is(err, webhookout.ErrNotFound) {
-		ctx.ErrorJSON(http.StatusNotFound, "not_found", "delivery not found", nil)
+		writeContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
 		return
 	}
 	if err != nil {
-		ctx.ErrorJSON(http.StatusBadRequest, "bad_request", err.Error(), nil)
+		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID})
+	writeContractResponse(ctx, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID})
 }
 
 func targetToDTO(t webhookout.Target) targetDTO {

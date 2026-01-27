@@ -35,7 +35,12 @@ func (a *App) applyGuardrails() {
 	cfg := a.configSnapshot()
 	a.mu.RLock()
 	logger := a.logger
+	requestIDEnabled := a.requestIDEnabled
 	a.mu.RUnlock()
+
+	if requestIDEnabled {
+		guards = append(guards, middleware.RequestID())
+	}
 
 	if cfg.Debug {
 		cfg := middleware.DefaultDebugErrorConfig()
@@ -104,6 +109,23 @@ func (a *App) enableLogging() error {
 	return nil
 }
 
+func (a *App) enableRequestID() error {
+	a.mu.RLock()
+	enabled := a.requestIDEnabled
+	a.mu.RUnlock()
+	if enabled {
+		return nil
+	}
+	if err := a.ensureMutable("enable_request_id", "enable request id"); err != nil {
+		return err
+	}
+
+	a.mu.Lock()
+	a.requestIDEnabled = true
+	a.mu.Unlock()
+	return nil
+}
+
 func (a *App) loggingMiddleware() middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		a.mu.RLock()
@@ -127,7 +149,11 @@ type metricsAdapter struct {
 
 func (m *metricsAdapter) Observe(ctx context.Context, metrics middleware.RequestMetrics) {
 	if m.collector != nil {
-		m.collector.ObserveHTTP(ctx, metrics.Method, metrics.Path, metrics.Status, metrics.Bytes, metrics.Duration)
+		path := metrics.Path
+		if metrics.Route != "" {
+			path = metrics.Route
+		}
+		m.collector.ObserveHTTP(ctx, metrics.Method, path, metrics.Status, metrics.Bytes, metrics.Duration)
 	}
 }
 

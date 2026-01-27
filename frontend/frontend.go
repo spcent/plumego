@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
 )
 
@@ -225,7 +226,12 @@ type handler struct {
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusMethodNotAllowed,
+			Code:     "method_not_allowed",
+			Message:  "method not allowed",
+			Category: contract.CategoryClient,
+		})
 		return
 	}
 

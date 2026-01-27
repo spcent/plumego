@@ -118,6 +118,8 @@ type MyController struct {
 // 自动获得改进的JSON响应处理
 ```
 
+推荐使用 `contract.WriteResponse` / `BaseResourceController.Response` 输出标准化 JSON，并自动携带 trace id。
+
 ## 测试覆盖
 
 ### 新增测试文件

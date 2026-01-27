@@ -23,7 +23,9 @@ import (
 // RequestContext contains request-scoped data that should be shared across middleware and handlers.
 // It preserves compatibility with the standard library by living inside the request's context.
 type RequestContext struct {
-	Params map[string]string
+	Params       map[string]string
+	RoutePattern string
+	RouteName    string
 }
 
 type RequestContextKey struct{}
@@ -169,6 +171,16 @@ func RequestContextFrom(ctx context.Context) RequestContext {
 	return RequestContext{Params: ParamsFromContext(ctx)}
 }
 
+// RoutePatternFromContext returns the matched route pattern stored in the request context.
+func RoutePatternFromContext(ctx context.Context) string {
+	return RequestContextFrom(ctx).RoutePattern
+}
+
+// RouteNameFromContext returns the matched route name stored in the request context.
+func RouteNameFromContext(ctx context.Context) string {
+	return RequestContextFrom(ctx).RouteName
+}
+
 // Param returns a single path parameter from the request's context.
 // The boolean indicates whether the parameter was present.
 func Param(r *http.Request, key string) (string, bool) {
@@ -273,6 +285,14 @@ func (c *Ctx) ErrorJSON(status int, errCode string, message string, details map[
 		Category: CategoryBusiness,
 	}
 	return c.JSON(status, payload)
+}
+
+// Response writes a standardized success response that includes trace id when available.
+func (c *Ctx) Response(status int, data any, meta map[string]any) error {
+	if c == nil {
+		return ErrContextNil
+	}
+	return WriteResponse(c.W, c.R, status, data, meta)
 }
 
 // JSON writes a JSON response with the given status code.

@@ -99,6 +99,7 @@ type MiddlewareManager struct {
 	middlewares []middleware.Middleware
 	mu          sync.RWMutex
 	metrics     metrics.MetricsCollector // Unified metrics collector for monitoring
+	version     uint64
 }
 
 // NewMiddlewareManager creates a new middleware manager with an empty middleware chain.
@@ -130,6 +131,7 @@ func (mm *MiddlewareManager) AddMiddleware(m middleware.Middleware) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 	mm.middlewares = append(mm.middlewares, m)
+	mm.version++
 }
 
 // GetMiddlewares returns a copy of all middlewares in the manager.
@@ -149,6 +151,13 @@ func (mm *MiddlewareManager) GetMiddlewares() []middleware.Middleware {
 	result := make([]middleware.Middleware, len(mm.middlewares))
 	copy(result, mm.middlewares)
 	return result
+}
+
+// Version returns the current middleware version for cache invalidation.
+func (mm *MiddlewareManager) Version() uint64 {
+	mm.mu.RLock()
+	defer mm.mu.RUnlock()
+	return mm.version
 }
 
 // MergeMiddlewares merges another middleware manager's middlewares with this manager's middlewares.
@@ -241,6 +250,7 @@ type Router struct {
 	routeValidations  map[string]*RouteValidation // Route parameter validations
 	validationIndex   map[string][]validationEntry
 	routeMeta         map[string]RouteMeta
+	methodNotAllowed  bool
 }
 
 // RouterOption defines a function type for router configuration options.
@@ -319,6 +329,13 @@ func WithLogger(logger log.StructuredLogger) RouterOption {
 	}
 }
 
+// WithMethodNotAllowed enables returning 405 with Allow header when path matches another method.
+func WithMethodNotAllowed(enabled bool) RouterOption {
+	return func(r *Router) {
+		r.methodNotAllowed = enabled
+	}
+}
+
 // NewRouter creates a new Router instance with default configuration.
 // The router is ready to accept route registrations immediately after creation.
 //
@@ -376,6 +393,20 @@ func (r *Router) SetLogger(logger log.StructuredLogger) {
 	defer r.mu.Unlock()
 
 	r.logger = logger
+}
+
+// SetMethodNotAllowed toggles 405 responses when another method matches the path.
+func (r *Router) SetMethodNotAllowed(enabled bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.methodNotAllowed = enabled
+}
+
+// MethodNotAllowedEnabled reports whether 405 handling is enabled.
+func (r *Router) MethodNotAllowedEnabled() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.methodNotAllowed
 }
 
 // Freeze prevents the router from accepting new route registrations.
@@ -968,8 +999,15 @@ func (r *Router) fullPath(path string) string {
 //	// Or use with other handlers
 //	http.Handle("/", r)
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// Parse and normalize request path first
+	path := r.normalizePath(req.URL.Path)
+	cachePath := path
+	if path != "/" {
+		cachePath = "/" + path
+	}
+
 	// Check route cache first for better performance
-	cacheKey := req.Method + ":" + req.Host + ":" + req.URL.Path
+	cacheKey := req.Method + ":" + req.Host + ":" + cachePath
 	if cachedResult, exists := r.routeCache.Get(cacheKey); exists {
 		// Use cached result without holding the lock
 		r.handleCachedRouteMatch(w, req, cachedResult)
@@ -983,12 +1021,12 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Find appropriate route tree for the request method
 	tree, found := r.findRouteTree(req.Method)
 	if !found {
+		if r.writeMethodNotAllowed(w, req, path) {
+			return
+		}
 		http.NotFound(w, req)
 		return
 	}
-
-	// Parse and normalize request path
-	path := r.normalizePath(req.URL.Path)
 
 	// Try to match route and handle request
 	r.handleRouteMatch(w, req, tree, path, cacheKey)
@@ -1026,18 +1064,40 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 	parts := strings.Split(path, "/")
 	matcher := NewRouteMatcher(tree)
 	result := matcher.Match(parts)
+	matchedAny := false
 
 	// Try ANY method if specific method didn't match
 	if result == nil && req.Method != ANY {
 		if anyTree := r.trees[ANY]; anyTree != nil {
 			anyMatcher := NewRouteMatcher(anyTree)
 			result = anyMatcher.Match(parts)
+			if result != nil {
+				matchedAny = true
+			}
 		}
 	}
 
 	if result == nil {
+		if r.writeMethodNotAllowed(w, req, path) {
+			return
+		}
 		http.NotFound(w, req)
 		return
+	}
+
+	if result.RouteMethod == "" {
+		if matchedAny {
+			result.RouteMethod = ANY
+		} else {
+			result.RouteMethod = req.Method
+		}
+	}
+	if result.RoutePattern == "" {
+		if path == "/" {
+			result.RoutePattern = "/"
+		} else {
+			result.RoutePattern = "/" + path
+		}
 	}
 
 	// Build parameter map
@@ -1056,13 +1116,25 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 	// Cache the matching result for future requests
 	r.routeCache.Set(cacheKey, result)
 
-	r.applyMiddlewareAndServe(w, req, params, result.Handler, result.RouteMiddlewares)
+	r.applyMiddlewareAndServe(w, req, params, result)
 }
 
 // handleCachedRouteMatch handles requests using cached route matching results
 func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request, result *MatchResult) {
 	// Build parameter map
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
+
+	if result.RouteMethod == "" {
+		result.RouteMethod = req.Method
+	}
+	if result.RoutePattern == "" {
+		path := r.normalizePath(req.URL.Path)
+		if path == "/" {
+			result.RoutePattern = "/"
+		} else {
+			result.RoutePattern = "/" + path
+		}
+	}
 
 	// Validate parameters if validations are registered
 	if params != nil {
@@ -1074,7 +1146,7 @@ func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request
 		}
 	}
 
-	r.applyMiddlewareAndServe(w, req, params, result.Handler, result.RouteMiddlewares)
+	r.applyMiddlewareAndServe(w, req, params, result)
 }
 
 // handleRootRequest handles requests to the root path "/"
@@ -1086,12 +1158,14 @@ func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tre
 			ParamValues:      nil,
 			ParamKeys:        nil,
 			RouteMiddlewares: tree.middlewares,
+			RoutePattern:     "/",
+			RouteMethod:      req.Method,
 		}
 
 		// Cache the result for future requests
 		r.routeCache.Set(cacheKey, result)
 
-		r.applyMiddlewareAndServe(w, req, nil, tree.handler, result.RouteMiddlewares)
+		r.applyMiddlewareAndServe(w, req, nil, result)
 		return
 	}
 	if req.Method != ANY {
@@ -1101,11 +1175,16 @@ func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tre
 				ParamValues:      nil,
 				ParamKeys:        nil,
 				RouteMiddlewares: anyTree.middlewares,
+				RoutePattern:     "/",
+				RouteMethod:      ANY,
 			}
 			r.routeCache.Set(cacheKey, result)
-			r.applyMiddlewareAndServe(w, req, nil, anyTree.handler, result.RouteMiddlewares)
+			r.applyMiddlewareAndServe(w, req, nil, result)
 			return
 		}
+	}
+	if r.writeMethodNotAllowed(w, req, "/") {
+		return
 	}
 	http.NotFound(w, req)
 }
@@ -1133,7 +1212,7 @@ func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[str
 }
 
 // applyMiddlewareAndServe applies middleware chain to the handler and serves the request
-func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, handler http.Handler, routeMiddlewares []middleware.Middleware) {
+func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *MatchResult) {
 	reqWithParams := req
 	ctx := req.Context()
 
@@ -1151,26 +1230,95 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	if len(params) > 0 {
 		existingRC.Params = params
 	}
+	if result != nil {
+		if result.RoutePattern != "" {
+			existingRC.RoutePattern = result.RoutePattern
+		}
+		meta := r.routeMeta[r.routeKey(result.RouteMethod, result.RoutePattern)]
+		if meta.Name != "" {
+			existingRC.RouteName = meta.Name
+		}
+	}
 
 	ctx = context.WithValue(ctx, contract.RequestContextKey{}, existingRC)
 	if ctx != req.Context() {
 		reqWithParams = req.WithContext(ctx)
+		*req = *reqWithParams
+		reqWithParams = req
+	}
+
+	if result == nil {
+		return
+	}
+
+	version := r.middlewareManager.Version()
+	if cached, ok := result.loadCached(version); ok {
+		cached.ServeHTTP(w, reqWithParams)
+		return
 	}
 
 	// Combine middleware slices directly
 	allMiddlewares := r.middlewareManager.GetMiddlewares()
-	combined := make([]middleware.Middleware, 0, len(allMiddlewares)+len(routeMiddlewares))
+	combined := make([]middleware.Middleware, 0, len(allMiddlewares)+len(result.RouteMiddlewares))
 	combined = append(combined, allMiddlewares...)
-	combined = append(combined, routeMiddlewares...)
+	combined = append(combined, result.RouteMiddlewares...)
 
 	if len(combined) == 0 {
-		handler.ServeHTTP(w, reqWithParams)
+		result.Handler.ServeHTTP(w, reqWithParams)
 		return
 	}
 
 	chain := middleware.NewChain(combined...)
-	wrappedHandler := chain.Apply(handler)
+	wrappedHandler := chain.Apply(result.Handler)
+	result.storeCached(version, wrappedHandler)
 	wrappedHandler.ServeHTTP(w, reqWithParams)
+}
+
+func (r *Router) writeMethodNotAllowed(w http.ResponseWriter, req *http.Request, path string) bool {
+	if !r.methodNotAllowed {
+		return false
+	}
+	allowed := r.allowedMethods(path)
+	if len(allowed) == 0 {
+		return false
+	}
+	w.Header().Set("Allow", strings.Join(allowed, ", "))
+	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	return true
+}
+
+func (r *Router) allowedMethods(path string) []string {
+	normalized := path
+	if normalized == "" {
+		normalized = "/"
+	}
+
+	var parts []string
+	if normalized != "/" {
+		parts = strings.Split(strings.Trim(normalized, "/"), "/")
+	}
+
+	allowed := make([]string, 0)
+	for method, tree := range r.trees {
+		if method == ANY || tree == nil {
+			continue
+		}
+		if normalized == "/" {
+			if tree.handler != nil {
+				allowed = append(allowed, method)
+			}
+			continue
+		}
+		matcher := NewRouteMatcher(tree)
+		if matcher.Match(parts) != nil {
+			allowed = append(allowed, method)
+		}
+	}
+
+	if len(allowed) > 1 {
+		sort.Strings(allowed)
+	}
+	return allowed
 }
 
 // compilePathSegments parses a URL path into route segments

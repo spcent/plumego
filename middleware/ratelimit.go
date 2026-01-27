@@ -588,9 +588,12 @@ func RateLimit(rate float64, capacity int, cleanupInterval, maxIdleTime time.Dur
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := r.RemoteAddr
 			if !limiter.Allow(ip) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusTooManyRequests)
-				w.Write([]byte(`{"error":"Too many requests, please try again later"}`))
+				contract.WriteError(w, r, contract.APIError{
+					Status:   http.StatusTooManyRequests,
+					Code:     "rate_limited",
+					Message:  "Too many requests, please try again later",
+					Category: contract.CategoryRateLimit,
+				})
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -607,9 +610,12 @@ func RateLimitFunc(rate float64, capacity int, cleanupInterval, maxIdleTime time
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := r.RemoteAddr
 			if !limiter.Allow(ip) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusTooManyRequests)
-				w.Write([]byte(`{"error":"Too many requests, please try again later"}`))
+				contract.WriteError(w, r, contract.APIError{
+					Status:   http.StatusTooManyRequests,
+					Code:     "rate_limited",
+					Message:  "Too many requests, please try again later",
+					Category: contract.CategoryRateLimit,
+				})
 				return
 			}
 			next.ServeHTTP(w, r)

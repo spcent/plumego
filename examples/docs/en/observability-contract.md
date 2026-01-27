@@ -10,6 +10,7 @@ and log field names for consistent troubleshooting.
 - If missing, middleware should generate one and inject it into:
   - Response header `X-Request-ID`
   - Context key `contract.TraceIDKey{}`
+  - `middleware.RequestID()` provides this behavior without requiring a tracer.
 
 ## Trace Context
 - Use `contract.TraceContext` when available.
@@ -19,6 +20,7 @@ and log field names for consistent troubleshooting.
 ## Context Field Conventions
 - Read-only identifiers: `trace_id`, `span_id`, `request_id`
 - Request metadata: method, path, status, duration, bytes
+- Route metadata (when available): `route` (pattern) and `route_name`
 - Security-sensitive fields should never include secrets or raw tokens.
 
 ## Log Field Names (Recommended)
@@ -26,6 +28,7 @@ Minimal fields for production troubleshooting:
 - `trace_id`
 - `method`
 - `path`
+- `route`
 - `status`
 - `duration_ms`
 - `bytes`
@@ -35,6 +38,7 @@ Additional fields when available:
 - `request_id`
 - `client_ip`
 - `user_agent`
+- `route_name`
 - `error`
 - `error_code`
 - `error_type`

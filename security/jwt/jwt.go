@@ -742,7 +742,7 @@ func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middlew
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := extractBearerToken(r, m.config.AllowQueryToken) // extract token from request
 			if token == "" {
-				http.Error(w, "missing authorization header", http.StatusUnauthorized)
+				writeAuthError(w, r, http.StatusUnauthorized, "missing_token", "missing authorization header")
 				return
 			}
 
@@ -750,9 +750,9 @@ func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middlew
 			if err != nil {
 				// return detailed error in debug mode
 				if m.config.DebugMode {
-					http.Error(w, fmt.Sprintf("token verification failed: %v", err), http.StatusUnauthorized)
+					writeAuthError(w, r, http.StatusUnauthorized, "invalid_token", fmt.Sprintf("token verification failed: %v", err))
 				} else {
-					http.Error(w, "invalid token", http.StatusUnauthorized)
+					writeAuthError(w, r, http.StatusUnauthorized, "invalid_token", "invalid token")
 				}
 				return
 			}
@@ -781,16 +781,25 @@ func AuthorizeMiddleware(policy AuthZPolicy) middleware.Middleware {
 			raw := r.Context().Value(claimsContextKey)
 			claims, ok := raw.(*TokenClaims)
 			if !ok {
-				http.Error(w, "missing authentication context", http.StatusForbidden)
+				writeAuthError(w, r, http.StatusForbidden, "auth_context_missing", "missing authentication context")
 				return
 			}
 			if !checkPolicy(policy, claims.Authorization) {
-				http.Error(w, "forbidden", http.StatusForbidden)
+				writeAuthError(w, r, http.StatusForbidden, "forbidden", "forbidden")
 				return
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func writeAuthError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
+	contract.WriteError(w, r, contract.APIError{
+		Status:   status,
+		Code:     code,
+		Message:  message,
+		Category: contract.CategoryAuthentication,
+	})
 }
 
 func checkPolicy(policy AuthZPolicy, auth AuthorizationClaims) bool {

@@ -37,7 +37,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.mu.RUnlock()
 
 	if handler == nil {
-		http.Error(w, "handler not configured", http.StatusServiceUnavailable)
+		writeHTTPError(w, r, http.StatusServiceUnavailable, "handler_not_configured", "handler not configured")
 		return
 	}
 

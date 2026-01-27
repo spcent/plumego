@@ -118,6 +118,8 @@ type MyController struct {
 // Automatically gets improved JSON response handling
 ```
 
+Prefer `contract.WriteResponse` / `BaseResourceController.Response` for standardized JSON with trace id.
+
 ## Test Coverage
 
 ### New Test File

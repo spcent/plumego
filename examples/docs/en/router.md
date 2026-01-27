@@ -31,6 +31,15 @@ v1.Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("p
 
 Register everything before `app.Boot()`; the router is frozen during boot to prevent missing registrations.
 
+## Method not allowed handling
+By default, method mismatches return `404`. Enable `405` with:
+
+```go
+r := router.NewRouter(router.WithMethodNotAllowed(true))
+```
+
+When enabled, the router returns `405` and sets the `Allow` header when another method matches the path.
+
 ## Static frontends and catch-alls
 Mount static assets under their own group so cache headers or auth can be isolated.
 

@@ -14,6 +14,10 @@ type Runner interface {
 - 使用 `app.Register(runner)` 或 `core.WithRunner` 注册。
 - 必须在 `Boot()` 之前完成注册。
 
+Shutdown hook：
+- 使用 `app.OnShutdown(func(ctx context.Context) error { ... })` 或 `core.WithShutdownHook` 注册。
+- 必须在 `Boot()` 之前完成注册。
+
 ## 启动顺序
 1. 加载环境配置。
 2. 挂载组件（路由 + 中间件）。
@@ -28,6 +32,7 @@ Runner 必须在 HTTP server 对外服务前启动。
 1. 关闭 HTTP server（优雅退出）。
 2. 停止 Runner（按注册顺序反向）。
 3. 停止组件（按依赖顺序反向）。
+4. 执行 shutdown hook（按注册顺序反向）。
 
 ## Context 约束
 - `Start` / `Stop` 必须遵守 ctx deadline。

@@ -10,9 +10,9 @@ import (
 // the best matching route for a given URL path.
 //
 // Matching strategy:
-//   1. Try static path segments first (exact match)
-//   2. Try parameter segments (dynamic segments like ":id")
-//   3. Try wildcard segments (catch-all segments like "*path")
+//  1. Try static path segments first (exact match)
+//  2. Try parameter segments (dynamic segments like ":id")
+//  3. Try wildcard segments (catch-all segments like "*path")
 //
 // Example:
 //
@@ -107,6 +107,7 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 		ParamValues:      paramValues,
 		ParamKeys:        current.paramKeys,
 		RouteMiddlewares: current.middlewares,
+		RoutePattern:     current.fullPath,
 	}
 }
 

@@ -80,7 +80,7 @@ func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 		secret = strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		ctx.ErrorJSON(http.StatusInternalServerError, "missing_secret", "GITHUB_WEBHOOK_SECRET is not configured", nil)
+		writeContractError(ctx, http.StatusInternalServerError, "missing_secret", "GITHUB_WEBHOOK_SECRET is not configured")
 		return
 	}
 
@@ -90,7 +90,7 @@ func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 	}
 	raw, err := webhookin.VerifyGitHub(ctx.R, secret, maxBody)
 	if err != nil {
-		ctx.ErrorJSON(http.StatusUnauthorized, "invalid_signature", "invalid GitHub signature", nil)
+		writeContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid GitHub signature")
 		return
 	}
 
@@ -105,13 +105,12 @@ func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if delivery != "unknown" && d.SeenBefore("github:"+delivery) {
-		ctx.JSON(http.StatusOK, map[string]any{
+		writeContractResponse(ctx, http.StatusOK, map[string]any{
 			"ok":          true,
 			"provider":    "github",
 			"event_type":  event,
 			"delivery_id": delivery,
 			"deduped":     true,
-			"trace_id":    ctx.TraceID,
 		})
 		return
 	}
@@ -142,14 +141,13 @@ func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 		c.logger.Error("Failed to publish GitHub event", log.Fields{"error": err, "topic": topic, "event_id": delivery})
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	writeContractResponse(ctx, http.StatusOK, map[string]any{
 		"ok":          true,
 		"provider":    "github",
 		"topic":       topic,
 		"event_type":  event,
 		"delivery_id": delivery,
 		"deduped":     false,
-		"trace_id":    ctx.TraceID,
 		"body_bytes":  len(raw),
 	})
 }
@@ -160,7 +158,7 @@ func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 		secret = strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		ctx.ErrorJSON(http.StatusInternalServerError, "missing_secret", "STRIPE_WEBHOOK_SECRET is not configured", nil)
+		writeContractError(ctx, http.StatusInternalServerError, "missing_secret", "STRIPE_WEBHOOK_SECRET is not configured")
 		return
 	}
 
@@ -175,7 +173,7 @@ func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 
 	raw, err := webhookin.VerifyStripe(ctx.R, secret, webhookin.StripeVerifyOptions{MaxBody: maxBody, Tolerance: tol})
 	if err != nil {
-		ctx.ErrorJSON(http.StatusUnauthorized, "invalid_signature", "invalid Stripe signature", nil)
+		writeContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid Stripe signature")
 		return
 	}
 
@@ -190,13 +188,12 @@ func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if evtID != "unknown" && d.SeenBefore("stripe:"+evtID) {
-		ctx.JSON(http.StatusOK, map[string]any{
+		writeContractResponse(ctx, http.StatusOK, map[string]any{
 			"ok":         true,
 			"provider":   "stripe",
 			"event_type": evtType,
 			"event_id":   evtID,
 			"deduped":    true,
-			"trace_id":   ctx.TraceID,
 		})
 		return
 	}
@@ -227,14 +224,13 @@ func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 		c.logger.Error("Failed to publish Stripe event", log.Fields{"error": err, "topic": topic, "event_id": evtID})
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	writeContractResponse(ctx, http.StatusOK, map[string]any{
 		"ok":         true,
 		"provider":   "stripe",
 		"topic":      topic,
 		"event_type": evtType,
 		"event_id":   evtID,
 		"deduped":    false,
-		"trace_id":   ctx.TraceID,
 		"body_bytes": len(raw),
 	})
 }

@@ -110,7 +110,6 @@ func TestMetricsCopyIsolation(t *testing.T) {
 	collector.RecordCheck("test", 10*time.Millisecond, true, StatusHealthy)
 
 	metrics := collector.GetMetrics()
-	metrics.CheckCount = 42
 	if metrics.ComponentMetrics["test"] == nil {
 		t.Fatalf("expected component metrics to exist")
 	}

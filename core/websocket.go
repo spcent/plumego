@@ -96,7 +96,7 @@ func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
 		if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
 			r.PostFunc(c.config.BroadcastPath, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
-					http.Error(w, "POST only", http.StatusMethodNotAllowed)
+					writeHTTPError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "POST only")
 					return
 				}
 				if !c.debug {
@@ -110,14 +110,14 @@ func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
 					}
 
 					if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
-						http.Error(w, "unauthorized", http.StatusUnauthorized)
+						writeHTTPError(w, r, http.StatusUnauthorized, "unauthorized", "unauthorized")
 						return
 					}
 				}
 
 				b, err := io.ReadAll(r.Body)
 				if err != nil {
-					http.Error(w, "Error reading request body", http.StatusInternalServerError)
+					writeHTTPError(w, r, http.StatusInternalServerError, "read_body_failed", "Error reading request body")
 					return
 				}
 

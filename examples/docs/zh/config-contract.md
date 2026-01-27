@@ -59,9 +59,9 @@ func Defaults() Config {
 func LoadConfig() (Config, error) {
 	cfg := Defaults()
 
-	cfg.Core.Addr = config.GetString("ADDR", cfg.Core.Addr)
-	cfg.Core.Debug = config.GetBool("DEBUG", cfg.Core.Debug)
-	cfg.FeatureXEnabled = config.GetBool("FEATURE_X_ENABLED", cfg.FeatureXEnabled)
+	cfg.Core.Addr = config.GetString("APP_ADDR", cfg.Core.Addr)
+	cfg.Core.Debug = config.GetBool("APP_DEBUG", cfg.Core.Debug)
+	cfg.FeatureXEnabled = config.GetBool("APP_FEATURE_X_ENABLED", cfg.FeatureXEnabled)
 
 	return cfg, nil
 }

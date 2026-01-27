@@ -37,6 +37,9 @@ type RequestMetrics struct {
 	// Path is the request path
 	Path string
 
+	// Route is the matched route pattern when available (e.g. /users/:id)
+	Route string
+
 	// Status is the HTTP status code
 	Status int
 
@@ -235,6 +238,7 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 
 			next.ServeHTTP(recorder, r)
 
+			rc := contract.RequestContextFrom(r.Context())
 			metricsData := RequestMetrics{
 				Method:    r.Method,
 				Path:      r.URL.Path,
@@ -243,6 +247,9 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 				Duration:  time.Since(start),
 				TraceID:   traceID,
 				UserAgent: r.UserAgent(),
+			}
+			if rc.RoutePattern != "" {
+				metricsData.Route = rc.RoutePattern
 			}
 
 			if metrics != nil {
@@ -255,12 +262,20 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 
 			fields := log.Fields{
 				"trace_id":    traceID,
+				"request_id":  traceID,
 				"method":      metricsData.Method,
 				"path":        metricsData.Path,
 				"status":      metricsData.Status,
 				"bytes":       metricsData.Bytes,
 				"duration_ms": metricsData.Duration.Milliseconds(),
 				"user_agent":  metricsData.UserAgent,
+				"client_ip":   clientIPKey(r),
+			}
+			if metricsData.Route != "" {
+				fields["route"] = metricsData.Route
+			}
+			if rc.RouteName != "" {
+				fields["route_name"] = rc.RouteName
 			}
 			if spanID != "" {
 				fields["span_id"] = spanID
@@ -272,6 +287,9 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 }
 
 func ensureTraceID(r *http.Request) string {
+	if id := contract.TraceIDFromContext(r.Context()); id != "" {
+		return id
+	}
 	if id := r.Header.Get("X-Request-ID"); id != "" {
 		return id
 	}

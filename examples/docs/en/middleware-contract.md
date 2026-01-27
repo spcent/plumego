@@ -21,6 +21,7 @@ It freezes behavior so agents and users can safely rely on the contract.
 - Middleware must preserve `context.Context` and may attach request-scoped values.
 - Standardized keys live in `contract` (e.g. `ContextWithPrincipal`).
 - Middleware must not mutate shared global state unless documented.
+- Middleware registration is expected to happen during startup before serving traffic; the registry is not goroutine-safe.
 
 ## Response Behavior
 - Middleware should not write headers/body after calling `next` unless it owns the response.

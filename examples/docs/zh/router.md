@@ -31,6 +31,15 @@ v1.Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("p
 
 所有注册应在 `app.Boot()` 前完成；启动时路由会被冻结以避免遗漏。
 
+## Method Not Allowed 处理
+默认情况下方法不匹配返回 `404`。如需 `405`：
+
+```go
+r := router.NewRouter(router.WithMethodNotAllowed(true))
+```
+
+启用后，当路径匹配但方法不支持时会返回 `405` 并设置 `Allow`。
+
 ## 静态前端与通配
 为静态资源单独划分分组，方便隔离缓存策略或鉴权。
 

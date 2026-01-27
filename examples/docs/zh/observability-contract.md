@@ -9,6 +9,7 @@
 - 若不存在，中间件应生成并注入：
   - 响应头 `X-Request-ID`
   - Context key `contract.TraceIDKey{}`
+  - `middleware.RequestID()` 提供该行为，无需 tracing SDK。
 
 ## Trace Context
 - 优先使用 `contract.TraceContext`。
@@ -18,6 +19,7 @@
 ## Context 字段规范
 - 只读标识：`trace_id`、`span_id`、`request_id`
 - 请求元数据：method、path、status、duration、bytes
+- 路由元信息（可用时）：`route`（pattern）和 `route_name`
 - 安全字段不可记录 secrets 或原始 token。
 
 ## 日志字段命名建议
@@ -25,6 +27,7 @@
 - `trace_id`
 - `method`
 - `path`
+- `route`
 - `status`
 - `duration_ms`
 - `bytes`
@@ -34,6 +37,7 @@
 - `request_id`
 - `client_ip`
 - `user_agent`
+- `route_name`
 - `error`
 - `error_code`
 - `error_type`

@@ -149,7 +149,7 @@ BenchmarkMapAllocation/WithPool-10      15,077,396 ops   79.51 ns/op   8 B/op   
 
 ### 实际应用场景改进
 
-1. **HTTP 响应处理**: `Ctx.JSON()` 方法使用缓冲池，减少每次请求的内存分配
+1. **HTTP 响应处理**：`Ctx.JSON()` 使用缓冲池减少每次请求分配；需要标准化响应时建议用 `Ctx.Response()`（contract 包装 + trace id），换取一致输出。
 2. **配置加载**: 配置文件解析使用 map 池，提升配置读取性能
 3. **KV 存储**: WAL 日志编码使用缓冲池，提升写入性能
 4. **Webhook 处理**: 事件数据序列化使用对象池，减少 GC 压力

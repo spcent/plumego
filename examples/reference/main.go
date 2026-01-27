@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
-	"encoding/json"
+	"flag"
 	"fmt"
 	"html"
 	"html/template"
@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/config"
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/health"
@@ -35,6 +36,7 @@ var staticFS embed.FS
 // AppContext holds application-wide dependencies and configuration
 type AppContext struct {
 	App        *core.App
+	Config     Config
 	Bus        *pubsub.InProcPubSub
 	WebhookSvc *webhookout.Service
 	Prom       *metrics.PrometheusCollector
@@ -42,30 +44,113 @@ type AppContext struct {
 	DocSite    *DocSite
 }
 
-// Config holds all application configuration
+// Config holds all application configuration.
 type Config struct {
-	Addr           string
-	WSecret        string
-	GitHubSecret   string
-	StripeSecret   string
-	WebhookToken   string
-	EnableDocs     bool
-	EnableMetrics  bool
-	EnableWebhooks bool
+	Core core.AppConfig
+
+	WebSocketSecret string
+	GitHubSecret    string
+	StripeSecret    string
+	WebhookToken    string
+	EnableDocs      bool
+	EnableMetrics   bool
+	EnableWebhooks  bool
 }
 
-// LoadConfig loads configuration from environment
-func LoadConfig() Config {
+func Defaults() Config {
 	return Config{
-		Addr:           config.GetString("ADDR", ":8080"),
-		WSecret:        config.GetString("WS_SECRET", "dev-secret"),
-		GitHubSecret:   config.GetString("GITHUB_WEBHOOK_SECRET", "dev-github-secret"),
-		StripeSecret:   config.GetString("STRIPE_WEBHOOK_SECRET", "whsec_dev"),
-		WebhookToken:   config.GetString("WEBHOOK_TRIGGER_TOKEN", "dev-trigger"),
-		EnableDocs:     config.GetBool("ENABLE_DOCS", true),
-		EnableMetrics:  config.GetBool("ENABLE_METRICS", true),
-		EnableWebhooks: config.GetBool("ENABLE_WEBHOOKS", true),
+		Core: core.AppConfig{
+			Addr:    ":8080",
+			EnvFile: ".env",
+			Debug:   true,
+		},
+		WebSocketSecret: "dev-secret",
+		GitHubSecret:    "dev-github-secret",
+		StripeSecret:    "whsec_dev",
+		WebhookToken:    "dev-trigger",
+		EnableDocs:      true,
+		EnableMetrics:   true,
+		EnableWebhooks:  true,
 	}
+}
+
+// LoadConfig loads configuration from env and flags.
+func LoadConfig() (Config, error) {
+	cfg := Defaults()
+
+	cfg.Core.EnvFile = resolveEnvFile(os.Args, cfg.Core.EnvFile)
+	if err := loadEnvFile(cfg.Core.EnvFile); err != nil {
+		return cfg, err
+	}
+
+	applyEnv(&cfg)
+	applyFlags(&cfg)
+
+	return cfg, ValidateConfig(cfg)
+}
+
+func ValidateConfig(cfg Config) error {
+	if cfg.Core.Addr == "" {
+		return fmt.Errorf("addr is required")
+	}
+	return nil
+}
+
+func applyEnv(cfg *Config) {
+	cfg.Core.Addr = config.GetString("APP_ADDR", cfg.Core.Addr)
+	cfg.Core.EnvFile = config.GetString("APP_ENV_FILE", cfg.Core.EnvFile)
+	cfg.Core.Debug = config.GetBool("APP_DEBUG", cfg.Core.Debug)
+
+	cfg.WebSocketSecret = config.GetString("WS_SECRET", cfg.WebSocketSecret)
+	cfg.GitHubSecret = config.GetString("GITHUB_WEBHOOK_SECRET", cfg.GitHubSecret)
+	cfg.StripeSecret = config.GetString("STRIPE_WEBHOOK_SECRET", cfg.StripeSecret)
+	cfg.WebhookToken = config.GetString("WEBHOOK_TRIGGER_TOKEN", cfg.WebhookToken)
+	cfg.EnableDocs = config.GetBool("ENABLE_DOCS", cfg.EnableDocs)
+	cfg.EnableMetrics = config.GetBool("ENABLE_METRICS", cfg.EnableMetrics)
+	cfg.EnableWebhooks = config.GetBool("ENABLE_WEBHOOKS", cfg.EnableWebhooks)
+}
+
+func applyFlags(cfg *Config) {
+	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
+	flag.StringVar(&cfg.Core.EnvFile, "env-file", cfg.Core.EnvFile, "path to .env file")
+	flag.BoolVar(&cfg.Core.Debug, "debug", cfg.Core.Debug, "enable debug mode")
+	flag.BoolVar(&cfg.EnableDocs, "enable-docs", cfg.EnableDocs, "enable docs site")
+	flag.BoolVar(&cfg.EnableMetrics, "enable-metrics", cfg.EnableMetrics, "enable metrics")
+	flag.BoolVar(&cfg.EnableWebhooks, "enable-webhooks", cfg.EnableWebhooks, "enable webhooks")
+	flag.Parse()
+}
+
+func resolveEnvFile(args []string, defaultPath string) string {
+	if envPath := strings.TrimSpace(os.Getenv("APP_ENV_FILE")); envPath != "" {
+		defaultPath = envPath
+	}
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--env-file" || arg == "-env-file" {
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+		}
+		if strings.HasPrefix(arg, "--env-file=") {
+			return strings.TrimPrefix(arg, "--env-file=")
+		}
+		if strings.HasPrefix(arg, "-env-file=") {
+			return strings.TrimPrefix(arg, "-env-file=")
+		}
+	}
+
+	return defaultPath
+}
+
+func loadEnvFile(path string) error {
+	if path == "" {
+		return nil
+	}
+	if _, err := os.Stat(path); err != nil {
+		return nil
+	}
+	return config.LoadEnv(path, true)
 }
 
 // NewAppContext creates and initializes the application context
@@ -80,19 +165,22 @@ func NewAppContext(cfg Config) (*AppContext, error) {
 	webhookSvc := webhookout.NewService(webhookStore, webhookCfg)
 
 	// Initialize metrics
-	prom := metrics.NewPrometheusCollector("plumego_reference")
-	tracer := metrics.NewOpenTelemetryTracer("plumego-reference")
+	var prom *metrics.PrometheusCollector
+	var tracer *metrics.OpenTelemetryTracer
+	if cfg.EnableMetrics {
+		prom = metrics.NewPrometheusCollector("plumego_reference")
+		tracer = metrics.NewOpenTelemetryTracer("plumego-reference")
+	}
 
 	// Create core application
-	app := core.New(
-		core.WithAddr(cfg.Addr),
-		core.WithDebug(),
+	opts := []core.Option{
+		core.WithAddr(cfg.Core.Addr),
+		core.WithEnvPath(cfg.Core.EnvFile),
+		core.WithRequestID(),
 		core.WithRecovery(),
 		core.WithLogging(),
 		core.WithCORS(),
 		core.WithPubSub(bus),
-		core.WithMetricsCollector(prom),
-		core.WithTracer(tracer),
 		core.WithWebhookIn(core.WebhookInConfig{
 			Enabled:           cfg.EnableWebhooks,
 			Pub:               bus,
@@ -111,7 +199,18 @@ func NewAppContext(cfg Config) (*AppContext, error) {
 			IncludeStats:     true,
 			DefaultPageLimit: 50,
 		}),
-	)
+	}
+	if cfg.Core.Debug {
+		opts = append(opts, core.WithDebug())
+	}
+	if prom != nil {
+		opts = append(opts, core.WithMetricsCollector(prom))
+	}
+	if tracer != nil {
+		opts = append(opts, core.WithTracer(tracer))
+	}
+
+	app := core.New(opts...)
 
 	// Load documentation site
 	var docSite *DocSite
@@ -125,6 +224,7 @@ func NewAppContext(cfg Config) (*AppContext, error) {
 
 	return &AppContext{
 		App:        app,
+		Config:     cfg,
 		Bus:        bus,
 		WebhookSvc: webhookSvc,
 		Prom:       prom,
@@ -220,7 +320,7 @@ func (ctx *AppContext) RegisterRoutes() error {
 
 	// Configure WebSocket
 	wsCfg := core.DefaultWebSocketConfig()
-	wsCfg.Secret = []byte(config.GetString("WS_SECRET", strings.Repeat("dev-secret", 6)))
+	wsCfg.Secret = []byte(ctx.Config.WebSocketSecret)
 	if _, err := ctx.App.ConfigureWebSocketWithOptions(wsCfg); err != nil {
 		return fmt.Errorf("failed to configure websocket: %w", err)
 	}
@@ -265,7 +365,7 @@ func (ctx *AppContext) registerAPIEndpoints() {
 				"api":       "/api",
 			},
 		}
-		ctx.writeJSON(w, response)
+		ctx.writeJSON(w, r, response)
 	})
 
 	// Status endpoint - returns comprehensive system status
@@ -298,7 +398,7 @@ func (ctx *AppContext) registerAPIEndpoints() {
 				"websocket": "/ws",
 			},
 		}
-		ctx.writeJSON(w, response)
+		ctx.writeJSON(w, r, response)
 	})
 
 	// API test endpoint with multiple response formats
@@ -344,7 +444,7 @@ func (ctx *AppContext) registerAPIEndpoints() {
 				"status":       "success",
 				"query_params": r.URL.Query().Encode(),
 			}
-			ctx.writeJSON(w, response)
+			ctx.writeJSON(w, r, response)
 		}
 	})
 }
@@ -366,11 +466,11 @@ func (ctx *AppContext) registerTestEndpoints() {
 		}
 
 		if err := ctx.Bus.Publish(topic, message); err != nil {
-			ctx.writeError(w, http.StatusInternalServerError, "publish failed", err)
+			ctx.writeError(w, r, http.StatusInternalServerError, "publish failed", err)
 			return
 		}
 
-		ctx.writeJSON(w, map[string]any{
+		ctx.writeJSON(w, r, map[string]any{
 			"status":    "success",
 			"topic":     topic,
 			"message":   fmt.Sprint(message.Data),
@@ -383,15 +483,15 @@ func (ctx *AppContext) registerTestEndpoints() {
 		const maxWebhookBody = int64(1 << 20)
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxWebhookBody+1))
 		if err != nil {
-			ctx.writeError(w, http.StatusBadRequest, "read body failed", err)
+			ctx.writeError(w, r, http.StatusBadRequest, "read body failed", err)
 			return
 		}
 		if int64(len(body)) > maxWebhookBody {
-			ctx.writeError(w, http.StatusRequestEntityTooLarge, "body too large", nil)
+			ctx.writeError(w, r, http.StatusRequestEntityTooLarge, "body too large", nil)
 			return
 		}
 
-		ctx.writeJSON(w, map[string]any{
+		ctx.writeJSON(w, r, map[string]any{
 			"status":         "webhook_received",
 			"content_length": len(body),
 			"timestamp":      time.Now().Format(time.RFC3339),
@@ -404,27 +504,24 @@ func (ctx *AppContext) registerTestEndpoints() {
 }
 
 // writeJSON writes a JSON response
-func (ctx *AppContext) writeJSON(w http.ResponseWriter, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(data); err != nil {
+func (ctx *AppContext) writeJSON(w http.ResponseWriter, r *http.Request, data any) {
+	if err := contract.WriteResponse(w, r, http.StatusOK, data, nil); err != nil {
 		log.Printf("failed to encode JSON response: %v", err)
 	}
 }
 
 // writeError writes an error response
-func (ctx *AppContext) writeError(w http.ResponseWriter, status int, message string, err error) {
-	response := map[string]any{
-		"status":  "error",
-		"message": message,
+func (ctx *AppContext) writeError(w http.ResponseWriter, r *http.Request, status int, message string, err error) {
+	apiErr := contract.APIError{
+		Status:   status,
+		Code:     http.StatusText(status),
+		Message:  message,
+		Category: contract.CategoryForStatus(status),
 	}
 	if err != nil {
-		response["error"] = err.Error()
+		apiErr.Details = map[string]any{"error": err.Error()}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if encodeErr := json.NewEncoder(w).Encode(response); encodeErr != nil {
-		log.Printf("failed to encode error response: %v", encodeErr)
-	}
+	contract.WriteError(w, r, apiErr)
 }
 
 // Start starts the application
@@ -884,7 +981,10 @@ func parseTableRow(line string) []string {
 
 func main() {
 	// Load configuration
-	cfg := LoadConfig()
+	cfg, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
 
 	// Initialize application context
 	appCtx, err := NewAppContext(cfg)
@@ -898,7 +998,7 @@ func main() {
 	}
 
 	// Start the application
-	log.Printf("Starting Plumego Reference on %s", cfg.Addr)
+	log.Printf("Starting Plumego Reference on %s", cfg.Core.Addr)
 	if err := appCtx.Start(); err != nil {
 		log.Fatalf("server stopped: %v", err)
 	}

@@ -163,3 +163,84 @@ func TestNewChain(t *testing.T) {
 		t.Error("expected X-MW2 header to be set")
 	}
 }
+
+func TestChainOrder(t *testing.T) {
+	var order []string
+
+	mw1 := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "mw1")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	mw2 := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "mw2")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	chain := NewChain(mw1, mw2)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	rr := httptest.NewRecorder()
+	chain.Apply(handler).ServeHTTP(rr, req)
+
+	expected := []string{"mw1", "mw2", "handler"}
+	if !equalStringSlice(order, expected) {
+		t.Fatalf("expected order %v, got %v", expected, order)
+	}
+}
+
+func TestChainShortCircuit(t *testing.T) {
+	var order []string
+
+	shortCircuit := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "short")
+			w.WriteHeader(http.StatusTeapot)
+		})
+	}
+
+	downstream := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "downstream")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	rr := httptest.NewRecorder()
+	NewChain(shortCircuit, downstream).Apply(handler).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusTeapot {
+		t.Fatalf("expected status 418, got %d", rr.Code)
+	}
+
+	expected := []string{"short"}
+	if !equalStringSlice(order, expected) {
+		t.Fatalf("expected order %v, got %v", expected, order)
+	}
+}
+
+func equalStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

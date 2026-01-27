@@ -14,6 +14,10 @@ type Runner interface {
 - Register via `app.Register(runner)` or `core.WithRunner`.
 - Registration must happen before `Boot()`.
 
+Shutdown hooks:
+- Register via `app.OnShutdown(func(ctx context.Context) error { ... })` or `core.WithShutdownHook`.
+- Registration must happen before `Boot()`.
+
 ## Startup Order
 1. Load environment configuration.
 2. Mount components (routes + middleware).
@@ -28,6 +32,7 @@ Runners are always started before the HTTP server begins serving requests.
 1. Stop HTTP server (graceful shutdown).
 2. Stop runners (reverse registration order).
 3. Stop components (reverse dependency order).
+4. Run shutdown hooks (reverse registration order).
 
 ## Context Semantics
 - `Start` and `Stop` must respect the provided context deadline.

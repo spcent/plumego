@@ -18,7 +18,7 @@ It freezes behavior so agents and users can safely rely on the contract.
 - If no method tree exists, it falls back to the `ANY` tree.
 - If no match is found in the method tree, it will try the `ANY` tree.
 - If still no match is found, it returns `404 Not Found`.
-- `405 Method Not Allowed` is not emitted by the router; method mismatch returns `404` unless an `ANY` route matches.
+- `405 Method Not Allowed` is disabled by default. Enable with `router.WithMethodNotAllowed(true)` to return `405` and set `Allow`.
 
 ## Path Normalization
 - Request path uses `req.URL.Path` as-is (no URL decoding).
@@ -27,13 +27,25 @@ It freezes behavior so agents and users can safely rely on the contract.
 - Internal duplicate slashes are not normalized (e.g. `/a//b` is treated literally and will not match `/a/:id`).
 
 ## Parameter Extraction
-- Param values are taken from the raw path segments (no URL decoding by the router).
+- Param values come from `req.URL.Path` (the router does not perform additional decoding).
+- `net/http` decodes percent-escapes in `URL.Path` (e.g. `%20` becomes space).
 - Param keys are derived from route definitions in order.
 - If duplicate param keys exist, later values overwrite earlier ones.
 - Wildcard params include embedded slashes (e.g. `/files/*path` → `path = "a/b/c.txt"`).
+- Percent-encoded slashes (`%2F`) are decoded by `net/http`, so a single-segment param will not match; wildcard params will capture the remainder (`a/b`).
 - Params are injected into the request context:
   - `contract.ParamsContextKey` (map of params)
   - `contract.RequestContextKey` (RequestContext with Params)
+- Router params override existing params stored in the request context.
+- When a route matches, the router also sets:
+  - `RequestContext.RoutePattern` (the matched route pattern)
+  - `RequestContext.RouteName` (if provided)
+
+## Cache Behavior
+- The router caches match results using a normalized path key that strips extra slashes and trailing slash for non-root paths.
+- Cache keys include request method and host.
+- Cached handlers are invalidated whenever middleware registration changes (middleware version bump).
+- Cache is an optimization only; it does not change matching semantics.
 
 ## Middleware Ordering (Router-Level)
 - Global middlewares (`router.Use`) execute before group middlewares.

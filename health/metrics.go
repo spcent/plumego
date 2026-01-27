@@ -1,11 +1,12 @@
 package health
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // HealthMetrics contains various health-related metrics.
@@ -391,10 +392,7 @@ func (mc *MetricsCollector) GenerateReport() HealthReport {
 func MetricsHandler(collector *MetricsCollector) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		metrics := collector.GetMetrics()
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(metrics)
+		_ = contract.WriteJSON(w, http.StatusOK, metrics)
 	})
 }
 
@@ -411,8 +409,6 @@ func HealthReportHandler(collector *MetricsCollector) http.Handler {
 			code = http.StatusPartialContent
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(report)
+		_ = contract.WriteJSON(w, code, report)
 	})
 }
