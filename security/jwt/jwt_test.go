@@ -607,7 +607,7 @@ func TestAuthorizeMiddleware(t *testing.T) {
 func TestDebugMode(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig(nil)
-	cfg.DebugMode = true
+	cfg.DebugMode = true // This is now deprecated and has no effect
 	mgr, _ := NewJWTManager(store, cfg)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -624,10 +624,11 @@ func TestDebugMode(t *testing.T) {
 
 	wrapped.ServeHTTP(rec, req)
 
-	// debug mode should return detailed error
+	// Security fix: debug mode no longer returns detailed error messages
+	// to prevent information leakage. Generic error is always returned.
 	body := rec.Body.String()
-	if !strings.Contains(body, "verification failed") {
-		t.Errorf("expected detailed error message in debug mode, got: %s", body)
+	if !strings.Contains(body, "invalid token") {
+		t.Errorf("expected generic error message, got: %s", body)
 	}
 }
 
@@ -652,10 +653,13 @@ func TestExtractBearerToken(t *testing.T) {
 			want:   "token456",
 		},
 		{
-			name:       "query param allowed",
+			// Security fix: query param tokens are no longer supported
+			// to prevent token leakage via server logs, browser history, and Referer headers.
+			// The allowQuery parameter is now ignored.
+			name:       "query param allowed (now disabled for security)",
 			queryParam: "querytoken",
 			allowQuery: true,
-			want:       "querytoken",
+			want:       "", // Changed from "querytoken" - query params are no longer supported
 		},
 		{
 			name:       "query param not allowed",

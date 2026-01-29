@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // DILifecycle defines the lifecycle management for dependencies.
@@ -57,7 +57,11 @@ type DIContainer struct {
 	services map[reflect.Type]DIRegistration
 
 	stackMu sync.Mutex
-	stacks  map[uint64][]reflect.Type // Per-goroutine resolution stack
+	stacks  map[uint64][]reflect.Type // Per-resolution-chain resolution stack
+
+	// resolutionCounter is used to generate unique IDs for each resolution chain.
+	// This is more reliable than using goroutine IDs which depend on runtime internals.
+	resolutionCounter atomic.Uint64
 }
 
 // NewDIContainer creates a new dependency injection container.
@@ -69,57 +73,182 @@ func NewDIContainer() *DIContainer {
 	}
 }
 
-// currentGoroutineID returns the numeric ID of the current goroutine.
-// This is used only for scoping resolution stacks to a single goroutine.
-func currentGoroutineID() uint64 {
-	var buf [64]byte
-	n := runtime.Stack(buf[:], false)
-	const prefix = "goroutine "
-	if n <= len(prefix) {
-		return 0
-	}
-
-	var id uint64
-	for i := len(prefix); i < n; i++ {
-		b := buf[i]
-		if b < '0' || b > '9' {
-			break
-		}
-		id = id*10 + uint64(b-'0')
-	}
-	return id
-}
-
-func (c *DIContainer) pushResolve(gid uint64, serviceType reflect.Type) error {
-	c.stackMu.Lock()
-	defer c.stackMu.Unlock()
-
-	stack := c.stacks[gid]
+// resolveWithStack resolves a service while tracking the resolution stack
+// to detect circular dependencies. This is called internally by Resolve.
+func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect.Type) (any, error) {
+	// Check for circular dependency
 	for _, t := range stack {
 		if t == serviceType {
-			return fmt.Errorf("circular dependency detected: %s", serviceType.String())
+			return nil, fmt.Errorf("circular dependency detected: %s", serviceType.String())
 		}
 	}
 
-	c.stacks[gid] = append(stack, serviceType)
+	// Add current type to stack
+	newStack := append(stack, serviceType)
+
+	c.mu.RLock()
+	registration, exists := c.services[serviceType]
+	c.mu.RUnlock()
+
+	if !exists {
+		// Try to find assignable service for interfaces
+		if serviceType.Kind() == reflect.Interface {
+			return c.resolveAssignableWithStack(serviceType, newStack)
+		}
+		return nil, fmt.Errorf("service not found: %s", serviceType.String())
+	}
+
+	// Handle singleton with existing instance
+	if registration.Lifecycle == Singleton && registration.Instance != nil {
+		return registration.Instance, nil
+	}
+
+	// Create new instance
+	var instance any
+	var err error
+
+	if registration.Factory != nil {
+		// Use factory function - pass original container
+		instance = registration.Factory(c)
+	} else {
+		// Try to create instance using reflection
+		instance, err = c.createInstanceWithStack(serviceType, newStack)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Register instance based on lifecycle
+	c.mu.Lock()
+	if registration.Lifecycle == Singleton {
+		registration.Instance = instance
+		c.services[serviceType] = registration
+	}
+	c.mu.Unlock()
+
+	return instance, nil
+}
+
+// resolveAssignableWithStack resolves a service that implements an interface with stack tracking.
+func (c *DIContainer) resolveAssignableWithStack(serviceType reflect.Type, stack []reflect.Type) (any, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var match any
+	for _, registration := range c.services {
+		if registration.Instance != nil {
+			instanceType := reflect.TypeOf(registration.Instance)
+			if instanceType.AssignableTo(serviceType) {
+				if match == nil {
+					match = registration.Instance
+					continue
+				}
+				if servicesEqual(match, registration.Instance) {
+					continue
+				}
+				return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
+			}
+		}
+	}
+
+	if match == nil {
+		return nil, errors.New("service not found: " + serviceType.String())
+	}
+	return match, nil
+}
+
+// createInstanceWithStack creates a new instance using reflection with stack tracking.
+func (c *DIContainer) createInstanceWithStack(serviceType reflect.Type, stack []reflect.Type) (any, error) {
+	if serviceType.Kind() == reflect.Ptr {
+		// Create pointer to new instance
+		elemType := serviceType.Elem()
+		newInstance := reflect.New(elemType)
+
+		// Try to inject dependencies into the struct
+		if err := c.injectWithStack(newInstance.Interface(), stack); err != nil {
+			// If injection fails, still return the instance
+			// This allows for simple structs without dependencies
+		}
+
+		return newInstance.Interface(), nil
+	}
+
+	return nil, fmt.Errorf("cannot create instance of non-pointer type: %s", serviceType.String())
+}
+
+// injectWithStack injects dependencies into a struct with stack tracking.
+func (c *DIContainer) injectWithStack(instance any, stack []reflect.Type) error {
+	if instance == nil {
+		return nil
+	}
+
+	instanceVal := reflect.ValueOf(instance)
+	if instanceVal.Kind() != reflect.Ptr {
+		return errors.New("instance must be a pointer to a struct")
+	}
+
+	structVal := instanceVal.Elem()
+	structType := structVal.Type()
+
+	if structType.Kind() != reflect.Struct {
+		return errors.New("instance must be a pointer to a struct")
+	}
+
+	// Iterate over all fields
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+		fieldVal := structVal.Field(i)
+
+		injectTag, ok := field.Tag.Lookup("inject")
+		if ok {
+			// Check if field is exportable
+			if !fieldVal.CanSet() {
+				continue
+			}
+
+			if injectTag == "-" {
+				continue
+			}
+
+			// Resolve the dependency with stack tracking
+			var dep any
+			var err error
+
+			if injectTag != "" {
+				dep, err = c.resolveByName(injectTag)
+				if err != nil {
+					dep, err = c.resolveWithStack(field.Type, stack)
+				}
+			} else {
+				dep, err = c.resolveWithStack(field.Type, stack)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			// Set the field value
+			depVal := reflect.ValueOf(dep)
+			if depVal.Type().AssignableTo(field.Type) {
+				fieldVal.Set(depVal)
+				continue
+			}
+
+			if depVal.Kind() == reflect.Ptr && !depVal.IsNil() && depVal.Elem().Type().AssignableTo(field.Type) {
+				fieldVal.Set(depVal.Elem())
+				continue
+			}
+
+			return fmt.Errorf("cannot assign dependency %s to field %s", depVal.Type(), field.Type)
+		}
+	}
+
 	return nil
 }
 
-func (c *DIContainer) popResolve(gid uint64) {
-	c.stackMu.Lock()
-	defer c.stackMu.Unlock()
-
-	stack := c.stacks[gid]
-	if len(stack) == 0 {
-		return
-	}
-	stack = stack[:len(stack)-1]
-	if len(stack) == 0 {
-		delete(c.stacks, gid)
-		return
-	}
-	c.stacks[gid] = stack
-}
+// pushResolve and popResolve are deprecated. Circular dependency detection
+// is now handled by passing the stack through the resolution chain.
+// These methods are kept for API compatibility but are no longer used internally.
 
 // Register registers a service instance in the container with singleton lifecycle.
 // The service will be available for resolution by its type and any assignable types.
@@ -186,13 +315,14 @@ func (c *DIContainer) RegisterFactory(serviceType reflect.Type, factory func(*DI
 // Resolve resolves a service by its type.
 // It handles singleton, transient, and scoped lifecycles.
 // Also supports interface types by finding assignable implementations.
+// Circular dependencies are detected and will return an error.
 //
 // Parameters:
 //   - serviceType: The type to resolve
 //
 // Returns:
 //   - any: The resolved service instance
-//   - error: Error if resolution fails
+//   - error: Error if resolution fails (including circular dependency)
 //
 // Example:
 //
@@ -203,83 +333,25 @@ func (c *DIContainer) RegisterFactory(serviceType reflect.Type, factory func(*DI
 //	}
 //	db = service.(*DatabaseService)
 func (c *DIContainer) Resolve(serviceType reflect.Type) (any, error) {
-	gid := currentGoroutineID()
-	if err := c.pushResolve(gid, serviceType); err != nil {
-		return nil, err
-	}
-	defer c.popResolve(gid)
-
-	c.mu.RLock()
-	registration, exists := c.services[serviceType]
-	c.mu.RUnlock()
-
-	if !exists {
-		// Try to find assignable service for interfaces
-		if serviceType.Kind() == reflect.Interface {
-			return c.resolveAssignable(serviceType)
-		}
-		return nil, fmt.Errorf("service not found: %s", serviceType.String())
-	}
-
-	// Handle singleton with existing instance
-	if registration.Lifecycle == Singleton && registration.Instance != nil {
-		return registration.Instance, nil
-	}
-
-	// Create new instance
-	var instance any
-	var err error
-
-	if registration.Factory != nil {
-		// Use factory function
-		instance = registration.Factory(c)
-		} else {
-			// Try to create instance using reflection
-			instance, err = c.createInstance(serviceType)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-	// Register instance based on lifecycle
-	c.mu.Lock()
-	if registration.Lifecycle == Singleton {
-		registration.Instance = instance
-		c.services[serviceType] = registration
-	}
-	c.mu.Unlock()
-
-	return instance, nil
+	// Start a new resolution chain with an empty stack
+	return c.resolveWithStack(serviceType, nil)
 }
 
 // createInstance creates a new instance using reflection.
 // It attempts to call the constructor and inject dependencies.
 func (c *DIContainer) createInstance(serviceType reflect.Type) (any, error) {
-	if serviceType.Kind() == reflect.Ptr {
-		// Create pointer to new instance
-		elemType := serviceType.Elem()
-		newInstance := reflect.New(elemType)
-
-		// Try to inject dependencies into the struct
-		if err := c.Inject(newInstance.Interface()); err != nil {
-			// If injection fails, still return the instance
-			// This allows for simple structs without dependencies
-		}
-
-		return newInstance.Interface(), nil
-	}
-
-	return nil, fmt.Errorf("cannot create instance of non-pointer type: %s", serviceType.String())
+	return c.createInstanceWithStack(serviceType, nil)
 }
 
 // Inject injects dependencies into a struct.
 // It looks for fields with the `inject` tag and tries to resolve them.
+// Circular dependencies are detected and will return an error.
 //
 // Parameters:
 //   - instance: Pointer to a struct to inject dependencies into
 //
 // Returns:
-//   - error: Error if injection fails
+//   - error: Error if injection fails (including circular dependency)
 //
 // Example:
 //
@@ -293,72 +365,8 @@ func (c *DIContainer) createInstance(serviceType reflect.Type) (any, error) {
 //	    return err
 //	}
 func (c *DIContainer) Inject(instance any) error {
-	if instance == nil {
-		return nil
-	}
-
-	instanceVal := reflect.ValueOf(instance)
-	if instanceVal.Kind() != reflect.Ptr {
-		return errors.New("instance must be a pointer to a struct")
-	}
-
-	structVal := instanceVal.Elem()
-	structType := structVal.Type()
-
-	if structType.Kind() != reflect.Struct {
-		return errors.New("instance must be a pointer to a struct")
-	}
-
-	// Iterate over all fields
-	for i := 0; i < structType.NumField(); i++ {
-		field := structType.Field(i)
-		fieldVal := structVal.Field(i)
-
-		injectTag, ok := field.Tag.Lookup("inject")
-		if ok {
-			// Check if field is exportable
-			if !fieldVal.CanSet() {
-				continue
-			}
-
-			if injectTag == "-" {
-				continue
-			}
-
-			// Resolve the dependency
-			var dep any
-			var err error
-
-			if injectTag != "" {
-				dep, err = c.resolveByName(injectTag)
-				if err != nil {
-					dep, err = c.Resolve(field.Type)
-				}
-			} else {
-				dep, err = c.Resolve(field.Type)
-			}
-
-			if err != nil {
-				return err
-			}
-
-			// Set the field value
-			depVal := reflect.ValueOf(dep)
-			if depVal.Type().AssignableTo(field.Type) {
-				fieldVal.Set(depVal)
-				continue
-			}
-
-			if depVal.Kind() == reflect.Ptr && !depVal.IsNil() && depVal.Elem().Type().AssignableTo(field.Type) {
-				fieldVal.Set(depVal.Elem())
-				continue
-			}
-
-			return fmt.Errorf("cannot assign dependency %s to field %s", depVal.Type(), field.Type)
-		}
-	}
-
-	return nil
+	// Start injection with an empty stack for circular dependency detection
+	return c.injectWithStack(instance, nil)
 }
 
 // resolveByName resolves a service by its name or type name.

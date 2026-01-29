@@ -99,20 +99,20 @@ func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
 					writeHTTPError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "POST only")
 					return
 				}
-				if !c.debug {
-					const bearerPrefix = "bearer "
-					rawAuth := r.Header.Get("Authorization")
-					var provided []byte
-					if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
-						provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
-					} else if q := r.URL.Query().Get("secret"); q != "" {
-						provided = []byte(q)
-					}
+				// Always require authentication for broadcast endpoint.
+				// Debug mode should only affect logging verbosity, never security checks.
+				const bearerPrefix = "bearer "
+				rawAuth := r.Header.Get("Authorization")
+				var provided []byte
+				if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
+					provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
+				}
+				// Note: Query parameter secrets are no longer supported for security reasons.
+				// Secrets in URLs can be leaked via server logs and Referer headers.
 
-					if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
-						writeHTTPError(w, r, http.StatusUnauthorized, "unauthorized", "unauthorized")
-						return
-					}
+				if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
+					writeHTTPError(w, r, http.StatusUnauthorized, "unauthorized", "unauthorized")
+					return
 				}
 
 				b, err := io.ReadAll(r.Body)
