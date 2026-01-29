@@ -413,9 +413,9 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 
 // PublishAsync publishes without waiting for delivery results (fire-and-forget).
 //
-// This is a convenience method that calls Publish. The delivery is still
-// guaranteed to be attempted, but this method returns immediately without
-// waiting for delivery confirmation.
+// This method returns immediately after launching a goroutine to handle
+// the publish operation. Errors are not reported back to the caller.
+// Use Publish() if you need error handling or confirmation.
 //
 // Example:
 //
@@ -424,10 +424,10 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 //	ps := pubsub.New()
 //	defer ps.Close()
 //
-//	// Fire-and-forget publish
-//	err := ps.PublishAsync("user.created", msg)
-func (ps *InProcPubSub) PublishAsync(topic string, msg Message) error {
-	return ps.Publish(topic, msg)
+//	// Fire-and-forget publish - returns immediately
+//	ps.PublishAsync("user.created", msg)
+func (ps *InProcPubSub) PublishAsync(topic string, msg Message) {
+	go ps.Publish(topic, msg)
 }
 
 // GetSubscriberCount returns the number of subscribers for a topic.

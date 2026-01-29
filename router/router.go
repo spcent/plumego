@@ -1350,13 +1350,8 @@ func compilePathSegments(path string) []segment {
 
 // --- Helper API ---
 
-// addRoute is a generic method for registering routes
-func (r *Router) addRoute(method, path string, handler Handler) {
-	r.AddRoute(method, path, handler)
-}
-
 // HTTP method-specific route registration
-// These convenience methods provide a fluent API for route registration.
+// These convenience methods return errors for proper error handling.
 
 // Get registers a GET route with the given path and handler.
 // GET requests are used to retrieve resources.
@@ -1365,11 +1360,15 @@ func (r *Router) addRoute(method, path string, handler Handler) {
 //   - path: URL path (can include parameters like "/users/:id")
 //   - handler: HTTP handler
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.Get("/users", listUsersHandler)
-//	r.Get("/users/:id", getUserHandler)
-func (r *Router) Get(path string, handler Handler) { r.addRoute(GET, path, handler) }
+//	if err := r.Get("/users", listUsersHandler); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) Get(path string, handler Handler) error { return r.AddRoute(GET, path, handler) }
 
 // Post registers a POST route with the given path and handler.
 // POST requests are used to create new resources.
@@ -1378,10 +1377,15 @@ func (r *Router) Get(path string, handler Handler) { r.addRoute(GET, path, handl
 //   - path: URL path
 //   - handler: HTTP handler
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.Post("/users", createUserHandler)
-func (r *Router) Post(path string, handler Handler) { r.addRoute(POST, path, handler) }
+//	if err := r.Post("/users", createUserHandler); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) Post(path string, handler Handler) error { return r.AddRoute(POST, path, handler) }
 
 // Put registers a PUT route with the given path and handler.
 // PUT requests are used to replace existing resources.
@@ -1390,10 +1394,15 @@ func (r *Router) Post(path string, handler Handler) { r.addRoute(POST, path, han
 //   - path: URL path (typically includes resource ID like "/users/:id")
 //   - handler: HTTP handler
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.Put("/users/:id", updateUserHandler)
-func (r *Router) Put(path string, handler Handler) { r.addRoute(PUT, path, handler) }
+//	if err := r.Put("/users/:id", updateUserHandler); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) Put(path string, handler Handler) error { return r.AddRoute(PUT, path, handler) }
 
 // Delete registers a DELETE route with the given path and handler.
 // DELETE requests are used to remove resources.
@@ -1402,10 +1411,17 @@ func (r *Router) Put(path string, handler Handler) { r.addRoute(PUT, path, handl
 //   - path: URL path (typically includes resource ID like "/users/:id")
 //   - handler: HTTP handler
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.Delete("/users/:id", deleteUserHandler)
-func (r *Router) Delete(path string, handler Handler) { r.addRoute(DELETE, path, handler) }
+//	if err := r.Delete("/users/:id", deleteUserHandler); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) Delete(path string, handler Handler) error {
+	return r.AddRoute(DELETE, path, handler)
+}
 
 // Patch registers a PATCH route with the given path and handler.
 // PATCH requests are used for partial updates to resources.
@@ -1414,10 +1430,15 @@ func (r *Router) Delete(path string, handler Handler) { r.addRoute(DELETE, path,
 //   - path: URL path (typically includes resource ID like "/users/:id")
 //   - handler: HTTP handler
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.Patch("/users/:id", patchUserHandler)
-func (r *Router) Patch(path string, handler Handler) { r.addRoute(PATCH, path, handler) }
+//	if err := r.Patch("/users/:id", patchUserHandler); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) Patch(path string, handler Handler) error { return r.AddRoute(PATCH, path, handler) }
 
 // Any registers a route that accepts any HTTP method with the given path and handler.
 // This is useful for catch-all routes or when you want to handle all methods the same way.
@@ -1426,10 +1447,15 @@ func (r *Router) Patch(path string, handler Handler) { r.addRoute(PATCH, path, h
 //   - path: URL path
 //   - handler: HTTP handler
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.Any("/health", healthCheckHandler) // Handles GET, POST, PUT, etc.
-func (r *Router) Any(path string, handler Handler) { r.addRoute(ANY, path, handler) }
+//	if err := r.Any("/health", healthCheckHandler); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) Any(path string, handler Handler) error { return r.AddRoute(ANY, path, handler) }
 
 // Options registers an OPTIONS route with the given path and handler.
 // OPTIONS requests are used to describe communication options for the target resource.
@@ -1438,10 +1464,17 @@ func (r *Router) Any(path string, handler Handler) { r.addRoute(ANY, path, handl
 //   - path: URL path
 //   - handler: HTTP handler
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.Options("/users", optionsHandler)
-func (r *Router) Options(path string, handler Handler) { r.addRoute("OPTIONS", path, handler) }
+//	if err := r.Options("/users", optionsHandler); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) Options(path string, handler Handler) error {
+	return r.AddRoute("OPTIONS", path, handler)
+}
 
 // Head registers a HEAD route with the given path and handler.
 // HEAD requests are identical to GET requests but without the response body.
@@ -1450,202 +1483,73 @@ func (r *Router) Options(path string, handler Handler) { r.addRoute("OPTIONS", p
 //   - path: URL path
 //   - handler: HTTP handler
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.Head("/users", headHandler)
-func (r *Router) Head(path string, handler Handler) { r.addRoute("HEAD", path, handler) }
+//	if err := r.Head("/users", headHandler); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) Head(path string, handler Handler) error { return r.AddRoute("HEAD", path, handler) }
 
 // Context-aware handler registration helpers
 // These methods register routes with context-aware handlers that receive
 // a request context and can access route parameters and other request-scoped data.
 
 // GetCtx registers a GET route with a context-aware handler.
-// Context-aware handlers provide direct access to request context and parameters.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: Context-aware handler function
-//
-// Example:
-//
-//	r.GetCtx("/users/:id", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-//	    params := router.ParamsFromContext(ctx)
-//	    userID := params["id"]
-//	    // Handle request...
-//	    return nil
-//	})
-func (r *Router) GetCtx(path string, handler contract.CtxHandlerFunc) {
-	r.addCtxRoute(GET, path, handler)
+func (r *Router) GetCtx(path string, handler contract.CtxHandlerFunc) error {
+	return r.addCtxRoute(GET, path, handler)
 }
 
 // PostCtx registers a POST route with a context-aware handler.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: Context-aware handler function
-//
-// Example:
-//
-//	r.PostCtx("/users", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-//	    // Handle request...
-//	    return nil
-//	})
-func (r *Router) PostCtx(path string, handler contract.CtxHandlerFunc) {
-	r.addCtxRoute(POST, path, handler)
+func (r *Router) PostCtx(path string, handler contract.CtxHandlerFunc) error {
+	return r.addCtxRoute(POST, path, handler)
 }
 
 // PutCtx registers a PUT route with a context-aware handler.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: Context-aware handler function
-//
-// Example:
-//
-//	r.PutCtx("/users/:id", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-//	    params := router.ParamsFromContext(ctx)
-//	    userID := params["id"]
-//	    // Handle request...
-//	    return nil
-//	})
-func (r *Router) PutCtx(path string, handler contract.CtxHandlerFunc) {
-	r.addCtxRoute(PUT, path, handler)
+func (r *Router) PutCtx(path string, handler contract.CtxHandlerFunc) error {
+	return r.addCtxRoute(PUT, path, handler)
 }
 
 // DeleteCtx registers a DELETE route with a context-aware handler.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: Context-aware handler function
-//
-// Example:
-//
-//	r.DeleteCtx("/users/:id", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-//	    params := router.ParamsFromContext(ctx)
-//	    userID := params["id"]
-//	    // Handle request...
-//	    return nil
-//	})
-func (r *Router) DeleteCtx(path string, handler contract.CtxHandlerFunc) {
-	r.addCtxRoute(DELETE, path, handler)
+func (r *Router) DeleteCtx(path string, handler contract.CtxHandlerFunc) error {
+	return r.addCtxRoute(DELETE, path, handler)
 }
 
 // PatchCtx registers a PATCH route with a context-aware handler.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: Context-aware handler function
-//
-// Example:
-//
-//	r.PatchCtx("/users/:id", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-//	    params := router.ParamsFromContext(ctx)
-//	    userID := params["id"]
-//	    // Handle request...
-//	    return nil
-//	})
-func (r *Router) PatchCtx(path string, handler contract.CtxHandlerFunc) {
-	r.addCtxRoute(PATCH, path, handler)
+func (r *Router) PatchCtx(path string, handler contract.CtxHandlerFunc) error {
+	return r.addCtxRoute(PATCH, path, handler)
 }
 
 // AnyCtx registers a route that accepts any HTTP method with a context-aware handler.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: Context-aware handler function
-//
-// Example:
-//
-//	r.AnyCtx("/webhook", func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-//	    // Handle webhook from any method...
-//	    return nil
-//	})
-func (r *Router) AnyCtx(path string, handler contract.CtxHandlerFunc) {
-	r.addCtxRoute(ANY, path, handler)
+func (r *Router) AnyCtx(path string, handler contract.CtxHandlerFunc) error {
+	return r.addCtxRoute(ANY, path, handler)
 }
 
 // HandleFunc registers a standard http.HandlerFunc for the given path and method.
-// This is a convenience method that wraps AddRoute for http.HandlerFunc.
-//
-// Parameters:
-//   - method: HTTP method
-//   - path: URL path
-//   - h: Standard http.HandlerFunc
-//
-// Example:
-//
-//	r.HandleFunc("GET", "/users", func(w http.ResponseWriter, r *http.Request) {
-//	    w.Write([]byte("Hello"))
-//	})
-func (r *Router) HandleFunc(method, path string, h http.HandlerFunc) {
-	r.AddRoute(method, path, h)
+func (r *Router) HandleFunc(method, path string, h http.HandlerFunc) error {
+	return r.AddRoute(method, path, h)
 }
 
 // Handle registers a standard http.Handler for the given path and method.
-// This is a convenience method that wraps AddRoute for http.Handler.
-//
-// Parameters:
-//   - method: HTTP method
-//   - path: URL path
-//   - h: Standard http.Handler
-//
-// Example:
-//
-//	r.Handle("GET", "/users", http.HandlerFunc(myHandler))
-func (r *Router) Handle(method, path string, h http.Handler) {
-	r.AddRoute(method, path, h)
+func (r *Router) Handle(method, path string, h http.Handler) error {
+	return r.AddRoute(method, path, h)
 }
 
 // HandleWithOptions registers a standard http.Handler for the given path and method with metadata.
-// This method combines route registration with metadata attachment.
-//
-// Parameters:
-//   - method: HTTP method
-//   - path: URL path
-//   - h: Standard http.Handler
-//   - opts: Route metadata options
-//
-// Example:
-//
-//	r.HandleWithOptions(
-//	    "GET",
-//	    "/users",
-//	    http.HandlerFunc(myHandler),
-//	    router.WithRouteName("list_users"),
-//	)
-func (r *Router) HandleWithOptions(method, path string, h http.Handler, opts ...RouteOption) {
-	_ = r.AddRouteWithOptions(method, path, h, opts...)
+func (r *Router) HandleWithOptions(method, path string, h http.Handler, opts ...RouteOption) error {
+	return r.AddRouteWithOptions(method, path, h, opts...)
 }
 
 // GetFunc registers a GET route with a standard http.HandlerFunc.
-// This is a convenience method combining Get and HandleFunc.
-//
-// Parameters:
-//   - path: URL path
-//   - h: Standard http.HandlerFunc
-//
-// Example:
-//
-//	r.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-//	    w.Write([]byte("Hello"))
-//	})
-func (r *Router) GetFunc(path string, h http.HandlerFunc) {
-	r.HandleFunc(GET, path, h)
+func (r *Router) GetFunc(path string, h http.HandlerFunc) error {
+	return r.HandleFunc(GET, path, h)
 }
 
 // PostFunc registers a POST route with a standard http.HandlerFunc.
-//
-// Parameters:
-//   - path: URL path
-//   - h: Standard http.HandlerFunc
-//
-// Example:
-//
-//	r.PostFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-//	    w.Write([]byte("Created"))
-//	})
-func (r *Router) PostFunc(path string, h http.HandlerFunc) {
-	r.HandleFunc(POST, path, h)
+func (r *Router) PostFunc(path string, h http.HandlerFunc) error {
+	return r.HandleFunc(POST, path, h)
 }
 
 // PutFunc registers a PUT route with a standard http.HandlerFunc.
@@ -1654,13 +1558,18 @@ func (r *Router) PostFunc(path string, h http.HandlerFunc) {
 //   - path: URL path
 //   - h: Standard http.HandlerFunc
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.PutFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+//	if err := r.PutFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 //	    w.Write([]byte("Updated"))
-//	})
-func (r *Router) PutFunc(path string, h http.HandlerFunc) {
-	r.HandleFunc(PUT, path, h)
+//	}); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) PutFunc(path string, h http.HandlerFunc) error {
+	return r.HandleFunc(PUT, path, h)
 }
 
 // DeleteFunc registers a DELETE route with a standard http.HandlerFunc.
@@ -1669,13 +1578,18 @@ func (r *Router) PutFunc(path string, h http.HandlerFunc) {
 //   - path: URL path
 //   - h: Standard http.HandlerFunc
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.DeleteFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+//	if err := r.DeleteFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 //	    w.Write([]byte("Deleted"))
-//	})
-func (r *Router) DeleteFunc(path string, h http.HandlerFunc) {
-	r.HandleFunc(DELETE, path, h)
+//	}); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) DeleteFunc(path string, h http.HandlerFunc) error {
+	return r.HandleFunc(DELETE, path, h)
 }
 
 // PatchFunc registers a PATCH route with a standard http.HandlerFunc.
@@ -1684,13 +1598,18 @@ func (r *Router) DeleteFunc(path string, h http.HandlerFunc) {
 //   - path: URL path
 //   - h: Standard http.HandlerFunc
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.PatchFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+//	if err := r.PatchFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 //	    w.Write([]byte("Patched"))
-//	})
-func (r *Router) PatchFunc(path string, h http.HandlerFunc) {
-	r.HandleFunc(PATCH, path, h)
+//	}); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) PatchFunc(path string, h http.HandlerFunc) error {
+	return r.HandleFunc(PATCH, path, h)
 }
 
 // AnyFunc registers a route for any HTTP method with a standard http.HandlerFunc.
@@ -1699,13 +1618,18 @@ func (r *Router) PatchFunc(path string, h http.HandlerFunc) {
 //   - path: URL path
 //   - h: Standard http.HandlerFunc
 //
+// Returns:
+//   - error: Error if route registration fails
+//
 // Example:
 //
-//	r.AnyFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
+//	if err := r.AnyFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
 //	    w.Write([]byte("Webhook received"))
-//	})
-func (r *Router) AnyFunc(path string, h http.HandlerFunc) {
-	r.HandleFunc(ANY, path, h)
+//	}); err != nil {
+//	    log.Fatal(err)
+//	}
+func (r *Router) AnyFunc(path string, h http.HandlerFunc) error {
+	return r.HandleFunc(ANY, path, h)
 }
 
 // Resource registers REST-style routes for a resource.
@@ -1714,6 +1638,9 @@ func (r *Router) AnyFunc(path string, h http.HandlerFunc) {
 // Parameters:
 //   - path: Base path for the resource (e.g., "/users")
 //   - c: ResourceController implementation
+//
+// Returns:
+//   - error: Error if any route registration fails
 //
 // Example:
 //
@@ -1730,7 +1657,9 @@ func (r *Router) AnyFunc(path string, h http.HandlerFunc) {
 //	// ... implement other methods
 //
 //	r := router.NewRouter()
-//	r.Resource("/users", &UserController{})
+//	if err := r.Resource("/users", &UserController{}); err != nil {
+//	    log.Fatal(err)
+//	}
 //
 // This creates the following routes:
 //   - GET    /users          -> Index
@@ -1743,19 +1672,40 @@ func (r *Router) AnyFunc(path string, h http.HandlerFunc) {
 //   - OPTIONS /users/:id     -> Options
 //   - HEAD   /users          -> Head
 //   - HEAD   /users/:id      -> Head
-func (r *Router) Resource(path string, c ResourceController) {
+func (r *Router) Resource(path string, c ResourceController) error {
 	path = strings.TrimSuffix(path, "/")
 
-	r.Get(path, http.HandlerFunc(c.Index))
-	r.Post(path, http.HandlerFunc(c.Create))
-	r.Get(path+"/:id", http.HandlerFunc(c.Show))
-	r.Put(path+"/:id", http.HandlerFunc(c.Update))
-	r.Delete(path+"/:id", http.HandlerFunc(c.Delete))
-	r.Patch(path+"/:id", http.HandlerFunc(c.Patch))
-	r.Options(path, http.HandlerFunc(c.Options))
-	r.Options(path+"/:id", http.HandlerFunc(c.Options))
-	r.Head(path, http.HandlerFunc(c.Head))
-	r.Head(path+"/:id", http.HandlerFunc(c.Head))
+	if err := r.Get(path, http.HandlerFunc(c.Index)); err != nil {
+		return err
+	}
+	if err := r.Post(path, http.HandlerFunc(c.Create)); err != nil {
+		return err
+	}
+	if err := r.Get(path+"/:id", http.HandlerFunc(c.Show)); err != nil {
+		return err
+	}
+	if err := r.Put(path+"/:id", http.HandlerFunc(c.Update)); err != nil {
+		return err
+	}
+	if err := r.Delete(path+"/:id", http.HandlerFunc(c.Delete)); err != nil {
+		return err
+	}
+	if err := r.Patch(path+"/:id", http.HandlerFunc(c.Patch)); err != nil {
+		return err
+	}
+	if err := r.Options(path, http.HandlerFunc(c.Options)); err != nil {
+		return err
+	}
+	if err := r.Options(path+"/:id", http.HandlerFunc(c.Options)); err != nil {
+		return err
+	}
+	if err := r.Head(path, http.HandlerFunc(c.Head)); err != nil {
+		return err
+	}
+	if err := r.Head(path+"/:id", http.HandlerFunc(c.Head)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Print prints all registered routes grouped by method.

@@ -607,7 +607,7 @@ func TestAuthorizeMiddleware(t *testing.T) {
 func TestDebugMode(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()
-	cfg.DebugMode = true // This is now deprecated and has no effect
+	// DebugMode has been removed for security - tokens are always validated strictly
 	mgr, _ := NewJWTManager(store, cfg)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

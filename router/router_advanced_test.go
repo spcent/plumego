@@ -224,7 +224,9 @@ func TestResourceControllerAdvanced(t *testing.T) {
 	ctrl.ResourceName = "advanced"
 
 	r := NewRouter()
-	r.Resource("/advanced", ctrl)
+	if err := r.Resource("/advanced", ctrl); err != nil {
+		t.Fatalf("Resource registration failed: %v", err)
+	}
 
 	// Test OPTIONS for CORS
 	req := httptest.NewRequest("OPTIONS", "/advanced", nil)
@@ -332,10 +334,10 @@ func TestConcurrentRequests(t *testing.T) {
 func TestRouterPrint(t *testing.T) {
 	r := NewRouter()
 
-	r.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {})
-	r.PostFunc("/users", func(w http.ResponseWriter, r *http.Request) {})
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {})
-	r.AnyFunc("/any/*path", func(w http.ResponseWriter, r *http.Request) {})
+	_ = r.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {})
+	_ = r.PostFunc("/users", func(w http.ResponseWriter, r *http.Request) {})
+	_ = r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {})
+	_ = r.AnyFunc("/any/*path", func(w http.ResponseWriter, r *http.Request) {})
 
 	var buf bytes.Buffer
 	r.Print(&buf)
@@ -363,7 +365,7 @@ type testRegistrar struct {
 
 func (tr *testRegistrar) Register(r *Router) {
 	tr.called = true
-	r.GetFunc("/registered", func(w http.ResponseWriter, r *http.Request) {
+	_ = r.GetFunc("/registered", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("registered"))
 	})
 }

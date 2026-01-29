@@ -98,9 +98,9 @@ func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
 
 func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
-	r.GetFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	r.PostFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	r.PutFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	_ = r.GetFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	_ = r.PostFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	_ = r.PutFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 
 	req := httptest.NewRequest(http.MethodDelete, "/only", nil)
 	rec := httptest.NewRecorder()

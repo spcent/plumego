@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"net/http"
-	"time"
 
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
@@ -165,11 +164,18 @@ func (a *App) EnableAuth() {
 }
 
 // EnableRateLimit enables the rate limiting middleware with the given configuration.
-// rate: requests per second.
-// capacity: maximum burst size.
-func (a *App) EnableRateLimit(rate float64, capacity int) {
-	if err := a.Use(middleware.RateLimit(rate, capacity, time.Minute, 5*time.Minute)); err != nil {
-		a.logError("EnableRateLimit failed", err, log.Fields{"rate": rate, "capacity": capacity})
+// maxConcurrent: maximum concurrent requests.
+// queueDepth: maximum queue depth for waiting requests.
+func (a *App) EnableRateLimit(maxConcurrent int64, queueDepth int64) {
+	config := middleware.RateLimiterConfig{
+		MaxConcurrent: maxConcurrent,
+		QueueDepth:    queueDepth,
+	}
+	if err := a.Use(middleware.RateLimitMiddleware(config)); err != nil {
+		a.logError("EnableRateLimit failed", err, log.Fields{
+			"maxConcurrent": maxConcurrent,
+			"queueDepth":    queueDepth,
+		})
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 // DILifecycle defines the lifecycle management for dependencies.
@@ -55,13 +54,6 @@ type DIRegistration struct {
 type DIContainer struct {
 	mu       sync.RWMutex
 	services map[reflect.Type]DIRegistration
-
-	stackMu sync.Mutex
-	stacks  map[uint64][]reflect.Type // Per-resolution-chain resolution stack
-
-	// resolutionCounter is used to generate unique IDs for each resolution chain.
-	// This is more reliable than using goroutine IDs which depend on runtime internals.
-	resolutionCounter atomic.Uint64
 }
 
 // NewDIContainer creates a new dependency injection container.
@@ -69,7 +61,6 @@ type DIContainer struct {
 func NewDIContainer() *DIContainer {
 	return &DIContainer{
 		services: make(map[reflect.Type]DIRegistration),
-		stacks:   make(map[uint64][]reflect.Type),
 	}
 }
 
@@ -245,10 +236,6 @@ func (c *DIContainer) injectWithStack(instance any, stack []reflect.Type) error 
 
 	return nil
 }
-
-// pushResolve and popResolve are deprecated. Circular dependency detection
-// is now handled by passing the stack through the resolution chain.
-// These methods are kept for API compatibility but are no longer used internally.
 
 // Register registers a service instance in the container with singleton lifecycle.
 // The service will be available for resolution by its type and any assignable types.
@@ -443,9 +430,6 @@ func (c *DIContainer) Clear() {
 	defer c.mu.Unlock()
 
 	c.services = make(map[reflect.Type]DIRegistration)
-	c.stackMu.Lock()
-	c.stacks = make(map[uint64][]reflect.Type)
-	c.stackMu.Unlock()
 }
 
 // GetRegistrations returns a list of all registered services.
