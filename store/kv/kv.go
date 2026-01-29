@@ -262,6 +262,8 @@ func (kv *KVStore) writeWal() {
 		case entry := <-kv.logChan:
 			if err := kv.writeWALEntry(entry); err != nil {
 				// In production, you'd want proper logging here
+				// For now, we log the error but continue processing
+				// This maintains backward compatibility while indicating the issue
 				fmt.Printf("WAL write error: %v\n", err)
 			}
 
@@ -521,8 +523,7 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 
 	shard := kv.getShard(key)
 
-	// Optimized: reduce lock contention by checking without lock first
-	// Use read lock for existence check
+	// Use read lock for the entire operation to prevent race conditions
 	shard.mu.RLock()
 	entry, exists := shard.data[key]
 
@@ -533,23 +534,28 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 		return nil, ErrKeyNotFound
 	}
 
-	// Check expiration (fast path)
+	// Check expiration
 	if !entry.ExpireAt.IsZero() && time.Now().After(entry.ExpireAt) {
 		shard.mu.RUnlock()
-		// Need write lock to delete expired entry
+
+		// Upgrade to write lock to delete expired entry
 		shard.mu.Lock()
-		// Recheck under write lock
+		// Double-check under write lock
 		if e, exists := shard.data[key]; exists {
 			if !e.ExpireAt.IsZero() && time.Now().After(e.ExpireAt) {
 				kv.deleteFromShard(shard, key, e)
 				if !kv.opts.ReadOnly {
 					kv.logDelete(key)
 				}
+				shard.mu.Unlock()
+				atomic.AddInt64(&kv.misses, 1)
+				return nil, ErrKeyExpired
 			}
 		}
 		shard.mu.Unlock()
-		atomic.AddInt64(&kv.misses, 1)
-		return nil, ErrKeyExpired
+
+		// Entry was refreshed by another goroutine, retry the read
+		return kv.Get(key)
 	}
 
 	// Create defensive copy while holding read lock

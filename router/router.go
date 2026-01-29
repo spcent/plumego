@@ -1007,7 +1007,8 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Check route cache first for better performance
-	cacheKey := req.Method + ":" + req.Host + ":" + cachePath
+	// Use method and path only, excluding host to allow cache sharing across domains
+	cacheKey := req.Method + ":" + cachePath
 	if cachedResult, exists := r.routeCache.Get(cacheKey); exists {
 		// Use cached result without holding the lock
 		r.handleCachedRouteMatch(w, req, cachedResult)

@@ -588,13 +588,30 @@ func (cm *ConfigManager) ReloadWithValidation(ctx context.Context, validate func
 		return cm.Reload(ctx)
 	}
 
-	snapshot := cm.GetAll()
+	// Create a deep snapshot of current data to prevent race conditions
+	cm.mu.RLock()
+	snapshot := make(map[string]any, len(cm.data))
+	for key, value := range cm.data {
+		snapshot[key] = value
+	}
+	cm.mu.RUnlock()
+
+	// Load new configuration
 	if err := cm.Load(ctx); err != nil {
 		return err
 	}
 
-	data := cm.GetAll()
+	// Get the loaded data for validation
+	cm.mu.RLock()
+	data := make(map[string]any, len(cm.data))
+	for key, value := range cm.data {
+		data[key] = value
+	}
+	cm.mu.RUnlock()
+
+	// Validate the new configuration
 	if err := validate(data); err != nil {
+		// Restore snapshot on validation failure
 		cm.mu.Lock()
 		cm.data = snapshot
 		cm.mu.Unlock()

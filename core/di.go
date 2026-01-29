@@ -54,6 +54,16 @@ type DIRegistration struct {
 type DIContainer struct {
 	mu       sync.RWMutex
 	services map[reflect.Type]DIRegistration
+
+	stackMu sync.Mutex
+	stacks  map[uint64][]reflect.Type // Per-resolution-chain resolution stack
+
+	// resolutionCounter is used to generate unique IDs for each resolution chain.
+	// This is more reliable than using goroutine IDs which depend on runtime internals.
+	resolutionCounter atomic.Uint64
+
+	// injectionLocks protects concurrent injection into the same instance
+	injectionLocks [64]sync.Mutex
 }
 
 // NewDIContainer creates a new dependency injection container.
@@ -185,7 +195,13 @@ func (c *DIContainer) injectWithStack(instance any, stack []reflect.Type) error 
 		return errors.New("instance must be a pointer to a struct")
 	}
 
-	// Iterate over all fields
+	// Iterate over all fields to resolve dependencies first
+	// This separates resolution (slow, potentially recursive) from assignment (fast, needs lock)
+	var updates []struct {
+		fieldIndex int
+		value      reflect.Value
+	}
+
 	for i := 0; i < structType.NumField(); i++ {
 		field := structType.Field(i)
 		fieldVal := structVal.Field(i)
@@ -218,19 +234,34 @@ func (c *DIContainer) injectWithStack(instance any, stack []reflect.Type) error 
 				return err
 			}
 
-			// Set the field value
+			// Prepare the value to set
 			depVal := reflect.ValueOf(dep)
+			var finalVal reflect.Value
+
 			if depVal.Type().AssignableTo(field.Type) {
-				fieldVal.Set(depVal)
-				continue
+				finalVal = depVal
+			} else if depVal.Kind() == reflect.Ptr && !depVal.IsNil() && depVal.Elem().Type().AssignableTo(field.Type) {
+				finalVal = depVal.Elem()
+			} else {
+				return fmt.Errorf("cannot assign dependency %s to field %s", depVal.Type(), field.Type)
 			}
 
-			if depVal.Kind() == reflect.Ptr && !depVal.IsNil() && depVal.Elem().Type().AssignableTo(field.Type) {
-				fieldVal.Set(depVal.Elem())
-				continue
-			}
+			updates = append(updates, struct {
+				fieldIndex int
+				value      reflect.Value
+			}{i, finalVal})
+		}
+	}
 
-			return fmt.Errorf("cannot assign dependency %s to field %s", depVal.Type(), field.Type)
+	// Apply updates with a lock to ensure atomicity
+	if len(updates) > 0 {
+		ptr := instanceVal.Pointer()
+		lockIdx := ptr % uintptr(len(c.injectionLocks))
+		c.injectionLocks[lockIdx].Lock()
+		defer c.injectionLocks[lockIdx].Unlock()
+
+		for _, update := range updates {
+			structVal.Field(update.fieldIndex).Set(update.value)
 		}
 	}
 

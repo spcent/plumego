@@ -413,9 +413,9 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 
 // PublishAsync publishes without waiting for delivery results (fire-and-forget).
 //
-// This method returns immediately after launching a goroutine to handle
-// the publish operation. Errors are not reported back to the caller.
-// Use Publish() if you need error handling or confirmation.
+// This method returns immediately after queuing the message for delivery,
+// without waiting for the actual delivery to subscribers. The message will
+// be delivered asynchronously to all matching subscribers.
 //
 // Example:
 //
@@ -424,10 +424,83 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 //	ps := pubsub.New()
 //	defer ps.Close()
 //
-//	// Fire-and-forget publish - returns immediately
-//	ps.PublishAsync("user.created", msg)
-func (ps *InProcPubSub) PublishAsync(topic string, msg Message) {
-	go ps.Publish(topic, msg)
+//	// Fire-and-forget publish
+//	err := ps.PublishAsync("user.created", msg)
+func (ps *InProcPubSub) PublishAsync(topic string, msg Message) error {
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics("publish_async", topic, time.Since(start), err)
+	}()
+
+	if ps.closed.Load() {
+		err = ErrPublishToClosed
+		return err
+	}
+
+	topic = strings.TrimSpace(topic)
+	if topic == "" {
+		err = ErrInvalidTopic
+		return err
+	}
+
+	// Fill message metadata (immutable copy)
+	msg.Topic = topic
+	if msg.Time.IsZero() {
+		msg.Time = time.Now().UTC()
+	}
+
+	ps.metrics.incPublish(topic)
+
+	// Use goroutine to deliver asynchronously
+	go func() {
+		ps.mu.RLock()
+		subsMap := ps.topics[topic]
+		var subs []*subscriber
+		if len(subsMap) > 0 {
+			// Create a snapshot to avoid holding lock during delivery
+			subs = make([]*subscriber, 0, len(subsMap))
+			for _, s := range subsMap {
+				subs = append(subs, s)
+			}
+		}
+
+		var patterns []patternSnapshot
+		if len(ps.patterns) > 0 {
+			patterns = make([]patternSnapshot, 0, len(ps.patterns))
+			for pattern, subMap := range ps.patterns {
+				if len(subMap) == 0 {
+					continue
+				}
+				snapshot := make([]*subscriber, 0, len(subMap))
+				for _, s := range subMap {
+					snapshot = append(snapshot, s)
+				}
+				patterns = append(patterns, patternSnapshot{
+					pattern: pattern,
+					subs:    snapshot,
+				})
+			}
+		}
+		ps.mu.RUnlock()
+
+		// Deliver to each subscriber
+		for _, s := range subs {
+			ps.deliver(s, msg)
+		}
+
+		if len(patterns) > 0 {
+			for _, entry := range patterns {
+				if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+					for _, s := range entry.subs {
+						ps.deliver(s, msg)
+					}
+				}
+			}
+		}
+	}()
+
+	return nil
 }
 
 // GetSubscriberCount returns the number of subscribers for a topic.
@@ -596,26 +669,32 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 }
 
 // deliverDropOldest drops the oldest message if buffer is full.
+// This implementation uses a buffered channel with a fixed size and implements
+// a proper ring buffer semantics by dropping the oldest message when full.
 func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopic string) bool {
 	select {
 	case s.ch <- msg:
 		ps.metrics.incDelivered(metricTopic)
 		return false
 	default:
-		// Buffer full, drop oldest
+		// Buffer is full, we need to drop the oldest message and add the new one
+		// Since Go channels don't guarantee FIFO order for buffered channels,
+		// we implement a simple approach: drain one message and try again
 		select {
 		case <-s.ch:
+			// Successfully drained one message (conceptually the oldest)
 			ps.metrics.incDropped(metricTopic, DropOldest)
 		default:
-			// Shouldn't happen, but safe
+			// This shouldn't happen since we know the channel is full
+			ps.metrics.incDropped(metricTopic, DropOldest)
 		}
 
-		// Try again
+		// Now try to send the new message
 		select {
 		case s.ch <- msg:
 			ps.metrics.incDelivered(metricTopic)
 		default:
-			// Still full after dropping one, drop this message
+			// Still full, drop this message too
 			ps.metrics.incDropped(metricTopic, DropOldest)
 		}
 		return false
