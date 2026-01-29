@@ -30,7 +30,7 @@ func newTestStore(t *testing.T) *kvstore.KVStore {
 
 func TestGenerateAndVerifyTokenPair(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.AccessExpiration = time.Minute
 	cfg.RefreshExpiration = time.Hour
 
@@ -85,7 +85,7 @@ func TestGenerateAndVerifyTokenPair(t *testing.T) {
 
 func TestMissingSubject(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	mgr, err := NewJWTManager(store, cfg)
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
@@ -102,7 +102,7 @@ func TestMissingSubject(t *testing.T) {
 
 func TestKeyRotationAndVerification(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.RotationInterval = time.Second
 
 	mgr, err := NewJWTManager(store, cfg)
@@ -146,7 +146,7 @@ func TestKeyRotationAndVerification(t *testing.T) {
 
 func TestAutomaticRotation(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.RotationInterval = 100 * time.Millisecond
 
 	mgr, err := NewJWTManager(store, cfg)
@@ -174,7 +174,7 @@ func TestAutomaticRotation(t *testing.T) {
 
 func TestBlacklistAndVersioning(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.AccessExpiration = time.Minute
 
 	mgr, err := NewJWTManager(store, cfg)
@@ -237,7 +237,7 @@ func TestBlacklistAndVersioning(t *testing.T) {
 
 func TestClockSkewTolerance(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.AccessExpiration = 1 * time.Second
 	cfg.ClockSkew = 1 * time.Second // allow 1 second clock skew
 
@@ -269,7 +269,7 @@ func TestClockSkewTolerance(t *testing.T) {
 
 func TestNotBeforeWithClockSkew(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.ClockSkew = 2 * time.Second
 
 	mgr, err := NewJWTManager(store, cfg)
@@ -320,7 +320,7 @@ func TestNotBeforeWithClockSkew(t *testing.T) {
 
 func TestEdDSAAlgorithm(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.Algorithm = AlgorithmEdDSA
 
 	mgr, err := NewJWTManager(store, cfg)
@@ -353,7 +353,7 @@ func TestEdDSAAlgorithm(t *testing.T) {
 
 func TestInvalidToken(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
 
 	tests := []struct {
@@ -379,7 +379,7 @@ func TestInvalidToken(t *testing.T) {
 
 func TestTokenTypeMismatch(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
 
 	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-type"}, AuthorizationClaims{})
@@ -393,7 +393,7 @@ func TestTokenTypeMismatch(t *testing.T) {
 
 func TestInvalidIssuerAudience(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.Issuer = "plumego"
 	cfg.Audience = "plumego-client"
 
@@ -503,7 +503,7 @@ func TestCheckPolicy(t *testing.T) {
 
 func TestJWTAuthenticatorMiddleware(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
 
 	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-mw"}, AuthorizationClaims{Roles: []string{"user"}})
@@ -606,8 +606,8 @@ func TestAuthorizeMiddleware(t *testing.T) {
 
 func TestDebugMode(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
-	cfg.DebugMode = true // This is now deprecated and has no effect
+	cfg := DefaultJWTConfig()
+	// DebugMode has been removed for security - tokens are always validated strictly
 	mgr, _ := NewJWTManager(store, cfg)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -636,11 +636,9 @@ func TestDebugMode(t *testing.T) {
 
 func TestExtractBearerToken(t *testing.T) {
 	tests := []struct {
-		name       string
-		header     string
-		queryParam string
-		allowQuery bool
-		want       string
+		name   string
+		header string
+		want   string
 	}{
 		{
 			name:   "valid bearer header",
@@ -653,42 +651,30 @@ func TestExtractBearerToken(t *testing.T) {
 			want:   "token456",
 		},
 		{
-			// Security fix: query param tokens are no longer supported
-			// to prevent token leakage via server logs, browser history, and Referer headers.
-			// The allowQuery parameter is now ignored.
-			name:       "query param allowed (now disabled for security)",
-			queryParam: "querytoken",
-			allowQuery: true,
-			want:       "", // Changed from "querytoken" - query params are no longer supported
+			name:   "no authorization header",
+			header: "",
+			want:   "",
 		},
 		{
-			name:       "query param not allowed",
-			queryParam: "querytoken",
-			allowQuery: false,
-			want:       "",
+			name:   "non-bearer authorization",
+			header: "Basic dXNlcjpwYXNz",
+			want:   "",
 		},
 		{
-			name:       "header takes precedence",
-			header:     "Bearer headertoken",
-			queryParam: "querytoken",
-			allowQuery: true,
-			want:       "headertoken",
+			name:   "case insensitive bearer",
+			header: "BEARER token789",
+			want:   "token789",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			url := "/test"
-			if tt.queryParam != "" {
-				url += "?token=" + tt.queryParam
-			}
-
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", "/test", nil)
 			if tt.header != "" {
 				req.Header.Set("Authorization", tt.header)
 			}
 
-			got := extractBearerToken(req, tt.allowQuery)
+			got := extractBearerToken(req)
 			if got != tt.want {
 				t.Errorf("extractBearerToken() = %q, want %q", got, tt.want)
 			}
@@ -700,7 +686,7 @@ func TestExtractBearerToken(t *testing.T) {
 
 func BenchmarkGenerateTokenPair(b *testing.B) {
 	store, _ := kvstore.NewKVStore(kvstore.Options{DataDir: b.TempDir()})
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
 
 	identity := IdentityClaims{Subject: "bench-user"}
@@ -714,7 +700,7 @@ func BenchmarkGenerateTokenPair(b *testing.B) {
 
 func BenchmarkVerifyToken(b *testing.B) {
 	store, _ := kvstore.NewKVStore(kvstore.Options{DataDir: b.TempDir()})
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
 
 	identity := IdentityClaims{Subject: "bench-user"}
@@ -728,7 +714,7 @@ func BenchmarkVerifyToken(b *testing.B) {
 
 func BenchmarkGenerateTokenPairEdDSA(b *testing.B) {
 	store, _ := kvstore.NewKVStore(kvstore.Options{DataDir: b.TempDir()})
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	cfg.Algorithm = AlgorithmEdDSA
 	mgr, _ := NewJWTManager(store, cfg)
 
@@ -745,7 +731,7 @@ func BenchmarkGenerateTokenPairEdDSA(b *testing.B) {
 
 func TestContractAuthenticator(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	mgr, err := NewJWTManager(store, cfg)
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
@@ -771,7 +757,7 @@ func TestContractAuthenticator(t *testing.T) {
 
 func TestContractAuthenticatorMissingToken(t *testing.T) {
 	store := newTestStore(t)
-	cfg := DefaultJWTConfig(nil)
+	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
 
 	authenticator := mgr.Authenticator(TokenTypeAccess)
