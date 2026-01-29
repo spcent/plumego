@@ -10,6 +10,7 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
 - **优雅生命周期**：环境变量加载、连接排水、就绪标志，以及可选的 TLS/HTTP2 配置，带有合理默认值。
 - **可选服务**：内置带认证的 WebSocket 中心、进程内 Pub/Sub（带调试快照）、入站/出站 Webhook 路由器，以及从磁盘或嵌入资源提供静态前端。
+- **任务调度**：通过 `scheduler` 包提供进程内 cron、延迟任务与可重试任务。
 
 ## 组件
 `core.App` 通过可插拔组件进行编排，而不是硬编码功能。组件可以注册路由、中间件和生命周期钩子：
@@ -112,6 +113,27 @@ app.Register(myRunner)
 ```
 
 Runner 会在 HTTP server 启动前启动，并在优雅关闭时停止。
+
+## 任务调度
+使用 `scheduler` 包提供进程内 cron 与延迟任务：
+
+```go
+sch := scheduler.New(scheduler.WithWorkers(2))
+sch.Start()
+defer sch.Stop(context.Background())
+
+sch.AddCron("cleanup", "0 * * * *", func(ctx context.Context) error {
+    // 每小时任务
+    return nil
+})
+
+sch.Delay("one-off", 5*time.Second, func(ctx context.Context) error {
+    return nil
+})
+```
+
+可选增强包括管理 Handler（`scheduler.NewAdminHandler`）以及可插拔持久化（`scheduler.WithStore`，支持内存或 KV）。
+还可以通过 `scheduler.WithPanicHandler` 与 `scheduler.WithMetricsSink` 接入异常处理与指标汇报。
 
 ## 认证契约
 Plumego 通过 `contract` 中的接口将认证、授权、会话校验分离，推荐用中间件组合：

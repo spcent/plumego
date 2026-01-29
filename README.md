@@ -10,6 +10,7 @@ Plumego is a lightweight Go HTTP toolkit built entirely on the standard library.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
 - **Optional Services**: Built-in authenticated WebSocket hub, in-process Pub/Sub (with debug snapshots), inbound/outbound webhook routers, and static frontend serving from disk or embedded resources.
+- **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `scheduler` package.
 
 ## Components
 `core.App` orchestrates through pluggable components instead of hardcoded functionality. Components can register routes, middleware, and lifecycle hooks:
@@ -112,6 +113,27 @@ app.Register(myRunner)
 ```
 
 Runners start before the HTTP server and stop during graceful shutdown.
+
+## Task Scheduling
+Use the `scheduler` package for in-process cron and delayed jobs:
+
+```go
+sch := scheduler.New(scheduler.WithWorkers(2))
+sch.Start()
+defer sch.Stop(context.Background())
+
+sch.AddCron("cleanup", "0 * * * *", func(ctx context.Context) error {
+    // hourly task
+    return nil
+})
+
+sch.Delay("one-off", 5*time.Second, func(ctx context.Context) error {
+    return nil
+})
+```
+
+Optional helpers include a minimal admin handler (`scheduler.NewAdminHandler`) and pluggable persistence (`scheduler.WithStore` with the in-memory or KV store).
+You can also register a panic handler and metrics sink via `scheduler.WithPanicHandler` and `scheduler.WithMetricsSink`.
 
 ## Auth Contracts
 Plumego keeps authentication, authorization, and session validation separate through interfaces in `contract`. Compose them with middleware rather than relying on framework magic:
