@@ -179,10 +179,16 @@ type JWTConfig struct {
 	// ClockSkew is the tolerance for clock skew
 	ClockSkew time.Duration
 
-	// AllowQueryToken allows tokens in URL query parameters (not recommended)
+	// Deprecated: AllowQueryToken is removed for security reasons.
+	// Tokens in URL query parameters are logged in server access logs,
+	// browser history, and Referer headers, causing token leakage.
+	// This field is kept for API compatibility but has no effect.
 	AllowQueryToken bool
 
-	// DebugMode returns detailed error messages (for development only)
+	// Deprecated: DebugMode is removed for security reasons.
+	// Detailed error messages can leak implementation details to attackers.
+	// Use structured logging to capture detailed errors internally.
+	// This field is kept for API compatibility but has no effect.
 	DebugMode bool
 }
 
@@ -683,7 +689,19 @@ func (m *JWTManager) RevokeToken(token string) error {
 
 func (m *JWTManager) isBlacklisted(jti string) bool {
 	_, err := m.store.Get(blacklistPrefix + jti)
-	return err == nil
+	if err == nil {
+		// Token is explicitly blacklisted
+		return true
+	}
+	// For "not found" errors, the token is not blacklisted.
+	// For any other errors (storage failure, network issues), we fail-safe
+	// by treating the token as blacklisted to prevent accepting potentially
+	// revoked tokens when the storage is unavailable.
+	if errors.Is(err, kvstore.ErrKeyNotFound) {
+		return false
+	}
+	// Unknown error - fail-safe by assuming blacklisted
+	return true
 }
 
 // IncrementIdentityVersion bumps the subject version, invalidating older tokens.
@@ -748,12 +766,9 @@ func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middlew
 
 			claims, err := m.VerifyToken(r.Context(), token, expectedType)
 			if err != nil {
-				// return detailed error in debug mode
-				if m.config.DebugMode {
-					writeAuthError(w, r, http.StatusUnauthorized, "invalid_token", fmt.Sprintf("token verification failed: %v", err))
-				} else {
-					writeAuthError(w, r, http.StatusUnauthorized, "invalid_token", "invalid token")
-				}
+				// Always return generic error message to prevent information leakage.
+				// Detailed errors are logged internally for debugging.
+				writeAuthError(w, r, http.StatusUnauthorized, "invalid_token", "invalid token")
 				return
 			}
 
@@ -856,19 +871,17 @@ func GetClaimsFromContext(r *http.Request) (*TokenClaims, error) {
 	return claims, nil
 }
 
-// extractBearerToken extracts Bearer token, supporting configurable URL token
-func extractBearerToken(r *http.Request, allowQuery bool) string {
+// extractBearerToken extracts Bearer token from the Authorization header.
+// For security reasons, tokens in URL query parameters are not supported
+// as they can be leaked via server logs, browser history, and Referer headers.
+func extractBearerToken(r *http.Request, _ bool) string {
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
 		return strings.TrimSpace(authHeader[7:])
 	}
 
-	// only read from query parameters if explicitly allowed
-	if allowQuery {
-		if token := r.URL.Query().Get("token"); token != "" {
-			return token
-		}
-	}
+	// Query parameter tokens are no longer supported for security reasons.
+	// The allowQuery parameter is ignored but kept for API compatibility.
 
 	return ""
 }

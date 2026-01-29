@@ -401,28 +401,43 @@ func (rl *RateLimiter) analyzePressure(metrics ConcurrencyMetrics) PressureLevel
 	return PressureNormal
 }
 
-// updateMaxConcurrent updates maximum concurrency
+// updateMaxConcurrent updates maximum concurrency safely.
+// This operation is synchronized to prevent race conditions between
+// the channel replacement and ongoing requests.
 func (rl *RateLimiter) updateMaxConcurrent(newMax int64) {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+
 	oldMax := atomic.LoadInt64(&rl.maxConcurrent)
 	if newMax == oldMax {
 		return
 	}
 
-	// Rebuild semaphore channel
+	// Create new semaphore with new capacity
 	newSem := make(chan struct{}, newMax)
 
-	// Copy existing slots
-	go func() {
-		for i := int64(0); i < min(oldMax, newMax); i++ {
-			select {
-			case <-rl.sem:
-				newSem <- struct{}{}
-			default:
-				return
-			}
+	// Synchronously migrate existing slots to the new semaphore.
+	// We need to count how many slots are currently in use and preserve them.
+	// The sem channel tracks available slots (empty = all in use).
+	// We drain the old channel and fill the new one with the same number of available slots.
+	availableSlots := int64(0)
+	for {
+		select {
+		case <-rl.sem:
+			availableSlots++
+		default:
+			goto done
 		}
-	}()
+	}
+done:
 
+	// Fill the new semaphore with available slots (up to newMax)
+	toFill := min(availableSlots, newMax)
+	for i := int64(0); i < toFill; i++ {
+		newSem <- struct{}{}
+	}
+
+	// Replace the semaphore
 	rl.sem = newSem
 	atomic.StoreInt64(&rl.maxConcurrent, newMax)
 }
@@ -495,6 +510,7 @@ func NewRateLimiterLegacy(rate float64, capacity int, cleanupInterval, maxIdleTi
 		capacity:        capacity,
 		cleanupInterval: cleanupInterval,
 		maxIdleTime:     maxIdleTime,
+		stopCh:          make(chan struct{}),
 	}
 }
 
@@ -506,6 +522,8 @@ type RateLimiterLegacy struct {
 	capacity        int
 	cleanupInterval time.Duration
 	maxIdleTime     time.Duration
+	stopCh          chan struct{} // Channel to signal cleanup goroutine to stop
+	stopped         bool          // Flag to indicate if the limiter has been stopped
 }
 
 // tokenBucket represents a single token bucket for rate limiting
@@ -560,22 +578,40 @@ func (rl *RateLimiterLegacy) getBucket(key string, now time.Time) *tokenBucket {
 	return bucket
 }
 
-// cleanup removes idle buckets to free memory
+// cleanup removes idle buckets to free memory.
+// This goroutine runs until Stop() is called.
 func (rl *RateLimiterLegacy) cleanup() {
 	ticker := time.NewTicker(rl.cleanupInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		now := time.Now()
-		rl.mu.Lock()
+	for {
+		select {
+		case <-rl.stopCh:
+			return
+		case <-ticker.C:
+			now := time.Now()
+			rl.mu.Lock()
 
-		for key, bucket := range rl.buckets {
-			if now.Sub(bucket.lastAccess) > rl.maxIdleTime {
-				delete(rl.buckets, key)
+			for key, bucket := range rl.buckets {
+				if now.Sub(bucket.lastAccess) > rl.maxIdleTime {
+					delete(rl.buckets, key)
+				}
 			}
-		}
 
-		rl.mu.Unlock()
+			rl.mu.Unlock()
+		}
+	}
+}
+
+// Stop stops the cleanup goroutine and releases resources.
+// After calling Stop, the limiter should not be used anymore.
+func (rl *RateLimiterLegacy) Stop() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if !rl.stopped {
+		rl.stopped = true
+		close(rl.stopCh)
 	}
 }
 

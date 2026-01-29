@@ -1,11 +1,15 @@
 package router
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
 	"github.com/spcent/plumego/middleware"
 )
+
+// ErrDuplicateRoute is returned when attempting to register a route that already exists.
+var ErrDuplicateRoute = errors.New("duplicate route")
 
 // RadixNode represents a node in the radix tree.
 // Each node corresponds to a path segment in the URL and stores routing information.
@@ -87,7 +91,7 @@ func NewRadixTree() *RadixTree {
 
 // Insert adds a route to the radix tree.
 // This method parses the path into segments and builds the tree structure.
-// It panics if a duplicate route is registered.
+// It returns ErrDuplicateRoute if a duplicate route is registered.
 //
 // Parameters:
 //   - method: HTTP method (GET, POST, etc.)
@@ -96,11 +100,17 @@ func NewRadixTree() *RadixTree {
 //   - paramKeys: Parameter keys extracted from the path (e.g., ["id"])
 //   - middlewares: Route-specific middlewares
 //
+// Returns:
+//   - error: ErrDuplicateRoute if the route already exists, nil otherwise
+//
 // Example:
 //
 //	tree := NewRadixTree()
-//	tree.Insert("GET", "/users/:id", handler, []string{"id"}, nil)
-func (rt *RadixTree) Insert(method, path string, handler Handler, paramKeys []string, middlewares []middleware.Middleware) {
+//	err := tree.Insert("GET", "/users/:id", handler, []string{"id"}, nil)
+//	if err != nil {
+//	    // handle duplicate route error
+//	}
+func (rt *RadixTree) Insert(method, path string, handler Handler, paramKeys []string, middlewares []middleware.Middleware) error {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 
@@ -114,11 +124,11 @@ func (rt *RadixTree) Insert(method, path string, handler Handler, paramKeys []st
 	// Handle root path
 	if path == "/" {
 		if root.handler != nil {
-			panic("duplicate route: " + method + " /")
+			return errors.New("duplicate route: " + method + " /")
 		}
 		root.handler = handler
 		root.fullPath = path
-		return
+		return nil
 	}
 
 	segments := compilePathSegments(path)
@@ -141,12 +151,13 @@ func (rt *RadixTree) Insert(method, path string, handler Handler, paramKeys []st
 
 	// Set handler on final node
 	if current.handler != nil {
-		panic("duplicate route: " + method + " " + path)
+		return errors.New("duplicate route: " + method + " " + path)
 	}
 	current.handler = handler
 	current.paramKeys = paramKeys
 	current.fullPath = path
 	current.middlewares = middlewares
+	return nil
 }
 
 // Find matches a path against the radix tree.

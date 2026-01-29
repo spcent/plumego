@@ -391,9 +391,8 @@ func (s *Scheduler) dispatch(j *job) {
 	}
 	if j.options.OverlapPolicy == SerialQueue {
 		if !j.running.CompareAndSwap(false, true) {
-			s.mu.Lock()
-			j.pending = true
-			s.mu.Unlock()
+			// Use atomic operation to set pending flag to avoid race condition
+			j.pending.Store(true)
 			return
 		}
 	}
@@ -514,9 +513,9 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	}
 	s.mu.Lock()
 	j.nextAttempt = 1
-	pending := j.options.OverlapPolicy == SerialQueue && j.pending
+	// Use atomic operation to read and clear pending flag
+	pending := j.options.OverlapPolicy == SerialQueue && j.pending.Swap(false)
 	if pending {
-		j.pending = false
 		s.queue.PushSchedule(&scheduleItem{runAt: time.Now(), job: j})
 		select {
 		case s.wakeCh <- struct{}{}:

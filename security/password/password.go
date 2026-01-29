@@ -125,9 +125,21 @@ func ValidatePasswordStrength(password string, config PasswordStrengthConfig) bo
 
 // DefaultCost represents the default iteration count for password hashing.
 // A higher value increases the computational cost for attackers attempting to
-// brute-force hashed passwords. Adjust cautiously to balance security and
-// performance.
-const DefaultCost = 10_000
+// brute-force hashed passwords.
+//
+// OWASP 2024 recommends at least 600,000 iterations for PBKDF2-SHA256 or
+// 210,000 iterations for PBKDF2-SHA512 to achieve approximately 100ms of
+// computation time on typical hardware. We use 210,000 as the default for
+// PBKDF2-SHA512.
+//
+// Note: The previous value of 10,000 was too low for modern security standards.
+// If you have existing hashed passwords, consider implementing a migration
+// strategy to rehash passwords with the new cost when users log in.
+const DefaultCost = 210_000
+
+// MinimumCost represents the minimum recommended iteration count.
+// Using fewer iterations than this is not recommended for security-critical applications.
+const MinimumCost = 100_000
 
 // HashPassword generates a salted hash of the password with the default cost.
 func HashPassword(password string) (string, error) {

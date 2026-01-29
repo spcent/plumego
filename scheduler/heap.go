@@ -27,7 +27,7 @@ type job struct {
 	running     atomic.Bool
 	lastRun     time.Time
 	lastError   error
-	pending     bool
+	pending     atomic.Bool // Changed to atomic.Bool to prevent race condition between dispatch and execute
 }
 
 type runRequest struct {
