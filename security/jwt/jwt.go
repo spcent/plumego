@@ -53,7 +53,7 @@ const (
 //
 //	import "github.com/spcent/plumego/security/jwt"
 //
-//	config := jwt.DefaultJWTConfig(secret)
+//	config := jwt.DefaultJWTConfig()
 //	config.Algorithm = jwt.AlgorithmEdDSA
 type Algorithm string
 
@@ -152,7 +152,7 @@ type TokenClaims struct {
 //
 //	import "github.com/spcent/plumego/security/jwt"
 //
-//	config := jwt.DefaultJWTConfig(secret)
+//	config := jwt.DefaultJWTConfig()
 //	config.Issuer = "my-app"
 //	config.AccessExpiration = 15 * time.Minute
 //	config.RefreshExpiration = 7 * 24 * time.Hour
@@ -178,18 +178,6 @@ type JWTConfig struct {
 
 	// ClockSkew is the tolerance for clock skew
 	ClockSkew time.Duration
-
-	// Deprecated: AllowQueryToken is removed for security reasons.
-	// Tokens in URL query parameters are logged in server access logs,
-	// browser history, and Referer headers, causing token leakage.
-	// This field is kept for API compatibility but has no effect.
-	AllowQueryToken bool
-
-	// Deprecated: DebugMode is removed for security reasons.
-	// Detailed error messages can leak implementation details to attackers.
-	// Use structured logging to capture detailed errors internally.
-	// This field is kept for API compatibility but has no effect.
-	DebugMode bool
 }
 
 // DefaultJWTConfig returns sane defaults.
@@ -202,17 +190,11 @@ type JWTConfig struct {
 //   - RotationInterval: 24 hours
 //   - Algorithm: HS256
 //   - ClockSkew: 5 seconds
-//   - AllowQueryToken: false
-//   - DebugMode: false
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	secret := []byte("my-secret-key")
-//	config := jwt.DefaultJWTConfig(secret)
-func DefaultJWTConfig(secret []byte) JWTConfig {
-	_ = secret // kept for API compatibility
+//	config := jwt.DefaultJWTConfig()
+func DefaultJWTConfig() JWTConfig {
 	return JWTConfig{
 		Issuer:            "plumego",
 		Audience:          "plumego-client",
@@ -220,9 +202,7 @@ func DefaultJWTConfig(secret []byte) JWTConfig {
 		RefreshExpiration: 7 * 24 * time.Hour,
 		RotationInterval:  24 * time.Hour,
 		Algorithm:         AlgorithmHS256,
-		ClockSkew:         5 * time.Second, // clock skew tolerance
-		AllowQueryToken:   false,           // allow token in query parameter
-		DebugMode:         false,           // debug mode (return detailed error messages)
+		ClockSkew:         5 * time.Second,
 	}
 }
 
@@ -279,7 +259,7 @@ type TokenPair struct {
 //	import "github.com/spcent/plumego/store/kv"
 //
 //	store := kv.New()
-//	config := jwt.DefaultJWTConfig(secret)
+//	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {
 //		// handle error
@@ -314,7 +294,7 @@ type JWTManager struct {
 //
 //	store := kv.New()
 //	secret := []byte("my-secret-key")
-//	config := jwt.DefaultJWTConfig(secret)
+//	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {
 //		// handle error
@@ -758,7 +738,7 @@ func (m *JWTManager) matchIdentityVersion(subject string, version int64) bool {
 func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			token := extractBearerToken(r, m.config.AllowQueryToken) // extract token from request
+			token := extractBearerToken(r)
 			if token == "" {
 				writeAuthError(w, r, http.StatusUnauthorized, "missing_token", "missing authorization header")
 				return
@@ -874,15 +854,11 @@ func GetClaimsFromContext(r *http.Request) (*TokenClaims, error) {
 // extractBearerToken extracts Bearer token from the Authorization header.
 // For security reasons, tokens in URL query parameters are not supported
 // as they can be leaked via server logs, browser history, and Referer headers.
-func extractBearerToken(r *http.Request, _ bool) string {
+func extractBearerToken(r *http.Request) string {
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
 		return strings.TrimSpace(authHeader[7:])
 	}
-
-	// Query parameter tokens are no longer supported for security reasons.
-	// The allowQuery parameter is ignored but kept for API compatibility.
-
 	return ""
 }
 

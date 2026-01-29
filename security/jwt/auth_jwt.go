@@ -22,7 +22,7 @@ func (a Authenticator) Authenticate(r *http.Request) (*contract.Principal, error
 		return nil, contract.ErrUnauthenticated
 	}
 
-	token := extractBearerToken(r, a.Manager.config.AllowQueryToken)
+	token := extractBearerToken(r)
 	if token == "" {
 		return nil, contract.ErrUnauthenticated
 	}
