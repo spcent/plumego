@@ -157,11 +157,12 @@ func (c CronSpec) Next(after time.Time) time.Time {
 			next = time.Date(next.Year(), next.Month()+1, 1, 0, 0, 0, 0, next.Location())
 			continue
 		}
-		if !containsInt(c.dom, next.Day()) {
-			next = time.Date(next.Year(), next.Month(), next.Day(), 0, 0, 0, 0, next.Location()).AddDate(0, 0, 1)
-			continue
-		}
-		if !containsInt(c.dow, int(next.Weekday())) {
+		// Standard cron: day-of-month and day-of-week are OR, not AND
+		// Match if either condition is satisfied
+		domMatch := containsInt(c.dom, next.Day())
+		dowMatch := containsInt(c.dow, int(next.Weekday()))
+
+		if !domMatch && !dowMatch {
 			next = time.Date(next.Year(), next.Month(), next.Day(), 0, 0, 0, 0, next.Location()).AddDate(0, 0, 1)
 			continue
 		}

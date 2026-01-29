@@ -756,17 +756,24 @@ func mergeSpanIntoTrace(trace *Trace, span *Span, maxSpans int) *Trace {
 	if trace == nil || span == nil {
 		return trace
 	}
-	for i, existingSpan := range trace.Spans {
+
+	// Create a deep copy of the trace to avoid modifying the original
+	newTrace := copyTrace(trace)
+
+	// Find existing span and update it
+	for i, existingSpan := range newTrace.Spans {
 		if existingSpan.ID == span.ID {
-			trace.Spans[i] = copySpan(span)
-			return trace
+			newTrace.Spans[i] = copySpan(span)
+			return newTrace
 		}
 	}
-	if maxSpans > 0 && len(trace.Spans) >= maxSpans {
-		return trace
+
+	// Add new span if not found
+	if maxSpans > 0 && len(newTrace.Spans) >= maxSpans {
+		return newTrace
 	}
-	trace.Spans = append(trace.Spans, copySpan(span))
-	return trace
+	newTrace.Spans = append(newTrace.Spans, copySpan(span))
+	return newTrace
 }
 
 func copyTrace(src *Trace) *Trace {
