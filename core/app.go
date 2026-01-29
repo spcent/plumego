@@ -31,7 +31,7 @@ type App struct {
 	httpServer  *http.Server       // HTTP server instance
 	connTracker *connectionTracker // Connection tracker for WebSocket
 	handler     http.Handler       // Combined handler with middleware applied
-	handlerOnce sync.Once          // Ensures handler initialization happens once
+	handlerOnce ResettableOnce     // Ensures handler initialization happens once, can be reset for testing
 
 	// Optional components
 	metricsCollector metrics.MetricsCollector
@@ -46,15 +46,15 @@ type App struct {
 	// Component management
 	components        []Component
 	startedComponents []Component
-	componentStopOnce sync.Once
+	componentStopOnce ResettableOnce
 	componentsMounted bool
 
 	runners        []Runner
 	startedRunners []Runner
-	runnerStopOnce sync.Once
+	runnerStopOnce ResettableOnce
 
 	shutdownHooks []ShutdownHook
-	shutdownOnce  sync.Once
+	shutdownOnce  ResettableOnce
 
 	// Dependency injection container
 	diContainer *DIContainer

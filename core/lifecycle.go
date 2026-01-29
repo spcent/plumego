@@ -377,6 +377,15 @@ func (a *App) stopRunners(ctx context.Context) {
 	})
 }
 
+// ResetForTesting resets all ResettableOnce instances for testing purposes.
+// This method is intended for testing only and should not be used in production.
+func (a *App) ResetForTesting() {
+	a.handlerOnce.Reset()
+	a.componentStopOnce.Reset()
+	a.runnerStopOnce.Reset()
+	a.shutdownOnce.Reset()
+}
+
 func (t *connectionTracker) track(_ net.Conn, state http.ConnState) {
 	switch state {
 	case http.StateNew:
