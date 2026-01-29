@@ -27,6 +27,7 @@ type RouteMatcher struct {
 
 // NewRouteMatcher creates a new route matcher for the given tree root.
 // The matcher is lightweight and can be reused for multiple matching operations.
+// This is primarily used internally by the Router for route matching.
 //
 // Parameters:
 //   - root: Root node of the radix tree
@@ -36,8 +37,8 @@ type RouteMatcher struct {
 //
 // Example:
 //
-//	tree := router.GetRadixTree()
-//	matcher := NewRouteMatcher(tree.GetRoot("GET"))
+//	// Internal usage within Router.handleRouteMatch:
+//	matcher := NewRouteMatcher(tree)
 //	result := matcher.Match([]string{"users", "123"})
 func NewRouteMatcher(root *node) *RouteMatcher {
 	return &RouteMatcher{
