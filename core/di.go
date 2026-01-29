@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // DILifecycle defines the lifecycle management for dependencies.
@@ -38,6 +39,7 @@ type DIRegistration struct {
 //   - Factory functions for complex initialization
 //   - Recursive dependency injection into struct fields
 //   - Thread-safe operations
+//   - Multiple lifecycle management: Singleton, Transient, and Scoped
 //
 // Example:
 //
@@ -62,6 +64,9 @@ type DIContainer struct {
 	// This is more reliable than using goroutine IDs which depend on runtime internals.
 	resolutionCounter atomic.Uint64
 
+	// scopedInstances stores instances for scoped lifecycle within a resolution chain
+	scopedInstances map[uint64]map[reflect.Type]any
+
 	// injectionLocks protects concurrent injection into the same instance
 	injectionLocks [64]sync.Mutex
 }
@@ -72,6 +77,12 @@ func NewDIContainer() *DIContainer {
 	return &DIContainer{
 		services: make(map[reflect.Type]DIRegistration),
 	}
+}
+
+// getOrCreateChainID generates a unique ID for the current resolution chain.
+// This is used to track scoped instances within a resolution scope.
+func (c *DIContainer) getOrCreateChainID() uint64 {
+	return c.resolutionCounter.Add(1)
 }
 
 // resolveWithStack resolves a service while tracking the resolution stack
@@ -104,6 +115,31 @@ func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect
 		return registration.Instance, nil
 	}
 
+	// Handle scoped lifecycle - check if we already have an instance for this resolution chain
+	if registration.Lifecycle == Scoped {
+		// For scoped services, we need to use the same chain ID for the entire resolution
+		// To get the chain ID, we check if we're already in a resolution chain
+		var chainID uint64
+		if len(stack) == 0 {
+			// This is the root of a new resolution chain
+			chainID = c.getOrCreateChainID()
+		} else {
+			// We're already in a resolution chain, use the existing chain ID
+			// Use a hash of the stack to ensure consistent chain IDs for the same resolution path
+			chainID = c.getChainIDForStack(stack)
+		}
+
+		c.mu.RLock()
+		scopedChain, exists := c.scopedInstances[chainID]
+		c.mu.RUnlock()
+
+		if exists {
+			if instance, ok := scopedChain[serviceType]; ok {
+				return instance, nil
+			}
+		}
+	}
+
 	// Create new instance
 	var instance any
 	var err error
@@ -124,10 +160,41 @@ func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect
 	if registration.Lifecycle == Singleton {
 		registration.Instance = instance
 		c.services[serviceType] = registration
+	} else if registration.Lifecycle == Scoped {
+		// Store scoped instance for this resolution chain
+		var chainID uint64
+		if len(stack) == 0 {
+			// This is the root of a new resolution chain
+			chainID = c.getOrCreateChainID()
+		} else {
+			// We're already in a resolution chain, use the existing chain ID
+			chainID = c.getChainIDForStack(stack)
+		}
+
+		if c.scopedInstances == nil {
+			c.scopedInstances = make(map[uint64]map[reflect.Type]any)
+		}
+		if c.scopedInstances[chainID] == nil {
+			c.scopedInstances[chainID] = make(map[reflect.Type]any)
+		}
+		c.scopedInstances[chainID][serviceType] = instance
 	}
 	c.mu.Unlock()
 
 	return instance, nil
+}
+
+// getChainIDForStack generates a consistent chain ID based on the resolution stack
+func (c *DIContainer) getChainIDForStack(stack []reflect.Type) uint64 {
+	// Use a simple hash of the stack types to generate a consistent chain ID
+	var hash uint64 = 5381
+	for _, t := range stack {
+		// Simple hash combining the type string
+		for _, b := range []byte(t.String()) {
+			hash = ((hash << 5) + hash) + uint64(b)
+		}
+	}
+	return hash
 }
 
 // resolveAssignableWithStack resolves a service that implements an interface with stack tracking.
@@ -461,6 +528,10 @@ func (c *DIContainer) Clear() {
 	defer c.mu.Unlock()
 
 	c.services = make(map[reflect.Type]DIRegistration)
+	c.stackMu.Lock()
+	c.stacks = make(map[uint64][]reflect.Type)
+	c.stackMu.Unlock()
+	c.scopedInstances = make(map[uint64]map[reflect.Type]any)
 }
 
 // GetRegistrations returns a list of all registered services.

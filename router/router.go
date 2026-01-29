@@ -1275,7 +1275,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	wrappedHandler.ServeHTTP(w, reqWithParams)
 }
 
-func (r *Router) writeMethodNotAllowed(w http.ResponseWriter, req *http.Request, path string) bool {
+func (r *Router) writeMethodNotAllowed(w http.ResponseWriter, _ *http.Request, path string) bool {
 	if !r.methodNotAllowed {
 		return false
 	}
