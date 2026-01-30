@@ -10,6 +10,11 @@ import (
 	log "github.com/spcent/plumego/log"
 )
 
+const (
+	// DefaultWorkChannelBuffer is the default buffer size for the work channel.
+	DefaultWorkChannelBuffer = 256
+)
+
 var (
 	// ErrSchedulerClosed indicates scheduler has been stopped.
 	ErrSchedulerClosed = errors.New("scheduler: closed")
@@ -106,7 +111,7 @@ func New(opts ...Option) *Scheduler {
 		wakeCh:      make(chan struct{}, 1),
 		stopCh:      make(chan struct{}),
 		workerCount: 4,
-		workCh:      make(chan *runRequest, 256),
+		workCh:      make(chan *runRequest, DefaultWorkChannelBuffer),
 		logger:      log.NewGLogger(),
 		clock:       realClock{},
 		registry:    make(map[string]TaskFunc),
