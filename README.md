@@ -195,7 +195,7 @@ if err := app.ConfigureObservability(obs); err != nil {
 When tracing is enabled, logs include `trace_id` and `span_id`, and responses include `X-Span-ID` for correlation.
 
 ## Configuration Reference
-Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Use the table below for predictable deployments.
+Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Config keys are normalized to lower_snake_case for lookups, so CamelCase and UPPER_SNAKE resolve to the same value. Use the table below for predictable deployments.
 
 | AppConfig Field          | Default        | Environment Variable           | Flag Example                     |
 |--------------------------|----------------|--------------------------------|----------------------------------|

@@ -26,6 +26,10 @@ type diNamedTarget struct {
 	Dep diService `inject:"diImpl"`
 }
 
+type diNamedPointerTarget struct {
+	Dep diService `inject:"*core.diImpl"`
+}
+
 type diValueTarget struct {
 	Dep diImpl `inject:""`
 }
@@ -49,6 +53,38 @@ func TestDIInjectByName(t *testing.T) {
 	c.Register(&diImpl{name: "named"})
 
 	var target diNamedTarget
+	if err := c.Inject(&target); err != nil {
+		t.Fatalf("inject failed: %v", err)
+	}
+
+	if target.Dep == nil || target.Dep.Name() != "named" {
+		t.Fatalf("unexpected injected dependency: %#v", target.Dep)
+	}
+}
+
+func TestDIInjectInterfaceWithFactory(t *testing.T) {
+	c := NewDIContainer()
+	c.RegisterFactory(reflect.TypeOf(&diImpl{}), func(c *DIContainer) any {
+		return &diImpl{name: "ok"}
+	}, Transient)
+
+	var target diTarget
+	if err := c.Inject(&target); err != nil {
+		t.Fatalf("inject failed: %v", err)
+	}
+
+	if target.Dep == nil || target.Dep.Name() != "ok" {
+		t.Fatalf("unexpected injected dependency: %#v", target.Dep)
+	}
+}
+
+func TestDIInjectByNameWithFactory(t *testing.T) {
+	c := NewDIContainer()
+	c.RegisterFactory(reflect.TypeOf(&diImpl{}), func(c *DIContainer) any {
+		return &diImpl{name: "named"}
+	}, Singleton)
+
+	var target diNamedPointerTarget
 	if err := c.Inject(&target); err != nil {
 		t.Fatalf("inject failed: %v", err)
 	}

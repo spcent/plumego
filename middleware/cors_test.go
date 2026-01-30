@@ -24,13 +24,13 @@ func TestCORSMiddleware(t *testing.T) {
 		MaxAge:           10 * time.Minute,
 	}
 
-	handler := CORSWithOptions(opts, dummyHandler)
+	handler := CORSWithOptions(opts, http.HandlerFunc(dummyHandler))
 
 	t.Run("No Origin header (non-CORS)", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
 		w := httptest.NewRecorder()
 
-		handler(w, req)
+		handler.ServeHTTP(w, req)
 
 		resp := w.Result()
 		if resp.StatusCode != http.StatusOK {
@@ -46,7 +46,7 @@ func TestCORSMiddleware(t *testing.T) {
 		req.Header.Set("Origin", "http://allowed.com")
 		w := httptest.NewRecorder()
 
-		handler(w, req)
+		handler.ServeHTTP(w, req)
 
 		resp := w.Result()
 		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "http://allowed.com" {
@@ -65,7 +65,7 @@ func TestCORSMiddleware(t *testing.T) {
 		req.Header.Set("Origin", "http://evil.com")
 		w := httptest.NewRecorder()
 
-		handler(w, req)
+		handler.ServeHTTP(w, req)
 
 		resp := w.Result()
 		if resp.Header.Get("Access-Control-Allow-Origin") != "" {
@@ -80,7 +80,7 @@ func TestCORSMiddleware(t *testing.T) {
 		req.Header.Set("Access-Control-Request-Headers", "Content-Type, Authorization")
 
 		w := httptest.NewRecorder()
-		handler(w, req)
+		handler.ServeHTTP(w, req)
 
 		resp := w.Result()
 		if resp.StatusCode != http.StatusNoContent {
@@ -102,13 +102,13 @@ func TestCORSMiddleware(t *testing.T) {
 			AllowedOrigins:   []string{"*"},
 			AllowCredentials: true,
 		}
-		handler2 := CORSWithOptions(opts2, dummyHandler)
+		handler2 := CORSWithOptions(opts2, http.HandlerFunc(dummyHandler))
 
 		req := httptest.NewRequest("GET", "/test", nil)
 		req.Header.Set("Origin", "http://foo.com")
 		w := httptest.NewRecorder()
 
-		handler2(w, req)
+		handler2.ServeHTTP(w, req)
 		resp := w.Result()
 
 		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "http://foo.com" {
@@ -119,13 +119,13 @@ func TestCORSMiddleware(t *testing.T) {
 
 func TestCORSMiddleware_ResponseBody(t *testing.T) {
 	opts := CORSOptions{AllowedOrigins: []string{"*"}}
-	handler := CORSWithOptions(opts, dummyHandler)
+	handler := CORSWithOptions(opts, http.HandlerFunc(dummyHandler))
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Origin", "http://anything.com")
 	w := httptest.NewRecorder()
 
-	handler(w, req)
+	handler.ServeHTTP(w, req)
 	resp := w.Result()
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != "ok" {

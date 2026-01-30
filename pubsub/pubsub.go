@@ -359,6 +359,7 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 	if msg.Time.IsZero() {
 		msg.Time = time.Now().UTC()
 	}
+	msg = cloneMessage(msg)
 
 	ps.metrics.incPublish(topic)
 
@@ -449,6 +450,7 @@ func (ps *InProcPubSub) PublishAsync(topic string, msg Message) error {
 	if msg.Time.IsZero() {
 		msg.Time = time.Now().UTC()
 	}
+	msg = cloneMessage(msg)
 
 	ps.metrics.incPublish(topic)
 
@@ -632,6 +634,8 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 	if s.pattern {
 		metricTopic = msg.Topic
 	}
+
+	msg = cloneMessage(msg)
 
 	// Fast path: check if closed without lock
 	if s.closed.Load() {

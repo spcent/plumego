@@ -6,7 +6,7 @@ Plumego’s middleware wraps standard `http.Handler` values. Chain them globally
 - **Recovery**: `core.WithRecovery()` catches panics, logs stack traces, returns JSON errors.
 - **Logging**: `core.WithLogging()` records request/response metadata and plugs into metrics/tracing collectors provided through `core.WithMetricsCollector` and `core.WithTracer`.
 - **Request ID**: `middleware.RequestID()` injects `X-Request-ID` and stores it in context for correlation.
-- **CORS**: `core.WithCORS()` sets permissive defaults; customize with `core.WithCORSOptions(...)` or `middleware.CORSWithOptions(...)`.
+- **CORS**: `core.WithCORS()` sets permissive defaults; customize with `core.WithCORSOptions(...)` or `middleware.CORSWithOptions(...)` (use `CORSWithOptionsFunc` for `http.HandlerFunc` return).
 - **Gzip**: `middleware.Gzip()` compresses responses when clients send `Accept-Encoding: gzip`.
 - **Timeout**: `middleware.Timeout(duration)` enforces per-request deadlines.
 - **Body limit**: `middleware.BodyLimit(maxBytes, logger)` caps request size with a structured 413 response.

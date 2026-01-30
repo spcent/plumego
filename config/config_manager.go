@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -187,14 +188,15 @@ func (cm *ConfigManager) Load(ctx context.Context) error {
 			return fmt.Errorf("failed to load from source %s: %w", source.Name(), err)
 		}
 
+		normalized := normalizeConfigData(sourceData, cm.logger)
 		// Merge data (later sources override earlier ones)
-		for key, value := range sourceData {
+		for key, value := range normalized {
 			data[key] = value
 		}
 
 		cm.logger.Info("Loaded configuration", log.Fields{
 			"source": source.Name(),
-			"keys":   len(sourceData),
+			"keys":   len(normalized),
 		})
 	}
 
@@ -237,13 +239,14 @@ func (cm *ConfigManager) LoadBestEffort(ctx context.Context) error {
 		}
 
 		loaded++
-		for key, value := range sourceData {
+		normalized := normalizeConfigData(sourceData, cm.logger)
+		for key, value := range normalized {
 			data[key] = value
 		}
 
 		cm.logger.Info("Loaded configuration", log.Fields{
 			"source": source.Name(),
-			"keys":   len(sourceData),
+			"keys":   len(normalized),
 		})
 	}
 
@@ -422,6 +425,10 @@ func (cm *ConfigManager) Watch(key string, callback WatcherCallback) error {
 		return errConfigClosed
 	}
 
+	if key != "*" {
+		key = normalizeConfigKey(key)
+	}
+
 	if _, exists := cm.watchers[key]; !exists {
 		cm.watchers[key] = make([]WatcherCallback, 0)
 	}
@@ -487,12 +494,16 @@ func (cm *ConfigManager) StartWatchers(ctx context.Context) error {
 
 // handleSourceUpdate handles configuration updates from a source
 func (cm *ConfigManager) handleSourceUpdate(sourceName string, newData map[string]any) {
-	cm.mu.Lock()
-
 	if len(newData) == 0 {
-		cm.mu.Unlock()
 		return
 	}
+
+	newData = normalizeConfigData(newData, cm.logger)
+	if len(newData) == 0 {
+		return
+	}
+
+	cm.mu.Lock()
 
 	// Detect changes
 	changes := make(map[string]struct{})
@@ -699,27 +710,18 @@ func (cm *ConfigManager) unmarshalValue(val reflect.Value) error {
 }
 
 func lookupConfigValue(data map[string]any, key string) (any, bool) {
+	if len(data) == 0 {
+		return nil, false
+	}
+
+	normalized := normalizeConfigKey(key)
+	if normalized != "" {
+		if value, exists := data[normalized]; exists {
+			return value, true
+		}
+	}
+
 	if value, exists := data[key]; exists {
-		return value, true
-	}
-
-	snake := toSnakeCase(key)
-	if value, exists := data[snake]; exists {
-		return value, true
-	}
-
-	upper := strings.ToUpper(key)
-	if value, exists := data[upper]; exists {
-		return value, true
-	}
-
-	upperSnake := strings.ToUpper(snake)
-	if value, exists := data[upperSnake]; exists {
-		return value, true
-	}
-
-	lower := strings.ToLower(key)
-	if value, exists := data[lower]; exists {
 		return value, true
 	}
 
@@ -888,6 +890,51 @@ func boolFromValue(value any, defaultValue bool) (bool, bool) {
 		}
 	}
 	return defaultValue, false
+}
+
+func normalizeConfigKey(key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	return strings.ToLower(toSnakeCase(key))
+}
+
+func normalizeConfigData(data map[string]any, logger log.StructuredLogger) map[string]any {
+	if len(data) == 0 {
+		return map[string]any{}
+	}
+
+	keys := make([]string, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	normalized := make(map[string]any, len(data))
+	seen := make(map[string][]string, len(data))
+	for _, key := range keys {
+		norm := normalizeConfigKey(key)
+		if norm == "" {
+			continue
+		}
+		seen[norm] = append(seen[norm], key)
+		normalized[norm] = data[key]
+	}
+
+	if logger != nil {
+		for norm, originals := range seen {
+			if len(originals) <= 1 {
+				continue
+			}
+			logger.Warn("Config key collision after normalization", log.Fields{
+				"key":       norm,
+				"originals": originals,
+			})
+		}
+	}
+
+	return normalized
 }
 
 // toSnakeCase converts CamelCase to snake_case

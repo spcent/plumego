@@ -92,3 +92,67 @@ func TestPubSub_InvalidPattern(t *testing.T) {
 		t.Fatalf("expected ErrInvalidPattern, got %v", err)
 	}
 }
+
+func TestPubSub_MessageImmutability(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	sub1, err := ps.Subscribe("topic", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe sub1: %v", err)
+	}
+	sub2, err := ps.Subscribe("topic", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe sub2: %v", err)
+	}
+
+	payload := map[string]any{"count": 1}
+	meta := map[string]string{"source": "test"}
+	msg := Message{ID: "m1", Data: payload, Meta: meta}
+	if err := ps.Publish("topic", msg); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	// Mutate original payload/meta after publish.
+	payload["count"] = 99
+	meta["source"] = "mutated"
+
+	var got1 Message
+	select {
+	case got1 = <-sub1.C():
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("sub1 timeout")
+	}
+
+	data1, ok := got1.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map payload, got %T", got1.Data)
+	}
+	if data1["count"] != 1 {
+		t.Fatalf("expected original payload, got %v", data1["count"])
+	}
+	if got1.Meta["source"] != "test" {
+		t.Fatalf("expected original meta, got %v", got1.Meta["source"])
+	}
+
+	// Mutate sub1 payload; sub2 should be unaffected.
+	data1["count"] = 2
+
+	var got2 Message
+	select {
+	case got2 = <-sub2.C():
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("sub2 timeout")
+	}
+
+	data2, ok := got2.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map payload, got %T", got2.Data)
+	}
+	if data2["count"] != 1 {
+		t.Fatalf("expected isolated payload, got %v", data2["count"])
+	}
+	if got2.Meta["source"] != "test" {
+		t.Fatalf("expected isolated meta, got %v", got2.Meta["source"])
+	}
+}

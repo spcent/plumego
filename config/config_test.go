@@ -137,6 +137,39 @@ func TestConfigWithData(t *testing.T) {
 	}
 }
 
+func TestConfigKeyNormalization(t *testing.T) {
+	cfg := NewConfigManager(nil)
+	ctx := context.Background()
+
+	src := &stubSource{
+		name: "test",
+		data: map[string]any{
+			"FooBar": "value",
+		},
+	}
+	if err := cfg.AddSource(src); err != nil {
+		t.Fatalf("add source: %v", err)
+	}
+	if err := cfg.Load(ctx); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	if got := cfg.Get("foo_bar"); got != "value" {
+		t.Fatalf("expected normalized lookup, got %q", got)
+	}
+	if got := cfg.Get("FOO_BAR"); got != "value" {
+		t.Fatalf("expected case-insensitive lookup, got %q", got)
+	}
+	if got := cfg.Get("FooBar"); got != "value" {
+		t.Fatalf("expected original lookup, got %q", got)
+	}
+
+	all := cfg.GetAll()
+	if _, ok := all["foo_bar"]; !ok {
+		t.Fatalf("expected normalized key in GetAll, got %v", all)
+	}
+}
+
 // TestValidatorRequired tests Required validator
 func TestValidatorRequired(t *testing.T) {
 	v := &Required{}

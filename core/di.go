@@ -57,9 +57,6 @@ type DIContainer struct {
 	mu       sync.RWMutex
 	services map[reflect.Type]DIRegistration
 
-	stackMu sync.Mutex
-	stacks  map[uint64][]reflect.Type // Per-resolution-chain resolution stack
-
 	// resolutionCounter is used to generate unique IDs for each resolution chain.
 	// This is more reliable than using goroutine IDs which depend on runtime internals.
 	resolutionCounter atomic.Uint64
@@ -85,9 +82,21 @@ func (c *DIContainer) getOrCreateChainID() uint64 {
 	return c.resolutionCounter.Add(1)
 }
 
-// resolveWithStack resolves a service while tracking the resolution stack
-// to detect circular dependencies. This is called internally by Resolve.
-func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect.Type) (any, error) {
+// clearScopedChain removes scoped instances for a completed resolution chain.
+func (c *DIContainer) clearScopedChain(chainID uint64) {
+	if chainID == 0 {
+		return
+	}
+	c.mu.Lock()
+	if c.scopedInstances != nil {
+		delete(c.scopedInstances, chainID)
+	}
+	c.mu.Unlock()
+}
+
+// resolveWithStackInChain resolves a service while tracking the resolution stack
+// to detect circular dependencies. This is called internally by Resolve/Inject.
+func (c *DIContainer) resolveWithStackInChain(serviceType reflect.Type, stack []reflect.Type, chainID uint64) (any, error) {
 	// Check for circular dependency
 	for _, t := range stack {
 		if t == serviceType {
@@ -105,7 +114,7 @@ func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect
 	if !exists {
 		// Try to find assignable service for interfaces
 		if serviceType.Kind() == reflect.Interface {
-			return c.resolveAssignableWithStack(serviceType, newStack)
+			return c.resolveAssignableWithStack(serviceType, newStack, chainID)
 		}
 		return nil, fmt.Errorf("service not found: %s", serviceType.String())
 	}
@@ -117,18 +126,6 @@ func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect
 
 	// Handle scoped lifecycle - check if we already have an instance for this resolution chain
 	if registration.Lifecycle == Scoped {
-		// For scoped services, we need to use the same chain ID for the entire resolution
-		// To get the chain ID, we check if we're already in a resolution chain
-		var chainID uint64
-		if len(stack) == 0 {
-			// This is the root of a new resolution chain
-			chainID = c.getOrCreateChainID()
-		} else {
-			// We're already in a resolution chain, use the existing chain ID
-			// Use a hash of the stack to ensure consistent chain IDs for the same resolution path
-			chainID = c.getChainIDForStack(stack)
-		}
-
 		c.mu.RLock()
 		scopedChain, exists := c.scopedInstances[chainID]
 		c.mu.RUnlock()
@@ -149,7 +146,7 @@ func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect
 		instance = registration.Factory(c)
 	} else {
 		// Try to create instance using reflection
-		instance, err = c.createInstanceWithStack(serviceType, newStack)
+		instance, err = c.createInstanceWithStack(serviceType, newStack, chainID)
 		if err != nil {
 			return nil, err
 		}
@@ -162,15 +159,6 @@ func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect
 		c.services[serviceType] = registration
 	} else if registration.Lifecycle == Scoped {
 		// Store scoped instance for this resolution chain
-		var chainID uint64
-		if len(stack) == 0 {
-			// This is the root of a new resolution chain
-			chainID = c.getOrCreateChainID()
-		} else {
-			// We're already in a resolution chain, use the existing chain ID
-			chainID = c.getChainIDForStack(stack)
-		}
-
 		if c.scopedInstances == nil {
 			c.scopedInstances = make(map[uint64]map[reflect.Type]any)
 		}
@@ -184,56 +172,75 @@ func (c *DIContainer) resolveWithStack(serviceType reflect.Type, stack []reflect
 	return instance, nil
 }
 
-// getChainIDForStack generates a consistent chain ID based on the resolution stack
-func (c *DIContainer) getChainIDForStack(stack []reflect.Type) uint64 {
-	// Use a simple hash of the stack types to generate a consistent chain ID
-	var hash uint64 = 5381
-	for _, t := range stack {
-		// Simple hash combining the type string
-		for _, b := range []byte(t.String()) {
-			hash = ((hash << 5) + hash) + uint64(b)
-		}
-	}
-	return hash
-}
-
 // resolveAssignableWithStack resolves a service that implements an interface with stack tracking.
-func (c *DIContainer) resolveAssignableWithStack(serviceType reflect.Type, stack []reflect.Type) (any, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+func (c *DIContainer) resolveAssignableWithStack(serviceType reflect.Type, stack []reflect.Type, chainID uint64) (any, error) {
+	type candidate struct {
+		serviceType reflect.Type
+		instance    any
+	}
 
-	var match any
+	var candidates []candidate
+	c.mu.RLock()
 	for _, registration := range c.services {
 		if registration.Instance != nil {
 			instanceType := reflect.TypeOf(registration.Instance)
 			if instanceType.AssignableTo(serviceType) {
-				if match == nil {
-					match = registration.Instance
-					continue
-				}
-				if servicesEqual(match, registration.Instance) {
-					continue
-				}
-				return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
+				candidates = append(candidates, candidate{instance: registration.Instance})
+			}
+			continue
+		}
+		if registration.Factory != nil && registration.Type != nil {
+			if registration.Type.AssignableTo(serviceType) || registration.Type == serviceType {
+				candidates = append(candidates, candidate{serviceType: registration.Type})
 			}
 		}
 	}
+	c.mu.RUnlock()
 
-	if match == nil {
-		return nil, errors.New("service not found: " + serviceType.String())
+	var matchInstance any
+	var matchType reflect.Type
+	for _, cand := range candidates {
+		if cand.instance != nil {
+			if matchInstance == nil && matchType == nil {
+				matchInstance = cand.instance
+				continue
+			}
+			if matchInstance != nil && servicesEqual(matchInstance, cand.instance) {
+				continue
+			}
+			return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
+		}
+		if matchInstance != nil {
+			return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
+		}
+		if matchType == nil {
+			matchType = cand.serviceType
+			continue
+		}
+		if matchType == cand.serviceType {
+			continue
+		}
+		return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
 	}
-	return match, nil
+
+	if matchInstance != nil {
+		return matchInstance, nil
+	}
+	if matchType != nil {
+		return c.resolveWithStackInChain(matchType, stack, chainID)
+	}
+	return nil, errors.New("service not found: " + serviceType.String())
 }
 
 // createInstanceWithStack creates a new instance using reflection with stack tracking.
-func (c *DIContainer) createInstanceWithStack(serviceType reflect.Type, stack []reflect.Type) (any, error) {
+func (c *DIContainer) createInstanceWithStack(serviceType reflect.Type, stack []reflect.Type, chainID uint64) (any, error) {
 	if serviceType.Kind() == reflect.Ptr {
 		// Create pointer to new instance
 		elemType := serviceType.Elem()
 		newInstance := reflect.New(elemType)
 
 		// Try to inject dependencies into the struct
-		if err := c.injectWithStack(newInstance.Interface(), stack); err != nil {
+		if err := c.injectWithStack(newInstance.Interface(), stack, chainID); err != nil {
 			// If injection fails, still return the instance
 			// This allows for simple structs without dependencies
 		}
@@ -245,7 +252,7 @@ func (c *DIContainer) createInstanceWithStack(serviceType reflect.Type, stack []
 }
 
 // injectWithStack injects dependencies into a struct with stack tracking.
-func (c *DIContainer) injectWithStack(instance any, stack []reflect.Type) error {
+func (c *DIContainer) injectWithStack(instance any, stack []reflect.Type, chainID uint64) error {
 	if instance == nil {
 		return nil
 	}
@@ -289,12 +296,12 @@ func (c *DIContainer) injectWithStack(instance any, stack []reflect.Type) error 
 			var err error
 
 			if injectTag != "" {
-				dep, err = c.resolveByName(injectTag)
+				dep, err = c.resolveByNameWithStack(injectTag, stack, chainID)
 				if err != nil {
-					dep, err = c.resolveWithStack(field.Type, stack)
+					dep, err = c.resolveWithStackInChain(field.Type, stack, chainID)
 				}
 			} else {
-				dep, err = c.resolveWithStack(field.Type, stack)
+				dep, err = c.resolveWithStackInChain(field.Type, stack, chainID)
 			}
 
 			if err != nil {
@@ -419,13 +426,9 @@ func (c *DIContainer) RegisterFactory(serviceType reflect.Type, factory func(*DI
 //	db = service.(*DatabaseService)
 func (c *DIContainer) Resolve(serviceType reflect.Type) (any, error) {
 	// Start a new resolution chain with an empty stack
-	return c.resolveWithStack(serviceType, nil)
-}
-
-// createInstance creates a new instance using reflection.
-// It attempts to call the constructor and inject dependencies.
-func (c *DIContainer) createInstance(serviceType reflect.Type) (any, error) {
-	return c.createInstanceWithStack(serviceType, nil)
+	chainID := c.getOrCreateChainID()
+	defer c.clearScopedChain(chainID)
+	return c.resolveWithStackInChain(serviceType, nil, chainID)
 }
 
 // Inject injects dependencies into a struct.
@@ -451,60 +454,66 @@ func (c *DIContainer) createInstance(serviceType reflect.Type) (any, error) {
 //	}
 func (c *DIContainer) Inject(instance any) error {
 	// Start injection with an empty stack for circular dependency detection
-	return c.injectWithStack(instance, nil)
+	chainID := c.getOrCreateChainID()
+	defer c.clearScopedChain(chainID)
+	return c.injectWithStack(instance, nil, chainID)
 }
 
 // resolveByName resolves a service by its name or type name.
-func (c *DIContainer) resolveByName(name string) (any, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+func (c *DIContainer) resolveByNameWithStack(name string, stack []reflect.Type, chainID uint64) (any, error) {
+	type candidate struct {
+		serviceType reflect.Type
+		instance    any
+	}
 
-	var match any
+	var candidates []candidate
+	c.mu.RLock()
 	for t, registration := range c.services {
 		if t.Name() == name || t.String() == name {
-			if match == nil {
-				match = registration.Instance
+			if registration.Instance != nil {
+				candidates = append(candidates, candidate{instance: registration.Instance})
 				continue
 			}
-			if servicesEqual(match, registration.Instance) {
+			if registration.Factory != nil && registration.Type != nil {
+				candidates = append(candidates, candidate{serviceType: registration.Type})
+			}
+		}
+	}
+	c.mu.RUnlock()
+
+	var matchInstance any
+	var matchType reflect.Type
+	for _, cand := range candidates {
+		if cand.instance != nil {
+			if matchInstance == nil && matchType == nil {
+				matchInstance = cand.instance
+				continue
+			}
+			if matchInstance != nil && servicesEqual(matchInstance, cand.instance) {
 				continue
 			}
 			return nil, fmt.Errorf("multiple services match name: %s", name)
 		}
-	}
-
-	if match == nil {
-		return nil, errors.New("service not found: " + name)
-	}
-	return match, nil
-}
-
-// resolveAssignable resolves a service that implements an interface.
-func (c *DIContainer) resolveAssignable(serviceType reflect.Type) (any, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	var match any
-	for _, registration := range c.services {
-		if registration.Instance != nil {
-			instanceType := reflect.TypeOf(registration.Instance)
-			if instanceType.AssignableTo(serviceType) {
-				if match == nil {
-					match = registration.Instance
-					continue
-				}
-				if servicesEqual(match, registration.Instance) {
-					continue
-				}
-				return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
-			}
+		if matchInstance != nil {
+			return nil, fmt.Errorf("multiple services match name: %s", name)
 		}
+		if matchType == nil {
+			matchType = cand.serviceType
+			continue
+		}
+		if matchType == cand.serviceType {
+			continue
+		}
+		return nil, fmt.Errorf("multiple services match name: %s", name)
 	}
 
-	if match == nil {
-		return nil, errors.New("service not found: " + serviceType.String())
+	if matchInstance != nil {
+		return matchInstance, nil
 	}
-	return match, nil
+	if matchType != nil {
+		return c.resolveWithStackInChain(matchType, stack, chainID)
+	}
+	return nil, errors.New("service not found: " + name)
 }
 
 // servicesEqual checks if two service instances are equal.
@@ -528,9 +537,6 @@ func (c *DIContainer) Clear() {
 	defer c.mu.Unlock()
 
 	c.services = make(map[reflect.Type]DIRegistration)
-	c.stackMu.Lock()
-	c.stacks = make(map[uint64][]reflect.Type)
-	c.stackMu.Unlock()
 	c.scopedInstances = make(map[uint64]map[reflect.Type]any)
 }
 

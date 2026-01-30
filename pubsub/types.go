@@ -2,8 +2,10 @@ package pubsub
 
 import "time"
 
-// Message is an immutable event object by convention.
-// After Publish, callers MUST NOT mutate Data/Meta referenced by this message.
+// Message is treated as immutable once published.
+// PubSub defensively copies Data/Meta on publish and per-delivery for common
+// reference types (maps/slices) to avoid accidental mutation.
+// Callers and subscribers should still treat Data/Meta as read-only.
 //
 // Example:
 //

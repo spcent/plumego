@@ -235,8 +235,6 @@ func (a *App) corsMiddleware() middleware.Middleware {
 		if opts == nil {
 			return middleware.CORS(next)
 		}
-		return middleware.FromFuncMiddleware(func(next http.HandlerFunc) http.HandlerFunc {
-			return middleware.CORSWithOptions(*opts, next)
-		})(next)
+		return middleware.CORSWithOptions(*opts, next)
 	}
 }

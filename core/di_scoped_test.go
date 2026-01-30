@@ -55,21 +55,11 @@ func TestScopedLifecycle(t *testing.T) {
 
 	// Test 2: Different resolution chains should get different scoped instances
 	t.Run("DifferentResolutionChainsDifferentInstances", func(t *testing.T) {
-		// Clear scoped instances to simulate new resolution chains
-		container.mu.Lock()
-		container.scopedInstances = make(map[uint64]map[reflect.Type]any)
-		container.mu.Unlock()
-
 		// Resolve scoped service in first chain
 		scoped1, err := container.Resolve(reflect.TypeOf((*ScopedService)(nil)))
 		if err != nil {
 			t.Fatalf("Failed to resolve scoped service: %v", err)
 		}
-
-		// Clear scoped instances to simulate new resolution chain
-		container.mu.Lock()
-		container.scopedInstances = make(map[uint64]map[reflect.Type]any)
-		container.mu.Unlock()
 
 		// Resolve scoped service in second chain
 		scoped2, err := container.Resolve(reflect.TypeOf((*ScopedService)(nil)))
@@ -82,6 +72,31 @@ func TestScopedLifecycle(t *testing.T) {
 			t.Errorf("Expected different scoped instances, got same instance")
 		}
 	})
+}
+
+// TestScopedSameChainSameInstance tests that scoped dependencies share instances within one chain.
+func TestScopedSameChainSameInstance(t *testing.T) {
+	container := NewDIContainer()
+
+	container.RegisterFactory(
+		reflect.TypeOf((*ScopedService)(nil)),
+		func(c *DIContainer) any {
+			return &ScopedService{ID: "scoped"}
+		},
+		Scoped,
+	)
+
+	target := &ScopedPair{}
+	if err := container.Inject(target); err != nil {
+		t.Fatalf("Failed to inject scoped pair: %v", err)
+	}
+
+	if target.A == nil || target.B == nil {
+		t.Fatalf("Expected scoped dependencies to be injected")
+	}
+	if target.A != target.B {
+		t.Errorf("Expected same scoped instance within a single injection chain")
+	}
 }
 
 // TestScopedWithDependencies tests scoped services with dependencies
@@ -266,13 +281,13 @@ func TestScopedLifecycleClear(t *testing.T) {
 		t.Fatalf("Failed to resolve scoped service: %v", err)
 	}
 
-	// Check that scoped instances exist
+	// Scoped instances should be cleared after resolution
 	container.mu.RLock()
 	hasScopedInstances := len(container.scopedInstances) > 0
 	container.mu.RUnlock()
 
-	if !hasScopedInstances {
-		t.Errorf("Expected scoped instances to exist after resolution")
+	if hasScopedInstances {
+		t.Errorf("Expected scoped instances to be cleared after resolution")
 	}
 
 	// Clear the container
@@ -286,11 +301,6 @@ func TestScopedLifecycleClear(t *testing.T) {
 	if hasScopedInstancesAfterClear {
 		t.Errorf("Expected scoped instances to be cleared after container clear")
 	}
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr
 }
 
 // Test service types for testing
@@ -335,4 +345,9 @@ type TransientService struct {
 
 type ScopedWithTransient struct {
 	Transient *TransientService
+}
+
+type ScopedPair struct {
+	A *ScopedService `inject:""`
+	B *ScopedService `inject:""`
 }

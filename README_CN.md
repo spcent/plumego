@@ -195,7 +195,7 @@ if err := app.ConfigureObservability(obs); err != nil {
 开启追踪后日志会包含 `trace_id` 与 `span_id`，响应中也会回传 `X-Span-ID` 便于关联。
 
 ## 配置参考
-使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；`config.ConfigManager` 也提供 `LoadBestEffort` 用于跳过可选配置源失败，并提供 `ReloadWithValidation` 做事务式热加载；使用下表实现可预测的部署。
+使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；`config.ConfigManager` 也提供 `LoadBestEffort` 用于跳过可选配置源失败，并提供 `ReloadWithValidation` 做事务式热加载；配置键在读取时会规范化为小写的 snake_case，因此 CamelCase 和 UPPER_SNAKE 会映射到同一值；使用下表实现可预测的部署。
 
 | AppConfig 字段             | 默认值          | 环境变量                       | Flag 示例                          |
 |----------------------------|-----------------|--------------------------------|------------------------------------|
