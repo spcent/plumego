@@ -229,10 +229,23 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 
 // SubscribePattern creates a new subscription to a topic pattern.
 //
-// Patterns use filepath.Match syntax:
-//   - "*" matches any sequence of non-separator characters
-//   - "?" matches any single non-separator character
-//   - "[...]" matches any character in the bracket expression
+// Pattern matching uses filepath.Match syntax with topic names as literal strings.
+// The pattern is matched against the entire topic name character-by-character.
+// Note: The term "separator" in filepath.Match refers to filepath separators ('/' or '\'),
+// but topic names are plain strings, so ALL characters including '.' are matched normally.
+//
+// Supported wildcards:
+//   - "*" matches zero or more characters (including '.')
+//   - "?" matches exactly one character (including '.')
+//   - "[...]" matches any single character in the bracket expression
+//   - "[^...]" matches any single character NOT in the bracket expression
+//
+// Pattern matching semantics:
+//   - Patterns are case-sensitive
+//   - "user.*" matches "user.created", "user.updated", "user.deleted", "user.profile.updated"
+//   - "user.?" matches "user.1", "user.a" but NOT "user.created" (? matches single char)
+//   - "*.error" matches "user.error", "payment.error", "system.auth.error"
+//   - "user.[cd]*" matches "user.created", "user.deleted" but NOT "user.updated"
 //
 // Example:
 //
@@ -255,6 +268,7 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 //	// - user.created
 //	// - user.updated
 //	// - user.deleted
+//	// - user.profile.updated (note: "*" matches across dots)
 func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
 	start := time.Now()
 	var err error
