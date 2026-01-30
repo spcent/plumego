@@ -51,6 +51,10 @@ func (s *BinarySerializer) EncodeWALEntry(entry WALEntry) ([]byte, error) {
 	}
 
 	totalSize := sum + valueLen
+	// Defensive check: ensure totalSize is a valid, non-overflowed int for allocation.
+	if totalSize < 0 || totalSize > math.MaxInt {
+		return nil, fmt.Errorf("entry too large")
+	}
 
 	buf := make([]byte, totalSize)
 	offset := 0
