@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"time"
 )
 
@@ -39,11 +40,15 @@ func (s *BinarySerializer) EncodeWALEntry(entry WALEntry) ([]byte, error) {
 		return nil, fmt.Errorf("value size %d exceeds maximum %d", valueLen, maxValueSize)
 	}
 
-	// Safe calculation: all values are now bounded
-	totalSize := walHeaderSize + keyLen + valueLen
-	if totalSize < 0 {
-		return nil, fmt.Errorf("total size overflow: %d", totalSize)
+	// Guard against integer overflow when computing totalSize
+	if keyLen > math.MaxInt-walHeaderSize {
+		return nil, fmt.Errorf("key size too large")
 	}
+	if valueLen > math.MaxInt-walHeaderSize-keyLen {
+		return nil, fmt.Errorf("value size too large")
+	}
+
+	totalSize := walHeaderSize + keyLen + valueLen
 
 	buf := make([]byte, totalSize)
 	offset := 0
