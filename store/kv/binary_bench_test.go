@@ -3,7 +3,6 @@ package kvstore
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"testing"
 	"time"
 )
@@ -21,11 +20,11 @@ func BenchmarkWALEntrySerialization(b *testing.B) {
 	}
 
 	b.Run("Binary_Encode", func(b *testing.B) {
-		kv := &KVStore{}
+		serializer := &BinarySerializer{}
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, err := kv.encodeWALEntryBinary(entry)
+			_, err := serializer.EncodeWALEntry(entry)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -33,11 +32,11 @@ func BenchmarkWALEntrySerialization(b *testing.B) {
 	})
 
 	b.Run("JSON_Encode", func(b *testing.B) {
+		serializer := &JSONSerializer{}
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			buf := new(bytes.Buffer)
-			err := json.NewEncoder(buf).Encode(entry)
+			_, err := serializer.EncodeWALEntry(entry)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -55,22 +54,21 @@ func BenchmarkWALEntryDeserialization(b *testing.B) {
 		CRC:      0x12345678,
 	}
 
-	kv := &KVStore{}
+	binarySerializer := &BinarySerializer{}
+	jsonSerializer := &JSONSerializer{}
 
 	// Prepare binary data
-	binaryData, _ := kv.encodeWALEntryBinary(entry)
+	binaryData, _ := binarySerializer.EncodeWALEntry(entry)
 
 	// Prepare JSON data
-	jsonBuf := new(bytes.Buffer)
-	json.NewEncoder(jsonBuf).Encode(entry)
-	jsonData := jsonBuf.Bytes()
+	jsonData, _ := jsonSerializer.EncodeWALEntry(entry)
 
 	b.Run("Binary_Decode", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			reader := bufio.NewReader(bytes.NewReader(binaryData))
-			_, err := kv.decodeWALEntryBinary(reader)
+			_, err := binarySerializer.DecodeWALEntry(reader)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -81,9 +79,8 @@ func BenchmarkWALEntryDeserialization(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			reader := bytes.NewReader(jsonData)
-			var decoded WALEntry
-			err := json.NewDecoder(reader).Decode(&decoded)
+			reader := bufio.NewReader(bytes.NewReader(jsonData))
+			_, err := jsonSerializer.DecodeWALEntry(reader)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -101,10 +98,11 @@ func BenchmarkEntrySerialization(b *testing.B) {
 	}
 
 	b.Run("Binary_Encode", func(b *testing.B) {
+		serializer := &BinarySerializer{}
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, err := encodeEntryBinary(entry)
+			_, err := serializer.EncodeEntry(entry)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -112,11 +110,11 @@ func BenchmarkEntrySerialization(b *testing.B) {
 	})
 
 	b.Run("JSON_Encode", func(b *testing.B) {
+		serializer := &JSONSerializer{}
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			buf := new(bytes.Buffer)
-			err := json.NewEncoder(buf).Encode(entry)
+			_, err := serializer.EncodeEntry(entry)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -133,20 +131,21 @@ func BenchmarkEntryDeserialization(b *testing.B) {
 		Size:     1088,
 	}
 
+	binarySerializer := &BinarySerializer{}
+	jsonSerializer := &JSONSerializer{}
+
 	// Prepare binary data
-	binaryData, _ := encodeEntryBinary(entry)
+	binaryData, _ := binarySerializer.EncodeEntry(entry)
 
 	// Prepare JSON data
-	jsonBuf := new(bytes.Buffer)
-	json.NewEncoder(jsonBuf).Encode(entry)
-	jsonData := jsonBuf.Bytes()
+	jsonData, _ := jsonSerializer.EncodeEntry(entry)
 
 	b.Run("Binary_Decode", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			reader := bufio.NewReader(bytes.NewReader(binaryData))
-			_, err := decodeEntryBinary(reader)
+			_, err := binarySerializer.DecodeEntry(reader)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -157,9 +156,8 @@ func BenchmarkEntryDeserialization(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			reader := bytes.NewReader(jsonData)
-			var decoded Entry
-			err := json.NewDecoder(reader).Decode(&decoded)
+			reader := bufio.NewReader(bytes.NewReader(jsonData))
+			_, err := jsonSerializer.DecodeEntry(reader)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -178,15 +176,14 @@ func BenchmarkSerializedSize(b *testing.B) {
 		CRC:      0x12345678,
 	}
 
-	kv := &KVStore{}
+	binarySerializer := &BinarySerializer{}
+	jsonSerializer := &JSONSerializer{}
 
 	// Get binary size
-	binaryData, _ := kv.encodeWALEntryBinary(entry)
+	binaryData, _ := binarySerializer.EncodeWALEntry(entry)
 
 	// Get JSON size
-	jsonBuf := new(bytes.Buffer)
-	json.NewEncoder(jsonBuf).Encode(entry)
-	jsonData := jsonBuf.Bytes()
+	jsonData, _ := jsonSerializer.EncodeWALEntry(entry)
 
 	b.Logf("Binary size: %d bytes", len(binaryData))
 	b.Logf("JSON size: %d bytes", len(jsonData))
@@ -207,14 +204,13 @@ func BenchmarkBulkSerialization(b *testing.B) {
 		}
 	}
 
-	kv := &KVStore{}
-
 	b.Run("Binary_Bulk_Encode", func(b *testing.B) {
+		serializer := &BinarySerializer{}
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			for _, entry := range entries {
-				_, err := kv.encodeWALEntryBinary(entry)
+				_, err := serializer.EncodeWALEntry(entry)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -223,12 +219,12 @@ func BenchmarkBulkSerialization(b *testing.B) {
 	})
 
 	b.Run("JSON_Bulk_Encode", func(b *testing.B) {
+		serializer := &JSONSerializer{}
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			for _, entry := range entries {
-				buf := new(bytes.Buffer)
-				err := json.NewEncoder(buf).Encode(entry)
+				_, err := serializer.EncodeWALEntry(entry)
 				if err != nil {
 					b.Fatal(err)
 				}

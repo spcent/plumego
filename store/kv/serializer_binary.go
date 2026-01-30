@@ -11,16 +11,19 @@ import (
 const (
 	// WAL entry format:
 	// [Magic:4][Op:1][KeyLen:4][Key:var][ValueLen:4][Value:var][ExpireAt:8][Version:8][CRC:4]
-	walEntryMagic    = 0x57414C45 // "WALE"
-	walHeaderSize    = 4 + 1 + 4 + 4 + 8 + 8 + 4 // 33 bytes fixed overhead
+	walEntryMagic  = 0x57414C45 // "WALE"
+	walHeaderSize  = 4 + 1 + 4 + 4 + 8 + 8 + 4 // 33 bytes fixed overhead
 
 	// Snapshot entry format:
 	// [KeyLen:4][Key:var][ValueLen:4][Value:var][ExpireAt:8][Version:8][Size:8]
 	snapshotHeaderSize = 4 + 4 + 8 + 8 + 8 // 32 bytes fixed overhead
 )
 
-// encodeWALEntryBinary encodes a WAL entry to binary format with zero allocations
-func (kv *KVStore) encodeWALEntryBinary(entry WALEntry) ([]byte, error) {
+// BinarySerializer implements Serializer using custom binary encoding
+type BinarySerializer struct{}
+
+// EncodeWALEntry encodes a WAL entry to binary format with zero allocations
+func (s *BinarySerializer) EncodeWALEntry(entry WALEntry) ([]byte, error) {
 	keyLen := len(entry.Key)
 	valueLen := len(entry.Value)
 	totalSize := walHeaderSize + keyLen + valueLen
@@ -66,8 +69,8 @@ func (kv *KVStore) encodeWALEntryBinary(entry WALEntry) ([]byte, error) {
 	return buf, nil
 }
 
-// decodeWALEntryBinary decodes a WAL entry from binary format
-func (kv *KVStore) decodeWALEntryBinary(reader *bufio.Reader) (*WALEntry, error) {
+// DecodeWALEntry decodes a WAL entry from binary format
+func (s *BinarySerializer) DecodeWALEntry(reader *bufio.Reader) (*WALEntry, error) {
 	// Read magic number
 	magicBuf := make([]byte, 4)
 	if _, err := io.ReadFull(reader, magicBuf); err != nil {
@@ -147,8 +150,58 @@ func (kv *KVStore) decodeWALEntryBinary(reader *bufio.Reader) (*WALEntry, error)
 	}, nil
 }
 
-// encodeEntryBinary encodes a snapshot entry to binary format
-func encodeEntryBinary(entry *Entry) ([]byte, error) {
+// WriteSnapshotHeader writes the binary snapshot header
+func (s *BinarySerializer) WriteSnapshotHeader(writer io.Writer) error {
+	// Write magic number
+	if err := binary.Write(writer, binary.BigEndian, magicNumber); err != nil {
+		return err
+	}
+
+	// Write version
+	if err := binary.Write(writer, binary.BigEndian, version); err != nil {
+		return err
+	}
+
+	// Write timestamp (Unix nanoseconds)
+	timestamp := time.Now().UnixNano()
+	if err := binary.Write(writer, binary.BigEndian, timestamp); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadSnapshotHeader reads and validates the binary snapshot header
+func (s *BinarySerializer) ReadSnapshotHeader(reader io.Reader) error {
+	// Read magic number
+	var magic uint32
+	if err := binary.Read(reader, binary.BigEndian, &magic); err != nil {
+		return err
+	}
+	if magic != magicNumber {
+		return fmt.Errorf("invalid snapshot magic: 0x%X", magic)
+	}
+
+	// Read version
+	var ver uint32
+	if err := binary.Read(reader, binary.BigEndian, &ver); err != nil {
+		return err
+	}
+	if ver != version {
+		return fmt.Errorf("unsupported snapshot version: %d", ver)
+	}
+
+	// Read timestamp (we don't use it, but need to consume it)
+	var timestamp int64
+	if err := binary.Read(reader, binary.BigEndian, &timestamp); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// EncodeEntry encodes a snapshot entry to binary format
+func (s *BinarySerializer) EncodeEntry(entry *Entry) ([]byte, error) {
 	keyLen := len(entry.Key)
 	valueLen := len(entry.Value)
 	totalSize := snapshotHeaderSize + keyLen + valueLen
@@ -186,8 +239,8 @@ func encodeEntryBinary(entry *Entry) ([]byte, error) {
 	return buf, nil
 }
 
-// decodeEntryBinary decodes a snapshot entry from binary format
-func decodeEntryBinary(reader *bufio.Reader) (*Entry, error) {
+// DecodeEntry decodes a snapshot entry from binary format
+func (s *BinarySerializer) DecodeEntry(reader *bufio.Reader) (*Entry, error) {
 	// Read key length
 	keyLenBuf := make([]byte, 4)
 	if _, err := io.ReadFull(reader, keyLenBuf); err != nil {
@@ -249,52 +302,7 @@ func decodeEntryBinary(reader *bufio.Reader) (*Entry, error) {
 	}, nil
 }
 
-// writeSnapshotHeader writes the binary snapshot header
-func writeSnapshotHeader(writer io.Writer) error {
-	// Write magic number
-	if err := binary.Write(writer, binary.BigEndian, magicNumber); err != nil {
-		return err
-	}
-
-	// Write version
-	if err := binary.Write(writer, binary.BigEndian, version); err != nil {
-		return err
-	}
-
-	// Write timestamp (Unix nanoseconds)
-	timestamp := time.Now().UnixNano()
-	if err := binary.Write(writer, binary.BigEndian, timestamp); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// readSnapshotHeader reads and validates the binary snapshot header
-func readSnapshotHeader(reader io.Reader) error {
-	// Read magic number
-	var magic uint32
-	if err := binary.Read(reader, binary.BigEndian, &magic); err != nil {
-		return err
-	}
-	if magic != magicNumber {
-		return fmt.Errorf("invalid snapshot magic: 0x%X", magic)
-	}
-
-	// Read version
-	var ver uint32
-	if err := binary.Read(reader, binary.BigEndian, &ver); err != nil {
-		return err
-	}
-	if ver != version {
-		return fmt.Errorf("unsupported snapshot version: %d", ver)
-	}
-
-	// Read timestamp (we don't use it, but need to consume it)
-	var timestamp int64
-	if err := binary.Read(reader, binary.BigEndian, &timestamp); err != nil {
-		return err
-	}
-
-	return nil
+// Format returns the serialization format
+func (s *BinarySerializer) Format() SerializationFormat {
+	return FormatBinary
 }
