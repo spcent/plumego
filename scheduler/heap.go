@@ -21,8 +21,8 @@ type job struct {
 	runAt       time.Time
 	fn          TaskFunc
 	options     JobOptions
-	paused      bool
-	canceled    bool
+	paused      atomic.Bool // Changed to atomic.Bool to prevent race condition in dispatch
+	canceled    atomic.Bool // Changed to atomic.Bool to prevent race condition in dispatch
 	nextAttempt int
 	running     atomic.Bool
 	lastRun     time.Time

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -762,17 +763,17 @@ func TestAppBootWithComponents(t *testing.T) {
 // TestAppBootWithLoggerLifecycle tests boot with logger that implements Lifecycle
 type testLifecycleLogger struct {
 	log.StructuredLogger
-	startCalled bool
-	stopCalled  bool
+	startCalled atomic.Bool
+	stopCalled  atomic.Bool
 }
 
 func (l *testLifecycleLogger) Start(ctx context.Context) error {
-	l.startCalled = true
+	l.startCalled.Store(true)
 	return nil
 }
 
 func (l *testLifecycleLogger) Stop(ctx context.Context) error {
-	l.stopCalled = true
+	l.stopCalled.Store(true)
 	return nil
 }
 
@@ -801,7 +802,7 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Check logger was started
-	if !logger.startCalled {
+	if !logger.startCalled.Load() {
 		t.Error("logger Start should have been called")
 	}
 
@@ -811,7 +812,7 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 	select {
 	case <-done:
 		// Check logger was stopped
-		if !logger.stopCalled {
+		if !logger.stopCalled.Load() {
 			t.Error("logger Stop should have been called")
 		}
 	case <-time.After(1 * time.Second):
