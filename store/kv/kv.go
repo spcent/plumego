@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/utils/pool"
 )
 
 var (
@@ -69,15 +67,17 @@ type WALEntry struct {
 
 // Options configures the KV store
 type Options struct {
-	DataDir           string        `json:"data_dir"`
-	MaxEntries        int           `json:"max_entries"`
-	MaxMemoryMB       int           `json:"max_memory_mb"`
-	FlushInterval     time.Duration `json:"flush_interval"`
-	CleanInterval     time.Duration `json:"clean_interval"`
-	ShardCount        int           `json:"shard_count"`
-	EnableCompression bool          `json:"enable_compression"`
-	ReadOnly          bool          `json:"read_only"`
-	CloseTimeout      time.Duration `json:"close_timeout"`
+	DataDir            string              `json:"data_dir"`
+	MaxEntries         int                 `json:"max_entries"`
+	MaxMemoryMB        int                 `json:"max_memory_mb"`
+	FlushInterval      time.Duration       `json:"flush_interval"`
+	CleanInterval      time.Duration       `json:"clean_interval"`
+	ShardCount         int                 `json:"shard_count"`
+	EnableCompression  bool                `json:"enable_compression"`
+	ReadOnly           bool                `json:"read_only"`
+	CloseTimeout       time.Duration       `json:"close_timeout"`
+	SerializerFormat   SerializationFormat `json:"serializer_format"`   // Serialization format (binary/json)
+	AutoDetectFormat   bool                `json:"auto_detect_format"`  // Auto-detect format when loading
 }
 
 // Shard represents a single data shard with optimized locking
@@ -93,7 +93,8 @@ type Shard struct {
 // KVStore is a simplified, high-performance key-value store
 type KVStore struct {
 	// Configuration
-	opts Options
+	opts       Options
+	serializer Serializer // Serialization strategy
 
 	// Sharded data
 	shards    []*Shard
@@ -162,9 +163,10 @@ func NewKVStore(opts Options) (*KVStore, error) {
 	}
 
 	kv := &KVStore{
-		opts:      opts,
-		shards:    shards,
-		shardMask: uint32(opts.ShardCount - 1),
+		opts:       opts,
+		shards:     shards,
+		shardMask:  uint32(opts.ShardCount - 1),
+		serializer: GetSerializer(opts.SerializerFormat),
 	}
 
 	kv.ctx, kv.cancel = context.WithCancel(context.Background())
@@ -211,6 +213,14 @@ func setDefaults(opts *Options) error {
 	}
 	if opts.CloseTimeout == 0 {
 		opts.CloseTimeout = defaultCloseTimeout
+	}
+	if opts.SerializerFormat == "" {
+		// Default to binary for best performance
+		opts.SerializerFormat = FormatBinary
+	}
+	// Auto-detect enabled by default for backward compatibility
+	if !opts.AutoDetectFormat {
+		opts.AutoDetectFormat = true
 	}
 	return nil
 }
@@ -684,7 +694,12 @@ func (kv *KVStore) Snapshot() error {
 		return ErrStoreClosed
 	}
 
-	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.json")
+	// Use format-specific extension
+	ext := ".bin"
+	if kv.serializer.Format() == FormatJSON {
+		ext = ".json"
+	}
+	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot"+ext)
 	tempPath := snapshotPath + ".tmp"
 
 	file, err := os.Create(tempPath)
@@ -703,15 +718,10 @@ func (kv *KVStore) Snapshot() error {
 		writer = gzWriter
 	}
 
-	encoder := json.NewEncoder(writer)
+	bufWriter := bufio.NewWriter(writer)
 
-	// Write header
-	header := map[string]any{
-		"magic":   magicNumber,
-		"version": version,
-		"created": time.Now(),
-	}
-	if err := encoder.Encode(header); err != nil {
+	// Write header using serializer
+	if err := kv.serializer.WriteSnapshotHeader(bufWriter); err != nil {
 		cleanup()
 		return err
 	}
@@ -722,7 +732,13 @@ func (kv *KVStore) Snapshot() error {
 		shard.mu.RLock()
 		for _, entry := range shard.data {
 			if entry.ExpireAt.IsZero() || now.Before(entry.ExpireAt) {
-				if err := encoder.Encode(entry); err != nil {
+				data, err := kv.serializer.EncodeEntry(entry)
+				if err != nil {
+					shard.mu.RUnlock()
+					cleanup()
+					return err
+				}
+				if _, err := bufWriter.Write(data); err != nil {
 					shard.mu.RUnlock()
 					cleanup()
 					return err
@@ -730,6 +746,11 @@ func (kv *KVStore) Snapshot() error {
 			}
 		}
 		shard.mu.RUnlock()
+	}
+
+	if err := bufWriter.Flush(); err != nil {
+		cleanup()
+		return err
 	}
 
 	if gzWriter != nil {
@@ -793,16 +814,37 @@ func (kv *KVStore) loadData() error {
 }
 
 func (kv *KVStore) loadSnapshot() error {
-	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.json")
+	// Try both formats
+	formats := []string{".bin", ".json"}
+	var file *os.File
+	var err error
+	var detectedSerializer Serializer
 
-	file, err := os.Open(snapshotPath)
-	if os.IsNotExist(err) {
+	for _, ext := range formats {
+		snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot"+ext)
+		file, err = os.Open(snapshotPath)
+		if err == nil {
+			// Auto-detect format if enabled
+			if kv.opts.AutoDetectFormat {
+				format, detectErr := DetectFormat(file)
+				if detectErr == nil {
+					detectedSerializer = GetSerializer(format)
+				}
+			}
+			break
+		}
+	}
+
+	if file == nil {
 		return nil // No snapshot exists
 	}
-	if err != nil {
-		return err
-	}
 	defer file.Close()
+
+	// Use detected serializer or configured one
+	serializer := kv.serializer
+	if detectedSerializer != nil {
+		serializer = detectedSerializer
+	}
 
 	var reader io.Reader = file
 	if kv.opts.EnableCompression {
@@ -813,26 +855,27 @@ func (kv *KVStore) loadSnapshot() error {
 		}
 	}
 
-	decoder := json.NewDecoder(reader)
+	bufReader := bufio.NewReader(reader)
 
-	// Read header
-	var header map[string]any
-	if err := decoder.Decode(&header); err != nil {
+	// Read header using serializer
+	if err := serializer.ReadSnapshotHeader(bufReader); err != nil {
 		return err
 	}
 
 	// Read entries
-	for decoder.More() {
-		var entry Entry
-		if err := decoder.Decode(&entry); err != nil {
+	for {
+		entry, err := serializer.DecodeEntry(bufReader)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
 			return err
 		}
 
 		shard := kv.getShard(entry.Key)
 		shard.mu.Lock()
-		entryCopy := entry
-		shard.data[entry.Key] = &entryCopy
-		kv.moveToFront(shard, &entryCopy)
+		shard.data[entry.Key] = entry
+		kv.moveToFront(shard, entry)
 		shard.mu.Unlock()
 
 		atomic.AddInt64(&kv.entries, 1)
@@ -854,16 +897,28 @@ func (kv *KVStore) replayWAL() error {
 	}
 	defer file.Close()
 
-	decoder := json.NewDecoder(file)
+	// Auto-detect WAL format if enabled
+	serializer := kv.serializer
+	if kv.opts.AutoDetectFormat {
+		format, detectErr := DetectWALFormat(file)
+		if detectErr == nil {
+			serializer = GetSerializer(format)
+		}
+	}
 
-	for decoder.More() {
-		var entry WALEntry
-		if err := decoder.Decode(&entry); err != nil {
+	reader := bufio.NewReader(file)
+
+	for {
+		entry, err := serializer.DecodeWALEntry(reader)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
 			// Stop on first error (corruption)
 			break
 		}
 
-		if !kv.validateWALEntry(entry) {
+		if !kv.validateWALEntry(*entry) {
 			continue // Skip corrupted entries
 		}
 
@@ -905,18 +960,7 @@ func (kv *KVStore) replayWAL() error {
 // Utility methods
 
 func (kv *KVStore) encodeWALEntry(entry WALEntry) ([]byte, error) {
-	// Use pooled buffer for encoding to reduce allocations
-	buf := pool.GetBuffer()
-	defer pool.PutBuffer(buf)
-
-	if err := json.NewEncoder(buf).Encode(entry); err != nil {
-		return nil, err
-	}
-
-	// Return a copy of the bytes
-	result := make([]byte, buf.Len())
-	copy(result, buf.Bytes())
-	return result, nil
+	return kv.serializer.EncodeWALEntry(entry)
 }
 
 func (kv *KVStore) calculateCRC(entry WALEntry) uint32 {
