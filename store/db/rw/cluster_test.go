@@ -496,3 +496,265 @@ func TestDefaultHealthCheckConfig(t *testing.T) {
 		t.Errorf("got recovery threshold %d, want 2", config.RecoveryThreshold)
 	}
 }
+func TestClusterQueryRowContext(t *testing.T) {
+	primary := newStubDB()
+	defer primary.Close()
+
+	replica := newStubDB()
+	defer replica.Close()
+
+	config := Config{
+		Primary:  primary,
+		Replicas: []*sql.DB{replica},
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	}
+
+	cluster, err := New(config)
+	if err != nil {
+		t.Fatalf("failed to create cluster: %v", err)
+	}
+	defer cluster.Close()
+
+	// Read query should use replica
+	ctx := context.Background()
+	row := cluster.QueryRowContext(ctx, "SELECT * FROM test WHERE id = ?", 1)
+	if row == nil {
+		t.Error("expected row, got nil")
+	}
+
+	metrics := cluster.Metrics()
+	if metrics.ReplicaQueries.Load() != 1 {
+		t.Errorf("got %d replica queries, want 1", metrics.ReplicaQueries.Load())
+	}
+}
+
+func TestClusterQueryRowContextPrimary(t *testing.T) {
+	primary := newStubDB()
+	defer primary.Close()
+
+	replica := newStubDB()
+	defer replica.Close()
+
+	config := Config{
+		Primary:  primary,
+		Replicas: []*sql.DB{replica},
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	}
+
+	cluster, err := New(config)
+	if err != nil {
+		t.Fatalf("failed to create cluster: %v", err)
+	}
+	defer cluster.Close()
+
+	// Write query should use primary
+	ctx := ForcePrimary(context.Background())
+	row := cluster.QueryRowContext(ctx, "SELECT * FROM test WHERE id = ?", 1)
+	if row == nil {
+		t.Error("expected row, got nil")
+	}
+
+	metrics := cluster.Metrics()
+	if metrics.PrimaryQueries.Load() != 1 {
+		t.Errorf("got %d primary queries, want 1", metrics.PrimaryQueries.Load())
+	}
+}
+
+func TestClusterNoReplicas(t *testing.T) {
+	primary := newStubDB()
+	defer primary.Close()
+
+	config := Config{
+		Primary:  primary,
+		Replicas: []*sql.DB{}, // No replicas
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	}
+
+	cluster, err := New(config)
+	if err != nil {
+		t.Fatalf("failed to create cluster: %v", err)
+	}
+	defer cluster.Close()
+
+	// Read query should fallback to primary
+	ctx := context.Background()
+	rows, err := cluster.QueryContext(ctx, "SELECT * FROM test")
+	if err != nil {
+		t.Errorf("QueryContext failed: %v", err)
+	}
+	if rows != nil {
+		rows.Close()
+	}
+
+	metrics := cluster.Metrics()
+	if metrics.PrimaryQueries.Load() != 1 {
+		t.Errorf("got %d primary queries, want 1", metrics.PrimaryQueries.Load())
+	}
+	if metrics.FallbackCount.Load() != 1 {
+		t.Errorf("got %d fallback count, want 1", metrics.FallbackCount.Load())
+	}
+}
+
+func TestLoadBalancerNames(t *testing.T) {
+	tests := []struct {
+		name string
+		lb   LoadBalancer
+		want string
+	}{
+		{"RoundRobin", NewRoundRobinBalancer(), "round_robin"},
+		{"Random", NewRandomBalancer(), "random"},
+		{"LeastConn", NewLeastConnBalancer(), "least_connections"},
+		{"Weighted", NewWeightedBalancer([]int{1, 2}), "weighted_round_robin"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.lb.Name(); got != tt.want {
+				t.Errorf("Name() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTransactionAwarePolicyNilBase(t *testing.T) {
+	// Should use default SQLTypePolicy when base is nil
+	policy := NewTransactionAwarePolicy(nil)
+
+	ctx := context.Background()
+
+	// Should route write to primary
+	if !policy.ShouldUsePrimary(ctx, "INSERT INTO test VALUES (1)") {
+		t.Error("expected INSERT to use primary")
+	}
+
+	// Should route read to replica
+	if policy.ShouldUsePrimary(ctx, "SELECT * FROM test") {
+		t.Error("expected SELECT to use replica")
+	}
+}
+
+func TestCompositePolicyEmpty(t *testing.T) {
+	policy := NewCompositePolicy()
+
+	ctx := context.Background()
+
+	// No policies, should default to false (replica)
+	if policy.ShouldUsePrimary(ctx, "INSERT INTO test VALUES (1)") {
+		t.Error("expected empty composite policy to return false")
+	}
+}
+
+// Benchmark tests
+func BenchmarkClusterQueryContext(b *testing.B) {
+	primary := newStubDB()
+	defer primary.Close()
+
+	replica := newStubDB()
+	defer replica.Close()
+
+	config := Config{
+		Primary:  primary,
+		Replicas: []*sql.DB{replica},
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	}
+
+	cluster, _ := New(config)
+	defer cluster.Close()
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rows, _ := cluster.QueryContext(ctx, "SELECT * FROM test")
+		if rows != nil {
+			rows.Close()
+		}
+	}
+}
+
+func BenchmarkClusterQueryContextPrimary(b *testing.B) {
+	primary := newStubDB()
+	defer primary.Close()
+
+	config := Config{
+		Primary: primary,
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	}
+
+	cluster, _ := New(config)
+	defer cluster.Close()
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rows, _ := cluster.QueryContext(ctx, "SELECT * FROM test FOR UPDATE")
+		if rows != nil {
+			rows.Close()
+		}
+	}
+}
+
+func BenchmarkClusterExecContext(b *testing.B) {
+	primary := newStubDB()
+	defer primary.Close()
+
+	config := Config{
+		Primary: primary,
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	}
+
+	cluster, _ := New(config)
+	defer cluster.Close()
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cluster.ExecContext(ctx, "INSERT INTO test VALUES (?)", i)
+	}
+}
+
+func BenchmarkRoutingDecision(b *testing.B) {
+	policy := NewTransactionAwarePolicy(NewSQLTypePolicy())
+	ctx := context.Background()
+
+	queries := []string{
+		"SELECT * FROM users",
+		"INSERT INTO users VALUES (1)",
+		"UPDATE users SET name = 'test'",
+		"SELECT * FROM users FOR UPDATE",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		query := queries[i%len(queries)]
+		policy.ShouldUsePrimary(ctx, query)
+	}
+}
+
+func BenchmarkLoadBalancerNext(b *testing.B) {
+	lb := NewRoundRobinBalancer()
+	replicas := []Replica{
+		{Index: 0, IsHealthy: true},
+		{Index: 1, IsHealthy: true},
+		{Index: 2, IsHealthy: true},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lb.Next(replicas)
+	}
+}
