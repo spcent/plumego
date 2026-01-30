@@ -384,7 +384,7 @@ func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 			}
 
 			if resp != nil && resp.Body != nil {
-				_, _ = io.Copy(io.Discard, resp.Body)
+				// Just close the body without reading - we're retrying anyway
 				_ = resp.Body.Close()
 			}
 			cancel()
