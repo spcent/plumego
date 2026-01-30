@@ -24,13 +24,17 @@ type SSEWriter struct {
 	f http.Flusher
 }
 
+// ErrSSENotSupported is returned when the response writer doesn't support SSE.
+var ErrSSENotSupported = errors.New("SSE not supported: response writer does not implement http.Flusher")
+
 // NewSSEWriter creates a new SSE writer.
-func NewSSEWriter(w http.ResponseWriter) *SSEWriter {
+// Returns an error if the response writer doesn't support flushing.
+func NewSSEWriter(w http.ResponseWriter) (*SSEWriter, error) {
 	f, ok := w.(http.Flusher)
 	if !ok {
-		return nil
+		return nil, ErrSSENotSupported
 	}
-	return &SSEWriter{w: w, f: f}
+	return &SSEWriter{w: w, f: f}, nil
 }
 
 // Write writes an SSE event to the response.
@@ -99,8 +103,8 @@ func validateChunkSize(chunkSize int) error {
 }
 
 // RespondWithSSE starts a Server-Sent Events response.
-// Returns an SSEWriter for sending events, or nil if SSE is not supported.
-func (c *Ctx) RespondWithSSE() *SSEWriter {
+// Returns an SSEWriter for sending events, or an error if SSE is not supported.
+func (c *Ctx) RespondWithSSE() (*SSEWriter, error) {
 	c.W.Header().Set("Content-Type", "text/event-stream")
 	c.W.Header().Set("Cache-Control", "no-cache")
 	c.W.Header().Set("Connection", "keep-alive")
@@ -111,7 +115,7 @@ func (c *Ctx) RespondWithSSE() *SSEWriter {
 
 // RespondWithEventSource starts an event stream response.
 // This is an alias for RespondWithSSE.
-func (c *Ctx) RespondWithEventSource() *SSEWriter {
+func (c *Ctx) RespondWithEventSource() (*SSEWriter, error) {
 	return c.RespondWithSSE()
 }
 
@@ -266,9 +270,9 @@ func (c *Ctx) StreamSSEWithChannel(eventChan <-chan SSEEvent) error {
 	if err := checkStreamContext(ctx); err != nil {
 		return err
 	}
-	sseWriter := c.RespondWithSSE()
-	if sseWriter == nil {
-		return errors.New("SSE not supported")
+	sseWriter, err := c.RespondWithSSE()
+	if err != nil {
+		return err
 	}
 
 	for {
@@ -357,9 +361,9 @@ func (c *Ctx) StreamSSEWithGenerator(generator func() (SSEEvent, error)) error {
 	if err := checkStreamContext(ctx); err != nil {
 		return err
 	}
-	sseWriter := c.RespondWithSSE()
-	if sseWriter == nil {
-		return errors.New("SSE not supported")
+	sseWriter, err := c.RespondWithSSE()
+	if err != nil {
+		return err
 	}
 
 	for {
@@ -402,9 +406,9 @@ func (c *Ctx) SetEventSourceHeaders() {
 
 // WriteSSE writes a single SSE event and flushes.
 func (c *Ctx) WriteSSE(event SSEEvent) error {
-	sseWriter := NewSSEWriter(c.W)
-	if sseWriter == nil {
-		return errors.New("SSE not supported")
+	sseWriter, err := NewSSEWriter(c.W)
+	if err != nil {
+		return err
 	}
 	return sseWriter.Write(event)
 }
@@ -496,9 +500,9 @@ func (c *Ctx) StreamSSEChunked(events []SSEEvent, chunkSize int) error {
 	if err := checkStreamContext(ctx); err != nil {
 		return err
 	}
-	sseWriter := c.RespondWithSSE()
-	if sseWriter == nil {
-		return errors.New("SSE not supported")
+	sseWriter, err := c.RespondWithSSE()
+	if err != nil {
+		return err
 	}
 
 	for i, event := range events {
@@ -618,9 +622,9 @@ func (c *Ctx) StreamSSEWithRetry(generator func() (SSEEvent, error), maxRetries 
 	if err := checkStreamContext(ctx); err != nil {
 		return err
 	}
-	sseWriter := c.RespondWithSSE()
-	if sseWriter == nil {
-		return errors.New("SSE not supported")
+	sseWriter, err := c.RespondWithSSE()
+	if err != nil {
+		return err
 	}
 
 	retries := 0

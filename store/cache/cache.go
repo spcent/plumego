@@ -28,6 +28,9 @@ var (
 
 	// ErrKeyTooLong is returned when cache key exceeds maximum length.
 	ErrKeyTooLong = errors.New("cache: key too long")
+
+	// ErrNotInteger is returned when attempting increment/decrement on non-integer value.
+	ErrNotInteger = errors.New("cache: value is not an integer")
 )
 
 const (
@@ -43,11 +46,29 @@ const (
 
 // Cache defines the minimal contract for cache backends.
 type Cache interface {
+	// Basic operations
 	Get(ctx context.Context, key string) ([]byte, error)
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
 	Exists(ctx context.Context, key string) (bool, error)
 	Clear(ctx context.Context) error
+
+	// Atomic operations
+	// Incr increments the integer value of a key by delta.
+	// Returns the new value after increment.
+	// If the key doesn't exist, it's created with delta as the initial value.
+	// Returns ErrNotInteger if the value is not an integer.
+	Incr(ctx context.Context, key string, delta int64) (int64, error)
+
+	// Decr decrements the integer value of a key by delta.
+	// Returns the new value after decrement.
+	// If the key doesn't exist, it's created with -delta as the initial value.
+	// Returns ErrNotInteger if the value is not an integer.
+	Decr(ctx context.Context, key string, delta int64) (int64, error)
+
+	// Append appends data to the end of an existing value.
+	// If the key doesn't exist, it's created with the data as the value.
+	Append(ctx context.Context, key string, data []byte) error
 }
 
 // Config defines the configuration for cache backends.
@@ -412,6 +433,73 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 	})
 
 	return nil
+}
+
+// Incr increments the integer value of a key by delta.
+func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
+	if err := mc.validateKey(key); err != nil {
+		return 0, err
+	}
+
+	// Get current value
+	var currentVal int64
+	if val, ok := mc.store.Load(key); ok {
+		item := val.(cacheItem)
+		if !expired(item.expiration) {
+			// Try to parse as int64
+			if len(item.value) > 0 {
+				var num int64
+				buf := bytes.NewReader(item.value)
+				if err := gob.NewDecoder(buf).Decode(&num); err != nil {
+					return 0, ErrNotInteger
+				}
+				currentVal = num
+			}
+		}
+	}
+
+	// Calculate new value
+	newVal := currentVal + delta
+
+	// Encode new value
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(newVal); err != nil {
+		return 0, err
+	}
+
+	// Store new value
+	if err := mc.Set(ctx, key, buf.Bytes(), 0); err != nil {
+		return 0, err
+	}
+
+	return newVal, nil
+}
+
+// Decr decrements the integer value of a key by delta.
+func (mc *MemoryCache) Decr(ctx context.Context, key string, delta int64) (int64, error) {
+	return mc.Incr(ctx, key, -delta)
+}
+
+// Append appends data to the end of an existing value.
+func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) error {
+	if err := mc.validateKey(key); err != nil {
+		return err
+	}
+
+	// Get existing value
+	var existingData []byte
+	if val, ok := mc.store.Load(key); ok {
+		item := val.(cacheItem)
+		if !expired(item.expiration) {
+			existingData = item.value
+		}
+	}
+
+	// Append new data
+	newData := append(cloneBytes(existingData), data...)
+
+	// Store new value
+	return mc.Set(ctx, key, newData, 0)
 }
 
 // GetMetrics returns the current cache metrics.

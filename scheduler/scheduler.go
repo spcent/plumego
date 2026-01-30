@@ -136,13 +136,18 @@ func (s *Scheduler) Start() {
 }
 
 // RegisterTask registers a named task for persistence recovery.
-func (s *Scheduler) RegisterTask(name string, task TaskFunc) {
-	if name == "" || task == nil {
-		return
+// Returns an error if the name is empty or the task is nil.
+func (s *Scheduler) RegisterTask(name string, task TaskFunc) error {
+	if name == "" {
+		return fmt.Errorf("task name cannot be empty")
+	}
+	if task == nil {
+		return fmt.Errorf("task function cannot be nil")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.registry[name] = task
+	return nil
 }
 
 // Stop stops the scheduler and waits for shutdown.

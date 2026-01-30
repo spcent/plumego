@@ -46,17 +46,15 @@ func (e *EnvSource) Load(ctx context.Context) (map[string]any, error) {
 	return data, nil
 }
 
-// Watch watches for environment variable changes
-func (e *EnvSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan error) {
-	updates := make(chan map[string]any, 1)
-	errs := make(chan error, 1)
-
+// Watch watches for environment variable changes.
+// Environment variables don't typically change during runtime,
+// so the returned channel is immediately closed.
+func (e *EnvSource) Watch(ctx context.Context) <-chan WatchResult {
+	results := make(chan WatchResult)
 	// Environment variables don't typically change during runtime
-	// Return closed channels to indicate no updates
-	close(updates)
-	close(errs)
-
-	return updates, errs
+	// Return closed channel to indicate no updates
+	close(results)
+	return results
 }
 
 // Name returns the source name
@@ -126,21 +124,19 @@ func (f *FileSource) Load(ctx context.Context) (map[string]any, error) {
 	return data, nil
 }
 
-// Watch watches for file changes
-func (f *FileSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan error) {
-	updates := make(chan map[string]any, 1)
-	errs := make(chan error, 1)
+// Watch watches for file changes.
+// Returns a channel that sends WatchResult containing updates or errors.
+func (f *FileSource) Watch(ctx context.Context) <-chan WatchResult {
+	results := make(chan WatchResult, 1)
 
 	if !f.watch {
-		// Return empty channels if watching is disabled
-		close(updates)
-		close(errs)
-		return updates, errs
+		// Return closed channel if watching is disabled
+		close(results)
+		return results
 	}
 
 	go func() {
-		defer close(updates)
-		defer close(errs)
+		defer close(results)
 
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
@@ -154,7 +150,11 @@ func (f *FileSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan e
 					if info.ModTime().After(f.lastMod) {
 						data, err := f.loadFile()
 						if err != nil {
-							errs <- fmt.Errorf("failed to load updated file: %w", err)
+							select {
+							case results <- WatchResult{Err: fmt.Errorf("failed to load updated file: %w", err)}:
+							case <-ctx.Done():
+								return
+							}
 							continue
 						}
 
@@ -163,7 +163,7 @@ func (f *FileSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan e
 							f.lastData = data
 							f.lastMod = info.ModTime()
 							select {
-							case updates <- data:
+							case results <- WatchResult{Data: data}:
 							case <-ctx.Done():
 								return
 							}
@@ -176,7 +176,7 @@ func (f *FileSource) Watch(ctx context.Context) (<-chan map[string]any, <-chan e
 		}
 	}()
 
-	return updates, errs
+	return results
 }
 
 // Name returns the source name

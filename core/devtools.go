@@ -161,25 +161,22 @@ func (c *devToolsComponent) watchEnvFile(ctx context.Context) {
 		c.logger.Warn("Devtools env watch load failed", log.Fields{"error": err})
 	}
 
-	updates, errs := fileSource.Watch(ctx)
+	results := fileSource.Watch(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case err, ok := <-errs:
+		case result, ok := <-results:
 			if !ok {
 				return
 			}
-			if err != nil {
-				c.logger.Warn("Devtools env watch error", log.Fields{"error": err})
-			}
-		case _, ok := <-updates:
-			if !ok {
-				return
-			}
-			if err := c.reloadEnv(ctx); err != nil {
-				c.logger.Warn("Devtools env reload failed", log.Fields{"error": err})
+			if result.Err != nil {
+				c.logger.Warn("Devtools env watch error", log.Fields{"error": result.Err})
+			} else if result.Data != nil {
+				if err := c.reloadEnv(ctx); err != nil {
+					c.logger.Warn("Devtools env reload failed", log.Fields{"error": err})
+				}
 			}
 		}
 	}

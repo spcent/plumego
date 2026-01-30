@@ -14,10 +14,20 @@ import (
 	log "github.com/spcent/plumego/log"
 )
 
+// WatchResult represents a configuration update or error from watching a source.
+type WatchResult struct {
+	// Data contains the updated configuration, nil if there was an error
+	Data map[string]any
+	// Err contains any error that occurred during watching
+	Err error
+}
+
 // Source represents a configuration source
 type Source interface {
 	Load(ctx context.Context) (map[string]any, error)
-	Watch(ctx context.Context) (<-chan map[string]any, <-chan error)
+	// Watch returns a channel that sends configuration updates or errors.
+	// The channel is closed when the context is cancelled or watching stops.
+	Watch(ctx context.Context) <-chan WatchResult
 	Name() string
 }
 
@@ -454,39 +464,32 @@ func (cm *ConfigManager) StartWatchers(ctx context.Context) error {
 	}
 
 	for _, source := range sources {
-		updates, errs := source.Watch(ctx)
+		results := source.Watch(ctx)
 
 		cm.watchWg.Add(1)
-		go func(src Source, updates <-chan map[string]any, errs <-chan error) {
+		go func(src Source, results <-chan WatchResult) {
 			defer cm.watchWg.Done()
-			for updates != nil || errs != nil {
+			for {
 				select {
 				case <-cm.ctx.Done():
 					return
 				case <-ctx.Done():
 					return
-				case update, ok := <-updates:
+				case result, ok := <-results:
 					if !ok {
-						updates = nil
-						continue
+						return
 					}
-					if update != nil {
-						cm.handleSourceUpdate(src.Name(), update)
-					}
-				case err, ok := <-errs:
-					if !ok {
-						errs = nil
-						continue
-					}
-					if err != nil {
+					if result.Err != nil {
 						cm.logger.Error("Watch error", log.Fields{
 							"source": src.Name(),
-							"error":  err,
+							"error":  result.Err,
 						})
+					} else if result.Data != nil {
+						cm.handleSourceUpdate(src.Name(), result.Data)
 					}
 				}
 			}
-		}(source, updates, errs)
+		}(source, results)
 	}
 
 	return nil
