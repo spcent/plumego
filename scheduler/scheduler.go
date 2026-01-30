@@ -205,7 +205,7 @@ func (s *Scheduler) Cancel(id JobID) bool {
 	if !ok {
 		return false
 	}
-	job.canceled = true
+	job.canceled.Store(true)
 	delete(s.jobs, id)
 	if s.store != nil {
 		_ = s.store.Delete(id)
@@ -221,7 +221,7 @@ func (s *Scheduler) Pause(id JobID) bool {
 	if !ok {
 		return false
 	}
-	j.paused = true
+	j.paused.Store(true)
 	return true
 }
 
@@ -230,13 +230,13 @@ func (s *Scheduler) Resume(id JobID) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	j, ok := s.jobs[id]
-	if !ok || j.canceled {
+	if !ok || j.canceled.Load() {
 		return false
 	}
-	if !j.paused {
+	if !j.paused.Load() {
 		return true
 	}
-	j.paused = false
+	j.paused.Store(false)
 	if j.kind == jobKindCron {
 		j.runAt = j.cron.Next(time.Now())
 		s.queue.PushSchedule(&scheduleItem{runAt: j.runAt, job: j})
@@ -295,7 +295,7 @@ func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec,
 		if !jobOpts.Replace {
 			return "", ErrJobExists
 		}
-		existing.canceled = true
+		existing.canceled.Store(true)
 		delete(s.jobs, id)
 	}
 
@@ -315,10 +315,10 @@ func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec,
 	if kind == jobKindDelay && runAt.Before(s.clock.Now()) {
 		j.runAt = s.clock.Now()
 	}
-	j.paused = jobOpts.Paused
+	j.paused.Store(jobOpts.Paused)
 
 	s.jobs[id] = j
-	if !j.paused {
+	if !j.paused.Load() {
 		s.pushScheduleLocked(j, j.runAt)
 	}
 	s.persistJobLocked(j)
@@ -391,7 +391,7 @@ func (s *Scheduler) popDue(now time.Time) *scheduleItem {
 }
 
 func (s *Scheduler) dispatch(j *job) {
-	if j == nil || j.canceled || j.paused {
+	if j == nil || j.canceled.Load() || j.paused.Load() {
 		return
 	}
 
@@ -426,7 +426,7 @@ func (s *Scheduler) dispatch(j *job) {
 func (s *Scheduler) scheduleNext(j *job, base time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || j.canceled {
+	if s.closed || j.canceled.Load() {
 		return
 	}
 	var next time.Time
@@ -642,7 +642,7 @@ func jobStatusFrom(j *job) JobStatus {
 		LastRun:       j.lastRun,
 		LastError:     j.lastError,
 		Attempt:       j.nextAttempt,
-		Paused:        j.paused,
+		Paused:        j.paused.Load(),
 		Running:       j.running.Load(),
 		Kind:          kind,
 		OverlapPolicy: j.options.OverlapPolicy,
