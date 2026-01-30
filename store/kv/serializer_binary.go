@@ -12,15 +12,15 @@ import (
 const (
 	// WAL entry format:
 	// [Magic:4][Op:1][KeyLen:4][Key:var][ValueLen:4][Value:var][ExpireAt:8][Version:8][CRC:4]
-	walEntryMagic  = 0x57414C45 // "WALE"
-	walHeaderSize  = 4 + 1 + 4 + 4 + 8 + 8 + 4 // 33 bytes fixed overhead
+	walEntryMagic = 0x57414C45                // "WALE"
+	walHeaderSize = 4 + 1 + 4 + 4 + 8 + 8 + 4 // 33 bytes fixed overhead
 
 	// Snapshot entry format:
 	// [KeyLen:4][Key:var][ValueLen:4][Value:var][ExpireAt:8][Version:8][Size:8]
 	snapshotHeaderSize = 4 + 4 + 8 + 8 + 8 // 32 bytes fixed overhead
 
 	// Safety limits to prevent overflow and excessive memory allocation
-	maxKeySize   = 64 * 1024 * 1024  // 64MB max key size
+	maxKeySize   = 64 * 1024         // 64KB max key size
 	maxValueSize = 512 * 1024 * 1024 // 512MB max value size
 )
 
@@ -44,11 +44,13 @@ func (s *BinarySerializer) EncodeWALEntry(entry WALEntry) ([]byte, error) {
 	if keyLen > math.MaxInt-walHeaderSize {
 		return nil, fmt.Errorf("key size too large")
 	}
-	if valueLen > math.MaxInt-walHeaderSize-keyLen {
+	// At this point walHeaderSize + keyLen is guaranteed not to overflow.
+	sum := walHeaderSize + keyLen
+	if valueLen > math.MaxInt-sum {
 		return nil, fmt.Errorf("value size too large")
 	}
 
-	totalSize := walHeaderSize + keyLen + valueLen
+	totalSize := sum + valueLen
 
 	buf := make([]byte, totalSize)
 	offset := 0
