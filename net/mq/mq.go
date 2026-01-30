@@ -283,6 +283,184 @@ type AckMessage struct {
 	AckTimeout time.Duration
 }
 
+// ackEntry represents a pending acknowledgment for a message.
+type ackEntry struct {
+	messageID   string
+	topic       string
+	message     Message
+	timestamp   time.Time
+	timeout     time.Duration
+	retryCount  int
+	maxRetries  int
+	timer       *time.Timer
+	ackReceived bool
+}
+
+// ackTracker manages pending acknowledgments and timeouts.
+type ackTracker struct {
+	mu      sync.RWMutex
+	pending map[string]*ackEntry
+	broker  *InProcBroker
+	closed  bool
+}
+
+// newAckTracker creates a new acknowledgment tracker.
+func newAckTracker(broker *InProcBroker) *ackTracker {
+	return &ackTracker{
+		pending: make(map[string]*ackEntry),
+		broker:  broker,
+	}
+}
+
+// track starts tracking an acknowledgment for a message.
+func (at *ackTracker) track(ackID, topic string, msg Message, timeout time.Duration, maxRetries int) error {
+	at.mu.Lock()
+	defer at.mu.Unlock()
+
+	if at.closed {
+		return ErrBrokerClosed
+	}
+
+	if _, exists := at.pending[ackID]; exists {
+		return fmt.Errorf("%w: ack ID %s already exists", ErrMessageAcknowledged, ackID)
+	}
+
+	entry := &ackEntry{
+		messageID:  msg.ID,
+		topic:      topic,
+		message:    msg,
+		timestamp:  time.Now(),
+		timeout:    timeout,
+		retryCount: 0,
+		maxRetries: maxRetries,
+	}
+
+	// Set up timeout timer
+	entry.timer = time.AfterFunc(timeout, func() {
+		at.handleTimeout(ackID)
+	})
+
+	at.pending[ackID] = entry
+	return nil
+}
+
+// acknowledge marks a message as acknowledged.
+func (at *ackTracker) acknowledge(ackID string) error {
+	at.mu.Lock()
+	defer at.mu.Unlock()
+
+	if at.closed {
+		return ErrBrokerClosed
+	}
+
+	entry, exists := at.pending[ackID]
+	if !exists {
+		return fmt.Errorf("%w: ack ID %s not found", ErrMessageNotAcked, ackID)
+	}
+
+	if entry.ackReceived {
+		return fmt.Errorf("%w: ack ID %s", ErrMessageAcknowledged, ackID)
+	}
+
+	// Mark as acknowledged and stop timer
+	entry.ackReceived = true
+	if entry.timer != nil {
+		entry.timer.Stop()
+	}
+
+	// Remove from pending
+	delete(at.pending, ackID)
+	return nil
+}
+
+// handleTimeout processes a timeout for an acknowledgment.
+func (at *ackTracker) handleTimeout(ackID string) {
+	at.mu.Lock()
+	entry, exists := at.pending[ackID]
+	if !exists || entry.ackReceived {
+		at.mu.Unlock()
+		return
+	}
+
+	entry.retryCount++
+	shouldRetry := entry.retryCount <= entry.maxRetries
+	at.mu.Unlock()
+
+	if shouldRetry {
+		// Retry: re-publish the message
+		if err := at.broker.redeliverMessage(entry); err != nil {
+			// If retry fails, send to dead letter queue
+			if at.broker.config.EnableDeadLetterQueue {
+				_ = at.broker.PublishToDeadLetter(
+					context.Background(),
+					entry.topic,
+					entry.message,
+					fmt.Sprintf("ack timeout after %d retries: %v", entry.retryCount, err),
+				)
+			}
+		}
+	} else {
+		// Max retries exceeded, send to dead letter queue
+		if at.broker.config.EnableDeadLetterQueue {
+			_ = at.broker.PublishToDeadLetter(
+				context.Background(),
+				entry.topic,
+				entry.message,
+				fmt.Sprintf("ack timeout after %d retries", entry.retryCount),
+			)
+		}
+
+		// Remove from pending
+		at.mu.Lock()
+		delete(at.pending, ackID)
+		at.mu.Unlock()
+	}
+}
+
+// close shuts down the tracker and cancels all pending timeouts.
+func (at *ackTracker) close() {
+	at.mu.Lock()
+	defer at.mu.Unlock()
+
+	if at.closed {
+		return
+	}
+
+	at.closed = true
+
+	// Stop all timers
+	for _, entry := range at.pending {
+		if entry.timer != nil {
+			entry.timer.Stop()
+		}
+	}
+
+	// Clear pending
+	at.pending = nil
+}
+
+// stats returns statistics about pending acknowledgments.
+func (at *ackTracker) stats() (pending int, oldestAge time.Duration) {
+	at.mu.RLock()
+	defer at.mu.RUnlock()
+
+	pending = len(at.pending)
+	if pending == 0 {
+		return
+	}
+
+	now := time.Now()
+	oldest := now
+	for _, entry := range at.pending {
+		if entry.timestamp.Before(oldest) {
+			oldest = entry.timestamp
+		}
+	}
+	oldestAge = now.Sub(oldest)
+
+	return
+}
+
 // Broker defines the interface for message queue backends.
 type Broker interface {
 	Publish(ctx context.Context, topic string, msg Message) error
@@ -536,6 +714,8 @@ type InProcBroker struct {
 	priorityQueues map[string]*priorityDispatcher
 	prioritySeq    uint64
 	priorityClosed atomic.Bool
+
+	ackTracker *ackTracker
 }
 
 // Option configures the broker.
@@ -643,6 +823,12 @@ func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
 			opt(broker)
 		}
 	}
+
+	// Initialize ackTracker if ACK support is enabled
+	if broker.config.EnableAckSupport {
+		broker.ackTracker = newAckTracker(broker)
+	}
+
 	return broker
 }
 
@@ -979,8 +1165,20 @@ func (b *InProcBroker) PublishWithAck(ctx context.Context, topic string, msg Ack
 			msg.AckTimeout = b.config.DefaultAckTimeout
 		}
 
-		// TODO: Implement acknowledgment logic
-		// For now, just publish the message
+		// Generate ACK ID if not provided
+		if msg.AckID == "" {
+			msg.AckID = fmt.Sprintf("%s-%d", msg.Message.ID, time.Now().UnixNano())
+		}
+
+		// Track acknowledgment if required
+		if msg.AckPolicy == AckRequired || msg.AckPolicy == AckTimeout {
+			maxRetries := 3 // Default max retries
+			if err := b.ackTracker.track(msg.AckID, topic, msg.Message, msg.AckTimeout, maxRetries); err != nil {
+				return err
+			}
+		}
+
+		// Publish the message
 		return b.ps.Publish(topic, msg.Message)
 	})
 }
@@ -1044,9 +1242,13 @@ func (b *InProcBroker) Ack(ctx context.Context, topic string, messageID string) 
 			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
 		}
 
-		// TODO: Implement acknowledgment tracking
-		// This would track which messages have been acknowledged
-		return nil
+		// Validate ackTracker
+		if b.ackTracker == nil {
+			return fmt.Errorf("%w: ack tracker not initialized", ErrNotInitialized)
+		}
+
+		// Acknowledge the message
+		return b.ackTracker.acknowledge(messageID)
 	})
 }
 
@@ -1070,8 +1272,33 @@ func (b *InProcBroker) Nack(ctx context.Context, topic string, messageID string)
 			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
 		}
 
-		// TODO: Implement negative acknowledgment logic
-		// This would request re-delivery of the message
+		// Validate ackTracker
+		if b.ackTracker == nil {
+			return fmt.Errorf("%w: ack tracker not initialized", ErrNotInitialized)
+		}
+
+		// Get the entry from tracker
+		b.ackTracker.mu.RLock()
+		entry, exists := b.ackTracker.pending[messageID]
+		b.ackTracker.mu.RUnlock()
+
+		if !exists {
+			return fmt.Errorf("%w: ack ID %s not found", ErrMessageNotAcked, messageID)
+		}
+
+		// Immediately redeliver the message
+		if err := b.redeliverMessage(entry); err != nil {
+			return fmt.Errorf("failed to redeliver message: %w", err)
+		}
+
+		// Stop the timer and remove from pending
+		b.ackTracker.mu.Lock()
+		if entry.timer != nil {
+			entry.timer.Stop()
+		}
+		delete(b.ackTracker.pending, messageID)
+		b.ackTracker.mu.Unlock()
+
 		return nil
 	})
 }
@@ -1100,6 +1327,17 @@ func (b *InProcBroker) GetMemoryUsage() uint64 {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	return memStats.Alloc
+}
+
+// redeliverMessage re-publishes a message that failed acknowledgment.
+func (b *InProcBroker) redeliverMessage(entry *ackEntry) error {
+	if b == nil || b.ps == nil {
+		return ErrNotInitialized
+	}
+
+	// Re-publish the message to the same topic
+	ctx := context.Background()
+	return b.Publish(ctx, entry.topic, entry.message)
 }
 
 // PublishToCluster publishes a message to the cluster (replicates to other nodes).
@@ -1424,6 +1662,12 @@ func (b *InProcBroker) Close() error {
 			return nil // Close is idempotent
 		}
 		b.closePriorityDispatchers()
+
+		// Close ack tracker if it exists
+		if b.ackTracker != nil {
+			b.ackTracker.close()
+		}
+
 		return b.ps.Close()
 	})
 }

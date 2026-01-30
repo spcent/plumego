@@ -607,6 +607,7 @@ func TestInProcBrokerAckSupport(t *testing.T) {
 	// Test publishing with acknowledgment
 	ackMsg := AckMessage{
 		Message:   Message{ID: "ack-1", Data: "ack required"},
+		AckID:     "test-ack-id",
 		AckPolicy: AckRequired,
 	}
 
@@ -615,13 +616,26 @@ func TestInProcBrokerAckSupport(t *testing.T) {
 		t.Fatalf("publish with ack error: %v", err)
 	}
 
-	// Test acknowledgment methods
-	err = brokerWithAck.Ack(context.Background(), "ack-topic", "ack-1")
+	// Test acknowledgment method
+	err = brokerWithAck.Ack(context.Background(), "ack-topic", "test-ack-id")
 	if err != nil {
 		t.Fatalf("ack error: %v", err)
 	}
 
-	err = brokerWithAck.Nack(context.Background(), "ack-topic", "ack-1")
+	// Publish another message for NACK test
+	ackMsg2 := AckMessage{
+		Message:   Message{ID: "ack-2", Data: "ack required 2"},
+		AckID:     "test-ack-id-2",
+		AckPolicy: AckRequired,
+	}
+
+	err = brokerWithAck.PublishWithAck(context.Background(), "ack-topic", ackMsg2)
+	if err != nil {
+		t.Fatalf("publish with ack error: %v", err)
+	}
+
+	// Test NACK (note: this will trigger redelivery, which is expected)
+	err = brokerWithAck.Nack(context.Background(), "ack-topic", "test-ack-id-2")
 	if err != nil {
 		t.Fatalf("nack error: %v", err)
 	}
