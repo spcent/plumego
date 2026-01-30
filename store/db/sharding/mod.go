@@ -33,9 +33,10 @@ func NewModStrategy() *ModStrategy {
 // The shard index is computed as: abs(key) % numShards
 //
 // Example:
-//   strategy := NewModStrategy()
-//   shardIdx, err := strategy.Shard(12345, 4)
-//   // Returns 1 because 12345 % 4 = 1
+//
+//	strategy := NewModStrategy()
+//	shardIdx, err := strategy.Shard(12345, 4)
+//	// Returns 1 because 12345 % 4 = 1
 func (m *ModStrategy) Shard(key any, numShards int) (int, error) {
 	if err := validateShardKey(key); err != nil {
 		return 0, err
@@ -62,10 +63,11 @@ func (m *ModStrategy) Shard(key any, numShards int) (int, error) {
 // map to and all shards in between.
 //
 // Example:
-//   shards, err := strategy.ShardRange(10, 25, 4)
-//   // For range [10, 25] with 4 shards:
-//   // 10 % 4 = 2, 25 % 4 = 1
-//   // Returns [0, 1, 2, 3] because the range wraps around
+//
+//	shards, err := strategy.ShardRange(10, 25, 4)
+//	// For range [10, 25] with 4 shards:
+//	// 10 % 4 = 2, 25 % 4 = 1
+//	// Returns [0, 1, 2, 3] because the range wraps around
 func (m *ModStrategy) ShardRange(start, end any, numShards int) ([]int, error) {
 	if err := validateNumShards(numShards); err != nil {
 		return nil, err

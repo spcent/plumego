@@ -9,14 +9,14 @@ import (
 
 // Common errors returned by sharding operations.
 var (
-	ErrInvalidShardKey     = errors.New("sharding: invalid shard key type")
-	ErrNoMatchingRange     = errors.New("sharding: no matching range for shard key")
-	ErrNoMatchingList      = errors.New("sharding: no matching list entry for shard key")
-	ErrInvalidNumShards    = errors.New("sharding: invalid number of shards")
-	ErrNilShardKey         = errors.New("sharding: shard key cannot be nil")
-	ErrRangeNotFound       = errors.New("sharding: range definition not found")
-	ErrInvalidRangeOrder   = errors.New("sharding: range definitions must be in order")
-	ErrOverlappingRanges   = errors.New("sharding: overlapping range definitions")
+	ErrInvalidShardKey   = errors.New("sharding: invalid shard key type")
+	ErrNoMatchingRange   = errors.New("sharding: no matching range for shard key")
+	ErrNoMatchingList    = errors.New("sharding: no matching list entry for shard key")
+	ErrInvalidNumShards  = errors.New("sharding: invalid number of shards")
+	ErrNilShardKey       = errors.New("sharding: shard key cannot be nil")
+	ErrRangeNotFound     = errors.New("sharding: range definition not found")
+	ErrInvalidRangeOrder = errors.New("sharding: range definitions must be in order")
+	ErrOverlappingRanges = errors.New("sharding: overlapping range definitions")
 )
 
 // Strategy defines the interface for all sharding strategies.

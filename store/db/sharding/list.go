@@ -34,12 +34,13 @@ type ListStrategy struct {
 // Keys not in the mapping will cause an error unless a default shard is set.
 //
 // Example:
-//   strategy := NewListStrategy(map[any]int{
-//       "US": 0,
-//       "EU": 1,
-//       "CN": 2,
-//       "JP": 3,
-//   })
+//
+//	strategy := NewListStrategy(map[any]int{
+//	    "US": 0,
+//	    "EU": 1,
+//	    "CN": 2,
+//	    "JP": 3,
+//	})
 func NewListStrategy(mapping map[any]int) *ListStrategy {
 	return &ListStrategy{
 		mapping:      mapping,
@@ -51,10 +52,11 @@ func NewListStrategy(mapping map[any]int) *ListStrategy {
 // for keys that are not explicitly mapped.
 //
 // Example:
-//   strategy := NewListStrategyWithDefault(map[any]int{
-//       "US": 0,
-//       "EU": 1,
-//   }, 2)  // All other countries go to shard 2
+//
+//	strategy := NewListStrategyWithDefault(map[any]int{
+//	    "US": 0,
+//	    "EU": 1,
+//	}, 2)  // All other countries go to shard 2
 func NewListStrategyWithDefault(mapping map[any]int, defaultShard int) *ListStrategy {
 	return &ListStrategy{
 		mapping:      mapping,
@@ -65,8 +67,9 @@ func NewListStrategyWithDefault(mapping map[any]int, defaultShard int) *ListStra
 // Shard looks up the shard index for the given key in the mapping table.
 //
 // Example:
-//   shardIdx, err := strategy.Shard("EU", 4)
-//   // Returns 1 (as mapped)
+//
+//	shardIdx, err := strategy.Shard("EU", 4)
+//	// Returns 1 (as mapped)
 func (l *ListStrategy) Shard(key any, numShards int) (int, error) {
 	if err := validateShardKey(key); err != nil {
 		return 0, err
