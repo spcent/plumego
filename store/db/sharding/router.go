@@ -81,6 +81,9 @@ type Router struct {
 	// resolver extracts shard keys from queries
 	resolver *ShardKeyResolver
 
+	// rewriter rewrites SQL queries with physical table names
+	rewriter *SQLRewriter
+
 	// config holds router configuration
 	config RouterConfig
 
@@ -142,6 +145,7 @@ func NewRouter(shards []*rw.Cluster, registry *ShardingRuleRegistry, opts ...Rou
 	router := &Router{
 		shards:   shards,
 		resolver: NewShardKeyResolver(registry),
+		rewriter: NewSQLRewriter(registry),
 		config:   DefaultRouterConfig(),
 		metrics: RouterMetrics{
 			ShardQueryCounts: make([]uint64, len(shards)),
@@ -183,9 +187,16 @@ func (r *Router) ExecContext(ctx context.Context, query string, args ...any) (sq
 	// Record metrics
 	r.recordShardQuery(resolved.ShardIndex)
 
+	// Rewrite SQL if needed (for physical table names)
+	rewrittenQuery, err := r.rewriter.Rewrite(query, resolved.ShardIndex)
+	if err != nil {
+		r.recordRoutingError()
+		return nil, fmt.Errorf("failed to rewrite SQL: %w", err)
+	}
+
 	// Execute on the resolved shard (will use primary)
 	shard := r.shards[resolved.ShardIndex]
-	return shard.ExecContext(ctx, query, args...)
+	return shard.ExecContext(ctx, rewrittenQuery, args...)
 }
 
 // QueryContext executes a read query (SELECT)
@@ -221,9 +232,16 @@ func (r *Router) QueryContext(ctx context.Context, query string, args ...any) (*
 	// Record metrics
 	r.recordShardQuery(resolved.ShardIndex)
 
+	// Rewrite SQL if needed (for physical table names)
+	rewrittenQuery, err := r.rewriter.Rewrite(query, resolved.ShardIndex)
+	if err != nil {
+		r.recordRoutingError()
+		return nil, fmt.Errorf("failed to rewrite SQL: %w", err)
+	}
+
 	// Execute on the resolved shard (may use replica)
 	shard := r.shards[resolved.ShardIndex]
-	return shard.QueryContext(ctx, query, args...)
+	return shard.QueryContext(ctx, rewrittenQuery, args...)
 }
 
 // QueryRowContext executes a query that returns at most one row
@@ -260,9 +278,21 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 	// Record metrics
 	r.recordShardQuery(resolved.ShardIndex)
 
+	// Rewrite SQL if needed (for physical table names)
+	rewrittenQuery, err := r.rewriter.Rewrite(query, resolved.ShardIndex)
+	if err != nil {
+		r.recordRoutingError()
+		// Fallback to default or first shard with original query
+		if r.config.DefaultShardIndex >= 0 {
+			shard := r.shards[r.config.DefaultShardIndex]
+			return shard.QueryRowContext(ctx, query, args...)
+		}
+		return r.shards[0].QueryRowContext(ctx, query, args...)
+	}
+
 	// Execute on the resolved shard
 	shard := r.shards[resolved.ShardIndex]
-	return shard.QueryRowContext(ctx, query, args...)
+	return shard.QueryRowContext(ctx, rewrittenQuery, args...)
 }
 
 // BeginTx begins a transaction on a specific shard
