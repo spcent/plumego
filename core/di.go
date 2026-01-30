@@ -154,10 +154,11 @@ func (c *DIContainer) resolveWithStackInChain(serviceType reflect.Type, stack []
 
 	// Register instance based on lifecycle
 	c.mu.Lock()
-	if registration.Lifecycle == Singleton {
+	switch registration.Lifecycle {
+	case Singleton:
 		registration.Instance = instance
 		c.services[serviceType] = registration
-	} else if registration.Lifecycle == Scoped {
+	case Scoped:
 		// Store scoped instance for this resolution chain
 		if c.scopedInstances == nil {
 			c.scopedInstances = make(map[uint64]map[reflect.Type]any)
