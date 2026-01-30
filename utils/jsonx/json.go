@@ -1,6 +1,7 @@
 package jsonx
 
 import (
+	"bytes"
 	"encoding/json"
 	"strconv"
 
@@ -68,23 +69,18 @@ func FieldInt(raw []byte, key string) int {
 // FieldInt64 extracts a top-level int64 field from JSON (best-effort).
 // Returns 0 if missing, invalid JSON, or not an int64.
 func FieldInt64(raw []byte, key string) int64 {
-	m := pool.GetMap()
-	defer pool.PutMap(m)
-
-	if err := json.Unmarshal(raw, &m); err != nil {
+	m := make(map[string]json.Number)
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(&m); err != nil {
 		return 0
 	}
 	v, ok := m[key]
 	if !ok {
 		return 0
 	}
-	switch val := v.(type) {
-	case float64:
-		return int64(val)
-	case string:
-		if i, err := strconv.ParseInt(val, 10, 64); err == nil {
-			return i
-		}
+	if i, err := v.Int64(); err == nil {
+		return i
 	}
 	return 0
 }
@@ -165,13 +161,13 @@ func PathInt(raw []byte, objKey, fieldKey string) int {
 // PathInt64 extracts a nested int64 field: m[objKey][fieldKey] (best-effort).
 // Returns 0 if missing, invalid JSON, or type mismatch.
 func PathInt64(raw []byte, objKey, fieldKey string) int64 {
-	m := pool.GetMap()
-	defer pool.PutMap(m)
-
-	if err := json.Unmarshal(raw, &m); err != nil {
+	var m map[string]map[string]json.Number
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(&m); err != nil {
 		return 0
 	}
-	obj, ok := m[objKey].(map[string]any)
+	obj, ok := m[objKey]
 	if !ok || obj == nil {
 		return 0
 	}
@@ -179,13 +175,8 @@ func PathInt64(raw []byte, objKey, fieldKey string) int64 {
 	if !ok {
 		return 0
 	}
-	switch val := v.(type) {
-	case float64:
-		return int64(val)
-	case string:
-		if i, err := strconv.ParseInt(val, 10, 64); err == nil {
-			return i
-		}
+	if i, err := v.Int64(); err == nil {
+		return i
 	}
 	return 0
 }
