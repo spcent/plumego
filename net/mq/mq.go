@@ -19,6 +19,33 @@ import (
 	"github.com/spcent/plumego/pubsub"
 )
 
+// Configuration constants
+const (
+	// DefaultBufferSize is the default buffer size for new subscriptions.
+	DefaultBufferSize = 16
+
+	// MaxTopicLength is the maximum length of a topic name in characters.
+	MaxTopicLength = 1024
+
+	// DefaultHealthCheckInterval is the default interval for health checks.
+	DefaultHealthCheckInterval = 30 * time.Second
+
+	// DefaultAckTimeoutDuration is the default timeout for message acknowledgment.
+	DefaultAckTimeoutDuration = 30 * time.Second
+
+	// DefaultClusterSyncInterval is the default interval for cluster state synchronization.
+	DefaultClusterSyncInterval = 5 * time.Second
+
+	// DefaultTransactionTimeoutDuration is the default timeout for transactions.
+	DefaultTransactionTimeoutDuration = 30 * time.Second
+
+	// DefaultMQTTPort is the default port for MQTT protocol.
+	DefaultMQTTPort = 1883
+
+	// DefaultAMQPPort is the default port for AMQP protocol.
+	DefaultAMQPPort = 5672
+)
+
 // Message re-exports pubsub.Message for broker compatibility.
 type Message = pubsub.Message
 
@@ -96,6 +123,9 @@ var ErrTransactionNotSupported = errors.New("mq: transaction not supported")
 
 // ErrDeadLetterNotSupported is returned when dead letter queue is not supported.
 var ErrDeadLetterNotSupported = errors.New("mq: dead letter queue not supported")
+
+// ErrMemoryLimitExceeded is returned when memory usage exceeds the configured limit.
+var ErrMemoryLimitExceeded = errors.New("mq: memory limit exceeded")
 
 // MessagePriority represents the priority of a message.
 type MessagePriority int
@@ -350,31 +380,32 @@ func DefaultConfig() Config {
 		EnableHealthCheck:        true,
 		MaxTopics:                0, // No limit
 		MaxSubscribers:           0, // No limit
-		DefaultBufferSize:        16,
+		DefaultBufferSize:        DefaultBufferSize,
 		EnableMetrics:            true,
-		HealthCheckInterval:      30 * time.Second,
+		HealthCheckInterval:      DefaultHealthCheckInterval,
 		MessageTTL:               0, // No TTL by default
 		EnablePriorityQueue:      true,
 		EnableAckSupport:         false, // Disabled by default for backward compatibility
-		DefaultAckTimeout:        30 * time.Second,
+		DefaultAckTimeout:        DefaultAckTimeoutDuration,
 		MaxMemoryUsage:           0,     // No limit by default
 		EnableTriePattern:        false, // Disabled by default for backward compatibility
 		EnableCluster:            false, // Disabled by default
 		ClusterReplicationFactor: 1,     // No replication by default
-		ClusterSyncInterval:      5 * time.Second,
+		ClusterSyncInterval:      DefaultClusterSyncInterval,
 		EnablePersistence:        false, // Disabled by default
 		EnableDeadLetterQueue:    false, // Disabled by default
 		EnableTransactions:       false, // Disabled by default
-		TransactionTimeout:       30 * time.Second,
+		TransactionTimeout:       DefaultTransactionTimeoutDuration,
 		EnableMQTT:               false, // Disabled by default
-		MQTTPort:                 1883,
+		MQTTPort:                 DefaultMQTTPort,
 		EnableAMQP:               false, // Disabled by default
-		AMQPPort:                 5672,
+		AMQPPort:                 DefaultAMQPPort,
 	}
 }
 
 // Validate checks if the configuration is valid.
 func (c Config) Validate() error {
+	// Basic validation
 	if c.DefaultBufferSize <= 0 {
 		return fmt.Errorf("%w: DefaultBufferSize must be positive", ErrInvalidConfig)
 	}
@@ -387,6 +418,60 @@ func (c Config) Validate() error {
 	if c.MaxSubscribers < 0 {
 		return fmt.Errorf("%w: MaxSubscribers cannot be negative", ErrInvalidConfig)
 	}
+
+	// Cluster configuration validation
+	if c.EnableCluster {
+		if strings.TrimSpace(c.ClusterNodeID) == "" {
+			return fmt.Errorf("%w: ClusterNodeID is required when cluster mode is enabled", ErrInvalidConfig)
+		}
+		if c.ClusterReplicationFactor < 1 {
+			return fmt.Errorf("%w: ClusterReplicationFactor must be at least 1", ErrInvalidConfig)
+		}
+		if c.ClusterSyncInterval < 0 {
+			return fmt.Errorf("%w: ClusterSyncInterval cannot be negative", ErrInvalidConfig)
+		}
+	}
+
+	// Persistence configuration validation
+	if c.EnablePersistence {
+		if strings.TrimSpace(c.PersistencePath) == "" {
+			return fmt.Errorf("%w: PersistencePath is required when persistence is enabled", ErrInvalidConfig)
+		}
+	}
+
+	// Dead letter queue configuration validation
+	if c.EnableDeadLetterQueue {
+		if strings.TrimSpace(c.DeadLetterTopic) == "" {
+			return fmt.Errorf("%w: DeadLetterTopic is required when dead letter queue is enabled", ErrInvalidConfig)
+		}
+	}
+
+	// Acknowledgment configuration validation
+	if c.EnableAckSupport {
+		if c.DefaultAckTimeout < 0 {
+			return fmt.Errorf("%w: DefaultAckTimeout cannot be negative", ErrInvalidConfig)
+		}
+	}
+
+	// Transaction configuration validation
+	if c.EnableTransactions {
+		if c.TransactionTimeout < 0 {
+			return fmt.Errorf("%w: TransactionTimeout cannot be negative", ErrInvalidConfig)
+		}
+	}
+
+	// Protocol configuration validation
+	if c.EnableMQTT {
+		if c.MQTTPort <= 0 || c.MQTTPort > 65535 {
+			return fmt.Errorf("%w: MQTTPort must be between 1 and 65535", ErrInvalidConfig)
+		}
+	}
+	if c.EnableAMQP {
+		if c.AMQPPort <= 0 || c.AMQPPort > 65535 {
+			return fmt.Errorf("%w: AMQPPort must be between 1 and 65535", ErrInvalidConfig)
+		}
+	}
+
 	return nil
 }
 
@@ -476,8 +561,8 @@ func validateTopic(topic string) error {
 	if topic == "" {
 		return fmt.Errorf("%w: cannot be empty", ErrInvalidTopic)
 	}
-	if len(topic) > 1024 {
-		return fmt.Errorf("%w: topic too long (max 1024 characters)", ErrInvalidTopic)
+	if len(topic) > MaxTopicLength {
+		return fmt.Errorf("%w: topic too long (max %d characters)", ErrInvalidTopic, MaxTopicLength)
 	}
 	return nil
 }
@@ -487,6 +572,59 @@ func validateMessage(msg Message) error {
 	if msg.ID == "" {
 		return fmt.Errorf("%w: ID is required", ErrNilMessage)
 	}
+	return nil
+}
+
+// validatePublishOperation performs common validation for all publish operations.
+// It checks context, broker initialization, topic, and optionally message.
+func (b *InProcBroker) validatePublishOperation(ctx context.Context, topic string, msg *Message) error {
+	// Validate context
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+
+	// Validate broker initialization
+	if b == nil || b.ps == nil {
+		return fmt.Errorf("%w", ErrNotInitialized)
+	}
+
+	// Validate topic
+	if err := validateTopic(topic); err != nil {
+		return err
+	}
+
+	// Validate message if provided
+	if msg != nil {
+		if err := validateMessage(*msg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateSubscribeOperation performs common validation for all subscribe operations.
+// It checks context, broker initialization, and topic.
+func (b *InProcBroker) validateSubscribeOperation(ctx context.Context, topic string) error {
+	// Validate context
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+
+	// Validate broker initialization
+	if b == nil || b.ps == nil {
+		return fmt.Errorf("%w", ErrNotInitialized)
+	}
+
+	// Validate topic
+	if err := validateTopic(topic); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -589,25 +727,13 @@ func (b *InProcBroker) executeWithObservability(
 // Publish sends a message to a topic.
 func (b *InProcBroker) Publish(ctx context.Context, topic string, msg Message) error {
 	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
-		// Validate context
-		if ctx != nil {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-		}
-
-		// Validate broker initialization
-		if b == nil || b.ps == nil {
-			return fmt.Errorf("%w", ErrNotInitialized)
-		}
-
-		// Validate topic
-		if err := validateTopic(topic); err != nil {
+		// Validate operation
+		if err := b.validatePublishOperation(ctx, topic, &msg); err != nil {
 			return err
 		}
 
-		// Validate message
-		if err := validateMessage(msg); err != nil {
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
 			return err
 		}
 
@@ -649,6 +775,11 @@ func (b *InProcBroker) PublishBatch(ctx context.Context, topic string, msgs []Me
 			// Note: TTL check would require type assertion on TTLMessage
 			// For regular Message types, we skip TTL validation
 			validMsgs = append(validMsgs, msg)
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
 		}
 
 		// Publish all valid messages
@@ -767,6 +898,11 @@ func (b *InProcBroker) PublishPriority(ctx context.Context, topic string, msg Pr
 			return err
 		}
 
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
 		// Check if priority queue is enabled
 		if !b.config.EnablePriorityQueue {
 			// Fall back to regular publish
@@ -825,6 +961,11 @@ func (b *InProcBroker) PublishWithAck(ctx context.Context, topic string, msg Ack
 
 		// Validate message
 		if err := validateMessage(msg.Message); err != nil {
+			return err
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
 			return err
 		}
 
@@ -948,7 +1089,7 @@ func (b *InProcBroker) checkMemoryLimit() error {
 	// Check if total allocated memory exceeds limit
 	if memStats.Alloc > b.config.MaxMemoryUsage {
 		return fmt.Errorf("%w: memory usage %d bytes exceeds limit %d bytes",
-			ErrInvalidConfig, memStats.Alloc, b.config.MaxMemoryUsage)
+			ErrMemoryLimitExceeded, memStats.Alloc, b.config.MaxMemoryUsage)
 	}
 
 	return nil
@@ -988,6 +1129,11 @@ func (b *InProcBroker) PublishToCluster(ctx context.Context, topic string, msg M
 
 		// Validate message
 		if err := validateMessage(msg); err != nil {
+			return err
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
 			return err
 		}
 
@@ -1089,6 +1235,11 @@ func (b *InProcBroker) PublishWithTransaction(ctx context.Context, topic string,
 			return err
 		}
 
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
 		// TODO: Implement transaction logic
 		// This would:
 		// 1. Start a transaction with txID
@@ -1183,6 +1334,11 @@ func (b *InProcBroker) PublishToDeadLetter(ctx context.Context, originalTopic st
 
 		// Validate message
 		if err := validateMessage(msg); err != nil {
+			return err
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
 			return err
 		}
 
