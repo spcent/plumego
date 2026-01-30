@@ -199,28 +199,33 @@ func (c *DIContainer) resolveAssignableWithStack(serviceType reflect.Type, stack
 
 	var matchInstance any
 	var matchType reflect.Type
+	hasInstance := false
+	hasType := false
+
 	for _, cand := range candidates {
 		if cand.instance != nil {
-			if matchInstance == nil && matchType == nil {
+			if !hasInstance && !hasType {
 				matchInstance = cand.instance
+				hasInstance = true
 				continue
 			}
-			if matchInstance != nil && servicesEqual(matchInstance, cand.instance) {
-				continue
+			if hasType || (hasInstance && !servicesEqual(matchInstance, cand.instance)) {
+				return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
 			}
+			continue
+		}
+		// cand.serviceType != nil
+		if hasInstance {
 			return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
 		}
-		if matchInstance != nil {
-			return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
-		}
-		if matchType == nil {
+		if !hasType {
 			matchType = cand.serviceType
+			hasType = true
 			continue
 		}
-		if matchType == cand.serviceType {
-			continue
+		if matchType != cand.serviceType {
+			return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
 		}
-		return nil, fmt.Errorf("multiple services match interface: %s", serviceType.String())
 	}
 
 	if matchInstance != nil {

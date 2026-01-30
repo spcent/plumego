@@ -401,7 +401,21 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 
 	if len(patterns) > 0 {
 		for _, entry := range patterns {
-			if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+			// Fast path: check if pattern contains wildcards
+			// If not, we can use simple string comparison
+			var matched bool
+			if strings.ContainsAny(entry.pattern, "*?[]\\") {
+				var err error
+				matched, err = path.Match(entry.pattern, topic)
+				if err != nil {
+					matched = false
+				}
+			} else {
+				// No wildcards - just compare strings
+				matched = entry.pattern == topic
+			}
+
+			if matched {
 				for _, s := range entry.subs {
 					ps.deliver(s, msg)
 				}

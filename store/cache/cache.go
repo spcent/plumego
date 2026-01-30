@@ -197,8 +197,18 @@ func (mc *MemoryCache) startCleanup() {
 }
 
 // cleanupExpired removes expired items from the cache.
+// To avoid O(N) scan on every cleanup cycle, we limit the number of items checked.
 func (mc *MemoryCache) cleanupExpired() {
+	const maxItemsPerCleanup = 1000 // Check at most 1000 items per cleanup cycle
+	checked := 0
+
 	mc.store.Range(func(key, value any) bool {
+		// Limit the number of items checked per cycle
+		if checked >= maxItemsPerCleanup {
+			return false // Stop iteration
+		}
+		checked++
+
 		item := value.(cacheItem)
 		if expired(item.expiration) {
 			mc.store.Delete(key)

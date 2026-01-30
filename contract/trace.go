@@ -251,9 +251,10 @@ type TraceCollector interface {
 
 // SimpleTraceCollector is a simple in-memory trace collector.
 type SimpleTraceCollector struct {
-	mu     sync.RWMutex
-	traces map[TraceID]*Trace
-	maxAge time.Duration
+	mu            sync.RWMutex
+	traces        map[TraceID]*Trace
+	maxAge        time.Duration
+	lastPruneTime time.Time
 }
 
 // NewSimpleTraceCollector creates a new simple trace collector.
@@ -267,6 +268,7 @@ func NewSimpleTraceCollector() *SimpleTraceCollector {
 func (c *SimpleTraceCollector) SetMaxAge(maxAge time.Duration) {
 	c.mu.Lock()
 	c.maxAge = maxAge
+	c.lastPruneTime = time.Time{} // Reset to force next prune
 	c.pruneLocked(time.Now())
 	c.mu.Unlock()
 }
@@ -277,9 +279,23 @@ func (c *SimpleTraceCollector) Collect(trace *Trace) {
 		return
 	}
 	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Don't store already-expired traces
+	if c.maxAge > 0 {
+		now := time.Now()
+		cutoff := now.Add(-c.maxAge)
+		timestamp := trace.StartTime
+		if trace.EndTime != nil {
+			timestamp = *trace.EndTime
+		}
+		if timestamp.Before(cutoff) {
+			return // Skip storing expired trace
+		}
+	}
+
 	c.traces[trace.ID] = trace.Clone()
 	c.pruneLocked(time.Now())
-	c.mu.Unlock()
 }
 
 // GetTrace retrieves a trace by ID.
@@ -321,6 +337,22 @@ func (c *SimpleTraceCollector) pruneLocked(now time.Time) {
 	if c.maxAge <= 0 {
 		return
 	}
+
+	// Only prune if enough time has passed since last prune
+	// Avoid pruning on every operation
+	pruneInterval := c.maxAge / 10
+	if pruneInterval < 10*time.Second {
+		pruneInterval = 10 * time.Second
+	}
+	if pruneInterval > time.Minute {
+		pruneInterval = time.Minute
+	}
+
+	if now.Sub(c.lastPruneTime) < pruneInterval {
+		return
+	}
+	c.lastPruneTime = now
+
 	cutoff := now.Add(-c.maxAge)
 	for id, trace := range c.traces {
 		if trace == nil {
@@ -855,22 +887,48 @@ func mergeSpanIntoTrace(trace *Trace, span *Span, maxSpans int) *Trace {
 		return trace
 	}
 
-	// Create a deep copy of the trace to avoid modifying the original
-	newTrace := trace.Clone()
-
-	// Find existing span and update it
-	for i, existingSpan := range newTrace.Spans {
+	// Check if we need to update or add
+	spanIndex := -1
+	for i, existingSpan := range trace.Spans {
 		if existingSpan.ID == span.ID {
-			newTrace.Spans[i] = span.Clone()
-			return newTrace
+			spanIndex = i
+			break
 		}
 	}
 
-	// Add new span if not found
-	if maxSpans > 0 && len(newTrace.Spans) >= maxSpans {
+	// If span exists, create shallow copy and update the specific span
+	if spanIndex >= 0 {
+		newTrace := &Trace{
+			ID:         trace.ID,
+			RootSpanID: trace.RootSpanID,
+			StartTime:  trace.StartTime,
+			EndTime:    trace.EndTime,
+			Attributes: trace.Attributes,
+			Links:      trace.Links,
+			Spans:      make([]*Span, len(trace.Spans)),
+		}
+		copy(newTrace.Spans, trace.Spans)
+		newTrace.Spans[spanIndex] = span.Clone()
 		return newTrace
 	}
-	newTrace.Spans = append(newTrace.Spans, span.Clone())
+
+	// Add new span if not found
+	if maxSpans > 0 && len(trace.Spans) >= maxSpans {
+		return trace
+	}
+
+	// Create new trace with additional span
+	newTrace := &Trace{
+		ID:         trace.ID,
+		RootSpanID: trace.RootSpanID,
+		StartTime:  trace.StartTime,
+		EndTime:    trace.EndTime,
+		Attributes: trace.Attributes,
+		Links:      trace.Links,
+		Spans:      make([]*Span, len(trace.Spans)+1),
+	}
+	copy(newTrace.Spans, trace.Spans)
+	newTrace.Spans[len(trace.Spans)] = span.Clone()
 	return newTrace
 }
 

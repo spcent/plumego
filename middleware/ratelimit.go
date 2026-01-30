@@ -232,7 +232,6 @@ func (rl *RateLimiter) tryEnterQueue() bool {
 	// Non-blocking attempt to send to queue
 	select {
 	case rl.queue <- struct{}{}:
-		atomic.AddInt64(&rl.currentQueue, 1)
 		return true
 	default:
 		return false
@@ -244,7 +243,6 @@ func (rl *RateLimiter) leaveQueue() {
 	// Non-blocking queue exit
 	select {
 	case <-rl.queue:
-		atomic.AddInt64(&rl.currentQueue, -1)
 	default:
 	}
 }
@@ -257,7 +255,6 @@ func (rl *RateLimiter) waitForConcurrencySlot() bool {
 	// Wait for concurrency slot or timeout
 	select {
 	case rl.sem <- struct{}{}:
-		atomic.AddInt64(&rl.currentConcurrent, 1)
 		return true
 	case <-timer.C:
 		return false
@@ -269,7 +266,6 @@ func (rl *RateLimiter) leaveConcurrency() {
 	// Non-blocking concurrency slot exit
 	select {
 	case <-rl.sem:
-		atomic.AddInt64(&rl.currentConcurrent, -1)
 	default:
 	}
 }
@@ -282,8 +278,8 @@ func (rl *RateLimiter) rejectRequest(w http.ResponseWriter, r *http.Request, cod
 		Category: contract.CategoryServer,
 		Message:  message,
 		Details: map[string]any{
-			"current_concurrent": atomic.LoadInt64(&rl.currentConcurrent),
-			"current_queue":      atomic.LoadInt64(&rl.currentQueue),
+			"current_concurrent": int64(len(rl.sem)),
+			"current_queue":      int64(len(rl.queue)),
 			"max_concurrent":     atomic.LoadInt64(&rl.maxConcurrent),
 			"queue_depth":        atomic.LoadInt64(&rl.queueDepth),
 		},
@@ -292,8 +288,8 @@ func (rl *RateLimiter) rejectRequest(w http.ResponseWriter, r *http.Request, cod
 	if rl.logger != nil {
 		rl.logger.WithFields(log.Fields{
 			"code":               code,
-			"current_concurrent": atomic.LoadInt64(&rl.currentConcurrent),
-			"current_queue":      atomic.LoadInt64(&rl.currentQueue),
+			"current_concurrent": int64(len(rl.sem)),
+			"current_queue":      int64(len(rl.queue)),
 		}).Warn("request rejected due to concurrency limit", nil)
 	}
 }
@@ -457,8 +453,8 @@ func (rl *RateLimiter) logAdjustment(direction string, oldVal, newVal int64) {
 func (rl *RateLimiter) GetMetrics() ConcurrencyMetrics {
 	metrics := ConcurrencyMetrics{
 		Timestamp:         time.Now(),
-		CurrentConcurrent: atomic.LoadInt64(&rl.currentConcurrent),
-		CurrentQueue:      atomic.LoadInt64(&rl.currentQueue),
+		CurrentConcurrent: int64(len(rl.sem)),
+		CurrentQueue:      int64(len(rl.queue)),
 		MaxConcurrent:     atomic.LoadInt64(&rl.maxConcurrent),
 		QueueDepth:        atomic.LoadInt64(&rl.queueDepth),
 		TotalRequests:     atomic.LoadInt64(&rl.totalRequests),
