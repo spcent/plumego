@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/spcent/plumego/pubsub"
 )
@@ -213,6 +214,152 @@ func BenchmarkSubscribeParallel(b *testing.B) {
 				b.Errorf("subscribe error: %v", err)
 			}
 			sub.Cancel()
+		}
+	})
+}
+
+// Benchmark TTL message publishing
+func BenchmarkPublishTTL(b *testing.B) {
+	cfg := DefaultConfig()
+	cfg.MessageTTL = 30 * time.Second
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	ctx := context.Background()
+	ttlMsg := TTLMessage{
+		Message:   Message{ID: "bench-ttl", Data: "benchmark ttl data"},
+		ExpiresAt: time.Now().Add(30 * time.Second),
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := broker.PublishTTL(ctx, "bench-topic", ttlMsg); err != nil {
+			b.Fatalf("publish TTL error: %v", err)
+		}
+	}
+}
+
+// Benchmark priority + TTL message publishing
+func BenchmarkPublishPriorityTTL(b *testing.B) {
+	cfg := DefaultConfig()
+	cfg.MessageTTL = 30 * time.Second
+	cfg.EnablePriorityQueue = true
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	ctx := context.Background()
+	priorityTTLMsg := PriorityTTLMessage{
+		Message:   Message{ID: "bench-priority-ttl", Data: "benchmark priority ttl data"},
+		Priority:  PriorityNormal,
+		ExpiresAt: time.Now().Add(30 * time.Second),
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := broker.PublishPriorityTTL(ctx, "bench-topic", priorityTTLMsg); err != nil {
+			b.Fatalf("publish priority TTL error: %v", err)
+		}
+	}
+}
+
+// Benchmark ACK + TTL message publishing
+func BenchmarkPublishWithAckTTL(b *testing.B) {
+	cfg := DefaultConfig()
+	cfg.MessageTTL = 30 * time.Second
+	cfg.EnableAckSupport = true
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ackTTLMsg := AckTTLMessage{
+			Message:    Message{ID: fmt.Sprintf("bench-ack-ttl-%d", i), Data: "benchmark ack ttl data"},
+			AckID:      fmt.Sprintf("bench-ack-%d", i),
+			AckPolicy:  AckRequired,
+			AckTimeout: 30 * time.Second,
+			ExpiresAt:  time.Now().Add(30 * time.Second),
+		}
+		if err := broker.PublishWithAckTTL(ctx, "bench-topic", ackTTLMsg); err != nil {
+			b.Fatalf("publish ACK TTL error: %v", err)
+		}
+	}
+}
+
+// Benchmark TTL validation
+func BenchmarkValidateTTL(b *testing.B) {
+	broker := NewInProcBroker(pubsub.New())
+	defer broker.Close()
+
+	expiresAt := time.Now().Add(30 * time.Second)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := broker.validateTTL(expiresAt); err != nil {
+			b.Fatalf("validate TTL error: %v", err)
+		}
+	}
+}
+
+// Benchmark TTL tracker operations
+func BenchmarkTTLTrackerTrack(b *testing.B) {
+	cfg := DefaultConfig()
+	cfg.MessageTTL = 30 * time.Second
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	expiresAt := time.Now().Add(30 * time.Second)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		msgID := fmt.Sprintf("msg-%d", i)
+		if err := broker.ttlTracker.track(msgID, "bench-topic", expiresAt); err != nil {
+			b.Fatalf("track error: %v", err)
+		}
+	}
+}
+
+// Benchmark TTL tracker stats
+func BenchmarkTTLTrackerStats(b *testing.B) {
+	cfg := DefaultConfig()
+	cfg.MessageTTL = 30 * time.Second
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	// Add some tracked messages
+	expiresAt := time.Now().Add(30 * time.Second)
+	for i := 0; i < 100; i++ {
+		broker.ttlTracker.track(fmt.Sprintf("msg-%d", i), "bench-topic", expiresAt)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = broker.ttlTracker.stats()
+	}
+}
+
+// Benchmark parallel TTL publishing
+func BenchmarkPublishTTLParallel(b *testing.B) {
+	cfg := DefaultConfig()
+	cfg.MessageTTL = 30 * time.Second
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			ttlMsg := TTLMessage{
+				Message:   Message{ID: fmt.Sprintf("bench-ttl-%d", i), Data: "benchmark ttl data"},
+				ExpiresAt: time.Now().Add(30 * time.Second),
+			}
+			if err := broker.PublishTTL(ctx, "bench-topic", ttlMsg); err != nil {
+				b.Errorf("publish TTL error: %v", err)
+			}
+			i++
 		}
 	})
 }
