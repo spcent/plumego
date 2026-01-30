@@ -39,9 +39,10 @@ func NewHashStrategyWithFunc(hashFunc func([]byte) uint64) *HashStrategy {
 // The hash of the key is computed and then mapped to a shard using modulo.
 //
 // Example:
-//   strategy := NewHashStrategy()
-//   shardIdx, err := strategy.Shard("user123", 4)
-//   // Returns 0-3 based on hash(user123) % 4
+//
+//	strategy := NewHashStrategy()
+//	shardIdx, err := strategy.Shard("user123", 4)
+//	// Returns 0-3 based on hash(user123) % 4
 func (h *HashStrategy) Shard(key any, numShards int) (int, error) {
 	if err := validateShardKey(key); err != nil {
 		return 0, err
@@ -64,8 +65,9 @@ func (h *HashStrategy) Shard(key any, numShards int) (int, error) {
 // need to query all shards. This method returns all shard indices.
 //
 // Example:
-//   shards, err := strategy.ShardRange("user100", "user200", 4)
-//   // Returns [0, 1, 2, 3] because hash doesn't preserve order
+//
+//	shards, err := strategy.ShardRange("user100", "user200", 4)
+//	// Returns [0, 1, 2, 3] because hash doesn't preserve order
 func (h *HashStrategy) ShardRange(start, end any, numShards int) ([]int, error) {
 	if err := validateNumShards(numShards); err != nil {
 		return nil, err

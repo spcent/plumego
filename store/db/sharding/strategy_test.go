@@ -172,64 +172,64 @@ func TestModStrategy(t *testing.T) {
 	strategy := NewModStrategy()
 
 	tests := []struct {
-		name       string
-		key        any
-		numShards  int
-		wantShard  int
-		wantErr    bool
+		name      string
+		key       any
+		numShards int
+		wantShard int
+		wantErr   bool
 	}{
 		{
-			name:       "simple positive",
-			key:        int64(12345),
-			numShards:  4,
-			wantShard:  1, // 12345 % 4 = 1
-			wantErr:    false,
+			name:      "simple positive",
+			key:       int64(12345),
+			numShards: 4,
+			wantShard: 1, // 12345 % 4 = 1
+			wantErr:   false,
 		},
 		{
-			name:       "negative key",
-			key:        int64(-12345),
-			numShards:  4,
-			wantShard:  1, // abs(-12345) % 4 = 1
-			wantErr:    false,
+			name:      "negative key",
+			key:       int64(-12345),
+			numShards: 4,
+			wantShard: 1, // abs(-12345) % 4 = 1
+			wantErr:   false,
 		},
 		{
-			name:       "zero key",
-			key:        int64(0),
-			numShards:  4,
-			wantShard:  0,
-			wantErr:    false,
+			name:      "zero key",
+			key:       int64(0),
+			numShards: 4,
+			wantShard: 0,
+			wantErr:   false,
 		},
 		{
-			name:       "int type",
-			key:        100,
-			numShards:  3,
-			wantShard:  1, // 100 % 3 = 1
-			wantErr:    false,
+			name:      "int type",
+			key:       100,
+			numShards: 3,
+			wantShard: 1, // 100 % 3 = 1
+			wantErr:   false,
 		},
 		{
-			name:       "uint type",
-			key:        uint64(50),
-			numShards:  7,
-			wantShard:  1, // 50 % 7 = 1
-			wantErr:    false,
+			name:      "uint type",
+			key:       uint64(50),
+			numShards: 7,
+			wantShard: 1, // 50 % 7 = 1
+			wantErr:   false,
 		},
 		{
-			name:       "nil key",
-			key:        nil,
-			numShards:  4,
-			wantErr:    true,
+			name:      "nil key",
+			key:       nil,
+			numShards: 4,
+			wantErr:   true,
 		},
 		{
-			name:       "non-integer key",
-			key:        "string",
-			numShards:  4,
-			wantErr:    true,
+			name:      "non-integer key",
+			key:       "string",
+			numShards: 4,
+			wantErr:   true,
 		},
 		{
-			name:       "zero shards",
-			key:        int64(100),
-			numShards:  0,
-			wantErr:    true,
+			name:      "zero shards",
+			key:       int64(100),
+			numShards: 0,
+			wantErr:   true,
 		},
 	}
 

@@ -44,11 +44,12 @@ type RangeDefinition struct {
 // Ranges must not overlap and should be provided in sorted order by Start value.
 //
 // Example:
-//   strategy := NewRangeStrategy([]RangeDefinition{
-//       {Start: int64(0), End: int64(10000), Shard: 0},
-//       {Start: int64(10000), End: int64(20000), Shard: 1},
-//       {Start: int64(20000), End: int64(30000), Shard: 2},
-//   })
+//
+//	strategy := NewRangeStrategy([]RangeDefinition{
+//	    {Start: int64(0), End: int64(10000), Shard: 0},
+//	    {Start: int64(10000), End: int64(20000), Shard: 1},
+//	    {Start: int64(20000), End: int64(30000), Shard: 2},
+//	})
 func NewRangeStrategy(ranges []RangeDefinition) (*RangeStrategy, error) {
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("range strategy requires at least one range definition")
@@ -75,8 +76,9 @@ func NewRangeStrategy(ranges []RangeDefinition) (*RangeStrategy, error) {
 // Uses binary search for efficient lookup in O(log n) time.
 //
 // Example:
-//   shardIdx, err := strategy.Shard(int64(15000), 3)
-//   // Returns 1 because 15000 is in range [10000, 20000)
+//
+//	shardIdx, err := strategy.Shard(int64(15000), 3)
+//	// Returns 1 because 15000 is in range [10000, 20000)
 func (r *RangeStrategy) Shard(key any, numShards int) (int, error) {
 	if err := validateShardKey(key); err != nil {
 		return 0, err
@@ -113,8 +115,9 @@ func (r *RangeStrategy) Shard(key any, numShards int) (int, error) {
 // This is efficient because only the relevant shards need to be queried.
 //
 // Example:
-//   shards, err := strategy.ShardRange(int64(8000), int64(15000), 3)
-//   // Returns [0, 1] because the range spans shards 0 and 1
+//
+//	shards, err := strategy.ShardRange(int64(8000), int64(15000), 3)
+//	// Returns [0, 1] because the range spans shards 0 and 1
 func (r *RangeStrategy) ShardRange(start, end any, numShards int) ([]int, error) {
 	if err := validateNumShards(numShards); err != nil {
 		return nil, err
