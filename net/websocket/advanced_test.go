@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -21,22 +22,22 @@ func TestConnConfiguration(t *testing.T) {
 
 	// Test SetReadLimit
 	mockConn.SetReadLimit(32 << 20) // 32MB
-	if mockConn.readLimit != 32<<20 {
-		t.Errorf("SetReadLimit failed, expected 32MB, got %d", mockConn.readLimit)
+	if atomic.LoadInt64(&mockConn.readLimit) != 32<<20 {
+		t.Errorf("SetReadLimit failed, expected 32MB, got %d", atomic.LoadInt64(&mockConn.readLimit))
 	}
 
 	// Test SetPingPeriod
 	newPingPeriod := 10 * time.Second
 	mockConn.SetPingPeriod(newPingPeriod)
-	if mockConn.pingPeriod != newPingPeriod {
-		t.Errorf("SetPingPeriod failed, expected %v, got %v", newPingPeriod, mockConn.pingPeriod)
+	if time.Duration(atomic.LoadInt64((*int64)(&mockConn.pingPeriod))) != newPingPeriod {
+		t.Errorf("SetPingPeriod failed, expected %v, got %v", newPingPeriod, time.Duration(atomic.LoadInt64((*int64)(&mockConn.pingPeriod))))
 	}
 
 	// Test SetPongWait
 	newPongWait := 15 * time.Second
 	mockConn.SetPongWait(newPongWait)
-	if mockConn.pongWait != newPongWait {
-		t.Errorf("SetPongWait failed, expected %v, got %v", newPongWait, mockConn.pongWait)
+	if time.Duration(atomic.LoadInt64((*int64)(&mockConn.pongWait))) != newPongWait {
+		t.Errorf("SetPongWait failed, expected %v, got %v", newPongWait, time.Duration(atomic.LoadInt64((*int64)(&mockConn.pongWait))))
 	}
 
 	// Test GetLastPong

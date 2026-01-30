@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -374,7 +375,7 @@ func TestPongMonitor(t *testing.T) {
 
 	done := make(chan bool)
 	go func() {
-		ticker := time.NewTicker(c.pingPeriod / 2)
+		ticker := time.NewTicker(time.Duration(atomic.LoadInt64((*int64)(&c.pingPeriod))) / 2)
 		defer ticker.Stop()
 
 		for {
@@ -383,8 +384,8 @@ func TestPongMonitor(t *testing.T) {
 				done <- true
 				return
 			case <-ticker.C:
-				last := time.Unix(0, c.lastPong)
-				if time.Since(last) > c.pongWait {
+				last := time.Unix(0, atomic.LoadInt64(&c.lastPong))
+				if time.Since(last) > time.Duration(atomic.LoadInt64((*int64)(&c.pongWait))) {
 					c.Close()
 				}
 			}
