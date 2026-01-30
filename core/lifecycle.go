@@ -357,7 +357,12 @@ func (a *App) stopComponents(ctx context.Context) {
 			if comps[i] == nil {
 				continue
 			}
-			_ = comps[i].Stop(ctx)
+			if err := comps[i].Stop(ctx); err != nil {
+				a.logger.WithFields(log.Fields{
+					"component_index": i,
+					"error":           err.Error(),
+				}).Error("failed to stop component", nil)
+			}
 		}
 	})
 }
@@ -372,7 +377,12 @@ func (a *App) stopRunners(ctx context.Context) {
 			if runners[i] == nil {
 				continue
 			}
-			_ = runners[i].Stop(ctx)
+			if err := runners[i].Stop(ctx); err != nil {
+				a.logger.WithFields(log.Fields{
+					"runner_index": i,
+					"error":        err.Error(),
+				}).Error("failed to stop runner", nil)
+			}
 		}
 	})
 }

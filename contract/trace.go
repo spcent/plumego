@@ -21,6 +21,12 @@ type TraceFlags uint8
 const (
 	// TraceFlagsSampled indicates that the trace should be sampled.
 	TraceFlagsSampled TraceFlags = 0x01
+
+	// TraceIDLength is the expected length of a trace ID in hexadecimal format (32 hex chars = 16 bytes).
+	TraceIDLength = 32
+
+	// SpanIDLength is the expected length of a span ID in hexadecimal format (16 hex chars = 8 bytes).
+	SpanIDLength = 16
 )
 
 // Trace represents a distributed trace containing multiple spans.
@@ -769,8 +775,8 @@ func TraceIDFromContext(ctx context.Context) string {
 
 // ParseTraceID parses a trace ID from string.
 func ParseTraceID(id string) (TraceID, error) {
-	if len(id) != 32 {
-		return "", fmt.Errorf("invalid trace ID length: expected 32, got %d", len(id))
+	if len(id) != TraceIDLength {
+		return "", fmt.Errorf("invalid trace ID length: expected %d, got %d", TraceIDLength, len(id))
 	}
 
 	// Validate hex string
@@ -783,8 +789,8 @@ func ParseTraceID(id string) (TraceID, error) {
 
 // ParseSpanID parses a span ID from string.
 func ParseSpanID(id string) (SpanID, error) {
-	if len(id) != 16 {
-		return "", fmt.Errorf("invalid span ID length: expected 16, got %d", len(id))
+	if len(id) != SpanIDLength {
+		return "", fmt.Errorf("invalid span ID length: expected %d, got %d", SpanIDLength, len(id))
 	}
 
 	// Validate hex string

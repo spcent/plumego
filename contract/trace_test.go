@@ -19,8 +19,8 @@ func TestRandomIDGenerator(t *testing.T) {
 		t.Fatalf("expected different trace IDs")
 	}
 
-	if len(traceID1) != 32 {
-		t.Fatalf("expected trace ID length 32, got %d", len(traceID1))
+	if len(traceID1) != TraceIDLength {
+		t.Fatalf("expected trace ID length %d, got %d", TraceIDLength, len(traceID1))
 	}
 
 	// Test span ID generation

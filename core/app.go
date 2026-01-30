@@ -12,6 +12,14 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
+const (
+	// DefaultMaxConcurrency is the default maximum number of concurrent requests.
+	DefaultMaxConcurrency = 256
+
+	// DefaultQueueDepth is the default depth of the request queue.
+	DefaultQueueDepth = 512
+)
+
 // App represents the main application instance.
 type App struct {
 	// Core components (immutable after construction)
@@ -79,8 +87,8 @@ func New(options ...Option) *App {
 		EnableHTTP2:           true,
 		DrainInterval:         500 * time.Millisecond,
 		MaxBodyBytes:          10 << 20, // 10 MiB
-		MaxConcurrency:        256,
-		QueueDepth:            512,
+		MaxConcurrency:        DefaultMaxConcurrency,
+		QueueDepth:            DefaultQueueDepth,
 		QueueTimeout:          250 * time.Millisecond,
 		EnableSecurityHeaders: true,
 		EnableAbuseGuard:      true,

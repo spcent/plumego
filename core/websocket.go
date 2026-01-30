@@ -33,6 +33,11 @@ type WebSocketConfig struct {
 	MaxRoomConnections int             // Maximum connections per room (0 = unlimited)
 }
 
+const (
+	// DefaultSendQueueSize is the default buffer size for the WebSocket send queue.
+	DefaultSendQueueSize = 256
+)
+
 // DefaultWebSocketConfig returns default WebSocket configuration.
 func DefaultWebSocketConfig() WebSocketConfig {
 	secret := []byte(os.Getenv("WS_SECRET"))
@@ -40,7 +45,7 @@ func DefaultWebSocketConfig() WebSocketConfig {
 	return WebSocketConfig{
 		WorkerCount:        16,
 		JobQueueSize:       4096,
-		SendQueueSize:      256,
+		SendQueueSize:      DefaultSendQueueSize,
 		SendTimeout:        200 * time.Millisecond,
 		SendBehavior:       ws.SendBlock,
 		Secret:             secret,
