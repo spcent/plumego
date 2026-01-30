@@ -97,12 +97,12 @@
 | 组件 | 职责 | 位置 |
 |------|------|------|
 | `Router` | 统一路由器,整合所有路由逻辑 | `store/db/router.go` |
-| `ReadWriteCluster` | 读写分离集群管理 | `store/db/readwrite/splitter.go` |
+| `ReadWriteCluster` | 读写分离集群管理 | `store/db/rw/splitter.go` |
 | `ShardingStrategy` | 分片策略接口和实现 | `store/db/sharding/strategy.go` |
-| `LoadBalancer` | 负载均衡器 | `store/db/readwrite/loadbalancer.go` |
+| `LoadBalancer` | 负载均衡器 | `store/db/rw/loadbalancer.go` |
 | `ShardKeyResolver` | 分片键解析 | `store/db/sharding/resolver.go` |
 | `SQLRewriter` | SQL 改写(分表场景) | `store/db/router.go` |
-| `HealthChecker` | 健康检查 | `store/db/readwrite/health.go` |
+| `HealthChecker` | 健康检查 | `store/db/rw/health.go` |
 
 ### 目录结构
 
@@ -111,7 +111,7 @@ store/db/
 ├── sql.go                    # 现有基础包 ✅
 ├── cluster.go                # 集群管理 [NEW]
 ├── router.go                 # 统一路由器 [NEW]
-├── readwrite/                # 读写分离 [NEW]
+├── rw/                # 读写分离 [NEW]
 │   ├── splitter.go
 │   ├── loadbalancer.go
 │   ├── policy.go
@@ -406,7 +406,7 @@ go test -bench=. -benchmem ./...
 ### 对于应用开发人员
 
 1. 阅读 **SHARDING_API.md** 第 1-2 章 (接口和示例)
-2. 运行示例代码 `examples/readwrite/main.go`
+2. 运行示例代码 `examples/rw/main.go`
 3. 阅读 **SHARDING_API.md** 第 5 章 (最佳实践)
 4. 参考 **SHARDING_API.md** 第 6 章 (故障排查)
 
@@ -437,7 +437,7 @@ go test -bench=. -benchmem ./...
 
 ### 第一周任务
 
-1. **创建目录结构**: `store/db/readwrite/`, `store/db/sharding/`
+1. **创建目录结构**: `store/db/rw/`, `store/db/sharding/`
 2. **定义接口**: 实现 `LoadBalancer`, `RoutingPolicy`, `Strategy` 接口
 3. **实现 ReadWriteCluster**: 基本的连接管理和路由
 4. **编写测试**: 单元测试骨架

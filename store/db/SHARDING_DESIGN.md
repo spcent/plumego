@@ -77,7 +77,7 @@ store/db/
 │   ├── mod.go                # 取模分片
 │   ├── resolver.go           # 分片键解析
 │   └── strategy_test.go
-├── readwrite/
+├── rw/
 │   ├── splitter.go           # 读写分离
 │   ├── loadbalancer.go       # 负载均衡
 │   ├── policy.go             # 路由策略
@@ -1119,10 +1119,10 @@ database, err := cluster.New(config)
 **目标**: 实现基本的读写分离功能
 
 **交付物**:
-- [ ] `readwrite/splitter.go` - 读写分离核心逻辑
-- [ ] `readwrite/loadbalancer.go` - 负载均衡实现(轮询、随机、最少连接)
-- [ ] `readwrite/policy.go` - 路由策略(SQL类型、上下文提示)
-- [ ] `readwrite/health.go` - 健康检查
+- [ ] `rw/splitter.go` - 读写分离核心逻辑
+- [ ] `rw/loadbalancer.go` - 负载均衡实现(轮询、随机、最少连接)
+- [ ] `rw/policy.go` - 路由策略(SQL类型、上下文提示)
+- [ ] `rw/health.go` - 健康检查
 - [ ] `cluster.go` - 集群管理
 - [ ] 完整的单元测试(覆盖率 > 85%)
 - [ ] 集成测试(使用 docker-compose 模拟主从)
