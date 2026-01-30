@@ -17,6 +17,10 @@ const (
 	// Snapshot entry format:
 	// [KeyLen:4][Key:var][ValueLen:4][Value:var][ExpireAt:8][Version:8][Size:8]
 	snapshotHeaderSize = 4 + 4 + 8 + 8 + 8 // 32 bytes fixed overhead
+
+	// Safety limits to prevent overflow and excessive memory allocation
+	maxKeySize   = 64 * 1024 * 1024  // 64MB max key size
+	maxValueSize = 512 * 1024 * 1024 // 512MB max value size
 )
 
 // BinarySerializer implements Serializer using custom binary encoding
@@ -26,7 +30,20 @@ type BinarySerializer struct{}
 func (s *BinarySerializer) EncodeWALEntry(entry WALEntry) ([]byte, error) {
 	keyLen := len(entry.Key)
 	valueLen := len(entry.Value)
+
+	// Validate sizes to prevent overflow
+	if keyLen > maxKeySize {
+		return nil, fmt.Errorf("key size %d exceeds maximum %d", keyLen, maxKeySize)
+	}
+	if valueLen > maxValueSize {
+		return nil, fmt.Errorf("value size %d exceeds maximum %d", valueLen, maxValueSize)
+	}
+
+	// Safe calculation: all values are now bounded
 	totalSize := walHeaderSize + keyLen + valueLen
+	if totalSize < 0 {
+		return nil, fmt.Errorf("total size overflow: %d", totalSize)
+	}
 
 	buf := make([]byte, totalSize)
 	offset := 0
@@ -95,6 +112,11 @@ func (s *BinarySerializer) DecodeWALEntry(reader *bufio.Reader) (*WALEntry, erro
 	}
 	keyLen := binary.BigEndian.Uint32(keyLenBuf)
 
+	// Validate key length
+	if keyLen > maxKeySize {
+		return nil, fmt.Errorf("key length %d exceeds maximum %d", keyLen, maxKeySize)
+	}
+
 	// Read key
 	keyBuf := make([]byte, keyLen)
 	if _, err := io.ReadFull(reader, keyBuf); err != nil {
@@ -108,6 +130,11 @@ func (s *BinarySerializer) DecodeWALEntry(reader *bufio.Reader) (*WALEntry, erro
 		return nil, err
 	}
 	valueLen := binary.BigEndian.Uint32(valueLenBuf)
+
+	// Validate value length
+	if valueLen > maxValueSize {
+		return nil, fmt.Errorf("value length %d exceeds maximum %d", valueLen, maxValueSize)
+	}
 
 	// Read value
 	value := make([]byte, valueLen)
@@ -204,7 +231,20 @@ func (s *BinarySerializer) ReadSnapshotHeader(reader io.Reader) error {
 func (s *BinarySerializer) EncodeEntry(entry *Entry) ([]byte, error) {
 	keyLen := len(entry.Key)
 	valueLen := len(entry.Value)
+
+	// Validate sizes to prevent overflow
+	if keyLen > maxKeySize {
+		return nil, fmt.Errorf("key size %d exceeds maximum %d", keyLen, maxKeySize)
+	}
+	if valueLen > maxValueSize {
+		return nil, fmt.Errorf("value size %d exceeds maximum %d", valueLen, maxValueSize)
+	}
+
+	// Safe calculation: all values are now bounded
 	totalSize := snapshotHeaderSize + keyLen + valueLen
+	if totalSize < 0 {
+		return nil, fmt.Errorf("total size overflow: %d", totalSize)
+	}
 
 	buf := make([]byte, totalSize)
 	offset := 0
@@ -248,6 +288,11 @@ func (s *BinarySerializer) DecodeEntry(reader *bufio.Reader) (*Entry, error) {
 	}
 	keyLen := binary.BigEndian.Uint32(keyLenBuf)
 
+	// Validate key length
+	if keyLen > maxKeySize {
+		return nil, fmt.Errorf("key length %d exceeds maximum %d", keyLen, maxKeySize)
+	}
+
 	// Read key
 	keyBuf := make([]byte, keyLen)
 	if _, err := io.ReadFull(reader, keyBuf); err != nil {
@@ -261,6 +306,11 @@ func (s *BinarySerializer) DecodeEntry(reader *bufio.Reader) (*Entry, error) {
 		return nil, err
 	}
 	valueLen := binary.BigEndian.Uint32(valueLenBuf)
+
+	// Validate value length
+	if valueLen > maxValueSize {
+		return nil, fmt.Errorf("value length %d exceeds maximum %d", valueLen, maxValueSize)
+	}
 
 	// Read value
 	value := make([]byte, valueLen)
