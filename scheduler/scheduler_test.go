@@ -299,10 +299,12 @@ func TestPersistenceReload(t *testing.T) {
 	done := make(chan struct{}, 1)
 
 	s := New(WithWorkers(1), WithStore(store))
-	s.RegisterTask("persisted", func(ctx context.Context) error {
+	if err := s.RegisterTask("persisted", func(ctx context.Context) error {
 		done <- struct{}{}
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("register task: %v", err)
+	}
 	s.Start()
 	_, err := s.Delay("persist-1", 10*time.Millisecond, func(ctx context.Context) error {
 		done <- struct{}{}
@@ -314,10 +316,12 @@ func TestPersistenceReload(t *testing.T) {
 	_ = s.Stop(context.Background())
 
 	s2 := New(WithWorkers(1), WithStore(store))
-	s2.RegisterTask("persisted", func(ctx context.Context) error {
+	if err := s2.RegisterTask("persisted", func(ctx context.Context) error {
 		done <- struct{}{}
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("register task: %v", err)
+	}
 	s2.Start()
 	defer func() { _ = s2.Stop(context.Background()) }()
 

@@ -139,6 +139,35 @@ func WithValidation(validations map[string]*RouteValidation) RouterOption {
 	}
 }
 
+// WithValidationRule creates a router option that adds a single validation rule
+// for a specific route. This is a convenience function for adding individual
+// validation rules without needing to create a full validation map.
+//
+// Parameters:
+//   - method: HTTP method (GET, POST, PUT, DELETE, PATCH)
+//   - path: URL path
+//   - validation: Validation rules for the route
+//
+// Example:
+//
+//	router := NewRouter(
+//	    WithValidationRule("POST", "/users", &RouteValidation{
+//	        Headers: map[string]Validator{
+//	            "Content-Type": StringValidator("application/json"),
+//	        },
+//	    }),
+//	)
+func WithValidationRule(method, path string, validation *RouteValidation) RouterOption {
+	return func(r *Router) {
+		if r.routeValidations == nil {
+			r.routeValidations = make(map[string]*RouteValidation)
+		}
+		key := method + " " + path
+		r.routeValidations[key] = validation
+		r.validationIndex = buildValidationIndex(r.routeValidations)
+	}
+}
+
 // AddValidation adds a validation rule for a specific route
 func (r *Router) AddValidation(method, path string, validation *RouteValidation) {
 	r.mu.Lock()

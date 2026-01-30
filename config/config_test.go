@@ -24,12 +24,10 @@ func (s *stubSource) Load(context.Context) (map[string]any, error) {
 	return s.data, nil
 }
 
-func (s *stubSource) Watch(context.Context) (<-chan map[string]any, <-chan error) {
-	updates := make(chan map[string]any)
-	errs := make(chan error)
-	close(updates)
-	close(errs)
-	return updates, errs
+func (s *stubSource) Watch(context.Context) <-chan WatchResult {
+	results := make(chan WatchResult)
+	close(results)
+	return results
 }
 
 func (s *stubSource) Name() string { return s.name }

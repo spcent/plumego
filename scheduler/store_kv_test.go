@@ -35,7 +35,9 @@ func TestKVStorePersistence(t *testing.T) {
 
 	// Ensure scheduler can load from KV store with registry.
 	s := New(WithStore(store))
-	s.RegisterTask("task", func(ctx context.Context) error { return nil })
+	if err := s.RegisterTask("task", func(ctx context.Context) error { return nil }); err != nil {
+		t.Fatalf("register task: %v", err)
+	}
 	s.Start()
 	_ = s.Stop(context.Background())
 }
