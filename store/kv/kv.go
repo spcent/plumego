@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/utils/pool"
 )
 
 var (
@@ -684,7 +682,7 @@ func (kv *KVStore) Snapshot() error {
 		return ErrStoreClosed
 	}
 
-	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.json")
+	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.bin")
 	tempPath := snapshotPath + ".tmp"
 
 	file, err := os.Create(tempPath)
@@ -703,15 +701,10 @@ func (kv *KVStore) Snapshot() error {
 		writer = gzWriter
 	}
 
-	encoder := json.NewEncoder(writer)
+	bufWriter := bufio.NewWriter(writer)
 
-	// Write header
-	header := map[string]any{
-		"magic":   magicNumber,
-		"version": version,
-		"created": time.Now(),
-	}
-	if err := encoder.Encode(header); err != nil {
+	// Write binary header
+	if err := writeSnapshotHeader(bufWriter); err != nil {
 		cleanup()
 		return err
 	}
@@ -722,7 +715,13 @@ func (kv *KVStore) Snapshot() error {
 		shard.mu.RLock()
 		for _, entry := range shard.data {
 			if entry.ExpireAt.IsZero() || now.Before(entry.ExpireAt) {
-				if err := encoder.Encode(entry); err != nil {
+				data, err := encodeEntryBinary(entry)
+				if err != nil {
+					shard.mu.RUnlock()
+					cleanup()
+					return err
+				}
+				if _, err := bufWriter.Write(data); err != nil {
 					shard.mu.RUnlock()
 					cleanup()
 					return err
@@ -730,6 +729,11 @@ func (kv *KVStore) Snapshot() error {
 			}
 		}
 		shard.mu.RUnlock()
+	}
+
+	if err := bufWriter.Flush(); err != nil {
+		cleanup()
+		return err
 	}
 
 	if gzWriter != nil {
@@ -793,7 +797,7 @@ func (kv *KVStore) loadData() error {
 }
 
 func (kv *KVStore) loadSnapshot() error {
-	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.json")
+	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.bin")
 
 	file, err := os.Open(snapshotPath)
 	if os.IsNotExist(err) {
@@ -813,26 +817,27 @@ func (kv *KVStore) loadSnapshot() error {
 		}
 	}
 
-	decoder := json.NewDecoder(reader)
+	bufReader := bufio.NewReader(reader)
 
-	// Read header
-	var header map[string]any
-	if err := decoder.Decode(&header); err != nil {
+	// Read binary header
+	if err := readSnapshotHeader(bufReader); err != nil {
 		return err
 	}
 
 	// Read entries
-	for decoder.More() {
-		var entry Entry
-		if err := decoder.Decode(&entry); err != nil {
+	for {
+		entry, err := decodeEntryBinary(bufReader)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
 			return err
 		}
 
 		shard := kv.getShard(entry.Key)
 		shard.mu.Lock()
-		entryCopy := entry
-		shard.data[entry.Key] = &entryCopy
-		kv.moveToFront(shard, &entryCopy)
+		shard.data[entry.Key] = entry
+		kv.moveToFront(shard, entry)
 		shard.mu.Unlock()
 
 		atomic.AddInt64(&kv.entries, 1)
@@ -854,16 +859,19 @@ func (kv *KVStore) replayWAL() error {
 	}
 	defer file.Close()
 
-	decoder := json.NewDecoder(file)
+	reader := bufio.NewReader(file)
 
-	for decoder.More() {
-		var entry WALEntry
-		if err := decoder.Decode(&entry); err != nil {
+	for {
+		entry, err := kv.decodeWALEntryBinary(reader)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
 			// Stop on first error (corruption)
 			break
 		}
 
-		if !kv.validateWALEntry(entry) {
+		if !kv.validateWALEntry(*entry) {
 			continue // Skip corrupted entries
 		}
 
@@ -905,18 +913,8 @@ func (kv *KVStore) replayWAL() error {
 // Utility methods
 
 func (kv *KVStore) encodeWALEntry(entry WALEntry) ([]byte, error) {
-	// Use pooled buffer for encoding to reduce allocations
-	buf := pool.GetBuffer()
-	defer pool.PutBuffer(buf)
-
-	if err := json.NewEncoder(buf).Encode(entry); err != nil {
-		return nil, err
-	}
-
-	// Return a copy of the bytes
-	result := make([]byte, buf.Len())
-	copy(result, buf.Bytes())
-	return result, nil
+	// Use binary encoding for better performance
+	return kv.encodeWALEntryBinary(entry)
 }
 
 func (kv *KVStore) calculateCRC(entry WALEntry) uint32 {

@@ -468,7 +468,7 @@ func TestSnapshot(t *testing.T) {
 	}
 
 	// Verify snapshot file exists
-	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.json")
+	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.bin")
 	if _, err := os.Stat(snapshotPath); os.IsNotExist(err) {
 		t.Error("Snapshot file should exist")
 	}
@@ -1453,7 +1453,7 @@ func TestSnapshotEmptyStore(t *testing.T) {
 	}
 
 	// Verify snapshot file was created
-	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.json")
+	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.bin")
 	if _, err := os.Stat(snapshotPath); os.IsNotExist(err) {
 		t.Error("Snapshot file should exist even for empty store")
 	}
