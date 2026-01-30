@@ -121,8 +121,17 @@ func New(config Config) (*Cluster, error) {
 		config.RoutingPolicy = NewTransactionAwarePolicy(NewSQLTypePolicy())
 	}
 
-	if config.HealthCheck.Interval == 0 {
-		config.HealthCheck = DefaultHealthCheckConfig()
+	// Apply default health check values only if enabled and interval is 0
+	if config.HealthCheck.Enabled && config.HealthCheck.Interval == 0 {
+		defaults := DefaultHealthCheckConfig()
+		config.HealthCheck.Interval = defaults.Interval
+		config.HealthCheck.Timeout = defaults.Timeout
+		if config.HealthCheck.FailureThreshold == 0 {
+			config.HealthCheck.FailureThreshold = defaults.FailureThreshold
+		}
+		if config.HealthCheck.RecoveryThreshold == 0 {
+			config.HealthCheck.RecoveryThreshold = defaults.RecoveryThreshold
+		}
 	}
 
 	// Initialize cluster
