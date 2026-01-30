@@ -18,7 +18,7 @@
 
 #### 任务清单
 
-- [ ] **Task 1.1.1**: 创建 `readwrite/` 目录结构
+- [ ] **Task 1.1.1**: 创建 `rw/` 目录结构
   - 文件: `splitter.go`, `loadbalancer.go`, `policy.go`, `health.go`
   - 预计时间: 0.5 天
 
