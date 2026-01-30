@@ -52,15 +52,49 @@ func JobLastErrorFromContext(ctx context.Context) (error, bool) {
 	return val, ok
 }
 
-// OverlapPolicy controls behavior when a job is still running.
+// OverlapPolicy controls the scheduler's behavior when a scheduled job execution
+// is triggered while a previous execution of the same job is still running.
+//
+// This policy is critical for jobs with unpredictable execution times or when
+// strict execution semantics are required.
 type OverlapPolicy int
 
 const (
-	// AllowConcurrent allows overlapping runs.
+	// AllowConcurrent allows multiple instances of the same job to run simultaneously.
+	//
+	// Use case: Stateless jobs that can safely run in parallel, such as:
+	//   - Health checks or monitoring tasks
+	//   - Independent data fetches
+	//   - Stateless notification dispatchers
+	//
+	// Caution: Can lead to resource exhaustion if job execution time exceeds schedule interval.
 	AllowConcurrent OverlapPolicy = iota
-	// SkipIfRunning skips a run if the previous run is still active.
+
+	// SkipIfRunning skips the scheduled execution if the previous run is still active.
+	// The skipped execution is dropped entirely and will not be retried.
+	//
+	// Use case: Jobs where missing an execution is acceptable, such as:
+	//   - Periodic cache refreshes
+	//   - Metrics collection (next interval will capture the data)
+	//   - Status updates
+	//
+	// Behavior: If job started at T0 is still running at T1, the T1 execution is skipped.
+	// The next opportunity to run is T2 (if the job has finished by then).
 	SkipIfRunning
-	// SerialQueue queues the next run to execute after the current run finishes.
+
+	// SerialQueue queues the next scheduled execution to run immediately after
+	// the current execution finishes. Multiple pending executions are queued in order.
+	//
+	// Use case: Jobs that must not run concurrently but should not skip executions:
+	//   - Database migrations or schema updates
+	//   - Sequential data processing pipelines
+	//   - Jobs that modify shared state
+	//
+	// Behavior: If job started at T0 is still running at T1 and T2, executions for
+	// T1 and T2 are queued and will run sequentially: T0 -> T1 -> T2.
+	//
+	// Caution: Queue can grow unbounded if execution time consistently exceeds interval.
+	// Consider monitoring queue depth or using SkipIfRunning for non-critical jobs.
 	SerialQueue
 )
 

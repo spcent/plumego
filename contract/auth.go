@@ -89,6 +89,9 @@ type Session struct {
 
 	// ---- Lifecycle ----
 
+	// Status represents the current lifecycle state of the session.
+	// Valid values: SessionActive, SessionRevoked, SessionExpired.
+	// Use this field to control access and track session validity.
 	Status SessionStatus
 
 	// CreatedAt is when the session was created (login time).
