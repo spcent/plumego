@@ -16,7 +16,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Plumego Read/Write Splitting Example ===\n")
+	fmt.Println("=== Plumego Read/Write Splitting Example ===")
+	fmt.Println()
 
 	// For this example, we'll use the same database for both primary and replicas
 	// In production, these would be different database instances
@@ -62,7 +63,8 @@ func main() {
 	}
 	defer cluster.Close()
 
-	fmt.Println("✓ Cluster created with 1 primary + 2 replicas\n")
+	fmt.Println("✓ Cluster created with 1 primary + 2 replicas")
+	fmt.Println()
 
 	ctx := context.Background()
 
