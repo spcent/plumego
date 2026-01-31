@@ -40,9 +40,10 @@ func newPlatformServer(addr string, config *Config) (Server, error) {
 
 	// Try Unix domain socket first
 	if !strings.Contains(addr, ":") {
-		// Ensure directory exists
+		// Ensure directory exists with configured permissions
 		dir := filepath.Dir(addr)
-		if err = os.MkdirAll(dir, 0755); err != nil {
+		dirPerm := os.FileMode(config.UnixSocketDirPerm)
+		if err = os.MkdirAll(dir, dirPerm); err != nil {
 			return nil, err
 		}
 
@@ -54,6 +55,13 @@ func newPlatformServer(addr string, config *Config) (Server, error) {
 		listener, err = net.Listen("unix", addr)
 		if err == nil {
 			socketPath = addr
+			// Set socket file permissions
+			socketPerm := os.FileMode(config.UnixSocketPerm)
+			if chmodErr := os.Chmod(addr, socketPerm); chmodErr != nil {
+				listener.Close()
+				os.Remove(addr)
+				return nil, chmodErr
+			}
 		}
 	}
 
@@ -86,7 +94,7 @@ func (s *unixServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	s.mu.RLock()
 	if s.closed {
 		s.mu.RUnlock()
-		return nil, net.ErrClosed
+		return nil, ErrServerClosed
 	}
 	s.mu.RUnlock()
 
@@ -202,56 +210,60 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 
 func (c *unixClient) Write(data []byte) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	c.mu.RUnlock()
 
-	return c.conn.Write(data)
+	return conn.Write(data)
 }
 
 func (c *unixClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	c.mu.RUnlock()
 
 	if timeout > 0 {
-		c.conn.SetWriteDeadline(time.Now().Add(timeout))
-		defer c.conn.SetWriteDeadline(time.Time{})
+		conn.SetWriteDeadline(time.Now().Add(timeout))
+		defer conn.SetWriteDeadline(time.Time{})
 	}
 
-	return c.conn.Write(data)
+	return conn.Write(data)
 }
 
 func (c *unixClient) Read(buf []byte) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	c.mu.RUnlock()
 
-	return c.conn.Read(buf)
+	return conn.Read(buf)
 }
 
 func (c *unixClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	c.mu.RUnlock()
 
 	if timeout > 0 {
-		c.conn.SetReadDeadline(time.Now().Add(timeout))
-		defer c.conn.SetReadDeadline(time.Time{})
+		conn.SetReadDeadline(time.Now().Add(timeout))
+		defer conn.SetReadDeadline(time.Time{})
 	}
 
-	return c.conn.Read(buf)
+	return conn.Read(buf)
 }
 
 func (c *unixClient) RemoteAddr() string {

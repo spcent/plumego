@@ -102,7 +102,7 @@ func (s *tcpServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	s.mu.RLock()
 	if s.closed {
 		s.mu.RUnlock()
-		return nil, net.ErrClosed
+		return nil, ErrServerClosed
 	}
 	s.mu.RUnlock()
 
@@ -158,7 +158,7 @@ func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return nil, net.ErrClosed
+		return nil, ErrServerClosed
 	}
 	handle := s.next
 	s.next = 0
@@ -408,23 +408,25 @@ func (c *winClient) Write(data []byte) (int, error) {
 
 func (c *winClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	handle := c.handle
+	c.mu.RUnlock()
 
-	if c.conn != nil {
+	if conn != nil {
 		if timeout > 0 {
-			c.conn.SetWriteDeadline(time.Now().Add(timeout))
-			defer c.conn.SetWriteDeadline(time.Time{})
+			conn.SetWriteDeadline(time.Now().Add(timeout))
+			defer conn.SetWriteDeadline(time.Time{})
 		}
-		return c.conn.Write(data)
+		return conn.Write(data)
 	}
 
-	if c.handle != 0 {
+	if handle != 0 {
 		var written uint32
-		err := syscall.WriteFile(c.handle, data, &written, nil)
+		err := syscall.WriteFile(handle, data, &written, nil)
 		return int(written), err
 	}
 
@@ -437,23 +439,25 @@ func (c *winClient) Read(buf []byte) (int, error) {
 
 func (c *winClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	handle := c.handle
+	c.mu.RUnlock()
 
-	if c.conn != nil {
+	if conn != nil {
 		if timeout > 0 {
-			c.conn.SetReadDeadline(time.Now().Add(timeout))
-			defer c.conn.SetReadDeadline(time.Time{})
+			conn.SetReadDeadline(time.Now().Add(timeout))
+			defer conn.SetReadDeadline(time.Time{})
 		}
-		return c.conn.Read(buf)
+		return conn.Read(buf)
 	}
 
-	if c.handle != 0 {
+	if handle != 0 {
 		var read uint32
-		err := syscall.ReadFile(c.handle, buf, &read, nil)
+		err := syscall.ReadFile(handle, buf, &read, nil)
 		return int(read), err
 	}
 
