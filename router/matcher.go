@@ -72,6 +72,20 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 	paramValues := make([]string, 0, len(parts))
 
 	for i, pathSegment := range parts {
+		// Reject empty path segments (e.g., from double slashes /users//123)
+		// Empty segments are only valid for wildcards
+		if pathSegment == "" {
+			// Try wildcard match for empty segment
+			if wildChild := rm.findWildChild(current); wildChild != nil {
+				wildValue := strings.Join(parts[i:], "/")
+				paramValues = append(paramValues, wildValue)
+				current = wildChild
+				break
+			}
+			// Empty segment with no wildcard = no match
+			return nil
+		}
+
 		// Try to find exact match first
 		if child := rm.findChildForPath(current, pathSegment); child != nil {
 			current = child
@@ -130,39 +144,40 @@ func (rm *RouteMatcher) findChildForPath(parent *node, path string) *node {
 		return nil
 	}
 
+	numChildren := len(parent.children)
+
+	// For very small sets (1-2 children), linear search is faster than index lookup
+	if numChildren <= 2 {
+		for i := 0; i < numChildren; i++ {
+			if parent.children[i].path == path {
+				return parent.children[i]
+			}
+		}
+		return nil
+	}
+
 	// Use indices for faster lookup when available
 	if len(parent.indices) > 0 && len(path) > 0 {
 		firstChar := path[0]
 
-		// Binary search in indices for better performance
+		// Find the first occurrence of the character in indices
 		idx := strings.IndexByte(parent.indices, firstChar)
 		if idx == -1 {
 			return nil
 		}
 
-		// Check the corresponding child
-		// Since indices are sorted, we can find the child more efficiently
-		for _, child := range parent.children {
-			if child.path == path {
-				return child
+		// Only scan children that start with the same character
+		// Since indices are sorted, all matching chars are consecutive
+		for i := idx; i < numChildren && parent.indices[i] == firstChar; i++ {
+			if parent.children[i].path == path {
+				return parent.children[i]
 			}
 		}
 		return nil
 	}
 
-	// Fallback to linear search for small sets or when indices aren't available
-	// For very small sets (1-2 children), linear search is faster
-	if len(parent.children) <= 2 {
-		for _, child := range parent.children {
-			if child.path == path {
-				return child
-			}
-		}
-		return nil
-	}
-
-	// For larger sets, optimize the loop
-	for i := range parent.children {
+	// Fallback to linear search when indices aren't available
+	for i := 0; i < numChildren; i++ {
 		if parent.children[i].path == path {
 			return parent.children[i]
 		}
@@ -172,7 +187,7 @@ func (rm *RouteMatcher) findChildForPath(parent *node, path string) *node {
 
 // findParamChild finds a param child node if exists.
 // Parameter nodes are identified by paths starting with ":".
-// This method is optimized to avoid unnecessary allocations.
+// This method uses indices for O(1) lookup when available.
 //
 // Parameters:
 //   - parent: Parent node to search in
@@ -184,10 +199,19 @@ func (rm *RouteMatcher) findParamChild(parent *node) *node {
 		return nil
 	}
 
+	// Use indices for fast lookup if available
+	if len(parent.indices) > 0 {
+		idx := strings.IndexByte(parent.indices, ':')
+		if idx >= 0 && idx < len(parent.children) {
+			return parent.children[idx]
+		}
+		return nil
+	}
+
+	// Fallback to linear search
 	for i := range parent.children {
-		child := parent.children[i]
-		if len(child.path) > 0 && child.path[0] == ':' {
-			return child
+		if len(parent.children[i].path) > 0 && parent.children[i].path[0] == ':' {
+			return parent.children[i]
 		}
 	}
 	return nil
@@ -195,7 +219,7 @@ func (rm *RouteMatcher) findParamChild(parent *node) *node {
 
 // findWildChild finds a wildcard child node if exists.
 // Wildcard nodes are identified by paths starting with "*".
-// This method is optimized to avoid unnecessary allocations.
+// This method uses indices for O(1) lookup when available.
 //
 // Parameters:
 //   - parent: Parent node to search in
@@ -207,10 +231,19 @@ func (rm *RouteMatcher) findWildChild(parent *node) *node {
 		return nil
 	}
 
+	// Use indices for fast lookup if available
+	if len(parent.indices) > 0 {
+		idx := strings.IndexByte(parent.indices, '*')
+		if idx >= 0 && idx < len(parent.children) {
+			return parent.children[idx]
+		}
+		return nil
+	}
+
+	// Fallback to linear search
 	for i := range parent.children {
-		child := parent.children[i]
-		if len(child.path) > 0 && child.path[0] == '*' {
-			return child
+		if len(parent.children[i].path) > 0 && parent.children[i].path[0] == '*' {
+			return parent.children[i]
 		}
 	}
 	return nil

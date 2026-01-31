@@ -49,8 +49,10 @@ func (mr *MatchResult) storeCached(version uint64, handler Handler) {
 
 // RouteMeta describes route metadata for debugging/observability.
 type RouteMeta struct {
-	Name string   `json:"name,omitempty"`
-	Tags []string `json:"tags,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Deprecated  bool     `json:"deprecated,omitempty"`
 }
 
 // RouteInfo describes a registered route with metadata.
@@ -58,4 +60,11 @@ type RouteInfo struct {
 	Method string    `json:"method"`
 	Path   string    `json:"path"`
 	Meta   RouteMeta `json:"meta,omitempty"`
+}
+
+// NamedRoute stores information for reverse URL generation.
+type NamedRoute struct {
+	Method   string
+	Pattern  string
+	ParamPos map[string]int // parameter name -> position in pattern
 }

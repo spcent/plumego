@@ -35,6 +35,14 @@ const (
 	ANY    = "ANY"    // Any HTTP method - catch-all route
 )
 
+// Configuration defaults
+const (
+	DefaultCacheCapacity = 100 // Default route cache capacity
+	DefaultMaxParams     = 8   // Default maximum parameters per route
+	DefaultPoolSliceCap  = 4   // Default capacity for pooled slices
+	DefaultPathPartsCap  = 8   // Default capacity for path parts slices
+)
+
 // Handler is an alias to the standard http.Handler for route handlers.
 // This type is used for all route handler registrations in the router.
 //
@@ -221,6 +229,7 @@ type route struct {
 //   - Route grouping with shared prefixes and middleware
 //   - Route caching for improved performance
 //   - Route metadata for documentation and API generation
+//   - Named routes with reverse URL generation
 //   - Thread-safe concurrent access
 //
 // Example:
@@ -233,6 +242,10 @@ type route struct {
 //	api := r.Group("/api/v1")
 //	api.Get("/users", listUsersHandler)
 //	api.Get("/users/:id", getUserHandler)
+//
+//	// Named routes for reverse URL generation
+//	r.Get("/users/:id", getUserHandler, router.WithRouteName("user.show"))
+//	url := r.URL("user.show", "id", "123") // returns "/users/123"
 //
 //	// Start HTTP server
 //	http.ListenAndServe(":8080", r)
@@ -250,6 +263,7 @@ type Router struct {
 	routeValidations  map[string]*RouteValidation // Route parameter validations
 	validationIndex   map[string][]validationEntry
 	routeMeta         map[string]RouteMeta
+	namedRoutes       map[string]*NamedRoute // Named routes for URL generation
 	methodNotAllowed  bool
 }
 
@@ -306,6 +320,37 @@ func WithRouteName(name string) RouteOption {
 func WithRouteTags(tags ...string) RouteOption {
 	return func(meta *RouteMeta) {
 		meta.Tags = append([]string(nil), tags...)
+	}
+}
+
+// WithRouteDescription sets a description for the route.
+// This is useful for API documentation generation.
+//
+// Parameters:
+//   - desc: Description text
+//
+// Example:
+//
+//	r.Get("/users", handler,
+//	    router.WithRouteDescription("List all users with pagination"),
+//	)
+func WithRouteDescription(desc string) RouteOption {
+	return func(meta *RouteMeta) {
+		meta.Description = desc
+	}
+}
+
+// WithRouteDeprecated marks the route as deprecated.
+// This is useful for API versioning and documentation.
+//
+// Example:
+//
+//	r.Get("/v1/users", handler,
+//	    router.WithRouteDeprecated(true),
+//	)
+func WithRouteDeprecated(deprecated bool) RouteOption {
+	return func(meta *RouteMeta) {
+		meta.Deprecated = deprecated
 	}
 }
 
@@ -367,7 +412,8 @@ func NewRouter(opts ...RouterOption) *Router {
 		routeValidations:  make(map[string]*RouteValidation),
 		validationIndex:   make(map[string][]validationEntry),
 		routeMeta:         make(map[string]RouteMeta),
-		routeCache:        NewRouteCache(100), // Initialize with default cache capacity
+		namedRoutes:       make(map[string]*NamedRoute),
+		routeCache:        NewRouteCache(DefaultCacheCapacity),
 	}
 
 	// Apply options
@@ -513,6 +559,7 @@ func (r *Router) Group(prefix string) *Router {
 		routeValidations:  r.routeValidations,
 		validationIndex:   r.validationIndex,
 		routeMeta:         r.routeMeta,
+		namedRoutes:       r.namedRoutes, // Share named routes with parent
 	}
 }
 
@@ -731,6 +778,8 @@ func (r *Router) AddRouteWithOptions(method, path string, handler Handler, opts 
 // SetRouteMeta sets metadata for a route.
 // This is useful for attaching documentation, tags, or other metadata to routes
 // for API generation, documentation, or monitoring purposes.
+// If the metadata includes a Name, the route will be registered as a named route
+// for reverse URL generation.
 //
 // Parameters:
 //   - method: HTTP method
@@ -752,6 +801,158 @@ func (r *Router) SetRouteMeta(method, path string, meta RouteMeta) {
 	}
 	key := r.routeKey(method, path)
 	r.routeMeta[key] = meta
+
+	// Register named route if name is provided
+	if meta.Name != "" {
+		fullPath := r.fullPath(path)
+		r.registerNamedRoute(meta.Name, method, fullPath)
+	}
+}
+
+// registerNamedRoute registers a named route for reverse URL generation
+func (r *Router) registerNamedRoute(name, method, pattern string) {
+	if r.namedRoutes == nil {
+		r.namedRoutes = make(map[string]*NamedRoute)
+	}
+
+	// Parse parameter positions
+	paramPos := make(map[string]int)
+	parts := strings.Split(strings.Trim(pattern, "/"), "/")
+	pos := 0
+	for _, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			paramPos[part[1:]] = pos
+			pos++
+		} else if strings.HasPrefix(part, "*") {
+			paramPos[part[1:]] = pos
+			pos++
+		}
+	}
+
+	r.namedRoutes[name] = &NamedRoute{
+		Method:   method,
+		Pattern:  pattern,
+		ParamPos: paramPos,
+	}
+}
+
+// URL generates a URL for a named route with the given parameters.
+// Parameters are passed as alternating key-value pairs.
+//
+// Parameters:
+//   - name: The name of the route
+//   - params: Alternating parameter names and values (key1, val1, key2, val2, ...)
+//
+// Returns:
+//   - string: The generated URL, or empty string if route not found
+//
+// Example:
+//
+//	r.Get("/users/:id", getUserHandler, router.WithRouteName("user.show"))
+//	url := r.URL("user.show", "id", "123") // returns "/users/123"
+//
+//	r.Get("/files/*path", fileHandler, router.WithRouteName("files"))
+//	url := r.URL("files", "path", "docs/readme.md") // returns "/files/docs/readme.md"
+func (r *Router) URL(name string, params ...string) string {
+	r.mu.RLock()
+	namedRoute, exists := r.namedRoutes[name]
+	r.mu.RUnlock()
+
+	if !exists {
+		return ""
+	}
+
+	// Build parameter map from variadic arguments
+	paramMap := make(map[string]string)
+	for i := 0; i < len(params)-1; i += 2 {
+		paramMap[params[i]] = params[i+1]
+	}
+
+	// Replace parameters in pattern
+	result := namedRoute.Pattern
+	parts := strings.Split(strings.Trim(result, "/"), "/")
+	resultParts := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			paramName := part[1:]
+			if val, ok := paramMap[paramName]; ok {
+				resultParts = append(resultParts, val)
+			} else {
+				resultParts = append(resultParts, part) // Keep original if not provided
+			}
+		} else if strings.HasPrefix(part, "*") {
+			paramName := part[1:]
+			if val, ok := paramMap[paramName]; ok {
+				resultParts = append(resultParts, val)
+			} else {
+				resultParts = append(resultParts, "") // Empty for wildcard if not provided
+			}
+		} else {
+			resultParts = append(resultParts, part)
+		}
+	}
+
+	return "/" + strings.Join(resultParts, "/")
+}
+
+// URLMust generates a URL for a named route and panics if the route doesn't exist.
+// This is useful during application initialization where missing routes should be fatal.
+//
+// Parameters:
+//   - name: The name of the route
+//   - params: Alternating parameter names and values
+//
+// Returns:
+//   - string: The generated URL
+//
+// Panics:
+//   - If the named route doesn't exist
+func (r *Router) URLMust(name string, params ...string) string {
+	url := r.URL(name, params...)
+	if url == "" {
+		panic(fmt.Sprintf("named route %q not found", name))
+	}
+	return url
+}
+
+// HasRoute checks if a named route exists.
+//
+// Parameters:
+//   - name: The name of the route to check
+//
+// Returns:
+//   - bool: True if the route exists
+func (r *Router) HasRoute(name string) bool {
+	r.mu.RLock()
+	_, exists := r.namedRoutes[name]
+	r.mu.RUnlock()
+	return exists
+}
+
+// NamedRoutes returns a copy of all registered named routes.
+// This is useful for debugging and documentation generation.
+//
+// Returns:
+//   - map[string]*NamedRoute: Copy of all named routes
+func (r *Router) NamedRoutes() map[string]*NamedRoute {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make(map[string]*NamedRoute, len(r.namedRoutes))
+	for k, v := range r.namedRoutes {
+		// Create a copy
+		paramPos := make(map[string]int, len(v.ParamPos))
+		for pk, pv := range v.ParamPos {
+			paramPos[pk] = pv
+		}
+		result[k] = &NamedRoute{
+			Method:   v.Method,
+			Pattern:  v.Pattern,
+			ParamPos: paramPos,
+		}
+	}
+	return result
 }
 
 // Routes returns a snapshot of all registered routes with metadata.
@@ -883,6 +1084,49 @@ func (r *Router) GetMetricsCollector() metrics.MetricsCollector {
 	return r.middlewareManager.metrics
 }
 
+// CacheStats returns statistics about the route cache.
+// This is useful for monitoring cache effectiveness and tuning capacity.
+//
+// Returns:
+//   - CacheStats: Current cache statistics
+//
+// Example:
+//
+//	stats := r.CacheStats()
+//	fmt.Printf("Cache hit rate: %.2f%%\n", stats.HitRate*100)
+//	fmt.Printf("Exact entries: %d, Pattern entries: %d\n",
+//	    stats.ExactEntries, stats.PatternEntries)
+func (r *Router) CacheStats() CacheStats {
+	if r.routeCache == nil {
+		return CacheStats{}
+	}
+	return r.routeCache.Stats()
+}
+
+// ClearCache clears all cached route matching results.
+// This is useful when routes are modified after initial registration
+// or for testing purposes.
+//
+// Example:
+//
+//	r.ClearCache()
+func (r *Router) ClearCache() {
+	if r.routeCache != nil {
+		r.routeCache.Clear()
+	}
+}
+
+// CacheSize returns the current number of cached entries.
+//
+// Returns:
+//   - int: Total number of cached entries (exact + pattern)
+func (r *Router) CacheSize() int {
+	if r.routeCache == nil {
+		return 0
+	}
+	return r.routeCache.Size()
+}
+
 // findChild finds a child node with the given path segment
 func (r *Router) findChild(parent *node, path string) *node {
 	// Check if it's a wildcard segment
@@ -1006,86 +1250,43 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		cachePath = "/" + path
 	}
 
-	// Check route cache first for better performance
-	// Use method and path only, excluding host to allow cache sharing across domains
+	// Check exact route cache first for better performance (no lock needed)
 	cacheKey := req.Method + ":" + cachePath
 	if cachedResult, exists := r.routeCache.Get(cacheKey); exists {
-		// Use cached result without holding the lock
 		r.handleCachedRouteMatch(w, req, cachedResult)
 		return
 	}
 
-	// Acquire read lock for route matching
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	// Find appropriate route tree for the request method
-	tree, found := r.findRouteTree(req.Method)
-	if !found {
-		if r.writeMethodNotAllowed(w, req, path) {
-			return
-		}
-		http.NotFound(w, req)
+	// Check pattern cache for parameterized routes (no lock needed)
+	if cachedResult, paramValues, exists := r.routeCache.GetByPattern(req.Method, cachePath); exists {
+		r.handleCachedPatternMatch(w, req, cachedResult, paramValues)
 		return
 	}
 
-	// Try to match route and handle request
-	r.handleRouteMatch(w, req, tree, path, cacheKey)
-}
-
-// findRouteTree finds the appropriate route tree for the given HTTP method
-func (r *Router) findRouteTree(method string) (*node, bool) {
-	tree := r.trees[method]
-	if tree == nil {
-		tree = r.trees[ANY]
-		if tree == nil {
-			return nil, false
-		}
-	}
-	return tree, true
-}
-
-// normalizePath normalizes the request path by trimming trailing slashes
-func (r *Router) normalizePath(path string) string {
-	if path == "/" || path == "" {
-		return "/"
-	}
-	return strings.Trim(path, "/")
-}
-
-// handleRouteMatch processes the matched route and applies middleware
-func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree *node, path string, cacheKey string) {
-	// Handle root path specially
-	if path == "/" {
-		r.handleRootRequest(w, req, tree, cacheKey)
-		return
-	}
-
-	// Perform route matching for non-root paths
-	parts := strings.Split(path, "/")
-	matcher := NewRouteMatcher(tree)
-	result := matcher.Match(parts)
-	matchedAny := false
-
-	// Try ANY method if specific method didn't match
-	if result == nil && req.Method != ANY {
-		if anyTree := r.trees[ANY]; anyTree != nil {
-			anyMatcher := NewRouteMatcher(anyTree)
-			result = anyMatcher.Match(parts)
-			if result != nil {
-				matchedAny = true
-			}
-		}
-	}
+	// Perform route matching with minimal lock time
+	result, matchedAny := r.matchRoute(req.Method, path)
 
 	if result == nil {
-		if r.writeMethodNotAllowed(w, req, path) {
-			return
+		// Need lock to check methodNotAllowed setting and trees
+		r.mu.RLock()
+		methodNotAllowed := r.methodNotAllowed
+		r.mu.RUnlock()
+
+		if methodNotAllowed {
+			r.mu.RLock()
+			allowed := r.allowedMethods(path)
+			r.mu.RUnlock()
+			if len(allowed) > 0 {
+				w.Header().Set("Allow", strings.Join(allowed, ", "))
+				http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+				return
+			}
 		}
 		http.NotFound(w, req)
 		return
 	}
 
+	// Set route metadata
 	if result.RouteMethod == "" {
 		if matchedAny {
 			result.RouteMethod = ANY
@@ -1105,20 +1306,105 @@ func (r *Router) handleRouteMatch(w http.ResponseWriter, req *http.Request, tree
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
 	// Validate parameters if validations are registered
-	// Use the full path with prefix for validation lookup
 	fullPath := r.prefix + path
 	if params != nil {
 		if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			contract.WriteError(w, req, contract.APIError{
+				Status:   http.StatusBadRequest,
+				Code:     "VALIDATION_ERROR",
+				Message:  err.Error(),
+				Category: contract.CategoryValidation,
+			})
 			return
 		}
 	}
 
-	// Cache the matching result for future requests
-	r.routeCache.Set(cacheKey, result)
+	// Cache the matching result using appropriate strategy
+	if result.RoutePattern != "" && IsParameterized(result.RoutePattern) {
+		r.routeCache.SetPattern(req.Method, result.RoutePattern, result)
+	} else {
+		r.routeCache.Set(cacheKey, result)
+	}
 
+	// No lock needed for middleware execution
 	r.applyMiddlewareAndServe(w, req, params, result)
 }
+
+// matchRoute performs route matching with minimal lock time
+// Returns the match result and whether it matched the ANY method
+func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	// Handle root path specially
+	if path == "/" {
+		tree := r.trees[method]
+		if tree != nil && tree.handler != nil {
+			return &MatchResult{
+				Handler:          tree.handler,
+				RouteMiddlewares: tree.middlewares,
+				RoutePattern:     "/",
+				RouteMethod:      method,
+			}, false
+		}
+		// Try ANY method
+		if method != ANY {
+			if anyTree := r.trees[ANY]; anyTree != nil && anyTree.handler != nil {
+				return &MatchResult{
+					Handler:          anyTree.handler,
+					RouteMiddlewares: anyTree.middlewares,
+					RoutePattern:     "/",
+					RouteMethod:      ANY,
+				}, true
+			}
+		}
+		return nil, false
+	}
+
+	// Find route tree
+	tree := r.trees[method]
+	if tree == nil {
+		tree = r.trees[ANY]
+		if tree == nil {
+			return nil, false
+		}
+	}
+
+	// Use pooled path parts
+	partsPtr := SplitPathToParts(path)
+	parts := *partsPtr
+	defer PutPathParts(partsPtr)
+
+	// Try to match
+	matcher := GetRouteMatcher(tree)
+	result := matcher.Match(parts)
+	PutRouteMatcher(matcher)
+
+	matchedAny := false
+
+	// Try ANY method if specific method didn't match
+	if result == nil && method != ANY {
+		if anyTree := r.trees[ANY]; anyTree != nil {
+			anyMatcher := GetRouteMatcher(anyTree)
+			result = anyMatcher.Match(parts)
+			PutRouteMatcher(anyMatcher)
+			if result != nil {
+				matchedAny = true
+			}
+		}
+	}
+
+	return result, matchedAny
+}
+
+// normalizePath normalizes the request path by trimming trailing slashes
+func (r *Router) normalizePath(path string) string {
+	if path == "/" || path == "" {
+		return "/"
+	}
+	return strings.Trim(path, "/")
+}
+
 
 // handleCachedRouteMatch handles requests using cached route matching results
 func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request, result *MatchResult) {
@@ -1142,7 +1428,12 @@ func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request
 		path := r.normalizePath(req.URL.Path)
 		fullPath := r.prefix + path
 		if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			contract.WriteError(w, req, contract.APIError{
+				Status:   http.StatusBadRequest,
+				Code:     "VALIDATION_ERROR",
+				Message:  err.Error(),
+				Category: contract.CategoryValidation,
+			})
 			return
 		}
 	}
@@ -1150,44 +1441,27 @@ func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request
 	r.applyMiddlewareAndServe(w, req, params, result)
 }
 
-// handleRootRequest handles requests to the root path "/"
-func (r *Router) handleRootRequest(w http.ResponseWriter, req *http.Request, tree *node, cacheKey string) {
-	if tree.handler != nil {
-		// Create a MatchResult for the root path with direct middleware slice
-		result := &MatchResult{
-			Handler:          tree.handler,
-			ParamValues:      nil,
-			ParamKeys:        nil,
-			RouteMiddlewares: tree.middlewares,
-			RoutePattern:     "/",
-			RouteMethod:      req.Method,
-		}
+// handleCachedPatternMatch handles requests using cached pattern matching results
+func (r *Router) handleCachedPatternMatch(w http.ResponseWriter, req *http.Request, result *MatchResult, paramValues []string) {
+	// Build parameter map using cached keys and extracted values
+	params := r.buildParamMap(paramValues, result.ParamKeys)
 
-		// Cache the result for future requests
-		r.routeCache.Set(cacheKey, result)
-
-		r.applyMiddlewareAndServe(w, req, nil, result)
-		return
-	}
-	if req.Method != ANY {
-		if anyTree := r.trees[ANY]; anyTree != nil && anyTree.handler != nil {
-			result := &MatchResult{
-				Handler:          anyTree.handler,
-				ParamValues:      nil,
-				ParamKeys:        nil,
-				RouteMiddlewares: anyTree.middlewares,
-				RoutePattern:     "/",
-				RouteMethod:      ANY,
-			}
-			r.routeCache.Set(cacheKey, result)
-			r.applyMiddlewareAndServe(w, req, nil, result)
+	// Validate parameters if validations are registered
+	if params != nil {
+		path := r.normalizePath(req.URL.Path)
+		fullPath := r.prefix + path
+		if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
+			contract.WriteError(w, req, contract.APIError{
+				Status:   http.StatusBadRequest,
+				Code:     "VALIDATION_ERROR",
+				Message:  err.Error(),
+				Category: contract.CategoryValidation,
+			})
 			return
 		}
 	}
-	if r.writeMethodNotAllowed(w, req, "/") {
-		return
-	}
-	http.NotFound(w, req)
+
+	r.applyMiddlewareAndServe(w, req, params, result)
 }
 
 // buildParamMap creates a parameter map from values and keys
@@ -1275,45 +1549,40 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	wrappedHandler.ServeHTTP(w, reqWithParams)
 }
 
-func (r *Router) writeMethodNotAllowed(w http.ResponseWriter, _ *http.Request, path string) bool {
-	if !r.methodNotAllowed {
-		return false
-	}
-	allowed := r.allowedMethods(path)
-	if len(allowed) == 0 {
-		return false
-	}
-	w.Header().Set("Allow", strings.Join(allowed, ", "))
-	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-	return true
-}
-
 func (r *Router) allowedMethods(path string) []string {
 	normalized := path
 	if normalized == "" {
 		normalized = "/"
 	}
 
-	var parts []string
-	if normalized != "/" {
-		parts = strings.Split(strings.Trim(normalized, "/"), "/")
-	}
+	allowed := make([]string, 0, len(r.trees))
 
-	allowed := make([]string, 0)
-	for method, tree := range r.trees {
-		if method == ANY || tree == nil {
-			continue
-		}
-		if normalized == "/" {
+	if normalized == "/" {
+		for method, tree := range r.trees {
+			if method == ANY || tree == nil {
+				continue
+			}
 			if tree.handler != nil {
 				allowed = append(allowed, method)
 			}
-			continue
 		}
-		matcher := NewRouteMatcher(tree)
-		if matcher.Match(parts) != nil {
-			allowed = append(allowed, method)
+	} else {
+		// Use pooled path parts
+		partsPtr := SplitPathToParts(normalized)
+		parts := *partsPtr
+
+		for method, tree := range r.trees {
+			if method == ANY || tree == nil {
+				continue
+			}
+			matcher := GetRouteMatcher(tree)
+			if matcher.Match(parts) != nil {
+				allowed = append(allowed, method)
+			}
+			PutRouteMatcher(matcher)
 		}
+
+		PutPathParts(partsPtr)
 	}
 
 	if len(allowed) > 1 {

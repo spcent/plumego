@@ -120,16 +120,180 @@ var (
 		pattern: regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`),
 	}
 
-	// UUIDValidator validates UUID format
+	// UUIDValidator validates UUID format (case insensitive)
 	UUIDValidator = &RegexValidator{
-		pattern: regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`),
+		pattern: regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`),
 	}
 
 	// PositiveIntValidator validates positive integers
 	PositiveIntValidator = &RegexValidator{
 		pattern: regexp.MustCompile(`^[1-9]\d*$`),
 	}
+
+	// SlugValidator validates URL slugs (lowercase alphanumeric with hyphens)
+	SlugValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`),
+	}
+
+	// AlphanumericValidator validates alphanumeric strings
+	AlphanumericValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^[a-zA-Z0-9]+$`),
+	}
+
+	// AlphaValidator validates alphabetic strings only
+	AlphaValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^[a-zA-Z]+$`),
+	}
+
+	// NumericValidator validates numeric strings (including negative and decimals)
+	NumericValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^-?\d+(\.\d+)?$`),
+	}
+
+	// IntegerValidator validates integer strings (including negative)
+	IntegerValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^-?\d+$`),
+	}
+
+	// HexColorValidator validates hex color codes (with or without #)
+	HexColorValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`),
+	}
+
+	// IPv4Validator validates IPv4 addresses
+	IPv4Validator = &RegexValidator{
+		pattern: regexp.MustCompile(`^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`),
+	}
+
+	// IPv6Validator validates IPv6 addresses (simplified)
+	IPv6Validator = &RegexValidator{
+		pattern: regexp.MustCompile(`^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}$|^(?:[0-9a-fA-F]{1,4}:){1,7}:$`),
+	}
+
+	// DateValidator validates ISO 8601 date format (YYYY-MM-DD)
+	DateValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$`),
+	}
+
+	// TimeValidator validates time format (HH:MM or HH:MM:SS)
+	TimeValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$`),
+	}
+
+	// DateTimeValidator validates ISO 8601 datetime format
+	DateTimeValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)?$`),
+	}
+
+	// PhoneValidator validates phone numbers (international format)
+	PhoneValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^\+?[1-9]\d{1,14}$`),
+	}
+
+	// UsernameValidator validates usernames (alphanumeric with underscores, 3-20 chars)
+	UsernameValidator = &CompositeValidator{
+		validators: []ParamValidator{
+			NewLengthValidator(3, 20),
+			&RegexValidator{pattern: regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)},
+		},
+	}
+
+	// Base64Validator validates base64 encoded strings
+	Base64Validator = &RegexValidator{
+		pattern: regexp.MustCompile(`^[A-Za-z0-9+/]*={0,2}$`),
+	}
+
+	// URLPathValidator validates URL path segments (no special characters)
+	URLPathValidator = &RegexValidator{
+		pattern: regexp.MustCompile(`^[a-zA-Z0-9._~:/?#\[\]@!$&'()*+,;=-]*$`),
+	}
 )
+
+// CompositeValidator combines multiple validators
+type CompositeValidator struct {
+	validators []ParamValidator
+}
+
+// NewCompositeValidator creates a new composite validator
+func NewCompositeValidator(validators ...ParamValidator) *CompositeValidator {
+	return &CompositeValidator{validators: validators}
+}
+
+// Validate checks all validators in sequence
+func (cv *CompositeValidator) Validate(name, value string) error {
+	for _, v := range cv.validators {
+		if err := v.Validate(name, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// EnumValidator validates that a value is one of the allowed values
+type EnumValidator struct {
+	allowed map[string]bool
+	values  []string // For error message
+}
+
+// NewEnumValidator creates a new enum validator
+func NewEnumValidator(values ...string) *EnumValidator {
+	allowed := make(map[string]bool, len(values))
+	for _, v := range values {
+		allowed[v] = true
+	}
+	return &EnumValidator{allowed: allowed, values: values}
+}
+
+// Validate checks if the value is one of the allowed values
+func (ev *EnumValidator) Validate(name, value string) error {
+	if !ev.allowed[value] {
+		return fmt.Errorf("parameter %s value %q is not one of: %s", name, value, strings.Join(ev.values, ", "))
+	}
+	return nil
+}
+
+// NotEmptyValidator validates that a value is not empty
+type NotEmptyValidator struct{}
+
+// Validate checks if the value is not empty
+func (nv *NotEmptyValidator) Validate(name, value string) error {
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf("parameter %s cannot be empty", name)
+	}
+	return nil
+}
+
+// NotEmpty is a predefined not-empty validator
+var NotEmpty = &NotEmptyValidator{}
+
+// CustomValidator wraps a custom validation function
+type CustomValidator struct {
+	fn      func(name, value string) error
+	message string
+}
+
+// NewCustomValidator creates a new custom validator
+func NewCustomValidator(fn func(name, value string) error) *CustomValidator {
+	return &CustomValidator{fn: fn}
+}
+
+// NewCustomValidatorWithMessage creates a new custom validator with error message
+func NewCustomValidatorWithMessage(fn func(value string) bool, message string) *CustomValidator {
+	return &CustomValidator{
+		fn: func(name, value string) error {
+			if !fn(value) {
+				return fmt.Errorf("parameter %s: %s", name, message)
+			}
+			return nil
+		},
+		message: message,
+	}
+}
+
+// Validate runs the custom validation function
+func (cv *CustomValidator) Validate(name, value string) error {
+	return cv.fn(name, value)
+}
 
 // WithValidation creates a router option that enables route validation
 func WithValidation(validations map[string]*RouteValidation) RouterOption {
