@@ -1,0 +1,165 @@
+# Complete Database Sharding Configuration Example
+
+# Database Shards
+shards:
+  # Shard 0 - Primary + Replicas
+  - name: shard0
+    primary:
+      driver: mysql
+      host: db0-primary.example.com
+      port: 3306
+      database: app_shard0
+      username: app_user
+      password: "${DB_PASSWORD}"  # Use environment variable
+      max_open_conns: 100
+      max_idle_conns: 10
+      conn_max_lifetime: 30m
+      conn_max_idle_time: 5m
+
+    replicas:
+      - driver: mysql
+        host: db0-replica1.example.com
+        port: 3306
+        database: app_shard0
+        username: app_user
+        password: "${DB_PASSWORD}"
+        max_open_conns: 50
+        max_idle_conns: 5
+
+      - driver: mysql
+        host: db0-replica2.example.com
+        port: 3306
+        database: app_shard0
+        username: app_user
+        password: "${DB_PASSWORD}"
+        max_open_conns: 50
+        max_idle_conns: 5
+
+    # Load balancing weights for replicas
+    replica_weights: [60, 40]  # 60% to replica1, 40% to replica2
+
+    # Fallback to primary if all replicas fail
+    fallback_to_primary: true
+
+    # Health check configuration
+    health_check:
+      enabled: true
+      interval: 30s
+      timeout: 5s
+      failure_threshold: 3
+      recovery_threshold: 2
+
+  # Shard 1
+  - name: shard1
+    primary:
+      driver: mysql
+      host: db1-primary.example.com
+      port: 3306
+      database: app_shard1
+      username: app_user
+      password: "${DB_PASSWORD}"
+      max_open_conns: 100
+      max_idle_conns: 10
+      conn_max_lifetime: 30m
+      conn_max_idle_time: 5m
+
+    replicas:
+      - driver: mysql
+        host: db1-replica1.example.com
+        port: 3306
+        database: app_shard1
+        username: app_user
+        password: "${DB_PASSWORD}"
+
+    replica_weights: [100]
+    fallback_to_primary: true
+
+    health_check:
+      enabled: true
+      interval: 30s
+      timeout: 5s
+      failure_threshold: 3
+      recovery_threshold: 2
+
+# Sharding Rules
+sharding_rules:
+  # Users table - Mod strategy
+  - table_name: users
+    shard_key_column: user_id
+    strategy: mod
+    actual_table_names:
+      0: users_0
+      1: users_1
+    default_shard: -1
+
+  # Orders table - Hash strategy
+  - table_name: orders
+    shard_key_column: user_id
+    strategy: hash
+    actual_table_names:
+      0: orders_0
+      1: orders_1
+    default_shard: -1
+
+  # Events table - Range strategy (time-based)
+  - table_name: events
+    shard_key_column: created_at
+    strategy: range
+    strategy_config:
+      ranges:
+        - start: 0
+          end: 1672531200  # 2023-01-01 00:00:00 UTC
+          shard: 0
+        - start: 1672531200
+          end: 9999999999
+          shard: 1
+    actual_table_names:
+      0: events_2022
+      1: events_2023
+    default_shard: 1
+
+  # Regions table - List strategy (geographic)
+  - table_name: regions
+    shard_key_column: region_code
+    strategy: list
+    strategy_config:
+      mapping:
+        US: 0
+        CA: 0
+        EU: 1
+        UK: 1
+        ASIA: 1
+      default_shard: 0
+    actual_table_names:
+      0: regions_americas
+      1: regions_emea_apac
+
+  # Products table - Mod strategy
+  - table_name: products
+    shard_key_column: product_id
+    strategy: mod
+    actual_table_names:
+      0: products_0
+      1: products_1
+
+# Global Settings
+
+# Cross-shard query policy
+# - deny: Reject queries that span multiple shards (default, safest)
+# - first: Execute on first matched shard only
+# - all: Execute on all shards and merge results (expensive)
+cross_shard_policy: deny
+
+# Default shard index when routing fails
+# -1 = no default (return error)
+# 0+ = use specified shard
+default_shard_index: -1
+
+# Enable Prometheus metrics collection
+enable_metrics: true
+
+# Enable OpenTelemetry distributed tracing
+enable_tracing: false
+
+# Logging level: debug, info, warn, error
+log_level: info

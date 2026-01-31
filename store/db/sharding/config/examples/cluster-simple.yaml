@@ -1,0 +1,38 @@
+# Minimal Database Sharding Configuration
+
+shards:
+  - name: shard0
+    primary:
+      driver: mysql
+      host: localhost
+      port: 3306
+      database: app_shard0
+      username: root
+      password: password
+
+  - name: shard1
+    primary:
+      driver: mysql
+      host: localhost
+      port: 3306
+      database: app_shard1
+      username: root
+      password: password
+
+sharding_rules:
+  - table_name: users
+    shard_key_column: user_id
+    strategy: mod
+    actual_table_names:
+      0: users_0
+      1: users_1
+
+  - table_name: orders
+    shard_key_column: user_id
+    strategy: mod
+    actual_table_names:
+      0: orders_0
+      1: orders_1
+
+cross_shard_policy: deny
+log_level: info
