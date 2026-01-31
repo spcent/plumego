@@ -1,0 +1,130 @@
+{
+  "shards": [
+    {
+      "name": "shard0",
+      "primary": {
+        "driver": "mysql",
+        "host": "db0-primary.example.com",
+        "port": 3306,
+        "database": "app_shard0",
+        "username": "app_user",
+        "password": "secret",
+        "max_open_conns": 100,
+        "max_idle_conns": 10,
+        "conn_max_lifetime": "30m",
+        "conn_max_idle_time": "5m"
+      },
+      "replicas": [
+        {
+          "driver": "mysql",
+          "host": "db0-replica1.example.com",
+          "port": 3306,
+          "database": "app_shard0",
+          "username": "app_user",
+          "password": "secret",
+          "max_open_conns": 50,
+          "max_idle_conns": 5
+        }
+      ],
+      "replica_weights": [100],
+      "fallback_to_primary": true,
+      "health_check": {
+        "enabled": true,
+        "interval": "30s",
+        "timeout": "5s",
+        "failure_threshold": 3,
+        "recovery_threshold": 2
+      }
+    },
+    {
+      "name": "shard1",
+      "primary": {
+        "driver": "mysql",
+        "host": "db1-primary.example.com",
+        "port": 3306,
+        "database": "app_shard1",
+        "username": "app_user",
+        "password": "secret",
+        "max_open_conns": 100,
+        "max_idle_conns": 10,
+        "conn_max_lifetime": "30m",
+        "conn_max_idle_time": "5m"
+      },
+      "health_check": {
+        "enabled": true,
+        "interval": "30s",
+        "timeout": "5s",
+        "failure_threshold": 3,
+        "recovery_threshold": 2
+      }
+    }
+  ],
+  "sharding_rules": [
+    {
+      "table_name": "users",
+      "shard_key_column": "user_id",
+      "strategy": "mod",
+      "actual_table_names": {
+        "0": "users_0",
+        "1": "users_1"
+      },
+      "default_shard": -1
+    },
+    {
+      "table_name": "orders",
+      "shard_key_column": "user_id",
+      "strategy": "hash",
+      "actual_table_names": {
+        "0": "orders_0",
+        "1": "orders_1"
+      },
+      "default_shard": -1
+    },
+    {
+      "table_name": "events",
+      "shard_key_column": "created_at",
+      "strategy": "range",
+      "strategy_config": {
+        "ranges": [
+          {
+            "start": 0,
+            "end": 1672531200,
+            "shard": 0
+          },
+          {
+            "start": 1672531200,
+            "end": 9999999999,
+            "shard": 1
+          }
+        ]
+      },
+      "actual_table_names": {
+        "0": "events_2022",
+        "1": "events_2023"
+      },
+      "default_shard": 1
+    },
+    {
+      "table_name": "regions",
+      "shard_key_column": "region_code",
+      "strategy": "list",
+      "strategy_config": {
+        "mapping": {
+          "US": 0,
+          "EU": 1,
+          "ASIA": 1
+        },
+        "default_shard": 0
+      },
+      "actual_table_names": {
+        "0": "regions_americas",
+        "1": "regions_emea_apac"
+      }
+    }
+  ],
+  "cross_shard_policy": "deny",
+  "default_shard_index": -1,
+  "enable_metrics": true,
+  "enable_tracing": false,
+  "log_level": "info"
+}
