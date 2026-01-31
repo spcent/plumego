@@ -9,28 +9,20 @@ import (
 
 func TestNewConfigWatcher(t *testing.T) {
 	// Create temp config file
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()
@@ -55,28 +47,20 @@ log_level: info
 }
 
 func TestConfigWatcher_WithOptions(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()
@@ -102,29 +86,21 @@ log_level: info
 }
 
 func TestConfigWatcher_Reload(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
 	// Initial config
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()
@@ -143,22 +119,14 @@ log_level: info
 	// Update config file
 	time.Sleep(10 * time.Millisecond) // Ensure different mtime
 
-	newYamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: all
-log_level: debug
-`)
+	newJsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "all",
+		"log_level": "debug"
+	}`)
 
-	if err := os.WriteFile(tmpfile.Name(), newYamlData, 0644); err != nil {
+	if err := os.WriteFile(tmpfile.Name(), newJsonData, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -179,28 +147,20 @@ log_level: debug
 }
 
 func TestConfigWatcher_OnChange(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()
@@ -222,22 +182,14 @@ log_level: info
 	// Update config file
 	time.Sleep(10 * time.Millisecond)
 
-	newYamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: all
-log_level: info
-`)
+	newJsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "all",
+		"log_level": "info"
+	}`)
 
-	if err := os.WriteFile(tmpfile.Name(), newYamlData, 0644); err != nil {
+	if err := os.WriteFile(tmpfile.Name(), newJsonData, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -261,28 +213,20 @@ log_level: info
 }
 
 func TestConfigWatcher_AddOnChange(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()
@@ -299,22 +243,14 @@ log_level: info
 
 	// Update and reload
 	time.Sleep(10 * time.Millisecond)
-	newYamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: all
-log_level: info
-`)
+	newJsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "all",
+		"log_level": "info"
+	}`)
 
-	if err := os.WriteFile(tmpfile.Name(), newYamlData, 0644); err != nil {
+	if err := os.WriteFile(tmpfile.Name(), newJsonData, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -328,28 +264,20 @@ log_level: info
 }
 
 func TestConfigWatcher_Start(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()
@@ -378,22 +306,14 @@ log_level: info
 	time.Sleep(50 * time.Millisecond)
 
 	// Update config file
-	newYamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: all
-log_level: info
-`)
+	newJsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "all",
+		"log_level": "info"
+	}`)
 
-	if err := os.WriteFile(tmpfile.Name(), newYamlData, 0644); err != nil {
+	if err := os.WriteFile(tmpfile.Name(), newJsonData, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -417,28 +337,20 @@ log_level: info
 }
 
 func TestConfigWatcher_Stop(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()
@@ -464,28 +376,20 @@ log_level: info
 }
 
 func TestConfigReloader(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()
@@ -509,27 +413,17 @@ log_level: info
 
 	// Update config
 	time.Sleep(10 * time.Millisecond)
-	newYamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-  - name: shard1
-    primary:
-      driver: mysql
-      host: localhost
-      database: test2
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	newJsonData := []byte(`{
+		"shards": [
+			{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}},
+			{"name": "shard1", "primary": {"driver": "mysql", "host": "localhost", "database": "test2"}}
+		],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if err := os.WriteFile(tmpfile.Name(), newYamlData, 0644); err != nil {
+	if err := os.WriteFile(tmpfile.Name(), newJsonData, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -551,28 +445,20 @@ log_level: info
 }
 
 func BenchmarkConfigWatcher_Get(b *testing.B) {
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
 
-	if _, err := tmpfile.Write(yamlData); err != nil {
+	if _, err := tmpfile.Write(jsonData); err != nil {
 		b.Fatal(err)
 	}
 	tmpfile.Close()

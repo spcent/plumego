@@ -414,44 +414,6 @@ func TestLoadFromJSON(t *testing.T) {
 	}
 }
 
-func TestLoadFromYAML(t *testing.T) {
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
-
-	config, err := LoadFromYAML(yamlData)
-	if err != nil {
-		t.Fatalf("failed to load YAML: %v", err)
-	}
-
-	if len(config.Shards) != 1 {
-		t.Errorf("expected 1 shard, got %d", len(config.Shards))
-	}
-
-	if config.Shards[0].Name != "shard0" {
-		t.Errorf("expected shard name 'shard0', got %s", config.Shards[0].Name)
-	}
-
-	if len(config.ShardingRules) != 1 {
-		t.Errorf("expected 1 sharding rule, got %d", len(config.ShardingRules))
-	}
-
-	if config.ShardingRules[0].TableName != "users" {
-		t.Errorf("expected table name 'users', got %s", config.ShardingRules[0].TableName)
-	}
-}
-
 func TestLoadFromFile_JSON(t *testing.T) {
 	// Create temp JSON file
 	tmpfile, err := os.CreateTemp("", "config*.json")
@@ -468,44 +430,6 @@ func TestLoadFromFile_JSON(t *testing.T) {
 	}`)
 
 	if _, err := tmpfile.Write(jsonData); err != nil {
-		t.Fatal(err)
-	}
-	tmpfile.Close()
-
-	config, err := LoadFromFile(tmpfile.Name())
-	if err != nil {
-		t.Fatalf("failed to load from file: %v", err)
-	}
-
-	if len(config.Shards) != 1 {
-		t.Errorf("expected 1 shard, got %d", len(config.Shards))
-	}
-}
-
-func TestLoadFromFile_YAML(t *testing.T) {
-	// Create temp YAML file
-	tmpfile, err := os.CreateTemp("", "config*.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tmpfile.Name())
-
-	yamlData := []byte(`
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: localhost
-      database: test
-sharding_rules:
-  - table_name: users
-    shard_key_column: id
-    strategy: mod
-cross_shard_policy: deny
-log_level: info
-`)
-
-	if _, err := tmpfile.Write(yamlData); err != nil {
 		t.Fatal(err)
 	}
 	tmpfile.Close()

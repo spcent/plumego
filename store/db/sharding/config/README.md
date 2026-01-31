@@ -1,104 +1,17 @@
 # Database Sharding Configuration
 
-This package provides configuration management for the database sharding system, including JSON/YAML file loading, environment variable support, and hot reload functionality.
+This package provides configuration management for the database sharding system, including JSON file loading, environment variable support, and hot reload functionality.
 
 ## Features
 
-- **Multiple Format Support**: Load configuration from JSON or YAML files
+- **JSON Configuration**: Load configuration from JSON files
 - **Environment Variables**: Override configuration with environment variables
 - **Hot Reload**: Watch configuration files for changes and reload automatically
 - **Validation**: Comprehensive validation of all configuration fields
 - **DSN Building**: Automatic DSN construction for MySQL, PostgreSQL, and SQLite
+- **Zero Dependencies**: No external dependencies, uses only Go standard library
 
-## Configuration File Formats
-
-### YAML Format (Recommended)
-
-```yaml
-# Database shards
-shards:
-  - name: shard0
-    primary:
-      driver: mysql
-      host: db0.example.com
-      port: 3306
-      database: app_shard0
-      username: app_user
-      password: secret
-      max_open_conns: 100
-      max_idle_conns: 10
-      conn_max_lifetime: 30m
-      conn_max_idle_time: 5m
-    replicas:
-      - driver: mysql
-        host: db0-replica.example.com
-        port: 3306
-        database: app_shard0
-        username: app_user
-        password: secret
-    replica_weights: [1]
-    fallback_to_primary: true
-    health_check:
-      enabled: true
-      interval: 30s
-      timeout: 5s
-      failure_threshold: 3
-      recovery_threshold: 2
-
-  - name: shard1
-    primary:
-      driver: mysql
-      host: db1.example.com
-      port: 3306
-      database: app_shard1
-      username: app_user
-      password: secret
-
-# Sharding rules
-sharding_rules:
-  - table_name: users
-    shard_key_column: user_id
-    strategy: mod
-    actual_table_names:
-      0: users_0
-      1: users_1
-    default_shard: -1
-
-  - table_name: orders
-    shard_key_column: user_id
-    strategy: hash
-    actual_table_names:
-      0: orders_0
-      1: orders_1
-
-  - table_name: events
-    shard_key_column: created_at
-    strategy: range
-    strategy_config:
-      ranges:
-        - start: 0
-          end: 1000000
-          shard: 0
-        - start: 1000000
-          end: 2000000
-          shard: 1
-
-  - table_name: regions
-    shard_key_column: region_code
-    strategy: list
-    strategy_config:
-      mapping:
-        US: 0
-        EU: 1
-      default_shard: 0
-
-# Global settings
-cross_shard_policy: deny  # deny, first, or all
-default_shard_index: -1   # -1 to disable
-enable_metrics: true
-enable_tracing: false
-log_level: info  # debug, info, warn, error
-```
+## Configuration File Format
 
 ### JSON Format
 
@@ -113,7 +26,30 @@ log_level: info  # debug, info, warn, error
         "port": 3306,
         "database": "app_shard0",
         "username": "app_user",
-        "password": "secret"
+        "password": "secret",
+        "max_open_conns": 100,
+        "max_idle_conns": 10,
+        "conn_max_lifetime": "30m",
+        "conn_max_idle_time": "5m"
+      },
+      "replicas": [
+        {
+          "driver": "mysql",
+          "host": "db0-replica.example.com",
+          "port": 3306,
+          "database": "app_shard0",
+          "username": "app_user",
+          "password": "secret"
+        }
+      ],
+      "replica_weights": [1],
+      "fallback_to_primary": true,
+      "health_check": {
+        "enabled": true,
+        "interval": "30s",
+        "timeout": "5s",
+        "failure_threshold": 3,
+        "recovery_threshold": 2
       }
     }
   ],
@@ -125,10 +61,45 @@ log_level: info  # debug, info, warn, error
       "actual_table_names": {
         "0": "users_0",
         "1": "users_1"
+      },
+      "default_shard": -1
+    },
+    {
+      "table_name": "events",
+      "shard_key_column": "created_at",
+      "strategy": "range",
+      "strategy_config": {
+        "ranges": [
+          {
+            "start": 0,
+            "end": 1000000,
+            "shard": 0
+          },
+          {
+            "start": 1000000,
+            "end": 2000000,
+            "shard": 1
+          }
+        ]
+      }
+    },
+    {
+      "table_name": "regions",
+      "shard_key_column": "region_code",
+      "strategy": "list",
+      "strategy_config": {
+        "mapping": {
+          "US": 0,
+          "EU": 1
+        },
+        "default_shard": 0
       }
     }
   ],
   "cross_shard_policy": "deny",
+  "default_shard_index": -1,
+  "enable_metrics": true,
+  "enable_tracing": false,
   "log_level": "info"
 }
 ```
@@ -200,25 +171,29 @@ log_level: info  # debug, info, warn, error
 ### Strategy Configuration
 
 For **range** strategy:
-```yaml
-strategy_config:
-  ranges:
-    - start: 0
-      end: 1000
-      shard: 0
-    - start: 1000
-      end: 2000
-      shard: 1
+```json
+{
+  "strategy_config": {
+    "ranges": [
+      {"start": 0, "end": 1000, "shard": 0},
+      {"start": 1000, "end": 2000, "shard": 1}
+    ]
+  }
+}
 ```
 
 For **list** strategy:
-```yaml
-strategy_config:
-  mapping:
-    US: 0
-    EU: 1
-    ASIA: 2
-  default_shard: 0
+```json
+{
+  "strategy_config": {
+    "mapping": {
+      "US": 0,
+      "EU": 1,
+      "ASIA": 2
+    },
+    "default_shard": 0
+  }
+}
 ```
 
 ## Environment Variables
@@ -246,7 +221,7 @@ import (
 
 func main() {
     // Load configuration from file
-    cfg, err := config.LoadFromFile("sharding.yaml")
+    cfg, err := config.LoadFromFile("sharding.json")
     if err != nil {
         panic(err)
     }
@@ -276,7 +251,7 @@ import (
 func main() {
     // Create config watcher
     watcher, err := config.NewConfigWatcher(
-        "sharding.yaml",
+        "sharding.json",
         config.WithWatchInterval(5*time.Second),
         config.WithOnChange(func(cfg *config.ShardingConfig) {
             log.Printf("Configuration reloaded: %d shards", len(cfg.Shards))
@@ -316,7 +291,7 @@ import (
 func main() {
     // Create reloader
     reloader, err := config.NewConfigReloader(
-        "sharding.yaml",
+        "sharding.json",
         config.WithWatchInterval(10*time.Second),
     )
     if err != nil {
@@ -349,21 +324,18 @@ func main() {
 }
 ```
 
-### Loading Different Formats
+### Loading Configuration
 
 ```go
-// Auto-detect format (JSON or YAML)
-cfg, err := config.LoadFromFile("config.yaml")
-
-// Explicitly load JSON
+// Load from JSON file
 cfg, err := config.LoadFromJSONFile("config.json")
 
-// Explicitly load YAML
-cfg, err := config.LoadFromYAMLFile("config.yaml")
-
-// Load from bytes
+// Load from JSON bytes
 data := []byte(`{"shards": [...]}`)
 cfg, err := config.LoadFromJSON(data)
+
+// LoadFromFile is an alias for LoadFromJSONFile
+cfg, err := config.LoadFromFile("config.json")
 ```
 
 ## DSN Building
@@ -371,37 +343,45 @@ cfg, err := config.LoadFromJSON(data)
 The package automatically builds DSNs for different database drivers:
 
 ### MySQL
-```yaml
-driver: mysql
-host: localhost
-port: 3306
-database: mydb
-username: user
-password: pass
+```json
+{
+  "driver": "mysql",
+  "host": "localhost",
+  "port": 3306,
+  "database": "mydb",
+  "username": "user",
+  "password": "pass"
+}
 ```
 Generates: `user:pass@tcp(localhost:3306)/mydb`
 
 ### PostgreSQL
-```yaml
-driver: postgres
-host: localhost
-port: 5432
-database: mydb
-username: user
-password: pass
+```json
+{
+  "driver": "postgres",
+  "host": "localhost",
+  "port": 5432,
+  "database": "mydb",
+  "username": "user",
+  "password": "pass"
+}
 ```
 Generates: `host=localhost port=5432 dbname=mydb user=user password=pass sslmode=disable`
 
 ### SQLite
-```yaml
-driver: sqlite3
-database: /path/to/db.sqlite
+```json
+{
+  "driver": "sqlite3",
+  "database": "/path/to/db.sqlite"
+}
 ```
 Generates: `/path/to/db.sqlite`
 
 ### Custom DSN
-```yaml
-dsn: "custom://connection/string"
+```json
+{
+  "dsn": "custom://connection/string"
+}
 ```
 Uses the provided DSN directly, ignoring other fields.
 
@@ -422,18 +402,17 @@ Validation errors are returned with context about which field failed.
 
 ## Best Practices
 
-1. **Use YAML for readability**: YAML is easier to read and maintain than JSON
-2. **Version control your config**: Keep configuration files in version control
-3. **Environment-specific configs**: Use different files for dev/staging/prod
-4. **Environment variables for secrets**: Override passwords and secrets via env vars
-5. **Enable health checks**: Always enable health checks in production
-6. **Set connection limits**: Configure `max_open_conns` and `max_idle_conns`
-7. **Use hot reload in production**: Enable automatic configuration reloading
-8. **Monitor metrics**: Enable metrics and integrate with Prometheus
+1. **Version control your config**: Keep configuration files in version control
+2. **Environment-specific configs**: Use different files for dev/staging/prod
+3. **Environment variables for secrets**: Override passwords and secrets via env vars
+4. **Enable health checks**: Always enable health checks in production
+5. **Set connection limits**: Configure `max_open_conns` and `max_idle_conns`
+6. **Use hot reload in production**: Enable automatic configuration reloading
+7. **Monitor metrics**: Enable metrics and integrate with Prometheus
+8. **Validate before deploy**: Use `Validate()` method to check configuration
 
 ## Examples
 
 See the `examples/` directory for complete configuration examples:
-- `cluster.yaml` - Full production configuration
-- `cluster-simple.yaml` - Minimal configuration
-- `cluster.json` - JSON format example
+- `cluster.json` - Full production configuration
+- `cluster-simple.json` - Minimal configuration

@@ -7,152 +7,150 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 // ShardingConfig represents the complete sharding configuration
 type ShardingConfig struct {
 	// Shards is the list of database shards
-	Shards []ShardConfig `json:"shards" yaml:"shards"`
+	Shards []ShardConfig `json:"shards"`
 
 	// ShardingRules defines how tables are sharded
-	ShardingRules []ShardingRuleConfig `json:"sharding_rules" yaml:"sharding_rules"`
+	ShardingRules []ShardingRuleConfig `json:"sharding_rules"`
 
 	// CrossShardPolicy determines how cross-shard queries are handled
-	CrossShardPolicy string `json:"cross_shard_policy" yaml:"cross_shard_policy"`
+	CrossShardPolicy string `json:"cross_shard_policy"`
 
 	// DefaultShardIndex is the default shard when routing fails (-1 to disable)
-	DefaultShardIndex int `json:"default_shard_index" yaml:"default_shard_index"`
+	DefaultShardIndex int `json:"default_shard_index"`
 
 	// EnableMetrics enables metrics collection
-	EnableMetrics bool `json:"enable_metrics" yaml:"enable_metrics"`
+	EnableMetrics bool `json:"enable_metrics"`
 
 	// EnableTracing enables distributed tracing
-	EnableTracing bool `json:"enable_tracing" yaml:"enable_tracing"`
+	EnableTracing bool `json:"enable_tracing"`
 
 	// LogLevel sets the logging level (debug, info, warn, error)
-	LogLevel string `json:"log_level" yaml:"log_level"`
+	LogLevel string `json:"log_level"`
 }
 
 // ShardConfig represents a single database shard configuration
 type ShardConfig struct {
 	// Name is the shard identifier
-	Name string `json:"name" yaml:"name"`
+	Name string `json:"name"`
 
 	// Primary is the primary database configuration
-	Primary DatabaseConfig `json:"primary" yaml:"primary"`
+	Primary DatabaseConfig `json:"primary"`
 
 	// Replicas are the read replica configurations
-	Replicas []DatabaseConfig `json:"replicas" yaml:"replicas"`
+	Replicas []DatabaseConfig `json:"replicas"`
 
 	// ReplicaWeights for load balancing (optional)
-	ReplicaWeights []int `json:"replica_weights" yaml:"replica_weights"`
+	ReplicaWeights []int `json:"replica_weights"`
 
 	// FallbackToPrimary when all replicas are down
-	FallbackToPrimary bool `json:"fallback_to_primary" yaml:"fallback_to_primary"`
+	FallbackToPrimary bool `json:"fallback_to_primary"`
 
 	// HealthCheck configuration
-	HealthCheck HealthCheckConfig `json:"health_check" yaml:"health_check"`
+	HealthCheck HealthCheckConfig `json:"health_check"`
 }
 
 // DatabaseConfig represents a database connection configuration
 type DatabaseConfig struct {
 	// Driver is the database driver (mysql, postgres, sqlite3)
-	Driver string `json:"driver" yaml:"driver"`
+	Driver string `json:"driver"`
 
 	// Host is the database host
-	Host string `json:"host" yaml:"host"`
+	Host string `json:"host"`
 
 	// Port is the database port
-	Port int `json:"port" yaml:"port"`
+	Port int `json:"port"`
 
 	// Database is the database name
-	Database string `json:"database" yaml:"database"`
+	Database string `json:"database"`
 
 	// Username for authentication
-	Username string `json:"username" yaml:"username"`
+	Username string `json:"username"`
 
 	// Password for authentication
-	Password string `json:"password" yaml:"password"`
+	Password string `json:"password"`
 
 	// DSN is the full data source name (overrides other fields if set)
-	DSN string `json:"dsn" yaml:"dsn"`
+	DSN string `json:"dsn"`
 
 	// MaxOpenConns is the maximum number of open connections
-	MaxOpenConns int `json:"max_open_conns" yaml:"max_open_conns"`
+	MaxOpenConns int `json:"max_open_conns"`
 
 	// MaxIdleConns is the maximum number of idle connections
-	MaxIdleConns int `json:"max_idle_conns" yaml:"max_idle_conns"`
+	MaxIdleConns int `json:"max_idle_conns"`
 
 	// ConnMaxLifetime is the maximum connection lifetime (e.g., "30m")
-	ConnMaxLifetime string `json:"conn_max_lifetime" yaml:"conn_max_lifetime"`
+	ConnMaxLifetime string `json:"conn_max_lifetime"`
 
 	// ConnMaxIdleTime is the maximum connection idle time (e.g., "5m")
-	ConnMaxIdleTime string `json:"conn_max_idle_time" yaml:"conn_max_idle_time"`
+	ConnMaxIdleTime string `json:"conn_max_idle_time"`
 }
 
 // HealthCheckConfig represents health check configuration
 type HealthCheckConfig struct {
 	// Enabled enables health checking
-	Enabled bool `json:"enabled" yaml:"enabled"`
+	Enabled bool `json:"enabled"`
 
 	// Interval is the health check interval (e.g., "30s")
-	Interval string `json:"interval" yaml:"interval"`
+	Interval string `json:"interval"`
 
 	// Timeout is the health check timeout (e.g., "5s")
-	Timeout string `json:"timeout" yaml:"timeout"`
+	Timeout string `json:"timeout"`
 
 	// FailureThreshold is the number of failures before marking unhealthy
-	FailureThreshold int `json:"failure_threshold" yaml:"failure_threshold"`
+	FailureThreshold int `json:"failure_threshold"`
 
 	// RecoveryThreshold is the number of successes before marking healthy
-	RecoveryThreshold int `json:"recovery_threshold" yaml:"recovery_threshold"`
+	RecoveryThreshold int `json:"recovery_threshold"`
 }
 
 // ShardingRuleConfig represents a sharding rule configuration
 type ShardingRuleConfig struct {
 	// TableName is the logical table name
-	TableName string `json:"table_name" yaml:"table_name"`
+	TableName string `json:"table_name"`
 
 	// ShardKeyColumn is the column name used for sharding
-	ShardKeyColumn string `json:"shard_key_column" yaml:"shard_key_column"`
+	ShardKeyColumn string `json:"shard_key_column"`
 
 	// Strategy is the sharding strategy (hash, mod, range, list)
-	Strategy string `json:"strategy" yaml:"strategy"`
+	Strategy string `json:"strategy"`
 
 	// StrategyConfig is strategy-specific configuration
-	StrategyConfig StrategyConfig `json:"strategy_config" yaml:"strategy_config"`
+	StrategyConfig StrategyConfig `json:"strategy_config"`
 
 	// ActualTableNames maps shard index to physical table name
-	ActualTableNames map[int]string `json:"actual_table_names" yaml:"actual_table_names"`
+	ActualTableNames map[int]string `json:"actual_table_names"`
 
 	// DefaultShard is the default shard for this table (-1 to disable)
-	DefaultShard int `json:"default_shard" yaml:"default_shard"`
+	DefaultShard int `json:"default_shard"`
 }
 
 // StrategyConfig represents strategy-specific configuration
 type StrategyConfig struct {
 	// Ranges for range-based sharding
-	Ranges []RangeConfig `json:"ranges" yaml:"ranges"`
+	Ranges []RangeConfig `json:"ranges"`
 
 	// Mapping for list-based sharding
-	Mapping map[string]int `json:"mapping" yaml:"mapping"`
+	Mapping map[string]int `json:"mapping"`
 
 	// DefaultShard for list strategy when value not in mapping
-	DefaultShard int `json:"default_shard" yaml:"default_shard"`
+	DefaultShard int `json:"default_shard"`
 }
 
 // RangeConfig represents a range definition for range-based sharding
 type RangeConfig struct {
 	// Start is the range start (inclusive)
-	Start interface{} `json:"start" yaml:"start"`
+	Start interface{} `json:"start"`
 
 	// End is the range end (exclusive)
-	End interface{} `json:"end" yaml:"end"`
+	End interface{} `json:"end"`
 
 	// Shard is the target shard index
-	Shard int `json:"shard" yaml:"shard"`
+	Shard int `json:"shard"`
 }
 
 // DefaultConfig returns a default sharding configuration
@@ -379,48 +377,9 @@ func LoadFromJSONFile(path string) (*ShardingConfig, error) {
 	return LoadFromJSON(data)
 }
 
-// LoadFromYAML loads configuration from YAML bytes
-func LoadFromYAML(data []byte) (*ShardingConfig, error) {
-	var config ShardingConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
-	}
-
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	return &config, nil
-}
-
-// LoadFromYAMLFile loads configuration from a YAML file
-func LoadFromYAMLFile(path string) (*ShardingConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	return LoadFromYAML(data)
-}
-
-// LoadFromFile loads configuration from a file (auto-detects JSON or YAML)
+// LoadFromFile loads configuration from a JSON file (alias for LoadFromJSONFile)
 func LoadFromFile(path string) (*ShardingConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	// Try JSON first
-	if config, err := LoadFromJSON(data); err == nil {
-		return config, nil
-	}
-
-	// Try YAML
-	if config, err := LoadFromYAML(data); err == nil {
-		return config, nil
-	}
-
-	return nil, fmt.Errorf("failed to parse configuration file: not valid JSON or YAML")
+	return LoadFromJSONFile(path)
 }
 
 // MergeWithEnv merges configuration with environment variables
