@@ -6,12 +6,15 @@ package ipc
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 	"unsafe"
+
+	glog "github.com/spcent/plumego/log"
 )
 
 var (
@@ -99,11 +102,13 @@ func (s *tcpServer) Accept() (Client, error) {
 }
 
 func (s *tcpServer) AcceptWithContext(ctx context.Context) (Client, error) {
+	start := time.Now()
 	s.mu.RLock()
 	if s.closed {
 		s.mu.RUnlock()
 		return nil, ErrServerClosed
 	}
+	config := s.config
 	s.mu.RUnlock()
 
 	if deadline, ok := ctx.Deadline(); ok {
@@ -116,6 +121,28 @@ func (s *tcpServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	}
 
 	conn, err := s.listener.Accept()
+	duration := time.Since(start)
+
+	// Log and record metrics
+	if config.Logger != nil {
+		fields := glog.Fields{
+			"operation": "accept",
+			"addr":      s.Addr(),
+			"transport": "tcp",
+			"duration":  duration,
+		}
+		if err != nil {
+			fields["error"] = err.Error()
+			config.Logger.Error("IPC accept failed", fields)
+		} else {
+			config.Logger.Debug("IPC accept succeeded", fields)
+		}
+	}
+
+	if config.Metrics != nil {
+		config.Metrics.ObserveIPC(ctx, "accept", s.Addr(), "tcp", 0, duration, err)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -182,6 +209,7 @@ func (s *winServer) Accept() (Client, error) {
 }
 
 func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
+	start := time.Now()
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -189,6 +217,7 @@ func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	}
 	handle := s.next
 	s.next = 0
+	config := s.config
 	s.mu.Unlock()
 
 	if handle == 0 {
@@ -199,23 +228,53 @@ func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
 		}
 	}
 
+	var connectErr error
 	for {
 		if err := connectNamedPipeWithContext(ctx, handle); err != nil {
 			if err == errorPipeClosing {
 				go syscall.CloseHandle(handle)
 				if ctx.Err() != nil {
-					return nil, ctx.Err()
+					connectErr = ctx.Err()
+					break
 				}
 				handle, err = createNamedPipe(s.pipeName, s.config.BufferSize)
 				if err != nil {
-					return nil, err
+					connectErr = err
+					break
 				}
 				continue
 			}
 			go syscall.CloseHandle(handle)
-			return nil, err
+			connectErr = err
+			break
 		}
 		break
+	}
+
+	duration := time.Since(start)
+
+	// Log and record metrics
+	if config.Logger != nil {
+		fields := glog.Fields{
+			"operation": "accept",
+			"addr":      s.pipeName,
+			"transport": "pipe",
+			"duration":  duration,
+		}
+		if connectErr != nil {
+			fields["error"] = connectErr.Error()
+			config.Logger.Error("IPC accept failed", fields)
+		} else {
+			config.Logger.Debug("IPC accept succeeded", fields)
+		}
+	}
+
+	if config.Metrics != nil {
+		config.Metrics.ObserveIPC(ctx, "accept", s.pipeName, "pipe", 0, duration, connectErr)
+	}
+
+	if connectErr != nil {
+		return nil, connectErr
 	}
 
 	// Asynchronously prepare the next handle to reduce Accept latency
@@ -270,6 +329,7 @@ func dialPlatform(addr string, config *Config) (Client, error) {
 }
 
 func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (Client, error) {
+	start := time.Now()
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -278,6 +338,28 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 	if isNamedPipeAddr(addr) || !strings.Contains(addr, ":") {
 		pipeName := normalizePipeAddr(addr)
 		handle, err := dialNamedPipe(ctx, pipeName, config.ConnectTimeout)
+		duration := time.Since(start)
+
+		// Log and record metrics
+		if config.Logger != nil {
+			fields := glog.Fields{
+				"operation": "dial",
+				"addr":      pipeName,
+				"transport": "pipe",
+				"duration":  duration,
+			}
+			if err != nil {
+				fields["error"] = err.Error()
+				config.Logger.Error("IPC dial failed", fields)
+			} else {
+				config.Logger.Debug("IPC dial succeeded", fields)
+			}
+		}
+
+		if config.Metrics != nil {
+			config.Metrics.ObserveIPC(ctx, "dial", pipeName, "pipe", 0, duration, err)
+		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -294,6 +376,28 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 	}
 
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	duration := time.Since(start)
+
+	// Log and record metrics
+	if config.Logger != nil {
+		fields := glog.Fields{
+			"operation": "dial",
+			"addr":      addr,
+			"transport": "tcp",
+			"duration":  duration,
+		}
+		if err != nil {
+			fields["error"] = err.Error()
+			config.Logger.Error("IPC dial failed", fields)
+		} else {
+			config.Logger.Debug("IPC dial succeeded", fields)
+		}
+	}
+
+	if config.Metrics != nil {
+		config.Metrics.ObserveIPC(ctx, "dial", addr, "tcp", 0, duration, err)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -462,6 +566,7 @@ func (c *winClient) Write(data []byte) (int, error) {
 }
 
 func (c *winClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, error) {
+	start := time.Now()
 	c.mu.RLock()
 	if c.closed {
 		c.mu.RUnlock()
@@ -469,23 +574,46 @@ func (c *winClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, e
 	}
 	conn := c.conn
 	handle := c.handle
+	config := c.config
 	c.mu.RUnlock()
 
+	var n int
+	var err error
+	var transport string
+
 	if conn != nil {
+		transport = "tcp"
 		if timeout > 0 {
 			conn.SetWriteDeadline(time.Now().Add(timeout))
 			defer conn.SetWriteDeadline(time.Time{})
 		}
-		return conn.Write(data)
-	}
-
-	if handle != 0 {
+		n, err = conn.Write(data)
+	} else if handle != 0 {
+		transport = "pipe"
 		var written uint32
-		err := syscall.WriteFile(handle, data, &written, nil)
-		return int(written), err
+		err = syscall.WriteFile(handle, data, &written, nil)
+		n = int(written)
+	} else {
+		return 0, fmt.Errorf("no valid connection")
 	}
 
-	return 0, fmt.Errorf("no valid connection")
+	duration := time.Since(start)
+
+	// Log and record metrics
+	if config.Logger != nil && err != nil {
+		config.Logger.Error("IPC write failed", glog.Fields{
+			"operation": "write",
+			"bytes":     n,
+			"duration":  duration,
+			"error":     err.Error(),
+		})
+	}
+
+	if config.Metrics != nil {
+		config.Metrics.ObserveIPC(context.Background(), "write", "", transport, n, duration, err)
+	}
+
+	return n, err
 }
 
 func (c *winClient) Read(buf []byte) (int, error) {
@@ -493,6 +621,7 @@ func (c *winClient) Read(buf []byte) (int, error) {
 }
 
 func (c *winClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, error) {
+	start := time.Now()
 	c.mu.RLock()
 	if c.closed {
 		c.mu.RUnlock()
@@ -500,23 +629,46 @@ func (c *winClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, err
 	}
 	conn := c.conn
 	handle := c.handle
+	config := c.config
 	c.mu.RUnlock()
 
+	var n int
+	var err error
+	var transport string
+
 	if conn != nil {
+		transport = "tcp"
 		if timeout > 0 {
 			conn.SetReadDeadline(time.Now().Add(timeout))
 			defer conn.SetReadDeadline(time.Time{})
 		}
-		return conn.Read(buf)
-	}
-
-	if handle != 0 {
+		n, err = conn.Read(buf)
+	} else if handle != 0 {
+		transport = "pipe"
 		var read uint32
-		err := syscall.ReadFile(handle, buf, &read, nil)
-		return int(read), err
+		err = syscall.ReadFile(handle, buf, &read, nil)
+		n = int(read)
+	} else {
+		return 0, fmt.Errorf("no valid connection")
 	}
 
-	return 0, fmt.Errorf("no valid connection")
+	duration := time.Since(start)
+
+	// Log and record metrics (only log errors to avoid excessive logging)
+	if config.Logger != nil && err != nil && err != io.EOF {
+		config.Logger.Error("IPC read failed", glog.Fields{
+			"operation": "read",
+			"bytes":     n,
+			"duration":  duration,
+			"error":     err.Error(),
+		})
+	}
+
+	if config.Metrics != nil {
+		config.Metrics.ObserveIPC(context.Background(), "read", "", transport, n, duration, err)
+	}
+
+	return n, err
 }
 
 func (c *winClient) RemoteAddr() string {
