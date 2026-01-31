@@ -51,8 +51,15 @@ func (a *App) Boot() error {
 		return err
 	}
 
-	if err := a.startServer(); err != nil && err != http.ErrServerClosed {
+	if err := a.startRunners(context.Background()); err != nil {
 		a.stopComponents(context.Background())
+		return err
+	}
+
+	if err := a.startServer(); err != nil && err != http.ErrServerClosed {
+		a.stopRunners(context.Background())
+		a.stopComponents(context.Background())
+		a.runShutdownHooks(context.Background())
 		return err
 	}
 
@@ -61,10 +68,14 @@ func (a *App) Boot() error {
 
 func (a *App) loadEnv() error {
 	a.mu.RLock()
-	envFile := a.config.EnvFile
+	envFile := ""
+	if a.config != nil {
+		envFile = a.config.EnvFile
+	}
+	loaded := a.envLoaded
 	a.mu.RUnlock()
 
-	if a.envLoaded || envFile == "" {
+	if loaded || envFile == "" {
 		return nil
 	}
 
@@ -179,7 +190,9 @@ func (a *App) startServer() error {
 			}
 		}
 
+		a.stopRunners(ctx)
 		a.stopComponents(ctx)
+		a.runShutdownHooks(ctx)
 		close(idleConnsClosed)
 	}()
 
@@ -206,7 +219,9 @@ func (a *App) startServer() error {
 	}
 
 	health.SetNotReady("shutting down")
+	a.stopRunners(context.Background())
 	a.stopComponents(context.Background())
+	a.runShutdownHooks(context.Background())
 
 	<-idleConnsClosed
 
@@ -306,6 +321,32 @@ func (a *App) startComponents(ctx context.Context, comps []Component) error {
 	return nil
 }
 
+func (a *App) startRunners(ctx context.Context) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if len(a.runners) == 0 {
+		return nil
+	}
+
+	started := make([]Runner, 0, len(a.runners))
+	for _, runner := range a.runners {
+		if runner == nil {
+			continue
+		}
+		if err := runner.Start(ctx); err != nil {
+			for i := len(started) - 1; i >= 0; i-- {
+				_ = started[i].Stop(ctx)
+			}
+			return err
+		}
+		started = append(started, runner)
+	}
+
+	a.startedRunners = started
+	return nil
+}
+
 func (a *App) stopComponents(ctx context.Context) {
 	a.componentStopOnce.Do(func() {
 		a.mu.Lock()
@@ -316,9 +357,43 @@ func (a *App) stopComponents(ctx context.Context) {
 			if comps[i] == nil {
 				continue
 			}
-			_ = comps[i].Stop(ctx)
+			if err := comps[i].Stop(ctx); err != nil {
+				a.logger.WithFields(log.Fields{
+					"component_index": i,
+					"error":           err.Error(),
+				}).Error("failed to stop component", nil)
+			}
 		}
 	})
+}
+
+func (a *App) stopRunners(ctx context.Context) {
+	a.runnerStopOnce.Do(func() {
+		a.mu.Lock()
+		runners := append([]Runner{}, a.startedRunners...)
+		a.mu.Unlock()
+
+		for i := len(runners) - 1; i >= 0; i-- {
+			if runners[i] == nil {
+				continue
+			}
+			if err := runners[i].Stop(ctx); err != nil {
+				a.logger.WithFields(log.Fields{
+					"runner_index": i,
+					"error":        err.Error(),
+				}).Error("failed to stop runner", nil)
+			}
+		}
+	})
+}
+
+// ResetForTesting resets all ResettableOnce instances for testing purposes.
+// This method is intended for testing only and should not be used in production.
+func (a *App) ResetForTesting() {
+	a.handlerOnce.Reset()
+	a.componentStopOnce.Reset()
+	a.runnerStopOnce.Reset()
+	a.shutdownOnce.Reset()
 }
 
 func (t *connectionTracker) track(_ net.Conn, state http.ConnState) {

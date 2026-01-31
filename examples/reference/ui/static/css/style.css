@@ -512,6 +512,10 @@ body {
   transition: all 0.3s ease;
 }
 
+.footer strong {
+  color: #fff;
+}
+
 .footer a:hover {
   text-decoration: underline;
 }

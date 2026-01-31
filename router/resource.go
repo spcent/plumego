@@ -1,26 +1,30 @@
 package router
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/spcent/plumego/contract"
 )
 
-// Response represents a standardized JSON response structure
+// Deprecated: use contract.Response or contract.WriteResponse instead.
+// Response represents a standardized JSON response structure.
 type Response struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    any    `json:"data,omitempty"`
 }
 
-// ErrorResponse represents a standardized error response structure
+// Deprecated: use contract.APIError or contract.WriteError instead.
+// ErrorResponse represents a standardized error response structure.
 type ErrorResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Details any    `json:"details,omitempty"`
 }
 
-// JSONWriter provides consistent JSON response writing
+// JSONWriter provides consistent JSON response writing.
+// Deprecated: prefer contract.WriteResponse/WriteError for new code.
 type JSONWriter struct {
 	resourceName string
 }
@@ -32,19 +36,7 @@ func NewJSONWriter(resourceName string) *JSONWriter {
 
 // WriteJSON writes a standardized JSON response
 func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-
-	response := Response{
-		Code:    status,
-		Message: http.StatusText(status),
-		Data:    data,
-	}
-
-	// Use a buffer to avoid partial writes on encoding errors
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		// If encoding fails, we can't write a proper error response since headers are already sent
-		// Just log it for debugging
+	if err := contract.WriteResponse(w, nil, status, data, nil); err != nil {
 		if jw != nil && jw.resourceName != "" {
 			fmt.Printf("[router/resource] JSON encoding failed for %s: %v\n", jw.resourceName, err)
 		} else {
@@ -55,24 +47,26 @@ func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data any) {
 
 // WriteError writes a standardized error response
 func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message string, details any) {
-	// Return standardized error response
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-
-	errorResp := ErrorResponse{
-		Code:    status,
-		Message: message,
-		Details: details,
+	apiErr := contract.APIError{
+		Status:   status,
+		Code:     http.StatusText(status),
+		Message:  message,
+		Category: contract.CategoryForStatus(status),
 	}
-
-	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
-		// Log encoding error but can't send error response since headers are already sent
-		if jw != nil && jw.resourceName != "" {
-			fmt.Printf("[router/resource] Error JSON encoding failed for %s: %v\n", jw.resourceName, err)
-		} else {
-			fmt.Printf("[router/resource] Error JSON encoding failed: %v\n", err)
-		}
+	if details != nil {
+		apiErr.Details = map[string]any{"details": details}
 	}
+	contract.WriteError(w, nil, apiErr)
+}
+
+// WriteResponse writes a contract response payload and includes trace id when available.
+func (jw *JSONWriter) WriteResponse(w http.ResponseWriter, r *http.Request, status int, data any, meta map[string]any) error {
+	return contract.WriteResponse(w, r, status, data, meta)
+}
+
+// WriteAPIError writes a contract error payload.
+func (jw *JSONWriter) WriteAPIError(w http.ResponseWriter, r *http.Request, err contract.APIError) {
+	contract.WriteError(w, r, err)
 }
 
 // WriteNotImplemented writes a standardized "Not Implemented" response
@@ -183,4 +177,14 @@ func (c *BaseResourceController) JSON(w http.ResponseWriter, status int, data an
 // Error is a helper method to write standardized error responses
 func (c *BaseResourceController) Error(w http.ResponseWriter, status int, message string, details any) {
 	c.jsonWriter.WriteError(w, status, message, details)
+}
+
+// Response is a helper method to write contract-based JSON responses.
+func (c *BaseResourceController) Response(w http.ResponseWriter, r *http.Request, status int, data any, meta map[string]any) {
+	_ = c.jsonWriter.WriteResponse(w, r, status, data, meta)
+}
+
+// APIError is a helper method to write contract-based error responses.
+func (c *BaseResourceController) APIError(w http.ResponseWriter, r *http.Request, err contract.APIError) {
+	c.jsonWriter.WriteAPIError(w, r, err)
 }

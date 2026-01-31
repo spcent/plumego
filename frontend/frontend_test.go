@@ -377,6 +377,89 @@ func TestCacheControlBehavior(t *testing.T) {
 	}
 }
 
+func TestIndexCacheControl(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
+		t.Fatalf("write index: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "asset.js"), []byte("asset"), 0o644); err != nil {
+		t.Fatalf("write asset: %v", err)
+	}
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(
+		r,
+		dir,
+		WithCacheControl("public, max-age=3600"),
+		WithIndexCacheControl("no-cache"),
+	); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	indexReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	indexRec := httptest.NewRecorder()
+	r.ServeHTTP(indexRec, indexReq)
+	if got := indexRec.Header().Get("Cache-Control"); got != "no-cache" {
+		t.Fatalf("index cache header: got %q, want %q", got, "no-cache")
+	}
+
+	assetReq := httptest.NewRequest(http.MethodGet, "/asset.js", nil)
+	assetRec := httptest.NewRecorder()
+	r.ServeHTTP(assetRec, assetReq)
+	if got := assetRec.Header().Get("Cache-Control"); got != "public, max-age=3600" {
+		t.Fatalf("asset cache header: got %q, want %q", got, "public, max-age=3600")
+	}
+}
+
+func TestFallbackDisabled(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
+		t.Fatalf("write index: %v", err)
+	}
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	missingReq := httptest.NewRequest(http.MethodGet, "/missing", nil)
+	missingRec := httptest.NewRecorder()
+	r.ServeHTTP(missingRec, missingReq)
+	if missingRec.Code != http.StatusNotFound {
+		t.Fatalf("missing status: got %d want %d", missingRec.Code, http.StatusNotFound)
+	}
+
+	rootReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	rootRec := httptest.NewRecorder()
+	r.ServeHTTP(rootRec, rootReq)
+	if rootRec.Code != http.StatusOK {
+		t.Fatalf("root status: got %d want %d", rootRec.Code, http.StatusOK)
+	}
+}
+
+func TestCustomHeaders(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
+		t.Fatalf("write index: %v", err)
+	}
+
+	headers := map[string]string{
+		"X-Frontend": "ok",
+	}
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithHeaders(headers)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if got := rec.Header().Get("X-Frontend"); got != "ok" {
+		t.Fatalf("header mismatch: got %q", got)
+	}
+}
+
 func TestIndexFileValidation(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
@@ -422,6 +505,11 @@ func TestNilFilesystem(t *testing.T) {
 }
 
 func TestUnreadableDirectory(t *testing.T) {
+	// Skip if running as root, as root can read any directory
+	if os.Getuid() == 0 {
+		t.Skip("skipping test when running as root")
+	}
+
 	dir := t.TempDir()
 	subDir := filepath.Join(dir, "unreadable")
 	if err := os.MkdirAll(subDir, 0o000); err != nil {

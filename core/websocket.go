@@ -33,6 +33,11 @@ type WebSocketConfig struct {
 	MaxRoomConnections int             // Maximum connections per room (0 = unlimited)
 }
 
+const (
+	// DefaultSendQueueSize is the default buffer size for the WebSocket send queue.
+	DefaultSendQueueSize = 256
+)
+
 // DefaultWebSocketConfig returns default WebSocket configuration.
 func DefaultWebSocketConfig() WebSocketConfig {
 	secret := []byte(os.Getenv("WS_SECRET"))
@@ -40,7 +45,7 @@ func DefaultWebSocketConfig() WebSocketConfig {
 	return WebSocketConfig{
 		WorkerCount:        16,
 		JobQueueSize:       4096,
-		SendQueueSize:      256,
+		SendQueueSize:      DefaultSendQueueSize,
 		SendTimeout:        200 * time.Millisecond,
 		SendBehavior:       ws.SendBlock,
 		Secret:             secret,
@@ -96,28 +101,28 @@ func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
 		if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
 			r.PostFunc(c.config.BroadcastPath, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
-					http.Error(w, "POST only", http.StatusMethodNotAllowed)
+					writeHTTPError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "POST only")
 					return
 				}
-				if !c.debug {
-					const bearerPrefix = "bearer "
-					rawAuth := r.Header.Get("Authorization")
-					var provided []byte
-					if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
-						provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
-					} else if q := r.URL.Query().Get("secret"); q != "" {
-						provided = []byte(q)
-					}
+				// Always require authentication for broadcast endpoint.
+				// Debug mode should only affect logging verbosity, never security checks.
+				const bearerPrefix = "bearer "
+				rawAuth := r.Header.Get("Authorization")
+				var provided []byte
+				if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
+					provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
+				}
+				// Note: Query parameter secrets are no longer supported for security reasons.
+				// Secrets in URLs can be leaked via server logs and Referer headers.
 
-					if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
-						http.Error(w, "unauthorized", http.StatusUnauthorized)
-						return
-					}
+				if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
+					writeHTTPError(w, r, http.StatusUnauthorized, "unauthorized", "unauthorized")
+					return
 				}
 
 				b, err := io.ReadAll(r.Body)
 				if err != nil {
-					http.Error(w, "Error reading request body", http.StatusInternalServerError)
+					writeHTTPError(w, r, http.StatusInternalServerError, "read_body_failed", "Error reading request body")
 					return
 				}
 
@@ -163,13 +168,25 @@ func (a *App) ConfigureWebSocket() (*ws.Hub, error) {
 
 // ConfigureWebSocketWithOptions configures WebSocket support with custom options.
 func (a *App) ConfigureWebSocketWithOptions(config WebSocketConfig) (*ws.Hub, error) {
-	comp, err := newWebSocketComponent(config, a.config.Debug, a.logger)
+	if err := a.ensureMutable("configure_websocket", "configure websocket"); err != nil {
+		return nil, err
+	}
+
+	cfg := a.configSnapshot()
+	a.mu.RLock()
+	logger := a.logger
+	a.mu.RUnlock()
+
+	comp, err := newWebSocketComponent(config, cfg.Debug, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	comp.RegisterRoutes(a.router)
+	comp.RegisterRoutes(a.ensureRouter())
+
+	a.mu.Lock()
 	a.components = append(a.components, comp)
+	a.mu.Unlock()
 
 	return comp.hub, nil
 }

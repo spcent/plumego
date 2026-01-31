@@ -111,6 +111,19 @@ func TestGeneratorStruct(t *testing.T) {
 	}
 }
 
+func TestZeroValueGenerator(t *testing.T) {
+	var gen TraceIDGenerator
+
+	id := gen.Generate()
+	if len(id) != idWidth {
+		t.Fatalf("expected id length %d, got %d", idWidth, len(id))
+	}
+
+	if _, _, _, err := DecodeTraceID(id); err != nil {
+		t.Fatalf("failed to decode id from zero value generator: %v", err)
+	}
+}
+
 // TestTimestampOrdering tests that newer trace IDs have newer timestamps
 func TestTimestampOrdering(t *testing.T) {
 	time.Sleep(time.Millisecond) // Ensure different millisecond

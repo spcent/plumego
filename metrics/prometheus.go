@@ -57,7 +57,8 @@ type PrometheusCollector struct {
 	startTime time.Time
 
 	// Base collector for unified interface
-	base *BaseMetricsCollector
+	base     *BaseMetricsCollector
+	baseOnce sync.Once
 }
 
 // NewPrometheusCollector constructs an in-memory collector with the provided namespace.
@@ -91,7 +92,9 @@ func NewPrometheusCollector(namespace string) *PrometheusCollector {
 //	collector := metrics.NewPrometheusCollector("myapp").
 //		WithMaxMemory(50000)
 func (p *PrometheusCollector) WithMaxMemory(max int) *PrometheusCollector {
-	p.maxMemory = max
+	if max > 0 {
+		p.maxMemory = max
+	}
 	return p
 }
 
@@ -117,7 +120,7 @@ func (p *PrometheusCollector) Observe(_ context.Context, m middleware.RequestMet
 	defer p.mu.Unlock()
 
 	// Check memory limit and evict if needed
-	if len(p.requests) >= p.maxMemory {
+	if p.maxMemory > 0 && len(p.requests) >= p.maxMemory {
 		p.evictOldest()
 	}
 
@@ -258,38 +261,24 @@ func (p *PrometheusCollector) Clear() {
 	p.requests = make(map[labelKey]uint64)
 	p.durations = make(map[labelKey]latencyStats)
 	p.startTime = time.Now()
+
+	if p.base != nil {
+		p.base.Clear()
+	}
 }
 
 // Record implements the unified MetricsCollector interface
 func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
 	// For HTTP requests, use the existing Prometheus format
 	if record.Type == MetricHTTPRequest {
-		if statusStr, ok := record.Labels["status"]; ok {
-			if status, err := strconv.Atoi(statusStr); err == nil {
-				if method, ok := record.Labels["method"]; ok {
-					if path, ok := record.Labels["path"]; ok {
-						metrics := middleware.RequestMetrics{
-							Method:    method,
-							Path:      path,
-							Status:    status,
-							Bytes:     0,
-							Duration:  record.Duration,
-							TraceID:   "",
-							UserAgent: "",
-						}
-						p.Observe(ctx, metrics)
-						return
-					}
-				}
-			}
+		if metrics, ok := httpMetricsFromRecord(record); ok {
+			p.Observe(ctx, metrics)
+			return
 		}
 	}
 
 	// For other metric types, use the base collector
-	if p.base == nil {
-		p.base = NewBaseMetricsCollector()
-	}
-	p.base.Record(ctx, record)
+	p.baseCollector().Record(ctx, record)
 }
 
 // ObserveHTTP implements the unified MetricsCollector interface
@@ -308,31 +297,22 @@ func (p *PrometheusCollector) ObserveHTTP(ctx context.Context, method, path stri
 
 // ObservePubSub implements the unified MetricsCollector interface
 func (p *PrometheusCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	if p.base == nil {
-		p.base = NewBaseMetricsCollector()
-	}
-	p.base.ObservePubSub(ctx, operation, topic, duration, err)
+	p.baseCollector().ObservePubSub(ctx, operation, topic, duration, err)
 }
 
 // ObserveMQ implements the unified MetricsCollector interface
 func (p *PrometheusCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	if p.base == nil {
-		p.base = NewBaseMetricsCollector()
-	}
-	p.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
+	p.baseCollector().ObserveMQ(ctx, operation, topic, duration, err, panicked)
 }
 
 // ObserveKV implements the unified MetricsCollector interface
 func (p *PrometheusCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	if p.base == nil {
-		p.base = NewBaseMetricsCollector()
-	}
-	p.base.ObserveKV(ctx, operation, key, duration, err, hit)
+	p.baseCollector().ObserveKV(ctx, operation, key, duration, err, hit)
 }
 
 func (p *PrometheusCollector) snapshot() (map[labelKey]uint64, map[labelKey]latencyStats, time.Duration) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
 	reqCopy := make(map[labelKey]uint64, len(p.requests))
 	for k, v := range p.requests {
@@ -349,7 +329,7 @@ func (p *PrometheusCollector) snapshot() (map[labelKey]uint64, map[labelKey]late
 }
 
 func (p *PrometheusCollector) evictOldest() {
-	// Simple eviction: remove 10% of oldest entries
+	// Simple eviction: remove 10% of least-used entries
 	evictCount := len(p.requests) / 10
 	if evictCount == 0 {
 		evictCount = 1
@@ -371,6 +351,43 @@ func (p *PrometheusCollector) evictOldest() {
 		delete(p.requests, keys[i])
 		delete(p.durations, keys[i])
 	}
+}
+
+func (p *PrometheusCollector) baseCollector() *BaseMetricsCollector {
+	p.baseOnce.Do(func() {
+		p.base = NewBaseMetricsCollector()
+	})
+	return p.base
+}
+
+func httpMetricsFromRecord(record MetricRecord) (middleware.RequestMetrics, bool) {
+	if record.Labels == nil {
+		return middleware.RequestMetrics{}, false
+	}
+
+	statusStr, ok := record.Labels[labelStatus]
+	if !ok {
+		return middleware.RequestMetrics{}, false
+	}
+	status, err := strconv.Atoi(statusStr)
+	if err != nil {
+		return middleware.RequestMetrics{}, false
+	}
+	method, ok := record.Labels[labelMethod]
+	if !ok {
+		return middleware.RequestMetrics{}, false
+	}
+	path, ok := record.Labels[labelPath]
+	if !ok {
+		return middleware.RequestMetrics{}, false
+	}
+
+	return middleware.RequestMetrics{
+		Method:   method,
+		Path:     path,
+		Status:   status,
+		Duration: record.Duration,
+	}, true
 }
 
 func sortedKeys[T any](m map[labelKey]T) []labelKey {

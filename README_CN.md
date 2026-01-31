@@ -10,6 +10,7 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
 - **优雅生命周期**：环境变量加载、连接排水、就绪标志，以及可选的 TLS/HTTP2 配置，带有合理默认值。
 - **可选服务**：内置带认证的 WebSocket 中心、进程内 Pub/Sub（带调试快照）、入站/出站 Webhook 路由器，以及从磁盘或嵌入资源提供静态前端。
+- **任务调度**：通过 `scheduler` 包提供进程内 cron、延迟任务与可重试任务。
 
 ## 组件
 `core.App` 通过可插拔组件进行编排，而不是硬编码功能。组件可以注册路由、中间件和生命周期钩子：
@@ -27,9 +28,6 @@ type Component interface {
 `HealthStatus` 使用限定的状态值（`healthy`、`degraded`、`unhealthy`）确保组件以结构化且类型安全的方式报告健康状况。
 
 在构造应用时使用 `core.WithComponent`（或 `WithComponents`）来添加功能。内置特性（Webhook 管理、入站 Webhook 接收器、PubSub 调试、WebSocket 辅助工具、前端服务）都可以作为组件挂载，因此示例可以只混合所需的部分。
-
-## Migration Notes
-- `plumego.ComponentFunc` re-export has been removed. Implement `core.Component` directly (see the interface above), or keep a local adapter type if you prefer functional hooks.
 
 ## 快速开始
 创建一个小型 `main.go`，连接路由和中间件，然后启动服务器：
@@ -95,11 +93,59 @@ func main() {
 - Debug 模式（`core.WithDebug`）默认开启 `/_debug` 调试端点（路由表、Middleware、配置快照、手动重载）、友好 JSON 错误输出，以及 `.env` 热加载。
 
 ## 关键组件
-- **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载。
-- **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（安全头、防滥用、请求体限制、并发限制）会在设置期间自动注入。恢复/日志/CORS 辅助工具可通过 `core.WithRecovery`、`core.WithLogging`、`core.WithCORS` 启用。
+- **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
+- **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（安全头、防滥用、请求体限制、并发限制）会在设置期间自动注入。恢复/日志/CORS 辅助工具可通过 `core.WithRecovery`、`core.WithLogging`、`core.WithCORS` 启用。生产基线可使用 `core.WithRecommendedMiddleware()` 一键启用 RequestID + Logging + Recovery 的推荐顺序组合。
+- **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
 - **WebSocket 中心**：`ConfigureWebSocket()` 挂载受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `WebSocketConfig` 自定义工作线程数和队列大小。
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。
+
+## 后台 Runner
+使用最小生命周期接口注册后台任务：
+
+```go
+type Runner interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
+app.Register(myRunner)
+```
+
+Runner 会在 HTTP server 启动前启动，并在优雅关闭时停止。
+
+## 任务调度
+使用 `scheduler` 包提供进程内 cron 与延迟任务：
+
+```go
+sch := scheduler.New(scheduler.WithWorkers(2))
+sch.Start()
+defer sch.Stop(context.Background())
+
+sch.AddCron("cleanup", "0 * * * *", func(ctx context.Context) error {
+    // 每小时任务
+    return nil
+})
+
+sch.Delay("one-off", 5*time.Second, func(ctx context.Context) error {
+    return nil
+})
+```
+
+可选增强包括管理 Handler（`scheduler.NewAdminHandler`）以及可插拔持久化（`scheduler.WithStore`，支持内存或 KV）。
+还可以通过 `scheduler.WithPanicHandler` 与 `scheduler.WithMetricsSink` 接入异常处理与指标汇报。
+
+## 认证契约
+Plumego 通过 `contract` 中的接口将认证、授权、会话校验分离，推荐用中间件组合：
+
+```go
+chain := middleware.NewChain().
+	Use(middleware.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
+	Use(middleware.SessionCheck(sessionStore, sessionValidator)).
+	Use(middleware.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
+```
+
+`security/jwt` 提供契约适配器（`jwtManager.Authenticator`、`jwt.PolicyAuthorizer`、`jwt.PermissionAuthorizer`），以保持存储与策略实现的解耦。
 
 ## 参考应用
 `examples/reference` 是一个开箱即用的 `main` 包，整合了常用组件：
@@ -149,7 +195,7 @@ if err := app.ConfigureObservability(obs); err != nil {
 开启追踪后日志会包含 `trace_id` 与 `span_id`，响应中也会回传 `X-Span-ID` 便于关联。
 
 ## 配置参考
-使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；`config.ConfigManager` 也提供 `LoadBestEffort` 用于跳过可选配置源失败，并提供 `ReloadWithValidation` 做事务式热加载；使用下表实现可预测的部署。
+使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；`config.ConfigManager` 也提供 `LoadBestEffort` 用于跳过可选配置源失败，并提供 `ReloadWithValidation` 做事务式热加载；配置键在读取时会规范化为小写的 snake_case，因此 CamelCase 和 UPPER_SNAKE 会映射到同一值；使用下表实现可预测的部署。
 
 | AppConfig 字段             | 默认值          | 环境变量                       | Flag 示例                          |
 |----------------------------|-----------------|--------------------------------|------------------------------------|

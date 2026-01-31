@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -177,18 +178,27 @@ func (ps *InProcPubSub) Close() error {
 //		fmt.Printf("Received: %v\n", msg.Data)
 //	}
 func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, error) {
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics("subscribe", topic, time.Since(start), err)
+	}()
+
 	if ps.closed.Load() {
-		return nil, ErrSubscribeToClosed
+		err = ErrSubscribeToClosed
+		return nil, err
 	}
 
 	topic = strings.TrimSpace(topic)
 	if topic == "" {
-		return nil, ErrInvalidTopic
+		err = ErrInvalidTopic
+		return nil, err
 	}
 
 	opts = normalizeSubOptions(opts)
 	if opts.BufferSize < 1 {
-		return nil, ErrBufferTooSmall
+		err = ErrBufferTooSmall
+		return nil, err
 	}
 
 	id := ps.nextID.Add(1)
@@ -204,7 +214,8 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 	defer ps.mu.Unlock()
 
 	if ps.closed.Load() {
-		return nil, ErrSubscribeToClosed
+		err = ErrSubscribeToClosed
+		return nil, err
 	}
 
 	if ps.topics[topic] == nil {
@@ -218,10 +229,23 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 
 // SubscribePattern creates a new subscription to a topic pattern.
 //
-// Patterns use filepath.Match syntax:
-//   - "*" matches any sequence of non-separator characters
-//   - "?" matches any single non-separator character
-//   - "[...]" matches any character in the bracket expression
+// Pattern matching uses filepath.Match syntax with topic names as literal strings.
+// The pattern is matched against the entire topic name character-by-character.
+// Note: The term "separator" in filepath.Match refers to filepath separators ('/' or '\'),
+// but topic names are plain strings, so ALL characters including '.' are matched normally.
+//
+// Supported wildcards:
+//   - "*" matches zero or more characters (including '.')
+//   - "?" matches exactly one character (including '.')
+//   - "[...]" matches any single character in the bracket expression
+//   - "[^...]" matches any single character NOT in the bracket expression
+//
+// Pattern matching semantics:
+//   - Patterns are case-sensitive
+//   - "user.*" matches "user.created", "user.updated", "user.deleted", "user.profile.updated"
+//   - "user.?" matches "user.1", "user.a" but NOT "user.created" (? matches single char)
+//   - "*.error" matches "user.error", "payment.error", "system.auth.error"
+//   - "user.[cd]*" matches "user.created", "user.deleted" but NOT "user.updated"
 //
 // Example:
 //
@@ -244,22 +268,33 @@ func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, 
 //	// - user.created
 //	// - user.updated
 //	// - user.deleted
+//	// - user.profile.updated (note: "*" matches across dots)
 func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics("subscribe", pattern, time.Since(start), err)
+	}()
+
 	if ps.closed.Load() {
-		return nil, ErrSubscribeToClosed
+		err = ErrSubscribeToClosed
+		return nil, err
 	}
 
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
-		return nil, ErrInvalidPattern
+		err = ErrInvalidPattern
+		return nil, err
 	}
 	if _, err := path.Match(pattern, "probe"); err != nil {
-		return nil, ErrInvalidPattern
+		err = ErrInvalidPattern
+		return nil, err
 	}
 
 	opts = normalizeSubOptions(opts)
 	if opts.BufferSize < 1 {
-		return nil, ErrBufferTooSmall
+		err = ErrBufferTooSmall
+		return nil, err
 	}
 
 	id := ps.nextID.Add(1)
@@ -276,7 +311,8 @@ func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subsc
 	defer ps.mu.Unlock()
 
 	if ps.closed.Load() {
-		return nil, ErrSubscribeToClosed
+		err = ErrSubscribeToClosed
+		return nil, err
 	}
 
 	if ps.patterns[pattern] == nil {
@@ -315,13 +351,21 @@ func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subsc
 //		// Handle error
 //	}
 func (ps *InProcPubSub) Publish(topic string, msg Message) error {
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics("publish", topic, time.Since(start), err)
+	}()
+
 	if ps.closed.Load() {
-		return ErrPublishToClosed
+		err = ErrPublishToClosed
+		return err
 	}
 
 	topic = strings.TrimSpace(topic)
 	if topic == "" {
-		return ErrInvalidTopic
+		err = ErrInvalidTopic
+		return err
 	}
 
 	// Fill message metadata (immutable copy)
@@ -329,6 +373,7 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 	if msg.Time.IsZero() {
 		msg.Time = time.Now().UTC()
 	}
+	msg = cloneMessage(msg)
 
 	ps.metrics.incPublish(topic)
 
@@ -370,7 +415,21 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 
 	if len(patterns) > 0 {
 		for _, entry := range patterns {
-			if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+			// Fast path: check if pattern contains wildcards
+			// If not, we can use simple string comparison
+			var matched bool
+			if strings.ContainsAny(entry.pattern, "*?[]\\") {
+				var err error
+				matched, err = path.Match(entry.pattern, topic)
+				if err != nil {
+					matched = false
+				}
+			} else {
+				// No wildcards - just compare strings
+				matched = entry.pattern == topic
+			}
+
+			if matched {
 				for _, s := range entry.subs {
 					ps.deliver(s, msg)
 				}
@@ -383,9 +442,9 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 
 // PublishAsync publishes without waiting for delivery results (fire-and-forget).
 //
-// This is a convenience method that calls Publish. The delivery is still
-// guaranteed to be attempted, but this method returns immediately without
-// waiting for delivery confirmation.
+// This method returns immediately after queuing the message for delivery,
+// without waiting for the actual delivery to subscribers. The message will
+// be delivered asynchronously to all matching subscribers.
 //
 // Example:
 //
@@ -397,7 +456,81 @@ func (ps *InProcPubSub) Publish(topic string, msg Message) error {
 //	// Fire-and-forget publish
 //	err := ps.PublishAsync("user.created", msg)
 func (ps *InProcPubSub) PublishAsync(topic string, msg Message) error {
-	return ps.Publish(topic, msg)
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics("publish_async", topic, time.Since(start), err)
+	}()
+
+	if ps.closed.Load() {
+		err = ErrPublishToClosed
+		return err
+	}
+
+	topic = strings.TrimSpace(topic)
+	if topic == "" {
+		err = ErrInvalidTopic
+		return err
+	}
+
+	// Fill message metadata (immutable copy)
+	msg.Topic = topic
+	if msg.Time.IsZero() {
+		msg.Time = time.Now().UTC()
+	}
+	msg = cloneMessage(msg)
+
+	ps.metrics.incPublish(topic)
+
+	// Use goroutine to deliver asynchronously
+	go func() {
+		ps.mu.RLock()
+		subsMap := ps.topics[topic]
+		var subs []*subscriber
+		if len(subsMap) > 0 {
+			// Create a snapshot to avoid holding lock during delivery
+			subs = make([]*subscriber, 0, len(subsMap))
+			for _, s := range subsMap {
+				subs = append(subs, s)
+			}
+		}
+
+		var patterns []patternSnapshot
+		if len(ps.patterns) > 0 {
+			patterns = make([]patternSnapshot, 0, len(ps.patterns))
+			for pattern, subMap := range ps.patterns {
+				if len(subMap) == 0 {
+					continue
+				}
+				snapshot := make([]*subscriber, 0, len(subMap))
+				for _, s := range subMap {
+					snapshot = append(snapshot, s)
+				}
+				patterns = append(patterns, patternSnapshot{
+					pattern: pattern,
+					subs:    snapshot,
+				})
+			}
+		}
+		ps.mu.RUnlock()
+
+		// Deliver to each subscriber
+		for _, s := range subs {
+			ps.deliver(s, msg)
+		}
+
+		if len(patterns) > 0 {
+			for _, entry := range patterns {
+				if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+					for _, s := range entry.subs {
+						ps.deliver(s, msg)
+					}
+				}
+			}
+		}
+	}()
+
+	return nil
 }
 
 // GetSubscriberCount returns the number of subscribers for a topic.
@@ -465,6 +598,7 @@ func (ps *InProcPubSub) ListTopics() []string {
 	for topic := range ps.topics {
 		topics = append(topics, topic)
 	}
+	sort.Strings(topics)
 	return topics
 }
 
@@ -489,6 +623,7 @@ func (ps *InProcPubSub) ListPatterns() []string {
 	for pattern := range ps.patterns {
 		patterns = append(patterns, pattern)
 	}
+	sort.Strings(patterns)
 	return patterns
 }
 
@@ -528,6 +663,8 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 		metricTopic = msg.Topic
 	}
 
+	msg = cloneMessage(msg)
+
 	// Fast path: check if closed without lock
 	if s.closed.Load() {
 		return
@@ -564,26 +701,32 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 }
 
 // deliverDropOldest drops the oldest message if buffer is full.
+// This implementation uses a buffered channel with a fixed size and implements
+// a proper ring buffer semantics by dropping the oldest message when full.
 func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopic string) bool {
 	select {
 	case s.ch <- msg:
 		ps.metrics.incDelivered(metricTopic)
 		return false
 	default:
-		// Buffer full, drop oldest
+		// Buffer is full, we need to drop the oldest message and add the new one
+		// Since Go channels don't guarantee FIFO order for buffered channels,
+		// we implement a simple approach: drain one message and try again
 		select {
 		case <-s.ch:
+			// Successfully drained one message (conceptually the oldest)
 			ps.metrics.incDropped(metricTopic, DropOldest)
 		default:
-			// Shouldn't happen, but safe
+			// This shouldn't happen since we know the channel is full
+			ps.metrics.incDropped(metricTopic, DropOldest)
 		}
 
-		// Try again
+		// Now try to send the new message
 		select {
 		case s.ch <- msg:
 			ps.metrics.incDelivered(metricTopic)
 		default:
-			// Still full after dropping one, drop this message
+			// Still full, drop this message too
 			ps.metrics.incDropped(metricTopic, DropOldest)
 		}
 		return false
@@ -706,8 +849,12 @@ func (ps *InProcPubSub) GetMetricsCollector() metrics.MetricsCollector {
 
 // recordMetrics records metrics using the unified collector.
 func (ps *InProcPubSub) recordMetrics(operation, topic string, duration time.Duration, err error) {
-	if ps.collector != nil {
-		ctx := context.Background()
-		ps.collector.ObservePubSub(ctx, operation, topic, duration, err)
+	ps.mu.RLock()
+	collector := ps.collector
+	ps.mu.RUnlock()
+	if collector == nil {
+		return
 	}
+	ctx := context.Background()
+	collector.ObservePubSub(ctx, operation, topic, duration, err)
 }

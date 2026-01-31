@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -15,6 +16,14 @@ import (
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
+
+type funcRunner struct {
+	start func(context.Context) error
+	stop  func(context.Context) error
+}
+
+func (f funcRunner) Start(ctx context.Context) error { return f.start(ctx) }
+func (f funcRunner) Stop(ctx context.Context) error  { return f.stop(ctx) }
 
 // TestBoot tests the complete boot process
 func TestBoot(t *testing.T) {
@@ -78,6 +87,94 @@ func TestBoot(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("boot did not complete in time")
+	}
+}
+
+func TestBootStartsRunnersBeforeServer(t *testing.T) {
+	app := New(WithAddr(":0"))
+
+	startCalled := make(chan struct{})
+	allowReturn := make(chan struct{})
+	startSawStarted := false
+	runnerStopped := false
+
+	runnerStart := func(ctx context.Context) error {
+		startSawStarted = app.started
+		close(startCalled)
+		<-allowReturn
+		return nil
+	}
+	runnerStop := func(ctx context.Context) error {
+		runnerStopped = true
+		return nil
+	}
+
+	if err := app.Register(funcRunner{start: runnerStart, stop: runnerStop}); err != nil {
+		t.Fatalf("unexpected register error: %v", err)
+	}
+
+	hookCalled := false
+	if err := app.OnShutdown(func(ctx context.Context) error {
+		hookCalled = true
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected shutdown hook error: %v", err)
+	}
+
+	app.Get("/boot-order", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	serverDone := make(chan error, 1)
+	go func() {
+		serverDone <- app.Boot()
+	}()
+
+	select {
+	case <-startCalled:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("runner did not start in time")
+	}
+
+	close(allowReturn)
+
+	if startSawStarted {
+		t.Fatalf("runner should start before server sets started flag")
+	}
+
+	var started bool
+	deadline := time.After(2 * time.Second)
+	for {
+		app.mu.RLock()
+		started = app.started
+		app.mu.RUnlock()
+		if started {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("server did not start in time")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+
+	select {
+	case err := <-serverDone:
+		if err != nil && err != http.ErrServerClosed {
+			t.Fatalf("unexpected boot error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("boot did not exit in time")
+	}
+	if !runnerStopped {
+		t.Fatalf("runner should stop on shutdown")
+	}
+	if !hookCalled {
+		t.Fatalf("shutdown hook should run on shutdown")
 	}
 }
 
@@ -666,17 +763,17 @@ func TestAppBootWithComponents(t *testing.T) {
 // TestAppBootWithLoggerLifecycle tests boot with logger that implements Lifecycle
 type testLifecycleLogger struct {
 	log.StructuredLogger
-	startCalled bool
-	stopCalled  bool
+	startCalled atomic.Bool
+	stopCalled  atomic.Bool
 }
 
 func (l *testLifecycleLogger) Start(ctx context.Context) error {
-	l.startCalled = true
+	l.startCalled.Store(true)
 	return nil
 }
 
 func (l *testLifecycleLogger) Stop(ctx context.Context) error {
-	l.stopCalled = true
+	l.stopCalled.Store(true)
 	return nil
 }
 
@@ -705,7 +802,7 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Check logger was started
-	if !logger.startCalled {
+	if !logger.startCalled.Load() {
 		t.Error("logger Start should have been called")
 	}
 
@@ -715,7 +812,7 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 	select {
 	case <-done:
 		// Check logger was stopped
-		if !logger.stopCalled {
+		if !logger.stopCalled.Load() {
 			t.Error("logger Stop should have been called")
 		}
 	case <-time.After(1 * time.Second):

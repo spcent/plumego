@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Health Overview - Plumego Reference</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="container">
+    {{template "siteHeader" .}}
+
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="status-indicator status-online"></div>
+        <span>Health Endpoints Active</span>
+      </div>
+      <div class="status-item">
+        <i class="fas fa-heartbeat"></i>
+        <span>Base Path: /health</span>
+      </div>
+      <div class="status-item">
+        <i class="fas fa-arrow-left"></i>
+        <a href="/" style="color: var(--primary); text-decoration: none;">Back to Home</a>
+      </div>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h3 class="feature-title">Readiness</h3>
+        <p class="feature-description">
+          Check readiness status for orchestration and load balancers.
+        </p>
+        <a href="/health/ready" class="btn">
+          <i class="fas fa-play"></i> View /health/ready
+        </a>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-info-circle"></i>
+        </div>
+        <h3 class="feature-title">Build Info</h3>
+        <p class="feature-description">
+          Inspect build metadata and version stamps.
+        </p>
+        <a href="/health/build" class="btn btn-secondary">
+          <i class="fas fa-code-branch"></i> View /health/build
+        </a>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <h3 class="feature-title">Health Report</h3>
+        <p class="feature-description">
+          Aggregate health summary and component readiness.
+        </p>
+        <a href="/health" class="btn">
+          <i class="fas fa-list"></i> View /health
+        </a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="panel-title">
+        <i class="fas fa-terminal"></i>
+        Endpoint Reference
+      </h3>
+      <div class="test-tools-grid">
+        <div class="tool-card">
+          <h4 class="tool-title">
+            <i class="fas fa-route"></i>
+            Available Endpoints
+          </h4>
+          <p class="tool-description">
+            Use these endpoints for liveness, readiness, and diagnostics.
+          </p>
+          <div class="response-display show">
+GET /health/ready
+GET /health/build
+GET /health
+GET /health/report
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <h4 class="tool-title">
+            <i class="fas fa-shield"></i>
+            Operational Notes
+          </h4>
+          <p class="tool-description">
+            Keep readiness checks fast and avoid heavy downstream calls.
+          </p>
+          <ul class="text-muted">
+            <li>Expose /health/ready for load balancers and probes.</li>
+            <li>Keep /health/build available for release verification.</li>
+            <li>Protect /health and /health/report if needed.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    {{template "siteFooter" .}}
+  </div>
+</body>
+</html>

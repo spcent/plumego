@@ -21,6 +21,12 @@ type TraceFlags uint8
 const (
 	// TraceFlagsSampled indicates that the trace should be sampled.
 	TraceFlagsSampled TraceFlags = 0x01
+
+	// TraceIDLength is the expected length of a trace ID in hexadecimal format (32 hex chars = 16 bytes).
+	TraceIDLength = 32
+
+	// SpanIDLength is the expected length of a span ID in hexadecimal format (16 hex chars = 8 bytes).
+	SpanIDLength = 16
 )
 
 // Trace represents a distributed trace containing multiple spans.
@@ -32,6 +38,38 @@ type Trace struct {
 	Spans      []*Span        `json:"spans"`
 	Attributes map[string]any `json:"attributes"`
 	Links      []TraceLink    `json:"links,omitempty"`
+}
+
+// Clone returns a deep copy of the Trace.
+// NOTE: Update this method when Trace struct fields change.
+func (t *Trace) Clone() *Trace {
+	if t == nil {
+		return nil
+	}
+
+	trace := &Trace{
+		ID:         t.ID,
+		RootSpanID: t.RootSpanID,
+		StartTime:  t.StartTime,
+		EndTime:    cloneTimePtr(t.EndTime),
+		Attributes: cloneAttributes(t.Attributes),
+	}
+
+	if len(t.Spans) > 0 {
+		trace.Spans = make([]*Span, len(t.Spans))
+		for i, span := range t.Spans {
+			trace.Spans[i] = span.Clone()
+		}
+	}
+
+	if len(t.Links) > 0 {
+		trace.Links = make([]TraceLink, len(t.Links))
+		for i, link := range t.Links {
+			trace.Links[i] = link.Clone()
+		}
+	}
+
+	return trace
 }
 
 // Span represents a single operation in a distributed trace.
@@ -48,6 +86,43 @@ type Span struct {
 	Attributes   map[string]any `json:"attributes"`
 	Events       []SpanEvent    `json:"events,omitempty"`
 	Links        []SpanLink     `json:"links,omitempty"`
+}
+
+// Clone returns a deep copy of the Span.
+// NOTE: Update this method when Span struct fields change.
+func (s *Span) Clone() *Span {
+	if s == nil {
+		return nil
+	}
+
+	span := &Span{
+		ID:           s.ID,
+		ParentSpanID: cloneSpanIDPtr(s.ParentSpanID),
+		TraceID:      s.TraceID,
+		Name:         s.Name,
+		Kind:         s.Kind,
+		StartTime:    s.StartTime,
+		EndTime:      cloneTimePtr(s.EndTime),
+		Duration:     s.Duration,
+		Status:       s.Status,
+		Attributes:   cloneAttributes(s.Attributes),
+	}
+
+	if len(s.Events) > 0 {
+		span.Events = make([]SpanEvent, len(s.Events))
+		for i, event := range s.Events {
+			span.Events[i] = event.Clone()
+		}
+	}
+
+	if len(s.Links) > 0 {
+		span.Links = make([]SpanLink, len(s.Links))
+		for i, link := range s.Links {
+			span.Links[i] = link.Clone()
+		}
+	}
+
+	return span
 }
 
 // SpanKind represents the kind of span.
@@ -83,6 +158,16 @@ type SpanEvent struct {
 	Attributes map[string]any `json:"attributes,omitempty"`
 }
 
+// Clone returns a deep copy of the SpanEvent.
+// NOTE: Update this method when SpanEvent struct fields change.
+func (e SpanEvent) Clone() SpanEvent {
+	return SpanEvent{
+		Name:       e.Name,
+		Timestamp:  e.Timestamp,
+		Attributes: cloneAttributes(e.Attributes),
+	}
+}
+
 // SpanLink represents a link to another span.
 type SpanLink struct {
 	TraceID    TraceID        `json:"trace_id"`
@@ -90,10 +175,29 @@ type SpanLink struct {
 	Attributes map[string]any `json:"attributes,omitempty"`
 }
 
+// Clone returns a deep copy of the SpanLink.
+// NOTE: Update this method when SpanLink struct fields change.
+func (l SpanLink) Clone() SpanLink {
+	return SpanLink{
+		TraceID:    l.TraceID,
+		SpanID:     l.SpanID,
+		Attributes: cloneAttributes(l.Attributes),
+	}
+}
+
 // TraceLink represents a link between traces.
 type TraceLink struct {
 	TraceID    TraceID        `json:"trace_id"`
 	Attributes map[string]any `json:"attributes,omitempty"`
+}
+
+// Clone returns a deep copy of the TraceLink.
+// NOTE: Update this method when TraceLink struct fields change.
+func (l TraceLink) Clone() TraceLink {
+	return TraceLink{
+		TraceID:    l.TraceID,
+		Attributes: cloneAttributes(l.Attributes),
+	}
 }
 
 // TraceContext represents the current tracing context.
@@ -153,9 +257,10 @@ type TraceCollector interface {
 
 // SimpleTraceCollector is a simple in-memory trace collector.
 type SimpleTraceCollector struct {
-	mu     sync.RWMutex
-	traces map[TraceID]*Trace
-	maxAge time.Duration
+	mu            sync.RWMutex
+	traces        map[TraceID]*Trace
+	maxAge        time.Duration
+	lastPruneTime time.Time
 }
 
 // NewSimpleTraceCollector creates a new simple trace collector.
@@ -169,6 +274,7 @@ func NewSimpleTraceCollector() *SimpleTraceCollector {
 func (c *SimpleTraceCollector) SetMaxAge(maxAge time.Duration) {
 	c.mu.Lock()
 	c.maxAge = maxAge
+	c.lastPruneTime = time.Time{} // Reset to force next prune
 	c.pruneLocked(time.Now())
 	c.mu.Unlock()
 }
@@ -179,9 +285,23 @@ func (c *SimpleTraceCollector) Collect(trace *Trace) {
 		return
 	}
 	c.mu.Lock()
-	c.traces[trace.ID] = copyTrace(trace)
+	defer c.mu.Unlock()
+
+	// Don't store already-expired traces
+	if c.maxAge > 0 {
+		now := time.Now()
+		cutoff := now.Add(-c.maxAge)
+		timestamp := trace.StartTime
+		if trace.EndTime != nil {
+			timestamp = *trace.EndTime
+		}
+		if timestamp.Before(cutoff) {
+			return // Skip storing expired trace
+		}
+	}
+
+	c.traces[trace.ID] = trace.Clone()
 	c.pruneLocked(time.Now())
-	c.mu.Unlock()
 }
 
 // GetTrace retrieves a trace by ID.
@@ -193,7 +313,7 @@ func (c *SimpleTraceCollector) GetTrace(traceID TraceID) (*Trace, bool) {
 	if !exists {
 		return nil, false
 	}
-	return copyTrace(trace), true
+	return trace.Clone(), true
 }
 
 // GetTraces retrieves traces matching the filter.
@@ -202,7 +322,7 @@ func (c *SimpleTraceCollector) GetTraces(filter TraceFilter) []*Trace {
 	c.pruneLocked(time.Now())
 	traces := make([]*Trace, 0, len(c.traces))
 	for _, trace := range c.traces {
-		traces = append(traces, copyTrace(trace))
+		traces = append(traces, trace.Clone())
 	}
 	c.mu.Unlock()
 
@@ -223,6 +343,22 @@ func (c *SimpleTraceCollector) pruneLocked(now time.Time) {
 	if c.maxAge <= 0 {
 		return
 	}
+
+	// Only prune if enough time has passed since last prune
+	// Avoid pruning on every operation
+	pruneInterval := c.maxAge / 10
+	if pruneInterval < 10*time.Second {
+		pruneInterval = 10 * time.Second
+	}
+	if pruneInterval > time.Minute {
+		pruneInterval = time.Minute
+	}
+
+	if now.Sub(c.lastPruneTime) < pruneInterval {
+		return
+	}
+	c.lastPruneTime = now
+
 	cutoff := now.Add(-c.maxAge)
 	for id, trace := range c.traces {
 		if trace == nil {
@@ -639,8 +775,8 @@ func TraceIDFromContext(ctx context.Context) string {
 
 // ParseTraceID parses a trace ID from string.
 func ParseTraceID(id string) (TraceID, error) {
-	if len(id) != 32 {
-		return "", fmt.Errorf("invalid trace ID length: expected 32, got %d", len(id))
+	if len(id) != TraceIDLength {
+		return "", fmt.Errorf("invalid trace ID length: expected %d, got %d", TraceIDLength, len(id))
 	}
 
 	// Validate hex string
@@ -653,8 +789,8 @@ func ParseTraceID(id string) (TraceID, error) {
 
 // ParseSpanID parses a span ID from string.
 func ParseSpanID(id string) (SpanID, error) {
-	if len(id) != 16 {
-		return "", fmt.Errorf("invalid span ID length: expected 16, got %d", len(id))
+	if len(id) != SpanIDLength {
+		return "", fmt.Errorf("invalid span ID length: expected %d, got %d", SpanIDLength, len(id))
 	}
 
 	// Validate hex string
@@ -756,85 +892,54 @@ func mergeSpanIntoTrace(trace *Trace, span *Span, maxSpans int) *Trace {
 	if trace == nil || span == nil {
 		return trace
 	}
+
+	// Check if we need to update or add
+	spanIndex := -1
 	for i, existingSpan := range trace.Spans {
 		if existingSpan.ID == span.ID {
-			trace.Spans[i] = copySpan(span)
-			return trace
+			spanIndex = i
+			break
 		}
 	}
+
+	// If span exists, create shallow copy and update the specific span
+	if spanIndex >= 0 {
+		newTrace := &Trace{
+			ID:         trace.ID,
+			RootSpanID: trace.RootSpanID,
+			StartTime:  trace.StartTime,
+			EndTime:    trace.EndTime,
+			Attributes: trace.Attributes,
+			Links:      trace.Links,
+			Spans:      make([]*Span, len(trace.Spans)),
+		}
+		copy(newTrace.Spans, trace.Spans)
+		newTrace.Spans[spanIndex] = span.Clone()
+		return newTrace
+	}
+
+	// Add new span if not found
 	if maxSpans > 0 && len(trace.Spans) >= maxSpans {
 		return trace
 	}
-	trace.Spans = append(trace.Spans, copySpan(span))
-	return trace
+
+	// Create new trace with additional span
+	newTrace := &Trace{
+		ID:         trace.ID,
+		RootSpanID: trace.RootSpanID,
+		StartTime:  trace.StartTime,
+		EndTime:    trace.EndTime,
+		Attributes: trace.Attributes,
+		Links:      trace.Links,
+		Spans:      make([]*Span, len(trace.Spans)+1),
+	}
+	copy(newTrace.Spans, trace.Spans)
+	newTrace.Spans[len(trace.Spans)] = span.Clone()
+	return newTrace
 }
 
-func copyTrace(src *Trace) *Trace {
-	if src == nil {
-		return nil
-	}
-
-	var endTime *time.Time
-	if src.EndTime != nil {
-		val := *src.EndTime
-		endTime = &val
-	}
-
-	trace := &Trace{
-		ID:         src.ID,
-		RootSpanID: src.RootSpanID,
-		StartTime:  src.StartTime,
-		EndTime:    endTime,
-		Attributes: copyAttributes(src.Attributes),
-		Links:      copyTraceLinks(src.Links),
-	}
-
-	if len(src.Spans) > 0 {
-		trace.Spans = make([]*Span, len(src.Spans))
-		for i, span := range src.Spans {
-			trace.Spans[i] = copySpan(span)
-		}
-	}
-
-	return trace
-}
-
-func copySpan(src *Span) *Span {
-	if src == nil {
-		return nil
-	}
-
-	var parent *SpanID
-	if src.ParentSpanID != nil {
-		val := *src.ParentSpanID
-		parent = &val
-	}
-
-	span := &Span{
-		ID:           src.ID,
-		ParentSpanID: parent,
-		TraceID:      src.TraceID,
-		Name:         src.Name,
-		Kind:         src.Kind,
-		StartTime:    src.StartTime,
-		EndTime:      copyTimePtr(src.EndTime),
-		Duration:     src.Duration,
-		Status:       src.Status,
-		Attributes:   copyAttributes(src.Attributes),
-		Links:        copySpanLinks(src.Links),
-	}
-
-	if len(src.Events) > 0 {
-		span.Events = make([]SpanEvent, len(src.Events))
-		for i, event := range src.Events {
-			span.Events[i] = copySpanEvent(event)
-		}
-	}
-
-	return span
-}
-
-func copyTimePtr(value *time.Time) *time.Time {
+// cloneTimePtr returns a deep copy of a time pointer.
+func cloneTimePtr(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}
@@ -842,44 +947,17 @@ func copyTimePtr(value *time.Time) *time.Time {
 	return &val
 }
 
-func copySpanEvent(src SpanEvent) SpanEvent {
-	return SpanEvent{
-		Name:       src.Name,
-		Timestamp:  src.Timestamp,
-		Attributes: copyAttributes(src.Attributes),
-	}
-}
-
-func copySpanLinks(links []SpanLink) []SpanLink {
-	if len(links) == 0 {
+// cloneSpanIDPtr returns a deep copy of a SpanID pointer.
+func cloneSpanIDPtr(value *SpanID) *SpanID {
+	if value == nil {
 		return nil
 	}
-	out := make([]SpanLink, len(links))
-	for i, link := range links {
-		out[i] = SpanLink{
-			TraceID:    link.TraceID,
-			SpanID:     link.SpanID,
-			Attributes: copyAttributes(link.Attributes),
-		}
-	}
-	return out
+	val := *value
+	return &val
 }
 
-func copyTraceLinks(links []TraceLink) []TraceLink {
-	if len(links) == 0 {
-		return nil
-	}
-	out := make([]TraceLink, len(links))
-	for i, link := range links {
-		out[i] = TraceLink{
-			TraceID:    link.TraceID,
-			Attributes: copyAttributes(link.Attributes),
-		}
-	}
-	return out
-}
-
-func copyAttributes(attrs map[string]any) map[string]any {
+// cloneAttributes returns a shallow copy of the attributes map.
+func cloneAttributes(attrs map[string]any) map[string]any {
 	if attrs == nil {
 		return nil
 	}

@@ -3,8 +3,11 @@ package webhookout
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -14,9 +17,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"crypto/rand"
-	"encoding/hex"
 )
 
 // Metrics tracks webhook delivery statistics.
@@ -354,13 +354,14 @@ func (s *Service) ReplayDelivery(ctx context.Context, deliveryID string) (Delive
 
 	newID := newID()
 
-	// Optional: keep the original payload verbatim, but update meta.delivery_id for the new delivery.
-	// Recommended: update delivery_id to keep the receiver's idempotency key correct.
+	// Update delivery_id in payload to maintain idempotency
+	// This is critical for replayed deliveries to avoid duplicate processing
 	raw := d.PayloadJSON
 	raw2, err := rewriteDeliveryIDInPayload(raw, newID)
 	if err != nil {
-		// fallback to raw as-is
-		raw2 = raw
+		// JSON rewrite failed - this could break idempotency
+		// Return error instead of silently using corrupted payload
+		return Delivery{}, fmt.Errorf("failed to update delivery_id in payload: %w", err)
 	}
 
 	newD := Delivery{

@@ -76,7 +76,9 @@ func (m *mockController) BatchDelete(w http.ResponseWriter, r *http.Request) {
 
 func TestResource_RouteRegistration(t *testing.T) {
 	r := NewRouter()
-	r.Resource("/users", &mockController{})
+	if err := r.Resource("/users", &mockController{}); err != nil {
+		t.Fatalf("Resource registration failed: %v", err)
+	}
 
 	testCases := []struct {
 		method string
@@ -105,7 +107,9 @@ func TestResource_RouteRegistration(t *testing.T) {
 func TestResource_ControllerInvocation(t *testing.T) {
 	r := NewRouter()
 	ctrl := &mockController{}
-	r.Resource("/posts", ctrl)
+	if err := r.Resource("/posts", ctrl); err != nil {
+		t.Fatalf("Resource registration failed: %v", err)
+	}
 
 	tests := []struct {
 		name     string
@@ -175,7 +179,9 @@ func TestBaseResourceController_DefaultImplementation(t *testing.T) {
 func TestResource_PathTrimSuffix(t *testing.T) {
 	r := NewRouter()
 	ctrl := &mockController{}
-	r.Resource("/products/", ctrl)
+	if err := r.Resource("/products/", ctrl); err != nil {
+		t.Fatalf("Resource registration failed: %v", err)
+	}
 
 	req := httptest.NewRequest("GET", "/products", nil)
 	rec := httptest.NewRecorder()

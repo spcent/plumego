@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
@@ -52,7 +53,7 @@ const (
 //
 //	import "github.com/spcent/plumego/security/jwt"
 //
-//	config := jwt.DefaultJWTConfig(secret)
+//	config := jwt.DefaultJWTConfig()
 //	config.Algorithm = jwt.AlgorithmEdDSA
 type Algorithm string
 
@@ -151,7 +152,7 @@ type TokenClaims struct {
 //
 //	import "github.com/spcent/plumego/security/jwt"
 //
-//	config := jwt.DefaultJWTConfig(secret)
+//	config := jwt.DefaultJWTConfig()
 //	config.Issuer = "my-app"
 //	config.AccessExpiration = 15 * time.Minute
 //	config.RefreshExpiration = 7 * 24 * time.Hour
@@ -177,12 +178,6 @@ type JWTConfig struct {
 
 	// ClockSkew is the tolerance for clock skew
 	ClockSkew time.Duration
-
-	// AllowQueryToken allows tokens in URL query parameters (not recommended)
-	AllowQueryToken bool
-
-	// DebugMode returns detailed error messages (for development only)
-	DebugMode bool
 }
 
 // DefaultJWTConfig returns sane defaults.
@@ -195,17 +190,11 @@ type JWTConfig struct {
 //   - RotationInterval: 24 hours
 //   - Algorithm: HS256
 //   - ClockSkew: 5 seconds
-//   - AllowQueryToken: false
-//   - DebugMode: false
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	secret := []byte("my-secret-key")
-//	config := jwt.DefaultJWTConfig(secret)
-func DefaultJWTConfig(secret []byte) JWTConfig {
-	_ = secret // kept for API compatibility
+//	config := jwt.DefaultJWTConfig()
+func DefaultJWTConfig() JWTConfig {
 	return JWTConfig{
 		Issuer:            "plumego",
 		Audience:          "plumego-client",
@@ -213,9 +202,7 @@ func DefaultJWTConfig(secret []byte) JWTConfig {
 		RefreshExpiration: 7 * 24 * time.Hour,
 		RotationInterval:  24 * time.Hour,
 		Algorithm:         AlgorithmHS256,
-		ClockSkew:         5 * time.Second, // clock skew tolerance
-		AllowQueryToken:   false,           // allow token in query parameter
-		DebugMode:         false,           // debug mode (return detailed error messages)
+		ClockSkew:         5 * time.Second,
 	}
 }
 
@@ -272,7 +259,7 @@ type TokenPair struct {
 //	import "github.com/spcent/plumego/store/kv"
 //
 //	store := kv.New()
-//	config := jwt.DefaultJWTConfig(secret)
+//	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {
 //		// handle error
@@ -307,7 +294,7 @@ type JWTManager struct {
 //
 //	store := kv.New()
 //	secret := []byte("my-secret-key")
-//	config := jwt.DefaultJWTConfig(secret)
+//	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {
 //		// handle error
@@ -682,7 +669,19 @@ func (m *JWTManager) RevokeToken(token string) error {
 
 func (m *JWTManager) isBlacklisted(jti string) bool {
 	_, err := m.store.Get(blacklistPrefix + jti)
-	return err == nil
+	if err == nil {
+		// Token is explicitly blacklisted
+		return true
+	}
+	// For "not found" errors, the token is not blacklisted.
+	// For any other errors (storage failure, network issues), we fail-safe
+	// by treating the token as blacklisted to prevent accepting potentially
+	// revoked tokens when the storage is unavailable.
+	if errors.Is(err, kvstore.ErrKeyNotFound) {
+		return false
+	}
+	// Unknown error - fail-safe by assuming blacklisted
+	return true
 }
 
 // IncrementIdentityVersion bumps the subject version, invalidating older tokens.
@@ -739,24 +738,24 @@ func (m *JWTManager) matchIdentityVersion(subject string, version int64) bool {
 func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			token := extractBearerToken(r, m.config.AllowQueryToken) // extract token from request
+			token := extractBearerToken(r)
 			if token == "" {
-				http.Error(w, "missing authorization header", http.StatusUnauthorized)
+				writeAuthError(w, r, http.StatusUnauthorized, "missing_token", "missing authorization header")
 				return
 			}
 
 			claims, err := m.VerifyToken(r.Context(), token, expectedType)
 			if err != nil {
-				// return detailed error in debug mode
-				if m.config.DebugMode {
-					http.Error(w, fmt.Sprintf("token verification failed: %v", err), http.StatusUnauthorized)
-				} else {
-					http.Error(w, "invalid token", http.StatusUnauthorized)
-				}
+				// Always return generic error message to prevent information leakage.
+				// Detailed errors are logged internally for debugging.
+				writeAuthError(w, r, http.StatusUnauthorized, "invalid_token", "invalid token")
 				return
 			}
 
 			ctx := context.WithValue(r.Context(), claimsContextKey, claims)
+			if principal := PrincipalFromClaims(claims); principal != nil {
+				ctx = contract.ContextWithPrincipal(ctx, principal)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -777,16 +776,25 @@ func AuthorizeMiddleware(policy AuthZPolicy) middleware.Middleware {
 			raw := r.Context().Value(claimsContextKey)
 			claims, ok := raw.(*TokenClaims)
 			if !ok {
-				http.Error(w, "missing authentication context", http.StatusForbidden)
+				writeAuthError(w, r, http.StatusForbidden, "auth_context_missing", "missing authentication context")
 				return
 			}
 			if !checkPolicy(policy, claims.Authorization) {
-				http.Error(w, "forbidden", http.StatusForbidden)
+				writeAuthError(w, r, http.StatusForbidden, "forbidden", "forbidden")
 				return
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func writeAuthError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
+	contract.WriteError(w, r, contract.APIError{
+		Status:   status,
+		Code:     code,
+		Message:  message,
+		Category: contract.CategoryAuthentication,
+	})
 }
 
 func checkPolicy(policy AuthZPolicy, auth AuthorizationClaims) bool {
@@ -843,20 +851,14 @@ func GetClaimsFromContext(r *http.Request) (*TokenClaims, error) {
 	return claims, nil
 }
 
-// extractBearerToken extracts Bearer token, supporting configurable URL token
-func extractBearerToken(r *http.Request, allowQuery bool) string {
+// extractBearerToken extracts Bearer token from the Authorization header.
+// For security reasons, tokens in URL query parameters are not supported
+// as they can be leaked via server logs, browser history, and Referer headers.
+func extractBearerToken(r *http.Request) string {
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
 		return strings.TrimSpace(authHeader[7:])
 	}
-
-	// only read from query parameters if explicitly allowed
-	if allowQuery {
-		if token := r.URL.Query().Get("token"); token != "" {
-			return token
-		}
-	}
-
 	return ""
 }
 

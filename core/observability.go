@@ -7,7 +7,6 @@ import (
 
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/router"
 )
 
 // MetricsConfig configures the built-in metrics endpoint and collector wiring.
@@ -61,6 +60,10 @@ func DefaultObservabilityConfig() ObservabilityConfig {
 
 // ConfigureObservability wires built-in metrics and tracing with structured logging.
 func (a *App) ConfigureObservability(cfg ObservabilityConfig) error {
+	if err := a.ensureMutable("configure_observability", "configure observability"); err != nil {
+		return err
+	}
+
 	if cfg.Metrics.Enabled {
 		if err := a.configureMetrics(cfg.Metrics); err != nil {
 			return err
@@ -83,10 +86,7 @@ func (a *App) ConfigureObservability(cfg ObservabilityConfig) error {
 }
 
 func (a *App) configureMetrics(cfg MetricsConfig) error {
-	if a.router == nil {
-		a.router = router.NewRouter()
-		a.router.SetLogger(a.logger)
-	}
+	a.ensureRouter()
 
 	path := normalizeObservabilityPath(cfg.Path)
 	if path == "" {
@@ -95,7 +95,9 @@ func (a *App) configureMetrics(cfg MetricsConfig) error {
 
 	collector := cfg.Collector
 	if collector == nil {
+		a.mu.RLock()
 		collector = a.metricsCollector
+		a.mu.RUnlock()
 	}
 
 	if collector == nil {
@@ -121,20 +123,26 @@ func (a *App) configureMetrics(cfg MetricsConfig) error {
 		return err
 	}
 
+	a.mu.Lock()
 	a.metricsCollector = collector
+	a.mu.Unlock()
 	return nil
 }
 
 func (a *App) configureTracing(cfg TracingConfig) error {
 	tracer := cfg.Tracer
 	if tracer == nil {
+		a.mu.RLock()
 		tracer = a.tracer
+		a.mu.RUnlock()
 	}
 	if tracer == nil {
 		tracer = metrics.NewOpenTelemetryTracer(cfg.ServiceName)
 	}
 
+	a.mu.Lock()
 	a.tracer = tracer
+	a.mu.Unlock()
 	return nil
 }
 

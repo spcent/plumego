@@ -77,6 +77,23 @@ func WithLogging() Option {
 	}
 }
 
+// WithRequestID enables the request id middleware.
+func WithRequestID() Option {
+	return func(a *App) {
+		_ = a.enableRequestID()
+	}
+}
+
+// WithRecommendedMiddleware enables the default production-safe middleware chain.
+// It includes RequestID, Logging, and Recovery in the recommended order.
+func WithRecommendedMiddleware() Option {
+	return func(a *App) {
+		_ = a.enableRequestID()
+		_ = a.enableLogging()
+		_ = a.enableRecovery()
+	}
+}
+
 // WithCORS enables the default CORS middleware.
 func WithCORS() Option {
 	return func(a *App) {
@@ -214,6 +231,56 @@ func WithComponents(components ...Component) Option {
 		for _, component := range components {
 			if component != nil {
 				a.components = append(a.components, component)
+			}
+		}
+	}
+}
+
+// WithMethodNotAllowed enables 405 responses with Allow headers for method mismatches.
+func WithMethodNotAllowed(enabled bool) Option {
+	return func(a *App) {
+		r := a.ensureRouter()
+		if r != nil {
+			r.SetMethodNotAllowed(enabled)
+		}
+	}
+}
+
+// WithShutdownHook registers a shutdown hook.
+func WithShutdownHook(hook ShutdownHook) Option {
+	return func(a *App) {
+		if hook != nil {
+			a.shutdownHooks = append(a.shutdownHooks, hook)
+		}
+	}
+}
+
+// WithShutdownHooks registers multiple shutdown hooks.
+func WithShutdownHooks(hooks ...ShutdownHook) Option {
+	return func(a *App) {
+		for _, hook := range hooks {
+			if hook != nil {
+				a.shutdownHooks = append(a.shutdownHooks, hook)
+			}
+		}
+	}
+}
+
+// WithRunner registers a background runner in the application lifecycle.
+func WithRunner(runner Runner) Option {
+	return func(a *App) {
+		if runner != nil {
+			a.runners = append(a.runners, runner)
+		}
+	}
+}
+
+// WithRunners registers multiple background runners.
+func WithRunners(runners ...Runner) Option {
+	return func(a *App) {
+		for _, runner := range runners {
+			if runner != nil {
+				a.runners = append(a.runners, runner)
 			}
 		}
 	}

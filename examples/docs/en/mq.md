@@ -4,6 +4,12 @@
 
 This document describes the improvements made to the `net/mq` module as part of the P0 priority refactoring effort.
 
+> Status: **Experimental**. The `net/mq` module includes unfinished features (see TODOs in `net/mq/mq.go`) and may change without notice. Avoid production use until those TODOs are completed.
+
+### Priority queue semantics
+- `PublishPriority` uses a per-topic priority queue (highest priority first; FIFO within the same priority).
+- Ordering is best-effort when the broker is under backlog pressure; it does not guarantee strict ordering across different topics or after restarts.
+
 ## Changes Made
 
 ### 1. Error Handling Improvements

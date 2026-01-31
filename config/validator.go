@@ -162,25 +162,8 @@ func (r *Required) Validate(value any, key string) error {
 		return fmt.Errorf("config %s is required", key)
 	}
 
-	str, ok := value.(string)
-	if ok && strings.TrimSpace(str) == "" {
-		return fmt.Errorf("config %s is required and cannot be empty", key)
-	}
-
-	// Convert to string for checking
-	var strValue string
-	switch v := value.(type) {
-	case string:
-		strValue = v
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		strValue = fmt.Sprintf("%d", v)
-	case float32, float64:
-		strValue = fmt.Sprintf("%g", v)
-	case bool:
-		strValue = strconv.FormatBool(v)
-	default:
-		strValue = fmt.Sprintf("%v", v)
-	}
+	// Convert to string for checking using the shared helper
+	strValue := configToString(value)
 
 	if strings.TrimSpace(strValue) == "" {
 		return fmt.Errorf("config %s is required and cannot be empty", key)

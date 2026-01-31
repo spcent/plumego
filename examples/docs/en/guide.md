@@ -26,9 +26,6 @@ type Component interface {
 
 Use `core.WithComponent` (or `WithComponents`) when constructing the app to add functionality. Built-in features (Webhook management, inbound Webhook receiver, PubSub debug, WebSocket utilities, frontend serving) can all be mounted as components, so examples can mix only the parts they need.
 
-## Migration Notes
-- `plumego.ComponentFunc` re-export has been removed. Implement `core.Component` directly (see the interface above), or keep a local adapter type if you prefer functional hooks.
-
 ## Quick Start
 Create a small `main.go`, wire routes and middleware, then start the server:
 
@@ -77,7 +74,7 @@ func main() {
     app := plumego.New()
 
     app.GetCtx("/health", func(ctx *plumego.Context) {
-        ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
+        _ = ctx.Response(http.StatusOK, map[string]string{"status": "ok"}, nil)
     })
 
     log.Println("server started at :8080")
@@ -93,9 +90,17 @@ func main() {
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, etc., or the context-aware variants (`GetCtx`) that expose a unified request context wrapper. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir`.
 - **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (body size limits, concurrency limits) are auto-injected during setup. Recovery/logging/CORS helpers are enabled via `core.WithRecovery`, `core.WithLogging`, and `core.WithCORS`.
+- **Contract Helpers**: Use `contract.WriteError` for standardized error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
 - **WebSocket Hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint, plus an optional broadcast endpoint (protected by a shared secret). Customize worker count and queue size via `WebSocketConfig`.
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
+
+## Contracts
+- Router contract: [router-contract.md](router-contract.md)
+- Middleware contract: [middleware-contract.md](middleware-contract.md)
+- Lifecycle contract: [lifecycle-contract.md](lifecycle-contract.md)
+- Observability contract: [observability-contract.md](observability-contract.md)
+- Config contract: [config-contract.md](config-contract.md)
 
 ## Reference App
 `examples/reference` is an out-of-the-box `main` package that integrates common components:

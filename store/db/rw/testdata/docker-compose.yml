@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # MySQL Primary (Master)
+  mysql-primary:
+    image: mysql:8.0
+    container_name: plumego-mysql-primary
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./init-primary.sql:/docker-entrypoint-initdb.d/init.sql
+      - primary-data:/var/lib/mysql
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - plumego-test
+
+  # MySQL Replica 1 (Slave)
+  mysql-replica1:
+    image: mysql:8.0
+    container_name: plumego-mysql-replica1
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+    ports:
+      - "3307:3306"
+    volumes:
+      - replica1-data:/var/lib/mysql
+    command:
+      - --server-id=2
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --relay-log=relay-bin
+      - --read-only=1
+    depends_on:
+      mysql-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - plumego-test
+
+  # MySQL Replica 2 (Slave)
+  mysql-replica2:
+    image: mysql:8.0
+    container_name: plumego-mysql-replica2
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+    ports:
+      - "3308:3306"
+    volumes:
+      - replica2-data:/var/lib/mysql
+    command:
+      - --server-id=3
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --relay-log=relay-bin
+      - --read-only=1
+    depends_on:
+      mysql-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - plumego-test
+
+  # Setup replication (one-time job)
+  replication-setup:
+    image: mysql:8.0
+    container_name: plumego-replication-setup
+    depends_on:
+      mysql-primary:
+        condition: service_healthy
+      mysql-replica1:
+        condition: service_healthy
+      mysql-replica2:
+        condition: service_healthy
+    volumes:
+      - ./setup-replication.sh:/setup-replication.sh
+    entrypoint: ["/bin/bash", "/setup-replication.sh"]
+    networks:
+      - plumego-test
+    restart: "no"
+
+volumes:
+  primary-data:
+  replica1-data:
+  replica2-data:
+
+networks:
+  plumego-test:
+    driver: bridge

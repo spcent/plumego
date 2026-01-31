@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
-	"encoding/json"
+	"flag"
 	"fmt"
 	"html"
 	"html/template"
@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/config"
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/health"
@@ -35,6 +36,7 @@ var staticFS embed.FS
 // AppContext holds application-wide dependencies and configuration
 type AppContext struct {
 	App        *core.App
+	Config     Config
 	Bus        *pubsub.InProcPubSub
 	WebhookSvc *webhookout.Service
 	Prom       *metrics.PrometheusCollector
@@ -42,30 +44,113 @@ type AppContext struct {
 	DocSite    *DocSite
 }
 
-// Config holds all application configuration
+// Config holds all application configuration.
 type Config struct {
-	Addr           string
-	WSecret        string
-	GitHubSecret   string
-	StripeSecret   string
-	WebhookToken   string
-	EnableDocs     bool
-	EnableMetrics  bool
-	EnableWebhooks bool
+	Core core.AppConfig
+
+	WebSocketSecret string
+	GitHubSecret    string
+	StripeSecret    string
+	WebhookToken    string
+	EnableDocs      bool
+	EnableMetrics   bool
+	EnableWebhooks  bool
 }
 
-// LoadConfig loads configuration from environment
-func LoadConfig() Config {
+func Defaults() Config {
 	return Config{
-		Addr:           config.GetString("ADDR", ":8080"),
-		WSecret:        config.GetString("WS_SECRET", "dev-secret"),
-		GitHubSecret:   config.GetString("GITHUB_WEBHOOK_SECRET", "dev-github-secret"),
-		StripeSecret:   config.GetString("STRIPE_WEBHOOK_SECRET", "whsec_dev"),
-		WebhookToken:   config.GetString("WEBHOOK_TRIGGER_TOKEN", "dev-trigger"),
-		EnableDocs:     config.GetBool("ENABLE_DOCS", true),
-		EnableMetrics:  config.GetBool("ENABLE_METRICS", true),
-		EnableWebhooks: config.GetBool("ENABLE_WEBHOOKS", true),
+		Core: core.AppConfig{
+			Addr:    ":8080",
+			EnvFile: ".env",
+			Debug:   true,
+		},
+		WebSocketSecret: "dev-secret",
+		GitHubSecret:    "dev-github-secret",
+		StripeSecret:    "whsec_dev",
+		WebhookToken:    "dev-trigger",
+		EnableDocs:      true,
+		EnableMetrics:   true,
+		EnableWebhooks:  true,
 	}
+}
+
+// LoadConfig loads configuration from env and flags.
+func LoadConfig() (Config, error) {
+	cfg := Defaults()
+
+	cfg.Core.EnvFile = resolveEnvFile(os.Args, cfg.Core.EnvFile)
+	if err := loadEnvFile(cfg.Core.EnvFile); err != nil {
+		return cfg, err
+	}
+
+	applyEnv(&cfg)
+	applyFlags(&cfg)
+
+	return cfg, ValidateConfig(cfg)
+}
+
+func ValidateConfig(cfg Config) error {
+	if cfg.Core.Addr == "" {
+		return fmt.Errorf("addr is required")
+	}
+	return nil
+}
+
+func applyEnv(cfg *Config) {
+	cfg.Core.Addr = config.GetString("APP_ADDR", cfg.Core.Addr)
+	cfg.Core.EnvFile = config.GetString("APP_ENV_FILE", cfg.Core.EnvFile)
+	cfg.Core.Debug = config.GetBool("APP_DEBUG", cfg.Core.Debug)
+
+	cfg.WebSocketSecret = config.GetString("WS_SECRET", cfg.WebSocketSecret)
+	cfg.GitHubSecret = config.GetString("GITHUB_WEBHOOK_SECRET", cfg.GitHubSecret)
+	cfg.StripeSecret = config.GetString("STRIPE_WEBHOOK_SECRET", cfg.StripeSecret)
+	cfg.WebhookToken = config.GetString("WEBHOOK_TRIGGER_TOKEN", cfg.WebhookToken)
+	cfg.EnableDocs = config.GetBool("ENABLE_DOCS", cfg.EnableDocs)
+	cfg.EnableMetrics = config.GetBool("ENABLE_METRICS", cfg.EnableMetrics)
+	cfg.EnableWebhooks = config.GetBool("ENABLE_WEBHOOKS", cfg.EnableWebhooks)
+}
+
+func applyFlags(cfg *Config) {
+	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
+	flag.StringVar(&cfg.Core.EnvFile, "env-file", cfg.Core.EnvFile, "path to .env file")
+	flag.BoolVar(&cfg.Core.Debug, "debug", cfg.Core.Debug, "enable debug mode")
+	flag.BoolVar(&cfg.EnableDocs, "enable-docs", cfg.EnableDocs, "enable docs site")
+	flag.BoolVar(&cfg.EnableMetrics, "enable-metrics", cfg.EnableMetrics, "enable metrics")
+	flag.BoolVar(&cfg.EnableWebhooks, "enable-webhooks", cfg.EnableWebhooks, "enable webhooks")
+	flag.Parse()
+}
+
+func resolveEnvFile(args []string, defaultPath string) string {
+	if envPath := strings.TrimSpace(os.Getenv("APP_ENV_FILE")); envPath != "" {
+		defaultPath = envPath
+	}
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--env-file" || arg == "-env-file" {
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+		}
+		if strings.HasPrefix(arg, "--env-file=") {
+			return strings.TrimPrefix(arg, "--env-file=")
+		}
+		if strings.HasPrefix(arg, "-env-file=") {
+			return strings.TrimPrefix(arg, "-env-file=")
+		}
+	}
+
+	return defaultPath
+}
+
+func loadEnvFile(path string) error {
+	if path == "" {
+		return nil
+	}
+	if _, err := os.Stat(path); err != nil {
+		return nil
+	}
+	return config.LoadEnv(path, true)
 }
 
 // NewAppContext creates and initializes the application context
@@ -80,19 +165,22 @@ func NewAppContext(cfg Config) (*AppContext, error) {
 	webhookSvc := webhookout.NewService(webhookStore, webhookCfg)
 
 	// Initialize metrics
-	prom := metrics.NewPrometheusCollector("plumego_reference")
-	tracer := metrics.NewOpenTelemetryTracer("plumego-reference")
+	var prom *metrics.PrometheusCollector
+	var tracer *metrics.OpenTelemetryTracer
+	if cfg.EnableMetrics {
+		prom = metrics.NewPrometheusCollector("plumego_reference")
+		tracer = metrics.NewOpenTelemetryTracer("plumego-reference")
+	}
 
 	// Create core application
-	app := core.New(
-		core.WithAddr(cfg.Addr),
-		core.WithDebug(),
+	opts := []core.Option{
+		core.WithAddr(cfg.Core.Addr),
+		core.WithEnvPath(cfg.Core.EnvFile),
+		core.WithRequestID(),
 		core.WithRecovery(),
 		core.WithLogging(),
 		core.WithCORS(),
 		core.WithPubSub(bus),
-		core.WithMetricsCollector(prom),
-		core.WithTracer(tracer),
 		core.WithWebhookIn(core.WebhookInConfig{
 			Enabled:           cfg.EnableWebhooks,
 			Pub:               bus,
@@ -111,7 +199,18 @@ func NewAppContext(cfg Config) (*AppContext, error) {
 			IncludeStats:     true,
 			DefaultPageLimit: 50,
 		}),
-	)
+	}
+	if cfg.Core.Debug {
+		opts = append(opts, core.WithDebug())
+	}
+	if prom != nil {
+		opts = append(opts, core.WithMetricsCollector(prom))
+	}
+	if tracer != nil {
+		opts = append(opts, core.WithTracer(tracer))
+	}
+
+	app := core.New(opts...)
 
 	// Load documentation site
 	var docSite *DocSite
@@ -125,6 +224,7 @@ func NewAppContext(cfg Config) (*AppContext, error) {
 
 	return &AppContext{
 		App:        app,
+		Config:     cfg,
 		Bus:        bus,
 		WebhookSvc: webhookSvc,
 		Prom:       prom,
@@ -141,13 +241,72 @@ func (ctx *AppContext) RegisterRoutes() error {
 		ctx.App.Get("/docs/*path", ctx.DocSite.Handler())
 	}
 
+	pageTemplates, err := template.ParseFS(staticFS,
+		"ui/templates/partials.html",
+		"ui/templates/index.html",
+		"ui/templates/webhooks.html",
+		"ui/templates/health.html",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to parse page templates: %w", err)
+	}
+
+	footerLinks := defaultFooterLinks()
+
+	homeData := PageData{
+		Header: PageHeader{
+			IconClass: "fas fa-feather",
+			Title:     "Plumego Reference",
+			Subtitle:  "Modern Go Web Framework Demo Platform - Showcasing Elegant Architecture Design",
+		},
+		FooterLinks: footerLinks,
+	}
+	webhooksData := PageData{
+		Header: PageHeader{
+			IconClass: "fas fa-plug",
+			Title:     "Webhook Management",
+			Subtitle:  "Test and verify webhook integration, supporting GitHub and Stripe with automatic retry and status monitoring.",
+		},
+		FooterLinks: footerLinks,
+	}
+	healthData := PageData{
+		Header: PageHeader{
+			IconClass: "fas fa-heartbeat",
+			Title:     "Health Overview",
+			Subtitle:  "Status, readiness, and build diagnostics for the reference service.",
+		},
+		FooterLinks: footerLinks,
+	}
+	ctx.App.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := pageTemplates.ExecuteTemplate(w, "index.html", homeData); err != nil {
+			log.Printf("failed to render homepage: %v", err)
+		}
+	})
+	ctx.App.Get("/webhooks", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := pageTemplates.ExecuteTemplate(w, "webhooks.html", webhooksData); err != nil {
+			log.Printf("failed to render webhooks page: %v", err)
+		}
+	})
+	ctx.App.Get("/health/detailed", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := pageTemplates.ExecuteTemplate(w, "health.html", healthData); err != nil {
+			log.Printf("failed to render health page: %v", err)
+		}
+	})
+
 	// Register static frontend
-	if err := frontend.RegisterFS(ctx.App.Router(), http.FS(staticFS), frontend.WithPrefix("/")); err != nil {
+	uiFS, err := fs.Sub(staticFS, "ui")
+	if err != nil {
+		return fmt.Errorf("failed to get ui directory: %w", err)
+	}
+	if err := frontend.RegisterFS(ctx.App.Router(), http.FS(uiFS), frontend.WithPrefix("/")); err != nil {
 		return fmt.Errorf("failed to register frontend: %w", err)
 	}
 
 	// Register static files (CSS, JS) under /static path
-	staticSubFS, err := fs.Sub(staticFS, "ui/static")
+	staticSubFS, err := fs.Sub(uiFS, "static")
 	if err != nil {
 		return fmt.Errorf("failed to get static subdirectory: %w", err)
 	}
@@ -161,7 +320,7 @@ func (ctx *AppContext) RegisterRoutes() error {
 
 	// Configure WebSocket
 	wsCfg := core.DefaultWebSocketConfig()
-	wsCfg.Secret = []byte(config.GetString("WS_SECRET", "dev-secret"))
+	wsCfg.Secret = []byte(ctx.Config.WebSocketSecret)
 	if _, err := ctx.App.ConfigureWebSocketWithOptions(wsCfg); err != nil {
 		return fmt.Errorf("failed to configure websocket: %w", err)
 	}
@@ -206,7 +365,7 @@ func (ctx *AppContext) registerAPIEndpoints() {
 				"api":       "/api",
 			},
 		}
-		ctx.writeJSON(w, response)
+		ctx.writeJSON(w, r, response)
 	})
 
 	// Status endpoint - returns comprehensive system status
@@ -239,7 +398,7 @@ func (ctx *AppContext) registerAPIEndpoints() {
 				"websocket": "/ws",
 			},
 		}
-		ctx.writeJSON(w, response)
+		ctx.writeJSON(w, r, response)
 	})
 
 	// API test endpoint with multiple response formats
@@ -285,7 +444,7 @@ func (ctx *AppContext) registerAPIEndpoints() {
 				"status":       "success",
 				"query_params": r.URL.Query().Encode(),
 			}
-			ctx.writeJSON(w, response)
+			ctx.writeJSON(w, r, response)
 		}
 	})
 }
@@ -307,11 +466,11 @@ func (ctx *AppContext) registerTestEndpoints() {
 		}
 
 		if err := ctx.Bus.Publish(topic, message); err != nil {
-			ctx.writeError(w, http.StatusInternalServerError, "publish failed", err)
+			ctx.writeError(w, r, http.StatusInternalServerError, "publish failed", err)
 			return
 		}
 
-		ctx.writeJSON(w, map[string]any{
+		ctx.writeJSON(w, r, map[string]any{
 			"status":    "success",
 			"topic":     topic,
 			"message":   fmt.Sprint(message.Data),
@@ -324,15 +483,15 @@ func (ctx *AppContext) registerTestEndpoints() {
 		const maxWebhookBody = int64(1 << 20)
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxWebhookBody+1))
 		if err != nil {
-			ctx.writeError(w, http.StatusBadRequest, "read body failed", err)
+			ctx.writeError(w, r, http.StatusBadRequest, "read body failed", err)
 			return
 		}
 		if int64(len(body)) > maxWebhookBody {
-			ctx.writeError(w, http.StatusRequestEntityTooLarge, "body too large", nil)
+			ctx.writeError(w, r, http.StatusRequestEntityTooLarge, "body too large", nil)
 			return
 		}
 
-		ctx.writeJSON(w, map[string]any{
+		ctx.writeJSON(w, r, map[string]any{
 			"status":         "webhook_received",
 			"content_length": len(body),
 			"timestamp":      time.Now().Format(time.RFC3339),
@@ -345,27 +504,24 @@ func (ctx *AppContext) registerTestEndpoints() {
 }
 
 // writeJSON writes a JSON response
-func (ctx *AppContext) writeJSON(w http.ResponseWriter, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(data); err != nil {
+func (ctx *AppContext) writeJSON(w http.ResponseWriter, r *http.Request, data any) {
+	if err := contract.WriteResponse(w, r, http.StatusOK, data, nil); err != nil {
 		log.Printf("failed to encode JSON response: %v", err)
 	}
 }
 
 // writeError writes an error response
-func (ctx *AppContext) writeError(w http.ResponseWriter, status int, message string, err error) {
-	response := map[string]any{
-		"status":  "error",
-		"message": message,
+func (ctx *AppContext) writeError(w http.ResponseWriter, r *http.Request, status int, message string, err error) {
+	apiErr := contract.APIError{
+		Status:   status,
+		Code:     http.StatusText(status),
+		Message:  message,
+		Category: contract.CategoryForStatus(status),
 	}
 	if err != nil {
-		response["error"] = err.Error()
+		apiErr.Details = map[string]any{"error": err.Error()}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if encodeErr := json.NewEncoder(w).Encode(response); encodeErr != nil {
-		log.Printf("failed to encode error response: %v", encodeErr)
-	}
+	contract.WriteError(w, r, apiErr)
 }
 
 // Start starts the application
@@ -399,6 +555,31 @@ type DocPage struct {
 	Title string
 }
 
+type PageHeader struct {
+	IconClass string
+	Title     string
+	Subtitle  string
+}
+
+type PageLink struct {
+	Href  string
+	Label string
+}
+
+type PageData struct {
+	Header      PageHeader
+	FooterLinks []PageLink
+}
+
+func defaultFooterLinks() []PageLink {
+	return []PageLink{
+		{Href: "/docs", Label: "Docs"},
+		{Href: "/health/ready", Label: "Health Check"},
+		{Href: "/health/build", Label: "Build Info"},
+		{Href: "/api/status", Label: "System Status"},
+	}
+}
+
 // NewDocSite creates a new documentation site
 func NewDocSite() (*DocSite, error) {
 	path := locateDocsPath()
@@ -421,16 +602,12 @@ func NewDocSite() (*DocSite, error) {
 		}
 	}
 
-	// Load template from embedded filesystem
-	tmplPath := filepath.Join("ui", "templates", "docs.html")
-	tmplContent, err := fs.ReadFile(staticFS, tmplPath)
+	tmpl, err := template.ParseFS(staticFS,
+		"ui/templates/docs.html",
+		"ui/templates/partials.html",
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read template file: %w", err)
-	}
-
-	tmpl, err := template.New("docs").Parse(string(tmplContent))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
+		return nil, fmt.Errorf("failed to parse docs template: %w", err)
 	}
 
 	return &DocSite{
@@ -595,8 +772,11 @@ func (d *DocSite) languages() []string {
 
 // renderPage renders the documentation page template
 func (d *DocSite) renderPage(w http.ResponseWriter, data docTemplateData) {
+	if len(data.FooterLinks) == 0 {
+		data.FooterLinks = defaultFooterLinks()
+	}
 	buf := &bytes.Buffer{}
-	if err := d.template.Execute(buf, data); err != nil {
+	if err := d.template.ExecuteTemplate(buf, "docs.html", data); err != nil {
 		http.Error(w, fmt.Sprintf("render docs: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -612,23 +792,32 @@ type docTemplateData struct {
 	Content      template.HTML
 	Navigation   map[string][]DocPage
 	LanguageList []string
+	FooterLinks  []PageLink
 }
 
 // markdownToHTML converts markdown to HTML (simplified)
 func markdownToHTML(md string) template.HTML {
-	scanner := bufio.NewScanner(strings.NewReader(md))
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	lines := strings.Split(md, "\n")
 	var b strings.Builder
 	inList := false
 	inCode := false
-	for scanner.Scan() {
-		line := scanner.Text()
+	inTable := false
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
 		switch {
 		case strings.HasPrefix(line, "```"):
+			if inTable {
+				b.WriteString("</tbody></table>")
+				inTable = false
+			}
 			if inCode {
 				b.WriteString("</code></pre>")
 				inCode = false
 			} else {
+				if inList {
+					b.WriteString("</ul>")
+					inList = false
+				}
 				b.WriteString("<pre><code>")
 				inCode = true
 			}
@@ -637,12 +826,41 @@ func markdownToHTML(md string) template.HTML {
 			b.WriteString(html.EscapeString(line))
 			b.WriteString("\n")
 			continue
+		case inTable:
+			if hasPipeRow(line) {
+				b.WriteString("<tr>")
+				for _, cell := range parseTableRow(line) {
+					b.WriteString("<td>" + renderInline(cell) + "</td>")
+				}
+				b.WriteString("</tr>")
+				continue
+			}
+			b.WriteString("</tbody></table>")
+			inTable = false
+		}
+
+		if isTableStart(lines, i) {
+			if inList {
+				b.WriteString("</ul>")
+				inList = false
+			}
+			b.WriteString("<table><thead><tr>")
+			for _, cell := range parseTableRow(line) {
+				b.WriteString("<th>" + renderInline(cell) + "</th>")
+			}
+			b.WriteString("</tr></thead><tbody>")
+			inTable = true
+			i++
+			continue
+		}
+
+		switch {
 		case strings.HasPrefix(line, "- "):
 			if !inList {
 				b.WriteString("<ul>")
 				inList = true
 			}
-			b.WriteString("<li>" + html.EscapeString(strings.TrimSpace(line[2:])) + "</li>")
+			b.WriteString("<li>" + renderInline(strings.TrimSpace(line[2:])) + "</li>")
 			continue
 		default:
 			if inList {
@@ -653,20 +871,25 @@ func markdownToHTML(md string) template.HTML {
 
 		trimmed := strings.TrimSpace(line)
 		switch {
+		case strings.HasPrefix(trimmed, "#### "):
+			b.WriteString("<h4>" + renderInline(strings.TrimSpace(trimmed[5:])) + "</h4>")
 		case strings.HasPrefix(trimmed, "### "):
-			b.WriteString("<h3>" + html.EscapeString(strings.TrimSpace(trimmed[4:])) + "</h3>")
+			b.WriteString("<h3>" + renderInline(strings.TrimSpace(trimmed[4:])) + "</h3>")
 		case strings.HasPrefix(trimmed, "## "):
-			b.WriteString("<h2>" + html.EscapeString(strings.TrimSpace(trimmed[3:])) + "</h2>")
+			b.WriteString("<h2>" + renderInline(strings.TrimSpace(trimmed[3:])) + "</h2>")
 		case strings.HasPrefix(trimmed, "# "):
-			b.WriteString("<h1>" + html.EscapeString(strings.TrimSpace(trimmed[2:])) + "</h1>")
+			b.WriteString("<h1>" + renderInline(strings.TrimSpace(trimmed[2:])) + "</h1>")
 		case trimmed == "":
 			b.WriteString("<p></p>")
 		default:
-			b.WriteString("<p>" + html.EscapeString(line) + "</p>")
+			b.WriteString("<p>" + renderInline(line) + "</p>")
 		}
 	}
 	if inList {
 		b.WriteString("</ul>")
+	}
+	if inTable {
+		b.WriteString("</tbody></table>")
 	}
 	if inCode {
 		b.WriteString("</code></pre>")
@@ -674,9 +897,94 @@ func markdownToHTML(md string) template.HTML {
 	return template.HTML(b.String())
 }
 
+func renderInline(text string) string {
+	escaped := html.EscapeString(text)
+	parts := strings.Split(escaped, "`")
+	for i, part := range parts {
+		if i%2 == 1 {
+			parts[i] = "<code>" + part + "</code>"
+			continue
+		}
+		parts[i] = renderBold(part)
+	}
+	return strings.Join(parts, "")
+}
+
+func renderBold(text string) string {
+	var b strings.Builder
+	for {
+		start := strings.Index(text, "**")
+		if start == -1 {
+			b.WriteString(text)
+			break
+		}
+		end := strings.Index(text[start+2:], "**")
+		if end == -1 {
+			b.WriteString(text)
+			break
+		}
+		b.WriteString(text[:start])
+		b.WriteString("<strong>")
+		b.WriteString(text[start+2 : start+2+end])
+		b.WriteString("</strong>")
+		text = text[start+2+end+2:]
+	}
+	return b.String()
+}
+
+func isTableStart(lines []string, index int) bool {
+	if index+1 >= len(lines) {
+		return false
+	}
+	return hasPipeRow(lines[index]) && isTableSeparator(lines[index+1])
+}
+
+func hasPipeRow(line string) bool {
+	return strings.Contains(line, "|")
+}
+
+func isTableSeparator(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return false
+	}
+	trimmed = strings.TrimPrefix(trimmed, "|")
+	trimmed = strings.TrimSuffix(trimmed, "|")
+	parts := strings.Split(trimmed, "|")
+	if len(parts) < 2 {
+		return false
+	}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return false
+		}
+		for _, r := range part {
+			if r != '-' && r != ':' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func parseTableRow(line string) []string {
+	trimmed := strings.TrimSpace(line)
+	trimmed = strings.TrimPrefix(trimmed, "|")
+	trimmed = strings.TrimSuffix(trimmed, "|")
+	parts := strings.Split(trimmed, "|")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
 func main() {
 	// Load configuration
-	cfg := LoadConfig()
+	cfg, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
 
 	// Initialize application context
 	appCtx, err := NewAppContext(cfg)
@@ -690,7 +998,7 @@ func main() {
 	}
 
 	// Start the application
-	log.Printf("Starting Plumego Reference on %s", cfg.Addr)
+	log.Printf("Starting Plumego Reference on %s", cfg.Core.Addr)
 	if err := appCtx.Start(); err != nil {
 		log.Fatalf("server stopped: %v", err)
 	}

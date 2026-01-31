@@ -3,6 +3,9 @@
 package ipc
 
 import (
+	"io"
+
+	glog "github.com/spcent/plumego/log"
 	"context"
 	"net"
 	"os"
@@ -40,9 +43,10 @@ func newPlatformServer(addr string, config *Config) (Server, error) {
 
 	// Try Unix domain socket first
 	if !strings.Contains(addr, ":") {
-		// Ensure directory exists
+		// Ensure directory exists with configured permissions
 		dir := filepath.Dir(addr)
-		if err = os.MkdirAll(dir, 0755); err != nil {
+		dirPerm := os.FileMode(config.UnixSocketDirPerm)
+		if err = os.MkdirAll(dir, dirPerm); err != nil {
 			return nil, err
 		}
 
@@ -54,6 +58,13 @@ func newPlatformServer(addr string, config *Config) (Server, error) {
 		listener, err = net.Listen("unix", addr)
 		if err == nil {
 			socketPath = addr
+			// Set socket file permissions
+			socketPerm := os.FileMode(config.UnixSocketPerm)
+			if chmodErr := os.Chmod(addr, socketPerm); chmodErr != nil {
+				listener.Close()
+				os.Remove(addr)
+				return nil, chmodErr
+			}
 		}
 	}
 
@@ -83,24 +94,77 @@ func (s *unixServer) Accept() (Client, error) {
 }
 
 func (s *unixServer) AcceptWithContext(ctx context.Context) (Client, error) {
+	start := time.Now()
 	s.mu.RLock()
 	if s.closed {
 		s.mu.RUnlock()
-		return nil, net.ErrClosed
+		return nil, ErrServerClosed
 	}
+	config := s.config
 	s.mu.RUnlock()
 
 	// Set deadline if context has timeout
 	if deadline, ok := ctx.Deadline(); ok {
-		// Use UnixListener's SetDeadline method with correct type assertion
-		if err := s.listener.(*net.UnixListener).SetDeadline(deadline); err != nil {
-			return nil, err
+		// Safe type assertion - handle both Unix and TCP listeners
+		switch l := s.listener.(type) {
+		case *net.UnixListener:
+			if err := l.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
+		case *net.TCPListener:
+			if err := l.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
 		}
+		// Clear deadline after accept completes
+		defer func() {
+			switch l := s.listener.(type) {
+			case *net.UnixListener:
+				l.SetDeadline(time.Time{})
+			case *net.TCPListener:
+				l.SetDeadline(time.Time{})
+			}
+		}()
 	}
 
 	conn, err := s.listener.Accept()
+	duration := time.Since(start)
+
+	// Get transport type
+	transport := "unix"
+	if _, ok := conn.(*net.TCPConn); ok {
+		transport = "tcp"
+	}
+
+	// Log and record metrics
+	if config.Logger != nil {
+		fields := glog.Fields{
+			"operation": "accept",
+			"addr":      s.Addr(),
+			"transport": transport,
+			"duration":  duration,
+		}
+		if err != nil {
+			fields["error"] = err.Error()
+			config.Logger.Error("IPC accept failed", fields)
+		} else {
+			config.Logger.Debug("IPC accept succeeded", fields)
+		}
+	}
+
+	if config.Metrics != nil {
+		config.Metrics.ObserveIPC(ctx, "accept", s.Addr(), transport, 0, duration, err)
+	}
+
 	if err != nil {
 		return nil, err
+	}
+
+	// Enable keepalive for TCP connections
+	if tcpConn, ok := conn.(*net.TCPConn); ok && s.config.KeepAlive {
+		if err := tcpConn.SetKeepAlive(true); err == nil {
+			tcpConn.SetKeepAlivePeriod(s.config.KeepAlivePeriod)
+		}
 	}
 
 	client := &unixClient{
@@ -146,30 +210,96 @@ func (s *unixServer) Close() error {
 	return err
 }
 
+func (s *unixServer) Shutdown(ctx context.Context) error {
+	// Mark as closed to stop accepting new connections
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	s.mu.Unlock()
+
+	// Close the listener to unblock any pending Accept calls
+	var err error
+	if s.listener != nil {
+		err = s.listener.Close()
+	}
+
+	// Wait for context cancellation (graceful period)
+	<-ctx.Done()
+
+	// Clean up socket file
+	if s.socketPath != "" {
+		if removeErr := os.Remove(s.socketPath); removeErr != nil && !os.IsNotExist(removeErr) {
+			if err == nil {
+				err = removeErr
+			}
+		}
+	}
+
+	return err
+}
+
 func dialPlatform(addr string, config *Config) (Client, error) {
 	return dialPlatformWithContext(context.Background(), addr, config)
 }
 
 func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (Client, error) {
+	start := time.Now()
 	if config == nil {
 		config = DefaultConfig()
 	}
 
 	var conn net.Conn
 	var err error
+	var transport string
 
 	dialer := &net.Dialer{
-		Timeout: config.ConnectTimeout,
+		Timeout:   config.ConnectTimeout,
+		KeepAlive: config.KeepAlivePeriod,
 	}
 
 	// Try Unix domain socket first if no port specified
 	if !strings.Contains(addr, ":") {
 		conn, err = dialer.DialContext(ctx, "unix", addr)
+		transport = "unix"
 	}
 
 	// Fallback to TCP if Unix socket fails
 	if conn == nil {
 		conn, err = dialer.DialContext(ctx, "tcp", addr)
+		transport = "tcp"
+		// Enable keepalive for TCP connections
+		if err == nil {
+			if tcpConn, ok := conn.(*net.TCPConn); ok && config.KeepAlive {
+				if setErr := tcpConn.SetKeepAlive(true); setErr == nil {
+					tcpConn.SetKeepAlivePeriod(config.KeepAlivePeriod)
+				}
+			}
+		}
+	}
+
+	duration := time.Since(start)
+
+	// Log and record metrics
+	if config.Logger != nil {
+		fields := glog.Fields{
+			"operation": "dial",
+			"addr":      addr,
+			"transport": transport,
+			"duration":  duration,
+		}
+		if err != nil {
+			fields["error"] = err.Error()
+			config.Logger.Error("IPC dial failed", fields)
+		} else {
+			config.Logger.Debug("IPC dial succeeded", fields)
+		}
+	}
+
+	if config.Metrics != nil {
+		config.Metrics.ObserveIPC(ctx, "dial", addr, transport, 0, duration, err)
 	}
 
 	if err != nil {
@@ -185,65 +315,111 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 }
 
 func (c *unixClient) Write(data []byte) (int, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
-	}
-
-	return c.conn.Write(data)
+	return c.WriteWithTimeout(data, 0)
 }
 
 func (c *unixClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, error) {
+	start := time.Now()
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	config := c.config
+	c.mu.RUnlock()
 
 	if timeout > 0 {
-		c.conn.SetWriteDeadline(time.Now().Add(timeout))
-		defer c.conn.SetWriteDeadline(time.Time{})
+		conn.SetWriteDeadline(time.Now().Add(timeout))
+		defer conn.SetWriteDeadline(time.Time{})
 	}
 
-	return c.conn.Write(data)
+	n, err := conn.Write(data)
+	duration := time.Since(start)
+
+	// Log and record metrics
+	if config.Logger != nil && err != nil {
+		config.Logger.Error("IPC write failed", glog.Fields{
+			"operation": "write",
+			"bytes":     n,
+			"duration":  duration,
+			"error":     err.Error(),
+		})
+	}
+
+	if config.Metrics != nil {
+		transport := "unix"
+		if _, ok := conn.(*net.TCPConn); ok {
+			transport = "tcp"
+		}
+		config.Metrics.ObserveIPC(context.Background(), "write", "", transport, n, duration, err)
+	}
+
+	return n, err
 }
 
 func (c *unixClient) Read(buf []byte) (int, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
-	}
-
-	return c.conn.Read(buf)
+	return c.ReadWithTimeout(buf, 0)
 }
 
 func (c *unixClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, error) {
+	start := time.Now()
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	config := c.config
+	c.mu.RUnlock()
 
 	if timeout > 0 {
-		c.conn.SetReadDeadline(time.Now().Add(timeout))
-		defer c.conn.SetReadDeadline(time.Time{})
+		conn.SetReadDeadline(time.Now().Add(timeout))
+		defer conn.SetReadDeadline(time.Time{})
 	}
 
-	return c.conn.Read(buf)
+	n, err := conn.Read(buf)
+	duration := time.Since(start)
+
+	// Log and record metrics (only log errors to avoid excessive logging)
+	if config.Logger != nil && err != nil && err != io.EOF {
+		config.Logger.Error("IPC read failed", glog.Fields{
+			"operation": "read",
+			"bytes":     n,
+			"duration":  duration,
+			"error":     err.Error(),
+		})
+	}
+
+	if config.Metrics != nil {
+		transport := "unix"
+		if _, ok := conn.(*net.TCPConn); ok {
+			transport = "tcp"
+		}
+		config.Metrics.ObserveIPC(context.Background(), "read", "", transport, n, duration, err)
+	}
+
+	return n, err
 }
 
-func (c *unixClient) RemoteAddr() string {
+func (c *unixClient) RemoteAddr() net.Addr {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if c.conn != nil {
-		return c.conn.RemoteAddr().String()
+		addr := c.conn.RemoteAddr()
+		if addr != nil {
+			return addr
+		}
+	}
+	// Return a default IPC address if no connection
+	return NewAddr("ipc", "")
+}
+
+func (c *unixClient) RemoteAddrString() string {
+	addr := c.RemoteAddr()
+	if addr != nil {
+		return addr.String()
 	}
 	return ""
 }

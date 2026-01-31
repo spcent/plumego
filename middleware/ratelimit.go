@@ -232,7 +232,6 @@ func (rl *RateLimiter) tryEnterQueue() bool {
 	// Non-blocking attempt to send to queue
 	select {
 	case rl.queue <- struct{}{}:
-		atomic.AddInt64(&rl.currentQueue, 1)
 		return true
 	default:
 		return false
@@ -244,7 +243,6 @@ func (rl *RateLimiter) leaveQueue() {
 	// Non-blocking queue exit
 	select {
 	case <-rl.queue:
-		atomic.AddInt64(&rl.currentQueue, -1)
 	default:
 	}
 }
@@ -257,7 +255,6 @@ func (rl *RateLimiter) waitForConcurrencySlot() bool {
 	// Wait for concurrency slot or timeout
 	select {
 	case rl.sem <- struct{}{}:
-		atomic.AddInt64(&rl.currentConcurrent, 1)
 		return true
 	case <-timer.C:
 		return false
@@ -269,7 +266,6 @@ func (rl *RateLimiter) leaveConcurrency() {
 	// Non-blocking concurrency slot exit
 	select {
 	case <-rl.sem:
-		atomic.AddInt64(&rl.currentConcurrent, -1)
 	default:
 	}
 }
@@ -282,8 +278,8 @@ func (rl *RateLimiter) rejectRequest(w http.ResponseWriter, r *http.Request, cod
 		Category: contract.CategoryServer,
 		Message:  message,
 		Details: map[string]any{
-			"current_concurrent": atomic.LoadInt64(&rl.currentConcurrent),
-			"current_queue":      atomic.LoadInt64(&rl.currentQueue),
+			"current_concurrent": int64(len(rl.sem)),
+			"current_queue":      int64(len(rl.queue)),
 			"max_concurrent":     atomic.LoadInt64(&rl.maxConcurrent),
 			"queue_depth":        atomic.LoadInt64(&rl.queueDepth),
 		},
@@ -292,8 +288,8 @@ func (rl *RateLimiter) rejectRequest(w http.ResponseWriter, r *http.Request, cod
 	if rl.logger != nil {
 		rl.logger.WithFields(log.Fields{
 			"code":               code,
-			"current_concurrent": atomic.LoadInt64(&rl.currentConcurrent),
-			"current_queue":      atomic.LoadInt64(&rl.currentQueue),
+			"current_concurrent": int64(len(rl.sem)),
+			"current_queue":      int64(len(rl.queue)),
 		}).Warn("request rejected due to concurrency limit", nil)
 	}
 }
@@ -401,28 +397,43 @@ func (rl *RateLimiter) analyzePressure(metrics ConcurrencyMetrics) PressureLevel
 	return PressureNormal
 }
 
-// updateMaxConcurrent updates maximum concurrency
+// updateMaxConcurrent updates maximum concurrency safely.
+// This operation is synchronized to prevent race conditions between
+// the channel replacement and ongoing requests.
 func (rl *RateLimiter) updateMaxConcurrent(newMax int64) {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+
 	oldMax := atomic.LoadInt64(&rl.maxConcurrent)
 	if newMax == oldMax {
 		return
 	}
 
-	// Rebuild semaphore channel
+	// Create new semaphore with new capacity
 	newSem := make(chan struct{}, newMax)
 
-	// Copy existing slots
-	go func() {
-		for i := int64(0); i < min(oldMax, newMax); i++ {
-			select {
-			case <-rl.sem:
-				newSem <- struct{}{}
-			default:
-				return
-			}
+	// Synchronously migrate existing slots to the new semaphore.
+	// We need to count how many slots are currently in use and preserve them.
+	// The sem channel tracks available slots (empty = all in use).
+	// We drain the old channel and fill the new one with the same number of available slots.
+	availableSlots := int64(0)
+	for {
+		select {
+		case <-rl.sem:
+			availableSlots++
+		default:
+			goto done
 		}
-	}()
+	}
+done:
 
+	// Fill the new semaphore with available slots (up to newMax)
+	toFill := min(availableSlots, newMax)
+	for i := int64(0); i < toFill; i++ {
+		newSem <- struct{}{}
+	}
+
+	// Replace the semaphore
 	rl.sem = newSem
 	atomic.StoreInt64(&rl.maxConcurrent, newMax)
 }
@@ -442,8 +453,8 @@ func (rl *RateLimiter) logAdjustment(direction string, oldVal, newVal int64) {
 func (rl *RateLimiter) GetMetrics() ConcurrencyMetrics {
 	metrics := ConcurrencyMetrics{
 		Timestamp:         time.Now(),
-		CurrentConcurrent: atomic.LoadInt64(&rl.currentConcurrent),
-		CurrentQueue:      atomic.LoadInt64(&rl.currentQueue),
+		CurrentConcurrent: int64(len(rl.sem)),
+		CurrentQueue:      int64(len(rl.queue)),
 		MaxConcurrent:     atomic.LoadInt64(&rl.maxConcurrent),
 		QueueDepth:        atomic.LoadInt64(&rl.queueDepth),
 		TotalRequests:     atomic.LoadInt64(&rl.totalRequests),
@@ -484,135 +495,4 @@ func max(a, b int64) int64 {
 func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 	rl := NewRateLimiter(config)
 	return rl.Middleware()
-}
-
-// Legacy RateLimit functions for backward compatibility
-// NewRateLimiterLegacy creates a token bucket rate limiter (legacy)
-func NewRateLimiterLegacy(rate float64, capacity int, cleanupInterval, maxIdleTime time.Duration) *RateLimiterLegacy {
-	return &RateLimiterLegacy{
-		buckets:         make(map[string]*tokenBucket),
-		rate:            rate,
-		capacity:        capacity,
-		cleanupInterval: cleanupInterval,
-		maxIdleTime:     maxIdleTime,
-	}
-}
-
-// RateLimiterLegacy represents a rate limiter that uses token bucket algorithm
-type RateLimiterLegacy struct {
-	mu              sync.RWMutex
-	buckets         map[string]*tokenBucket
-	rate            float64
-	capacity        int
-	cleanupInterval time.Duration
-	maxIdleTime     time.Duration
-}
-
-// tokenBucket represents a single token bucket for rate limiting
-type tokenBucket struct {
-	tokens     float64
-	lastRefill time.Time
-	lastAccess time.Time
-}
-
-// Allow checks if a request from the given key is allowed
-func (rl *RateLimiterLegacy) Allow(key string) bool {
-	now := time.Now()
-	bucket := rl.getBucket(key, now)
-
-	// Calculate tokens to add since last refill
-	elapsed := now.Sub(bucket.lastRefill)
-	addTokens := rl.rate * elapsed.Seconds()
-
-	// Update bucket
-	newTokens := bucket.tokens + addTokens
-	if newTokens > float64(rl.capacity) {
-		newTokens = float64(rl.capacity)
-	}
-	bucket.tokens = newTokens
-	bucket.lastRefill = now
-	bucket.lastAccess = now
-
-	// Check if we have enough tokens
-	if bucket.tokens >= 1 {
-		bucket.tokens--
-		return true
-	}
-
-	return false
-}
-
-// getBucket returns the token bucket for the given key, creating it if needed
-func (rl *RateLimiterLegacy) getBucket(key string, now time.Time) *tokenBucket {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	bucket, exists := rl.buckets[key]
-	if !exists {
-		bucket = &tokenBucket{
-			tokens:     float64(rl.capacity),
-			lastRefill: now,
-			lastAccess: now,
-		}
-		rl.buckets[key] = bucket
-	}
-
-	return bucket
-}
-
-// cleanup removes idle buckets to free memory
-func (rl *RateLimiterLegacy) cleanup() {
-	ticker := time.NewTicker(rl.cleanupInterval)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		now := time.Now()
-		rl.mu.Lock()
-
-		for key, bucket := range rl.buckets {
-			if now.Sub(bucket.lastAccess) > rl.maxIdleTime {
-				delete(rl.buckets, key)
-			}
-		}
-
-		rl.mu.Unlock()
-	}
-}
-
-// RateLimit creates a middleware that limits requests based on IP address (legacy)
-func RateLimit(rate float64, capacity int, cleanupInterval, maxIdleTime time.Duration) Middleware {
-	limiter := NewRateLimiterLegacy(rate, capacity, cleanupInterval, maxIdleTime)
-	go limiter.cleanup()
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := r.RemoteAddr
-			if !limiter.Allow(ip) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusTooManyRequests)
-				w.Write([]byte(`{"error":"Too many requests, please try again later"}`))
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// RateLimitFunc creates a Middleware version of RateLimit (legacy)
-func RateLimitFunc(rate float64, capacity int, cleanupInterval, maxIdleTime time.Duration) Middleware {
-	limiter := NewRateLimiterLegacy(rate, capacity, cleanupInterval, maxIdleTime)
-	go limiter.cleanup()
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := r.RemoteAddr
-			if !limiter.Allow(ip) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusTooManyRequests)
-				w.Write([]byte(`{"error":"Too many requests, please try again later"}`))
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
 }

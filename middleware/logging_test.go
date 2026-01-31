@@ -150,6 +150,11 @@ func TestLoggingAddsStructuredFields(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/structured", nil)
 	req.Header.Set("X-Request-ID", "trace-123")
+	rc := contract.RequestContext{
+		RoutePattern: "/structured/:id",
+		RouteName:    "structured",
+	}
+	req = req.WithContext(context.WithValue(req.Context(), contract.RequestContextKey{}, rc))
 	rec := httptest.NewRecorder()
 
 	middleware(handler).ServeHTTP(rec, req)
@@ -175,6 +180,8 @@ func TestLoggingAddsStructuredFields(t *testing.T) {
 		"trace_id":    "trace-123",
 		"method":      http.MethodPost,
 		"path":        "/structured",
+		"route":       "/structured/:id",
+		"route_name":  "structured",
 		"status":      http.StatusCreated,
 		"bytes":       len("ok"),
 		"user_agent":  "",

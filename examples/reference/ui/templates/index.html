@@ -10,13 +10,7 @@
 <body>
   <div class="container">
     <!-- Header -->
-    <header class="header">
-      <div class="logo">
-        <i class="fas fa-feather"></i>
-      </div>
-      <h1 class="title">Plumego Reference</h1>
-      <p class="subtitle">Modern Go Web Framework Demo Platform - Showcasing Elegant Architecture Design</p>
-    </header>
+    {{template "siteHeader" .}}
 
     <!-- Status Bar -->
     <div class="status-bar">
@@ -115,7 +109,7 @@
           <div class="log-content log-info">WebSocket test tool is ready, click "Connect" to start testing...</div>
         </div>
       </div>
-      
+
       <div class="stats-grid">
          <div class="stat-card">
            <div class="stat-value" id="sentCount">0</div>
@@ -142,7 +136,7 @@
         <i class="fas fa-tools"></i>
         Advanced Testing Tools
       </h3>
-      
+
       <div class="test-tools-grid">
         <!-- API Test Tool -->
         <div class="tool-card">
@@ -153,7 +147,7 @@
           <p class="tool-description">
             Test various API endpoints, supporting different response formats and parameter configurations.
           </p>
-          
+
           <form onsubmit="testAPI(event)">
             <div class="form-group">
               <label class="form-label">API Path</label>
@@ -166,7 +160,7 @@
                 <option value="/metrics">GET /metrics</option>
               </select>
             </div>
-            
+
             <div class="form-group">
               <label class="form-label">Response Format</label>
               <select class="form-select" id="apiFormat">
@@ -176,17 +170,17 @@
                 <option value="plain">Plain Text</option>
               </select>
             </div>
-            
+
             <div class="form-group">
               <label class="form-label">Query Parameters</label>
               <input type="text" class="form-input" id="apiParams" placeholder="e.g., format=json&delay=1s" />
             </div>
-            
+
             <button type="submit" class="btn">
               <i class="fas fa-play"></i> Execute Test
             </button>
           </form>
-          
+
           <div class="response-display" id="apiResponse"></div>
         </div>
 
@@ -199,7 +193,7 @@
           <p class="tool-description">
             Real-time monitoring of system performance and metrics, view application status.
           </p>
-          
+
           <div class="btn-group">
             <button class="btn" onclick="checkHealth()">
               <i class="fas fa-heartbeat"></i> Health Check
@@ -208,7 +202,7 @@
               <i class="fas fa-chart-bar"></i> Load Metrics
             </button>
           </div>
-          
+
           <div class="response-display" id="healthMetrics"></div>
         </div>
 
@@ -221,7 +215,7 @@
           <p class="tool-description">
             Test Webhook functionality, simulate different types of Webhook events.
           </p>
-          
+
           <form onsubmit="testWebhook(event)">
             <div class="form-group">
               <label class="form-label">Event Type</label>
@@ -231,17 +225,17 @@
                 <option value="custom">Custom Webhook</option>
               </select>
             </div>
-            
+
             <div class="form-group">
               <label class="form-label">Event Data (JSON)</label>
               <textarea class="form-textarea" id="webhookData" placeholder='{"event": "test", "data": {}}'></textarea>
             </div>
-            
+
             <button type="submit" class="btn">
               <i class="fas fa-paper-plane"></i> Send Webhook
             </button>
           </form>
-          
+
           <div class="response-display" id="webhookResponse"></div>
         </div>
 
@@ -254,38 +248,30 @@
           <p class="tool-description">
             Test publish-subscribe system, send and receive messages.
           </p>
-          
+
           <form onsubmit="testPubSub(event)">
             <div class="form-group">
               <label class="form-label">Topic Name</label>
               <input type="text" class="form-input" id="pubSubTopic" placeholder="e.g., test.topic" value="test.default" />
             </div>
-            
+
             <div class="form-group">
               <label class="form-label">Message Content</label>
               <textarea class="form-textarea" id="pubSubMessage" placeholder="Enter message content to publish..."></textarea>
             </div>
-            
+
             <button type="submit" class="btn">
               <i class="fas fa-broadcast-tower"></i> Publish Message
             </button>
           </form>
-          
+
           <div class="response-display" id="pubSubResponse"></div>
         </div>
       </div>
     </div>
 
     <!-- Footer -->
-    <div class="footer">
-      <p>Powered by <strong style="color: white;">Plumego</strong> - Modern Go Web Framework</p>
-      <p style="margin-top: 0.5rem;">
-        <a href="/docs">Docs</a> · 
-        <a href="/health/ready">Health Check</a> · 
-        <a href="/health/build">Build Info</a> · 
-        <a href="/api/status">System Status</a>
-      </p>
-    </div>
+    {{template "siteFooter" .}}
   </div>
 
   <script src="/static/js/app.js"></script>

@@ -102,7 +102,8 @@ type OpenTelemetryTracer struct {
 	spans []Span
 
 	// Base collector for unified interface
-	base *BaseMetricsCollector
+	base     *BaseMetricsCollector
+	baseOnce sync.Once
 }
 
 // NewOpenTelemetryTracer creates a tracer with the given instrumentation name.
@@ -363,42 +364,27 @@ type SpanStats struct {
 
 // Record implements the unified MetricsCollector interface
 func (t *OpenTelemetryTracer) Record(ctx context.Context, record MetricRecord) {
-	if t.base == nil {
-		t.base = NewBaseMetricsCollector()
-	}
-	t.base.Record(ctx, record)
+	t.baseCollector().Record(ctx, record)
 }
 
 // ObserveHTTP implements the unified MetricsCollector interface
 func (t *OpenTelemetryTracer) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	if t.base == nil {
-		t.base = NewBaseMetricsCollector()
-	}
-	t.base.ObserveHTTP(ctx, method, path, status, bytes, duration)
+	t.baseCollector().ObserveHTTP(ctx, method, path, status, bytes, duration)
 }
 
 // ObservePubSub implements the unified MetricsCollector interface
 func (t *OpenTelemetryTracer) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	if t.base == nil {
-		t.base = NewBaseMetricsCollector()
-	}
-	t.base.ObservePubSub(ctx, operation, topic, duration, err)
+	t.baseCollector().ObservePubSub(ctx, operation, topic, duration, err)
 }
 
 // ObserveMQ implements the unified MetricsCollector interface
 func (t *OpenTelemetryTracer) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	if t.base == nil {
-		t.base = NewBaseMetricsCollector()
-	}
-	t.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
+	t.baseCollector().ObserveMQ(ctx, operation, topic, duration, err, panicked)
 }
 
 // ObserveKV implements the unified MetricsCollector interface
 func (t *OpenTelemetryTracer) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	if t.base == nil {
-		t.base = NewBaseMetricsCollector()
-	}
-	t.base.ObserveKV(ctx, operation, key, duration, err, hit)
+	t.baseCollector().ObserveKV(ctx, operation, key, duration, err, hit)
 }
 
 // GetStats implements the unified MetricsCollector interface
@@ -436,4 +422,11 @@ func (t *OpenTelemetryTracer) Clear() {
 	if t.base != nil {
 		t.base.Clear()
 	}
+}
+
+func (t *OpenTelemetryTracer) baseCollector() *BaseMetricsCollector {
+	t.baseOnce.Do(func() {
+		t.base = NewBaseMetricsCollector()
+	})
+	return t.base
 }

@@ -70,7 +70,7 @@ func (c *Conn) WriteJSON(v any) error {
 
 // writerPump consumes sendQueue and writes frames to client. It fragments large messages.
 func (c *Conn) writerPump() {
-	ticker := time.NewTicker(c.pingPeriod)
+	ticker := time.NewTicker(time.Duration(atomic.LoadInt64((*int64)(&c.pingPeriod))))
 	defer func() {
 		ticker.Stop()
 		c.Close()
@@ -121,7 +121,7 @@ func (c *Conn) writerPump() {
 
 // pongMonitor closes connection if no pong received within pongWait
 func (c *Conn) pongMonitor() {
-	ticker := time.NewTicker(c.pingPeriod / 2)
+	ticker := time.NewTicker(time.Duration(atomic.LoadInt64((*int64)(&c.pingPeriod))) / 2)
 	defer ticker.Stop()
 	for {
 		select {
@@ -129,7 +129,7 @@ func (c *Conn) pongMonitor() {
 			return
 		case <-ticker.C:
 			last := time.Unix(0, atomic.LoadInt64(&c.lastPong))
-			if time.Since(last) > c.pongWait {
+			if time.Since(last) > time.Duration(atomic.LoadInt64((*int64)(&c.pongWait))) {
 				_ = c.Close()
 				return
 			}

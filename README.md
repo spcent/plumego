@@ -10,6 +10,7 @@ Plumego is a lightweight Go HTTP toolkit built entirely on the standard library.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
 - **Optional Services**: Built-in authenticated WebSocket hub, in-process Pub/Sub (with debug snapshots), inbound/outbound webhook routers, and static frontend serving from disk or embedded resources.
+- **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `scheduler` package.
 
 ## Components
 `core.App` orchestrates through pluggable components instead of hardcoded functionality. Components can register routes, middleware, and lifecycle hooks:
@@ -27,9 +28,6 @@ type Component interface {
 `HealthStatus` uses constrained values (`healthy`, `degraded`, `unhealthy`) to ensure components report health in a structured, type-safe way.
 
 Use `core.WithComponent` (or `WithComponents`) when constructing the app to add functionality. Built-in features (Webhook management, inbound Webhook receiver, PubSub debug, WebSocket utilities, frontend serving) can all be mounted as components, so examples can mix only the parts they need.
-
-## Migration Notes
-- `plumego.ComponentFunc` re-export has been removed. Implement `core.Component` directly (see the interface above), or keep a local adapter type if you prefer functional hooks.
 
 ## Quick Start
 Create a small `main.go`, wire routes and middleware, then start the server:
@@ -95,11 +93,59 @@ func main() {
 - Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, reload), friendly JSON error output, and `.env` hot reload.
 
 ## Key Components
-- **Router**: Register handlers with `Get`, `Post`, etc., or the context-aware variants (`GetCtx`) that expose a unified request context wrapper. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir`.
-- **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (security headers, abuse guard, body size limits, concurrency limits) are auto-injected during setup. Recovery/logging/CORS helpers can be enabled via `core.WithRecovery`, `core.WithLogging`, and `core.WithCORS`.
+- **Router**: Register handlers with `Get`, `Post`, etc., or the context-aware variants (`GetCtx`) that expose a unified request context wrapper. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
+- **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (security headers, abuse guard, body size limits, concurrency limits) are auto-injected during setup. Recovery/logging/CORS helpers can be enabled via `core.WithRecovery`, `core.WithLogging`, and `core.WithCORS`. For a production-safe baseline, `core.WithRecommendedMiddleware()` enables RequestID + Logging + Recovery in the recommended order.
+- **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
 - **WebSocket Hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint, plus an optional broadcast endpoint (protected by a shared secret). Customize worker count and queue size via `WebSocketConfig`.
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
+
+## Background Runners
+Register background tasks with a minimal lifecycle interface:
+
+```go
+type Runner interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
+app.Register(myRunner)
+```
+
+Runners start before the HTTP server and stop during graceful shutdown.
+
+## Task Scheduling
+Use the `scheduler` package for in-process cron and delayed jobs:
+
+```go
+sch := scheduler.New(scheduler.WithWorkers(2))
+sch.Start()
+defer sch.Stop(context.Background())
+
+sch.AddCron("cleanup", "0 * * * *", func(ctx context.Context) error {
+    // hourly task
+    return nil
+})
+
+sch.Delay("one-off", 5*time.Second, func(ctx context.Context) error {
+    return nil
+})
+```
+
+Optional helpers include a minimal admin handler (`scheduler.NewAdminHandler`) and pluggable persistence (`scheduler.WithStore` with the in-memory or KV store).
+You can also register a panic handler and metrics sink via `scheduler.WithPanicHandler` and `scheduler.WithMetricsSink`.
+
+## Auth Contracts
+Plumego keeps authentication, authorization, and session validation separate through interfaces in `contract`. Compose them with middleware rather than relying on framework magic:
+
+```go
+chain := middleware.NewChain().
+	Use(middleware.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
+	Use(middleware.SessionCheck(sessionStore, sessionValidator)).
+	Use(middleware.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
+```
+
+The `security/jwt` package provides adapters (`jwtManager.Authenticator`, `jwt.PolicyAuthorizer`, `jwt.PermissionAuthorizer`) that implement these contracts while keeping your own storage and policy engines decoupled.
 
 ## Reference App
 `examples/reference` is an out-of-the-box `main` package that integrates common components:
@@ -149,7 +195,7 @@ if err := app.ConfigureObservability(obs); err != nil {
 When tracing is enabled, logs include `trace_id` and `span_id`, and responses include `X-Span-ID` for correlation.
 
 ## Configuration Reference
-Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Use the table below for predictable deployments.
+Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Config keys are normalized to lower_snake_case for lookups, so CamelCase and UPPER_SNAKE resolve to the same value. Use the table below for predictable deployments.
 
 | AppConfig Field          | Default        | Environment Variable           | Flag Example                     |
 |--------------------------|----------------|--------------------------------|----------------------------------|

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/utils/pool"
 )
 
 var (
@@ -69,15 +67,17 @@ type WALEntry struct {
 
 // Options configures the KV store
 type Options struct {
-	DataDir           string        `json:"data_dir"`
-	MaxEntries        int           `json:"max_entries"`
-	MaxMemoryMB       int           `json:"max_memory_mb"`
-	FlushInterval     time.Duration `json:"flush_interval"`
-	CleanInterval     time.Duration `json:"clean_interval"`
-	ShardCount        int           `json:"shard_count"`
-	EnableCompression bool          `json:"enable_compression"`
-	ReadOnly          bool          `json:"read_only"`
-	CloseTimeout      time.Duration `json:"close_timeout"`
+	DataDir            string              `json:"data_dir"`
+	MaxEntries         int                 `json:"max_entries"`
+	MaxMemoryMB        int                 `json:"max_memory_mb"`
+	FlushInterval      time.Duration       `json:"flush_interval"`
+	CleanInterval      time.Duration       `json:"clean_interval"`
+	ShardCount         int                 `json:"shard_count"`
+	EnableCompression  bool                `json:"enable_compression"`
+	ReadOnly           bool                `json:"read_only"`
+	CloseTimeout       time.Duration       `json:"close_timeout"`
+	SerializerFormat   SerializationFormat `json:"serializer_format"`   // Serialization format (binary/json)
+	AutoDetectFormat   bool                `json:"auto_detect_format"`  // Auto-detect format when loading
 }
 
 // Shard represents a single data shard with optimized locking
@@ -93,7 +93,8 @@ type Shard struct {
 // KVStore is a simplified, high-performance key-value store
 type KVStore struct {
 	// Configuration
-	opts Options
+	opts       Options
+	serializer Serializer // Serialization strategy
 
 	// Sharded data
 	shards    []*Shard
@@ -103,7 +104,6 @@ type KVStore struct {
 	walFile   *os.File
 	walWriter *bufio.Writer
 	walMutex  sync.Mutex
-	logChan   chan WALEntry
 
 	// Background workers
 	ctx    context.Context
@@ -163,10 +163,10 @@ func NewKVStore(opts Options) (*KVStore, error) {
 	}
 
 	kv := &KVStore{
-		opts:      opts,
-		shards:    shards,
-		shardMask: uint32(opts.ShardCount - 1),
-		logChan:   make(chan WALEntry, 1000),
+		opts:       opts,
+		shards:     shards,
+		shardMask:  uint32(opts.ShardCount - 1),
+		serializer: GetSerializer(opts.SerializerFormat),
 	}
 
 	kv.ctx, kv.cancel = context.WithCancel(context.Background())
@@ -179,7 +179,7 @@ func NewKVStore(opts Options) (*KVStore, error) {
 
 		// Start background workers
 		kv.wg.Add(2)
-		go kv.writeWal()
+		go kv.walFlusher()
 		go kv.cleaner()
 	}
 
@@ -213,6 +213,14 @@ func setDefaults(opts *Options) error {
 	}
 	if opts.CloseTimeout == 0 {
 		opts.CloseTimeout = defaultCloseTimeout
+	}
+	if opts.SerializerFormat == "" {
+		// Default to binary for best performance
+		opts.SerializerFormat = FormatBinary
+	}
+	// Auto-detect enabled by default for backward compatibility
+	if !opts.AutoDetectFormat {
+		opts.AutoDetectFormat = true
 	}
 	return nil
 }
@@ -250,8 +258,8 @@ func (kv *KVStore) initWAL() error {
 	return nil
 }
 
-// walWriter handles background WAL writing
-func (kv *KVStore) writeWal() {
+// walFlusher handles periodic WAL flushing to disk
+func (kv *KVStore) walFlusher() {
 	defer kv.wg.Done()
 
 	ticker := time.NewTicker(kv.opts.FlushInterval)
@@ -259,26 +267,12 @@ func (kv *KVStore) writeWal() {
 
 	for {
 		select {
-		case entry := <-kv.logChan:
-			if err := kv.writeWALEntry(entry); err != nil {
-				// In production, you'd want proper logging here
-				fmt.Printf("WAL write error: %v\n", err)
-			}
-
 		case <-ticker.C:
 			kv.flushWAL()
 
 		case <-kv.ctx.Done():
-			// Drain remaining entries
-			for {
-				select {
-				case entry := <-kv.logChan:
-					kv.writeWALEntry(entry)
-				default:
-					kv.flushWAL()
-					return
-				}
-			}
+			kv.flushWAL()
+			return
 		}
 	}
 }
@@ -363,9 +357,7 @@ func (kv *KVStore) cleanExpired() {
 						// Double check expiration under write lock
 						if !entry.ExpireAt.IsZero() && now.After(entry.ExpireAt) {
 							kv.deleteFromShard(shard, key, entry)
-							if !kv.opts.ReadOnly {
-								kv.logDelete(key)
-							}
+							// No need to log to WAL - expired entries are handled during recovery
 						}
 					}
 				}
@@ -424,10 +416,7 @@ func (kv *KVStore) evictLRU(shard *Shard) {
 
 	entry := shard.lruTail
 	kv.deleteFromShard(shard, entry.Key, entry)
-
-	if !kv.opts.ReadOnly {
-		kv.logDelete(entry.Key)
-	}
+	// No need to log to WAL - LRU evictions are a cache management strategy
 
 	atomic.AddInt64(&kv.evictions, 1)
 }
@@ -462,10 +451,9 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	if kv.isClosed() {
 		return ErrStoreClosed
 	}
-
-	shard := kv.getShard(key)
-	shard.mu.Lock()
-	defer shard.mu.Unlock()
+	if kv.opts.ReadOnly {
+		return ErrStoreClosed
+	}
 
 	var expireAt time.Time
 	if ttl > 0 {
@@ -474,6 +462,26 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 
 	size := int64(len(key) + len(value) + 64) // rough estimate
 	version := atomic.AddInt64(&kv.version, 1)
+
+	// Write to WAL first (before updating memory)
+	walEntry := WALEntry{
+		Op:       opSet,
+		Key:      key,
+		Value:    value,
+		ExpireAt: expireAt,
+		Version:  version,
+	}
+	walEntry.CRC = kv.calculateCRC(walEntry)
+
+	// Synchronous WAL write - fail fast if WAL fails
+	if err := kv.writeWALEntry(walEntry); err != nil {
+		return fmt.Errorf("WAL write failed: %w", err)
+	}
+
+	// WAL write succeeded, now update memory
+	shard := kv.getShard(key)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
 
 	// Check limits and evict if necessary
 	for atomic.LoadInt64(&kv.entries) >= int64(kv.opts.MaxEntries) {
@@ -506,11 +514,6 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	atomic.AddInt64(&kv.entries, 1)
 	atomic.AddInt64(&kv.memoryUsage, size)
 
-	// Log to WAL
-	if !kv.opts.ReadOnly {
-		kv.logSet(key, value, expireAt, version)
-	}
-
 	return nil
 }
 
@@ -521,8 +524,7 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 
 	shard := kv.getShard(key)
 
-	// Optimized: reduce lock contention by checking without lock first
-	// Use read lock for existence check
+	// Use read lock for the entire operation to prevent race conditions
 	shard.mu.RLock()
 	entry, exists := shard.data[key]
 
@@ -533,23 +535,26 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 		return nil, ErrKeyNotFound
 	}
 
-	// Check expiration (fast path)
+	// Check expiration
 	if !entry.ExpireAt.IsZero() && time.Now().After(entry.ExpireAt) {
 		shard.mu.RUnlock()
-		// Need write lock to delete expired entry
+
+		// Upgrade to write lock to delete expired entry
 		shard.mu.Lock()
-		// Recheck under write lock
+		// Double-check under write lock
 		if e, exists := shard.data[key]; exists {
 			if !e.ExpireAt.IsZero() && time.Now().After(e.ExpireAt) {
 				kv.deleteFromShard(shard, key, e)
-				if !kv.opts.ReadOnly {
-					kv.logDelete(key)
-				}
+				// No need to log to WAL - expired entries are handled during recovery
+				shard.mu.Unlock()
+				atomic.AddInt64(&kv.misses, 1)
+				return nil, ErrKeyExpired
 			}
 		}
 		shard.mu.Unlock()
-		atomic.AddInt64(&kv.misses, 1)
-		return nil, ErrKeyExpired
+
+		// Entry was refreshed by another goroutine, retry the read
+		return kv.Get(key)
 	}
 
 	// Create defensive copy while holding read lock
@@ -582,7 +587,25 @@ func (kv *KVStore) Delete(key string) error {
 	if kv.isClosed() {
 		return ErrStoreClosed
 	}
+	if kv.opts.ReadOnly {
+		return ErrStoreClosed
+	}
 
+	// Write to WAL first (before updating memory)
+	version := atomic.AddInt64(&kv.version, 1)
+	walEntry := WALEntry{
+		Op:      opDelete,
+		Key:     key,
+		Version: version,
+	}
+	walEntry.CRC = kv.calculateCRC(walEntry)
+
+	// Synchronous WAL write - fail fast if WAL fails
+	if err := kv.writeWALEntry(walEntry); err != nil {
+		return fmt.Errorf("WAL write failed: %w", err)
+	}
+
+	// WAL write succeeded, now update memory
 	shard := kv.getShard(key)
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
@@ -593,10 +616,6 @@ func (kv *KVStore) Delete(key string) error {
 	}
 
 	kv.deleteFromShard(shard, key, entry)
-
-	if !kv.opts.ReadOnly {
-		kv.logDelete(key)
-	}
 
 	return nil
 }
@@ -675,7 +694,12 @@ func (kv *KVStore) Snapshot() error {
 		return ErrStoreClosed
 	}
 
-	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.json")
+	// Use format-specific extension
+	ext := ".bin"
+	if kv.serializer.Format() == FormatJSON {
+		ext = ".json"
+	}
+	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot"+ext)
 	tempPath := snapshotPath + ".tmp"
 
 	file, err := os.Create(tempPath)
@@ -694,15 +718,10 @@ func (kv *KVStore) Snapshot() error {
 		writer = gzWriter
 	}
 
-	encoder := json.NewEncoder(writer)
+	bufWriter := bufio.NewWriter(writer)
 
-	// Write header
-	header := map[string]any{
-		"magic":   magicNumber,
-		"version": version,
-		"created": time.Now(),
-	}
-	if err := encoder.Encode(header); err != nil {
+	// Write header using serializer
+	if err := kv.serializer.WriteSnapshotHeader(bufWriter); err != nil {
 		cleanup()
 		return err
 	}
@@ -713,7 +732,13 @@ func (kv *KVStore) Snapshot() error {
 		shard.mu.RLock()
 		for _, entry := range shard.data {
 			if entry.ExpireAt.IsZero() || now.Before(entry.ExpireAt) {
-				if err := encoder.Encode(entry); err != nil {
+				data, err := kv.serializer.EncodeEntry(entry)
+				if err != nil {
+					shard.mu.RUnlock()
+					cleanup()
+					return err
+				}
+				if _, err := bufWriter.Write(data); err != nil {
 					shard.mu.RUnlock()
 					cleanup()
 					return err
@@ -721,6 +746,11 @@ func (kv *KVStore) Snapshot() error {
 			}
 		}
 		shard.mu.RUnlock()
+	}
+
+	if err := bufWriter.Flush(); err != nil {
+		cleanup()
+		return err
 	}
 
 	if gzWriter != nil {
@@ -784,16 +814,37 @@ func (kv *KVStore) loadData() error {
 }
 
 func (kv *KVStore) loadSnapshot() error {
-	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.json")
+	// Try both formats
+	formats := []string{".bin", ".json"}
+	var file *os.File
+	var err error
+	var detectedSerializer Serializer
 
-	file, err := os.Open(snapshotPath)
-	if os.IsNotExist(err) {
+	for _, ext := range formats {
+		snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot"+ext)
+		file, err = os.Open(snapshotPath)
+		if err == nil {
+			// Auto-detect format if enabled
+			if kv.opts.AutoDetectFormat {
+				format, detectErr := DetectFormat(file)
+				if detectErr == nil {
+					detectedSerializer = GetSerializer(format)
+				}
+			}
+			break
+		}
+	}
+
+	if file == nil {
 		return nil // No snapshot exists
 	}
-	if err != nil {
-		return err
-	}
 	defer file.Close()
+
+	// Use detected serializer or configured one
+	serializer := kv.serializer
+	if detectedSerializer != nil {
+		serializer = detectedSerializer
+	}
 
 	var reader io.Reader = file
 	if kv.opts.EnableCompression {
@@ -804,26 +855,27 @@ func (kv *KVStore) loadSnapshot() error {
 		}
 	}
 
-	decoder := json.NewDecoder(reader)
+	bufReader := bufio.NewReader(reader)
 
-	// Read header
-	var header map[string]any
-	if err := decoder.Decode(&header); err != nil {
+	// Read header using serializer
+	if err := serializer.ReadSnapshotHeader(bufReader); err != nil {
 		return err
 	}
 
 	// Read entries
-	for decoder.More() {
-		var entry Entry
-		if err := decoder.Decode(&entry); err != nil {
+	for {
+		entry, err := serializer.DecodeEntry(bufReader)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
 			return err
 		}
 
 		shard := kv.getShard(entry.Key)
 		shard.mu.Lock()
-		entryCopy := entry
-		shard.data[entry.Key] = &entryCopy
-		kv.moveToFront(shard, &entryCopy)
+		shard.data[entry.Key] = entry
+		kv.moveToFront(shard, entry)
 		shard.mu.Unlock()
 
 		atomic.AddInt64(&kv.entries, 1)
@@ -845,16 +897,28 @@ func (kv *KVStore) replayWAL() error {
 	}
 	defer file.Close()
 
-	decoder := json.NewDecoder(file)
+	// Auto-detect WAL format if enabled
+	serializer := kv.serializer
+	if kv.opts.AutoDetectFormat {
+		format, detectErr := DetectWALFormat(file)
+		if detectErr == nil {
+			serializer = GetSerializer(format)
+		}
+	}
 
-	for decoder.More() {
-		var entry WALEntry
-		if err := decoder.Decode(&entry); err != nil {
+	reader := bufio.NewReader(file)
+
+	for {
+		entry, err := serializer.DecodeWALEntry(reader)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
 			// Stop on first error (corruption)
 			break
 		}
 
-		if !kv.validateWALEntry(entry) {
+		if !kv.validateWALEntry(*entry) {
 			continue // Skip corrupted entries
 		}
 
@@ -895,51 +959,8 @@ func (kv *KVStore) replayWAL() error {
 
 // Utility methods
 
-func (kv *KVStore) logSet(key string, value []byte, expireAt time.Time, version int64) {
-	entry := WALEntry{
-		Op:       opSet,
-		Key:      key,
-		Value:    value,
-		ExpireAt: expireAt,
-		Version:  version,
-	}
-	entry.CRC = kv.calculateCRC(entry)
-
-	select {
-	case kv.logChan <- entry:
-	case <-kv.ctx.Done():
-		// Store closed, stop trying to log
-	}
-}
-
-func (kv *KVStore) logDelete(key string) {
-	entry := WALEntry{
-		Op:      opDelete,
-		Key:     key,
-		Version: atomic.AddInt64(&kv.version, 1),
-	}
-	entry.CRC = kv.calculateCRC(entry)
-
-	select {
-	case kv.logChan <- entry:
-	case <-kv.ctx.Done():
-		// Store closed, stop trying to log
-	}
-}
-
 func (kv *KVStore) encodeWALEntry(entry WALEntry) ([]byte, error) {
-	// Use pooled buffer for encoding to reduce allocations
-	buf := pool.GetBuffer()
-	defer pool.PutBuffer(buf)
-
-	if err := json.NewEncoder(buf).Encode(entry); err != nil {
-		return nil, err
-	}
-
-	// Return a copy of the bytes
-	result := make([]byte, buf.Len())
-	copy(result, buf.Bytes())
-	return result, nil
+	return kv.serializer.EncodeWALEntry(entry)
 }
 
 func (kv *KVStore) calculateCRC(entry WALEntry) uint32 {

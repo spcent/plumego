@@ -2,6 +2,7 @@ package glog
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	stdlog "log"
 	"os"
@@ -820,6 +821,68 @@ func TestLogRotation(t *testing.T) {
 	if currentSize > int64(std.rotationConfig.MaxSize)*1024*1024 {
 		t.Errorf("Current log size %d should be less than max size %d after rotation",
 			currentSize, int64(std.rotationConfig.MaxSize)*1024*1024)
+	}
+}
+
+func TestLogRetentionCleanup(t *testing.T) {
+	resetGlobalLogger()
+
+	tempDir := createTempDir(t)
+	defer cleanupTempDir(t, tempDir)
+
+	std.logDir = tempDir
+	std.program = "testapp"
+	std.SetRotationConfig(RotationConfig{
+		MaxAge:     1, // days
+		MaxBackups: 1,
+	})
+
+	oldTime := time.Now().Add(-48 * time.Hour)
+	oldName := fmt.Sprintf("%s.host.INFO.20200101-000000.1.log", std.program)
+	oldPath := filepath.Join(tempDir, oldName)
+	if err := os.WriteFile(oldPath, []byte("old"), 0644); err != nil {
+		t.Fatalf("failed to create old log file: %v", err)
+	}
+	if err := os.Chtimes(oldPath, oldTime, oldTime); err != nil {
+		t.Fatalf("failed to update old log time: %v", err)
+	}
+
+	recentBase := time.Now().Add(-1 * time.Hour)
+	for i := 0; i < 2; i++ {
+		name := fmt.Sprintf("%s.host.INFO.20220101-000000.%d.log", std.program, i)
+		path := filepath.Join(tempDir, name)
+		if err := os.WriteFile(path, []byte("recent"), 0644); err != nil {
+			t.Fatalf("failed to create recent log file: %v", err)
+		}
+		modTime := recentBase.Add(time.Duration(i) * time.Minute)
+		if err := os.Chtimes(path, modTime, modTime); err != nil {
+			t.Fatalf("failed to update recent log time: %v", err)
+		}
+	}
+
+	if err := std.initLogFiles(); err != nil {
+		t.Fatalf("Failed to initialize log files: %v", err)
+	}
+	defer std.Close()
+
+	entries, err := os.ReadDir(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to read temp dir: %v", err)
+	}
+
+	infoLogs := 0
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), "INFO") && strings.HasSuffix(entry.Name(), ".log") {
+			infoLogs++
+		}
+	}
+
+	if infoLogs > 2 {
+		t.Fatalf("expected at most 2 INFO logs after cleanup, got %d", infoLogs)
+	}
+
+	if _, err := os.Stat(oldPath); err == nil {
+		t.Fatalf("expected old log file to be removed: %s", oldPath)
 	}
 }
 

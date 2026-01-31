@@ -75,6 +75,8 @@ var (
 	buildTime = "unknown"
 )
 
+var errManagerClosed = errors.New("manager is closed")
+
 // These variables can be overridden at build time using -ldflags.
 var (
 	// Version reports the application version.
@@ -110,13 +112,16 @@ type HealthManager interface {
 
 // healthManager is the concrete implementation of HealthManager.
 type healthManager struct {
-	mu           sync.RWMutex
-	components   map[string]ComponentChecker
-	health       map[string]*ComponentHealth
-	history      []HealthHistoryEntry
-	config       HealthCheckConfig
-	cleanupTimer *time.Timer
-	closed       bool
+	mu                sync.RWMutex
+	components        map[string]ComponentChecker
+	health            map[string]*ComponentHealth
+	history           []HealthHistoryEntry
+	config            HealthCheckConfig
+	cleanupTimer      *time.Timer
+	closed            bool
+	metrics           *MetricsCollector
+	lastCheckTime     time.Time
+	lastCheckDuration time.Duration
 }
 
 // NewHealthManager creates a new HealthManager instance.
@@ -171,7 +176,7 @@ func (hm *healthManager) RegisterComponent(checker ComponentChecker) error {
 	defer hm.mu.Unlock()
 
 	if hm.closed {
-		return errors.New("manager is closed")
+		return errManagerClosed
 	}
 
 	name := checker.Name()
@@ -198,7 +203,7 @@ func (hm *healthManager) UnregisterComponent(name string) error {
 	defer hm.mu.Unlock()
 
 	if hm.closed {
-		return errors.New("manager is closed")
+		return errManagerClosed
 	}
 
 	if _, exists := hm.components[name]; !exists {
@@ -251,49 +256,87 @@ func (hm *healthManager) GetAllHealth() map[string]*ComponentHealth {
 
 // CheckComponent performs a health check for a specific component.
 func (hm *healthManager) CheckComponent(ctx context.Context, name string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	hm.mu.RLock()
+	if hm.closed {
+		hm.mu.RUnlock()
+		return errManagerClosed
+	}
+
 	checker, exists := hm.components[name]
-	health, healthExists := hm.health[name]
+	config := hm.config
+	metrics := hm.metrics
 	hm.mu.RUnlock()
 
 	if !exists {
 		return fmt.Errorf("component %s not found", name)
 	}
 
+	checkCtx, cancel := withCheckTimeout(ctx, config.Timeout)
+	defer cancel()
+
+	start := time.Now()
+	attempts, err := runCheckWithRetry(checkCtx, checker, config)
+	duration := time.Since(start)
+
+	timestamp := time.Now()
+	status := StatusHealthy
+	message := "component is healthy"
+	if err != nil {
+		status = StatusUnhealthy
+		message = err.Error()
+	}
+
+	hm.mu.Lock()
+	health, healthExists := hm.health[name]
 	if !healthExists {
+		hm.mu.Unlock()
+		if metrics != nil {
+			metrics.RecordCheckWithError(name, duration, err == nil, status, err)
+		}
 		return fmt.Errorf("health status for component %s not found", name)
 	}
 
-	start := time.Now()
-	err := checker.Check(ctx)
-	duration := time.Since(start)
-
-	hm.mu.Lock()
-	defer hm.mu.Unlock()
-
 	// Update health status
-	if err != nil {
-		health.Status = StatusUnhealthy
-		health.Message = err.Error()
-	} else {
-		health.Status = StatusHealthy
-		health.Message = "component is healthy"
-	}
-
-	health.Timestamp = time.Now()
+	health.Status = status
+	health.Message = message
+	health.Timestamp = timestamp
 	health.Duration = duration
 	if health.Details == nil {
 		health.Details = make(map[string]any)
 	}
-	health.Details["last_check"] = health.Timestamp
+	health.Details["last_check"] = timestamp
 	health.Details["check_duration"] = duration.String()
+	health.Details["check_attempts"] = attempts
+	hm.lastCheckTime = timestamp
+	hm.lastCheckDuration = duration
+	hm.mu.Unlock()
+
+	if metrics != nil {
+		metrics.RecordCheckWithError(name, duration, err == nil, status, err)
+	}
 
 	return err
 }
 
 // CheckAllComponents performs health checks for all registered components.
 func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	hm.mu.RLock()
+	if hm.closed {
+		hm.mu.RUnlock()
+		return HealthStatus{
+			Status:    StatusUnhealthy,
+			Message:   errManagerClosed.Error(),
+			Timestamp: time.Now(),
+		}
+	}
 	components := make([]string, 0, len(hm.components))
 	for name := range hm.components {
 		components = append(components, name)
@@ -325,17 +368,11 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 			sem <- struct{}{}        // Acquire semaphore
 			defer func() { <-sem }() // Release semaphore
 
-			// Perform health check with timeout
-			checkCtx, cancel := context.WithTimeout(ctx, hm.config.Timeout)
-			defer cancel()
-
-			err := hm.CheckComponent(checkCtx, componentName)
-			duration := time.Since(start)
+			err := hm.CheckComponent(ctx, componentName)
 
 			results <- componentCheckResult{
-				Name:     componentName,
-				Error:    err,
-				Duration: duration,
+				Name:  componentName,
+				Error: err,
 			}
 		}(name)
 	}
@@ -361,8 +398,10 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 	defer hm.mu.Unlock()
 
 	// Update overall readiness based on component health
+	timestamp := time.Now()
 	readiness := ReadinessStatus{
-		Timestamp: time.Now(),
+		Timestamp:  timestamp,
+		Components: make(map[string]bool, len(hm.health)),
 	}
 
 	if allHealthy {
@@ -373,13 +412,17 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 		readiness.Reason = fmt.Sprintf("components failed: %v", failedComponents)
 	}
 
+	for name, compHealth := range hm.health {
+		readiness.Components[name] = compHealth.Status.isReady()
+	}
+
 	// Update readiness
 	updateReadiness(readiness)
 
 	// Add to history if enabled
 	if hm.config.EnableHistory {
 		entry := HealthHistoryEntry{
-			Timestamp:  time.Now(),
+			Timestamp:  timestamp,
 			State:      getOverallState(hm.health),
 			Message:    readiness.Reason,
 			Components: components,
@@ -420,10 +463,13 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 		overallMessage = fmt.Sprintf("Issues detected: %v", overallMessages)
 	}
 
+	hm.lastCheckTime = timestamp
+	hm.lastCheckDuration = duration
+
 	return HealthStatus{
 		Status:       overallStatus,
 		Message:      overallMessage,
-		Timestamp:    time.Now(),
+		Timestamp:    timestamp,
 		Details:      map[string]any{},
 		Duration:     duration,
 		Dependencies: components,
@@ -442,11 +488,78 @@ func (hm *healthManager) getOptimalConcurrency(componentCount int) int {
 	}
 }
 
+func withCheckTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if timeout <= 0 {
+		return ctx, func() {}
+	}
+
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 || remaining <= timeout {
+			return ctx, func() {}
+		}
+	}
+
+	return context.WithTimeout(ctx, timeout)
+}
+
+func runCheckWithRetry(ctx context.Context, checker ComponentChecker, config HealthCheckConfig) (int, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	maxAttempts := config.RetryCount + 1
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+
+	var err error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err = checker.Check(ctx)
+		if err == nil {
+			return attempt, nil
+		}
+		if attempt >= maxAttempts {
+			return attempt, err
+		}
+		if ctx != nil && ctx.Err() != nil {
+			return attempt, err
+		}
+		if !sleepWithContext(ctx, config.RetryDelay) {
+			return attempt, err
+		}
+	}
+
+	return maxAttempts, err
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) bool {
+	if delay <= 0 {
+		return true
+	}
+	if ctx == nil {
+		time.Sleep(delay)
+		return true
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
 // componentCheckResult represents the result of a single component health check.
 type componentCheckResult struct {
-	Name     string
-	Error    error
-	Duration time.Duration
+	Name  string
+	Error error
 }
 
 // GetOverallHealth returns the overall health status of the application.
@@ -528,10 +641,11 @@ func (hm *healthManager) getComponentNames() []string {
 	return names
 }
 
-// getLastCheckDuration returns the duration since last check.
+// getLastCheckDuration returns the duration of the last health check.
 func (hm *healthManager) getLastCheckDuration() time.Duration {
-	// This would need to track last check time, for now return 0
-	return 0
+	hm.mu.RLock()
+	defer hm.mu.RUnlock()
+	return hm.lastCheckDuration
 }
 
 // GetHealthHistory returns the health history.
@@ -663,7 +777,7 @@ func (hm *healthManager) SetConfig(config HealthCheckConfig) error {
 	defer hm.mu.Unlock()
 
 	if hm.closed {
-		return errors.New("manager is closed")
+		return errManagerClosed
 	}
 
 	hm.config = config

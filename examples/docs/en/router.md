@@ -31,6 +31,15 @@ v1.Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("p
 
 Register everything before `app.Boot()`; the router is frozen during boot to prevent missing registrations.
 
+## Method not allowed handling
+By default, method mismatches return `404`. Enable `405` with:
+
+```go
+r := router.NewRouter(router.WithMethodNotAllowed(true))
+```
+
+When enabled, the router returns `405` and sets the `Allow` header when another method matches the path.
+
 ## Static frontends and catch-alls
 Mount static assets under their own group so cache headers or auth can be isolated.
 
@@ -45,7 +54,14 @@ For embedded bundles, use the helpers in `frontend`:
 
 ```go
 // Mount an embedded SPA or docs site at "/".
-_ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"))
+_ = frontend.RegisterFS(
+    app.Router(),
+    http.FS(staticFS),
+    frontend.WithPrefix("/"),
+    frontend.WithCacheControl("public, max-age=31536000"),
+    frontend.WithIndexCacheControl("no-cache"),
+    frontend.WithFallback(true),
+)
 ```
 
 ## Debugging tools
@@ -55,5 +71,5 @@ _ = frontend.RegisterFS(app.Router(), http.FS(staticFS), frontend.WithPrefix("/"
 
 ## Where to look in the repo
 - `router/router.go`: trie matching, groups, and handler helpers.
-- `frontend/register.go`: helpers for mounting static directories or embedded frontend bundles.
+- `frontend/frontend.go`: helpers for mounting static directories or embedded frontend bundles.
 - `examples/reference/main.go`: real wiring of API, metrics, health, docs, and frontend routes.

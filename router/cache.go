@@ -33,17 +33,30 @@ func NewRouteCache(capacity int) *RouteCache {
 
 // Get retrieves a cached route match result
 func (rc *RouteCache) Get(key string) (*MatchResult, bool) {
+	// First try with read lock
 	rc.mu.RLock()
-	defer rc.mu.RUnlock()
-
 	element, exists := rc.cache[key]
 	if !exists {
+		rc.mu.RUnlock()
 		return nil, false
 	}
 
-	// Move to front (most recently used)
-	rc.list.MoveToFront(element)
-	return element.Value.(*CacheEntry).value, true
+	// Check if already at front - if so, no need to move
+	isAtFront := element == rc.list.Front()
+	value := element.Value.(*CacheEntry).value
+	rc.mu.RUnlock()
+
+	// Only acquire write lock if we need to move the element
+	if !isAtFront {
+		rc.mu.Lock()
+		// Double-check element still exists and reacquire it
+		if elem, ok := rc.cache[key]; ok && elem == element {
+			rc.list.MoveToFront(elem)
+		}
+		rc.mu.Unlock()
+	}
+
+	return value, true
 }
 
 // Set adds a route match result to the cache

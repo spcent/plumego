@@ -24,6 +24,19 @@ app.GetHandler("/health/build", health.BuildInfoHandler())
 
 - `ReadinessHandler` returns 200 after boot flips the ready flag; returns 503 during startup/shutdown.
 - `BuildInfoHandler` surfaces `health.BuildInfo` (version, commit, build time) as JSON; set these fields via ldflags at build time.
+- Error responses use the contract error envelope (`contract.APIError`) with consistent `trace_id` when available.
+
+## Health metrics
+Attach a collector to a `HealthManager` to expose structured health metrics:
+
+```go
+manager, _ := health.NewHealthManager(health.HealthCheckConfig{})
+collector := health.NewMetricsCollector(manager) // auto-attaches
+app.GetHandler("/health/metrics", health.MetricsHandler(collector))
+```
+
+- If you construct a collector separately, call `health.AttachMetrics(manager, collector)` to wire it in.
+- `HealthMetrics` includes `check_count`, `success_count`, `failure_count`, and per-component metrics in JSON.
 
 ## Component health reporting
 Components can report structured health to feed readiness decisions or dashboards:
@@ -43,6 +56,7 @@ func (w *worker) Health() (string, health.HealthStatus) {
 - Expose `/metrics` on an authenticated or internal path if your deployment requires it; the handler is plain `http.Handler` and can sit behind middleware.
 - Keep readiness checks fast—avoid downstream calls or large allocations.
 - Pair logging middleware with Prometheus/OTel collectors so every request gets correlated metrics and trace IDs automatically.
+- `metrics.NewBaseMetricsCollector()` retains up to 10k records by default; call `WithMaxRecords(n)` to tune or `WithMaxRecords(0)` to disable retention.
 
 ## Where to look in the repo
 - `metrics/prometheus.go` and `metrics/otel.go`: collector and tracer adapters.

@@ -10,9 +10,9 @@ import (
 // the best matching route for a given URL path.
 //
 // Matching strategy:
-//   1. Try static path segments first (exact match)
-//   2. Try parameter segments (dynamic segments like ":id")
-//   3. Try wildcard segments (catch-all segments like "*path")
+//  1. Try static path segments first (exact match)
+//  2. Try parameter segments (dynamic segments like ":id")
+//  3. Try wildcard segments (catch-all segments like "*path")
 //
 // Example:
 //
@@ -27,6 +27,7 @@ type RouteMatcher struct {
 
 // NewRouteMatcher creates a new route matcher for the given tree root.
 // The matcher is lightweight and can be reused for multiple matching operations.
+// This is primarily used internally by the Router for route matching.
 //
 // Parameters:
 //   - root: Root node of the radix tree
@@ -36,8 +37,8 @@ type RouteMatcher struct {
 //
 // Example:
 //
-//	tree := router.GetRadixTree()
-//	matcher := NewRouteMatcher(tree.GetRoot("GET"))
+//	// Internal usage within Router.handleRouteMatch:
+//	matcher := NewRouteMatcher(tree)
 //	result := matcher.Match([]string{"users", "123"})
 func NewRouteMatcher(root *node) *RouteMatcher {
 	return &RouteMatcher{
@@ -107,6 +108,7 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 		ParamValues:      paramValues,
 		ParamKeys:        current.paramKeys,
 		RouteMiddlewares: current.middlewares,
+		RoutePattern:     current.fullPath,
 	}
 }
 

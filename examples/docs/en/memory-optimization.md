@@ -149,7 +149,7 @@ BenchmarkMapAllocation/WithPool-10      15,077,396 ops   79.51 ns/op   8 B/op   
 
 ### Real-World Application Improvements
 
-1. **HTTP Response Handling**: `Ctx.JSON()` method uses buffer pool, reducing memory allocation per request
+1. **HTTP Response Handling**: `Ctx.JSON()` uses a buffer pool to reduce per-request allocations. For standardized payloads, prefer `Ctx.Response()` (contract envelope + trace id), accepting a small encoding overhead for consistent output.
 2. **Configuration Loading**: Configuration file parsing uses map pool, improving configuration read performance
 3. **KV Storage**: WAL log encoding uses buffer pool, improving write performance
 4. **Webhook Processing**: Event data serialization uses object pool, reducing GC pressure

@@ -126,6 +126,28 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) {
 	_ = json.NewEncoder(w).Encode(ErrorResponse{Error: err})
 }
 
+// CategoryForStatus maps an HTTP status to a default error category.
+func CategoryForStatus(status int) ErrorCategory {
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return CategoryAuthentication
+	case http.StatusTooManyRequests:
+		return CategoryRateLimit
+	case http.StatusRequestTimeout:
+		return CategoryTimeout
+	case http.StatusBadRequest, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity:
+		return CategoryClient
+	default:
+		if status >= http.StatusInternalServerError {
+			return CategoryServer
+		}
+		if status >= http.StatusBadRequest {
+			return CategoryClient
+		}
+		return ""
+	}
+}
+
 // ErrorLogger converts an error into structured logging fields while preserving correlation ids.
 func ErrorLogger(logger log.StructuredLogger, r *http.Request, err APIError) {
 	if logger == nil {

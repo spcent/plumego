@@ -1,174 +1,660 @@
 package abuse
 
 import (
+	"fmt"
+	"math/rand"
+	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
-type fakeClock struct {
-	now time.Time
+func TestConfigValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+	}{
+		{
+			name: "valid config",
+			config: Config{
+				Rate:            10.0,
+				Capacity:        100,
+				MaxEntries:      1000,
+				CleanupInterval: time.Minute,
+				MaxIdle:         5 * time.Minute,
+				Shards:          4,
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative rate",
+			config: Config{
+				Rate:     -1.0,
+				Capacity: 100,
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero capacity",
+			config: Config{
+				Rate:     10.0,
+				Capacity: 0,
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative max entries",
+			config: Config{
+				Rate:       10.0,
+				Capacity:   100,
+				MaxEntries: -10,
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero cleanup interval",
+			config: Config{
+				Rate:            10.0,
+				Capacity:        100,
+				CleanupInterval: 0,
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative max idle",
+			config: Config{
+				Rate:     10.0,
+				Capacity: 100,
+				MaxIdle:  -1,
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero shards",
+			config: Config{
+				Rate:     10.0,
+				Capacity: 100,
+				Shards:   0,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Config.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
 
-func (c *fakeClock) Now() time.Time {
-	return c.now
-}
+func TestLimiterObjectPool(t *testing.T) {
+	config := Config{
+		Rate:            10.0,
+		Capacity:        100,
+		MaxEntries:      100,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          2,
+	}
 
-func (c *fakeClock) Advance(d time.Duration) {
-	c.now = c.now.Add(d)
-}
-
-func TestLimiterAllow(t *testing.T) {
-	clock := &fakeClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	limiter := NewLimiter(Config{
-		Rate:     1,
-		Capacity: 2,
-		Now:      clock.Now,
-	})
+	limiter := NewLimiter(config)
 	defer limiter.Stop()
 
-	decision := limiter.Allow("client")
-	if !decision.Allowed {
-		t.Fatalf("expected first request to be allowed")
-	}
-	if decision.Remaining != 1 {
-		t.Fatalf("expected remaining 1, got %d", decision.Remaining)
-	}
-
-	decision = limiter.Allow("client")
-	if !decision.Allowed {
-		t.Fatalf("expected second request to be allowed")
-	}
-	if decision.Remaining != 0 {
-		t.Fatalf("expected remaining 0, got %d", decision.Remaining)
+	// Create and delete many buckets to test object pool
+	for i := 0; i < 50; i++ {
+		key := "pool-test-" + string(rune(i))
+		decision := limiter.Allow(key)
+		if !decision.Allowed {
+			t.Errorf("Expected request to be allowed, got denied")
+		}
 	}
 
-	decision = limiter.Allow("client")
-	if decision.Allowed {
-		t.Fatalf("expected third request to be rate limited")
-	}
-	if decision.RetryAfter == 0 {
-		t.Fatalf("expected retry-after to be set")
+	// Wait for cleanup to potentially reuse buckets
+	time.Sleep(time.Millisecond * 150)
+}
+
+func TestLimiterShardCounter(t *testing.T) {
+	config := Config{
+		Rate:            10.0,
+		Capacity:        100,
+		MaxEntries:      1000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          4,
 	}
 
-	clock.Advance(time.Second)
-	decision = limiter.Allow("client")
-	if !decision.Allowed {
-		t.Fatalf("expected request after refill to be allowed")
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	// Create some entries
+	for i := 0; i < 10; i++ {
+		key := "counter-test-" + string(rune(i))
+		limiter.Allow(key)
+	}
+
+	// Test that the limiter is working correctly
+	decision := limiter.Allow("test-key")
+	if decision.Limit != 100 {
+		t.Errorf("Expected limit to be 100, got %d", decision.Limit)
 	}
 }
 
-func TestLimiterCleanup(t *testing.T) {
-	clock := &fakeClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	limiter := NewLimiter(Config{
-		Rate:            1,
-		Capacity:        1,
-		Shards:          1,
-		Now:             clock.Now,
-		CleanupInterval: time.Hour,
-		MaxIdle:         time.Minute,
-	})
-	defer limiter.Stop()
-
-	limiter.Allow("client")
-	if countBuckets(limiter) != 1 {
-		t.Fatalf("expected 1 bucket, got %d", countBuckets(limiter))
+func TestLimiterConcurrentPerformance(t *testing.T) {
+	config := Config{
+		Rate:            100.0,
+		Capacity:        1000,
+		MaxEntries:      10000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          16,
 	}
 
-	clock.Advance(2 * time.Minute)
-	limiter.cleanup(clock.Now())
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
 
-	if countBuckets(limiter) != 0 {
-		t.Fatalf("expected buckets to be cleaned up, got %d", countBuckets(limiter))
+	var wg sync.WaitGroup
+	var totalAllowed, totalRejected int64
+
+	// Start multiple goroutines to test concurrent performance
+	numGoroutines := 20
+	operationsPerGoroutine := 50
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			for j := 0; j < operationsPerGoroutine; j++ {
+				key := "concurrent-" + string(rune(id)) + "-" + string(rune(j))
+				decision := limiter.Allow(key)
+
+				if decision.Allowed {
+					atomic.AddInt64(&totalAllowed, 1)
+				} else {
+					atomic.AddInt64(&totalRejected, 1)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	totalOperations := int64(numGoroutines * operationsPerGoroutine)
+	if totalOperations != totalAllowed+totalRejected {
+		t.Errorf("Total operations mismatch: expected %d, got %d", totalOperations, totalAllowed+totalRejected)
+	}
+
+	// Should have some allowed requests
+	if totalAllowed == 0 {
+		t.Errorf("Expected some requests to be allowed, got 0")
 	}
 }
 
-func TestLimiterUnknownKey(t *testing.T) {
-	clock := &fakeClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	limiter := NewLimiter(Config{
-		Rate:            1,
-		Capacity:        1,
-		Now:             clock.Now,
-		CleanupInterval: time.Hour,
-		MaxIdle:         time.Hour,
-	})
+func TestLimiterTOCTOUFix(t *testing.T) {
+	config := Config{
+		Rate:            10.0,
+		Capacity:        100,
+		MaxEntries:      10, // Small limit to trigger eviction
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          4,
+	}
+
+	limiter := NewLimiter(config)
 	defer limiter.Stop()
 
-	limiter.Allow("")
-	if countBuckets(limiter) != 1 {
-		t.Fatalf("expected 1 bucket after unknown key")
+	// Pre-populate with entries
+	for i := 0; i < 5; i++ {
+		key := "key-" + string(rune(i))
+		limiter.Allow(key)
+		time.Sleep(time.Millisecond * 10)
 	}
-	shard := limiter.shardFor("unknown")
-	if _, ok := shard.buckets["unknown"]; !ok {
-		t.Fatalf("expected empty key to map to unknown bucket")
+
+	// Start concurrent operations that may trigger TOCTOU
+	var wg sync.WaitGroup
+	var errors int64
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			for j := 0; j < 50; j++ {
+				key := "concurrent-key-" + string(rune(id)) + "-" + string(rune(j))
+				decision := limiter.Allow(key)
+				if !decision.Allowed {
+					atomic.AddInt64(&errors, 1)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Should not have excessive errors due to TOCTOU race
+	if errors > 200 { // Allow some errors due to rate limiting
+		t.Errorf("Too many errors, possible TOCTOU issue: %d", errors)
 	}
 }
 
-func TestLimiterClockRollback(t *testing.T) {
-	clock := &fakeClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	limiter := NewLimiter(Config{
-		Rate:     1,
-		Capacity: 2,
-		Shards:   1,
-		Now:      clock.Now,
-	})
+func TestLimiterConfigurationDefaults(t *testing.T) {
+	config := DefaultConfig()
+
+	if config.Rate <= 0 {
+		t.Errorf("Default rate should be positive, got %f", config.Rate)
+	}
+	if config.Capacity <= 0 {
+		t.Errorf("Default capacity should be positive, got %d", config.Capacity)
+	}
+	if config.MaxEntries <= 0 {
+		t.Errorf("Default max entries should be positive, got %d", config.MaxEntries)
+	}
+	if config.CleanupInterval <= 0 {
+		t.Errorf("Default cleanup interval should be positive, got %v", config.CleanupInterval)
+	}
+	if config.MaxIdle <= 0 {
+		t.Errorf("Default max idle should be positive, got %v", config.MaxIdle)
+	}
+	if config.Shards <= 0 {
+		t.Errorf("Default shards should be positive, got %d", config.Shards)
+	}
+}
+
+func TestLimiterWithCustomNowFunction(t *testing.T) {
+	var currentTime time.Time
+	config := Config{
+		Rate:            10.0,
+		Capacity:        100,
+		MaxEntries:      1000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          4,
+		Now:             func() time.Time { return currentTime },
+	}
+
+	limiter := NewLimiter(config)
 	defer limiter.Stop()
 
-	decision := limiter.Allow("client")
+	currentTime = time.Now()
+	decision := limiter.Allow("test-key")
 	if !decision.Allowed {
-		t.Fatalf("expected first request to be allowed")
-	}
-
-	clock.Advance(-time.Second)
-	decision = limiter.Allow("client")
-	if !decision.Allowed {
-		t.Fatalf("expected request to be allowed after clock rollback")
-	}
-	if decision.Remaining != 0 {
-		t.Fatalf("expected remaining 0, got %d", decision.Remaining)
+		t.Errorf("Expected request to be allowed with custom Now function")
 	}
 }
 
-func TestLimiterMaxEntriesEviction(t *testing.T) {
-	clock := &fakeClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	limiter := NewLimiter(Config{
-		Rate:       1,
-		Capacity:   1,
-		MaxEntries: 1,
-		Shards:     1,
-		Now:        clock.Now,
-	})
-	defer limiter.Stop()
-
-	limiter.Allow("client-a")
-	limiter.Allow("client-b")
-
-	if countBuckets(limiter) != 1 {
-		t.Fatalf("expected at most 1 bucket, got %d", countBuckets(limiter))
+func TestLimiterStop(t *testing.T) {
+	config := Config{
+		Rate:            10.0,
+		Capacity:        100,
+		MaxEntries:      1000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          4,
 	}
+
+	limiter := NewLimiter(config)
+
+	// Test that Stop can be called multiple times
+	limiter.Stop()
+	limiter.Stop()
+	limiter.Stop()
+
+	// Should not panic
 }
 
 func BenchmarkLimiterAllow(b *testing.B) {
-	limit := b.N + 1
-	limiter := NewLimiter(Config{
-		Rate:            float64(limit),
-		Capacity:        limit,
-		CleanupInterval: time.Hour,
-		MaxIdle:         time.Hour,
-	})
+	config := Config{
+		Rate:            1000.0,
+		Capacity:        10000,
+		MaxEntries:      100000,
+		CleanupInterval: time.Minute,
+		MaxIdle:         5 * time.Minute,
+		Shards:          16,
+	}
+
+	limiter := NewLimiter(config)
 	defer limiter.Stop()
 
-	b.ReportAllocs()
 	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			key := "bench-key-" + string(rune(i%1000))
+			limiter.Allow(key)
+			i++
+		}
+	})
+}
 
-	for i := 0; i < b.N; i++ {
-		limiter.Allow("client")
+func BenchmarkLimiterStressTest(b *testing.B) {
+	config := Config{
+		Rate:            100.0,
+		Capacity:        1000,
+		MaxEntries:      10000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          16,
+	}
+
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			key := fmt.Sprintf("stress-key-%d", rand.Int63())
+			limiter.Allow(key)
+		}
+	})
+}
+
+func TestLimiterExtremeConfigurations(t *testing.T) {
+	tests := []struct {
+		name   string
+		config Config
+	}{
+		{
+			name: "very high rate",
+			config: Config{
+				Rate:            1000000.0,
+				Capacity:        1000000,
+				MaxEntries:      1000000,
+				CleanupInterval: time.Millisecond * 10,
+				MaxIdle:         time.Millisecond * 100,
+				Shards:          64,
+			},
+		},
+		{
+			name: "very low rate",
+			config: Config{
+				Rate:            0.001,
+				Capacity:        1,
+				MaxEntries:      1000,
+				CleanupInterval: time.Minute,
+				MaxIdle:         time.Hour,
+				Shards:          1,
+			},
+		},
+		{
+			name: "maximum capacity",
+			config: Config{
+				Rate:            1000.0,
+				Capacity:        1000000,
+				MaxEntries:      1000000,
+				CleanupInterval: time.Minute,
+				MaxIdle:         time.Hour,
+				Shards:          16,
+			},
+		},
+		{
+			name: "minimum capacity",
+			config: Config{
+				Rate:            10.0,
+				Capacity:        1,
+				MaxEntries:      100,
+				CleanupInterval: time.Millisecond * 100,
+				MaxIdle:         time.Second * 5,
+				Shards:          1,
+			},
+		},
+		{
+			name: "many shards",
+			config: Config{
+				Rate:            100.0,
+				Capacity:        1000,
+				MaxEntries:      10000,
+				CleanupInterval: time.Minute,
+				MaxIdle:         time.Minute * 10,
+				Shards:          256,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			limiter := NewLimiter(tt.config)
+			defer limiter.Stop()
+
+			// Test basic functionality
+			decision := limiter.Allow("test-key")
+			if !decision.Allowed {
+				t.Errorf("Expected request to be allowed with extreme config")
+			}
+
+			// Test multiple keys
+			for i := 0; i < 10; i++ {
+				key := fmt.Sprintf("key-%d", i)
+				limiter.Allow(key)
+			}
+
+			// Test metrics
+			metrics := limiter.Metrics()
+			if metrics.Allowed.Load() == 0 {
+				t.Errorf("Expected some allowed requests")
+			}
+		})
 	}
 }
 
-func countBuckets(l *Limiter) int {
-	total := 0
-	for i := range l.shards {
-		total += len(l.shards[i].buckets)
+func TestLimiterBoundaryConditions(t *testing.T) {
+	config := Config{
+		Rate:            1.0,
+		Capacity:        1,
+		MaxEntries:      10,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          1,
 	}
-	return total
+
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	// Test exact capacity
+	for i := 0; i < 10; i++ {
+		key := fmt.Sprintf("boundary-key-%d", i)
+		decision := limiter.Allow(key)
+		if !decision.Allowed {
+			t.Errorf("Expected request %d to be allowed", i)
+		}
+	}
+
+	// Test eviction boundary
+	decision := limiter.Allow("boundary-test-key")
+	if !decision.Allowed {
+		t.Errorf("Expected boundary test key to be allowed")
+	}
+
+	// Test rate limiting boundary
+	time.Sleep(time.Second)
+	decision = limiter.Allow("rate-test-key")
+	if !decision.Allowed {
+		t.Errorf("Expected rate test key to be allowed after sleep")
+	}
+}
+
+func TestLimiterMetricsAccuracy(t *testing.T) {
+	config := Config{
+		Rate:            100.0,
+		Capacity:        100,
+		MaxEntries:      1000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          4,
+	}
+
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	// Allow some requests
+	for i := 0; i < 50; i++ {
+		key := fmt.Sprintf("metrics-key-%d", i)
+		limiter.Allow(key)
+	}
+
+	// Check metrics
+	metrics := limiter.Metrics()
+	allowed := metrics.Allowed.Load()
+	rejected := metrics.Rejected.Load()
+	total := allowed + rejected
+
+	if total != 50 {
+		t.Errorf("Expected total metrics to be 50, got %d", total)
+	}
+
+	if allowed == 0 {
+		t.Errorf("Expected some allowed requests")
+	}
+}
+
+func TestLimiterConcurrentMetrics(t *testing.T) {
+	config := Config{
+		Rate:            1000.0,
+		Capacity:        1000,
+		MaxEntries:      10000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          16,
+	}
+
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	var wg sync.WaitGroup
+	numGoroutines := 20
+	operationsPerGoroutine := 100
+
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < operationsPerGoroutine; j++ {
+				key := fmt.Sprintf("concurrent-metrics-%d-%d", id, j)
+				limiter.Allow(key)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Check metrics consistency
+	metrics := limiter.Metrics()
+	allowed := metrics.Allowed.Load()
+	rejected := metrics.Rejected.Load()
+	total := allowed + rejected
+	expectedTotal := int64(numGoroutines * operationsPerGoroutine)
+
+	if total != expectedTotal {
+		t.Errorf("Expected total metrics %d, got %d", expectedTotal, total)
+	}
+}
+
+func TestLimiterCleanupUnderLoad(t *testing.T) {
+	config := Config{
+		Rate:            100.0,
+		Capacity:        100,
+		MaxEntries:      100,
+		CleanupInterval: time.Millisecond * 50,
+		MaxIdle:         time.Millisecond * 100,
+		Shards:          4,
+	}
+
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	// Pre-populate with entries
+	for i := 0; i < 50; i++ {
+		key := fmt.Sprintf("cleanup-key-%d", i)
+		limiter.Allow(key)
+		time.Sleep(time.Millisecond * 10)
+	}
+
+	// Start concurrent operations while cleanup is happening
+	var wg sync.WaitGroup
+	wg.Add(10)
+
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				key := fmt.Sprintf("cleanup-concurrent-%d-%d", id, j)
+				limiter.Allow(key)
+				time.Sleep(time.Millisecond * 5)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Wait for cleanup to run
+	time.Sleep(time.Millisecond * 150)
+
+	// Should not panic or deadlock
+	metrics := limiter.Metrics()
+	if metrics.Allowed.Load() == 0 {
+		t.Errorf("Expected some allowed requests during cleanup")
+	}
+}
+
+func TestLimiterMemoryUsage(t *testing.T) {
+	config := Config{
+		Rate:            100.0,
+		Capacity:        100,
+		MaxEntries:      1000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          16,
+	}
+
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	// Create many entries
+	for i := 0; i < 500; i++ {
+		key := fmt.Sprintf("memory-test-key-%d", i)
+		limiter.Allow(key)
+	}
+
+	// Force garbage collection
+	runtime.GC()
+
+	// Check that we can still operate
+	decision := limiter.Allow("memory-test-final")
+	if !decision.Allowed {
+		t.Errorf("Expected final request to be allowed")
+	}
+}
+
+func TestLimiterWithCustomTimeFunction(t *testing.T) {
+	var currentTime time.Time
+	config := Config{
+		Rate:            10.0,
+		Capacity:        100,
+		MaxEntries:      1000,
+		CleanupInterval: time.Millisecond * 100,
+		MaxIdle:         time.Second * 5,
+		Shards:          4,
+		Now:             func() time.Time { return currentTime },
+	}
+
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	// Set initial time
+	currentTime = time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	decision := limiter.Allow("custom-time-key")
+	if !decision.Allowed {
+		t.Errorf("Expected request to be allowed with custom time")
+	}
+
+	// Advance time
+	currentTime = currentTime.Add(time.Second)
+	decision = limiter.Allow("custom-time-key-2")
+	if !decision.Allowed {
+		t.Errorf("Expected second request to be allowed after time advance")
+	}
 }

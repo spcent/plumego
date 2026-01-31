@@ -12,6 +12,14 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
+const (
+	// DefaultMaxConcurrency is the default maximum number of concurrent requests.
+	DefaultMaxConcurrency = 256
+
+	// DefaultQueueDepth is the default depth of the request queue.
+	DefaultQueueDepth = 512
+)
+
 // App represents the main application instance.
 type App struct {
 	// Core components (immutable after construction)
@@ -31,13 +39,14 @@ type App struct {
 	httpServer  *http.Server       // HTTP server instance
 	connTracker *connectionTracker // Connection tracker for WebSocket
 	handler     http.Handler       // Combined handler with middleware applied
-	handlerOnce sync.Once          // Ensures handler initialization happens once
+	handlerOnce ResettableOnce     // Ensures handler initialization happens once, can be reset for testing
 
 	// Optional components
 	metricsCollector metrics.MetricsCollector
 	tracer           middleware.Tracer
 	pub              pubsub.PubSub
 	loggingEnabled   bool
+	requestIDEnabled bool
 	recoveryEnabled  bool
 	corsEnabled      bool
 	corsOptions      *middleware.CORSOptions
@@ -45,8 +54,15 @@ type App struct {
 	// Component management
 	components        []Component
 	startedComponents []Component
-	componentStopOnce sync.Once
+	componentStopOnce ResettableOnce
 	componentsMounted bool
+
+	runners        []Runner
+	startedRunners []Runner
+	runnerStopOnce ResettableOnce
+
+	shutdownHooks []ShutdownHook
+	shutdownOnce  ResettableOnce
 
 	// Dependency injection container
 	diContainer *DIContainer
@@ -71,8 +87,8 @@ func New(options ...Option) *App {
 		EnableHTTP2:           true,
 		DrainInterval:         500 * time.Millisecond,
 		MaxBodyBytes:          10 << 20, // 10 MiB
-		MaxConcurrency:        256,
-		QueueDepth:            512,
+		MaxConcurrency:        DefaultMaxConcurrency,
+		QueueDepth:            DefaultQueueDepth,
 		QueueTimeout:          250 * time.Millisecond,
 		EnableSecurityHeaders: true,
 		EnableAbuseGuard:      true,

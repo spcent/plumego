@@ -15,7 +15,22 @@ import (
 )
 
 // RetryPolicy defines the interface for retry strategy.
+//
+// Implementations determine whether an HTTP request should be retried based on
+// the response, error, and current attempt number.
 type RetryPolicy interface {
+	// ShouldRetry determines if the request should be retried.
+	//
+	// Parameters:
+	//   - resp: The HTTP response (may be nil if request failed before receiving response)
+	//   - err: The error from the request attempt (may be nil if response was received)
+	//   - attempt: The zero-based attempt counter (0 = first attempt, 1 = first retry, etc.)
+	//
+	// Returns true if the request should be retried, false otherwise.
+	//
+	// Note: This method is called AFTER each failed attempt. The attempt parameter
+	// starts at 0 for the initial request attempt, increments to 1 for the first retry,
+	// 2 for the second retry, and so on.
 	ShouldRetry(resp *http.Response, err error, attempt int) bool
 }
 
@@ -384,7 +399,7 @@ func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 			}
 
 			if resp != nil && resp.Body != nil {
-				_, _ = io.Copy(io.Discard, resp.Body)
+				// Just close the body without reading - we're retrying anyway
 				_ = resp.Body.Close()
 			}
 			cancel()

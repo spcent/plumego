@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -63,30 +62,27 @@ func (c *devToolsComponent) RegisterRoutes(r *router.Router) {
 		r.Print(w)
 	}))
 
-	r.Get(devToolsRoutesJSONPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	r.Get(devToolsRoutesJSONPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"routes": r.Routes(),
 		}
-		_ = json.NewEncoder(w).Encode(payload)
+		writeHTTPResponse(w, req, http.StatusOK, payload)
 	}))
 
-	r.Get(devToolsMiddlewarePath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	r.Get(devToolsMiddlewarePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"middlewares": c.middlewareList(),
 		}
-		_ = json.NewEncoder(w).Encode(payload)
+		writeHTTPResponse(w, req, http.StatusOK, payload)
 	}))
 
-	r.Get(devToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(c.configSnapshot())
+	r.Get(devToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		writeHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
 	}))
 
-	r.Post(devToolsReloadPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := c.reloadEnv(r.Context()); err != nil {
-			contract.WriteError(w, r, contract.APIError{
+	r.Post(devToolsReloadPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if err := c.reloadEnv(req.Context()); err != nil {
+			contract.WriteError(w, req, contract.APIError{
 				Status:   http.StatusBadRequest,
 				Code:     "env_reload_failed",
 				Category: contract.CategoryClient,
@@ -95,8 +91,7 @@ func (c *devToolsComponent) RegisterRoutes(r *router.Router) {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		writeHTTPResponse(w, req, http.StatusOK, map[string]any{
 			"status": "ok",
 		})
 	}))
@@ -166,25 +161,22 @@ func (c *devToolsComponent) watchEnvFile(ctx context.Context) {
 		c.logger.Warn("Devtools env watch load failed", log.Fields{"error": err})
 	}
 
-	updates, errs := fileSource.Watch(ctx)
+	results := fileSource.Watch(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case err, ok := <-errs:
+		case result, ok := <-results:
 			if !ok {
 				return
 			}
-			if err != nil {
-				c.logger.Warn("Devtools env watch error", log.Fields{"error": err})
-			}
-		case _, ok := <-updates:
-			if !ok {
-				return
-			}
-			if err := c.reloadEnv(ctx); err != nil {
-				c.logger.Warn("Devtools env reload failed", log.Fields{"error": err})
+			if result.Err != nil {
+				c.logger.Warn("Devtools env watch error", log.Fields{"error": result.Err})
+			} else if result.Data != nil {
+				if err := c.reloadEnv(ctx); err != nil {
+					c.logger.Warn("Devtools env reload failed", log.Fields{"error": err})
+				}
 			}
 		}
 	}

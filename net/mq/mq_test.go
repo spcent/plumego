@@ -373,6 +373,199 @@ func TestInProcBrokerInvalidConfig(t *testing.T) {
 	_ = NewInProcBroker(pubsub.New(), WithConfig(invalidCfg))
 }
 
+func TestConfigValidation(t *testing.T) {
+	testCases := []struct {
+		name    string
+		config  func() Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid default config",
+			config: func() Config {
+				return DefaultConfig()
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid buffer size",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.DefaultBufferSize = 0
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "DefaultBufferSize must be positive",
+		},
+		{
+			name: "negative health check interval",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.HealthCheckInterval = -1
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "HealthCheckInterval cannot be negative",
+		},
+		{
+			name: "cluster enabled without node ID",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableCluster = true
+				cfg.ClusterNodeID = ""
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "ClusterNodeID is required",
+		},
+		{
+			name: "cluster enabled with whitespace node ID",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableCluster = true
+				cfg.ClusterNodeID = "   "
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "ClusterNodeID is required",
+		},
+		{
+			name: "invalid replication factor",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableCluster = true
+				cfg.ClusterNodeID = "node-1"
+				cfg.ClusterReplicationFactor = 0
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "ClusterReplicationFactor must be at least 1",
+		},
+		{
+			name: "persistence enabled without path",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnablePersistence = true
+				cfg.PersistencePath = ""
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "PersistencePath is required",
+		},
+		{
+			name: "dead letter queue enabled without topic",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableDeadLetterQueue = true
+				cfg.DeadLetterTopic = ""
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "DeadLetterTopic is required",
+		},
+		{
+			name: "negative ack timeout",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableAckSupport = true
+				cfg.DefaultAckTimeout = -1
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "DefaultAckTimeout cannot be negative",
+		},
+		{
+			name: "negative transaction timeout",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableTransactions = true
+				cfg.TransactionTimeout = -1
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "TransactionTimeout cannot be negative",
+		},
+		{
+			name: "invalid MQTT port (zero)",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableMQTT = true
+				cfg.MQTTPort = 0
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "MQTTPort must be between 1 and 65535",
+		},
+		{
+			name: "invalid MQTT port (too large)",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableMQTT = true
+				cfg.MQTTPort = 70000
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "MQTTPort must be between 1 and 65535",
+		},
+		{
+			name: "invalid AMQP port",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableAMQP = true
+				cfg.AMQPPort = -1
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "AMQPPort must be between 1 and 65535",
+		},
+		{
+			name: "valid cluster config",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnableCluster = true
+				cfg.ClusterNodeID = "node-1"
+				cfg.ClusterReplicationFactor = 2
+				return cfg
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid persistence config",
+			config: func() Config {
+				cfg := DefaultConfig()
+				cfg.EnablePersistence = true
+				cfg.PersistencePath = "/tmp/mq-data"
+				return cfg
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := tc.config()
+			err := cfg.Validate()
+
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("expected error containing %q, got nil", tc.errMsg)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.errMsg) {
+					t.Errorf("expected error containing %q, got %v", tc.errMsg, err)
+				}
+				if !errors.Is(err, ErrInvalidConfig) {
+					t.Errorf("expected error to wrap ErrInvalidConfig, got %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestInProcBrokerPriorityQueue(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
@@ -414,6 +607,7 @@ func TestInProcBrokerAckSupport(t *testing.T) {
 	// Test publishing with acknowledgment
 	ackMsg := AckMessage{
 		Message:   Message{ID: "ack-1", Data: "ack required"},
+		AckID:     "test-ack-id",
 		AckPolicy: AckRequired,
 	}
 
@@ -422,13 +616,26 @@ func TestInProcBrokerAckSupport(t *testing.T) {
 		t.Fatalf("publish with ack error: %v", err)
 	}
 
-	// Test acknowledgment methods
-	err = brokerWithAck.Ack(context.Background(), "ack-topic", "ack-1")
+	// Test acknowledgment method
+	err = brokerWithAck.Ack(context.Background(), "ack-topic", "test-ack-id")
 	if err != nil {
 		t.Fatalf("ack error: %v", err)
 	}
 
-	err = brokerWithAck.Nack(context.Background(), "ack-topic", "ack-1")
+	// Publish another message for NACK test
+	ackMsg2 := AckMessage{
+		Message:   Message{ID: "ack-2", Data: "ack required 2"},
+		AckID:     "test-ack-id-2",
+		AckPolicy: AckRequired,
+	}
+
+	err = brokerWithAck.PublishWithAck(context.Background(), "ack-topic", ackMsg2)
+	if err != nil {
+		t.Fatalf("publish with ack error: %v", err)
+	}
+
+	// Test NACK (note: this will trigger redelivery, which is expected)
+	err = brokerWithAck.Nack(context.Background(), "ack-topic", "test-ack-id-2")
 	if err != nil {
 		t.Fatalf("nack error: %v", err)
 	}
@@ -470,11 +677,88 @@ func TestInProcBrokerMemoryLimitExceeded(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	// Try to publish a message (should work since we don't check memory on publish yet)
-	// This is a framework test - actual memory checking would be implemented in production
+	// Try to publish a message - should fail due to memory limit
 	err := broker.Publish(context.Background(), "test-topic", Message{ID: "test-1", Data: "test"})
-	if err != nil {
-		t.Fatalf("publish should succeed even with low memory limit: %v", err)
+	if !errors.Is(err, ErrMemoryLimitExceeded) {
+		t.Fatalf("expected ErrMemoryLimitExceeded, got %v", err)
+	}
+}
+
+func TestInProcBrokerMemoryLimitEnforced(t *testing.T) {
+	// Test that memory limit is actually enforced on all publish methods
+	cfg := DefaultConfig()
+	cfg.MaxMemoryUsage = 1 // 1 byte limit
+	cfg.EnablePriorityQueue = true
+	cfg.EnableAckSupport = true
+	cfg.EnableCluster = true
+	cfg.ClusterNodeID = "node-1"
+	cfg.EnableTransactions = true
+	cfg.EnableDeadLetterQueue = true
+	cfg.DeadLetterTopic = "dlq" // Required when dead letter queue is enabled
+	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	defer broker.Close()
+
+	testCases := []struct {
+		name string
+		fn   func() error
+	}{
+		{
+			name: "Publish",
+			fn: func() error {
+				return broker.Publish(context.Background(), "topic", Message{ID: "1", Data: "test"})
+			},
+		},
+		{
+			name: "PublishBatch",
+			fn: func() error {
+				return broker.PublishBatch(context.Background(), "topic", []Message{{ID: "1", Data: "test"}})
+			},
+		},
+		{
+			name: "PublishPriority",
+			fn: func() error {
+				return broker.PublishPriority(context.Background(), "topic", PriorityMessage{
+					Message:  Message{ID: "1", Data: "test"},
+					Priority: PriorityHigh,
+				})
+			},
+		},
+		{
+			name: "PublishWithAck",
+			fn: func() error {
+				return broker.PublishWithAck(context.Background(), "topic", AckMessage{
+					Message:   Message{ID: "1", Data: "test"},
+					AckPolicy: AckRequired,
+				})
+			},
+		},
+		{
+			name: "PublishToCluster",
+			fn: func() error {
+				return broker.PublishToCluster(context.Background(), "topic", Message{ID: "1", Data: "test"})
+			},
+		},
+		{
+			name: "PublishWithTransaction",
+			fn: func() error {
+				return broker.PublishWithTransaction(context.Background(), "topic", Message{ID: "1", Data: "test"}, "tx-1")
+			},
+		},
+		{
+			name: "PublishToDeadLetter",
+			fn: func() error {
+				return broker.PublishToDeadLetter(context.Background(), "topic", Message{ID: "1", Data: "test"}, "reason")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.fn()
+			if !errors.Is(err, ErrMemoryLimitExceeded) {
+				t.Errorf("%s: expected ErrMemoryLimitExceeded, got %v", tc.name, err)
+			}
+		})
 	}
 }
 

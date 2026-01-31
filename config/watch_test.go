@@ -62,3 +62,30 @@ func TestConfigWatchersReceiveUpdates(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigWatchersNormalizeKeys(t *testing.T) {
+	cm := NewConfigManager(nil)
+	cm.data["foo_bar"] = "old"
+
+	resultCh := make(chan watchResult, 1)
+	if err := cm.Watch("FooBar", func(old, new any) {
+		resultCh <- watchResult{
+			old:     fmt.Sprint(old),
+			new:     fmt.Sprint(new),
+			current: cm.Get("foo_bar"),
+		}
+	}); err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+
+	cm.handleSourceUpdate("test", map[string]any{"FOO_BAR": "new"})
+
+	select {
+	case res := <-resultCh:
+		if res.old != "old" || res.new != "new" || res.current != "new" {
+			t.Fatalf("unexpected watch result: %+v", res)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("watchers did not fire in time")
+	}
+}

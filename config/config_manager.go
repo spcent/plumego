@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,10 +14,20 @@ import (
 	log "github.com/spcent/plumego/log"
 )
 
+// WatchResult represents a configuration update or error from watching a source.
+type WatchResult struct {
+	// Data contains the updated configuration, nil if there was an error
+	Data map[string]any
+	// Err contains any error that occurred during watching
+	Err error
+}
+
 // Source represents a configuration source
 type Source interface {
 	Load(ctx context.Context) (map[string]any, error)
-	Watch(ctx context.Context) (<-chan map[string]any, <-chan error)
+	// Watch returns a channel that sends configuration updates or errors.
+	// The channel is closed when the context is cancelled or watching stops.
+	Watch(ctx context.Context) <-chan WatchResult
 	Name() string
 }
 
@@ -31,6 +42,8 @@ type ConfigManager struct {
 	watchWg  sync.WaitGroup
 	logger   log.StructuredLogger
 }
+
+var errConfigClosed = errors.New("config manager is closed")
 
 // Type-safe configuration access methods
 
@@ -135,6 +148,17 @@ func NewConfigManager(logger log.StructuredLogger) *ConfigManager {
 	}
 }
 
+func (cm *ConfigManager) snapshotSources() ([]Source, error) {
+	cm.mu.RLock()
+	if cm.ctx.Err() != nil {
+		cm.mu.RUnlock()
+		return nil, errConfigClosed
+	}
+	sources := append([]Source(nil), cm.sources...)
+	cm.mu.RUnlock()
+	return sources, nil
+}
+
 // AddSource adds a configuration source
 func (cm *ConfigManager) AddSource(source Source) error {
 	if source == nil {
@@ -145,7 +169,7 @@ func (cm *ConfigManager) AddSource(source Source) error {
 	defer cm.mu.Unlock()
 
 	if cm.ctx.Err() != nil {
-		return errors.New("config manager is closed")
+		return errConfigClosed
 	}
 
 	cm.sources = append(cm.sources, source)
@@ -154,18 +178,17 @@ func (cm *ConfigManager) AddSource(source Source) error {
 
 // Load loads configuration from all sources
 func (cm *ConfigManager) Load(ctx context.Context) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if cm.ctx.Err() != nil {
-		return errors.New("config manager is closed")
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	// Clear existing data
-	cm.data = make(map[string]any)
+	sources, err := cm.snapshotSources()
+	if err != nil {
+		return err
+	}
 
-	// Load from all sources
-	for _, source := range cm.sources {
+	data := make(map[string]any)
+	for _, source := range sources {
 		sourceData, err := source.Load(ctx)
 		if err != nil {
 			cm.logger.Error("Failed to load configuration", log.Fields{
@@ -175,16 +198,25 @@ func (cm *ConfigManager) Load(ctx context.Context) error {
 			return fmt.Errorf("failed to load from source %s: %w", source.Name(), err)
 		}
 
+		normalized := normalizeConfigData(sourceData, cm.logger)
 		// Merge data (later sources override earlier ones)
-		for key, value := range sourceData {
-			cm.data[key] = value
+		for key, value := range normalized {
+			data[key] = value
 		}
 
 		cm.logger.Info("Loaded configuration", log.Fields{
 			"source": source.Name(),
-			"keys":   len(sourceData),
+			"keys":   len(normalized),
 		})
 	}
+
+	cm.mu.Lock()
+	if cm.ctx.Err() != nil {
+		cm.mu.Unlock()
+		return errConfigClosed
+	}
+	cm.data = data
+	cm.mu.Unlock()
 
 	return nil
 }
@@ -192,18 +224,20 @@ func (cm *ConfigManager) Load(ctx context.Context) error {
 // LoadBestEffort loads configuration from all sources, skipping failures.
 // It returns an error only if all sources fail.
 func (cm *ConfigManager) LoadBestEffort(ctx context.Context) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if cm.ctx.Err() != nil {
-		return errors.New("config manager is closed")
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	cm.data = make(map[string]any)
+	sources, err := cm.snapshotSources()
+	if err != nil {
+		return err
+	}
+
+	data := make(map[string]any)
 	loaded := 0
 	var lastErr error
 
-	for _, source := range cm.sources {
+	for _, source := range sources {
 		sourceData, err := source.Load(ctx)
 		if err != nil {
 			lastErr = err
@@ -215,13 +249,14 @@ func (cm *ConfigManager) LoadBestEffort(ctx context.Context) error {
 		}
 
 		loaded++
-		for key, value := range sourceData {
-			cm.data[key] = value
+		normalized := normalizeConfigData(sourceData, cm.logger)
+		for key, value := range normalized {
+			data[key] = value
 		}
 
 		cm.logger.Info("Loaded configuration", log.Fields{
 			"source": source.Name(),
-			"keys":   len(sourceData),
+			"keys":   len(normalized),
 		})
 	}
 
@@ -229,15 +264,27 @@ func (cm *ConfigManager) LoadBestEffort(ctx context.Context) error {
 		return fmt.Errorf("failed to load any configuration sources: %w", lastErr)
 	}
 
+	cm.mu.Lock()
+	if cm.ctx.Err() != nil {
+		cm.mu.Unlock()
+		return errConfigClosed
+	}
+	cm.data = data
+	cm.mu.Unlock()
+
 	return nil
+}
+
+func (cm *ConfigManager) getValue(key string) (any, bool) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return lookupConfigValue(cm.data, key)
 }
 
 // Get retrieves a configuration value as string
 func (cm *ConfigManager) Get(key string) string {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-
-	if value, exists := cm.data[key]; exists {
+	value, exists := cm.getValue(key)
+	if exists {
 		return cm.toString(value)
 	}
 	return ""
@@ -254,46 +301,46 @@ func (cm *ConfigManager) GetString(key, defaultValue string) string {
 
 // GetInt retrieves a configuration value as int
 func (cm *ConfigManager) GetInt(key string, defaultValue int) int {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
+	value, exists := cm.getValue(key)
+	if !exists {
+		return defaultValue
+	}
 
-	if value, exists := cm.data[key]; exists {
-		// Direct type assertion first for better performance
-		switch v := value.(type) {
-		case int:
-			return v
-		case int8:
-			return int(v)
-		case int16:
-			return int(v)
-		case int32:
-			return int(v)
-		case int64:
-			return int(v)
-		case uint:
-			return int(v)
-		case uint8:
-			return int(v)
-		case uint16:
-			return int(v)
-		case uint32:
-			return int(v)
-		case uint64:
-			return int(v)
-		case float32:
-			return int(v)
-		case float64:
-			return int(v)
-		case bool:
-			if v {
-				return 1
-			}
-			return 0
-		case string:
-			if v := strings.TrimSpace(v); v != "" {
-				if intValue, err := strconv.Atoi(v); err == nil {
-					return intValue
-				}
+	// Direct type assertion first for better performance
+	switch v := value.(type) {
+	case int:
+		return v
+	case int8:
+		return int(v)
+	case int16:
+		return int(v)
+	case int32:
+		return int(v)
+	case int64:
+		return int(v)
+	case uint:
+		return int(v)
+	case uint8:
+		return int(v)
+	case uint16:
+		return int(v)
+	case uint32:
+		return int(v)
+	case uint64:
+		return int(v)
+	case float32:
+		return int(v)
+	case float64:
+		return int(v)
+	case bool:
+		if v {
+			return 1
+		}
+		return 0
+	case string:
+		if v := strings.TrimSpace(v); v != "" {
+			if intValue, err := strconv.Atoi(v); err == nil {
+				return intValue
 			}
 		}
 	}
@@ -302,97 +349,59 @@ func (cm *ConfigManager) GetInt(key string, defaultValue int) int {
 
 // GetBool retrieves a configuration value as bool
 func (cm *ConfigManager) GetBool(key string, defaultValue bool) bool {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-
-	// Helper function to convert value to bool
-	convertToBool := func(value any) (bool, bool) {
-		// Direct type assertion first for better performance
-		switch v := value.(type) {
-		case bool:
-			return v, true
-		case int, int8, int16, int32, int64:
-			return v != 0, true
-		case uint, uint8, uint16, uint32, uint64:
-			return v != 0, true
-		case float32, float64:
-			return v != 0, true
-		case string:
-			if v := strings.TrimSpace(v); v != "" {
-				return parseBool(v, defaultValue), true
-			}
-		}
-		return defaultValue, false
+	value, exists := cm.getValue(key)
+	if !exists {
+		return defaultValue
 	}
 
-	// Try exact key first
-	if value, exists := cm.data[key]; exists {
-		if boolValue, ok := convertToBool(value); ok {
-			return boolValue
-		}
+	if boolValue, ok := boolFromValue(value, defaultValue); ok {
+		return boolValue
 	}
-
-	// Try snake_case version
-	snakeKey := toSnakeCase(key)
-	if value, exists := cm.data[snakeKey]; exists {
-		if boolValue, ok := convertToBool(value); ok {
-			return boolValue
-		}
-	}
-
-	// Try uppercase version
-	upperKey := strings.ToUpper(key)
-	if value, exists := cm.data[upperKey]; exists {
-		if boolValue, ok := convertToBool(value); ok {
-			return boolValue
-		}
-	}
-
 	return defaultValue
 }
 
 // GetFloat retrieves a configuration value as float64
 func (cm *ConfigManager) GetFloat(key string, defaultValue float64) float64 {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
+	value, exists := cm.getValue(key)
+	if !exists {
+		return defaultValue
+	}
 
-	if value, exists := cm.data[key]; exists {
-		// Direct type assertion first for better performance
-		switch v := value.(type) {
-		case float32:
-			return float64(v)
-		case float64:
-			return v
-		case int:
-			return float64(v)
-		case int8:
-			return float64(v)
-		case int16:
-			return float64(v)
-		case int32:
-			return float64(v)
-		case int64:
-			return float64(v)
-		case uint:
-			return float64(v)
-		case uint8:
-			return float64(v)
-		case uint16:
-			return float64(v)
-		case uint32:
-			return float64(v)
-		case uint64:
-			return float64(v)
-		case bool:
-			if v {
-				return 1.0
-			}
-			return 0.0
-		case string:
-			if v := strings.TrimSpace(v); v != "" {
-				if floatValue, err := strconv.ParseFloat(v, 64); err == nil {
-					return floatValue
-				}
+	// Direct type assertion first for better performance
+	switch v := value.(type) {
+	case float32:
+		return float64(v)
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case int8:
+		return float64(v)
+	case int16:
+		return float64(v)
+	case int32:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case uint:
+		return float64(v)
+	case uint8:
+		return float64(v)
+	case uint16:
+		return float64(v)
+	case uint32:
+		return float64(v)
+	case uint64:
+		return float64(v)
+	case bool:
+		if v {
+			return 1.0
+		}
+		return 0.0
+	case string:
+		if v := strings.TrimSpace(v); v != "" {
+			if floatValue, err := strconv.ParseFloat(v, 64); err == nil {
+				return floatValue
 			}
 		}
 	}
@@ -423,7 +432,11 @@ func (cm *ConfigManager) Watch(key string, callback WatcherCallback) error {
 	defer cm.mu.Unlock()
 
 	if cm.ctx.Err() != nil {
-		return errors.New("config manager is closed")
+		return errConfigClosed
+	}
+
+	if key != "*" {
+		key = normalizeConfigKey(key)
 	}
 
 	if _, exists := cm.watchers[key]; !exists {
@@ -441,45 +454,42 @@ func (cm *ConfigManager) WatchGlobal(callback WatcherCallback) error {
 
 // StartWatchers starts watching all configured sources for changes
 func (cm *ConfigManager) StartWatchers(ctx context.Context) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if cm.ctx.Err() != nil {
-		return errors.New("config manager is closed")
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	for _, source := range cm.sources {
-		updates, errs := source.Watch(ctx)
+	sources, err := cm.snapshotSources()
+	if err != nil {
+		return err
+	}
+
+	for _, source := range sources {
+		results := source.Watch(ctx)
 
 		cm.watchWg.Add(1)
-		go func(src Source, updates <-chan map[string]any, errs <-chan error) {
+		go func(src Source, results <-chan WatchResult) {
 			defer cm.watchWg.Done()
-			for updates != nil || errs != nil {
+			for {
 				select {
 				case <-cm.ctx.Done():
 					return
-				case update, ok := <-updates:
+				case <-ctx.Done():
+					return
+				case result, ok := <-results:
 					if !ok {
-						updates = nil
-						continue
+						return
 					}
-					if update != nil {
-						cm.handleSourceUpdate(src.Name(), update)
-					}
-				case err, ok := <-errs:
-					if !ok {
-						errs = nil
-						continue
-					}
-					if err != nil {
+					if result.Err != nil {
 						cm.logger.Error("Watch error", log.Fields{
 							"source": src.Name(),
-							"error":  err,
+							"error":  result.Err,
 						})
+					} else if result.Data != nil {
+						cm.handleSourceUpdate(src.Name(), result.Data)
 					}
 				}
 			}
-		}(source, updates, errs)
+		}(source, results)
 	}
 
 	return nil
@@ -487,12 +497,16 @@ func (cm *ConfigManager) StartWatchers(ctx context.Context) error {
 
 // handleSourceUpdate handles configuration updates from a source
 func (cm *ConfigManager) handleSourceUpdate(sourceName string, newData map[string]any) {
-	cm.mu.Lock()
-
 	if len(newData) == 0 {
-		cm.mu.Unlock()
 		return
 	}
+
+	newData = normalizeConfigData(newData, cm.logger)
+	if len(newData) == 0 {
+		return
+	}
+
+	cm.mu.Lock()
 
 	// Detect changes
 	changes := make(map[string]struct{})
@@ -588,13 +602,30 @@ func (cm *ConfigManager) ReloadWithValidation(ctx context.Context, validate func
 		return cm.Reload(ctx)
 	}
 
-	snapshot := cm.GetAll()
+	// Create a deep snapshot of current data to prevent race conditions
+	cm.mu.RLock()
+	snapshot := make(map[string]any, len(cm.data))
+	for key, value := range cm.data {
+		snapshot[key] = value
+	}
+	cm.mu.RUnlock()
+
+	// Load new configuration
 	if err := cm.Load(ctx); err != nil {
 		return err
 	}
 
-	data := cm.GetAll()
+	// Get the loaded data for validation
+	cm.mu.RLock()
+	data := make(map[string]any, len(cm.data))
+	for key, value := range cm.data {
+		data[key] = value
+	}
+	cm.mu.RUnlock()
+
+	// Validate the new configuration
 	if err := validate(data); err != nil {
+		// Restore snapshot on validation failure
 		cm.mu.Lock()
 		cm.data = snapshot
 		cm.mu.Unlock()
@@ -607,14 +638,14 @@ func (cm *ConfigManager) ReloadWithValidation(ctx context.Context, validate func
 // Close stops all watchers and releases resources
 func (cm *ConfigManager) Close() error {
 	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
 	if cm.ctx.Err() != nil {
+		cm.mu.Unlock()
 		return nil
 	}
-
 	cm.cancel()
-	cm.watchWg.Wait() // Wait for all watcher goroutines to finish
+	cm.mu.Unlock()
+
+	cm.watchWg.Wait()
 	cm.logger.Info("Config manager closed", nil)
 	return nil
 }
@@ -671,7 +702,7 @@ func (cm *ConfigManager) unmarshalValue(val reflect.Value) error {
 			key = field.Name
 		}
 
-		if value, exists := cm.lookupConfigValue(key); exists {
+		if value, exists := lookupConfigValue(cm.data, key); exists {
 			if err := cm.setField(fieldValue, value); err != nil {
 				return fmt.Errorf("failed to set field %s: %w", field.Name, err)
 			}
@@ -681,28 +712,19 @@ func (cm *ConfigManager) unmarshalValue(val reflect.Value) error {
 	return nil
 }
 
-func (cm *ConfigManager) lookupConfigValue(key string) (any, bool) {
-	if value, exists := cm.data[key]; exists {
-		return value, true
+func lookupConfigValue(data map[string]any, key string) (any, bool) {
+	if len(data) == 0 {
+		return nil, false
 	}
 
-	snake := toSnakeCase(key)
-	if value, exists := cm.data[snake]; exists {
-		return value, true
+	normalized := normalizeConfigKey(key)
+	if normalized != "" {
+		if value, exists := data[normalized]; exists {
+			return value, true
+		}
 	}
 
-	upper := strings.ToUpper(key)
-	if value, exists := cm.data[upper]; exists {
-		return value, true
-	}
-
-	upperSnake := strings.ToUpper(snake)
-	if value, exists := cm.data[upperSnake]; exists {
-		return value, true
-	}
-
-	lower := strings.ToLower(key)
-	if value, exists := cm.data[lower]; exists {
+	if value, exists := data[key]; exists {
 		return value, true
 	}
 
@@ -835,6 +857,87 @@ func parseBool(value string, defaultValue bool) bool {
 	default:
 		return defaultValue
 	}
+}
+
+func boolFromValue(value any, defaultValue bool) (bool, bool) {
+	switch v := value.(type) {
+	case bool:
+		return v, true
+	case int:
+		return v != 0, true
+	case int8:
+		return v != 0, true
+	case int16:
+		return v != 0, true
+	case int32:
+		return v != 0, true
+	case int64:
+		return v != 0, true
+	case uint:
+		return v != 0, true
+	case uint8:
+		return v != 0, true
+	case uint16:
+		return v != 0, true
+	case uint32:
+		return v != 0, true
+	case uint64:
+		return v != 0, true
+	case float32:
+		return v != 0, true
+	case float64:
+		return v != 0, true
+	case string:
+		if v := strings.TrimSpace(v); v != "" {
+			return parseBool(v, defaultValue), true
+		}
+	}
+	return defaultValue, false
+}
+
+func normalizeConfigKey(key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	return strings.ToLower(toSnakeCase(key))
+}
+
+func normalizeConfigData(data map[string]any, logger log.StructuredLogger) map[string]any {
+	if len(data) == 0 {
+		return map[string]any{}
+	}
+
+	keys := make([]string, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	normalized := make(map[string]any, len(data))
+	seen := make(map[string][]string, len(data))
+	for _, key := range keys {
+		norm := normalizeConfigKey(key)
+		if norm == "" {
+			continue
+		}
+		seen[norm] = append(seen[norm], key)
+		normalized[norm] = data[key]
+	}
+
+	if logger != nil {
+		for norm, originals := range seen {
+			if len(originals) <= 1 {
+				continue
+			}
+			logger.Warn("Config key collision after normalization", log.Fields{
+				"key":       norm,
+				"originals": originals,
+			})
+		}
+	}
+
+	return normalized
 }
 
 // toSnakeCase converts CamelCase to snake_case

@@ -1,4 +1,4 @@
-# plumego API Reference
+# API Reference
 
 This document provides a comprehensive API reference for the plumego web toolkit.
 

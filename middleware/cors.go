@@ -126,7 +126,7 @@ func CORS(next http.Handler) http.Handler {
 //   - When AllowCredentials is true, Access-Control-Allow-Origin cannot be "*"
 //     and will echo the request's Origin header instead
 //   - Use specific origins instead of "*" in production
-func CORSWithOptions(opts CORSOptions, next http.HandlerFunc) http.HandlerFunc {
+func CORSWithOptions(opts CORSOptions, next http.Handler) http.Handler {
 	// provide sensible defaults
 	if len(opts.AllowedMethods) == 0 {
 		opts.AllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
@@ -137,11 +137,11 @@ func CORSWithOptions(opts CORSOptions, next http.HandlerFunc) http.HandlerFunc {
 
 	allowAllOrigins := contains(opts.AllowedOrigins, "*")
 
-	return func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		// If no Origin header -> not a cross-origin request; just pass through
 		if origin == "" {
-			next(w, r)
+			next.ServeHTTP(w, r)
 			return
 		}
 
@@ -158,7 +158,7 @@ func CORSWithOptions(opts CORSOptions, next http.HandlerFunc) http.HandlerFunc {
 			allowOriginValue = origin
 		} else {
 			// origin not allowed -> no CORS headers, proceed normally (browser will block)
-			next(w, r)
+			next.ServeHTTP(w, r)
 			return
 		}
 
@@ -220,6 +220,12 @@ func CORSWithOptions(opts CORSOptions, next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Not preflight -> call next handler normally
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// CORSWithOptionsFunc is a convenience wrapper around CORSWithOptions
+// for http.HandlerFunc callers.
+func CORSWithOptionsFunc(opts CORSOptions, next http.HandlerFunc) http.HandlerFunc {
+	return CORSWithOptions(opts, next).ServeHTTP
 }

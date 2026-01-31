@@ -192,6 +192,26 @@ func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 	}
 }
 
+func TestUseAfterServeHTTPReturnsError(t *testing.T) {
+	app := New()
+
+	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	rr := httptest.NewRecorder()
+	app.ServeHTTP(rr, req)
+
+	if err := app.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r)
+		})
+	}); err == nil {
+		t.Fatalf("expected error when adding middleware after handler is built")
+	}
+}
+
 func TestLoadEnvFromFile(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "app_env")
 	if err != nil {
@@ -343,7 +363,9 @@ func TestBroadcastAuthAndToggle(t *testing.T) {
 		t.Fatalf("expected success when authorized, got %d", rr.Code)
 	}
 
-	// Debug mode bypasses broadcast auth
+	// Security fix: Debug mode no longer bypasses broadcast auth.
+	// This was a security vulnerability that could allow unauthorized access
+	// to broadcast endpoints in debug environments.
 	debugApp := New(WithDebug())
 	debugConfig := config
 	if _, err := debugApp.ConfigureWebSocketWithOptions(debugConfig); err != nil {
@@ -353,8 +375,18 @@ func TestBroadcastAuthAndToggle(t *testing.T) {
 	rr = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/broadcast", strings.NewReader("hello"))
 	debugApp.Router().ServeHTTP(rr, req)
+	// Changed expectation: debug mode should still require auth
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized in debug mode without auth (security fix), got %d", rr.Code)
+	}
+
+	// Verify that auth still works in debug mode
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/broadcast", strings.NewReader("hello"))
+	req.Header.Set("Authorization", "Bearer "+string(secret))
+	debugApp.Router().ServeHTTP(rr, req)
 	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected success in debug without auth, got %d", rr.Code)
+		t.Fatalf("expected success in debug mode when authorized, got %d", rr.Code)
 	}
 
 	// Disable broadcast endpoint

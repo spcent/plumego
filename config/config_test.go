@@ -24,12 +24,10 @@ func (s *stubSource) Load(context.Context) (map[string]any, error) {
 	return s.data, nil
 }
 
-func (s *stubSource) Watch(context.Context) (<-chan map[string]any, <-chan error) {
-	updates := make(chan map[string]any)
-	errs := make(chan error)
-	close(updates)
-	close(errs)
-	return updates, errs
+func (s *stubSource) Watch(context.Context) <-chan WatchResult {
+	results := make(chan WatchResult)
+	close(results)
+	return results
 }
 
 func (s *stubSource) Name() string { return s.name }
@@ -53,6 +51,29 @@ func TestConfigBasic(t *testing.T) {
 
 	if cfg.GetBool("missing", true) != true {
 		t.Error("GetBool should return default value for missing keys")
+	}
+}
+
+func TestGetBoolNumericValues(t *testing.T) {
+	cfg := New()
+	cfg.data = map[string]any{
+		"int_zero":   int8(0),
+		"int_one":    int16(1),
+		"float_zero": float32(0),
+		"float_one":  float64(2.5),
+	}
+
+	if cfg.GetBool("int_zero", true) {
+		t.Error("expected int_zero to be false")
+	}
+	if !cfg.GetBool("int_one", false) {
+		t.Error("expected int_one to be true")
+	}
+	if cfg.GetBool("float_zero", true) {
+		t.Error("expected float_zero to be false")
+	}
+	if !cfg.GetBool("float_one", false) {
+		t.Error("expected float_one to be true")
 	}
 }
 
@@ -111,6 +132,39 @@ func TestConfigWithData(t *testing.T) {
 
 	if cfg.GetString("api_url", "") != "https://api.example.com" {
 		t.Errorf("Expected api_url to be 'https://api.example.com', got '%s'", cfg.GetString("api_url", ""))
+	}
+}
+
+func TestConfigKeyNormalization(t *testing.T) {
+	cfg := NewConfigManager(nil)
+	ctx := context.Background()
+
+	src := &stubSource{
+		name: "test",
+		data: map[string]any{
+			"FooBar": "value",
+		},
+	}
+	if err := cfg.AddSource(src); err != nil {
+		t.Fatalf("add source: %v", err)
+	}
+	if err := cfg.Load(ctx); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	if got := cfg.Get("foo_bar"); got != "value" {
+		t.Fatalf("expected normalized lookup, got %q", got)
+	}
+	if got := cfg.Get("FOO_BAR"); got != "value" {
+		t.Fatalf("expected case-insensitive lookup, got %q", got)
+	}
+	if got := cfg.Get("FooBar"); got != "value" {
+		t.Fatalf("expected original lookup, got %q", got)
+	}
+
+	all := cfg.GetAll()
+	if _, ok := all["foo_bar"]; !ok {
+		t.Fatalf("expected normalized key in GetAll, got %v", all)
 	}
 }
 

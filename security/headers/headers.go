@@ -218,9 +218,21 @@ func isHTTPSRequest(r *http.Request) bool {
 		return true
 	}
 
-	proto := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0])
-	if strings.EqualFold(proto, "https") {
-		return true
+	// Check X-Forwarded-Proto header - validate entire proxy chain
+	protoHeader := r.Header.Get("X-Forwarded-Proto")
+	if protoHeader != "" {
+		// Split by comma to get all proxy values
+		proxies := strings.Split(protoHeader, ",")
+		for _, proxy := range proxies {
+			proto := strings.TrimSpace(proxy)
+			if strings.EqualFold(proto, "https") {
+				return true
+			}
+			// If we encounter http in the chain, it's not secure
+			if strings.EqualFold(proto, "http") {
+				return false
+			}
+		}
 	}
 
 	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Ssl")), "on") {

@@ -381,11 +381,18 @@ func TestRequestContextFrom(t *testing.T) {
 	}
 
 	// Test with RequestContext
-	rc := RequestContext{Params: map[string]string{"id": "123"}}
+	rc := RequestContext{
+		Params:       map[string]string{"id": "123"},
+		RoutePattern: "/users/:id",
+		RouteName:    "user_show",
+	}
 	ctx := context.WithValue(context.Background(), RequestContextKey{}, rc)
 	result = RequestContextFrom(ctx)
 	if result.Params == nil || result.Params["id"] != "123" {
 		t.Error("expected RequestContext with params")
+	}
+	if result.RoutePattern != "/users/:id" || result.RouteName != "user_show" {
+		t.Error("expected route fields from RequestContext")
 	}
 
 	// Test fallback to ParamsContextKey
@@ -394,6 +401,29 @@ func TestRequestContextFrom(t *testing.T) {
 	result = RequestContextFrom(ctx)
 	if result.Params == nil || result.Params["name"] != "test" {
 		t.Error("expected fallback to ParamsContextKey")
+	}
+}
+
+func TestCtxResponse(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/test", nil)
+	r = r.WithContext(context.WithValue(r.Context(), TraceIDKey{}, "trace-xyz"))
+	ctx := NewCtx(w, r, nil)
+
+	err := ctx.Response(http.StatusOK, map[string]string{"status": "ok"}, map[string]any{"page": 1})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var response Response
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if response.TraceID != "trace-xyz" {
+		t.Fatalf("expected trace id, got %q", response.TraceID)
+	}
+	if response.Meta == nil || response.Meta["page"] != float64(1) {
+		t.Fatalf("expected meta to be included")
 	}
 }
 

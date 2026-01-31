@@ -26,9 +26,6 @@ type Component interface {
 
 在构造应用时使用 `core.WithComponent`（或 `WithComponents`）来添加功能。内置特性（Webhook 管理、入站 Webhook 接收器、PubSub 调试、WebSocket 辅助工具、前端服务）都可以作为组件挂载，因此示例可以只混合所需的部分。
 
-## Migration Notes
-- `plumego.ComponentFunc` re-export has been removed. Implement `core.Component` directly (see the interface above), or keep a local adapter type if you prefer functional hooks.
-
 ## 快速开始
 创建一个小型 `main.go`，连接路由和中间件，然后启动服务器：
 
@@ -77,7 +74,7 @@ func main() {
     app := plumego.New()
 
     app.GetCtx("/health", func(ctx *plumego.Context) {
-        ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
+        _ = ctx.Response(http.StatusOK, map[string]string{"status": "ok"}, nil)
     })
 
     log.Println("server started at :8080")
@@ -93,9 +90,17 @@ func main() {
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载。
 - **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（请求体限制、并发限制）会在设置期间自动注入。恢复/日志/CORS 辅助工具通过 `core.WithRecovery`、`core.WithLogging`、`core.WithCORS` 启用。
+- **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
 - **WebSocket 中心**：`ConfigureWebSocket()` 挂载受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `WebSocketConfig` 自定义工作线程数和队列大小。
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。
+
+## 契约文档
+- 路由契约： [router-contract.md](router-contract.md)
+- 中间件契约： [middleware-contract.md](middleware-contract.md)
+- 生命周期契约： [lifecycle-contract.md](lifecycle-contract.md)
+- 可观测性契约： [observability-contract.md](observability-contract.md)
+- 配置契约： [config-contract.md](config-contract.md)
 
 ## 参考应用
 `examples/reference` 是一个开箱即用的 `main` 包，整合了常用组件：

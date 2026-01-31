@@ -5,7 +5,8 @@ Plumego’s middleware wraps standard `http.Handler` values. Chain them globally
 ## Built-in middleware
 - **Recovery**: `core.WithRecovery()` catches panics, logs stack traces, returns JSON errors.
 - **Logging**: `core.WithLogging()` records request/response metadata and plugs into metrics/tracing collectors provided through `core.WithMetricsCollector` and `core.WithTracer`.
-- **CORS**: `core.WithCORS()` sets permissive defaults; customize with `core.WithCORSOptions(...)` or `middleware.CORSWithOptions(...)`.
+- **Request ID**: `middleware.RequestID()` injects `X-Request-ID` and stores it in context for correlation.
+- **CORS**: `core.WithCORS()` sets permissive defaults; customize with `core.WithCORSOptions(...)` or `middleware.CORSWithOptions(...)` (use `CORSWithOptionsFunc` for `http.HandlerFunc` return).
 - **Gzip**: `middleware.Gzip()` compresses responses when clients send `Accept-Encoding: gzip`.
 - **Timeout**: `middleware.Timeout(duration)` enforces per-request deadlines.
 - **Body limit**: `middleware.BodyLimit(maxBytes, logger)` caps request size with a structured 413 response.
@@ -37,7 +38,7 @@ secured.Get("/stats", middleware.TimeoutFunc(1*time.Second)(func(w http.Response
 ### Using `contract.Ctx` helpers
 ```go
 app.GetCtx("/echo/:msg", middleware.WrapCtx(middleware.Timeout(2*time.Second), func(ctx *contract.Ctx) {
-    ctx.JSON(http.StatusOK, map[string]any{"echo": ctx.Param("msg")})
+    _ = ctx.Response(http.StatusOK, map[string]any{"echo": ctx.Param("msg")}, nil)
 }))
 ```
 

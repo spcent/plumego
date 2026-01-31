@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -338,6 +339,88 @@ func TestWithComponents(t *testing.T) {
 	}
 }
 
+func TestWithRequestID(t *testing.T) {
+	app := New(WithRequestID())
+	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Header().Get("X-Request-ID") == "" {
+		t.Fatalf("expected X-Request-ID to be set")
+	}
+}
+
+func TestWithRecommendedMiddleware(t *testing.T) {
+	app := New(WithRecommendedMiddleware())
+	if !app.requestIDEnabled {
+		t.Fatalf("expected request id to be enabled")
+	}
+	if !app.loggingEnabled {
+		t.Fatalf("expected logging to be enabled")
+	}
+	if !app.recoveryEnabled {
+		t.Fatalf("expected recovery to be enabled")
+	}
+
+	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Header().Get("X-Request-ID") == "" {
+		t.Fatalf("expected X-Request-ID to be set")
+	}
+}
+
+func TestWithMethodNotAllowed(t *testing.T) {
+	app := New(WithMethodNotAllowed(true))
+	app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/only", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+	if rec.Header().Get("Allow") != http.MethodGet {
+		t.Fatalf("expected Allow header to include GET")
+	}
+}
+
+func TestWithRunner(t *testing.T) {
+	app := &App{}
+	runner := &mockRunner{}
+	opt := WithRunner(runner)
+	opt(app)
+	if len(app.runners) != 1 {
+		t.Errorf("expected 1 runner, got %d", len(app.runners))
+	}
+	if app.runners[0] != runner {
+		t.Errorf("expected runner to be set")
+	}
+}
+
+func TestWithRunners(t *testing.T) {
+	app := &App{}
+	r1 := &mockRunner{}
+	r2 := &mockRunner{}
+	opt := WithRunners(r1, r2)
+	opt(app)
+	if len(app.runners) != 2 {
+		t.Errorf("expected 2 runners, got %d", len(app.runners))
+	}
+}
+
 func TestWithMetricsCollector(t *testing.T) {
 	app := &App{}
 	collector := &mockMetricsCollector{}
@@ -372,6 +455,11 @@ func (m *mockComponent) Stop(ctx context.Context) error              { return ni
 func (m *mockComponent) Health() (string, health.HealthStatus) {
 	return "mock", health.HealthStatus{Status: health.StatusHealthy}
 }
+
+type mockRunner struct{}
+
+func (m *mockRunner) Start(ctx context.Context) error { return nil }
+func (m *mockRunner) Stop(ctx context.Context) error  { return nil }
 
 type mockMetricsCollector struct{}
 

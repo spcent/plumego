@@ -43,7 +43,11 @@ func (a *App) hasComponentType(target any) bool {
 		return false
 	}
 
-	for _, c := range a.components {
+	a.mu.RLock()
+	comps := append([]Component{}, a.components...)
+	a.mu.RUnlock()
+
+	for _, c := range comps {
 		if reflect.TypeOf(c) == typeOfTarget {
 			return true
 		}

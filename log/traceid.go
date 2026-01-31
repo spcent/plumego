@@ -30,6 +30,9 @@ const (
 
 	// Fixed output width
 	idWidth = 12
+
+	// Random pool size for fast generation.
+	randomPoolSize = 4096
 )
 
 // Error definitions
@@ -52,7 +55,7 @@ type TraceIDGenerator struct {
 func NewTraceIDGenerator() *TraceIDGenerator {
 	g := &TraceIDGenerator{
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
-		randomPool: make([]int32, 4096), // Pre-generate 4096 random numbers
+		randomPool: make([]int32, randomPoolSize), // Pre-generate random numbers
 	}
 
 	// Pre-generate random numbers to avoid runtime generation overhead
@@ -74,9 +77,13 @@ func NewTraceID() string {
 
 // Generate creates a new trace ID using optimized atomic operations
 func (g *TraceIDGenerator) Generate() string {
+	g.ensureInitialized()
 	for {
 		nowMs := time.Now().UnixMilli()
 		lastMs := g.lastMs.Load()
+		if nowMs < lastMs {
+			nowMs = lastMs
+		}
 
 		if nowMs == lastMs {
 			// Same millisecond, try to increment sequence
@@ -106,9 +113,7 @@ func (g *TraceIDGenerator) Generate() string {
 
 // buildID constructs the trace ID from components using optimized random number access
 func (g *TraceIDGenerator) buildID(unixMs int64, seqVal int) string {
-	// Get random number from pre-generated pool (lock-free)
-	poolIdx := int(g.poolIdx.Add(1) - 1)
-	r := int(g.randomPool[poolIdx%len(g.randomPool)])
+	r := g.randomValue()
 
 	// Encode timestamp delta
 	delta := unixMs - epochMilli
@@ -121,6 +126,65 @@ func (g *TraceIDGenerator) buildID(unixMs int64, seqVal int) string {
 	v := (ts << shiftTS) | (uint64(r&randMask) << shiftRand) | uint64(seqVal)
 
 	return encodeBase62Fixed(v, idWidth)
+}
+
+func (g *TraceIDGenerator) ensureInitialized() {
+	if g.rng != nil && len(g.randomPool) > 0 {
+		return
+	}
+
+	g.poolMu.Lock()
+	defer g.poolMu.Unlock()
+
+	if g.rng == nil {
+		g.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+	if len(g.randomPool) == 0 {
+		g.randomPool = make([]int32, randomPoolSize)
+	}
+	for i := range g.randomPool {
+		g.randomPool[i] = int32(g.rng.Intn(randMax))
+	}
+}
+
+func (g *TraceIDGenerator) randomValue() int {
+	g.ensureInitialized()
+
+	poolSize := len(g.randomPool)
+	if poolSize == 0 {
+		return g.randomFallback()
+	}
+
+	idx := uint32(g.poolIdx.Add(1) - 1)
+	pos := int(idx % uint32(poolSize))
+
+	if pos == 0 && idx != 0 {
+		g.refreshRandomPool()
+	}
+
+	return int(g.randomPool[pos])
+}
+
+func (g *TraceIDGenerator) refreshRandomPool() {
+	g.poolMu.Lock()
+	defer g.poolMu.Unlock()
+
+	if g.rng == nil {
+		g.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+	for i := range g.randomPool {
+		g.randomPool[i] = int32(g.rng.Intn(randMax))
+	}
+}
+
+func (g *TraceIDGenerator) randomFallback() int {
+	g.poolMu.Lock()
+	defer g.poolMu.Unlock()
+
+	if g.rng == nil {
+		g.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+	return g.rng.Intn(randMax)
 }
 
 // DecodeTraceID reverses a 12-char Base62 trace id into components

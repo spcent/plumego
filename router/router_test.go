@@ -199,6 +199,26 @@ func TestAnyRoute(t *testing.T) {
 	}
 }
 
+func TestAnyRootFallback(t *testing.T) {
+	r := NewRouter()
+
+	r.GetFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("docs"))
+	})
+
+	r.Any("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("home"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if got := strings.TrimSpace(w.Body.String()); got != "home" {
+		t.Fatalf("expected any root to match, got %q", got)
+	}
+}
+
 func TestPrintRoutes(t *testing.T) {
 	// Reset global r
 	r := NewRouter()
@@ -347,6 +367,50 @@ func TestRouteGroupMiddlewareIsolation(t *testing.T) {
 
 	if w.Header().Get("X-Group") != "" {
 		t.Errorf("expected group middleware not to run on /status")
+	}
+}
+
+func TestNestedGroupMiddlewareOrder(t *testing.T) {
+	r := NewRouter()
+
+	var order []string
+
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "global")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	api := r.Group("/api")
+	api.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "api")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	v1 := api.Group("/v1")
+	v1.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "v1")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	v1.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+		w.Write([]byte("pong"))
+	})
+
+	req := httptest.NewRequest("GET", "/api/v1/ping", nil)
+	w := httptest.NewRecorder()
+	order = []string{}
+	r.ServeHTTP(w, req)
+
+	expected := []string{"global", "api", "v1", "handler"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected middleware order %v, got %v", expected, order)
 	}
 }
 

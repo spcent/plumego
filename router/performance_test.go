@@ -104,10 +104,10 @@ func BenchmarkRouterComparison(b *testing.B) {
 	}
 }
 
-// BenchmarkRadixTreePerformance tests radix tree routing performance
-func BenchmarkRadixTreePerformance(b *testing.B) {
-	// Create a radix tree directly
-	rt := NewRadixTree()
+// BenchmarkRouterTreePerformance tests router tree routing performance
+func BenchmarkRouterTreePerformance(b *testing.B) {
+	// Create a router
+	r := NewRouter()
 
 	// Register routes
 	routes := []struct {
@@ -124,9 +124,9 @@ func BenchmarkRadixTreePerformance(b *testing.B) {
 	}
 
 	for _, route := range routes {
-		rt.Insert(route.method, route.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.AddRoute(route.method, route.path, http.HandlerFunc(func(w http.ResponseWriter, rr *http.Request) {
 			w.WriteHeader(http.StatusOK)
-		}), []string{}, nil)
+		}))
 	}
 
 	paths := []string{
@@ -140,8 +140,10 @@ func BenchmarkRadixTreePerformance(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		path := paths[i%len(paths)]
-		result := rt.Find("GET", path)
-		if result == nil {
+		req := httptest.NewRequest("GET", path, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
 			b.Fatal("Route not found")
 		}
 	}
@@ -268,9 +270,9 @@ func TestOptimizedRouterFeatures(t *testing.T) {
 	}
 }
 
-// TestRadixTreeMatching validates radix tree routing
-func TestRadixTreeMatching(t *testing.T) {
-	rt := NewRadixTree()
+// TestRouterTreeMatching validates router tree routing
+func TestRouterTreeMatching(t *testing.T) {
+	r := NewRouter()
 
 	// Register routes
 	routes := []struct {
@@ -283,27 +285,30 @@ func TestRadixTreeMatching(t *testing.T) {
 	}
 
 	for _, route := range routes {
-		rt.Insert(route.method, route.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}), []string{}, nil)
+		r.AddRoute(route.method, route.path, http.HandlerFunc(func(w http.ResponseWriter, rr *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
 	}
 
 	// Test cases
 	tests := []struct {
-		method   string
-		path     string
-		expected bool
+		method       string
+		path         string
+		expectedCode int
 	}{
-		{"GET", "/users/123", true},
-		{"GET", "/users/456/posts/789", true},
-		{"GET", "/static/css/main.css", true},
-		{"GET", "/users", false},
-		{"POST", "/users/123", false},
+		{"GET", "/users/123", http.StatusOK},
+		{"GET", "/users/456/posts/789", http.StatusOK},
+		{"GET", "/static/css/main.css", http.StatusOK},
+		{"GET", "/users", http.StatusNotFound},
+		{"POST", "/users/123", http.StatusNotFound},
 	}
 
 	for _, tt := range tests {
-		result := rt.Find(tt.method, tt.path)
-		found := result != nil
-		if found != tt.expected {
-			t.Errorf("Find(%s, %s): expected %v, got %v", tt.method, tt.path, tt.expected, found)
+		req := httptest.NewRequest(tt.method, tt.path, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != tt.expectedCode {
+			t.Errorf("ServeHTTP(%s, %s): expected status %d, got %d", tt.method, tt.path, tt.expectedCode, w.Code)
 		}
 	}
 }

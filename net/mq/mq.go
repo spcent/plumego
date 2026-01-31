@@ -1,15 +1,49 @@
+// Package mq provides an in-process message broker.
+//
+// Experimental: this module includes incomplete features (see TODOs) and may change
+// without notice. Avoid production use until the TODOs are fully implemented.
 package mq
 
 import (
+	"container/heap"
 	"context"
 	"errors"
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/pubsub"
+)
+
+// Configuration constants
+const (
+	// DefaultBufferSize is the default buffer size for new subscriptions.
+	DefaultBufferSize = 16
+
+	// MaxTopicLength is the maximum length of a topic name in characters.
+	MaxTopicLength = 1024
+
+	// DefaultHealthCheckInterval is the default interval for health checks.
+	DefaultHealthCheckInterval = 30 * time.Second
+
+	// DefaultAckTimeoutDuration is the default timeout for message acknowledgment.
+	DefaultAckTimeoutDuration = 30 * time.Second
+
+	// DefaultClusterSyncInterval is the default interval for cluster state synchronization.
+	DefaultClusterSyncInterval = 5 * time.Second
+
+	// DefaultTransactionTimeoutDuration is the default timeout for transactions.
+	DefaultTransactionTimeoutDuration = 30 * time.Second
+
+	// DefaultMQTTPort is the default port for MQTT protocol.
+	DefaultMQTTPort = 1883
+
+	// DefaultAMQPPort is the default port for AMQP protocol.
+	DefaultAMQPPort = 5672
 )
 
 // Message re-exports pubsub.Message for broker compatibility.
@@ -90,6 +124,12 @@ var ErrTransactionNotSupported = errors.New("mq: transaction not supported")
 // ErrDeadLetterNotSupported is returned when dead letter queue is not supported.
 var ErrDeadLetterNotSupported = errors.New("mq: dead letter queue not supported")
 
+// ErrMemoryLimitExceeded is returned when memory usage exceeds the configured limit.
+var ErrMemoryLimitExceeded = errors.New("mq: memory limit exceeded")
+
+// ErrMessageExpired is returned when a message has expired based on its TTL.
+var ErrMessageExpired = errors.New("mq: message has expired")
+
 // MessagePriority represents the priority of a message.
 type MessagePriority int
 
@@ -119,12 +159,471 @@ type PriorityMessage struct {
 	Priority MessagePriority
 }
 
+type priorityEnvelope struct {
+	msg      Message
+	priority MessagePriority
+	seq      uint64
+	ctx      context.Context
+	done     chan error
+}
+
+type priorityQueue []*priorityEnvelope
+
+func (pq priorityQueue) Len() int { return len(pq) }
+
+func (pq priorityQueue) Less(i, j int) bool {
+	if pq[i].priority == pq[j].priority {
+		return pq[i].seq < pq[j].seq
+	}
+	return pq[i].priority > pq[j].priority
+}
+
+func (pq priorityQueue) Swap(i, j int) { pq[i], pq[j] = pq[j], pq[i] }
+
+func (pq *priorityQueue) Push(x any) {
+	*pq = append(*pq, x.(*priorityEnvelope))
+}
+
+func (pq *priorityQueue) Pop() any {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	*pq = old[:n-1]
+	return item
+}
+
+type priorityDispatcher struct {
+	broker *InProcBroker
+	topic  string
+
+	mu     sync.Mutex
+	cond   *sync.Cond
+	queue  priorityQueue
+	closed bool
+}
+
+func newPriorityDispatcher(b *InProcBroker, topic string) *priorityDispatcher {
+	d := &priorityDispatcher{
+		broker: b,
+		topic:  topic,
+	}
+	d.cond = sync.NewCond(&d.mu)
+	heap.Init(&d.queue)
+	go d.run()
+	return d
+}
+
+func (d *priorityDispatcher) enqueue(env *priorityEnvelope) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.closed {
+		return ErrBrokerClosed
+	}
+	heap.Push(&d.queue, env)
+	d.cond.Signal()
+	return nil
+}
+
+func (d *priorityDispatcher) close() {
+	d.mu.Lock()
+	if d.closed {
+		d.mu.Unlock()
+		return
+	}
+	d.closed = true
+	pending := make([]*priorityEnvelope, len(d.queue))
+	copy(pending, d.queue)
+	d.queue = nil
+	d.cond.Broadcast()
+	d.mu.Unlock()
+
+	for _, env := range pending {
+		if env.done != nil {
+			env.done <- ErrBrokerClosed
+			close(env.done)
+		}
+	}
+}
+
+func (d *priorityDispatcher) run() {
+	for {
+		d.mu.Lock()
+		for !d.closed && len(d.queue) == 0 {
+			d.cond.Wait()
+		}
+		if d.closed {
+			d.mu.Unlock()
+			return
+		}
+		env := heap.Pop(&d.queue).(*priorityEnvelope)
+		d.mu.Unlock()
+
+		err := d.publish(env)
+		if env.done != nil {
+			env.done <- err
+			close(env.done)
+		}
+	}
+}
+
+func (d *priorityDispatcher) publish(env *priorityEnvelope) error {
+	if env.ctx != nil {
+		if err := env.ctx.Err(); err != nil {
+			return err
+		}
+	}
+	if d.broker == nil || d.broker.ps == nil {
+		return ErrNotInitialized
+	}
+	return d.broker.ps.Publish(d.topic, env.msg)
+}
+
 // AckMessage extends Message with acknowledgment support.
 type AckMessage struct {
 	Message
 	AckID      string
 	AckPolicy  AckPolicy
 	AckTimeout time.Duration
+}
+
+// PriorityTTLMessage combines priority and TTL features.
+type PriorityTTLMessage struct {
+	Message
+	Priority  MessagePriority
+	ExpiresAt time.Time
+}
+
+// AckTTLMessage combines acknowledgment and TTL features.
+type AckTTLMessage struct {
+	Message
+	AckID      string
+	AckPolicy  AckPolicy
+	AckTimeout time.Duration
+	ExpiresAt  time.Time
+}
+
+// ackEntry represents a pending acknowledgment for a message.
+type ackEntry struct {
+	messageID   string
+	topic       string
+	message     Message
+	timestamp   time.Time
+	timeout     time.Duration
+	retryCount  int
+	maxRetries  int
+	timer       *time.Timer
+	ackReceived bool
+}
+
+// ackTracker manages pending acknowledgments and timeouts.
+type ackTracker struct {
+	mu      sync.RWMutex
+	pending map[string]*ackEntry
+	broker  *InProcBroker
+	closed  bool
+}
+
+// newAckTracker creates a new acknowledgment tracker.
+func newAckTracker(broker *InProcBroker) *ackTracker {
+	return &ackTracker{
+		pending: make(map[string]*ackEntry),
+		broker:  broker,
+	}
+}
+
+// track starts tracking an acknowledgment for a message.
+func (at *ackTracker) track(ackID, topic string, msg Message, timeout time.Duration, maxRetries int) error {
+	at.mu.Lock()
+	defer at.mu.Unlock()
+
+	if at.closed {
+		return ErrBrokerClosed
+	}
+
+	if _, exists := at.pending[ackID]; exists {
+		return fmt.Errorf("%w: ack ID %s already exists", ErrMessageAcknowledged, ackID)
+	}
+
+	entry := &ackEntry{
+		messageID:  msg.ID,
+		topic:      topic,
+		message:    msg,
+		timestamp:  time.Now(),
+		timeout:    timeout,
+		retryCount: 0,
+		maxRetries: maxRetries,
+	}
+
+	// Set up timeout timer
+	entry.timer = time.AfterFunc(timeout, func() {
+		at.handleTimeout(ackID)
+	})
+
+	at.pending[ackID] = entry
+	return nil
+}
+
+// acknowledge marks a message as acknowledged.
+func (at *ackTracker) acknowledge(ackID string) error {
+	at.mu.Lock()
+	defer at.mu.Unlock()
+
+	if at.closed {
+		return ErrBrokerClosed
+	}
+
+	entry, exists := at.pending[ackID]
+	if !exists {
+		return fmt.Errorf("%w: ack ID %s not found", ErrMessageNotAcked, ackID)
+	}
+
+	if entry.ackReceived {
+		return fmt.Errorf("%w: ack ID %s", ErrMessageAcknowledged, ackID)
+	}
+
+	// Mark as acknowledged and stop timer
+	entry.ackReceived = true
+	if entry.timer != nil {
+		entry.timer.Stop()
+	}
+
+	// Remove from pending
+	delete(at.pending, ackID)
+	return nil
+}
+
+// handleTimeout processes a timeout for an acknowledgment.
+func (at *ackTracker) handleTimeout(ackID string) {
+	at.mu.Lock()
+	entry, exists := at.pending[ackID]
+	if !exists || entry.ackReceived {
+		at.mu.Unlock()
+		return
+	}
+
+	entry.retryCount++
+	shouldRetry := entry.retryCount <= entry.maxRetries
+	at.mu.Unlock()
+
+	if shouldRetry {
+		// Retry: re-publish the message
+		if err := at.broker.redeliverMessage(entry); err != nil {
+			// If retry fails, send to dead letter queue
+			if at.broker.config.EnableDeadLetterQueue {
+				_ = at.broker.PublishToDeadLetter(
+					context.Background(),
+					entry.topic,
+					entry.message,
+					fmt.Sprintf("ack timeout after %d retries: %v", entry.retryCount, err),
+				)
+			}
+		}
+	} else {
+		// Max retries exceeded, send to dead letter queue
+		if at.broker.config.EnableDeadLetterQueue {
+			_ = at.broker.PublishToDeadLetter(
+				context.Background(),
+				entry.topic,
+				entry.message,
+				fmt.Sprintf("ack timeout after %d retries", entry.retryCount),
+			)
+		}
+
+		// Remove from pending
+		at.mu.Lock()
+		delete(at.pending, ackID)
+		at.mu.Unlock()
+	}
+}
+
+// close shuts down the tracker and cancels all pending timeouts.
+func (at *ackTracker) close() {
+	at.mu.Lock()
+	defer at.mu.Unlock()
+
+	if at.closed {
+		return
+	}
+
+	at.closed = true
+
+	// Stop all timers
+	for _, entry := range at.pending {
+		if entry.timer != nil {
+			entry.timer.Stop()
+		}
+	}
+
+	// Clear pending
+	at.pending = nil
+}
+
+// stats returns statistics about pending acknowledgments.
+func (at *ackTracker) stats() (pending int, oldestAge time.Duration) {
+	at.mu.RLock()
+	defer at.mu.RUnlock()
+
+	pending = len(at.pending)
+	if pending == 0 {
+		return
+	}
+
+	now := time.Now()
+	oldest := now
+	for _, entry := range at.pending {
+		if entry.timestamp.Before(oldest) {
+			oldest = entry.timestamp
+		}
+	}
+	oldestAge = now.Sub(oldest)
+
+	return
+}
+
+// ttlEntry tracks a message with TTL.
+type ttlEntry struct {
+	messageID string
+	topic     string
+	expiresAt time.Time
+}
+
+// ttlTracker manages messages with TTL and handles expiration cleanup.
+type ttlTracker struct {
+	mu       sync.RWMutex
+	messages map[string]*ttlEntry  // messageID -> entry
+	broker   *InProcBroker
+	stopCh   chan struct{}
+	closed   bool
+}
+
+// newTTLTracker creates a new TTL tracker and starts the cleanup goroutine.
+func newTTLTracker(broker *InProcBroker) *ttlTracker {
+	tt := &ttlTracker{
+		messages: make(map[string]*ttlEntry),
+		broker:   broker,
+		stopCh:   make(chan struct{}),
+	}
+
+	// Start background cleanup goroutine
+	go tt.cleanupLoop()
+
+	return tt
+}
+
+// track registers a message with TTL for tracking.
+func (tt *ttlTracker) track(messageID, topic string, expiresAt time.Time) error {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+
+	if tt.closed {
+		return ErrBrokerClosed
+	}
+
+	// Don't track if already expired
+	if time.Now().After(expiresAt) {
+		return ErrMessageExpired
+	}
+
+	tt.messages[messageID] = &ttlEntry{
+		messageID: messageID,
+		topic:     topic,
+		expiresAt: expiresAt,
+	}
+
+	return nil
+}
+
+// isExpired checks if a message has expired.
+func (tt *ttlTracker) isExpired(messageID string) bool {
+	tt.mu.RLock()
+	defer tt.mu.RUnlock()
+
+	entry, exists := tt.messages[messageID]
+	if !exists {
+		return false
+	}
+
+	return time.Now().After(entry.expiresAt)
+}
+
+// remove removes a message from tracking (e.g., when consumed).
+func (tt *ttlTracker) remove(messageID string) {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+
+	delete(tt.messages, messageID)
+}
+
+// cleanupLoop runs in the background and removes expired messages.
+func (tt *ttlTracker) cleanupLoop() {
+	ticker := time.NewTicker(1 * time.Second) // Check every second
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			tt.cleanupExpiredMessages()
+		case <-tt.stopCh:
+			return
+		}
+	}
+}
+
+// cleanupExpiredMessages removes all expired messages from tracking.
+func (tt *ttlTracker) cleanupExpiredMessages() {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+
+	now := time.Now()
+	expiredIDs := make([]string, 0)
+
+	for id, entry := range tt.messages {
+		if now.After(entry.expiresAt) {
+			expiredIDs = append(expiredIDs, id)
+		}
+	}
+
+	// Remove expired messages
+	for _, id := range expiredIDs {
+		delete(tt.messages, id)
+	}
+
+	// Note: The actual message removal from pubsub would require
+	// additional support in the pubsub package to remove specific messages
+	// from subscriber buffers. For now, we just track expiration.
+}
+
+// close stops the cleanup goroutine and clears all tracked messages.
+func (tt *ttlTracker) close() {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+
+	if tt.closed {
+		return
+	}
+
+	tt.closed = true
+	close(tt.stopCh)
+
+	// Clear all tracked messages
+	tt.messages = make(map[string]*ttlEntry)
+}
+
+// stats returns the number of tracked messages and count of expired messages.
+func (tt *ttlTracker) stats() (tracked int, expired int) {
+	tt.mu.RLock()
+	defer tt.mu.RUnlock()
+
+	tracked = len(tt.messages)
+	now := time.Now()
+
+	for _, entry := range tt.messages {
+		if now.After(entry.expiresAt) {
+			expired++
+		}
+	}
+
+	return
 }
 
 // Broker defines the interface for message queue backends.
@@ -224,31 +723,32 @@ func DefaultConfig() Config {
 		EnableHealthCheck:        true,
 		MaxTopics:                0, // No limit
 		MaxSubscribers:           0, // No limit
-		DefaultBufferSize:        16,
+		DefaultBufferSize:        DefaultBufferSize,
 		EnableMetrics:            true,
-		HealthCheckInterval:      30 * time.Second,
+		HealthCheckInterval:      DefaultHealthCheckInterval,
 		MessageTTL:               0, // No TTL by default
 		EnablePriorityQueue:      true,
 		EnableAckSupport:         false, // Disabled by default for backward compatibility
-		DefaultAckTimeout:        30 * time.Second,
+		DefaultAckTimeout:        DefaultAckTimeoutDuration,
 		MaxMemoryUsage:           0,     // No limit by default
 		EnableTriePattern:        false, // Disabled by default for backward compatibility
 		EnableCluster:            false, // Disabled by default
 		ClusterReplicationFactor: 1,     // No replication by default
-		ClusterSyncInterval:      5 * time.Second,
+		ClusterSyncInterval:      DefaultClusterSyncInterval,
 		EnablePersistence:        false, // Disabled by default
 		EnableDeadLetterQueue:    false, // Disabled by default
 		EnableTransactions:       false, // Disabled by default
-		TransactionTimeout:       30 * time.Second,
+		TransactionTimeout:       DefaultTransactionTimeoutDuration,
 		EnableMQTT:               false, // Disabled by default
-		MQTTPort:                 1883,
+		MQTTPort:                 DefaultMQTTPort,
 		EnableAMQP:               false, // Disabled by default
-		AMQPPort:                 5672,
+		AMQPPort:                 DefaultAMQPPort,
 	}
 }
 
 // Validate checks if the configuration is valid.
 func (c Config) Validate() error {
+	// Basic validation
 	if c.DefaultBufferSize <= 0 {
 		return fmt.Errorf("%w: DefaultBufferSize must be positive", ErrInvalidConfig)
 	}
@@ -261,6 +761,60 @@ func (c Config) Validate() error {
 	if c.MaxSubscribers < 0 {
 		return fmt.Errorf("%w: MaxSubscribers cannot be negative", ErrInvalidConfig)
 	}
+
+	// Cluster configuration validation
+	if c.EnableCluster {
+		if strings.TrimSpace(c.ClusterNodeID) == "" {
+			return fmt.Errorf("%w: ClusterNodeID is required when cluster mode is enabled", ErrInvalidConfig)
+		}
+		if c.ClusterReplicationFactor < 1 {
+			return fmt.Errorf("%w: ClusterReplicationFactor must be at least 1", ErrInvalidConfig)
+		}
+		if c.ClusterSyncInterval < 0 {
+			return fmt.Errorf("%w: ClusterSyncInterval cannot be negative", ErrInvalidConfig)
+		}
+	}
+
+	// Persistence configuration validation
+	if c.EnablePersistence {
+		if strings.TrimSpace(c.PersistencePath) == "" {
+			return fmt.Errorf("%w: PersistencePath is required when persistence is enabled", ErrInvalidConfig)
+		}
+	}
+
+	// Dead letter queue configuration validation
+	if c.EnableDeadLetterQueue {
+		if strings.TrimSpace(c.DeadLetterTopic) == "" {
+			return fmt.Errorf("%w: DeadLetterTopic is required when dead letter queue is enabled", ErrInvalidConfig)
+		}
+	}
+
+	// Acknowledgment configuration validation
+	if c.EnableAckSupport {
+		if c.DefaultAckTimeout < 0 {
+			return fmt.Errorf("%w: DefaultAckTimeout cannot be negative", ErrInvalidConfig)
+		}
+	}
+
+	// Transaction configuration validation
+	if c.EnableTransactions {
+		if c.TransactionTimeout < 0 {
+			return fmt.Errorf("%w: TransactionTimeout cannot be negative", ErrInvalidConfig)
+		}
+	}
+
+	// Protocol configuration validation
+	if c.EnableMQTT {
+		if c.MQTTPort <= 0 || c.MQTTPort > 65535 {
+			return fmt.Errorf("%w: MQTTPort must be between 1 and 65535", ErrInvalidConfig)
+		}
+	}
+	if c.EnableAMQP {
+		if c.AMQPPort <= 0 || c.AMQPPort > 65535 {
+			return fmt.Errorf("%w: AMQPPort must be between 1 and 65535", ErrInvalidConfig)
+		}
+	}
+
 	return nil
 }
 
@@ -320,6 +874,14 @@ type InProcBroker struct {
 	lastError     error
 	lastPanic     error
 	lastPanicTime time.Time
+
+	priorityMu     sync.Mutex
+	priorityQueues map[string]*priorityDispatcher
+	prioritySeq    uint64
+	priorityClosed atomic.Bool
+
+	ackTracker *ackTracker
+	ttlTracker *ttlTracker
 }
 
 // Option configures the broker.
@@ -345,8 +907,8 @@ func validateTopic(topic string) error {
 	if topic == "" {
 		return fmt.Errorf("%w: cannot be empty", ErrInvalidTopic)
 	}
-	if len(topic) > 1024 {
-		return fmt.Errorf("%w: topic too long (max 1024 characters)", ErrInvalidTopic)
+	if len(topic) > MaxTopicLength {
+		return fmt.Errorf("%w: topic too long (max %d characters)", ErrInvalidTopic, MaxTopicLength)
 	}
 	return nil
 }
@@ -356,6 +918,72 @@ func validateMessage(msg Message) error {
 	if msg.ID == "" {
 		return fmt.Errorf("%w: ID is required", ErrNilMessage)
 	}
+	return nil
+}
+
+// validatePublishOperation performs common validation for all publish operations.
+// It checks context, broker initialization, topic, and optionally message.
+func (b *InProcBroker) validatePublishOperation(ctx context.Context, topic string, msg *Message) error {
+	// Validate context
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+
+	// Validate broker initialization
+	if b == nil || b.ps == nil {
+		return fmt.Errorf("%w", ErrNotInitialized)
+	}
+
+	// Validate topic
+	if err := validateTopic(topic); err != nil {
+		return err
+	}
+
+	// Validate message if provided
+	if msg != nil {
+		if err := validateMessage(*msg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateSubscribeOperation performs common validation for all subscribe operations.
+// It checks context, broker initialization, and topic.
+func (b *InProcBroker) validateSubscribeOperation(ctx context.Context, topic string) error {
+	// Validate context
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+
+	// Validate broker initialization
+	if b == nil || b.ps == nil {
+		return fmt.Errorf("%w", ErrNotInitialized)
+	}
+
+	// Validate topic
+	if err := validateTopic(topic); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateTTL checks if a TTL message is valid and not expired.
+func (b *InProcBroker) validateTTL(expiresAt time.Time) error {
+	if expiresAt.IsZero() {
+		return nil // No TTL set, message doesn't expire
+	}
+
+	if time.Now().After(expiresAt) {
+		return fmt.Errorf("%w: message expired at %v", ErrMessageExpired, expiresAt)
+	}
+
 	return nil
 }
 
@@ -374,7 +1002,67 @@ func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
 			opt(broker)
 		}
 	}
+
+	// Initialize ackTracker if ACK support is enabled
+	if broker.config.EnableAckSupport {
+		broker.ackTracker = newAckTracker(broker)
+	}
+
+	// Initialize ttlTracker if TTL is enabled (MessageTTL > 0)
+	if broker.config.MessageTTL > 0 {
+		broker.ttlTracker = newTTLTracker(broker)
+	}
+
 	return broker
+}
+
+func (b *InProcBroker) ensurePriorityDispatcher(topic string) (*priorityDispatcher, error) {
+	if b == nil || b.ps == nil {
+		return nil, ErrNotInitialized
+	}
+	if b.priorityClosed.Load() {
+		return nil, ErrBrokerClosed
+	}
+
+	b.priorityMu.Lock()
+	defer b.priorityMu.Unlock()
+
+	if b.priorityClosed.Load() {
+		return nil, ErrBrokerClosed
+	}
+
+	if b.priorityQueues == nil {
+		b.priorityQueues = make(map[string]*priorityDispatcher)
+	}
+
+	dispatcher := b.priorityQueues[topic]
+	if dispatcher == nil {
+		dispatcher = newPriorityDispatcher(b, topic)
+		b.priorityQueues[topic] = dispatcher
+	}
+
+	return dispatcher, nil
+}
+
+func (b *InProcBroker) closePriorityDispatchers() {
+	if b == nil {
+		return
+	}
+	if !b.priorityClosed.CompareAndSwap(false, true) {
+		return
+	}
+
+	b.priorityMu.Lock()
+	dispatchers := make([]*priorityDispatcher, 0, len(b.priorityQueues))
+	for _, dispatcher := range b.priorityQueues {
+		dispatchers = append(dispatchers, dispatcher)
+	}
+	b.priorityQueues = nil
+	b.priorityMu.Unlock()
+
+	for _, dispatcher := range dispatchers {
+		dispatcher.close()
+	}
 }
 
 // WithConfig sets the broker configuration.
@@ -409,25 +1097,13 @@ func (b *InProcBroker) executeWithObservability(
 // Publish sends a message to a topic.
 func (b *InProcBroker) Publish(ctx context.Context, topic string, msg Message) error {
 	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
-		// Validate context
-		if ctx != nil {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-		}
-
-		// Validate broker initialization
-		if b == nil || b.ps == nil {
-			return fmt.Errorf("%w", ErrNotInitialized)
-		}
-
-		// Validate topic
-		if err := validateTopic(topic); err != nil {
+		// Validate operation
+		if err := b.validatePublishOperation(ctx, topic, &msg); err != nil {
 			return err
 		}
 
-		// Validate message
-		if err := validateMessage(msg); err != nil {
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
 			return err
 		}
 
@@ -469,6 +1145,11 @@ func (b *InProcBroker) PublishBatch(ctx context.Context, topic string, msgs []Me
 			// Note: TTL check would require type assertion on TTLMessage
 			// For regular Message types, we skip TTL validation
 			validMsgs = append(validMsgs, msg)
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
 		}
 
 		// Publish all valid messages
@@ -587,14 +1268,72 @@ func (b *InProcBroker) PublishPriority(ctx context.Context, topic string, msg Pr
 			return err
 		}
 
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
 		// Check if priority queue is enabled
 		if !b.config.EnablePriorityQueue {
 			// Fall back to regular publish
 			return b.ps.Publish(topic, msg.Message)
 		}
 
-		// TODO: Implement priority queue logic
-		// For now, just publish with priority metadata
+		dispatcher, err := b.ensurePriorityDispatcher(topic)
+		if err != nil {
+			return err
+		}
+
+		env := &priorityEnvelope{
+			msg:      msg.Message,
+			priority: msg.Priority,
+			seq:      atomic.AddUint64(&b.prioritySeq, 1),
+			ctx:      ctx,
+			done:     make(chan error, 1),
+		}
+
+		if err := dispatcher.enqueue(env); err != nil {
+			return err
+		}
+
+		if ctx == nil {
+			return <-env.done
+		}
+
+		select {
+		case err := <-env.done:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+}
+
+// PublishTTL publishes a message with time-to-live expiration.
+func (b *InProcBroker) PublishTTL(ctx context.Context, topic string, msg TTLMessage) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate operation
+		if err := b.validatePublishOperation(ctx, topic, &msg.Message); err != nil {
+			return err
+		}
+
+		// Validate TTL
+		if err := b.validateTTL(msg.ExpiresAt); err != nil {
+			return err
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
+		// Track message with TTL if tracker is enabled
+		if b.ttlTracker != nil && !msg.ExpiresAt.IsZero() {
+			if err := b.ttlTracker.track(msg.Message.ID, topic, msg.ExpiresAt); err != nil {
+				return err
+			}
+		}
+
 		return b.ps.Publish(topic, msg.Message)
 	})
 }
@@ -624,6 +1363,11 @@ func (b *InProcBroker) PublishWithAck(ctx context.Context, topic string, msg Ack
 			return err
 		}
 
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
 		// Check if acknowledgment support is enabled
 		if !b.config.EnableAckSupport {
 			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
@@ -634,8 +1378,131 @@ func (b *InProcBroker) PublishWithAck(ctx context.Context, topic string, msg Ack
 			msg.AckTimeout = b.config.DefaultAckTimeout
 		}
 
-		// TODO: Implement acknowledgment logic
-		// For now, just publish the message
+		// Generate ACK ID if not provided
+		if msg.AckID == "" {
+			msg.AckID = fmt.Sprintf("%s-%d", msg.Message.ID, time.Now().UnixNano())
+		}
+
+		// Track acknowledgment if required
+		if msg.AckPolicy == AckRequired || msg.AckPolicy == AckTimeout {
+			maxRetries := 3 // Default max retries
+			if err := b.ackTracker.track(msg.AckID, topic, msg.Message, msg.AckTimeout, maxRetries); err != nil {
+				return err
+			}
+		}
+
+		// Publish the message
+		return b.ps.Publish(topic, msg.Message)
+	})
+}
+
+// PublishPriorityTTL publishes a message with both priority and TTL.
+func (b *InProcBroker) PublishPriorityTTL(ctx context.Context, topic string, msg PriorityTTLMessage) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate operation
+		if err := b.validatePublishOperation(ctx, topic, &msg.Message); err != nil {
+			return err
+		}
+
+		// Validate TTL
+		if err := b.validateTTL(msg.ExpiresAt); err != nil {
+			return err
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
+		// Track message with TTL if tracker is enabled
+		if b.ttlTracker != nil && !msg.ExpiresAt.IsZero() {
+			if err := b.ttlTracker.track(msg.Message.ID, topic, msg.ExpiresAt); err != nil {
+				return err
+			}
+		}
+
+		// Create priority envelope and dispatch
+		env := &priorityEnvelope{
+			msg:      msg.Message,
+			priority: msg.Priority,
+			seq:      atomic.AddUint64(&b.prioritySeq, 1),
+			ctx:      ctx,
+			done:     make(chan error, 1),
+		}
+
+		dispatcher, err := b.ensurePriorityDispatcher(topic)
+		if err != nil {
+			return err
+		}
+
+		// Enqueue message with priority
+		if err := dispatcher.enqueue(env); err != nil {
+			return err
+		}
+
+		if ctx == nil {
+			return <-env.done
+		}
+
+		select {
+		case err := <-env.done:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+}
+
+// PublishWithAckTTL publishes a message with both acknowledgment and TTL.
+func (b *InProcBroker) PublishWithAckTTL(ctx context.Context, topic string, msg AckTTLMessage) error {
+	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+		// Validate operation
+		if err := b.validatePublishOperation(ctx, topic, &msg.Message); err != nil {
+			return err
+		}
+
+		// Validate TTL
+		if err := b.validateTTL(msg.ExpiresAt); err != nil {
+			return err
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
+		// Check if acknowledgment support is enabled
+		if !b.config.EnableAckSupport {
+			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
+		}
+
+		// Set default timeout if not specified
+		ackTimeout := msg.AckTimeout
+		if ackTimeout == 0 {
+			ackTimeout = b.config.DefaultAckTimeout
+		}
+
+		// Generate ACK ID if not provided
+		ackID := msg.AckID
+		if ackID == "" {
+			ackID = fmt.Sprintf("%s-%d", msg.Message.ID, time.Now().UnixNano())
+		}
+
+		// Track acknowledgment if required
+		if msg.AckPolicy == AckRequired || msg.AckPolicy == AckTimeout {
+			maxRetries := 3 // Default retry count
+			if err := b.ackTracker.track(ackID, topic, msg.Message, ackTimeout, maxRetries); err != nil {
+				return err
+			}
+		}
+
+		// Track message with TTL if tracker is enabled
+		if b.ttlTracker != nil && !msg.ExpiresAt.IsZero() {
+			if err := b.ttlTracker.track(msg.Message.ID, topic, msg.ExpiresAt); err != nil {
+				return err
+			}
+		}
+
 		return b.ps.Publish(topic, msg.Message)
 	})
 }
@@ -699,9 +1566,13 @@ func (b *InProcBroker) Ack(ctx context.Context, topic string, messageID string) 
 			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
 		}
 
-		// TODO: Implement acknowledgment tracking
-		// This would track which messages have been acknowledged
-		return nil
+		// Validate ackTracker
+		if b.ackTracker == nil {
+			return fmt.Errorf("%w: ack tracker not initialized", ErrNotInitialized)
+		}
+
+		// Acknowledge the message
+		return b.ackTracker.acknowledge(messageID)
 	})
 }
 
@@ -725,8 +1596,33 @@ func (b *InProcBroker) Nack(ctx context.Context, topic string, messageID string)
 			return fmt.Errorf("%w: acknowledgment support is disabled", ErrInvalidConfig)
 		}
 
-		// TODO: Implement negative acknowledgment logic
-		// This would request re-delivery of the message
+		// Validate ackTracker
+		if b.ackTracker == nil {
+			return fmt.Errorf("%w: ack tracker not initialized", ErrNotInitialized)
+		}
+
+		// Get the entry from tracker
+		b.ackTracker.mu.RLock()
+		entry, exists := b.ackTracker.pending[messageID]
+		b.ackTracker.mu.RUnlock()
+
+		if !exists {
+			return fmt.Errorf("%w: ack ID %s not found", ErrMessageNotAcked, messageID)
+		}
+
+		// Immediately redeliver the message
+		if err := b.redeliverMessage(entry); err != nil {
+			return fmt.Errorf("failed to redeliver message: %w", err)
+		}
+
+		// Stop the timer and remove from pending
+		b.ackTracker.mu.Lock()
+		if entry.timer != nil {
+			entry.timer.Stop()
+		}
+		delete(b.ackTracker.pending, messageID)
+		b.ackTracker.mu.Unlock()
+
 		return nil
 	})
 }
@@ -744,7 +1640,7 @@ func (b *InProcBroker) checkMemoryLimit() error {
 	// Check if total allocated memory exceeds limit
 	if memStats.Alloc > b.config.MaxMemoryUsage {
 		return fmt.Errorf("%w: memory usage %d bytes exceeds limit %d bytes",
-			ErrInvalidConfig, memStats.Alloc, b.config.MaxMemoryUsage)
+			ErrMemoryLimitExceeded, memStats.Alloc, b.config.MaxMemoryUsage)
 	}
 
 	return nil
@@ -755,6 +1651,17 @@ func (b *InProcBroker) GetMemoryUsage() uint64 {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	return memStats.Alloc
+}
+
+// redeliverMessage re-publishes a message that failed acknowledgment.
+func (b *InProcBroker) redeliverMessage(entry *ackEntry) error {
+	if b == nil || b.ps == nil {
+		return ErrNotInitialized
+	}
+
+	// Re-publish the message to the same topic
+	ctx := context.Background()
+	return b.Publish(ctx, entry.topic, entry.message)
 }
 
 // PublishToCluster publishes a message to the cluster (replicates to other nodes).
@@ -784,6 +1691,11 @@ func (b *InProcBroker) PublishToCluster(ctx context.Context, topic string, msg M
 
 		// Validate message
 		if err := validateMessage(msg); err != nil {
+			return err
+		}
+
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
 			return err
 		}
 
@@ -885,6 +1797,11 @@ func (b *InProcBroker) PublishWithTransaction(ctx context.Context, topic string,
 			return err
 		}
 
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
 		// TODO: Implement transaction logic
 		// This would:
 		// 1. Start a transaction with txID
@@ -982,6 +1899,11 @@ func (b *InProcBroker) PublishToDeadLetter(ctx context.Context, originalTopic st
 			return err
 		}
 
+		// Check memory limit
+		if err := b.checkMemoryLimit(); err != nil {
+			return err
+		}
+
 		// Determine dead letter topic
 		topic := b.config.DeadLetterTopic
 		if topic == "" {
@@ -1063,6 +1985,18 @@ func (b *InProcBroker) Close() error {
 		if b == nil || b.ps == nil {
 			return nil // Close is idempotent
 		}
+		b.closePriorityDispatchers()
+
+		// Close ack tracker if it exists
+		if b.ackTracker != nil {
+			b.ackTracker.close()
+		}
+
+		// Close TTL tracker if it exists
+		if b.ttlTracker != nil {
+			b.ttlTracker.close()
+		}
+
 		return b.ps.Close()
 	})
 }

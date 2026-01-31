@@ -193,17 +193,17 @@ func (c *Conn) Close() error {
 
 // SetReadLimit sets the maximum message size
 func (c *Conn) SetReadLimit(limit int64) {
-	c.readLimit = limit
+	atomic.StoreInt64(&c.readLimit, limit)
 }
 
 // SetPingPeriod sets the ping interval
 func (c *Conn) SetPingPeriod(d time.Duration) {
-	c.pingPeriod = d
+	atomic.StoreInt64((*int64)(&c.pingPeriod), int64(d))
 }
 
 // SetPongWait sets the pong wait time
 func (c *Conn) SetPongWait(d time.Duration) {
-	c.pongWait = d
+	atomic.StoreInt64((*int64)(&c.pongWait), int64(d))
 }
 
 // GetLastPong returns the last pong time
@@ -245,7 +245,7 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		payloadLen = prefix
 	}
 
-	if payloadLen > c.readLimit {
+	if payloadLen > atomic.LoadInt64(&c.readLimit) {
 		return 0, false, nil, errors.New("payload too large")
 	}
 
