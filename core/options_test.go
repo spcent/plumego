@@ -472,6 +472,8 @@ func (m *mockMetricsCollector) ObserveMQ(ctx context.Context, operation, topic s
 }
 func (m *mockMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
 }
+func (m *mockMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
+}
 func (m *mockMetricsCollector) GetStats() metrics.CollectorStats {
 	return metrics.CollectorStats{}
 }

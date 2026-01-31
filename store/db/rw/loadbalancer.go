@@ -19,10 +19,10 @@ var (
 
 // Replica represents a database replica with its metadata
 type Replica struct {
-	Index     int      // Replica index in the list
-	DB        *sql.DB  // Database connection
-	Weight    int      // Weight for weighted load balancing
-	IsHealthy bool     // Health status
+	Index     int     // Replica index in the list
+	DB        *sql.DB // Database connection
+	Weight    int     // Weight for weighted load balancing
+	IsHealthy bool    // Health status
 }
 
 // LoadBalancer defines the interface for load balancing strategies

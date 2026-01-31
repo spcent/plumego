@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -505,6 +506,10 @@ func TestNilFilesystem(t *testing.T) {
 }
 
 func TestUnreadableDirectory(t *testing.T) {
+	// Skip on Windows as it doesn't support Unix-style permissions
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping test on Windows due to permission model differences")
+	}
 	// Skip if running as root, as root can read any directory
 	if os.Getuid() == 0 {
 		t.Skip("skipping test when running as root")

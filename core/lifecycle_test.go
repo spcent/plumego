@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
@@ -77,7 +76,7 @@ func TestBoot(t *testing.T) {
 	}
 
 	// Signal shutdown
-	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	sendShutdownSignal(t)
 
 	// Wait for shutdown
 	select {
@@ -160,7 +159,7 @@ func TestBootStartsRunnersBeforeServer(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	sendShutdownSignal(t)
 
 	select {
 	case err := <-serverDone:
@@ -425,7 +424,7 @@ func TestStartServer(t *testing.T) {
 		}
 
 		// Trigger shutdown
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		sendShutdownSignal(t)
 
 		select {
 		case err := <-serverDone:
@@ -748,7 +747,7 @@ func TestAppBootWithComponents(t *testing.T) {
 	}
 
 	// Shutdown
-	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	sendShutdownSignal(t)
 
 	select {
 	case err := <-serverDone:
@@ -807,7 +806,7 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 	}
 
 	// Trigger shutdown
-	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	sendShutdownSignal(t)
 
 	select {
 	case <-done:

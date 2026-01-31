@@ -1070,6 +1070,10 @@ func (m *metricsCollector) ObserveKV(ctx context.Context, operation, key string,
 	// Not used in this test
 }
 
+func (m *metricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
+	// Not used in this test
+}
+
 func (m *metricsCollector) GetStats() metrics.CollectorStats {
 	return metrics.CollectorStats{}
 }

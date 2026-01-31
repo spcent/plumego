@@ -485,8 +485,8 @@ func (l *Limiter) evictOldestGlobal() {
 }
 
 // Metrics returns the current metrics for monitoring
-func (l *Limiter) Metrics() LimiterMetrics {
-	return l.metrics
+func (l *Limiter) Metrics() *LimiterMetrics {
+	return &l.metrics
 }
 
 // RecordAllow records the outcome of an Allow check for metrics

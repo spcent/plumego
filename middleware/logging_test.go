@@ -50,6 +50,19 @@ func (l *stubLogger) Info(msg string, fields log.Fields)  { l.record(msg, fields
 func (l *stubLogger) Warn(msg string, fields log.Fields)  { l.record(msg, fields) }
 func (l *stubLogger) Error(msg string, fields log.Fields) { l.record(msg, fields) }
 
+func (l *stubLogger) DebugCtx(ctx context.Context, msg string, fields log.Fields) {
+	l.record(msg, fields)
+}
+func (l *stubLogger) InfoCtx(ctx context.Context, msg string, fields log.Fields) {
+	l.record(msg, fields)
+}
+func (l *stubLogger) WarnCtx(ctx context.Context, msg string, fields log.Fields) {
+	l.record(msg, fields)
+}
+func (l *stubLogger) ErrorCtx(ctx context.Context, msg string, fields log.Fields) {
+	l.record(msg, fields)
+}
+
 func (l *stubLogger) record(msg string, fields log.Fields) {
 	merged := make(log.Fields, len(l.baseFields)+len(fields))
 	for k, v := range l.baseFields {

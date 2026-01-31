@@ -9,9 +9,9 @@ func TestSQLTypePolicy(t *testing.T) {
 	policy := NewSQLTypePolicy()
 
 	tests := []struct {
-		name    string
-		query   string
-		want    bool // true = primary, false = replica
+		name  string
+		query string
+		want  bool // true = primary, false = replica
 	}{
 		// Write operations -> primary
 		{"INSERT", "INSERT INTO users (name) VALUES ('alice')", true},

@@ -316,9 +316,9 @@ func (c *Cluster) markReplicaHealth(idx int, healthy bool) {
 	}
 }
 
-// Metrics returns a copy of cluster metrics
-func (c *Cluster) Metrics() ClusterMetrics {
-	return c.metrics
+// Metrics returns a pointer to cluster metrics
+func (c *Cluster) Metrics() *ClusterMetrics {
+	return &c.metrics
 }
 
 // Primary returns the primary database connection

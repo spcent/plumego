@@ -490,7 +490,7 @@ type ttlEntry struct {
 // ttlTracker manages messages with TTL and handles expiration cleanup.
 type ttlTracker struct {
 	mu       sync.RWMutex
-	messages map[string]*ttlEntry  // messageID -> entry
+	messages map[string]*ttlEntry // messageID -> entry
 	broker   *InProcBroker
 	stopCh   chan struct{}
 	closed   bool

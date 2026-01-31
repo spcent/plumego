@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -57,6 +58,22 @@ func (m *mockStructuredLogger) Error(msg string, fields log.Fields) {
 		}
 		m.onError(msg, combinedFields)
 	}
+}
+
+func (m *mockStructuredLogger) DebugCtx(ctx context.Context, msg string, fields log.Fields) {
+	// Not used in this test
+}
+
+func (m *mockStructuredLogger) InfoCtx(ctx context.Context, msg string, fields log.Fields) {
+	// Not used in this test
+}
+
+func (m *mockStructuredLogger) WarnCtx(ctx context.Context, msg string, fields log.Fields) {
+	// Not used in this test
+}
+
+func (m *mockStructuredLogger) ErrorCtx(ctx context.Context, msg string, fields log.Fields) {
+	// Not used in this test
 }
 
 func TestErrorBuilder(t *testing.T) {

@@ -67,17 +67,17 @@ type WALEntry struct {
 
 // Options configures the KV store
 type Options struct {
-	DataDir            string              `json:"data_dir"`
-	MaxEntries         int                 `json:"max_entries"`
-	MaxMemoryMB        int                 `json:"max_memory_mb"`
-	FlushInterval      time.Duration       `json:"flush_interval"`
-	CleanInterval      time.Duration       `json:"clean_interval"`
-	ShardCount         int                 `json:"shard_count"`
-	EnableCompression  bool                `json:"enable_compression"`
-	ReadOnly           bool                `json:"read_only"`
-	CloseTimeout       time.Duration       `json:"close_timeout"`
-	SerializerFormat   SerializationFormat `json:"serializer_format"`   // Serialization format (binary/json)
-	AutoDetectFormat   bool                `json:"auto_detect_format"`  // Auto-detect format when loading
+	DataDir           string              `json:"data_dir"`
+	MaxEntries        int                 `json:"max_entries"`
+	MaxMemoryMB       int                 `json:"max_memory_mb"`
+	FlushInterval     time.Duration       `json:"flush_interval"`
+	CleanInterval     time.Duration       `json:"clean_interval"`
+	ShardCount        int                 `json:"shard_count"`
+	EnableCompression bool                `json:"enable_compression"`
+	ReadOnly          bool                `json:"read_only"`
+	CloseTimeout      time.Duration       `json:"close_timeout"`
+	SerializerFormat  SerializationFormat `json:"serializer_format"`  // Serialization format (binary/json)
+	AutoDetectFormat  bool                `json:"auto_detect_format"` // Auto-detect format when loading
 }
 
 // Shard represents a single data shard with optimized locking

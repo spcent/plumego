@@ -867,12 +867,18 @@ func TestMetricsCollector(t *testing.T) {
 type mockMetricsCollector struct{}
 
 func (m *mockMetricsCollector) Record(_ context.Context, _ metrics.MetricRecord) {}
-func (m *mockMetricsCollector) ObserveHTTP(_ context.Context, _, _ string, _, _ int, _ time.Duration) {}
-func (m *mockMetricsCollector) ObservePubSub(_ context.Context, _, _ string, _ time.Duration, _ error) {}
-func (m *mockMetricsCollector) ObserveMQ(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {}
-func (m *mockMetricsCollector) ObserveKV(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {}
+func (m *mockMetricsCollector) ObserveHTTP(_ context.Context, _, _ string, _, _ int, _ time.Duration) {
+}
+func (m *mockMetricsCollector) ObservePubSub(_ context.Context, _, _ string, _ time.Duration, _ error) {
+}
+func (m *mockMetricsCollector) ObserveMQ(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {
+}
+func (m *mockMetricsCollector) ObserveKV(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {
+}
+func (m *mockMetricsCollector) ObserveIPC(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
+}
 func (m *mockMetricsCollector) GetStats() metrics.CollectorStats { return metrics.CollectorStats{} }
-func (m *mockMetricsCollector) Clear()                            {}
+func (m *mockMetricsCollector) Clear()                           {}
 
 // Test validate options with more edge cases
 func TestValidateOptionsExtended(t *testing.T) {

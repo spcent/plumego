@@ -310,6 +310,11 @@ func (p *PrometheusCollector) ObserveKV(ctx context.Context, operation, key stri
 	p.baseCollector().ObserveKV(ctx, operation, key, duration, err, hit)
 }
 
+// ObserveIPC implements the unified MetricsCollector interface
+func (p *PrometheusCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
+	p.baseCollector().ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
+}
+
 func (p *PrometheusCollector) snapshot() (map[labelKey]uint64, map[labelKey]latencyStats, time.Duration) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

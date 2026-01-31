@@ -527,6 +527,8 @@ func (c *stubConn) Begin() (driver.Tx, error) {
 }
 
 func (c *stubConn) Ping(ctx context.Context) error {
+	// Add a small delay to ensure measurable latency in tests
+	time.Sleep(1 * time.Millisecond)
 	return c.pingErr
 }
 

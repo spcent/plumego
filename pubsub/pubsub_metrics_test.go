@@ -38,6 +38,9 @@ func (s *stubCollector) ObserveMQ(_ context.Context, _, _ string, _ time.Duratio
 
 func (s *stubCollector) ObserveKV(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {}
 
+func (s *stubCollector) ObserveIPC(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
+}
+
 func (s *stubCollector) GetStats() metrics.CollectorStats { return s.stats }
 
 func (s *stubCollector) Clear() {}

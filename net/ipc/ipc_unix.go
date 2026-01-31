@@ -5,8 +5,8 @@ package ipc
 import (
 	"io"
 
-	glog "github.com/spcent/plumego/log"
 	"context"
+	glog "github.com/spcent/plumego/log"
 	"net"
 	"os"
 	"path/filepath"

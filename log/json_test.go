@@ -173,8 +173,8 @@ func TestJSONLogger_InfoCtx(t *testing.T) {
 
 func TestJSONLogger_ContextLevels(t *testing.T) {
 	tests := []struct {
-		name     string
-		logFunc  func(logger *JSONLogger, ctx context.Context)
+		name      string
+		logFunc   func(logger *JSONLogger, ctx context.Context)
 		wantLevel string
 	}{
 		{

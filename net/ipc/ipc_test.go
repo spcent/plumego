@@ -915,10 +915,14 @@ type testMetricsCollector struct {
 }
 
 func (c *testMetricsCollector) Record(ctx context.Context, record metrics.MetricRecord) {}
-func (c *testMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {}
-func (c *testMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {}
-func (c *testMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {}
-func (c *testMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {}
+func (c *testMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+}
+func (c *testMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+}
+func (c *testMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
+}
+func (c *testMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
+}
 
 func (c *testMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
 	c.mu.Lock()
@@ -970,6 +974,22 @@ func (l *testLogger) Error(msg string, fields glog.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.logs = append(l.logs, logEntry{level: "error", msg: msg, fields: copyGlogFields(fields)})
+}
+
+func (l *testLogger) DebugCtx(ctx context.Context, msg string, fields glog.Fields) {
+	l.Debug(msg, fields)
+}
+
+func (l *testLogger) InfoCtx(ctx context.Context, msg string, fields glog.Fields) {
+	l.Info(msg, fields)
+}
+
+func (l *testLogger) WarnCtx(ctx context.Context, msg string, fields glog.Fields) {
+	l.Warn(msg, fields)
+}
+
+func (l *testLogger) ErrorCtx(ctx context.Context, msg string, fields glog.Fields) {
+	l.Error(msg, fields)
 }
 
 func copyGlogFields(fields glog.Fields) glog.Fields {

@@ -5,14 +5,14 @@
 // This version includes the following breaking changes:
 //
 // 1. Client.RemoteAddr() now returns net.Addr instead of string
-//    - Migration: Use RemoteAddrString() for backward compatibility
-//    - Or: Use addr.String() on the returned net.Addr
+//   - Migration: Use RemoteAddrString() for backward compatibility
+//   - Or: Use addr.String() on the returned net.Addr
 //
 // 2. Client interface has been refactored into composable sub-interfaces
-//    - Reader: io.Reader + ReadWithTimeout
-//    - Writer: io.Writer + WriteWithTimeout
-//    - AddrProvider: RemoteAddr() + RemoteAddrString()
-//    - Client now embeds all these interfaces
+//   - Reader: io.Reader + ReadWithTimeout
+//   - Writer: io.Writer + WriteWithTimeout
+//   - AddrProvider: RemoteAddr() + RemoteAddrString()
+//   - Client now embeds all these interfaces
 //
 // These changes improve type safety and enable more flexible composition.
 //
@@ -163,30 +163,30 @@ func (e *Error) Unwrap() error {
 
 // Config holds configuration for IPC connections
 type Config struct {
-	ConnectTimeout     time.Duration            // Timeout for connection establishment
-	ReadTimeout        time.Duration            // Timeout for read operations
-	WriteTimeout       time.Duration            // Timeout for write operations
-	BufferSize         int                      // Buffer size for read/write operations (Windows Named Pipe only)
-	UnixSocketPerm     uint32                   // Unix socket file permissions (e.g., 0700). Default: 0700 (owner only). Unix/Linux only.
-	UnixSocketDirPerm  uint32                   // Unix socket directory permissions (e.g., 0755). Default: 0755. Unix/Linux only.
-	KeepAlive          bool                     // Enable TCP keepalive for TCP connections. Default: true.
-	KeepAlivePeriod    time.Duration            // TCP keepalive period. Default: 30s. Only applies to TCP connections.
-	WindowsSecuritySDDL string                  // Windows security descriptor (SDDL string). Windows only. Empty = default security.
-	Metrics            metrics.MetricsCollector // Optional metrics collector
-	Logger             glog.StructuredLogger    // Optional structured logger
+	ConnectTimeout      time.Duration            // Timeout for connection establishment
+	ReadTimeout         time.Duration            // Timeout for read operations
+	WriteTimeout        time.Duration            // Timeout for write operations
+	BufferSize          int                      // Buffer size for read/write operations (Windows Named Pipe only)
+	UnixSocketPerm      uint32                   // Unix socket file permissions (e.g., 0700). Default: 0700 (owner only). Unix/Linux only.
+	UnixSocketDirPerm   uint32                   // Unix socket directory permissions (e.g., 0755). Default: 0755. Unix/Linux only.
+	KeepAlive           bool                     // Enable TCP keepalive for TCP connections. Default: true.
+	KeepAlivePeriod     time.Duration            // TCP keepalive period. Default: 30s. Only applies to TCP connections.
+	WindowsSecuritySDDL string                   // Windows security descriptor (SDDL string). Windows only. Empty = default security.
+	Metrics             metrics.MetricsCollector // Optional metrics collector
+	Logger              glog.StructuredLogger    // Optional structured logger
 }
 
 // DefaultConfig returns default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		ConnectTimeout:   10 * time.Second,
-		ReadTimeout:      30 * time.Second,
-		WriteTimeout:     30 * time.Second,
-		BufferSize:       4096,
-		UnixSocketPerm:   0700,  // Owner only (rwx------)
+		ConnectTimeout:    10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		BufferSize:        4096,
+		UnixSocketPerm:    0700, // Owner only (rwx------)
 		UnixSocketDirPerm: 0755, // Owner rwx, others rx (rwxr-xr-x)
-		KeepAlive:        true,
-		KeepAlivePeriod:  30 * time.Second,
+		KeepAlive:         true,
+		KeepAlivePeriod:   30 * time.Second,
 	}
 }
 
@@ -277,6 +277,7 @@ func WithLogger(l glog.StructuredLogger) Option {
 //   - "D:P(A;;GA;;;WD)" - Allow all access to Everyone
 //   - "D:P(A;;GA;;;SY)(A;;GA;;;BA)" - Allow SYSTEM and Administrators
 //   - "D:P(A;;GRGW;;;AU)" - Allow Authenticated Users read/write
+//
 // See https://docs.microsoft.com/en-us/windows/win32/secauthz/security-descriptor-string-format
 func WithWindowsSecuritySDDL(sddl string) Option {
 	return func(c *Config) {
@@ -430,12 +431,12 @@ func DefaultHeartbeatConfig() *HeartbeatConfig {
 
 // reconnectClient wraps a Client with auto-reconnection capability
 type reconnectClient struct {
-	addr      string
-	config    *Config
-	reconn    *ReconnectConfig
-	mu        sync.RWMutex
-	client    Client
-	closed    bool
+	addr         string
+	config       *Config
+	reconn       *ReconnectConfig
+	mu           sync.RWMutex
+	client       Client
+	closed       bool
 	reconnecting bool
 }
 
@@ -900,7 +901,7 @@ func (hb *heartbeatClient) ping() error {
 	// Simple ping: write a special byte sequence
 	pingMsg := []byte{0xFF, 0xFF, 0x00, 0x00} // Magic ping bytes
 	deadline := time.Now().Add(hb.config.Timeout)
-	
+
 	// Set deadline for ping
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
@@ -1000,15 +1001,15 @@ type poolConn struct {
 
 // Pool manages a pool of reusable IPC connections
 type Pool struct {
-	addr   string
-	config *Config
+	addr    string
+	config  *Config
 	poolCfg *PoolConfig
-	
+
 	mu      sync.Mutex
 	conns   []*poolConn
 	waiting []chan *poolConn
 	closed  bool
-	
+
 	stopCh chan struct{}
 }
 
@@ -1017,12 +1018,12 @@ func NewPool(addr string, poolCfg *PoolConfig, opts ...Option) (*Pool, error) {
 	if poolCfg == nil {
 		poolCfg = DefaultPoolConfig()
 	}
-	
+
 	config := DefaultConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
-	
+
 	pool := &Pool{
 		addr:    addr,
 		config:  config,
@@ -1031,10 +1032,10 @@ func NewPool(addr string, poolCfg *PoolConfig, opts ...Option) (*Pool, error) {
 		waiting: make([]chan *poolConn, 0),
 		stopCh:  make(chan struct{}),
 	}
-	
+
 	// Start background cleanup goroutine
 	go pool.cleanup()
-	
+
 	return pool, nil
 }
 
@@ -1046,12 +1047,12 @@ func (p *Pool) Get() (Client, error) {
 // GetWithContext acquires a connection from the pool with context
 func (p *Pool) GetWithContext(ctx context.Context) (Client, error) {
 	p.mu.Lock()
-	
+
 	if p.closed {
 		p.mu.Unlock()
 		return nil, ErrClientClosed
 	}
-	
+
 	// Try to find an idle connection
 	for i, pc := range p.conns {
 		if !pc.inUse {
@@ -1062,14 +1063,14 @@ func (p *Pool) GetWithContext(ctx context.Context) (Client, error) {
 				p.conns = append(p.conns[:i], p.conns[i+1:]...)
 				continue
 			}
-			
+
 			pc.inUse = true
 			pc.lastUsed = time.Now()
 			p.mu.Unlock()
 			return &poolClient{conn: pc}, nil
 		}
 	}
-	
+
 	// No idle connection, try to create new one
 	if len(p.conns) < p.poolCfg.MaxConns {
 		p.mu.Unlock()
@@ -1077,7 +1078,7 @@ func (p *Pool) GetWithContext(ctx context.Context) (Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		pc := &poolConn{
 			client:    client,
 			pool:      p,
@@ -1085,19 +1086,19 @@ func (p *Pool) GetWithContext(ctx context.Context) (Client, error) {
 			lastUsed:  time.Now(),
 			inUse:     true,
 		}
-		
+
 		p.mu.Lock()
 		p.conns = append(p.conns, pc)
 		p.mu.Unlock()
-		
+
 		return &poolClient{conn: pc}, nil
 	}
-	
+
 	// Pool is full, wait for a connection to be released
 	waiter := make(chan *poolConn, 1)
 	p.waiting = append(p.waiting, waiter)
 	p.mu.Unlock()
-	
+
 	select {
 	case pc := <-waiter:
 		return &poolClient{conn: pc}, nil
@@ -1119,15 +1120,15 @@ func (p *Pool) GetWithContext(ctx context.Context) (Client, error) {
 func (p *Pool) put(pc *poolConn) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	if p.closed {
 		pc.client.Close()
 		return
 	}
-	
+
 	pc.lastUsed = time.Now()
 	pc.inUse = false
-	
+
 	// Wake up waiting goroutine if any
 	if len(p.waiting) > 0 {
 		waiter := p.waiting[0]
@@ -1141,25 +1142,25 @@ func (p *Pool) put(pc *poolConn) {
 func (p *Pool) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	if p.closed {
 		return nil
 	}
 	p.closed = true
 	close(p.stopCh)
-	
+
 	// Close all connections
 	for _, pc := range p.conns {
 		pc.client.Close()
 	}
 	p.conns = nil
-	
+
 	// Wake up all waiting goroutines
 	for _, waiter := range p.waiting {
 		close(waiter)
 	}
 	p.waiting = nil
-	
+
 	return nil
 }
 
@@ -1167,50 +1168,50 @@ func (p *Pool) Close() error {
 func (p *Pool) cleanup() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
 			p.mu.Lock()
 			now := time.Now()
-			
+
 			// Keep track of connections to close
 			var toClose []*poolConn
-			
+
 			// Filter out expired idle connections
 			filtered := make([]*poolConn, 0, len(p.conns))
 			idleCount := 0
-			
+
 			for _, pc := range p.conns {
 				if pc.inUse {
 					filtered = append(filtered, pc)
 					continue
 				}
-				
+
 				// Check if connection is too old
 				if now.Sub(pc.lastUsed) > p.poolCfg.MaxIdleTime {
 					toClose = append(toClose, pc)
 					continue
 				}
-				
+
 				// Check if we have too many idle connections
 				idleCount++
 				if idleCount > p.poolCfg.MaxIdleConns {
 					toClose = append(toClose, pc)
 					continue
 				}
-				
+
 				filtered = append(filtered, pc)
 			}
-			
+
 			p.conns = filtered
 			p.mu.Unlock()
-			
+
 			// Close connections outside lock
 			for _, pc := range toClose {
 				pc.client.Close()
 			}
-			
+
 		case <-p.stopCh:
 			return
 		}
@@ -1221,12 +1222,12 @@ func (p *Pool) cleanup() {
 func (p *Pool) Stats() PoolStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	stats := PoolStats{
 		TotalConns: len(p.conns),
 		Waiting:    len(p.waiting),
 	}
-	
+
 	for _, pc := range p.conns {
 		if pc.inUse {
 			stats.InUse++
@@ -1234,7 +1235,7 @@ func (p *Pool) Stats() PoolStats {
 			stats.Idle++
 		}
 	}
-	
+
 	return stats
 }
 
@@ -1279,15 +1280,15 @@ func (pc *poolClient) RemoteAddrString() string {
 func (pc *poolClient) Close() error {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
-	
+
 	if pc.conn == nil {
 		return nil
 	}
-	
+
 	pool := pc.conn.pool
 	conn := pc.conn
 	pc.conn = nil
-	
+
 	// Return to pool instead of closing
 	pool.put(conn)
 	return nil
@@ -1304,7 +1305,7 @@ type StreamConfig struct {
 // DefaultStreamConfig returns default stream configuration
 func DefaultStreamConfig() *StreamConfig {
 	return &StreamConfig{
-		ChunkSize:      64 * 1024, // 64KB chunks
+		ChunkSize:      64 * 1024,  // 64KB chunks
 		BufferSize:     128 * 1024, // 128KB buffer
 		EnableChecksum: true,
 		Timeout:        5 * time.Minute,
@@ -1332,7 +1333,7 @@ func NewStreamClient(client Client, cfg *StreamConfig) StreamClient {
 	if cfg == nil {
 		cfg = DefaultStreamConfig()
 	}
-	
+
 	return &streamClient{
 		client: client,
 		config: cfg,
@@ -1342,7 +1343,7 @@ func NewStreamClient(client Client, cfg *StreamConfig) StreamClient {
 func (sc *streamClient) WriteStream(r io.Reader) (int64, error) {
 	var totalWritten int64
 	buf := make([]byte, sc.config.ChunkSize)
-	
+
 	for {
 		// Read chunk
 		n, readErr := r.Read(buf)
@@ -1353,11 +1354,11 @@ func (sc *streamClient) WriteStream(r io.Reader) (int64, error) {
 			sizeBytes[1] = byte(n >> 16)
 			sizeBytes[2] = byte(n >> 8)
 			sizeBytes[3] = byte(n)
-			
+
 			if _, err := sc.client.WriteWithTimeout(sizeBytes, sc.config.Timeout); err != nil {
 				return totalWritten, fmt.Errorf("failed to write chunk size: %w", err)
 			}
-			
+
 			// Write chunk data
 			written := 0
 			for written < n {
@@ -1367,10 +1368,10 @@ func (sc *streamClient) WriteStream(r io.Reader) (int64, error) {
 				}
 				written += w
 			}
-			
+
 			totalWritten += int64(n)
 		}
-		
+
 		if readErr == io.EOF {
 			// Write zero-length chunk to signal end
 			endMarker := []byte{0, 0, 0, 0}
@@ -1379,45 +1380,45 @@ func (sc *streamClient) WriteStream(r io.Reader) (int64, error) {
 			}
 			break
 		}
-		
+
 		if readErr != nil {
 			return totalWritten, readErr
 		}
 	}
-	
+
 	return totalWritten, nil
 }
 
 func (sc *streamClient) ReadStream(w io.Writer) (int64, error) {
 	var totalRead int64
-	
+
 	for {
 		// Read chunk size (4 bytes)
 		sizeBytes := make([]byte, 4)
 		if _, err := io.ReadFull(sc.client, sizeBytes); err != nil {
 			return totalRead, fmt.Errorf("failed to read chunk size: %w", err)
 		}
-		
+
 		chunkSize := int(uint32(sizeBytes[0])<<24 |
 			uint32(sizeBytes[1])<<16 |
 			uint32(sizeBytes[2])<<8 |
 			uint32(sizeBytes[3]))
-		
+
 		// Zero-length chunk signals end of stream
 		if chunkSize == 0 {
 			break
 		}
-		
+
 		if chunkSize > sc.config.ChunkSize*2 {
 			return totalRead, fmt.Errorf("chunk size too large: %d (max %d)", chunkSize, sc.config.ChunkSize*2)
 		}
-		
+
 		// Read chunk data
 		buf := make([]byte, chunkSize)
 		if _, err := io.ReadFull(sc.client, buf); err != nil {
 			return totalRead, fmt.Errorf("failed to read chunk data: %w", err)
 		}
-		
+
 		// Write to destination
 		written := 0
 		for written < chunkSize {
@@ -1427,10 +1428,10 @@ func (sc *streamClient) ReadStream(w io.Writer) (int64, error) {
 			}
 			written += w
 		}
-		
+
 		totalRead += int64(chunkSize)
 	}
-	
+
 	return totalRead, nil
 }
 
@@ -1473,10 +1474,10 @@ type RateLimiter interface {
 
 // tokenBucketLimiter implements a token bucket rate limiter
 type tokenBucketLimiter struct {
-	rate      float64       // Tokens per second
-	capacity  int           // Maximum burst size
-	tokens    float64       // Current tokens
-	lastCheck time.Time     // Last time tokens were added
+	rate      float64   // Tokens per second
+	capacity  int       // Maximum burst size
+	tokens    float64   // Current tokens
+	lastCheck time.Time // Last time tokens were added
 	mu        sync.Mutex
 }
 
@@ -1495,14 +1496,14 @@ func NewRateLimiter(rate float64, burst int) RateLimiter {
 func (tb *tokenBucketLimiter) Allow() bool {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
-	
+
 	tb.refill()
-	
+
 	if tb.tokens >= 1.0 {
 		tb.tokens -= 1.0
 		return true
 	}
-	
+
 	return false
 }
 
@@ -1511,13 +1512,13 @@ func (tb *tokenBucketLimiter) Wait(ctx context.Context) error {
 		if tb.Allow() {
 			return nil
 		}
-		
+
 		// Calculate how long to wait for next token
 		tb.mu.Lock()
 		tokensNeeded := 1.0 - tb.tokens
 		waitTime := time.Duration(float64(time.Second) * tokensNeeded / tb.rate)
 		tb.mu.Unlock()
-		
+
 		if waitTime > 0 {
 			timer := time.NewTimer(waitTime)
 			select {
@@ -1535,11 +1536,11 @@ func (tb *tokenBucketLimiter) refill() {
 	now := time.Now()
 	elapsed := now.Sub(tb.lastCheck)
 	tb.lastCheck = now
-	
+
 	// Add tokens based on elapsed time
 	tokensToAdd := elapsed.Seconds() * tb.rate
 	tb.tokens += tokensToAdd
-	
+
 	if tb.tokens > float64(tb.capacity) {
 		tb.tokens = float64(tb.capacity)
 	}
@@ -1568,7 +1569,7 @@ func (rs *rateLimitedServer) AcceptWithContext(ctx context.Context) (Client, err
 	if err := rs.limiter.Wait(ctx); err != nil {
 		return nil, err
 	}
-	
+
 	return rs.server.AcceptWithContext(ctx)
 }
 

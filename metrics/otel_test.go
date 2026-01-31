@@ -20,6 +20,9 @@ func TestOpenTelemetryTracer(t *testing.T) {
 		t.Fatalf("tracer should return context and span")
 	}
 
+	// Add a small delay to ensure non-zero duration
+	time.Sleep(1 * time.Millisecond)
+
 	span.End(middleware.RequestMetrics{
 		Status:   http.StatusOK,
 		Bytes:    10,
@@ -106,6 +109,9 @@ func TestOpenTelemetryTracerStats(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		_, span := tracer.Start(context.Background(), req)
+
+		// Add a small delay to ensure non-zero duration
+		time.Sleep(1 * time.Millisecond)
 
 		status := http.StatusOK
 		if i == 3 {
