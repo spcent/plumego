@@ -102,7 +102,7 @@ func (s *tcpServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	s.mu.RLock()
 	if s.closed {
 		s.mu.RUnlock()
-		return nil, net.ErrClosed
+		return nil, ErrServerClosed
 	}
 	s.mu.RUnlock()
 
@@ -118,6 +118,13 @@ func (s *tcpServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	conn, err := s.listener.Accept()
 	if err != nil {
 		return nil, err
+	}
+
+	// Enable keepalive for TCP connections
+	if tcpConn, ok := conn.(*net.TCPConn); ok && s.config.KeepAlive {
+		if err := tcpConn.SetKeepAlive(true); err == nil {
+			tcpConn.SetKeepAlivePeriod(s.config.KeepAlivePeriod)
+		}
 	}
 
 	return &winClient{
@@ -150,6 +157,26 @@ func (s *tcpServer) Close() error {
 	return nil
 }
 
+func (s *tcpServer) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	s.mu.Unlock()
+
+	var err error
+	if s.listener != nil {
+		err = s.listener.Close()
+	}
+
+	// Wait for context cancellation (graceful period)
+	<-ctx.Done()
+
+	return err
+}
+
 func (s *winServer) Accept() (Client, error) {
 	return s.AcceptWithContext(context.Background())
 }
@@ -158,7 +185,7 @@ func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return nil, net.ErrClosed
+		return nil, ErrServerClosed
 	}
 	handle := s.next
 	s.next = 0
@@ -191,7 +218,8 @@ func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
 		break
 	}
 
-	s.prepareNextHandle()
+	// Asynchronously prepare the next handle to reduce Accept latency
+	go s.prepareNextHandle()
 
 	return &winClient{
 		handle: handle,
@@ -215,6 +243,25 @@ func (s *winServer) Close() error {
 		_ = syscall.CloseHandle(s.next)
 		s.next = 0
 	}
+	return nil
+}
+
+func (s *winServer) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	if s.next != 0 {
+		_ = syscall.CloseHandle(s.next)
+		s.next = 0
+	}
+	s.mu.Unlock()
+
+	// Wait for context cancellation (graceful period)
+	<-ctx.Done()
+
 	return nil
 }
 
@@ -242,12 +289,20 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 
 	// Fallback to TCP
 	dialer := &net.Dialer{
-		Timeout: config.ConnectTimeout,
+		Timeout:   config.ConnectTimeout,
+		KeepAlive: config.KeepAlivePeriod,
 	}
 
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
+	}
+
+	// Enable keepalive for TCP connections
+	if tcpConn, ok := conn.(*net.TCPConn); ok && config.KeepAlive {
+		if setErr := tcpConn.SetKeepAlive(true); setErr == nil {
+			tcpConn.SetKeepAlivePeriod(config.KeepAlivePeriod)
+		}
 	}
 
 	return &winClient{
@@ -280,31 +335,51 @@ func createNamedPipe(pipeName string, bufSize int) (syscall.Handle, error) {
 	return syscall.Handle(handle), nil
 }
 
+// connectNamedPipeWithContext attempts to connect a named pipe with context cancellation.
+// Note: On Windows, ConnectNamedPipe is a blocking system call that cannot be truly
+// interrupted. If the context is cancelled, we close the handle which will eventually
+// unblock the system call, but there may be a brief delay. The goroutine will complete
+// once the system call returns.
 func connectNamedPipeWithContext(ctx context.Context, handle syscall.Handle) error {
-	done := make(chan error, 1)
+	type result struct {
+		err    error
+		handle syscall.Handle
+	}
+	done := make(chan result, 1)
+
 	go func() {
 		ret, _, err := procConnectNamedPipe.Call(uintptr(handle), 0)
 		if ret == 0 {
 			if err == errorPipeConnected {
-				done <- nil
+				done <- result{err: nil, handle: handle}
 				return
 			}
 			if err != nil {
-				done <- err
+				done <- result{err: err, handle: handle}
 				return
 			}
-			done <- fmt.Errorf("failed to connect named pipe")
+			done <- result{err: fmt.Errorf("failed to connect named pipe"), handle: handle}
 			return
 		}
-		done <- nil
+		done <- result{err: nil, handle: handle}
 	}()
 
 	select {
 	case <-ctx.Done():
-		go syscall.CloseHandle(handle)
+		// Close the handle to unblock the ConnectNamedPipe call
+		// The goroutine will complete shortly after the handle is closed
+		syscall.CloseHandle(handle)
+		// Wait for the goroutine to finish to avoid leaks
+		select {
+		case <-done:
+			// Goroutine completed
+		case <-time.After(100 * time.Millisecond):
+			// Timeout waiting for goroutine - it will complete eventually
+			// This is acceptable as we've closed the handle
+		}
 		return ctx.Err()
-	case err := <-done:
-		return err
+	case res := <-done:
+		return res.err
 	}
 }
 
@@ -388,23 +463,25 @@ func (c *winClient) Write(data []byte) (int, error) {
 
 func (c *winClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	handle := c.handle
+	c.mu.RUnlock()
 
-	if c.conn != nil {
+	if conn != nil {
 		if timeout > 0 {
-			c.conn.SetWriteDeadline(time.Now().Add(timeout))
-			defer c.conn.SetWriteDeadline(time.Time{})
+			conn.SetWriteDeadline(time.Now().Add(timeout))
+			defer conn.SetWriteDeadline(time.Time{})
 		}
-		return c.conn.Write(data)
+		return conn.Write(data)
 	}
 
-	if c.handle != 0 {
+	if handle != 0 {
 		var written uint32
-		err := syscall.WriteFile(c.handle, data, &written, nil)
+		err := syscall.WriteFile(handle, data, &written, nil)
 		return int(written), err
 	}
 
@@ -417,23 +494,25 @@ func (c *winClient) Read(buf []byte) (int, error) {
 
 func (c *winClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	handle := c.handle
+	c.mu.RUnlock()
 
-	if c.conn != nil {
+	if conn != nil {
 		if timeout > 0 {
-			c.conn.SetReadDeadline(time.Now().Add(timeout))
-			defer c.conn.SetReadDeadline(time.Time{})
+			conn.SetReadDeadline(time.Now().Add(timeout))
+			defer conn.SetReadDeadline(time.Time{})
 		}
-		return c.conn.Read(buf)
+		return conn.Read(buf)
 	}
 
-	if c.handle != 0 {
+	if handle != 0 {
 		var read uint32
-		err := syscall.ReadFile(c.handle, buf, &read, nil)
+		err := syscall.ReadFile(handle, buf, &read, nil)
 		return int(read), err
 	}
 

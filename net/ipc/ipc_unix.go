@@ -40,9 +40,10 @@ func newPlatformServer(addr string, config *Config) (Server, error) {
 
 	// Try Unix domain socket first
 	if !strings.Contains(addr, ":") {
-		// Ensure directory exists
+		// Ensure directory exists with configured permissions
 		dir := filepath.Dir(addr)
-		if err = os.MkdirAll(dir, 0755); err != nil {
+		dirPerm := os.FileMode(config.UnixSocketDirPerm)
+		if err = os.MkdirAll(dir, dirPerm); err != nil {
 			return nil, err
 		}
 
@@ -54,6 +55,13 @@ func newPlatformServer(addr string, config *Config) (Server, error) {
 		listener, err = net.Listen("unix", addr)
 		if err == nil {
 			socketPath = addr
+			// Set socket file permissions
+			socketPerm := os.FileMode(config.UnixSocketPerm)
+			if chmodErr := os.Chmod(addr, socketPerm); chmodErr != nil {
+				listener.Close()
+				os.Remove(addr)
+				return nil, chmodErr
+			}
 		}
 	}
 
@@ -86,21 +94,44 @@ func (s *unixServer) AcceptWithContext(ctx context.Context) (Client, error) {
 	s.mu.RLock()
 	if s.closed {
 		s.mu.RUnlock()
-		return nil, net.ErrClosed
+		return nil, ErrServerClosed
 	}
 	s.mu.RUnlock()
 
 	// Set deadline if context has timeout
 	if deadline, ok := ctx.Deadline(); ok {
-		// Use UnixListener's SetDeadline method with correct type assertion
-		if err := s.listener.(*net.UnixListener).SetDeadline(deadline); err != nil {
-			return nil, err
+		// Safe type assertion - handle both Unix and TCP listeners
+		switch l := s.listener.(type) {
+		case *net.UnixListener:
+			if err := l.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
+		case *net.TCPListener:
+			if err := l.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
 		}
+		// Clear deadline after accept completes
+		defer func() {
+			switch l := s.listener.(type) {
+			case *net.UnixListener:
+				l.SetDeadline(time.Time{})
+			case *net.TCPListener:
+				l.SetDeadline(time.Time{})
+			}
+		}()
 	}
 
 	conn, err := s.listener.Accept()
 	if err != nil {
 		return nil, err
+	}
+
+	// Enable keepalive for TCP connections
+	if tcpConn, ok := conn.(*net.TCPConn); ok && s.config.KeepAlive {
+		if err := tcpConn.SetKeepAlive(true); err == nil {
+			tcpConn.SetKeepAlivePeriod(s.config.KeepAlivePeriod)
+		}
 	}
 
 	client := &unixClient{
@@ -146,6 +177,37 @@ func (s *unixServer) Close() error {
 	return err
 }
 
+func (s *unixServer) Shutdown(ctx context.Context) error {
+	// Mark as closed to stop accepting new connections
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	s.mu.Unlock()
+
+	// Close the listener to unblock any pending Accept calls
+	var err error
+	if s.listener != nil {
+		err = s.listener.Close()
+	}
+
+	// Wait for context cancellation (graceful period)
+	<-ctx.Done()
+
+	// Clean up socket file
+	if s.socketPath != "" {
+		if removeErr := os.Remove(s.socketPath); removeErr != nil && !os.IsNotExist(removeErr) {
+			if err == nil {
+				err = removeErr
+			}
+		}
+	}
+
+	return err
+}
+
 func dialPlatform(addr string, config *Config) (Client, error) {
 	return dialPlatformWithContext(context.Background(), addr, config)
 }
@@ -159,7 +221,8 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 	var err error
 
 	dialer := &net.Dialer{
-		Timeout: config.ConnectTimeout,
+		Timeout:   config.ConnectTimeout,
+		KeepAlive: config.KeepAlivePeriod,
 	}
 
 	// Try Unix domain socket first if no port specified
@@ -170,6 +233,14 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 	// Fallback to TCP if Unix socket fails
 	if conn == nil {
 		conn, err = dialer.DialContext(ctx, "tcp", addr)
+		// Enable keepalive for TCP connections
+		if err == nil {
+			if tcpConn, ok := conn.(*net.TCPConn); ok && config.KeepAlive {
+				if setErr := tcpConn.SetKeepAlive(true); setErr == nil {
+					tcpConn.SetKeepAlivePeriod(config.KeepAlivePeriod)
+				}
+			}
+		}
 	}
 
 	if err != nil {
@@ -186,56 +257,60 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 
 func (c *unixClient) Write(data []byte) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	c.mu.RUnlock()
 
-	return c.conn.Write(data)
+	return conn.Write(data)
 }
 
 func (c *unixClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	c.mu.RUnlock()
 
 	if timeout > 0 {
-		c.conn.SetWriteDeadline(time.Now().Add(timeout))
-		defer c.conn.SetWriteDeadline(time.Time{})
+		conn.SetWriteDeadline(time.Now().Add(timeout))
+		defer conn.SetWriteDeadline(time.Time{})
 	}
 
-	return c.conn.Write(data)
+	return conn.Write(data)
 }
 
 func (c *unixClient) Read(buf []byte) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	c.mu.RUnlock()
 
-	return c.conn.Read(buf)
+	return conn.Read(buf)
 }
 
 func (c *unixClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if c.closed || c.conn == nil {
-		return 0, net.ErrClosed
+		c.mu.RUnlock()
+		return 0, ErrClientClosed
 	}
+	conn := c.conn
+	c.mu.RUnlock()
 
 	if timeout > 0 {
-		c.conn.SetReadDeadline(time.Now().Add(timeout))
-		defer c.conn.SetReadDeadline(time.Time{})
+		conn.SetReadDeadline(time.Now().Add(timeout))
+		defer conn.SetReadDeadline(time.Time{})
 	}
 
-	return c.conn.Read(buf)
+	return conn.Read(buf)
 }
 
 func (c *unixClient) RemoteAddr() string {

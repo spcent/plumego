@@ -415,7 +415,7 @@ func TestWithContext(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 
-		client, err := DialWithContext(ctx, server.Addr(), nil)
+		client, err := DialWithContext(ctx, server.Addr())
 		if err != nil {
 			t.Fatalf("DialWithContext failed: %v", err)
 		}
@@ -438,7 +438,7 @@ func TestWithContext(t *testing.T) {
 		// Cancel immediately
 		cancel()
 
-		_, err = DialWithContext(ctx, server.Addr(), nil)
+		_, err = DialWithContext(ctx, server.Addr())
 		if err == nil {
 			t.Error("Expected context cancellation error")
 		}
