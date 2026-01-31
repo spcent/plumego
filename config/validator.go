@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/spcent/plumego/contract"
@@ -154,7 +153,7 @@ func (csm *ConfigSchemaManager) ValidateAndApplyDefaults(config map[string]any) 
 	return result, errors
 }
 
-// Required validator ensures a value is not empty
+// Required validator ensures a value is not empty.
 type Required struct{}
 
 func (r *Required) Validate(value any, key string) error {
@@ -162,9 +161,7 @@ func (r *Required) Validate(value any, key string) error {
 		return fmt.Errorf("config %s is required", key)
 	}
 
-	// Convert to string for checking using the shared helper
-	strValue := configToString(value)
-
+	strValue := toString(value)
 	if strings.TrimSpace(strValue) == "" {
 		return fmt.Errorf("config %s is required and cannot be empty", key)
 	}
@@ -182,7 +179,7 @@ type MinLength struct {
 }
 
 func (m *MinLength) Validate(value any, key string) error {
-	str := configToString(value)
+	str := toString(value)
 	if utf8.RuneCountInString(str) < m.Min {
 		return fmt.Errorf("config %s must be at least %d characters, got %d", key, m.Min, utf8.RuneCountInString(str))
 	}
@@ -199,7 +196,7 @@ type MaxLength struct {
 }
 
 func (m *MaxLength) Validate(value any, key string) error {
-	str := configToString(value)
+	str := toString(value)
 	if utf8.RuneCountInString(str) > m.Max {
 		return fmt.Errorf("config %s must be at most %d characters, got %d", key, m.Max, utf8.RuneCountInString(str))
 	}
@@ -232,7 +229,7 @@ func (p *Pattern) Validate(value any, key string) error {
 		return err
 	}
 
-	str := configToString(value)
+	str := toString(value)
 	if !p.regex.MatchString(str) {
 		return fmt.Errorf("config %s must match pattern %s, got %s", key, p.Pattern, str)
 	}
@@ -247,7 +244,7 @@ func (p *Pattern) Name() string {
 type URL struct{}
 
 func (u *URL) Validate(value any, key string) error {
-	str := configToString(value)
+	str := toString(value)
 	if str == "" {
 		return nil // Empty string is allowed (can use default)
 	}
@@ -276,7 +273,7 @@ type Range struct {
 }
 
 func (r *Range) Validate(value any, key string) error {
-	num, err := configToFloat64(value)
+	num, err := parseFloatForValidation(value)
 	if err != nil {
 		return err
 	}
@@ -296,7 +293,7 @@ type OneOf struct {
 }
 
 func (o *OneOf) Validate(value any, key string) error {
-	str := configToString(value)
+	str := toString(value)
 	for _, allowed := range o.Values {
 		if str == allowed {
 			return nil
@@ -357,33 +354,9 @@ func (s *ConfigSchema) Validate(data map[string]any) error {
 	return nil
 }
 
-// configToString converts any value to string (helper for validators)
-func configToString(value any) string {
-	if value == nil {
-		return ""
-	}
-
-	switch v := value.(type) {
-	case string:
-		return v
-	case int, int8, int16, int32, int64:
-		return fmt.Sprintf("%d", v)
-	case uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", v)
-	case float32, float64:
-		return fmt.Sprintf("%g", v)
-	case bool:
-		return strconv.FormatBool(v)
-	case time.Time:
-		return v.Format(time.RFC3339)
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}
-
-// configToFloat64 converts any value to float64 (helper for validators)
-func configToFloat64(value any) (float64, error) {
-	str := configToString(value)
+// parseFloatForValidation converts any value to float64 for validation purposes.
+func parseFloatForValidation(value any) (float64, error) {
+	str := toString(value)
 	if str == "" {
 		return 0, fmt.Errorf("cannot convert empty value to float64")
 	}
