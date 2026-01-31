@@ -4,271 +4,63 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
+	glog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/store/db/rw"
 )
 
-func TestLogLevel_String(t *testing.T) {
-	tests := []struct {
-		level LogLevel
-		want  string
-	}{
-		{LogLevelDebug, "DEBUG"},
-		{LogLevelInfo, "INFO"},
-		{LogLevelWarn, "WARN"},
-		{LogLevelError, "ERROR"},
-		{LogLevel(999), "UNKNOWN"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			got := tt.level.String()
-			if got != tt.want {
-				t.Errorf("String() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLogger_LogLevels(t *testing.T) {
-	var buf bytes.Buffer
-	config := DefaultLoggerConfig()
-	config.Output = &buf
-	config.Level = LogLevelInfo
-
-	logger := NewLogger(config)
-	ctx := context.Background()
-
-	t.Run("debug below threshold", func(t *testing.T) {
-		buf.Reset()
-		logger.Debug(ctx, "debug message")
-
-		if buf.Len() > 0 {
-			t.Error("expected debug message to be filtered out")
-		}
-	})
-
-	t.Run("info at threshold", func(t *testing.T) {
-		buf.Reset()
-		logger.Info(ctx, "info message")
-
-		output := buf.String()
-		if !strings.Contains(output, "info message") {
-			t.Error("expected info message to be logged")
-		}
-		if !strings.Contains(output, `"level":"INFO"`) {
-			t.Error("expected INFO level in output")
-		}
-	})
-
-	t.Run("warn above threshold", func(t *testing.T) {
-		buf.Reset()
-		logger.Warn(ctx, "warn message")
-
-		output := buf.String()
-		if !strings.Contains(output, "warn message") {
-			t.Error("expected warn message to be logged")
-		}
-		if !strings.Contains(output, `"level":"WARN"`) {
-			t.Error("expected WARN level in output")
-		}
-	})
-
-	t.Run("error above threshold", func(t *testing.T) {
-		buf.Reset()
-		logger.Error(ctx, "error message")
-
-		output := buf.String()
-		if !strings.Contains(output, "error message") {
-			t.Error("expected error message to be logged")
-		}
-		if !strings.Contains(output, `"level":"ERROR"`) {
-			t.Error("expected ERROR level in output")
-		}
-	})
-}
-
-func TestLogger_WithFields(t *testing.T) {
-	var buf bytes.Buffer
-	config := DefaultLoggerConfig()
-	config.Output = &buf
-	config.Level = LogLevelInfo
-
-	logger := NewLogger(config)
-	ctx := context.Background()
-
-	loggerWithFields := logger.WithFields(map[string]interface{}{
-		"component": "sharding",
-		"version":   "1.0",
-	})
-
-	loggerWithFields.Info(ctx, "test message")
-
-	output := buf.String()
-	if !strings.Contains(output, `"component":"sharding"`) {
-		t.Error("expected component field in output")
-	}
-	if !strings.Contains(output, `"version":"1.0"`) {
-		t.Error("expected version field in output")
-	}
-}
-
-func TestLogger_WithField(t *testing.T) {
-	var buf bytes.Buffer
-	config := DefaultLoggerConfig()
-	config.Output = &buf
-
-	logger := NewLogger(config)
-	ctx := context.Background()
-
-	loggerWithField := logger.WithField("request_id", "12345")
-	loggerWithField.Info(ctx, "test message")
-
-	output := buf.String()
-	if !strings.Contains(output, `"request_id":"12345"`) {
-		t.Error("expected request_id field in output")
-	}
-}
-
-func TestLogger_Debugf(t *testing.T) {
-	var buf bytes.Buffer
-	config := DefaultLoggerConfig()
-	config.Output = &buf
-	config.Level = LogLevelDebug
-
-	logger := NewLogger(config)
-	ctx := context.Background()
-
-	logger.Debugf(ctx, "user %s logged in at %d", "alice", 123456)
-
-	output := buf.String()
-	if !strings.Contains(output, "user alice logged in at 123456") {
-		t.Error("expected formatted message in output")
-	}
-}
-
-func TestLogger_InfoWithFields(t *testing.T) {
-	var buf bytes.Buffer
-	config := DefaultLoggerConfig()
-	config.Output = &buf
-
-	logger := NewLogger(config)
-	ctx := context.Background()
-
-	logger.InfoWithFields(ctx, "query executed", map[string]interface{}{
-		"query":    "SELECT * FROM users",
-		"duration": "10ms",
-	})
-
-	output := buf.String()
-	if !strings.Contains(output, "query executed") {
-		t.Error("expected message in output")
-	}
-	if !strings.Contains(output, `"query":"SELECT * FROM users"`) {
-		t.Error("expected query field in output")
-	}
-	if !strings.Contains(output, `"duration":"10ms"`) {
-		t.Error("expected duration field in output")
-	}
-}
-
-func TestLogger_SetLevel(t *testing.T) {
-	var buf bytes.Buffer
-	config := DefaultLoggerConfig()
-	config.Output = &buf
-	config.Level = LogLevelInfo
-
-	logger := NewLogger(config)
-	ctx := context.Background()
-
-	// Debug should be filtered
-	logger.Debug(ctx, "debug message")
-	if buf.Len() > 0 {
-		t.Error("expected debug to be filtered")
-	}
-
-	// Change level to DEBUG
-	logger.SetLevel(LogLevelDebug)
-
-	// Debug should now be logged
-	buf.Reset()
-	logger.Debug(ctx, "debug message")
-	if buf.Len() == 0 {
-		t.Error("expected debug to be logged after level change")
-	}
-}
-
-func TestLogger_GetLevel(t *testing.T) {
-	config := DefaultLoggerConfig()
-	config.Level = LogLevelWarn
-
-	logger := NewLogger(config)
-
-	if logger.GetLevel() != LogLevelWarn {
-		t.Errorf("expected level WARN, got %v", logger.GetLevel())
-	}
-
-	logger.SetLevel(LogLevelError)
-
-	if logger.GetLevel() != LogLevelError {
-		t.Errorf("expected level ERROR, got %v", logger.GetLevel())
-	}
-}
-
-func TestLoggingRouter(t *testing.T) {
-	var buf bytes.Buffer
-	logConfig := DefaultLoggerConfig()
-	logConfig.Output = &buf
-	logConfig.Level = LogLevelDebug
-
-	logger := NewLogger(logConfig)
-
+func TestLoggingRouter_Creation(t *testing.T) {
 	// Create a test router
-	shards := make([]*rw.Cluster, 2)
-	for i := 0; i < 2; i++ {
-		connector := &stubConnector{conn: &stubConn{}}
-		primary := sql.OpenDB(connector)
-		cluster, _ := rw.New(rw.Config{
-			Primary: primary,
-			HealthCheck: rw.HealthCheckConfig{
-				Enabled: false,
-			},
-		})
-		shards[i] = cluster
-	}
-	defer func() {
-		for _, shard := range shards {
-			shard.Close()
-		}
-	}()
+	connector := &stubConnector{conn: &stubConn{}}
+	primary := sql.OpenDB(connector)
+	cluster, _ := rw.New(rw.Config{
+		Primary: primary,
+		HealthCheck: rw.HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	defer cluster.Close()
 
 	registry := NewShardingRuleRegistry()
-	rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 2)
-	registry.Register(rule)
+	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
-	router, _ := NewRouter(shards, registry)
+	t.Run("with nil logger creates default JSONLogger", func(t *testing.T) {
+		loggingRouter := NewLoggingRouter(router, nil)
 
-	loggingRouter := NewLoggingRouter(router, logger)
+		if loggingRouter.Logger() == nil {
+			t.Error("expected logger to be set")
+		}
 
-	if loggingRouter.Logger() == nil {
-		t.Error("expected logger to be set")
-	}
+		if loggingRouter.Router() != router {
+			t.Error("expected router to be the same")
+		}
+	})
 
-	if loggingRouter.Router() != router {
-		t.Error("expected router to be the same")
-	}
+	t.Run("with custom logger", func(t *testing.T) {
+		var buf bytes.Buffer
+		logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+			Output: &buf,
+			Level:  glog.INFO,
+		})
+
+		loggingRouter := NewLoggingRouter(router, logger)
+
+		if loggingRouter.Logger() != logger {
+			t.Error("expected custom logger to be used")
+		}
+	})
 }
 
 func TestLoggingRouter_LogQuery(t *testing.T) {
 	var buf bytes.Buffer
-	logConfig := DefaultLoggerConfig()
-	logConfig.Output = &buf
-	logConfig.Level = LogLevelDebug
-
-	logger := NewLogger(logConfig)
+	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output: &buf,
+		Level:  glog.INFO,
+	})
 
 	// Create minimal router
 	connector := &stubConnector{conn: &stubConn{}}
@@ -293,6 +85,20 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 		if !strings.Contains(output, "SELECT * FROM users") {
 			t.Error("expected query in output")
 		}
+
+		// Verify JSON structure
+		var entry map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+			t.Fatalf("failed to parse JSON output: %v", err)
+		}
+
+		if entry["query"] != "SELECT * FROM users" {
+			t.Errorf("expected query field, got %v", entry["query"])
+		}
+
+		if entry["shard_index"] != float64(0) {
+			t.Errorf("expected shard_index 0, got %v", entry["shard_index"])
+		}
 	})
 
 	t.Run("failed query", func(t *testing.T) {
@@ -306,16 +112,24 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 		if !strings.Contains(output, "ERROR") {
 			t.Error("expected ERROR level for failed query")
 		}
+
+		var entry map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+			t.Fatalf("failed to parse JSON output: %v", err)
+		}
+
+		if _, ok := entry["error"]; !ok {
+			t.Error("expected error field in output")
+		}
 	})
 }
 
 func TestLoggingRouter_LogShardResolution(t *testing.T) {
 	var buf bytes.Buffer
-	logConfig := DefaultLoggerConfig()
-	logConfig.Output = &buf
-	logConfig.Level = LogLevelDebug
-
-	logger := NewLogger(logConfig)
+	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output: &buf,
+		Level:  glog.INFO,
+	})
 
 	connector := &stubConnector{conn: &stubConn{}}
 	primary := sql.OpenDB(connector)
@@ -337,15 +151,27 @@ func TestLoggingRouter_LogShardResolution(t *testing.T) {
 	if !strings.Contains(output, "users") {
 		t.Error("expected table name in output")
 	}
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	if entry["table"] != "users" {
+		t.Errorf("expected table 'users', got %v", entry["table"])
+	}
+
+	if entry["shard_index"] != float64(0) {
+		t.Errorf("expected shard_index 0, got %v", entry["shard_index"])
+	}
 }
 
 func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 	var buf bytes.Buffer
-	logConfig := DefaultLoggerConfig()
-	logConfig.Output = &buf
-	logConfig.Level = LogLevelWarn
-
-	logger := NewLogger(logConfig)
+	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output: &buf,
+		Level:  glog.WARNING,
+	})
 
 	connector := &stubConnector{conn: &stubConn{}}
 	primary := sql.OpenDB(connector)
@@ -367,15 +193,27 @@ func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 	if !strings.Contains(output, "WARN") {
 		t.Error("expected WARN level for cross-shard query")
 	}
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	if entry["level"] != "WARN" {
+		t.Errorf("expected level WARN, got %v", entry["level"])
+	}
+
+	if entry["policy"] != "all" {
+		t.Errorf("expected policy 'all', got %v", entry["policy"])
+	}
 }
 
 func TestLoggingRouter_LogRewrite(t *testing.T) {
 	var buf bytes.Buffer
-	logConfig := DefaultLoggerConfig()
-	logConfig.Output = &buf
-	logConfig.Level = LogLevelDebug
-
-	logger := NewLogger(logConfig)
+	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output: &buf,
+		Level:  glog.INFO,
+	})
 
 	connector := &stubConnector{conn: &stubConn{}}
 	primary := sql.OpenDB(connector)
@@ -397,37 +235,111 @@ func TestLoggingRouter_LogRewrite(t *testing.T) {
 	if !strings.Contains(output, "users_0") {
 		t.Error("expected rewritten table name in output")
 	}
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	if entry["original"] != "SELECT * FROM users" {
+		t.Errorf("expected original query, got %v", entry["original"])
+	}
+
+	if entry["rewritten"] != "SELECT * FROM users_0" {
+		t.Errorf("expected rewritten query, got %v", entry["rewritten"])
+	}
+
+	if entry["cached"] != true {
+		t.Errorf("expected cached true, got %v", entry["cached"])
+	}
 }
 
-func BenchmarkLogger_Info(b *testing.B) {
+func TestLoggingRouter_WithTraceID(t *testing.T) {
 	var buf bytes.Buffer
-	config := DefaultLoggerConfig()
-	config.Output = &buf
+	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output: &buf,
+		Level:  glog.INFO,
+	})
 
-	logger := NewLogger(config)
+	connector := &stubConnector{conn: &stubConn{}}
+	primary := sql.OpenDB(connector)
+	cluster, _ := rw.New(rw.Config{Primary: primary})
+	defer cluster.Close()
+
+	registry := NewShardingRuleRegistry()
+	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
+
+	loggingRouter := NewLoggingRouter(router, logger)
+
+	// Create context with trace ID
+	ctx := context.Background()
+	traceID := "test-trace-123"
+	ctx = glog.WithTraceID(ctx, traceID)
+
+	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	if entry["trace_id"] != traceID {
+		t.Errorf("expected trace_id %q, got %v", traceID, entry["trace_id"])
+	}
+}
+
+func TestLoggingRouter_DefaultFields(t *testing.T) {
+	var buf bytes.Buffer
+
+	connector := &stubConnector{conn: &stubConn{}}
+	primary := sql.OpenDB(connector)
+	cluster, _ := rw.New(rw.Config{Primary: primary})
+	defer cluster.Close()
+
+	registry := NewShardingRuleRegistry()
+	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
+
+	// Create a custom logger with buffer and default fields
+	customLogger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output: &buf,
+		Level:  glog.INFO,
+		Fields: glog.Fields{"component": "sharding"},
+	})
+	loggingRouter := NewLoggingRouter(router, customLogger)
+
+	ctx := context.Background()
+	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	if entry["component"] != "sharding" {
+		t.Errorf("expected component field 'sharding', got %v", entry["component"])
+	}
+}
+
+func BenchmarkLoggingRouter_LogQuery(b *testing.B) {
+	var buf bytes.Buffer
+	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output: &buf,
+		Level:  glog.INFO,
+	})
+
+	connector := &stubConnector{conn: &stubConn{}}
+	primary := sql.OpenDB(connector)
+	cluster, _ := rw.New(rw.Config{Primary: primary})
+	defer cluster.Close()
+
+	registry := NewShardingRuleRegistry()
+	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
+
+	loggingRouter := NewLoggingRouter(router, logger)
 	ctx := context.Background()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Info(ctx, "test message")
-	}
-}
-
-func BenchmarkLogger_InfoWithFields(b *testing.B) {
-	var buf bytes.Buffer
-	config := DefaultLoggerConfig()
-	config.Output = &buf
-
-	logger := NewLogger(config)
-	ctx := context.Background()
-
-	fields := map[string]interface{}{
-		"query":    "SELECT * FROM users",
-		"duration": "10ms",
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.InfoWithFields(ctx, "query executed", fields)
+		loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
 	}
 }
