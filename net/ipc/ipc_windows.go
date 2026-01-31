@@ -671,14 +671,26 @@ func (c *winClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, err
 	return n, err
 }
 
-func (c *winClient) RemoteAddr() string {
+func (c *winClient) RemoteAddr() net.Addr {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if c.conn != nil {
-		return c.conn.RemoteAddr().String()
+		addr := c.conn.RemoteAddr()
+		if addr != nil {
+			return addr
+		}
 	}
-	return "named-pipe"
+	// Return a default IPC address for named pipe
+	return NewAddr("pipe", "named-pipe")
+}
+
+func (c *winClient) RemoteAddrString() string {
+	addr := c.RemoteAddr()
+	if addr != nil {
+		return addr.String()
+	}
+	return ""
 }
 
 func (c *winClient) Close() error {

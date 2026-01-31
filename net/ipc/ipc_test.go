@@ -424,7 +424,8 @@ func TestWithContext(t *testing.T) {
 		}
 		defer client.Close()
 
-		if client.RemoteAddr() == "" {
+		addr := client.RemoteAddr()
+		if addr == nil || addr.String() == "" {
 			t.Error("Client RemoteAddr is empty")
 		}
 	})

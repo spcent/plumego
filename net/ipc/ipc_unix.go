@@ -402,12 +402,24 @@ func (c *unixClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, er
 	return n, err
 }
 
-func (c *unixClient) RemoteAddr() string {
+func (c *unixClient) RemoteAddr() net.Addr {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if c.conn != nil {
-		return c.conn.RemoteAddr().String()
+		addr := c.conn.RemoteAddr()
+		if addr != nil {
+			return addr
+		}
+	}
+	// Return a default IPC address if no connection
+	return NewAddr("ipc", "")
+}
+
+func (c *unixClient) RemoteAddrString() string {
+	addr := c.RemoteAddr()
+	if addr != nil {
+		return addr.String()
 	}
 	return ""
 }

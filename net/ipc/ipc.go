@@ -1,5 +1,21 @@
 // Package ipc provides cross-platform inter-process communication (IPC) primitives.
 //
+// # Version 2 Breaking Changes
+//
+// This version includes the following breaking changes:
+//
+// 1. Client.RemoteAddr() now returns net.Addr instead of string
+//    - Migration: Use RemoteAddrString() for backward compatibility
+//    - Or: Use addr.String() on the returned net.Addr
+//
+// 2. Client interface has been refactored into composable sub-interfaces
+//    - Reader: io.Reader + ReadWithTimeout
+//    - Writer: io.Writer + WriteWithTimeout
+//    - AddrProvider: RemoteAddr() + RemoteAddrString()
+//    - Client now embeds all these interfaces
+//
+// These changes improve type safety and enable more flexible composition.
+//
 // # Supported Transports
 //
 // - Unix Domain Sockets (Linux, macOS, BSD)
@@ -34,6 +50,14 @@
 //		log.Fatal(err)
 //	}
 //	defer client.Close()
+//
+//	// Get remote address (v2 API)
+//	addr := client.RemoteAddr()
+//	fmt.Printf("Connected to: %s (%s)\n", addr.String(), addr.Network())
+//
+//	// Or use backward-compatible string method
+//	addrStr := client.RemoteAddrString()
+//	fmt.Printf("Address: %s\n", addrStr)
 //
 // # Functional Options
 //
@@ -92,6 +116,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -259,6 +284,30 @@ func WithWindowsSecuritySDDL(sddl string) Option {
 	}
 }
 
+// Addr represents an IPC address, implementing net.Addr interface
+type Addr struct {
+	network string // "unix", "pipe", "tcp"
+	address string // actual address string
+}
+
+// Network returns the network type
+func (a *Addr) Network() string {
+	return a.network
+}
+
+// String returns the address string
+func (a *Addr) String() string {
+	return a.address
+}
+
+// NewAddr creates a new IPC address
+func NewAddr(network, address string) net.Addr {
+	return &Addr{
+		network: network,
+		address: address,
+	}
+}
+
 // Server defines the IPC server interface
 type Server interface {
 	// Accept waits for and returns the next connection to the server
@@ -275,12 +324,33 @@ type Server interface {
 	Shutdown(ctx context.Context) error
 }
 
-// Client defines the IPC client interface
-type Client interface {
-	io.ReadWriteCloser
-	WriteWithTimeout(data []byte, timeout time.Duration) (int, error)
+// Reader defines the read interface with timeout support
+type Reader interface {
+	io.Reader
 	ReadWithTimeout(buf []byte, timeout time.Duration) (int, error)
-	RemoteAddr() string
+}
+
+// Writer defines the write interface with timeout support
+type Writer interface {
+	io.Writer
+	WriteWithTimeout(data []byte, timeout time.Duration) (int, error)
+}
+
+// AddrProvider defines the interface for getting remote address
+type AddrProvider interface {
+	// RemoteAddr returns the remote network address as net.Addr
+	RemoteAddr() net.Addr
+	// RemoteAddrString returns the remote address as a string (for backward compatibility)
+	RemoteAddrString() string
+}
+
+// Client defines the IPC client interface
+// It composes Reader, Writer, Closer, and AddrProvider interfaces
+type Client interface {
+	Reader
+	Writer
+	io.Closer
+	AddrProvider
 }
 
 // NewServer creates a new IPC server with default config
@@ -535,11 +605,19 @@ func (rc *reconnectClient) ReadWithTimeout(buf []byte, timeout time.Duration) (i
 	return n, err
 }
 
-func (rc *reconnectClient) RemoteAddr() string {
+func (rc *reconnectClient) RemoteAddr() net.Addr {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
 	if rc.client != nil {
 		return rc.client.RemoteAddr()
+	}
+	return NewAddr("ipc", rc.addr)
+}
+
+func (rc *reconnectClient) RemoteAddrString() string {
+	addr := rc.RemoteAddr()
+	if addr != nil {
+		return addr.String()
 	}
 	return ""
 }
@@ -732,8 +810,12 @@ func (fc *framedClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int,
 	return fc.client.ReadWithTimeout(buf, timeout)
 }
 
-func (fc *framedClient) RemoteAddr() string {
+func (fc *framedClient) RemoteAddr() net.Addr {
 	return fc.client.RemoteAddr()
+}
+
+func (fc *framedClient) RemoteAddrString() string {
+	return fc.client.RemoteAddrString()
 }
 
 func (fc *framedClient) Close() error {
@@ -870,8 +952,12 @@ func (hb *heartbeatClient) ReadWithTimeout(buf []byte, timeout time.Duration) (i
 	return hb.client.ReadWithTimeout(buf, timeout)
 }
 
-func (hb *heartbeatClient) RemoteAddr() string {
+func (hb *heartbeatClient) RemoteAddr() net.Addr {
 	return hb.client.RemoteAddr()
+}
+
+func (hb *heartbeatClient) RemoteAddrString() string {
+	return hb.client.RemoteAddrString()
 }
 
 func (hb *heartbeatClient) Close() error {
@@ -1182,8 +1268,12 @@ func (pc *poolClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, e
 	return pc.conn.client.ReadWithTimeout(buf, timeout)
 }
 
-func (pc *poolClient) RemoteAddr() string {
+func (pc *poolClient) RemoteAddr() net.Addr {
 	return pc.conn.client.RemoteAddr()
+}
+
+func (pc *poolClient) RemoteAddrString() string {
+	return pc.conn.client.RemoteAddrString()
 }
 
 func (pc *poolClient) Close() error {
@@ -1361,8 +1451,12 @@ func (sc *streamClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int,
 	return sc.client.ReadWithTimeout(buf, timeout)
 }
 
-func (sc *streamClient) RemoteAddr() string {
+func (sc *streamClient) RemoteAddr() net.Addr {
 	return sc.client.RemoteAddr()
+}
+
+func (sc *streamClient) RemoteAddrString() string {
+	return sc.client.RemoteAddrString()
 }
 
 func (sc *streamClient) Close() error {
