@@ -120,6 +120,13 @@ func (s *tcpServer) AcceptWithContext(ctx context.Context) (Client, error) {
 		return nil, err
 	}
 
+	// Enable keepalive for TCP connections
+	if tcpConn, ok := conn.(*net.TCPConn); ok && s.config.KeepAlive {
+		if err := tcpConn.SetKeepAlive(true); err == nil {
+			tcpConn.SetKeepAlivePeriod(s.config.KeepAlivePeriod)
+		}
+	}
+
 	return &winClient{
 		conn:   conn,
 		config: s.config,
@@ -148,6 +155,26 @@ func (s *tcpServer) Close() error {
 		return s.listener.Close()
 	}
 	return nil
+}
+
+func (s *tcpServer) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	s.mu.Unlock()
+
+	var err error
+	if s.listener != nil {
+		err = s.listener.Close()
+	}
+
+	// Wait for context cancellation (graceful period)
+	<-ctx.Done()
+
+	return err
 }
 
 func (s *winServer) Accept() (Client, error) {
@@ -191,7 +218,8 @@ func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
 		break
 	}
 
-	s.prepareNextHandle()
+	// Asynchronously prepare the next handle to reduce Accept latency
+	go s.prepareNextHandle()
 
 	return &winClient{
 		handle: handle,
@@ -215,6 +243,25 @@ func (s *winServer) Close() error {
 		_ = syscall.CloseHandle(s.next)
 		s.next = 0
 	}
+	return nil
+}
+
+func (s *winServer) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	if s.next != 0 {
+		_ = syscall.CloseHandle(s.next)
+		s.next = 0
+	}
+	s.mu.Unlock()
+
+	// Wait for context cancellation (graceful period)
+	<-ctx.Done()
+
 	return nil
 }
 
@@ -242,12 +289,20 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 
 	// Fallback to TCP
 	dialer := &net.Dialer{
-		Timeout: config.ConnectTimeout,
+		Timeout:   config.ConnectTimeout,
+		KeepAlive: config.KeepAlivePeriod,
 	}
 
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
+	}
+
+	// Enable keepalive for TCP connections
+	if tcpConn, ok := conn.(*net.TCPConn); ok && config.KeepAlive {
+		if setErr := tcpConn.SetKeepAlive(true); setErr == nil {
+			tcpConn.SetKeepAlivePeriod(config.KeepAlivePeriod)
+		}
 	}
 
 	return &winClient{

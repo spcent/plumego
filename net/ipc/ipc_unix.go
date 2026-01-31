@@ -127,6 +127,13 @@ func (s *unixServer) AcceptWithContext(ctx context.Context) (Client, error) {
 		return nil, err
 	}
 
+	// Enable keepalive for TCP connections
+	if tcpConn, ok := conn.(*net.TCPConn); ok && s.config.KeepAlive {
+		if err := tcpConn.SetKeepAlive(true); err == nil {
+			tcpConn.SetKeepAlivePeriod(s.config.KeepAlivePeriod)
+		}
+	}
+
 	client := &unixClient{
 		conn:   conn,
 		config: s.config,
@@ -170,6 +177,37 @@ func (s *unixServer) Close() error {
 	return err
 }
 
+func (s *unixServer) Shutdown(ctx context.Context) error {
+	// Mark as closed to stop accepting new connections
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	s.mu.Unlock()
+
+	// Close the listener to unblock any pending Accept calls
+	var err error
+	if s.listener != nil {
+		err = s.listener.Close()
+	}
+
+	// Wait for context cancellation (graceful period)
+	<-ctx.Done()
+
+	// Clean up socket file
+	if s.socketPath != "" {
+		if removeErr := os.Remove(s.socketPath); removeErr != nil && !os.IsNotExist(removeErr) {
+			if err == nil {
+				err = removeErr
+			}
+		}
+	}
+
+	return err
+}
+
 func dialPlatform(addr string, config *Config) (Client, error) {
 	return dialPlatformWithContext(context.Background(), addr, config)
 }
@@ -183,7 +221,8 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 	var err error
 
 	dialer := &net.Dialer{
-		Timeout: config.ConnectTimeout,
+		Timeout:   config.ConnectTimeout,
+		KeepAlive: config.KeepAlivePeriod,
 	}
 
 	// Try Unix domain socket first if no port specified
@@ -194,6 +233,14 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 	// Fallback to TCP if Unix socket fails
 	if conn == nil {
 		conn, err = dialer.DialContext(ctx, "tcp", addr)
+		// Enable keepalive for TCP connections
+		if err == nil {
+			if tcpConn, ok := conn.(*net.TCPConn); ok && config.KeepAlive {
+				if setErr := tcpConn.SetKeepAlive(true); setErr == nil {
+					tcpConn.SetKeepAlivePeriod(config.KeepAlivePeriod)
+				}
+			}
+		}
 	}
 
 	if err != nil {
