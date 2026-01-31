@@ -21,6 +21,12 @@ type StructuredLogger interface {
 	Info(msg string, fields Fields)
 	Warn(msg string, fields Fields)
 	Error(msg string, fields Fields)
+
+	// Context-aware logging methods that can extract trace IDs and other context values
+	DebugCtx(ctx context.Context, msg string, fields Fields)
+	InfoCtx(ctx context.Context, msg string, fields Fields)
+	WarnCtx(ctx context.Context, msg string, fields Fields)
+	ErrorCtx(ctx context.Context, msg string, fields Fields)
 }
 
 // Lifecycle allows a logger to participate in application start/stop hooks
@@ -85,8 +91,56 @@ func (l *gLogger) Error(msg string, fields Fields) {
 	l.logWithFields("ERROR", msg, fields)
 }
 
+// DebugCtx logs a debug message with context support.
+func (l *gLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
+	if !V(1) {
+		return
+	}
+	l.logWithFieldsAndContext(ctx, "DEBUG", msg, fields)
+}
+
+// InfoCtx logs an info message with context support.
+func (l *gLogger) InfoCtx(ctx context.Context, msg string, fields Fields) {
+	l.logWithFieldsAndContext(ctx, "INFO", msg, fields)
+}
+
+// WarnCtx logs a warning message with context support.
+func (l *gLogger) WarnCtx(ctx context.Context, msg string, fields Fields) {
+	l.logWithFieldsAndContext(ctx, "WARN", msg, fields)
+}
+
+// ErrorCtx logs an error message with context support.
+func (l *gLogger) ErrorCtx(ctx context.Context, msg string, fields Fields) {
+	l.logWithFieldsAndContext(ctx, "ERROR", msg, fields)
+}
+
 func (l *gLogger) logWithFields(level string, msg string, fields Fields) {
 	combined := l.mergeFields(fields)
+	formatted := l.formatFields(combined)
+	if formatted != "" {
+		msg = msg + " " + formatted
+	}
+
+	switch level {
+	case "DEBUG":
+		Info(msg)
+	case "INFO":
+		Info(msg)
+	case "WARN":
+		Warning(msg)
+	case "ERROR":
+		Error(msg)
+	}
+}
+
+func (l *gLogger) logWithFieldsAndContext(ctx context.Context, level string, msg string, fields Fields) {
+	combined := l.mergeFields(fields)
+
+	// Add trace ID from context if present
+	if traceID := TraceIDFromContext(ctx); traceID != "" {
+		combined["trace_id"] = traceID
+	}
+
 	formatted := l.formatFields(combined)
 	if formatted != "" {
 		msg = msg + " " + formatted
