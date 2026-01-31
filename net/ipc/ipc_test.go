@@ -13,6 +13,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	glog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"time"
 )
 
@@ -421,7 +424,8 @@ func TestWithContext(t *testing.T) {
 		}
 		defer client.Close()
 
-		if client.RemoteAddr() == "" {
+		addr := client.RemoteAddr()
+		if addr == nil || addr.String() == "" {
 			t.Error("Client RemoteAddr is empty")
 		}
 	})
@@ -769,4 +773,209 @@ func getTestAddrB() string {
 		return "127.0.0.1:0"
 	}
 	return filepath.Join(os.TempDir(), fmt.Sprintf("bench_socket_%d_%d", os.Getpid(), time.Now().UnixNano()))
+}
+
+// TestMetricsIntegration tests metrics collection
+func TestMetricsIntegration(t *testing.T) {
+	collector := &testMetricsCollector{
+		records: make(map[string]int),
+	}
+
+	addr := getTestAddr()
+	server, err := NewServer(addr,
+		WithMetrics(collector),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Close()
+
+	// Accept connection in background
+	var acceptedClient Client
+	acceptDone := make(chan error, 1)
+	go func() {
+		var acceptErr error
+		acceptedClient, acceptErr = server.Accept()
+		acceptDone <- acceptErr
+	}()
+
+	// Connect client
+	client, err := Dial(server.Addr(),
+		WithMetrics(collector),
+	)
+	if err != nil {
+		t.Fatalf("Failed to dial: %v", err)
+	}
+	defer client.Close()
+
+	// Wait for accept to complete
+	if err := <-acceptDone; err != nil {
+		t.Fatalf("Accept failed: %v", err)
+	}
+	defer acceptedClient.Close()
+
+	// Write some data
+	data := []byte("test data")
+	if _, err := client.Write(data); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	// Read the data
+	buf := make([]byte, len(data))
+	if _, err := acceptedClient.Read(buf); err != nil {
+		t.Fatalf("Read failed: %v", err)
+	}
+
+	// Verify metrics were collected
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+
+	if collector.records["accept"] < 1 {
+		t.Errorf("Expected at least 1 accept metric, got %d", collector.records["accept"])
+	}
+	if collector.records["dial"] < 1 {
+		t.Errorf("Expected at least 1 dial metric, got %d", collector.records["dial"])
+	}
+	if collector.records["write"] < 1 {
+		t.Errorf("Expected at least 1 write metric, got %d", collector.records["write"])
+	}
+	if collector.records["read"] < 1 {
+		t.Errorf("Expected at least 1 read metric, got %d", collector.records["read"])
+	}
+}
+
+// TestLoggingIntegration tests structured logging
+func TestLoggingIntegration(t *testing.T) {
+	logger := &testLogger{
+		logs: make([]logEntry, 0),
+	}
+
+	addr := getTestAddr()
+	server, err := NewServer(addr,
+		WithLogger(logger),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Close()
+
+	// Accept connection in background
+	var acceptedClient Client
+	acceptDone := make(chan error, 1)
+	go func() {
+		var acceptErr error
+		acceptedClient, acceptErr = server.Accept()
+		acceptDone <- acceptErr
+	}()
+
+	// Connect client with logger
+	client, err := Dial(server.Addr(),
+		WithLogger(logger),
+	)
+	if err != nil {
+		t.Fatalf("Failed to dial: %v", err)
+	}
+	defer client.Close()
+
+	// Wait for accept to complete
+	if err := <-acceptDone; err != nil {
+		t.Fatalf("Accept failed: %v", err)
+	}
+	defer acceptedClient.Close()
+
+	// Write some data to trigger logging
+	data := []byte("test data")
+	if _, err := client.Write(data); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	// Verify logs were collected
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+
+	if len(logger.logs) < 2 {
+		t.Errorf("Expected at least 2 log entries, got %d", len(logger.logs))
+	}
+
+	// Verify log entries have required fields
+	for i, entry := range logger.logs {
+		if entry.fields["operation"] == nil {
+			t.Errorf("Log entry %d missing operation field", i)
+		}
+		if entry.fields["duration"] == nil {
+			t.Errorf("Log entry %d missing duration field", i)
+		}
+	}
+}
+
+// testMetricsCollector is a simple test implementation of MetricsCollector
+type testMetricsCollector struct {
+	mu      sync.Mutex
+	records map[string]int
+}
+
+func (c *testMetricsCollector) Record(ctx context.Context, record metrics.MetricRecord) {}
+func (c *testMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {}
+func (c *testMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {}
+func (c *testMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {}
+func (c *testMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {}
+
+func (c *testMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.records[operation]++
+}
+
+func (c *testMetricsCollector) GetStats() metrics.CollectorStats {
+	return metrics.CollectorStats{}
+}
+
+func (c *testMetricsCollector) Clear() {}
+
+// testLogger is a simple test implementation of StructuredLogger
+type testLogger struct {
+	mu   sync.Mutex
+	logs []logEntry
+}
+
+type logEntry struct {
+	level  string
+	msg    string
+	fields glog.Fields
+}
+
+func (l *testLogger) WithFields(fields glog.Fields) glog.StructuredLogger {
+	return l
+}
+
+func (l *testLogger) Debug(msg string, fields glog.Fields) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logs = append(l.logs, logEntry{level: "debug", msg: msg, fields: copyGlogFields(fields)})
+}
+
+func (l *testLogger) Info(msg string, fields glog.Fields) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logs = append(l.logs, logEntry{level: "info", msg: msg, fields: copyGlogFields(fields)})
+}
+
+func (l *testLogger) Warn(msg string, fields glog.Fields) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logs = append(l.logs, logEntry{level: "warn", msg: msg, fields: copyGlogFields(fields)})
+}
+
+func (l *testLogger) Error(msg string, fields glog.Fields) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logs = append(l.logs, logEntry{level: "error", msg: msg, fields: copyGlogFields(fields)})
+}
+
+func copyGlogFields(fields glog.Fields) glog.Fields {
+	result := make(glog.Fields)
+	for k, v := range fields {
+		result[k] = v
+	}
+	return result
 }

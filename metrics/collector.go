@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -35,6 +36,13 @@ const (
 	MetricKVHit    MetricType = "kv_hit"
 	MetricKVMiss   MetricType = "kv_miss"
 	MetricKVEvict  MetricType = "kv_evict"
+
+	// IPC metrics
+	MetricIPCAccept MetricType = "ipc_accept"
+	MetricIPCDial   MetricType = "ipc_dial"
+	MetricIPCRead   MetricType = "ipc_read"
+	MetricIPCWrite  MetricType = "ipc_write"
+	MetricIPCClose  MetricType = "ipc_close"
 )
 
 // MetricLabels represents key-value labels for metrics
@@ -49,6 +57,9 @@ const (
 	labelKVKey     = "key"
 	labelPanicked  = "panicked"
 	labelHit       = "hit"
+	labelAddr      = "addr"
+	labelTransport = "transport"
+	labelBytes     = "bytes"
 )
 
 // MetricRecord represents a single metric record
@@ -78,6 +89,9 @@ type MetricsCollector interface {
 
 	// ObserveKV is a convenience method for Key-Value Store metrics
 	ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool)
+
+	// ObserveIPC is a convenience method for IPC metrics
+	ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error)
 
 	// GetStats returns current statistics
 	GetStats() CollectorStats
@@ -303,6 +317,46 @@ func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key str
 		}
 		b.Record(ctx, hitRecord)
 	}
+}
+
+// ObserveIPC implements IPC metrics recording
+func (b *BaseMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
+	var metricType MetricType
+	switch operation {
+	case "accept":
+		metricType = MetricIPCAccept
+	case "dial":
+		metricType = MetricIPCDial
+	case "read":
+		metricType = MetricIPCRead
+	case "write":
+		metricType = MetricIPCWrite
+	case "close":
+		metricType = MetricIPCClose
+	default:
+		metricType = MetricIPCRead
+	}
+
+	labels := MetricLabels{
+		labelOperation: operation,
+		labelTransport: transport,
+	}
+	if addr != "" {
+		labels[labelAddr] = addr
+	}
+	if bytes > 0 {
+		labels[labelBytes] = fmt.Sprintf("%d", bytes)
+	}
+
+	record := MetricRecord{
+		Type:     metricType,
+		Name:     "ipc_" + operation,
+		Value:    float64(duration.Microseconds()),
+		Labels:   labels,
+		Duration: duration,
+		Error:    err,
+	}
+	b.Record(ctx, record)
 }
 
 // GetStats returns current statistics
