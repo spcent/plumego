@@ -280,31 +280,51 @@ func createNamedPipe(pipeName string, bufSize int) (syscall.Handle, error) {
 	return syscall.Handle(handle), nil
 }
 
+// connectNamedPipeWithContext attempts to connect a named pipe with context cancellation.
+// Note: On Windows, ConnectNamedPipe is a blocking system call that cannot be truly
+// interrupted. If the context is cancelled, we close the handle which will eventually
+// unblock the system call, but there may be a brief delay. The goroutine will complete
+// once the system call returns.
 func connectNamedPipeWithContext(ctx context.Context, handle syscall.Handle) error {
-	done := make(chan error, 1)
+	type result struct {
+		err    error
+		handle syscall.Handle
+	}
+	done := make(chan result, 1)
+
 	go func() {
 		ret, _, err := procConnectNamedPipe.Call(uintptr(handle), 0)
 		if ret == 0 {
 			if err == errorPipeConnected {
-				done <- nil
+				done <- result{err: nil, handle: handle}
 				return
 			}
 			if err != nil {
-				done <- err
+				done <- result{err: err, handle: handle}
 				return
 			}
-			done <- fmt.Errorf("failed to connect named pipe")
+			done <- result{err: fmt.Errorf("failed to connect named pipe"), handle: handle}
 			return
 		}
-		done <- nil
+		done <- result{err: nil, handle: handle}
 	}()
 
 	select {
 	case <-ctx.Done():
-		go syscall.CloseHandle(handle)
+		// Close the handle to unblock the ConnectNamedPipe call
+		// The goroutine will complete shortly after the handle is closed
+		syscall.CloseHandle(handle)
+		// Wait for the goroutine to finish to avoid leaks
+		select {
+		case <-done:
+			// Goroutine completed
+		case <-time.After(100 * time.Millisecond):
+			// Timeout waiting for goroutine - it will complete eventually
+			// This is acceptable as we've closed the handle
+		}
 		return ctx.Err()
-	case err := <-done:
-		return err
+	case res := <-done:
+		return res.err
 	}
 }
 

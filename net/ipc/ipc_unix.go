@@ -92,10 +92,26 @@ func (s *unixServer) AcceptWithContext(ctx context.Context) (Client, error) {
 
 	// Set deadline if context has timeout
 	if deadline, ok := ctx.Deadline(); ok {
-		// Use UnixListener's SetDeadline method with correct type assertion
-		if err := s.listener.(*net.UnixListener).SetDeadline(deadline); err != nil {
-			return nil, err
+		// Safe type assertion - handle both Unix and TCP listeners
+		switch l := s.listener.(type) {
+		case *net.UnixListener:
+			if err := l.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
+		case *net.TCPListener:
+			if err := l.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
 		}
+		// Clear deadline after accept completes
+		defer func() {
+			switch l := s.listener.(type) {
+			case *net.UnixListener:
+				l.SetDeadline(time.Time{})
+			case *net.TCPListener:
+				l.SetDeadline(time.Time{})
+			}
+		}()
 	}
 
 	conn, err := s.listener.Accept()
