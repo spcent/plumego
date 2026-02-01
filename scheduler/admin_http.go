@@ -44,6 +44,11 @@ func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, h.scheduler.Stats())
 		return
 	case r.Method == http.MethodGet && path == "/jobs":
+		query := parseJobQuery(r)
+		if query != nil {
+			writeJSON(w, http.StatusOK, h.scheduler.QueryJobs(*query).Jobs)
+			return
+		}
 		writeJSON(w, http.StatusOK, h.scheduler.List())
 		return
 	case strings.HasPrefix(path, "/jobs/"):
@@ -102,6 +107,42 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 		writeJSON(w, http.StatusOK, map[string]string{"status": "canceled"})
 	default:
 		http.NotFound(w, r)
+	}
+}
+
+func parseJobQuery(r *http.Request) *JobQuery {
+	if r == nil {
+		return nil
+	}
+	values := r.URL.Query()
+	stateValues := values["state"]
+	if len(stateValues) == 0 {
+		return nil
+	}
+	states := make([]JobState, 0, len(stateValues))
+	for _, value := range stateValues {
+		if state := parseJobState(value); state != "" {
+			states = append(states, state)
+		}
+	}
+	if len(states) == 0 {
+		return nil
+	}
+	return &JobQuery{States: states}
+}
+
+func parseJobState(value string) JobState {
+	switch JobState(strings.ToLower(value)) {
+	case JobStateQueued,
+		JobStateScheduled,
+		JobStateRunning,
+		JobStateFailed,
+		JobStateRetrying,
+		JobStateCanceled,
+		JobStateCompleted:
+		return JobState(strings.ToLower(value))
+	default:
+		return ""
 	}
 }
 

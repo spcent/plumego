@@ -607,8 +607,8 @@ func TestBatchOperationsByGroup(t *testing.T) {
 		t.Fatalf("expected 2 jobs canceled, got %d", canceled)
 	}
 
-	_, ok = sched.Status("group-a-1")
-	if ok {
+	status, ok = sched.Status("group-a-1")
+	if !ok || status.State != JobStateCanceled {
 		t.Fatalf("expected group-a-1 to be canceled")
 	}
 
@@ -666,8 +666,8 @@ func TestBatchOperationsByTags(t *testing.T) {
 		t.Fatalf("expected 2 jobs canceled, got %d", canceled)
 	}
 
-	_, ok = sched.Status("tagged-1")
-	if ok {
+	status, ok = sched.Status("tagged-1")
+	if !ok || status.State != JobStateCanceled {
 		t.Fatalf("expected tagged-1 to be canceled")
 	}
 
@@ -840,7 +840,7 @@ func TestJobDependenciesSuccess(t *testing.T) {
 		}
 	}
 
-	if aIndex == -1 || bIndex == -1 || cIndex == -1{
+	if aIndex == -1 || bIndex == -1 || cIndex == -1 {
 		t.Fatalf("not all jobs executed: %v", execOrder)
 	}
 
@@ -920,8 +920,8 @@ func TestJobDependencyFailureCancel(t *testing.T) {
 	}
 
 	// Verify job-b is canceled
-	_, ok := sched.Status("job-b")
-	if ok {
+	status, ok := sched.Status("job-b")
+	if !ok || status.State != JobStateCanceled {
 		t.Fatalf("expected job-b to be canceled")
 	}
 }
@@ -977,6 +977,75 @@ func TestJobDependencyValidation(t *testing.T) {
 	if !errors.Is(err, ErrDependencyNotFound) {
 		t.Fatalf("expected ErrDependencyNotFound, got: %v", err)
 	}
+}
+
+func TestJobStateTransitions(t *testing.T) {
+	sched := New(WithWorkers(1))
+	sched.Start()
+	defer func() { _ = sched.Stop(context.Background()) }()
+
+	block := make(chan struct{})
+	_, err := sched.Delay("state-running", 0, func(ctx context.Context) error {
+		<-block
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("failed to add job: %v", err)
+	}
+
+	if !waitForState(t, sched, "state-running", JobStateRunning, 500*time.Millisecond) {
+		t.Fatalf("expected state-running to reach running state")
+	}
+
+	close(block)
+
+	if !waitForState(t, sched, "state-running", JobStateCompleted, 500*time.Millisecond) {
+		t.Fatalf("expected state-running to reach completed state")
+	}
+
+	var attempts atomic.Int32
+	_, err = sched.Delay("state-retry", 0, func(ctx context.Context) error {
+		if attempts.Add(1) == 1 {
+			return fmt.Errorf("fail once")
+		}
+		return nil
+	}, WithRetryPolicy(RetryPolicy{
+		MaxAttempts: 2,
+		Backoff: func(attempt int) time.Duration {
+			return 50 * time.Millisecond
+		},
+	}))
+	if err != nil {
+		t.Fatalf("failed to add retry job: %v", err)
+	}
+
+	if !waitForState(t, sched, "state-retry", JobStateRetrying, 200*time.Millisecond) {
+		t.Fatalf("expected state-retry to enter retrying state")
+	}
+
+	_, err = sched.Delay("state-failed", 0, func(ctx context.Context) error {
+		return fmt.Errorf("always fail")
+	}, WithRetryPolicy(RetryPolicy{MaxAttempts: 1}))
+	if err != nil {
+		t.Fatalf("failed to add failed job: %v", err)
+	}
+
+	if !waitForState(t, sched, "state-failed", JobStateFailed, 500*time.Millisecond) {
+		t.Fatalf("expected state-failed to reach failed state")
+	}
+}
+
+func waitForState(t *testing.T, sched *Scheduler, id JobID, state JobState, timeout time.Duration) bool {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		status, ok := sched.Status(id)
+		if ok && status.State == state {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
 }
 
 func TestCronDescriptors(t *testing.T) {

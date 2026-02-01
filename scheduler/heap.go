@@ -28,6 +28,8 @@ type job struct {
 	lastRun     time.Time
 	lastError   error
 	pending     atomic.Bool // Changed to atomic.Bool to prevent race condition between dispatch and execute
+	state       JobState
+	stateAt     time.Time
 }
 
 type runRequest struct {

@@ -134,6 +134,8 @@ sch.Delay("one-off", 5*time.Second, func(ctx context.Context) error {
 
 Optional helpers include a minimal admin handler (`scheduler.NewAdminHandler`) and pluggable persistence (`scheduler.WithStore` with the in-memory or KV store).
 You can also register a panic handler and metrics sink via `scheduler.WithPanicHandler` and `scheduler.WithMetricsSink`.
+Job status snapshots now include a unified state machine (`queued`, `scheduled`, `running`, `retrying`, `failed`, `canceled`, `completed`) with a `StateUpdated` timestamp. The `JobQuery` filter supports state-based filtering via the `States` field.
+The admin handler accepts a `state` query parameter on `/scheduler/jobs` (repeatable) to filter by job state.
 
 ## Auth Contracts
 Plumego keeps authentication, authorization, and session validation separate through interfaces in `contract`. Compose them with middleware rather than relying on framework magic:

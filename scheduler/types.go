@@ -373,6 +373,22 @@ func DefaultBackpressureConfig() BackpressureConfig {
 }
 
 // JobStatus exposes job runtime state for observability.
+type JobState string
+
+const (
+	JobStateQueued    JobState = "queued"
+	JobStateScheduled JobState = "scheduled"
+	JobStateRunning   JobState = "running"
+	JobStateFailed    JobState = "failed"
+	JobStateRetrying  JobState = "retrying"
+	JobStateCanceled  JobState = "canceled"
+	JobStateCompleted JobState = "completed"
+)
+
+func (s JobState) String() string {
+	return string(s)
+}
+
 type JobStatus struct {
 	ID            JobID
 	NextRun       time.Time
@@ -385,6 +401,8 @@ type JobStatus struct {
 	OverlapPolicy OverlapPolicy
 	Group         string
 	Tags          []string
+	State         JobState
+	StateUpdated  time.Time
 }
 
 // JobQuery defines filtering and sorting criteria for querying jobs.
@@ -399,6 +417,8 @@ type JobQuery struct {
 	Running *bool
 	// Paused filters by paused state (nil = no filter, true = only paused, false = only not paused).
 	Paused *bool
+	// States filters by job state (empty = no filter).
+	States []JobState
 	// OrderBy specifies sorting field: "id", "next_run", "last_run", "group" (empty = no sorting).
 	OrderBy string
 	// Ascending determines sort direction (default: true).
