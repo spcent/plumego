@@ -877,6 +877,8 @@ func (m *mockMetricsCollector) ObserveKV(_ context.Context, _, _ string, _ time.
 }
 func (m *mockMetricsCollector) ObserveIPC(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
 }
+func (m *mockMetricsCollector) ObserveDB(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
+}
 func (m *mockMetricsCollector) GetStats() metrics.CollectorStats { return metrics.CollectorStats{} }
 func (m *mockMetricsCollector) Clear()                           {}
 

@@ -322,6 +322,13 @@ func (m *MultiCollector) ObserveIPC(ctx context.Context, operation, addr, transp
 	}
 }
 
+// ObserveDB forwards the database observation to all collectors.
+func (m *MultiCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+	for _, c := range m.collectors {
+		c.ObserveDB(ctx, operation, driver, query, rows, duration, err)
+	}
+}
+
 // GetStats returns combined statistics from all collectors.
 // The statistics are aggregated across all collectors.
 func (m *MultiCollector) GetStats() CollectorStats {

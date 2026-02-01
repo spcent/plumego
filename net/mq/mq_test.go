@@ -1074,6 +1074,10 @@ func (m *metricsCollector) ObserveIPC(ctx context.Context, operation, addr, tran
 	// Not used in this test
 }
 
+func (m *metricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+	// Not used in this test
+}
+
 func (m *metricsCollector) GetStats() metrics.CollectorStats {
 	return metrics.CollectorStats{}
 }

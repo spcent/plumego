@@ -930,6 +930,9 @@ func (c *testMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, 
 	c.records[operation]++
 }
 
+func (c *testMetricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+}
+
 func (c *testMetricsCollector) GetStats() metrics.CollectorStats {
 	return metrics.CollectorStats{}
 }

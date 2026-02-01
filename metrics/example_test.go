@@ -378,3 +378,31 @@ func ExamplePrometheusCollector_integration() {
 	// Unique series: 3
 	// Metrics endpoint status: 200
 }
+
+// ExampleBaseMetricsCollector_ObserveDB demonstrates database metrics tracking
+func ExampleBaseMetricsCollector_ObserveDB() {
+	// Create a metrics collector
+	collector := metrics.NewBaseMetricsCollector()
+	ctx := context.Background()
+
+	// Record database operations
+	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users WHERE id = ?", 1, 25*time.Millisecond, nil)
+	collector.ObserveDB(ctx, "exec", "postgres", "INSERT INTO users (name) VALUES (?)", 1, 15*time.Millisecond, nil)
+	collector.ObserveDB(ctx, "transaction", "postgres", "BEGIN", 0, 2*time.Millisecond, nil)
+	collector.ObserveDB(ctx, "ping", "postgres", "", 0, 1*time.Millisecond, nil)
+
+	// Get statistics
+	stats := collector.GetStats()
+	fmt.Printf("Total database operations: %d\n", stats.TotalRecords)
+	fmt.Printf("Query operations: %d\n", stats.TypeBreakdown[metrics.MetricDBQuery])
+	fmt.Printf("Exec operations: %d\n", stats.TypeBreakdown[metrics.MetricDBExec])
+	fmt.Printf("Transaction operations: %d\n", stats.TypeBreakdown[metrics.MetricDBTransaction])
+	fmt.Printf("Ping operations: %d\n", stats.TypeBreakdown[metrics.MetricDBPing])
+
+	// Output:
+	// Total database operations: 4
+	// Query operations: 1
+	// Exec operations: 1
+	// Transaction operations: 1
+	// Ping operations: 1
+}
