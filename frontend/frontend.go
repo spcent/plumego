@@ -38,6 +38,23 @@ type Config struct {
 
 	// Headers are applied to every successful file response.
 	Headers map[string]string
+
+	// EnablePrecompressed enables serving pre-compressed files (.gz, .br)
+	// when they exist and the client supports them.
+	EnablePrecompressed bool
+
+	// NotFoundPage is the path to a custom 404 error page.
+	// If empty, uses the standard http.NotFound response.
+	NotFoundPage string
+
+	// ErrorPage is the path to a custom 5xx error page.
+	// If empty, uses the standard http.Error response.
+	ErrorPage string
+
+	// MIMETypes maps file extensions to MIME types.
+	// This overrides the default content type detection.
+	// Example: map[string]string{".wasm": "application/wasm"}
+	MIMETypes map[string]string
 }
 
 // Option mutates a Config.
@@ -82,6 +99,53 @@ func WithFallback(enabled bool) Option {
 func WithHeaders(headers map[string]string) Option {
 	return func(cfg *Config) {
 		cfg.Headers = copyHeaders(headers)
+	}
+}
+
+// WithPrecompressed enables serving pre-compressed files (.gz, .br).
+// When enabled, if a requested file has a .gz or .br variant and the client
+// supports that encoding, the pre-compressed file is served directly.
+func WithPrecompressed(enabled bool) Option {
+	return func(cfg *Config) {
+		cfg.EnablePrecompressed = enabled
+	}
+}
+
+// WithNotFoundPage sets a custom 404 error page.
+// The page path is relative to the filesystem root.
+func WithNotFoundPage(page string) Option {
+	return func(cfg *Config) {
+		cfg.NotFoundPage = strings.TrimSpace(page)
+	}
+}
+
+// WithErrorPage sets a custom 5xx error page.
+// The page path is relative to the filesystem root.
+func WithErrorPage(page string) Option {
+	return func(cfg *Config) {
+		cfg.ErrorPage = strings.TrimSpace(page)
+	}
+}
+
+// WithMIMETypes sets custom MIME type mappings for file extensions.
+// Extensions should include the leading dot (e.g., ".wasm").
+func WithMIMETypes(mimeTypes map[string]string) Option {
+	return func(cfg *Config) {
+		if len(mimeTypes) == 0 {
+			return
+		}
+		cfg.MIMETypes = make(map[string]string, len(mimeTypes))
+		for ext, mime := range mimeTypes {
+			cleanExt := strings.TrimSpace(ext)
+			cleanMime := strings.TrimSpace(mime)
+			if cleanExt != "" && cleanMime != "" {
+				// Ensure extension starts with dot
+				if !strings.HasPrefix(cleanExt, ".") {
+					cleanExt = "." + cleanExt
+				}
+				cfg.MIMETypes[cleanExt] = cleanMime
+			}
+		}
 	}
 }
 
@@ -143,13 +207,17 @@ func RegisterFS(r *router.Router, fsys http.FileSystem, opts ...Option) error {
 
 	// Create handler
 	h := &handler{
-		fs:           fsys,
-		prefix:       cleanedPrefix,
-		indexFile:    indexFile,
-		cacheControl: strings.TrimSpace(cfg.CacheControl),
-		indexCache:   strings.TrimSpace(cfg.IndexCacheControl),
-		fallback:     cfg.Fallback,
-		headers:      copyHeaders(cfg.Headers),
+		fs:            fsys,
+		prefix:        cleanedPrefix,
+		indexFile:     indexFile,
+		cacheControl:  strings.TrimSpace(cfg.CacheControl),
+		indexCache:    strings.TrimSpace(cfg.IndexCacheControl),
+		fallback:      cfg.Fallback,
+		headers:       copyHeaders(cfg.Headers),
+		precompressed: cfg.EnablePrecompressed,
+		notFoundPage:  strings.TrimSpace(cfg.NotFoundPage),
+		errorPage:     strings.TrimSpace(cfg.ErrorPage),
+		mimeTypes:     cfg.MIMETypes,
 	}
 
 	// Register routes based on prefix
@@ -215,13 +283,17 @@ func normalizePrefix(prefix string) (string, error) {
 }
 
 type handler struct {
-	fs           http.FileSystem
-	prefix       string
-	indexFile    string
-	cacheControl string
-	indexCache   string
-	headers      map[string]string
-	fallback     bool
+	fs            http.FileSystem
+	prefix        string
+	indexFile     string
+	cacheControl  string
+	indexCache    string
+	headers       map[string]string
+	fallback      bool
+	precompressed bool
+	notFoundPage  string
+	errorPage     string
+	mimeTypes     map[string]string
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -241,26 +313,26 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if requestPath == "/" {
 		if h.prefix == "/" {
 			if !h.serveFile(w, r, h.indexFile) {
-				http.NotFound(w, r)
+				h.serveNotFound(w, r)
 			}
 			return
 		}
 		// If we have a non-root prefix, root path should not be handled here
-		http.NotFound(w, r)
+		h.serveNotFound(w, r)
 		return
 	}
 
 	// Handle exact prefix match (e.g. /app)
 	if requestPath == h.prefix {
 		if !h.serveFile(w, r, h.indexFile) {
-			http.NotFound(w, r)
+			h.serveNotFound(w, r)
 		}
 		return
 	}
 
 	// For non-root prefix, ensure path starts with prefix
 	if h.prefix != "/" && !strings.HasPrefix(requestPath, h.prefix+"/") {
-		http.NotFound(w, r)
+		h.serveNotFound(w, r)
 		return
 	}
 
@@ -275,7 +347,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// If relative path is empty after trimming, serve index
 	if relativePath == "" {
 		if !h.serveFile(w, r, h.indexFile) {
-			http.NotFound(w, r)
+			h.serveNotFound(w, r)
 		}
 		return
 	}
@@ -285,11 +357,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if cleanedPath == "." || cleanedPath == ".." || strings.Contains(cleanedPath, "..") {
 		if h.fallback {
 			if !h.serveFile(w, r, h.indexFile) {
-				http.NotFound(w, r)
+				h.serveNotFound(w, r)
 			}
 			return
 		}
-		http.NotFound(w, r)
+		h.serveNotFound(w, r)
 		return
 	}
 
@@ -300,15 +372,46 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !h.serveFile(w, r, filePath) {
 		if h.fallback {
 			if !h.serveFile(w, r, h.indexFile) {
-				http.NotFound(w, r)
+				h.serveNotFound(w, r)
 			}
 			return
 		}
-		http.NotFound(w, r)
+		h.serveNotFound(w, r)
 	}
 }
 
 func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath string) bool {
+	// Try pre-compressed files first
+	if preFile, preStat, encoding := h.tryPrecompressed(r, filePath); preFile != nil {
+		defer preFile.Close()
+
+		h.applyHeaders(w)
+
+		// Apply cache control
+		if isIndexFile(filePath, h.indexFile) {
+			if h.indexCache != "" {
+				w.Header().Set("Cache-Control", h.indexCache)
+			}
+		} else if h.cacheControl != "" {
+			w.Header().Set("Cache-Control", h.cacheControl)
+		}
+
+		// Set encoding header
+		w.Header().Set("Content-Encoding", encoding)
+		// Add Vary header to indicate response varies by Accept-Encoding
+		w.Header().Add("Vary", "Accept-Encoding")
+
+		// Set custom MIME type if configured (for original file, not compressed)
+		if customType := h.getContentType(filePath); customType != "" {
+			w.Header().Set("Content-Type", customType)
+		}
+
+		// Serve the pre-compressed file
+		http.ServeContent(w, r, path.Base(filePath), preStat.ModTime(), preFile)
+		return true
+	}
+
+	// Open the original file
 	f, err := h.fs.Open(filePath)
 	if err != nil {
 		return false
@@ -335,6 +438,11 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath str
 		}
 	} else if h.cacheControl != "" {
 		w.Header().Set("Cache-Control", h.cacheControl)
+	}
+
+	// Set custom MIME type if configured
+	if customType := h.getContentType(filePath); customType != "" {
+		w.Header().Set("Content-Type", customType)
 	}
 
 	// Use http.ServeContent for proper content serving
@@ -380,4 +488,92 @@ func copyHeaders(headers map[string]string) map[string]string {
 		return nil
 	}
 	return copied
+}
+
+// serveNotFound serves a custom 404 page or falls back to http.NotFound
+func (h *handler) serveNotFound(w http.ResponseWriter, r *http.Request) {
+	if h.notFoundPage != "" {
+		if h.serveFile(w, r, h.notFoundPage) {
+			return
+		}
+	}
+	http.NotFound(w, r)
+}
+
+// serveError serves a custom error page or falls back to http.Error
+func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message string, code int) {
+	if h.errorPage != "" && code >= 500 {
+		if h.serveFile(w, r, h.errorPage) {
+			return
+		}
+	}
+	http.Error(w, message, code)
+}
+
+// acceptsEncoding checks if the client accepts the given encoding
+func acceptsEncoding(r *http.Request, encoding string) bool {
+	acceptEncoding := r.Header.Get("Accept-Encoding")
+	if acceptEncoding == "" {
+		return false
+	}
+	// Simple check - more sophisticated parsing could be done
+	return strings.Contains(acceptEncoding, encoding)
+}
+
+// tryPrecompressed attempts to serve a pre-compressed version of the file
+// Returns (file, stat, encoding) if successful, or (nil, nil, "") if not found
+func (h *handler) tryPrecompressed(r *http.Request, filePath string) (http.File, os.FileInfo, string) {
+	if !h.precompressed {
+		return nil, nil, ""
+	}
+
+	// Try Brotli first (better compression)
+	if acceptsEncoding(r, "br") {
+		if f, stat := h.tryOpenFile(filePath + ".br"); f != nil {
+			return f, stat, "br"
+		}
+	}
+
+	// Try Gzip
+	if acceptsEncoding(r, "gzip") {
+		if f, stat := h.tryOpenFile(filePath + ".gz"); f != nil {
+			return f, stat, "gzip"
+		}
+	}
+
+	return nil, nil, ""
+}
+
+// tryOpenFile attempts to open a file and return it with its stat
+func (h *handler) tryOpenFile(filePath string) (http.File, os.FileInfo) {
+	f, err := h.fs.Open(filePath)
+	if err != nil {
+		return nil, nil
+	}
+
+	stat, err := f.Stat()
+	if err != nil || stat.IsDir() {
+		f.Close()
+		return nil, nil
+	}
+
+	return f, stat
+}
+
+// getContentType returns the MIME type for the given file path
+func (h *handler) getContentType(filePath string) string {
+	if len(h.mimeTypes) == 0 {
+		return ""
+	}
+
+	ext := path.Ext(filePath)
+	if ext == "" {
+		return ""
+	}
+
+	if mimeType, ok := h.mimeTypes[ext]; ok {
+		return mimeType
+	}
+
+	return ""
 }
