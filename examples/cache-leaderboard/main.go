@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Gaming Leaderboard Example ===\n")
+	fmt.Println("=== Gaming Leaderboard Example ===")
+	fmt.Println()
 
 	// Create leaderboard cache
 	config := cache.DefaultConfig()
