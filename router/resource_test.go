@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -190,4 +191,248 @@ func TestResource_PathTrimSuffix(t *testing.T) {
 	if ctrl.indexCalled != 1 {
 		t.Error("Path with trailing slash was not trimmed correctly, Index handler was not called")
 	}
+}
+
+// ================================================
+// Enhanced CRUD Framework Tests
+// ================================================
+
+func TestQueryBuilder_Parse_Pagination(t *testing.T) {
+	tests := []struct {
+		name     string
+		query    string
+		expected QueryParams
+	}{
+		{
+			name:  "default pagination",
+			query: "",
+			expected: QueryParams{
+				Page:     1,
+				PageSize: 20,
+				Limit:    20,
+				Offset:   0,
+				Filters:  map[string]string{},
+			},
+		},
+		{
+			name:  "custom page and page_size",
+			query: "page=2&page_size=50",
+			expected: QueryParams{
+				Page:     2,
+				PageSize: 50,
+				Limit:    50,
+				Offset:   50,
+				Filters:  map[string]string{},
+			},
+		},
+		{
+			name:  "page_size exceeds max",
+			query: "page_size=200",
+			expected: QueryParams{
+				Page:     1,
+				PageSize: 100,
+				Limit:    100,
+				Offset:   0,
+				Filters:  map[string]string{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/?"+tt.query, nil)
+			qb := NewQueryBuilder()
+			params := qb.Parse(req)
+
+			if params.Page != tt.expected.Page {
+				t.Errorf("Page = %d, want %d", params.Page, tt.expected.Page)
+			}
+			if params.PageSize != tt.expected.PageSize {
+				t.Errorf("PageSize = %d, want %d", params.PageSize, tt.expected.PageSize)
+			}
+			if params.Limit != tt.expected.Limit {
+				t.Errorf("Limit = %d, want %d", params.Limit, tt.expected.Limit)
+			}
+			if params.Offset != tt.expected.Offset {
+				t.Errorf("Offset = %d, want %d", params.Offset, tt.expected.Offset)
+			}
+		})
+	}
+}
+
+func TestQueryBuilder_Parse_Sorting(t *testing.T) {
+	tests := []struct {
+		name     string
+		query    string
+		expected []SortField
+	}{
+		{
+			name:     "single ascending sort",
+			query:    "sort=name",
+			expected: []SortField{{Field: "name", Desc: false}},
+		},
+		{
+			name:     "single descending sort",
+			query:    "sort=-created_at",
+			expected: []SortField{{Field: "created_at", Desc: true}},
+		},
+		{
+			name:  "multiple sort fields",
+			query: "sort=name,-created_at,email",
+			expected: []SortField{
+				{Field: "name", Desc: false},
+				{Field: "created_at", Desc: true},
+				{Field: "email", Desc: false},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/?"+tt.query, nil)
+			qb := NewQueryBuilder()
+			params := qb.Parse(req)
+
+			if len(params.Sort) != len(tt.expected) {
+				t.Fatalf("Sort length = %d, want %d", len(params.Sort), len(tt.expected))
+			}
+
+			for i, sort := range params.Sort {
+				if sort.Field != tt.expected[i].Field {
+					t.Errorf("Sort[%d].Field = %s, want %s", i, sort.Field, tt.expected[i].Field)
+				}
+				if sort.Desc != tt.expected[i].Desc {
+					t.Errorf("Sort[%d].Desc = %v, want %v", i, sort.Desc, tt.expected[i].Desc)
+				}
+			}
+		})
+	}
+}
+
+func TestNewPaginationMeta(t *testing.T) {
+	tests := []struct {
+		name       string
+		page       int
+		pageSize   int
+		totalItems int64
+		expected   PaginationMeta
+	}{
+		{
+			name:       "first page",
+			page:       1,
+			pageSize:   20,
+			totalItems: 100,
+			expected: PaginationMeta{
+				Page:       1,
+				PageSize:   20,
+				TotalItems: 100,
+				TotalPages: 5,
+				HasNext:    true,
+				HasPrev:    false,
+			},
+		},
+		{
+			name:       "last page",
+			page:       5,
+			pageSize:   20,
+			totalItems: 100,
+			expected: PaginationMeta{
+				Page:       5,
+				PageSize:   20,
+				TotalItems: 100,
+				TotalPages: 5,
+				HasNext:    false,
+				HasPrev:    true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := NewPaginationMeta(tt.page, tt.pageSize, tt.totalItems)
+
+			if meta.Page != tt.expected.Page {
+				t.Errorf("Page = %d, want %d", meta.Page, tt.expected.Page)
+			}
+			if meta.TotalPages != tt.expected.TotalPages {
+				t.Errorf("TotalPages = %d, want %d", meta.TotalPages, tt.expected.TotalPages)
+			}
+			if meta.HasNext != tt.expected.HasNext {
+				t.Errorf("HasNext = %v, want %v", meta.HasNext, tt.expected.HasNext)
+			}
+			if meta.HasPrev != tt.expected.HasPrev {
+				t.Errorf("HasPrev = %v, want %v", meta.HasPrev, tt.expected.HasPrev)
+			}
+		})
+	}
+}
+
+func TestParamExtractor_GetQueryInt(t *testing.T) {
+	pe := NewParamExtractor()
+
+	tests := []struct {
+		name         string
+		query        string
+		paramName    string
+		defaultValue int
+		expected     int
+	}{
+		{
+			name:         "valid integer",
+			query:        "limit=50",
+			paramName:    "limit",
+			defaultValue: 10,
+			expected:     50,
+		},
+		{
+			name:         "missing parameter",
+			query:        "",
+			paramName:    "limit",
+			defaultValue: 10,
+			expected:     10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/?"+tt.query, nil)
+			result := pe.GetQueryInt(req, tt.paramName, tt.defaultValue)
+
+			if result != tt.expected {
+				t.Errorf("GetQueryInt() = %d, want %d", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestBatchProcessor_Process(t *testing.T) {
+	processor := NewBatchProcessor(10)
+
+	t.Run("successful batch", func(t *testing.T) {
+		items := []any{1, 2, 3}
+		result := processor.Process(nil, items, func(ctx context.Context, item any) error {
+			return nil
+		})
+
+		if result.Successful != 3 {
+			t.Errorf("Successful = %d, want 3", result.Successful)
+		}
+		if result.Failed != 0 {
+			t.Errorf("Failed = %d, want 0", result.Failed)
+		}
+	})
+
+	t.Run("batch too large", func(t *testing.T) {
+		items := make([]any, 20)
+		result := processor.Process(nil, items, func(ctx context.Context, item any) error {
+			return nil
+		})
+
+		if result.Failed != 20 {
+			t.Errorf("Failed = %d, want 20", result.Failed)
+		}
+		if len(result.Errors) != 1 {
+			t.Errorf("Errors length = %d, want 1", len(result.Errors))
+		}
+	})
 }
