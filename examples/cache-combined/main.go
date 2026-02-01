@@ -12,7 +12,8 @@ import (
 
 func main() {
 	fmt.Println("=== Distributed Leaderboard Example ===")
-	fmt.Println("Global gaming platform with regional leaderboards\n")
+	fmt.Println("Global gaming platform with regional leaderboards")
+	fmt.Println()
 
 	// Create leaderboard caches for different regions
 	fmt.Println("1. Setting up regional leaderboard nodes...")
@@ -133,11 +134,11 @@ func main() {
 	fmt.Println("6. Managing player sessions...")
 
 	sessions := map[string]string{
-		"session:Alice_USA":  "Active, Last match: 2m ago",
-		"session:David_UK":   "Active, Last match: 5m ago",
-		"session:Grace_JP":   "Idle, Last match: 15m ago",
-		"session:Henry_KR":   "Active, Last match: 1m ago",
-		"session:Eve_FR":     "Active, Last match: 3m ago",
+		"session:Alice_USA": "Active, Last match: 2m ago",
+		"session:David_UK":  "Active, Last match: 5m ago",
+		"session:Grace_JP":  "Idle, Last match: 15m ago",
+		"session:Henry_KR":  "Active, Last match: 1m ago",
+		"session:Eve_FR":    "Active, Last match: 3m ago",
 	}
 
 	for sessionKey, sessionData := range sessions {

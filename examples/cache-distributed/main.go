@@ -11,7 +11,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Distributed Cache Example ===\n")
+	fmt.Println("=== Distributed Cache Example ===")
+	fmt.Println()
 
 	// Create 3 cache nodes
 	fmt.Println("1. Setting up 3 cache nodes...")
