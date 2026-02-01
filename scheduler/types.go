@@ -52,6 +52,70 @@ func JobLastErrorFromContext(ctx context.Context) (error, bool) {
 	return val, ok
 }
 
+// BackpressurePolicy controls the scheduler's behavior when the work queue is full.
+//
+// This policy determines how the scheduler handles new job executions when all
+// worker threads are busy and the work queue has reached its capacity.
+type BackpressurePolicy int
+
+const (
+	// BackpressureDrop immediately drops the job execution when the queue is full.
+	// The dropped execution is counted in statistics and can trigger an optional callback.
+	//
+	// Use case: Non-critical jobs where dropping executions is acceptable:
+	//   - Best-effort monitoring tasks
+	//   - Optional background work
+	//   - Jobs that will be retried naturally
+	//
+	// Behavior: The dispatch() call returns immediately. Statistics are updated,
+	// and the optional OnBackpressure callback is invoked if configured.
+	BackpressureDrop BackpressurePolicy = iota
+
+	// BackpressureBlock blocks until space becomes available in the queue.
+	// The caller (scheduler dispatch loop) will wait indefinitely.
+	//
+	// Use case: Critical jobs that must not be lost:
+	//   - Payment processing
+	//   - Critical data synchronization
+	//   - Jobs without alternative retry mechanisms
+	//
+	// Behavior: The dispatch() call blocks until a worker becomes available.
+	// This can cause the scheduler's dispatch loop to pause, potentially delaying
+	// other jobs from being dispatched.
+	//
+	// Caution: Can lead to deadlock if all workers are blocked on I/O and no
+	// jobs complete. Monitor queue depth and worker utilization.
+	BackpressureBlock
+
+	// BackpressureBlockTimeout blocks with a timeout when the queue is full.
+	// If the timeout expires, the job is dropped.
+	//
+	// Use case: Important jobs with bounded wait tolerance:
+	//   - API requests with SLA requirements
+	//   - Jobs with time-sensitive execution windows
+	//   - Graceful degradation scenarios
+	//
+	// Behavior: The dispatch() call blocks for up to BackpressureTimeout duration.
+	// If space becomes available, the job is queued. Otherwise, it's treated as
+	// dropped (statistics updated, callback invoked).
+	//
+	// Note: This provides a middle ground between Drop and Block, preventing
+	// indefinite blocking while still attempting to queue the job.
+	BackpressureBlockTimeout
+)
+
+// BackpressureConfig configures backpressure behavior.
+type BackpressureConfig struct {
+	// Policy determines the backpressure strategy.
+	Policy BackpressurePolicy
+	// Timeout is the maximum duration to wait when Policy is BackpressureBlockTimeout.
+	// Ignored for other policies.
+	Timeout time.Duration
+	// OnBackpressure is an optional callback invoked when a job is dropped due to backpressure.
+	// Called for BackpressureDrop and BackpressureBlockTimeout (on timeout).
+	OnBackpressure func(jobID JobID)
+}
+
 // OverlapPolicy controls the scheduler's behavior when a scheduled job execution
 // is triggered while a previous execution of the same job is still running.
 //
@@ -114,15 +178,17 @@ type RetryPolicy struct {
 
 // JobOptions customize a job.
 type JobOptions struct {
-	Timeout       time.Duration
-	OverlapPolicy OverlapPolicy
-	RetryPolicy   RetryPolicy
-	Paused        bool
-	DeadLetter    func(context.Context, JobID, error)
-	Group         string
-	Tags          []string
-	Replace       bool
-	TaskName      string
+	Timeout          time.Duration
+	OverlapPolicy    OverlapPolicy
+	RetryPolicy      RetryPolicy
+	Paused           bool
+	DeadLetter       func(context.Context, JobID, error)
+	Group            string
+	Tags             []string
+	Replace          bool
+	TaskName         string
+	Dependencies     []JobID
+	DependencyPolicy DependencyFailurePolicy
 }
 
 // JobOption mutates JobOptions.
@@ -266,9 +332,43 @@ func Paused() JobOption {
 	}
 }
 
+// DependencyFailurePolicy determines what happens when a dependency fails.
+type DependencyFailurePolicy int
+
+const (
+	// DependencyFailureSkip skips execution of dependent jobs if a dependency fails.
+	// The dependent job's next run is still scheduled (for cron jobs).
+	DependencyFailureSkip DependencyFailurePolicy = iota
+
+	// DependencyFailureCancel cancels the dependent job if a dependency fails.
+	// This removes the job from the scheduler entirely.
+	DependencyFailureCancel
+
+	// DependencyFailureContinue continues execution even if a dependency fails.
+	// This effectively ignores the dependency failure.
+	DependencyFailureContinue
+)
+
+// WithDependsOn sets job dependencies. The job will only run after all
+// dependencies have completed successfully (unless policy overrides this).
+func WithDependsOn(policy DependencyFailurePolicy, dependencies ...JobID) JobOption {
+	return func(opts *JobOptions) {
+		opts.Dependencies = dependencies
+		opts.DependencyPolicy = policy
+	}
+}
+
 func defaultJobOptions() JobOptions {
 	return JobOptions{
 		OverlapPolicy: AllowConcurrent,
+	}
+}
+
+// DefaultBackpressureConfig returns the default backpressure configuration.
+func DefaultBackpressureConfig() BackpressureConfig {
+	return BackpressureConfig{
+		Policy:  BackpressureDrop,
+		Timeout: 0,
 	}
 }
 
@@ -285,4 +385,34 @@ type JobStatus struct {
 	OverlapPolicy OverlapPolicy
 	Group         string
 	Tags          []string
+}
+
+// JobQuery defines filtering and sorting criteria for querying jobs.
+type JobQuery struct {
+	// Group filters jobs by group name (empty = no filter).
+	Group string
+	// Tags filters jobs that have ALL of the specified tags (empty = no filter).
+	Tags []string
+	// Kinds filters jobs by kind ("cron", "delay", or empty = no filter).
+	Kinds []string
+	// Running filters by running state (nil = no filter, true = only running, false = only not running).
+	Running *bool
+	// Paused filters by paused state (nil = no filter, true = only paused, false = only not paused).
+	Paused *bool
+	// OrderBy specifies sorting field: "id", "next_run", "last_run", "group" (empty = no sorting).
+	OrderBy string
+	// Ascending determines sort direction (default: true).
+	Ascending bool
+	// Limit limits the number of results (0 = no limit).
+	Limit int
+	// Offset skips the first N results (for pagination).
+	Offset int
+}
+
+// JobQueryResult contains the query results and metadata.
+type JobQueryResult struct {
+	// Jobs is the filtered and sorted list of job statuses.
+	Jobs []JobStatus
+	// Total is the total count of matching jobs (before limit/offset).
+	Total int
 }

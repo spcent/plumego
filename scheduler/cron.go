@@ -8,22 +8,75 @@ import (
 	"time"
 )
 
+// Predefined cron schedule constants for common patterns.
+const (
+	CronEveryMinute = "* * * * *"
+	CronHourly      = "0 * * * *"
+	CronDaily       = "0 0 * * *"
+	CronWeekly      = "0 0 * * 0"
+	CronMonthly     = "0 0 1 * *"
+	CronYearly      = "0 0 1 1 *"
+)
+
 // CronSpec represents a parsed cron expression (minute, hour, dom, month, dow).
 type CronSpec struct {
-	seconds []int
-	minutes []int
-	hours   []int
-	dom     []int
-	months  []int
-	dow     []int
+	seconds  []int
+	minutes  []int
+	hours    []int
+	dom      []int
+	months   []int
+	dow      []int
+	location *time.Location // Time zone for scheduling
+	interval time.Duration  // For @every syntax
 }
 
 // ParseCronSpec parses a cron expression with 5 (minute) or 6 (second) fields.
 // Fields: [second] minute hour day-of-month month day-of-week
+// Also supports descriptors like @hourly, @daily, @weekly, @monthly, @yearly
+// and @every <duration> (e.g., @every 5m, @every 1h30m)
 func ParseCronSpec(expr string) (CronSpec, error) {
+	return ParseCronSpecWithLocation(expr, time.UTC)
+}
+
+// ParseCronSpecWithLocation parses a cron expression with a specific timezone.
+func ParseCronSpecWithLocation(expr string, loc *time.Location) (CronSpec, error) {
+	if loc == nil {
+		loc = time.UTC
+	}
+
+	// Handle @every syntax
+	if strings.HasPrefix(expr, "@every ") {
+		durationStr := strings.TrimPrefix(expr, "@every ")
+		duration, err := time.ParseDuration(durationStr)
+		if err != nil {
+			return CronSpec{}, fmt.Errorf("%w: %v", ErrInvalidEveryDuration, err)
+		}
+		if duration <= 0 {
+			return CronSpec{}, fmt.Errorf("%w: must be positive", ErrInvalidEveryDuration)
+		}
+		return CronSpec{
+			location: loc,
+			interval: duration,
+		}, nil
+	}
+
+	// Handle predefined descriptors
+	switch expr {
+	case "@hourly":
+		expr = CronHourly
+	case "@daily", "@midnight":
+		expr = CronDaily
+	case "@weekly":
+		expr = CronWeekly
+	case "@monthly":
+		expr = CronMonthly
+	case "@yearly", "@annually":
+		expr = CronYearly
+	}
+
 	fields := strings.Fields(expr)
 	if len(fields) != 5 && len(fields) != 6 {
-		return CronSpec{}, fmt.Errorf("invalid cron spec: expected 5 or 6 fields, got %d", len(fields))
+		return CronSpec{}, fmt.Errorf("%w: expected 5 or 6 fields, got %d", ErrInvalidCronExpr, len(fields))
 	}
 
 	var seconds []int
@@ -61,12 +114,13 @@ func ParseCronSpec(expr string) (CronSpec, error) {
 	}
 
 	return CronSpec{
-		seconds: seconds,
-		minutes: minutes,
-		hours:   hours,
-		dom:     dom,
-		months:  months,
-		dow:     dow,
+		seconds:  seconds,
+		minutes:  minutes,
+		hours:    hours,
+		dom:      dom,
+		months:   months,
+		dow:      dow,
+		location: loc,
 	}, nil
 }
 
@@ -80,19 +134,19 @@ func parseCronField(field string, min, max int) ([]int, error) {
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
-			return nil, fmt.Errorf("empty field")
+			return nil, fmt.Errorf("%w: empty field", ErrInvalidCronField)
 		}
 
 		step := 1
 		if strings.Contains(part, "/") {
 			s := strings.Split(part, "/")
 			if len(s) != 2 {
-				return nil, fmt.Errorf("invalid step syntax")
+				return nil, fmt.Errorf("%w: invalid step syntax", ErrInvalidCronField)
 			}
 			part = s[0]
 			parsed, err := strconv.Atoi(s[1])
 			if err != nil || parsed <= 0 {
-				return nil, fmt.Errorf("invalid step")
+				return nil, fmt.Errorf("%w: invalid step value", ErrInvalidCronField)
 			}
 			step = parsed
 		}
@@ -104,28 +158,28 @@ func parseCronField(field string, min, max int) ([]int, error) {
 		} else if strings.Contains(part, "-") {
 			bounds := strings.Split(part, "-")
 			if len(bounds) != 2 {
-				return nil, fmt.Errorf("invalid range")
+				return nil, fmt.Errorf("%w: invalid range syntax", ErrInvalidCronField)
 			}
 			var err error
 			start, err = strconv.Atoi(bounds[0])
 			if err != nil {
-				return nil, fmt.Errorf("invalid range start")
+				return nil, fmt.Errorf("%w: invalid range start", ErrInvalidCronField)
 			}
 			end, err = strconv.Atoi(bounds[1])
 			if err != nil {
-				return nil, fmt.Errorf("invalid range end")
+				return nil, fmt.Errorf("%w: invalid range end", ErrInvalidCronField)
 			}
 		} else {
 			val, err := strconv.Atoi(part)
 			if err != nil {
-				return nil, fmt.Errorf("invalid value")
+				return nil, fmt.Errorf("%w: invalid value", ErrInvalidCronField)
 			}
 			start = val
 			end = val
 		}
 
 		if start < min || end > max || start > end {
-			return nil, fmt.Errorf("value out of bounds")
+			return nil, fmt.Errorf("%w: value out of bounds [%d-%d]", ErrInvalidCronField, min, max)
 		}
 
 		for v := start; v <= end; v += step {
@@ -151,7 +205,18 @@ func buildRange(min, max, step int) []int {
 
 // Next returns the next time after the given time that matches the spec.
 func (c CronSpec) Next(after time.Time) time.Time {
-	next := after.Truncate(time.Second).Add(time.Second)
+	// Handle @every interval syntax
+	if c.interval > 0 {
+		return after.Add(c.interval)
+	}
+
+	// Convert to the spec's timezone
+	loc := c.location
+	if loc == nil {
+		loc = time.UTC
+	}
+	next := after.In(loc).Truncate(time.Second).Add(time.Second)
+
 	for i := 0; i < 366*24*60*60; i++ {
 		if !containsInt(c.months, int(next.Month())) {
 			next = time.Date(next.Year(), next.Month()+1, 1, 0, 0, 0, 0, next.Location())
