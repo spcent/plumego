@@ -1,6 +1,9 @@
 package pubsub
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Message is treated as immutable once published.
 // PubSub defensively copies Data/Meta on publish and per-delivery for common
@@ -72,6 +75,22 @@ const (
 	CloseSubscriber
 )
 
+// String returns the string representation of a BackpressurePolicy.
+func (p BackpressurePolicy) String() string {
+	switch p {
+	case DropOldest:
+		return "drop_oldest"
+	case DropNewest:
+		return "drop_newest"
+	case BlockWithTimeout:
+		return "block_with_timeout"
+	case CloseSubscriber:
+		return "close_subscriber"
+	default:
+		return "unknown"
+	}
+}
+
 // SubOptions configures a subscription.
 //
 // Example:
@@ -92,6 +111,31 @@ type SubOptions struct {
 
 	// BlockTimeout is used when Policy == BlockWithTimeout (default: 50ms)
 	BlockTimeout time.Duration
+
+	// ZeroCopy disables message cloning for this subscriber.
+	// Only use this if the subscriber guarantees not to modify the message.
+	// This can significantly improve performance for read-only subscribers.
+	ZeroCopy bool
+
+	// Filter is an optional function to filter messages before delivery.
+	// If Filter returns false, the message is not delivered to this subscriber.
+	// Filter is called under the subscriber's lock, so keep it fast.
+	Filter func(msg Message) bool
+}
+
+// SubscriptionStats contains statistics for a subscription.
+type SubscriptionStats struct {
+	// Received is the total number of messages received
+	Received uint64
+
+	// Dropped is the total number of messages dropped due to backpressure
+	Dropped uint64
+
+	// QueueLen is the current number of messages in the buffer
+	QueueLen int
+
+	// QueueCap is the capacity of the buffer
+	QueueCap int
 }
 
 // Subscription represents a message subscription.
@@ -119,6 +163,18 @@ type Subscription interface {
 
 	// Cancel unsubscribes and closes the channel
 	Cancel()
+
+	// ID returns the unique subscription ID
+	ID() uint64
+
+	// Topic returns the topic or pattern this subscription is for
+	Topic() string
+
+	// Stats returns subscription statistics
+	Stats() SubscriptionStats
+
+	// Done returns a channel that is closed when the subscription is cancelled
+	Done() <-chan struct{}
 }
 
 // PubSub defines the publish-subscribe interface.
@@ -163,6 +219,39 @@ type PatternPubSub interface {
 
 	// SubscribePattern creates a new subscription to a topic pattern.
 	SubscribePattern(pattern string, opts SubOptions) (Subscription, error)
+}
+
+// ContextPubSub extends PatternPubSub with context-aware operations.
+type ContextPubSub interface {
+	PatternPubSub
+
+	// PublishWithContext publishes a message with context support.
+	PublishWithContext(ctx context.Context, topic string, msg Message) error
+
+	// SubscribeWithContext creates a subscription that is cancelled when the context is done.
+	SubscribeWithContext(ctx context.Context, topic string, opts SubOptions) (Subscription, error)
+
+	// SubscribePatternWithContext creates a pattern subscription that is cancelled when the context is done.
+	SubscribePatternWithContext(ctx context.Context, pattern string, opts SubOptions) (Subscription, error)
+}
+
+// BatchPubSub extends ContextPubSub with batch operations.
+type BatchPubSub interface {
+	ContextPubSub
+
+	// PublishBatch publishes multiple messages to a topic atomically.
+	PublishBatch(topic string, msgs []Message) error
+
+	// PublishMulti publishes messages to multiple topics.
+	PublishMulti(msgs map[string][]Message) error
+}
+
+// DrainablePubSub extends BatchPubSub with graceful shutdown support.
+type DrainablePubSub interface {
+	BatchPubSub
+
+	// Drain waits for all pending messages to be delivered or until the context is cancelled.
+	Drain(ctx context.Context) error
 }
 
 // DefaultSubOptions returns production-ready default options.

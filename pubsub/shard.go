@@ -1,0 +1,273 @@
+package pubsub
+
+import (
+	"hash/fnv"
+	"sync"
+)
+
+// shard represents a partition of topics/patterns.
+// Each shard has its own lock to reduce contention.
+type shard struct {
+	mu       sync.RWMutex
+	topics   map[string]map[uint64]*subscriber
+	patterns map[string]map[uint64]*subscriber
+}
+
+// shardedMap manages multiple shards for reduced lock contention.
+type shardedMap struct {
+	shards     []*shard
+	shardCount int
+	shardMask  uint32
+}
+
+// newShardedMap creates a new sharded map with the given number of shards.
+// For best performance, shardCount should be a power of 2.
+func newShardedMap(shardCount int) *shardedMap {
+	if shardCount <= 0 {
+		shardCount = 16
+	}
+
+	// Round up to the next power of 2
+	shardCount = nextPowerOf2(shardCount)
+
+	shards := make([]*shard, shardCount)
+	for i := 0; i < shardCount; i++ {
+		shards[i] = &shard{
+			topics:   make(map[string]map[uint64]*subscriber),
+			patterns: make(map[string]map[uint64]*subscriber),
+		}
+	}
+
+	return &shardedMap{
+		shards:     shards,
+		shardCount: shardCount,
+		shardMask:  uint32(shardCount - 1),
+	}
+}
+
+// nextPowerOf2 returns the smallest power of 2 >= n.
+func nextPowerOf2(n int) int {
+	if n <= 1 {
+		return 1
+	}
+	n--
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	return n + 1
+}
+
+// getShard returns the shard for a given topic/pattern.
+func (sm *shardedMap) getShard(key string) *shard {
+	h := fnv.New32a()
+	h.Write([]byte(key))
+	return sm.shards[h.Sum32()&sm.shardMask]
+}
+
+// getShardIndex returns the shard index for a given topic/pattern.
+func (sm *shardedMap) getShardIndex(key string) int {
+	h := fnv.New32a()
+	h.Write([]byte(key))
+	return int(h.Sum32() & sm.shardMask)
+}
+
+// addTopic adds a subscriber to a topic in the appropriate shard.
+func (sm *shardedMap) addTopic(topic string, id uint64, sub *subscriber) {
+	s := sm.getShard(topic)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.topics[topic] == nil {
+		s.topics[topic] = make(map[uint64]*subscriber)
+	}
+	s.topics[topic][id] = sub
+}
+
+// addPattern adds a subscriber to a pattern in the appropriate shard.
+func (sm *shardedMap) addPattern(pattern string, id uint64, sub *subscriber) {
+	s := sm.getShard(pattern)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.patterns[pattern] == nil {
+		s.patterns[pattern] = make(map[uint64]*subscriber)
+	}
+	s.patterns[pattern][id] = sub
+}
+
+// removeTopic removes a subscriber from a topic.
+// Returns true if the topic map is now empty.
+func (sm *shardedMap) removeTopic(topic string, id uint64) bool {
+	s := sm.getShard(topic)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	subs := s.topics[topic]
+	if subs == nil {
+		return true
+	}
+
+	delete(subs, id)
+
+	if len(subs) == 0 {
+		delete(s.topics, topic)
+		return true
+	}
+	return false
+}
+
+// removePattern removes a subscriber from a pattern.
+// Returns true if the pattern map is now empty.
+func (sm *shardedMap) removePattern(pattern string, id uint64) bool {
+	s := sm.getShard(pattern)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	subs := s.patterns[pattern]
+	if subs == nil {
+		return true
+	}
+
+	delete(subs, id)
+
+	if len(subs) == 0 {
+		delete(s.patterns, pattern)
+		return true
+	}
+	return false
+}
+
+// getTopicSubscribers returns a snapshot of subscribers for a topic.
+func (sm *shardedMap) getTopicSubscribers(topic string) []*subscriber {
+	s := sm.getShard(topic)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	subs := s.topics[topic]
+	if len(subs) == 0 {
+		return nil
+	}
+
+	result := make([]*subscriber, 0, len(subs))
+	for _, sub := range subs {
+		result = append(result, sub)
+	}
+	return result
+}
+
+// getTopicSubscriberCount returns the number of subscribers for a topic.
+func (sm *shardedMap) getTopicSubscriberCount(topic string) int {
+	s := sm.getShard(topic)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.topics[topic])
+}
+
+// getPatternSubscriberCount returns the number of subscribers for a pattern.
+func (sm *shardedMap) getPatternSubscriberCount(pattern string) int {
+	s := sm.getShard(pattern)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.patterns[pattern])
+}
+
+// getAllPatterns returns all patterns and their subscribers across all shards.
+// This requires locking all shards, so use sparingly.
+func (sm *shardedMap) getAllPatterns() []patternSnapshot {
+	// Collect from all shards
+	var result []patternSnapshot
+
+	for _, s := range sm.shards {
+		s.mu.RLock()
+		for pattern, subs := range s.patterns {
+			if len(subs) == 0 {
+				continue
+			}
+			snapshot := make([]*subscriber, 0, len(subs))
+			for _, sub := range subs {
+				snapshot = append(snapshot, sub)
+			}
+			result = append(result, patternSnapshot{
+				pattern: pattern,
+				subs:    snapshot,
+			})
+		}
+		s.mu.RUnlock()
+	}
+
+	return result
+}
+
+// listTopics returns all topics with subscribers.
+func (sm *shardedMap) listTopics() []string {
+	var topics []string
+
+	for _, s := range sm.shards {
+		s.mu.RLock()
+		for topic := range s.topics {
+			topics = append(topics, topic)
+		}
+		s.mu.RUnlock()
+	}
+
+	return topics
+}
+
+// listPatterns returns all patterns with subscribers.
+func (sm *shardedMap) listPatterns() []string {
+	var patterns []string
+
+	for _, s := range sm.shards {
+		s.mu.RLock()
+		for pattern := range s.patterns {
+			patterns = append(patterns, pattern)
+		}
+		s.mu.RUnlock()
+	}
+
+	return patterns
+}
+
+// collectAllSubscribers returns all subscribers from all shards.
+// This is used during Close() to cancel all subscriptions.
+func (sm *shardedMap) collectAllSubscribers() []*subscriber {
+	var all []*subscriber
+
+	for _, s := range sm.shards {
+		s.mu.Lock()
+		for _, subs := range s.topics {
+			for _, sub := range subs {
+				all = append(all, sub)
+			}
+		}
+		for _, subs := range s.patterns {
+			for _, sub := range subs {
+				all = append(all, sub)
+			}
+		}
+		// Clear maps
+		s.topics = make(map[string]map[uint64]*subscriber)
+		s.patterns = make(map[string]map[uint64]*subscriber)
+		s.mu.Unlock()
+	}
+
+	return all
+}
+
+// topicExists checks if a topic has any subscribers.
+func (sm *shardedMap) topicExists(topic string) bool {
+	s := sm.getShard(topic)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.topics[topic]) > 0
+}
+
+// patternExists checks if a pattern has any subscribers.
+func (sm *shardedMap) patternExists(pattern string) bool {
+	s := sm.getShard(pattern)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.patterns[pattern]) > 0
+}
