@@ -311,14 +311,20 @@ func TestMetadata(t *testing.T) {
 	defer mockConn.Close()
 
 	// Test metadata operations
-	mockConn.Metadata["key1"] = "value1"
-	mockConn.Metadata["key2"] = 123
+	mockConn.SetMetadata("key1", "value1")
+	mockConn.SetMetadata("key2", 123)
 
-	if mockConn.Metadata["key1"] != "value1" {
+	if val, ok := mockConn.GetMetadata("key1"); !ok || val != "value1" {
 		t.Error("Metadata string value not stored correctly")
 	}
-	if mockConn.Metadata["key2"] != 123 {
+	if val, ok := mockConn.GetMetadata("key2"); !ok || val != 123 {
 		t.Error("Metadata int value not stored correctly")
+	}
+
+	// Test delete
+	mockConn.DeleteMetadata("key1")
+	if _, ok := mockConn.GetMetadata("key1"); ok {
+		t.Error("Metadata should have been deleted")
 	}
 }
 

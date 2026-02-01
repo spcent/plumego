@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"errors"
 	"log"
 	"os"
 	"sync"
@@ -55,8 +54,15 @@ type Hub struct {
 
 	maxConns     int
 	maxRoomConns int
+	totalConns   atomic.Uint64 // Atomic counter for total active connections
 	accepted     atomic.Uint64
 	rejected     atomic.Uint64
+
+	// Rate limiting (simple token bucket implementation)
+	rateLimiter *simpleRateLimiter
+
+	// Message pooling to reduce allocations
+	connListPool sync.Pool // Pool of []*Conn slices
 
 	// Production-ready configuration
 	config HubConfig
@@ -66,6 +72,80 @@ type Hub struct {
 	logger *log.Logger
 	// Channel for security events
 	securityEvents chan SecurityEvent
+}
+
+// getConnList gets a connection list from the pool
+func (h *Hub) getConnList() *[]*Conn {
+	return h.connListPool.Get().(*[]*Conn)
+}
+
+// putConnList returns a connection list to the pool after clearing it
+func (h *Hub) putConnList(conns *[]*Conn) {
+	// Clear the slice but keep the underlying array
+	*conns = (*conns)[:0]
+	h.connListPool.Put(conns)
+}
+
+// simpleRateLimiter implements a basic token bucket rate limiter using only standard library
+type simpleRateLimiter struct {
+	rate     int           // Tokens per second
+	burst    int           // Maximum burst size
+	tokens   atomic.Uint64 // Current tokens (scaled by 1000 for precision)
+	lastRefill atomic.Int64 // Last refill timestamp (nanoseconds)
+	mu       sync.Mutex
+}
+
+// newRateLimiter creates a rate limiter that allows 'rate' events per second with burst capacity
+func newRateLimiter(rate, burst int) *simpleRateLimiter {
+	if rate <= 0 {
+		return nil
+	}
+	if burst <= 0 {
+		burst = rate
+	}
+	rl := &simpleRateLimiter{
+		rate:  rate,
+		burst: burst,
+	}
+	rl.tokens.Store(uint64(burst * 1000)) // Start with full burst capacity
+	rl.lastRefill.Store(time.Now().UnixNano())
+	return rl
+}
+
+// allow checks if an event can proceed under rate limits
+func (rl *simpleRateLimiter) allow() bool {
+	if rl == nil {
+		return true
+	}
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now().UnixNano()
+	last := rl.lastRefill.Load()
+	elapsed := time.Duration(now - last)
+
+	// Calculate tokens to add based on elapsed time
+	tokensToAdd := int64(elapsed.Seconds() * float64(rl.rate) * 1000)
+	if tokensToAdd > 0 {
+		current := rl.tokens.Load()
+		maxTokens := uint64(rl.burst * 1000)
+		newTokens := current + uint64(tokensToAdd)
+		if newTokens > maxTokens {
+			newTokens = maxTokens
+		}
+		rl.tokens.Store(newTokens)
+		rl.lastRefill.Store(now)
+	}
+
+	// Try to consume one token
+	current := rl.tokens.Load()
+	if current >= 1000 {
+		rl.tokens.Store(current - 1000)
+		return true
+	}
+
+	return false
 }
 
 // SecurityEvent represents a security-related event.
@@ -155,11 +235,6 @@ type HubMetrics struct {
 	MaxRoomConnections int    `json:"max_room_connections"`
 }
 
-var (
-	ErrHubFull  = errors.New("websocket hub at capacity")
-	ErrRoomFull = errors.New("websocket room at capacity")
-)
-
 // NewHub creates a new WebSocket hub with default configuration.
 //
 // Example:
@@ -214,6 +289,26 @@ func NewHubWithConfig(cfg HubConfig) *Hub {
 		securityEvents: make(chan SecurityEvent, 100),
 		logger:         log.New(os.Stderr, "[WEBSOCKET] ", log.LstdFlags),
 	}
+
+	// Initialize connection list pool
+	h.connListPool = sync.Pool{
+		New: func() any {
+			// Pre-allocate with reasonable capacity
+			conns := make([]*Conn, 0, 64)
+			return &conns
+		},
+	}
+
+	// Initialize rate limiter if configured
+	if cfg.MaxConnectionRate > 0 {
+		// Allow burst up to 2x the rate for handling spikes
+		burst := cfg.MaxConnectionRate * 2
+		h.rateLimiter = newRateLimiter(cfg.MaxConnectionRate, burst)
+		if cfg.EnableDebugLogging {
+			h.logger.Printf("Rate limiter initialized: %d connections/sec (burst: %d)", cfg.MaxConnectionRate, burst)
+		}
+	}
+
 	h.startWorkers()
 	h.startSecurityMonitor()
 	return h
@@ -325,29 +420,29 @@ func (h *Hub) Stop() {
 //		}
 //	}
 func (h *Hub) TryJoin(room string, c *Conn) error {
+	// Rate limiting check (before acquiring lock for better performance)
+	if h.rateLimiter != nil && !h.rateLimiter.allow() {
+		h.rejected.Add(1)
+		if h.config.EnableSecurityMetrics {
+			h.recordSecurityEvent("rate_limit_exceeded", map[string]any{
+				"room": room,
+			}, "warning")
+		}
+		return ErrRateLimitExceeded
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Rate limiting check
-	if h.config.MaxConnectionRate > 0 {
-		// Implementation would need connection timestamp tracking
-		// For now, we log if rate limit is configured
-		if h.config.EnableDebugLogging {
-			h.logger.Printf("Rate limiting configured: %d connections/sec", h.config.MaxConnectionRate)
-		}
-	}
-
+	// Fast path: check atomic counter for total connections (O(1) instead of O(n))
 	if h.maxConns > 0 {
-		total := 0
-		for _, rs := range h.rooms {
-			total += len(rs)
-		}
-		if total >= h.maxConns {
+		currentTotal := int(h.totalConns.Load())
+		if currentTotal >= h.maxConns {
 			h.rejected.Add(1)
 			if h.config.EnableSecurityMetrics {
 				h.recordSecurityEvent("hub_full", map[string]any{
 					"room":  room,
-					"total": total,
+					"total": currentTotal,
 				}, "warning")
 			}
 			return ErrHubFull
@@ -359,6 +454,15 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 		rs = make(map[*Conn]struct{})
 		h.rooms[room] = rs
 	}
+
+	// Check if connection already in room (idempotent join)
+	if _, exists := rs[c]; exists {
+		if h.config.EnableDebugLogging {
+			h.logger.Printf("Connection already in room: %s", room)
+		}
+		return nil
+	}
+
 	if h.maxRoomConns > 0 && len(rs) >= h.maxRoomConns {
 		h.rejected.Add(1)
 		if h.config.EnableSecurityMetrics {
@@ -371,10 +475,11 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 	}
 
 	rs[c] = struct{}{}
+	h.totalConns.Add(1) // Increment atomic counter
 	h.accepted.Add(1)
 
 	if h.config.EnableDebugLogging {
-		h.logger.Printf("Connection joined room: %s (total: %d, room: %d)", room, h.accepted.Load(), len(rs))
+		h.logger.Printf("Connection joined room: %s (total: %d, room: %d)", room, h.totalConns.Load(), len(rs))
 	}
 
 	return nil
@@ -395,18 +500,13 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 //	}
 //	// Room has capacity, proceed with join
 func (h *Hub) CanJoin(room string) error {
+	// Fast path: check atomic counter for total connections
+	if h.maxConns > 0 && int(h.totalConns.Load()) >= h.maxConns {
+		return ErrHubFull
+	}
+
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-
-	if h.maxConns > 0 {
-		total := 0
-		for _, rs := range h.rooms {
-			total += len(rs)
-		}
-		if total >= h.maxConns {
-			return ErrHubFull
-		}
-	}
 
 	if h.maxRoomConns > 0 {
 		if rs, ok := h.rooms[room]; ok && len(rs) >= h.maxRoomConns {
@@ -444,16 +544,11 @@ func (h *Hub) Join(room string, c *Conn) {
 //	fmt.Printf("Active connections: %d\n", metrics.ActiveConnections)
 func (h *Hub) Metrics() HubMetrics {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-
 	rooms := len(h.rooms)
-	active := 0
-	for _, rs := range h.rooms {
-		active += len(rs)
-	}
+	h.mu.RUnlock()
 
 	return HubMetrics{
-		ActiveConnections:  active,
+		ActiveConnections:  int(h.totalConns.Load()), // Use atomic counter
 		Rooms:              rooms,
 		AcceptedTotal:      h.accepted.Load(),
 		RejectedTotal:      h.rejected.Load(),
@@ -477,9 +572,12 @@ func (h *Hub) Leave(room string, c *Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if rs, ok := h.rooms[room]; ok {
-		delete(rs, c)
-		if len(rs) == 0 {
-			delete(h.rooms, room)
+		if _, exists := rs[c]; exists {
+			delete(rs, c)
+			h.totalConns.Add(^uint64(0)) // Decrement (add -1 in two's complement)
+			if len(rs) == 0 {
+				delete(h.rooms, room)
+			}
 		}
 	}
 }
@@ -501,13 +599,19 @@ func (h *Hub) Leave(room string, c *Conn) {
 func (h *Hub) RemoveConn(c *Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	removedCount := 0
 	for room, rs := range h.rooms {
 		if _, ok := rs[c]; ok {
 			delete(rs, c)
+			removedCount++
 			if len(rs) == 0 {
 				delete(h.rooms, room)
 			}
 		}
+	}
+	// Decrement totalConns by the number of rooms the connection was in
+	if removedCount > 0 {
+		h.totalConns.Add(^uint64(removedCount - 1)) // Subtract removedCount
 	}
 }
 
@@ -526,17 +630,41 @@ func (h *Hub) RemoveConn(c *Conn) {
 //	// Broadcast binary data
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeBinary, []byte{0x01, 0x02, 0x03})
 func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
+	// Get a connection list from pool
+	connsList := h.getConnList()
+	defer h.putConnList(connsList)
+
+	// Copy connections while holding read lock to prevent race conditions
 	h.mu.RLock()
 	rs, ok := h.rooms[room]
-	h.mu.RUnlock()
 	if !ok || len(rs) == 0 {
+		h.mu.RUnlock()
+		return
+	}
+
+	// Grow slice if needed (pool size might be too small)
+	if cap(*connsList) < len(rs) {
+		*connsList = make([]*Conn, 0, len(rs))
+	}
+
+	// Create snapshot of connections to iterate safely
+	for c := range rs {
+		// Only include active connections
+		if !c.IsClosed() {
+			*connsList = append(*connsList, c)
+		}
+	}
+	h.mu.RUnlock()
+
+	if len(*connsList) == 0 {
 		return
 	}
 
 	sent := 0
 	dropped := 0
 
-	for c := range rs {
+	// Iterate over snapshot - safe from concurrent modifications
+	for _, c := range *connsList {
 		select {
 		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
 			sent++
@@ -559,13 +687,9 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 		}
 	}
 
-	// Production metrics
-	if h.config.EnableMetrics && (sent > 0 || dropped > 0) {
-		h.mu.Lock()
-		if dropped > 0 {
-			securityMetrics.BroadcastQueueFull += uint64(dropped)
-		}
-		h.mu.Unlock()
+	// Production metrics - use atomic operations instead of mutex
+	if h.config.EnableMetrics && dropped > 0 {
+		atomic.AddUint64(&securityMetrics.BroadcastQueueFull, uint64(dropped))
 	}
 }
 
@@ -582,19 +706,39 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 //	// Send system-wide notification
 //	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
+	// Get a connection list from pool
+	connsList := h.getConnList()
+	defer h.putConnList(connsList)
+
+	// Copy all connections while holding read lock
 	h.mu.RLock()
-	var conns []*Conn
+	// Pre-allocate slice with estimated capacity if needed
+	estimatedSize := 0
+	for _, rs := range h.rooms {
+		estimatedSize += len(rs)
+	}
+	if cap(*connsList) < estimatedSize {
+		*connsList = make([]*Conn, 0, estimatedSize)
+	}
+
 	for _, rs := range h.rooms {
 		for c := range rs {
-			conns = append(conns, c)
+			// Only include active connections
+			if !c.IsClosed() {
+				*connsList = append(*connsList, c)
+			}
 		}
 	}
 	h.mu.RUnlock()
 
+	if len(*connsList) == 0 {
+		return
+	}
+
 	sent := 0
 	dropped := 0
 
-	for _, c := range conns {
+	for _, c := range *connsList {
 		select {
 		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
 			sent++
@@ -614,13 +758,9 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 		}
 	}
 
-	// Production metrics
-	if h.config.EnableMetrics && (sent > 0 || dropped > 0) {
-		h.mu.Lock()
-		if dropped > 0 {
-			securityMetrics.BroadcastQueueFull += uint64(dropped)
-		}
-		h.mu.Unlock()
+	// Production metrics - use atomic operations instead of mutex
+	if h.config.EnableMetrics && dropped > 0 {
+		atomic.AddUint64(&securityMetrics.BroadcastQueueFull, uint64(dropped))
 	}
 }
 
@@ -652,13 +792,8 @@ func (h *Hub) GetRoomCount(room string) int {
 //	total := hub.GetTotalCount()
 //	fmt.Printf("Total connections: %d\n", total)
 func (h *Hub) GetTotalCount() int {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	count := 0
-	for _, rs := range h.rooms {
-		count += len(rs)
-	}
-	return count
+	// Use atomic counter for O(1) performance
+	return int(h.totalConns.Load())
 }
 
 // GetRooms returns a list of all room names.

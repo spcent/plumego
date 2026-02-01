@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"sync/atomic"
@@ -9,43 +10,63 @@ import (
 
 // WriteMessage enqueues message to sendQueue. Behavior on full queue depends on c.sendBehavior.
 // It waits up to sendTimeout if blocking behavior chosen.
+//
+// Deprecated: Use WriteMessageContext for better cancellation support.
 func (c *Conn) WriteMessage(op byte, data []byte) error {
-	if c.IsClosed() {
-		return errors.New("connection closed")
+	ctx := context.Background()
+	if c.sendTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.sendTimeout)
+		defer cancel()
 	}
+	return c.WriteMessageContext(ctx, op, data)
+}
+
+// WriteMessageContext enqueues message to sendQueue with context support.
+// Behavior on full queue depends on c.sendBehavior.
+//
+// The context can be used for cancellation and custom timeouts:
+//
+//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//	defer cancel()
+//	err := conn.WriteMessageContext(ctx, websocket.OpcodeText, []byte("hello"))
+func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) error {
+	if c.IsClosed() {
+		return ErrConnClosed
+	}
+
 	out := Outbound{Op: op, Data: data}
+
+	// Fast path: try non-blocking send first
 	select {
 	case c.sendQueue <- out:
 		return nil
 	default:
-		// queue full
-		switch c.sendBehavior {
-		case SendBlock:
-			// wait up to timeout
-			if c.sendTimeout <= 0 {
-				c.sendQueue <- out // block until available
-				return nil
-			}
-			timer := time.NewTimer(c.sendTimeout)
-			defer timer.Stop()
-			select {
-			case c.sendQueue <- out:
-				return nil
-			case <-timer.C:
-				return errors.New("send timeout")
-			case <-c.closeC:
-				return errors.New("connection closed")
-			}
-		case SendDrop:
-			// drop silently (or return an error)
-			return errors.New("send queue full: dropped")
-		case SendClose:
-			// close connection
-			c.Close()
-			return errors.New("send queue full: connection closed")
-		default:
-			return errors.New("unknown send behavior")
+		// Queue is full, handle according to behavior
+	}
+
+	// Handle full queue based on behavior
+	switch c.sendBehavior {
+	case SendBlock:
+		// Block until space available, context cancelled, or connection closed
+		select {
+		case c.sendQueue <- out:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-c.closeC:
+			return ErrConnClosed
 		}
+
+	case SendDrop:
+		return ErrQueueFull
+
+	case SendClose:
+		c.Close()
+		return ErrQueueFullClosed
+
+	default:
+		return errors.New("unknown send behavior")
 	}
 }
 

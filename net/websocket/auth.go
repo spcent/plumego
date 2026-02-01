@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"log"
 	"strings"
 	"sync"
@@ -88,47 +87,47 @@ func (s *simpleRoomAuth) CheckRoomPassword(room, provided string) bool {
 func (s *simpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return nil, errors.New("invalid jwt")
+		return nil, ErrInvalidToken
 	}
 	hdrb, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidToken
 	}
 	var hdr map[string]any
 	if err = json.Unmarshal(hdrb, &hdr); err != nil {
-		return nil, err
+		return nil, ErrInvalidToken
 	}
 	if alg, ok := hdr["alg"].(string); !ok || alg != "HS256" {
-		return nil, errors.New("unsupported jwt alg")
+		return nil, ErrInvalidToken
 	}
 	payloadb, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidToken
 	}
 	var payload map[string]any
 	if err = json.Unmarshal(payloadb, &payload); err != nil {
-		return nil, err
+		return nil, ErrInvalidToken
 	}
 	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidToken
 	}
 	mac := hmac.New(sha256.New, s.jwtSecret)
 	mac.Write([]byte(parts[0] + "." + parts[1]))
 	expected := mac.Sum(nil)
 	if !hmac.Equal(expected, sig) {
-		return nil, errors.New("invalid jwt signature")
+		return nil, ErrInvalidToken
 	}
 	// Verify exp if present
 	if expv, ok := payload["exp"]; ok {
 		switch t := expv.(type) {
 		case float64:
 			if time.Now().Unix() > int64(t) {
-				return nil, errors.New("jwt expired")
+				return nil, ErrTokenExpired
 			}
 		case int64:
 			if time.Now().Unix() > t {
-				return nil, errors.New("jwt expired")
+				return nil, ErrTokenExpired
 			}
 		}
 	}

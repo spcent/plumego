@@ -3,6 +3,7 @@ package websocket
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -218,8 +219,10 @@ func TestWriteMessageWithTimeout(t *testing.T) {
 	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
-	if err == nil || !strings.Contains(err.Error(), "timeout") {
-		t.Errorf("expected timeout error, got %v", err)
+	if err == nil {
+		t.Error("expected timeout error, got nil")
+	} else if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "timeout") && !strings.Contains(err.Error(), "deadline") {
+		t.Errorf("expected timeout/deadline error, got %v", err)
 	}
 }
 
@@ -233,8 +236,10 @@ func TestWriteMessageDrop(t *testing.T) {
 	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
-	if err == nil || !strings.Contains(err.Error(), "dropped") {
-		t.Errorf("expected dropped error, got %v", err)
+	if err == nil {
+		t.Error("expected queue full error, got nil")
+	} else if !errors.Is(err, ErrQueueFull) && !strings.Contains(err.Error(), "queue full") {
+		t.Errorf("expected queue full error, got %v", err)
 	}
 }
 
@@ -325,8 +330,10 @@ func TestWriteMessageClosed(t *testing.T) {
 	c.Close()
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
-	if err == nil || err.Error() != "connection closed" {
-		t.Errorf("expected 'connection closed' error, got %v", err)
+	if err == nil {
+		t.Error("expected connection closed error, got nil")
+	} else if !errors.Is(err, ErrConnClosed) && !strings.Contains(err.Error(), "closed") {
+		t.Errorf("expected connection closed error, got %v", err)
 	}
 }
 
@@ -406,8 +413,10 @@ func TestReadMessageStreamClosed(t *testing.T) {
 	c.Close()
 
 	_, _, err := c.ReadMessageStream()
-	if err == nil || err.Error() != "connection closed" {
-		t.Errorf("expected 'connection closed' error, got %v", err)
+	if err == nil {
+		t.Error("expected connection closed error, got nil")
+	} else if !errors.Is(err, ErrConnClosed) && !strings.Contains(err.Error(), "closed") {
+		t.Errorf("expected connection closed error, got %v", err)
 	}
 }
 
@@ -514,7 +523,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 				c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
 			},
 			expectErr: true,
-			errMsg:    "timeout",
+			errMsg:    "deadline", // context.DeadlineExceeded
 		},
 		{
 			name:     "drop when full",
@@ -524,7 +533,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 				c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
 			},
 			expectErr: true,
-			errMsg:    "dropped",
+			errMsg:    "queue full", // ErrQueueFull
 		},
 		{
 			name:     "close when full",
