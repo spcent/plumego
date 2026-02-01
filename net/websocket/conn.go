@@ -3,7 +3,6 @@ package websocket
 import (
 	"bufio"
 	"encoding/binary"
-	"errors"
 	"io"
 	"net"
 	"sync"
@@ -224,7 +223,7 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	prefix := int64(h[1] & 0x7F)
 
 	if !mask {
-		return 0, false, nil, errors.New("protocol error: unmasked client frame")
+		return 0, false, nil, ErrUnmaskedFrame
 	}
 
 	var payloadLen int64
@@ -246,7 +245,7 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	}
 
 	if payloadLen > atomic.LoadInt64(&c.readLimit) {
-		return 0, false, nil, errors.New("payload too large")
+		return 0, false, nil, ErrPayloadTooLarge
 	}
 
 	var maskKey [4]byte
@@ -266,10 +265,10 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	// control frame checks
 	if op >= 0x8 {
 		if !fin {
-			return 0, false, nil, errors.New("protocol error: fragmented control frame")
+			return 0, false, nil, ErrFragmentedControl
 		}
 		if int64(len(payload)) > maxControlPayload {
-			return 0, false, nil, errors.New("protocol error: control frame too large")
+			return 0, false, nil, ErrControlTooLarge
 		}
 	}
 	return op, fin, payload, nil

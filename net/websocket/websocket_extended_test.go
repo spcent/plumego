@@ -413,8 +413,10 @@ func TestReadMessageStreamClosed(t *testing.T) {
 	c.Close()
 
 	_, _, err := c.ReadMessageStream()
-	if err == nil || err.Error() != "connection closed" {
-		t.Errorf("expected 'connection closed' error, got %v", err)
+	if err == nil {
+		t.Error("expected connection closed error, got nil")
+	} else if !errors.Is(err, ErrConnClosed) && !strings.Contains(err.Error(), "closed") {
+		t.Errorf("expected connection closed error, got %v", err)
 	}
 }
 

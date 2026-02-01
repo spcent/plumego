@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"errors"
 	"log"
 	"os"
 	"sync"
@@ -429,7 +428,7 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 				"room": room,
 			}, "warning")
 		}
-		return errors.New("rate limit exceeded")
+		return ErrRateLimitExceeded
 	}
 
 	h.mu.Lock()
