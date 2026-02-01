@@ -41,6 +41,9 @@ func (s *stubCollector) ObserveKV(_ context.Context, _, _ string, _ time.Duratio
 func (s *stubCollector) ObserveIPC(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
 }
 
+func (s *stubCollector) ObserveDB(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
+}
+
 func (s *stubCollector) GetStats() metrics.CollectorStats { return s.stats }
 
 func (s *stubCollector) Clear() {}

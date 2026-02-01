@@ -387,6 +387,14 @@ func (t *OpenTelemetryTracer) ObserveKV(ctx context.Context, operation, key stri
 	t.baseCollector().ObserveKV(ctx, operation, key, duration, err, hit)
 }
 
+func (t *OpenTelemetryTracer) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
+	t.baseCollector().ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
+}
+
+func (t *OpenTelemetryTracer) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+	t.baseCollector().ObserveDB(ctx, operation, driver, query, rows, duration, err)
+}
+
 // GetStats implements the unified MetricsCollector interface
 // This method returns span statistics
 func (t *OpenTelemetryTracer) GetStats() CollectorStats {

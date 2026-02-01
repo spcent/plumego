@@ -315,6 +315,10 @@ func (p *PrometheusCollector) ObserveIPC(ctx context.Context, operation, addr, t
 	p.baseCollector().ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
 }
 
+func (p *PrometheusCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+	p.baseCollector().ObserveDB(ctx, operation, driver, query, rows, duration, err)
+}
+
 func (p *PrometheusCollector) snapshot() (map[labelKey]uint64, map[labelKey]latencyStats, time.Duration) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

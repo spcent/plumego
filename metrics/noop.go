@@ -68,6 +68,11 @@ func (n *NoopCollector) ObserveIPC(ctx context.Context, operation, addr, transpo
 	// No-op
 }
 
+// ObserveDB does nothing and returns immediately.
+func (n *NoopCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+	// No-op
+}
+
 // GetStats returns an empty statistics structure.
 //
 // Example:
