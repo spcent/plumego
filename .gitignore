@@ -1,3 +1,8 @@
 .claude/
 *.exe
 *.log
+
+# Example binaries and backups
+examples/crud-demo/crud-demo
+examples/reference/reference
+*.bak
