@@ -342,33 +342,3 @@ func TestMultiCollectorEmpty(t *testing.T) {
 func TestMultiCollectorImplementsInterface(t *testing.T) {
 	var _ MetricsCollector = (*MultiCollector)(nil)
 }
-
-// Benchmark helpers
-func BenchmarkTimerElapsed(b *testing.B) {
-	timer := NewTimer()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = timer.Elapsed()
-	}
-}
-
-func BenchmarkRecordSuccess(b *testing.B) {
-	collector := NewBaseMetricsCollector()
-	ctx := context.Background()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		RecordSuccess(ctx, collector, "test", 50*time.Millisecond)
-	}
-}
-
-func BenchmarkMultiCollectorObserveHTTP(b *testing.B) {
-	collector1 := NewBaseMetricsCollector()
-	collector2 := NewBaseMetricsCollector()
-	multi := NewMultiCollector(collector1, collector2)
-	ctx := context.Background()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
-	}
-}

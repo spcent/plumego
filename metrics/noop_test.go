@@ -106,30 +106,3 @@ func TestNoopCollectorConcurrency(t *testing.T) {
 		<-done
 	}
 }
-
-// BenchmarkNoopCollector measures the overhead of the noop collector
-func BenchmarkNoopCollectorObserveHTTP(b *testing.B) {
-	collector := NewNoopCollector()
-	ctx := context.Background()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		collector.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
-	}
-}
-
-// BenchmarkNoopCollectorRecord measures the overhead of generic record
-func BenchmarkNoopCollectorRecord(b *testing.B) {
-	collector := NewNoopCollector()
-	ctx := context.Background()
-	record := MetricRecord{
-		Type:  MetricHTTPRequest,
-		Name:  "test",
-		Value: 100,
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		collector.Record(ctx, record)
-	}
-}
