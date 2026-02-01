@@ -5,47 +5,9 @@ import (
 	"database/sql"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/metrics"
 )
-
-// mockMetricsCollector is a test implementation of MetricsCollector
-type mockMetricsCollector struct {
-	calls []metricsCall
-}
-
-type metricsCall struct {
-	operation string
-	driver    string
-	query     string
-	rows      int
-	duration  time.Duration
-	err       error
-}
-
-func (m *mockMetricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	m.calls = append(m.calls, metricsCall{
-		operation: operation,
-		driver:    driver,
-		query:     query,
-		rows:      rows,
-		duration:  duration,
-		err:       err,
-	})
-}
-
-func (m *mockMetricsCollector) getLastCall() *metricsCall {
-	if len(m.calls) == 0 {
-		return nil
-	}
-	return &m.calls[len(m.calls)-1]
-}
-
-func (m *mockMetricsCollector) callCount() int {
-	return len(m.calls)
-}
-
-func (m *mockMetricsCollector) reset() {
-	m.calls = nil
-}
 
 // mockDB is a test double for sql.DB that doesn't require a real database
 type mockDB struct {
@@ -62,7 +24,7 @@ func newMockDB() *sql.DB {
 func TestNewInstrumentedDB(t *testing.T) {
 	// Since we can't easily mock sql.DB without a driver,
 	// we test the InstrumentedDB creation logic
-	collector := &mockMetricsCollector{}
+	collector := metrics.NewMockCollector()
 
 	// Test with nil DB (edge case)
 	idb := NewInstrumentedDB(nil, collector, "postgres")
@@ -81,33 +43,33 @@ func TestNewInstrumentedDB(t *testing.T) {
 func TestInstrumentedDB_MetricsRecording(t *testing.T) {
 	// Test that metrics are properly recorded
 	// This tests the instrumentation logic without requiring a real DB
-	collector := &mockMetricsCollector{}
+	collector := metrics.NewMockCollector()
 
 	// Simulate recording metrics directly
 	ctx := context.Background()
 	collector.ObserveDB(ctx, "exec", "postgres", "INSERT INTO users (name) VALUES (?)", 1, 30*time.Millisecond, nil)
 
-	if collector.callCount() != 1 {
-		t.Fatalf("expected 1 metric call, got %d", collector.callCount())
+	if collector.DBCallCount() != 1 {
+		t.Fatalf("expected 1 metric call, got %d", collector.DBCallCount())
 	}
 
-	call := collector.getLastCall()
-	if call.operation != "exec" {
-		t.Errorf("expected operation 'exec', got %q", call.operation)
+	call := collector.GetLastDBCall()
+	if call.Operation != "exec" {
+		t.Errorf("expected operation 'exec', got %q", call.Operation)
 	}
-	if call.driver != "postgres" {
-		t.Errorf("expected driver 'postgres', got %q", call.driver)
+	if call.Driver != "postgres" {
+		t.Errorf("expected driver 'postgres', got %q", call.Driver)
 	}
-	if call.rows != 1 {
-		t.Errorf("expected 1 row, got %d", call.rows)
+	if call.Rows != 1 {
+		t.Errorf("expected 1 row, got %d", call.Rows)
 	}
-	if call.duration != 30*time.Millisecond {
-		t.Errorf("expected duration 30ms, got %v", call.duration)
+	if call.Duration != 30*time.Millisecond {
+		t.Errorf("expected duration 30ms, got %v", call.Duration)
 	}
 }
 
 func TestInstrumentedDB_MultipleOperations(t *testing.T) {
-	collector := &mockMetricsCollector{}
+	collector := metrics.NewMockCollector()
 	ctx := context.Background()
 
 	// Simulate multiple operations
@@ -127,8 +89,8 @@ func TestInstrumentedDB_MultipleOperations(t *testing.T) {
 		collector.ObserveDB(ctx, op.operation, "postgres", op.query, op.rows, op.duration, nil)
 	}
 
-	if collector.callCount() != len(operations) {
-		t.Errorf("expected %d operations, got %d", len(operations), collector.callCount())
+	if collector.DBCallCount() != len(operations) {
+		t.Errorf("expected %d operations, got %d", len(operations), collector.DBCallCount())
 	}
 }
 
@@ -146,7 +108,7 @@ func TestInstrumentedDB_NilCollector(t *testing.T) {
 }
 
 func TestInstrumentedDB_RecordPoolStats_Logic(t *testing.T) {
-	collector := &mockMetricsCollector{}
+	collector := metrics.NewMockCollector()
 	ctx := context.Background()
 
 	// Test the pool stats recording logic by directly calling the collector
@@ -163,14 +125,14 @@ func TestInstrumentedDB_RecordPoolStats_Logic(t *testing.T) {
 	collector.ObserveDB(ctx, "pool_max_lifetime_closed", "postgres", "", 3, 0, nil)
 
 	// Verify all 7 pool metrics were recorded
-	if collector.callCount() != 7 {
-		t.Errorf("expected 7 pool metrics, got %d", collector.callCount())
+	if collector.DBCallCount() != 7 {
+		t.Errorf("expected 7 pool metrics, got %d", collector.DBCallCount())
 	}
 
 	// Verify operation names
 	operations := make(map[string]bool)
-	for _, call := range collector.calls {
-		operations[call.operation] = true
+	for _, call := range collector.GetDBCalls() {
+		operations[call.Operation] = true
 	}
 
 	expectedOps := []string{
@@ -191,30 +153,30 @@ func TestInstrumentedDB_RecordPoolStats_Logic(t *testing.T) {
 }
 
 func TestInstrumentedDB_ErrorTracking(t *testing.T) {
-	collector := &mockMetricsCollector{}
+	collector := metrics.NewMockCollector()
 	ctx := context.Background()
 
 	// Simulate a query error
 	err := sql.ErrNoRows
 	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM invalid", 0, 20*time.Millisecond, err)
 
-	if collector.callCount() != 1 {
-		t.Fatalf("expected 1 metric call, got %d", collector.callCount())
+	if collector.DBCallCount() != 1 {
+		t.Fatalf("expected 1 metric call, got %d", collector.DBCallCount())
 	}
 
-	call := collector.getLastCall()
-	if call.err == nil {
+	call := collector.GetLastDBCall()
+	if call.Err == nil {
 		t.Error("expected error to be recorded")
 	}
-	if call.err != err {
-		t.Errorf("expected error %v, got %v", err, call.err)
+	if call.Err != err {
+		t.Errorf("expected error %v, got %v", err, call.Err)
 	}
 }
 
 func TestInstrumentedDB_Unwrap(t *testing.T) {
 	// Test Unwrap returns the underlying DB
 	var mockDB *sql.DB // nil in this test
-	collector := &mockMetricsCollector{}
+	collector := metrics.NewMockCollector()
 	idb := NewInstrumentedDB(mockDB, collector, "postgres")
 
 	unwrapped := idb.Unwrap()
@@ -224,7 +186,7 @@ func TestInstrumentedDB_Unwrap(t *testing.T) {
 }
 
 func TestInstrumentedDB_InterfaceCompliance(t *testing.T) {
-	collector := &mockMetricsCollector{}
+	collector := metrics.NewMockCollector()
 	idb := NewInstrumentedDB(nil, collector, "postgres")
 
 	// Verify it implements DB interface

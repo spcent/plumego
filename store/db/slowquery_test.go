@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/metrics"
 )
 
 func TestSlowQueryDetector_Check(t *testing.T) {
@@ -220,7 +222,7 @@ func TestSlowQueryDetector_Concurrency(t *testing.T) {
 
 func TestMetricsCollectorWithSlowQueryDetection(t *testing.T) {
 	callbackCalled := false
-	base := &mockMetricsCollector{}
+	base := metrics.NewMockCollector()
 
 	collector := NewMetricsCollectorWithSlowQueryDetection(
 		base,
@@ -234,8 +236,8 @@ func TestMetricsCollectorWithSlowQueryDetection(t *testing.T) {
 	collector.ObserveDB(nil, "query", "postgres", "SELECT * FROM users", 10, 200*time.Millisecond, nil)
 
 	// Verify it was forwarded to base collector
-	if base.callCount() != 1 {
-		t.Errorf("expected base collector to receive 1 call, got %d", base.callCount())
+	if base.DBCallCount() != 1 {
+		t.Errorf("expected base collector to receive 1 call, got %d", base.DBCallCount())
 	}
 
 	// Verify slow query was detected
