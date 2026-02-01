@@ -48,7 +48,7 @@ type UserController struct {
 func NewUserController() *UserController {
 	ctrl := &UserController{
 		BaseContextResourceController: NewBaseContextResourceController("user"),
-		validator:                      validator.NewValidator(nil),
+		validator:                     validator.NewValidator(nil),
 	}
 
 	// Configure query builder with allowed fields
@@ -340,7 +340,7 @@ func (t *UserTransformer) TransformCollection(ctx context.Context, resources any
 // Simulated Database Operations (for example purposes)
 // ================================================
 
-func (c *UserController) fetchUsers(params *QueryParams) ([]*User, int64) {
+func (c *UserController) fetchUsers(_ *QueryParams) ([]*User, int64) {
 	// This would normally query a database
 	users := []*User{
 		{ID: "1", Name: "Alice", Email: "alice@example.com", CreatedAt: time.Now(), UpdatedAt: time.Now()},

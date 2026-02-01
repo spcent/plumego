@@ -410,7 +410,7 @@ func TestBatchProcessor_Process(t *testing.T) {
 
 	t.Run("successful batch", func(t *testing.T) {
 		items := []any{1, 2, 3}
-		result := processor.Process(nil, items, func(ctx context.Context, item any) error {
+		result := processor.Process(t.Context(), items, func(ctx context.Context, item any) error {
 			return nil
 		})
 
@@ -424,7 +424,7 @@ func TestBatchProcessor_Process(t *testing.T) {
 
 	t.Run("batch too large", func(t *testing.T) {
 		items := make([]any, 20)
-		result := processor.Process(nil, items, func(ctx context.Context, item any) error {
+		result := processor.Process(t.Context(), items, func(ctx context.Context, item any) error {
 			return nil
 		})
 

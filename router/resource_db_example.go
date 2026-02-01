@@ -161,7 +161,7 @@ type UserDBController struct {
 // NewUserDBController creates a new user controller
 func NewUserDBController(database db.DB) *UserDBController {
 	repo := NewUserRepository(database)
-	ctrl := NewDBResourceController[UserModel]("user", repo)
+	ctrl := NewDBResourceController("user", repo)
 
 	// Configure query builder
 	ctrl.QueryBuilder.

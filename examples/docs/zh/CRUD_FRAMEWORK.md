@@ -2,7 +2,7 @@
 
 完整的数据库 CRUD 框架,将 RESTful API 模式与 `store/db` 包深度集成,提供企业级的可复用组件。
 
-## 📋 目录
+## 目录
 
 - [核心概念](#核心概念)
 - [快速开始](#快速开始)
@@ -11,7 +11,7 @@
 - [最佳实践](#最佳实践)
 - [API 参考](#api-参考)
 
-## 🎯 核心概念
+## 核心概念
 
 ### 架构图
 
@@ -40,7 +40,7 @@ Database (PostgreSQL/MySQL/SQLite)
 5. **ResourceHooks** - 生命周期钩子
 6. **ResourceTransformer** - 资源转换器
 
-## 🚀 快速开始
+## 快速开始
 
 ### 1. 定义数据模型
 
@@ -123,7 +123,7 @@ func RegisterUserRoutes(r *router.Router, database db.DB) {
 }
 ```
 
-## 📦 组件详解
+## 组件详解
 
 ### Repository 接口
 
@@ -280,7 +280,7 @@ func (t *UserTransformer) TransformCollection(ctx context.Context, resources any
 }
 ```
 
-## 💡 完整示例
+## 完整示例
 
 ### 用户管理 API
 
@@ -383,7 +383,7 @@ DELETE /users/user-123
 }
 ```
 
-## 🎨 高级特性
+## 高级特性
 
 ### 软删除支持
 
@@ -479,7 +479,7 @@ func (c *UserController) TransferOwnership(ctx *contract.Ctx) {
 }
 ```
 
-## 📚 最佳实践
+## 最佳实践
 
 ### 1. 分离关注点
 
@@ -556,7 +556,7 @@ func (t *UserTransformer) Transform(ctx context.Context, resource any) (any, err
 }
 ```
 
-## 🔧 API 参考
+## API 参考
 
 ### Repository 方法
 
@@ -619,7 +619,7 @@ ctrl.Hooks = &MyHooks{}
 ctrl.Transformer = &MyTransformer{}
 ```
 
-## 🎓 学习资源
+## 学习资源
 
 - [resource.go](router/resource.go) - CRUD 框架核心
 - [resource_db.go](router/resource_db.go) - 数据库集成
@@ -627,7 +627,7 @@ ctrl.Transformer = &MyTransformer{}
 - [resource_db_example.go](router/resource_db_example.go) - 数据库示例
 - [store/db 包文档](../store/db) - 数据库抽象层
 
-## 📝 总结
+## 总结
 
 这个 CRUD 框架提供了:
 
