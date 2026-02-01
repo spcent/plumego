@@ -707,3 +707,287 @@ func TestPrefixNormalization(t *testing.T) {
 		})
 	}
 }
+
+func TestPrecompressedFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	write := func(path, content string) {
+		full := filepath.Join(dir, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	// Create original file and compressed variants
+	write("index.html", "<html>index</html>")
+	write("app.js", "console.log('original')")
+	write("app.js.gz", "gzipped content")
+	write("app.js.br", "brotli content")
+	write("style.css", "body { color: red; }")
+	write("style.css.gz", "gzipped css")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithPrecompressed(true)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		path           string
+		acceptEncoding string
+		expectBody     string
+		expectEncoding string
+		expectVary     bool
+	}{
+		{
+			name:           "brotli preferred",
+			path:           "/app.js",
+			acceptEncoding: "br, gzip, deflate",
+			expectBody:     "brotli content",
+			expectEncoding: "br",
+			expectVary:     true,
+		},
+		{
+			name:           "gzip when br not accepted",
+			path:           "/app.js",
+			acceptEncoding: "gzip, deflate",
+			expectBody:     "gzipped content",
+			expectEncoding: "gzip",
+			expectVary:     true,
+		},
+		{
+			name:           "original when no encoding accepted",
+			path:           "/app.js",
+			acceptEncoding: "",
+			expectBody:     "console.log('original')",
+			expectEncoding: "",
+			expectVary:     false,
+		},
+		{
+			name:           "only gzip available",
+			path:           "/style.css",
+			acceptEncoding: "br, gzip",
+			expectBody:     "gzipped css",
+			expectEncoding: "gzip",
+			expectVary:     true,
+		},
+		{
+			name:           "no precompressed version",
+			path:           "/index.html",
+			acceptEncoding: "gzip, br",
+			expectBody:     "<html>index</html>",
+			expectEncoding: "",
+			expectVary:     false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			if tc.acceptEncoding != "" {
+				req.Header.Set("Accept-Encoding", tc.acceptEncoding)
+			}
+			rec := httptest.NewRecorder()
+
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status: got %d want %d", rec.Code, http.StatusOK)
+			}
+
+			if !strings.Contains(rec.Body.String(), tc.expectBody) {
+				t.Fatalf("body: got %q, expected to contain %q", rec.Body.String(), tc.expectBody)
+			}
+
+			gotEncoding := rec.Header().Get("Content-Encoding")
+			if gotEncoding != tc.expectEncoding {
+				t.Fatalf("Content-Encoding: got %q want %q", gotEncoding, tc.expectEncoding)
+			}
+
+			hasVary := rec.Header().Get("Vary") != ""
+			if hasVary != tc.expectVary {
+				t.Fatalf("Vary header: got %v want %v", hasVary, tc.expectVary)
+			}
+		})
+	}
+}
+
+func TestPrecompressedDisabled(t *testing.T) {
+	dir := t.TempDir()
+
+	write := func(path, content string) {
+		full := filepath.Join(dir, path)
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	write("index.html", "<html>index</html>")
+	write("app.js", "original")
+	write("app.js.gz", "gzipped")
+
+	r := router.NewRouter()
+	// Precompressed disabled by default or explicitly set to false
+	if err := RegisterFromDir(r, dir, WithPrecompressed(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: %d", rec.Code)
+	}
+
+	if rec.Body.String() != "original" {
+		t.Fatalf("should serve original file when precompressed disabled, got: %q", rec.Body.String())
+	}
+
+	if rec.Header().Get("Content-Encoding") != "" {
+		t.Fatalf("should not set Content-Encoding when precompressed disabled")
+	}
+}
+
+func TestCustomNotFoundPage(t *testing.T) {
+	dir := t.TempDir()
+
+	write := func(path, content string) {
+		full := filepath.Join(dir, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	write("index.html", "<html>home</html>")
+	write("404.html", "<html>Custom 404 Page</html>")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir,
+		WithNotFoundPage("404.html"),
+		WithFallback(false), // Disable fallback to test 404 page
+	); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
+	rec := httptest.NewRecorder()
+
+	r.ServeHTTP(rec, req)
+
+	if !strings.Contains(rec.Body.String(), "Custom 404 Page") {
+		t.Fatalf("should serve custom 404 page, got: %q", rec.Body.String())
+	}
+}
+
+func TestCustomMIMETypes(t *testing.T) {
+	dir := t.TempDir()
+
+	write := func(path, content string) {
+		full := filepath.Join(dir, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	write("index.html", "<html>index</html>")
+	write("app.wasm", "wasm binary content")
+	write("manifest.json", `{"name":"app"}`)
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithMIMETypes(map[string]string{
+		".wasm": "application/wasm",
+		".json": "application/json; charset=utf-8",
+	})); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	tests := []struct {
+		path          string
+		expectType    string
+		shouldContain bool
+	}{
+		{"/app.wasm", "application/wasm", true},
+		{"/manifest.json", "application/json; charset=utf-8", true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status: %d", rec.Code)
+			}
+
+			contentType := rec.Header().Get("Content-Type")
+			if tc.shouldContain && !strings.Contains(contentType, tc.expectType) {
+				t.Fatalf("Content-Type: got %q, expected to contain %q", contentType, tc.expectType)
+			}
+		})
+	}
+}
+
+func TestMIMETypesWithPrecompressed(t *testing.T) {
+	dir := t.TempDir()
+
+	write := func(path, content string) {
+		full := filepath.Join(dir, path)
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	write("index.html", "<html>index</html>")
+	write("app.wasm", "wasm original")
+	write("app.wasm.br", "wasm compressed")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir,
+		WithPrecompressed(true),
+		WithMIMETypes(map[string]string{
+			".wasm": "application/wasm",
+		}),
+	); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.wasm", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: %d", rec.Code)
+	}
+
+	// Should serve compressed version
+	if !strings.Contains(rec.Body.String(), "wasm compressed") {
+		t.Fatalf("should serve compressed version")
+	}
+
+	// Should still set correct MIME type for original file
+	contentType := rec.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "application/wasm") {
+		t.Fatalf("Content-Type should be set for original file type, got: %q", contentType)
+	}
+
+	// Should have Content-Encoding header
+	if rec.Header().Get("Content-Encoding") != "br" {
+		t.Fatalf("should set Content-Encoding")
+	}
+}
