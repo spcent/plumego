@@ -2,7 +2,6 @@ package websocket
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -74,7 +73,7 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 				continue
 			} else {
 				// shouldn't get new data opcode while assembling
-				sr.readErr = errors.New("protocol error: new data opcode while assembling")
+				sr.readErr = ErrProtocolError
 				sr.done = true
 				return 0, sr.readErr
 			}
@@ -94,7 +93,7 @@ func (sr *streamReader) Close() error {
 // Caller must Close() the returned ReadCloser when finished to allow connection continue.
 func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 	if c.IsClosed() {
-		return 0, nil, errors.New("connection closed")
+		return 0, nil, ErrConnClosed
 	}
 	// read first frame - must be text/binary or control
 	for {

@@ -36,11 +36,66 @@ func headerContains(h http.Header, key, val string) bool {
 	return false
 }
 
+// isOriginAllowed checks if the request origin is in the allowed list
+// Returns true if allowedOrigins is nil/empty (skip validation) or contains "*" or the specific origin
+func isOriginAllowed(origin string, allowedOrigins []string) bool {
+	// Skip validation if no origins configured
+	if len(allowedOrigins) == 0 {
+		return true
+	}
+
+	// Check for wildcard
+	for _, allowed := range allowedOrigins {
+		if allowed == "*" {
+			return true
+		}
+		if allowed == origin {
+			return true
+		}
+	}
+	return false
+}
+
+// ServerConfig configures WebSocket server options
+type ServerConfig struct {
+	Hub            *Hub
+	Auth           *simpleRoomAuth
+	QueueSize      int
+	SendTimeout    time.Duration
+	SendBehavior   SendBehavior
+	AllowedOrigins []string // Allowed origins for CORS, use ["*"] to allow all
+}
+
 // ServeWSWithAuth does the handshake and basic auth checks before accepting connection.
 // Accepts token from Authorization header "Bearer <token>" or ?token= in query.
 // room password from ?room_password= param.
 // onConn will be called when Conn is ready.
 func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *simpleRoomAuth, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
+	ServeWSWithConfig(w, r, ServerConfig{
+		Hub:            hub,
+		Auth:           auth,
+		QueueSize:      queueSize,
+		SendTimeout:    sendTimeout,
+		SendBehavior:   behavior,
+		AllowedOrigins: nil, // No origin validation for backward compatibility
+	})
+}
+
+// ServeWSWithConfig does the handshake with full configuration options including origin validation.
+// Accepts token from Authorization header "Bearer <token>" or ?token= in query.
+// room password from ?room_password= param.
+// onConn will be called when Conn is ready.
+func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig) {
+	// Origin validation (CSRF protection)
+	origin := r.Header.Get("Origin")
+	if origin != "" && !isOriginAllowed(origin, cfg.AllowedOrigins) {
+		metricsMutex.Lock()
+		securityMetrics.RejectedConnections++
+		metricsMutex.Unlock()
+		http.Error(w, "forbidden origin", http.StatusForbidden)
+		return
+	}
+
 	// Basic HTTP validation first
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -71,14 +126,14 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *sim
 	}
 	// check room password
 	roomPwd := r.URL.Query().Get("room_password")
-	if !auth.CheckRoomPassword(room, roomPwd) {
+	if !cfg.Auth.CheckRoomPassword(room, roomPwd) {
 		metricsMutex.Lock()
 		securityMetrics.RejectedConnections++
 		metricsMutex.Unlock()
 		http.Error(w, "forbidden: bad room password", http.StatusForbidden)
 		return
 	}
-	if err := hub.CanJoin(room); err != nil {
+	if err := cfg.Hub.CanJoin(room); err != nil {
 		status := http.StatusServiceUnavailable
 		if errors.Is(err, ErrRoomFull) {
 			status = http.StatusTooManyRequests
@@ -95,7 +150,7 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *sim
 		token = t
 	}
 	if token != "" {
-		payload, err := auth.VerifyJWT(token)
+		payload, err := cfg.Auth.VerifyJWT(token)
 		if err != nil {
 			metricsMutex.Lock()
 			securityMetrics.RejectedConnections++
@@ -134,7 +189,7 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *sim
 		return
 	}
 
-	c := NewConn(conn, queueSize, sendTimeout, behavior)
+	c := NewConn(conn, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
 	// Set user information if authenticated
 	c.UserInfo = userInfo
 	// override br/bw with hijacked conn
@@ -142,15 +197,15 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *sim
 	c.bw = bufio.NewWriterSize(conn, 8192)
 
 	// register in hub
-	if err := hub.TryJoin(room, c); err != nil {
+	if err := cfg.Hub.TryJoin(room, c); err != nil {
 		conn.Close()
 		return
 	}
 	// cleanup on close
 	go func() {
 		<-c.closeC
-		hub.Leave(room, c)
-		hub.RemoveConn(c)
+		cfg.Hub.Leave(room, c)
+		cfg.Hub.RemoveConn(c)
 	}()
 	// spawn a goroutine to read frames and push to room broadcast on completed stream
 	go func() {
@@ -169,7 +224,7 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *sim
 			_, _ = io.Copy(buf, rstream) // streaming
 			_ = rstream.Close()
 			// broadcast to room
-			hub.BroadcastRoom(room, op, buf.Bytes())
+			cfg.Hub.BroadcastRoom(room, op, buf.Bytes())
 		}
 	}()
 }

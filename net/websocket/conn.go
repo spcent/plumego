@@ -3,7 +3,6 @@ package websocket
 import (
 	"bufio"
 	"encoding/binary"
-	"errors"
 	"io"
 	"net"
 	"sync"
@@ -138,8 +137,8 @@ type Conn struct {
 	// User information (set after authentication)
 	UserInfo *UserInfo
 
-	// Connection metadata
-	Metadata map[string]any
+	// Connection metadata (concurrent-safe)
+	metadata sync.Map
 }
 
 // NewConn creates a Conn after handshake.
@@ -167,7 +166,7 @@ func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior Send
 		readLimit:     16 << 20, // 16MB
 		pingPeriod:    defaultPingPeriod,
 		pongWait:      defaultPongWait,
-		Metadata:      make(map[string]any),
+		// metadata is sync.Map, no initialization needed
 	}
 	atomic.StoreInt64(&cc.lastPong, time.Now().UnixNano())
 	// start writer pump
@@ -224,7 +223,7 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	prefix := int64(h[1] & 0x7F)
 
 	if !mask {
-		return 0, false, nil, errors.New("protocol error: unmasked client frame")
+		return 0, false, nil, ErrUnmaskedFrame
 	}
 
 	var payloadLen int64
@@ -246,7 +245,7 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	}
 
 	if payloadLen > atomic.LoadInt64(&c.readLimit) {
-		return 0, false, nil, errors.New("payload too large")
+		return 0, false, nil, ErrPayloadTooLarge
 	}
 
 	var maskKey [4]byte
@@ -266,10 +265,10 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	// control frame checks
 	if op >= 0x8 {
 		if !fin {
-			return 0, false, nil, errors.New("protocol error: fragmented control frame")
+			return 0, false, nil, ErrFragmentedControl
 		}
 		if int64(len(payload)) > maxControlPayload {
-			return 0, false, nil, errors.New("protocol error: control frame too large")
+			return 0, false, nil, ErrControlTooLarge
 		}
 	}
 	return op, fin, payload, nil
@@ -316,4 +315,66 @@ func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 		}
 	}
 	return c.bw.Flush()
+}
+
+// SetMetadata sets a metadata value for the connection (concurrent-safe).
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	conn := websocket.NewConn(...)
+//	conn.SetMetadata("session_id", "abc123")
+//	conn.SetMetadata("client_ip", "192.168.1.1")
+func (c *Conn) SetMetadata(key string, value any) {
+	c.metadata.Store(key, value)
+}
+
+// GetMetadata retrieves a metadata value for the connection (concurrent-safe).
+//
+// Returns the value and true if found, nil and false otherwise.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	conn := websocket.NewConn(...)
+//	conn.SetMetadata("session_id", "abc123")
+//	if sessionID, ok := conn.GetMetadata("session_id"); ok {
+//		fmt.Printf("Session ID: %v\n", sessionID)
+//	}
+func (c *Conn) GetMetadata(key string) (any, bool) {
+	return c.metadata.Load(key)
+}
+
+// DeleteMetadata removes a metadata value from the connection (concurrent-safe).
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	conn := websocket.NewConn(...)
+//	conn.SetMetadata("temp_data", "value")
+//	conn.DeleteMetadata("temp_data")
+func (c *Conn) DeleteMetadata(key string) {
+	c.metadata.Delete(key)
+}
+
+// RangeMetadata iterates over all metadata key-value pairs (concurrent-safe).
+//
+// The iteration stops if the function returns false.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	conn := websocket.NewConn(...)
+//	conn.SetMetadata("key1", "value1")
+//	conn.SetMetadata("key2", "value2")
+//	conn.RangeMetadata(func(key, value any) bool {
+//		fmt.Printf("%v: %v\n", key, value)
+//		return true // continue iteration
+//	})
+func (c *Conn) RangeMetadata(f func(key, value any) bool) {
+	c.metadata.Range(f)
 }

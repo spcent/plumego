@@ -126,7 +126,7 @@ func ValidateWebSocketKey(key string) error {
 // ValidateRoomPassword checks password strength
 func ValidateRoomPassword(pwd string, config password.PasswordStrengthConfig, enforce bool) error {
 	if pwd == "" {
-		return errors.New("password cannot be empty")
+		return NewValidationError("password", "cannot be empty")
 	}
 
 	// Check strength - use the password package's function
@@ -222,7 +222,7 @@ func ResetSecurityMetrics() {
 // GenerateSecureSecret generates a cryptographically secure random secret
 func GenerateSecureSecret(length int) ([]byte, error) {
 	if length < 32 {
-		return nil, errors.New("secret length should be at least 32 bytes")
+		return nil, NewValidationError("secret", "length should be at least 32 bytes")
 	}
 	secret := make([]byte, length)
 	if _, err := rand.Read(secret); err != nil {
