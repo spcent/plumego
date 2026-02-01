@@ -62,6 +62,9 @@ type Hub struct {
 	// Rate limiting (simple token bucket implementation)
 	rateLimiter *simpleRateLimiter
 
+	// Message pooling to reduce allocations
+	connListPool sync.Pool // Pool of []*Conn slices
+
 	// Production-ready configuration
 	config HubConfig
 	// Metrics for monitoring
@@ -70,6 +73,18 @@ type Hub struct {
 	logger *log.Logger
 	// Channel for security events
 	securityEvents chan SecurityEvent
+}
+
+// getConnList gets a connection list from the pool
+func (h *Hub) getConnList() *[]*Conn {
+	return h.connListPool.Get().(*[]*Conn)
+}
+
+// putConnList returns a connection list to the pool after clearing it
+func (h *Hub) putConnList(conns *[]*Conn) {
+	// Clear the slice but keep the underlying array
+	*conns = (*conns)[:0]
+	h.connListPool.Put(conns)
 }
 
 // simpleRateLimiter implements a basic token bucket rate limiter using only standard library
@@ -221,11 +236,6 @@ type HubMetrics struct {
 	MaxRoomConnections int    `json:"max_room_connections"`
 }
 
-var (
-	ErrHubFull  = errors.New("websocket hub at capacity")
-	ErrRoomFull = errors.New("websocket room at capacity")
-)
-
 // NewHub creates a new WebSocket hub with default configuration.
 //
 // Example:
@@ -279,6 +289,15 @@ func NewHubWithConfig(cfg HubConfig) *Hub {
 		config:         cfg,
 		securityEvents: make(chan SecurityEvent, 100),
 		logger:         log.New(os.Stderr, "[WEBSOCKET] ", log.LstdFlags),
+	}
+
+	// Initialize connection list pool
+	h.connListPool = sync.Pool{
+		New: func() any {
+			// Pre-allocate with reasonable capacity
+			conns := make([]*Conn, 0, 64)
+			return &conns
+		},
 	}
 
 	// Initialize rate limiter if configured
@@ -612,6 +631,10 @@ func (h *Hub) RemoveConn(c *Conn) {
 //	// Broadcast binary data
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeBinary, []byte{0x01, 0x02, 0x03})
 func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
+	// Get a connection list from pool
+	connsList := h.getConnList()
+	defer h.putConnList(connsList)
+
 	// Copy connections while holding read lock to prevent race conditions
 	h.mu.RLock()
 	rs, ok := h.rooms[room]
@@ -620,17 +643,21 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 		return
 	}
 
+	// Grow slice if needed (pool size might be too small)
+	if cap(*connsList) < len(rs) {
+		*connsList = make([]*Conn, 0, len(rs))
+	}
+
 	// Create snapshot of connections to iterate safely
-	conns := make([]*Conn, 0, len(rs))
 	for c := range rs {
 		// Only include active connections
 		if !c.IsClosed() {
-			conns = append(conns, c)
+			*connsList = append(*connsList, c)
 		}
 	}
 	h.mu.RUnlock()
 
-	if len(conns) == 0 {
+	if len(*connsList) == 0 {
 		return
 	}
 
@@ -638,7 +665,7 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 	dropped := 0
 
 	// Iterate over snapshot - safe from concurrent modifications
-	for _, c := range conns {
+	for _, c := range *connsList {
 		select {
 		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
 			sent++
@@ -680,33 +707,39 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 //	// Send system-wide notification
 //	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
+	// Get a connection list from pool
+	connsList := h.getConnList()
+	defer h.putConnList(connsList)
+
 	// Copy all connections while holding read lock
 	h.mu.RLock()
-	// Pre-allocate slice with estimated capacity
+	// Pre-allocate slice with estimated capacity if needed
 	estimatedSize := 0
 	for _, rs := range h.rooms {
 		estimatedSize += len(rs)
 	}
-	conns := make([]*Conn, 0, estimatedSize)
+	if cap(*connsList) < estimatedSize {
+		*connsList = make([]*Conn, 0, estimatedSize)
+	}
 
 	for _, rs := range h.rooms {
 		for c := range rs {
 			// Only include active connections
 			if !c.IsClosed() {
-				conns = append(conns, c)
+				*connsList = append(*connsList, c)
 			}
 		}
 	}
 	h.mu.RUnlock()
 
-	if len(conns) == 0 {
+	if len(*connsList) == 0 {
 		return
 	}
 
 	sent := 0
 	dropped := 0
 
-	for _, c := range conns {
+	for _, c := range *connsList {
 		select {
 		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
 			sent++
