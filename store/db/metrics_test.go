@@ -504,3 +504,65 @@ func BenchmarkInstrumentedDB_Overhead(b *testing.B) {
 		}
 	})
 }
+
+func TestInstrumentedDB_RecordPoolStats(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	// Configure pool settings
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+
+	collector := &mockMetricsCollector{}
+	idb := NewInstrumentedDB(db, collector, "sqlite3")
+
+	// Record pool stats
+	ctx := context.Background()
+	idb.RecordPoolStats(ctx)
+
+	// Verify metrics were recorded
+	// Should record 7 pool metrics: open_connections, in_use, idle, wait_count, wait_duration, max_idle_closed, max_lifetime_closed
+	if collector.callCount() < 7 {
+		t.Errorf("expected at least 7 pool metrics, got %d", collector.callCount())
+	}
+
+	// Verify some specific operations were recorded
+	operations := make(map[string]bool)
+	for _, call := range collector.calls {
+		operations[call.operation] = true
+	}
+
+	expectedOps := []string{
+		"pool_open_connections",
+		"pool_in_use",
+		"pool_idle",
+		"pool_wait_count",
+		"pool_wait_duration",
+		"pool_max_idle_closed",
+		"pool_max_lifetime_closed",
+	}
+
+	for _, op := range expectedOps {
+		if !operations[op] {
+			t.Errorf("expected operation %q to be recorded", op)
+		}
+	}
+}
+
+func TestInstrumentedDB_RecordPoolStats_NilCollector(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	// Create with nil collector
+	idb := NewInstrumentedDB(db, nil, "sqlite3")
+
+	// Should not panic
+	ctx := context.Background()
+	idb.RecordPoolStats(ctx)
+}

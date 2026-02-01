@@ -151,5 +151,55 @@ func (idb *InstrumentedDB) SetConnMaxIdleTime(d time.Duration) {
 	idb.db.SetConnMaxIdleTime(d)
 }
 
+// RecordPoolStats records current connection pool statistics as metrics.
+// This should be called periodically (e.g., every 30 seconds) to monitor pool health.
+//
+// Example:
+//
+//	ticker := time.NewTicker(30 * time.Second)
+//	go func() {
+//		for range ticker.C {
+//			idb.RecordPoolStats(context.Background())
+//		}
+//	}()
+func (idb *InstrumentedDB) RecordPoolStats(ctx context.Context) {
+	if idb.collector == nil {
+		return
+	}
+
+	stats := idb.db.Stats()
+
+	// Record pool statistics as separate metric observations
+	// These can be aggregated by monitoring systems like Prometheus
+
+	// Track open connections
+	idb.collector.ObserveDB(ctx, "pool_open_connections", idb.driver,
+		"", int(stats.OpenConnections), 0, nil)
+
+	// Track connections in use
+	idb.collector.ObserveDB(ctx, "pool_in_use", idb.driver,
+		"", int(stats.InUse), 0, nil)
+
+	// Track idle connections
+	idb.collector.ObserveDB(ctx, "pool_idle", idb.driver,
+		"", int(stats.Idle), 0, nil)
+
+	// Track wait count (total number of connections waited for)
+	idb.collector.ObserveDB(ctx, "pool_wait_count", idb.driver,
+		"", int(stats.WaitCount), 0, nil)
+
+	// Track wait duration
+	idb.collector.ObserveDB(ctx, "pool_wait_duration", idb.driver,
+		"", 0, stats.WaitDuration, nil)
+
+	// Track max idle closed (connections closed due to idle limit)
+	idb.collector.ObserveDB(ctx, "pool_max_idle_closed", idb.driver,
+		"", int(stats.MaxIdleClosed), 0, nil)
+
+	// Track max lifetime closed (connections closed due to max lifetime)
+	idb.collector.ObserveDB(ctx, "pool_max_lifetime_closed", idb.driver,
+		"", int(stats.MaxLifetimeClosed), 0, nil)
+}
+
 // Verify InstrumentedDB implements DB interface at compile time
 var _ DB = (*InstrumentedDB)(nil)
