@@ -1,6 +1,13 @@
 package input
 
-import "unicode/utf8"
+import (
+	"regexp"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/spcent/plumego/validator"
+)
 
 // IsToken reports whether value is a valid HTTP token (RFC 7230).
 //
@@ -96,4 +103,206 @@ func isTchar(ch byte) bool {
 	default:
 		return false
 	}
+}
+
+// ValidateEmail performs security-focused email validation.
+//
+// Returns true if the email appears valid. This is a basic check for security
+// purposes, not a comprehensive email validation.
+//
+// This function delegates to validator.SecureEmail() for the actual validation logic.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	if !input.ValidateEmail(userEmail) {
+//		// Reject invalid email
+//	}
+func ValidateEmail(email string) bool {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return false
+	}
+	rule := validator.SecureEmail()
+	err := rule.Validate(email)
+	return err == nil
+}
+
+// ValidateURL performs security-focused URL validation.
+//
+// Returns true if the URL is valid and safe to use. This function checks for
+// common security issues like javascript: URLs, file: URLs, and malformed URLs.
+//
+// This function delegates to validator.SecureURL() for the actual validation logic.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	if !input.ValidateURL(userURL) {
+//		// Reject invalid or unsafe URL
+//	}
+func ValidateURL(rawURL string) bool {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return false
+	}
+	rule := validator.SecureURL()
+	err := rule.Validate(rawURL)
+	return err == nil
+}
+
+// ValidatePhone performs basic phone number validation.
+//
+// Returns true if the phone number appears valid. This is a basic check that
+// accepts E.164 format and common phone number patterns.
+//
+// This function delegates to validator.SecurePhone() for the actual validation logic.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	if !input.ValidatePhone(userPhone) {
+//		// Reject invalid phone
+//	}
+func ValidatePhone(phone string) bool {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return false
+	}
+	rule := validator.SecurePhone()
+	err := rule.Validate(phone)
+	return err == nil
+}
+
+// SanitizeHTML removes potentially dangerous HTML tags and attributes.
+//
+// This is a basic sanitizer that removes script tags, event handlers, and
+// other dangerous HTML constructs. For production use with untrusted HTML,
+// consider using a dedicated HTML sanitization library.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	safe := input.SanitizeHTML(userInput)
+func SanitizeHTML(s string) string {
+	// Remove script tags and content
+	scriptRe := regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
+	s = scriptRe.ReplaceAllString(s, "")
+
+	// Remove event handlers (onclick, onload, etc.)
+	eventRe := regexp.MustCompile(`(?i)\s*on\w+\s*=\s*["'][^"']*["']`)
+	s = eventRe.ReplaceAllString(s, "")
+
+	// Remove javascript: URLs
+	jsRe := regexp.MustCompile(`(?i)javascript:`)
+	s = jsRe.ReplaceAllString(s, "")
+
+	// Remove data: URLs (can be used for XSS)
+	dataRe := regexp.MustCompile(`(?i)data:`)
+	s = dataRe.ReplaceAllString(s, "")
+
+	return s
+}
+
+// SanitizeSQL removes common SQL injection patterns.
+//
+// WARNING: This is NOT a substitute for parameterized queries. Always use
+// parameterized queries for database operations. This function is only for
+// defense-in-depth scenarios.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	// Still use parameterized queries!
+//	cleaned := input.SanitizeSQL(userInput)
+func SanitizeSQL(s string) string {
+	// Remove SQL comments
+	s = regexp.MustCompile(`--.*`).ReplaceAllString(s, "")
+	s = regexp.MustCompile(`/\*.*?\*/`).ReplaceAllString(s, "")
+
+	// Remove common SQL injection patterns
+	dangerous := []string{
+		";", "UNION", "SELECT", "INSERT", "UPDATE", "DELETE",
+		"DROP", "CREATE", "ALTER", "EXEC", "EXECUTE",
+	}
+
+	for _, pattern := range dangerous {
+		s = strings.ReplaceAll(s, pattern, "")
+		s = strings.ReplaceAll(s, strings.ToLower(pattern), "")
+	}
+
+	return s
+}
+
+// StripControlChars removes ASCII control characters except newline and tab.
+//
+// This function removes characters that could cause display issues or
+// be used for terminal injection attacks.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	clean := input.StripControlChars(userInput)
+func StripControlChars(s string) string {
+	return strings.Map(func(r rune) rune {
+		// Keep newline and tab
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		// Remove other control characters
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+// ContainsDangerousChars checks for characters commonly used in injection attacks.
+//
+// Returns true if the string contains potentially dangerous characters.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	if input.ContainsDangerousChars(userInput) {
+//		// Handle potentially dangerous input
+//	}
+func ContainsDangerousChars(s string) bool {
+	dangerous := []rune{0, '\r', '<', '>', '"', '\'', '`', '\\', '{', '}'}
+	for _, r := range s {
+		for _, d := range dangerous {
+			if r == d {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// TrimWhitespace removes leading and trailing whitespace and normalizes internal whitespace.
+//
+// This function collapses multiple consecutive whitespace characters into a
+// single space and removes leading/trailing whitespace.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	normalized := input.TrimWhitespace("  hello    world  ")
+//	// Returns: "hello world"
+func TrimWhitespace(s string) string {
+	s = strings.TrimSpace(s)
+
+	// Replace multiple spaces with single space
+	spaceRe := regexp.MustCompile(`\s+`)
+	s = spaceRe.ReplaceAllString(s, " ")
+
+	return s
 }

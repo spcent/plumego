@@ -107,6 +107,11 @@ func NewRuleRegistry() *RuleRegistry {
 	registry.Register("array", Array())
 	registry.Register("object", Object())
 
+	// Security-focused validation rules
+	registry.Register("secureEmail", SecureEmail())
+	registry.Register("secureUrl", SecureURL())
+	registry.Register("securePhone", SecurePhone())
+
 	return registry
 }
 
@@ -1922,5 +1927,207 @@ func WithCode(rule Rule, code string) Rule {
 			err.Code = code
 		}
 		return err
+	})
+}
+
+// Security-focused validation rules
+
+// SecureEmail performs security-focused email validation with additional checks.
+//
+// This rule adds security checks beyond basic email format validation:
+// - Length limits (max 254 characters for email, max 64 for local part, max 253 for domain)
+// - Rejects double dots (..)
+// - Validates domain has at least one dot
+//
+// Example:
+//
+//	type UserInput struct {
+//		Email string `validate:"secureEmail"`
+//	}
+func SecureEmail() Rule {
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+
+	return RuleFunc(func(value any) *ValidationError {
+		if value == nil {
+			return nil
+		}
+
+		str, ok := value.(string)
+		if !ok {
+			return &ValidationError{Code: "secureEmail", Message: "must be a string"}
+		}
+
+		str = strings.TrimSpace(str)
+		if str == "" {
+			return nil
+		}
+
+		// Basic length check to prevent DoS
+		if len(str) > 254 {
+			return &ValidationError{Code: "secureEmail", Message: "email too long (max 254 characters)"}
+		}
+
+		// Check regex format
+		if !emailRegex.MatchString(str) {
+			return &ValidationError{Code: "secureEmail", Message: "invalid email format"}
+		}
+
+		// Check for dangerous patterns
+		if strings.Contains(str, "..") {
+			return &ValidationError{Code: "secureEmail", Message: "email contains consecutive dots"}
+		}
+
+		// Split and validate parts
+		parts := strings.Split(str, "@")
+		if len(parts) != 2 {
+			return &ValidationError{Code: "secureEmail", Message: "invalid email format"}
+		}
+
+		local, domain := parts[0], parts[1]
+
+		// Validate local part
+		if len(local) == 0 || len(local) > 64 {
+			return &ValidationError{Code: "secureEmail", Message: "email local part invalid length"}
+		}
+
+		// Validate domain part
+		if len(domain) == 0 || len(domain) > 253 {
+			return &ValidationError{Code: "secureEmail", Message: "email domain invalid length"}
+		}
+
+		// Domain must contain at least one dot
+		if !strings.Contains(domain, ".") {
+			return &ValidationError{Code: "secureEmail", Message: "email domain must contain a dot"}
+		}
+
+		return nil
+	})
+}
+
+// SecureURL performs security-focused URL validation.
+//
+// This rule adds security checks to prevent common URL-based attacks:
+// - Rejects dangerous schemes (javascript:, data:, file:, vbscript:)
+// - Requires http/https for absolute URLs
+// - Checks for null bytes
+// - Length limit (max 2083 characters)
+//
+// Example:
+//
+//	type UserInput struct {
+//		WebsiteURL string `validate:"secureUrl"`
+//	}
+func SecureURL() Rule {
+	return RuleFunc(func(value any) *ValidationError {
+		if value == nil {
+			return nil
+		}
+
+		str, ok := value.(string)
+		if !ok {
+			return &ValidationError{Code: "secureUrl", Message: "must be a string"}
+		}
+
+		str = strings.TrimSpace(str)
+		if str == "" {
+			return nil
+		}
+
+		// Basic length check
+		if len(str) > 2083 {
+			return &ValidationError{Code: "secureUrl", Message: "URL too long (max 2083 characters)"}
+		}
+
+		// Parse URL
+		u, err := url.Parse(str)
+		if err != nil {
+			return &ValidationError{Code: "secureUrl", Message: "invalid URL format"}
+		}
+
+		// Reject dangerous schemes
+		scheme := strings.ToLower(u.Scheme)
+		switch scheme {
+		case "javascript", "data", "vbscript", "file":
+			return &ValidationError{Code: "secureUrl", Message: "dangerous URL scheme not allowed"}
+		}
+
+		// Require http or https for absolute URLs
+		if u.IsAbs() {
+			if scheme != "http" && scheme != "https" {
+				return &ValidationError{Code: "secureUrl", Message: "only http and https schemes allowed"}
+			}
+		}
+
+		// Check for null bytes
+		if strings.Contains(str, "\x00") {
+			return &ValidationError{Code: "secureUrl", Message: "URL contains null bytes"}
+		}
+
+		return nil
+	})
+}
+
+// SecurePhone performs security-focused phone number validation.
+//
+// This rule validates phone numbers with security considerations:
+// - Supports E.164 format (up to 15 digits)
+// - Allows common formatting characters (spaces, dashes, parentheses, dots)
+// - Rejects unexpected characters that could indicate injection attempts
+// - Length validation (7-16 characters after formatting)
+//
+// Example:
+//
+//	type UserInput struct {
+//		Phone string `validate:"securePhone"`
+//	}
+func SecurePhone() Rule {
+	return RuleFunc(func(value any) *ValidationError {
+		if value == nil {
+			return nil
+		}
+
+		str, ok := value.(string)
+		if !ok {
+			return &ValidationError{Code: "securePhone", Message: "must be a string"}
+		}
+
+		str = strings.TrimSpace(str)
+		if str == "" {
+			return nil
+		}
+
+		// Remove common formatting characters
+		cleaned := strings.Map(func(r rune) rune {
+			if r >= '0' && r <= '9' || r == '+' {
+				return r
+			}
+			if r == ' ' || r == '-' || r == '(' || r == ')' || r == '.' {
+				return -1
+			}
+			// Reject unexpected characters
+			return 0
+		}, str)
+
+		// Check if any unexpected characters were found
+		if strings.Contains(cleaned, string(rune(0))) {
+			return &ValidationError{Code: "securePhone", Message: "phone contains invalid characters"}
+		}
+
+		// Basic length check (E.164 allows up to 15 digits)
+		if len(cleaned) < 7 || len(cleaned) > 16 {
+			return &ValidationError{Code: "securePhone", Message: "phone number length invalid"}
+		}
+
+		// Must start with + or digit
+		if !strings.HasPrefix(cleaned, "+") && (cleaned[0] < '0' || cleaned[0] > '9') {
+			return &ValidationError{Code: "securePhone", Message: "phone must start with + or digit"}
+		}
+
+		// If starts with +, must have at least one digit
+		if strings.HasPrefix(cleaned, "+") && len(cleaned) < 2 {
+			return &ValidationError{Code: "securePhone", Message: "phone number too short"}
+		}
+
+		return nil
 	})
 }
