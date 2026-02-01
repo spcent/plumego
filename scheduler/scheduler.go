@@ -250,7 +250,7 @@ func (s *Scheduler) Cancel(id JobID) bool {
 		return false
 	}
 	job.canceled.Store(true)
-	delete(s.jobs, id)
+	s.setJobStateLocked(job, JobStateCanceled)
 	if s.store != nil {
 		_ = s.store.Delete(id)
 	}
@@ -283,13 +283,9 @@ func (s *Scheduler) Resume(id JobID) bool {
 	j.paused.Store(false)
 	if j.kind == jobKindCron {
 		j.runAt = j.cron.Next(time.Now())
-		s.queue.PushSchedule(&scheduleItem{runAt: j.runAt, job: j})
+		s.pushScheduleLocked(j, j.runAt)
 	} else if j.kind == jobKindDelay {
-		s.queue.PushSchedule(&scheduleItem{runAt: j.runAt, job: j})
-	}
-	select {
-	case s.wakeCh <- struct{}{}:
-	default:
+		s.pushScheduleLocked(j, j.runAt)
 	}
 	return true
 }
@@ -367,17 +363,11 @@ func (s *Scheduler) ResumeByGroup(group string) int {
 			// Reschedule the job
 			if j.kind == jobKindCron {
 				j.runAt = j.cron.Next(s.clock.Now())
-				s.queue.PushSchedule(&scheduleItem{runAt: j.runAt, job: j})
+				s.pushScheduleLocked(j, j.runAt)
 			} else if j.kind == jobKindDelay {
-				s.queue.PushSchedule(&scheduleItem{runAt: j.runAt, job: j})
+				s.pushScheduleLocked(j, j.runAt)
 			}
 			count++
-		}
-	}
-	if count > 0 {
-		select {
-		case s.wakeCh <- struct{}{}:
-		default:
 		}
 	}
 	return count
@@ -398,17 +388,11 @@ func (s *Scheduler) ResumeByTags(tags ...string) int {
 			// Reschedule the job
 			if j.kind == jobKindCron {
 				j.runAt = j.cron.Next(s.clock.Now())
-				s.queue.PushSchedule(&scheduleItem{runAt: j.runAt, job: j})
+				s.pushScheduleLocked(j, j.runAt)
 			} else if j.kind == jobKindDelay {
-				s.queue.PushSchedule(&scheduleItem{runAt: j.runAt, job: j})
+				s.pushScheduleLocked(j, j.runAt)
 			}
 			count++
-		}
-	}
-	if count > 0 {
-		select {
-		case s.wakeCh <- struct{}{}:
-		default:
 		}
 	}
 	return count
@@ -426,7 +410,7 @@ func (s *Scheduler) CancelByGroup(group string) int {
 	for id, j := range s.jobs {
 		if j.options.Group == group {
 			j.canceled.Store(true)
-			delete(s.jobs, id)
+			s.setJobStateLocked(j, JobStateCanceled)
 			if s.store != nil {
 				_ = s.store.Delete(id)
 			}
@@ -448,7 +432,7 @@ func (s *Scheduler) CancelByTags(tags ...string) int {
 	for id, j := range s.jobs {
 		if hasAllTags(j.options.Tags, tags) {
 			j.canceled.Store(true)
-			delete(s.jobs, id)
+			s.setJobStateLocked(j, JobStateCanceled)
 			if s.store != nil {
 				_ = s.store.Delete(id)
 			}
@@ -510,6 +494,18 @@ func (s *Scheduler) QueryJobs(query JobQuery) JobQueryResult {
 		}
 		if query.Paused != nil && status.Paused != *query.Paused {
 			continue
+		}
+		if len(query.States) > 0 {
+			matched := false
+			for _, state := range query.States {
+				if status.State == state {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
 		}
 
 		filtered = append(filtered, status)
@@ -600,11 +596,11 @@ func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec,
 		return "", ErrSchedulerClosed
 	}
 	if existing, exists := s.jobs[id]; exists {
-		if !jobOpts.Replace {
+		if !jobOpts.Replace && !existing.canceled.Load() {
 			return "", ErrJobExists
 		}
 		existing.canceled.Store(true)
-		delete(s.jobs, id)
+		s.setJobStateLocked(existing, JobStateCanceled)
 	}
 
 	j := &job{
@@ -624,6 +620,7 @@ func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec,
 		j.runAt = s.clock.Now()
 	}
 	j.paused.Store(jobOpts.Paused)
+	s.setJobStateLocked(j, JobStateQueued)
 
 	// Validate dependencies
 	for _, depID := range jobOpts.Dependencies {
@@ -660,6 +657,9 @@ func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec,
 }
 
 func (s *Scheduler) pushScheduleLocked(j *job, runAt time.Time) {
+	if j != nil && !j.canceled.Load() {
+		s.setJobStateIfIdleLocked(j, JobStateScheduled)
+	}
 	s.queue.PushSchedule(&scheduleItem{runAt: runAt, job: j})
 	select {
 	case s.wakeCh <- struct{}{}:
@@ -821,6 +821,7 @@ func (s *Scheduler) scheduleNext(j *job, base time.Time) {
 		return
 	}
 	j.runAt = next
+	s.setJobStateIfIdleLocked(j, JobStateScheduled)
 	s.queue.PushSchedule(&scheduleItem{runAt: next, job: j})
 	select {
 	case s.wakeCh <- struct{}{}:
@@ -856,6 +857,7 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	attempt := j.nextAttempt
 	scheduledAt := j.runAt
 	lastErr := j.lastError
+	s.setJobStateLocked(j, JobStateRunning)
 	s.mu.Unlock()
 	ctx = context.WithValue(ctx, jobIDKey{}, j.id)
 	ctx = context.WithValue(ctx, jobAttemptKey{}, attempt)
@@ -909,11 +911,15 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	}
 	s.mu.Lock()
 	j.nextAttempt = 1
+	if j.kind == jobKindDelay {
+		s.setJobStateLocked(j, JobStateCompleted)
+	}
 	// Mark dependency as succeeded
 	s.dependencyStatus[j.id] = true
 	// Use atomic operation to read and clear pending flag
 	pending := j.options.OverlapPolicy == SerialQueue && j.pending.Swap(false)
 	if pending {
+		s.setJobStateIfIdleLocked(j, JobStateScheduled)
 		s.queue.PushSchedule(&scheduleItem{runAt: time.Now(), job: j})
 		select {
 		case s.wakeCh <- struct{}{}:
@@ -944,6 +950,11 @@ func (s *Scheduler) handleFailure(j *job, err error) {
 	s.mu.Unlock()
 
 	if policy.MaxAttempts <= 1 {
+		if j.kind == jobKindDelay {
+			s.mu.Lock()
+			s.setJobStateLocked(j, JobStateFailed)
+			s.mu.Unlock()
+		}
 		// Add to DLQ if enabled
 		if s.dlq != nil {
 			s.addToDeadLetterQueue(j, err, 1)
@@ -962,6 +973,11 @@ func (s *Scheduler) handleFailure(j *job, err error) {
 	}
 
 	if attempt >= policy.MaxAttempts {
+		if j.kind == jobKindDelay {
+			s.mu.Lock()
+			s.setJobStateLocked(j, JobStateFailed)
+			s.mu.Unlock()
+		}
 		// Add to DLQ if enabled
 		if s.dlq != nil {
 			s.addToDeadLetterQueue(j, err, attempt)
@@ -978,6 +994,10 @@ func (s *Scheduler) handleFailure(j *job, err error) {
 		}
 		return
 	}
+
+	s.mu.Lock()
+	s.setJobStateLocked(j, JobStateRetrying)
+	s.mu.Unlock()
 
 	backoff := time.Duration(0)
 	if policy.Backoff != nil {
@@ -1049,6 +1069,8 @@ func jobStatusFrom(j *job) JobStatus {
 		OverlapPolicy: j.options.OverlapPolicy,
 		Group:         j.options.Group,
 		Tags:          append([]string(nil), j.options.Tags...),
+		State:         j.state,
+		StateUpdated:  j.stateAt,
 	}
 }
 
@@ -1141,6 +1163,7 @@ func (s *Scheduler) triggerDependentJobs(completedJobID JobID) {
 
 		if allDependenciesMet {
 			// All dependencies met, schedule the job
+			s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
 			s.queue.PushSchedule(&scheduleItem{runAt: depJob.runAt, job: depJob})
 			select {
 			case s.wakeCh <- struct{}{}:
@@ -1179,7 +1202,7 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 			// Skip this execution but keep the job
 			if s.logger != nil {
 				s.logger.Warn("skipping dependent job due to dependency failure", log.Fields{
-					"job_id":          depJobID,
+					"job_id":            depJobID,
 					"failed_dependency": failedJob.id,
 				})
 			}
@@ -1187,6 +1210,7 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 			if depJob.kind == jobKindCron {
 				next := depJob.cron.Next(s.clock.Now())
 				depJob.runAt = next
+				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
 				s.queue.PushSchedule(&scheduleItem{runAt: next, job: depJob})
 				select {
 				case s.wakeCh <- struct{}{}:
@@ -1198,12 +1222,12 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 			// Cancel the dependent job
 			if s.logger != nil {
 				s.logger.Warn("canceling dependent job due to dependency failure", log.Fields{
-					"job_id":          depJobID,
+					"job_id":            depJobID,
 					"failed_dependency": failedJob.id,
 				})
 			}
 			depJob.canceled.Store(true)
-			delete(s.jobs, depJobID)
+			s.setJobStateLocked(depJob, JobStateCanceled)
 			if s.store != nil {
 				_ = s.store.Delete(depJobID)
 			}
@@ -1212,7 +1236,7 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 			// Continue as if dependency succeeded
 			if s.logger != nil {
 				s.logger.Info("continuing dependent job despite dependency failure", log.Fields{
-					"job_id":          depJobID,
+					"job_id":            depJobID,
 					"failed_dependency": failedJob.id,
 				})
 			}
@@ -1227,6 +1251,7 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 				}
 			}
 			if allDependenciesMet {
+				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
 				s.queue.PushSchedule(&scheduleItem{runAt: depJob.runAt, job: depJob})
 				select {
 				case s.wakeCh <- struct{}{}:
@@ -1251,6 +1276,30 @@ func (s *Scheduler) addToDeadLetterQueue(j *job, err error, attempts int) {
 		Tags:        j.options.Tags,
 	}
 	s.dlq.Add(entry)
+}
+
+func (s *Scheduler) setJobStateLocked(j *job, state JobState) {
+	if j == nil {
+		return
+	}
+	if j.state == state {
+		return
+	}
+	j.state = state
+	j.stateAt = s.clock.Now()
+}
+
+func (s *Scheduler) setJobStateIfIdleLocked(j *job, state JobState) {
+	if j == nil {
+		return
+	}
+	if j.running.Load() {
+		return
+	}
+	if j.state == JobStateRetrying {
+		return
+	}
+	s.setJobStateLocked(j, state)
 }
 
 // ListDeadLetters returns all dead letter entries.

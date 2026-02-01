@@ -51,4 +51,50 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("pause status: %d", rec.Code)
 	}
+
+	block := make(chan struct{})
+	_, err = s.Delay("admin-running", 0, func(ctx context.Context) error {
+		<-block
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("delay running: %v", err)
+	}
+	if !waitForAdminState(s, "admin-running", JobStateRunning, 500*time.Millisecond) {
+		t.Fatalf("expected admin-running to reach running state")
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/scheduler/jobs?state=running", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("jobs state status: %d", rec.Code)
+	}
+	var jobs []JobStatus
+	if err := json.NewDecoder(rec.Body).Decode(&jobs); err != nil {
+		t.Fatalf("decode jobs: %v", err)
+	}
+	found := false
+	for _, job := range jobs {
+		if job.ID == "admin-running" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected admin-running to be in running jobs list")
+	}
+	close(block)
+}
+
+func waitForAdminState(s *Scheduler, id JobID, state JobState, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		status, ok := s.Status(id)
+		if ok && status.State == state {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
 }

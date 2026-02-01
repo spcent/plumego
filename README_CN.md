@@ -134,6 +134,8 @@ sch.Delay("one-off", 5*time.Second, func(ctx context.Context) error {
 
 可选增强包括管理 Handler（`scheduler.NewAdminHandler`）以及可插拔持久化（`scheduler.WithStore`，支持内存或 KV）。
 还可以通过 `scheduler.WithPanicHandler` 与 `scheduler.WithMetricsSink` 接入异常处理与指标汇报。
+作业状态快照提供统一状态机（`queued`、`scheduled`、`running`、`retrying`、`failed`、`canceled`、`completed`），并包含 `StateUpdated` 时间戳；`JobQuery` 支持通过 `States` 字段按状态过滤。
+Admin Handler 在 `/scheduler/jobs` 支持 `state` 查询参数（可重复）按作业状态过滤。
 
 ## 认证契约
 Plumego 通过 `contract` 中的接口将认证、授权、会话校验分离，推荐用中间件组合：
