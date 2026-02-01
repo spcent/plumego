@@ -173,19 +173,52 @@ func (ps *InProcPubSub) Reply(reqMsg Message, respMsg Message) error {
 }
 
 // Request sends a message and waits for a response.
+// This creates a temporary subscription for the reply.
 func (ps *InProcPubSub) Request(ctx context.Context, topic string, msg Message) (Message, error) {
-	if ps.requestManager == nil {
-		return Message{}, NewError(ErrCodeInternal, "request", "request-reply not enabled")
+	if ps.closed.Load() {
+		return Message{}, ErrClosed
 	}
-	return ps.requestManager.Request(ctx, topic, msg)
+
+	// Generate unique reply topic and correlation ID
+	replyTopic := generateReplyTopic()
+	correlationID := generateCorrelationID()
+
+	// Set up message metadata
+	if msg.Meta == nil {
+		msg.Meta = make(map[string]string)
+	}
+	msg.Meta[ReplyToHeader] = replyTopic
+	msg.Meta[CorrelationIDHeader] = correlationID
+
+	// Subscribe to reply topic
+	replySub, err := ps.Subscribe(replyTopic, SubOptions{
+		BufferSize: 1,
+		Policy:     DropNewest,
+	})
+	if err != nil {
+		return Message{}, err
+	}
+	defer replySub.Cancel()
+
+	// Publish the request
+	if err := ps.Publish(topic, msg); err != nil {
+		return Message{}, err
+	}
+
+	// Wait for response
+	select {
+	case resp := <-replySub.C():
+		return resp, nil
+	case <-ctx.Done():
+		return Message{}, ctx.Err()
+	}
 }
 
 // RequestWithTimeout sends a message and waits for a response with timeout.
 func (ps *InProcPubSub) RequestWithTimeout(topic string, msg Message, timeout time.Duration) (Message, error) {
-	if ps.requestManager == nil {
-		return Message{}, NewError(ErrCodeInternal, "request", "request-reply not enabled")
-	}
-	return ps.requestManager.RequestWithTimeout(topic, msg, timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return ps.Request(ctx, topic, msg)
 }
 
 // IsRequest checks if a message is a request that expects a reply.

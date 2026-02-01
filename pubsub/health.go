@@ -16,7 +16,7 @@ type HealthStatus struct {
 	Timestamp time.Time `json:"timestamp"`
 
 	// Uptime is how long the system has been running
-	Uptime time.Duration `json:"uptime"`
+	Uptime time.Duration `json:"uptime,omitempty"`
 
 	// Metrics contains key health metrics
 	Metrics HealthMetrics `json:"metrics"`
@@ -87,30 +87,11 @@ func (ps *InProcPubSub) Health() HealthStatus {
 		status.Status = "healthy"
 	}
 
-	// Calculate uptime if startTime is tracked
-	if ps.startTime != nil {
-		status.Uptime = time.Since(*ps.startTime)
-	}
-
 	// Collect metrics
 	status.Metrics = ps.collectHealthMetrics()
 
 	// Add details
 	status.Details["shards"] = ps.shards.shardCount
-	if ps.scheduler != nil {
-		status.Details["scheduler_enabled"] = true
-		status.Details["delayed_messages"] = ps.scheduler.PendingCount()
-	}
-	if ps.history != nil {
-		status.Details["history_enabled"] = true
-		historyStats := ps.history.Stats()
-		var totalHistory int
-		for _, s := range historyStats {
-			totalHistory += s.Count
-		}
-		status.Details["history_topics"] = len(historyStats)
-		status.Details["history_messages"] = totalHistory
-	}
 
 	return status
 }
@@ -152,18 +133,6 @@ func (ps *InProcPubSub) collectHealthMetrics() HealthMetrics {
 		metrics.TotalDelivered += tm.DeliveredTotal
 		for _, dropped := range tm.DroppedByPolicy {
 			metrics.TotalDropped += dropped
-		}
-	}
-
-	// Delayed messages
-	if ps.scheduler != nil {
-		metrics.DelayedMessages = ps.scheduler.PendingCount()
-	}
-
-	// History size
-	if ps.history != nil {
-		for _, stats := range ps.history.Stats() {
-			metrics.HistorySize += stats.Count
 		}
 	}
 
@@ -212,11 +181,11 @@ func (ps *InProcPubSub) DiagnosticInfo() map[string]any {
 
 	// Config info
 	info["config"] = map[string]any{
-		"shard_count":           ps.config.ShardCount,
-		"default_buffer_size":   ps.config.DefaultBufferSize,
-		"default_policy":        ps.config.DefaultPolicy.String(),
-		"worker_pool_size":      ps.config.WorkerPoolSize,
-		"panic_recovery":        ps.config.EnablePanicRecovery,
+		"shard_count":         ps.config.ShardCount,
+		"default_buffer_size": ps.config.DefaultBufferSize,
+		"default_policy":      ps.config.DefaultPolicy.String(),
+		"worker_pool_size":    ps.config.WorkerPoolSize,
+		"panic_recovery":      ps.config.EnablePanicRecovery,
 	}
 
 	// Shard info
@@ -242,11 +211,6 @@ func (ps *InProcPubSub) DiagnosticInfo() map[string]any {
 
 	// Metrics snapshot
 	info["metrics"] = ps.metrics.Snapshot()
-
-	// Enhanced metrics if available
-	if ps.enhancedMetrics != nil {
-		info["enhanced_metrics"] = ps.enhancedMetrics.Snapshot()
-	}
 
 	return info
 }
