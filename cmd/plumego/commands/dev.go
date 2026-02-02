@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/spcent/plumego/cmd/plumego/internal/devserver"
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
 	"github.com/spcent/plumego/cmd/plumego/internal/watcher"
 )
@@ -32,9 +34,12 @@ func (c *DevCmd) Long() string {
 This command runs your application and watches for file changes,
 automatically rebuilding and restarting when Go files are modified.
 
+New: Use --dashboard to enable the web-based development dashboard!
+
 Examples:
   plumego dev
   plumego dev --addr :3000
+  plumego dev --dashboard :9999
   plumego dev --watch "**/*.go,**/*.yaml"
   plumego dev --no-reload`
 }
@@ -43,6 +48,7 @@ func (c *DevCmd) Flags() []Flag {
 	return []Flag{
 		{Name: "dir", Default: ".", Usage: "Project directory"},
 		{Name: "addr", Default: ":8080", Usage: "Listen address (sets APP_ADDR)"},
+		{Name: "dashboard", Default: "", Usage: "Enable dashboard on specified address (e.g., :9999)"},
 		{Name: "watch", Default: "**/*.go", Usage: "Watch patterns (comma-separated)"},
 		{Name: "exclude", Default: "", Usage: "Exclude patterns (comma-separated)"},
 		{Name: "no-reload", Default: "false", Usage: "Disable hot reload"},
@@ -57,6 +63,7 @@ func (c *DevCmd) Run(args []string) error {
 
 	dir := fs.String("dir", ".", "Project directory")
 	addr := fs.String("addr", ":8080", "Listen address")
+	dashboardAddr := fs.String("dashboard", "", "Dashboard address")
 	watchPatterns := fs.String("watch", "**/*.go", "Watch patterns")
 	excludePatterns := fs.String("exclude", "", "Exclude patterns")
 	noReload := fs.Bool("no-reload", false, "Disable hot reload")
@@ -68,14 +75,128 @@ func (c *DevCmd) Run(args []string) error {
 		return err
 	}
 
+	// If dashboard is enabled, use new dashboard mode
+	if *dashboardAddr != "" {
+		return c.runWithDashboard(*dir, *addr, *dashboardAddr, *watchPatterns, *excludePatterns, *debounceStr)
+	}
+
+	// Otherwise, use legacy mode (backward compatible)
+	return c.runLegacyMode(*dir, *addr, *watchPatterns, *excludePatterns, *noReload, *buildCmd, *runCmd, *debounceStr)
+}
+
+// runWithDashboard runs dev server with web dashboard
+func (c *DevCmd) runWithDashboard(dir, addr, dashboardAddr, watchPatterns, excludePatterns, debounceStr string) error {
 	// Parse debounce duration
-	debounce, err := time.ParseDuration(*debounceStr)
+	debounce, err := time.ParseDuration(debounceStr)
 	if err != nil {
 		return output.NewFormatter().Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
 	}
 
 	// Get absolute directory
-	absDir, err := filepath.Abs(*dir)
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return output.NewFormatter().Error(fmt.Sprintf("invalid directory: %v", err), 1)
+	}
+
+	// Check if directory exists
+	if _, err := os.Stat(absDir); os.IsNotExist(err) {
+		return output.NewFormatter().Error(fmt.Sprintf("directory not found: %s", absDir), 1)
+	}
+
+	fmt.Printf("🚀 Starting Plumego Dev Server with Dashboard\n")
+	fmt.Printf("   Project: %s\n", absDir)
+	fmt.Printf("   App URL: http://localhost%s\n", addr)
+	fmt.Printf("   Dashboard URL: http://localhost%s\n", dashboardAddr)
+	fmt.Println()
+
+	// Get UI path
+	uiPath := filepath.Join(getExecutableDir(), "internal", "devserver", "ui")
+
+	// Create dashboard
+	dash, err := devserver.NewDashboard(devserver.Config{
+		DashboardAddr: dashboardAddr,
+		AppAddr:       addr,
+		ProjectDir:    absDir,
+		UIPath:        uiPath,
+	})
+	if err != nil {
+		return output.NewFormatter().Error(fmt.Sprintf("failed to create dashboard: %v", err), 1)
+	}
+
+	ctx := context.Background()
+
+	// Start dashboard
+	if err := dash.Start(ctx); err != nil {
+		return output.NewFormatter().Error(fmt.Sprintf("failed to start dashboard: %v", err), 1)
+	}
+
+	fmt.Printf("✓ Dashboard started at http://localhost%s\n\n", dashboardAddr)
+
+	// Build and run the application
+	if err := dash.BuildAndRun(ctx); err != nil {
+		return output.NewFormatter().Error(fmt.Sprintf("failed to build and run: %v", err), 1)
+	}
+
+	// Parse watch patterns
+	watches := parsePatterns(watchPatterns)
+	excludes := parsePatterns(excludePatterns)
+	excludes = append(excludes, "**/vendor/**", "**/node_modules/**", "**/.git/**", "**/*_test.go")
+
+	// Watch for file changes
+	w, err := watcher.NewWatcher(absDir, watches, excludes, debounce)
+	if err != nil {
+		dash.Stop(ctx)
+		return output.NewFormatter().Error(fmt.Sprintf("failed to create watcher: %v", err), 1)
+	}
+	defer w.Close()
+
+	// Handle signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	fmt.Println("👀 Watching for changes...")
+	fmt.Println("   Press Ctrl+C to stop")
+
+	// Event loop
+	for {
+		select {
+		case path := <-w.Events():
+			fmt.Printf("\n📝 File changed: %s\n", path)
+
+			// Publish file change event
+			dash.PublishEvent(devserver.EventFileChange, devserver.FileChangeEvent{
+				Path:   path,
+				Action: "modify",
+			})
+
+			// Rebuild and restart
+			if err := dash.Rebuild(ctx); err != nil {
+				fmt.Printf("❌ Reload failed: %v\n", err)
+			} else {
+				fmt.Println("✓ Reload complete\n")
+			}
+
+		case err := <-w.Errors():
+			fmt.Printf("⚠️  Watcher error: %v\n", err)
+
+		case <-sigChan:
+			fmt.Println("\n\n🛑 Shutting down...")
+			dash.Stop(ctx)
+			return nil
+		}
+	}
+}
+
+// runLegacyMode runs dev server in legacy mode (backward compatible)
+func (c *DevCmd) runLegacyMode(dir, addr, watchPatterns, excludePatterns string, noReload bool, buildCmd, runCmd, debounceStr string) error {
+	// Parse debounce duration
+	debounce, err := time.ParseDuration(debounceStr)
+	if err != nil {
+		return output.NewFormatter().Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
+	}
+
+	// Get absolute directory
+	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return output.NewFormatter().Error(fmt.Sprintf("invalid directory: %v", err), 1)
 	}
@@ -86,12 +207,12 @@ func (c *DevCmd) Run(args []string) error {
 	}
 
 	// Set environment variable for address
-	os.Setenv("APP_ADDR", *addr)
+	os.Setenv("APP_ADDR", addr)
 	os.Setenv("APP_DEBUG", "true")
 
 	// Parse watch patterns
-	watches := parsePatterns(*watchPatterns)
-	excludes := parsePatterns(*excludePatterns)
+	watches := parsePatterns(watchPatterns)
+	excludes := parsePatterns(excludePatterns)
 
 	// Add default excludes
 	excludes = append(excludes, "**/vendor/**", "**/node_modules/**", "**/.git/**", "**/*_test.go")
@@ -99,21 +220,21 @@ func (c *DevCmd) Run(args []string) error {
 	if flagVerbose {
 		fmt.Printf("Starting development server\n")
 		fmt.Printf("  Directory: %s\n", absDir)
-		fmt.Printf("  Address: %s\n", *addr)
+		fmt.Printf("  Address: %s\n", addr)
 		fmt.Printf("  Watch patterns: %v\n", watches)
 		fmt.Printf("  Exclude patterns: %v\n", excludes)
 	}
 
 	// Create development server
 	devServer := &DevServer{
-		Dir:         absDir,
-		Addr:        *addr,
-		BuildCmd:    *buildCmd,
-		RunCmd:      *runCmd,
-		NoReload:    *noReload,
-		Watch:       watches,
-		Exclude:     excludes,
-		Debounce:    debounce,
+		Dir:      absDir,
+		Addr:     addr,
+		BuildCmd: buildCmd,
+		RunCmd:   runCmd,
+		NoReload: noReload,
+		Watch:    watches,
+		Exclude:  excludes,
+		Debounce: debounce,
 	}
 
 	return devServer.Run()
@@ -314,4 +435,15 @@ func parsePatterns(s string) []string {
 	}
 
 	return result
+}
+
+// getExecutableDir returns the directory containing the plumego executable
+func getExecutableDir() string {
+	ex, err := os.Executable()
+	if err != nil {
+		// Fallback to working directory
+		wd, _ := os.Getwd()
+		return wd
+	}
+	return filepath.Dir(ex)
 }
