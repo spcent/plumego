@@ -1,11 +1,9 @@
 package health
 
 import (
-	"encoding/csv"
 	"fmt"
 	"net/http"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +14,6 @@ const (
 	healthHandlerTimeout       = 10 * time.Second
 	componentHealthTimeout     = 5 * time.Second
 	allComponentsHealthTimeout = 15 * time.Second
-	readinessHandlerTimeout    = 5 * time.Second
 )
 
 // ErrorResponse represents a standardized error response.
@@ -168,190 +165,6 @@ func AllComponentsHealthHandler(manager HealthManager) http.Handler {
 	})
 }
 
-// HealthHistoryHandler creates a handler that returns health check history.
-func HealthHistoryHandler(manager HealthManager) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
-			return
-		}
-
-		history := manager.GetHealthHistory()
-
-		_ = contract.WriteJSON(w, http.StatusOK, history)
-	})
-}
-
-// HealthHistoryExportHandler creates a handler that exports health check history in various formats.
-func HealthHistoryExportHandler(manager HealthManager) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
-			return
-		}
-
-		// Parse query parameters for filtering and format
-		query := HealthHistoryQuery{}
-
-		// Parse time range
-		if startTimeStr := r.URL.Query().Get("start_time"); startTimeStr != "" {
-			if startTime, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
-				query.StartTime = &startTime
-			}
-		}
-
-		if endTimeStr := r.URL.Query().Get("end_time"); endTimeStr != "" {
-			if endTime, err := time.Parse(time.RFC3339, endTimeStr); err == nil {
-				query.EndTime = &endTime
-			}
-		}
-
-		// Parse state filter
-		if stateStr := r.URL.Query().Get("state"); stateStr != "" {
-			state := HealthState(stateStr)
-			query.State = &state
-		}
-
-		// Parse component filter
-		if component := r.URL.Query().Get("component"); component != "" {
-			query.Component = component
-		}
-
-		// Parse limit
-		if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-			if limit, err := strconv.Atoi(limitStr); err == nil {
-				query.Limit = limit
-			}
-		}
-
-		// Parse offset
-		if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-			if offset, err := strconv.Atoi(offsetStr); err == nil {
-				query.Offset = offset
-			}
-		}
-
-		// Get format parameter
-		format := r.URL.Query().Get("format")
-		if format == "" {
-			format = "json"
-		}
-
-		// Query history
-		result := manager.QueryHealthHistory(query)
-
-		switch strings.ToLower(format) {
-		case "csv":
-			exportHistoryToCSV(w, result.Entries)
-		case "json":
-			_ = contract.WriteJSON(w, http.StatusOK, result)
-		default:
-			sendErrorResponse(w, r, http.StatusBadRequest, "INVALID_FORMAT",
-				"Supported formats: json, csv", "")
-			return
-		}
-	})
-}
-
-// exportHistoryToCSV exports health history entries to CSV format.
-func exportHistoryToCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
-
-	writer := csv.NewWriter(w)
-
-	// Write header
-	header := []string{"Timestamp", "State", "Message", "Components", "Duration"}
-	_ = writer.Write(header)
-
-	// Write data
-	for _, entry := range entries {
-		record := []string{
-			entry.Timestamp.Format(time.RFC3339),
-			string(entry.State),
-			entry.Message,
-			strings.Join(entry.Components, ";"),
-			entry.Duration.String(),
-		}
-		_ = writer.Write(record)
-	}
-
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		http.Error(w, "Failed to write CSV", http.StatusInternalServerError)
-	}
-}
-
-// HealthHistoryStatsHandler returns statistics about health history.
-func HealthHistoryStatsHandler(manager HealthManager) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
-			return
-		}
-
-		stats := manager.GetHealthHistoryStats()
-
-		_ = contract.WriteJSON(w, http.StatusOK, stats)
-	})
-}
-
-// ReadinessHandler exposes the current readiness state as JSON.
-// It returns HTTP 200 when ready and 503 otherwise.
-func ReadinessHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		status := GetReadiness()
-		code := http.StatusOK
-		if !status.Ready {
-			code = http.StatusServiceUnavailable
-		}
-
-		_ = contract.WriteJSON(w, code, status)
-	})
-}
-
-// ReadinessHandlerWithManager exposes the current readiness state based on component health.
-// It returns HTTP 200 when ready and 503 otherwise.
-func ReadinessHandlerWithManager(manager HealthManager) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
-			return
-		}
-
-		ctx, cancel := withCheckTimeout(r.Context(), readinessHandlerTimeout)
-		defer cancel()
-
-		// Perform health check
-		overallHealth := manager.CheckAllComponents(ctx)
-
-		code := http.StatusOK
-		if !overallHealth.Status.isReady() {
-			code = http.StatusServiceUnavailable
-		}
-
-		response := map[string]any{
-			"ready":     overallHealth.Status.isReady(),
-			"status":    overallHealth.Status,
-			"message":   overallHealth.Message,
-			"timestamp": overallHealth.Timestamp,
-		}
-
-		_ = contract.WriteJSON(w, code, response)
-	})
-}
-
-// BuildInfoHandler exposes build metadata as JSON for diagnostics and release verification.
-func BuildInfoHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_ = contract.WriteJSON(w, http.StatusOK, GetBuildInfo())
-	})
-}
-
 // LiveHandler creates a liveness probe handler that always returns 200.
 // This is useful for Kubernetes liveness probes.
 func LiveHandler() http.Handler {
@@ -383,11 +196,6 @@ func ComponentsListHandler(manager HealthManager) http.Handler {
 
 		_ = contract.WriteJSON(w, http.StatusOK, response)
 	})
-}
-
-// isReady checks if the health status indicates the service is ready to serve traffic.
-func (hs HealthState) isReady() bool {
-	return hs == StatusHealthy || hs == StatusDegraded
 }
 
 // extractRequestID extracts request ID from headers for tracing.
