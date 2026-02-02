@@ -246,6 +246,49 @@ Use `config.Get*` helpers (see `config/env.go`) or Go's `flag` package to transf
 - Run tests: `go test ./...`
 - Use Go toolchain for formatting and static checks (`go fmt`, `go vet`).
 
+## Development Server with Dashboard
+
+The `plumego` CLI includes a powerful development server built with the plumego framework itself (dogfooding). It provides hot reload, real-time monitoring, and a web-based dashboard for enhanced development experience.
+
+The dashboard is **enabled by default** - simply run `plumego dev` to get started.
+
+### Quick Start
+
+```bash
+plumego dev
+# Dashboard: http://localhost:9999
+# Your app:  http://localhost:8080
+```
+
+### Dashboard Features
+
+Every `plumego dev` session includes:
+
+- **Real-time Logs**: Stream application stdout/stderr with filtering
+- **Route Browser**: Auto-discover and display all HTTP routes from your app
+- **Metrics Dashboard**: Monitor uptime, PID, health status, and performance
+- **Build Management**: View build output and manually trigger rebuilds
+- **App Control**: Start, stop, and restart your application from the UI
+- **Hot Reload**: Automatic rebuild and restart on file changes (< 5 seconds)
+
+### Customization
+
+```bash
+# Custom application port
+plumego dev --addr :3000
+
+# Custom dashboard port
+plumego dev --dashboard-addr :8888
+
+# Custom watch patterns
+plumego dev --watch "**/*.go,**/*.yaml"
+
+# Adjust hot reload sensitivity
+plumego dev --debounce 1s
+```
+
+For complete documentation, see `cmd/plumego/DEV_SERVER.md`.
+
 ## Documentation
 For detailed documentation, see the `examples/docs` directory:
 - `examples/docs/en/` - English documentation

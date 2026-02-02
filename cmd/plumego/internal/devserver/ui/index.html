@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plumego Dev Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Plumego Dev Dashboard</h1>
+            <div class="status-bar">
+                <span class="status-item">
+                    <span class="label">Dashboard:</span>
+                    <span id="dashboard-status" class="badge badge-success">Running</span>
+                </span>
+                <span class="status-item">
+                    <span class="label">App:</span>
+                    <span id="app-status" class="badge badge-secondary">Stopped</span>
+                </span>
+                <span class="status-item">
+                    <span class="label">Uptime:</span>
+                    <span id="uptime">0s</span>
+                </span>
+            </div>
+        </header>
+
+        <div class="controls">
+            <button id="btn-restart" class="btn btn-primary">🔄 Restart</button>
+            <button id="btn-build" class="btn btn-secondary">🔨 Build</button>
+            <button id="btn-stop" class="btn btn-danger">⏹️ Stop</button>
+            <button id="btn-clear" class="btn btn-outline">🗑️ Clear Logs</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="logs">📄 Logs</button>
+            <button class="tab" data-tab="routes">🛣️ Routes</button>
+            <button class="tab" data-tab="metrics">📊 Metrics</button>
+            <button class="tab" data-tab="build">🔨 Build Output</button>
+            <button class="tab" data-tab="events">🔔 Events</button>
+        </div>
+
+        <div class="tab-content">
+            <div id="logs-tab" class="tab-pane active">
+                <div class="log-header">
+                    <div class="log-stats">
+                        <span>Total: <strong id="log-count">0</strong></span>
+                        <span>Errors: <strong id="error-count" class="text-error">0</strong></span>
+                    </div>
+                    <div class="log-filter">
+                        <label>
+                            <input type="checkbox" id="filter-info" checked> Info
+                        </label>
+                        <label>
+                            <input type="checkbox" id="filter-warn" checked> Warn
+                        </label>
+                        <label>
+                            <input type="checkbox" id="filter-error" checked> Error
+                        </label>
+                    </div>
+                </div>
+                <div id="logs" class="log-container"></div>
+            </div>
+
+            <div id="routes-tab" class="tab-pane">
+                <div class="routes-header">
+                    <h3>Application Routes</h3>
+                    <button id="btn-refresh-routes" class="btn btn-secondary">🔄 Refresh</button>
+                </div>
+                <div id="routes-container" class="routes-list">
+                    <p class="text-secondary">Loading routes...</p>
+                </div>
+            </div>
+
+            <div id="metrics-tab" class="tab-pane">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h4>Dashboard</h4>
+                        <div id="dashboard-metrics"></div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Application</h4>
+                        <div id="app-metrics"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="build-tab" class="tab-pane">
+                <div id="build-status" class="build-status">
+                    <span class="badge badge-secondary">No build yet</span>
+                </div>
+                <div id="build-output" class="log-container"></div>
+            </div>
+
+            <div id="events-tab" class="tab-pane">
+                <div id="events" class="event-list"></div>
+            </div>
+        </div>
+
+        <footer>
+            <div class="connection-status">
+                <div class="connection-indicator" id="connection-indicator"></div>
+                <span id="ws-status" class="badge badge-secondary">Connecting...</span>
+            </div>
+            <div class="info">
+                Powered by <strong>Plumego</strong> |
+                <a href="https://github.com/spcent/plumego" target="_blank">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
