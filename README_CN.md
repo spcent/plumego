@@ -245,3 +245,55 @@ if err := app.ConfigureObservability(obs); err != nil {
 - 安装 Go 1.24+（匹配 `go.mod`）。
 - 运行测试：`go test ./...`
 - 使用 Go 工具链进行格式化和静态检查（`go fmt`、`go vet`）。
+
+## 开发服务器与仪表盘
+
+`plumego` CLI 包含一个强大的开发服务器，它本身就是使用 plumego 框架构建的（狗粮原则）。它提供热重载、实时监控，以及可选的 Web 仪表盘，大大提升开发体验。
+
+### 基本用法
+
+```bash
+# 简单模式（仅热重载）
+plumego dev
+
+# 带仪表盘（推荐）
+plumego dev --dashboard :9999
+```
+
+### 仪表盘功能
+
+使用 `--dashboard` 参数运行时，你将获得：
+
+- **实时日志**：流式传输应用程序的 stdout/stderr，支持过滤
+- **路由浏览器**：自动发现并展示应用程序的所有 HTTP 路由
+- **指标仪表盘**：监控运行时间、PID、健康状态和性能
+- **构建管理**：查看构建输出并手动触发重新构建
+- **应用控制**：从 UI 中启动、停止和重启应用程序
+- **热重载**：文件更改时自动重新构建和重启（< 5 秒）
+
+### 示例
+
+```bash
+cd your-plumego-app
+plumego dev --dashboard :9999
+# 在浏览器中打开 http://localhost:9999 查看仪表盘
+# 你的应用运行在 http://localhost:8080
+```
+
+### 高级选项
+
+```bash
+plumego dev \
+  --addr :8080 \
+  --dashboard :9999 \
+  --watch "**/*.go" \
+  --exclude "**/vendor/**" \
+  --debounce 500ms
+```
+
+完整文档请参见 `cmd/plumego/DEV_SERVER.md`。
+
+## 文档
+详细文档请参见 `examples/docs` 目录：
+- `examples/docs/en/` - 英文文档
+- `examples/docs/zh/` - 中文文档
