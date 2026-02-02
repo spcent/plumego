@@ -70,9 +70,12 @@ func (r *AppRunner) Start(ctx context.Context) error {
 	r.mu.Unlock()
 
 	// Publish start event
-	r.pubsub.Publish(EventAppStart, NewEvent(EventAppStart, AppLifecycleEvent{
-		State: "starting",
-	}))
+	r.pubsub.Publish(EventAppStart, pubsub.Message{
+		Topic: EventAppStart,
+		Data: AppLifecycleEvent{
+			State: "starting",
+		},
+	})
 
 	// Create command
 	var cmd *exec.Cmd
@@ -98,10 +101,13 @@ func (r *AppRunner) Start(ctx context.Context) error {
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
-		r.pubsub.Publish(EventAppStart, NewEvent(EventAppStart, AppLifecycleEvent{
-			State: "crashed",
-			Error: err.Error(),
-		}))
+		r.pubsub.Publish(EventAppStart, pubsub.Message{
+			Topic: EventAppStart,
+			Data: AppLifecycleEvent{
+				State: "crashed",
+				Error: err.Error(),
+			},
+		})
 		return fmt.Errorf("failed to start: %w", err)
 	}
 
@@ -128,22 +134,31 @@ func (r *AppRunner) Start(ctx context.Context) error {
 		r.mu.Unlock()
 
 		if err != nil {
-			r.pubsub.Publish(EventAppStop, NewEvent(EventAppStop, AppLifecycleEvent{
-				State: "crashed",
-				Error: err.Error(),
-			}))
+			r.pubsub.Publish(EventAppStop, pubsub.Message{
+				Topic: EventAppStop,
+				Data: AppLifecycleEvent{
+					State: "crashed",
+					Error: err.Error(),
+				},
+			})
 		} else {
-			r.pubsub.Publish(EventAppStop, NewEvent(EventAppStop, AppLifecycleEvent{
-				State: "stopped",
-			}))
+			r.pubsub.Publish(EventAppStop, pubsub.Message{
+				Topic: EventAppStop,
+				Data: AppLifecycleEvent{
+					State: "stopped",
+				},
+			})
 		}
 	}()
 
 	// Publish running event
-	r.pubsub.Publish(EventAppStart, NewEvent(EventAppStart, AppLifecycleEvent{
-		State: "running",
-		PID:   cmd.Process.Pid,
-	}))
+	r.pubsub.Publish(EventAppStart, pubsub.Message{
+		Topic: EventAppStart,
+		Data: AppLifecycleEvent{
+			State: "running",
+			PID:   cmd.Process.Pid,
+		},
+	})
 
 	return nil
 }
@@ -191,9 +206,12 @@ func (r *AppRunner) Stop() error {
 
 // Restart restarts the application
 func (r *AppRunner) Restart(ctx context.Context) error {
-	r.pubsub.Publish(EventAppRestart, NewEvent(EventAppRestart, AppLifecycleEvent{
-		State: "restarting",
-	}))
+	r.pubsub.Publish(EventAppRestart, pubsub.Message{
+		Topic: EventAppRestart,
+		Data: AppLifecycleEvent{
+			State: "restarting",
+		},
+	})
 
 	if err := r.Stop(); err != nil {
 		return fmt.Errorf("failed to stop: %w", err)
@@ -228,11 +246,14 @@ func (r *AppRunner) streamOutput(ctx context.Context, reader io.Reader, source s
 			}
 
 			// Publish log event
-			r.pubsub.Publish(EventAppLog, NewEvent(EventAppLog, LogEvent{
-				Level:   level,
-				Message: line,
-				Source:  source,
-			}))
+			r.pubsub.Publish(EventAppLog, pubsub.Message{
+				Topic: EventAppLog,
+				Data: LogEvent{
+					Level:   level,
+					Message: line,
+					Source:  source,
+				},
+			})
 
 			// Also print to console for backward compatibility
 			if source == "stderr" {
@@ -244,10 +265,13 @@ func (r *AppRunner) streamOutput(ctx context.Context, reader io.Reader, source s
 	}
 
 	if err := scanner.Err(); err != nil {
-		r.pubsub.Publish(EventAppError, NewEvent(EventAppError, LogEvent{
-			Level:   "error",
-			Message: fmt.Sprintf("Error reading %s: %v", source, err),
-			Source:  source,
-		}))
+		r.pubsub.Publish(EventAppError, pubsub.Message{
+			Topic: EventAppError,
+			Data: LogEvent{
+				Level:   "error",
+				Message: fmt.Sprintf("Error reading %s: %v", source, err),
+				Source:  source,
+			},
+		})
 	}
 }

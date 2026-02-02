@@ -111,8 +111,18 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	d.app.PostCtx("/api/stop", d.handleStop)
 
 	// Static UI files
-	if uiPath != "" {
-		router := d.app.Router()
+	router := d.app.Router()
+
+	// Try embedded UI first, then fallback to disk
+	if HasEmbeddedUI() {
+		uiFS, err := GetUIFS()
+		if err == nil {
+			frontend.RegisterFS(router, http.FS(uiFS),
+				frontend.WithPrefix("/"),
+				frontend.WithIndex("index.html"),
+			)
+		}
+	} else if uiPath != "" {
 		frontend.RegisterFromDir(router, uiPath,
 			frontend.WithPrefix("/"),
 			frontend.WithIndex("index.html"),
@@ -150,8 +160,7 @@ func (d *Dashboard) subscribeEvents() {
 
 // Start starts the dashboard server
 func (d *Dashboard) Start(ctx context.Context) error {
-	// Start WebSocket hub
-	go d.hub.Run()
+	// Note: WebSocket hub workers are automatically started in NewHub()
 
 	// Start the dashboard server in background
 	go func() {
@@ -317,7 +326,10 @@ func (d *Dashboard) getAppPID() int {
 
 // PublishEvent publishes an event to the event bus
 func (d *Dashboard) PublishEvent(eventType string, data interface{}) {
-	d.pubsub.Publish(eventType, data)
+	d.pubsub.Publish(eventType, pubsub.Message{
+		Topic: eventType,
+		Data:  data,
+	})
 }
 
 // GetPubSub returns the PubSub instance for external use
