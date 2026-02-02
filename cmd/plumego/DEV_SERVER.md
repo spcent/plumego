@@ -1,16 +1,16 @@
 # Plumego Dev Server with Dashboard
 
-This document describes the enhanced `plumego dev` command with an optional web-based dashboard.
+This document describes the enhanced `plumego dev` command with integrated web-based dashboard.
 
 ## Overview
 
-The `plumego dev` command now supports a **dual-server architecture** with an optional development dashboard that provides real-time monitoring, route inspection, and application management.
+The `plumego dev` command features a **dual-server architecture** with a development dashboard that provides real-time monitoring, route inspection, and application management. The dashboard is **built with plumego itself** (dogfooding), demonstrating the framework's capabilities.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
-│  plumego dev --dashboard :9999              │
+│  plumego dev                                │
 └────────────────┬────────────────────────────┘
                  │
         ┌────────┴────────┐
@@ -34,13 +34,13 @@ The `plumego dev` command now supports a **dual-server architecture** with an op
 ## Features
 
 ### Core Features
-- ✅ **Hot Reload**: Automatic rebuild and restart on file changes
+- ✅ **Hot Reload**: Automatic rebuild and restart on file changes (< 5 seconds)
 - ✅ **Dual Server Mode**: User app + Dashboard run simultaneously
 - ✅ **Event-Driven**: PubSub architecture for loose coupling
 - ✅ **WebSocket Streaming**: Real-time log and event streaming
-- ✅ **Backward Compatible**: Legacy mode works without changes
+- ✅ **Dogfooding**: Dashboard built with plumego framework itself
 
-### Dashboard Features
+### Dashboard Features (Default)
 - 🚀 **Real-time Logs**: Capture and filter stdout/stderr
 - 🛣️ **Route Browser**: Discover and display all HTTP routes
 - 📊 **Metrics Dashboard**: Performance and health monitoring
@@ -50,26 +50,33 @@ The `plumego dev` command now supports a **dual-server architecture** with an op
 
 ## Usage
 
-### Basic Usage (Legacy Mode)
+### Quick Start
 ```bash
 plumego dev
-# Runs your app with hot reload (no dashboard)
+# Dashboard: http://localhost:9999
+# Your app:  http://localhost:8080
 ```
 
-### Dashboard Mode
+### Custom Ports
 ```bash
-plumego dev --dashboard :9999
-# Runs your app at :8080 with dashboard at :9999
+# Custom application port
+plumego dev --addr :3000
+
+# Custom dashboard port
+plumego dev --dashboard-addr :8888
+
+# Both custom
+plumego dev --addr :3000 --dashboard-addr :7777
 ```
 
 ### Full Options
 ```bash
 plumego dev \
-  --addr :8080 \              # User app address
-  --dashboard :9999 \         # Dashboard address (enables dashboard)
-  --watch "**/*.go" \         # Watch patterns
-  --exclude "**/vendor/**" \  # Exclude patterns
-  --debounce 500ms            # File change debounce
+  --addr :8080 \                    # User app address (default: :8080)
+  --dashboard-addr :9999 \          # Dashboard address (default: :9999)
+  --watch "**/*.go,**/*.yaml" \     # Watch patterns
+  --exclude "**/vendor/**" \        # Exclude patterns
+  --debounce 1s                     # File change debounce (default: 500ms)
 ```
 
 ## Dashboard UI

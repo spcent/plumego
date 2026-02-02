@@ -248,21 +248,21 @@ Use `config.Get*` helpers (see `config/env.go`) or Go's `flag` package to transf
 
 ## Development Server with Dashboard
 
-The `plumego` CLI includes a powerful development server built with the plumego framework itself (dogfooding). It provides hot reload, real-time monitoring, and an optional web-based dashboard for enhanced development experience.
+The `plumego` CLI includes a powerful development server built with the plumego framework itself (dogfooding). It provides hot reload, real-time monitoring, and a web-based dashboard for enhanced development experience.
 
-### Basic Usage
+The dashboard is **enabled by default** - simply run `plumego dev` to get started.
+
+### Quick Start
 
 ```bash
-# Simple mode (hot reload only)
 plumego dev
-
-# With dashboard (recommended)
-plumego dev --dashboard :9999
+# Dashboard: http://localhost:9999
+# Your app:  http://localhost:8080
 ```
 
 ### Dashboard Features
 
-When running with `--dashboard`, you get:
+Every `plumego dev` session includes:
 
 - **Real-time Logs**: Stream application stdout/stderr with filtering
 - **Route Browser**: Auto-discover and display all HTTP routes from your app
@@ -271,24 +271,20 @@ When running with `--dashboard`, you get:
 - **App Control**: Start, stop, and restart your application from the UI
 - **Hot Reload**: Automatic rebuild and restart on file changes (< 5 seconds)
 
-### Example
+### Customization
 
 ```bash
-cd your-plumego-app
-plumego dev --dashboard :9999
-# Open http://localhost:9999 for the dashboard
-# Your app runs at http://localhost:8080
-```
+# Custom application port
+plumego dev --addr :3000
 
-### Advanced Options
+# Custom dashboard port
+plumego dev --dashboard-addr :8888
 
-```bash
-plumego dev \
-  --addr :8080 \
-  --dashboard :9999 \
-  --watch "**/*.go" \
-  --exclude "**/vendor/**" \
-  --debounce 500ms
+# Custom watch patterns
+plumego dev --watch "**/*.go,**/*.yaml"
+
+# Adjust hot reload sensitivity
+plumego dev --debounce 1s
 ```
 
 For complete documentation, see `cmd/plumego/DEV_SERVER.md`.

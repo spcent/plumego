@@ -248,21 +248,21 @@ if err := app.ConfigureObservability(obs); err != nil {
 
 ## 开发服务器与仪表盘
 
-`plumego` CLI 包含一个强大的开发服务器，它本身就是使用 plumego 框架构建的（狗粮原则）。它提供热重载、实时监控，以及可选的 Web 仪表盘，大大提升开发体验。
+`plumego` CLI 包含一个强大的开发服务器，它本身就是使用 plumego 框架构建的（狗粮原则）。它提供热重载、实时监控和 Web 仪表盘，大大提升开发体验。
 
-### 基本用法
+仪表盘**默认启用** - 只需运行 `plumego dev` 即可开始使用。
+
+### 快速开始
 
 ```bash
-# 简单模式（仅热重载）
 plumego dev
-
-# 带仪表盘（推荐）
-plumego dev --dashboard :9999
+# 仪表盘：http://localhost:9999
+# 你的应用：http://localhost:8080
 ```
 
 ### 仪表盘功能
 
-使用 `--dashboard` 参数运行时，你将获得：
+每个 `plumego dev` 会话都包含：
 
 - **实时日志**：流式传输应用程序的 stdout/stderr，支持过滤
 - **路由浏览器**：自动发现并展示应用程序的所有 HTTP 路由
@@ -271,24 +271,20 @@ plumego dev --dashboard :9999
 - **应用控制**：从 UI 中启动、停止和重启应用程序
 - **热重载**：文件更改时自动重新构建和重启（< 5 秒）
 
-### 示例
+### 自定义配置
 
 ```bash
-cd your-plumego-app
-plumego dev --dashboard :9999
-# 在浏览器中打开 http://localhost:9999 查看仪表盘
-# 你的应用运行在 http://localhost:8080
-```
+# 自定义应用端口
+plumego dev --addr :3000
 
-### 高级选项
+# 自定义仪表盘端口
+plumego dev --dashboard-addr :8888
 
-```bash
-plumego dev \
-  --addr :8080 \
-  --dashboard :9999 \
-  --watch "**/*.go" \
-  --exclude "**/vendor/**" \
-  --debounce 500ms
+# 自定义监听模式
+plumego dev --watch "**/*.go,**/*.yaml"
+
+# 调整热重载灵敏度
+plumego dev --debounce 1s
 ```
 
 完整文档请参见 `cmd/plumego/DEV_SERVER.md`。
