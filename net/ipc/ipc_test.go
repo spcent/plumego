@@ -778,7 +778,8 @@ func getTestAddrB() string {
 // TestMetricsIntegration tests metrics collection
 func TestMetricsIntegration(t *testing.T) {
 	collector := &testMetricsCollector{
-		records: make(map[string]int),
+		NoopCollector: metrics.NewNoopCollector(),
+		records:       make(map[string]int),
 	}
 
 	addr := getTestAddr()
@@ -908,20 +909,13 @@ func TestLoggingIntegration(t *testing.T) {
 	}
 }
 
-// testMetricsCollector is a simple test implementation of MetricsCollector
+// testMetricsCollector is a simple test implementation of MetricsCollector.
+// It embeds NoopCollector for default implementations and only overrides ObserveIPC
+// to track IPC operation counts.
 type testMetricsCollector struct {
+	*metrics.NoopCollector
 	mu      sync.Mutex
 	records map[string]int
-}
-
-func (c *testMetricsCollector) Record(ctx context.Context, record metrics.MetricRecord) {}
-func (c *testMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-}
-func (c *testMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-}
-func (c *testMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-}
-func (c *testMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
 }
 
 func (c *testMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
@@ -929,15 +923,6 @@ func (c *testMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, 
 	defer c.mu.Unlock()
 	c.records[operation]++
 }
-
-func (c *testMetricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-}
-
-func (c *testMetricsCollector) GetStats() metrics.CollectorStats {
-	return metrics.CollectorStats{}
-}
-
-func (c *testMetricsCollector) Clear() {}
 
 // testLogger is a simple test implementation of StructuredLogger
 type testLogger struct {

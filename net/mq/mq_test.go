@@ -72,7 +72,9 @@ func TestInProcBrokerPanicRecovery(t *testing.T) {
 }
 
 func TestInProcBrokerMetrics(t *testing.T) {
-	collector := &metricsCollector{}
+	collector := &metricsCollector{
+		NoopCollector: metrics.NewNoopCollector(),
+	}
 	broker := NewInProcBroker(pubsub.New(), WithMetricsCollector(collector))
 	defer broker.Close()
 
@@ -1035,22 +1037,13 @@ func (p panicPubSub) Close() error {
 	return nil
 }
 
+// metricsCollector embeds NoopCollector for default implementations
+// and only overrides ObserveMQ and Clear to track MQ-specific metrics.
 type metricsCollector struct {
+	*metrics.NoopCollector
 	mu    sync.Mutex
 	last  Metrics
 	count int
-}
-
-func (m *metricsCollector) Record(ctx context.Context, record metrics.MetricRecord) {
-	// Not used in this test
-}
-
-func (m *metricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	// Not used in this test
-}
-
-func (m *metricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	// Not used in this test
 }
 
 func (m *metricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
@@ -1064,22 +1057,6 @@ func (m *metricsCollector) ObserveMQ(ctx context.Context, operation, topic strin
 		Panic:     panicked,
 	}
 	m.count++
-}
-
-func (m *metricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	// Not used in this test
-}
-
-func (m *metricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	// Not used in this test
-}
-
-func (m *metricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	// Not used in this test
-}
-
-func (m *metricsCollector) GetStats() metrics.CollectorStats {
-	return metrics.CollectorStats{}
 }
 
 func (m *metricsCollector) Clear() {

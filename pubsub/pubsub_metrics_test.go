@@ -9,7 +9,10 @@ import (
 	"github.com/spcent/plumego/metrics"
 )
 
+// stubCollector embeds NoopCollector for default implementations
+// and only overrides Record, ObservePubSub, and GetStats to track PubSub-specific metrics.
 type stubCollector struct {
+	*metrics.NoopCollector
 	mu      sync.Mutex
 	ops     []string
 	topics  []string
@@ -24,8 +27,6 @@ func (s *stubCollector) Record(_ context.Context, record metrics.MetricRecord) {
 	s.records = append(s.records, record)
 }
 
-func (s *stubCollector) ObserveHTTP(_ context.Context, _, _ string, _ int, _ int, _ time.Duration) {}
-
 func (s *stubCollector) ObservePubSub(_ context.Context, operation, topic string, _ time.Duration, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -34,25 +35,15 @@ func (s *stubCollector) ObservePubSub(_ context.Context, operation, topic string
 	s.errs = append(s.errs, err)
 }
 
-func (s *stubCollector) ObserveMQ(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {}
-
-func (s *stubCollector) ObserveKV(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {}
-
-func (s *stubCollector) ObserveIPC(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
-}
-
-func (s *stubCollector) ObserveDB(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
-}
-
 func (s *stubCollector) GetStats() metrics.CollectorStats { return s.stats }
-
-func (s *stubCollector) Clear() {}
 
 func TestPubSubMetricsCollector(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	collector := &stubCollector{}
+	collector := &stubCollector{
+		NoopCollector: metrics.NewNoopCollector(),
+	}
 	ps.SetMetricsCollector(collector)
 
 	if _, err := ps.Subscribe("metrics", DefaultSubOptions()); err != nil {
