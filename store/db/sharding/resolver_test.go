@@ -482,20 +482,58 @@ func TestShardKeyResolver_CanResolve(t *testing.T) {
 func TestShardKeyResolver_ResolveMultiple(t *testing.T) {
 	resolver, _ := setupTestResolver()
 
-	// For now, ResolveMultiple just returns single resolution
-	resolved, err := resolver.ResolveMultiple("SELECT * FROM users WHERE user_id = ?", []any{100})
+	t.Run("single shard", func(t *testing.T) {
+		resolved, err := resolver.ResolveMultiple("SELECT * FROM users WHERE user_id = ?", []any{100})
+		if err != nil {
+			t.Fatalf("ResolveMultiple() unexpected error: %v", err)
+		}
 
-	if err != nil {
-		t.Fatalf("ResolveMultiple() unexpected error: %v", err)
-	}
+		if len(resolved) != 1 {
+			t.Errorf("ResolveMultiple() returned %d shards, want 1", len(resolved))
+		}
 
-	if len(resolved) != 1 {
-		t.Errorf("ResolveMultiple() returned %d shards, want 1", len(resolved))
-	}
+		if resolved[0].ShardIndex != 0 {
+			t.Errorf("ShardIndex = %d, want 0", resolved[0].ShardIndex)
+		}
+	})
 
-	if resolved[0].ShardIndex != 0 {
-		t.Errorf("ShardIndex = %d, want 0", resolved[0].ShardIndex)
-	}
+	t.Run("in clause", func(t *testing.T) {
+		resolved, err := resolver.ResolveMultiple("SELECT * FROM users WHERE user_id IN (?, ?, ?)", []any{1, 2, 3})
+		if err != nil {
+			t.Fatalf("ResolveMultiple() unexpected error: %v", err)
+		}
+
+		if len(resolved) != 3 {
+			t.Errorf("ResolveMultiple() returned %d shards, want 3", len(resolved))
+		}
+
+		got := []int{resolved[0].ShardIndex, resolved[1].ShardIndex, resolved[2].ShardIndex}
+		want := []int{1, 2, 3}
+		for i, shard := range want {
+			if got[i] != shard {
+				t.Errorf("ShardIndex[%d] = %d, want %d", i, got[i], shard)
+			}
+		}
+	})
+
+	t.Run("range query", func(t *testing.T) {
+		resolved, err := resolver.ResolveMultiple("SELECT * FROM users WHERE user_id >= ? AND user_id <= ?", []any{1, 2})
+		if err != nil {
+			t.Fatalf("ResolveMultiple() unexpected error: %v", err)
+		}
+
+		if len(resolved) != 2 {
+			t.Errorf("ResolveMultiple() returned %d shards, want 2", len(resolved))
+		}
+
+		got := []int{resolved[0].ShardIndex, resolved[1].ShardIndex}
+		want := []int{1, 2}
+		for i, shard := range want {
+			if got[i] != shard {
+				t.Errorf("ShardIndex[%d] = %d, want %d", i, got[i], shard)
+			}
+		}
+	})
 }
 
 func TestResolvedShard_GetActualTableName(t *testing.T) {
