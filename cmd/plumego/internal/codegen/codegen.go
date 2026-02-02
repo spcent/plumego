@@ -21,10 +21,10 @@ type GenerateOptions struct {
 
 // GenerateResult represents the result of code generation
 type GenerateResult struct {
-	Type    string                 `json:"type" yaml:"type"`
-	Name    string                 `json:"name" yaml:"name"`
-	Files   map[string][]string    `json:"files" yaml:"files"`
-	Imports []string               `json:"imports,omitempty" yaml:"imports,omitempty"`
+	Type    string              `json:"type" yaml:"type"`
+	Name    string              `json:"name" yaml:"name"`
+	Files   map[string][]string `json:"files" yaml:"files"`
+	Imports []string            `json:"imports,omitempty" yaml:"imports,omitempty"`
 }
 
 // Generate generates code based on options
@@ -221,9 +221,9 @@ func generateHandler(dir string, opts GenerateOptions) (*GenerateResult, error) 
 
 func generateModel(dir string, opts GenerateOptions) (*GenerateResult, error) {
 	result := &GenerateResult{
-		Type:  "model",
-		Name:  opts.Name,
-		Files: make(map[string][]string),
+		Type:    "model",
+		Name:    opts.Name,
+		Files:   make(map[string][]string),
 		Imports: []string{},
 	}
 
@@ -272,8 +272,8 @@ func generateComponentCode(name, pkg string) string {
 
 import (
 	"context"
+	"net/http"
 
-	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
@@ -281,42 +281,49 @@ import (
 
 // %sComponent implements the Component interface
 type %sComponent struct {
-	// Add component fields here
+	// Name identifies this component instance.
+	Name string
 }
 
 // New%sComponent creates a new %s component
 func New%sComponent() *%sComponent {
-	return &%sComponent{}
+	return &%sComponent{Name: "%s"}
 }
 
 // RegisterRoutes registers routes for this component
 func (c *%sComponent) RegisterRoutes(r *router.Router) {
-	// TODO: Register routes
-	// r.GET("/api/%s", c.handleGet)
+	r.Get("/%s/health", http.HandlerFunc(c.handleHealth))
 }
 
 // RegisterMiddleware registers middleware for this component
 func (c *%sComponent) RegisterMiddleware(m *middleware.Registry) {
-	// TODO: Register middleware if needed
+	// No middleware registered by default.
 }
 
 // Start starts the component
 func (c *%sComponent) Start(ctx context.Context) error {
-	// TODO: Initialize component resources
 	return nil
 }
 
 // Stop stops the component
 func (c *%sComponent) Stop(ctx context.Context) error {
-	// TODO: Cleanup component resources
 	return nil
 }
 
 // Health returns the component health status
 func (c *%sComponent) Health() (string, health.HealthStatus) {
-	return "%s", health.Healthy()
+	if c.Name == "" {
+		return "%s", health.Healthy()
+	}
+	return c.Name, health.Healthy()
 }
-`, pkg, name, name, name, name, name, name, name, name, strings.ToLower(name), name, name, name, name, strings.ToLower(name))
+
+func (c *%sComponent) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("{\"status\":\"ok\"}"))
+}
+`, pkg, name, name, name, name, name, name, name, name, strings.ToLower(name), name, name, name, name, strings.ToLower(name), strings.ToLower(name), name, strings.ToLower(name))
 }
 
 func generateComponentTestCode(name, pkg string) string {
@@ -357,16 +364,14 @@ import (
 	"net/http"
 )
 
-// %s is a middleware that TODO: describe what it does
+// %s adds a header and passes the request through.
 func %s(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Implement middleware logic
-
-		// Call next handler
+		w.Header().Set("X-%s", "true")
 		next.ServeHTTP(w, r)
 	})
 }
-`, pkg, name, name)
+`, pkg, name, name, name)
 }
 
 func generateMiddlewareTestCode(name, pkg string) string {
@@ -423,42 +428,34 @@ func generateHandlerMethodCode(name, method string) string {
 		return fmt.Sprintf(`
 // Get%s handles GET requests for %s
 func Get%s(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement GET logic
-	contract.JSON(w, http.StatusOK, map[string]string{
-		"message": "Get%s not yet implemented",
-	})
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+		"message": "%s retrieved",
+	}, nil)
 }
-`, name, name, name, name)
+`, name, name, name, strings.ToLower(name))
 	case "POST":
 		return fmt.Sprintf(`
 // Create%s handles POST requests for %s
 func Create%s(w http.ResponseWriter, r *http.Request) {
-	// TODO: Parse request body
-	// TODO: Validate input
-	// TODO: Create resource
-	contract.JSON(w, http.StatusCreated, map[string]string{
-		"message": "Create%s not yet implemented",
-	})
+	_ = contract.WriteResponse(w, r, http.StatusCreated, map[string]string{
+		"message": "%s created",
+	}, nil)
 }
-`, name, name, name, name)
+`, name, name, name, strings.ToLower(name))
 	case "PUT":
 		return fmt.Sprintf(`
 // Update%s handles PUT requests for %s
 func Update%s(w http.ResponseWriter, r *http.Request) {
-	// TODO: Parse request body
-	// TODO: Validate input
-	// TODO: Update resource
-	contract.JSON(w, http.StatusOK, map[string]string{
-		"message": "Update%s not yet implemented",
-	})
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+		"message": "%s updated",
+	}, nil)
 }
-`, name, name, name, name)
+`, name, name, name, strings.ToLower(name))
 	case "DELETE":
 		return fmt.Sprintf(`
 // Delete%s handles DELETE requests for %s
 func Delete%s(w http.ResponseWriter, r *http.Request) {
-	// TODO: Delete resource
-	contract.JSON(w, http.StatusNoContent, nil)
+	_ = contract.WriteResponse(w, r, http.StatusNoContent, nil, nil)
 }
 `, name, name, name)
 	default:
@@ -549,21 +546,35 @@ func generateModelCode(name, pkg string, withValidation bool) string {
 		validation = `
 // Validate validates the model
 func (m *` + name + `) Validate() error {
-	// TODO: Add validation logic
+	if strings.TrimSpace(m.Name) == "" {
+		return fmt.Errorf("name is required")
+	}
 	return nil
 }`
 	}
 
+	imports := ""
+	if withValidation {
+		imports = `
+
+import (
+	"fmt"
+	"strings"
+)
+`
+	}
+
 	return fmt.Sprintf(`package %s
+%s
 
 // %s represents a %s model
 type %s struct {
-	ID        int64  ` + "`json:\"id\"`" + `
-	CreatedAt string ` + "`json:\"created_at\"`" + `
-	UpdatedAt string ` + "`json:\"updated_at\"`" + `
+	ID        int64  `+"`json:\"id\"`"+`
+	CreatedAt string `+"`json:\"created_at\"`"+`
+	UpdatedAt string `+"`json:\"updated_at\"`"+`
 
-	// TODO: Add model fields
+	Name string `+"`json:\"name\"`"+`
 }
 %s
-`, pkg, name, strings.ToLower(name), name, validation)
+`, pkg, imports, name, strings.ToLower(name), name, validation)
 }

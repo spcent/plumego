@@ -242,7 +242,7 @@ package middleware
 
 func RateLimit(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // TODO: Implement middleware logic
+        w.Header().Set("X-RateLimit", "true")
         next.ServeHTTP(w, r)
     })
 }
@@ -253,15 +253,15 @@ func RateLimit(next http.Handler) http.Handler {
 package handlers
 
 func GetUser(w http.ResponseWriter, r *http.Request) {
-    contract.JSON(w, http.StatusOK, map[string]string{
-        "message": "GetUser not yet implemented",
-    })
+    _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+        "message": "user retrieved",
+    }, nil)
 }
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
-    contract.JSON(w, http.StatusCreated, map[string]string{
-        "message": "CreateUser not yet implemented",
-    })
+    _ = contract.WriteResponse(w, r, http.StatusCreated, map[string]string{
+        "message": "user created",
+    }, nil)
 }
 // ... PUT, DELETE methods
 ```
