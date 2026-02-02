@@ -1,135 +1,115 @@
 # Plumego CLI
 
-A code agent-friendly command-line interface for the plumego HTTP toolkit.
+A code agent-friendly command-line tool for plumego projects. Designed for automation, CI/CD integration, and AI-assisted development workflows.
 
 ## Features
 
-- **JSON-first output**: Default structured output for easy parsing
-- **Non-interactive**: All operations via flags and config
-- **Predictable exit codes**: Clear success/failure indicators
-- **Multiple formats**: JSON, YAML, or plain text output
-- **Composable commands**: Unix philosophy for automation
+- **Machine-First Design**: JSON/YAML/Text output formats (default: JSON)
+- **Non-Interactive**: All operations via flags, no prompts
+- **Predictable**: Clear exit codes (0=success, 1=error, 2=warning)
+- **Composable**: Works seamlessly with jq, grep, pipes
+- **Automation-Ready**: Perfect for CI/CD and code agents
 
 ## Installation
 
-```bash
-# Install from source
-go install github.com/spcent/plumego/cmd/plumego@latest
+### From Source
 
-# Or build locally
+```bash
+# Clone the repository
+git clone https://github.com/spcent/plumego.git
+cd plumego/cmd/plumego
+
+# Build and install
 go build -o plumego .
+sudo mv plumego /usr/local/bin/
+
+# Or just build locally
+go build -o ../../bin/plumego .
+```
+
+### Verify Installation
+
+```bash
+plumego --help
 ```
 
 ## Quick Start
 
+### Create a New Project
+
 ```bash
-# Create new project
-plumego new myapp --template api
+# Create a minimal project
+plumego new myapp
 
-# Get JSON output
-plumego new myapp --format json
+# Create an API server
+plumego new myapi --template api
 
-# Preview without creating
-plumego new myapp --dry-run
+# Create with custom module path
+plumego new myapp --template fullstack --module github.com/myorg/myapp
+```
+
+### Generate Code
+
+```bash
+# Generate a component
+plumego generate component Auth --with-tests
+
+# Generate middleware
+plumego generate middleware RateLimit
+
+# Generate REST handlers
+plumego generate handler User --methods GET,POST,PUT,DELETE --with-tests
+```
+
+### Development Server
+
+```bash
+# Start dev server with hot reload
+plumego dev
+
+# Custom port
+plumego dev --addr :3000
 ```
 
 ## Commands
 
-- `new` - Create project from template ✅
-- `generate` - Generate code (🚧 coming soon)
-- `dev` - Development server with hot reload (🚧 coming soon)
-- `routes` - Inspect routes (🚧 coming soon)
-- `check` - Health validation (🚧 coming soon)
-- `config` - Configuration management (🚧 coming soon)
-- `test` - Test runner (🚧 coming soon)
-- `build` - Build utilities (🚧 coming soon)
-- `inspect` - Runtime inspection (🚧 coming soon)
+All 9 commands are fully implemented:
 
-## Documentation
+1. **new** - Create projects from templates
+2. **generate** - Generate components, middleware, handlers, models
+3. **dev** - Development server with hot reload
+4. **check** - Health and security validation
+5. **config** - Configuration management
+6. **routes** - Route analysis and inspection
+7. **build** - Build with optimizations
+8. **test** - Enhanced test runner
+9. **inspect** - Runtime inspection
 
-See [docs/](../../docs/) for detailed documentation:
-- [CLI_DESIGN.md](../../docs/CLI_DESIGN.md) - Complete design specification
-- [CLI_QUICK_START.md](../../docs/CLI_QUICK_START.md) - Getting started guide
-- [CLI_SUMMARY.md](../../docs/CLI_SUMMARY.md) - Overview and summary
+See full documentation: [docs/CLI_DESIGN.md](../../docs/CLI_DESIGN.md)
 
-## Examples
+## CI/CD Integration
 
-### Create API Server
-```bash
-plumego new myapi --template api --module github.com/myorg/myapi
-cd myapi
-go mod tidy
-go run main.go
+```yaml
+# GitHub Actions example
+- name: Install Plumego CLI
+  run: |
+    cd cmd/plumego
+    go build -o $GITHUB_WORKSPACE/bin/plumego .
+
+- name: Health Check
+  run: plumego check --format json
+
+- name: Run Tests
+  run: plumego test --race --cover --format json
 ```
 
-### Parse JSON Output
-```bash
-PROJECT_PATH=$(plumego new myapp --format json | jq -r '.data.path')
-cd "$PROJECT_PATH"
-```
+## Exit Codes
 
-### CI/CD Integration
-```bash
-#!/bin/bash
-if plumego check --format json > health.json; then
-  echo "✓ Validation passed"
-else
-  jq -r '.errors[]' health.json
-  exit 1
-fi
-```
-
-## Architecture
-
-```
-cmd/plumego/
-├── main.go              # Entry point
-├── commands/            # Command implementations
-│   ├── root.go         # Command dispatcher
-│   ├── new.go          # Project scaffolding
-│   └── stubs.go        # Stub implementations
-└── internal/            # Internal packages
-    ├── output/         # Output formatting
-    └── scaffold/       # Project templates
-```
-
-## Development
-
-```bash
-# Build
-go build -o plumego .
-
-# Test
-./plumego --help
-./plumego new testapp --dry-run --format json
-
-# Install locally
-go install
-```
-
-## Design Principles
-
-1. **Machine-first**: Default to JSON for agent parsing
-2. **Non-interactive**: No prompts, all via flags
-3. **Idempotent**: Safe to run multiple times
-4. **Composable**: Works with pipes and tools
-5. **Predictable**: Clear exit codes and structure
-
-## Status
-
-- ✅ Core framework implemented
-- ✅ `plumego new` command working
-- ✅ JSON/YAML/Text output formats
-- ✅ Project scaffolding system
-- 🚧 Other commands (stubs in place)
-
-## Contributing
-
-This CLI follows plumego's standard library-first philosophy:
-- Minimal dependencies (only gopkg.in/yaml.v3 for YAML)
-- Standard library patterns
-- Clear, testable code
+- `0` = Success
+- `1` = General error
+- `2` = Configuration error
+- `3` = Resource conflict
 
 ## License
 
-Same as plumego main project.
+Same as plumego core - see [LICENSE](../../LICENSE).

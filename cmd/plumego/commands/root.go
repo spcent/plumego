@@ -57,6 +57,7 @@ func Execute() error {
 	root.Register(&TestCmd{})
 	root.Register(&BuildCmd{})
 	root.Register(&InspectCmd{})
+	root.Register(&VersionCmd{})
 
 	return root.Run(os.Args[1:])
 }
@@ -154,6 +155,7 @@ Available Commands:
   test        Enhanced test running
   build       Build application
   inspect     Inspect running application
+  version     Show version information
 
 Use "plumego <command> --help" for more information about a command.
 
