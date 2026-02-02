@@ -81,6 +81,17 @@ function updateConnectionStatus(status) {
     const config = statusMap[status] || statusMap.connecting;
     elements.wsStatus.textContent = config.text;
     elements.wsStatus.className = `badge ${config.class}`;
+
+    // Update connection indicator
+    const indicator = document.getElementById('connection-indicator');
+    if (indicator) {
+        indicator.style.background = status === 'connected' ? 'var(--success)' :
+                                     status === 'error' ? 'var(--error)' :
+                                     'var(--warning)';
+        indicator.style.boxShadow = status === 'connected' ? '0 0 10px var(--success)' :
+                                    status === 'error' ? '0 0 10px var(--error)' :
+                                    '0 0 10px var(--warning)';
+    }
 }
 
 // Event Handlers
