@@ -268,24 +268,9 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 ---
 
-## Stub Commands 🚧
+## Remaining Planned Commands 🚧
 
 These commands are planned but not yet implemented:
-
-### `plumego dev` - Development Server
-Hot reload development server with file watching.
-
-### `plumego routes` - Route Inspection
-List and inspect registered HTTP routes.
-
-### `plumego test` - Test Runner
-Enhanced test runner with coverage and race detection.
-
-### `plumego build` - Build Utilities
-Build application with optimizations and asset embedding.
-
-### `plumego inspect` - Runtime Inspection
-Inspect running application health and metrics.
 
 ### `plumego migrate` - Database Migrations
 Manage database migrations (up, down, status, create).
@@ -300,10 +285,15 @@ cmd/plumego/
 ├── commands/
 │   ├── root.go                     # Command dispatcher
 │   ├── new.go                      # ✅ Project scaffolding
+│   ├── dev.go                      # ✅ Development server
+│   ├── routes.go                   # ✅ Route inspection
 │   ├── check.go                    # ✅ Health validation
 │   ├── config.go                   # ✅ Configuration management
 │   ├── generate.go                 # ✅ Code generation
-│   └── stubs.go                    # 🚧 Stub implementations
+│   ├── test.go                     # ✅ Test runner
+│   ├── build.go                    # ✅ Build utilities
+│   ├── inspect.go                  # ✅ Runtime inspection
+│   └── stubs.go                    # Legacy placeholder registry
 └── internal/
     ├── output/
     │   └── formatter.go            # ✅ JSON/YAML/Text output
@@ -313,8 +303,12 @@ cmd/plumego/
     │   └── checker.go              # ✅ Health check logic
     ├── configmgr/
     │   └── configmgr.go            # ✅ Configuration logic
-    └── codegen/
-        └── codegen.go              # ✅ Code generation templates
+    ├── codegen/
+    │   └── codegen.go              # ✅ Code generation templates
+    ├── routeanalyzer/
+    │   └── analyzer.go             # ✅ Route inspection analysis
+    └── watcher/
+        └── watcher.go              # ✅ File watching
 ```
 
 ---
