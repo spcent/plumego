@@ -6,3 +6,4 @@
 examples/crud-demo/crud-demo
 examples/reference/reference
 *.bak
+bin/
