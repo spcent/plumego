@@ -43,6 +43,14 @@ const (
 	MetricIPCRead   MetricType = "ipc_read"
 	MetricIPCWrite  MetricType = "ipc_write"
 	MetricIPCClose  MetricType = "ipc_close"
+
+	// Database metrics
+	MetricDBQuery       MetricType = "db_query"
+	MetricDBExec        MetricType = "db_exec"
+	MetricDBTransaction MetricType = "db_transaction"
+	MetricDBPing        MetricType = "db_ping"
+	MetricDBConnect     MetricType = "db_connect"
+	MetricDBClose       MetricType = "db_close"
 )
 
 // MetricLabels represents key-value labels for metrics
@@ -60,6 +68,10 @@ const (
 	labelAddr      = "addr"
 	labelTransport = "transport"
 	labelBytes     = "bytes"
+	labelDriver    = "driver"
+	labelQuery     = "query"
+	labelTable     = "table"
+	labelRows      = "rows"
 )
 
 // MetricRecord represents a single metric record
@@ -92,6 +104,9 @@ type MetricsCollector interface {
 
 	// ObserveIPC is a convenience method for IPC metrics
 	ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error)
+
+	// ObserveDB is a convenience method for database metrics
+	ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error)
 
 	// GetStats returns current statistics
 	GetStats() CollectorStats
@@ -352,6 +367,56 @@ func (b *BaseMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, 
 		Type:     metricType,
 		Name:     "ipc_" + operation,
 		Value:    float64(duration.Microseconds()),
+		Labels:   labels,
+		Duration: duration,
+		Error:    err,
+	}
+	b.Record(ctx, record)
+}
+
+// ObserveDB implements database metrics recording
+func (b *BaseMetricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+	var metricType MetricType
+	switch operation {
+	case "query":
+		metricType = MetricDBQuery
+	case "exec":
+		metricType = MetricDBExec
+	case "transaction":
+		metricType = MetricDBTransaction
+	case "ping":
+		metricType = MetricDBPing
+	case "connect":
+		metricType = MetricDBConnect
+	case "close":
+		metricType = MetricDBClose
+	default:
+		metricType = MetricDBQuery
+	}
+
+	labels := MetricLabels{
+		labelOperation: operation,
+	}
+	if driver != "" {
+		labels[labelDriver] = driver
+	}
+	if query != "" {
+		// Truncate long queries to avoid excessive label cardinality
+		maxQueryLen := 100
+		if len(query) > maxQueryLen {
+			labels[labelQuery] = query[:maxQueryLen] + "..."
+		} else {
+			labels[labelQuery] = query
+		}
+	}
+	if rows > 0 {
+		labels[labelRows] = fmt.Sprintf("%d", rows)
+	}
+
+	record := MetricRecord{
+		Type:     metricType,
+		Name:     "db_" + operation,
+		Value:    float64(duration.Milliseconds()),
 		Labels:   labels,
 		Duration: duration,
 		Error:    err,

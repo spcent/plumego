@@ -423,7 +423,9 @@ func TestWithRunners(t *testing.T) {
 
 func TestWithMetricsCollector(t *testing.T) {
 	app := &App{}
-	collector := &mockMetricsCollector{}
+	collector := &mockMetricsCollector{
+		NoopCollector: metrics.NewNoopCollector(),
+	}
 	opt := WithMetricsCollector(collector)
 	opt(app)
 	// Since app.metricsCollector is an interface, we need to compare differently
@@ -461,23 +463,12 @@ type mockRunner struct{}
 func (m *mockRunner) Start(ctx context.Context) error { return nil }
 func (m *mockRunner) Stop(ctx context.Context) error  { return nil }
 
-type mockMetricsCollector struct{}
-
-func (m *mockMetricsCollector) Record(ctx context.Context, record metrics.MetricRecord) {}
-func (m *mockMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+// mockMetricsCollector embeds NoopCollector for cleaner mock implementation.
+// When new methods are added to MetricsCollector interface, this mock doesn't need updates
+// because NoopCollector implements all interface methods.
+type mockMetricsCollector struct {
+	*metrics.NoopCollector
 }
-func (m *mockMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-}
-func (m *mockMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-}
-func (m *mockMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-}
-func (m *mockMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-}
-func (m *mockMetricsCollector) GetStats() metrics.CollectorStats {
-	return metrics.CollectorStats{}
-}
-func (m *mockMetricsCollector) Clear() {}
 
 type mockTracer struct{}
 

@@ -2,7 +2,6 @@ package kvstore
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -847,7 +846,9 @@ func TestMetricsCollector(t *testing.T) {
 	}
 
 	// Test SetMetricsCollector
-	mockCollector := &mockMetricsCollector{}
+	mockCollector := &mockMetricsCollector{
+		NoopCollector: metrics.NewNoopCollector(),
+	}
 	kv.SetMetricsCollector(mockCollector)
 
 	// Verify collector was set
@@ -864,21 +865,12 @@ func TestMetricsCollector(t *testing.T) {
 	kv.recordMetrics("test", "key", time.Millisecond, nil, true)
 }
 
-type mockMetricsCollector struct{}
-
-func (m *mockMetricsCollector) Record(_ context.Context, _ metrics.MetricRecord) {}
-func (m *mockMetricsCollector) ObserveHTTP(_ context.Context, _, _ string, _, _ int, _ time.Duration) {
+// mockMetricsCollector embeds NoopCollector for cleaner mock implementation.
+// When new methods are added to MetricsCollector interface, this mock doesn't need updates
+// because NoopCollector implements all interface methods.
+type mockMetricsCollector struct {
+	*metrics.NoopCollector
 }
-func (m *mockMetricsCollector) ObservePubSub(_ context.Context, _, _ string, _ time.Duration, _ error) {
-}
-func (m *mockMetricsCollector) ObserveMQ(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {
-}
-func (m *mockMetricsCollector) ObserveKV(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {
-}
-func (m *mockMetricsCollector) ObserveIPC(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
-}
-func (m *mockMetricsCollector) GetStats() metrics.CollectorStats { return metrics.CollectorStats{} }
-func (m *mockMetricsCollector) Clear()                           {}
 
 // Test validate options with more edge cases
 func TestValidateOptionsExtended(t *testing.T) {
