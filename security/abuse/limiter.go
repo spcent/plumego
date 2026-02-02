@@ -1,3 +1,34 @@
+// Package abuse provides rate limiting and anti-abuse protection.
+//
+// This package implements a high-performance token bucket rate limiter with:
+//   - Per-key rate limiting (e.g., per IP, per user)
+//   - Configurable burst capacity and refill rate
+//   - Automatic cleanup of idle entries
+//   - Sharded internal storage for reduced lock contention
+//   - Memory-efficient design with configurable limits
+//
+// The token bucket algorithm allows controlled burst traffic while maintaining
+// a steady rate over time, making it ideal for API rate limiting.
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/security/abuse"
+//
+//	// Create limiter: 100 requests/sec with burst of 200
+//	limiter := abuse.NewGuard(abuse.Config{
+//		Rate:     100,  // tokens per second
+//		Capacity: 200,  // burst capacity
+//	})
+//
+//	// Check if request is allowed
+//	clientIP := "192.168.1.1"
+//	if !limiter.Allow(clientIP) {
+//		// Rate limit exceeded
+//		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+//		return
+//	}
+//
+//	// Process request...
 package abuse
 
 import (

@@ -7,12 +7,12 @@ import (
 
 // Priority levels (lower number = higher priority)
 const (
-	PriorityHighest  = 0
-	PriorityHigh     = 1
-	PriorityNormal   = 2
-	PriorityLow      = 3
-	PriorityLowest   = 4
-	PriorityDefault  = PriorityNormal
+	PriorityHighest = 0
+	PriorityHigh    = 1
+	PriorityNormal  = 2
+	PriorityLow     = 3
+	PriorityLowest  = 4
+	PriorityDefault = PriorityNormal
 )
 
 // PriorityMessage wraps a message with priority for queue ordering.
@@ -221,8 +221,8 @@ func (pb *PriorityBuffer) Stats() PriorityBufferStats {
 	defer pb.mu.Unlock()
 
 	stats := PriorityBufferStats{
-		Size:     len(pb.pq),
-		Capacity: pb.capacity,
+		Size:       len(pb.pq),
+		Capacity:   pb.capacity,
 		ByPriority: make(map[int]int),
 	}
 

@@ -88,11 +88,11 @@ func (h *Hub) putConnList(conns *[]*Conn) {
 
 // simpleRateLimiter implements a basic token bucket rate limiter using only standard library
 type simpleRateLimiter struct {
-	rate     int           // Tokens per second
-	burst    int           // Maximum burst size
-	tokens   atomic.Uint64 // Current tokens (scaled by 1000 for precision)
-	lastRefill atomic.Int64 // Last refill timestamp (nanoseconds)
-	mu       sync.Mutex
+	rate       int           // Tokens per second
+	burst      int           // Maximum burst size
+	tokens     atomic.Uint64 // Current tokens (scaled by 1000 for precision)
+	lastRefill atomic.Int64  // Last refill timestamp (nanoseconds)
+	mu         sync.Mutex
 }
 
 // newRateLimiter creates a rate limiter that allows 'rate' events per second with burst capacity

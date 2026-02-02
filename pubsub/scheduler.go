@@ -10,11 +10,11 @@ import (
 
 // delayedMessage represents a message scheduled for future delivery.
 type delayedMessage struct {
-	topic   string
-	msg     Message
-	fireAt  time.Time
-	index   int // heap index
-	id      uint64
+	topic  string
+	msg    Message
+	fireAt time.Time
+	index  int // heap index
+	id     uint64
 }
 
 // delayedHeap implements heap.Interface for delayed messages.

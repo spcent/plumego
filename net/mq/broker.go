@@ -191,6 +191,9 @@ func (b *InProcBroker) validateTTL(expiresAt time.Time) error {
 }
 
 // NewInProcBroker wraps the in-process pubsub implementation.
+//
+// Panics if configuration is invalid or persistence initialization fails.
+// Use Config.Validate() beforehand if you need to handle errors gracefully.
 func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
 	if ps == nil {
 		ps = pubsub.New()

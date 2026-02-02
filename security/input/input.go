@@ -1,3 +1,38 @@
+// Package input provides input validation and sanitization utilities.
+//
+// This package implements validation functions for common input types including:
+//   - Email addresses (RFC 5322 compliant)
+//   - URLs (RFC 3986 compliant)
+//   - Phone numbers (E.164 format)
+//   - HTTP tokens (RFC 7230)
+//   - Safe strings (alphanumeric + whitespace)
+//
+// All validators are designed to be fast, secure, and follow relevant RFCs.
+// They use standard library regex where appropriate and avoid ReDoS vulnerabilities.
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/security/input"
+//
+//	// Validate email
+//	if !input.ValidateEmail("user@example.com") {
+//		// Invalid email
+//	}
+//
+//	// Validate URL
+//	if !input.ValidateURL("https://example.com") {
+//		// Invalid URL
+//	}
+//
+//	// Validate phone number (E.164)
+//	if !input.ValidatePhone("+1234567890") {
+//		// Invalid phone number
+//	}
+//
+//	// Check if string is safe (no special chars)
+//	if !input.IsSafeString("Hello World 123") {
+//		// Contains unsafe characters
+//	}
 package input
 
 import (

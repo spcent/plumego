@@ -19,7 +19,7 @@ type Builder struct {
 	buildCmd   string
 	buildArgs  []string
 
-	pubsub     *pubsub.InProcPubSub
+	pubsub *pubsub.InProcPubSub
 }
 
 // NewBuilder creates a new builder

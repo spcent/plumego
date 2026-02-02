@@ -100,8 +100,8 @@ func (a *Analyzer) ProbeEndpoints() []RouteInfo {
 
 		if err == nil && resp.StatusCode < 500 {
 			discovered = append(discovered, RouteInfo{
-				Method: "HEAD",
-				Path:   path,
+				Method:      "HEAD",
+				Path:        path,
 				Description: fmt.Sprintf("Discovered (status: %d)", resp.StatusCode),
 			})
 			resp.Body.Close()

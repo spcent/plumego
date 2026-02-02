@@ -1,3 +1,38 @@
+// Package db provides database connectivity and operations with advanced features.
+//
+// This package wraps database/sql with additional functionality including:
+//   - Connection pool management
+//   - Read/write splitting for high availability
+//   - Horizontal sharding for scalability
+//   - Automatic query retry with backoff
+//   - Metrics collection (query timing, error rates)
+//   - Health checking and monitoring
+//   - Transaction management with context support
+//
+// The package supports multiple database drivers (MySQL, PostgreSQL, SQLite)
+// and provides both simple single-database and complex multi-database topologies.
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/store/db"
+//
+//	// Connect to a database
+//	database, err := db.Connect(db.Config{
+//		Driver:   "mysql",
+//		Host:     "localhost",
+//		Port:     3306,
+//		Database: "myapp",
+//		Username: "user",
+//		Password: "pass",
+//		MaxOpenConns: 25,
+//		MaxIdleConns: 10,
+//	})
+//
+//	// Execute a query
+//	rows, err := database.Query(ctx, "SELECT * FROM users WHERE id = ?", 123)
+//
+//	// Begin a transaction
+//	tx, err := database.BeginTx(ctx)
 package db
 
 import (

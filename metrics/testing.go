@@ -48,24 +48,24 @@ type MockCollector struct {
 	mu sync.RWMutex
 
 	// Captured calls
-	records    []MetricRecord
-	httpCalls  []HTTPCall
-	dbCalls    []DBCall
-	kvCalls    []KVCall
-	ipcCalls   []IPCCall
-	mqCalls    []MQCall
+	records     []MetricRecord
+	httpCalls   []HTTPCall
+	dbCalls     []DBCall
+	kvCalls     []KVCall
+	ipcCalls    []IPCCall
+	mqCalls     []MQCall
 	pubsubCalls []PubSubCall
 
 	// Configurable hooks (optional)
-	OnRecord       func(ctx context.Context, record MetricRecord)
-	OnObserveHTTP  func(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
-	OnObserveDB    func(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error)
-	OnObserveKV    func(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool)
-	OnObserveIPC   func(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error)
-	OnObserveMQ    func(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool)
+	OnRecord        func(ctx context.Context, record MetricRecord)
+	OnObserveHTTP   func(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
+	OnObserveDB     func(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error)
+	OnObserveKV     func(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool)
+	OnObserveIPC    func(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error)
+	OnObserveMQ     func(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool)
 	OnObservePubSub func(ctx context.Context, operation, topic string, duration time.Duration, err error)
-	OnGetStats     func() CollectorStats
-	OnClear        func()
+	OnGetStats      func() CollectorStats
+	OnClear         func()
 }
 
 // Call types for capturing invocations
@@ -271,7 +271,7 @@ func (m *MockCollector) GetStats() CollectorStats {
 	}
 
 	return CollectorStats{
-		TotalRecords: int64(recordCount),
+		TotalRecords:  int64(recordCount),
 		TypeBreakdown: make(map[MetricType]int64),
 	}
 }

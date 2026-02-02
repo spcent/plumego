@@ -161,10 +161,10 @@ type LatencyStats struct {
 
 // slidingWindow tracks events in a time window for throughput calculation.
 type slidingWindow struct {
-	mu       sync.Mutex
-	events   []time.Time
-	window   time.Duration
-	maxSize  int
+	mu      sync.Mutex
+	events  []time.Time
+	window  time.Duration
+	maxSize int
 }
 
 // newSlidingWindow creates a new sliding window.
@@ -335,14 +335,14 @@ func (em *EnhancedMetrics) Snapshot() EnhancedMetricsSnapshot {
 		}
 
 		snapshot.Topics[topic] = EnhancedTopicMetrics{
-			PublishLatency:  pubStats,
-			DeliverLatency:  delStats,
-			QueueDepthAvg:   queueDepthAvg,
-			QueueDepthMax:   int(tm.queueDepthMax.Load()),
-			MessageSizeAvg:  messageSizeAvg,
-			MessageSizeMax:  int(tm.messageSizeMax.Load()),
-			PublishRate:     tm.publishTimes.Rate(),
-			DeliverRate:     tm.deliverTimes.Rate(),
+			PublishLatency: pubStats,
+			DeliverLatency: delStats,
+			QueueDepthAvg:  queueDepthAvg,
+			QueueDepthMax:  int(tm.queueDepthMax.Load()),
+			MessageSizeAvg: messageSizeAvg,
+			MessageSizeMax: int(tm.messageSizeMax.Load()),
+			PublishRate:    tm.publishTimes.Rate(),
+			DeliverRate:    tm.deliverTimes.Rate(),
 		}
 	}
 

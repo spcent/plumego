@@ -29,13 +29,13 @@ type AckableSubscription interface {
 type ackableSubscriber struct {
 	*subscriber
 
-	mu          sync.Mutex
-	pending     map[string]*pendingMessage // msgID -> pending message
-	ackTimeout  time.Duration
-	maxRetries  int
-	deadLetter  *InProcPubSub
-	dlTopic     string
-	ps          *InProcPubSub
+	mu         sync.Mutex
+	pending    map[string]*pendingMessage // msgID -> pending message
+	ackTimeout time.Duration
+	maxRetries int
+	deadLetter *InProcPubSub
+	dlTopic    string
+	ps         *InProcPubSub
 }
 
 // pendingMessage tracks a message awaiting acknowledgment.

@@ -10,10 +10,10 @@ import (
 type messageHistory struct {
 	mu       sync.RWMutex
 	messages []historicalMessage
-	head     int  // oldest message index
-	tail     int  // next write index
-	count    int  // current message count
-	capacity int  // maximum messages to retain
+	head     int // oldest message index
+	tail     int // next write index
+	count    int // current message count
+	capacity int // maximum messages to retain
 	sequence uint64
 }
 

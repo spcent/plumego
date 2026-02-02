@@ -282,12 +282,13 @@ func TestConfigWatcher_Start(t *testing.T) {
 	}
 	tmpfile.Close()
 
-	callCount := 0
+	// Use a channel to safely communicate callback invocations
+	callCh := make(chan struct{}, 10)
 	watcher, err := NewConfigWatcher(
 		tmpfile.Name(),
 		WithWatchInterval(100*time.Millisecond),
 		WithOnChange(func(c *ShardingConfig) {
-			callCount++
+			callCh <- struct{}{}
 		}),
 	)
 	if err != nil {
@@ -317,12 +318,12 @@ func TestConfigWatcher_Start(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Wait for watcher to detect change
-	time.Sleep(200 * time.Millisecond)
-
-	// Verify callback was called
-	if callCount != 1 {
-		t.Errorf("expected 1 callback from auto-reload, got %d", callCount)
+	// Wait for callback notification
+	select {
+	case <-callCh:
+		// Expected callback received
+	case <-time.After(300 * time.Millisecond):
+		t.Error("expected callback from auto-reload, but none received")
 	}
 
 	// Verify config was updated

@@ -11,15 +11,15 @@ import (
 
 // CheckResult represents the overall health check result
 type CheckResult struct {
-	Status string                  `json:"status" yaml:"status"` // healthy, degraded, unhealthy
-	Checks map[string]CheckDetail  `json:"checks" yaml:"checks"`
+	Status string                 `json:"status" yaml:"status"` // healthy, degraded, unhealthy
+	Checks map[string]CheckDetail `json:"checks" yaml:"checks"`
 }
 
 // CheckDetail represents a single check result
 type CheckDetail struct {
-	Status   string        `json:"status" yaml:"status"`     // passed, warning, failed
-	Issues   []CheckIssue  `json:"issues" yaml:"issues"`
-	Outdated []string      `json:"outdated,omitempty" yaml:"outdated,omitempty"`
+	Status   string       `json:"status" yaml:"status"` // passed, warning, failed
+	Issues   []CheckIssue `json:"issues" yaml:"issues"`
+	Outdated []string     `json:"outdated,omitempty" yaml:"outdated,omitempty"`
 }
 
 // CheckIssue represents a specific issue found
@@ -210,8 +210,8 @@ func CheckSecurity(dir, envFile string) CheckDetail {
 
 			// Check for hardcoded secrets (basic check)
 			if strings.Contains(line, `secret := "`) ||
-			   strings.Contains(line, `password := "`) ||
-			   strings.Contains(line, `key := "`) {
+				strings.Contains(line, `password := "`) ||
+				strings.Contains(line, `key := "`) {
 				detail.Status = "warning"
 				detail.Issues = append(detail.Issues, CheckIssue{
 					Severity: "high",

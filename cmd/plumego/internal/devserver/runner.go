@@ -18,18 +18,18 @@ import (
 
 // AppRunner manages the user application lifecycle
 type AppRunner struct {
-	dir       string
+	dir        string
 	binaryPath string
-	cmd       string
-	args      []string
-	env       []string
+	cmd        string
+	args       []string
+	env        []string
 
-	process   *os.Process
-	cancel    context.CancelFunc
-	mu        sync.Mutex
+	process *os.Process
+	cancel  context.CancelFunc
+	mu      sync.Mutex
 
-	pubsub    *pubsub.InProcPubSub
-	running   bool
+	pubsub  *pubsub.InProcPubSub
+	running bool
 }
 
 // NewAppRunner creates a new application runner

@@ -22,9 +22,9 @@ type SlowQuery struct {
 type SlowQueryDetector struct {
 	mu sync.RWMutex
 
-	threshold    time.Duration
-	maxRecords   int
-	slowQueries  []SlowQuery
+	threshold     time.Duration
+	maxRecords    int
+	slowQueries   []SlowQuery
 	totalDetected int64
 
 	// Callbacks
@@ -59,7 +59,7 @@ func WithSlowQueryCallback(callback func(SlowQuery)) SlowQueryDetectorOption {
 func NewSlowQueryDetector(opts ...SlowQueryDetectorOption) *SlowQueryDetector {
 	d := &SlowQueryDetector{
 		threshold:   1 * time.Second, // default threshold
-		maxRecords:  100,              // default max records
+		maxRecords:  100,             // default max records
 		slowQueries: make([]SlowQuery, 0, 100),
 	}
 

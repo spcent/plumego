@@ -75,9 +75,9 @@ func TestBroadcastAllRaceCondition(t *testing.T) {
 	defer hub.Stop()
 
 	const (
-		numRooms      = 10
+		numRooms        = 10
 		numConnsPerRoom = 10
-		numBroadcasts = 50
+		numBroadcasts   = 50
 	)
 
 	// Create connections in multiple rooms

@@ -39,7 +39,7 @@ func TestSlowQueryDetector_Check(t *testing.T) {
 
 func TestSlowQueryDetector_MaxRecords(t *testing.T) {
 	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50 * time.Millisecond),
+		WithSlowQueryThreshold(50*time.Millisecond),
 		WithSlowQueryMaxRecords(5),
 	)
 
@@ -65,7 +65,7 @@ func TestSlowQueryDetector_Callback(t *testing.T) {
 	var recordedQuery SlowQuery
 
 	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50 * time.Millisecond),
+		WithSlowQueryThreshold(50*time.Millisecond),
 		WithSlowQueryCallback(func(sq SlowQuery) {
 			callbackCalled = true
 			recordedQuery = sq
@@ -196,7 +196,7 @@ func TestSlowQueryDetector_DefaultThreshold(t *testing.T) {
 
 func TestSlowQueryDetector_Concurrency(t *testing.T) {
 	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50 * time.Millisecond),
+		WithSlowQueryThreshold(50*time.Millisecond),
 		WithSlowQueryMaxRecords(1000),
 	)
 
@@ -253,9 +253,9 @@ func TestMetricsCollectorWithSlowQueryDetection(t *testing.T) {
 
 func TestTruncateQuery(t *testing.T) {
 	tests := []struct {
-		query   string
-		maxLen  int
-		want    string
+		query  string
+		maxLen int
+		want   string
 	}{
 		{"SELECT * FROM users", 50, "SELECT * FROM users"},
 		{"SELECT * FROM users WHERE name = 'very long name that exceeds limit'", 30, "SELECT * FROM users WHERE name..."},

@@ -1,3 +1,42 @@
+// Package password provides secure password hashing and strength validation.
+//
+// This package implements industry-standard password security using PBKDF2-HMAC-SHA512
+// with configurable iterations and salt generation. It provides both hashing/verification
+// and password strength validation.
+//
+// Features:
+//   - PBKDF2-HMAC-SHA512 key derivation (default: 210,000 iterations)
+//   - Automatic salt generation (32 bytes)
+//   - Constant-time comparison to prevent timing attacks
+//   - Password strength validation with customizable rules
+//   - Common password dictionary check (optional)
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/security/password"
+//
+//	// Hash a password
+//	hash, err := password.Hash("user-password-123")
+//	if err != nil {
+//		// Handle error
+//	}
+//
+//	// Verify a password
+//	ok := password.Verify("user-password-123", hash)
+//	if !ok {
+//		// Invalid password
+//	}
+//
+//	// Validate password strength
+//	config := password.PasswordStrengthConfig{
+//		MinLength:        12,
+//		RequireUppercase: true,
+//		RequireLowercase: true,
+//		RequireDigit:     true,
+//		RequireSpecial:   true,
+//	}
+//	err = password.ValidateStrength("WeakPass", config)
+//	// Returns error if password doesn't meet requirements
 package password
 
 import (

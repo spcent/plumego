@@ -1,3 +1,27 @@
+// Package jsonx provides fast JSON utilities for common operations.
+//
+// This package offers optimized functions for extracting fields from JSON
+// without full deserialization. It uses object pooling to minimize allocations
+// and is designed for high-throughput scenarios.
+//
+// Features:
+//   - Fast field extraction (string, bool, int, float)
+//   - Object pooling for reduced GC pressure
+//   - Best-effort parsing (returns zero values on error)
+//   - No external dependencies
+//
+// These utilities are ideal for webhook handlers, log parsers, or any scenario
+// where you need to extract a few fields from large JSON payloads.
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/utils/jsonx"
+//
+//	payload := []byte(`{"user_id": "123", "active": true, "score": 98.5}`)
+//
+//	userID := jsonx.FieldString(payload, "user_id")    // "123"
+//	active := jsonx.FieldBool(payload, "active")        // true
+//	score := jsonx.FieldFloat(payload, "score")         // 98.5
 package jsonx
 
 import (

@@ -454,7 +454,7 @@ func NewDBResourceController[T any](
 ) *DBResourceController[T] {
 	return &DBResourceController[T]{
 		BaseContextResourceController: NewBaseContextResourceController(resourceName),
-		repository:                     repository,
+		repository:                    repository,
 	}
 }
 

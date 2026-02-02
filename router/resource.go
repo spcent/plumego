@@ -470,16 +470,16 @@ type ResourceHooks interface {
 // NoOpResourceHooks provides a no-op implementation of ResourceHooks
 type NoOpResourceHooks struct{}
 
-func (h *NoOpResourceHooks) BeforeCreate(ctx context.Context, data any) error         { return nil }
-func (h *NoOpResourceHooks) AfterCreate(ctx context.Context, data any) error          { return nil }
+func (h *NoOpResourceHooks) BeforeCreate(ctx context.Context, data any) error { return nil }
+func (h *NoOpResourceHooks) AfterCreate(ctx context.Context, data any) error  { return nil }
 func (h *NoOpResourceHooks) BeforeUpdate(ctx context.Context, id string, data any) error {
 	return nil
 }
 func (h *NoOpResourceHooks) AfterUpdate(ctx context.Context, id string, data any) error {
 	return nil
 }
-func (h *NoOpResourceHooks) BeforeDelete(ctx context.Context, id string) error      { return nil }
-func (h *NoOpResourceHooks) AfterDelete(ctx context.Context, id string) error       { return nil }
+func (h *NoOpResourceHooks) BeforeDelete(ctx context.Context, id string) error         { return nil }
+func (h *NoOpResourceHooks) AfterDelete(ctx context.Context, id string) error          { return nil }
 func (h *NoOpResourceHooks) BeforeList(ctx context.Context, params *QueryParams) error { return nil }
 func (h *NoOpResourceHooks) AfterList(ctx context.Context, params *QueryParams, data any) error {
 	return nil
@@ -580,11 +580,11 @@ type ContextResourceController interface {
 
 // BaseContextResourceController provides a default implementation with context support
 type BaseContextResourceController struct {
-	ResourceName string
-	QueryBuilder *QueryBuilder
+	ResourceName   string
+	QueryBuilder   *QueryBuilder
 	ParamExtractor *ParamExtractor
-	Hooks        ResourceHooks
-	Transformer  ResourceTransformer
+	Hooks          ResourceHooks
+	Transformer    ResourceTransformer
 }
 
 // NewBaseContextResourceController creates a new context-aware resource controller
@@ -696,13 +696,13 @@ type ResourceOptions struct {
 // DefaultResourceOptions returns default resource options
 func DefaultResourceOptions() *ResourceOptions {
 	return &ResourceOptions{
-		DefaultPageSize: 20,
-		MaxPageSize:     100,
-		AllowedSorts:    []string{},
-		AllowedFilters:  []string{},
-		SoftDelete:      false,
-		SoftDeleteField: "deleted_at",
-		EnableHooks:     true,
+		DefaultPageSize:   20,
+		MaxPageSize:       100,
+		AllowedSorts:      []string{},
+		AllowedFilters:    []string{},
+		SoftDelete:        false,
+		SoftDeleteField:   "deleted_at",
+		EnableHooks:       true,
 		EnableTransformer: false,
 	}
 }
@@ -713,11 +713,11 @@ func DefaultResourceOptions() *ResourceOptions {
 
 // BatchResult represents the result of a batch operation
 type BatchResult struct {
-	Successful int                    `json:"successful"`
-	Failed     int                    `json:"failed"`
-	Total      int                    `json:"total"`
-	Errors     []BatchError           `json:"errors,omitempty"`
-	Results    []map[string]any       `json:"results,omitempty"`
+	Successful int              `json:"successful"`
+	Failed     int              `json:"failed"`
+	Total      int              `json:"total"`
+	Errors     []BatchError     `json:"errors,omitempty"`
+	Results    []map[string]any `json:"results,omitempty"`
 }
 
 // BatchError represents an error in a batch operation

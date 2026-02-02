@@ -1,3 +1,41 @@
+// Package jwt provides JSON Web Token (JWT) generation, verification, and management
+// with key rotation support.
+//
+// This package implements a production-ready JWT system supporting multiple token types:
+//   - Access tokens: Short-lived tokens for API authentication (default: 15 minutes)
+//   - Refresh tokens: Long-lived tokens for obtaining new access tokens (default: 7 days)
+//   - API tokens: Tokens for programmatic API access with custom expiration
+//
+// Features:
+//   - HMAC-SHA256 signing with automatic key rotation
+//   - EdDSA (Ed25519) signing for enhanced security
+//   - Token blacklisting for logout and revocation
+//   - HTTP middleware for automatic token validation
+//   - Thread-safe operations with minimal lock contention
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/security/jwt"
+//
+//	// Create a JWT manager with a secret (min 32 bytes)
+//	secret := []byte("your-secret-key-min-32-bytes-long")
+//	manager := jwt.NewManager(secret)
+//
+//	// Generate an access token
+//	claims := jwt.Claims{
+//		"sub":   "user123",
+//		"email": "user@example.com",
+//	}
+//	token, err := manager.Generate(claims, jwt.TokenTypeAccess)
+//
+//	// Verify a token
+//	verified, err := manager.Verify(token, jwt.TokenTypeAccess)
+//	if err != nil {
+//		// Handle invalid or expired token
+//	}
+//
+//	// Use as HTTP middleware
+//	app.Use(manager.Middleware())
 package jwt
 
 import (
