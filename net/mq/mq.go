@@ -1231,10 +1231,11 @@ type InProcBroker struct {
 	prioritySeq    uint64
 	priorityClosed atomic.Bool
 
-	ackTracker        *ackTracker
-	ttlTracker        *ttlTracker
-	txManager         *transactionManager
-	deadLetterManager *deadLetterManager
+	ackTracker         *ackTracker
+	ttlTracker         *ttlTracker
+	txManager          *transactionManager
+	deadLetterManager  *deadLetterManager
+	persistenceManager *persistenceManager
 }
 
 // Option configures the broker.
@@ -1376,6 +1377,18 @@ func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
 		broker.deadLetterManager = newDeadLetterManager(broker)
 	}
 
+	// Initialize persistenceManager if persistence is enabled
+	if broker.config.EnablePersistence {
+		if broker.config.PersistencePath == "" {
+			panic(fmt.Sprintf("invalid broker config: PersistencePath is required when persistence is enabled"))
+		}
+		backend, err := NewKVPersistence(broker.config.PersistencePath)
+		if err != nil {
+			panic(fmt.Sprintf("failed to initialize persistence: %v", err))
+		}
+		broker.persistenceManager = newPersistenceManager(broker, backend)
+	}
+
 	return broker
 }
 
@@ -1474,6 +1487,15 @@ func (b *InProcBroker) Publish(ctx context.Context, topic string, msg Message) e
 		// Note: TTLMessage is a wrapper, so we need to check the underlying type
 		// For now, we'll skip TTL check for regular Message types
 
+		// Persist message if persistence is enabled
+		if b.config.EnablePersistence && b.persistenceManager != nil {
+			if err := b.persistenceManager.saveMessage(ctx, topic, msg); err != nil {
+				// Log error but don't fail the publish
+				// This ensures availability over consistency
+				b.lastError = fmt.Errorf("failed to persist message: %w", err)
+			}
+		}
+
 		return b.ps.Publish(topic, msg)
 	})
 }
@@ -1513,6 +1535,16 @@ func (b *InProcBroker) PublishBatch(ctx context.Context, topic string, msgs []Me
 		// Check memory limit
 		if err := b.checkMemoryLimit(); err != nil {
 			return err
+		}
+
+		// Persist messages if persistence is enabled
+		if b.config.EnablePersistence && b.persistenceManager != nil {
+			for _, msg := range validMsgs {
+				if err := b.persistenceManager.saveMessage(ctx, topic, msg); err != nil {
+					// Log error but don't fail the publish
+					b.lastError = fmt.Errorf("failed to persist message: %w", err)
+				}
+			}
 		}
 
 		// Publish all valid messages
@@ -2350,6 +2382,42 @@ func (b *InProcBroker) StartAMQPServer() error {
 	return nil
 }
 
+// RecoverMessages recovers persisted messages for a topic.
+// This is useful for replaying messages after broker restart.
+func (b *InProcBroker) RecoverMessages(ctx context.Context, topic string, limit int) ([]Message, error) {
+	if b == nil || b.ps == nil {
+		return nil, fmt.Errorf("%w", ErrNotInitialized)
+	}
+
+	if !b.config.EnablePersistence {
+		return nil, fmt.Errorf("persistence is not enabled")
+	}
+
+	if b.persistenceManager == nil {
+		return nil, fmt.Errorf("%w: persistence manager not initialized", ErrNotInitialized)
+	}
+
+	return b.persistenceManager.loadMessages(ctx, topic, limit)
+}
+
+// ReplayMessages replays persisted messages to subscribers.
+// This is useful for recovering messages after broker restart.
+func (b *InProcBroker) ReplayMessages(ctx context.Context, topic string, limit int) error {
+	messages, err := b.RecoverMessages(ctx, topic, limit)
+	if err != nil {
+		return err
+	}
+
+	// Republish each message
+	for _, msg := range messages {
+		if err := b.Publish(ctx, topic, msg); err != nil {
+			return fmt.Errorf("failed to replay message %s: %w", msg.ID, err)
+		}
+	}
+
+	return nil
+}
+
 // Close shuts down the broker.
 func (b *InProcBroker) Close() error {
 	return b.executeWithObservability(context.Background(), OpClose, "", func() error {
@@ -2377,6 +2445,13 @@ func (b *InProcBroker) Close() error {
 		// Close dead letter manager if it exists
 		if b.deadLetterManager != nil {
 			b.deadLetterManager.close()
+		}
+
+		// Close persistence manager if it exists
+		if b.persistenceManager != nil {
+			if err := b.persistenceManager.close(); err != nil {
+				b.lastError = fmt.Errorf("failed to close persistence: %w", err)
+			}
 		}
 
 		return b.ps.Close()
