@@ -76,7 +76,7 @@ $ plumego new myapp --template api --format json
 | `routes` | Inspect registered routes | Route list | ✅ Implemented |
 | `check` | Health and security checks | Validation report | ✅ Implemented |
 | `config` | Configuration management | Config tree | ✅ Implemented |
-| `migrate` | Database migrations | Migration status | 🚧 Stub |
+| `migrate` | Database migrations | Migration status | ✅ Implemented |
 | `test` | Enhanced test runner | Test results | ✅ Implemented |
 | `build` | Build with optimizations | Build metadata | ✅ Implemented |
 | `inspect` | Inspect running app | Runtime status | ✅ Implemented |
@@ -94,6 +94,7 @@ cmd/plumego/
 │   ├── routes.go             # Route inspection
 │   ├── check.go              # Health checks
 │   ├── config.go             # Config management
+│   ├── migrate.go            # Database migrations
 │   ├── test.go               # Test runner
 │   ├── build.go              # Build utilities
 │   ├── inspect.go            # Runtime inspection
@@ -304,6 +305,7 @@ echo "  Coverage: $(jq -r '.coverage' test-results.json)%"
 - `plumego routes` command for route discovery
 - `plumego check` command for health and security checks
 - `plumego config` command for configuration management
+- `plumego migrate` command for database migrations
 - `plumego test` command with structured test output
 - `plumego build` command with build metadata
 - `plumego inspect` command for runtime inspection
@@ -312,9 +314,8 @@ echo "  Coverage: $(jq -r '.coverage' test-results.json)%"
 - Help system
 
 ### Next Steps 🚧
-1. Implement `plumego migrate` for database migrations
-2. Extend `plumego inspect` with richer endpoint adapters (per-app integration)
-3. Add additional scaffolds/templates for specialized project types
+1. Extend `plumego inspect` with richer endpoint adapters (per-app integration)
+2. Add additional scaffolds/templates for specialized project types
 
 ### Future Enhancements 💡
 - Plugin system for custom commands

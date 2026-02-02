@@ -5,6 +5,7 @@ package commands
 // - generate.go: GenerateCmd
 // - check.go: CheckCmd
 // - config.go: ConfigCmd
+// - migrate.go: MigrateCmd
 // - routes.go: RoutesCmd
 // - build.go: BuildCmd
 // - test.go: TestCmd

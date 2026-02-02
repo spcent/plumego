@@ -8,12 +8,12 @@ import (
 
 // Global flags
 var (
-	flagFormat   string
-	flagQuiet    bool
-	flagVerbose  bool
-	flagNoColor  bool
-	flagConfig   string
-	flagEnvFile  string
+	flagFormat  string
+	flagQuiet   bool
+	flagVerbose bool
+	flagNoColor bool
+	flagConfig  string
+	flagEnvFile string
 )
 
 // RootCmd represents the base command
@@ -33,11 +33,11 @@ type Command interface {
 
 // Flag represents a command flag
 type Flag struct {
-	Name      string
-	Short     string
-	Default   interface{}
-	Usage     string
-	Required  bool
+	Name     string
+	Short    string
+	Default  interface{}
+	Usage    string
+	Required bool
 }
 
 // Execute runs the root command
@@ -54,6 +54,7 @@ func Execute() error {
 	root.Register(&RoutesCmd{})
 	root.Register(&CheckCmd{})
 	root.Register(&ConfigCmd{})
+	root.Register(&MigrateCmd{})
 	root.Register(&TestCmd{})
 	root.Register(&BuildCmd{})
 	root.Register(&InspectCmd{})
@@ -152,6 +153,7 @@ Available Commands:
   routes      Inspect registered routes
   check       Validate project health
   config      Configuration management
+  migrate     Database migrations
   test        Enhanced test running
   build       Build application
   inspect     Inspect running application

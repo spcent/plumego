@@ -342,7 +342,8 @@ plumego migrate <command> [flags]
 
 **Flags:**
 - `--steps <n>` - Number of migrations (default: all)
-- `--db-url <url>` - Database connection string
+- `--db-url <url>` - Database connection string (DSN)
+- `--driver <name>` - Database driver name (e.g., sqlite3, postgres, mysql)
 - `--dir <path>` - Migrations directory (default: ./migrations)
 
 **Output (JSON):**
@@ -369,13 +370,13 @@ plumego migrate <command> [flags]
 **Examples:**
 ```bash
 # Apply all pending migrations
-plumego migrate up --db-url "postgres://localhost/mydb"
+plumego migrate up --driver postgres --db-url "postgres://localhost/mydb"
 
 # Create new migration
 plumego migrate create add_users_email_index
 
 # Check status
-plumego migrate status --format json
+plumego migrate status --driver postgres --db-url "postgres://localhost/mydb" --format json
 ```
 
 ---
