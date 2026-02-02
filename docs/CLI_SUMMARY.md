@@ -71,15 +71,15 @@ $ plumego new myapp --template api --format json
 | Command | Purpose | Output | Status |
 |---------|---------|--------|--------|
 | `new` | Create project from template | Project metadata | ✅ Implemented |
-| `generate` | Generate code (components, handlers) | Generated files | 🚧 Stub |
-| `dev` | Development server with hot reload | Real-time events | 🚧 Stub |
-| `routes` | Inspect registered routes | Route list | 🚧 Stub |
-| `check` | Health and security checks | Validation report | 🚧 Stub |
-| `config` | Configuration management | Config tree | 🚧 Stub |
+| `generate` | Generate code (components, handlers) | Generated files | ✅ Implemented |
+| `dev` | Development server with hot reload | Real-time events | ✅ Implemented |
+| `routes` | Inspect registered routes | Route list | ✅ Implemented |
+| `check` | Health and security checks | Validation report | ✅ Implemented |
+| `config` | Configuration management | Config tree | ✅ Implemented |
 | `migrate` | Database migrations | Migration status | 🚧 Stub |
-| `test` | Enhanced test runner | Test results | 🚧 Stub |
-| `build` | Build with optimizations | Build metadata | 🚧 Stub |
-| `inspect` | Inspect running app | Runtime status | 🚧 Stub |
+| `test` | Enhanced test runner | Test results | ✅ Implemented |
+| `build` | Build with optimizations | Build metadata | ✅ Implemented |
+| `inspect` | Inspect running app | Runtime status | ✅ Implemented |
 
 ## Architecture
 
@@ -97,15 +97,15 @@ cmd/plumego/
 │   ├── test.go               # Test runner
 │   ├── build.go              # Build utilities
 │   ├── inspect.go            # Runtime inspection
-│   └── stubs.go              # Stub implementations
+│   └── stubs.go              # Stub registry (legacy placeholder)
 └── internal/
     ├── output/
     │   └── formatter.go      # Output formatting (JSON/YAML/Text)
     ├── scaffold/
     │   └── scaffold.go       # Project scaffolding
-    ├── codegen/              # Code generation (TODO)
-    ├── watcher/              # File watching (TODO)
-    └── inspector/            # Runtime inspection (TODO)
+    ├── codegen/              # Code generation
+    ├── routeanalyzer/        # Route inspection analysis
+    └── watcher/              # File watching
 ```
 
 ## Design Principles
@@ -299,17 +299,22 @@ echo "  Coverage: $(jq -r '.coverage' test-results.json)%"
 - Global flags (format, quiet, verbose, etc.)
 - Output formatter (JSON, YAML, text)
 - `plumego new` command with templates
+- `plumego generate` command for components, handlers, middleware, and models
+- `plumego dev` command with file watching and hot reload
+- `plumego routes` command for route discovery
+- `plumego check` command for health and security checks
+- `plumego config` command for configuration management
+- `plumego test` command with structured test output
+- `plumego build` command with build metadata
+- `plumego inspect` command for runtime inspection
 - Project scaffolding system
 - Exit code management
 - Help system
 
 ### Next Steps 🚧
-1. Implement `plumego generate` for code generation
-2. Add `plumego dev` with file watching
-3. Build `plumego routes` for route inspection
-4. Create `plumego check` for validation
-5. Add `plumego config` management
-6. Implement remaining commands
+1. Implement `plumego migrate` for database migrations
+2. Extend `plumego inspect` with richer endpoint adapters (per-app integration)
+3. Add additional scaffolds/templates for specialized project types
 
 ### Future Enhancements 💡
 - Plugin system for custom commands
