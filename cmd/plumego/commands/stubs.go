@@ -3,16 +3,7 @@ package commands
 import "github.com/spcent/plumego/cmd/plumego/internal/output"
 
 // Stub implementations for other commands
-
-type GenerateCmd struct{}
-
-func (c *GenerateCmd) Name() string  { return "generate" }
-func (c *GenerateCmd) Short() string { return "Generate components, middleware, handlers" }
-func (c *GenerateCmd) Long() string  { return "Generate boilerplate code" }
-func (c *GenerateCmd) Flags() []Flag { return nil }
-func (c *GenerateCmd) Run(args []string) error {
-	return output.NewFormatter().Error("generate command not yet implemented", 1)
-}
+// GenerateCmd is now in generate.go
 
 type DevCmd struct{}
 
@@ -34,25 +25,8 @@ func (c *RoutesCmd) Run(args []string) error {
 	return output.NewFormatter().Error("routes command not yet implemented", 1)
 }
 
-type CheckCmd struct{}
-
-func (c *CheckCmd) Name() string  { return "check" }
-func (c *CheckCmd) Short() string { return "Validate project health" }
-func (c *CheckCmd) Long() string  { return "Health checks" }
-func (c *CheckCmd) Flags() []Flag { return nil }
-func (c *CheckCmd) Run(args []string) error {
-	return output.NewFormatter().Error("check command not yet implemented", 1)
-}
-
-type ConfigCmd struct{}
-
-func (c *ConfigCmd) Name() string  { return "config" }
-func (c *ConfigCmd) Short() string { return "Configuration management" }
-func (c *ConfigCmd) Long() string  { return "Config management" }
-func (c *ConfigCmd) Flags() []Flag { return nil }
-func (c *ConfigCmd) Run(args []string) error {
-	return output.NewFormatter().Error("config command not yet implemented", 1)
-}
+// CheckCmd is now in check.go
+// ConfigCmd is now in config.go
 
 type TestCmd struct{}
 
