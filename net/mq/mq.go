@@ -1,7 +1,45 @@
-// Package mq provides an in-process message broker.
+// Package mq provides an in-process message broker with advanced features.
 //
-// Experimental: this module includes incomplete features (see TODOs) and may change
-// without notice. Avoid production use until the TODOs are fully implemented.
+// Features:
+//   - Basic pub/sub messaging with topic-based routing
+//   - Priority queue support for message ordering
+//   - Message TTL (time-to-live) with automatic expiration
+//   - Message acknowledgment (ACK/NACK) with timeout and retry
+//   - Transaction support for atomic message publishing
+//   - Dead letter queue for failed message handling
+//   - Persistence storage with automatic recovery
+//   - Memory management with configurable limits
+//   - Metrics collection and observability
+//
+// Status:
+//   - Core features: Production-ready ✓
+//   - Advanced features (transactions, persistence, DLQ): Stable ✓
+//   - Protocol support (MQTT, AMQP): Not implemented
+//   - Cluster mode: Interface defined, implementation pending
+//
+// Example usage:
+//
+//	cfg := mq.DefaultConfig()
+//	cfg.EnableTransactions = true
+//	cfg.EnablePersistence = true
+//	cfg.PersistencePath = "/data/mq"
+//	cfg.EnableDeadLetterQueue = true
+//	cfg.DeadLetterTopic = "dlq"
+//
+//	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+//	defer broker.Close()
+//
+//	// Publish with transaction
+//	txID := "tx-1"
+//	broker.PublishWithTransaction(ctx, "orders", msg1, txID)
+//	broker.PublishWithTransaction(ctx, "orders", msg2, txID)
+//	broker.CommitTransaction(ctx, txID)
+//
+//	// Subscribe and process
+//	sub, _ := broker.Subscribe(ctx, "orders", mq.SubOptions{BufferSize: 100})
+//	for msg := range sub.C() {
+//	    // Process message
+//	}
 package mq
 
 import (
