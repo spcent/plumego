@@ -139,15 +139,15 @@ func (c *BuildCmd) Run(args []string) error {
 		sizeBytes = fileInfo.Size()
 	}
 
-	result := map[string]interface{}{
-		"binary":         absOutput,
-		"size_bytes":     sizeBytes,
-		"size_mb":        float64(sizeBytes) / (1024 * 1024),
-		"build_time_ms":  buildTime.Milliseconds(),
-		"go_version":     goVersion,
-		"git_commit":     gitCommit,
-		"race_detector":  *race,
-		"trimpath":       *trimpath,
+	result := map[string]any{
+		"binary":        absOutput,
+		"size_bytes":    sizeBytes,
+		"size_mb":       float64(sizeBytes) / (1024 * 1024),
+		"build_time_ms": buildTime.Milliseconds(),
+		"go_version":    goVersion,
+		"git_commit":    gitCommit,
+		"race_detector": *race,
+		"trimpath":      *trimpath,
 	}
 
 	if *tags != "" {

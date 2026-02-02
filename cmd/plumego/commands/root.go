@@ -35,7 +35,7 @@ type Command interface {
 type Flag struct {
 	Name     string
 	Short    string
-	Default  interface{}
+	Default  any
 	Usage    string
 	Required bool
 }

@@ -247,7 +247,7 @@ broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
 ```go
 type Message struct {
     ID   string
-    Data interface{}
+    Data any
 }
 ```
 

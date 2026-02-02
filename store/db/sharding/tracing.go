@@ -32,7 +32,7 @@ func DefaultTracingConfig() TracingConfig {
 // In production, replace with actual OpenTelemetry SDK
 type Span struct {
 	name       string
-	attributes map[string]interface{}
+	attributes map[string]any
 	events     []SpanEvent
 	status     SpanStatus
 	ctx        context.Context
@@ -41,7 +41,7 @@ type Span struct {
 // SpanEvent represents an event within a span
 type SpanEvent struct {
 	Name       string
-	Attributes map[string]interface{}
+	Attributes map[string]any
 }
 
 // SpanStatus represents the status of a span
@@ -77,12 +77,12 @@ func NewTracer(config TracingConfig) *Tracer {
 // StartSpan starts a new span
 func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, *Span) {
 	if !t.config.Enabled {
-		return ctx, &Span{ctx: ctx, name: name, attributes: make(map[string]interface{})}
+		return ctx, &Span{ctx: ctx, name: name, attributes: make(map[string]any)}
 	}
 
 	span := &Span{
 		name:       name,
-		attributes: make(map[string]interface{}),
+		attributes: make(map[string]any),
 		events:     []SpanEvent{},
 		ctx:        ctx,
 	}
@@ -96,22 +96,22 @@ func (t *Tracer) StartSpan(ctx context.Context, name string) (context.Context, *
 }
 
 // SetAttribute sets an attribute on the span
-func (s *Span) SetAttribute(key string, value interface{}) {
+func (s *Span) SetAttribute(key string, value any) {
 	if s.attributes == nil {
-		s.attributes = make(map[string]interface{})
+		s.attributes = make(map[string]any)
 	}
 	s.attributes[key] = value
 }
 
 // SetAttributes sets multiple attributes on the span
-func (s *Span) SetAttributes(attrs map[string]interface{}) {
+func (s *Span) SetAttributes(attrs map[string]any) {
 	for k, v := range attrs {
 		s.SetAttribute(k, v)
 	}
 }
 
 // AddEvent adds an event to the span
-func (s *Span) AddEvent(name string, attributes map[string]interface{}) {
+func (s *Span) AddEvent(name string, attributes map[string]any) {
 	s.events = append(s.events, SpanEvent{
 		Name:       name,
 		Attributes: attributes,
@@ -133,7 +133,7 @@ func (s *Span) RecordError(err error) {
 	}
 
 	s.SetStatus(SpanStatusError, err.Error())
-	s.AddEvent("error", map[string]interface{}{
+	s.AddEvent("error", map[string]any{
 		"error.message": err.Error(),
 		"error.type":    fmt.Sprintf("%T", err),
 	})
@@ -165,10 +165,10 @@ func NewTracingHelper(config TracingConfig) *TracingHelper {
 }
 
 // TraceQuery traces a database query
-func (h *TracingHelper) TraceQuery(ctx context.Context, query string, args []interface{}) (context.Context, *Span) {
+func (h *TracingHelper) TraceQuery(ctx context.Context, query string, args []any) (context.Context, *Span) {
 	ctx, span := h.tracer.StartSpan(ctx, "db.query")
 
-	span.SetAttributes(map[string]interface{}{
+	span.SetAttributes(map[string]any{
 		"db.system":    "sharding",
 		"db.statement": query,
 		"db.operation": getQueryOperation(query),
@@ -185,7 +185,7 @@ func (h *TracingHelper) TraceQuery(ctx context.Context, query string, args []int
 func (h *TracingHelper) TraceShardResolve(ctx context.Context, tableName string) (context.Context, *Span) {
 	ctx, span := h.tracer.StartSpan(ctx, "shard.resolve")
 
-	span.SetAttributes(map[string]interface{}{
+	span.SetAttributes(map[string]any{
 		"shard.table": tableName,
 	})
 
@@ -196,7 +196,7 @@ func (h *TracingHelper) TraceShardResolve(ctx context.Context, tableName string)
 func (h *TracingHelper) TraceSQLRewrite(ctx context.Context, originalSQL string) (context.Context, *Span) {
 	ctx, span := h.tracer.StartSpan(ctx, "sql.rewrite")
 
-	span.SetAttributes(map[string]interface{}{
+	span.SetAttributes(map[string]any{
 		"sql.original": originalSQL,
 	})
 
@@ -207,7 +207,7 @@ func (h *TracingHelper) TraceSQLRewrite(ctx context.Context, originalSQL string)
 func (h *TracingHelper) TraceShardQuery(ctx context.Context, shardIndex int, query string) (context.Context, *Span) {
 	ctx, span := h.tracer.StartSpan(ctx, "shard.query")
 
-	span.SetAttributes(map[string]interface{}{
+	span.SetAttributes(map[string]any{
 		"shard.index":  shardIndex,
 		"db.statement": query,
 	})
@@ -219,7 +219,7 @@ func (h *TracingHelper) TraceShardQuery(ctx context.Context, shardIndex int, que
 func (h *TracingHelper) TraceCrossShardQuery(ctx context.Context, shardCount int, policy string) (context.Context, *Span) {
 	ctx, span := h.tracer.StartSpan(ctx, "shard.cross_query")
 
-	span.SetAttributes(map[string]interface{}{
+	span.SetAttributes(map[string]any{
 		"shard.count":  shardCount,
 		"shard.policy": policy,
 	})

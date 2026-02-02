@@ -289,12 +289,13 @@ func Example_batchOperations() {
 	// Receive all messages
 	count := 0
 	timeout := time.After(100 * time.Millisecond)
+LOOP:
 	for count < 3 {
 		select {
 		case <-sub.C():
 			count++
 		case <-timeout:
-			break
+			break LOOP
 		}
 	}
 

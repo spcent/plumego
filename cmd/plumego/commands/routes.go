@@ -82,7 +82,7 @@ func (c *RoutesCmd) Run(args []string) error {
 		return output.NewFormatter().Error(fmt.Sprintf("failed to analyze routes: %v", err), 1)
 	}
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"routes": routes.Routes,
 		"total":  routes.Total,
 	}

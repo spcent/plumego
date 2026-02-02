@@ -121,9 +121,10 @@ func (c *CheckCmd) Run(args []string) error {
 
 	// Determine exit code
 	exitCode := 0
-	if checks.Status == "unhealthy" {
+	switch checks.Status {
+	case "unhealthy":
 		exitCode = 1
-	} else if checks.Status == "degraded" {
+	case "degraded":
 		exitCode = 2
 	}
 

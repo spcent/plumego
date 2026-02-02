@@ -169,8 +169,8 @@ type testEvent struct {
 	Elapsed float64 `json:"Elapsed"`
 }
 
-func parseTestOutput(jsonOutput string) map[string]interface{} {
-	result := map[string]interface{}{
+func parseTestOutput(jsonOutput string) map[string]any {
+	result := map[string]any{
 		"status":  "passed",
 		"tests":   0,
 		"passed":  0,
@@ -178,7 +178,7 @@ func parseTestOutput(jsonOutput string) map[string]interface{} {
 		"skipped": 0,
 	}
 
-	failures := []map[string]interface{}{}
+	failures := []map[string]any{}
 	lines := strings.Split(jsonOutput, "\n")
 
 	for _, line := range lines {
@@ -201,7 +201,7 @@ func parseTestOutput(jsonOutput string) map[string]interface{} {
 			if event.Test != "" {
 				result["tests"] = result["tests"].(int) + 1
 				result["failed"] = result["failed"].(int) + 1
-				failures = append(failures, map[string]interface{}{
+				failures = append(failures, map[string]any{
 					"package": event.Package,
 					"test":    event.Test,
 				})

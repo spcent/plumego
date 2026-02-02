@@ -104,7 +104,7 @@ func (c *ConfigCmd) runValidate(args []string) error {
 		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose("Validating configuration...")
+	c.formatter.Verbose(fmt.Sprintf("Validating configuration with args: %v", args))
 	result := configmgr.ValidateConfig(cwd, flagEnvFile)
 
 	if len(result.Errors) > 0 {
@@ -132,13 +132,13 @@ func (c *ConfigCmd) runInit(args []string) error {
 		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose("Generating default configuration files...")
+	c.formatter.Verbose(fmt.Sprintf("Generating default configuration files with args: %v", args))
 	files, err := configmgr.InitConfig(cwd)
 	if err != nil {
 		return c.formatter.Error(fmt.Sprintf("failed to init config: %v", err), 1)
 	}
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"files_created": files,
 	}
 
@@ -151,7 +151,7 @@ func (c *ConfigCmd) runEnv(args []string) error {
 		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose("Loading environment variables...")
+	c.formatter.Verbose(fmt.Sprintf("Loading environment variables with args: %v", args))
 	envVars := configmgr.GetEnvVars(cwd, flagEnvFile)
 
 	return c.formatter.Print(envVars)

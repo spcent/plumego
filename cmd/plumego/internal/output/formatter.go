@@ -45,7 +45,7 @@ func (f *Formatter) SetColor(color bool) {
 }
 
 // Print outputs data in the configured format
-func (f *Formatter) Print(data interface{}) error {
+func (f *Formatter) Print(data any) error {
 	switch f.format {
 	case "json":
 		return f.printJSON(data)
@@ -59,12 +59,12 @@ func (f *Formatter) Print(data interface{}) error {
 }
 
 // Success outputs a success message
-func (f *Formatter) Success(message string, data interface{}) error {
+func (f *Formatter) Success(message string, data any) error {
 	if f.quiet {
 		return nil
 	}
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"status":  "success",
 		"message": message,
 	}
@@ -77,8 +77,8 @@ func (f *Formatter) Success(message string, data interface{}) error {
 }
 
 // Error outputs an error message
-func (f *Formatter) Error(message string, code int, optionalData ...interface{}) error {
-	result := map[string]interface{}{
+func (f *Formatter) Error(message string, code int, optionalData ...any) error {
+	result := map[string]any{
 		"status":    "error",
 		"message":   message,
 		"exit_code": code,
@@ -111,7 +111,7 @@ func (f *Formatter) Info(message string) {
 	}
 }
 
-func (f *Formatter) printJSON(data interface{}) error {
+func (f *Formatter) printJSON(data any) error {
 	// If data is already a string, just print it
 	if str, ok := data.(string); ok {
 		fmt.Println(str)
@@ -123,7 +123,7 @@ func (f *Formatter) printJSON(data interface{}) error {
 	return encoder.Encode(data)
 }
 
-func (f *Formatter) printYAML(data interface{}) error {
+func (f *Formatter) printYAML(data any) error {
 	// If data is already a string, just print it
 	if str, ok := data.(string); ok {
 		fmt.Println(str)
@@ -135,7 +135,7 @@ func (f *Formatter) printYAML(data interface{}) error {
 	return encoder.Encode(data)
 }
 
-func (f *Formatter) printText(data interface{}) error {
+func (f *Formatter) printText(data any) error {
 	// Simple text output
 	fmt.Println(data)
 	return nil

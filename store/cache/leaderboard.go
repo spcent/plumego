@@ -193,7 +193,7 @@ func (lbc *MemoryLeaderboardCache) cleanupExpiredLeaderboards() {
 	now := time.Now()
 	count := 0
 
-	lbc.leaderboards.Range(func(key, value interface{}) bool {
+	lbc.leaderboards.Range(func(key, value any) bool {
 		ss := value.(*sortedSet)
 		if !ss.expiration.IsZero() && now.After(ss.expiration) {
 			lbc.leaderboards.Delete(key)
@@ -222,7 +222,7 @@ func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Dur
 
 	// Check max leaderboards limit
 	count := int64(0)
-	lbc.leaderboards.Range(func(_, _ interface{}) bool {
+	lbc.leaderboards.Range(func(_, _ any) bool {
 		count++
 		return true
 	})
@@ -649,7 +649,7 @@ func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 	totalLeaderboards := int64(0)
 	totalMembers := int64(0)
 
-	lbc.leaderboards.Range(func(key, value interface{}) bool {
+	lbc.leaderboards.Range(func(key, value any) bool {
 		ss := value.(*sortedSet)
 		ss.mu.RLock()
 		totalMembers += ss.skipList.length

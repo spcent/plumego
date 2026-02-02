@@ -119,7 +119,7 @@ func (c *NewCmd) Run(args []string) error {
 	// Dry run - just show what would be created
 	if dryRun {
 		files := scaffold.GetTemplateFiles(template)
-		result := map[string]interface{}{
+		result := map[string]any{
 			"dry_run":       true,
 			"project":       projectName,
 			"path":          dir,
@@ -137,7 +137,7 @@ func (c *NewCmd) Run(args []string) error {
 	}
 
 	// Success response
-	result := map[string]interface{}{
+	result := map[string]any{
 		"project":       projectName,
 		"path":          dir,
 		"module":        module,

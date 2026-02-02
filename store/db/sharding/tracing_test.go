@@ -66,7 +66,7 @@ func TestSpan_SetAttributes(t *testing.T) {
 	ctx := context.Background()
 	_, span := tracer.StartSpan(ctx, "test")
 
-	attrs := map[string]interface{}{
+	attrs := map[string]any{
 		"db.system":    "mysql",
 		"db.statement": "SELECT * FROM users",
 		"db.operation": "SELECT",
@@ -86,7 +86,7 @@ func TestSpan_AddEvent(t *testing.T) {
 	ctx := context.Background()
 	_, span := tracer.StartSpan(ctx, "test")
 
-	span.AddEvent("query.start", map[string]interface{}{
+	span.AddEvent("query.start", map[string]any{
 		"query": "SELECT * FROM users",
 	})
 
@@ -143,7 +143,7 @@ func TestTracingHelper_TraceQuery(t *testing.T) {
 
 	ctx := context.Background()
 	query := "SELECT * FROM users WHERE id = ?"
-	args := []interface{}{123}
+	args := []any{123}
 
 	newCtx, span := helper.TraceQuery(ctx, query, args)
 

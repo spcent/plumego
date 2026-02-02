@@ -85,7 +85,7 @@ func (c *MigrateCmd) Run(args []string) error {
 			return output.NewFormatter().Error(fmt.Sprintf("failed to create migration: %v", err), 1)
 		}
 
-		result := map[string]interface{}{
+		result := map[string]any{
 			"version":   migration.Version,
 			"name":      migration.Name,
 			"up_path":   migration.UpPath,
@@ -150,12 +150,12 @@ func (c *MigrateCmd) reportStatus(migrations []migrate.Migration, applied []migr
 		appliedMap[entry.Version] = entry
 	}
 
-	var pending []map[string]interface{}
+	var pending []map[string]any
 	for _, migration := range migrations {
 		if _, ok := appliedMap[migration.Version]; ok {
 			continue
 		}
-		pending = append(pending, map[string]interface{}{
+		pending = append(pending, map[string]any{
 			"version": migration.Version,
 			"name":    migration.Name,
 			"up_path": migration.UpPath,
@@ -167,7 +167,7 @@ func (c *MigrateCmd) reportStatus(migrations []migrate.Migration, applied []migr
 		currentVersion = applied[len(applied)-1].Version
 	}
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"applied":         applied,
 		"pending":         pending,
 		"current_version": currentVersion,
@@ -199,14 +199,14 @@ func (c *MigrateCmd) applyUp(ctx context.Context, db *sql.DB, driver string, mig
 		return output.NewFormatter().Error("no migrations to apply", 2)
 	}
 
-	var appliedResults []map[string]interface{}
+	var appliedResults []map[string]any
 	for _, migration := range pending {
 		duration, err := migrate.ApplyUp(ctx, db, driver, migration, time.Now())
 		if err != nil {
 			return output.NewFormatter().Error(fmt.Sprintf("failed to apply migration %s: %v", migration.Version, err), 1)
 		}
 
-		appliedResults = append(appliedResults, map[string]interface{}{
+		appliedResults = append(appliedResults, map[string]any{
 			"version":     migration.Version,
 			"name":        migration.Name,
 			"duration_ms": duration.Milliseconds(),
@@ -218,7 +218,7 @@ func (c *MigrateCmd) applyUp(ctx context.Context, db *sql.DB, driver string, mig
 		return output.NewFormatter().Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
 	}
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"command":         "up",
 		"applied":         appliedResults,
 		"current_version": latestVersion(newApplied),
@@ -249,7 +249,7 @@ func (c *MigrateCmd) applyDown(ctx context.Context, db *sql.DB, driver string, m
 		toRollback[i], toRollback[opp] = toRollback[opp], toRollback[i]
 	}
 
-	var rolledBack []map[string]interface{}
+	var rolledBack []map[string]any
 	for _, entry := range toRollback {
 		migration, ok := migrationMap[entry.Version]
 		if !ok {
@@ -261,7 +261,7 @@ func (c *MigrateCmd) applyDown(ctx context.Context, db *sql.DB, driver string, m
 			return output.NewFormatter().Error(fmt.Sprintf("failed to roll back migration %s: %v", migration.Version, err), 1)
 		}
 
-		rolledBack = append(rolledBack, map[string]interface{}{
+		rolledBack = append(rolledBack, map[string]any{
 			"version":     migration.Version,
 			"name":        migration.Name,
 			"duration_ms": duration.Milliseconds(),
@@ -273,7 +273,7 @@ func (c *MigrateCmd) applyDown(ctx context.Context, db *sql.DB, driver string, m
 		return output.NewFormatter().Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
 	}
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"command":         "down",
 		"rolled_back":     rolledBack,
 		"current_version": latestVersion(newApplied),

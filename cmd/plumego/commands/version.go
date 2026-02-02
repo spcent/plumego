@@ -42,7 +42,7 @@ func (c *VersionCmd) Run(args []string) error {
 		return err
 	}
 
-	versionInfo := map[string]interface{}{
+	versionInfo := map[string]any{
 		"version":    Version,
 		"git_commit": GitCommit,
 		"build_date": BuildDate,

@@ -113,7 +113,7 @@ type Decision struct {
 // The limiter automatically cleans up idle entries to prevent memory leaks.
 // Call Stop() when done to clean up resources.
 var bucketPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &bucket{}
 	},
 }

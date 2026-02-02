@@ -10,8 +10,8 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Config map[string]interface{} `json:"config" yaml:"config"`
-	Source map[string]string      `json:"source,omitempty" yaml:"source,omitempty"`
+	Config map[string]any    `json:"config" yaml:"config"`
+	Source map[string]string `json:"source,omitempty" yaml:"source,omitempty"`
 }
 
 // ValidationResult represents configuration validation result
@@ -31,7 +31,7 @@ type ValidationIssue struct {
 // LoadConfig loads configuration from files and environment
 func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 	config := &Config{
-		Config: make(map[string]interface{}),
+		Config: make(map[string]any),
 		Source: make(map[string]string),
 	}
 
@@ -57,7 +57,7 @@ func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 	}
 
 	// App configuration
-	appConfig := make(map[string]interface{})
+	appConfig := make(map[string]any)
 
 	addr := getConfigValue("APP_ADDR", envVars, resolve)
 	if addr != "" {
@@ -89,7 +89,7 @@ func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 	config.Config["app"] = appConfig
 
 	// Security configuration
-	securityConfig := make(map[string]interface{})
+	securityConfig := make(map[string]any)
 
 	wsSecret := getConfigValue("WS_SECRET", envVars, resolve)
 	if wsSecret != "" {
@@ -114,14 +114,14 @@ func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 // RedactSensitive redacts sensitive values in configuration
 func RedactSensitive(config *Config) *Config {
 	redacted := &Config{
-		Config: make(map[string]interface{}),
+		Config: make(map[string]any),
 		Source: config.Source,
 	}
 
 	for key, value := range config.Config {
 		if key == "security" {
-			if secMap, ok := value.(map[string]interface{}); ok {
-				redactedSec := make(map[string]interface{})
+			if secMap, ok := value.(map[string]any); ok {
+				redactedSec := make(map[string]any)
 				for secKey, secValue := range secMap {
 					if strings.Contains(secKey, "secret") || strings.Contains(secKey, "key") {
 						redactedSec[secKey] = "***REDACTED***"
@@ -271,8 +271,8 @@ test:
 }
 
 // GetEnvVars returns all environment variables
-func GetEnvVars(dir, envFile string) map[string]interface{} {
-	result := make(map[string]interface{})
+func GetEnvVars(dir, envFile string) map[string]any {
+	result := make(map[string]any)
 
 	envPath := filepath.Join(dir, envFile)
 	envVars := make(map[string]string)
@@ -302,10 +302,10 @@ func GetEnvVars(dir, envFile string) map[string]interface{} {
 			// Only include APP_*, WS_*, JWT_*, DB_*, REDIS_* prefixes
 			key := parts[0]
 			if strings.HasPrefix(key, "APP_") ||
-			   strings.HasPrefix(key, "WS_") ||
-			   strings.HasPrefix(key, "JWT_") ||
-			   strings.HasPrefix(key, "DB_") ||
-			   strings.HasPrefix(key, "REDIS_") {
+				strings.HasPrefix(key, "WS_") ||
+				strings.HasPrefix(key, "JWT_") ||
+				strings.HasPrefix(key, "DB_") ||
+				strings.HasPrefix(key, "REDIS_") {
 				systemEnv[key] = parts[1]
 			}
 		}

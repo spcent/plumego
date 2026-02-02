@@ -144,10 +144,10 @@ type StrategyConfig struct {
 // RangeConfig represents a range definition for range-based sharding
 type RangeConfig struct {
 	// Start is the range start (inclusive)
-	Start interface{} `json:"start"`
+	Start any `json:"start"`
 
 	// End is the range end (exclusive)
-	End interface{} `json:"end"`
+	End any `json:"end"`
 
 	// Shard is the target shard index
 	Shard int `json:"shard"`

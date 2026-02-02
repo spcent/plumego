@@ -129,7 +129,7 @@ func inspectHealth(client *http.Client, baseURL, auth string) error {
 		}
 
 		// Try to parse as JSON
-		var healthData map[string]interface{}
+		var healthData map[string]any
 		if err := json.Unmarshal(body, &healthData); err == nil {
 			healthData["endpoint"] = endpoint
 			healthData["status_code"] = resp.StatusCode
@@ -142,7 +142,7 @@ func inspectHealth(client *http.Client, baseURL, auth string) error {
 		}
 
 		// Not JSON, return as text
-		result := map[string]interface{}{
+		result := map[string]any{
 			"endpoint":    endpoint,
 			"status_code": resp.StatusCode,
 			"body":        string(body),
@@ -201,14 +201,14 @@ func inspectMetrics(client *http.Client, baseURL, auth string) error {
 		}
 
 		// Try to parse as JSON
-		var metricsData map[string]interface{}
+		var metricsData map[string]any
 		if err := json.Unmarshal(body, &metricsData); err == nil {
 			metricsData["endpoint"] = endpoint
 			return output.NewFormatter().Success("Metrics retrieved", metricsData)
 		}
 
 		// Return as text (e.g., Prometheus format)
-		result := map[string]interface{}{
+		result := map[string]any{
 			"endpoint": endpoint,
 			"format":   "text",
 			"data":     string(body),
@@ -251,7 +251,7 @@ func inspectRoutes(client *http.Client, baseURL, auth string) error {
 		return output.NewFormatter().Error(fmt.Sprintf("failed to read response: %v", err), 1)
 	}
 
-	var routesData map[string]interface{}
+	var routesData map[string]any
 	if err := json.Unmarshal(body, &routesData); err != nil {
 		return output.NewFormatter().Error(fmt.Sprintf("failed to parse response: %v", err), 1)
 	}
@@ -286,7 +286,7 @@ func inspectConfig(client *http.Client, baseURL, auth string) error {
 		return output.NewFormatter().Error(fmt.Sprintf("failed to read response: %v", err), 1)
 	}
 
-	var configData map[string]interface{}
+	var configData map[string]any
 	if err := json.Unmarshal(body, &configData); err != nil {
 		return output.NewFormatter().Error(fmt.Sprintf("failed to parse response: %v", err), 1)
 	}
@@ -321,7 +321,7 @@ func inspectInfo(client *http.Client, baseURL, auth string) error {
 		return output.NewFormatter().Error(fmt.Sprintf("failed to read response: %v", err), 1)
 	}
 
-	var infoData map[string]interface{}
+	var infoData map[string]any
 	if err := json.Unmarshal(body, &infoData); err != nil {
 		return output.NewFormatter().Error(fmt.Sprintf("failed to parse response: %v", err), 1)
 	}
