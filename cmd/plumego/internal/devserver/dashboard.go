@@ -24,6 +24,7 @@ type Dashboard struct {
 	pubsub    *pubsub.InProcPubSub
 	builder   *Builder
 	runner    *AppRunner
+	analyzer  *Analyzer
 	startTime time.Time
 
 	// Configuration
@@ -71,9 +72,10 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 		startTime:     time.Now(),
 	}
 
-	// Create builder and runner
+	// Create builder, runner, and analyzer
 	d.builder = NewBuilder(absDir, ps)
 	d.runner = NewAppRunner(absDir, ps)
+	d.analyzer = NewAnalyzer(fmt.Sprintf("http://localhost%s", cfg.AppAddr))
 
 	// Set app address for runner
 	d.runner.SetEnv("APP_ADDR", cfg.AppAddr)
@@ -106,6 +108,9 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	// API endpoints (without Group - register directly)
 	d.app.GetCtx("/api/status", d.handleStatus)
 	d.app.GetCtx("/api/health", d.handleHealth)
+	d.app.GetCtx("/api/routes", d.handleRoutes)
+	d.app.GetCtx("/api/config", d.handleConfig)
+	d.app.GetCtx("/api/metrics", d.handleMetrics)
 	d.app.PostCtx("/api/build", d.handleBuild)
 	d.app.PostCtx("/api/restart", d.handleRestart)
 	d.app.PostCtx("/api/stop", d.handleStop)
@@ -304,6 +309,77 @@ func (d *Dashboard) handleStop(ctx *plumego.Context) {
 		"success": true,
 		"message": "Application stopped successfully",
 	})
+}
+
+func (d *Dashboard) handleRoutes(ctx *plumego.Context) {
+	if !d.runner.IsRunning() {
+		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+			"error": "Application is not running",
+		})
+		return
+	}
+
+	// Try to fetch routes from the running app
+	routes, err := d.analyzer.GetRoutes()
+	if err != nil {
+		// Fallback to probing if debug endpoint is not available
+		routes = d.analyzer.ProbeEndpoints()
+		if len(routes) == 0 {
+			ctx.JSON(http.StatusOK, map[string]interface{}{
+				"routes": []RouteInfo{},
+				"error":  "Could not fetch routes: " + err.Error(),
+			})
+			return
+		}
+	}
+
+	ctx.JSON(http.StatusOK, map[string]interface{}{
+		"routes": routes,
+		"count":  len(routes),
+	})
+}
+
+func (d *Dashboard) handleConfig(ctx *plumego.Context) {
+	if !d.runner.IsRunning() {
+		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+			"error": "Application is not running",
+		})
+		return
+	}
+
+	config, err := d.analyzer.GetAppInfo()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": "Could not fetch config: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, config)
+}
+
+func (d *Dashboard) handleMetrics(ctx *plumego.Context) {
+	metrics := map[string]interface{}{
+		"dashboard": map[string]interface{}{
+			"uptime":    time.Since(d.startTime).Seconds(),
+			"startTime": d.startTime.Format(time.RFC3339),
+		},
+		"app": map[string]interface{}{
+			"running": d.runner.IsRunning(),
+			"pid":     d.getAppPID(),
+		},
+	}
+
+	// If app is running, try to get health info
+	if d.runner.IsRunning() {
+		healthy, details, err := d.analyzer.HealthCheck()
+		if err == nil {
+			metrics["app"].(map[string]interface{})["healthy"] = healthy
+			metrics["app"].(map[string]interface{})["healthDetails"] = details
+		}
+	}
+
+	ctx.JSON(http.StatusOK, metrics)
 }
 
 // Helper methods

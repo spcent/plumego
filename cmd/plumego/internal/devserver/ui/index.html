@@ -35,8 +35,10 @@
 
         <div class="tabs">
             <button class="tab active" data-tab="logs">📄 Logs</button>
+            <button class="tab" data-tab="routes">🛣️ Routes</button>
+            <button class="tab" data-tab="metrics">📊 Metrics</button>
             <button class="tab" data-tab="build">🔨 Build Output</button>
-            <button class="tab" data-tab="events">📊 Events</button>
+            <button class="tab" data-tab="events">🔔 Events</button>
         </div>
 
         <div class="tab-content">
@@ -59,6 +61,29 @@
                     </div>
                 </div>
                 <div id="logs" class="log-container"></div>
+            </div>
+
+            <div id="routes-tab" class="tab-pane">
+                <div class="routes-header">
+                    <h3>Application Routes</h3>
+                    <button id="btn-refresh-routes" class="btn btn-secondary">🔄 Refresh</button>
+                </div>
+                <div id="routes-container" class="routes-list">
+                    <p class="text-secondary">Loading routes...</p>
+                </div>
+            </div>
+
+            <div id="metrics-tab" class="tab-pane">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h4>Dashboard</h4>
+                        <div id="dashboard-metrics"></div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Application</h4>
+                        <div id="app-metrics"></div>
+                    </div>
+                </div>
             </div>
 
             <div id="build-tab" class="tab-pane">

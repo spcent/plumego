@@ -366,3 +366,119 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Routes and Metrics
+function loadRoutes() {
+    fetch('/api/routes')
+        .then(res => res.json())
+        .then(data => {
+            const container = document.getElementById('routes-container');
+
+            if (!data.routes || data.routes.length === 0) {
+                container.innerHTML = '<p class="text-secondary">No routes found. App may not be running or routes endpoint not available.</p>';
+                if (data.error) {
+                    container.innerHTML += `<p class="text-error">${data.error}</p>`;
+                }
+                return;
+            }
+
+            container.innerHTML = data.routes.map(route => `
+                <div class="route-item">
+                    <span class="route-method ${route.method}">${route.method}</span>
+                    <span class="route-path">${escapeHtml(route.path)}</span>
+                    ${route.description ? `<div class="route-description">${escapeHtml(route.description)}</div>` : ''}
+                </div>
+            `).join('');
+        })
+        .catch(err => {
+            document.getElementById('routes-container').innerHTML =
+                `<p class="text-error">Failed to load routes: ${err.message}</p>`;
+        });
+}
+
+function loadMetrics() {
+    fetch('/api/metrics')
+        .then(res => res.json())
+        .then(data => {
+            // Dashboard metrics
+            const dashboardMetrics = document.getElementById('dashboard-metrics');
+            if (data.dashboard) {
+                dashboardMetrics.innerHTML = `
+                    <div class="metric-item">
+                        <span class="metric-label">Uptime</span>
+                        <span class="metric-value">${formatUptime(data.dashboard.uptime)}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Start Time</span>
+                        <span class="metric-value">${new Date(data.dashboard.startTime).toLocaleString()}</span>
+                    </div>
+                `;
+            }
+
+            // App metrics
+            const appMetrics = document.getElementById('app-metrics');
+            if (data.app) {
+                let html = `
+                    <div class="metric-item">
+                        <span class="metric-label">Status</span>
+                        <span class="metric-value">${data.app.running ? '✅ Running' : '⏸️ Stopped'}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">PID</span>
+                        <span class="metric-value">${data.app.pid || 'N/A'}</span>
+                    </div>
+                `;
+
+                if (data.app.healthy !== undefined) {
+                    html += `
+                        <div class="metric-item">
+                            <span class="metric-label">Health</span>
+                            <span class="metric-value">${data.app.healthy ? '✅ Healthy' : '❌ Unhealthy'}</span>
+                        </div>
+                    `;
+                }
+
+                appMetrics.innerHTML = html;
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load metrics:', err);
+        });
+}
+
+function formatUptime(seconds) {
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`;
+    return `${(seconds / 3600).toFixed(1)}h`;
+}
+
+// Tab change handler - load data when switching tabs
+document.addEventListener('DOMContentLoaded', () => {
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetTab = tab.dataset.tab;
+
+            // Load data when switching to specific tabs
+            if (targetTab === 'routes') {
+                loadRoutes();
+            } else if (targetTab === 'metrics') {
+                loadMetrics();
+            }
+        });
+    });
+
+    // Refresh routes button
+    const btnRefreshRoutes = document.getElementById('btn-refresh-routes');
+    if (btnRefreshRoutes) {
+        btnRefreshRoutes.addEventListener('click', loadRoutes);
+    }
+
+    // Auto-refresh metrics every 5 seconds
+    setInterval(() => {
+        const metricsTab = document.getElementById('metrics-tab');
+        if (metricsTab && metricsTab.classList.contains('active')) {
+            loadMetrics();
+        }
+    }, 5000);
+});
