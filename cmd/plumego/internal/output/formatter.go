@@ -77,11 +77,16 @@ func (f *Formatter) Success(message string, data interface{}) error {
 }
 
 // Error outputs an error message
-func (f *Formatter) Error(message string, code int) error {
+func (f *Formatter) Error(message string, code int, optionalData ...interface{}) error {
 	result := map[string]interface{}{
 		"status":    "error",
 		"message":   message,
 		"exit_code": code,
+	}
+
+	// Add optional data if provided
+	if len(optionalData) > 0 && optionalData[0] != nil {
+		result["data"] = optionalData[0]
 	}
 
 	if err := f.Print(result); err != nil {
