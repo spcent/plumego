@@ -837,21 +837,28 @@ func TestInProcBrokerTransaction(t *testing.T) {
 		t.Fatalf("expected EnableTransactions to be true")
 	}
 
-	// Test transaction publish
-	txID := "tx-1"
-	err := broker.PublishWithTransaction(context.Background(), "tx-topic", Message{ID: "tx-1", Data: "transaction data"}, txID)
+	// Test transaction publish and commit
+	txID1 := "tx-1"
+	err := broker.PublishWithTransaction(context.Background(), "tx-topic", Message{ID: "tx-1", Data: "transaction data"}, txID1)
 	if err != nil {
 		t.Fatalf("publish with transaction error: %v", err)
 	}
 
 	// Test commit transaction
-	err = broker.CommitTransaction(context.Background(), txID)
+	err = broker.CommitTransaction(context.Background(), txID1)
 	if err != nil {
 		t.Fatalf("commit transaction error: %v", err)
 	}
 
+	// Test transaction publish and rollback (use different txID)
+	txID2 := "tx-2"
+	err = broker.PublishWithTransaction(context.Background(), "tx-topic", Message{ID: "tx-2", Data: "transaction data 2"}, txID2)
+	if err != nil {
+		t.Fatalf("publish with transaction error: %v", err)
+	}
+
 	// Test rollback transaction
-	err = broker.RollbackTransaction(context.Background(), txID)
+	err = broker.RollbackTransaction(context.Background(), txID2)
 	if err != nil {
 		t.Fatalf("rollback transaction error: %v", err)
 	}
