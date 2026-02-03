@@ -3,6 +3,7 @@ package plumego
 import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
+	"github.com/spcent/plumego/tenant"
 )
 
 // App is the main application entrypoint. It implements http.Handler so it can be
@@ -90,3 +91,47 @@ var DefaultTracingConfig = core.DefaultTracingConfig
 
 // DefaultObservabilityConfig exposes default observability settings.
 var DefaultObservabilityConfig = core.DefaultObservabilityConfig
+
+// Tenant types for multi-tenancy support.
+type (
+	TenantConfig          = tenant.Config
+	TenantQuotaConfig     = tenant.QuotaConfig
+	TenantPolicyConfig    = tenant.PolicyConfig
+	TenantConfigManager   = tenant.ConfigManager
+	TenantQuotaManager    = tenant.QuotaManager
+	TenantPolicyEvaluator = tenant.PolicyEvaluator
+	TenantHooks           = tenant.Hooks
+	TenantQuotaRequest    = tenant.QuotaRequest
+	TenantQuotaResult     = tenant.QuotaResult
+	TenantPolicyRequest   = tenant.PolicyRequest
+	TenantPolicyResult    = tenant.PolicyResult
+	TenantResolveInfo     = tenant.ResolveInfo
+	TenantQuotaDecision   = tenant.QuotaDecision
+	TenantPolicyDecision  = tenant.PolicyDecision
+)
+
+// Tenant configuration and middleware options.
+type TenantMiddlewareOptions = core.TenantMiddlewareOptions
+
+// Tenant functions for creating managers and extracting context.
+var (
+	NewInMemoryTenantConfigManager = tenant.NewInMemoryConfigManager
+	NewInMemoryQuotaManager        = tenant.NewInMemoryQuotaManager
+	NewConfigPolicyEvaluator       = tenant.NewConfigPolicyEvaluator
+	TenantIDFromContext            = tenant.TenantIDFromContext
+	ContextWithTenantID            = tenant.ContextWithTenantID
+	RequestWithTenantID            = tenant.RequestWithTenantID
+)
+
+// Tenant configuration options.
+var (
+	WithTenantConfigManager = core.WithTenantConfigManager
+	WithTenantMiddleware    = core.WithTenantMiddleware
+)
+
+// Tenant errors.
+var (
+	ErrTenantNotFound = tenant.ErrTenantNotFound
+	ErrQuotaExceeded  = tenant.ErrQuotaExceeded
+	ErrPolicyDenied   = tenant.ErrPolicyDenied
+)
