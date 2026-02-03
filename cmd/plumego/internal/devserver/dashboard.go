@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego"
@@ -26,6 +27,7 @@ type Dashboard struct {
 	builder   *Builder
 	runner    *AppRunner
 	analyzer  *Analyzer
+	depsCache *depsCache
 	startTime time.Time
 
 	// Configuration
@@ -71,6 +73,7 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 		appAddr:       cfg.AppAddr,
 		projectDir:    absDir,
 		startTime:     time.Now(),
+		depsCache:     newDepsCache(),
 	}
 
 	// Create builder, runner, and analyzer
@@ -112,6 +115,11 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	d.app.GetCtx("/api/routes", d.handleRoutes)
 	d.app.GetCtx("/api/config", d.handleConfig)
 	d.app.GetCtx("/api/metrics", d.handleMetrics)
+	d.app.PostCtx("/api/metrics/clear", d.handleMetricsClear)
+	d.app.GetCtx("/api/deps", d.handleDeps)
+	d.app.GetCtx("/api/pprof/types", d.handlePprofTypes)
+	d.app.GetCtx("/api/pprof/raw", d.handlePprofRaw)
+	d.app.PostCtx("/api/test", d.handleAPITest)
 	d.app.PostCtx("/api/build", d.handleBuild)
 	d.app.PostCtx("/api/restart", d.handleRestart)
 	d.app.PostCtx("/api/stop", d.handleStop)
@@ -377,6 +385,8 @@ func (d *Dashboard) handleMetrics(ctx *plumego.Context) {
 		},
 	}
 
+	alerts, thresholds := evaluateRequestAlerts(nil)
+
 	// If app is running, try to get health info
 	if d.runner.IsRunning() {
 		healthy, details, err := d.analyzer.HealthCheck()
@@ -384,9 +394,121 @@ func (d *Dashboard) handleMetrics(ctx *plumego.Context) {
 			metrics["app"].(map[string]interface{})["healthy"] = healthy
 			metrics["app"].(map[string]interface{})["healthDetails"] = details
 		}
+
+		if devMetrics, err := d.analyzer.GetDevMetrics(); err == nil {
+			metrics["app"].(map[string]interface{})["requests"] = devMetrics.HTTP
+			metrics["app"].(map[string]interface{})["db"] = devMetrics.DB
+			alerts, thresholds = evaluateRequestAlerts(&devMetrics.HTTP)
+		} else {
+			metrics["app"].(map[string]interface{})["requests_error"] = err.Error()
+		}
 	}
 
+	metrics["alerts"] = alerts
+	metrics["thresholds"] = thresholds
+
 	ctx.JSON(http.StatusOK, metrics)
+}
+
+func (d *Dashboard) handleMetricsClear(ctx *plumego.Context) {
+	if !d.runner.IsRunning() {
+		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+			"success": false,
+			"error":   "Application is not running",
+		})
+		return
+	}
+
+	if err := d.analyzer.ClearDevMetrics(); err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (d *Dashboard) handlePprofTypes(ctx *plumego.Context) {
+	ctx.JSON(http.StatusOK, map[string]interface{}{
+		"types": pprofProfiles(),
+	})
+}
+
+func (d *Dashboard) handlePprofRaw(ctx *plumego.Context) {
+	if !d.runner.IsRunning() {
+		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+			"error": "Application is not running",
+		})
+		return
+	}
+
+	profileType, seconds, err := parsePprofRequest(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	payload, contentType, err := d.analyzer.FetchPprof(profileType, seconds)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if download := strings.TrimSpace(ctx.Query.Get("download")); download == "0" || strings.EqualFold(download, "false") {
+		ctx.JSON(http.StatusOK, map[string]interface{}{
+			"type":         profileType,
+			"seconds":      seconds,
+			"content_type": contentType,
+			"size_bytes":   len(payload),
+			"preview_hex":  previewHex(payload, 96),
+			"download_url": fmt.Sprintf("/api/pprof/raw?type=%s&seconds=%d", profileType, seconds),
+		})
+		return
+	}
+
+	ctx.W.Header().Set("Content-Type", contentType)
+	ctx.W.Header().Set("Access-Control-Allow-Origin", "*")
+	ctx.W.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pprof", profileType))
+	ctx.W.WriteHeader(http.StatusOK)
+	_, _ = ctx.W.Write(payload)
+}
+
+func (d *Dashboard) handleAPITest(ctx *plumego.Context) {
+	if !d.runner.IsRunning() {
+		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+			"success": false,
+			"error":   "Application is not running",
+		})
+		return
+	}
+
+	var req APITestRequest
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	resp, err := d.analyzer.DoAPITest(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resp)
 }
 
 // Helper methods

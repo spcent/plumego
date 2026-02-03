@@ -37,6 +37,9 @@
             <button class="tab active" data-tab="logs">📄 Logs</button>
             <button class="tab" data-tab="routes">🛣️ Routes</button>
             <button class="tab" data-tab="metrics">📊 Metrics</button>
+            <button class="tab" data-tab="deps">🧭 Dependencies</button>
+            <button class="tab" data-tab="profiling">🔥 Profiling</button>
+            <button class="tab" data-tab="api-test">🧪 API Test</button>
             <button class="tab" data-tab="build">🔨 Build Output</button>
             <button class="tab" data-tab="events">🔔 Events</button>
         </div>
@@ -82,6 +85,175 @@
                     <div class="metric-card">
                         <h4>Application</h4>
                         <div id="app-metrics"></div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Database</h4>
+                        <div id="db-metrics"></div>
+                        <div id="db-slow" class="metric-table db-table"></div>
+                        <div id="db-redaction" class="text-secondary"></div>
+                        <div id="db-detail" class="db-detail text-secondary">Select a slow query to see details.</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Requests</h4>
+                        <div id="request-metrics"></div>
+                        <div id="request-routes" class="metric-table"></div>
+                        <div class="metric-actions">
+                            <button id="btn-clear-metrics" class="btn btn-secondary">Clear Metrics</button>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Alerts</h4>
+                        <div class="alert-controls">
+                            <label>
+                                <span>Total P95 (ms)</span>
+                                <input id="alert-total-p95" type="number" min="1">
+                            </label>
+                            <label>
+                                <span>Total P99 (ms)</span>
+                                <input id="alert-total-p99" type="number" min="1">
+                            </label>
+                            <label>
+                                <span>Total Err% </span>
+                                <input id="alert-total-error" type="number" min="0" step="0.1">
+                            </label>
+                            <label>
+                                <span>Route P95 (ms)</span>
+                                <input id="alert-route-p95" type="number" min="1">
+                            </label>
+                            <label>
+                                <span>Route Err% </span>
+                                <input id="alert-route-error" type="number" min="0" step="0.1">
+                            </label>
+                            <div class="alert-actions">
+                                <button id="btn-alert-apply" class="btn btn-secondary">Apply</button>
+                                <button id="btn-alert-reset" class="btn btn-outline">Reset</button>
+                                <button id="btn-alert-export" class="btn btn-outline">Export</button>
+                                <button id="btn-alert-import" class="btn btn-outline">Import</button>
+                                <input id="alert-import-file" type="file" accept="application/json" style="display:none">
+                            </div>
+                        </div>
+                        <div id="metrics-alerts" class="alert-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="deps-tab" class="tab-pane">
+                <div class="deps-card">
+                    <div class="deps-header">
+                        <h4>Dependency Graph</h4>
+                        <div class="deps-controls">
+                            <label class="deps-field">
+                                <span>Max nodes</span>
+                                <input id="deps-max-nodes" type="number" min="5" max="60" value="18">
+                            </label>
+                            <label class="deps-field deps-checkbox">
+                                <input id="deps-include-std" type="checkbox" checked>
+                                <span>Include stdlib</span>
+                            </label>
+                            <button id="btn-deps-refresh" class="btn btn-secondary">Refresh</button>
+                        </div>
+                    </div>
+                    <div id="deps-summary" class="deps-summary"></div>
+                    <div class="deps-graph-wrap">
+                        <svg id="deps-graph" viewBox="0 0 800 450"></svg>
+                    </div>
+                    <div class="deps-lists">
+                        <div class="deps-list-card">
+                            <h5>Modules</h5>
+                            <div id="deps-list" class="metric-table deps-table"></div>
+                        </div>
+                        <div class="deps-list-card">
+                            <h5>Top Edges</h5>
+                            <div id="deps-edges" class="metric-table deps-edge-table"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="profiling-tab" class="tab-pane">
+                <div class="profiling-card">
+                    <h4>Request Profiling</h4>
+                    <div class="profiling-controls">
+                        <label class="profiling-field">
+                            <span>Profile Type</span>
+                            <select id="profile-type"></select>
+                        </label>
+                        <label class="profiling-field" id="profile-seconds-field">
+                            <span>Seconds</span>
+                            <input id="profile-seconds" type="number" min="1" max="120" step="1" value="10">
+                        </label>
+                        <div class="profiling-actions">
+                            <button id="btn-profile-preview" class="btn btn-outline">Preview</button>
+                            <button id="btn-profile-download" class="btn btn-secondary">Download Pprof</button>
+                            <button id="btn-profile-open" class="btn btn-primary">Open Flamegraph</button>
+                        </div>
+                    </div>
+                    <div id="profile-preview" class="profiling-preview"></div>
+                    <div id="profile-status" class="profiling-status text-secondary">
+                        Opening flamegraph will capture a fresh profile via the app's debug endpoint.
+                    </div>
+                </div>
+            </div>
+
+            <div id="api-test-tab" class="tab-pane">
+                <div class="api-test-card">
+                    <h4>API Endpoint Tester</h4>
+                    <div class="api-test-grid">
+                        <label class="api-field">
+                            <span>Method</span>
+                            <select id="api-method">
+                                <option>GET</option>
+                                <option>POST</option>
+                                <option>PUT</option>
+                                <option>PATCH</option>
+                                <option>DELETE</option>
+                                <option>HEAD</option>
+                                <option>OPTIONS</option>
+                            </select>
+                        </label>
+                        <label class="api-field api-field-wide">
+                            <span>Path</span>
+                            <input id="api-path" type="text" placeholder="/api/users">
+                        </label>
+                        <label class="api-field api-field-wide">
+                            <span>Query (optional)</span>
+                            <input id="api-query" type="text" placeholder="page=1&limit=20">
+                        </label>
+                        <label class="api-field api-field-wide">
+                            <span>Headers (one per line: Key: Value)</span>
+                            <textarea id="api-headers" rows="4" placeholder="Authorization: Bearer ..."></textarea>
+                        </label>
+                        <label class="api-field api-field-wide">
+                            <span>Body</span>
+                            <textarea id="api-body" rows="6" placeholder='{"name":"demo"}'></textarea>
+                        </label>
+                    </div>
+                    <div class="api-actions">
+                        <button id="btn-api-send" class="btn btn-primary">Send Request</button>
+                    </div>
+                    <div class="api-saved-row">
+                        <div class="api-list-card">
+                            <div class="api-list-header">
+                                <h5>History</h5>
+                                <button id="btn-api-clear-history" class="btn btn-outline">Clear</button>
+                            </div>
+                            <div id="api-history" class="api-list"></div>
+                        </div>
+                        <div class="api-list-card">
+                            <div class="api-list-header">
+                                <h5>Saved</h5>
+                                <div class="api-list-actions">
+                                    <button id="btn-api-save" class="btn btn-secondary">Save Current</button>
+                                    <button id="btn-api-export" class="btn btn-outline">Export</button>
+                                    <button id="btn-api-import" class="btn btn-outline">Import</button>
+                                    <input id="api-import-file" type="file" accept="application/json" style="display:none">
+                                </div>
+                            </div>
+                            <div id="api-saved" class="api-list"></div>
+                        </div>
+                    </div>
+                    <div id="api-response" class="api-response">
+                        <div class="text-secondary">Run a request to see the response.</div>
                     </div>
                 </div>
             </div>

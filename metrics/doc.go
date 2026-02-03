@@ -7,12 +7,13 @@
 //
 // # Core Components
 //
-// The package provides three main collector implementations:
+// The package provides collector implementations for different needs:
 //
 //  1. BaseMetricsCollector - A simple in-memory collector for testing and development
-//  2. PrometheusCollector - Prometheus-compatible metrics exposition
-//  3. OpenTelemetryTracer - OpenTelemetry-compatible distributed tracing
-//  4. NoopCollector - A no-op collector for disabled metrics or testing
+//  2. DevCollector - A lightweight dev dashboard collector with HTTP aggregation
+//  3. PrometheusCollector - Prometheus-compatible metrics exposition
+//  4. OpenTelemetryTracer - OpenTelemetry-compatible distributed tracing
+//  5. NoopCollector - A no-op collector for disabled metrics or testing
 //
 // # Unified Interface
 //

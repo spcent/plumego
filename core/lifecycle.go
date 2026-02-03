@@ -202,6 +202,8 @@ func (a *App) startServer() error {
 			"routes":     devToolsRoutesPath,
 			"middleware": devToolsMiddlewarePath,
 			"config":     devToolsConfigPath,
+			"metrics":    devToolsMetricsPath,
+			"pprof":      devToolsPprofBasePath,
 			"reload":     devToolsReloadPath,
 		})
 	}

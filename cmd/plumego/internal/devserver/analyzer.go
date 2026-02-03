@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/spcent/plumego/metrics"
 )
 
 // RouteInfo represents information about a route
@@ -158,4 +160,48 @@ func (a *Analyzer) HealthCheck() (bool, map[string]interface{}, error) {
 	}
 
 	return healthy, details, nil
+}
+
+// DevMetricsSnapshot contains dev HTTP + DB metrics.
+type DevMetricsSnapshot struct {
+	HTTP metrics.DevHTTPSnapshot `json:"http"`
+	DB   metrics.DevDBSnapshot   `json:"db"`
+}
+
+// GetDevMetrics fetches dev metrics from the application.
+func (a *Analyzer) GetDevMetrics() (*DevMetricsSnapshot, error) {
+	metricsURL := a.appURL + "/_debug/metrics"
+
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+	}
+
+	resp, err := client.Get(metricsURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch metrics: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("metrics endpoint returned status %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		Enabled bool                    `json:"enabled"`
+		HTTP    metrics.DevHTTPSnapshot `json:"http"`
+		DB      metrics.DevDBSnapshot   `json:"db"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("failed to parse metrics: %w", err)
+	}
+
+	if !payload.Enabled {
+		return nil, fmt.Errorf("dev metrics disabled")
+	}
+
+	return &DevMetricsSnapshot{
+		HTTP: payload.HTTP,
+		DB:   payload.DB,
+	}, nil
 }

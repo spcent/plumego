@@ -96,7 +96,7 @@ func main() {
 - 常用变量：`AUTH_TOKEN`（SimpleAuth 中间件）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - 应用默认包括 10485760 字节（10 MiB）请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5000ms（5 秒）优雅关闭窗口。可通过 `core.With...` 选项覆盖。
 - 安全基线默认启用（安全头 + 防滥用中间件）。防滥用默认每客户端 100 req/s，突发 200，并最多跟踪 10 万个活跃 key。可通过 `core.WithSecurityHeadersEnabled`、`core.WithSecurityHeadersPolicy`、`core.WithAbuseGuardEnabled`、`core.WithAbuseGuardConfig` 关闭或调整。
-- Debug 模式（`core.WithDebug`）默认开启 `/_debug` 调试端点（路由表、Middleware、配置快照、手动重载）、友好 JSON 错误输出，以及 `.env` 热加载。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
+- Debug 模式（`core.WithDebug`）默认开启 `/_debug` 调试端点（路由表、Middleware、配置快照、指标、pprof、手动重载）、友好 JSON 错误输出，以及 `.env` 热加载。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
 
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
@@ -352,7 +352,7 @@ if err := app.ConfigureObservability(obs); err != nil {
 **定位差异与生产建议**
 - `core.WithDebug` 会暴露应用级 `/_debug` 端点，属于应用自身调试接口，生产环境应关闭或加访问控制。
 - `plumego dev` 仪表盘是本地开发工具，运行独立的仪表盘服务，不建议在生产环境对外暴露。
-- 仪表盘可能读取应用的 `/_debug` 端点用于路由/配置展示，因此仅建议在本地或受控环境启用。
+- 仪表盘可能读取应用的 `/_debug` 端点用于路由/配置/指标/pprof 展示，因此仅建议在本地或受控环境启用。
 
 ### 快速开始
 

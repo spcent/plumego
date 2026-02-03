@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
@@ -22,6 +24,14 @@ const (
 	devToolsRoutesJSONPath = devToolsBasePath + "/routes.json"
 	devToolsMiddlewarePath = devToolsBasePath + "/middleware"
 	devToolsConfigPath     = devToolsBasePath + "/config"
+	devToolsMetricsPath    = devToolsBasePath + "/metrics"
+	devToolsMetricsClear   = devToolsMetricsPath + "/clear"
+	devToolsPprofBasePath  = devToolsBasePath + "/pprof"
+	devToolsPprofIndexPath = devToolsPprofBasePath + "/"
+	devToolsPprofCmdline   = devToolsPprofBasePath + "/cmdline"
+	devToolsPprofProfile   = devToolsPprofBasePath + "/profile"
+	devToolsPprofSymbol    = devToolsPprofBasePath + "/symbol"
+	devToolsPprofTrace     = devToolsPprofBasePath + "/trace"
 	devToolsReloadPath     = devToolsBasePath + "/reload"
 )
 
@@ -35,6 +45,8 @@ type devToolsComponent struct {
 	watchOnce sync.Once
 	watchStop context.CancelFunc
 	watchWg   sync.WaitGroup
+
+	devMetrics *metrics.DevCollector
 }
 
 func newDevToolsComponent(app *App) *devToolsComponent {
@@ -45,10 +57,11 @@ func newDevToolsComponent(app *App) *devToolsComponent {
 	app.mu.RUnlock()
 
 	return &devToolsComponent{
-		app:     app,
-		debug:   debug,
-		logger:  logger,
-		envFile: envFile,
+		app:        app,
+		debug:      debug,
+		logger:     logger,
+		envFile:    envFile,
+		devMetrics: metrics.NewDevCollector(metrics.DefaultDevCollectorConfig()),
 	}
 }
 
@@ -100,6 +113,44 @@ func (c *devToolsComponent) RegisterRoutes(r *router.Router) {
 		writeHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
 	}))
 
+	r.Get(devToolsMetricsPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if c.devMetrics == nil {
+			writeHTTPResponse(w, req, http.StatusOK, map[string]any{
+				"enabled": false,
+			})
+			return
+		}
+
+		writeHTTPResponse(w, req, http.StatusOK, map[string]any{
+			"enabled": true,
+			"http":    c.devMetrics.Snapshot(),
+			"db":      c.devMetrics.DBSnapshot(),
+		})
+	}))
+
+	r.Post(devToolsMetricsClear, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if c.devMetrics != nil {
+			c.devMetrics.Clear()
+		}
+		writeHTTPResponse(w, req, http.StatusOK, map[string]any{
+			"status": "ok",
+		})
+	}))
+
+	// pprof endpoints (debug-only)
+	r.Get(devToolsPprofBasePath, http.HandlerFunc(pprof.Index))
+	r.Get(devToolsPprofIndexPath, http.HandlerFunc(pprof.Index))
+	r.Get(devToolsPprofCmdline, http.HandlerFunc(pprof.Cmdline))
+	r.Get(devToolsPprofProfile, http.HandlerFunc(pprof.Profile))
+	r.Get(devToolsPprofSymbol, http.HandlerFunc(pprof.Symbol))
+	r.Post(devToolsPprofSymbol, http.HandlerFunc(pprof.Symbol))
+	r.Get(devToolsPprofTrace, http.HandlerFunc(pprof.Trace))
+
+	for _, name := range []string{"allocs", "block", "goroutine", "heap", "mutex", "threadcreate"} {
+		path := devToolsPprofBasePath + "/" + name
+		r.Get(path, pprof.Handler(name))
+	}
+
 	r.Post(devToolsReloadPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if err := c.reloadEnv(req.Context()); err != nil {
 			contract.WriteError(w, req, contract.APIError{
@@ -117,7 +168,9 @@ func (c *devToolsComponent) RegisterRoutes(r *router.Router) {
 	}))
 }
 
-func (c *devToolsComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *devToolsComponent) RegisterMiddleware(_ *middleware.Registry) {
+	c.attachDevMetrics()
+}
 
 func (c *devToolsComponent) Start(ctx context.Context) error {
 	if !c.debug || c.envFile == "" {
@@ -171,6 +224,26 @@ func (c *devToolsComponent) reloadEnv(ctx context.Context) error {
 
 	c.logger.Info("Reloaded .env file", log.Fields{"path": c.envFile})
 	return nil
+}
+
+func (c *devToolsComponent) attachDevMetrics() {
+	if c.app == nil || c.devMetrics == nil {
+		return
+	}
+
+	c.app.mu.Lock()
+	defer c.app.mu.Unlock()
+
+	if c.app.metricsCollector == nil {
+		c.app.metricsCollector = c.devMetrics
+		return
+	}
+
+	if c.app.metricsCollector == c.devMetrics {
+		return
+	}
+
+	c.app.metricsCollector = metrics.NewMultiCollector(c.app.metricsCollector, c.devMetrics)
 }
 
 func (c *devToolsComponent) watchEnvFile(ctx context.Context) {

@@ -44,6 +44,9 @@ The `plumego dev` command features a **dual-server architecture** with a develop
 - **Real-time Logs**: Capture and filter stdout/stderr
 - **Route Browser**: Discover and display all HTTP routes
 - **Metrics Dashboard**: Performance and health monitoring
+- **Dependency Graph**: Visualize module relationships and hot spots
+- **Profiling**: Capture CPU/heap/trace profiles and open flamegraphs
+- **API Testing**: Send ad-hoc requests to your app from the dashboard
 - **Build Management**: Manual build triggers and output
 - **App Control**: Restart/build/stop controls
 - **Event Stream**: All development events in one place
@@ -102,8 +105,31 @@ plumego dev \
 #### Metrics
 - **Dashboard**: Uptime, start time
 - **Application**: Status, PID, health
+- **Requests**: Aggregated request latency (p50/p95/p99), error rate, and top slow routes
+- **Alerts**: Threshold-based latency and error-rate warnings
+- **Database**: Query latency stats, slow query list, and redaction-aware drilldown (requires instrumented DB)
 - Auto-refreshes every 5 seconds
 - Health check integration
+- Alert thresholds can be overridden in the dashboard (stored per-project in browser state)
+- Alert thresholds can be exported/imported as JSON
+
+#### Dependencies
+- Module dependency graph based on `go list` output
+- Summary of direct vs indirect modules and edge counts
+- Top edges list for hot dependency paths
+
+#### Profiling
+- CPU/heap/allocs/goroutine/block/mutex/threadcreate/trace profiles
+- Download raw pprof profiles
+- Open flamegraphs in Speedscope (external viewer)
+
+#### API Test
+- Send ad-hoc requests to the running app
+- Edit method/path/headers/body
+- View status, headers, body, and timing
+- Request history and saved presets
+- Inline JSON viewer with collapsible formatting
+- Export/import saved requests as JSON
 
 #### Build Output
 - Build status (success/failure)
@@ -159,6 +185,7 @@ Returns all HTTP routes discovered from the application.
 ### Metrics
 ```bash
 GET /api/metrics
+POST /api/metrics/clear
 ```
 Returns dashboard and application metrics.
 
@@ -173,10 +200,59 @@ Returns dashboard and application metrics.
     "running": true,
     "pid": 12345,
     "healthy": true,
-    "healthDetails": {...}
+    "healthDetails": {...},
+    "requests": {
+      "window_seconds": 300,
+      "started_at": "2026-02-02T11:06:29Z",
+      "total": {
+        "count": 1280,
+        "error_count": 12,
+        "duration_ms": {"p50": 12.2, "p95": 45.1, "p99": 80.3}
+      },
+      "routes": [
+        {"method": "GET", "path": "/api/users", "count": 420, "duration_ms": {"p95": 32.4}}
+      ]
+    },
+    "db": {
+      "total": {
+        "count": 88,
+        "error_count": 2,
+        "duration_ms": {"p95": 30.4}
+      },
+      "slow": [
+        {"operation": "query", "driver": "mysql", "duration_ms": 520.2}
+      ]
+    }
   }
 }
 ```
+Includes `alerts` and `thresholds` fields for performance bottleneck detection.
+
+### Dependencies
+```bash
+GET /api/deps?include_std=1&max_nodes=20&refresh=1
+```
+Returns module dependency graph data derived from `go list`.
+
+Query parameters:
+- `include_std` (default `1`): include standard library packages
+- `max_nodes` (default `0` for all): limit node count for visualization
+- `refresh` (default `0`): force graph refresh (otherwise cached briefly)
+
+Response includes `summary`, `nodes`, and `edges`.
+
+### Profiling
+```bash
+GET /api/pprof/types
+GET /api/pprof/raw?type=cpu&seconds=10
+GET /api/pprof/raw?type=cpu&seconds=10&download=0
+```
+Returns supported profile types and raw pprof data (for Speedscope or download).
+
+**Notes**
+- CPU/trace profiles accept a `seconds` parameter (defaults applied).
+- Raw pprof responses include CORS headers for Speedscope integration.
+- `download=0` returns a JSON preview (size, content type, hex sample) for inline display.
 
 ### Configuration
 ```bash
@@ -191,6 +267,23 @@ POST /api/restart
 POST /api/stop
 ```
 Control application lifecycle.
+
+### API Testing
+```bash
+POST /api/test
+```
+Send an API request to the running application and return status, headers, and body.
+
+**Request:**
+```json
+{
+  "method": "POST",
+  "path": "/api/users",
+  "query": "debug=true",
+  "headers": {"Content-Type": "application/json"},
+  "body": "{\"name\":\"demo\"}"
+}
+```
 
 ## WebSocket
 
@@ -242,6 +335,18 @@ ws.onmessage = (event) => {
 - Probes common endpoints (fallback)
 - Health check integration
 - Configuration fetching
+- DB metrics are available when your app uses instrumented DB helpers in `store/db`
+
+#### Database Monitoring
+To collect query metrics, wrap your `*sql.DB` with `store/db` instrumentation and pass a metrics collector:
+
+```go
+collector := metrics.NewBaseMetricsCollector()
+dbConn, _ := sql.Open("mysql", dsn)
+instrumented := db.NewInstrumentedDB(dbConn, collector, "mysql")
+// Use instrumented in your data layer
+```
+Slow query drilldown displays redacted SQL and highlights the redaction rules used.
 
 ### Embedded UI
 
@@ -275,6 +380,7 @@ Fallback to disk-based serving for development.
 - `core.WithDebug` exposes app-level `/_debug` endpoints. Use only in local/dev or protect them in production.
 - `plumego dev` dashboard is a local developer tool that runs a separate dashboard server; do not expose it publicly in production.
 - The dashboard may query app `/_debug` endpoints for routes/config, so keep debug endpoints gated outside local/dev usage.
+- Profiling uses the app `/_debug/pprof` endpoints, so keep them gated outside local/dev usage.
 
 ## Backward Compatibility
 
@@ -299,10 +405,23 @@ plumego dev --no-reload
 - Check if `/_debug/routes.json` endpoint is accessible
 - Dashboard will fallback to probing common paths
 
+### Request metrics not showing
+- Ensure logging middleware is enabled (`core.WithLogging` or `core.WithRecommendedMiddleware`)
+- Verify `/_debug/metrics` endpoint is accessible (debug must be enabled)
+
+### Database monitoring not showing
+- Ensure your DB is instrumented (see `store/db` helpers)
+- Confirm the app is passing a metrics collector to the instrumented DB
+
 ### Hot reload not working
 - Check file watch patterns (`--watch`)
 - Verify files are not in excluded directories
 - Check debounce setting (`--debounce`)
+
+### Profiling not working
+- Ensure debug endpoints are enabled (`core.WithDebug` or `APP_DEBUG`)
+- Verify `/_debug/pprof` endpoints are reachable
+- For Speedscope, confirm the dashboard endpoint is reachable from the browser
 
 ## Examples
 
@@ -327,11 +446,11 @@ plumego dev --dashboard-addr :9999 --watch "**/*.go,**/*.yaml"
 ## Future Enhancements
 
 Potential improvements for future releases:
-- [ ] Request profiling and flamegraphs
-- [ ] Database query monitoring
-- [ ] API endpoint testing UI
-- [ ] Performance bottleneck detection
-- [ ] Dependency graph visualization
+- [x] Request profiling and flamegraphs
+- [x] Database query monitoring
+- [x] API endpoint testing UI
+- [x] Performance bottleneck detection
+- [x] Dependency graph visualization
 - [ ] Live configuration editing
 
 ## Contributing
