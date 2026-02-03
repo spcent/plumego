@@ -3,6 +3,7 @@ package plumego
 import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
+	"github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/tenant"
 )
 
@@ -116,11 +117,24 @@ type TenantMiddlewareOptions = core.TenantMiddlewareOptions
 // Tenant functions for creating managers and extracting context.
 var (
 	NewInMemoryTenantConfigManager = tenant.NewInMemoryConfigManager
+	NewDBTenantConfigManager       = db.NewDBTenantConfigManager
 	NewInMemoryQuotaManager        = tenant.NewInMemoryQuotaManager
 	NewConfigPolicyEvaluator       = tenant.NewConfigPolicyEvaluator
 	TenantIDFromContext            = tenant.TenantIDFromContext
 	ContextWithTenantID            = tenant.ContextWithTenantID
 	RequestWithTenantID            = tenant.RequestWithTenantID
+)
+
+// Tenant database configuration options.
+var (
+	WithTenantCache  = db.WithTenantCache
+	WithTenantColumn = db.WithTenantColumn
+)
+
+// Tenant database isolation functions.
+var (
+	NewTenantDB   = db.NewTenantDB
+	ValidateQuery = db.ValidateQuery
 )
 
 // Tenant configuration options.
