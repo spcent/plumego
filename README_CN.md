@@ -1,6 +1,10 @@
 # Plumego — 仅基于golang标准库的 Web 工具包
 
-Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
+[![Go 版本](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![版本](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
+[![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现,同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
 
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
@@ -95,11 +99,102 @@ func main() {
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
 - **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（安全头、防滥用、请求体限制、并发限制）会在设置期间自动注入。恢复/日志/CORS 辅助工具可通过 `core.WithRecovery`、`core.WithLogging`、`core.WithCORS` 启用。生产基线可使用 `core.WithRecommendedMiddleware()` 一键启用 RequestID + Logging + Recovery 的推荐顺序组合。
-- **租户工具包**：`tenant` 提供租户配置、策略与配额的基础能力，以及 `middleware.TenantResolver` / `middleware.TenantPolicy` / `middleware.TenantQuota` 等中间件和 `core.TenantConfigComponent` 组件，便于挂载到应用生命周期中。
+- **多租户**：生产级租户隔离，支持配额管理、策略控制和自动数据库过滤。详见[多租户](#多租户)章节。
 - **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
 - **WebSocket 中心**：`ConfigureWebSocket()` 挂载受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `WebSocketConfig` 自定义工作线程数和队列大小。
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。
+
+## 多租户
+
+Plumego 为 SaaS 应用提供生产级多租户支持，包括租户隔离、配额管理和策略控制。
+
+### 功能特性
+
+- **租户配置**：灵活的存储后端（内存、数据库 + LRU 缓存）
+- **配额管理**：租户级速率限制（每分钟请求数、token 数），固定窗口执行
+- **策略控制**：租户级模型和工具白名单
+- **数据库隔离**：通过 `TenantDB` 包装器自动为所有 SQL 查询添加租户过滤
+- **中间件栈**：租户解析 → 配额检查 → 策略执行
+- **审计钩子**：可选的回调接口，用于监控配额/策略违规
+
+### 快速配置
+
+```go
+import (
+    "github.com/spcent/plumego"
+    "github.com/spcent/plumego/store/db"
+)
+
+// 创建带缓存的租户配置管理器
+tenantMgr := plumego.NewDBTenantConfigManager(
+    database,
+    plumego.WithTenantCache(1000, 5*time.Minute),
+)
+
+// 创建配额和策略管理器
+quotaMgr := plumego.NewInMemoryQuotaManager(tenantMgr)
+policyEval := plumego.NewConfigPolicyEvaluator(tenantMgr)
+
+// 创建租户感知数据库包装器
+tenantDB := plumego.NewTenantDB(database)
+
+// 配置应用
+app := plumego.New(
+    plumego.WithTenantConfigManager(tenantMgr),
+    plumego.WithTenantMiddleware(plumego.TenantMiddlewareOptions{
+        HeaderName:      "X-Tenant-ID",
+        AllowMissing:    false,
+        QuotaManager:    quotaMgr,
+        PolicyEvaluator: policyEval,
+        Hooks: plumego.TenantHooks{
+            OnQuota: func(ctx context.Context, decision plumego.TenantQuotaDecision) {
+                if !decision.Allowed {
+                    log.Printf("租户 %s 超过配额", decision.TenantID)
+                }
+            },
+        },
+    }),
+)
+```
+
+### 自动查询过滤
+
+`TenantDB` 包装器会自动为所有查询添加租户 ID 过滤：
+
+```go
+// 你的查询
+rows, err := tenantDB.QueryFromContext(ctx,
+    "SELECT * FROM users WHERE active = ?", true)
+
+// 自动转换为
+"SELECT * FROM users WHERE tenant_id = ? AND active = ?"
+// tenant_id 来自上下文
+```
+
+这样可防止跨租户数据泄露，并通过移除手动租户过滤简化业务逻辑。
+
+### 示例应用
+
+参见 `examples/multi-tenant-saas/` 完整示例，包含：
+- 租户 CRUD 操作的管理 API
+- 租户范围的业务 API
+- 带 retry-after 头的配额执行
+- 模型/工具的策略验证
+- 租户级请求分析
+
+运行示例：
+```bash
+cd examples/multi-tenant-saas
+go run .
+```
+
+### 生产环境注意事项
+
+- **性能**：使用带 LRU 缓存的数据库配置管理器（支持 1000+ 租户）
+- **安全**：将基于 Header 的租户 ID 替换为签名 JWT token
+- **监控**：启用配额/策略钩子进行指标采集
+- **扩展**：多实例部署于负载均衡器后，共享数据库
 
 ## 后台 Runner
 使用最小生命周期接口注册后台任务：

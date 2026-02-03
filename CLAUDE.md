@@ -1,5 +1,7 @@
 # CLAUDE.md — plumego
 
+> **Version**: v1.0.0-rc.1 | **Status**: Release Candidate | **Go**: 1.24+
+
 This document is the **authoritative reference for AI assistants** (Claude, Copilot, Cursor, etc.) working in the `spcent/plumego` repository. It explains the codebase structure, development workflows, and key conventions to follow.
 
 ---
@@ -112,6 +114,7 @@ Agents **must respect module boundaries**. Do not blur these separations:
 | `contract/` | Context, errors, response helpers | **High** |
 | `config/` | Environment loading, validation | Medium |
 | `security/` | Cryptographic operations, signatures | **Critical** |
+| `tenant/` | Multi-tenancy primitives, quota, policy | **High** |
 | `scheduler/` | Task scheduling, cron | Medium |
 | `store/` | Persistence abstractions | Medium |
 | `net/` | Network utilities | Medium |
@@ -187,6 +190,108 @@ contract.WriteError(w, r, err)
 
 // Error categories: Client, Server, Business, Timeout, Validation, Authentication, RateLimit
 ```
+
+### Multi-Tenancy (`tenant/`)
+
+Plumego provides production-ready multi-tenancy support for SaaS applications.
+
+#### Core Types
+
+```go
+// Tenant configuration
+type Config struct {
+    TenantID  string
+    Quota     QuotaConfig
+    Policy    PolicyConfig
+    Metadata  map[string]string
+    UpdatedAt time.Time
+}
+
+// Quota enforcement
+type QuotaConfig struct {
+    RequestsPerMinute int
+    TokensPerMinute   int
+}
+
+// Policy controls
+type PolicyConfig struct {
+    AllowedModels []string
+    AllowedTools  []string
+}
+```
+
+#### Configuration Management
+
+```go
+// In-memory (testing)
+configMgr := tenant.NewInMemoryConfigManager()
+
+// Database-backed with LRU cache (production)
+configMgr := db.NewDBTenantConfigManager(
+    database,
+    db.WithTenantCache(1000, 5*time.Minute),
+)
+
+// Managers
+quotaMgr := tenant.NewInMemoryQuotaManager(configMgr)
+policyEval := tenant.NewConfigPolicyEvaluator(configMgr)
+```
+
+#### Middleware Integration
+
+```go
+app := core.New(
+    core.WithTenantConfigManager(configMgr),
+    core.WithTenantMiddleware(core.TenantMiddlewareOptions{
+        HeaderName:      "X-Tenant-ID",
+        AllowMissing:    false,
+        QuotaManager:    quotaMgr,
+        PolicyEvaluator: policyEval,
+        Hooks: tenant.Hooks{
+            OnQuota: func(ctx context.Context, decision tenant.QuotaDecision) {
+                // Log quota violations
+            },
+            OnPolicy: func(ctx context.Context, decision tenant.PolicyDecision) {
+                // Log policy violations
+            },
+        },
+    }),
+)
+```
+
+#### Database Isolation
+
+```go
+// Automatic tenant filtering
+tenantDB := db.NewTenantDB(database)
+
+// All queries automatically scoped by tenant_id
+rows, err := tenantDB.QueryFromContext(ctx,
+    "SELECT * FROM users WHERE active = ?", true)
+// Becomes: SELECT * FROM users WHERE tenant_id = ? AND active = ?
+
+// Access raw DB when needed (e.g., for logging)
+tenantDB.RawDB().Exec("INSERT INTO audit_logs ...")
+```
+
+#### Context Helpers
+
+```go
+// Extract tenant ID from context
+tenantID := tenant.TenantIDFromContext(ctx)
+
+// Add tenant ID to context
+ctx = tenant.ContextWithTenantID(ctx, "tenant-123")
+```
+
+#### Example
+
+See `examples/multi-tenant-saas/` for complete working example with:
+- Admin API for tenant CRUD
+- Tenant-scoped business logic
+- Quota enforcement with retry-after
+- Policy validation
+- Per-tenant analytics
 
 ---
 

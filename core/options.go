@@ -9,6 +9,7 @@ import (
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/security/headers"
+	"github.com/spcent/plumego/tenant"
 )
 
 // WithRouter sets the router for the App.
@@ -297,5 +298,73 @@ func WithMetricsCollector(collector metrics.MetricsCollector) Option {
 func WithTracer(tracer middleware.Tracer) Option {
 	return func(a *App) {
 		a.tracer = tracer
+	}
+}
+
+// WithTenantConfigManager registers a tenant config manager as a component.
+// This enables multi-tenancy support with per-tenant configuration.
+func WithTenantConfigManager(manager tenant.ConfigManager) Option {
+	return func(a *App) {
+		component := &TenantConfigComponent{
+			Name:    "tenant-config",
+			Manager: manager,
+		}
+		a.components = append(a.components, component)
+	}
+}
+
+// TenantMiddlewareOptions configures tenant middleware chain.
+type TenantMiddlewareOptions struct {
+	// HeaderName is the HTTP header to extract tenant ID from (default: "X-Tenant-ID")
+	HeaderName string
+	// AllowMissing allows requests without tenant ID (default: false)
+	AllowMissing bool
+	// DisablePrincipal disables tenant extraction from Principal (default: false)
+	DisablePrincipal bool
+	// QuotaManager enforces per-tenant quota limits (optional)
+	QuotaManager tenant.QuotaManager
+	// PolicyEvaluator enforces per-tenant policies (optional)
+	PolicyEvaluator tenant.PolicyEvaluator
+	// Hooks provides callbacks for tenant resolution, quota, and policy events
+	Hooks tenant.Hooks
+}
+
+// WithTenantMiddleware adds tenant resolution, quota, and policy middleware.
+// This should be used after WithTenantConfigManager.
+//
+// Example:
+//
+//	app := core.New(
+//	    core.WithTenantConfigManager(manager),
+//	    core.WithTenantMiddleware(core.TenantMiddlewareOptions{
+//	        QuotaManager:    quotaMgr,
+//	        PolicyEvaluator: policyEval,
+//	    }),
+//	)
+func WithTenantMiddleware(options TenantMiddlewareOptions) Option {
+	return func(a *App) {
+		// Add tenant resolver middleware
+		a.Use(middleware.TenantResolver(middleware.TenantResolverOptions{
+			HeaderName:       options.HeaderName,
+			AllowMissing:     options.AllowMissing,
+			DisablePrincipal: options.DisablePrincipal,
+			Hooks:            options.Hooks,
+		}))
+
+		// Add quota enforcement if configured
+		if options.QuotaManager != nil {
+			a.Use(middleware.TenantQuota(middleware.TenantQuotaOptions{
+				Manager: options.QuotaManager,
+				Hooks:   options.Hooks,
+			}))
+		}
+
+		// Add policy enforcement if configured
+		if options.PolicyEvaluator != nil {
+			a.Use(middleware.TenantPolicy(middleware.TenantPolicyOptions{
+				Evaluator: options.PolicyEvaluator,
+				Hooks:     options.Hooks,
+			}))
+		}
 	}
 }
