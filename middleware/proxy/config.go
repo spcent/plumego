@@ -84,6 +84,14 @@ type Config struct {
 	// BufferPool is a pool of buffers for copying request/response bodies
 	// Default: nil (creates new buffers)
 	BufferPool BufferPool
+
+	// CircuitBreakerEnabled enables circuit breaker per backend
+	// Default: false
+	CircuitBreakerEnabled bool
+
+	// CircuitBreakerConfig configures the circuit breaker
+	// Only used if CircuitBreakerEnabled is true
+	CircuitBreakerConfig *CircuitBreakerConfig
 }
 
 // Validate validates the proxy configuration
@@ -243,4 +251,23 @@ type ServiceDiscovery interface {
 type BufferPool interface {
 	Get() []byte
 	Put([]byte)
+}
+
+// CircuitBreakerConfig configures circuit breaker behavior
+type CircuitBreakerConfig struct {
+	// FailureThreshold is the failure rate threshold (0.0-1.0)
+	// Default: 0.5 (50%)
+	FailureThreshold float64
+
+	// SuccessThreshold is the number of successes needed to close circuit
+	// Default: 3
+	SuccessThreshold uint64
+
+	// Timeout is how long circuit stays open before trying half-open
+	// Default: 30 seconds
+	Timeout time.Duration
+
+	// MinRequests is minimum requests before evaluating failure rate
+	// Default: 10
+	MinRequests uint64
 }

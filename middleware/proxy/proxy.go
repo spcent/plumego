@@ -93,6 +93,14 @@ func New(config Config) func(http.Handler) http.Handler {
 		proxy.lcBalancer = lcb
 	}
 
+	// Enable circuit breakers for backends if configured
+	if cfg.CircuitBreakerEnabled {
+		for _, backend := range pool.Backends() {
+			cb := newBackendCircuitBreaker(backend.URL, cfg.CircuitBreakerConfig)
+			backend.SetCircuitBreaker(cb)
+		}
+	}
+
 	// Start health checker if configured
 	if cfg.HealthCheck != nil {
 		proxy.health = NewHealthChecker(pool, cfg.HealthCheck)
@@ -194,8 +202,14 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Ba
 		},
 	}
 
-	// Execute the request
-	resp, err := client.Do(backendReq)
+	// Execute request with circuit breaker protection
+	var resp *http.Response
+	err := backend.Execute(func() error {
+		var execErr error
+		resp, execErr = client.Do(backendReq)
+		return execErr
+	})
+
 	if err != nil {
 		return err
 	}

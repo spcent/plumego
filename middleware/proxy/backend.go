@@ -30,6 +30,9 @@ type Backend struct {
 	totalRequests       atomic.Uint64
 	totalFailures       atomic.Uint64
 	totalSuccesses      atomic.Uint64
+
+	// Circuit breaker (optional)
+	circuitBreaker CircuitBreaker
 }
 
 // NewBackend creates a new backend
@@ -65,6 +68,26 @@ func (b *Backend) SetHealthy(healthy bool) {
 	if healthy {
 		b.consecutiveFailures.Store(0)
 	}
+}
+
+// SetCircuitBreaker sets the circuit breaker for this backend
+func (b *Backend) SetCircuitBreaker(cb CircuitBreaker) {
+	b.circuitBreaker = cb
+}
+
+// HasCircuitBreaker returns whether this backend has a circuit breaker
+func (b *Backend) HasCircuitBreaker() bool {
+	return b.circuitBreaker != nil
+}
+
+// Execute executes a function with circuit breaker protection
+// If no circuit breaker is set, executes directly
+func (b *Backend) Execute(fn func() error) error {
+	if b.circuitBreaker == nil {
+		return fn()
+	}
+
+	return b.circuitBreaker.Call(fn)
 }
 
 // RecordSuccess records a successful request
