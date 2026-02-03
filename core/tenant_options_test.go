@@ -68,12 +68,17 @@ func TestWithTenantMiddleware_Full(t *testing.T) {
 		w.Write([]byte(tenantID))
 	})
 
+	// Setup server to initialize handler
+	if err := app.setupServer(); err != nil {
+		t.Fatalf("setupServer failed: %v", err)
+	}
+
 	// Test with tenant header
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Custom-Tenant", "test-tenant")
 	rec := httptest.NewRecorder()
 
-	app.router.ServeHTTP(rec, req)
+	app.handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected status 200, got %d", rec.Code)
@@ -104,11 +109,16 @@ func TestWithTenantMiddleware_QuotaOnly(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// Setup server
+	if err := app.setupServer(); err != nil {
+		t.Fatalf("setupServer failed: %v", err)
+	}
+
 	// First request - should be allowed
 	req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req1.Header.Set("X-Tenant-ID", "test-tenant")
 	rec1 := httptest.NewRecorder()
-	app.router.ServeHTTP(rec1, req1)
+	app.handler.ServeHTTP(rec1, req1)
 	if rec1.Code != http.StatusOK {
 		t.Errorf("first request should be allowed, got %d", rec1.Code)
 	}
@@ -117,7 +127,7 @@ func TestWithTenantMiddleware_QuotaOnly(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req2.Header.Set("X-Tenant-ID", "test-tenant")
 	rec2 := httptest.NewRecorder()
-	app.router.ServeHTTP(rec2, req2)
+	app.handler.ServeHTTP(rec2, req2)
 	if rec2.Code != http.StatusOK {
 		t.Errorf("second request should be allowed, got %d", rec2.Code)
 	}
@@ -126,7 +136,7 @@ func TestWithTenantMiddleware_QuotaOnly(t *testing.T) {
 	req3 := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req3.Header.Set("X-Tenant-ID", "test-tenant")
 	rec3 := httptest.NewRecorder()
-	app.router.ServeHTTP(rec3, req3)
+	app.handler.ServeHTTP(rec3, req3)
 	if rec3.Code != http.StatusTooManyRequests {
 		t.Errorf("third request should be denied, got %d", rec3.Code)
 	}
@@ -153,12 +163,17 @@ func TestWithTenantMiddleware_PolicyOnly(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// Setup server to initialize handler
+	if err := app.setupServer(); err != nil {
+		t.Fatalf("setupServer failed: %v", err)
+	}
+
 	// Allowed model
 	req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req1.Header.Set("X-Tenant-ID", "restricted-tenant")
 	req1.Header.Set("X-Model", "gpt-3.5-turbo")
 	rec1 := httptest.NewRecorder()
-	app.router.ServeHTTP(rec1, req1)
+	app.handler.ServeHTTP(rec1, req1)
 	if rec1.Code != http.StatusOK {
 		t.Errorf("allowed model should pass, got %d", rec1.Code)
 	}
@@ -168,7 +183,7 @@ func TestWithTenantMiddleware_PolicyOnly(t *testing.T) {
 	req2.Header.Set("X-Tenant-ID", "restricted-tenant")
 	req2.Header.Set("X-Model", "gpt-4")
 	rec2 := httptest.NewRecorder()
-	app.router.ServeHTTP(rec2, req2)
+	app.handler.ServeHTTP(rec2, req2)
 	if rec2.Code != http.StatusForbidden {
 		t.Errorf("disallowed model should be forbidden, got %d", rec2.Code)
 	}
@@ -192,10 +207,15 @@ func TestWithTenantMiddleware_AllowMissing(t *testing.T) {
 		}
 	})
 
+	// Setup server to initialize handler
+	if err := app.setupServer(); err != nil {
+		t.Fatalf("setupServer failed: %v", err)
+	}
+
 	// Request without tenant header - should be allowed
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	rec := httptest.NewRecorder()
-	app.router.ServeHTTP(rec, req)
+	app.handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected status 200, got %d", rec.Code)
@@ -247,12 +267,17 @@ func TestWithTenantMiddleware_Integration(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// Setup server to initialize handler
+	if err := app.setupServer(); err != nil {
+		t.Fatalf("setupServer failed: %v", err)
+	}
+
 	// Make request
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Tenant-ID", "full-tenant")
 	req.Header.Set("X-Model", "gpt-4")
 	rec := httptest.NewRecorder()
-	app.router.ServeHTTP(rec, req)
+	app.handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected status 200, got %d", rec.Code)
