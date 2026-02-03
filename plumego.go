@@ -119,6 +119,7 @@ var (
 	NewInMemoryTenantConfigManager = tenant.NewInMemoryConfigManager
 	NewDBTenantConfigManager       = db.NewDBTenantConfigManager
 	NewInMemoryQuotaManager        = tenant.NewInMemoryQuotaManager
+	NewSlidingWindowQuotaManager   = tenant.NewSlidingWindowQuotaManager
 	NewConfigPolicyEvaluator       = tenant.NewConfigPolicyEvaluator
 	TenantIDFromContext            = tenant.TenantIDFromContext
 	ContextWithTenantID            = tenant.ContextWithTenantID
