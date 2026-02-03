@@ -207,5 +207,49 @@ This feature is under active development. See `tenant/README.md` for details.
 
 ## Conclusion
 
-For v1.0: **Keep as experimental**, clearly documented.
-For v1.1: **Complete and stabilize** based on user feedback.
+For v1.0: **Keep as experimental**, clearly documented. ✅ **DONE**
+For v1.1: **Complete and stabilize** - See implementation plan below.
+
+---
+
+## v1.1 Implementation Plan
+
+**Status**: Planning Complete ✅
+**Target Release**: v1.1.0
+**Estimated Effort**: 30 hours (3-4 days)
+
+### Detailed Planning Documents
+
+1. **TENANT_PRODUCTION_PLAN.md** - Comprehensive architecture and feature design
+2. **TENANT_IMPLEMENTATION_CHECKLIST.md** - Day-by-day task breakdown
+
+### Quick Summary
+
+**What's Already Done** (~60%):
+- ✅ Core types (Config, Quota, Policy)
+- ✅ In-memory implementations
+- ✅ All middleware (Resolver, Quota, Policy)
+- ✅ Context integration
+- ✅ Hooks system
+- ✅ Basic tests
+
+**What's Missing** (~40%):
+- ❌ Comprehensive test coverage (80%+ target)
+- ❌ Core integration options (`WithTenant*()`)
+- ❌ Public exports in `plumego.go`
+- ❌ Database-backed config manager
+- ❌ Database isolation helpers
+- ❌ Example application
+- ❌ Complete documentation
+
+### Implementation Phases
+
+1. **Phase 1**: Testing & Stability (6h) - CRITICAL
+2. **Phase 2**: Core Integration (2.5h) - CRITICAL
+3. **Phase 3**: Persistent Storage (4h) - HIGH
+4. **Phase 4**: Database Isolation (4h) - HIGH
+5. **Phase 5**: Example Application (3h) - HIGH
+6. **Phase 6**: Documentation (2h) - HIGH
+7. **Phase 7**: Advanced Features (7h) - MEDIUM
+
+**Next Action**: Begin Phase 1 - Tenant package unit tests
