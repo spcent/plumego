@@ -1,5 +1,7 @@
 # CLAUDE.md — plumego
 
+> **Version**: v1.0.0-rc.1 | **Status**: Release Candidate | **Go**: 1.24+
+
 This document is the **authoritative reference for AI assistants** (Claude, Copilot, Cursor, etc.) working in the `spcent/plumego` repository. It explains the codebase structure, development workflows, and key conventions to follow.
 
 ---

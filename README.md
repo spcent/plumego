@@ -1,5 +1,9 @@
 # Plumego — Standard Library Web Toolkit
 
+[![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, WebSocket utilities, webhook pipelines, and static frontend hosting. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
 
 ## Highlights

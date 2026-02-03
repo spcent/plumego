@@ -1,6 +1,10 @@
 # Plumego — 仅基于golang标准库的 Web 工具包
 
-Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
+[![Go 版本](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![版本](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
+[![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现,同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
 
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
