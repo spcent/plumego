@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,6 +18,7 @@ type Formatter struct {
 	color   bool
 	out     io.Writer
 	err     io.Writer
+	mu      sync.Mutex
 }
 
 // NewFormatter creates a new output formatter
@@ -64,8 +66,16 @@ func (f *Formatter) Format() string {
 	return f.format
 }
 
+// IsQuiet returns whether quiet mode is enabled.
+func (f *Formatter) IsQuiet() bool {
+	return f.quiet
+}
+
 // Print outputs data in the configured format
 func (f *Formatter) Print(data any) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	switch f.format {
 	case "json":
 		return f.printJSON(data)
@@ -119,6 +129,8 @@ func (f *Formatter) Error(message string, code int, optionalData ...any) error {
 // Verbose outputs verbose logging
 func (f *Formatter) Verbose(message string) {
 	if f.verbose {
+		f.mu.Lock()
+		defer f.mu.Unlock()
 		fmt.Fprintf(f.err, "[VERBOSE] %s\n", message)
 	}
 }
@@ -126,6 +138,8 @@ func (f *Formatter) Verbose(message string) {
 // Info outputs informational message
 func (f *Formatter) Info(message string) {
 	if !f.quiet {
+		f.mu.Lock()
+		defer f.mu.Unlock()
 		fmt.Fprintf(f.err, "[INFO] %s\n", message)
 	}
 }

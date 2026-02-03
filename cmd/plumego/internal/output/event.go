@@ -27,6 +27,9 @@ func (f *Formatter) Event(e Event) error {
 		return nil
 	}
 
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	switch f.format {
 	case "json":
 		return f.printEventJSON(e)
@@ -58,6 +61,8 @@ func (f *Formatter) Textln(message string) error {
 	if f.format != "text" || f.quiet {
 		return nil
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	_, err := fmt.Fprintln(f.out, message)
 	return err
 }
@@ -67,6 +72,8 @@ func (f *Formatter) Textf(format string, args ...any) error {
 	if f.format != "text" || f.quiet {
 		return nil
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	_, err := fmt.Fprintf(f.out, format, args...)
 	return err
 }

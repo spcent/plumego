@@ -2,21 +2,41 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/devserver"
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
 	"github.com/spcent/plumego/cmd/plumego/internal/watcher"
+	"github.com/spcent/plumego/pubsub"
 )
 
 type DevCmd struct{}
+
+type devOptions struct {
+	dir             string
+	addr            string
+	dashboardAddr   string
+	watchPatterns   string
+	excludePatterns string
+	debounceStr     string
+	noReload        bool
+	buildCmd        string
+	runCmd          string
+}
+
+var newDevDashboard = func(cfg devserver.Config) (devserver.DashboardAPI, error) {
+	return devserver.NewDashboard(cfg)
+}
 
 func (c *DevCmd) Name() string {
 	return "dev"
@@ -55,35 +75,55 @@ func (c *DevCmd) Flags() []Flag {
 		{Name: "watch", Default: "**/*.go", Usage: "Watch patterns (comma-separated)"},
 		{Name: "exclude", Default: "", Usage: "Exclude patterns (comma-separated)"},
 		{Name: "debounce", Default: "500ms", Usage: "Debounce duration for file changes"},
+		{Name: "no-reload", Default: false, Usage: "Disable hot reload"},
+		{Name: "build-cmd", Default: "", Usage: "Custom build command"},
+		{Name: "run-cmd", Default: "", Usage: "Custom run command"},
 	}
 }
 
 func (c *DevCmd) Run(ctx *Context, args []string) error {
-	fs := flag.NewFlagSet("dev", flag.ExitOnError)
-
-	dir := fs.String("dir", ".", "Project directory")
-	addr := fs.String("addr", ":8080", "Application listen address")
-	dashboardAddr := fs.String("dashboard-addr", ":9999", "Dashboard listen address")
-	watchPatterns := fs.String("watch", "**/*.go", "Watch patterns")
-	excludePatterns := fs.String("exclude", "", "Exclude patterns")
-	debounceStr := fs.String("debounce", "500ms", "Debounce duration")
-
-	if err := fs.Parse(args); err != nil {
-		return err
+	opts, err := parseDevArgs(args)
+	if err != nil {
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	return c.run(ctx.Out, *dir, *addr, *dashboardAddr, *watchPatterns, *excludePatterns, *debounceStr)
+	return c.runWithContext(context.Background(), ctx.Out, opts)
 }
 
-func (c *DevCmd) run(out *output.Formatter, dir, addr, dashboardAddr, watchPatterns, excludePatterns, debounceStr string) error {
+func parseDevArgs(args []string) (devOptions, error) {
+	fs := flag.NewFlagSet("dev", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	opts := devOptions{}
+	fs.StringVar(&opts.dir, "dir", ".", "Project directory")
+	fs.StringVar(&opts.addr, "addr", ":8080", "Application listen address")
+	fs.StringVar(&opts.dashboardAddr, "dashboard-addr", ":9999", "Dashboard listen address")
+	fs.StringVar(&opts.watchPatterns, "watch", "**/*.go", "Watch patterns")
+	fs.StringVar(&opts.excludePatterns, "exclude", "", "Exclude patterns")
+	fs.StringVar(&opts.debounceStr, "debounce", "500ms", "Debounce duration")
+	fs.BoolVar(&opts.noReload, "no-reload", false, "Disable hot reload")
+	fs.StringVar(&opts.buildCmd, "build-cmd", "", "Custom build command")
+	fs.StringVar(&opts.runCmd, "run-cmd", "", "Custom run command")
+
+	if err := fs.Parse(args); err != nil {
+		return devOptions{}, err
+	}
+
+	return opts, nil
+}
+
+func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts devOptions) error {
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// Parse debounce duration
-	debounce, err := time.ParseDuration(debounceStr)
+	debounce, err := time.ParseDuration(opts.debounceStr)
 	if err != nil {
 		return out.Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
 	}
 
 	// Get absolute directory
-	absDir, err := filepath.Abs(dir)
+	absDir, err := filepath.Abs(opts.dir)
 	if err != nil {
 		return out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
 	}
@@ -93,7 +133,7 @@ func (c *DevCmd) run(out *output.Formatter, dir, addr, dashboardAddr, watchPatte
 		return out.Error(fmt.Sprintf("directory not found: %s", absDir), 1)
 	}
 
-	if err := emitDevStart(out, absDir, addr, dashboardAddr); err != nil {
+	if err := emitDevStart(out, absDir, opts.addr, opts.dashboardAddr); err != nil {
 		return err
 	}
 
@@ -101,9 +141,9 @@ func (c *DevCmd) run(out *output.Formatter, dir, addr, dashboardAddr, watchPatte
 	uiPath := filepath.Join(getExecutableDir(), "internal", "devserver", "ui")
 
 	// Create dashboard
-	dash, err := devserver.NewDashboard(devserver.Config{
-		DashboardAddr: dashboardAddr,
-		AppAddr:       addr,
+	dash, err := newDevDashboard(devserver.Config{
+		DashboardAddr: opts.dashboardAddr,
+		AppAddr:       opts.addr,
 		ProjectDir:    absDir,
 		UIPath:        uiPath,
 	})
@@ -111,28 +151,78 @@ func (c *DevCmd) run(out *output.Formatter, dir, addr, dashboardAddr, watchPatte
 		return out.Error(fmt.Sprintf("failed to create dashboard: %v", err), 1)
 	}
 
-	ctx := context.Background()
+	if opts.buildCmd != "" {
+		cmd, args, err := parseCommandLine(opts.buildCmd)
+		if err != nil {
+			return out.Error(fmt.Sprintf("invalid build command: %v", err), 1)
+		}
+		if cmd == "" {
+			return out.Error("build command is empty", 1)
+		}
+		dash.GetBuilder().SetCustomBuild(cmd, args)
+	}
+
+	if opts.runCmd != "" {
+		cmd, args, err := parseCommandLine(opts.runCmd)
+		if err != nil {
+			return out.Error(fmt.Sprintf("invalid run command: %v", err), 1)
+		}
+		if cmd == "" {
+			return out.Error("run command is empty", 1)
+		}
+		dash.GetRunner().SetCustomCommand(cmd, args)
+	}
+
+	dash.GetRunner().SetOutputPassthrough(out.Format() == "text" && !out.IsQuiet())
+
+	if out.Format() != "text" {
+		stopForwarder, err := startDevEventForwarder(runCtx, out, dash.GetPubSub())
+		if err != nil {
+			return out.Error(fmt.Sprintf("failed to subscribe to dev events: %v", err), 1)
+		}
+		defer stopForwarder()
+	}
 
 	// Start dashboard server
-	if err := dash.Start(ctx); err != nil {
+	if err := dash.Start(runCtx); err != nil {
 		return out.Error(fmt.Sprintf("failed to start dashboard: %v", err), 1)
 	}
 
-	if err := emitDashboardStarted(out, dashboardAddr); err != nil {
+	if err := emitDashboardStarted(out, opts.dashboardAddr); err != nil {
 		return err
 	}
 
 	// Build and run the application
-	if err := dash.BuildAndRun(ctx); err != nil {
+	if err := dash.BuildAndRun(runCtx); err != nil {
 		return out.Error(fmt.Sprintf("failed to build and run: %v", err), 1)
 	}
-	if err := emitAppReady(out, addr); err != nil {
+	if err := emitAppReady(out, opts.addr); err != nil {
 		return err
 	}
 
+	if opts.noReload {
+		if err := emitReloadDisabled(out); err != nil {
+			return err
+		}
+
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		select {
+		case <-sigChan:
+		case <-runCtx.Done():
+		}
+		signal.Stop(sigChan)
+		if err := emitShutdown(out); err != nil {
+			return err
+		}
+		dash.Stop(runCtx)
+		return nil
+	}
+
 	// Parse watch patterns
-	watches := parsePatterns(watchPatterns)
-	excludes := parsePatterns(excludePatterns)
+	watches := parsePatterns(opts.watchPatterns)
+	excludes := parsePatterns(opts.excludePatterns)
 
 	// Add sensible default excludes
 	excludes = append(excludes,
@@ -146,7 +236,7 @@ func (c *DevCmd) run(out *output.Formatter, dir, addr, dashboardAddr, watchPatte
 	// Start file watcher
 	w, err := watcher.NewWatcher(absDir, watches, excludes, debounce)
 	if err != nil {
-		dash.Stop(ctx)
+		dash.Stop(runCtx)
 		return out.Error(fmt.Sprintf("failed to create watcher: %v", err), 1)
 	}
 	defer w.Close()
@@ -187,7 +277,7 @@ func (c *DevCmd) run(out *output.Formatter, dir, addr, dashboardAddr, watchPatte
 			}
 
 			// Trigger rebuild and restart
-			if err := dash.Rebuild(ctx); err != nil {
+			if err := dash.Rebuild(runCtx); err != nil {
 				if err := emitReloadFailed(out, err); err != nil {
 					return err
 				}
@@ -206,7 +296,7 @@ func (c *DevCmd) run(out *output.Formatter, dir, addr, dashboardAddr, watchPatte
 			if err := emitShutdown(out); err != nil {
 				return err
 			}
-			dash.Stop(ctx)
+			dash.Stop(runCtx)
 			return nil
 		}
 	}
@@ -228,6 +318,202 @@ func parsePatterns(s string) []string {
 	}
 
 	return result
+}
+
+func parseCommandLine(input string) (string, []string, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return "", nil, nil
+	}
+
+	var args []string
+	var buf strings.Builder
+	inSingle := false
+	inDouble := false
+	escaped := false
+
+	flush := func() {
+		if buf.Len() > 0 {
+			args = append(args, buf.String())
+			buf.Reset()
+		}
+	}
+
+	for _, r := range input {
+		if escaped {
+			buf.WriteRune(r)
+			escaped = false
+			continue
+		}
+
+		if r == '\\' && !inSingle {
+			escaped = true
+			continue
+		}
+
+		if r == '\'' && !inDouble {
+			inSingle = !inSingle
+			continue
+		}
+
+		if r == '"' && !inSingle {
+			inDouble = !inDouble
+			continue
+		}
+
+		if !inSingle && !inDouble && unicode.IsSpace(r) {
+			flush()
+			continue
+		}
+
+		buf.WriteRune(r)
+	}
+
+	if escaped {
+		return "", nil, fmt.Errorf("unfinished escape sequence")
+	}
+	if inSingle || inDouble {
+		return "", nil, fmt.Errorf("unterminated quote")
+	}
+
+	flush()
+	if len(args) == 0 {
+		return "", nil, fmt.Errorf("empty command")
+	}
+
+	return args[0], args[1:], nil
+}
+
+func startDevEventForwarder(ctx context.Context, out *output.Formatter, ps *pubsub.InProcPubSub) (func(), error) {
+	patterns := []string{"app.*", "build.*"}
+	opts := pubsub.DefaultSubOptions()
+	subs := make([]pubsub.Subscription, 0, len(patterns))
+
+	for _, pattern := range patterns {
+		sub, err := ps.SubscribePatternWithContext(ctx, pattern, opts)
+		if err != nil {
+			for _, existing := range subs {
+				existing.Cancel()
+			}
+			return func() {}, err
+		}
+		subs = append(subs, sub)
+		go forwardDevEvents(ctx, out, sub)
+	}
+
+	return func() {
+		for _, sub := range subs {
+			sub.Cancel()
+		}
+	}, nil
+}
+
+func forwardDevEvents(ctx context.Context, out *output.Formatter, sub pubsub.Subscription) {
+	for {
+		select {
+		case <-ctx.Done():
+			sub.Cancel()
+			return
+		case msg, ok := <-sub.C():
+			if !ok {
+				return
+			}
+			emitPubSubEvent(out, msg)
+		}
+	}
+}
+
+func emitPubSubEvent(out *output.Formatter, msg pubsub.Message) {
+	event := output.Event{
+		Event: msg.Topic,
+	}
+	if !msg.Time.IsZero() {
+		event.Time = msg.Time.Format(time.RFC3339)
+	}
+
+	switch msg.Topic {
+	case devserver.EventBuildStart:
+		event.Message = "Build started"
+		if data, ok := msg.Data.(devserver.BuildEvent); ok {
+			event.Data = buildEventData(data)
+		}
+	case devserver.EventBuildSuccess:
+		event.Message = "Build succeeded"
+		if data, ok := msg.Data.(devserver.BuildEvent); ok {
+			event.Data = buildEventData(data)
+		}
+	case devserver.EventBuildFail:
+		event.Message = "Build failed"
+		event.Level = "error"
+		if data, ok := msg.Data.(devserver.BuildEvent); ok {
+			event.Data = buildEventData(data)
+		}
+	case devserver.EventAppStart, devserver.EventAppStop, devserver.EventAppRestart:
+		if data, ok := msg.Data.(devserver.AppLifecycleEvent); ok {
+			event.Data = map[string]any{
+				"state": data.State,
+			}
+			if data.PID != 0 {
+				event.Data["pid"] = data.PID
+			}
+			if data.Error != "" {
+				event.Data["error"] = data.Error
+				event.Level = "error"
+			}
+			event.Message = "Application " + data.State
+		}
+	case devserver.EventAppLog, devserver.EventAppError:
+		if data, ok := msg.Data.(devserver.LogEvent); ok {
+			event.Level = data.Level
+			event.Message = data.Message
+			event.Data = map[string]any{
+				"source": data.Source,
+			}
+		}
+	default:
+		event.Data = toEventMap(msg.Data)
+	}
+
+	_ = out.Event(event)
+}
+
+func buildEventData(data devserver.BuildEvent) map[string]any {
+	payload := map[string]any{
+		"success": data.Success,
+	}
+	if data.Duration > 0 {
+		payload["duration_ms"] = data.Duration.Milliseconds()
+	}
+	if data.Output != "" {
+		payload["output"] = data.Output
+	}
+	if data.Error != "" {
+		payload["error"] = data.Error
+	}
+	return payload
+}
+
+func toEventMap(data any) map[string]any {
+	switch v := data.(type) {
+	case map[string]any:
+		return v
+	case map[string]string:
+		out := make(map[string]any, len(v))
+		for k, val := range v {
+			out[k] = val
+		}
+		return out
+	default:
+		raw, err := json.Marshal(data)
+		if err != nil {
+			return map[string]any{"value": fmt.Sprintf("%v", data)}
+		}
+		var out map[string]any
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return map[string]any{"value": fmt.Sprintf("%v", data)}
+		}
+		return out
+	}
 }
 
 func emitDevStart(out *output.Formatter, absDir, addr, dashboardAddr string) error {
@@ -300,6 +586,23 @@ func emitWatching(out *output.Formatter) error {
 	return out.Event(output.Event{
 		Event:   "watching",
 		Message: "Watching for changes",
+	})
+}
+
+func emitReloadDisabled(out *output.Formatter) error {
+	if out.Format() == "text" {
+		if err := out.Textln("Auto reload disabled."); err != nil {
+			return err
+		}
+		return out.Textln("Press Ctrl+C to stop")
+	}
+
+	return out.Event(output.Event{
+		Event:   "reload_disabled",
+		Message: "Auto reload disabled",
+		Data: map[string]any{
+			"auto_reload": false,
+		},
 	})
 }
 

@@ -176,26 +176,38 @@ plumego dev [flags]
 ```
 
 **Flags:**
+- `--dir <path>` - Project directory (default: .)
 - `--addr <address>` - Listen address (default: :8080)
+- `--dashboard-addr <address>` - Dashboard listen address (default: :9999)
 - `--watch <patterns>` - Watch patterns (default: **/*.go)
 - `--exclude <patterns>` - Exclude patterns
-- `--no-reload` - Disable hot reload
-- `--build-cmd <cmd>` - Custom build command
+- `--debounce <duration>` - Debounce duration for file changes (default: 500ms)
+- `--no-reload` - Disable hot reload (no file watcher)
+- `--build-cmd <cmd>` - Custom build command (must output `.dev-server` unless `--run-cmd` is set)
 - `--run-cmd <cmd>` - Custom run command
 
 **Output (JSON streaming):**
 ```json
-{"event": "starting", "addr": ":8080", "pid": 12345}
-{"event": "ready", "time_ms": 234}
-{"event": "file_changed", "path": "handler.go"}
-{"event": "reloading", "reason": "file_changed"}
-{"event": "stopped", "code": 0}
+{"event": "starting", "message": "Plumego Dev Server starting", "data": {"project": "/abs/path", "app_addr": ":8080", "dashboard_addr": ":9999"}}
+{"event": "dashboard_started", "message": "Dashboard started", "data": {"url": "http://localhost:9999"}}
+{"event": "ready", "message": "Application ready", "data": {"url": "http://localhost:8080"}}
+{"event": "file_changed", "message": "File changed", "data": {"path": "handler.go"}}
+{"event": "reloading", "message": "Reloading application", "data": {"reason": "file_changed", "path": "handler.go"}}
+{"event": "reload_complete", "message": "Reload complete"}
+{"event": "stopped", "message": "Shutting down", "data": {"code": 0}}
 ```
 
+Additional events may be emitted for build and app lifecycle/logs:
+`build.start`, `build.success`, `build.fail`, `app.start`, `app.stop`, `app.restart`, `app.log`, `app.error`.
+
+Event field conventions (for CI parsing):
+- `build.*`: `data.success` (bool), `data.duration_ms` (int, when available), `data.error` (string), `data.output` (string)
+- `app.*`: `data.state` (string), `data.pid` (int, when available), `data.error` (string)
+- `app.log` / `app.error`: `level` (info|warn|error|debug), `message` (string), `data.source` (stdout|stderr)
+
 **Exit Codes:**
-- `0` - Clean exit
+- `0` - Clean exit (including Ctrl+C)
 - `1` - Build error
-- `130` - SIGINT (Ctrl+C)
 
 **Examples:**
 ```bash
@@ -207,6 +219,9 @@ plumego dev --addr :3000 --watch "internal/**/*.go,pkg/**/*.go"
 
 # Without hot reload
 plumego dev --no-reload
+
+# Custom build and run commands
+plumego dev --build-cmd "go build -o .dev-server ./cmd/api" --run-cmd "./.dev-server"
 ```
 
 ---

@@ -31,6 +31,11 @@ func NewBuilder(dir string, ps *pubsub.InProcPubSub) *Builder {
 	}
 }
 
+// HasCustomBuild reports whether a custom build command is configured.
+func (b *Builder) HasCustomBuild() bool {
+	return b.buildCmd != ""
+}
+
 // SetCustomBuild sets a custom build command
 func (b *Builder) SetCustomBuild(cmd string, args []string) {
 	b.buildCmd = cmd
@@ -127,6 +132,10 @@ func (b *Builder) Verify() error {
 	goModPath := filepath.Join(b.dir, "go.mod")
 	if _, err := os.Stat(goModPath); os.IsNotExist(err) {
 		return fmt.Errorf("go.mod not found in %s", b.dir)
+	}
+
+	if b.buildCmd != "" {
+		return nil
 	}
 
 	// Check if main package exists

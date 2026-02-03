@@ -3,6 +3,7 @@ package commands
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -45,7 +46,8 @@ func (c *RoutesCmd) Flags() []Flag {
 }
 
 func (c *RoutesCmd) Run(ctx *Context, args []string) error {
-	fs := flag.NewFlagSet("routes", flag.ExitOnError)
+	fs := flag.NewFlagSet("routes", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
 	dir := fs.String("dir", ".", "Project directory")
 	method := fs.String("method", "", "Filter by HTTP method")
@@ -55,7 +57,7 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	sortBy := fs.String("sort", "path", "Sort by: path, method, group")
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
 	// Get absolute directory path

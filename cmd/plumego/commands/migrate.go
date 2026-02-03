@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"io"
 	"path/filepath"
 	"sort"
 	"time"
@@ -49,7 +50,8 @@ func (c *MigrateCmd) Flags() []Flag {
 }
 
 func (c *MigrateCmd) Run(ctx *Context, args []string) error {
-	fs := flag.NewFlagSet("migrate", flag.ExitOnError)
+	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
 	dir := fs.String("dir", "./migrations", "Migrations directory")
 	dbURL := fs.String("db-url", "", "Database connection string")
@@ -57,7 +59,7 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	steps := fs.Int("steps", 0, "Number of migrations to apply/rollback (0 = all)")
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
 	out := ctx.Out

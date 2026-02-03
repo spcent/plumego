@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -204,6 +205,12 @@ func (d *Dashboard) BuildAndRun(ctx context.Context) error {
 	// Build
 	if err := d.builder.Build(); err != nil {
 		return fmt.Errorf("build failed: %w", err)
+	}
+
+	if d.builder.HasCustomBuild() && !d.runner.HasCustomCommand() {
+		if _, err := os.Stat(d.builder.OutputPath()); err != nil {
+			return fmt.Errorf("custom build command must output %s or set --run-cmd", d.builder.OutputPath())
+		}
 	}
 
 	// Start the application
@@ -414,11 +421,11 @@ func (d *Dashboard) GetPubSub() *pubsub.InProcPubSub {
 }
 
 // GetBuilder returns the Builder instance
-func (d *Dashboard) GetBuilder() *Builder {
+func (d *Dashboard) GetBuilder() BuilderAPI {
 	return d.builder
 }
 
 // GetRunner returns the AppRunner instance
-func (d *Dashboard) GetRunner() *AppRunner {
+func (d *Dashboard) GetRunner() RunnerAPI {
 	return d.runner
 }

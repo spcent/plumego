@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -24,8 +25,32 @@ type funcRunner struct {
 func (f funcRunner) Start(ctx context.Context) error { return f.start(ctx) }
 func (f funcRunner) Stop(ctx context.Context) error  { return f.stop(ctx) }
 
+func testListenAddr() string {
+	if addr := strings.TrimSpace(os.Getenv("PLUMEGO_TEST_ADDR")); addr != "" {
+		return addr
+	}
+	return "127.0.0.1:0"
+}
+
+func requireNetwork(t *testing.T) string {
+	t.Helper()
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("PLUMEGO_TEST_SKIP_NETWORK")), "1") {
+		t.Skip("network tests disabled via PLUMEGO_TEST_SKIP_NETWORK")
+	}
+
+	addr := testListenAddr()
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Skipf("network listen not permitted: %v", err)
+	}
+	_ = ln.Close()
+	return addr
+}
+
 // TestBoot tests the complete boot process
 func TestBoot(t *testing.T) {
+	addr := requireNetwork(t)
+
 	// Create a temporary .env file for testing
 	tmpFile, err := os.CreateTemp("", "boot_test_env")
 	if err != nil {
@@ -40,7 +65,7 @@ func TestBoot(t *testing.T) {
 
 	app := New(
 		WithEnvPath(tmpFile.Name()),
-		WithAddr(":0"), // Use random port
+		WithAddr(addr), // Use random port
 	)
 
 	// Add a test route
@@ -90,7 +115,8 @@ func TestBoot(t *testing.T) {
 }
 
 func TestBootStartsRunnersBeforeServer(t *testing.T) {
-	app := New(WithAddr(":0"))
+	addr := requireNetwork(t)
+	app := New(WithAddr(addr))
 
 	startCalled := make(chan struct{})
 	allowReturn := make(chan struct{})
@@ -397,8 +423,9 @@ func TestStartServer(t *testing.T) {
 
 	// Test regular HTTP
 	t.Run("HTTP success", func(t *testing.T) {
+		addr := requireNetwork(t)
 		app := New()
-		app.config.Addr = ":0"
+		app.config.Addr = addr
 		app.config.ShutdownTimeout = 1 * time.Second
 
 		app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -700,6 +727,8 @@ func TestConnectionTracker(t *testing.T) {
 
 // TestAppBootWithComponents tests boot process with components
 func TestAppBootWithComponents(t *testing.T) {
+	addr := requireNetwork(t)
+
 	// Create a test component that registers routes and middleware
 	testComp := &stubComponent{
 		path:           "/boot-component",
@@ -708,7 +737,7 @@ func TestAppBootWithComponents(t *testing.T) {
 
 	app := New(
 		WithComponent(testComp),
-		WithAddr(":0"),
+		WithAddr(addr),
 	)
 
 	// Add another route
@@ -781,10 +810,11 @@ func (l *testLifecycleLogger) Error(msg string, fields log.Fields) {}
 func (l *testLifecycleLogger) Debug(msg string, fields log.Fields) {}
 
 func TestAppBootWithLoggerLifecycle(t *testing.T) {
+	addr := requireNetwork(t)
 	logger := &testLifecycleLogger{}
 	app := New(
 		WithLogger(logger),
-		WithAddr(":0"),
+		WithAddr(addr),
 	)
 
 	// Don't actually start server, just test Boot up to setup

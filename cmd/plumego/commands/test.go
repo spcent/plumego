@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,7 +53,8 @@ func (c *TestCmd) Flags() []Flag {
 }
 
 func (c *TestCmd) Run(ctx *Context, args []string) error {
-	fs := flag.NewFlagSet("test", flag.ExitOnError)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
 	dir := fs.String("dir", ".", "Project directory")
 	race := fs.Bool("race", false, "Enable race detector")
@@ -64,7 +66,7 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 	short := fs.Bool("short", false, "Short tests")
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
 	// Get absolute directory

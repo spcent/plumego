@@ -18,11 +18,12 @@ import (
 
 // AppRunner manages the user application lifecycle
 type AppRunner struct {
-	dir        string
-	binaryPath string
-	cmd        string
-	args       []string
-	env        []string
+	dir         string
+	binaryPath  string
+	cmd         string
+	args        []string
+	env         []string
+	printOutput bool
 
 	process *os.Process
 	cancel  context.CancelFunc
@@ -35,17 +36,28 @@ type AppRunner struct {
 // NewAppRunner creates a new application runner
 func NewAppRunner(dir string, ps *pubsub.InProcPubSub) *AppRunner {
 	return &AppRunner{
-		dir:        dir,
-		binaryPath: filepath.Join(dir, ".dev-server"),
-		pubsub:     ps,
-		env:        os.Environ(),
+		dir:         dir,
+		binaryPath:  filepath.Join(dir, ".dev-server"),
+		pubsub:      ps,
+		env:         os.Environ(),
+		printOutput: true,
 	}
+}
+
+// HasCustomCommand reports whether a custom run command is configured.
+func (r *AppRunner) HasCustomCommand() bool {
+	return r.cmd != ""
 }
 
 // SetCustomCommand sets a custom run command
 func (r *AppRunner) SetCustomCommand(cmd string, args []string) {
 	r.cmd = cmd
 	r.args = args
+}
+
+// SetOutputPassthrough controls whether app output is printed to console.
+func (r *AppRunner) SetOutputPassthrough(enabled bool) {
+	r.printOutput = enabled
 }
 
 // SetEnv adds environment variables
@@ -255,11 +267,13 @@ func (r *AppRunner) streamOutput(ctx context.Context, reader io.Reader, source s
 				},
 			})
 
-			// Also print to console for backward compatibility
-			if source == "stderr" {
-				fmt.Fprintln(os.Stderr, line)
-			} else {
-				fmt.Println(line)
+			// Also print to console when enabled.
+			if r.printOutput {
+				if source == "stderr" {
+					fmt.Fprintln(os.Stderr, line)
+				} else {
+					fmt.Println(line)
+				}
 			}
 		}
 	}

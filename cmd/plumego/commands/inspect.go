@@ -50,14 +50,15 @@ func (c *InspectCmd) Flags() []Flag {
 }
 
 func (c *InspectCmd) Run(ctx *Context, args []string) error {
-	fs := flag.NewFlagSet("inspect", flag.ExitOnError)
+	fs := flag.NewFlagSet("inspect", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
 	url := fs.String("url", "http://localhost:8080", "Application URL")
 	auth := fs.String("auth", "", "Authentication token")
 	timeoutStr := fs.String("timeout", "10s", "Request timeout")
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
 	// Parse timeout

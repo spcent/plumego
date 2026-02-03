@@ -3,6 +3,7 @@ package commands
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,7 +47,8 @@ func (c *BuildCmd) Flags() []Flag {
 }
 
 func (c *BuildCmd) Run(ctx *Context, args []string) error {
-	fs := flag.NewFlagSet("build", flag.ExitOnError)
+	fs := flag.NewFlagSet("build", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
 	dir := fs.String("dir", ".", "Project directory")
 	outputPath := fs.String("output", "./bin/app", "Output binary path")
@@ -56,7 +58,7 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	trimpath := fs.Bool("trimpath", true, "Remove file system paths")
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
 	// Get absolute directory

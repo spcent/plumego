@@ -2,6 +2,8 @@ package commands
 
 import (
 	"flag"
+	"fmt"
+	"io"
 	"runtime"
 )
 
@@ -35,9 +37,10 @@ func (c *VersionCmd) Flags() []Flag {
 }
 
 func (c *VersionCmd) Run(ctx *Context, args []string) error {
-	fs := flag.NewFlagSet("version", flag.ExitOnError)
+	fs := flag.NewFlagSet("version", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 	if err := fs.Parse(args); err != nil {
-		return err
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
 	versionInfo := map[string]any{
