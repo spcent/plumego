@@ -2,7 +2,7 @@
 
 ## Current State
 
-The `tenant/` package provides multi-tenancy infrastructure but is **not yet fully integrated** into the plumego core API.
+The `tenant/` package provides multi-tenancy infrastructure and is integrated via core options, but remains **experimental**.
 
 ### ✅ Implemented
 
@@ -33,27 +33,32 @@ The `tenant/` package provides multi-tenancy infrastructure but is **not yet ful
    - `TenantConfigComponent` - Pluggable component
    - Health check support
 
+7. **Core Options** (`core/options.go`)
+   - `WithTenantConfigManager`
+   - `WithTenantMiddleware`
+   - Tests in `core/tenant_options_test.go`
+
+8. **HTTP Middleware** (`middleware/tenant_*.go`)
+   - `TenantResolver`, `TenantPolicy`, `TenantQuota`
+   - Basic middleware tests in `middleware/tenant_middleware_test.go`
+
+9. **Database Integration** (`store/db/*`)
+   - `NewDBTenantConfigManager`, `NewTenantDB`
+   - SQL query isolation helpers
+
+10. **Package Tests** (`tenant/*_test.go`)
+   - Config, quota, policy, context coverage
+
 ### ❌ Missing
 
-1. **No `WithTenant*` options in `core/options.go`**
-   - Cannot easily configure tenant support at app level
-   - Users must manually create and register `TenantConfigComponent`
+1. **No dedicated tenant guide**
+   - Only a README section; no package-level guide or cookbook
 
-2. **No tests** - 0% coverage
-   - No `*_test.go` files
-   - Untested code
+2. **Limited end-to-end integration coverage**
+   - Core + middleware + DB wiring lacks full E2E tests
 
-3. **No middleware**
-   - No HTTP middleware to extract tenant ID from headers/JWT
-   - No automatic quota enforcement middleware
-
-4. **No examples**
-   - No example showing how to use multi-tenancy
-   - No documentation on integration patterns
-
-5. **Not exported in `plumego.go`**
-   - Types not re-exported at top level
-   - Users must import `github.com/spcent/plumego/tenant` directly
+3. **No full example application**
+   - Quick snippets exist, but no runnable multi-tenant sample app
 
 ## Recommendation for v1.0
 
@@ -72,9 +77,9 @@ The `tenant/` package provides multi-tenancy infrastructure but is **not yet ful
 // in future versions. Use at your own risk for production systems.
 //
 // Missing features:
-//   - HTTP middleware for tenant extraction
-//   - Automatic quota enforcement
-//   - Comprehensive test coverage
+//   - Dedicated tenant guide and cookbook
+//   - End-to-end integration tests
+//   - Production-ready example application
 //
 // For stable multi-tenancy, consider implementing your own solution
 // using this package as a reference.
@@ -114,11 +119,10 @@ package tenant
 ### Option C: Complete for v1.0 🟢
 
 **Action:**
-1. Add tests (QuotaEnforcer, PolicyConfig, etc.)
-2. Create middleware for tenant extraction
-3. Add `core.WithTenant()` option
-4. Write examples and documentation
-5. Export types in `plumego.go`
+1. Expand integration tests (core + middleware + DB)
+2. Write a dedicated tenant guide and cookbook
+3. Provide a runnable multi-tenant example app
+4. Evaluate moving from experimental to stable
 
 **Estimated effort:** 2-3 days
 
@@ -154,24 +158,21 @@ Add to `/home/user/plumego/tenant/config.go`:
 //
 // The tenant package enables multi-tenancy support with per-tenant
 // configuration, quota enforcement, and policy management. However,
-// it is not yet feature-complete and lacks production-ready middleware
-// integration.
+// it is not yet feature-complete for production use.
 //
 // Current limitations:
-//   - No HTTP middleware for automatic tenant extraction
-//   - No integration with core.App options
-//   - Limited test coverage
-//   - No comprehensive examples
+//   - Experimental API surface (may change in minor versions)
+//   - Limited integration tests across storage backends
+//   - No dedicated tenant guide beyond the main README
 //
 // For production multi-tenancy, we recommend:
-//   - Implementing custom tenant extraction middleware
-//   - Using this package's types as a foundation
-//   - Thoroughly testing your integration
+//   - Wiring tenant middleware explicitly
+//   - Validating isolation and quota behavior in your environment
+//   - Treating the API as experimental until stabilized
 //
 // Planned for v1.1:
-//   - Full middleware integration
-//   - Complete test suite
-//   - Production-ready examples
+//   - Integration test suite across storage backends
+//   - Dedicated tenant guide and example app
 //   - Stability guarantees
 package tenant
 ```
@@ -196,10 +197,9 @@ This feature is under active development. See `tenant/README.md` for details.
 
 ## Future Roadmap (v1.1+)
 
-- [ ] HTTP middleware: `tenant.ExtractFromHeader()`, `tenant.ExtractFromJWT()`
-- [ ] Quota enforcement middleware: `tenant.EnforceQuota()`
-- [ ] Core integration: `core.WithTenant(manager)`
-- [ ] Complete test suite (80%+ coverage)
+- [ ] Dedicated tenant guide and cookbook
+- [ ] End-to-end integration tests (core + middleware + DB, target 80%+ coverage)
+- [ ] Middleware usage guide and recommended chain
 - [ ] Example: Multi-tenant SaaS application
 - [ ] Database sharding integration
 - [ ] Tenant isolation verification tools
@@ -228,28 +228,24 @@ For v1.1: **Complete and stabilize** - See implementation plan below.
 **What's Already Done** (~60%):
 - ✅ Core types (Config, Quota, Policy)
 - ✅ In-memory implementations
-- ✅ All middleware (Resolver, Quota, Policy)
-- ✅ Context integration
-- ✅ Hooks system
-- ✅ Basic tests
+- ✅ Core options (`WithTenantConfigManager`, `WithTenantMiddleware`)
+- ✅ Middleware (Resolver, Quota, Policy)
+- ✅ DB-backed config manager + TenantDB isolation helpers
+- ✅ Context integration + hooks
+- ✅ Basic unit tests
 
 **What's Missing** (~40%):
-- ❌ Comprehensive test coverage (80%+ target)
-- ❌ Core integration options (`WithTenant*()`)
-- ❌ Public exports in `plumego.go`
-- ❌ Database-backed config manager
-- ❌ Database isolation helpers
-- ❌ Example application
-- ❌ Complete documentation
+- ❌ End-to-end integration tests (core + middleware + DB)
+- ❌ Dedicated tenant guide and cookbook
+- ❌ Runnable example application
+- ❌ Stability guarantees / graduation criteria
 
 ### Implementation Phases
 
-1. **Phase 1**: Testing & Stability (6h) - CRITICAL
-2. **Phase 2**: Core Integration (2.5h) - CRITICAL
-3. **Phase 3**: Persistent Storage (4h) - HIGH
-4. **Phase 4**: Database Isolation (4h) - HIGH
-5. **Phase 5**: Example Application (3h) - HIGH
-6. **Phase 6**: Documentation (2h) - HIGH
-7. **Phase 7**: Advanced Features (7h) - MEDIUM
+1. **Phase 1**: Integration tests & coverage
+2. **Phase 2**: Documentation (guide + cookbook)
+3. **Phase 3**: Example application
+4. **Phase 4**: Advanced features (sharding, isolation tooling)
+5. **Phase 5**: Stability review and graduation criteria
 
-**Next Action**: Begin Phase 1 - Tenant package unit tests
+**Next Action**: Define integration test matrix (core + middleware + DB)

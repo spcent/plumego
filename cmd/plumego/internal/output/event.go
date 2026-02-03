@@ -101,13 +101,17 @@ func (f *Formatter) printEventText(e Event, level string) error {
 	prefix := ""
 	switch level {
 	case "error":
-		prefix = "ERROR: "
+		prefix = f.colorize("error", "ERROR: ")
 	case "warn":
-		prefix = "WARN: "
+		prefix = f.colorize("warn", "WARN: ")
 	case "debug":
-		prefix = "DEBUG: "
+		prefix = f.colorize("debug", "DEBUG: ")
 	}
 
-	_, err := fmt.Fprintln(f.out, prefix+message)
+	writer := f.out
+	if level == "error" || level == "warn" || level == "debug" {
+		writer = f.err
+	}
+	_, err := fmt.Fprintln(writer, prefix+message)
 	return err
 }

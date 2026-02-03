@@ -7,15 +7,14 @@
 // it is not yet feature-complete for production use.
 //
 // Current limitations:
-//   - No HTTP middleware for automatic tenant extraction
-//   - No integration with core.App configuration options
-//   - Limited test coverage (not production-tested)
-//   - No comprehensive examples or documentation
+//   - Experimental API surface (may change in minor versions)
+//   - Limited integration tests across storage backends
+//   - No dedicated tenant guide beyond the main README
 //
 // For production multi-tenancy, we recommend:
-//   - Implementing custom tenant extraction middleware
-//   - Using this package's types as a reference foundation
-//   - Thoroughly testing your tenant isolation
+//   - Wiring tenant middleware explicitly (see middleware.TenantResolver/Policy/Quota)
+//   - Validating isolation and quota behavior in your environment
+//   - Treating the API as experimental until stabilized
 //
 // Planned for future versions:
 //   - Complete middleware integration

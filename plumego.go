@@ -3,6 +3,7 @@ package plumego
 import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
+	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/tenant"
 )
@@ -22,6 +23,15 @@ type ContextHandlerFunc = contract.CtxHandlerFunc
 
 // Component hooks into routing, middleware, and lifecycle events.
 type Component = core.Component
+
+// Runner defines a background task with a lifecycle.
+type Runner = core.Runner
+
+// ShutdownHook is invoked during application shutdown.
+type ShutdownHook = core.ShutdownHook
+
+// CORSOptions configures the CORS middleware.
+type CORSOptions = middleware.CORSOptions
 
 // TLSConfig re-exports the TLS settings for App configuration.
 type TLSConfig = core.TLSConfig
@@ -61,6 +71,12 @@ var (
 	WithServerTimeouts         = core.WithServerTimeouts
 	WithMaxHeaderBytes         = core.WithMaxHeaderBytes
 	WithMaxBodyBytes           = core.WithMaxBodyBytes
+	WithRecovery               = core.WithRecovery
+	WithLogging                = core.WithLogging
+	WithRequestID              = core.WithRequestID
+	WithRecommendedMiddleware  = core.WithRecommendedMiddleware
+	WithCORS                   = core.WithCORS
+	WithCORSOptions            = core.WithCORSOptions
 	WithSecurityHeadersEnabled = core.WithSecurityHeadersEnabled
 	WithSecurityHeadersPolicy  = core.WithSecurityHeadersPolicy
 	WithAbuseGuardEnabled      = core.WithAbuseGuardEnabled
@@ -77,6 +93,11 @@ var (
 	WithLogger                 = core.WithLogger
 	WithComponent              = core.WithComponent
 	WithComponents             = core.WithComponents
+	WithMethodNotAllowed       = core.WithMethodNotAllowed
+	WithShutdownHook           = core.WithShutdownHook
+	WithShutdownHooks          = core.WithShutdownHooks
+	WithRunner                 = core.WithRunner
+	WithRunners                = core.WithRunners
 	WithMetricsCollector       = core.WithMetricsCollector
 	WithTracer                 = core.WithTracer
 )

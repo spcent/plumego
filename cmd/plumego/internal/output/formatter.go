@@ -128,20 +128,20 @@ func (f *Formatter) Error(message string, code int, optionalData ...any) error {
 
 // Verbose outputs verbose logging
 func (f *Formatter) Verbose(message string) {
-	if f.verbose {
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		fmt.Fprintf(f.err, "[VERBOSE] %s\n", message)
-	}
+	_ = f.Event(Event{
+		Event:   "cli.verbose",
+		Level:   "debug",
+		Message: message,
+	})
 }
 
 // Info outputs informational message
 func (f *Formatter) Info(message string) {
-	if !f.quiet {
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		fmt.Fprintf(f.err, "[INFO] %s\n", message)
-	}
+	_ = f.Event(Event{
+		Event:   "cli.info",
+		Level:   "info",
+		Message: message,
+	})
 }
 
 func (f *Formatter) printJSON(data any) error {
@@ -172,4 +172,26 @@ func (f *Formatter) printText(data any) error {
 	// Simple text output
 	fmt.Fprintln(f.out, data)
 	return nil
+}
+
+func (f *Formatter) colorize(level, text string) string {
+	if !f.color || f.format != "text" || text == "" {
+		return text
+	}
+	const (
+		reset  = "\x1b[0m"
+		red    = "\x1b[31m"
+		yellow = "\x1b[33m"
+		blue   = "\x1b[34m"
+	)
+	switch level {
+	case "error":
+		return red + text + reset
+	case "warn":
+		return yellow + text + reset
+	case "debug":
+		return blue + text + reset
+	default:
+		return text
+	}
 }

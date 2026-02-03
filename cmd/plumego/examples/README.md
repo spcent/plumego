@@ -223,8 +223,8 @@ done
 # Override defaults
 APP_ADDR=:3000 plumego dev
 
-# Custom config file
-plumego --config .plumego.prod.yaml build
+# Custom env file for config inspection
+plumego --env-file .env.prod config show
 ```
 
 ## Contributing

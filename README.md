@@ -6,6 +6,8 @@
 
 Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, WebSocket utilities, webhook pipelines, and static frontend hosting. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
 
+The `core` package is the stable, primary entrypoint. The top-level `plumego` package provides convenience re-exports for common types and options.
+
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
 - **Middleware Chain**: Logging, recovery, gzip, CORS, timeout (buffers up to 10 MiB by default), rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.
@@ -92,14 +94,14 @@ func main() {
 ## Configuration Basics
 - Environment variables can be loaded from a `.env` file (default path `.env`; override via `core.WithEnvPath`).
 - Common variables: `AUTH_TOKEN` (SimpleAuth middleware), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
-- The app defaults to a 10 MiB request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5-second graceful shutdown window. Override via `core.With...` options.
+- The app defaults to a 10485760 byte (10 MiB) request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5000ms (5s) graceful shutdown window. Override via `core.With...` options.
 - Security guardrails (security headers + abuse guard) are enabled by default. Abuse guard defaults to 100 req/s with a burst of 200 per client and tracks up to 100k active keys. Disable or tune via `core.WithSecurityHeadersEnabled`, `core.WithSecurityHeadersPolicy`, `core.WithAbuseGuardEnabled`, and `core.WithAbuseGuardConfig`.
-- Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, reload), friendly JSON error output, and `.env` hot reload.
+- Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, reload), friendly JSON error output, and `.env` hot reload. These endpoints are intended for local development or protected environments; disable or gate them in production.
 
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, etc., or the context-aware variants (`GetCtx`) that expose a unified request context wrapper. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
 - **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (security headers, abuse guard, body size limits, concurrency limits) are auto-injected during setup. Recovery/logging/CORS helpers can be enabled via `core.WithRecovery`, `core.WithLogging`, and `core.WithCORS`. For a production-safe baseline, `core.WithRecommendedMiddleware()` enables RequestID + Logging + Recovery in the recommended order.
-- **Multi-Tenancy**: Production-ready tenant isolation with quota enforcement, policy controls, and automatic database filtering. See [Multi-Tenancy](#multi-tenancy) section for details.
+- **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
 - **WebSocket Hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint, plus an optional broadcast endpoint (protected by a shared secret). Customize worker count and queue size via `WebSocketConfig`.
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
@@ -107,7 +109,7 @@ func main() {
 
 ## Multi-Tenancy
 
-Plumego provides production-ready multi-tenancy primitives for SaaS applications with tenant isolation, quota enforcement, and policy controls.
+Plumego provides experimental multi-tenancy primitives for SaaS applications with tenant isolation, quota enforcement, and policy controls.
 
 ### Features
 
@@ -293,22 +295,22 @@ if err := app.ConfigureObservability(obs); err != nil {
 When tracing is enabled, logs include `trace_id` and `span_id`, and responses include `X-Span-ID` for correlation.
 
 ## Configuration Reference
-Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Config keys are normalized to lower_snake_case for lookups, so CamelCase and UPPER_SNAKE resolve to the same value. Use the table below for predictable deployments.
+Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Config keys are normalized to lower_snake_case for lookups, so CamelCase and UPPER_SNAKE resolve to the same value. Durations in environment variables use milliseconds (the `_MS` suffix). Use the table below for predictable deployments.
 
 | AppConfig Field          | Default        | Environment Variable           | Flag Example                     |
 |--------------------------|----------------|--------------------------------|----------------------------------|
 | Addr                     | :8080          | APP_ADDR                      | --addr :8080                    |
 | EnvFile                  | .env           | APP_ENV_FILE                  | --env-file .env                 |
 | Debug                    | false          | APP_DEBUG                     | --debug                         |
-| ShutdownTimeout          | 5s             | APP_SHUTDOWN_TIMEOUT_MS       | --shutdown-timeout 5s           |
-| ReadTimeout              | 30s            | APP_READ_TIMEOUT_MS           | --read-timeout 30s              |
-| ReadHeaderTimeout        | 5s             | APP_READ_HEADER_TIMEOUT_MS    | --read-header-timeout 5s        |
-| WriteTimeout             | 30s            | APP_WRITE_TIMEOUT_MS          | --write-timeout 30s             |
-| IdleTimeout              | 60s            | APP_IDLE_TIMEOUT_MS           | --idle-timeout 60s              |
-| MaxHeaderBytes           | 1 MiB          | APP_MAX_HEADER_BYTES          | --max-header-bytes 1048576      |
+| ShutdownTimeout          | 5000ms         | APP_SHUTDOWN_TIMEOUT_MS       | --shutdown-timeout 5000ms       |
+| ReadTimeout              | 30000ms        | APP_READ_TIMEOUT_MS           | --read-timeout 30000ms          |
+| ReadHeaderTimeout        | 5000ms         | APP_READ_HEADER_TIMEOUT_MS    | --read-header-timeout 5000ms    |
+| WriteTimeout             | 30000ms        | APP_WRITE_TIMEOUT_MS          | --write-timeout 30000ms         |
+| IdleTimeout              | 60000ms        | APP_IDLE_TIMEOUT_MS           | --idle-timeout 60000ms          |
+| MaxHeaderBytes           | 1048576        | APP_MAX_HEADER_BYTES          | --max-header-bytes 1048576      |
 | EnableHTTP2              | true           | APP_ENABLE_HTTP2              | --http2=false                   |
 | DrainInterval            | 500ms          | APP_DRAIN_INTERVAL_MS         | --drain-interval 500ms          |
-| MaxBodyBytes             | 10 MiB         | APP_MAX_BODY_BYTES            | --max-body-bytes 10485760       |
+| MaxBodyBytes             | 10485760       | APP_MAX_BODY_BYTES            | --max-body-bytes 10485760       |
 | MaxConcurrency           | 256            | APP_MAX_CONCURRENCY           | --max-concurrency 256           |
 | QueueDepth               | 512            | APP_QUEUE_DEPTH               | --queue-depth 512               |
 | QueueTimeout             | 250ms          | APP_QUEUE_TIMEOUT_MS          | --queue-timeout 250ms           |
@@ -323,8 +325,8 @@ Use `config.LoadEnv` to load environment variables, or bind command-line flags; 
 | WebhookOut.DefaultPageLimit| 0 (no default) | WEBHOOK_DEFAULT_PAGE_LIMIT    | --webhook-page-limit 50         |
 | WebhookIn.GitHubSecret   | env or config  | GITHUB_WEBHOOK_SECRET         | --github-secret value           |
 | WebhookIn.StripeSecret   | env or config  | STRIPE_WEBHOOK_SECRET         | --stripe-secret value           |
-| WebhookIn.MaxBodyBytes   | 1 MiB          | WEBHOOK_MAX_BODY_BYTES        | --webhook-max-body 1048576      |
-| WebhookIn.StripeTolerance| 5m             | WEBHOOK_STRIPE_TOLERANCE_MS   | --stripe-tolerance 5m           |
+| WebhookIn.MaxBodyBytes   | 1048576        | WEBHOOK_MAX_BODY_BYTES        | --webhook-max-body 1048576      |
+| WebhookIn.StripeTolerance| 300000ms       | WEBHOOK_STRIPE_TOLERANCE_MS   | --stripe-tolerance 300000ms     |
 | WebhookIn.TopicPrefixGitHub| in.github.     | WEBHOOK_TOPIC_PREFIX_GITHUB   | --github-topic-prefix in.github.|
 | WebhookIn.TopicPrefixStripe | in.stripe.     | WEBHOOK_TOPIC_PREFIX_STRIPE   | --stripe-topic-prefix in.stripe.|
 | WebSocket.Secret         | env or config  | WS_SECRET                     | --ws-secret value               |
@@ -346,6 +348,11 @@ Use `config.Get*` helpers (see `config/env.go`) or Go's `flag` package to transf
 The `plumego` CLI includes a powerful development server built with the plumego framework itself (dogfooding). It provides hot reload, real-time monitoring, and a web-based dashboard for enhanced development experience.
 
 The dashboard is **enabled by default** - simply run `plumego dev` to get started.
+
+**Positioning & Production Guidance**
+- `core.WithDebug` exposes application devtools under `/_debug`. These are app endpoints and should be disabled or protected in production.
+- `plumego dev` dashboard is a local developer tool that runs a separate dashboard server; it is not intended to be exposed publicly in production environments.
+- The dashboard may query the app’s `/_debug` endpoints for routes/config when available, so keep debug endpoints gated outside local/dev usage.
 
 ### Quick Start
 

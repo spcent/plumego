@@ -5,7 +5,7 @@
 The plumego CLI is now **100% complete** with all planned features implemented, documented, and tested. The CLI is production-ready and optimized for code agents, CI/CD pipelines, and developer workflows.
 
 **Status**: COMPLETE  
-**Commands Implemented**: 10/10 (100%)  
+**Commands Implemented**: 11/11 (100%)  
 **Documentation**: Comprehensive  
 **Testing**: All commands validated  
 **Build System**: Makefile with version injection  
@@ -15,7 +15,7 @@ The plumego CLI is now **100% complete** with all planned features implemented, 
 
 ## Implemented Commands
 
-### Core Commands (10/10)
+### Core Commands (11/11)
 
 | # | Command | Status | Description | Lines of Code |
 |---|---------|--------|-------------|---------------|
@@ -24,13 +24,14 @@ The plumego CLI is now **100% complete** with all planned features implemented, 
 | 3 | `check` | Complete | Health and security validation | ~250 |
 | 4 | `config` | Complete | Configuration management | ~300 |
 | 5 | `routes` | Complete | Route analysis via AST | ~250 |
-| 6 | `build` | Complete | Build with optimizations | ~150 |
-| 7 | `test` | Complete | Enhanced test runner | ~250 |
-| 8 | `inspect` | Complete | Runtime inspection | ~300 |
-| 9 | `dev` | Complete | Dev server with hot reload | ~300 |
-| 10 | `version` | Complete | Version information | ~50 |
+| 6 | `migrate` | Complete | Database migrations | ~300 |
+| 7 | `build` | Complete | Build with optimizations | ~150 |
+| 8 | `test` | Complete | Enhanced test runner | ~250 |
+| 9 | `inspect` | Complete | Runtime inspection | ~300 |
+| 10 | `dev` | Complete | Dev server with hot reload | ~300 |
+| 11 | `version` | Complete | Version information | ~50 |
 
-**Total**: ~2,750 lines of command code
+**Total**: ~2,900 lines of command code
 
 ---
 
@@ -54,6 +55,7 @@ cmd/plumego/
 │   ├── check.go                    # Health checks
 │   ├── config.go                   # Config management
 │   ├── routes.go                   # Route analysis
+│   ├── migrate.go                  # Database migrations
 │   ├── build.go                    # Build utilities
 │   ├── test.go                     # Test runner
 │   ├── inspect.go                  # Runtime inspection
@@ -74,8 +76,12 @@ cmd/plumego/
 │   │   └── configmgr.go            # Config loading/validation
 │   ├── routeanalyzer/              # Route extraction
 │   │   └── analyzer.go             # AST-based analysis
-│   └── watcher/                    # File watching
-│       └── watcher.go              # Hot reload support
+│   ├── devserver/                  # Dev dashboard
+│   │   └── dashboard.go            # Dashboard server
+│   ├── watcher/                    # File watching
+│   │   └── watcher.go              # Hot reload support
+│   └── migrate/                    # Database migrations
+│       └── migrate.go              # Migration runner
 │
 └── examples/                       # Real-world scripts
     ├── README.md                   # Examples documentation
@@ -87,10 +93,10 @@ cmd/plumego/
 ### Code Statistics
 
 ```
-Total Files:       20
+Total Files:       20+
 Total Lines:       ~5,000
-Commands:          10
-Internal Packages: 7
+Commands:          11
+Internal Packages: 9
 Example Scripts:   3
 Documentation:     7 files
 ```

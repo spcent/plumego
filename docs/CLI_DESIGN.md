@@ -12,7 +12,7 @@ A command-line interface for plumego that prioritizes machine readability, autom
 4. **Idempotent**: Safe to run multiple times
 5. **Composable**: Commands do one thing well
 6. **Discoverable**: Self-documenting with `--help`
-7. **Configuration Layering**: Flags > ENV > Config File > Defaults
+7. **Configuration Transparency**: Flags are explicit; `.env` is used by `plumego config` for app settings (no global config file support yet)
 
 ---
 
@@ -37,9 +37,12 @@ plumego [global-flags] <command> [command-flags] [args]
 | `--format` | `-f` | string | `json` | Output format: json, yaml, text |
 | `--quiet` | `-q` | bool | false | Suppress non-essential output |
 | `--verbose` | `-v` | bool | false | Detailed logging |
-| `--no-color` | | bool | false | Disable color output |
-| `--config` | `-c` | string | `.plumego.yaml` | Config file path |
-| `--env-file` | | string | `.env` | Environment file path |
+| `--no-color` | | bool | false | Disable color output (text mode) |
+| `--env-file` | | string | `.env` | Environment file path (used by `plumego config`) |
+
+**Response Envelope:**
+Most commands return a standard envelope:
+`{"status":"success","message":"...","data":{...}}` or `{"status":"error","message":"...","exit_code":1,"data":{...}}`.
 
 ---
 
@@ -118,15 +121,14 @@ plumego generate <type> [flags] <name>
 - `middleware` - HTTP middleware
 - `handler` - HTTP handler
 - `model` - Data model with validation
-- `service` - Business logic service
-- `test` - Test file for existing code
 
 **Flags:**
 - `--output <path>` - Output file path (default: auto-detect)
 - `--package <name>` - Package name (default: inferred)
 - `--methods <list>` - HTTP methods for handlers (GET,POST,PUT,DELETE)
 - `--with-tests` - Generate test file
-- `--with-docs` - Generate godoc comments
+- `--with-validation` - Generate validation
+- `--force` - Overwrite existing files
 
 **Output (JSON):**
 ```json
@@ -198,7 +200,8 @@ plumego dev [flags]
 ```
 
 Additional events may be emitted for build and app lifecycle/logs:
-`build.start`, `build.success`, `build.fail`, `app.start`, `app.stop`, `app.restart`, `app.log`, `app.error`.
+`dashboard_started`, `watching`, `reload_complete`, `reload_disabled`,
+`build.start`, `build.success`, `build.fail`, `app.start`, `app.stop`, `app.log`, `app.error`.
 
 Event field conventions (for CI parsing):
 - `build.*`: `data.success` (bool), `data.duration_ms` (int, when available), `data.error` (string), `data.output` (string)
@@ -398,7 +401,9 @@ plumego migrate status --driver postgres --db-url "postgres://localhost/mydb" --
 
 ### 7. `plumego config` — Configuration Management
 
-View, validate, and generate configuration files.
+View, validate, and generate environment configuration.
+
+Configuration is loaded from `.env` (or `--env-file`) and the current process environment. A global YAML config file is not used by the CLI yet.
 
 ```bash
 plumego config <command> [flags]
@@ -407,7 +412,7 @@ plumego config <command> [flags]
 **Commands:**
 - `show` - Display current configuration
 - `validate` - Validate configuration
-- `init` - Generate default config files
+- `init` - Generate `env.example`
 - `env` - Show environment variables
 
 **Flags:**
@@ -439,7 +444,7 @@ plumego config <command> [flags]
 **Exit Codes:**
 - `0` - Valid configuration
 - `1` - Invalid configuration
-- `2` - Missing required values
+- `2` - Valid with warnings
 
 **Examples:**
 ```bash
@@ -467,11 +472,14 @@ plumego test [flags] [packages...]
 ```
 
 **Flags:**
+- `--dir <path>` - Project directory (default: .)
 - `--race` - Enable race detector
 - `--cover` - Generate coverage report
 - `--bench` - Run benchmarks
-- `--integration` - Include integration tests
 - `--timeout <duration>` - Test timeout (default: 20s)
+- `--tags <tags>` - Build tags
+- `--run <pattern>` - Run only tests matching pattern
+- `--short` - Run short tests only
 
 **Output (JSON):**
 ```json
@@ -482,12 +490,14 @@ plumego test [flags] [packages...]
   "failed": 2,
   "skipped": 0,
   "duration_ms": 1234,
-  "coverage": 78.5,
+  "race_detector": false,
+  "coverage_enabled": true,
+  "benchmark": false,
+  "coverage_percent": 78.5,
   "failures": [
     {
       "package": "github.com/user/myapp/handlers",
-      "test": "TestUserCreate",
-      "message": "Expected status 201, got 500"
+      "test": "TestUserCreate"
     }
   ]
 }
@@ -565,12 +575,14 @@ Inspect running plumego application via HTTP endpoints.
 plumego inspect <command> [flags]
 ```
 
+`routes`, `config`, and `info` call `/_routes`, `/_config`, and `/_info` (core provides compatible aliases under `/_debug/*`).
+
 **Commands:**
 - `health` - Check health endpoints
 - `metrics` - Fetch metrics
 - `routes` - List active routes
 - `config` - View runtime config
-- `goroutines` - Show goroutine info
+- `info` - General application info
 
 **Flags:**
 - `--url <url>` - Application URL (default: http://localhost:8080)
@@ -579,16 +591,13 @@ plumego inspect <command> [flags]
 **Output (JSON):**
 ```json
 {
-  "health": {
-    "status": "healthy",
-    "checks": {
-      "database": "healthy",
-      "cache": "healthy"
-    }
+  "status": "healthy",
+  "checks": {
+    "database": "healthy",
+    "cache": "healthy"
   },
-  "uptime_seconds": 3600,
-  "goroutines": 45,
-  "memory_mb": 128
+  "endpoint": "/health",
+  "status_code": 200
 }
 ```
 
@@ -610,51 +619,27 @@ plumego inspect routes --auth "Bearer token"
 
 ---
 
-## Configuration File Format
+## Configuration Sources
 
-### .plumego.yaml
+### .env (optional)
 
-```yaml
-project:
-  name: myapp
-  module: github.com/user/myapp
+`plumego config` reads key/value pairs from `.env` (or `--env-file`) and merges them with the current process environment.
 
-dev:
-  addr: :8080
-  watch:
-    - "**/*.go"
-  exclude:
-    - "**/*_test.go"
-    - "**/vendor/**"
-  reload: true
-
-build:
-  output: ./bin/app
-  embed_frontend: true
-  tags:
-    - prod
-
-test:
-  timeout: 20s
-  race: true
-  coverage: true
-
-templates:
-  dir: ./.plumego/templates
-```
-
----
-
-## Environment Variables
-
-All CLI configuration can be overridden via environment variables:
+Example `.env`:
 
 ```bash
-PLUMEGO_FORMAT=json       # Output format
-PLUMEGO_QUIET=true        # Quiet mode
-PLUMEGO_CONFIG=./config   # Config file
-PLUMEGO_ENV_FILE=.env     # Environment file
+APP_ADDR=:8080
+APP_DEBUG=false
+APP_SHUTDOWN_TIMEOUT_MS=5000
+WS_SECRET=your-websocket-secret-here-32-bytes-minimum
+JWT_EXPIRY=15m
 ```
+
+### Environment Variables
+
+At runtime, the `config` command reads the following prefixes from the process environment (and, when `--resolve` is set, from the `.env` file): `APP_`, `WS_`, `JWT_`, `DB_`, `REDIS_`.
+
+Note: CLI global flags are not currently configurable via `PLUMEGO_*` environment variables.
 
 ---
 

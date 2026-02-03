@@ -12,7 +12,6 @@ var (
 	flagQuiet   bool
 	flagVerbose bool
 	flagNoColor bool
-	flagConfig  string
 	flagEnvFile string
 )
 
@@ -91,7 +90,6 @@ func (r *RootCmd) Run(args []string) error {
 
 	ctx := &Context{
 		Out:        r.formatter,
-		ConfigPath: flagConfig,
 		EnvFile:    flagEnvFile,
 	}
 
@@ -103,7 +101,6 @@ func (r *RootCmd) parseGlobalFlags(args []string) []string {
 	// In production, use pflag or similar
 	remaining := []string{}
 	flagFormat = "json"
-	flagConfig = ".plumego.yaml"
 	flagEnvFile = ".env"
 
 	for i := 0; i < len(args); i++ {
@@ -120,11 +117,6 @@ func (r *RootCmd) parseGlobalFlags(args []string) []string {
 			flagVerbose = true
 		case "--no-color":
 			flagNoColor = true
-		case "--config", "-c":
-			if i+1 < len(args) {
-				flagConfig = args[i+1]
-				i++
-			}
 		case "--env-file":
 			if i+1 < len(args) {
 				flagEnvFile = args[i+1]
@@ -149,7 +141,6 @@ Global Flags:
   -q, --quiet            Suppress non-essential output
   -v, --verbose          Detailed logging
       --no-color         Disable color output
-  -c, --config <path>    Config file path (default: .plumego.yaml)
       --env-file <path>  Environment file path (default: .env)
 
 Available Commands:

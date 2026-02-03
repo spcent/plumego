@@ -6,6 +6,8 @@
 
 Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现,同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
 
+`core` 包是稳定的主入口；顶层 `plumego` 包提供常用类型与选项的便捷 re-export。
+
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
 - **中间件链**：日志、恢复、gzip、CORS、超时（默认缓冲上限 10 MiB）、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。
@@ -92,14 +94,14 @@ func main() {
 ## 配置基础
 - 环境变量可以从 `.env` 文件加载（默认路径 `.env`；可通过 `core.WithEnvPath` 覆盖）。
 - 常用变量：`AUTH_TOKEN`（SimpleAuth 中间件）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
-- 应用默认包括 10 MiB 请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5 秒优雅关闭窗口。可通过 `core.With...` 选项覆盖。
+- 应用默认包括 10485760 字节（10 MiB）请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5000ms（5 秒）优雅关闭窗口。可通过 `core.With...` 选项覆盖。
 - 安全基线默认启用（安全头 + 防滥用中间件）。防滥用默认每客户端 100 req/s，突发 200，并最多跟踪 10 万个活跃 key。可通过 `core.WithSecurityHeadersEnabled`、`core.WithSecurityHeadersPolicy`、`core.WithAbuseGuardEnabled`、`core.WithAbuseGuardConfig` 关闭或调整。
-- Debug 模式（`core.WithDebug`）默认开启 `/_debug` 调试端点（路由表、Middleware、配置快照、手动重载）、友好 JSON 错误输出，以及 `.env` 热加载。
+- Debug 模式（`core.WithDebug`）默认开启 `/_debug` 调试端点（路由表、Middleware、配置快照、手动重载）、友好 JSON 错误输出，以及 `.env` 热加载。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
 
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
 - **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（安全头、防滥用、请求体限制、并发限制）会在设置期间自动注入。恢复/日志/CORS 辅助工具可通过 `core.WithRecovery`、`core.WithLogging`、`core.WithCORS` 启用。生产基线可使用 `core.WithRecommendedMiddleware()` 一键启用 RequestID + Logging + Recovery 的推荐顺序组合。
-- **多租户**：生产级租户隔离，支持配额管理、策略控制和自动数据库过滤。详见[多租户](#多租户)章节。
+- **多租户（实验）**：提供租户隔离、配额管理、策略控制和数据库过滤能力，API 仍处于实验阶段，可能变更。详见[多租户](#多租户)章节。
 - **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
 - **WebSocket 中心**：`ConfigureWebSocket()` 挂载受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `WebSocketConfig` 自定义工作线程数和队列大小。
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
@@ -107,7 +109,7 @@ func main() {
 
 ## 多租户
 
-Plumego 为 SaaS 应用提供生产级多租户支持，包括租户隔离、配额管理和策略控制。
+Plumego 为 SaaS 应用提供实验性的多租户支持，包括租户隔离、配额管理和策略控制。
 
 ### 功能特性
 
@@ -293,22 +295,22 @@ if err := app.ConfigureObservability(obs); err != nil {
 开启追踪后日志会包含 `trace_id` 与 `span_id`，响应中也会回传 `X-Span-ID` 便于关联。
 
 ## 配置参考
-使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；`config.ConfigManager` 也提供 `LoadBestEffort` 用于跳过可选配置源失败，并提供 `ReloadWithValidation` 做事务式热加载；配置键在读取时会规范化为小写的 snake_case，因此 CamelCase 和 UPPER_SNAKE 会映射到同一值；使用下表实现可预测的部署。
+使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；`config.ConfigManager` 也提供 `LoadBestEffort` 用于跳过可选配置源失败，并提供 `ReloadWithValidation` 做事务式热加载；配置键在读取时会规范化为小写的 snake_case，因此 CamelCase 和 UPPER_SNAKE 会映射到同一值；带 `_MS` 后缀的环境变量单位为毫秒；使用下表实现可预测的部署。
 
 | AppConfig 字段             | 默认值          | 环境变量                       | Flag 示例                          |
 |----------------------------|-----------------|--------------------------------|------------------------------------|
 | Addr                       | :8080          | APP_ADDR                      | --addr :8080                      |
 | EnvFile                    | .env           | APP_ENV_FILE                  | --env-file .env                   |
 | Debug                      | false          | APP_DEBUG                     | --debug                           |
-| ShutdownTimeout            | 5s             | APP_SHUTDOWN_TIMEOUT_MS       | --shutdown-timeout 5s             |
-| ReadTimeout                | 30s            | APP_READ_TIMEOUT_MS           | --read-timeout 30s                |
-| ReadHeaderTimeout          | 5s             | APP_READ_HEADER_TIMEOUT_MS    | --read-header-timeout 5s          |
-| WriteTimeout               | 30s            | APP_WRITE_TIMEOUT_MS          | --write-timeout 30s               |
-| IdleTimeout                | 60s            | APP_IDLE_TIMEOUT_MS           | --idle-timeout 60s                |
-| MaxHeaderBytes             | 1 MiB          | APP_MAX_HEADER_BYTES          | --max-header-bytes 1048576        |
+| ShutdownTimeout            | 5000ms         | APP_SHUTDOWN_TIMEOUT_MS       | --shutdown-timeout 5000ms         |
+| ReadTimeout                | 30000ms        | APP_READ_TIMEOUT_MS           | --read-timeout 30000ms            |
+| ReadHeaderTimeout          | 5000ms         | APP_READ_HEADER_TIMEOUT_MS    | --read-header-timeout 5000ms      |
+| WriteTimeout               | 30000ms        | APP_WRITE_TIMEOUT_MS          | --write-timeout 30000ms           |
+| IdleTimeout                | 60000ms        | APP_IDLE_TIMEOUT_MS           | --idle-timeout 60000ms            |
+| MaxHeaderBytes             | 1048576        | APP_MAX_HEADER_BYTES          | --max-header-bytes 1048576        |
 | EnableHTTP2                | true           | APP_ENABLE_HTTP2              | --http2=false                     |
 | DrainInterval              | 500ms          | APP_DRAIN_INTERVAL_MS         | --drain-interval 500ms            |
-| MaxBodyBytes               | 10 MiB         | APP_MAX_BODY_BYTES            | --max-body-bytes 10485760         |
+| MaxBodyBytes               | 10485760       | APP_MAX_BODY_BYTES            | --max-body-bytes 10485760         |
 | MaxConcurrency             | 256            | APP_MAX_CONCURRENCY           | --max-concurrency 256             |
 | QueueDepth                 | 512            | APP_QUEUE_DEPTH               | --queue-depth 512                 |
 | QueueTimeout               | 250ms          | APP_QUEUE_TIMEOUT_MS          | --queue-timeout 250ms             |
@@ -323,8 +325,8 @@ if err := app.ConfigureObservability(obs); err != nil {
 | WebhookOut.DefaultPageLimit| 0 (no default) | WEBHOOK_DEFAULT_PAGE_LIMIT    | --webhook-page-limit 50           |
 | WebhookIn.GitHubSecret     | env or config  | GITHUB_WEBHOOK_SECRET         | --github-secret value             |
 | WebhookIn.StripeSecret     | env or config  | STRIPE_WEBHOOK_SECRET         | --stripe-secret value             |
-| WebhookIn.MaxBodyBytes     | 1 MiB          | WEBHOOK_MAX_BODY_BYTES        | --webhook-max-body 1048576        |
-| WebhookIn.StripeTolerance  | 5m             | WEBHOOK_STRIPE_TOLERANCE_MS   | --stripe-tolerance 5m             |
+| WebhookIn.MaxBodyBytes     | 1048576        | WEBHOOK_MAX_BODY_BYTES        | --webhook-max-body 1048576        |
+| WebhookIn.StripeTolerance  | 300000ms       | WEBHOOK_STRIPE_TOLERANCE_MS   | --stripe-tolerance 300000ms       |
 | WebhookIn.TopicPrefixGitHub| in.github.     | WEBHOOK_TOPIC_PREFIX_GITHUB   | --github-topic-prefix in.github.  |
 | WebhookIn.TopicPrefixStripe | in.stripe.     | WEBHOOK_TOPIC_PREFIX_STRIPE   | --stripe-topic-prefix in.stripe.  |
 | WebSocket.Secret           | env or config  | WS_SECRET                     | --ws-secret value                 |
@@ -346,6 +348,11 @@ if err := app.ConfigureObservability(obs); err != nil {
 `plumego` CLI 包含一个强大的开发服务器，它本身就是使用 plumego 框架构建的（狗粮原则）。它提供热重载、实时监控和 Web 仪表盘，大大提升开发体验。
 
 仪表盘**默认启用** - 只需运行 `plumego dev` 即可开始使用。
+
+**定位差异与生产建议**
+- `core.WithDebug` 会暴露应用级 `/_debug` 端点，属于应用自身调试接口，生产环境应关闭或加访问控制。
+- `plumego dev` 仪表盘是本地开发工具，运行独立的仪表盘服务，不建议在生产环境对外暴露。
+- 仪表盘可能读取应用的 `/_debug` 端点用于路由/配置展示，因此仅建议在本地或受控环境启用。
 
 ### 快速开始
 

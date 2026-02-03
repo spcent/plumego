@@ -63,22 +63,26 @@ plumego new myapp --format text
 ```bash
 $ plumego new myapp --format json
 {
-  "project": "myapp",
-  "path": "./myapp",
-  "module": "myapp",
-  "template": "minimal",
-  "files_created": [
-    "main.go",
-    "go.mod",
-    "env.example",
-    ".gitignore",
-    "README.md"
-  ],
-  "next_steps": [
-    "cd myapp",
-    "go mod tidy",
-    "plumego dev"
-  ]
+  "status": "success",
+  "message": "Project created successfully",
+  "data": {
+    "project": "myapp",
+    "path": "./myapp",
+    "module": "myapp",
+    "template": "minimal",
+    "files_created": [
+      "main.go",
+      "go.mod",
+      "env.example",
+      ".gitignore",
+      "README.md"
+    ],
+    "next_steps": [
+      "cd myapp",
+      "go mod tidy",
+      "plumego dev"
+    ]
+  }
 }
 ```
 
@@ -134,9 +138,8 @@ echo "Project $PROJECT created and validated successfully"
 | `--format`, `-f` | Output format (json, yaml, text) | `plumego new myapp -f yaml` |
 | `--quiet`, `-q` | Suppress non-essential output | `plumego new myapp -q` |
 | `--verbose`, `-v` | Detailed logging | `plumego new myapp -v` |
-| `--no-color` | Disable color output | `plumego new myapp --no-color` |
-| `--config`, `-c` | Config file path | `plumego -c .plumego.yaml dev` |
-| `--env-file` | Environment file path | `plumego --env-file .env.dev dev` |
+| `--no-color` | Disable color output (text mode) | `plumego new myapp --no-color` |
+| `--env-file` | Environment file path (used by `plumego config`) | `plumego --env-file .env.dev config show` |
 
 ## Exit Codes
 
@@ -147,44 +150,23 @@ echo "Project $PROJECT created and validated successfully"
 | 2 | Configuration/validation error | Fix configuration |
 | 3 | Resource conflict | Use --force or resolve |
 
-## Configuration File
+## Environment File
 
-Create `.plumego.yaml` in project root:
+Create `.env` (or use `--env-file`) to supply app settings to `plumego config`:
 
-```yaml
-project:
-  name: myapp
-  module: github.com/myorg/myapp
-
-dev:
-  addr: :8080
-  watch:
-    - "**/*.go"
-  exclude:
-    - "**/*_test.go"
-    - "**/vendor/**"
-
-build:
-  output: ./bin/app
-  tags:
-    - prod
-
-test:
-  timeout: 20s
-  race: true
+```bash
+APP_ADDR=:8080
+APP_DEBUG=false
+APP_SHUTDOWN_TIMEOUT_MS=5000
+WS_SECRET=your-websocket-secret-here-32-bytes-minimum
+JWT_EXPIRY=15m
 ```
 
 ## Environment Variables
 
-Override flags with environment variables:
+`plumego config` reads `APP_`, `WS_`, `JWT_`, `DB_`, and `REDIS_` from the process environment (and from the `.env` file when `--resolve` is set).
 
-```bash
-export PLUMEGO_FORMAT=json
-export PLUMEGO_QUIET=true
-export PLUMEGO_CONFIG=./config/.plumego.yaml
-
-plumego new myapp
-```
+CLI global flags are not currently configurable via `PLUMEGO_*`.
 
 ## Next Steps
 

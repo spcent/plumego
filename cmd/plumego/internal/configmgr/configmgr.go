@@ -235,38 +235,6 @@ JWT_EXPIRY=15m
 		created = append(created, "env.example")
 	}
 
-	// Create .plumego.yaml if it doesn't exist
-	plumegoConfigPath := filepath.Join(dir, ".plumego.yaml")
-	if _, err := os.Stat(plumegoConfigPath); os.IsNotExist(err) {
-		content := `project:
-  name: myapp
-  module: github.com/user/myapp
-
-dev:
-  addr: :8080
-  watch:
-    - "**/*.go"
-  exclude:
-    - "**/*_test.go"
-    - "**/vendor/**"
-  reload: true
-
-build:
-  output: ./bin/app
-  embed_frontend: false
-  tags: []
-
-test:
-  timeout: 20s
-  race: true
-  coverage: true
-`
-		if err := os.WriteFile(plumegoConfigPath, []byte(content), 0644); err != nil {
-			return created, fmt.Errorf("failed to write .plumego.yaml: %w", err)
-		}
-		created = append(created, ".plumego.yaml")
-	}
-
 	return created, nil
 }
 

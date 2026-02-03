@@ -57,6 +57,26 @@ func (c *devToolsComponent) RegisterRoutes(r *router.Router) {
 		return
 	}
 
+	// Legacy aliases for CLI compatibility.
+	r.Get("/_routes", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		payload := map[string]any{
+			"routes": r.Routes(),
+		}
+		writeHTTPResponse(w, req, http.StatusOK, payload)
+	}))
+
+	r.Get("/_config", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		writeHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
+	}))
+
+	r.Get("/_info", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		payload := map[string]any{
+			"config": c.configSnapshot(),
+			"build":  health.GetBuildInfo(),
+		}
+		writeHTTPResponse(w, req, http.StatusOK, payload)
+	}))
+
 	r.Get(devToolsRoutesPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		r.Print(w)

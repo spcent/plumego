@@ -119,7 +119,7 @@ Manages configuration files and environment variables.
 - Configuration source tracking
 - Environment variable resolution
 - Sensitive value redaction
-- Auto-generates env.example and .plumego.yaml
+- Auto-generates env.example
 - Validation with error/warning detection
 
 **Usage:**
@@ -323,8 +323,7 @@ All commands support:
 - `--format, -f` - Output format
 - `--quiet, -q` - Suppress non-essential output
 - `--verbose, -v` - Detailed logging
-- `--no-color` - Disable color output
-- `--config, -c` - Config file path
+- `--no-color` - Disable color output (text mode)
 - `--env-file` - Environment file path
 
 ### Exit Codes

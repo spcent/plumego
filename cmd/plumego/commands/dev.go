@@ -518,19 +518,16 @@ func toEventMap(data any) map[string]any {
 
 func emitDevStart(out *output.Formatter, absDir, addr, dashboardAddr string) error {
 	if out.Format() == "text" {
-		if err := out.Textln("🚀 Starting Plumego Dev Server"); err != nil {
-			return err
-		}
-		if err := out.Textln(fmt.Sprintf("   Project: %s", absDir)); err != nil {
-			return err
-		}
-		if err := out.Textln(fmt.Sprintf("   App URL: http://localhost%s", addr)); err != nil {
-			return err
-		}
-		if err := out.Textln(fmt.Sprintf("   Dashboard URL: http://localhost%s", dashboardAddr)); err != nil {
-			return err
-		}
-		return out.Textln("")
+		message := fmt.Sprintf(
+			"🚀 Starting Plumego Dev Server\n   Project: %s\n   App URL: http://localhost%s\n   Dashboard URL: http://localhost%s\n",
+			absDir,
+			addr,
+			dashboardAddr,
+		)
+		return out.Event(output.Event{
+			Event:   "starting",
+			Message: message,
+		})
 	}
 
 	return out.Event(output.Event{
@@ -546,10 +543,10 @@ func emitDevStart(out *output.Formatter, absDir, addr, dashboardAddr string) err
 
 func emitDashboardStarted(out *output.Formatter, dashboardAddr string) error {
 	if out.Format() == "text" {
-		if err := out.Textln(fmt.Sprintf("✓ Dashboard started at http://localhost%s", dashboardAddr)); err != nil {
-			return err
-		}
-		return out.Textln("")
+		return out.Event(output.Event{
+			Event:   "dashboard_started",
+			Message: fmt.Sprintf("✓ Dashboard started at http://localhost%s\n", dashboardAddr),
+		})
 	}
 
 	return out.Event(output.Event{
@@ -577,10 +574,10 @@ func emitAppReady(out *output.Formatter, addr string) error {
 
 func emitWatching(out *output.Formatter) error {
 	if out.Format() == "text" {
-		if err := out.Textln("👀 Watching for changes..."); err != nil {
-			return err
-		}
-		return out.Textln("   Press Ctrl+C to stop")
+		return out.Event(output.Event{
+			Event:   "watching",
+			Message: "👀 Watching for changes...\n   Press Ctrl+C to stop",
+		})
 	}
 
 	return out.Event(output.Event{
@@ -591,10 +588,13 @@ func emitWatching(out *output.Formatter) error {
 
 func emitReloadDisabled(out *output.Formatter) error {
 	if out.Format() == "text" {
-		if err := out.Textln("Auto reload disabled."); err != nil {
-			return err
-		}
-		return out.Textln("Press Ctrl+C to stop")
+		return out.Event(output.Event{
+			Event:   "reload_disabled",
+			Message: "Auto reload disabled.\nPress Ctrl+C to stop",
+			Data: map[string]any{
+				"auto_reload": false,
+			},
+		})
 	}
 
 	return out.Event(output.Event{
@@ -608,10 +608,13 @@ func emitReloadDisabled(out *output.Formatter) error {
 
 func emitFileChanged(out *output.Formatter, path string) error {
 	if out.Format() == "text" {
-		if err := out.Textln(""); err != nil {
-			return err
-		}
-		return out.Textln(fmt.Sprintf("📝 File changed: %s", path))
+		return out.Event(output.Event{
+			Event:   "file_changed",
+			Message: fmt.Sprintf("\n📝 File changed: %s", path),
+			Data: map[string]any{
+				"path": path,
+			},
+		})
 	}
 
 	return out.Event(output.Event{
@@ -624,14 +627,15 @@ func emitFileChanged(out *output.Formatter, path string) error {
 }
 
 func emitReloadFailed(out *output.Formatter, reloadErr error) error {
+	message := "Reload failed"
 	if out.Format() == "text" {
-		return out.Textln(fmt.Sprintf("❌ Reload failed: %v", reloadErr))
+		message = fmt.Sprintf("❌ Reload failed: %v", reloadErr)
 	}
 
 	return out.Event(output.Event{
 		Event:   "reload_failed",
 		Level:   "error",
-		Message: "Reload failed",
+		Message: message,
 		Data: map[string]any{
 			"error": reloadErr.Error(),
 		},
@@ -640,10 +644,10 @@ func emitReloadFailed(out *output.Formatter, reloadErr error) error {
 
 func emitReloadComplete(out *output.Formatter) error {
 	if out.Format() == "text" {
-		if err := out.Textln("✓ Reload complete"); err != nil {
-			return err
-		}
-		return out.Textln("")
+		return out.Event(output.Event{
+			Event:   "reload_complete",
+			Message: "✓ Reload complete\n",
+		})
 	}
 
 	return out.Event(output.Event{
@@ -653,14 +657,15 @@ func emitReloadComplete(out *output.Formatter) error {
 }
 
 func emitWatcherError(out *output.Formatter, watchErr error) error {
+	message := "Watcher error"
 	if out.Format() == "text" {
-		return out.Textln(fmt.Sprintf("⚠️  Watcher error: %v", watchErr))
+		message = fmt.Sprintf("⚠️  Watcher error: %v", watchErr)
 	}
 
 	return out.Event(output.Event{
 		Event:   "watcher_error",
 		Level:   "warn",
-		Message: "Watcher error",
+		Message: message,
 		Data: map[string]any{
 			"error": watchErr.Error(),
 		},
@@ -669,13 +674,13 @@ func emitWatcherError(out *output.Formatter, watchErr error) error {
 
 func emitShutdown(out *output.Formatter) error {
 	if out.Format() == "text" {
-		if err := out.Textln(""); err != nil {
-			return err
-		}
-		if err := out.Textln(""); err != nil {
-			return err
-		}
-		return out.Textln("🛑 Shutting down...")
+		return out.Event(output.Event{
+			Event:   "stopped",
+			Message: "\n\n🛑 Shutting down...",
+			Data: map[string]any{
+				"code": 0,
+			},
+		})
 	}
 
 	return out.Event(output.Event{
