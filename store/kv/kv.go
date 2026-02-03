@@ -1,3 +1,36 @@
+// Package kvstore provides an embedded persistent key-value store with WAL.
+//
+// This package implements a high-performance, disk-backed key-value store featuring:
+//   - Write-Ahead Logging (WAL) for durability
+//   - LRU eviction with configurable memory limits
+//   - TTL (time-to-live) support for automatic expiration
+//   - Snapshot and restore capabilities
+//   - Transaction support for atomic operations
+//   - Compression (gzip) for reduced disk usage
+//   - Metrics collection and monitoring
+//
+// The store is optimized for embedded use cases where you need persistence
+// without the complexity of a separate database server. It's ideal for
+// configuration storage, session management, and small-to-medium datasets.
+//
+// Example usage:
+//
+//	import kvstore "github.com/spcent/plumego/store/kv"
+//
+//	// Create or open a store
+//	store, err := kvstore.Open(kvstore.Config{
+//		Path:         "/data/mystore",
+//		MaxMemoryMB:  512,
+//		SyncWrites:   true,
+//		EnableMetrics: true,
+//	})
+//	defer store.Close(context.Background())
+//
+//	// Set a key with 1-hour TTL
+//	err = store.Set("session:abc", sessionData, 1*time.Hour)
+//
+//	// Get a key
+//	val, err := store.Get("session:abc")
 package kvstore
 
 import (

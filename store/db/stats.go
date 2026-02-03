@@ -217,9 +217,9 @@ func (a *DBStatsAggregator) GetTopSlowTables(n int) []TableStat {
 	tables := make([]TableStat, 0, len(a.byTable))
 	for name, stats := range a.byTable {
 		tables = append(tables, TableStat{
-			Table:       name,
-			SlowQueries: stats.SlowQueries,
-			AvgDuration: stats.AvgDuration,
+			Table:        name,
+			SlowQueries:  stats.SlowQueries,
+			AvgDuration:  stats.AvgDuration,
 			TotalQueries: stats.TotalQueries,
 		})
 	}

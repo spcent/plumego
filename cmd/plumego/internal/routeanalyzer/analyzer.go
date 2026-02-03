@@ -24,9 +24,9 @@ type Route struct {
 
 // AnalyzeResult contains the analysis result
 type AnalyzeResult struct {
-	Routes            []Route           `json:"routes" yaml:"routes"`
-	Total             int               `json:"total" yaml:"total"`
-	MiddlewareSummary map[string]int    `json:"middleware_summary,omitempty" yaml:"middleware_summary,omitempty"`
+	Routes            []Route        `json:"routes" yaml:"routes"`
+	Total             int            `json:"total" yaml:"total"`
+	MiddlewareSummary map[string]int `json:"middleware_summary,omitempty" yaml:"middleware_summary,omitempty"`
 }
 
 // AnalyzeOptions contains options for route analysis

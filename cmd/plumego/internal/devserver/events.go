@@ -56,9 +56,9 @@ type AppLifecycleEvent struct {
 
 // LogEvent represents a log message from the application
 type LogEvent struct {
-	Level   string `json:"level"`   // "info", "warn", "error", "debug"
+	Level   string `json:"level"` // "info", "warn", "error", "debug"
 	Message string `json:"message"`
-	Source  string `json:"source"`  // "stdout", "stderr"
+	Source  string `json:"source"` // "stdout", "stderr"
 }
 
 // HealthEvent represents application health status

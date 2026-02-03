@@ -19,9 +19,9 @@ const (
 
 // requestManager manages request-reply pattern.
 type requestManager struct {
-	mu       sync.RWMutex
-	pending  map[string]chan Message // correlationID -> response channel
-	ps       *InProcPubSub
+	mu         sync.RWMutex
+	pending    map[string]chan Message // correlationID -> response channel
+	ps         *InProcPubSub
 	replyTopic string
 	replySub   Subscription
 }

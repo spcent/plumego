@@ -1,3 +1,37 @@
+// Package webhookin provides webhook receiver functionality with signature verification.
+//
+// This package implements secure webhook handling for popular providers including:
+//   - GitHub webhooks with HMAC-SHA256 verification
+//   - Stripe webhooks with timestamp-based signatures
+//   - Generic HMAC webhook verification
+//   - Deduplication to prevent replay attacks
+//   - Request validation and parsing
+//
+// All signature verification uses constant-time comparison to prevent timing attacks.
+// The package follows security best practices for webhook handling.
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/net/webhookin"
+//
+//	// Verify GitHub webhook
+//	secret := []byte("your-webhook-secret")
+//	payload, err := webhookin.VerifyGitHub(r, secret)
+//	if err != nil {
+//		// Invalid signature or request
+//	}
+//
+//	// Verify Stripe webhook
+//	event, err := webhookin.VerifyStripe(r, stripeSecret)
+//	if err != nil {
+//		// Invalid signature
+//	}
+//
+//	// Use deduplication to prevent replays
+//	dedup := webhookin.NewDeduper(10 * time.Minute)
+//	if !dedup.Allow(requestID) {
+//		// Duplicate request
+//	}
 package webhookin
 
 import (

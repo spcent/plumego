@@ -212,7 +212,7 @@ type UserController struct {
 func NewUserController(repo *InMemoryUserRepository) *UserController {
 	ctrl := &UserController{
 		BaseContextResourceController: router.NewBaseContextResourceController("user"),
-		repo:                           repo,
+		repo:                          repo,
 	}
 
 	ctrl.QueryBuilder.WithPageSize(10, 50).

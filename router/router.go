@@ -1405,7 +1405,6 @@ func (r *Router) normalizePath(path string) string {
 	return strings.Trim(path, "/")
 }
 
-
 // handleCachedRouteMatch handles requests using cached route matching results
 func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request, result *MatchResult) {
 	// Build parameter map

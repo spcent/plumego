@@ -18,10 +18,10 @@ func init() {
 
 // skipListNode represents a node in the skip list
 type skipListNode struct {
-	member   string             // Member name
-	score    float64            // Score value
-	backward *skipListNode      // Backward pointer for reverse traversal
-	level    []skipListLevel    // Forward pointers and spans at each level
+	member   string          // Member name
+	score    float64         // Score value
+	backward *skipListNode   // Backward pointer for reverse traversal
+	level    []skipListLevel // Forward pointers and spans at each level
 }
 
 // skipListLevel represents the forward pointer and span at a specific level

@@ -1,3 +1,39 @@
+// Package headers provides HTTP security header management and middleware.
+//
+// This package implements a comprehensive security header policy system supporting:
+//   - HSTS (HTTP Strict Transport Security)
+//   - CSP (Content Security Policy)
+//   - X-Frame-Options
+//   - X-Content-Type-Options
+//   - Referrer-Policy
+//   - Permissions-Policy
+//
+// Features:
+//   - Declarative policy configuration
+//   - HTTP middleware for automatic header injection
+//   - CSP nonce generation for inline scripts
+//   - Policy validation and error reporting
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/security/headers"
+//
+//	policy := headers.Policy{
+//		StrictTransportSecurity: &headers.HSTSOptions{
+//			MaxAge:            365 * 24 * time.Hour,
+//			IncludeSubDomains: true,
+//			Preload:           true,
+//		},
+//		ContentSecurityPolicy: &headers.CSPOptions{
+//			DefaultSrc: []string{"'self'"},
+//			ScriptSrc:  []string{"'self'", "'unsafe-inline'"},
+//		},
+//		XFrameOptions: "DENY",
+//	}
+//
+//	// Apply as middleware
+//	middleware := policy.Middleware()
+//	app.Use(middleware)
 package headers
 
 import (

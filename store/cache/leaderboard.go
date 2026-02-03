@@ -138,7 +138,10 @@ type LeaderboardMetrics struct {
 	TotalMembers      int64
 }
 
-// NewMemoryLeaderboardCache creates a new in-memory leaderboard cache
+// NewMemoryLeaderboardCache creates a new in-memory leaderboard cache.
+//
+// Panics if either configuration is invalid. Call config.Validate() beforehand
+// if you need to handle validation errors gracefully.
 func NewMemoryLeaderboardCache(cacheConfig Config, lbConfig *LeaderboardConfig) *MemoryLeaderboardCache {
 	if lbConfig == nil {
 		lbConfig = DefaultLeaderboardConfig()

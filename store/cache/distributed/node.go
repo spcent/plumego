@@ -74,9 +74,9 @@ type LocalCacheNode struct {
 
 // NodeConfig configures a cache node
 type NodeConfig struct {
-	ID     string       // Unique node identifier
-	Cache  cache.Cache  // Cache instance
-	Weight int          // Node weight for load balancing (default: 1)
+	ID     string      // Unique node identifier
+	Cache  cache.Cache // Cache instance
+	Weight int         // Node weight for load balancing (default: 1)
 }
 
 // NewNode creates a new local cache node

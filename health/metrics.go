@@ -384,4 +384,3 @@ func (mc *MetricsCollector) GenerateReport() HealthReport {
 		Components:   components,
 	}
 }
-

@@ -1,3 +1,31 @@
+// Package http provides an HTTP client with automatic retry and backoff.
+//
+// This package wraps the standard library's http.Client with intelligent retry logic:
+//   - Automatic retry for network errors and 5xx responses
+//   - Configurable retry policies (exponential backoff, linear, custom)
+//   - Request timeout handling
+//   - Idempotency-aware retries (safe for GET, PUT, DELETE)
+//   - Jitter to prevent thundering herd
+//
+// The client is designed for reliable HTTP communication in distributed systems
+// where transient failures are common.
+//
+// Example usage:
+//
+//	import nethttp "github.com/spcent/plumego/net/http"
+//
+//	// Create client with retry
+//	client := nethttp.NewClient(nethttp.ClientConfig{
+//		Timeout:     10 * time.Second,
+//		MaxRetries:  3,
+//		RetryPolicy: nethttp.ExponentialBackoff(time.Second, 2.0),
+//	})
+//
+//	// Make a request (automatically retries on failure)
+//	resp, err := client.Get("https://api.example.com/data")
+//	if err != nil {
+//		// All retries failed
+//	}
 package http
 
 import (

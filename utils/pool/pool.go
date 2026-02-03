@@ -1,3 +1,32 @@
+// Package pool provides reusable object pools for common types.
+//
+// This package offers sync.Pool-based pools for frequently allocated objects,
+// reducing GC pressure and improving performance in high-throughput applications.
+//
+// Available pools:
+//   - JSONBufferPool: bytes.Buffer for JSON encoding/decoding
+//   - MapPool: map[string]any for temporary JSON operations
+//   - ByteSlicePool: []byte for temporary byte operations
+//   - StringSlicePool: []string for temporary string operations
+//   - JSONEncoderPool: json.Encoder with pooled buffers
+//   - JSONDecoderPool: json.Decoder for reuse
+//
+// All pools are pre-configured with sensible defaults (initial capacity, buffer size)
+// and are safe for concurrent use.
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/utils/pool"
+//
+//	// Get a buffer, use it, then return it
+//	buf := pool.GetJSONBuffer()
+//	defer pool.PutJSONBuffer(buf)
+//	json.NewEncoder(buf).Encode(data)
+//
+//	// Get a map for JSON parsing
+//	m := pool.GetMap()
+//	defer pool.PutMap(m)
+//	json.Unmarshal(data, &m)
 package pool
 
 import (

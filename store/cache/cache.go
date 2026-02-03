@@ -1,3 +1,36 @@
+// Package cache provides an in-memory caching system with TTL and LRU eviction.
+//
+// This package implements a high-performance cache with features including:
+//   - TTL (time-to-live) expiration for entries
+//   - LRU (Least Recently Used) eviction when capacity is reached
+//   - Distributed mode with consistent hashing
+//   - Leaderboard support for ranked data
+//   - Metrics collection and monitoring
+//   - Thread-safe operations
+//
+// The cache can operate in standalone or distributed mode, supporting both
+// simple key-value storage and complex use cases like leaderboards.
+//
+// Example usage:
+//
+//	import "github.com/spcent/plumego/store/cache"
+//
+//	// Create a cache with 1000 items max, 5 minute TTL
+//	c := cache.New(cache.Config{
+//		MaxSize: 1000,
+//		TTL:     5 * time.Minute,
+//	})
+//
+//	// Set a value
+//	c.Set("user:123", userData)
+//
+//	// Get a value
+//	if val, found := c.Get("user:123"); found {
+//		// Use val
+//	}
+//
+//	// Delete a value
+//	c.Delete("user:123")
 package cache
 
 import (
@@ -179,6 +212,9 @@ func NewMemoryCache() *MemoryCache {
 }
 
 // NewMemoryCacheWithConfig creates a MemoryCache with custom configuration.
+//
+// Panics if the configuration is invalid. Call config.Validate() beforehand
+// if you need to handle validation errors gracefully.
 func NewMemoryCacheWithConfig(config Config) *MemoryCache {
 	if err := config.Validate(); err != nil {
 		panic(fmt.Sprintf("invalid cache config: %v", err))

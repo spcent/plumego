@@ -53,13 +53,13 @@ type DistributedCache struct {
 type DistributedMetrics struct {
 	mu sync.RWMutex
 
-	TotalRequests    uint64
-	FailoverCount    uint64
-	ReplicationLag   time.Duration
-	HashCollisions   uint64
-	HealthyNodes     int
-	UnhealthyNodes   int
-	RebalanceEvents  uint64
+	TotalRequests   uint64
+	FailoverCount   uint64
+	ReplicationLag  time.Duration
+	HashCollisions  uint64
+	HealthyNodes    int
+	UnhealthyNodes  int
+	RebalanceEvents uint64
 }
 
 // Config configures the distributed cache
