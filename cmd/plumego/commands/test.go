@@ -11,8 +11,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
 
 type TestCmd struct{}
@@ -53,7 +51,7 @@ func (c *TestCmd) Flags() []Flag {
 	}
 }
 
-func (c *TestCmd) Run(args []string) error {
+func (c *TestCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("test", flag.ExitOnError)
 
 	dir := fs.String("dir", ".", "Project directory")
@@ -72,12 +70,12 @@ func (c *TestCmd) Run(args []string) error {
 	// Get absolute directory
 	absDir, err := filepath.Abs(*dir)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("invalid directory: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
 	}
 
 	// Check if directory exists
 	if _, err := os.Stat(absDir); os.IsNotExist(err) {
-		return output.NewFormatter().Error(fmt.Sprintf("directory not found: %s", absDir), 1)
+		return ctx.Out.Error(fmt.Sprintf("directory not found: %s", absDir), 1)
 	}
 
 	// Build test arguments
@@ -132,7 +130,7 @@ func (c *TestCmd) Run(args []string) error {
 	cmd.Stderr = &stderr
 
 	if flagVerbose {
-		fmt.Printf("Running: go %s\n", strings.Join(testArgs, " "))
+		ctx.Out.Verbose(fmt.Sprintf("Running: go %s", strings.Join(testArgs, " ")))
 	}
 
 	testErr := cmd.Run()
@@ -155,10 +153,10 @@ func (c *TestCmd) Run(args []string) error {
 
 	if testErr != nil {
 		testResult["status"] = "failed"
-		return output.NewFormatter().Error("Tests failed", 1, testResult)
+		return ctx.Out.Error("Tests failed", 1, testResult)
 	}
 
-	return output.NewFormatter().Success("Tests passed", testResult)
+	return ctx.Out.Success("Tests passed", testResult)
 }
 
 type testEvent struct {

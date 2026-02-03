@@ -5,12 +5,10 @@ import (
 	"os"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/codegen"
-	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
 
 // GenerateCmd generates code
 type GenerateCmd struct {
-	formatter *output.Formatter
 }
 
 func (c *GenerateCmd) Name() string  { return "generate" }
@@ -43,14 +41,11 @@ func (c *GenerateCmd) Flags() []Flag {
 	}
 }
 
-func (c *GenerateCmd) Run(args []string) error {
-	c.formatter = output.NewFormatter()
-	c.formatter.SetFormat(flagFormat)
-	c.formatter.SetQuiet(flagQuiet)
-	c.formatter.SetVerbose(flagVerbose)
+func (c *GenerateCmd) Run(ctx *Context, args []string) error {
+	out := ctx.Out
 
 	if len(args) < 2 {
-		return c.formatter.Error("generate type and name required (e.g., plumego generate component Auth)", 1)
+		return out.Error("generate type and name required (e.g., plumego generate component Auth)", 1)
 	}
 
 	genType := args[0]
@@ -93,10 +88,10 @@ func (c *GenerateCmd) Run(args []string) error {
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose(fmt.Sprintf("Generating %s: %s", genType, name))
+	out.Verbose(fmt.Sprintf("Generating %s: %s", genType, name))
 
 	opts := codegen.GenerateOptions{
 		Type:           genType,
@@ -111,8 +106,8 @@ func (c *GenerateCmd) Run(args []string) error {
 
 	result, err := codegen.Generate(cwd, opts)
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("generation failed: %v", err), 1)
+		return out.Error(fmt.Sprintf("generation failed: %v", err), 1)
 	}
 
-	return c.formatter.Success(fmt.Sprintf("%s generated successfully", genType), result)
+	return out.Success(fmt.Sprintf("%s generated successfully", genType), result)
 }

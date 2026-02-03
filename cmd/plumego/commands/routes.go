@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spcent/plumego/cmd/plumego/internal/output"
 	"github.com/spcent/plumego/cmd/plumego/internal/routeanalyzer"
 )
 
@@ -45,7 +44,7 @@ func (c *RoutesCmd) Flags() []Flag {
 	}
 }
 
-func (c *RoutesCmd) Run(args []string) error {
+func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("routes", flag.ExitOnError)
 
 	dir := fs.String("dir", ".", "Project directory")
@@ -62,12 +61,12 @@ func (c *RoutesCmd) Run(args []string) error {
 	// Get absolute directory path
 	absDir, err := filepath.Abs(*dir)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("invalid directory: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
 	}
 
 	// Check if directory exists
 	if _, err := os.Stat(absDir); os.IsNotExist(err) {
-		return output.NewFormatter().Error(fmt.Sprintf("directory not found: %s", absDir), 1)
+		return ctx.Out.Error(fmt.Sprintf("directory not found: %s", absDir), 1)
 	}
 
 	// Analyze routes
@@ -79,7 +78,7 @@ func (c *RoutesCmd) Run(args []string) error {
 		SortBy:         *sortBy,
 	})
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to analyze routes: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("failed to analyze routes: %v", err), 1)
 	}
 
 	result := map[string]any{
@@ -91,5 +90,5 @@ func (c *RoutesCmd) Run(args []string) error {
 		result["middleware_summary"] = routes.MiddlewareSummary
 	}
 
-	return output.NewFormatter().Success("Routes analyzed successfully", result)
+	return ctx.Out.Success("Routes analyzed successfully", result)
 }

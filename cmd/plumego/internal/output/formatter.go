@@ -3,6 +3,7 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -14,6 +15,8 @@ type Formatter struct {
 	quiet   bool
 	verbose bool
 	color   bool
+	out     io.Writer
+	err     io.Writer
 }
 
 // NewFormatter creates a new output formatter
@@ -21,6 +24,8 @@ func NewFormatter() *Formatter {
 	return &Formatter{
 		format: "json",
 		color:  true,
+		out:    os.Stdout,
+		err:    os.Stderr,
 	}
 }
 
@@ -42,6 +47,21 @@ func (f *Formatter) SetVerbose(verbose bool) {
 // SetColor sets color output
 func (f *Formatter) SetColor(color bool) {
 	f.color = color
+}
+
+// SetWriters sets the output and error writers.
+func (f *Formatter) SetWriters(out, err io.Writer) {
+	if out != nil {
+		f.out = out
+	}
+	if err != nil {
+		f.err = err
+	}
+}
+
+// Format returns the current output format.
+func (f *Formatter) Format() string {
+	return f.format
 }
 
 // Print outputs data in the configured format
@@ -93,32 +113,31 @@ func (f *Formatter) Error(message string, code int, optionalData ...any) error {
 		return err
 	}
 
-	os.Exit(code)
-	return nil
+	return &ExitError{Code: code, Message: message}
 }
 
 // Verbose outputs verbose logging
 func (f *Formatter) Verbose(message string) {
 	if f.verbose {
-		fmt.Fprintf(os.Stderr, "[VERBOSE] %s\n", message)
+		fmt.Fprintf(f.err, "[VERBOSE] %s\n", message)
 	}
 }
 
 // Info outputs informational message
 func (f *Formatter) Info(message string) {
 	if !f.quiet {
-		fmt.Fprintf(os.Stderr, "[INFO] %s\n", message)
+		fmt.Fprintf(f.err, "[INFO] %s\n", message)
 	}
 }
 
 func (f *Formatter) printJSON(data any) error {
 	// If data is already a string, just print it
 	if str, ok := data.(string); ok {
-		fmt.Println(str)
+		fmt.Fprintln(f.out, str)
 		return nil
 	}
 
-	encoder := json.NewEncoder(os.Stdout)
+	encoder := json.NewEncoder(f.out)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(data)
 }
@@ -126,17 +145,17 @@ func (f *Formatter) printJSON(data any) error {
 func (f *Formatter) printYAML(data any) error {
 	// If data is already a string, just print it
 	if str, ok := data.(string); ok {
-		fmt.Println(str)
+		fmt.Fprintln(f.out, str)
 		return nil
 	}
 
-	encoder := yaml.NewEncoder(os.Stdout)
+	encoder := yaml.NewEncoder(f.out)
 	encoder.SetIndent(2)
 	return encoder.Encode(data)
 }
 
 func (f *Formatter) printText(data any) error {
 	// Simple text output
-	fmt.Println(data)
+	fmt.Fprintln(f.out, data)
 	return nil
 }

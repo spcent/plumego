@@ -28,7 +28,7 @@ type Command interface {
 	Short() string
 	Long() string
 	Flags() []Flag
-	Run(args []string) error
+	Run(ctx *Context, args []string) error
 }
 
 // Flag represents a command flag
@@ -89,7 +89,13 @@ func (r *RootCmd) Run(args []string) error {
 		return r.showHelp()
 	}
 
-	return cmd.Run(args[1:])
+	ctx := &Context{
+		Out:        r.formatter,
+		ConfigPath: flagConfig,
+		EnvFile:    flagEnvFile,
+	}
+
+	return cmd.Run(ctx, args[1:])
 }
 
 func (r *RootCmd) parseGlobalFlags(args []string) []string {

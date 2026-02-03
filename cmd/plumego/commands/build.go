@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
 
 type BuildCmd struct{}
@@ -47,7 +45,7 @@ func (c *BuildCmd) Flags() []Flag {
 	}
 }
 
-func (c *BuildCmd) Run(args []string) error {
+func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("build", flag.ExitOnError)
 
 	dir := fs.String("dir", ".", "Project directory")
@@ -64,24 +62,24 @@ func (c *BuildCmd) Run(args []string) error {
 	// Get absolute directory
 	absDir, err := filepath.Abs(*dir)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("invalid directory: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
 	}
 
 	// Check if directory exists
 	if _, err := os.Stat(absDir); os.IsNotExist(err) {
-		return output.NewFormatter().Error(fmt.Sprintf("directory not found: %s", absDir), 1)
+		return ctx.Out.Error(fmt.Sprintf("directory not found: %s", absDir), 1)
 	}
 
 	// Get output path
 	absOutput, err := filepath.Abs(*outputPath)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("invalid output path: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("invalid output path: %v", err), 1)
 	}
 
 	// Create output directory
 	outputDir := filepath.Dir(absOutput)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to create output directory: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("failed to create output directory: %v", err), 1)
 	}
 
 	// Build command
@@ -123,11 +121,11 @@ func (c *BuildCmd) Run(args []string) error {
 	cmd.Stderr = os.Stderr
 
 	if flagVerbose {
-		fmt.Printf("Building: go %s\n", strings.Join(buildArgs, " "))
+		ctx.Out.Verbose(fmt.Sprintf("Building: go %s", strings.Join(buildArgs, " ")))
 	}
 
 	if err := cmd.Run(); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("build failed: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("build failed: %v", err), 1)
 	}
 
 	buildTime := time.Since(startTime)
@@ -154,7 +152,7 @@ func (c *BuildCmd) Run(args []string) error {
 		result["build_tags"] = strings.Split(*tags, ",")
 	}
 
-	return output.NewFormatter().Success("Build completed successfully", result)
+	return ctx.Out.Success("Build completed successfully", result)
 }
 
 func getGoVersion() (string, error) {

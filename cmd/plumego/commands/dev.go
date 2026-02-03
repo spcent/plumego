@@ -58,7 +58,7 @@ func (c *DevCmd) Flags() []Flag {
 	}
 }
 
-func (c *DevCmd) Run(args []string) error {
+func (c *DevCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("dev", flag.ExitOnError)
 
 	dir := fs.String("dir", ".", "Project directory")
@@ -72,32 +72,30 @@ func (c *DevCmd) Run(args []string) error {
 		return err
 	}
 
-	return c.run(*dir, *addr, *dashboardAddr, *watchPatterns, *excludePatterns, *debounceStr)
+	return c.run(ctx.Out, *dir, *addr, *dashboardAddr, *watchPatterns, *excludePatterns, *debounceStr)
 }
 
-func (c *DevCmd) run(dir, addr, dashboardAddr, watchPatterns, excludePatterns, debounceStr string) error {
+func (c *DevCmd) run(out *output.Formatter, dir, addr, dashboardAddr, watchPatterns, excludePatterns, debounceStr string) error {
 	// Parse debounce duration
 	debounce, err := time.ParseDuration(debounceStr)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
+		return out.Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
 	}
 
 	// Get absolute directory
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("invalid directory: %v", err), 1)
+		return out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
 	}
 
 	// Check if directory exists
 	if _, err := os.Stat(absDir); os.IsNotExist(err) {
-		return output.NewFormatter().Error(fmt.Sprintf("directory not found: %s", absDir), 1)
+		return out.Error(fmt.Sprintf("directory not found: %s", absDir), 1)
 	}
 
-	fmt.Printf("🚀 Starting Plumego Dev Server\n")
-	fmt.Printf("   Project: %s\n", absDir)
-	fmt.Printf("   App URL: http://localhost%s\n", addr)
-	fmt.Printf("   Dashboard URL: http://localhost%s\n", dashboardAddr)
-	fmt.Println()
+	if err := emitDevStart(out, absDir, addr, dashboardAddr); err != nil {
+		return err
+	}
 
 	// Get UI path (embedded or disk)
 	uiPath := filepath.Join(getExecutableDir(), "internal", "devserver", "ui")
@@ -110,21 +108,26 @@ func (c *DevCmd) run(dir, addr, dashboardAddr, watchPatterns, excludePatterns, d
 		UIPath:        uiPath,
 	})
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to create dashboard: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to create dashboard: %v", err), 1)
 	}
 
 	ctx := context.Background()
 
 	// Start dashboard server
 	if err := dash.Start(ctx); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to start dashboard: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to start dashboard: %v", err), 1)
 	}
 
-	fmt.Printf("✓ Dashboard started at http://localhost%s\n\n", dashboardAddr)
+	if err := emitDashboardStarted(out, dashboardAddr); err != nil {
+		return err
+	}
 
 	// Build and run the application
 	if err := dash.BuildAndRun(ctx); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to build and run: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to build and run: %v", err), 1)
+	}
+	if err := emitAppReady(out, addr); err != nil {
+		return err
 	}
 
 	// Parse watch patterns
@@ -144,7 +147,7 @@ func (c *DevCmd) run(dir, addr, dashboardAddr, watchPatterns, excludePatterns, d
 	w, err := watcher.NewWatcher(absDir, watches, excludes, debounce)
 	if err != nil {
 		dash.Stop(ctx)
-		return output.NewFormatter().Error(fmt.Sprintf("failed to create watcher: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to create watcher: %v", err), 1)
 	}
 	defer w.Close()
 
@@ -152,14 +155,17 @@ func (c *DevCmd) run(dir, addr, dashboardAddr, watchPatterns, excludePatterns, d
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	fmt.Println("👀 Watching for changes...")
-	fmt.Println("   Press Ctrl+C to stop")
+	if err := emitWatching(out); err != nil {
+		return err
+	}
 
 	// Main event loop
 	for {
 		select {
 		case path := <-w.Events():
-			fmt.Printf("\n📝 File changed: %s\n", path)
+			if err := emitFileChanged(out, path); err != nil {
+				return err
+			}
 
 			// Publish file change event to dashboard
 			dash.PublishEvent(devserver.EventFileChange, devserver.FileChangeEvent{
@@ -167,18 +173,39 @@ func (c *DevCmd) run(dir, addr, dashboardAddr, watchPatterns, excludePatterns, d
 				Action: "modify",
 			})
 
+			if out.Format() != "text" {
+				if err := out.Event(output.Event{
+					Event:   "reloading",
+					Message: "Reloading application",
+					Data: map[string]any{
+						"reason": "file_changed",
+						"path":   path,
+					},
+				}); err != nil {
+					return err
+				}
+			}
+
 			// Trigger rebuild and restart
 			if err := dash.Rebuild(ctx); err != nil {
-				fmt.Printf("❌ Reload failed: %v\n", err)
+				if err := emitReloadFailed(out, err); err != nil {
+					return err
+				}
 			} else {
-				fmt.Println("✓ Reload complete\n")
+				if err := emitReloadComplete(out); err != nil {
+					return err
+				}
 			}
 
 		case err := <-w.Errors():
-			fmt.Printf("⚠️  Watcher error: %v\n", err)
+			if err := emitWatcherError(out, err); err != nil {
+				return err
+			}
 
 		case <-sigChan:
-			fmt.Println("\n\n🛑 Shutting down...")
+			if err := emitShutdown(out); err != nil {
+				return err
+			}
 			dash.Stop(ctx)
 			return nil
 		}
@@ -201,6 +228,160 @@ func parsePatterns(s string) []string {
 	}
 
 	return result
+}
+
+func emitDevStart(out *output.Formatter, absDir, addr, dashboardAddr string) error {
+	if out.Format() == "text" {
+		if err := out.Textln("🚀 Starting Plumego Dev Server"); err != nil {
+			return err
+		}
+		if err := out.Textln(fmt.Sprintf("   Project: %s", absDir)); err != nil {
+			return err
+		}
+		if err := out.Textln(fmt.Sprintf("   App URL: http://localhost%s", addr)); err != nil {
+			return err
+		}
+		if err := out.Textln(fmt.Sprintf("   Dashboard URL: http://localhost%s", dashboardAddr)); err != nil {
+			return err
+		}
+		return out.Textln("")
+	}
+
+	return out.Event(output.Event{
+		Event:   "starting",
+		Message: "Plumego Dev Server starting",
+		Data: map[string]any{
+			"project":        absDir,
+			"app_addr":       addr,
+			"dashboard_addr": dashboardAddr,
+		},
+	})
+}
+
+func emitDashboardStarted(out *output.Formatter, dashboardAddr string) error {
+	if out.Format() == "text" {
+		if err := out.Textln(fmt.Sprintf("✓ Dashboard started at http://localhost%s", dashboardAddr)); err != nil {
+			return err
+		}
+		return out.Textln("")
+	}
+
+	return out.Event(output.Event{
+		Event:   "dashboard_started",
+		Message: "Dashboard started",
+		Data: map[string]any{
+			"url": fmt.Sprintf("http://localhost%s", dashboardAddr),
+		},
+	})
+}
+
+func emitAppReady(out *output.Formatter, addr string) error {
+	if out.Format() == "text" {
+		return nil
+	}
+
+	return out.Event(output.Event{
+		Event:   "ready",
+		Message: "Application ready",
+		Data: map[string]any{
+			"url": fmt.Sprintf("http://localhost%s", addr),
+		},
+	})
+}
+
+func emitWatching(out *output.Formatter) error {
+	if out.Format() == "text" {
+		if err := out.Textln("👀 Watching for changes..."); err != nil {
+			return err
+		}
+		return out.Textln("   Press Ctrl+C to stop")
+	}
+
+	return out.Event(output.Event{
+		Event:   "watching",
+		Message: "Watching for changes",
+	})
+}
+
+func emitFileChanged(out *output.Formatter, path string) error {
+	if out.Format() == "text" {
+		if err := out.Textln(""); err != nil {
+			return err
+		}
+		return out.Textln(fmt.Sprintf("📝 File changed: %s", path))
+	}
+
+	return out.Event(output.Event{
+		Event:   "file_changed",
+		Message: "File changed",
+		Data: map[string]any{
+			"path": path,
+		},
+	})
+}
+
+func emitReloadFailed(out *output.Formatter, reloadErr error) error {
+	if out.Format() == "text" {
+		return out.Textln(fmt.Sprintf("❌ Reload failed: %v", reloadErr))
+	}
+
+	return out.Event(output.Event{
+		Event:   "reload_failed",
+		Level:   "error",
+		Message: "Reload failed",
+		Data: map[string]any{
+			"error": reloadErr.Error(),
+		},
+	})
+}
+
+func emitReloadComplete(out *output.Formatter) error {
+	if out.Format() == "text" {
+		if err := out.Textln("✓ Reload complete"); err != nil {
+			return err
+		}
+		return out.Textln("")
+	}
+
+	return out.Event(output.Event{
+		Event:   "reload_complete",
+		Message: "Reload complete",
+	})
+}
+
+func emitWatcherError(out *output.Formatter, watchErr error) error {
+	if out.Format() == "text" {
+		return out.Textln(fmt.Sprintf("⚠️  Watcher error: %v", watchErr))
+	}
+
+	return out.Event(output.Event{
+		Event:   "watcher_error",
+		Level:   "warn",
+		Message: "Watcher error",
+		Data: map[string]any{
+			"error": watchErr.Error(),
+		},
+	})
+}
+
+func emitShutdown(out *output.Formatter) error {
+	if out.Format() == "text" {
+		if err := out.Textln(""); err != nil {
+			return err
+		}
+		if err := out.Textln(""); err != nil {
+			return err
+		}
+		return out.Textln("🛑 Shutting down...")
+	}
+
+	return out.Event(output.Event{
+		Event:   "stopped",
+		Message: "Shutting down",
+		Data: map[string]any{
+			"code": 0,
+		},
+	})
 }
 
 // getExecutableDir returns the directory containing the plumego executable

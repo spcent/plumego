@@ -49,7 +49,7 @@ func (c *InspectCmd) Flags() []Flag {
 	}
 }
 
-func (c *InspectCmd) Run(args []string) error {
+func (c *InspectCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("inspect", flag.ExitOnError)
 
 	url := fs.String("url", "http://localhost:8080", "Application URL")
@@ -63,7 +63,7 @@ func (c *InspectCmd) Run(args []string) error {
 	// Parse timeout
 	timeout, err := time.ParseDuration(*timeoutStr)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("invalid timeout: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("invalid timeout: %v", err), 1)
 	}
 
 	// Get subcommand
@@ -78,21 +78,21 @@ func (c *InspectCmd) Run(args []string) error {
 
 	switch subcommand {
 	case "health":
-		return inspectHealth(client, *url, *auth)
+		return inspectHealth(ctx.Out, client, *url, *auth)
 	case "metrics":
-		return inspectMetrics(client, *url, *auth)
+		return inspectMetrics(ctx.Out, client, *url, *auth)
 	case "routes":
-		return inspectRoutes(client, *url, *auth)
+		return inspectRoutes(ctx.Out, client, *url, *auth)
 	case "config":
-		return inspectConfig(client, *url, *auth)
+		return inspectConfig(ctx.Out, client, *url, *auth)
 	case "info":
-		return inspectInfo(client, *url, *auth)
+		return inspectInfo(ctx.Out, client, *url, *auth)
 	default:
-		return output.NewFormatter().Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
+		return ctx.Out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
 }
 
-func inspectHealth(client *http.Client, baseURL, auth string) error {
+func inspectHealth(out *output.Formatter, client *http.Client, baseURL, auth string) error {
 	// Try common health endpoints
 	endpoints := []string{
 		"/health",
@@ -135,9 +135,9 @@ func inspectHealth(client *http.Client, baseURL, auth string) error {
 			healthData["status_code"] = resp.StatusCode
 
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-				return output.NewFormatter().Success("Application is healthy", healthData)
+				return out.Success("Application is healthy", healthData)
 			} else {
-				return output.NewFormatter().Error("Application is unhealthy", 1, healthData)
+				return out.Error("Application is unhealthy", 1, healthData)
 			}
 		}
 
@@ -149,20 +149,20 @@ func inspectHealth(client *http.Client, baseURL, auth string) error {
 		}
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return output.NewFormatter().Success("Application is healthy", result)
+			return out.Success("Application is healthy", result)
 		} else {
-			return output.NewFormatter().Error("Application is unhealthy", 1, result)
+			return out.Error("Application is unhealthy", 1, result)
 		}
 	}
 
 	if lastErr != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to connect: %v", lastErr), 1)
+		return out.Error(fmt.Sprintf("failed to connect: %v", lastErr), 1)
 	}
 
-	return output.NewFormatter().Error("no health endpoints found", 1)
+	return out.Error("no health endpoints found", 1)
 }
 
-func inspectMetrics(client *http.Client, baseURL, auth string) error {
+func inspectMetrics(out *output.Formatter, client *http.Client, baseURL, auth string) error {
 	// Try common metrics endpoints
 	endpoints := []string{
 		"/metrics",
@@ -204,7 +204,7 @@ func inspectMetrics(client *http.Client, baseURL, auth string) error {
 		var metricsData map[string]any
 		if err := json.Unmarshal(body, &metricsData); err == nil {
 			metricsData["endpoint"] = endpoint
-			return output.NewFormatter().Success("Metrics retrieved", metricsData)
+			return out.Success("Metrics retrieved", metricsData)
 		}
 
 		// Return as text (e.g., Prometheus format)
@@ -214,22 +214,22 @@ func inspectMetrics(client *http.Client, baseURL, auth string) error {
 			"data":     string(body),
 		}
 
-		return output.NewFormatter().Success("Metrics retrieved", result)
+		return out.Success("Metrics retrieved", result)
 	}
 
 	if lastErr != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to fetch metrics: %v", lastErr), 1)
+		return out.Error(fmt.Sprintf("failed to fetch metrics: %v", lastErr), 1)
 	}
 
-	return output.NewFormatter().Error("no metrics endpoints found", 1)
+	return out.Error("no metrics endpoints found", 1)
 }
 
-func inspectRoutes(client *http.Client, baseURL, auth string) error {
+func inspectRoutes(out *output.Formatter, client *http.Client, baseURL, auth string) error {
 	url := strings.TrimSuffix(baseURL, "/") + "/_routes"
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to create request: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to create request: %v", err), 1)
 	}
 
 	if auth != "" {
@@ -238,33 +238,33 @@ func inspectRoutes(client *http.Client, baseURL, auth string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to connect: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return output.NewFormatter().Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
+		return out.Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to read response: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to read response: %v", err), 1)
 	}
 
 	var routesData map[string]any
 	if err := json.Unmarshal(body, &routesData); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to parse response: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to parse response: %v", err), 1)
 	}
 
-	return output.NewFormatter().Success("Routes retrieved", routesData)
+	return out.Success("Routes retrieved", routesData)
 }
 
-func inspectConfig(client *http.Client, baseURL, auth string) error {
+func inspectConfig(out *output.Formatter, client *http.Client, baseURL, auth string) error {
 	url := strings.TrimSuffix(baseURL, "/") + "/_config"
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to create request: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to create request: %v", err), 1)
 	}
 
 	if auth != "" {
@@ -273,33 +273,33 @@ func inspectConfig(client *http.Client, baseURL, auth string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to connect: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return output.NewFormatter().Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
+		return out.Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to read response: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to read response: %v", err), 1)
 	}
 
 	var configData map[string]any
 	if err := json.Unmarshal(body, &configData); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to parse response: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to parse response: %v", err), 1)
 	}
 
-	return output.NewFormatter().Success("Configuration retrieved", configData)
+	return out.Success("Configuration retrieved", configData)
 }
 
-func inspectInfo(client *http.Client, baseURL, auth string) error {
+func inspectInfo(out *output.Formatter, client *http.Client, baseURL, auth string) error {
 	url := strings.TrimSuffix(baseURL, "/") + "/_info"
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to create request: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to create request: %v", err), 1)
 	}
 
 	if auth != "" {
@@ -308,23 +308,23 @@ func inspectInfo(client *http.Client, baseURL, auth string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to connect: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return output.NewFormatter().Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
+		return out.Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to read response: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to read response: %v", err), 1)
 	}
 
 	var infoData map[string]any
 	if err := json.Unmarshal(body, &infoData); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to parse response: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to parse response: %v", err), 1)
 	}
 
-	return output.NewFormatter().Success("Application info retrieved", infoData)
+	return out.Success("Application info retrieved", infoData)
 }

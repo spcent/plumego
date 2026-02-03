@@ -10,7 +10,6 @@ import (
 
 // CheckCmd validates project health
 type CheckCmd struct {
-	formatter *output.Formatter
 }
 
 func (c *CheckCmd) Name() string  { return "check" }
@@ -39,11 +38,8 @@ func (c *CheckCmd) Flags() []Flag {
 	}
 }
 
-func (c *CheckCmd) Run(args []string) error {
-	c.formatter = output.NewFormatter()
-	c.formatter.SetFormat(flagFormat)
-	c.formatter.SetQuiet(flagQuiet)
-	c.formatter.SetVerbose(flagVerbose)
+func (c *CheckCmd) Run(ctx *Context, args []string) error {
+	out := ctx.Out
 
 	// Parse flags
 	configOnly := false
@@ -64,10 +60,10 @@ func (c *CheckCmd) Run(args []string) error {
 	// Determine current directory
 	cwd, err := os.Getwd()
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose(fmt.Sprintf("Checking project at: %s", cwd))
+	out.Verbose(fmt.Sprintf("Checking project at: %s", cwd))
 
 	// Run checks
 	checks := &checker.CheckResult{
@@ -77,8 +73,8 @@ func (c *CheckCmd) Run(args []string) error {
 
 	// Configuration check
 	if !depsOnly {
-		c.formatter.Verbose("Running configuration checks...")
-		configCheck := checker.CheckConfig(cwd, flagEnvFile)
+		out.Verbose("Running configuration checks...")
+		configCheck := checker.CheckConfig(cwd, ctx.EnvFile)
 		checks.Checks["config"] = configCheck
 		if configCheck.Status == "failed" {
 			checks.Status = "unhealthy"
@@ -87,7 +83,7 @@ func (c *CheckCmd) Run(args []string) error {
 
 	// Dependencies check
 	if !configOnly {
-		c.formatter.Verbose("Running dependency checks...")
+		out.Verbose("Running dependency checks...")
 		depsCheck := checker.CheckDependencies(cwd)
 		checks.Checks["dependencies"] = depsCheck
 		if depsCheck.Status == "failed" {
@@ -99,8 +95,8 @@ func (c *CheckCmd) Run(args []string) error {
 
 	// Security check
 	if security && !configOnly && !depsOnly {
-		c.formatter.Verbose("Running security checks...")
-		securityCheck := checker.CheckSecurity(cwd, flagEnvFile)
+		out.Verbose("Running security checks...")
+		securityCheck := checker.CheckSecurity(cwd, ctx.EnvFile)
 		checks.Checks["security"] = securityCheck
 		if securityCheck.Status == "failed" {
 			checks.Status = "unhealthy"
@@ -111,7 +107,7 @@ func (c *CheckCmd) Run(args []string) error {
 
 	// Project structure check
 	if !configOnly && !depsOnly {
-		c.formatter.Verbose("Running project structure checks...")
+		out.Verbose("Running project structure checks...")
 		structureCheck := checker.CheckStructure(cwd)
 		checks.Checks["structure"] = structureCheck
 		if structureCheck.Status == "warning" && checks.Status == "healthy" {
@@ -129,13 +125,12 @@ func (c *CheckCmd) Run(args []string) error {
 	}
 
 	if exitCode == 0 {
-		return c.formatter.Success("All checks passed", checks)
+		return out.Success("All checks passed", checks)
 	}
 
 	// Print result and exit with appropriate code
-	if err := c.formatter.Print(checks); err != nil {
+	if err := out.Print(checks); err != nil {
 		return err
 	}
-	os.Exit(exitCode)
-	return nil
+	return output.Exit(exitCode)
 }

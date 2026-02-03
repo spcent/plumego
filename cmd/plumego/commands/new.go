@@ -5,13 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spcent/plumego/cmd/plumego/internal/output"
 	"github.com/spcent/plumego/cmd/plumego/internal/scaffold"
 )
 
 // NewCmd creates a new project
 type NewCmd struct {
-	formatter *output.Formatter
 }
 
 func (c *NewCmd) Name() string  { return "new" }
@@ -43,14 +41,11 @@ func (c *NewCmd) Flags() []Flag {
 	}
 }
 
-func (c *NewCmd) Run(args []string) error {
-	c.formatter = output.NewFormatter()
-	c.formatter.SetFormat(flagFormat)
-	c.formatter.SetQuiet(flagQuiet)
-	c.formatter.SetVerbose(flagVerbose)
+func (c *NewCmd) Run(ctx *Context, args []string) error {
+	out := ctx.Out
 
 	if len(args) == 0 {
-		return c.formatter.Error("project name required", 1)
+		return out.Error("project name required", 1)
 	}
 
 	projectName := args[0]
@@ -93,14 +88,14 @@ func (c *NewCmd) Run(args []string) error {
 		module = projectName
 	}
 
-	c.formatter.Verbose(fmt.Sprintf("Creating project: %s", projectName))
-	c.formatter.Verbose(fmt.Sprintf("Template: %s", template))
-	c.formatter.Verbose(fmt.Sprintf("Module: %s", module))
-	c.formatter.Verbose(fmt.Sprintf("Directory: %s", dir))
+	out.Verbose(fmt.Sprintf("Creating project: %s", projectName))
+	out.Verbose(fmt.Sprintf("Template: %s", template))
+	out.Verbose(fmt.Sprintf("Module: %s", module))
+	out.Verbose(fmt.Sprintf("Directory: %s", dir))
 
 	// Check if directory exists
 	if _, err := os.Stat(dir); err == nil && !force {
-		return c.formatter.Error(fmt.Sprintf("directory %s already exists (use --force to overwrite)", dir), 2)
+		return out.Error(fmt.Sprintf("directory %s already exists (use --force to overwrite)", dir), 2)
 	}
 
 	// Validate template
@@ -113,7 +108,7 @@ func (c *NewCmd) Run(args []string) error {
 		}
 	}
 	if !valid {
-		return c.formatter.Error(fmt.Sprintf("invalid template: %s (valid: minimal, api, fullstack, microservice)", template), 3)
+		return out.Error(fmt.Sprintf("invalid template: %s (valid: minimal, api, fullstack, microservice)", template), 3)
 	}
 
 	// Dry run - just show what would be created
@@ -127,13 +122,13 @@ func (c *NewCmd) Run(args []string) error {
 			"template":      template,
 			"files_created": files,
 		}
-		return c.formatter.Print(result)
+		return out.Print(result)
 	}
 
 	// Create project
 	files, err := scaffold.CreateProject(dir, projectName, module, template, !noGit)
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to create project: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to create project: %v", err), 1)
 	}
 
 	// Success response
@@ -150,5 +145,5 @@ func (c *NewCmd) Run(args []string) error {
 		},
 	}
 
-	return c.formatter.Success("Project created successfully", result)
+	return out.Success("Project created successfully", result)
 }

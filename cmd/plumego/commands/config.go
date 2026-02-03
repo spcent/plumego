@@ -10,7 +10,6 @@ import (
 
 // ConfigCmd manages configuration
 type ConfigCmd struct {
-	formatter *output.Formatter
 }
 
 func (c *ConfigCmd) Name() string  { return "config" }
@@ -40,14 +39,11 @@ func (c *ConfigCmd) Flags() []Flag {
 	}
 }
 
-func (c *ConfigCmd) Run(args []string) error {
-	c.formatter = output.NewFormatter()
-	c.formatter.SetFormat(flagFormat)
-	c.formatter.SetQuiet(flagQuiet)
-	c.formatter.SetVerbose(flagVerbose)
+func (c *ConfigCmd) Run(ctx *Context, args []string) error {
+	out := ctx.Out
 
 	if len(args) == 0 {
-		return c.formatter.Error("config command required (show, validate, init, env)", 1)
+		return out.Error("config command required (show, validate, init, env)", 1)
 	}
 
 	subCmd := args[0]
@@ -55,19 +51,19 @@ func (c *ConfigCmd) Run(args []string) error {
 
 	switch subCmd {
 	case "show":
-		return c.runShow(subArgs)
+		return c.runShow(out, ctx.EnvFile, subArgs)
 	case "validate":
-		return c.runValidate(subArgs)
+		return c.runValidate(out, ctx.EnvFile, subArgs)
 	case "init":
-		return c.runInit(subArgs)
+		return c.runInit(out, subArgs)
 	case "env":
-		return c.runEnv(subArgs)
+		return c.runEnv(out, ctx.EnvFile, subArgs)
 	default:
-		return c.formatter.Error(fmt.Sprintf("unknown config command: %s", subCmd), 1)
+		return out.Error(fmt.Sprintf("unknown config command: %s", subCmd), 1)
 	}
 }
 
-func (c *ConfigCmd) runShow(args []string) error {
+func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string) error {
 	resolve := false
 	redact := false
 
@@ -82,77 +78,75 @@ func (c *ConfigCmd) runShow(args []string) error {
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose("Loading configuration...")
-	config, err := configmgr.LoadConfig(cwd, flagEnvFile, resolve)
+	out.Verbose("Loading configuration...")
+	config, err := configmgr.LoadConfig(cwd, envFile, resolve)
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to load config: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to load config: %v", err), 1)
 	}
 
 	if redact {
 		config = configmgr.RedactSensitive(config)
 	}
 
-	return c.formatter.Print(config)
+	return out.Print(config)
 }
 
-func (c *ConfigCmd) runValidate(args []string) error {
+func (c *ConfigCmd) runValidate(out *output.Formatter, envFile string, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose(fmt.Sprintf("Validating configuration with args: %v", args))
-	result := configmgr.ValidateConfig(cwd, flagEnvFile)
+	out.Verbose(fmt.Sprintf("Validating configuration with args: %v", args))
+	result := configmgr.ValidateConfig(cwd, envFile)
 
 	if len(result.Errors) > 0 {
-		if err := c.formatter.Print(result); err != nil {
+		if err := out.Print(result); err != nil {
 			return err
 		}
-		os.Exit(1)
-		return nil
+		return output.Exit(1)
 	}
 
 	if len(result.Warnings) > 0 {
-		if err := c.formatter.Print(result); err != nil {
+		if err := out.Print(result); err != nil {
 			return err
 		}
-		os.Exit(2)
-		return nil
+		return output.Exit(2)
 	}
 
-	return c.formatter.Success("Configuration is valid", result)
+	return out.Success("Configuration is valid", result)
 }
 
-func (c *ConfigCmd) runInit(args []string) error {
+func (c *ConfigCmd) runInit(out *output.Formatter, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose(fmt.Sprintf("Generating default configuration files with args: %v", args))
+	out.Verbose(fmt.Sprintf("Generating default configuration files with args: %v", args))
 	files, err := configmgr.InitConfig(cwd)
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to init config: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to init config: %v", err), 1)
 	}
 
 	result := map[string]any{
 		"files_created": files,
 	}
 
-	return c.formatter.Success("Configuration files created", result)
+	return out.Success("Configuration files created", result)
 }
 
-func (c *ConfigCmd) runEnv(args []string) error {
+func (c *ConfigCmd) runEnv(out *output.Formatter, envFile string, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return c.formatter.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	c.formatter.Verbose(fmt.Sprintf("Loading environment variables with args: %v", args))
-	envVars := configmgr.GetEnvVars(cwd, flagEnvFile)
+	out.Verbose(fmt.Sprintf("Loading environment variables with args: %v", args))
+	envVars := configmgr.GetEnvVars(cwd, envFile)
 
-	return c.formatter.Print(envVars)
+	return out.Print(envVars)
 }

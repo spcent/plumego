@@ -48,7 +48,7 @@ func (c *MigrateCmd) Flags() []Flag {
 	}
 }
 
-func (c *MigrateCmd) Run(args []string) error {
+func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("migrate", flag.ExitOnError)
 
 	dir := fs.String("dir", "./migrations", "Migrations directory")
@@ -60,6 +60,8 @@ func (c *MigrateCmd) Run(args []string) error {
 		return err
 	}
 
+	out := ctx.Out
+
 	subcommand := "status"
 	if fs.NArg() > 0 {
 		subcommand = fs.Arg(0)
@@ -67,7 +69,7 @@ func (c *MigrateCmd) Run(args []string) error {
 
 	absDir, err := filepath.Abs(*dir)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("invalid directory: %v", err), 1)
+		return out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
 	}
 
 	switch subcommand {
@@ -77,12 +79,12 @@ func (c *MigrateCmd) Run(args []string) error {
 			name = fs.Arg(1)
 		}
 		if name == "" {
-			return output.NewFormatter().Error("migration name is required", 1)
+			return out.Error("migration name is required", 1)
 		}
 
 		migration, err := migrate.CreateMigrationFiles(absDir, name, time.Now())
 		if err != nil {
-			return output.NewFormatter().Error(fmt.Sprintf("failed to create migration: %v", err), 1)
+			return out.Error(fmt.Sprintf("failed to create migration: %v", err), 1)
 		}
 
 		result := map[string]any{
@@ -93,58 +95,58 @@ func (c *MigrateCmd) Run(args []string) error {
 			"directory": absDir,
 		}
 
-		return output.NewFormatter().Success("Migration files created", result)
+		return out.Success("Migration files created", result)
 	case "status", "up", "down":
 		if *driver == "" || *dbURL == "" {
-			return output.NewFormatter().Error("driver and db-url are required", 1)
+			return out.Error("driver and db-url are required", 1)
 		}
-		return c.runWithDatabase(subcommand, absDir, *driver, *dbURL, *steps)
+		return c.runWithDatabase(out, subcommand, absDir, *driver, *dbURL, *steps)
 	default:
-		return output.NewFormatter().Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
+		return out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
 }
 
-func (c *MigrateCmd) runWithDatabase(subcommand, dir, driver, dbURL string, steps int) error {
+func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, driver, dbURL string, steps int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	db, err := sql.Open(driver, dbURL)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to open database: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to open database: %v", err), 1)
 	}
 	defer db.Close()
 
 	if err := db.PingContext(ctx); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to connect: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
 	}
 
 	if err := migrate.EnsureSchemaTable(ctx, db); err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to ensure schema table: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to ensure schema table: %v", err), 1)
 	}
 
 	migrations, err := migrate.LoadMigrations(dir)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to load migrations: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to load migrations: %v", err), 1)
 	}
 
 	applied, err := migrate.FetchApplied(ctx, db)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
 	}
 
 	switch subcommand {
 	case "status":
-		return c.reportStatus(migrations, applied)
+		return c.reportStatus(out, migrations, applied)
 	case "up":
-		return c.applyUp(ctx, db, driver, migrations, applied, steps)
+		return c.applyUp(out, ctx, db, driver, migrations, applied, steps)
 	case "down":
-		return c.applyDown(ctx, db, driver, migrations, applied, steps)
+		return c.applyDown(out, ctx, db, driver, migrations, applied, steps)
 	default:
-		return output.NewFormatter().Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
+		return out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
 }
 
-func (c *MigrateCmd) reportStatus(migrations []migrate.Migration, applied []migrate.AppliedMigration) error {
+func (c *MigrateCmd) reportStatus(out *output.Formatter, migrations []migrate.Migration, applied []migrate.AppliedMigration) error {
 	appliedMap := make(map[string]migrate.AppliedMigration)
 	for _, entry := range applied {
 		appliedMap[entry.Version] = entry
@@ -174,10 +176,10 @@ func (c *MigrateCmd) reportStatus(migrations []migrate.Migration, applied []migr
 		"total":           len(migrations),
 	}
 
-	return output.NewFormatter().Success("Migration status", result)
+	return out.Success("Migration status", result)
 }
 
-func (c *MigrateCmd) applyUp(ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
+func (c *MigrateCmd) applyUp(out *output.Formatter, ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
 	appliedMap := make(map[string]struct{})
 	for _, entry := range applied {
 		appliedMap[entry.Version] = struct{}{}
@@ -196,14 +198,14 @@ func (c *MigrateCmd) applyUp(ctx context.Context, db *sql.DB, driver string, mig
 	}
 
 	if len(pending) == 0 {
-		return output.NewFormatter().Error("no migrations to apply", 2)
+		return out.Error("no migrations to apply", 2)
 	}
 
 	var appliedResults []map[string]any
 	for _, migration := range pending {
 		duration, err := migrate.ApplyUp(ctx, db, driver, migration, time.Now())
 		if err != nil {
-			return output.NewFormatter().Error(fmt.Sprintf("failed to apply migration %s: %v", migration.Version, err), 1)
+			return out.Error(fmt.Sprintf("failed to apply migration %s: %v", migration.Version, err), 1)
 		}
 
 		appliedResults = append(appliedResults, map[string]any{
@@ -215,7 +217,7 @@ func (c *MigrateCmd) applyUp(ctx context.Context, db *sql.DB, driver string, mig
 
 	newApplied, err := migrate.FetchApplied(ctx, db)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
 	}
 
 	result := map[string]any{
@@ -225,12 +227,12 @@ func (c *MigrateCmd) applyUp(ctx context.Context, db *sql.DB, driver string, mig
 		"pending":         pendingVersions(migrations, newApplied),
 	}
 
-	return output.NewFormatter().Success("Migrations applied", result)
+	return out.Success("Migrations applied", result)
 }
 
-func (c *MigrateCmd) applyDown(ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
+func (c *MigrateCmd) applyDown(out *output.Formatter, ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
 	if len(applied) == 0 {
-		return output.NewFormatter().Error("no migrations to roll back", 2)
+		return out.Error("no migrations to roll back", 2)
 	}
 
 	migrationMap := make(map[string]migrate.Migration)
@@ -253,12 +255,12 @@ func (c *MigrateCmd) applyDown(ctx context.Context, db *sql.DB, driver string, m
 	for _, entry := range toRollback {
 		migration, ok := migrationMap[entry.Version]
 		if !ok {
-			return output.NewFormatter().Error(fmt.Sprintf("missing migration files for version %s", entry.Version), 1)
+			return out.Error(fmt.Sprintf("missing migration files for version %s", entry.Version), 1)
 		}
 
 		duration, err := migrate.ApplyDown(ctx, db, driver, migration)
 		if err != nil {
-			return output.NewFormatter().Error(fmt.Sprintf("failed to roll back migration %s: %v", migration.Version, err), 1)
+			return out.Error(fmt.Sprintf("failed to roll back migration %s: %v", migration.Version, err), 1)
 		}
 
 		rolledBack = append(rolledBack, map[string]any{
@@ -270,7 +272,7 @@ func (c *MigrateCmd) applyDown(ctx context.Context, db *sql.DB, driver string, m
 
 	newApplied, err := migrate.FetchApplied(ctx, db)
 	if err != nil {
-		return output.NewFormatter().Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
 	}
 
 	result := map[string]any{
@@ -280,7 +282,7 @@ func (c *MigrateCmd) applyDown(ctx context.Context, db *sql.DB, driver string, m
 		"pending":         pendingVersions(migrations, newApplied),
 	}
 
-	return output.NewFormatter().Success("Migrations rolled back", result)
+	return out.Success("Migrations rolled back", result)
 }
 
 func latestVersion(applied []migrate.AppliedMigration) string {

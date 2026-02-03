@@ -4,7 +4,7 @@
 
 为 plumego 设计并实现了一个 **代码代理友好** 的命令行工具，具有完整的结构化输出、非交互操作和可预测的退出码。
 
-## ✅ 已完成的工作
+## 已完成的工作
 
 ### 1. CLI 架构设计
 **文档**: `docs/CLI_DESIGN.md` (500+ 行)
@@ -56,7 +56,7 @@
 ### 3. 实现的命令
 
 #### 命令 #1: `plumego new` - 项目脚手架
-**状态**: ✅ 完全实现
+**状态**: 完全实现
 
 创建带模板的新 plumego 项目。
 
@@ -97,17 +97,17 @@ plumego new myapp --dry-run --format json
 ---
 
 #### 命令 #2: `plumego check` - 健康验证
-**状态**: ✅ 完全实现
+**状态**: 完全实现
 **位置**: `commands/check.go`, `internal/checker/`
 
 全面的项目健康检查。
 
 **检查项:**
-- ✅ 配置验证（go.mod, env 文件）
-- ✅ 依赖验证（go mod verify）
-- ✅ 过时包检测
-- ✅ 安全审计（秘密检测, .gitignore）
-- ✅ 项目结构验证
+- 配置验证（go.mod, env 文件）
+- 依赖验证（go mod verify）
+- 过时包检测
+- 安全审计（秘密检测, .gitignore）
+- 项目结构验证
 
 **选项:**
 - `--config-only` - 仅检查配置
@@ -159,7 +159,7 @@ plumego check --config-only
 ---
 
 #### 命令 #3: `plumego config` - 配置管理
-**状态**: ✅ 完全实现
+**状态**: 完全实现
 **位置**: `commands/config.go`, `internal/configmgr/`
 
 管理配置文件和环境变量。
@@ -223,7 +223,7 @@ plumego config env --format json
 ---
 
 #### 命令 #4: `plumego generate` - 代码生成
-**状态**: ✅ 完全实现
+**状态**: 完全实现
 **位置**: `commands/generate.go`, `internal/codegen/`
 
 生成 plumego 组件的样板代码。
@@ -347,10 +347,10 @@ require (
 ```
 
 **好处:**
-1. ✅ 依赖隔离 - CLI 依赖不影响核心库
-2. ✅ 更干净的核心 - 使用 plumego 的项目获得零额外依赖
-3. ✅ 灵活的工具 - CLI 可以使用任何需要的依赖
-4. ✅ 更好的兼容性 - 核心保持超轻量
+1. 依赖隔离 - CLI 依赖不影响核心库
+2. 更干净的核心 - 使用 plumego 的项目获得零额外依赖
+3. 灵活的工具 - CLI 可以使用任何需要的依赖
+4. 更好的兼容性 - 核心保持超轻量
 
 **验证:**
 ```bash
@@ -412,12 +412,12 @@ cd cmd/plumego && grep yaml go.mod  # 显示 gopkg.in/yaml.v3
 **测试覆盖**: 手动测试完成
 
 **实现细分:**
-- ✅ 核心框架: 100%
-- ✅ 项目脚手架: 100%
-- ✅ 健康验证: 100%
-- ✅ 配置管理: 100%
-- ✅ 代码生成: 100%
-- ✅ 独立模块: 100%
+- 核心框架: 100%
+- 项目脚手架: 100%
+- 健康验证: 100%
+- 配置管理: 100%
+- 代码生成: 100%
+- 独立模块: 100%
 - 🚧 开发工具: 0%
 - 🚧 运行时检查: 0%
 
@@ -440,22 +440,22 @@ cmd/plumego/
 ├── main.go                         # 入口点
 ├── commands/
 │   ├── root.go                    # 命令调度器
-│   ├── new.go                     # ✅ 项目脚手架
-│   ├── check.go                   # ✅ 健康验证
-│   ├── config.go                  # ✅ 配置管理
-│   ├── generate.go                # ✅ 代码生成
+│   ├── new.go                     # 项目脚手架
+│   ├── check.go                   # 健康验证
+│   ├── config.go                  # 配置管理
+│   ├── generate.go                # 代码生成
 │   └── stubs.go                   # 🚧 存根实现
 └── internal/
     ├── output/
-    │   └── formatter.go           # ✅ JSON/YAML/Text 输出
+    │   └── formatter.go           # JSON/YAML/Text 输出
     ├── scaffold/
-    │   └── scaffold.go            # ✅ 项目模板
+    │   └── scaffold.go            # 项目模板
     ├── checker/
-    │   └── checker.go             # ✅ 健康检查逻辑
+    │   └── checker.go             # 健康检查逻辑
     ├── configmgr/
-    │   └── configmgr.go           # ✅ 配置逻辑
+    │   └── configmgr.go           # 配置逻辑
     └── codegen/
-        └── codegen.go             # ✅ 代码生成模板
+        └── codegen.go             # 代码生成模板
 ```
 
 ---
@@ -578,11 +578,11 @@ plumego generate component Auth
 
 plumego CLI 已 **40% 完成**，所有核心功能已为代码代理实现：
 
-✅ **项目创建** - 脚手架新项目
-✅ **健康验证** - 检查项目健康
-✅ **配置管理** - 管理配置
-✅ **代码生成** - 生成样板代码
-✅ **独立模块** - CLI 与核心分离
+**项目创建** - 脚手架新项目
+**健康验证** - 检查项目健康
+**配置管理** - 管理配置
+**代码生成** - 生成样板代码
+**独立模块** - CLI 与核心分离
 
 所有实现的命令：
 - 输出结构化 JSON/YAML

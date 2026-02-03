@@ -3,8 +3,6 @@ package commands
 import (
 	"flag"
 	"runtime"
-
-	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
 
 // Version information (set at build time)
@@ -36,7 +34,7 @@ func (c *VersionCmd) Flags() []Flag {
 	return nil
 }
 
-func (c *VersionCmd) Run(args []string) error {
+func (c *VersionCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("version", flag.ExitOnError)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -50,5 +48,5 @@ func (c *VersionCmd) Run(args []string) error {
 		"platform":   runtime.GOOS + "/" + runtime.GOARCH,
 	}
 
-	return output.NewFormatter().Success("Plumego CLI", versionInfo)
+	return ctx.Out.Success("Plumego CLI", versionInfo)
 }
