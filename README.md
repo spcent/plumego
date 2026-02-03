@@ -99,11 +99,102 @@ func main() {
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, etc., or the context-aware variants (`GetCtx`) that expose a unified request context wrapper. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
 - **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (security headers, abuse guard, body size limits, concurrency limits) are auto-injected during setup. Recovery/logging/CORS helpers can be enabled via `core.WithRecovery`, `core.WithLogging`, and `core.WithCORS`. For a production-safe baseline, `core.WithRecommendedMiddleware()` enables RequestID + Logging + Recovery in the recommended order.
-- **Tenant toolkit**: `tenant` provides tenant config, policy, and quota primitives plus middleware helpers (`middleware.TenantResolver`, `middleware.TenantPolicy`, `middleware.TenantQuota`) and a `core.TenantConfigComponent` for wiring tenant configuration into the core lifecycle.
+- **Multi-Tenancy**: Production-ready tenant isolation with quota enforcement, policy controls, and automatic database filtering. See [Multi-Tenancy](#multi-tenancy) section for details.
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
 - **WebSocket Hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint, plus an optional broadcast endpoint (protected by a shared secret). Customize worker count and queue size via `WebSocketConfig`.
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
+
+## Multi-Tenancy
+
+Plumego provides production-ready multi-tenancy primitives for SaaS applications with tenant isolation, quota enforcement, and policy controls.
+
+### Features
+
+- **Tenant Configuration**: Flexible storage backends (in-memory, database with LRU caching)
+- **Quota Management**: Per-tenant rate limiting (requests/minute, tokens/minute) with fixed-window enforcement
+- **Policy Controls**: Per-tenant allow-lists for models and tools
+- **Database Isolation**: Automatic tenant filtering for all SQL queries via `TenantDB` wrapper
+- **Middleware Stack**: Tenant resolution → Quota checking → Policy enforcement
+- **Audit Hooks**: Optional callbacks for monitoring quota/policy violations
+
+### Quick Setup
+
+```go
+import (
+    "github.com/spcent/plumego"
+    "github.com/spcent/plumego/store/db"
+)
+
+// Create tenant config manager with caching
+tenantMgr := plumego.NewDBTenantConfigManager(
+    database,
+    plumego.WithTenantCache(1000, 5*time.Minute),
+)
+
+// Create quota and policy managers
+quotaMgr := plumego.NewInMemoryQuotaManager(tenantMgr)
+policyEval := plumego.NewConfigPolicyEvaluator(tenantMgr)
+
+// Create tenant-aware database wrapper
+tenantDB := plumego.NewTenantDB(database)
+
+// Configure application
+app := plumego.New(
+    plumego.WithTenantConfigManager(tenantMgr),
+    plumego.WithTenantMiddleware(plumego.TenantMiddlewareOptions{
+        HeaderName:      "X-Tenant-ID",
+        AllowMissing:    false,
+        QuotaManager:    quotaMgr,
+        PolicyEvaluator: policyEval,
+        Hooks: plumego.TenantHooks{
+            OnQuota: func(ctx context.Context, decision plumego.TenantQuotaDecision) {
+                if !decision.Allowed {
+                    log.Printf("Quota exceeded for %s", decision.TenantID)
+                }
+            },
+        },
+    }),
+)
+```
+
+### Automatic Query Filtering
+
+The `TenantDB` wrapper automatically filters all queries by tenant ID:
+
+```go
+// Your query
+rows, err := tenantDB.QueryFromContext(ctx,
+    "SELECT * FROM users WHERE active = ?", true)
+
+// Automatically becomes
+"SELECT * FROM users WHERE tenant_id = ? AND active = ?"
+// with tenant_id from context
+```
+
+This prevents cross-tenant data leaks and simplifies business logic by removing manual tenant filtering.
+
+### Example Application
+
+See `examples/multi-tenant-saas/` for a complete working example with:
+- Admin API for tenant CRUD operations
+- Tenant-scoped business API
+- Quota enforcement with retry-after headers
+- Policy validation for models/tools
+- Request analytics per tenant
+
+Run it:
+```bash
+cd examples/multi-tenant-saas
+go run .
+```
+
+### Production Considerations
+
+- **Performance**: Use database-backed config manager with LRU caching (1000+ tenants)
+- **Security**: Replace header-based tenant ID with signed JWT tokens
+- **Monitoring**: Enable quota/policy hooks for metrics collection
+- **Scaling**: Run multiple instances behind load balancer with shared database
 
 ## Background Runners
 Register background tasks with a minimal lifecycle interface:
