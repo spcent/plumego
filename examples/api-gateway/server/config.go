@@ -22,6 +22,11 @@ type Config struct {
 	Security  SecurityConfig  `json:"security"`
 	TLS       TLSConfig       `json:"tls"`
 	Admin     AdminConfig     `json:"admin"`
+	// Phase 3 features
+	Tracing  TracingConfig  `json:"tracing"`
+	Cache    CacheConfig    `json:"cache"`
+	Canary   CanaryConfig   `json:"canary"`
+	Advanced AdvancedConfig `json:"advanced"`
 }
 
 // ServerConfig holds server-level configuration
@@ -65,6 +70,57 @@ type AdminConfig struct {
 	Enabled bool   `json:"enabled"`
 	Path    string `json:"path"`
 	APIKey  string `json:"api_key"` // Simple API key for admin endpoints
+}
+
+// TracingConfig holds distributed tracing configuration
+type TracingConfig struct {
+	Enabled      bool    `json:"enabled"`
+	Endpoint     string  `json:"endpoint"`      // OpenTelemetry collector endpoint
+	ServiceName  string  `json:"service_name"`  // Service name for traces
+	SampleRate   float64 `json:"sample_rate"`   // Sampling rate (0.0-1.0)
+	ExportFormat string  `json:"export_format"` // jaeger, zipkin, otlp
+}
+
+// CacheConfig holds response caching configuration
+type CacheConfig struct {
+	Enabled      bool          `json:"enabled"`
+	TTL          time.Duration `json:"ttl"`           // Default cache TTL
+	MaxSize      int           `json:"max_size"`      // Maximum cache size in MB
+	ExcludePaths []string      `json:"exclude_paths"` // Paths to exclude from caching
+	OnlyMethods  []string      `json:"only_methods"`  // Only cache these methods (default: GET)
+	VaryHeaders  []string      `json:"vary_headers"`  // Headers that affect cache key
+}
+
+// CanaryConfig holds canary deployment / traffic splitting configuration
+type CanaryConfig struct {
+	Enabled       bool         `json:"enabled"`
+	Rules         []CanaryRule `json:"rules"`          // Canary rules per service
+	DefaultWeight int          `json:"default_weight"` // Default weight for primary targets
+}
+
+// CanaryRule defines a traffic splitting rule for a service
+type CanaryRule struct {
+	ServiceName   string            `json:"service_name"`   // Which service this applies to
+	CanaryTargets []string          `json:"canary_targets"` // Canary backend targets
+	CanaryWeight  int               `json:"canary_weight"`  // Weight for canary (0-100)
+	HeaderMatch   map[string]string `json:"header_match"`   // Route based on headers
+	CookieMatch   string            `json:"cookie_match"`   // Route based on cookie
+}
+
+// AdvancedConfig holds advanced routing configuration
+type AdvancedConfig struct {
+	Enabled      bool          `json:"enabled"`
+	RoutingRules []RoutingRule `json:"routing_rules"` // Advanced routing rules
+}
+
+// RoutingRule defines an advanced routing rule
+type RoutingRule struct {
+	Path          string            `json:"path"`           // Path pattern to match
+	HeaderMatch   map[string]string `json:"header_match"`   // Header conditions
+	QueryMatch    map[string]string `json:"query_match"`    // Query parameter conditions
+	TargetService string            `json:"target_service"` // Which service to route to
+	TargetURL     string            `json:"target_url"`     // Or specific URL to route to
+	Priority      int               `json:"priority"`       // Rule priority (higher = first)
 }
 
 // MetricsConfig holds metrics configuration
@@ -198,6 +254,31 @@ func LoadConfig() (*Config, error) {
 				RetryCount:   getEnvInt("PRODUCT_SERVICE_RETRY", 3),
 			},
 		},
+		// Phase 3 features
+		Tracing: TracingConfig{
+			Enabled:      getEnvBool("TRACING_ENABLED", false),
+			Endpoint:     getEnv("TRACING_ENDPOINT", "http://localhost:14268/api/traces"),
+			ServiceName:  getEnv("TRACING_SERVICE_NAME", "api-gateway"),
+			SampleRate:   getEnvFloat("TRACING_SAMPLE_RATE", 1.0),
+			ExportFormat: getEnv("TRACING_EXPORT_FORMAT", "jaeger"),
+		},
+		Cache: CacheConfig{
+			Enabled:      getEnvBool("CACHE_ENABLED", false),
+			TTL:          getEnvDuration("CACHE_TTL", 5*time.Minute),
+			MaxSize:      getEnvInt("CACHE_MAX_SIZE", 100), // 100 MB
+			ExcludePaths: getEnvSlice("CACHE_EXCLUDE_PATHS", []string{"/admin/*", "/metrics"}),
+			OnlyMethods:  getEnvSlice("CACHE_ONLY_METHODS", []string{"GET"}),
+			VaryHeaders:  getEnvSlice("CACHE_VARY_HEADERS", []string{"Accept", "Accept-Encoding"}),
+		},
+		Canary: CanaryConfig{
+			Enabled:       getEnvBool("CANARY_ENABLED", false),
+			DefaultWeight: getEnvInt("CANARY_DEFAULT_WEIGHT", 100),
+			// Rules loaded separately via JSON config if needed
+		},
+		Advanced: AdvancedConfig{
+			Enabled: getEnvBool("ADVANCED_ROUTING_ENABLED", false),
+			// Rules loaded separately via JSON config if needed
+		},
 	}
 
 	return cfg, nil
@@ -281,6 +362,17 @@ func getEnvInt(key string, defaultValue int) int {
 			return defaultValue
 		}
 		return i
+	}
+	return defaultValue
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		f, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return defaultValue
+		}
+		return f
 	}
 	return defaultValue
 }

@@ -37,6 +37,10 @@ func main() {
 	log.Printf("  Security Headers: %v", cfg.Security.Enabled)
 	log.Printf("  TLS: %v", cfg.TLS.Enabled)
 	log.Printf("  Admin API: %v (%s)", cfg.Admin.Enabled, cfg.Admin.Path)
+	log.Printf("  Tracing: %v (%s)", cfg.Tracing.Enabled, cfg.Tracing.ServiceName)
+	log.Printf("  Cache: %v (TTL: %v, Size: %dMB)", cfg.Cache.Enabled, cfg.Cache.TTL, cfg.Cache.MaxSize)
+	log.Printf("  Canary: %v", cfg.Canary.Enabled)
+	log.Printf("  Advanced Routing: %v", cfg.Advanced.Enabled)
 	log.Printf("  User Service: %v (%d targets, timeout=%v, retries=%d)",
 		cfg.Services.UserService.Enabled, len(cfg.Services.UserService.Targets),
 		cfg.Services.UserService.Timeout, cfg.Services.UserService.RetryCount)
@@ -109,7 +113,14 @@ func main() {
 	// Configure middleware stack for /api routes
 	apiGroup := app.Router().Group("/api")
 
-	// Apply security headers if enabled (first in chain)
+	// Apply distributed tracing if enabled (first to capture full request)
+	if cfg.Tracing.Enabled {
+		apiGroup.Use(TracingMiddleware(cfg.Tracing))
+		log.Printf("✓ Distributed tracing enabled (service: %s, sample: %.0f%%)",
+			cfg.Tracing.ServiceName, cfg.Tracing.SampleRate*100)
+	}
+
+	// Apply security headers if enabled
 	if cfg.Security.Enabled {
 		apiGroup.Use(SecurityHeadersMiddleware(cfg.Security))
 		log.Printf("✓ Security headers enabled (HSTS: %v, CSP: %v)",
@@ -119,6 +130,13 @@ func main() {
 	// Apply access logging middleware
 	apiGroup.Use(AccessLogMiddleware(logger, metricsCollector))
 	log.Printf("✓ Access logging enabled")
+
+	// Apply response caching if enabled (after logging, before auth)
+	if cfg.Cache.Enabled {
+		apiGroup.Use(CacheMiddleware(cfg.Cache))
+		log.Printf("✓ Response caching enabled (TTL: %v, Max: %dMB)",
+			cfg.Cache.TTL, cfg.Cache.MaxSize)
+	}
 
 	// Apply JWT authentication if enabled (before rate limiting)
 	if cfg.Auth.Enabled && jwtManager != nil {
@@ -214,7 +232,26 @@ Service Discovery:
   - Type: Static (in-memory)
   - Services: user-service, order-service, product-service
 
-Features:
+Features (Phase 1 - Observability):
+  - ✅ Prometheus metrics
+  - ✅ Structured logging
+  - ✅ Rate limiting
+  - ✅ Gateway timeouts
+  - ✅ Retry policies
+
+Features (Phase 2 - Security):
+  - ✅ JWT authentication
+  - ✅ Security headers (HSTS, CSP, etc.)
+  - ✅ TLS/HTTPS support
+  - ✅ Admin API
+
+Features (Phase 3 - Advanced):
+  - ✅ Distributed tracing
+  - ✅ Response caching
+  - ✅ Canary deployments
+  - ✅ Advanced routing
+
+Core Features:
   - ✅ Reverse proxy
   - ✅ Load balancing
   - ✅ Health checking
@@ -223,13 +260,6 @@ Features:
   - ✅ Request/response modification
   - ✅ Custom error handling
   - ✅ CORS support
-  - ✅ Prometheus metrics
-  - ✅ Structured logging
-  - ✅ Rate limiting
-  - ✅ JWT authentication
-  - ✅ Security headers
-  - ✅ TLS support
-  - ✅ Admin API
 `))
 	})
 
