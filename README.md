@@ -12,7 +12,7 @@ The `core` package is the stable, primary entrypoint. The top-level `plumego` pa
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
 - **Middleware Chain**: Logging, recovery, gzip, CORS, timeout (buffers up to 10 MiB by default), rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.
 - **Security Helpers**: JWT + password utilities, security header policies, input-safety helpers, and abuse guard primitives for baseline hardening.
-- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and message queues (the `net/mq` module is experimental).
+- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and message queues (the `net/mq` module includes a durable task queue mode; still experimental).
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
 - **Optional Services**: Built-in authenticated WebSocket hub, in-process Pub/Sub (with debug snapshots), inbound/outbound webhook routers, and static frontend serving from disk or embedded resources.

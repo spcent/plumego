@@ -21,6 +21,69 @@ A high-performance, feature-rich in-process message broker for Go applications.
 - **Persistence**: Message persistence with automatic recovery using store/kv backend
 - **Message Recovery**: Replay persisted messages after broker restart
 
+### ✅ Durable Task Queue (SQL-backed)
+
+- **Task leasing**: Reserve/ack with lease timeouts for competitive consumers
+- **Retry & DLQ**: Release with backoff, move to dead letter on exhaustion
+- **Pluggable storage**: `TaskStore` interface with SQL and in-memory stores
+- **Schema**: See `docs/MQ_TASK_QUEUE_SCHEMA.md` for recommended SQL tables
+- **Attempt audit**: Optional attempt logging via `SQLConfig.EnableAttemptLog`
+- **Metrics**: Queue operations emit `ObserveMQ` with `queue_*` operations
+- **Graceful shutdown**: In-flight tasks are released if shutdown times out
+
+### Durable Task Queue (Quick Start)
+
+```go
+// import mqstore "github.com/spcent/plumego/net/mq/store"
+db, _ := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+store := mqstore.NewSQL(db, mqstore.DefaultSQLConfig())
+
+queue := mq.NewTaskQueue(store)
+worker := mq.NewWorker(queue, mq.WorkerConfig{
+    ConsumerID:  "worker-1",
+    Concurrency: 8,
+})
+
+worker.Register("sms.send", func(ctx context.Context, task mq.Task) error {
+    // process task.Payload
+    return nil
+})
+
+go worker.Start(context.Background())
+
+_ = queue.Enqueue(context.Background(), mq.Task{
+    ID:       "task-1",
+    Topic:    "sms.send",
+    TenantID: "tenant-a",
+    Payload:  []byte(`{\"to\":\"13800000000\"}`),
+}, mq.EnqueueOptions{})
+```
+
+### Queue Metrics
+
+```go
+collector := metrics.NewDevCollector(metrics.DefaultDevCollectorConfig())
+queue := mq.NewTaskQueue(store, mq.WithQueueMetricsCollector(collector))
+
+worker := mq.NewWorker(queue, mq.WorkerConfig{
+    ConsumerID:       "worker-1",
+    Concurrency:      8,
+    MetricsCollector: collector,
+})
+```
+
+### Attempt Log (Optional)
+
+```go
+cfg := mqstore.DefaultSQLConfig()
+cfg.EnableAttemptLog = true
+cfg.AttemptLogHook = func(ctx context.Context, info mqstore.AttemptLogError) {
+    log.Printf("attempt log failed op=%s task=%s attempt=%d err=%v", info.Op, info.TaskID, info.Attempt, info.Err)
+}
+
+store := mqstore.NewSQL(db, cfg)
+```
+
 ### ⚠️ Not Implemented
 
 - **MQTT Protocol**: Interface defined, implementation pending
