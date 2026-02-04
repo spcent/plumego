@@ -1000,6 +1000,104 @@ header h1 {
     color: var(--text-primary);
 }
 
+.config-card {
+    padding: var(--spacing-lg);
+    background: var(--bg-glass);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.config-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.config-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.config-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.config-grid {
+    margin-top: var(--spacing-md);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.config-table {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 360px;
+    overflow: auto;
+}
+
+.config-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.4fr) auto;
+    gap: var(--spacing-sm);
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.config-row input {
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.85rem;
+}
+
+.config-row button {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+}
+
+.config-editor-actions {
+    margin-top: var(--spacing-sm);
+}
+
+.config-note {
+    margin-top: var(--spacing-sm);
+    font-size: 0.85rem;
+}
+
+.config-runtime {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.config-runtime h5 {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.config-runtime-body {
+    max-height: 360px;
+    overflow: auto;
+}
+
 .db-detail {
     margin-top: var(--spacing-sm);
     padding: var(--spacing-md);

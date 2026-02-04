@@ -38,6 +38,7 @@
             <button class="tab" data-tab="routes">🛣️ Routes</button>
             <button class="tab" data-tab="metrics">📊 Metrics</button>
             <button class="tab" data-tab="deps">🧭 Dependencies</button>
+            <button class="tab" data-tab="config">⚙️ Config</button>
             <button class="tab" data-tab="profiling">🔥 Profiling</button>
             <button class="tab" data-tab="api-test">🧪 API Test</button>
             <button class="tab" data-tab="build">🔨 Build Output</button>
@@ -165,6 +166,35 @@
                         <div class="deps-list-card">
                             <h5>Top Edges</h5>
                             <div id="deps-edges" class="metric-table deps-edge-table"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="config-tab" class="tab-pane">
+                <div class="config-card">
+                    <div class="config-header">
+                        <h4>Live Configuration</h4>
+                        <div class="config-actions">
+                            <button id="btn-config-refresh" class="btn btn-outline">Refresh</button>
+                            <button id="btn-config-save" class="btn btn-secondary">Save</button>
+                            <button id="btn-config-save-restart" class="btn btn-primary">Save & Restart</button>
+                        </div>
+                    </div>
+                    <div id="config-meta" class="text-secondary"></div>
+                    <div class="config-grid">
+                        <div class="config-editor">
+                            <div class="config-table" id="config-table"></div>
+                            <div class="config-editor-actions">
+                                <button id="btn-config-add" class="btn btn-outline">Add Row</button>
+                            </div>
+                            <div class="text-secondary config-note">
+                                Changes are stored in the env file and applied after restart.
+                            </div>
+                        </div>
+                        <div class="config-runtime">
+                            <h5>Runtime Snapshot</h5>
+                            <div id="config-runtime" class="config-runtime-body"></div>
                         </div>
                     </div>
                 </div>

@@ -10,6 +10,12 @@ let lastAlertThresholds = {};
 let alertOverrides = {};
 let depsSnapshot = null;
 let projectKey = window.location.host;
+let configState = {
+    entries: [],
+    path: '',
+    exists: false,
+    updatedAt: ''
+};
 let filters = {
     info: true,
     warn: true,
@@ -74,6 +80,13 @@ const elements = {
     apiHistory: document.getElementById('api-history'),
     apiSaved: document.getElementById('api-saved'),
     apiResponse: document.getElementById('api-response'),
+    configMeta: document.getElementById('config-meta'),
+    configTable: document.getElementById('config-table'),
+    configRuntime: document.getElementById('config-runtime'),
+    btnConfigAdd: document.getElementById('btn-config-add'),
+    btnConfigSave: document.getElementById('btn-config-save'),
+    btnConfigSaveRestart: document.getElementById('btn-config-save-restart'),
+    btnConfigRefresh: document.getElementById('btn-config-refresh'),
     depsSummary: document.getElementById('deps-summary'),
     depsGraph: document.getElementById('deps-graph'),
     depsList: document.getElementById('deps-list'),
@@ -94,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initApiTester();
         initAlertControls();
         initDeps();
+        initConfigEditor();
     });
 });
 
@@ -1497,6 +1511,34 @@ function initDeps() {
     }
 }
 
+function initConfigEditor() {
+    if (!elements.configTable) return;
+
+    if (elements.btnConfigAdd) {
+        elements.btnConfigAdd.addEventListener('click', () => {
+            addConfigRow();
+        });
+    }
+
+    if (elements.btnConfigSave) {
+        elements.btnConfigSave.addEventListener('click', () => {
+            saveConfig(false);
+        });
+    }
+
+    if (elements.btnConfigSaveRestart) {
+        elements.btnConfigSaveRestart.addEventListener('click', () => {
+            saveConfig(true);
+        });
+    }
+
+    if (elements.btnConfigRefresh) {
+        elements.btnConfigRefresh.addEventListener('click', () => {
+            loadConfigEditor();
+        });
+    }
+}
+
 function loadDeps(forceRefresh) {
     if (!elements.depsSummary) return;
 
@@ -1541,6 +1583,143 @@ function loadDeps(forceRefresh) {
             if (elements.depsEdges) {
                 elements.depsEdges.innerHTML = '';
             }
+    });
+}
+
+function loadConfigEditor() {
+    if (!elements.configTable) return;
+
+    if (elements.configMeta) {
+        elements.configMeta.textContent = 'Loading config file...';
+    }
+    elements.configTable.innerHTML = '';
+
+    fetch('/api/config/edit')
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok) {
+                throw new Error(data && data.error ? data.error : 'Request failed');
+            }
+            configState = {
+                entries: Array.isArray(data.entries) ? data.entries : [],
+                path: data.path || '.env',
+                exists: data.exists || false,
+                updatedAt: data.updated_at || ''
+            };
+            renderConfigEditor();
+            loadRuntimeConfig();
+        })
+        .catch(err => {
+            if (elements.configMeta) {
+                elements.configMeta.textContent = `Failed to load config: ${err.message}`;
+            }
+        });
+}
+
+function renderConfigEditor() {
+    if (!elements.configTable) return;
+
+    const rows = (configState.entries || []).map(entry => renderConfigRow(entry)).join('');
+    elements.configTable.innerHTML = rows || '<div class="text-secondary">No entries yet.</div>';
+
+    if (elements.configMeta) {
+        const existsText = configState.exists ? 'file exists' : 'file not found';
+        const updated = configState.updatedAt ? ` Updated: ${new Date(configState.updatedAt).toLocaleString()}.` : '';
+        elements.configMeta.textContent = `Editing ${configState.path} (${existsText}).${updated}`;
+    }
+
+    bindConfigRowHandlers();
+}
+
+function renderConfigRow(entry) {
+    const key = entry.key || entry.Key || '';
+    const value = entry.value || entry.Value || '';
+    return `
+        <div class="config-row">
+            <input class="config-key" type="text" placeholder="KEY" value="${escapeHtml(key)}">
+            <input class="config-value" type="text" placeholder="value" value="${escapeHtml(value)}">
+            <button class="btn btn-outline config-remove">Remove</button>
+        </div>
+    `;
+}
+
+function bindConfigRowHandlers() {
+    elements.configTable.querySelectorAll('.config-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('.config-row');
+            if (row) {
+                row.remove();
+            }
+        });
+    });
+}
+
+function addConfigRow() {
+    if (!elements.configTable) return;
+    if (elements.configTable.querySelector('.text-secondary')) {
+        elements.configTable.innerHTML = '';
+    }
+    elements.configTable.insertAdjacentHTML('beforeend', renderConfigRow({}));
+    bindConfigRowHandlers();
+}
+
+function collectConfigEntries() {
+    const entries = [];
+    if (!elements.configTable) return entries;
+
+    elements.configTable.querySelectorAll('.config-row').forEach(row => {
+        const keyInput = row.querySelector('.config-key');
+        const valueInput = row.querySelector('.config-value');
+        const key = keyInput ? keyInput.value.trim() : '';
+        const value = valueInput ? valueInput.value : '';
+        if (!key) return;
+        entries.push({ key, value });
+    });
+
+    return entries;
+}
+
+function saveConfig(restart) {
+    const entries = collectConfigEntries();
+    const payload = { entries, restart: !!restart };
+
+    fetch('/api/config/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok) {
+                throw new Error(data && data.error ? data.error : 'Save failed');
+            }
+            if (elements.configMeta) {
+                const restartText = data.restarted ? 'Restarted.' : 'Saved.';
+                elements.configMeta.textContent = `Saved to ${data.path}. ${restartText}`;
+            }
+            loadConfigEditor();
+        })
+        .catch(err => {
+            if (elements.configMeta) {
+                elements.configMeta.textContent = `Save failed: ${err.message}`;
+            }
+        });
+}
+
+function loadRuntimeConfig() {
+    if (!elements.configRuntime) return;
+    elements.configRuntime.innerHTML = '<div class="text-secondary">Loading runtime config...</div>';
+
+    fetch('/api/config')
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok) {
+                throw new Error(data && data.error ? data.error : 'Runtime config unavailable');
+            }
+            elements.configRuntime.innerHTML = renderJsonViewer(data);
+        })
+        .catch(err => {
+            elements.configRuntime.innerHTML = `<div class="text-secondary">${escapeHtml(err.message)}</div>`;
         });
 }
 
@@ -1802,6 +1981,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadMetrics();
             } else if (targetTab === 'deps') {
                 loadDeps();
+            } else if (targetTab === 'config') {
+                loadConfigEditor();
             }
         });
     });

@@ -131,16 +131,8 @@ func (r *ShardKeyResolver) extractFromInsert(parsed *ParsedSQL, rule *ShardingRu
 
 // extractFromWhere extracts shard key from WHERE clause
 func (r *ShardKeyResolver) extractFromWhere(query string, parsed *ParsedSQL, rule *ShardingRule, args []any) (any, error) {
-	// Check if the shard key column is in the WHERE conditions
-	op, found := parsed.GetCondition(rule.ShardKeyColumn)
-	if !found {
+	if strings.TrimSpace(parsed.WhereClause) == "" {
 		return nil, fmt.Errorf("%w: column %s not found in WHERE clause", ErrShardKeyNotFound, rule.ShardKeyColumn)
-	}
-
-	// For now, we only support equality (=) conditions for shard key extraction
-	// IN, >, <, etc. would require more complex handling
-	if op != "=" {
-		return nil, fmt.Errorf("%w: shard key must use = operator, got %s", ErrShardKeyNotFound, op)
 	}
 
 	// For UPDATE statements, we need to offset by the number of SET placeholders
@@ -149,11 +141,15 @@ func (r *ShardKeyResolver) extractFromWhere(query string, parsed *ParsedSQL, rul
 		argOffset = r.countSetPlaceholders(query)
 	}
 
-	// Find the position of the shard key in the WHERE clause
-	// Count placeholders before the shard key column
-	argIndex := r.findArgumentIndex(parsed, rule.ShardKeyColumn)
-	if argIndex == -1 {
-		return nil, fmt.Errorf("%w: could not determine argument position for %s", ErrShardKeyNotFound, rule.ShardKeyColumn)
+	op, argIndex, ok := r.findShardKeyArgIndex(parsed.WhereClause, rule.ShardKeyColumn)
+	if !ok {
+		return nil, fmt.Errorf("%w: column %s not found in WHERE clause", ErrShardKeyNotFound, rule.ShardKeyColumn)
+	}
+
+	// For now, we only support equality (=) conditions for shard key extraction
+	// IN, >, <, etc. would require more complex handling
+	if op != "=" {
+		return nil, fmt.Errorf("%w: shard key must use = operator, got %s", ErrShardKeyNotFound, op)
 	}
 
 	// Add offset for UPDATE statements
@@ -166,19 +162,21 @@ func (r *ShardKeyResolver) extractFromWhere(query string, parsed *ParsedSQL, rul
 	return args[finalIndex], nil
 }
 
-// findArgumentIndex finds the argument index for a given column in the WHERE clause
-// This is a simplified version that counts the position of the column in Conditions map
-func (r *ShardKeyResolver) findArgumentIndex(parsed *ParsedSQL, shardKeyColumn string) int {
-	// In a simplified approach, we assume arguments appear in the order they're parsed
-	// This works for simple queries like: WHERE user_id = ? AND status = ?
-	idx := 0
-	for col := range parsed.Conditions {
-		if col == shardKeyColumn {
-			return idx
+// findShardKeyArgIndex finds the argument index for a given column in the WHERE clause
+// by walking conditions in order and counting placeholders.
+func (r *ShardKeyResolver) findShardKeyArgIndex(whereClause, shardKeyColumn string) (string, int, bool) {
+	argIndex := 0
+	for _, part := range splitConditions(whereClause) {
+		column, op, placeholders, ok := parseCondition(part)
+		if !ok {
+			continue
 		}
-		idx++
+		if strings.EqualFold(column, shardKeyColumn) {
+			return op, argIndex, true
+		}
+		argIndex += placeholders
 	}
-	return -1
+	return "", -1, false
 }
 
 // countSetPlaceholders counts the number of placeholders in UPDATE SET clause

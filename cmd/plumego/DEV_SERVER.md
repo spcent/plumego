@@ -45,6 +45,7 @@ The `plumego dev` command features a **dual-server architecture** with a develop
 - **Route Browser**: Discover and display all HTTP routes
 - **Metrics Dashboard**: Performance and health monitoring
 - **Dependency Graph**: Visualize module relationships and hot spots
+- **Live Config Editing**: Update `.env` values from the dashboard (restart to apply)
 - **Profiling**: Capture CPU/heap/trace profiles and open flamegraphs
 - **API Testing**: Send ad-hoc requests to your app from the dashboard
 - **Build Management**: Manual build triggers and output
@@ -117,6 +118,12 @@ plumego dev \
 - Module dependency graph based on `go list` output
 - Summary of direct vs indirect modules and edge counts
 - Top edges list for hot dependency paths
+
+#### Config
+- Edit `.env` values from the dashboard
+- Save-only or Save & Restart workflow (changes apply after restart)
+- Runtime config snapshot from `/_debug/config` for verification
+The editor targets the app's configured `env_file` when available; otherwise it falls back to `.env`.
 
 #### Profiling
 - CPU/heap/allocs/goroutine/block/mutex/threadcreate/trace profiles
@@ -259,6 +266,25 @@ Returns supported profile types and raw pprof data (for Speedscope or download).
 GET /api/config
 ```
 Returns application configuration from `/_debug/config`.
+
+### Live Config Editing
+```bash
+GET /api/config/edit
+POST /api/config/edit
+```
+Reads or writes the editable env file (defaults to `.env`).
+If the app is running, the dashboard will target the app's configured `env_file` when available.
+
+**Save request:**
+```json
+{
+  "entries": [
+    {"key": "APP_NAME", "value": "demo"},
+    {"key": "APP_DEBUG", "value": "true"}
+  ],
+  "restart": true
+}
+```
 
 ### Build Control
 ```bash
@@ -451,7 +477,7 @@ Potential improvements for future releases:
 - [x] API endpoint testing UI
 - [x] Performance bottleneck detection
 - [x] Dependency graph visualization
-- [ ] Live configuration editing
+- [x] Live configuration editing
 
 ## Contributing
 

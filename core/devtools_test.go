@@ -159,8 +159,8 @@ func TestDevToolsMetricsClearEndpoint(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected total metrics, got %#v", httpMetrics["total"])
 	}
-	if count, ok := total["count"].(float64); !ok || count != 0 {
-		t.Fatalf("expected count 0 after clear, got %#v", total["count"])
+	if count, ok := total["count"].(float64); !ok || count != 1 {
+		t.Fatalf("expected count 1 after clear (metrics request recorded), got %#v", total["count"])
 	}
 }
 

@@ -445,9 +445,9 @@ func TestStartServer(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Test the server is running
-		port := app.httpServer.Addr
-		if !strings.HasPrefix(port, ":") {
-			t.Errorf("expected port to start with :, got %s", port)
+		addr = app.httpServer.Addr
+		if _, _, err := net.SplitHostPort(addr); err != nil {
+			t.Errorf("expected host:port address, got %s", addr)
 		}
 
 		// Trigger shutdown

@@ -114,6 +114,8 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	d.app.GetCtx("/api/health", d.handleHealth)
 	d.app.GetCtx("/api/routes", d.handleRoutes)
 	d.app.GetCtx("/api/config", d.handleConfig)
+	d.app.GetCtx("/api/config/edit", d.handleConfigEditGet)
+	d.app.PostCtx("/api/config/edit", d.handleConfigEditSave)
 	d.app.GetCtx("/api/metrics", d.handleMetrics)
 	d.app.PostCtx("/api/metrics/clear", d.handleMetricsClear)
 	d.app.GetCtx("/api/deps", d.handleDeps)
