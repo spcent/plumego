@@ -1,4 +1,4 @@
-// Package proxy provides reverse proxy middleware for plumego
+// Package proxy provides reverse proxy handler for plumego
 //
 // This package implements a production-grade HTTP reverse proxy with features including:
 //   - Load balancing (round-robin, weighted, least-connections, IP-hash)
@@ -19,12 +19,18 @@
 //
 //	app := core.New()
 //
-//	// Simple static proxy
-//	app.Use("/api/*", proxy.New(proxy.Config{
+//	// Register proxy as a route handler
+//	app.Any("/api/*", proxy.New(proxy.Config{
 //		Targets: []string{
 //			"http://backend-1:8080",
 //			"http://backend-2:8080",
 //		},
+//	}))
+//
+//	// Or use with router groups
+//	apiGroup := app.Router().Group("/api")
+//	apiGroup.Any("/*", proxy.New(proxy.Config{
+//		Targets: []string{"http://backend:8080"},
 //	}))
 //
 //	app.Boot()
@@ -39,7 +45,7 @@ import (
 	"time"
 )
 
-// Proxy is the reverse proxy middleware
+// Proxy is the reverse proxy handler that implements http.Handler
 type Proxy struct {
 	config    *Config
 	pool      *BackendPool
@@ -53,8 +59,9 @@ type Proxy struct {
 	mu sync.RWMutex
 }
 
-// New creates a new reverse proxy middleware
-func New(config Config) func(http.Handler) http.Handler {
+// New creates a new reverse proxy handler that implements http.Handler.
+// The proxy can be directly registered as a route handler.
+func New(config Config) *Proxy {
 	// Apply defaults
 	cfg := config.WithDefaults()
 
@@ -112,21 +119,31 @@ func New(config Config) func(http.Handler) http.Handler {
 		go proxy.watchServiceDiscovery()
 	}
 
-	return proxy.middleware
+	return proxy
 }
 
-// middleware is the actual middleware function
-func (p *Proxy) middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if this is a WebSocket upgrade request
-		if p.config.WebSocketEnabled && isWebSocketRequest(r) {
-			p.handleWebSocket(w, r)
-			return
-		}
+// ServeHTTP implements http.Handler interface for the proxy.
+// This allows the proxy to be used directly as a route handler.
+func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Check if this is a WebSocket upgrade request
+	if p.config.WebSocketEnabled && isWebSocketRequest(r) {
+		p.handleWebSocket(w, r)
+		return
+	}
 
-		// Handle HTTP request
-		p.handleHTTP(w, r)
-	})
+	// Handle HTTP request
+	p.handleHTTP(w, r)
+}
+
+// Middleware returns a middleware function wrapper around the proxy.
+// Use this if you need to use the proxy as middleware (rare).
+// In most cases, you should use the proxy directly as a handler with app.Any() or similar.
+func (p *Proxy) Middleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			p.ServeHTTP(w, r)
+		})
+	}
 }
 
 // handleHTTP handles HTTP requests

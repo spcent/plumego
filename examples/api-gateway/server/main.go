@@ -4,9 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/spcent/plumego/core"
@@ -32,7 +29,7 @@ func main() {
 		},
 	})
 
-	// Create application
+	// Create application with CORS enabled globally
 	app := core.New(
 		core.WithAddr(":8080"),
 		core.WithDebug(),
@@ -40,11 +37,15 @@ func main() {
 		core.WithLogging(),
 	)
 
-	// Configure CORS for browser access
-	app.Use("/api/*", corsMiddleware())
+	// Configure CORS for /api routes using router group
+	apiGroup := app.Router().Group("/api")
+	apiGroup.Use(corsMiddleware())
 
-	// Proxy to user service
-	app.Use("/api/v1/users/*", proxy.New(proxy.Config{
+	// Create /api/v1 group
+	v1Group := apiGroup.Group("/v1")
+
+	// Proxy to user service - now using Any() since proxy is a handler
+	v1Group.Any("/users/*", proxy.New(proxy.Config{
 		Targets: []string{
 			"http://localhost:8081",
 			"http://localhost:8082",
@@ -59,7 +60,7 @@ func main() {
 	}))
 
 	// Proxy to order service with service discovery
-	app.Use("/api/v1/orders/*", proxy.New(proxy.Config{
+	v1Group.Any("/orders/*", proxy.New(proxy.Config{
 		ServiceName:  "order-service",
 		Discovery:    sd,
 		LoadBalancer: proxy.NewWeightedRoundRobinBalancer(),
@@ -80,7 +81,7 @@ func main() {
 	}))
 
 	// Proxy to product service with custom error handling
-	app.Use("/api/v1/products/*", proxy.New(proxy.Config{
+	v1Group.Any("/products/*", proxy.New(proxy.Config{
 		Targets: []string{
 			"http://localhost:7001",
 		},
@@ -140,28 +141,13 @@ Features:
 `))
 	})
 
-	// Graceful shutdown
-	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
-		<-sigint
+	// Register shutdown hook to close service discovery
+	app.OnShutdown(func(ctx context.Context) error {
+		log.Println("Closing service discovery...")
+		return sd.Close()
+	})
 
-		log.Println("Shutting down gateway...")
-
-		// Close service discovery
-		if err := sd.Close(); err != nil {
-			log.Printf("Error closing service discovery: %v", err)
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := app.Shutdown(ctx); err != nil {
-			log.Printf("Gateway shutdown error: %v", err)
-		}
-	}()
-
-	// Start server
+	// Start server (includes built-in graceful shutdown)
 	log.Println("Starting API Gateway on :8080")
 	log.Println("Visit http://localhost:8080/status for info")
 
