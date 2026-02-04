@@ -34,9 +34,9 @@ func main() {
 
 	// Add tenant middleware
 	app.Use("/api/*", tenant.Middleware(tenant.MiddlewareConfig{
-		HeaderName:    "X-Tenant-ID",
-		AllowMissing:  true,
-		QuotaManager:  quotaMgr,
+		HeaderName:   "X-Tenant-ID",
+		AllowMissing: true,
+		QuotaManager: quotaMgr,
 	}))
 
 	// Add circuit breaker for all API routes
