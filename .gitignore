@@ -5,5 +5,6 @@
 # Example binaries and backups
 examples/crud-demo/crud-demo
 examples/reference/reference
+examples/ai-agent-gateway/gateway
 *.bak
 bin/
