@@ -16,12 +16,12 @@ type SlidingWindowQuotaManager struct {
 
 // slidingWindow tracks requests in a rolling time window.
 type slidingWindow struct {
-	mu              sync.RWMutex
-	requestTimes    []time.Time // sorted list of request timestamps
-	tokenUsage      []tokenUsage
-	lastCleanup     time.Time
-	requestsPerMin  int
-	tokensPerMin    int
+	mu             sync.RWMutex
+	requestTimes   []time.Time // sorted list of request timestamps
+	tokenUsage     []tokenUsage
+	lastCleanup    time.Time
+	requestsPerMin int
+	tokensPerMin   int
 }
 
 // tokenUsage tracks token consumption with timestamp.

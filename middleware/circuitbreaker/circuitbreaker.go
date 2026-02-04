@@ -72,13 +72,13 @@ type CircuitBreaker struct {
 	config Config
 
 	// State management
-	state         atomic.Int32
-	stateChanged  time.Time
-	stateMu       sync.RWMutex
+	state        atomic.Int32
+	stateChanged time.Time
+	stateMu      sync.RWMutex
 
 	// Metrics (closed state)
-	requests atomic.Uint64
-	failures atomic.Uint64
+	requests  atomic.Uint64
+	failures  atomic.Uint64
 	successes atomic.Uint64
 
 	// Metrics (half-open state)

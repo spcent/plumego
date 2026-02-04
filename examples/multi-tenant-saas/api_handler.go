@@ -34,10 +34,10 @@ type CreateUserRequest struct {
 
 // RequestAnalytics represents request analytics data
 type RequestAnalytics struct {
-	TotalRequests int                       `json:"total_requests"`
-	ByStatus      map[string]int            `json:"by_status"`
-	AvgDurationMS float64                   `json:"avg_duration_ms"`
-	RecentRequests []RequestLog             `json:"recent_requests"`
+	TotalRequests  int            `json:"total_requests"`
+	ByStatus       map[string]int `json:"by_status"`
+	AvgDurationMS  float64        `json:"avg_duration_ms"`
+	RecentRequests []RequestLog   `json:"recent_requests"`
 }
 
 // RequestLog represents a single request log entry

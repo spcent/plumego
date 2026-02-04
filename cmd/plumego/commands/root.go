@@ -89,8 +89,8 @@ func (r *RootCmd) Run(args []string) error {
 	}
 
 	ctx := &Context{
-		Out:        r.formatter,
-		EnvFile:    flagEnvFile,
+		Out:     r.formatter,
+		EnvFile: flagEnvFile,
 	}
 
 	return cmd.Run(ctx, args[1:])

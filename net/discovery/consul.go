@@ -27,11 +27,11 @@ import (
 //
 //	backends, err := sd.Resolve(ctx, "user-service")
 type Consul struct {
-	address string
-	config  ConsulConfig
-	client  *http.Client
+	address  string
+	config   ConsulConfig
+	client   *http.Client
 	watchers map[string]*consulWatcher
-	mu      sync.RWMutex
+	mu       sync.RWMutex
 }
 
 // ConsulConfig holds Consul-specific configuration
@@ -204,7 +204,7 @@ func (c *Consul) Register(ctx context.Context, instance Instance) error {
 		c.config.Scheme, c.address)
 
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, "PUT", registerURL, 
+	req, err := http.NewRequestWithContext(ctx, "PUT", registerURL,
 		io.NopCloser(bytes.NewReader(body)))
 	if err != nil {
 		return err

@@ -177,9 +177,9 @@ func (tdb *TenantDB) addTenantToUpdate(query string, tenantID string, args []int
 
 		// Insert tenant arg after SET parameters
 		newArgs := make([]interface{}, 0, len(args)+1)
-		newArgs = append(newArgs, args[:setPlaceholders]...)  // SET parameters
-		newArgs = append(newArgs, tenantID)                   // tenant_id
-		newArgs = append(newArgs, args[setPlaceholders:]...)  // WHERE parameters
+		newArgs = append(newArgs, args[:setPlaceholders]...) // SET parameters
+		newArgs = append(newArgs, tenantID)                  // tenant_id
+		newArgs = append(newArgs, args[setPlaceholders:]...) // WHERE parameters
 
 		filteredQuery := query[:whereIdx] + "WHERE " + whereClause + " AND " + query[whereIdx+5:]
 		return filteredQuery, newArgs
