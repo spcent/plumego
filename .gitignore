@@ -1,10 +1,29 @@
 .claude/
-*.exe
-*.log
 
-# Example binaries and backups
-examples/crud-demo/crud-demo
-examples/reference/reference
-examples/ai-agent-gateway/gateway
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+
+# Logs and temporary files
+*.log
 *.bak
+*.swp
+*.swo
+*~
+
+# Output directories
 bin/
+dist/
+build/
+
+# Example binaries (executables with same name as their directory)
+examples/*/crud-demo
+examples/*/reference
+examples/*/gateway
+examples/*/ai-agent-gateway
+examples/*/*-demo
+examples/*/*-gateway
+
