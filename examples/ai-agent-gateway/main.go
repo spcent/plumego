@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/ai/filter"
+	"github.com/spcent/plumego/ai/instrumentation"
 	"github.com/spcent/plumego/ai/llmcache"
+	"github.com/spcent/plumego/ai/logging"
+	"github.com/spcent/plumego/ai/metrics"
 	"github.com/spcent/plumego/ai/orchestration"
 	"github.com/spcent/plumego/ai/prompt"
 	"github.com/spcent/plumego/ai/provider"
@@ -28,11 +31,24 @@ func main() {
 		log.Println("Warning: CLAUDE_API_KEY not set, using mock provider")
 	}
 
-	// Create providers
+	// Phase 3: Create metrics collector
+	collector := metrics.NewMemoryCollector()
+
+	// Phase 3: Create structured logger
+	logger := logging.NewConsoleLogger(
+		logging.WithLevel(logging.InfoLevel),
+		logging.WithFormat(logging.JSONFormat),
+	)
+	logger.Info("Starting AI Agent Gateway", logging.Fields("version", "phase-3")...)
+
+	// Create providers (Phase 3: wrapped with instrumentation)
 	providerMgr := provider.NewManager()
 	if apiKey != "" {
 		claudeProvider := provider.NewClaudeProvider(apiKey)
-		providerMgr.Register(claudeProvider)
+		// Wrap with instrumentation
+		instrumentedProvider := instrumentation.NewInstrumentedProvider(claudeProvider, collector)
+		providerMgr.Register(instrumentedProvider)
+		logger.Info("Registered Claude provider with instrumentation")
 	}
 
 	// Create session manager
@@ -62,11 +78,17 @@ func main() {
 		filter.NewPromptInjectionFilter(),
 	)
 
-	// Phase 2: Create LLM cache
+	// Phase 2: Create LLM cache (Phase 3: wrapped with instrumentation)
 	llmCache := llmcache.NewMemoryCache(1*time.Hour, 1000)
+	// Note: We create an instrumented cache wrapper for metrics collection
+	// The raw cache is still used for direct stats queries
+	_ = instrumentation.NewInstrumentedMemoryCache(llmCache, collector)
+	logger.Info("Created LLM cache with instrumentation")
 
-	// Phase 2: Create orchestration engine
+	// Phase 2: Create orchestration engine (Phase 3: wrapped with instrumentation)
 	orchEngine := orchestration.NewEngine()
+	instrumentedEngine := instrumentation.NewInstrumentedEngine(orchEngine, collector)
+	logger.Info("Created orchestration engine with instrumentation")
 
 	// Create application
 	app := core.New(
@@ -88,10 +110,15 @@ func main() {
 	app.Post("/api/templates/render", renderTemplateHandler(promptEngine))
 	app.Post("/api/filter", filterContentHandler(contentFilter))
 	app.Get("/api/cache/stats", cacheStatsHandler(llmCache))
-	app.Post("/api/workflows/:id/execute", executeWorkflowHandler(orchEngine))
-	app.Get("/api/workflows", listWorkflowsHandler(orchEngine))
+	app.Post("/api/workflows/:id/execute", executeWorkflowHandler(instrumentedEngine))
+	app.Get("/api/workflows", listWorkflowsHandler(instrumentedEngine))
 
-	log.Println("🤖 AI Agent Gateway (Phase 1 + 2) starting on http://localhost:8080")
+	// Phase 3 Routes
+	promExporter := metrics.NewPrometheusExporter(collector, "ai_gateway")
+	app.Get("/metrics", promExporter.Handler())
+	app.Get("/api/metrics/snapshot", metricsSnapshotHandler(collector))
+
+	log.Println("🤖 AI Agent Gateway (Phase 1 + 2 + 3) starting on http://localhost:8080")
 	log.Println("\nPhase 1 Endpoints:")
 	log.Println("  POST /api/sessions - Create a new session")
 	log.Println("  POST /api/sessions/:id/messages - Send a message")
@@ -104,6 +131,9 @@ func main() {
 	log.Println("  GET  /api/cache/stats - LLM cache statistics")
 	log.Println("  POST /api/workflows/:id/execute - Execute a workflow")
 	log.Println("  GET  /api/workflows - List available workflows")
+	log.Println("\nPhase 3 Endpoints (NEW!):")
+	log.Println("  GET  /metrics - Prometheus metrics (Prometheus text format)")
+	log.Println("  GET  /api/metrics/snapshot - Metrics snapshot (JSON)")
 
 	if err := app.Boot(); err != nil {
 		log.Fatal(err)
@@ -123,7 +153,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
     </style>
 </head>
 <body>
-    <h1>🤖 AI Agent Gateway (Phase 1 + Phase 2)</h1>
+    <h1>🤖 AI Agent Gateway (Phase 1 + Phase 2 + Phase 3)</h1>
     <p>A comprehensive AI agent gateway built with Plumego</p>
 
     <h2>Phase 1 Features</h2>
@@ -135,13 +165,22 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
         <li>✅ Tool calling framework with sandboxing</li>
     </ul>
 
-    <h2>Phase 2 Features (NEW!)</h2>
+    <h2>Phase 2 Features</h2>
     <ul>
         <li>🎯 Prompt template engine with 7 builtin templates</li>
         <li>🛡️ Content filtering (PII, secrets, prompt injection)</li>
         <li>💾 Intelligent LLM response caching</li>
         <li>🔀 Enhanced multi-model routing (task-based, cost-optimized)</li>
         <li>🎭 Agent orchestration (sequential, parallel, conditional)</li>
+    </ul>
+
+    <h2>Phase 3 Features (NEW!)</h2>
+    <ul>
+        <li>📊 Comprehensive metrics collection (counters, gauges, histograms)</li>
+        <li>📈 Prometheus-compatible metrics export at /metrics</li>
+        <li>🔍 Structured logging (JSON and text formats)</li>
+        <li>🎯 Instrumentation for providers, cache, and orchestration</li>
+        <li>📉 Real-time performance monitoring</li>
     </ul>
 
     <h2>API Endpoints</h2>
@@ -400,7 +439,7 @@ func cacheStatsHandler(cache *llmcache.MemoryCache) http.HandlerFunc {
 	}
 }
 
-func executeWorkflowHandler(engine *orchestration.Engine) http.HandlerFunc {
+func executeWorkflowHandler(engine *instrumentation.InstrumentedEngine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		workflowID := r.URL.Query().Get(":id")
 		if workflowID == "" {
@@ -441,7 +480,7 @@ func executeWorkflowHandler(engine *orchestration.Engine) http.HandlerFunc {
 	}
 }
 
-func listWorkflowsHandler(engine *orchestration.Engine) http.HandlerFunc {
+func listWorkflowsHandler(engine *instrumentation.InstrumentedEngine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// In a real implementation, you'd list registered workflows
 		// For now, return empty list
@@ -452,4 +491,66 @@ func listWorkflowsHandler(engine *orchestration.Engine) http.HandlerFunc {
 			"message":   "Register workflows using engine.RegisterWorkflow()",
 		})
 	}
+}
+
+// Phase 3 Handlers
+
+func metricsSnapshotHandler(collector *metrics.MemoryCollector) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		snapshot := collector.Snapshot()
+
+		// Convert snapshot to a more readable JSON format
+		response := map[string]any{
+			"timestamp": snapshot.Timestamp,
+			"counters":  convertCounters(snapshot.Counters),
+			"gauges":    convertGauges(snapshot.Gauges),
+			"histograms": convertHistograms(snapshot.Histograms),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func convertCounters(counters map[string]metrics.CounterSnapshot) []map[string]any {
+	result := make([]map[string]any, 0, len(counters))
+	for name, counter := range counters {
+		result = append(result, map[string]any{
+			"name":  name,
+			"value": counter.Value,
+			"tags":  counter.Tags,
+		})
+	}
+	return result
+}
+
+func convertGauges(gauges map[string]metrics.GaugeSnapshot) []map[string]any {
+	result := make([]map[string]any, 0, len(gauges))
+	for name, gauge := range gauges {
+		result = append(result, map[string]any{
+			"name":  name,
+			"value": gauge.Value,
+			"tags":  gauge.Tags,
+		})
+	}
+	return result
+}
+
+func convertHistograms(histograms map[string]metrics.HistogramSnapshot) []map[string]any {
+	result := make([]map[string]any, 0, len(histograms))
+	for name, hist := range histograms {
+		result = append(result, map[string]any{
+			"name":  name,
+			"count": hist.Count,
+			"sum":   hist.Sum,
+			"min":   hist.Min,
+			"max":   hist.Max,
+			"avg":   hist.Avg,
+			"p50":   hist.P50,
+			"p95":   hist.P95,
+			"p99":   hist.P99,
+			"tags":  hist.Tags,
+		})
+	}
+	return result
 }
