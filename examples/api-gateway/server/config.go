@@ -18,12 +18,53 @@ type Config struct {
 	Metrics   MetricsConfig   `json:"metrics"`
 	RateLimit RateLimitConfig `json:"rate_limit"`
 	Timeouts  TimeoutsConfig  `json:"timeouts"`
+	Auth      AuthConfig      `json:"auth"`
+	Security  SecurityConfig  `json:"security"`
+	TLS       TLSConfig       `json:"tls"`
+	Admin     AdminConfig     `json:"admin"`
 }
 
 // ServerConfig holds server-level configuration
 type ServerConfig struct {
 	Addr  string `json:"addr"`
 	Debug bool   `json:"debug"`
+}
+
+// AuthConfig holds authentication configuration
+type AuthConfig struct {
+	Enabled         bool     `json:"enabled"`
+	JWTSecret       string   `json:"jwt_secret"`
+	PublicPaths     []string `json:"public_paths"` // Paths that don't require auth
+	TokenHeader     string   `json:"token_header"`
+	TokenQueryParam string   `json:"token_query_param"`
+	AccessTokenTTL  int      `json:"access_token_ttl"`  // in minutes
+	RefreshTokenTTL int      `json:"refresh_token_ttl"` // in days
+}
+
+// SecurityConfig holds security headers configuration
+type SecurityConfig struct {
+	Enabled               bool   `json:"enabled"`
+	HSTSMaxAge            int    `json:"hsts_max_age"` // in seconds
+	HSTSIncludeSubDomains bool   `json:"hsts_include_subdomains"`
+	HSTSPreload           bool   `json:"hsts_preload"`
+	ContentSecurityPolicy string `json:"content_security_policy"`
+	XFrameOptions         string `json:"x_frame_options"`
+	XContentTypeOptions   string `json:"x_content_type_options"`
+	ReferrerPolicy        string `json:"referrer_policy"`
+}
+
+// TLSConfig holds TLS configuration
+type TLSConfig struct {
+	Enabled  bool   `json:"enabled"`
+	CertFile string `json:"cert_file"`
+	KeyFile  string `json:"key_file"`
+}
+
+// AdminConfig holds admin API configuration
+type AdminConfig struct {
+	Enabled bool   `json:"enabled"`
+	Path    string `json:"path"`
+	APIKey  string `json:"api_key"` // Simple API key for admin endpoints
 }
 
 // MetricsConfig holds metrics configuration
@@ -78,6 +119,35 @@ func LoadConfig() (*Config, error) {
 		Server: ServerConfig{
 			Addr:  getEnv("GATEWAY_ADDR", ":8080"),
 			Debug: getEnvBool("GATEWAY_DEBUG", false),
+		},
+		Auth: AuthConfig{
+			Enabled:         getEnvBool("AUTH_ENABLED", false),
+			JWTSecret:       getEnv("JWT_SECRET", ""),
+			PublicPaths:     getEnvSlice("AUTH_PUBLIC_PATHS", []string{"/health", "/status", "/metrics"}),
+			TokenHeader:     getEnv("AUTH_TOKEN_HEADER", "Authorization"),
+			TokenQueryParam: getEnv("AUTH_TOKEN_QUERY_PARAM", "token"),
+			AccessTokenTTL:  getEnvInt("AUTH_ACCESS_TOKEN_TTL", 15), // 15 minutes
+			RefreshTokenTTL: getEnvInt("AUTH_REFRESH_TOKEN_TTL", 7), // 7 days
+		},
+		Security: SecurityConfig{
+			Enabled:               getEnvBool("SECURITY_HEADERS_ENABLED", true),
+			HSTSMaxAge:            getEnvInt("SECURITY_HSTS_MAX_AGE", 31536000), // 1 year
+			HSTSIncludeSubDomains: getEnvBool("SECURITY_HSTS_INCLUDE_SUBDOMAINS", true),
+			HSTSPreload:           getEnvBool("SECURITY_HSTS_PRELOAD", false),
+			ContentSecurityPolicy: getEnv("SECURITY_CSP", "default-src 'self'"),
+			XFrameOptions:         getEnv("SECURITY_X_FRAME_OPTIONS", "DENY"),
+			XContentTypeOptions:   getEnv("SECURITY_X_CONTENT_TYPE_OPTIONS", "nosniff"),
+			ReferrerPolicy:        getEnv("SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin"),
+		},
+		TLS: TLSConfig{
+			Enabled:  getEnvBool("TLS_ENABLED", false),
+			CertFile: getEnv("TLS_CERT_FILE", ""),
+			KeyFile:  getEnv("TLS_KEY_FILE", ""),
+		},
+		Admin: AdminConfig{
+			Enabled: getEnvBool("ADMIN_ENABLED", false),
+			Path:    getEnv("ADMIN_PATH", "/admin"),
+			APIKey:  getEnv("ADMIN_API_KEY", ""),
 		},
 		Metrics: MetricsConfig{
 			Enabled:   getEnvBool("METRICS_ENABLED", true),
@@ -234,6 +304,52 @@ func (c *Config) Validate() error {
 	// Server validation
 	if c.Server.Addr == "" {
 		return fmt.Errorf("server address cannot be empty")
+	}
+
+	// Auth validation
+	if c.Auth.Enabled {
+		if len(c.Auth.JWTSecret) < 32 {
+			return fmt.Errorf("JWT secret must be at least 32 characters when auth is enabled")
+		}
+		if c.Auth.TokenHeader == "" {
+			return fmt.Errorf("auth token header cannot be empty when auth is enabled")
+		}
+		if c.Auth.AccessTokenTTL <= 0 {
+			return fmt.Errorf("access token TTL must be positive")
+		}
+		if c.Auth.RefreshTokenTTL <= 0 {
+			return fmt.Errorf("refresh token TTL must be positive")
+		}
+	}
+
+	// TLS validation
+	if c.TLS.Enabled {
+		if c.TLS.CertFile == "" {
+			return fmt.Errorf("TLS cert file cannot be empty when TLS is enabled")
+		}
+		if c.TLS.KeyFile == "" {
+			return fmt.Errorf("TLS key file cannot be empty when TLS is enabled")
+		}
+	}
+
+	// Admin validation
+	if c.Admin.Enabled {
+		if c.Admin.Path == "" {
+			return fmt.Errorf("admin path cannot be empty when admin is enabled")
+		}
+		if c.Admin.APIKey == "" {
+			return fmt.Errorf("admin API key cannot be empty when admin is enabled")
+		}
+		if len(c.Admin.APIKey) < 16 {
+			return fmt.Errorf("admin API key must be at least 16 characters")
+		}
+	}
+
+	// Security headers validation
+	if c.Security.Enabled {
+		if c.Security.HSTSMaxAge < 0 {
+			return fmt.Errorf("HSTS max age cannot be negative")
+		}
 	}
 
 	// Metrics validation

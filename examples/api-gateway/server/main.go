@@ -11,6 +11,8 @@ import (
 	"github.com/spcent/plumego/middleware/proxy"
 	"github.com/spcent/plumego/net/discovery"
 	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/security/jwt"
+	kvstore "github.com/spcent/plumego/store/kv"
 )
 
 func main() {
@@ -31,6 +33,10 @@ func main() {
 	log.Printf("  Rate Limit: %v (%d req/s)", cfg.RateLimit.Enabled, cfg.RateLimit.RequestsPerSecond)
 	log.Printf("  Timeouts: Gateway=%v, Service=%v", cfg.Timeouts.Gateway, cfg.Timeouts.Service)
 	log.Printf("  CORS: %v", cfg.CORS.Enabled)
+	log.Printf("  Auth: %v", cfg.Auth.Enabled)
+	log.Printf("  Security Headers: %v", cfg.Security.Enabled)
+	log.Printf("  TLS: %v", cfg.TLS.Enabled)
+	log.Printf("  Admin API: %v (%s)", cfg.Admin.Enabled, cfg.Admin.Path)
 	log.Printf("  User Service: %v (%d targets, timeout=%v, retries=%d)",
 		cfg.Services.UserService.Enabled, len(cfg.Services.UserService.Targets),
 		cfg.Services.UserService.Timeout, cfg.Services.UserService.RetryCount)
@@ -46,6 +52,30 @@ func main() {
 	if cfg.Metrics.Enabled {
 		metricsCollector = metrics.NewPrometheusCollector(cfg.Metrics.Namespace)
 		log.Printf("✓ Prometheus metrics enabled at %s", cfg.Metrics.Path)
+	}
+
+	// Initialize JWT manager if authentication is enabled
+	var jwtManager *jwt.JWTManager
+	if cfg.Auth.Enabled {
+		// Create KV store for JWT manager (using in-memory store)
+		kvStore, err := kvstore.NewKVStore(kvstore.Options{
+			DataDir: ":memory:", // In-memory store for JWT tokens
+		})
+		if err != nil {
+			log.Fatalf("Failed to create KV store: %v", err)
+		}
+
+		// Create JWT configuration
+		jwtConfig := jwt.DefaultJWTConfig()
+		jwtConfig.Issuer = "plumego-api-gateway"
+		jwtConfig.Audience = "plumego-client"
+
+		// Create JWT manager
+		jwtManager, err = jwt.NewJWTManager(kvStore, jwtConfig)
+		if err != nil {
+			log.Fatalf("Failed to create JWT manager: %v", err)
+		}
+		log.Printf("✓ JWT authentication enabled (public paths: %v)", cfg.Auth.PublicPaths)
 	}
 
 	// Create service discovery for services that need it
@@ -65,6 +95,12 @@ func main() {
 		appOptions = append(appOptions, core.WithDebug())
 	}
 
+	// Add TLS configuration if enabled
+	if cfg.TLS.Enabled {
+		appOptions = append(appOptions, core.WithTLS(cfg.TLS.CertFile, cfg.TLS.KeyFile))
+		log.Printf("✓ TLS enabled (cert: %s, key: %s)", cfg.TLS.CertFile, cfg.TLS.KeyFile)
+	}
+
 	app := core.New(appOptions...)
 
 	// Get logger for access logging
@@ -73,9 +109,22 @@ func main() {
 	// Configure middleware stack for /api routes
 	apiGroup := app.Router().Group("/api")
 
+	// Apply security headers if enabled (first in chain)
+	if cfg.Security.Enabled {
+		apiGroup.Use(SecurityHeadersMiddleware(cfg.Security))
+		log.Printf("✓ Security headers enabled (HSTS: %v, CSP: %v)",
+			cfg.Security.HSTSMaxAge > 0, cfg.Security.ContentSecurityPolicy != "")
+	}
+
 	// Apply access logging middleware
 	apiGroup.Use(AccessLogMiddleware(logger, metricsCollector))
 	log.Printf("✓ Access logging enabled")
+
+	// Apply JWT authentication if enabled (before rate limiting)
+	if cfg.Auth.Enabled && jwtManager != nil {
+		apiGroup.Use(JWTAuthMiddleware(cfg.Auth, jwtManager))
+		log.Printf("✓ JWT authentication middleware enabled")
+	}
 
 	// Apply rate limiting if enabled
 	if cfg.RateLimit.Enabled {
@@ -110,6 +159,23 @@ func main() {
 		}
 	}
 
+	// Admin API endpoints
+	if cfg.Admin.Enabled {
+		adminHandlers := NewAdminHandlers(cfg, metricsCollector)
+		adminGroup := app.Router().Group(cfg.Admin.Path)
+
+		// Apply admin API key authentication
+		adminGroup.Use(AdminAPIKeyMiddleware(cfg.Admin.APIKey))
+
+		// Register admin endpoints
+		adminGroup.Get("/stats", http.HandlerFunc(adminHandlers.HandleStats))
+		adminGroup.Get("/health", http.HandlerFunc(adminHandlers.HandleHealth))
+		adminGroup.Get("/config", http.HandlerFunc(adminHandlers.HandleConfig))
+		adminGroup.Post("/reload", http.HandlerFunc(adminHandlers.HandleReload))
+
+		log.Printf("✓ Admin API enabled at %s (requires API key)", cfg.Admin.Path)
+	}
+
 	// Health check endpoint for the gateway itself
 	app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -128,9 +194,16 @@ Plumego API Gateway
 Endpoints:
   - GET  /health                    Gateway health check
   - GET  /status                    This status page
+  - GET  /metrics                   Prometheus metrics
   - *    /api/v1/users/*            User service (round-robin, 2 backends)
   - *    /api/v1/orders/*           Order service (weighted, service discovery)
   - *    /api/v1/products/*         Product service (single backend)
+
+Admin API:
+  - GET  /admin/stats               Gateway statistics
+  - GET  /admin/health              Detailed health check
+  - GET  /admin/config              Current configuration
+  - POST /admin/reload              Reload configuration
 
 Load Balancing:
   - User service: Round-robin
@@ -150,6 +223,13 @@ Features:
   - ✅ Request/response modification
   - ✅ Custom error handling
   - ✅ CORS support
+  - ✅ Prometheus metrics
+  - ✅ Structured logging
+  - ✅ Rate limiting
+  - ✅ JWT authentication
+  - ✅ Security headers
+  - ✅ TLS support
+  - ✅ Admin API
 `))
 	})
 
