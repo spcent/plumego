@@ -1,0 +1,526 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/spcent/plumego/middleware/proxy"
+)
+
+// Config holds the API gateway configuration
+type Config struct {
+	Server    ServerConfig    `json:"server"`
+	Services  ServicesConfig  `json:"services"`
+	CORS      CORSConfig      `json:"cors"`
+	Metrics   MetricsConfig   `json:"metrics"`
+	RateLimit RateLimitConfig `json:"rate_limit"`
+	Timeouts  TimeoutsConfig  `json:"timeouts"`
+	Auth      AuthConfig      `json:"auth"`
+	Security  SecurityConfig  `json:"security"`
+	TLS       TLSConfig       `json:"tls"`
+	Admin     AdminConfig     `json:"admin"`
+	// Phase 3 features
+	Tracing  TracingConfig  `json:"tracing"`
+	Cache    CacheConfig    `json:"cache"`
+	Canary   CanaryConfig   `json:"canary"`
+	Advanced AdvancedConfig `json:"advanced"`
+}
+
+// ServerConfig holds server-level configuration
+type ServerConfig struct {
+	Addr  string `json:"addr"`
+	Debug bool   `json:"debug"`
+}
+
+// AuthConfig holds authentication configuration
+type AuthConfig struct {
+	Enabled         bool     `json:"enabled"`
+	JWTSecret       string   `json:"jwt_secret"`
+	PublicPaths     []string `json:"public_paths"` // Paths that don't require auth
+	TokenHeader     string   `json:"token_header"`
+	TokenQueryParam string   `json:"token_query_param"`
+	AccessTokenTTL  int      `json:"access_token_ttl"`  // in minutes
+	RefreshTokenTTL int      `json:"refresh_token_ttl"` // in days
+}
+
+// SecurityConfig holds security headers configuration
+type SecurityConfig struct {
+	Enabled               bool   `json:"enabled"`
+	HSTSMaxAge            int    `json:"hsts_max_age"` // in seconds
+	HSTSIncludeSubDomains bool   `json:"hsts_include_subdomains"`
+	HSTSPreload           bool   `json:"hsts_preload"`
+	ContentSecurityPolicy string `json:"content_security_policy"`
+	XFrameOptions         string `json:"x_frame_options"`
+	XContentTypeOptions   string `json:"x_content_type_options"`
+	ReferrerPolicy        string `json:"referrer_policy"`
+}
+
+// TLSConfig holds TLS configuration
+type TLSConfig struct {
+	Enabled  bool   `json:"enabled"`
+	CertFile string `json:"cert_file"`
+	KeyFile  string `json:"key_file"`
+}
+
+// AdminConfig holds admin API configuration
+type AdminConfig struct {
+	Enabled bool   `json:"enabled"`
+	Path    string `json:"path"`
+	APIKey  string `json:"api_key"` // Simple API key for admin endpoints
+}
+
+// TracingConfig holds distributed tracing configuration
+type TracingConfig struct {
+	Enabled      bool    `json:"enabled"`
+	Endpoint     string  `json:"endpoint"`      // OpenTelemetry collector endpoint
+	ServiceName  string  `json:"service_name"`  // Service name for traces
+	SampleRate   float64 `json:"sample_rate"`   // Sampling rate (0.0-1.0)
+	ExportFormat string  `json:"export_format"` // jaeger, zipkin, otlp
+}
+
+// CacheConfig holds response caching configuration
+type CacheConfig struct {
+	Enabled      bool          `json:"enabled"`
+	TTL          time.Duration `json:"ttl"`           // Default cache TTL
+	MaxSize      int           `json:"max_size"`      // Maximum cache size in MB
+	ExcludePaths []string      `json:"exclude_paths"` // Paths to exclude from caching
+	OnlyMethods  []string      `json:"only_methods"`  // Only cache these methods (default: GET)
+	VaryHeaders  []string      `json:"vary_headers"`  // Headers that affect cache key
+}
+
+// CanaryConfig holds canary deployment / traffic splitting configuration
+type CanaryConfig struct {
+	Enabled       bool         `json:"enabled"`
+	Rules         []CanaryRule `json:"rules"`          // Canary rules per service
+	DefaultWeight int          `json:"default_weight"` // Default weight for primary targets
+}
+
+// CanaryRule defines a traffic splitting rule for a service
+type CanaryRule struct {
+	ServiceName   string            `json:"service_name"`   // Which service this applies to
+	CanaryTargets []string          `json:"canary_targets"` // Canary backend targets
+	CanaryWeight  int               `json:"canary_weight"`  // Weight for canary (0-100)
+	HeaderMatch   map[string]string `json:"header_match"`   // Route based on headers
+	CookieMatch   string            `json:"cookie_match"`   // Route based on cookie
+}
+
+// AdvancedConfig holds advanced routing configuration
+type AdvancedConfig struct {
+	Enabled      bool          `json:"enabled"`
+	RoutingRules []RoutingRule `json:"routing_rules"` // Advanced routing rules
+}
+
+// RoutingRule defines an advanced routing rule
+type RoutingRule struct {
+	Path          string            `json:"path"`           // Path pattern to match
+	HeaderMatch   map[string]string `json:"header_match"`   // Header conditions
+	QueryMatch    map[string]string `json:"query_match"`    // Query parameter conditions
+	TargetService string            `json:"target_service"` // Which service to route to
+	TargetURL     string            `json:"target_url"`     // Or specific URL to route to
+	Priority      int               `json:"priority"`       // Rule priority (higher = first)
+}
+
+// MetricsConfig holds metrics configuration
+type MetricsConfig struct {
+	Enabled   bool   `json:"enabled"`
+	Path      string `json:"path"`
+	Namespace string `json:"namespace"`
+}
+
+// RateLimitConfig holds rate limiting configuration
+type RateLimitConfig struct {
+	Enabled           bool `json:"enabled"`
+	RequestsPerSecond int  `json:"requests_per_second"`
+	BurstSize         int  `json:"burst_size"`
+}
+
+// TimeoutsConfig holds timeout configuration
+type TimeoutsConfig struct {
+	Gateway time.Duration `json:"gateway"` // Gateway-level timeout
+	Service time.Duration `json:"service"` // Default service timeout
+}
+
+// ServicesConfig holds all service configurations
+type ServicesConfig struct {
+	UserService    ServiceConfig `json:"user_service"`
+	OrderService   ServiceConfig `json:"order_service"`
+	ProductService ServiceConfig `json:"product_service"`
+}
+
+// ServiceConfig holds configuration for a single backend service
+type ServiceConfig struct {
+	Enabled      bool          `json:"enabled"`
+	Targets      []string      `json:"targets"`
+	PathPrefix   string        `json:"path_prefix"`
+	LoadBalancer string        `json:"load_balancer"`
+	HealthCheck  bool          `json:"health_check"`
+	Timeout      time.Duration `json:"timeout"` // Service-specific timeout
+	RetryCount   int           `json:"retry_count"`
+}
+
+// CORSConfig holds CORS configuration
+type CORSConfig struct {
+	Enabled        bool     `json:"enabled"`
+	AllowedOrigins []string `json:"allowed_origins"`
+	AllowedMethods []string `json:"allowed_methods"`
+	AllowedHeaders []string `json:"allowed_headers"`
+}
+
+// LoadConfig loads configuration from environment variables
+func LoadConfig() (*Config, error) {
+	cfg := &Config{
+		Server: ServerConfig{
+			Addr:  getEnv("GATEWAY_ADDR", ":8080"),
+			Debug: getEnvBool("GATEWAY_DEBUG", false),
+		},
+		Auth: AuthConfig{
+			Enabled:         getEnvBool("AUTH_ENABLED", false),
+			JWTSecret:       getEnv("JWT_SECRET", ""),
+			PublicPaths:     getEnvSlice("AUTH_PUBLIC_PATHS", []string{"/health", "/status", "/metrics"}),
+			TokenHeader:     getEnv("AUTH_TOKEN_HEADER", "Authorization"),
+			TokenQueryParam: getEnv("AUTH_TOKEN_QUERY_PARAM", "token"),
+			AccessTokenTTL:  getEnvInt("AUTH_ACCESS_TOKEN_TTL", 15), // 15 minutes
+			RefreshTokenTTL: getEnvInt("AUTH_REFRESH_TOKEN_TTL", 7), // 7 days
+		},
+		Security: SecurityConfig{
+			Enabled:               getEnvBool("SECURITY_HEADERS_ENABLED", true),
+			HSTSMaxAge:            getEnvInt("SECURITY_HSTS_MAX_AGE", 31536000), // 1 year
+			HSTSIncludeSubDomains: getEnvBool("SECURITY_HSTS_INCLUDE_SUBDOMAINS", true),
+			HSTSPreload:           getEnvBool("SECURITY_HSTS_PRELOAD", false),
+			ContentSecurityPolicy: getEnv("SECURITY_CSP", "default-src 'self'"),
+			XFrameOptions:         getEnv("SECURITY_X_FRAME_OPTIONS", "DENY"),
+			XContentTypeOptions:   getEnv("SECURITY_X_CONTENT_TYPE_OPTIONS", "nosniff"),
+			ReferrerPolicy:        getEnv("SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin"),
+		},
+		TLS: TLSConfig{
+			Enabled:  getEnvBool("TLS_ENABLED", false),
+			CertFile: getEnv("TLS_CERT_FILE", ""),
+			KeyFile:  getEnv("TLS_KEY_FILE", ""),
+		},
+		Admin: AdminConfig{
+			Enabled: getEnvBool("ADMIN_ENABLED", false),
+			Path:    getEnv("ADMIN_PATH", "/admin"),
+			APIKey:  getEnv("ADMIN_API_KEY", ""),
+		},
+		Metrics: MetricsConfig{
+			Enabled:   getEnvBool("METRICS_ENABLED", true),
+			Path:      getEnv("METRICS_PATH", "/metrics"),
+			Namespace: getEnv("METRICS_NAMESPACE", "api_gateway"),
+		},
+		RateLimit: RateLimitConfig{
+			Enabled:           getEnvBool("RATE_LIMIT_ENABLED", true),
+			RequestsPerSecond: getEnvInt("RATE_LIMIT_RPS", 1000),
+			BurstSize:         getEnvInt("RATE_LIMIT_BURST", 2000),
+		},
+		Timeouts: TimeoutsConfig{
+			Gateway: getEnvDuration("TIMEOUT_GATEWAY", 30*time.Second),
+			Service: getEnvDuration("TIMEOUT_SERVICE", 10*time.Second),
+		},
+		CORS: CORSConfig{
+			Enabled:        getEnvBool("CORS_ENABLED", true),
+			AllowedOrigins: getEnvSlice("CORS_ALLOWED_ORIGINS", []string{"*"}),
+			AllowedMethods: getEnvSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
+			AllowedHeaders: getEnvSlice("CORS_ALLOWED_HEADERS", []string{"Content-Type", "Authorization"}),
+		},
+		Services: ServicesConfig{
+			UserService: ServiceConfig{
+				Enabled:      getEnvBool("USER_SERVICE_ENABLED", true),
+				Targets:      getEnvSlice("USER_SERVICE_TARGETS", []string{"http://localhost:8081", "http://localhost:8082"}),
+				PathPrefix:   getEnv("USER_SERVICE_PATH_PREFIX", "/api/v1/users"),
+				LoadBalancer: getEnv("USER_SERVICE_LB", "round-robin"),
+				HealthCheck:  getEnvBool("USER_SERVICE_HEALTH_CHECK", false),
+				Timeout:      getEnvDuration("USER_SERVICE_TIMEOUT", 10*time.Second),
+				RetryCount:   getEnvInt("USER_SERVICE_RETRY", 3),
+			},
+			OrderService: ServiceConfig{
+				Enabled:      getEnvBool("ORDER_SERVICE_ENABLED", true),
+				Targets:      getEnvSlice("ORDER_SERVICE_TARGETS", []string{"http://localhost:9001", "http://localhost:9002"}),
+				PathPrefix:   getEnv("ORDER_SERVICE_PATH_PREFIX", "/api/v1/orders"),
+				LoadBalancer: getEnv("ORDER_SERVICE_LB", "weighted-round-robin"),
+				HealthCheck:  getEnvBool("ORDER_SERVICE_HEALTH_CHECK", true),
+				Timeout:      getEnvDuration("ORDER_SERVICE_TIMEOUT", 15*time.Second),
+				RetryCount:   getEnvInt("ORDER_SERVICE_RETRY", 2),
+			},
+			ProductService: ServiceConfig{
+				Enabled:      getEnvBool("PRODUCT_SERVICE_ENABLED", true),
+				Targets:      getEnvSlice("PRODUCT_SERVICE_TARGETS", []string{"http://localhost:7001"}),
+				PathPrefix:   getEnv("PRODUCT_SERVICE_PATH_PREFIX", "/api/v1/products"),
+				LoadBalancer: getEnv("PRODUCT_SERVICE_LB", "round-robin"),
+				HealthCheck:  getEnvBool("PRODUCT_SERVICE_HEALTH_CHECK", false),
+				Timeout:      getEnvDuration("PRODUCT_SERVICE_TIMEOUT", 10*time.Second),
+				RetryCount:   getEnvInt("PRODUCT_SERVICE_RETRY", 3),
+			},
+		},
+		// Phase 3 features
+		Tracing: TracingConfig{
+			Enabled:      getEnvBool("TRACING_ENABLED", false),
+			Endpoint:     getEnv("TRACING_ENDPOINT", "http://localhost:14268/api/traces"),
+			ServiceName:  getEnv("TRACING_SERVICE_NAME", "api-gateway"),
+			SampleRate:   getEnvFloat("TRACING_SAMPLE_RATE", 1.0),
+			ExportFormat: getEnv("TRACING_EXPORT_FORMAT", "jaeger"),
+		},
+		Cache: CacheConfig{
+			Enabled:      getEnvBool("CACHE_ENABLED", false),
+			TTL:          getEnvDuration("CACHE_TTL", 5*time.Minute),
+			MaxSize:      getEnvInt("CACHE_MAX_SIZE", 100), // 100 MB
+			ExcludePaths: getEnvSlice("CACHE_EXCLUDE_PATHS", []string{"/admin/*", "/metrics"}),
+			OnlyMethods:  getEnvSlice("CACHE_ONLY_METHODS", []string{"GET"}),
+			VaryHeaders:  getEnvSlice("CACHE_VARY_HEADERS", []string{"Accept", "Accept-Encoding"}),
+		},
+		Canary: CanaryConfig{
+			Enabled:       getEnvBool("CANARY_ENABLED", false),
+			DefaultWeight: getEnvInt("CANARY_DEFAULT_WEIGHT", 100),
+			// Rules loaded separately via JSON config if needed
+		},
+		Advanced: AdvancedConfig{
+			Enabled: getEnvBool("ADVANCED_ROUTING_ENABLED", false),
+			// Rules loaded separately via JSON config if needed
+		},
+	}
+
+	return cfg, nil
+}
+
+// GetLoadBalancer returns a load balancer instance based on config
+func (sc *ServiceConfig) GetLoadBalancer() proxy.LoadBalancer {
+	switch sc.LoadBalancer {
+	case "weighted-round-robin":
+		return proxy.NewWeightedRoundRobinBalancer()
+	case "least-connections":
+		return proxy.NewLeastConnectionsBalancer()
+	case "ip-hash":
+		return proxy.NewIPHashBalancer()
+	default:
+		return proxy.NewRoundRobinBalancer()
+	}
+}
+
+// GetHealthCheckConfig returns health check configuration
+func (sc *ServiceConfig) GetHealthCheckConfig() *proxy.HealthCheckConfig {
+	if !sc.HealthCheck {
+		return nil
+	}
+
+	return &proxy.HealthCheckConfig{
+		Interval:       10 * time.Second,
+		Timeout:        5 * time.Second,
+		Path:           "/health",
+		ExpectedStatus: 200,
+	}
+}
+
+// GetTimeout returns the service-specific timeout or default
+func (sc *ServiceConfig) GetTimeout(defaultTimeout time.Duration) time.Duration {
+	if sc.Timeout > 0 {
+		return sc.Timeout
+	}
+	return defaultTimeout
+}
+
+// GetRetryCount returns the service-specific retry count
+func (sc *ServiceConfig) GetRetryCount() int {
+	if sc.RetryCount > 0 {
+		return sc.RetryCount
+	}
+	return 0 // No retries by default
+}
+
+// Helper functions
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return defaultValue
+		}
+		return b
+	}
+	return defaultValue
+}
+
+func getEnvSlice(key string, defaultValue []string) []string {
+	if value := os.Getenv(key); value != "" {
+		return strings.Split(value, ",")
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		i, err := strconv.Atoi(value)
+		if err != nil {
+			return defaultValue
+		}
+		return i
+	}
+	return defaultValue
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		f, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return defaultValue
+		}
+		return f
+	}
+	return defaultValue
+}
+
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		// Support both seconds and duration strings
+		if d, err := time.ParseDuration(value); err == nil {
+			return d
+		}
+		// Try parsing as seconds
+		if seconds, err := strconv.Atoi(value); err == nil {
+			return time.Duration(seconds) * time.Second
+		}
+	}
+	return defaultValue
+}
+
+// Validate validates the configuration
+func (c *Config) Validate() error {
+	// Server validation
+	if c.Server.Addr == "" {
+		return fmt.Errorf("server address cannot be empty")
+	}
+
+	// Auth validation
+	if c.Auth.Enabled {
+		if len(c.Auth.JWTSecret) < 32 {
+			return fmt.Errorf("JWT secret must be at least 32 characters when auth is enabled")
+		}
+		if c.Auth.TokenHeader == "" {
+			return fmt.Errorf("auth token header cannot be empty when auth is enabled")
+		}
+		if c.Auth.AccessTokenTTL <= 0 {
+			return fmt.Errorf("access token TTL must be positive")
+		}
+		if c.Auth.RefreshTokenTTL <= 0 {
+			return fmt.Errorf("refresh token TTL must be positive")
+		}
+	}
+
+	// TLS validation
+	if c.TLS.Enabled {
+		if c.TLS.CertFile == "" {
+			return fmt.Errorf("TLS cert file cannot be empty when TLS is enabled")
+		}
+		if c.TLS.KeyFile == "" {
+			return fmt.Errorf("TLS key file cannot be empty when TLS is enabled")
+		}
+	}
+
+	// Admin validation
+	if c.Admin.Enabled {
+		if c.Admin.Path == "" {
+			return fmt.Errorf("admin path cannot be empty when admin is enabled")
+		}
+		if c.Admin.APIKey == "" {
+			return fmt.Errorf("admin API key cannot be empty when admin is enabled")
+		}
+		if len(c.Admin.APIKey) < 16 {
+			return fmt.Errorf("admin API key must be at least 16 characters")
+		}
+	}
+
+	// Security headers validation
+	if c.Security.Enabled {
+		if c.Security.HSTSMaxAge < 0 {
+			return fmt.Errorf("HSTS max age cannot be negative")
+		}
+	}
+
+	// Metrics validation
+	if c.Metrics.Enabled {
+		if c.Metrics.Path == "" {
+			return fmt.Errorf("metrics path cannot be empty when metrics enabled")
+		}
+		if c.Metrics.Namespace == "" {
+			return fmt.Errorf("metrics namespace cannot be empty when metrics enabled")
+		}
+	}
+
+	// Rate limit validation
+	if c.RateLimit.Enabled {
+		if c.RateLimit.RequestsPerSecond <= 0 {
+			return fmt.Errorf("rate limit requests per second must be positive")
+		}
+		if c.RateLimit.BurstSize <= 0 {
+			return fmt.Errorf("rate limit burst size must be positive")
+		}
+		if c.RateLimit.BurstSize < c.RateLimit.RequestsPerSecond {
+			return fmt.Errorf("rate limit burst size should be >= requests per second")
+		}
+	}
+
+	// Timeout validation
+	if c.Timeouts.Gateway <= 0 {
+		return fmt.Errorf("gateway timeout must be positive")
+	}
+	if c.Timeouts.Service <= 0 {
+		return fmt.Errorf("service timeout must be positive")
+	}
+	if c.Timeouts.Service > c.Timeouts.Gateway {
+		return fmt.Errorf("service timeout should not exceed gateway timeout")
+	}
+
+	// Validate at least one service is enabled
+	hasService := false
+	services := []struct {
+		name   string
+		config ServiceConfig
+	}{
+		{"user", c.Services.UserService},
+		{"order", c.Services.OrderService},
+		{"product", c.Services.ProductService},
+	}
+
+	for _, svc := range services {
+		if svc.config.Enabled {
+			if len(svc.config.Targets) == 0 {
+				return fmt.Errorf("%s service is enabled but has no targets", svc.name)
+			}
+			// Validate each target URL
+			for _, target := range svc.config.Targets {
+				if target == "" {
+					return fmt.Errorf("%s service has empty target URL", svc.name)
+				}
+				if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+					return fmt.Errorf("%s service target must start with http:// or https://: %s", svc.name, target)
+				}
+			}
+			// Validate timeout
+			if svc.config.Timeout <= 0 {
+				return fmt.Errorf("%s service timeout must be positive", svc.name)
+			}
+			if svc.config.Timeout > c.Timeouts.Gateway {
+				return fmt.Errorf("%s service timeout exceeds gateway timeout", svc.name)
+			}
+			// Validate retry count
+			if svc.config.RetryCount < 0 {
+				return fmt.Errorf("%s service retry count cannot be negative", svc.name)
+			}
+			hasService = true
+		}
+	}
+
+	if !hasService {
+		return fmt.Errorf("at least one service must be enabled with valid targets")
+	}
+
+	return nil
+}

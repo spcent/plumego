@@ -47,7 +47,7 @@ func NewProxyError(backend string, err error, attempt int) *ProxyError {
 
 // Error implements the error interface
 func (e *ProxyError) Error() string {
-	return fmt.Sprintf("proxy error (backend=%s, attempt=%d): %v", 
+	return fmt.Sprintf("proxy error (backend=%s, attempt=%d): %v",
 		e.Backend, e.Attempt, e.Err)
 }
 

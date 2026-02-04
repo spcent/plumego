@@ -23,28 +23,28 @@ func TestStrategyAcceptHeader(t *testing.T) {
 	}))
 
 	tests := []struct {
-		name           string
-		acceptHeader   string
+		name            string
+		acceptHeader    string
 		expectedVersion int
 	}{
 		{
-			name:           "Version 2 from Accept header",
-			acceptHeader:   "application/vnd.myapi.v2+json",
+			name:            "Version 2 from Accept header",
+			acceptHeader:    "application/vnd.myapi.v2+json",
 			expectedVersion: 2,
 		},
 		{
-			name:           "Version 3 from Accept header",
-			acceptHeader:   "application/vnd.myapi.v3+json",
+			name:            "Version 3 from Accept header",
+			acceptHeader:    "application/vnd.myapi.v3+json",
 			expectedVersion: 3,
 		},
 		{
-			name:           "No version - use default",
-			acceptHeader:   "application/json",
+			name:            "No version - use default",
+			acceptHeader:    "application/json",
 			expectedVersion: 1,
 		},
 		{
-			name:           "Empty Accept - use default",
-			acceptHeader:   "",
+			name:            "Empty Accept - use default",
+			acceptHeader:    "",
 			expectedVersion: 1,
 		},
 	}
@@ -91,28 +91,28 @@ func TestStrategyURLPath(t *testing.T) {
 	}))
 
 	tests := []struct {
-		name           string
-		path           string
+		name            string
+		path            string
 		expectedVersion int
-		expectedPath   string
+		expectedPath    string
 	}{
 		{
-			name:           "Version 2 from path",
-			path:           "/v2/users/123",
+			name:            "Version 2 from path",
+			path:            "/v2/users/123",
 			expectedVersion: 2,
-			expectedPath:   "/users/123",
+			expectedPath:    "/users/123",
 		},
 		{
-			name:           "Version 3 from path",
-			path:           "/v3/products",
+			name:            "Version 3 from path",
+			path:            "/v3/products",
 			expectedVersion: 3,
-			expectedPath:   "/products",
+			expectedPath:    "/products",
 		},
 		{
-			name:           "No version - use default",
-			path:           "/users",
+			name:            "No version - use default",
+			path:            "/users",
 			expectedVersion: 1,
-			expectedPath:   "/users",
+			expectedPath:    "/users",
 		},
 	}
 
@@ -152,23 +152,23 @@ func TestStrategyQueryParam(t *testing.T) {
 	}))
 
 	tests := []struct {
-		name           string
-		url            string
+		name            string
+		url             string
 		expectedVersion int
 	}{
 		{
-			name:           "Version 2 from query param",
-			url:            "/test?version=2",
+			name:            "Version 2 from query param",
+			url:             "/test?version=2",
 			expectedVersion: 2,
 		},
 		{
-			name:           "Version 3 from query param",
-			url:            "/test?version=3",
+			name:            "Version 3 from query param",
+			url:             "/test?version=3",
 			expectedVersion: 3,
 		},
 		{
-			name:           "No version - use default",
-			url:            "/test",
+			name:            "No version - use default",
+			url:             "/test",
 			expectedVersion: 1,
 		},
 	}
@@ -209,23 +209,23 @@ func TestStrategyCustomHeader(t *testing.T) {
 	}))
 
 	tests := []struct {
-		name           string
-		headerValue    string
+		name            string
+		headerValue     string
 		expectedVersion int
 	}{
 		{
-			name:           "Version 2 from header",
-			headerValue:    "2",
+			name:            "Version 2 from header",
+			headerValue:     "2",
 			expectedVersion: 2,
 		},
 		{
-			name:           "Version 3 from header",
-			headerValue:    "3",
+			name:            "Version 3 from header",
+			headerValue:     "3",
 			expectedVersion: 3,
 		},
 		{
-			name:           "No header - use default",
-			headerValue:    "",
+			name:            "No header - use default",
+			headerValue:     "",
 			expectedVersion: 1,
 		},
 	}
@@ -300,23 +300,23 @@ func TestCustomExtractor(t *testing.T) {
 	}))
 
 	tests := []struct {
-		name           string
-		host           string
+		name            string
+		host            string
 		expectedVersion int
 	}{
 		{
-			name:           "Version 2 from subdomain",
-			host:           "v2.api.example.com",
+			name:            "Version 2 from subdomain",
+			host:            "v2.api.example.com",
 			expectedVersion: 2,
 		},
 		{
-			name:           "Version 3 from subdomain",
-			host:           "v3.api.example.com",
+			name:            "Version 3 from subdomain",
+			host:            "v3.api.example.com",
 			expectedVersion: 3,
 		},
 		{
-			name:           "Default version",
-			host:           "api.example.com",
+			name:            "Default version",
+			host:            "api.example.com",
 			expectedVersion: 1,
 		},
 	}

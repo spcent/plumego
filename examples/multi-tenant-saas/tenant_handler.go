@@ -18,21 +18,21 @@ type AdminHandler struct {
 
 // CreateTenantRequest represents the request body for creating a tenant
 type CreateTenantRequest struct {
-	TenantID             string            `json:"tenant_id"`
-	QuotaRequestsPerMin  int               `json:"quota_requests_per_minute"`
-	QuotaTokensPerMin    int               `json:"quota_tokens_per_minute"`
-	AllowedModels        []string          `json:"allowed_models"`
-	AllowedTools         []string          `json:"allowed_tools"`
-	Metadata             map[string]string `json:"metadata,omitempty"`
+	TenantID            string            `json:"tenant_id"`
+	QuotaRequestsPerMin int               `json:"quota_requests_per_minute"`
+	QuotaTokensPerMin   int               `json:"quota_tokens_per_minute"`
+	AllowedModels       []string          `json:"allowed_models"`
+	AllowedTools        []string          `json:"allowed_tools"`
+	Metadata            map[string]string `json:"metadata,omitempty"`
 }
 
 // TenantResponse represents the response for tenant operations
 type TenantResponse struct {
-	TenantID    string                       `json:"tenant_id"`
-	Quota       plumego.TenantQuotaConfig    `json:"quota"`
-	Policy      plumego.TenantPolicyConfig   `json:"policy"`
-	Metadata    map[string]string            `json:"metadata,omitempty"`
-	UpdatedAt   time.Time                    `json:"updated_at"`
+	TenantID  string                     `json:"tenant_id"`
+	Quota     plumego.TenantQuotaConfig  `json:"quota"`
+	Policy    plumego.TenantPolicyConfig `json:"policy"`
+	Metadata  map[string]string          `json:"metadata,omitempty"`
+	UpdatedAt time.Time                  `json:"updated_at"`
 }
 
 // CreateTenant creates a new tenant

@@ -65,11 +65,11 @@ type Store interface {
 
 // StoreStats holds cache store statistics
 type StoreStats struct {
-	Items      int
-	Hits       uint64
-	Misses     uint64
-	Evictions  uint64
-	Size       int64 // Approximate size in bytes
+	Items     int
+	Hits      uint64
+	Misses    uint64
+	Evictions uint64
+	Size      int64 // Approximate size in bytes
 }
 
 // KeyStrategy generates cache keys from requests
