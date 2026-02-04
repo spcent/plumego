@@ -4,99 +4,66 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/middleware/proxy"
 	"github.com/spcent/plumego/net/discovery"
+	"github.com/spcent/plumego/router"
 )
 
 func main() {
-	// Create service discovery
-	// In this example, we use static configuration
-	// For production, you would use Consul, Kubernetes, etc.
+	// Load configuration from environment variables
+	cfg, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
+
+	log.Printf("Starting API Gateway with configuration:")
+	log.Printf("  Server: %s (Debug: %v)", cfg.Server.Addr, cfg.Server.Debug)
+	log.Printf("  CORS: %v", cfg.CORS.Enabled)
+	log.Printf("  User Service: %v (%d targets)", cfg.Services.UserService.Enabled, len(cfg.Services.UserService.Targets))
+	log.Printf("  Order Service: %v (%d targets)", cfg.Services.OrderService.Enabled, len(cfg.Services.OrderService.Targets))
+	log.Printf("  Product Service: %v (%d targets)", cfg.Services.ProductService.Enabled, len(cfg.Services.ProductService.Targets))
+
+	// Create service discovery for services that need it
 	sd := discovery.NewStatic(map[string][]string{
-		"user-service": {
-			"http://localhost:8081",
-			"http://localhost:8082",
-		},
-		"order-service": {
-			"http://localhost:9001",
-			"http://localhost:9002",
-		},
-		"product-service": {
-			"http://localhost:7001",
-		},
+		"order-service": cfg.Services.OrderService.Targets,
 	})
 
-	// Create application with CORS enabled globally
-	app := core.New(
-		core.WithAddr(":8080"),
-		core.WithDebug(),
+	// Create application options
+	appOptions := []core.Option{
+		core.WithAddr(cfg.Server.Addr),
 		core.WithRecovery(),
 		core.WithLogging(),
-	)
+	}
 
-	// Configure CORS for /api routes using router group
-	apiGroup := app.Router().Group("/api")
-	apiGroup.Use(corsMiddleware())
+	// Add debug option if enabled
+	if cfg.Server.Debug {
+		appOptions = append(appOptions, core.WithDebug())
+	}
 
-	// Create /api/v1 group
-	v1Group := apiGroup.Group("/v1")
+	app := core.New(appOptions...)
 
-	// Proxy to user service - now using Any() since proxy is a handler
-	v1Group.Any("/users/*", proxy.New(proxy.Config{
-		Targets: []string{
-			"http://localhost:8081",
-			"http://localhost:8082",
-		},
-		LoadBalancer: proxy.NewRoundRobinBalancer(),
-		PathRewrite:  proxy.StripPrefix("/api/v1"),
-		ModifyRequest: proxy.ChainRequestModifiers(
-			proxy.AddHeader("X-Gateway", "plumego"),
-			proxy.AddHeader("X-Gateway-Version", "1.0"),
-		),
-		ModifyResponse: proxy.AddResponseHeader("X-Served-By", "API-Gateway"),
-	}))
+	// Configure CORS if enabled
+	if cfg.CORS.Enabled {
+		apiGroup := app.Router().Group("/api")
+		apiGroup.Use(corsMiddleware(cfg.CORS))
 
-	// Proxy to order service with service discovery
-	v1Group.Any("/orders/*", proxy.New(proxy.Config{
-		ServiceName:  "order-service",
-		Discovery:    sd,
-		LoadBalancer: proxy.NewWeightedRoundRobinBalancer(),
-		PathRewrite:  proxy.StripPrefix("/api/v1"),
-		HealthCheck: &proxy.HealthCheckConfig{
-			Interval:       10 * time.Second,
-			Timeout:        5 * time.Second,
-			Path:           "/health",
-			ExpectedStatus: http.StatusOK,
-			OnHealthChange: func(backend *proxy.Backend, healthy bool) {
-				status := "healthy"
-				if !healthy {
-					status = "unhealthy"
-				}
-				log.Printf("Backend %s is now %s", backend.URL, status)
-			},
-		},
-	}))
+		// Create /api/v1 group
+		v1Group := apiGroup.Group("/v1")
 
-	// Proxy to product service with custom error handling
-	v1Group.Any("/products/*", proxy.New(proxy.Config{
-		Targets: []string{
-			"http://localhost:7001",
-		},
-		PathRewrite: proxy.StripPrefix("/api/v1"),
-		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-			log.Printf("Proxy error: %v", err)
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{
-				"error": "Service temporarily unavailable",
-				"message": "The product service is currently unavailable. Please try again later."
-			}`))
-		},
-	}))
+		// Register enabled services
+		registerServices(v1Group, cfg, sd)
+	} else {
+		// Register services without CORS
+		v1Group := app.Router().Group("/api/v1")
+		registerServices(v1Group, cfg, sd)
+	}
 
 	// Health check endpoint for the gateway itself
 	app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +115,7 @@ Features:
 	})
 
 	// Start server (includes built-in graceful shutdown)
-	log.Println("Starting API Gateway on :8080")
+	log.Printf("Starting API Gateway on %s", cfg.Server.Addr)
 	log.Println("Visit http://localhost:8080/status for info")
 
 	if err := app.Boot(); err != nil {
@@ -156,13 +123,92 @@ Features:
 	}
 }
 
-// corsMiddleware adds CORS headers
-func corsMiddleware() func(http.Handler) http.Handler {
+// registerServices registers all enabled services to the router group
+func registerServices(v1Group *router.Router, cfg *Config, sd *discovery.Static) {
+	// User Service
+	if cfg.Services.UserService.Enabled {
+		log.Printf("Registering User Service: %s -> %v",
+			cfg.Services.UserService.PathPrefix,
+			cfg.Services.UserService.Targets)
+
+		v1Group.Any("/users/*", proxy.New(proxy.Config{
+			Targets:      cfg.Services.UserService.Targets,
+			LoadBalancer: cfg.Services.UserService.GetLoadBalancer(),
+			PathRewrite:  proxy.StripPrefix("/api/v1"),
+			ModifyRequest: proxy.ChainRequestModifiers(
+				proxy.AddHeader("X-Gateway", "plumego"),
+				proxy.AddHeader("X-Gateway-Version", "1.0"),
+			),
+			ModifyResponse: proxy.AddResponseHeader("X-Served-By", "API-Gateway"),
+			HealthCheck:    cfg.Services.UserService.GetHealthCheckConfig(),
+		}))
+	}
+
+	// Order Service
+	if cfg.Services.OrderService.Enabled {
+		log.Printf("Registering Order Service: %s -> %v (with service discovery)",
+			cfg.Services.OrderService.PathPrefix,
+			cfg.Services.OrderService.Targets)
+
+		v1Group.Any("/orders/*", proxy.New(proxy.Config{
+			ServiceName:  "order-service",
+			Discovery:    sd,
+			LoadBalancer: cfg.Services.OrderService.GetLoadBalancer(),
+			PathRewrite:  proxy.StripPrefix("/api/v1"),
+			HealthCheck:  cfg.Services.OrderService.GetHealthCheckConfig(),
+		}))
+	}
+
+	// Product Service
+	if cfg.Services.ProductService.Enabled {
+		log.Printf("Registering Product Service: %s -> %v",
+			cfg.Services.ProductService.PathPrefix,
+			cfg.Services.ProductService.Targets)
+
+		v1Group.Any("/products/*", proxy.New(proxy.Config{
+			Targets:      cfg.Services.ProductService.Targets,
+			LoadBalancer: cfg.Services.ProductService.GetLoadBalancer(),
+			PathRewrite:  proxy.StripPrefix("/api/v1"),
+			HealthCheck:  cfg.Services.ProductService.GetHealthCheckConfig(),
+			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+				log.Printf("Proxy error: %v", err)
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				w.Write([]byte(`{
+					"error": "Service temporarily unavailable",
+					"message": "The product service is currently unavailable. Please try again later."
+				}`))
+			},
+		}))
+	}
+}
+
+// corsMiddleware adds CORS headers based on configuration
+func corsMiddleware(cfg CORSConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			// Join allowed origins
+			origins := "*"
+			if len(cfg.AllowedOrigins) > 0 {
+				origins = cfg.AllowedOrigins[0]
+			}
+
+			// Join allowed methods
+			methods := "GET, POST, PUT, DELETE, OPTIONS"
+			if len(cfg.AllowedMethods) > 0 {
+				methods = joinStrings(cfg.AllowedMethods, ", ")
+			}
+
+			// Join allowed headers
+			headers := "Content-Type, Authorization"
+			if len(cfg.AllowedHeaders) > 0 {
+				headers = joinStrings(cfg.AllowedHeaders, ", ")
+			}
+
+			w.Header().Set("Access-Control-Allow-Origin", origins)
+			w.Header().Set("Access-Control-Allow-Methods", methods)
+			w.Header().Set("Access-Control-Allow-Headers", headers)
 
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
@@ -172,4 +218,16 @@ func corsMiddleware() func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// joinStrings joins a slice of strings with a separator
+func joinStrings(slice []string, sep string) string {
+	if len(slice) == 0 {
+		return ""
+	}
+	result := slice[0]
+	for i := 1; i < len(slice); i++ {
+		result += sep + slice[i]
+	}
+	return result
 }
