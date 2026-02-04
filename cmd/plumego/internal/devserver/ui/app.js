@@ -286,11 +286,23 @@ function addLogToDisplay(logEntry) {
     }
 
     const time = formatTime(timestamp);
-    div.innerHTML = `
-        <span class="log-time">${time}</span>
-        <span class="log-level" style="color: ${getLevelColor(level)}">${level.toUpperCase()}</span>
-        <span class="log-message">${escapeHtml(message)}</span>
-    `;
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'log-time';
+    timeSpan.textContent = time;
+
+    const levelSpan = document.createElement('span');
+    levelSpan.className = 'log-level';
+    levelSpan.style.color = getLevelColor(level);
+    levelSpan.textContent = (level || '').toUpperCase();
+
+    const messageSpan = document.createElement('span');
+    messageSpan.className = 'log-message';
+    messageSpan.textContent = message;
+
+    div.appendChild(timeSpan);
+    div.appendChild(levelSpan);
+    div.appendChild(messageSpan);
 
     elements.logs.appendChild(div);
 
