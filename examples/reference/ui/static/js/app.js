@@ -21,25 +21,31 @@ function addLog(message, type = 'info') {
   const logEl = document.getElementById('messageLog');
   const now = new Date();
   const timestamp = now.toLocaleTimeString();
-  
+
   const entry = document.createElement('div');
   entry.className = 'log-entry';
-  
+
   let contentClass = '';
   switch (type) {
     case 'sent': contentClass = 'log-sent'; stats.sent++; break;
     case 'received': contentClass = 'log-received'; stats.received++; break;
     case 'error': contentClass = 'log-error'; stats.errors++; break;
   }
-  
-  entry.innerHTML = `
-    <div class="log-timestamp">${timestamp}</div>
-    <div class="log-content ${contentClass}">${message}</div>
-  `;
-  
+
+  const timestampEl = document.createElement('div');
+  timestampEl.className = 'log-timestamp';
+  timestampEl.textContent = timestamp;
+
+  const contentEl = document.createElement('div');
+  contentEl.className = `log-content ${contentClass}`;
+  contentEl.textContent = message;
+
+  entry.appendChild(timestampEl);
+  entry.appendChild(contentEl);
+
   logEl.appendChild(entry);
   logEl.scrollTop = logEl.scrollHeight;
-  
+
   updateStats();
 }
 
