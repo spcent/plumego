@@ -1,4 +1,4 @@
-package core
+package di
 
 import (
 	"errors"
@@ -43,9 +43,9 @@ type DIRegistration struct {
 //
 // Example:
 //
-//	container := core.NewDIContainer()
+//	container := di.NewDIContainer()
 //	container.Register(&DatabaseService{})
-//	container.RegisterFactory(reflect.TypeOf((*CacheService)(nil)), func(c *core.DIContainer) any {
+//	container.RegisterFactory(reflect.TypeOf((*CacheService)(nil)), func(c *di.DIContainer) any {
 //	    return NewRedisCache(c)
 //	})
 //
@@ -544,6 +544,14 @@ func (c *DIContainer) Clear() {
 
 	c.services = make(map[reflect.Type]DIRegistration)
 	c.scopedInstances = make(map[uint64]map[reflect.Type]any)
+}
+
+// ScopedInstanceCount reports how many resolution chains currently hold scoped instances.
+// This is primarily useful for diagnostics and tests.
+func (c *DIContainer) ScopedInstanceCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.scopedInstances)
 }
 
 // GetRegistrations returns a list of all registered services.

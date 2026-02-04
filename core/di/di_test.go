@@ -1,4 +1,4 @@
-package core
+package di
 
 import (
 	"reflect"
@@ -27,7 +27,7 @@ type diNamedTarget struct {
 }
 
 type diNamedPointerTarget struct {
-	Dep diService `inject:"*core.diImpl"`
+	Dep diService `inject:"*di.diImpl"`
 }
 
 type diValueTarget struct {

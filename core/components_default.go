@@ -1,10 +1,16 @@
 package core
 
-import "reflect"
+import (
+	"reflect"
+
+	"github.com/spcent/plumego/core/components/builtin"
+	"github.com/spcent/plumego/core/components/pubsubdebug"
+	"github.com/spcent/plumego/core/components/webhook"
+	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/pubsub"
+)
 
 func (a *App) builtInComponents() []Component {
-	var comps []Component
-
 	a.mu.RLock()
 	pubSubConfig := a.config.PubSub
 	webhookOutConfig := a.config.WebhookOut
@@ -14,23 +20,33 @@ func (a *App) builtInComponents() []Component {
 	logger := a.logger
 	a.mu.RUnlock()
 
-	if debug && !a.hasComponentType((*devToolsComponent)(nil)) {
-		comps = append(comps, newDevToolsComponent(a))
-	}
+	comps := builtin.BuiltInComponents(builtin.Hooks{
+		Debug:            debug,
+		PubSubConfig:     pubSubConfig,
+		WebhookOutConfig: webhookOutConfig,
+		WebhookInConfig:  webhookInConfig,
+		PubSub:           pub,
+		Logger:           logger,
+		HasComponentType: a.hasComponentType,
+		NewDevTools: func() builtin.Component {
+			return newDevToolsComponent(a)
+		},
+		NewPubSubDebug: func(cfg pubsubdebug.PubSubConfig, fallback pubsub.PubSub) builtin.Component {
+			return newPubSubDebugComponent(cfg, fallback)
+		},
+		NewWebhookOut: func(cfg webhook.WebhookOutConfig) builtin.Component {
+			return newWebhookOutComponent(cfg)
+		},
+		NewWebhookIn: func(cfg webhook.WebhookInConfig, fallback pubsub.PubSub, logger log.StructuredLogger) builtin.Component {
+			return newWebhookInComponent(cfg, fallback, logger)
+		},
+	})
 
-	if pubSubConfig.Enabled && !a.hasComponentType((*pubSubDebugComponent)(nil)) {
-		comps = append(comps, newPubSubDebugComponent(pubSubConfig, pub))
+	out := make([]Component, 0, len(comps))
+	for _, c := range comps {
+		out = append(out, c)
 	}
-
-	if webhookOutConfig.Enabled && !a.hasComponentType((*webhookOutComponent)(nil)) {
-		comps = append(comps, newWebhookOutComponent(webhookOutConfig))
-	}
-
-	if webhookInConfig.Enabled && !a.hasComponentType((*webhookInComponent)(nil)) {
-		comps = append(comps, newWebhookInComponent(webhookInConfig, pub, logger))
-	}
-
-	return comps
+	return out
 }
 
 func (a *App) hasComponentType(target any) bool {

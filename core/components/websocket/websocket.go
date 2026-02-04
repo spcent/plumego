@@ -1,4 +1,4 @@
-package core
+package websocket
 
 import (
 	"context"
@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/core/internal/contractio"
 	"github.com/spcent/plumego/health"
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
@@ -57,8 +59,7 @@ func DefaultWebSocketConfig() WebSocketConfig {
 	}
 }
 
-type webSocketComponent struct {
-	BaseComponent
+type WebSocketComponent struct {
 	config WebSocketConfig
 	debug  bool
 	logger log.StructuredLogger
@@ -69,7 +70,7 @@ type webSocketComponent struct {
 
 const minWebSocketSecretLen = 32
 
-func newWebSocketComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*webSocketComponent, error) {
+func NewComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*WebSocketComponent, error) {
 	if len(cfg.Secret) < minWebSocketSecretLen {
 		return nil, fmt.Errorf("websocket secret must be at least %d bytes", minWebSocketSecretLen)
 	}
@@ -81,7 +82,7 @@ func newWebSocketComponent(cfg WebSocketConfig, debug bool, logger log.Structure
 		MaxRoomConnections: cfg.MaxRoomConnections,
 	})
 
-	return &webSocketComponent{
+	return &WebSocketComponent{
 		config: cfg,
 		debug:  debug,
 		logger: logger,
@@ -89,7 +90,7 @@ func newWebSocketComponent(cfg WebSocketConfig, debug bool, logger log.Structure
 	}, nil
 }
 
-func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
+func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 	c.routesOnce.Do(func() {
 		wsAuth := ws.NewSimpleRoomAuth(c.config.Secret)
 
@@ -101,7 +102,7 @@ func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
 		if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
 			r.PostFunc(c.config.BroadcastPath, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
-					writeHTTPError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "POST only")
+					contractio.WriteHTTPError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "POST only")
 					return
 				}
 				// Always require authentication for broadcast endpoint.
@@ -116,13 +117,13 @@ func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
 				// Secrets in URLs can be leaked via server logs and Referer headers.
 
 				if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
-					writeHTTPError(w, r, http.StatusUnauthorized, "unauthorized", "unauthorized")
+					contractio.WriteHTTPError(w, r, http.StatusUnauthorized, "unauthorized", "unauthorized")
 					return
 				}
 
 				b, err := io.ReadAll(r.Body)
 				if err != nil {
-					writeHTTPError(w, r, http.StatusInternalServerError, "read_body_failed", "Error reading request body")
+					contractio.WriteHTTPError(w, r, http.StatusInternalServerError, "read_body_failed", "Error reading request body")
 					return
 				}
 
@@ -133,11 +134,11 @@ func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *webSocketComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *WebSocketComponent) RegisterMiddleware(_ *middleware.Registry) {}
 
-func (c *webSocketComponent) Start(_ context.Context) error { return nil }
+func (c *WebSocketComponent) Start(_ context.Context) error { return nil }
 
-func (c *webSocketComponent) Stop(_ context.Context) error {
+func (c *WebSocketComponent) Stop(_ context.Context) error {
 	if c.hub != nil {
 		c.hub.Stop()
 		c.hub = nil
@@ -145,7 +146,7 @@ func (c *webSocketComponent) Stop(_ context.Context) error {
 	return nil
 }
 
-func (c *webSocketComponent) Health() (string, health.HealthStatus) {
+func (c *WebSocketComponent) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"broadcastEnabled": c.config.BroadcastEnabled}}
 
 	if c.hub == nil {
@@ -156,52 +157,7 @@ func (c *webSocketComponent) Health() (string, health.HealthStatus) {
 	return "websocket", status
 }
 
-// ConfigureWebSocket configures WebSocket support for the app.
-// It returns the Hub for advanced usage.
-func (a *App) ConfigureWebSocket() (*ws.Hub, error) {
-	if err := a.loadEnv(); err != nil {
-		return nil, err
-	}
+func (c *WebSocketComponent) Dependencies() []reflect.Type { return nil }
 
-	return a.ConfigureWebSocketWithOptions(DefaultWebSocketConfig())
-}
-
-// ConfigureWebSocketWithOptions configures WebSocket support with custom options.
-func (a *App) ConfigureWebSocketWithOptions(config WebSocketConfig) (*ws.Hub, error) {
-	if err := a.ensureMutable("configure_websocket", "configure websocket"); err != nil {
-		return nil, err
-	}
-
-	cfg := a.configSnapshot()
-	a.mu.RLock()
-	logger := a.logger
-	a.mu.RUnlock()
-
-	comp, err := newWebSocketComponent(config, cfg.Debug, logger)
-	if err != nil {
-		return nil, err
-	}
-
-	comp.RegisterRoutes(a.ensureRouter())
-
-	a.mu.Lock()
-	a.components = append(a.components, comp)
-	a.mu.Unlock()
-
-	return comp.hub, nil
-}
-
-// NewWebSocketComponent builds a pluggable WebSocket component so examples can
-// compose it via core.WithComponent.
-func NewWebSocketComponent(config WebSocketConfig, logger log.StructuredLogger, debug bool) (Component, *ws.Hub, error) {
-	if logger == nil {
-		logger = log.NewGLogger()
-	}
-
-	comp, err := newWebSocketComponent(config, debug, logger)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return comp, comp.hub, nil
-}
+// Hub exposes the underlying WebSocket hub for advanced usage.
+func (c *WebSocketComponent) Hub() *ws.Hub { return c.hub }

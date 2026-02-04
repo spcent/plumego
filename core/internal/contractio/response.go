@@ -1,4 +1,4 @@
-package core
+package contractio
 
 import (
 	"net/http"
@@ -6,14 +6,14 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-func writeContractResponse(ctx *contract.Ctx, status int, data any) {
+func WriteContractResponse(ctx *contract.Ctx, status int, data any) {
 	if ctx == nil {
 		return
 	}
 	_ = ctx.Response(status, data, nil)
 }
 
-func writeContractError(ctx *contract.Ctx, status int, code, message string) {
+func WriteContractError(ctx *contract.Ctx, status int, code, message string) {
 	if ctx == nil {
 		return
 	}
@@ -26,11 +26,11 @@ func writeContractError(ctx *contract.Ctx, status int, code, message string) {
 	contract.WriteError(ctx.W, ctx.R, apiErr)
 }
 
-func writeHTTPResponse(w http.ResponseWriter, r *http.Request, status int, data any) {
+func WriteHTTPResponse(w http.ResponseWriter, r *http.Request, status int, data any) {
 	_ = contract.WriteResponse(w, r, status, data, nil)
 }
 
-func writeHTTPError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
+func WriteHTTPError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
 	apiErr := contract.APIError{
 		Status:   status,
 		Code:     code,

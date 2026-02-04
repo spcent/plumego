@@ -1,6 +1,10 @@
 package core
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/spcent/plumego/core/internal/contractio"
+)
 
 // ensureHandler lazily builds the application's handler chain so App can satisfy http.Handler.
 func (a *App) ensureHandler() {
@@ -37,7 +41,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.mu.RUnlock()
 
 	if handler == nil {
-		writeHTTPError(w, r, http.StatusServiceUnavailable, "handler_not_configured", "handler not configured")
+		contractio.WriteHTTPError(w, r, http.StatusServiceUnavailable, "handler_not_configured", "handler not configured")
 		return
 	}
 

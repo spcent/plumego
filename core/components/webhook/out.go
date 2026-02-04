@@ -1,4 +1,4 @@
-package core
+package webhook
 
 import (
 	"context"
@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/core/internal/contractio"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	webhookout "github.com/spcent/plumego/net/webhookout"
@@ -19,17 +21,16 @@ import (
 	"github.com/spcent/plumego/utils/stringsx"
 )
 
-type webhookOutComponent struct {
-	BaseComponent
+type WebhookOutComponent struct {
 	cfg        WebhookOutConfig
 	routesOnce sync.Once
 }
 
-func newWebhookOutComponent(cfg WebhookOutConfig) Component {
-	return &webhookOutComponent{cfg: cfg}
+func NewWebhookOutComponent(cfg WebhookOutConfig) *WebhookOutComponent {
+	return &WebhookOutComponent{cfg: cfg}
 }
 
-func (c *webhookOutComponent) RegisterRoutes(r *router.Router) {
+func (c *WebhookOutComponent) RegisterRoutes(r *router.Router) {
 	if !c.cfg.Enabled || c.cfg.Service == nil {
 		return
 	}
@@ -59,13 +60,13 @@ func (c *webhookOutComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *webhookOutComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *WebhookOutComponent) RegisterMiddleware(_ *middleware.Registry) {}
 
-func (c *webhookOutComponent) Start(_ context.Context) error { return nil }
+func (c *WebhookOutComponent) Start(_ context.Context) error { return nil }
 
-func (c *webhookOutComponent) Stop(_ context.Context) error { return nil }
+func (c *WebhookOutComponent) Stop(_ context.Context) error { return nil }
 
-func (c *webhookOutComponent) Health() (string, health.HealthStatus) {
+func (c *WebhookOutComponent) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}
 
 	if !c.cfg.Enabled {
@@ -75,6 +76,8 @@ func (c *webhookOutComponent) Health() (string, health.HealthStatus) {
 
 	return "webhook_out", status
 }
+
+func (c *WebhookOutComponent) Dependencies() []reflect.Type { return nil }
 
 type targetDTO struct {
 	ID      string   `json:"id"`
@@ -99,17 +102,17 @@ type targetDTO struct {
 func webhookCreateTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	var req webhookout.Target
 	if err := ctx.BindJSON(&req); err != nil {
-		writeContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	t, err := svc.CreateTarget(ctx.R.Context(), req)
 	if err != nil {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	writeContractResponse(ctx, http.StatusCreated, targetToDTO(t))
+	contractio.WriteContractResponse(ctx, http.StatusCreated, targetToDTO(t))
 }
 
 func webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
@@ -127,7 +130,7 @@ func webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
 		Event:   event,
 	})
 	if err != nil {
-		writeContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
+		contractio.WriteContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
 		return
 	}
 
@@ -136,71 +139,71 @@ func webhookListTargets(ctx *contract.Ctx, svc *webhookout.Service) {
 		out = append(out, targetToDTO(t))
 	}
 
-	writeContractResponse(ctx, http.StatusOK, map[string]any{"items": out})
+	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{"items": out})
 }
 
 func webhookGetTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	t, ok := svc.GetTarget(ctx.R.Context(), id)
 	if !ok {
-		writeContractError(ctx, http.StatusNotFound, "not_found", "target not found")
+		contractio.WriteContractError(ctx, http.StatusNotFound, "not_found", "target not found")
 		return
 	}
 
-	writeContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	contractio.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookPatchTarget(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	var req webhookout.TargetPatch
 	if err := ctx.BindJSON(&req); err != nil {
-		writeContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, req)
 	if err != nil {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	writeContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	contractio.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookSetTargetEnabled(ctx *contract.Ctx, svc *webhookout.Service, enable bool) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, webhookout.TargetPatch{Enabled: &enable})
 	if err != nil {
 		if err == webhookout.ErrNotFound {
-			writeContractError(ctx, http.StatusNotFound, "not_found", "target not found")
+			contractio.WriteContractError(ctx, http.StatusNotFound, "not_found", "target not found")
 			return
 		}
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	writeContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	contractio.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, token string, allowEmpty bool) {
 	event, ok := ctx.Param("event")
 	if !ok || strings.TrimSpace(event) == "" {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", "event is required")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "event is required")
 		return
 	}
 
@@ -210,11 +213,11 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, token strin
 	}
 
 	if token == "" && !allowEmpty {
-		writeContractError(ctx, http.StatusForbidden, "forbidden", "triggering is disabled")
+		contractio.WriteContractError(ctx, http.StatusForbidden, "forbidden", "triggering is disabled")
 		return
 	}
 	if token != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-		writeContractError(ctx, http.StatusUnauthorized, "unauthorized", "invalid trigger token")
+		contractio.WriteContractError(ctx, http.StatusUnauthorized, "unauthorized", "invalid trigger token")
 		return
 	}
 
@@ -223,17 +226,17 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *webhookout.Service, token strin
 		Meta map[string]any `json:"meta"`
 	}
 	if err := ctx.BindJSON(&payload); err != nil {
-		writeContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	enqueued, err := svc.TriggerEvent(ctx.R.Context(), webhookout.Event{Type: event, Data: payload.Data, Meta: payload.Meta})
 	if err != nil {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	writeContractResponse(ctx, http.StatusAccepted, map[string]any{
+	contractio.WriteContractResponse(ctx, http.StatusAccepted, map[string]any{
 		"enqueued": enqueued,
 		"event":    event,
 	})
@@ -274,7 +277,7 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *webhookout.Service, defaultLi
 
 	deliveries, err := svc.ListDeliveries(ctx.R.Context(), filter)
 	if err != nil {
-		writeContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
+		contractio.WriteContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
 		return
 	}
 
@@ -314,25 +317,25 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *webhookout.Service, defaultLi
 	}
 
 	resp := map[string]any{"items": out}
-	writeContractResponse(ctx, http.StatusOK, resp)
+	contractio.WriteContractResponse(ctx, http.StatusOK, resp)
 }
 
 func webhookGetDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	d, ok := svc.GetDelivery(ctx.R.Context(), id)
 	if !ok {
-		writeContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
+		contractio.WriteContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
 		return
 	}
 
 	payload := json.RawMessage(d.PayloadJSON)
 
-	writeContractResponse(ctx, http.StatusOK, map[string]any{
+	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"id":                d.ID,
 		"target_id":         d.TargetID,
 		"event_id":          d.EventID,
@@ -353,21 +356,21 @@ func webhookGetDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 func webhookReplayDelivery(ctx *contract.Ctx, svc *webhookout.Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	d, err := svc.ReplayDelivery(ctx.R.Context(), id)
 	if errors.Is(err, webhookout.ErrNotFound) {
-		writeContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
+		contractio.WriteContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
 		return
 	}
 	if err != nil {
-		writeContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	writeContractResponse(ctx, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID})
+	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID})
 }
 
 func targetToDTO(t webhookout.Target) targetDTO {
@@ -392,23 +395,4 @@ func targetToDTO(t webhookout.Target) targetDTO {
 	}
 
 	return dto
-}
-
-// ConfigureWebhookOut mounts outbound webhook management APIs.
-// It remains for backward compatibility but now mounts a component into the lifecycle.
-func (a *App) ConfigureWebhookOut() {
-	if err := a.ensureMutable("configure_webhook_out", "configure webhook out"); err != nil {
-		a.logError("ConfigureWebhookOut failed", err, nil)
-		return
-	}
-
-	cfg := a.configSnapshot()
-
-	comp := newWebhookOutComponent(cfg.WebhookOut)
-	comp.RegisterRoutes(a.ensureRouter())
-	comp.RegisterMiddleware(a.ensureMiddlewareRegistry())
-
-	a.mu.Lock()
-	a.components = append(a.components, comp)
-	a.mu.Unlock()
 }

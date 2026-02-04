@@ -1,15 +1,17 @@
-package core
+package webhook
 
 import (
 	"context"
 	"encoding/json"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/core/internal/contractio"
 	"github.com/spcent/plumego/health"
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
@@ -19,8 +21,7 @@ import (
 	"github.com/spcent/plumego/utils/jsonx"
 )
 
-type webhookInComponent struct {
-	BaseComponent
+type WebhookInComponent struct {
 	cfg        WebhookInConfig
 	pub        pubsub.PubSub
 	logger     log.StructuredLogger
@@ -28,16 +29,19 @@ type webhookInComponent struct {
 	routesOnce sync.Once
 }
 
-func newWebhookInComponent(cfg WebhookInConfig, fallbackPub pubsub.PubSub, logger log.StructuredLogger) Component {
+func NewWebhookInComponent(cfg WebhookInConfig, fallbackPub pubsub.PubSub, logger log.StructuredLogger) *WebhookInComponent {
+	if logger == nil {
+		logger = log.NewGLogger()
+	}
 	pub := cfg.Pub
 	if pub == nil {
 		pub = fallbackPub
 	}
 
-	return &webhookInComponent{cfg: cfg, pub: pub, logger: logger}
+	return &WebhookInComponent{cfg: cfg, pub: pub, logger: logger}
 }
 
-func (c *webhookInComponent) RegisterRoutes(r *router.Router) {
+func (c *WebhookInComponent) RegisterRoutes(r *router.Router) {
 	if !c.cfg.Enabled || c.pub == nil {
 		return
 	}
@@ -57,13 +61,13 @@ func (c *webhookInComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *webhookInComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *WebhookInComponent) RegisterMiddleware(_ *middleware.Registry) {}
 
-func (c *webhookInComponent) Start(_ context.Context) error { return nil }
+func (c *WebhookInComponent) Start(_ context.Context) error { return nil }
 
-func (c *webhookInComponent) Stop(_ context.Context) error { return nil }
+func (c *WebhookInComponent) Stop(_ context.Context) error { return nil }
 
-func (c *webhookInComponent) Health() (string, health.HealthStatus) {
+func (c *WebhookInComponent) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}
 
 	if !c.cfg.Enabled {
@@ -74,13 +78,15 @@ func (c *webhookInComponent) Health() (string, health.HealthStatus) {
 	return "webhook_in", status
 }
 
-func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
+func (c *WebhookInComponent) Dependencies() []reflect.Type { return nil }
+
+func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 	secret := strings.TrimSpace(c.cfg.GitHubSecret)
 	if secret == "" {
 		secret = strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		writeContractError(ctx, http.StatusInternalServerError, "missing_secret", "GITHUB_WEBHOOK_SECRET is not configured")
+		contractio.WriteContractError(ctx, http.StatusInternalServerError, "missing_secret", "GITHUB_WEBHOOK_SECRET is not configured")
 		return
 	}
 
@@ -90,7 +96,7 @@ func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 	}
 	raw, err := webhookin.VerifyGitHub(ctx.R, secret, maxBody)
 	if err != nil {
-		writeContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid GitHub signature")
+		contractio.WriteContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid GitHub signature")
 		return
 	}
 
@@ -105,7 +111,7 @@ func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if delivery != "unknown" && d.SeenBefore("github:"+delivery) {
-		writeContractResponse(ctx, http.StatusOK, map[string]any{
+		contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 			"ok":          true,
 			"provider":    "github",
 			"event_type":  event,
@@ -141,7 +147,7 @@ func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 		c.logger.Error("Failed to publish GitHub event", log.Fields{"error": err, "topic": topic, "event_id": delivery})
 	}
 
-	writeContractResponse(ctx, http.StatusOK, map[string]any{
+	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"ok":          true,
 		"provider":    "github",
 		"topic":       topic,
@@ -152,13 +158,13 @@ func (c *webhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 	})
 }
 
-func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
+func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 	secret := strings.TrimSpace(c.cfg.StripeSecret)
 	if secret == "" {
 		secret = strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		writeContractError(ctx, http.StatusInternalServerError, "missing_secret", "STRIPE_WEBHOOK_SECRET is not configured")
+		contractio.WriteContractError(ctx, http.StatusInternalServerError, "missing_secret", "STRIPE_WEBHOOK_SECRET is not configured")
 		return
 	}
 
@@ -173,7 +179,7 @@ func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 
 	raw, err := webhookin.VerifyStripe(ctx.R, secret, webhookin.StripeVerifyOptions{MaxBody: maxBody, Tolerance: tol})
 	if err != nil {
-		writeContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid Stripe signature")
+		contractio.WriteContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid Stripe signature")
 		return
 	}
 
@@ -188,7 +194,7 @@ func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if evtID != "unknown" && d.SeenBefore("stripe:"+evtID) {
-		writeContractResponse(ctx, http.StatusOK, map[string]any{
+		contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 			"ok":         true,
 			"provider":   "stripe",
 			"event_type": evtType,
@@ -224,7 +230,7 @@ func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 		c.logger.Error("Failed to publish Stripe event", log.Fields{"error": err, "topic": topic, "event_id": evtID})
 	}
 
-	writeContractResponse(ctx, http.StatusOK, map[string]any{
+	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"ok":         true,
 		"provider":   "stripe",
 		"topic":      topic,
@@ -235,7 +241,7 @@ func (c *webhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 	})
 }
 
-func (c *webhookInComponent) ensureWebhookInDeduper() *webhookin.Deduper {
+func (c *WebhookInComponent) ensureWebhookInDeduper() *webhookin.Deduper {
 	if c.cfg.Deduper != nil {
 		return c.cfg.Deduper
 	}
@@ -272,28 +278,4 @@ func sanitizeTopicSuffix(s string) string {
 		}
 	}
 	return strings.ToLower(b.String())
-}
-
-// ConfigureWebhookIn mounts inbound webhook receivers for GitHub and Stripe.
-// It remains for backward compatibility but now mounts a component into the lifecycle.
-func (a *App) ConfigureWebhookIn() {
-	if err := a.ensureMutable("configure_webhook_in", "configure webhook in"); err != nil {
-		a.logError("ConfigureWebhookIn failed", err, nil)
-		return
-	}
-
-	cfg := a.configSnapshot()
-
-	a.mu.RLock()
-	pub := a.pub
-	logger := a.logger
-	a.mu.RUnlock()
-
-	comp := newWebhookInComponent(cfg.WebhookIn, pub, logger)
-	comp.RegisterRoutes(a.ensureRouter())
-	comp.RegisterMiddleware(a.ensureMiddlewareRegistry())
-
-	a.mu.Lock()
-	a.components = append(a.components, comp)
-	a.mu.Unlock()
 }

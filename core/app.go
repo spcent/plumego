@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/core/di"
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
@@ -65,7 +66,7 @@ type App struct {
 	shutdownOnce  ResettableOnce
 
 	// Dependency injection container
-	diContainer *DIContainer
+	diContainer *di.DIContainer
 }
 
 // Option defines a function type for configuring the App.
@@ -99,7 +100,7 @@ func New(options ...Option) *App {
 		router:        router.NewRouter(),
 		middlewareReg: middleware.NewRegistry(),
 		logger:        log.NewGLogger(),
-		diContainer:   NewDIContainer(),
+		diContainer:   di.NewDIContainer(),
 	}
 
 	for _, opt := range options {

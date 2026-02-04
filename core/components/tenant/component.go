@@ -1,18 +1,26 @@
-package core
+package tenantcomponent
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/tenant"
 )
 
 // TenantConfigComponent exposes a tenant config manager as a core component.
 type TenantConfigComponent struct {
-	BaseComponent
 	Name    string
 	Manager tenant.ConfigManager
 }
+
+// RegisterRoutes implements Component.
+func (c *TenantConfigComponent) RegisterRoutes(_ *router.Router) {}
+
+// RegisterMiddleware implements Component.
+func (c *TenantConfigComponent) RegisterMiddleware(_ *middleware.Registry) {}
 
 // Start implements Component.
 func (c *TenantConfigComponent) Start(ctx context.Context) error {
@@ -35,3 +43,6 @@ func (c *TenantConfigComponent) Health() (name string, status health.HealthStatu
 	}
 	return componentName, health.HealthStatus{Status: health.StatusHealthy}
 }
+
+// Dependencies implements Component.
+func (c *TenantConfigComponent) Dependencies() []reflect.Type { return nil }

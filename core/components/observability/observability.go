@@ -1,4 +1,4 @@
-package core
+package observability
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/router"
 )
 
 // MetricsConfig configures the built-in metrics endpoint and collector wiring.
@@ -58,26 +59,32 @@ func DefaultObservabilityConfig() ObservabilityConfig {
 	}
 }
 
-// ConfigureObservability wires built-in metrics and tracing with structured logging.
-func (a *App) ConfigureObservability(cfg ObservabilityConfig) error {
-	if err := a.ensureMutable("configure_observability", "configure observability"); err != nil {
+// Configure wires built-in metrics and tracing with structured logging.
+func Configure(hooks Hooks, cfg ObservabilityConfig) error {
+	if hooks.EnsureMutable == nil {
+		return fmt.Errorf("observability hooks missing EnsureMutable")
+	}
+	if err := hooks.EnsureMutable("configure_observability", "configure observability"); err != nil {
 		return err
 	}
 
 	if cfg.Metrics.Enabled {
-		if err := a.configureMetrics(cfg.Metrics); err != nil {
+		if err := configureMetrics(hooks, cfg.Metrics); err != nil {
 			return err
 		}
 	}
 
 	if cfg.Tracing.Enabled {
-		if err := a.configureTracing(cfg.Tracing); err != nil {
+		if err := configureTracing(hooks, cfg.Tracing); err != nil {
 			return err
 		}
 	}
 
 	if cfg.Metrics.Enabled || cfg.Tracing.Enabled {
-		if err := a.enableLogging(); err != nil {
+		if hooks.EnableLogging == nil {
+			return fmt.Errorf("observability hooks missing EnableLogging")
+		}
+		if err := hooks.EnableLogging(); err != nil {
 			return err
 		}
 	}
@@ -85,8 +92,11 @@ func (a *App) ConfigureObservability(cfg ObservabilityConfig) error {
 	return nil
 }
 
-func (a *App) configureMetrics(cfg MetricsConfig) error {
-	a.ensureRouter()
+func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
+	if hooks.EnsureRouter == nil {
+		return fmt.Errorf("observability hooks missing EnsureRouter")
+	}
+	router := hooks.EnsureRouter()
 
 	path := normalizeObservabilityPath(cfg.Path)
 	if path == "" {
@@ -94,10 +104,8 @@ func (a *App) configureMetrics(cfg MetricsConfig) error {
 	}
 
 	collector := cfg.Collector
-	if collector == nil {
-		a.mu.RLock()
-		collector = a.metricsCollector
-		a.mu.RUnlock()
+	if collector == nil && hooks.GetMetricsCollector != nil {
+		collector = hooks.GetMetricsCollector()
 	}
 
 	if collector == nil {
@@ -119,30 +127,28 @@ func (a *App) configureMetrics(cfg MetricsConfig) error {
 		return fmt.Errorf("metrics enabled but no handler available")
 	}
 
-	if err := a.router.AddRoute(http.MethodGet, path, handler); err != nil {
+	if err := router.AddRoute(http.MethodGet, path, handler); err != nil {
 		return err
 	}
 
-	a.mu.Lock()
-	a.metricsCollector = collector
-	a.mu.Unlock()
+	if hooks.SetMetricsCollector != nil {
+		hooks.SetMetricsCollector(collector)
+	}
 	return nil
 }
 
-func (a *App) configureTracing(cfg TracingConfig) error {
+func configureTracing(hooks Hooks, cfg TracingConfig) error {
 	tracer := cfg.Tracer
-	if tracer == nil {
-		a.mu.RLock()
-		tracer = a.tracer
-		a.mu.RUnlock()
+	if tracer == nil && hooks.GetTracer != nil {
+		tracer = hooks.GetTracer()
 	}
 	if tracer == nil {
 		tracer = metrics.NewOpenTelemetryTracer(cfg.ServiceName)
 	}
 
-	a.mu.Lock()
-	a.tracer = tracer
-	a.mu.Unlock()
+	if hooks.SetTracer != nil {
+		hooks.SetTracer(tracer)
+	}
 	return nil
 }
 
@@ -155,4 +161,15 @@ func normalizeObservabilityPath(path string) string {
 		return "/" + path
 	}
 	return path
+}
+
+// Hooks provide access to the app wiring points needed by Configure.
+type Hooks struct {
+	EnsureMutable       func(op, desc string) error
+	EnsureRouter        func() *router.Router
+	EnableLogging       func() error
+	GetMetricsCollector func() metrics.MetricsCollector
+	SetMetricsCollector func(metrics.MetricsCollector)
+	GetTracer           func() middleware.Tracer
+	SetTracer           func(middleware.Tracer)
 }

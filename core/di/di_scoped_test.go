@@ -1,4 +1,4 @@
-package core
+package di
 
 import (
 	"reflect"
@@ -282,9 +282,7 @@ func TestScopedLifecycleClear(t *testing.T) {
 	}
 
 	// Scoped instances should be cleared after resolution
-	container.mu.RLock()
-	hasScopedInstances := len(container.scopedInstances) > 0
-	container.mu.RUnlock()
+	hasScopedInstances := container.ScopedInstanceCount() > 0
 
 	if hasScopedInstances {
 		t.Errorf("Expected scoped instances to be cleared after resolution")
@@ -294,9 +292,7 @@ func TestScopedLifecycleClear(t *testing.T) {
 	container.Clear()
 
 	// Check that scoped instances are cleared
-	container.mu.RLock()
-	hasScopedInstancesAfterClear := len(container.scopedInstances) > 0
-	container.mu.RUnlock()
+	hasScopedInstancesAfterClear := container.ScopedInstanceCount() > 0
 
 	if hasScopedInstancesAfterClear {
 		t.Errorf("Expected scoped instances to be cleared after container clear")
