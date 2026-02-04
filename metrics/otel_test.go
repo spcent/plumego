@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/observability"
 )
 
 func TestOpenTelemetryTracer(t *testing.T) {
@@ -23,7 +23,7 @@ func TestOpenTelemetryTracer(t *testing.T) {
 	// Add a small delay to ensure non-zero duration
 	time.Sleep(1 * time.Millisecond)
 
-	span.End(middleware.RequestMetrics{
+	span.End(observability.RequestMetrics{
 		Status:   http.StatusOK,
 		Bytes:    10,
 		TraceID:  "abc123",
@@ -57,7 +57,7 @@ func TestOpenTelemetryTracerError(t *testing.T) {
 		t.Fatalf("tracer should return span")
 	}
 
-	span.End(middleware.RequestMetrics{
+	span.End(observability.RequestMetrics{
 		Status:   http.StatusInternalServerError,
 		Bytes:    50,
 		TraceID:  "error123",
@@ -83,7 +83,7 @@ func TestOpenTelemetryTracerWithParent(t *testing.T) {
 	req.Header.Set("X-Trace-ID", "parent-trace-id")
 	_, span := tracer.Start(context.Background(), req)
 
-	span.End(middleware.RequestMetrics{
+	span.End(observability.RequestMetrics{
 		Status:   http.StatusOK,
 		Bytes:    10,
 		TraceID:  "abc123",
@@ -118,7 +118,7 @@ func TestOpenTelemetryTracerStats(t *testing.T) {
 			status = http.StatusInternalServerError
 		}
 
-		span.End(middleware.RequestMetrics{
+		span.End(observability.RequestMetrics{
 			Status:   status,
 			Bytes:    100,
 			TraceID:  "trace",
@@ -144,7 +144,7 @@ func TestOpenTelemetryTracerClear(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	_, span := tracer.Start(context.Background(), req)
-	span.End(middleware.RequestMetrics{
+	span.End(observability.RequestMetrics{
 		Status:  http.StatusOK,
 		Bytes:   10,
 		TraceID: "test",
@@ -169,7 +169,7 @@ func TestOpenTelemetryTracerConcurrency(t *testing.T) {
 		go func() {
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			_, span := tracer.Start(context.Background(), req)
-			span.End(middleware.RequestMetrics{
+			span.End(observability.RequestMetrics{
 				Status:  http.StatusOK,
 				Bytes:   10,
 				TraceID: "concurrent",

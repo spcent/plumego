@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/observability"
 )
 
 // Span captures finalized tracing data for inspection or export.
@@ -68,7 +68,7 @@ type spanHandle struct {
 	parentID  string
 }
 
-// OpenTelemetryTracer implements middleware.Tracer without external dependencies.
+// OpenTelemetryTracer implements observability.Tracer without external dependencies.
 //
 // This tracer provides OpenTelemetry-compatible tracing without requiring
 // external dependencies. It's designed for:
@@ -140,7 +140,7 @@ func NewOpenTelemetryTracer(name string) *OpenTelemetryTracer {
 //		Bytes:   100,
 //		TraceID: span.TraceID(),
 //	})
-func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (context.Context, middleware.TraceSpan) {
+func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (context.Context, observability.TraceSpan) {
 	// Generate simple span and trace IDs
 	spanID := generateSpanID()
 	traceID := contract.TraceIDFromContext(ctx)
@@ -271,7 +271,7 @@ func (t *OpenTelemetryTracer) record(span Span) {
 //		Bytes:   100,
 //		TraceID: span.TraceID(),
 //	})
-func (s *spanHandle) End(metrics middleware.RequestMetrics) {
+func (s *spanHandle) End(metrics observability.RequestMetrics) {
 	duration := time.Since(s.startTime)
 
 	// Build attributes

@@ -240,9 +240,9 @@ Plumego keeps authentication, authorization, and session validation separate thr
 
 ```go
 chain := middleware.NewChain().
-	Use(middleware.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
-	Use(middleware.SessionCheck(sessionStore, sessionValidator)).
-	Use(middleware.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
+	Use(auth.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
+	Use(auth.SessionCheck(sessionStore, sessionValidator)).
+	Use(auth.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
 ```
 
 The `security/jwt` package provides adapters (`jwtManager.Authenticator`, `jwt.PolicyAuthorizer`, `jwt.PermissionAuthorizer`) that implement these contracts while keeping your own storage and policy engines decoupled.
@@ -275,8 +275,8 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ## Observability Adapters
 No need to write your own adapters to hook logging middleware into metrics/tracing backends:
 
-- `metrics.NewPrometheusCollector(namespace)` implements `middleware.MetricsCollector`, and exposes a `/metrics` handler via `collector.Handler()`.
-- `metrics.NewOpenTelemetryTracer(name)` implements `middleware.Tracer`, emitting spans with HTTP metadata.
+- `metrics.NewPrometheusCollector(namespace)` implements `observability.MetricsCollector`, and exposes a `/metrics` handler via `collector.Handler()`.
+- `metrics.NewOpenTelemetryTracer(name)` implements `observability.Tracer`, emitting spans with HTTP metadata.
 
 As shown in `examples/reference`, wire them into `core.New` using `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
 

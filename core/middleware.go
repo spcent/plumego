@@ -7,6 +7,14 @@ import (
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/auth"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/debug"
+	"github.com/spcent/plumego/middleware/limits"
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/ratelimit"
+	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/middleware/security"
 )
 
 // Use adds middleware to the application's middleware chain.
@@ -38,33 +46,33 @@ func (a *App) applyGuardrails() {
 	a.mu.RUnlock()
 
 	if requestIDEnabled {
-		guards = append(guards, middleware.RequestID())
+		guards = append(guards, observability.RequestID())
 	}
 
 	if cfg.Debug {
-		cfg := middleware.DefaultDebugErrorConfig()
+		cfg := debug.DefaultDebugErrorConfig()
 		cfg.NotFoundHint = devToolsRoutesPath
-		guards = append(guards, middleware.DebugErrors(cfg))
+		guards = append(guards, debug.DebugErrors(cfg))
 	}
 
 	if cfg.EnableSecurityHeaders {
-		guards = append(guards, middleware.SecurityHeaders(cfg.SecurityHeadersPolicy))
+		guards = append(guards, security.SecurityHeaders(cfg.SecurityHeadersPolicy))
 	}
 
 	if cfg.EnableAbuseGuard {
-		guardCfg := middleware.DefaultAbuseGuardConfig()
+		guardCfg := ratelimit.DefaultAbuseGuardConfig()
 		if cfg.AbuseGuardConfig != nil {
 			guardCfg = *cfg.AbuseGuardConfig
 		}
-		guards = append(guards, middleware.AbuseGuard(guardCfg))
+		guards = append(guards, ratelimit.AbuseGuard(guardCfg))
 	}
 
 	if cfg.MaxBodyBytes > 0 {
-		guards = append(guards, middleware.BodyLimit(cfg.MaxBodyBytes, logger))
+		guards = append(guards, limits.BodyLimit(cfg.MaxBodyBytes, logger))
 	}
 
 	if cfg.MaxConcurrency > 0 {
-		guards = append(guards, middleware.ConcurrencyLimit(
+		guards = append(guards, limits.ConcurrencyLimit(
 			cfg.MaxConcurrency,
 			cfg.QueueDepth,
 			cfg.QueueTimeout,
@@ -133,11 +141,11 @@ func (a *App) loggingMiddleware() middleware.Middleware {
 		tracer := a.tracer
 		a.mu.RUnlock()
 
-		var metricsCollector middleware.MetricsCollector
+		var metricsCollector observability.MetricsCollector
 		if collector != nil {
 			metricsCollector = &metricsAdapter{collector: collector}
 		}
-		return middleware.Logging(logger, metricsCollector, tracer)(next)
+		return observability.Logging(logger, metricsCollector, tracer)(next)
 	}
 }
 
@@ -146,7 +154,7 @@ type metricsAdapter struct {
 	collector metrics.MetricsCollector
 }
 
-func (m *metricsAdapter) Observe(ctx context.Context, metrics middleware.RequestMetrics) {
+func (m *metricsAdapter) Observe(ctx context.Context, metrics observability.RequestMetrics) {
 	if m.collector != nil {
 		path := metrics.Path
 		if metrics.Route != "" {
@@ -158,7 +166,7 @@ func (m *metricsAdapter) Observe(ctx context.Context, metrics middleware.Request
 
 // EnableAuth enables the auth middleware.
 func (a *App) EnableAuth() {
-	if err := a.Use(middleware.FromFuncMiddleware(middleware.Auth)); err != nil {
+	if err := a.Use(middleware.FromFuncMiddleware(auth.Auth)); err != nil {
 		a.logError("EnableAuth failed", err, nil)
 	}
 }
@@ -167,11 +175,11 @@ func (a *App) EnableAuth() {
 // maxConcurrent: maximum concurrent requests.
 // queueDepth: maximum queue depth for waiting requests.
 func (a *App) EnableRateLimit(maxConcurrent int64, queueDepth int64) {
-	config := middleware.RateLimiterConfig{
+	config := ratelimit.RateLimiterConfig{
 		MaxConcurrent: maxConcurrent,
 		QueueDepth:    queueDepth,
 	}
-	if err := a.Use(middleware.RateLimitMiddleware(config)); err != nil {
+	if err := a.Use(ratelimit.RateLimitMiddleware(config)); err != nil {
 		a.logError("EnableRateLimit failed", err, log.Fields{
 			"maxConcurrent": maxConcurrent,
 			"queueDepth":    queueDepth,
@@ -187,7 +195,7 @@ func (a *App) enableRecovery() error {
 		return nil
 	}
 
-	if err := a.Use(middleware.RecoveryMiddleware); err != nil {
+	if err := a.Use(recovery.RecoveryMiddleware); err != nil {
 		return err
 	}
 
@@ -197,12 +205,12 @@ func (a *App) enableRecovery() error {
 	return nil
 }
 
-func (a *App) enableCORS(opts *middleware.CORSOptions) error {
+func (a *App) enableCORS(opts *cors.CORSOptions) error {
 	if err := a.ensureMutable("enable_cors", "enable CORS"); err != nil {
 		return err
 	}
 
-	var cfg *middleware.CORSOptions
+	var cfg *cors.CORSOptions
 	if opts != nil {
 		copy := *opts
 		cfg = &copy
@@ -233,8 +241,8 @@ func (a *App) corsMiddleware() middleware.Middleware {
 		a.mu.RUnlock()
 
 		if opts == nil {
-			return middleware.CORS(next)
+			return cors.CORS(next)
 		}
-		return middleware.CORSWithOptions(*opts, next)
+		return cors.CORSWithOptions(*opts, next)
 	}
 }

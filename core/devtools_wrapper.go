@@ -6,11 +6,10 @@ import (
 
 	"github.com/spcent/plumego/core/components/devtools"
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/ratelimit"
 )
 
 const (
-	devToolsBasePath       = devtools.DevToolsBasePath
 	devToolsRoutesPath     = devtools.DevToolsRoutesPath
 	devToolsRoutesJSONPath = devtools.DevToolsRoutesJSONPath
 	devToolsMiddlewarePath = devtools.DevToolsMiddlewarePath
@@ -95,7 +94,7 @@ func devtoolsConfigSnapshot(app *App) map[string]any {
 
 	abuseConfig := cfg.AbuseGuardConfig
 	if abuseConfig == nil {
-		defaults := middleware.DefaultAbuseGuardConfig()
+		defaults := ratelimit.DefaultAbuseGuardConfig()
 		abuseConfig = &defaults
 	}
 

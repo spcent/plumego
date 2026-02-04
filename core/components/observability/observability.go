@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware"
+	mwobs "github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/router"
 )
 
@@ -24,7 +24,7 @@ type MetricsConfig struct {
 type TracingConfig struct {
 	Enabled     bool
 	ServiceName string
-	Tracer      middleware.Tracer
+	Tracer      mwobs.Tracer
 }
 
 // ObservabilityConfig combines metrics and tracing settings.
@@ -170,6 +170,6 @@ type Hooks struct {
 	EnableLogging       func() error
 	GetMetricsCollector func() metrics.MetricsCollector
 	SetMetricsCollector func(metrics.MetricsCollector)
-	GetTracer           func() middleware.Tracer
-	SetTracer           func(middleware.Tracer)
+	GetTracer           func() mwobs.Tracer
+	SetTracer           func(mwobs.Tracer)
 }

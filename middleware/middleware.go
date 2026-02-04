@@ -40,9 +40,9 @@ func ApplyGlobal(h http.HandlerFunc) http.HandlerFunc {
 // Example:
 //
 //	chain := middleware.NewChain().
-//		Use(middleware.Logging).
-//		Use(middleware.Recovery).
-//		Use(middleware.CORS)
+//		Use(observability.Logging(log.NewGLogger(), nil, nil)).
+//		Use(recovery.RecoveryMiddleware).
+//		Use(cors.CORS)
 //	handler := chain.Apply(myHandler)
 type Chain struct {
 	middlewares []Middleware

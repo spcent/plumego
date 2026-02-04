@@ -50,7 +50,7 @@
 //
 //	// Start span
 //	ctx, span := tracer.Start(context.Background(), request)
-//	defer span.End(middleware.RequestMetrics{
+//	defer span.End(observability.RequestMetrics{
 //		Status:  http.StatusOK,
 //		Bytes:   1024,
 //		TraceID: span.TraceID(),
@@ -145,7 +145,7 @@
 //
 //	// In HTTP handler
 //	ctx, span := tracer.Start(context.Background(), r)
-//	defer span.End(middleware.RequestMetrics{
+//	defer span.End(observability.RequestMetrics{
 //		Status:  w.Status(),
 //		Bytes:   w.BytesWritten(),
 //		TraceID: span.TraceID(),
@@ -224,7 +224,7 @@
 //	import (
 //		"github.com/spcent/plumego/core"
 //		"github.com/spcent/plumego/metrics"
-//		"github.com/spcent/plumego/middleware"
+//		"github.com/spcent/plumego/middleware/observability"
 //	)
 //
 //	app := core.New(
@@ -236,7 +236,7 @@
 //	app.Get("/metrics", collector.Handler().ServeHTTP)
 //
 //	// Use in middleware
-//	app.Use(middleware.Metrics(collector))
+//	app.Use(metrics.MetricsMiddleware(collector))
 //
 // # Best Practices
 //

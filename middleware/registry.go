@@ -12,17 +12,24 @@ package middleware
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/middleware"
+//	import (
+//		"github.com/spcent/plumego/log"
+//		"github.com/spcent/plumego/middleware"
+//		"github.com/spcent/plumego/middleware/cors"
+//		"github.com/spcent/plumego/middleware/observability"
+//		"github.com/spcent/plumego/middleware/recovery"
+//		"github.com/spcent/plumego/middleware/security"
+//	)
 //
 //	registry := middleware.NewRegistry()
 //
 //	// Add middleware in registration order
-//	registry.Use(middleware.Logging)
-//	registry.Use(middleware.Recovery)
-//	registry.Use(middleware.CORS)
+//	registry.Use(observability.Logging(log.NewGLogger(), nil, nil))
+//	registry.Use(recovery.RecoveryMiddleware)
+//	registry.Use(cors.CORS)
 //
 //	// Prepend middleware (executes first)
-//	registry.Prepend(middleware.SecurityHeaders)
+//	registry.Prepend(security.SecurityHeaders(nil))
 //
 //	// Get all middleware
 //	middlewares := registry.Middlewares()
@@ -48,11 +55,16 @@ func NewRegistry() *Registry {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/middleware"
+//	import (
+//		"github.com/spcent/plumego/log"
+//		"github.com/spcent/plumego/middleware"
+//		"github.com/spcent/plumego/middleware/observability"
+//		"github.com/spcent/plumego/middleware/recovery"
+//	)
 //
 //	registry := middleware.NewRegistry()
-//	registry.Use(middleware.Logging)
-//	registry.Use(middleware.Recovery)
+//	registry.Use(observability.Logging(log.NewGLogger(), nil, nil))
+//	registry.Use(recovery.RecoveryMiddleware)
 func (r *Registry) Use(middlewares ...Middleware) {
 	if r == nil {
 		return
@@ -67,11 +79,17 @@ func (r *Registry) Use(middlewares ...Middleware) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/middleware"
+//	import (
+//		"github.com/spcent/plumego/log"
+//		"github.com/spcent/plumego/middleware"
+//		"github.com/spcent/plumego/middleware/observability"
+//		"github.com/spcent/plumego/middleware/recovery"
+//		"github.com/spcent/plumego/middleware/security"
+//	)
 //
 //	registry := middleware.NewRegistry()
-//	registry.Use(middleware.Logging)
-//	registry.Prepend(middleware.SecurityHeaders) // Executes first
+//	registry.Use(observability.Logging(log.NewGLogger(), nil, nil))
+//	registry.Prepend(security.SecurityHeaders(nil)) // Executes first
 func (r *Registry) Prepend(middlewares ...Middleware) {
 	if r == nil || len(middlewares) == 0 {
 		return
@@ -89,11 +107,16 @@ func (r *Registry) Prepend(middlewares ...Middleware) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/middleware"
+//	import (
+//		"github.com/spcent/plumego/log"
+//		"github.com/spcent/plumego/middleware"
+//		"github.com/spcent/plumego/middleware/observability"
+//		"github.com/spcent/plumego/middleware/recovery"
+//	)
 //
 //	registry := middleware.NewRegistry()
-//	registry.Use(middleware.Logging)
-//	registry.Use(middleware.Recovery)
+//	registry.Use(observability.Logging(log.NewGLogger(), nil, nil))
+//	registry.Use(recovery.RecoveryMiddleware)
 //
 //	middlewares := registry.Middlewares()
 //	handler := middleware.Apply(myHandler, middlewares...)

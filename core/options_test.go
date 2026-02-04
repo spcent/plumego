@@ -11,6 +11,9 @@ import (
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/ratelimit"
 	webhookin "github.com/spcent/plumego/net/webhookin"
 	webhookout "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
@@ -130,7 +133,7 @@ func TestWithCORS(t *testing.T) {
 
 func TestWithCORSOptions(t *testing.T) {
 	app := &App{}
-	opts := middleware.CORSOptions{AllowedOrigins: []string{"https://example.com"}}
+	opts := cors.CORSOptions{AllowedOrigins: []string{"https://example.com"}}
 	opt := WithCORSOptions(opts)
 	opt(app)
 	if !app.corsEnabled {
@@ -177,7 +180,7 @@ func TestWithAbuseGuardEnabled(t *testing.T) {
 
 func TestWithAbuseGuardConfig(t *testing.T) {
 	app := &App{config: &AppConfig{}}
-	cfg := middleware.DefaultAbuseGuardConfig()
+	cfg := ratelimit.DefaultAbuseGuardConfig()
 	cfg.Rate = 10
 	opt := WithAbuseGuardConfig(cfg)
 	opt(app)
@@ -472,7 +475,7 @@ type mockMetricsCollector struct {
 
 type mockTracer struct{}
 
-func (m *mockTracer) Start(ctx context.Context, r *http.Request) (context.Context, middleware.TraceSpan) {
+func (m *mockTracer) Start(ctx context.Context, r *http.Request) (context.Context, observability.TraceSpan) {
 	return ctx, &mockSpan{}
 }
 func (m *mockTracer) StartSpan(name string) any              { return nil }
@@ -482,4 +485,4 @@ func (m *mockTracer) Log(span any, fields map[string]any)    {}
 
 type mockSpan struct{}
 
-func (m *mockSpan) End(metrics middleware.RequestMetrics) {}
+func (m *mockSpan) End(metrics observability.RequestMetrics) {}

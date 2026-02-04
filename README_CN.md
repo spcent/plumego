@@ -240,9 +240,9 @@ Plumego 通过 `contract` 中的接口将认证、授权、会话校验分离，
 
 ```go
 chain := middleware.NewChain().
-	Use(middleware.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
-	Use(middleware.SessionCheck(sessionStore, sessionValidator)).
-	Use(middleware.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
+	Use(auth.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
+	Use(auth.SessionCheck(sessionStore, sessionValidator)).
+	Use(auth.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
 ```
 
 `security/jwt` 提供契约适配器（`jwtManager.Authenticator`、`jwt.PolicyAuthorizer`、`jwt.PermissionAuthorizer`），以保持存储与策略实现的解耦。
@@ -275,8 +275,8 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ## 可观测性适配器
 无需自行编写适配器，即可将日志中间件接入指标/链路追踪后端：
 
-- `metrics.NewPrometheusCollector(namespace)` 实现 `middleware.MetricsCollector`，并通过 `collector.Handler()` 暴露 `/metrics` 处理程序。
-- `metrics.NewOpenTelemetryTracer(name)` 实现 `middleware.Tracer`，发出带有 HTTP 元数据的 span。
+- `metrics.NewPrometheusCollector(namespace)` 实现 `observability.MetricsCollector`，并通过 `collector.Handler()` 暴露 `/metrics` 处理程序。
+- `metrics.NewOpenTelemetryTracer(name)` 实现 `observability.Tracer`，发出带有 HTTP 元数据的 span。
 
 如 `examples/reference` 所示，使用 `core.WithMetricsCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`。
 

@@ -185,13 +185,6 @@ func (c *Config) withDefaults() *Config {
 	return &config
 }
 
-func min(a, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // ========================================
 // Key Functions
 // ========================================

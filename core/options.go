@@ -5,11 +5,14 @@ import (
 
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/ratelimit"
+	"github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/security/headers"
-	"github.com/spcent/plumego/tenant"
+	tenants "github.com/spcent/plumego/tenant"
 )
 
 // WithRouter sets the router for the App.
@@ -103,7 +106,7 @@ func WithCORS() Option {
 }
 
 // WithCORSOptions enables CORS with custom options.
-func WithCORSOptions(opts middleware.CORSOptions) Option {
+func WithCORSOptions(opts cors.CORSOptions) Option {
 	return func(a *App) {
 		_ = a.enableCORS(&opts)
 	}
@@ -132,7 +135,7 @@ func WithAbuseGuardEnabled(enabled bool) Option {
 }
 
 // WithAbuseGuardConfig customizes the abuse guard middleware.
-func WithAbuseGuardConfig(cfg middleware.AbuseGuardConfig) Option {
+func WithAbuseGuardConfig(cfg ratelimit.AbuseGuardConfig) Option {
 	return func(a *App) {
 		a.config.AbuseGuardConfig = &cfg
 		a.config.EnableAbuseGuard = true
@@ -295,7 +298,7 @@ func WithMetricsCollector(collector metrics.MetricsCollector) Option {
 }
 
 // WithTracer sets a tracer hook for observability middleware.
-func WithTracer(tracer middleware.Tracer) Option {
+func WithTracer(tracer observability.Tracer) Option {
 	return func(a *App) {
 		a.tracer = tracer
 	}
@@ -303,7 +306,7 @@ func WithTracer(tracer middleware.Tracer) Option {
 
 // WithTenantConfigManager registers a tenant config manager as a component.
 // This enables multi-tenancy support with per-tenant configuration.
-func WithTenantConfigManager(manager tenant.ConfigManager) Option {
+func WithTenantConfigManager(manager tenants.ConfigManager) Option {
 	return func(a *App) {
 		component := &TenantConfigComponent{
 			Name:    "tenant-config",
@@ -322,11 +325,11 @@ type TenantMiddlewareOptions struct {
 	// DisablePrincipal disables tenant extraction from Principal (default: false)
 	DisablePrincipal bool
 	// QuotaManager enforces per-tenant quota limits (optional)
-	QuotaManager tenant.QuotaManager
+	QuotaManager tenants.QuotaManager
 	// PolicyEvaluator enforces per-tenant policies (optional)
-	PolicyEvaluator tenant.PolicyEvaluator
+	PolicyEvaluator tenants.PolicyEvaluator
 	// Hooks provides callbacks for tenant resolution, quota, and policy events
-	Hooks tenant.Hooks
+	Hooks tenants.Hooks
 }
 
 // WithTenantMiddleware adds tenant resolution, quota, and policy middleware.
@@ -344,7 +347,7 @@ type TenantMiddlewareOptions struct {
 func WithTenantMiddleware(options TenantMiddlewareOptions) Option {
 	return func(a *App) {
 		// Add tenant resolver middleware
-		a.Use(middleware.TenantResolver(middleware.TenantResolverOptions{
+		a.Use(tenant.TenantResolver(tenant.TenantResolverOptions{
 			HeaderName:       options.HeaderName,
 			AllowMissing:     options.AllowMissing,
 			DisablePrincipal: options.DisablePrincipal,
@@ -353,7 +356,7 @@ func WithTenantMiddleware(options TenantMiddlewareOptions) Option {
 
 		// Add quota enforcement if configured
 		if options.QuotaManager != nil {
-			a.Use(middleware.TenantQuota(middleware.TenantQuotaOptions{
+			a.Use(tenant.TenantQuota(tenant.TenantQuotaOptions{
 				Manager: options.QuotaManager,
 				Hooks:   options.Hooks,
 			}))
@@ -361,7 +364,7 @@ func WithTenantMiddleware(options TenantMiddlewareOptions) Option {
 
 		// Add policy enforcement if configured
 		if options.PolicyEvaluator != nil {
-			a.Use(middleware.TenantPolicy(middleware.TenantPolicyOptions{
+			a.Use(tenant.TenantPolicy(tenant.TenantPolicyOptions{
 				Evaluator: options.PolicyEvaluator,
 				Hooks:     options.Hooks,
 			}))

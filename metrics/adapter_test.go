@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/observability"
 )
 
 func TestMiddlewareAdapter(t *testing.T) {
@@ -15,7 +15,7 @@ func TestMiddlewareAdapter(t *testing.T) {
 	adapter := NewMiddlewareAdapter(collector)
 
 	ctx := context.Background()
-	metrics := middleware.RequestMetrics{
+	metrics := observability.RequestMetrics{
 		Method:   "GET",
 		Path:     "/test",
 		Status:   200,
@@ -278,7 +278,7 @@ func BenchmarkMiddlewareAdapter(b *testing.B) {
 	collector := NewBaseMetricsCollector()
 	adapter := NewMiddlewareAdapter(collector)
 	ctx := context.Background()
-	metrics := middleware.RequestMetrics{
+	metrics := observability.RequestMetrics{
 		Method:   "GET",
 		Path:     "/test",
 		Status:   200,

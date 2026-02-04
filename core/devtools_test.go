@@ -179,6 +179,58 @@ func TestDevToolsPprofEndpoint(t *testing.T) {
 	}
 }
 
+func TestDevToolsPprofPaths(t *testing.T) {
+	app := New(WithDebug())
+	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Test pprof index path
+	req := httptest.NewRequest(http.MethodGet, devToolsPprofIndexPath, nil)
+	resp := httptest.NewRecorder()
+	app.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for pprof index, got %d", resp.Code)
+	}
+
+	// Test pprof cmdline path
+	req = httptest.NewRequest(http.MethodGet, devToolsPprofCmdline, nil)
+	resp = httptest.NewRecorder()
+	app.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for pprof cmdline, got %d", resp.Code)
+	}
+
+	// Test pprof profile path
+	req = httptest.NewRequest(http.MethodGet, devToolsPprofProfile, nil)
+	resp = httptest.NewRecorder()
+	app.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for pprof profile, got %d", resp.Code)
+	}
+
+	// Test pprof symbol path
+	req = httptest.NewRequest(http.MethodGet, devToolsPprofSymbol, nil)
+	resp = httptest.NewRecorder()
+	app.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for pprof symbol, got %d", resp.Code)
+	}
+
+	// Test pprof trace path
+	req = httptest.NewRequest(http.MethodGet, devToolsPprofTrace, nil)
+	resp = httptest.NewRecorder()
+	app.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for pprof trace, got %d", resp.Code)
+	}
+}
+
 func TestDevToolsDisabledInNonDebug(t *testing.T) {
 	app := New()
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {

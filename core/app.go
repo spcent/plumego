@@ -9,6 +9,8 @@ import (
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
 )
@@ -44,13 +46,13 @@ type App struct {
 
 	// Optional components
 	metricsCollector metrics.MetricsCollector
-	tracer           middleware.Tracer
+	tracer           observability.Tracer
 	pub              pubsub.PubSub
 	loggingEnabled   bool
 	requestIDEnabled bool
 	recoveryEnabled  bool
 	corsEnabled      bool
-	corsOptions      *middleware.CORSOptions
+	corsOptions      *cors.CORSOptions
 
 	// Component management
 	components        []Component

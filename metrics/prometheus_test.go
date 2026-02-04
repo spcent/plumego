@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/observability"
 )
 
 func TestPrometheusCollectorObserveAndHandler(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test")
 
-	collector.Observe(context.Background(), middleware.RequestMetrics{
+	collector.Observe(context.Background(), observability.RequestMetrics{
 		Method:   http.MethodGet,
 		Path:     "/test",
 		Status:   http.StatusOK,
@@ -80,7 +80,7 @@ func TestPrometheusCollectorMultipleRequests(t *testing.T) {
 	}
 
 	for _, req := range requests {
-		collector.Observe(context.Background(), middleware.RequestMetrics{
+		collector.Observe(context.Background(), observability.RequestMetrics{
 			Method:   req.method,
 			Path:     req.path,
 			Status:   req.status,
@@ -114,7 +114,7 @@ func TestPrometheusCollectorStats(t *testing.T) {
 
 	// Add some requests
 	for i := 0; i < 5; i++ {
-		collector.Observe(context.Background(), middleware.RequestMetrics{
+		collector.Observe(context.Background(), observability.RequestMetrics{
 			Method:   http.MethodGet,
 			Path:     "/test",
 			Status:   http.StatusOK,
@@ -141,7 +141,7 @@ func TestPrometheusCollectorStats(t *testing.T) {
 func TestPrometheusCollectorClear(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test")
 
-	collector.Observe(context.Background(), middleware.RequestMetrics{
+	collector.Observe(context.Background(), observability.RequestMetrics{
 		Method:   http.MethodGet,
 		Path:     "/test",
 		Status:   http.StatusOK,
@@ -165,7 +165,7 @@ func TestPrometheusCollectorMaxMemory(t *testing.T) {
 
 	// Add more requests than max memory
 	for i := 0; i < 5; i++ {
-		collector.Observe(context.Background(), middleware.RequestMetrics{
+		collector.Observe(context.Background(), observability.RequestMetrics{
 			Method:   http.MethodGet,
 			Path:     "/test" + string(rune('A'+i)),
 			Status:   http.StatusOK,
@@ -185,7 +185,7 @@ func TestPrometheusCollectorConcurrency(t *testing.T) {
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func() {
-			collector.Observe(context.Background(), middleware.RequestMetrics{
+			collector.Observe(context.Background(), observability.RequestMetrics{
 				Method:   http.MethodGet,
 				Path:     "/concurrent",
 				Status:   http.StatusOK,
@@ -208,7 +208,7 @@ func TestPrometheusCollectorConcurrency(t *testing.T) {
 func TestPrometheusCollectorMetricsFormat(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test")
 
-	collector.Observe(context.Background(), middleware.RequestMetrics{
+	collector.Observe(context.Background(), observability.RequestMetrics{
 		Method:   http.MethodPost,
 		Path:     "/api/data",
 		Status:   http.StatusCreated,
@@ -246,7 +246,7 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 
 	// Fill up to limit
 	for i := 0; i < 5; i++ {
-		collector.Observe(context.Background(), middleware.RequestMetrics{
+		collector.Observe(context.Background(), observability.RequestMetrics{
 			Method:   http.MethodGet,
 			Path:     "/fill" + string(rune('0'+i)),
 			Status:   http.StatusOK,
@@ -260,7 +260,7 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 	}
 
 	// Add one more, should trigger eviction
-	collector.Observe(context.Background(), middleware.RequestMetrics{
+	collector.Observe(context.Background(), observability.RequestMetrics{
 		Method:   http.MethodGet,
 		Path:     "/new",
 		Status:   http.StatusOK,

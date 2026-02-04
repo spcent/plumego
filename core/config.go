@@ -3,7 +3,7 @@ package core
 import (
 	"time"
 
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/security/headers"
 )
 
@@ -37,7 +37,7 @@ type AppConfig struct {
 	EnableSecurityHeaders bool
 	SecurityHeadersPolicy *headers.Policy
 	EnableAbuseGuard      bool
-	AbuseGuardConfig      *middleware.AbuseGuardConfig
+	AbuseGuardConfig      *ratelimit.AbuseGuardConfig
 
 	PubSub     PubSubConfig     // PubSub configuration
 	WebhookOut WebhookOutConfig // Webhook outbound configuration

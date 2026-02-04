@@ -3,7 +3,7 @@ package plumego
 import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/tenant"
 )
@@ -31,7 +31,7 @@ type Runner = core.Runner
 type ShutdownHook = core.ShutdownHook
 
 // CORSOptions configures the CORS middleware.
-type CORSOptions = middleware.CORSOptions
+type CORSOptions = cors.CORSOptions
 
 // TLSConfig re-exports the TLS settings for App configuration.
 type TLSConfig = core.TLSConfig

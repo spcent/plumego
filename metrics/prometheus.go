@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/observability"
 )
 
 type labelKey struct {
@@ -103,17 +103,17 @@ func (p *PrometheusCollector) WithMaxMemory(max int) *PrometheusCollector {
 // Example:
 //
 //	import "github.com/spcent/plumego/metrics"
-//	import "github.com/spcent/plumego/middleware"
+//	import "github.com/spcent/plumego/middleware/observability"
 //
 //	collector := metrics.NewPrometheusCollector("myapp")
-//	collector.Observe(context.Background(), middleware.RequestMetrics{
+//	collector.Observe(context.Background(), observability.RequestMetrics{
 //		Method:   "GET",
 //		Path:     "/api/users",
 //		Status:   200,
 //		Bytes:    100,
 //		Duration: 50 * time.Millisecond,
 //	})
-func (p *PrometheusCollector) Observe(_ context.Context, m middleware.RequestMetrics) {
+func (p *PrometheusCollector) Observe(_ context.Context, m observability.RequestMetrics) {
 	key := labelKey{m.Method, m.Path, strconv.Itoa(m.Status)}
 
 	p.mu.Lock()
@@ -283,7 +283,7 @@ func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
 
 // ObserveHTTP implements the unified MetricsCollector interface
 func (p *PrometheusCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	metrics := middleware.RequestMetrics{
+	metrics := observability.RequestMetrics{
 		Method:    method,
 		Path:      path,
 		Status:    status,
@@ -369,29 +369,29 @@ func (p *PrometheusCollector) baseCollector() *BaseMetricsCollector {
 	return p.base
 }
 
-func httpMetricsFromRecord(record MetricRecord) (middleware.RequestMetrics, bool) {
+func httpMetricsFromRecord(record MetricRecord) (observability.RequestMetrics, bool) {
 	if record.Labels == nil {
-		return middleware.RequestMetrics{}, false
+		return observability.RequestMetrics{}, false
 	}
 
 	statusStr, ok := record.Labels[labelStatus]
 	if !ok {
-		return middleware.RequestMetrics{}, false
+		return observability.RequestMetrics{}, false
 	}
 	status, err := strconv.Atoi(statusStr)
 	if err != nil {
-		return middleware.RequestMetrics{}, false
+		return observability.RequestMetrics{}, false
 	}
 	method, ok := record.Labels[labelMethod]
 	if !ok {
-		return middleware.RequestMetrics{}, false
+		return observability.RequestMetrics{}, false
 	}
 	path, ok := record.Labels[labelPath]
 	if !ok {
-		return middleware.RequestMetrics{}, false
+		return observability.RequestMetrics{}, false
 	}
 
-	return middleware.RequestMetrics{
+	return observability.RequestMetrics{
 		Method:   method,
 		Path:     path,
 		Status:   status,

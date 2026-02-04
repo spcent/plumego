@@ -3,7 +3,7 @@ package core
 import (
 	"github.com/spcent/plumego/core/components/observability"
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware"
+	mwobs "github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/router"
 )
 
@@ -41,12 +41,12 @@ func (a *App) ConfigureObservability(cfg ObservabilityConfig) error {
 			a.metricsCollector = c
 			a.mu.Unlock()
 		},
-		GetTracer: func() middleware.Tracer {
+		GetTracer: func() mwobs.Tracer {
 			a.mu.RLock()
 			defer a.mu.RUnlock()
 			return a.tracer
 		},
-		SetTracer: func(t middleware.Tracer) {
+		SetTracer: func(t mwobs.Tracer) {
 			a.mu.Lock()
 			a.tracer = t
 			a.mu.Unlock()
