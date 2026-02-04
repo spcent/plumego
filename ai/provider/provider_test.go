@@ -309,3 +309,335 @@ func (m *mockProvider) GetModel(ctx context.Context, modelID string) (*Model, er
 func (m *mockProvider) CountTokens(text string) (int, error) {
 	return len(text) / 4, nil
 }
+
+func TestTaskBasedRouter_InferTaskType(t *testing.T) {
+	router := NewTaskBasedRouter()
+
+	tests := []struct {
+		name     string
+		prompt   string
+		expected TaskType
+	}{
+		{
+			name:     "coding task",
+			prompt:   "Write a function to sort an array",
+			expected: TaskTypeCoding,
+		},
+		{
+			name:     "implement task",
+			prompt:   "Implement a REST API endpoint",
+			expected: TaskTypeCoding,
+		},
+		{
+			name:     "analysis task",
+			prompt:   "Analyze this data and find patterns",
+			expected: TaskTypeAnalysis,
+		},
+		{
+			name:     "summarization task",
+			prompt:   "Summarize this document for me",
+			expected: TaskTypeSummarization,
+		},
+		{
+			name:     "translation task",
+			prompt:   "Translate this text to Spanish",
+			expected: TaskTypeTranslation,
+		},
+		{
+			name:     "conversation task",
+			prompt:   "Hello, how are you today?",
+			expected: TaskTypeConversation,
+		},
+		{
+			name:     "default to conversation",
+			prompt:   "What is the capital of France?",
+			expected: TaskTypeConversation,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &CompletionRequest{
+				Messages: []Message{
+					NewTextMessage(RoleUser, tt.prompt),
+				},
+			}
+			taskType := router.inferTaskType(req)
+			if taskType != tt.expected {
+				t.Errorf("inferTaskType() = %v, want %v", taskType, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTaskBasedRouter_Route(t *testing.T) {
+	router := NewTaskBasedRouter()
+
+	claudeProvider := &mockProvider{name: "claude"}
+	openaiProvider := &mockProvider{name: "openai"}
+	providers := []Provider{claudeProvider, openaiProvider}
+
+	tests := []struct {
+		name     string
+		prompt   string
+		expected string
+	}{
+		{
+			name:     "coding routes to claude",
+			prompt:   "Write a function in Go",
+			expected: "claude",
+		},
+		{
+			name:     "analysis routes to claude",
+			prompt:   "Analyze this codebase structure",
+			expected: "claude",
+		},
+		{
+			name:     "conversation routes to claude",
+			prompt:   "Hello, tell me about yourself",
+			expected: "claude", // TaskTypeConversation prefers claude-3-sonnet
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &CompletionRequest{
+				Messages: []Message{
+					NewTextMessage(RoleUser, tt.prompt),
+				},
+			}
+			provider, err := router.Route(context.Background(), req, providers)
+			if err != nil {
+				t.Fatalf("Route() error = %v", err)
+			}
+			if provider.Name() != tt.expected {
+				t.Errorf("Route() provider = %v, want %v", provider.Name(), tt.expected)
+			}
+		})
+	}
+}
+
+func TestCostOptimizedRouter_Route(t *testing.T) {
+	router := NewCostOptimizedRouter()
+
+	claudeProvider := &mockProvider{name: "claude"}
+	openaiProvider := &mockProvider{name: "openai"}
+	providers := []Provider{claudeProvider, openaiProvider}
+
+	tests := []struct {
+		name     string
+		model    string
+		expected string
+	}{
+		{
+			name:     "gpt-3.5-turbo routes to openai",
+			model:    "gpt-3.5-turbo",
+			expected: "openai",
+		},
+		{
+			name:     "gpt-4 routes to openai",
+			model:    "gpt-4",
+			expected: "openai",
+		},
+		{
+			name:     "claude-3-opus routes to claude",
+			model:    "claude-3-opus",
+			expected: "claude",
+		},
+		{
+			name:     "unknown model falls back to first provider",
+			model:    "unknown-model",
+			expected: "claude",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &CompletionRequest{
+				Model:    tt.model,
+				Messages: []Message{NewTextMessage(RoleUser, "test")},
+			}
+
+			provider, err := router.Route(context.Background(), req, providers)
+			if err != nil {
+				t.Fatalf("Route() error = %v", err)
+			}
+
+			if provider.Name() != tt.expected {
+				t.Errorf("Route() = %v, want %v", provider.Name(), tt.expected)
+			}
+		})
+	}
+}
+
+func TestFallbackRouter_Route(t *testing.T) {
+	primary := NewTaskBasedRouter()
+	fallback := &DefaultRouter{}
+	router := NewFallbackRouter(primary, fallback)
+
+	claudeProvider := &mockProvider{name: "claude"}
+	openaiProvider := &mockProvider{name: "openai"}
+	providers := []Provider{claudeProvider, openaiProvider}
+
+	tests := []struct {
+		name     string
+		prompt   string
+		wantName string
+	}{
+		{
+			name:     "primary router works",
+			prompt:   "Write code in Python",
+			wantName: "claude",
+		},
+		{
+			name:     "fallback on empty providers",
+			prompt:   "Any task",
+			wantName: "claude", // DefaultRouter falls back to first
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &CompletionRequest{
+				Messages: []Message{
+					NewTextMessage(RoleUser, tt.prompt),
+				},
+			}
+			provider, err := router.Route(context.Background(), req, providers)
+			if err != nil {
+				t.Fatalf("Route() error = %v", err)
+			}
+			if provider.Name() != tt.wantName {
+				t.Errorf("Route() provider = %v, want %v", provider.Name(), tt.wantName)
+			}
+		})
+	}
+}
+
+func TestSmartRouter_Route(t *testing.T) {
+	// Test with default strategies
+	router := NewSmartRouter()
+
+	claudeProvider := &mockProvider{name: "claude"}
+	openaiProvider := &mockProvider{name: "openai"}
+	providers := []Provider{claudeProvider, openaiProvider}
+
+	tests := []struct {
+		name     string
+		prompt   string
+		wantName string
+	}{
+		{
+			name:     "coding task routed by task type",
+			prompt:   "Debug this function",
+			wantName: "claude",
+		},
+		{
+			name:     "conversation routed to claude",
+			prompt:   "Tell me a story",
+			wantName: "claude", // TaskTypeConversation prefers claude-3-sonnet
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &CompletionRequest{
+				Messages: []Message{
+					NewTextMessage(RoleUser, tt.prompt),
+				},
+			}
+			provider, err := router.Route(context.Background(), req, providers)
+			if err != nil {
+				t.Fatalf("Route() error = %v", err)
+			}
+			if provider.Name() != tt.wantName {
+				t.Errorf("Route() provider = %v, want %v", provider.Name(), tt.wantName)
+			}
+		})
+	}
+}
+
+func TestSmartRouter_CustomStrategies(t *testing.T) {
+	// Test with custom strategy order
+	router := NewSmartRouter(
+		NewCostOptimizedRouter(),
+		NewTaskBasedRouter(),
+	)
+
+	claudeProvider := &mockProvider{name: "claude"}
+	openaiProvider := &mockProvider{name: "openai"}
+	providers := []Provider{claudeProvider, openaiProvider}
+
+	req := &CompletionRequest{
+		Model: "gpt-3.5-turbo", // Specify model for CostOptimizedRouter
+		Messages: []Message{
+			NewTextMessage(RoleUser, "Short question"),
+		},
+	}
+
+	provider, err := router.Route(context.Background(), req, providers)
+	if err != nil {
+		t.Fatalf("Route() error = %v", err)
+	}
+
+	// Should use first strategy (cost optimized) and route gpt-3.5-turbo to openai
+	if provider.Name() != "openai" {
+		t.Errorf("Route() with custom strategies = %v, want openai (cost optimized)", provider.Name())
+	}
+}
+
+func TestHelperFunctions(t *testing.T) {
+	t.Run("contains", func(t *testing.T) {
+		if !contains("hello world", "world") {
+			t.Error("contains() should find 'world' in 'hello world'")
+		}
+		if contains("hello world", "universe") {
+			t.Error("contains() should not find 'universe' in 'hello world'")
+		}
+		if !contains("HELLO", "hello") {
+			t.Error("contains() should be case-insensitive")
+		}
+	})
+
+	t.Run("findSubstring", func(t *testing.T) {
+		if !findSubstring("hello world", "world") {
+			t.Error("findSubstring() should find 'world'")
+		}
+		if findSubstring("hello world", "universe") {
+			t.Error("findSubstring() should not find 'universe'")
+		}
+		if !findSubstring("HELLO World", "hello") {
+			t.Error("findSubstring() should be case-insensitive")
+		}
+	})
+
+	t.Run("toLower", func(t *testing.T) {
+		tests := []struct {
+			input    string
+			expected string
+		}{
+			{"HELLO", "hello"},
+			{"World", "world"},
+			{"TEST123", "test123"},
+			{"mixedCASE", "mixedcase"},
+		}
+		for _, tt := range tests {
+			result := toLower(tt.input)
+			if result != tt.expected {
+				t.Errorf("toLower(%v) = %v, want %v", tt.input, result, tt.expected)
+			}
+		}
+	})
+
+	t.Run("min", func(t *testing.T) {
+		if min(5, 3) != 3 {
+			t.Errorf("min(5, 3) = %d, want 3", min(5, 3))
+		}
+		if min(2, 10) != 2 {
+			t.Errorf("min(2, 10) = %d, want 2", min(2, 10))
+		}
+		if min(7, 7) != 7 {
+			t.Errorf("min(7, 7) = %d, want 7", min(7, 7))
+		}
+	})
+}
