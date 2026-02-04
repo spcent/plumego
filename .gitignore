@@ -23,6 +23,7 @@ build/
 examples/*/crud-demo
 examples/*/reference
 examples/*/gateway
+examples/*/ai-gateway
 examples/*/ai-agent-gateway
 examples/*/*-demo
 examples/*/*-gateway
