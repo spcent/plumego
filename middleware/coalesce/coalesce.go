@@ -141,30 +141,35 @@ func (c *Coalescer) Middleware() func(http.Handler) http.Handler {
 			// Generate request key
 			key := c.config.KeyFunc(r)
 
-			// Check if request is already in-flight
-			c.mu.RLock()
+			// Check if request is already in-flight (single critical section)
+			c.mu.Lock()
 			inflight, exists := c.inFlight[key]
-			c.mu.RUnlock()
-
 			if exists {
+				inflight.waiters++
+				c.mu.Unlock()
+
 				// Wait for in-flight request to complete
 				c.waitForInFlight(w, r, key, inflight)
 				return
 			}
 
 			// Start new request
-			c.executeRequest(w, r, key, next)
+			inflight = &inFlightRequest{
+				key:       key,
+				done:      make(chan struct{}),
+				waiters:   0,
+				startTime: time.Now(),
+			}
+			c.inFlight[key] = inflight
+			c.mu.Unlock()
+
+			c.executeRequest(w, r, key, inflight, next)
 		})
 	}
 }
 
 // waitForInFlight waits for an in-flight request to complete
 func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key string, inflight *inFlightRequest) {
-	// Increment waiter count
-	c.mu.Lock()
-	inflight.waiters++
-	c.mu.Unlock()
-
 	// Wait for completion or timeout
 	select {
 	case <-inflight.done:
@@ -196,20 +201,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 }
 
 // executeRequest executes a new request and broadcasts to waiters
-func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key string, next http.Handler) {
-	// Create new in-flight request
-	inflight := &inFlightRequest{
-		key:       key,
-		done:      make(chan struct{}),
-		waiters:   0,
-		startTime: time.Now(),
-	}
-
-	// Register in-flight request
-	c.mu.Lock()
-	c.inFlight[key] = inflight
-	c.mu.Unlock()
-
+func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key string, inflight *inFlightRequest, next http.Handler) {
 	// Create response recorder
 	recorder := &responseRecorder{
 		ResponseWriter: w,

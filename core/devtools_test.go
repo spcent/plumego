@@ -203,8 +203,8 @@ func TestDevToolsPprofPaths(t *testing.T) {
 		t.Fatalf("expected 200 for pprof cmdline, got %d", resp.Code)
 	}
 
-	// Test pprof profile path
-	req = httptest.NewRequest(http.MethodGet, devToolsPprofProfile, nil)
+	// Test pprof profile path (use short duration to avoid long test timeouts)
+	req = httptest.NewRequest(http.MethodGet, devToolsPprofProfile+"?seconds=1", nil)
 	resp = httptest.NewRecorder()
 	app.ServeHTTP(resp, req)
 
@@ -221,8 +221,8 @@ func TestDevToolsPprofPaths(t *testing.T) {
 		t.Fatalf("expected 200 for pprof symbol, got %d", resp.Code)
 	}
 
-	// Test pprof trace path
-	req = httptest.NewRequest(http.MethodGet, devToolsPprofTrace, nil)
+	// Test pprof trace path (use short duration to avoid long test timeouts)
+	req = httptest.NewRequest(http.MethodGet, devToolsPprofTrace+"?seconds=1", nil)
 	resp = httptest.NewRecorder()
 	app.ServeHTTP(resp, req)
 
