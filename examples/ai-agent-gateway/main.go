@@ -7,7 +7,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/spcent/plumego/ai/filter"
+	"github.com/spcent/plumego/ai/llmcache"
+	"github.com/spcent/plumego/ai/orchestration"
+	"github.com/spcent/plumego/ai/prompt"
 	"github.com/spcent/plumego/ai/provider"
 	"github.com/spcent/plumego/ai/session"
 	"github.com/spcent/plumego/ai/sse"
@@ -42,6 +47,27 @@ func main() {
 	toolRegistry.Register(tool.NewCalculatorTool())
 	toolRegistry.Register(tool.NewTimestampTool())
 
+	// Phase 2: Create prompt engine
+	promptStorage := prompt.NewMemoryStorage()
+	promptEngine := prompt.NewEngine(promptStorage)
+	if err := prompt.LoadBuiltinTemplates(promptEngine); err != nil {
+		log.Printf("Warning: Failed to load builtin templates: %v", err)
+	}
+
+	// Phase 2: Create content filters
+	contentFilter := filter.NewChain(
+		&filter.StrictPolicy{},
+		filter.NewPIIFilter(),
+		filter.NewSecretFilter(),
+		filter.NewPromptInjectionFilter(),
+	)
+
+	// Phase 2: Create LLM cache
+	llmCache := llmcache.NewMemoryCache(1*time.Hour, 1000)
+
+	// Phase 2: Create orchestration engine
+	orchEngine := orchestration.NewEngine()
+
 	// Create application
 	app := core.New(
 		core.WithAddr(":8080"),
@@ -50,19 +76,34 @@ func main() {
 		core.WithRecovery(),
 	)
 
-	// Routes
+	// Phase 1 Routes
 	app.Get("/", indexHandler)
 	app.Post("/api/sessions", createSessionHandler(sessionMgr))
 	app.Post("/api/sessions/:id/messages", sendMessageHandler(sessionMgr, providerMgr, toolRegistry))
 	app.Get("/api/sessions/:id/stream", streamHandler(sessionMgr, providerMgr, toolRegistry))
 	app.Get("/api/tools", listToolsHandler(toolRegistry))
 
-	log.Println("AI Agent Gateway starting on http://localhost:8080")
-	log.Println("Endpoints:")
+	// Phase 2 Routes
+	app.Get("/api/templates", listTemplatesHandler(promptEngine))
+	app.Post("/api/templates/render", renderTemplateHandler(promptEngine))
+	app.Post("/api/filter", filterContentHandler(contentFilter))
+	app.Get("/api/cache/stats", cacheStatsHandler(llmCache))
+	app.Post("/api/workflows/:id/execute", executeWorkflowHandler(orchEngine))
+	app.Get("/api/workflows", listWorkflowsHandler(orchEngine))
+
+	log.Println("🤖 AI Agent Gateway (Phase 1 + 2) starting on http://localhost:8080")
+	log.Println("\nPhase 1 Endpoints:")
 	log.Println("  POST /api/sessions - Create a new session")
 	log.Println("  POST /api/sessions/:id/messages - Send a message")
 	log.Println("  GET  /api/sessions/:id/stream - Stream responses (SSE)")
 	log.Println("  GET  /api/tools - List available tools")
+	log.Println("\nPhase 2 Endpoints:")
+	log.Println("  GET  /api/templates - List prompt templates")
+	log.Println("  POST /api/templates/render - Render a template")
+	log.Println("  POST /api/filter - Filter content for PII/secrets")
+	log.Println("  GET  /api/cache/stats - LLM cache statistics")
+	log.Println("  POST /api/workflows/:id/execute - Execute a workflow")
+	log.Println("  GET  /api/workflows - List available workflows")
 
 	if err := app.Boot(); err != nil {
 		log.Fatal(err)
@@ -82,16 +123,25 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
     </style>
 </head>
 <body>
-    <h1>🤖 AI Agent Gateway (Phase 1)</h1>
-    <p>A lightweight AI agent gateway built with Plumego</p>
+    <h1>🤖 AI Agent Gateway (Phase 1 + Phase 2)</h1>
+    <p>A comprehensive AI agent gateway built with Plumego</p>
 
-    <h2>Features</h2>
+    <h2>Phase 1 Features</h2>
     <ul>
         <li>✅ SSE (Server-Sent Events) for streaming</li>
         <li>✅ LLM Provider abstraction (Claude, OpenAI)</li>
-        <li>✅ Session management</li>
-        <li>✅ Token counting</li>
-        <li>✅ Tool calling framework</li>
+        <li>✅ Session management with context windows</li>
+        <li>✅ Token counting and quota tracking</li>
+        <li>✅ Tool calling framework with sandboxing</li>
+    </ul>
+
+    <h2>Phase 2 Features (NEW!)</h2>
+    <ul>
+        <li>🎯 Prompt template engine with 7 builtin templates</li>
+        <li>🛡️ Content filtering (PII, secrets, prompt injection)</li>
+        <li>💾 Intelligent LLM response caching</li>
+        <li>🔀 Enhanced multi-model routing (task-based, cost-optimized)</li>
+        <li>🎭 Agent orchestration (sequential, parallel, conditional)</li>
     </ul>
 
     <h2>API Endpoints</h2>
@@ -247,6 +297,159 @@ func listToolsHandler(toolRegistry *tool.Registry) http.HandlerFunc {
 		json.NewEncoder(w).Encode(map[string]any{
 			"tools": response,
 			"count": len(tools),
+		})
+	}
+}
+
+// Phase 2 Handlers
+
+func listTemplatesHandler(engine *prompt.Engine) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get all builtin templates
+		templates := prompt.BuiltinTemplates()
+
+		response := make([]map[string]any, len(templates))
+		for i, tmpl := range templates {
+			response[i] = map[string]any{
+				"name":    tmpl.Name,
+				"model":   tmpl.Model,
+				"tags":    tmpl.Tags,
+				"version": tmpl.Version,
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"templates": response,
+			"count":     len(templates),
+		})
+	}
+}
+
+func renderTemplateHandler(engine *prompt.Engine) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name      string         `json:"name"`
+			Variables map[string]any `json:"variables"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		result, err := engine.RenderByName(r.Context(), req.Name, req.Variables)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"rendered": result,
+		})
+	}
+}
+
+func filterContentHandler(chain *filter.Chain) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Content string `json:"content"`
+			Stage   string `json:"stage"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		stage := filter.StageInput
+		if req.Stage == "output" {
+			stage = filter.StageOutput
+		}
+
+		result, err := chain.Filter(r.Context(), req.Content, stage)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"allowed":     result.Allowed,
+			"reason":      result.Reason,
+			"labels":      result.Labels,
+			"filter_name": result.FilterName,
+			"score":       result.Score,
+		})
+	}
+}
+
+func cacheStatsHandler(cache *llmcache.MemoryCache) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		stats := cache.Stats()
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"hits":         stats.Hits,
+			"misses":       stats.Misses,
+			"evictions":    stats.Evictions,
+			"total_tokens": stats.TotalTokens,
+			"hit_rate":     stats.HitRate(),
+		})
+	}
+}
+
+func executeWorkflowHandler(engine *orchestration.Engine) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		workflowID := r.URL.Query().Get(":id")
+		if workflowID == "" {
+			http.Error(w, "workflow_id required", http.StatusBadRequest)
+			return
+		}
+
+		var req struct {
+			State map[string]any `json:"state"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		results, err := engine.Execute(r.Context(), workflowID, req.State)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response := make([]map[string]any, len(results))
+		for i, res := range results {
+			response[i] = map[string]any{
+				"agent_id": res.AgentID,
+				"output":   res.Output,
+				"duration": res.Duration.String(),
+				"tokens":   res.TokenUsage.TotalTokens,
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"results": response,
+			"count":   len(results),
+		})
+	}
+}
+
+func listWorkflowsHandler(engine *orchestration.Engine) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// In a real implementation, you'd list registered workflows
+		// For now, return empty list
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"workflows": []map[string]any{},
+			"count":     0,
+			"message":   "Register workflows using engine.RegisterWorkflow()",
 		})
 	}
 }
