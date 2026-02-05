@@ -19,14 +19,8 @@ type TenantPolicyOptions struct {
 
 // TenantPolicy enforces tenant policy checks.
 func TenantPolicy(options TenantPolicyOptions) middleware.Middleware {
-	modelHeader := options.ModelHeader
-	if modelHeader == "" {
-		modelHeader = "X-Model"
-	}
-	toolHeader := options.ToolHeader
-	if toolHeader == "" {
-		toolHeader = "X-Tool"
-	}
+	modelHeader := headerOrDefault(options.ModelHeader, defaultModelHeader)
+	toolHeader := headerOrDefault(options.ToolHeader, defaultToolHeader)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -67,12 +61,7 @@ func TenantPolicy(options TenantPolicyOptions) middleware.Middleware {
 				return
 			}
 
-			contract.WriteError(w, r, contract.APIError{
-				Status:   status,
-				Code:     "policy_denied",
-				Message:  "tenant policy denied request",
-				Category: contract.CategoryAuthentication,
-			})
+			writeTenantError(w, r, status, "policy_denied", "tenant policy denied request", contract.CategoryAuthentication)
 		})
 	}
 }

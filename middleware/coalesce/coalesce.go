@@ -33,12 +33,13 @@
 package coalesce
 
 import (
-	"bytes"
 	"fmt"
 	"hash/fnv"
 	"net/http"
 	"sync"
 	"time"
+
+	nethttp "github.com/spcent/plumego/net/http"
 )
 
 // KeyFunc generates a unique key for request deduplication
@@ -203,21 +204,16 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 // executeRequest executes a new request and broadcasts to waiters
 func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key string, inflight *inFlightRequest, next http.Handler) {
 	// Create response recorder
-	recorder := &responseRecorder{
-		ResponseWriter: w,
-		statusCode:     http.StatusOK,
-		header:         make(http.Header),
-		body:           &bytes.Buffer{},
-	}
+	recorder := nethttp.NewResponseRecorder(w)
 
 	// Execute request
 	next.ServeHTTP(recorder, r)
 
 	// Capture response
 	inflight.response = &capturedResponse{
-		statusCode: recorder.statusCode,
+		statusCode: recorder.StatusCode(),
 		header:     recorder.Header().Clone(),
-		body:       recorder.body.Bytes(),
+		body:       recorder.Body(),
 	}
 
 	// Cleanup and broadcast
@@ -236,46 +232,6 @@ func (c *Coalescer) isSafeMethod(method string) bool {
 		}
 	}
 	return false
-}
-
-// responseRecorder captures HTTP response for broadcasting
-type responseRecorder struct {
-	http.ResponseWriter
-	statusCode int
-	header     http.Header
-	body       *bytes.Buffer
-	written    bool
-}
-
-func (r *responseRecorder) Header() http.Header {
-	return r.header
-}
-
-func (r *responseRecorder) WriteHeader(code int) {
-	if !r.written {
-		r.statusCode = code
-		r.written = true
-
-		// Copy headers to underlying writer
-		for key, values := range r.header {
-			for _, value := range values {
-				r.ResponseWriter.Header().Add(key, value)
-			}
-		}
-		r.ResponseWriter.WriteHeader(code)
-	}
-}
-
-func (r *responseRecorder) Write(b []byte) (int, error) {
-	if !r.written {
-		r.WriteHeader(http.StatusOK)
-	}
-
-	// Write to buffer for broadcasting
-	r.body.Write(b)
-
-	// Write to original client
-	return r.ResponseWriter.Write(b)
 }
 
 // writeResponse writes a captured response to the client

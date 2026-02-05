@@ -161,6 +161,7 @@ func DefaultPolicy() Policy {
 //   - X-Content-Type-Options: nosniff
 //   - Referrer-Policy: no-referrer
 //   - Permissions-Policy: geolocation=(), camera=(), microphone=()
+//   - Content-Security-Policy: strict CSP (via StrictCSP)
 //   - Cross-Origin-Opener-Policy: same-origin
 //   - Cross-Origin-Resource-Policy: same-origin
 //   - Cross-Origin-Embedder-Policy: require-corp
@@ -181,6 +182,7 @@ func StrictPolicy() Policy {
 		CrossOriginOpenerPolicy:   "same-origin",
 		CrossOriginResourcePolicy: "same-origin",
 		CrossOriginEmbedderPolicy: "require-corp",
+		ContentSecurityPolicy:     StrictCSP(),
 		StrictTransportSecurity: &HSTSOptions{
 			MaxAge:            365 * 24 * time.Hour,
 			IncludeSubDomains: true,

@@ -2,6 +2,8 @@ package proxy
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/base64"
 	"io"
 	"net"
 	"net/http"
@@ -253,11 +255,10 @@ func getClientIP(r *http.Request) string {
 	}
 
 	// Fall back to RemoteAddr
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
+	if host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr)); err == nil {
+		return host
 	}
-	return ip
+	return r.RemoteAddr
 }
 
 // computeAcceptKey computes the Sec-WebSocket-Accept value
@@ -265,14 +266,8 @@ func getClientIP(r *http.Request) string {
 func computeAcceptKey(key string) string {
 	// WebSocket protocol magic string
 	const magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
-	// For simplicity, we'll skip the SHA-1 computation here
-	// In production, you would:
-	// h := sha1.New()
-	// h.Write([]byte(key + magic))
-	// return base64.StdEncoding.EncodeToString(h.Sum(nil))
-
-	// For now, return a placeholder
-	// The actual implementation should use crypto/sha1 and encoding/base64
-	return key + magic
+	h := sha1.New()
+	_, _ = h.Write([]byte(key))
+	_, _ = h.Write([]byte(magic))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }

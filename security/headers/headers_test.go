@@ -35,6 +35,9 @@ func TestStrictPolicyHSTS(t *testing.T) {
 	if got := w.Result().Header.Get("Strict-Transport-Security"); got != "" {
 		t.Fatalf("expected no HSTS on non-TLS request, got %q", got)
 	}
+	if got := w.Result().Header.Get("Content-Security-Policy"); got == "" {
+		t.Fatalf("expected CSP to be set for strict policy")
+	}
 
 	tlsReq := httptest.NewRequest(http.MethodGet, "https://example.com", nil)
 	tlsReq.TLS = &tls.ConnectionState{}

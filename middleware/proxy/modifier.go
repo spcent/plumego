@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"net"
 	"net/http"
 	"strings"
 )
@@ -29,8 +30,8 @@ func AddForwardedHeaders() RequestModifier {
 	return func(r *http.Request) error {
 		// X-Forwarded-For
 		clientIP := r.RemoteAddr
-		if idx := strings.LastIndex(clientIP, ":"); idx != -1 {
-			clientIP = clientIP[:idx]
+		if host, _, err := net.SplitHostPort(clientIP); err == nil {
+			clientIP = host
 		}
 
 		if prior := r.Header.Get("X-Forwarded-For"); prior != "" {

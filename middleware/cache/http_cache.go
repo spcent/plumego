@@ -36,13 +36,14 @@
 package cache
 
 import (
-	"bytes"
 	"fmt"
 	"hash/fnv"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	nethttp "github.com/spcent/plumego/net/http"
 )
 
 // Store is the interface for cache storage backends
@@ -223,23 +224,18 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			}
 
 			// Create response recorder
-			recorder := &responseRecorder{
-				ResponseWriter: w,
-				statusCode:     http.StatusOK,
-				header:         make(http.Header),
-				body:           &bytes.Buffer{},
-			}
+			recorder := nethttp.NewResponseRecorder(w)
 
 			// Execute next handler
 			next.ServeHTTP(recorder, r)
 
 			// Check if response is cacheable
-			if !isCacheableStatus(recorder.statusCode, cfg.StatusCodes) {
+			if !isCacheableStatus(recorder.StatusCode(), cfg.StatusCodes) {
 				return
 			}
 
 			// Check response size
-			bodySize := int64(recorder.body.Len())
+			bodySize := int64(len(recorder.Body()))
 			if bodySize > cfg.MaxSize {
 				return
 			}
@@ -258,14 +254,14 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			// Generate ETag if enabled
 			etag := ""
 			if cfg.EnableConditionalRequests {
-				etag = generateETag(recorder.body.Bytes())
+				etag = generateETag(recorder.Body())
 			}
 
 			// Create cached response
 			cached = &CachedResponse{
-				StatusCode: recorder.statusCode,
+				StatusCode: recorder.StatusCode(),
 				Header:     recorder.Header().Clone(),
-				Body:       recorder.body.Bytes(),
+				Body:       recorder.Body(),
 				CachedAt:   time.Now(),
 				ExpiresAt:  time.Now().Add(ttl),
 				ETag:       etag,
@@ -281,46 +277,6 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			cfg.Store.Set(key, cached, ttl)
 		})
 	}
-}
-
-// responseRecorder captures HTTP response for caching
-type responseRecorder struct {
-	http.ResponseWriter
-	statusCode int
-	header     http.Header
-	body       *bytes.Buffer
-	written    bool
-}
-
-func (r *responseRecorder) Header() http.Header {
-	return r.header
-}
-
-func (r *responseRecorder) WriteHeader(code int) {
-	if !r.written {
-		r.statusCode = code
-		r.written = true
-
-		// Copy headers to underlying writer
-		for key, values := range r.header {
-			for _, value := range values {
-				r.ResponseWriter.Header().Add(key, value)
-			}
-		}
-		r.ResponseWriter.WriteHeader(code)
-	}
-}
-
-func (r *responseRecorder) Write(b []byte) (int, error) {
-	if !r.written {
-		r.WriteHeader(http.StatusOK)
-	}
-
-	// Write to buffer for caching
-	r.body.Write(b)
-
-	// Write to client
-	return r.ResponseWriter.Write(b)
 }
 
 // IsExpired checks if cached response has expired

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"os"
 
@@ -78,7 +79,7 @@ func (am *SimpleAuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		}
 
 		// Check if token matches expected token
-		if token != am.authToken {
+		if subtle.ConstantTimeCompare([]byte(token), []byte(am.authToken)) != 1 {
 			w.Header().Set("WWW-Authenticate", "Bearer realm=\""+am.realm+"\"")
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":"unauthorized","message":"Invalid or missing authentication token"}`))

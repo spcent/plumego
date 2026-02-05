@@ -19,10 +19,7 @@ type TenantResolverOptions struct {
 
 // TenantResolver resolves tenant id from request and stores it in context.
 func TenantResolver(options TenantResolverOptions) middleware.Middleware {
-	header := options.HeaderName
-	if header == "" {
-		header = "X-Tenant-ID"
-	}
+	header := headerOrDefault(options.HeaderName, defaultTenantHeader)
 	requireTenant := !options.AllowMissing
 	allowFromPrincipal := !options.DisablePrincipal
 
@@ -51,12 +48,7 @@ func TenantResolver(options TenantResolverOptions) middleware.Middleware {
 					return
 				}
 
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusUnauthorized,
-					Code:     "tenant_required",
-					Message:  "tenant id is required",
-					Category: contract.CategoryAuthentication,
-				})
+				writeTenantError(w, r, http.StatusUnauthorized, "tenant_required", "tenant id is required", contract.CategoryAuthentication)
 				return
 			}
 

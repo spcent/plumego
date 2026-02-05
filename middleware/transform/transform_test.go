@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 )
 
@@ -206,6 +207,31 @@ func TestRemoveResponseHeader(t *testing.T) {
 
 	if w.Header().Get("X-Remove-Me") != "" {
 		t.Error("Expected X-Remove-Me header to be removed from response")
+	}
+}
+
+func TestRenameJSONResponseFieldUpdatesContentLength(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"old":"value"}`))
+	})
+
+	middleware := Middleware(Config{
+		ResponseTransformers: []ResponseTransformer{
+			RenameJSONResponseField("old", "new"),
+		},
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	middleware(handler).ServeHTTP(w, req)
+
+	body := w.Body.Bytes()
+	got := w.Header().Get("Content-Length")
+	want := strconv.Itoa(len(body))
+	if got != want {
+		t.Fatalf("expected Content-Length %q, got %q", want, got)
 	}
 }
 

@@ -23,17 +23,18 @@ import (
 //	// Or with custom policy
 //	policy := &headers.Policy{
 //		FrameOptions: "DENY",
-//		XSSProtection: "1; mode=block",
 //		ContentTypeOptions: "nosniff",
+//		ContentSecurityPolicy: headers.StrictCSP(),
 //	}
 //	handler := security.SecurityHeaders(policy)(myHandler)
 //
 // The default policy includes:
-//   - X-Frame-Options: DENY (prevents clickjacking)
+//   - X-Frame-Options: SAMEORIGIN (prevents clickjacking)
 //   - X-Content-Type-Options: nosniff (prevents MIME sniffing)
-//   - X-XSS-Protection: 1; mode=block (enables XSS protection)
 //   - Referrer-Policy: strict-origin-when-cross-origin
-//   - Content-Security-Policy: default-src 'self'
+//
+// For stronger XSS protection, set Content-Security-Policy explicitly,
+// e.g. use headers.StrictCSP() or headers.StrictPolicy().
 //
 // Note: This middleware should be applied early in the middleware chain
 // to ensure security headers are set for all responses.

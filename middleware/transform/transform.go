@@ -33,6 +33,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -108,18 +109,19 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			var transformedBody []byte
 			if resp.Body != nil {
 				transformedBody, _ = io.ReadAll(resp.Body)
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 
 			// Write transformed response
-			for key, values := range resp.Header {
-				for _, value := range values {
-					w.Header().Add(key, value)
-				}
+			copyResponseHeaders(w.Header(), resp.Header)
+			if len(transformedBody) > 0 {
+				w.Header().Set("Content-Length", strconv.Itoa(len(transformedBody)))
+			} else {
+				w.Header().Del("Content-Length")
 			}
 			w.WriteHeader(resp.StatusCode)
 			if len(transformedBody) > 0 {
-				w.Write(transformedBody)
+				_, _ = w.Write(transformedBody)
 			}
 		})
 	}
@@ -211,12 +213,39 @@ func RemoveQueryParam(key string) RequestTransformer {
 	}
 }
 
+func isJSONContentType(contentType string) bool {
+	if contentType == "" {
+		return false
+	}
+	lower := strings.ToLower(contentType)
+	return strings.Contains(lower, "application/json") || strings.Contains(lower, "+json")
+}
+
+func decodeJSONObject(body []byte) (map[string]interface{}, bool) {
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, false
+	}
+	return data, true
+}
+
+func setRequestBody(r *http.Request, body []byte) {
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Length", strconv.Itoa(len(body)))
+}
+
+func setResponseBody(r *http.Response, body []byte) {
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Length", strconv.Itoa(len(body)))
+}
+
 // RenameJSONRequestField renames a JSON field in request body
 func RenameJSONRequestField(from, to string) RequestTransformer {
 	return func(r *http.Request) error {
 		// Only process JSON content
-		contentType := r.Header.Get("Content-Type")
-		if !strings.Contains(contentType, "application/json") {
+		if !isJSONContentType(r.Header.Get("Content-Type")) {
 			return nil
 		}
 
@@ -225,11 +254,11 @@ func RenameJSONRequestField(from, to string) RequestTransformer {
 		if err != nil {
 			return err
 		}
-		r.Body.Close()
+		_ = r.Body.Close()
 
 		// Parse JSON
-		var data map[string]interface{}
-		if err := json.Unmarshal(body, &data); err != nil {
+		data, ok := decodeJSONObject(body)
+		if !ok {
 			// Not JSON object, restore body
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			return nil
@@ -248,8 +277,7 @@ func RenameJSONRequestField(from, to string) RequestTransformer {
 		}
 
 		// Update request
-		r.Body = io.NopCloser(bytes.NewReader(newBody))
-		r.ContentLength = int64(len(newBody))
+		setRequestBody(r, newBody)
 
 		return nil
 	}
@@ -258,8 +286,7 @@ func RenameJSONRequestField(from, to string) RequestTransformer {
 // ModifyJSONRequest applies a custom function to modify JSON request body
 func ModifyJSONRequest(modifier func(map[string]interface{}) error) RequestTransformer {
 	return func(r *http.Request) error {
-		contentType := r.Header.Get("Content-Type")
-		if !strings.Contains(contentType, "application/json") {
+		if !isJSONContentType(r.Header.Get("Content-Type")) {
 			return nil
 		}
 
@@ -267,10 +294,10 @@ func ModifyJSONRequest(modifier func(map[string]interface{}) error) RequestTrans
 		if err != nil {
 			return err
 		}
-		r.Body.Close()
+		_ = r.Body.Close()
 
-		var data map[string]interface{}
-		if err := json.Unmarshal(body, &data); err != nil {
+		data, ok := decodeJSONObject(body)
+		if !ok {
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			return nil
 		}
@@ -285,8 +312,7 @@ func ModifyJSONRequest(modifier func(map[string]interface{}) error) RequestTrans
 			return err
 		}
 
-		r.Body = io.NopCloser(bytes.NewReader(newBody))
-		r.ContentLength = int64(len(newBody))
+		setRequestBody(r, newBody)
 
 		return nil
 	}
@@ -326,8 +352,7 @@ func RenameResponseHeader(from, to string) ResponseTransformer {
 // RenameJSONResponseField renames a JSON field in response body
 func RenameJSONResponseField(from, to string) ResponseTransformer {
 	return func(r *http.Response) error {
-		contentType := r.Header.Get("Content-Type")
-		if !strings.Contains(contentType, "application/json") {
+		if !isJSONContentType(r.Header.Get("Content-Type")) {
 			return nil
 		}
 
@@ -335,10 +360,10 @@ func RenameJSONResponseField(from, to string) ResponseTransformer {
 		if err != nil {
 			return err
 		}
-		r.Body.Close()
+		_ = r.Body.Close()
 
-		var data map[string]interface{}
-		if err := json.Unmarshal(body, &data); err != nil {
+		data, ok := decodeJSONObject(body)
+		if !ok {
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			return nil
 		}
@@ -354,8 +379,7 @@ func RenameJSONResponseField(from, to string) ResponseTransformer {
 			return err
 		}
 
-		r.Body = io.NopCloser(bytes.NewReader(newBody))
-		r.Header.Set("Content-Length", string(rune(len(newBody))))
+		setResponseBody(r, newBody)
 
 		return nil
 	}
@@ -364,8 +388,7 @@ func RenameJSONResponseField(from, to string) ResponseTransformer {
 // ModifyJSONResponse applies a custom function to modify JSON response body
 func ModifyJSONResponse(modifier func(map[string]interface{}) error) ResponseTransformer {
 	return func(r *http.Response) error {
-		contentType := r.Header.Get("Content-Type")
-		if !strings.Contains(contentType, "application/json") {
+		if !isJSONContentType(r.Header.Get("Content-Type")) {
 			return nil
 		}
 
@@ -373,10 +396,10 @@ func ModifyJSONResponse(modifier func(map[string]interface{}) error) ResponseTra
 		if err != nil {
 			return err
 		}
-		r.Body.Close()
+		_ = r.Body.Close()
 
-		var data map[string]interface{}
-		if err := json.Unmarshal(body, &data); err != nil {
+		data, ok := decodeJSONObject(body)
+		if !ok {
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			return nil
 		}
@@ -390,7 +413,7 @@ func ModifyJSONResponse(modifier func(map[string]interface{}) error) ResponseTra
 			return err
 		}
 
-		r.Body = io.NopCloser(bytes.NewReader(newBody))
+		setResponseBody(r, newBody)
 
 		return nil
 	}
@@ -399,8 +422,7 @@ func ModifyJSONResponse(modifier func(map[string]interface{}) error) ResponseTra
 // WrapJSONResponse wraps response JSON in a standard envelope
 func WrapJSONResponse(wrapperKey string) ResponseTransformer {
 	return func(r *http.Response) error {
-		contentType := r.Header.Get("Content-Type")
-		if !strings.Contains(contentType, "application/json") {
+		if !isJSONContentType(r.Header.Get("Content-Type")) {
 			return nil
 		}
 
@@ -408,7 +430,7 @@ func WrapJSONResponse(wrapperKey string) ResponseTransformer {
 		if err != nil {
 			return err
 		}
-		r.Body.Close()
+		_ = r.Body.Close()
 
 		var data interface{}
 		if err := json.Unmarshal(body, &data); err != nil {
@@ -426,7 +448,7 @@ func WrapJSONResponse(wrapperKey string) ResponseTransformer {
 			return err
 		}
 
-		r.Body = io.NopCloser(bytes.NewReader(newBody))
+		setResponseBody(r, newBody)
 
 		return nil
 	}
@@ -461,5 +483,16 @@ func ChainResponse(transformers ...ResponseTransformer) ResponseTransformer {
 			}
 		}
 		return nil
+	}
+}
+
+func copyResponseHeaders(dst, src http.Header) {
+	for key, values := range src {
+		if strings.EqualFold(key, "Content-Length") || strings.EqualFold(key, "Transfer-Encoding") {
+			continue
+		}
+		for _, value := range values {
+			dst.Add(key, value)
+		}
 	}
 }

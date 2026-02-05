@@ -2,7 +2,6 @@ package tenant
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -53,25 +52,15 @@ func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
 				return
 			}
 
-			if result.RetryAfter > 0 {
-				w.Header().Set("Retry-After", strconv.Itoa(int(result.RetryAfter.Seconds())))
-			}
-			if result.Limit > 0 {
-				w.Header().Set("X-RateLimit-Limit", strconv.FormatInt(result.Limit, 10))
-			}
-			w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(result.Remaining, 10))
+			setRetryAfterHeader(w, result.RetryAfter)
+			setRateLimitHeaders(w, result.Limit, result.Remaining)
 
 			if options.OnRejected != nil {
 				options.OnRejected(w, r, result)
 				return
 			}
 
-			contract.WriteError(w, r, contract.APIError{
-				Status:   status,
-				Code:     "tenant_rate_limited",
-				Message:  "tenant rate limit exceeded",
-				Category: contract.CategoryRateLimit,
-			})
+			writeTenantError(w, r, status, "tenant_rate_limited", "tenant rate limit exceeded", contract.CategoryRateLimit)
 		})
 	}
 }

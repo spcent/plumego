@@ -21,10 +21,7 @@ type TenantQuotaOptions struct {
 
 // TenantQuota enforces tenant quota limits.
 func TenantQuota(options TenantQuotaOptions) middleware.Middleware {
-	tokensHeader := options.TokensHeader
-	if tokensHeader == "" {
-		tokensHeader = "X-Token-Count"
-	}
+	tokensHeader := headerOrDefault(options.TokensHeader, defaultTokensHeader)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -67,21 +64,14 @@ func TenantQuota(options TenantQuotaOptions) middleware.Middleware {
 				return
 			}
 
-			if result.RetryAfter > 0 {
-				w.Header().Set("Retry-After", strconv.Itoa(int(result.RetryAfter.Seconds())))
-			}
+			setRetryAfterHeader(w, result.RetryAfter)
 
 			if options.OnRejected != nil {
 				options.OnRejected(w, r, result)
 				return
 			}
 
-			contract.WriteError(w, r, contract.APIError{
-				Status:   status,
-				Code:     "quota_exceeded",
-				Message:  "tenant quota exceeded",
-				Category: contract.CategoryRateLimit,
-			})
+			writeTenantError(w, r, status, "quota_exceeded", "tenant quota exceeded", contract.CategoryRateLimit)
 		})
 	}
 }
