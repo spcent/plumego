@@ -608,10 +608,13 @@ func CachedWithConfig(c Cache, config Config, keyFn func(*http.Request) string) 
 			recorder := httptest.NewRecorder()
 			next.ServeHTTP(recorder, r)
 
+			// Capture body once for writing and optional caching
+			bodyBytes := recorder.Body.Bytes()
+
 			copyHeaders(w.Header(), recorder.Header())
 			w.Header().Set("X-Cache", "MISS")
 			w.WriteHeader(recorder.Code)
-			_, _ = w.Write(recorder.Body.Bytes())
+			_, _ = w.Write(bodyBytes)
 
 			// Only cache successful JSON responses to reduce XSS surface
 			contentType := recorder.Header().Get("Content-Type")
@@ -620,7 +623,7 @@ func CachedWithConfig(c Cache, config Config, keyFn func(*http.Request) string) 
 				resp := cachedResponse{
 					Status: recorder.Code,
 					Header: cloneHeader(recorder.Header()),
-					Body:   recorder.Body.Bytes(),
+					Body:   bodyBytes,
 				}
 				if encoded, err := encodeCachedResponse(resp); err == nil {
 					ttl := config.DefaultTTL
