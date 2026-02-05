@@ -12,3 +12,8 @@ Apply only the ones you need.
 
 - `idempotency_postgres.sql`
 - `idempotency_mysql.sql`
+
+## SMS Gateway Example
+
+- `sms_gateway_messages_postgres.sql`
+- `sms_gateway_messages_mysql.sql`

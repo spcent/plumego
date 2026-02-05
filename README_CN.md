@@ -4,7 +4,7 @@
 [![版本](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
 [![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现,同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
+Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
 
 `core` 包是稳定的主入口；顶层 `plumego` 包提供常用类型与选项的便捷 re-export。
 
@@ -115,10 +115,12 @@ Plumego 为 SaaS 应用提供实验性的多租户支持，包括租户隔离、
 ### 功能特性
 
 - **租户配置**：灵活的存储后端（内存、数据库 + LRU 缓存）
-- **配额管理**：租户级速率限制（每分钟请求数、token 数），固定窗口执行
+- **限流能力**：租户级令牌桶（每秒请求数 + 突发控制）
+- **配额管理**：租户级用量限制（分钟/小时/日/月窗口），固定窗口执行
 - **策略控制**：租户级模型和工具白名单
+- **路由策略缓存**：租户级路由策略支持缓存封装
 - **数据库隔离**：通过 `TenantDB` 包装器自动为所有 SQL 查询添加租户过滤
-- **中间件栈**：租户解析 → 配额检查 → 策略执行
+- **中间件栈**：租户解析 → 限流 → 配额检查 → 策略执行
 - **审计钩子**：可选的回调接口，用于监控配额/策略违规
 
 ### 快速配置
@@ -135,8 +137,17 @@ tenantMgr := plumego.NewDBTenantConfigManager(
     plumego.WithTenantCache(1000, 5*time.Minute),
 )
 
+// 创建限流配置与限流器
+rateLimitProvider := plumego.NewInMemoryRateLimitProvider()
+rateLimitProvider.SetRateLimit("tenant-id", plumego.TenantRateLimitConfig{
+    RequestsPerSecond: 50,
+    Burst:             100,
+})
+rateLimiter := plumego.NewTokenBucketRateLimiter(rateLimitProvider)
+
 // 创建配额和策略管理器
-quotaMgr := plumego.NewInMemoryQuotaManager(tenantMgr)
+quotaStore := plumego.NewInMemoryQuotaStore()
+quotaMgr := plumego.NewWindowQuotaManager(tenantMgr, quotaStore)
 policyEval := plumego.NewConfigPolicyEvaluator(tenantMgr)
 
 // 创建租户感知数据库包装器
@@ -148,6 +159,7 @@ app := plumego.New(
     plumego.WithTenantMiddleware(plumego.TenantMiddlewareOptions{
         HeaderName:      "X-Tenant-ID",
         AllowMissing:    false,
+        RateLimiter:     rateLimiter,
         QuotaManager:    quotaMgr,
         PolicyEvaluator: policyEval,
         Hooks: plumego.TenantHooks{
@@ -159,6 +171,31 @@ app := plumego.New(
         },
     }),
 )
+```
+
+如果你在代码中管理租户配置（或实现自定义配置提供者），可以这样设置多窗口配额：
+
+```go
+tenantMgr := plumego.NewInMemoryTenantConfigManager()
+tenantMgr.SetTenantConfig(plumego.TenantConfig{
+    TenantID: "tenant-id",
+    Quota: plumego.TenantQuotaConfig{
+        Limits: []plumego.TenantQuotaLimit{
+            {Window: plumego.TenantQuotaWindowDay, Requests: 200000},
+            {Window: plumego.TenantQuotaWindowMonth, Tokens: 10_000_000},
+        },
+    },
+})
+
+// 路由策略缓存（可选）
+routePolicyStore := plumego.NewInMemoryRoutePolicyStore()
+_ = routePolicyStore.SetRoutePolicy(context.Background(), plumego.TenantRoutePolicy{
+    TenantID: "tenant-id",
+    Strategy: "weighted",
+    Payload:  []byte(`{"rules":[{"provider":"a","weight":70},{"provider":"b","weight":30}]}`),
+})
+routePolicyCache := plumego.NewInMemoryRoutePolicyCache(1000, 5*time.Minute)
+routePolicyProvider := plumego.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
 ```
 
 ### 自动查询过滤

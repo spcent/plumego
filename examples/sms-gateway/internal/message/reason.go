@@ -12,6 +12,7 @@ const (
 	ReasonBlacklisted       ReasonCode = "recipient_blacklisted"
 	ReasonProviderTransient ReasonCode = "provider_transient"
 	ReasonProviderPermanent ReasonCode = "provider_permanent"
+	ReasonDLQ               ReasonCode = "dead_letter"
 	ReasonNetworkError      ReasonCode = "network_error"
 	ReasonTimeout           ReasonCode = "timeout"
 	ReasonUnknown           ReasonCode = "unknown"

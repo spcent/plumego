@@ -14,6 +14,9 @@ var ErrQuotaExceeded = errors.New("quota exceeded")
 type QuotaConfig struct {
 	RequestsPerMinute int
 	TokensPerMinute   int
+	// Limits defines additional quota windows (hour/day/month, etc.).
+	// When non-empty, Limits take precedence over per-minute settings.
+	Limits []QuotaLimit
 }
 
 // QuotaRequest is the input to quota checks.

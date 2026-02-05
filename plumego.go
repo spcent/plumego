@@ -116,20 +116,29 @@ var DefaultObservabilityConfig = core.DefaultObservabilityConfig
 
 // Tenant types for multi-tenancy support.
 type (
-	TenantConfig          = tenant.Config
-	TenantQuotaConfig     = tenant.QuotaConfig
-	TenantPolicyConfig    = tenant.PolicyConfig
-	TenantConfigManager   = tenant.ConfigManager
-	TenantQuotaManager    = tenant.QuotaManager
-	TenantPolicyEvaluator = tenant.PolicyEvaluator
-	TenantHooks           = tenant.Hooks
-	TenantQuotaRequest    = tenant.QuotaRequest
-	TenantQuotaResult     = tenant.QuotaResult
-	TenantPolicyRequest   = tenant.PolicyRequest
-	TenantPolicyResult    = tenant.PolicyResult
-	TenantResolveInfo     = tenant.ResolveInfo
-	TenantQuotaDecision   = tenant.QuotaDecision
-	TenantPolicyDecision  = tenant.PolicyDecision
+	TenantConfig              = tenant.Config
+	TenantQuotaConfig         = tenant.QuotaConfig
+	TenantPolicyConfig        = tenant.PolicyConfig
+	TenantRateLimitConfig     = tenant.RateLimitConfig
+	TenantQuotaLimit          = tenant.QuotaLimit
+	TenantQuotaWindow         = tenant.QuotaWindow
+	TenantRoutePolicy         = tenant.RoutePolicy
+	TenantConfigManager       = tenant.ConfigManager
+	TenantQuotaManager        = tenant.QuotaManager
+	TenantPolicyEvaluator     = tenant.PolicyEvaluator
+	TenantRateLimiter         = tenant.RateLimiter
+	TenantRoutePolicyStore    = tenant.RoutePolicyStore
+	TenantRoutePolicyProvider = tenant.RoutePolicyProvider
+	TenantHooks               = tenant.Hooks
+	TenantQuotaRequest        = tenant.QuotaRequest
+	TenantQuotaResult         = tenant.QuotaResult
+	TenantPolicyRequest       = tenant.PolicyRequest
+	TenantPolicyResult        = tenant.PolicyResult
+	TenantRateLimitRequest    = tenant.RateLimitRequest
+	TenantRateLimitResult     = tenant.RateLimitResult
+	TenantResolveInfo         = tenant.ResolveInfo
+	TenantQuotaDecision       = tenant.QuotaDecision
+	TenantPolicyDecision      = tenant.PolicyDecision
 )
 
 // Tenant configuration and middleware options.
@@ -141,7 +150,14 @@ var (
 	NewDBTenantConfigManager       = db.NewDBTenantConfigManager
 	NewInMemoryQuotaManager        = tenant.NewInMemoryQuotaManager
 	NewSlidingWindowQuotaManager   = tenant.NewSlidingWindowQuotaManager
+	NewWindowQuotaManager          = tenant.NewWindowQuotaManager
+	NewInMemoryQuotaStore          = tenant.NewInMemoryQuotaStore
 	NewConfigPolicyEvaluator       = tenant.NewConfigPolicyEvaluator
+	NewInMemoryRateLimitProvider   = tenant.NewInMemoryRateLimitProvider
+	NewTokenBucketRateLimiter      = tenant.NewTokenBucketRateLimiter
+	NewInMemoryRoutePolicyStore    = tenant.NewInMemoryRoutePolicyStore
+	NewInMemoryRoutePolicyCache    = tenant.NewInMemoryRoutePolicyCache
+	NewCachedRoutePolicyProvider   = tenant.NewCachedRoutePolicyProvider
 	TenantIDFromContext            = tenant.TenantIDFromContext
 	ContextWithTenantID            = tenant.ContextWithTenantID
 	RequestWithTenantID            = tenant.RequestWithTenantID
@@ -167,7 +183,9 @@ var (
 
 // Tenant errors.
 var (
-	ErrTenantNotFound = tenant.ErrTenantNotFound
-	ErrQuotaExceeded  = tenant.ErrQuotaExceeded
-	ErrPolicyDenied   = tenant.ErrPolicyDenied
+	ErrTenantNotFound      = tenant.ErrTenantNotFound
+	ErrQuotaExceeded       = tenant.ErrQuotaExceeded
+	ErrRateLimitExceeded   = tenant.ErrRateLimitExceeded
+	ErrRoutePolicyNotFound = tenant.ErrRoutePolicyNotFound
+	ErrPolicyDenied        = tenant.ErrPolicyDenied
 )

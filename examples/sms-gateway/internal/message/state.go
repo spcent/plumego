@@ -24,6 +24,7 @@ var ErrInvalidTransition = errors.New("message: invalid status transition")
 type Message struct {
 	ID             string
 	TenantID       string
+	Provider       string
 	Status         Status
 	ReasonCode     ReasonCode
 	ReasonDetail   string

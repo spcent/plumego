@@ -142,6 +142,45 @@ func TestWithTenantMiddleware_QuotaOnly(t *testing.T) {
 	}
 }
 
+func TestWithTenantMiddleware_RateLimiter(t *testing.T) {
+	rateLimitProvider := tenant.NewInMemoryRateLimitProvider()
+	rateLimitProvider.SetRateLimit("test-tenant", tenant.RateLimitConfig{
+		RequestsPerSecond: 1,
+		Burst:             1,
+	})
+	limiter := tenant.NewTokenBucketRateLimiter(rateLimitProvider)
+
+	app := New(
+		WithTenantMiddleware(TenantMiddlewareOptions{
+			RateLimiter: limiter,
+		}),
+	)
+
+	app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	if err := app.setupServer(); err != nil {
+		t.Fatalf("setupServer failed: %v", err)
+	}
+
+	req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req1.Header.Set("X-Tenant-ID", "test-tenant")
+	rec1 := httptest.NewRecorder()
+	app.handler.ServeHTTP(rec1, req1)
+	if rec1.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec1.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req2.Header.Set("X-Tenant-ID", "test-tenant")
+	rec2 := httptest.NewRecorder()
+	app.handler.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status 429, got %d", rec2.Code)
+	}
+}
+
 func TestWithTenantMiddleware_PolicyOnly(t *testing.T) {
 	manager := tenant.NewInMemoryConfigManager()
 	manager.SetTenantConfig(tenant.Config{

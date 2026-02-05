@@ -115,10 +115,12 @@ Plumego provides experimental multi-tenancy primitives for SaaS applications wit
 ### Features
 
 - **Tenant Configuration**: Flexible storage backends (in-memory, database with LRU caching)
-- **Quota Management**: Per-tenant rate limiting (requests/minute, tokens/minute) with fixed-window enforcement
+- **Rate Limiting**: Per-tenant token bucket (requests/second with burst control)
+- **Quota Management**: Per-tenant usage limits across minute/hour/day/month windows with fixed-window enforcement
 - **Policy Controls**: Per-tenant allow-lists for models and tools
+- **Routing Policy Cache**: Tenant-specific routing policy with cache wrapper
 - **Database Isolation**: Automatic tenant filtering for all SQL queries via `TenantDB` wrapper
-- **Middleware Stack**: Tenant resolution → Quota checking → Policy enforcement
+- **Middleware Stack**: Tenant resolution → Rate limiting → Quota checking → Policy enforcement
 - **Audit Hooks**: Optional callbacks for monitoring quota/policy violations
 
 ### Quick Setup
@@ -135,8 +137,17 @@ tenantMgr := plumego.NewDBTenantConfigManager(
     plumego.WithTenantCache(1000, 5*time.Minute),
 )
 
+// Create rate limit provider and limiter
+rateLimitProvider := plumego.NewInMemoryRateLimitProvider()
+rateLimitProvider.SetRateLimit("tenant-id", plumego.TenantRateLimitConfig{
+    RequestsPerSecond: 50,
+    Burst:             100,
+})
+rateLimiter := plumego.NewTokenBucketRateLimiter(rateLimitProvider)
+
 // Create quota and policy managers
-quotaMgr := plumego.NewInMemoryQuotaManager(tenantMgr)
+quotaStore := plumego.NewInMemoryQuotaStore()
+quotaMgr := plumego.NewWindowQuotaManager(tenantMgr, quotaStore)
 policyEval := plumego.NewConfigPolicyEvaluator(tenantMgr)
 
 // Create tenant-aware database wrapper
@@ -148,6 +159,7 @@ app := plumego.New(
     plumego.WithTenantMiddleware(plumego.TenantMiddlewareOptions{
         HeaderName:      "X-Tenant-ID",
         AllowMissing:    false,
+        RateLimiter:     rateLimiter,
         QuotaManager:    quotaMgr,
         PolicyEvaluator: policyEval,
         Hooks: plumego.TenantHooks{
@@ -159,6 +171,31 @@ app := plumego.New(
         },
     }),
 )
+```
+
+If you manage tenant config in code (or provide your own config provider), you can set multi-window quotas like:
+
+```go
+tenantMgr := plumego.NewInMemoryTenantConfigManager()
+tenantMgr.SetTenantConfig(plumego.TenantConfig{
+    TenantID: "tenant-id",
+    Quota: plumego.TenantQuotaConfig{
+        Limits: []plumego.TenantQuotaLimit{
+            {Window: plumego.TenantQuotaWindowDay, Requests: 200000},
+            {Window: plumego.TenantQuotaWindowMonth, Tokens: 10_000_000},
+        },
+    },
+})
+
+// Route policy cache (optional)
+routePolicyStore := plumego.NewInMemoryRoutePolicyStore()
+_ = routePolicyStore.SetRoutePolicy(context.Background(), plumego.TenantRoutePolicy{
+    TenantID: "tenant-id",
+    Strategy: "weighted",
+    Payload:  []byte(`{"rules":[{"provider":"a","weight":70},{"provider":"b","weight":30}]}`),
+})
+routePolicyCache := plumego.NewInMemoryRoutePolicyCache(1000, 5*time.Minute)
+routePolicyProvider := plumego.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
 ```
 
 ### Automatic Query Filtering

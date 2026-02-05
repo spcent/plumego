@@ -4,19 +4,40 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/examples/sms-gateway/internal/routing"
+	"github.com/spcent/plumego/examples/sms-gateway/internal/tasks"
+	"github.com/spcent/plumego/net/mq"
 	"github.com/spcent/plumego/store/idempotency"
+	"github.com/spcent/plumego/tenant"
 )
 
 // ExampleSendHandler demonstrates wiring idempotency + state transitions in a handler.
 // This is a reference implementation and should be adapted to your persistence layer.
-func ExampleSendHandler(idem idempotency.Store, repo Repository) contract.CtxHandlerFunc {
+func ExampleSendHandler(idem idempotency.Store, repo Repository, router *routing.PolicyRouter, enqueuer TaskEnqueuer) contract.CtxHandlerFunc {
 	return func(ctx *contract.Ctx) {
+		tenantID := tenant.TenantIDFromContext(ctx.R.Context())
+		if tenantID == "" {
+			contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("tenant_id", "missing tenant id"))
+			return
+		}
+
+		provider := ""
+		if router != nil {
+			selected, _, err := router.SelectProvider(ctx.R.Context(), tenantID)
+			if err != nil {
+				contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("route policy unavailable"))
+				return
+			}
+			provider = selected
+		}
+
 		idempotencyKey := ctx.R.Header.Get("Idempotency-Key")
 		if idempotencyKey == "" {
 			contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("Idempotency-Key", "missing Idempotency-Key"))
@@ -28,6 +49,26 @@ func ExampleSendHandler(idem idempotency.Store, repo Repository) contract.CtxHan
 			contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("body", "invalid body"))
 			return
 		}
+
+		var req SendRequest
+		if err := json.Unmarshal(payload, &req); err != nil {
+			contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("body", "invalid json payload"))
+			return
+		}
+		if req.To == "" {
+			contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("to", "missing recipient"))
+			return
+		}
+		if req.Body == "" {
+			contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("body", "missing body"))
+			return
+		}
+
+		maxAttempts := req.MaxAttempts
+		if maxAttempts <= 0 {
+			maxAttempts = mq.DefaultTaskMaxAttempts
+		}
+
 		hash := sha256.Sum256(payload)
 		requestHash := hex.EncodeToString(hash[:])
 
@@ -65,21 +106,64 @@ func ExampleSendHandler(idem idempotency.Store, repo Repository) contract.CtxHan
 		}
 
 		msg := Message{
-			ID:        fmt.Sprintf("msg-%d", time.Now().UnixNano()),
-			Status:    StatusAccepted,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+			ID:             fmt.Sprintf("msg-%d", time.Now().UnixNano()),
+			TenantID:       tenantID,
+			Provider:       provider,
+			Status:         StatusAccepted,
+			MaxAttempts:    maxAttempts,
+			IdempotencyKey: idempotencyKey,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
 		}
 		hooks := []TransitionHook{&AuditHook{repo: repo}}
+
+		if err := repo.Insert(ctx.R.Context(), msg); err != nil {
+			contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("persist failed"))
+			return
+		}
 
 		if err := ApplyTransition(ctx.R.Context(), &msg, StatusQueued, hooks...); err != nil {
 			contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("transition failed"))
 			return
 		}
 
-		if err := repo.Insert(ctx.R.Context(), msg); err != nil {
-			contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("persist failed"))
-			return
+		if provider != "" {
+			if updater, ok := repo.(ProviderUpdater); ok {
+				_ = updater.UpdateProvider(ctx.R.Context(), msg.ID, provider)
+			}
+		}
+
+		if enqueuer != nil {
+			taskPayload, err := tasks.EncodeSendTask(tasks.SendTaskPayload{
+				MessageID: msg.ID,
+				TenantID:  tenantID,
+				To:        req.To,
+				Body:      req.Body,
+				Provider:  provider,
+			})
+			if err != nil {
+				contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("queue payload error"))
+				return
+			}
+
+			task := mq.Task{
+				ID:        fmt.Sprintf("task-%d", time.Now().UnixNano()),
+				Topic:     tasks.SendTopic,
+				TenantID:  tenantID,
+				Payload:   taskPayload,
+				DedupeKey: msg.ID,
+			}
+
+			tasks.AttachTrace(ctx.R.Context(), &task)
+
+			opts := mq.EnqueueOptions{}
+			if req.MaxAttempts > 0 {
+				opts.MaxAttempts = req.MaxAttempts
+			}
+			if err := enqueuer.Enqueue(ctx.R.Context(), task, opts); err != nil {
+				contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("enqueue failed"))
+				return
+			}
 		}
 
 		response := []byte(`{"message_id":"` + msg.ID + `"}`)
@@ -92,12 +176,6 @@ func ExampleSendHandler(idem idempotency.Store, repo Repository) contract.CtxHan
 		ctx.W.WriteHeader(http.StatusOK)
 		_, _ = ctx.W.Write(response)
 	}
-}
-
-// Repository is the minimal persistence interface needed by the handler example.
-type Repository interface {
-	Insert(ctx context.Context, msg Message) error
-	UpdateStatus(ctx context.Context, id string, from Status, to Status, reason Reason) error
 }
 
 // AuditHook is a simple example hook that persists transition events.
@@ -128,4 +206,11 @@ func idempotencyConflict() contract.APIError {
 		Code("IDEMPOTENCY_CONFLICT").
 		Message("idempotency key conflict").
 		Build()
+}
+
+// SendRequest is the minimal payload expected by the handler example.
+type SendRequest struct {
+	To          string `json:"to"`
+	Body        string `json:"body"`
+	MaxAttempts int    `json:"max_attempts,omitempty"`
 }

@@ -324,6 +324,8 @@ type TenantMiddlewareOptions struct {
 	AllowMissing bool
 	// DisablePrincipal disables tenant extraction from Principal (default: false)
 	DisablePrincipal bool
+	// RateLimiter enforces per-tenant rate limits (optional)
+	RateLimiter tenants.RateLimiter
 	// QuotaManager enforces per-tenant quota limits (optional)
 	QuotaManager tenants.QuotaManager
 	// PolicyEvaluator enforces per-tenant policies (optional)
@@ -353,6 +355,14 @@ func WithTenantMiddleware(options TenantMiddlewareOptions) Option {
 			DisablePrincipal: options.DisablePrincipal,
 			Hooks:            options.Hooks,
 		}))
+
+		// Add rate limiting if configured
+		if options.RateLimiter != nil {
+			a.Use(tenant.TenantRateLimit(tenant.TenantRateLimitOptions{
+				Limiter: options.RateLimiter,
+				Hooks:   options.Hooks,
+			}))
+		}
 
 		// Add quota enforcement if configured
 		if options.QuotaManager != nil {
