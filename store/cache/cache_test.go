@@ -634,3 +634,283 @@ func TestMemoryCacheConcurrentAccess(t *testing.T) {
 		t.Fatalf("expected 100 sets, got %d", metrics.Sets)
 	}
 }
+
+func TestMemoryCacheControlCharacterValidation(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	tests := []struct {
+		name    string
+		key     string
+		wantErr bool
+	}{
+		{
+			name:    "valid key",
+			key:     "valid:key",
+			wantErr: false,
+		},
+		{
+			name:    "key with newline",
+			key:     "key\nwith\nnewline",
+			wantErr: true,
+		},
+		{
+			name:    "key with tab",
+			key:     "key\twith\ttab",
+			wantErr: true,
+		},
+		{
+			name:    "key with null byte",
+			key:     "key\x00null",
+			wantErr: true,
+		},
+		{
+			name:    "key with DEL character",
+			key:     "key\x7Fdel",
+			wantErr: true,
+		},
+		{
+			name:    "key with carriage return",
+			key:     "key\rwith\rCR",
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := cache.Set(context.Background(), tc.key, []byte("value"), 0)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Set() error = %v, wantErr %v", err, tc.wantErr)
+			}
+
+			// Also test Get, Delete, Exists, Incr, Decr, Append
+			if tc.wantErr {
+				_, err := cache.Get(context.Background(), tc.key)
+				if err == nil {
+					t.Fatal("Get() should reject invalid key")
+				}
+
+				err = cache.Delete(context.Background(), tc.key)
+				if err == nil {
+					t.Fatal("Delete() should reject invalid key")
+				}
+
+				_, err = cache.Exists(context.Background(), tc.key)
+				if err == nil {
+					t.Fatal("Exists() should reject invalid key")
+				}
+
+				_, err = cache.Incr(context.Background(), tc.key, 1)
+				if err == nil {
+					t.Fatal("Incr() should reject invalid key")
+				}
+
+				_, err = cache.Decr(context.Background(), tc.key, 1)
+				if err == nil {
+					t.Fatal("Decr() should reject invalid key")
+				}
+
+				err = cache.Append(context.Background(), tc.key, []byte("data"))
+				if err == nil {
+					t.Fatal("Append() should reject invalid key")
+				}
+			}
+		})
+	}
+}
+
+func TestMemoryCacheIncr(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	// Test increment on non-existent key
+	val1, err := cache.Incr(context.Background(), "counter", 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val1 != 5 {
+		t.Fatalf("expected 5, got %d", val1)
+	}
+
+	// Test increment on existing key
+	val2, err := cache.Incr(context.Background(), "counter", 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val2 != 8 {
+		t.Fatalf("expected 8, got %d", val2)
+	}
+
+	// Test increment by negative number
+	val3, err := cache.Incr(context.Background(), "counter", -2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val3 != 6 {
+		t.Fatalf("expected 6, got %d", val3)
+	}
+}
+
+func TestMemoryCacheDecr(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	// Test decrement on non-existent key
+	val1, err := cache.Decr(context.Background(), "counter", 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val1 != -5 {
+		t.Fatalf("expected -5, got %d", val1)
+	}
+
+	// Test decrement on existing key
+	val2, err := cache.Decr(context.Background(), "counter", 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val2 != -8 {
+		t.Fatalf("expected -8, got %d", val2)
+	}
+}
+
+func TestMemoryCacheIncrNonInteger(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	// Set a non-integer value
+	err := cache.Set(context.Background(), "key", []byte("not an integer"), 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Try to increment
+	_, err = cache.Incr(context.Background(), "key", 1)
+	if !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("expected ErrNotInteger, got %v", err)
+	}
+}
+
+func TestMemoryCacheAppend(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	// Test append on non-existent key
+	err := cache.Append(context.Background(), "key", []byte("hello"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	val, err := cache.Get(context.Background(), "key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(val) != "hello" {
+		t.Fatalf("expected 'hello', got %q", val)
+	}
+
+	// Test append on existing key
+	err = cache.Append(context.Background(), "key", []byte(" world"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	val, err = cache.Get(context.Background(), "key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(val) != "hello world" {
+		t.Fatalf("expected 'hello world', got %q", val)
+	}
+}
+
+func TestCachedMiddlewareOnlyCachesSafeContentTypes(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	tests := []struct {
+		name        string
+		contentType string
+		shouldCache bool
+	}{
+		{
+			name:        "JSON should be cached",
+			contentType: "application/json",
+			shouldCache: true,
+		},
+		{
+			name:        "JSON with charset should be cached",
+			contentType: "application/json; charset=utf-8",
+			shouldCache: true,
+		},
+		{
+			name:        "XML should be cached",
+			contentType: "application/xml",
+			shouldCache: true,
+		},
+		{
+			name:        "HTML should NOT be cached (XSS risk)",
+			contentType: "text/html",
+			shouldCache: false,
+		},
+		{
+			name:        "HTML with charset should NOT be cached",
+			contentType: "text/html; charset=utf-8",
+			shouldCache: false,
+		},
+		{
+			name:        "JavaScript should NOT be cached (XSS risk)",
+			contentType: "application/javascript",
+			shouldCache: false,
+		},
+		{
+			name:        "Plain text should NOT be cached",
+			contentType: "text/plain",
+			shouldCache: false,
+		},
+		{
+			name:        "Image should be cached",
+			contentType: "image/png",
+			shouldCache: true,
+		},
+		{
+			name:        "PDF should be cached",
+			contentType: "application/pdf",
+			shouldCache: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", tc.contentType)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("test content"))
+			})
+
+			key := "test-key-" + tc.name
+			cachedHandler := Cached(cache, time.Minute, func(r *http.Request) string {
+				return key
+			})(handler)
+
+			// First request
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			resp1 := httptest.NewRecorder()
+			cachedHandler.ServeHTTP(resp1, req)
+
+			// Second request
+			resp2 := httptest.NewRecorder()
+			cachedHandler.ServeHTTP(resp2, req)
+
+			if tc.shouldCache {
+				if resp2.Header().Get("X-Cache") != "HIT" {
+					t.Fatalf("expected cache HIT for %s, got %s", tc.contentType, resp2.Header().Get("X-Cache"))
+				}
+			} else {
+				if resp2.Header().Get("X-Cache") != "MISS" {
+					t.Fatalf("expected cache MISS for %s (XSS prevention), got %s", tc.contentType, resp2.Header().Get("X-Cache"))
+				}
+			}
+		})
+	}
+}
