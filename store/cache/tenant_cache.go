@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/tenant"
@@ -133,10 +134,40 @@ func (tc *TenantCache) scopeKey(ctx context.Context, key string) (string, error)
 	if tenantID == "" {
 		return "", tenant.ErrTenantNotFound
 	}
+
+	// Prevent tenant isolation bypass by rejecting IDs with separator or control chars
+	if err := tc.validateTenantID(tenantID); err != nil {
+		return "", err
+	}
+
 	return tc.buildKey(tenantID, key), nil
 }
 
+// validateTenantID ensures tenant ID cannot be used to bypass isolation.
+func (tc *TenantCache) validateTenantID(tenantID string) error {
+	if tenantID == "" {
+		return tenant.ErrTenantNotFound
+	}
+
+	// Prevent separator injection - this could allow one tenant to access another's data
+	// e.g., if separator is ":", tenant "abc:xyz" could collide with "abc" + "xyz"
+	if strings.Contains(tenantID, tc.separator) {
+		return fmt.Errorf("tenant ID cannot contain separator character '%s'", tc.separator)
+	}
+
+	// Prevent control character injection similar to cache key validation
+	for i := 0; i < len(tenantID); i++ {
+		c := tenantID[i]
+		if c < 0x20 || c == 0x7F {
+			return fmt.Errorf("tenant ID contains invalid control character at position %d", i)
+		}
+	}
+
+	return nil
+}
+
 // buildKey constructs a cache key with tenant prefix.
+// Assumes tenantID has already been validated by validateTenantID.
 func (tc *TenantCache) buildKey(tenantID, key string) string {
 	if tc.keyPrefix == "" {
 		return fmt.Sprintf("%s%s%s", tenantID, tc.separator, key)

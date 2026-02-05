@@ -86,9 +86,9 @@ func TestCachedMiddlewareCachesSuccessfulResponse(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&calls, 1)
-		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("hello"))
+		_, _ = w.Write([]byte(`{"message": "hello"}`))
 	})
 
 	cachedHandler := Cached(cache, time.Minute, func(r *http.Request) string {
@@ -106,8 +106,8 @@ func TestCachedMiddlewareCachesSuccessfulResponse(t *testing.T) {
 	if resp1.Header().Get("X-Cache") != "MISS" {
 		t.Fatalf("expected X-Cache MISS, got %q", resp1.Header().Get("X-Cache"))
 	}
-	if ct := resp1.Header().Get("Content-Type"); ct != "text/plain" {
-		t.Fatalf("expected Content-Type text/plain, got %q", ct)
+	if ct := resp1.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected Content-Type application/json, got %q", ct)
 	}
 
 	resp2 := httptest.NewRecorder()
@@ -119,8 +119,8 @@ func TestCachedMiddlewareCachesSuccessfulResponse(t *testing.T) {
 	if resp2.Header().Get("X-Cache") != "HIT" {
 		t.Fatalf("expected X-Cache HIT, got %q", resp2.Header().Get("X-Cache"))
 	}
-	if ct := resp2.Header().Get("Content-Type"); ct != "text/plain" {
-		t.Fatalf("expected cached Content-Type text/plain, got %q", ct)
+	if ct := resp2.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected cached Content-Type application/json, got %q", ct)
 	}
 
 	if atomic.LoadInt32(&calls) != 1 {
@@ -444,9 +444,9 @@ func TestCachedWithConfig(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&calls, 1)
-		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("hello"))
+		_, _ = w.Write([]byte(`{"message": "hello"}`))
 	})
 
 	config := DefaultConfig()
