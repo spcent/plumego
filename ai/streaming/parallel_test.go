@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/spcent/plumego/ai/orchestration"
 	"github.com/spcent/plumego/ai/sse"
@@ -15,8 +14,8 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ExecuteEmpty", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
+		ctx := context.Background()
+		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
 		sps := NewStreamingParallelStep(
@@ -29,7 +28,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		)
 
 		workflow := &orchestration.Workflow{Name: "test"}
-		err := sps.Execute(context.Background(), workflow)
+		_, err := sps.Execute(ctx, workflow)
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
@@ -38,18 +37,17 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ExecuteSingleAgent", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
+		ctx := context.Background()
+		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
+		mockProvider := &mockProvider{
+			output: "result-1",
+		}
+
 		mockAgent := &orchestration.Agent{
-			Name: "agent-1",
-			Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-				return &orchestration.AgentResult{
-					Success: true,
-					Output:  "result-1",
-				}, nil
-			},
+			Name:     "agent-1",
+			Provider: mockProvider,
 		}
 
 		sps := NewStreamingParallelStep(
@@ -62,7 +60,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		)
 
 		workflow := &orchestration.Workflow{Name: "test"}
-		err := sps.Execute(context.Background(), workflow)
+		_, err := sps.Execute(ctx, workflow)
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
@@ -76,31 +74,22 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ExecuteMultipleAgents", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
+		ctx := context.Background()
+		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
 		agents := []*orchestration.Agent{
 			{
-				Name: "agent-1",
-				Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-					time.Sleep(10 * time.Millisecond)
-					return &orchestration.AgentResult{Success: true, Output: "result-1"}, nil
-				},
+				Name:     "agent-1",
+				Provider: &mockProvider{output: "result-1"},
 			},
 			{
-				Name: "agent-2",
-				Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-					time.Sleep(5 * time.Millisecond)
-					return &orchestration.AgentResult{Success: true, Output: "result-2"}, nil
-				},
+				Name:     "agent-2",
+				Provider: &mockProvider{output: "result-2"},
 			},
 			{
-				Name: "agent-3",
-				Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-					time.Sleep(15 * time.Millisecond)
-					return &orchestration.AgentResult{Success: true, Output: "result-3"}, nil
-				},
+				Name:     "agent-3",
+				Provider: &mockProvider{output: "result-3"},
 			},
 		}
 
@@ -114,7 +103,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		)
 
 		workflow := &orchestration.Workflow{Name: "test"}
-		err := sps.Execute(context.Background(), workflow)
+		_, err := sps.Execute(ctx, workflow)
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
@@ -140,28 +129,22 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ExecuteWithError", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
+		ctx := context.Background()
+		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
 		agents := []*orchestration.Agent{
 			{
-				Name: "agent-1",
-				Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-					return &orchestration.AgentResult{Success: true}, nil
-				},
+				Name:     "agent-1",
+				Provider: &mockProvider{output: "result-1"},
 			},
 			{
-				Name: "failing-agent",
-				Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-					return nil, fmt.Errorf("agent failed")
-				},
+				Name:     "failing-agent",
+				Provider: &mockProvider{err: fmt.Errorf("agent failed")},
 			},
 			{
-				Name: "agent-3",
-				Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-					return &orchestration.AgentResult{Success: true}, nil
-				},
+				Name:     "agent-3",
+				Provider: &mockProvider{output: "result-3"},
 			},
 		}
 
@@ -175,7 +158,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		)
 
 		workflow := &orchestration.Workflow{Name: "test"}
-		err := sps.Execute(context.Background(), workflow)
+		_, err := sps.Execute(ctx, workflow)
 		if err == nil {
 			t.Error("expected error from failing agent")
 		}
@@ -189,20 +172,16 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ProgressTracking", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
+		ctx := context.Background()
+		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
 		agentCount := 5
 		agents := make([]*orchestration.Agent, agentCount)
 		for i := 0; i < agentCount; i++ {
-			idx := i
 			agents[i] = &orchestration.Agent{
-				Name: fmt.Sprintf("agent-%d", idx),
-				Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-					time.Sleep(time.Duration(idx*2) * time.Millisecond)
-					return &orchestration.AgentResult{Success: true}, nil
-				},
+				Name:     fmt.Sprintf("agent-%d", i),
+				Provider: &mockProvider{output: fmt.Sprintf("result-%d", i)},
 			}
 		}
 
@@ -216,7 +195,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		)
 
 		workflow := &orchestration.Workflow{Name: "test"}
-		err := sps.Execute(context.Background(), workflow)
+		_, err := sps.Execute(ctx, workflow)
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
@@ -306,25 +285,17 @@ func TestConcurrentStreamingParallelStep(t *testing.T) {
 	t.Run("HighConcurrency", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
+		ctx := context.Background()
+		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
 		// Create many agents
 		agentCount := 20
 		agents := make([]*orchestration.Agent, agentCount)
 		for i := 0; i < agentCount; i++ {
-			idx := i
 			agents[i] = &orchestration.Agent{
-				Name: fmt.Sprintf("agent-%d", idx),
-				Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-					// Simulate varying work times
-					time.Sleep(time.Duration(idx%10) * time.Millisecond)
-					return &orchestration.AgentResult{
-						Success: true,
-						Output:  fmt.Sprintf("result-%d", idx),
-					}, nil
-				},
+				Name:     fmt.Sprintf("agent-%d", i),
+				Provider: &mockProvider{output: fmt.Sprintf("result-%d", i)},
 			}
 		}
 
@@ -338,7 +309,7 @@ func TestConcurrentStreamingParallelStep(t *testing.T) {
 		)
 
 		workflow := &orchestration.Workflow{Name: "test"}
-		err := sps.Execute(context.Background(), workflow)
+		_, err := sps.Execute(ctx, workflow)
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}

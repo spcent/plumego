@@ -118,7 +118,14 @@ func (sm *StreamManager) SendUpdate(workflowID string, update *ProgressUpdate) e
 		return fmt.Errorf("stream not found: %s", workflowID)
 	}
 
-	return stream.SendJSON(update)
+	// Marshal update to JSON
+	jsonData, err := json.Marshal(update)
+	if err != nil {
+		return fmt.Errorf("failed to marshal update: %w", err)
+	}
+
+	// SendJSON expects event type and JSON string
+	return stream.SendJSON("progress", string(jsonData))
 }
 
 // Close closes a stream and unregisters it.
@@ -323,16 +330,20 @@ func (se *StreamingEngine) sendUpdate(workflowID string, update *ProgressUpdate)
 // getStepName extracts the step name from a step.
 func getStepName(step orchestration.Step) string {
 	switch s := step.(type) {
-	case *orchestration.AgentStep:
-		if s.Agent != nil {
-			return s.Agent.Name
-		}
-		return "agent"
 	case *orchestration.SequentialStep:
+		if s.StepName != "" {
+			return s.StepName
+		}
 		return "sequential"
 	case *orchestration.ParallelStep:
+		if s.StepName != "" {
+			return s.StepName
+		}
 		return "parallel"
 	case *orchestration.ConditionalStep:
+		if s.StepName != "" {
+			return s.StepName
+		}
 		return "conditional"
 	case *orchestration.RetryStep:
 		return "retry"
@@ -344,8 +355,6 @@ func getStepName(step orchestration.Step) string {
 // getStepType returns the step type as a string.
 func getStepType(step orchestration.Step) string {
 	switch step.(type) {
-	case *orchestration.AgentStep:
-		return "agent"
 	case *orchestration.SequentialStep:
 		return "sequential"
 	case *orchestration.ParallelStep:

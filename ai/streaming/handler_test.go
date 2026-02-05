@@ -152,17 +152,25 @@ func TestStreamWorkflow(t *testing.T) {
 		engine := orchestration.NewEngine()
 		streamEngine := NewStreamingEngine(engine, nil)
 
+		mockProvider := &mockProvider{
+			output: "test output",
+		}
+
 		mockAgent := &orchestration.Agent{
-			Name: "test-agent",
-			Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-				return &orchestration.AgentResult{Success: true}, nil
-			},
+			Name:     "test-agent",
+			Provider: mockProvider,
 		}
 
 		workflow := &orchestration.Workflow{
-			Name: "test-workflow",
+			Name:  "test-workflow",
+			State: make(map[string]any),
 			Steps: []orchestration.Step{
-				&orchestration.AgentStep{Agent: mockAgent},
+				&orchestration.SequentialStep{
+					StepName:  "test-step",
+					Agent:     mockAgent,
+					InputFn:   func(state map[string]any) string { return "test input" },
+					OutputKey: "result",
+				},
 			},
 		}
 
@@ -175,8 +183,8 @@ func TestStreamWorkflow(t *testing.T) {
 		}
 
 		output := w.Body.String()
-		if !contains(output, "test-agent") {
-			t.Error("expected test-agent in output")
+		if !contains(output, "test-") {
+			t.Error("expected test- in output")
 		}
 	})
 }

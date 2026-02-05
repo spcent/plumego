@@ -1,10 +1,9 @@
 package streaming
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"net/http"
+	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -18,7 +17,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
+		stream, _ := sse.NewStream(context.Background(), w)
 
 		sm.Register("workflow-1", stream)
 
@@ -36,7 +35,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
+		stream, _ := sse.NewStream(context.Background(), w)
 
 		sm.Register("workflow-1", stream)
 		sm.Unregister("workflow-1")
@@ -56,8 +55,10 @@ func TestStreamManager(t *testing.T) {
 
 		w1 := httptest.NewRecorder()
 		w2 := httptest.NewRecorder()
-		sm.Register("workflow-1", sse.NewStream(w1))
-		sm.Register("workflow-2", sse.NewStream(w2))
+		stream1, _ := sse.NewStream(context.Background(), w1)
+		stream2, _ := sse.NewStream(context.Background(), w2)
+		sm.Register("workflow-1", stream1)
+		sm.Register("workflow-2", stream2)
 
 		if sm.Count() != 2 {
 			t.Errorf("expected 2 streams, got %d", sm.Count())
@@ -68,8 +69,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
+		stream, _ := sse.NewStream(context.Background(), w)
 
 		sm.Register("workflow-1", stream)
 
@@ -113,7 +113,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
+		stream, _ := sse.NewStream(context.Background(), w)
 
 		sm.Register("workflow-1", stream)
 
@@ -207,17 +207,16 @@ func TestStreamingEngine(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
-
 		ctx := context.Background()
-		result, err := streamEngine.ExecuteStreaming(ctx, workflow, "workflow-1", stream)
+		stream, _ := sse.NewStream(ctx, w)
+
+		results, err := streamEngine.ExecuteStreaming(ctx, workflow, "workflow-1", stream)
 		if err != nil {
 			t.Fatalf("ExecuteStreaming failed: %v", err)
 		}
 
-		if !result.Success {
-			t.Error("expected successful result for empty workflow")
+		if len(results) != 0 {
+			t.Error("expected empty results for empty workflow")
 		}
 
 		// Check that events were sent
@@ -227,40 +226,45 @@ func TestStreamingEngine(t *testing.T) {
 		}
 	})
 
-	t.Run("ExecuteStreamingWithAgentStep", func(t *testing.T) {
+	t.Run("ExecuteStreamingWithSequentialStep", func(t *testing.T) {
 		engine := orchestration.NewEngine()
 		streamEngine := NewStreamingEngine(engine, nil)
 
+		// Create a mock provider
+		mockProvider := &mockProvider{
+			output: "test output",
+		}
+
 		mockAgent := &orchestration.Agent{
-			Name: "test-agent",
-			System: "You are a test agent",
-			Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-				return &orchestration.AgentResult{
-					Success: true,
-					Output:  "test output",
-				}, nil
-			},
+			Name:         "test-agent",
+			SystemPrompt: "You are a test agent",
+			Provider:     mockProvider,
 		}
 
 		workflow := &orchestration.Workflow{
-			Name: "test-workflow",
+			Name:  "test-workflow",
+			State: make(map[string]any),
 			Steps: []orchestration.Step{
-				&orchestration.AgentStep{Agent: mockAgent},
+				&orchestration.SequentialStep{
+					StepName:  "test-step",
+					Agent:     mockAgent,
+					InputFn:   func(state map[string]any) string { return "test input" },
+					OutputKey: "result",
+				},
 			},
 		}
 
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
-
 		ctx := context.Background()
-		result, err := streamEngine.ExecuteStreaming(ctx, workflow, "workflow-1", stream)
+		stream, _ := sse.NewStream(ctx, w)
+
+		results, err := streamEngine.ExecuteStreaming(ctx, workflow, "workflow-1", stream)
 		if err != nil {
 			t.Fatalf("ExecuteStreaming failed: %v", err)
 		}
 
-		if !result.Success {
-			t.Error("expected successful result")
+		if len(results) == 0 {
+			t.Error("expected at least one result")
 		}
 
 		// Parse events from output
@@ -282,25 +286,33 @@ func TestStreamingEngine(t *testing.T) {
 		engine := orchestration.NewEngine()
 		streamEngine := NewStreamingEngine(engine, nil)
 
+		// Create a mock provider that returns an error
+		mockProvider := &mockProvider{
+			err: fmt.Errorf("agent error"),
+		}
+
 		mockAgent := &orchestration.Agent{
-			Name: "failing-agent",
-			Execute: func(ctx context.Context) (*orchestration.AgentResult, error) {
-				return nil, fmt.Errorf("agent error")
-			},
+			Name:     "failing-agent",
+			Provider: mockProvider,
 		}
 
 		workflow := &orchestration.Workflow{
-			Name: "test-workflow",
+			Name:  "test-workflow",
+			State: make(map[string]any),
 			Steps: []orchestration.Step{
-				&orchestration.AgentStep{Agent: mockAgent},
+				&orchestration.SequentialStep{
+					StepName:  "failing-step",
+					Agent:     mockAgent,
+					InputFn:   func(state map[string]any) string { return "test input" },
+					OutputKey: "result",
+				},
 			},
 		}
 
 		w := httptest.NewRecorder()
-		stream := sse.NewStream(w)
-		stream.Setup()
-
 		ctx := context.Background()
+		stream, _ := sse.NewStream(ctx, w)
+
 		_, err := streamEngine.ExecuteStreaming(ctx, workflow, "workflow-1", stream)
 		if err == nil {
 			t.Error("expected error from failing agent")
@@ -321,11 +333,12 @@ func TestGetStepName(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "AgentStep",
-			step: &orchestration.AgentStep{
-				Agent: &orchestration.Agent{Name: "test-agent"},
+			name: "SequentialStep",
+			step: &orchestration.SequentialStep{
+				StepName: "test-step",
+				Agent:    &orchestration.Agent{Name: "test-agent"},
 			},
-			expected: "test-agent",
+			expected: "test-step",
 		},
 		{
 			name:     "SequentialStep",
@@ -366,9 +379,9 @@ func TestGetStepType(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "AgentStep",
-			step:     &orchestration.AgentStep{},
-			expected: "agent",
+			name:     "SequentialStep",
+			step:     &orchestration.SequentialStep{},
+			expected: "sequential",
 		},
 		{
 			name:     "SequentialStep",
@@ -392,6 +405,3 @@ func TestGetStepType(t *testing.T) {
 	}
 }
 
-func contains(s, substr string) bool {
-	return bytes.Contains([]byte(s), []byte(substr))
-}

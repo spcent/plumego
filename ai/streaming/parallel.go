@@ -248,7 +248,12 @@ func (sw *StreamingWorkflow) AddParallelStep(agents []*orchestration.Agent) *Str
 
 // AddAgentStep adds a regular agent step to the workflow.
 func (sw *StreamingWorkflow) AddAgentStep(agent *orchestration.Agent) *StreamingWorkflow {
-	sw.Steps = append(sw.Steps, &orchestration.AgentStep{Agent: agent})
+	sw.Steps = append(sw.Steps, &orchestration.SequentialStep{
+		StepName:  agent.Name,
+		Agent:     agent,
+		InputFn:   func(state map[string]any) string { return "" },
+		OutputKey: agent.Name + "_output",
+	})
 	return sw
 }
 

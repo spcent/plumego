@@ -64,10 +64,11 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send final completion event
-	stream.SendJSON(map[string]string{
+	jsonData, _ := json.Marshal(map[string]string{
 		"event":   "complete",
 		"message": "Workflow execution completed",
 	})
+	stream.SendJSON("complete", string(jsonData))
 }
 
 // HandleExecute handles HTTP POST requests to execute workflows with streaming.
@@ -109,11 +110,12 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send final result
-	stream.SendJSON(map[string]interface{}{
-		"event":        "result",
-		"success":      err == nil,
+	jsonData, _ := json.Marshal(map[string]interface{}{
+		"event":         "result",
+		"success":       err == nil,
 		"results_count": len(results),
 	})
+	stream.SendJSON("result", string(jsonData))
 }
 
 // StreamWorkflow is a convenience function to stream a workflow execution.
