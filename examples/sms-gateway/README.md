@@ -109,6 +109,32 @@ go test ./examples/sms-gateway -run TestSMSGatewaySQLPersistence
 
 You will need a Go SQL driver (e.g. `pgx`, `pq`, or `mysql`) in your build.
 
+## Ops/Admin Endpoints
+
+The demo wires `core/components/ops` under `/ops`. Set a token to protect it:
+
+```bash
+SMS_GATEWAY_OPS_TOKEN="dev-ops-token" go run ./examples/sms-gateway
+```
+
+Use `X-Token: <token>` when calling ops endpoints. For local-only testing you can allow
+insecure access (not recommended in production):
+
+```bash
+SMS_GATEWAY_OPS_INSECURE=1 go run ./examples/sms-gateway
+```
+
+Sample calls:
+
+- Queue stats:
+  `curl -H 'X-Token: dev-ops-token' http://127.0.0.1:8089/ops/queue?queue=send`
+- Replay DLQ (re-queue failed tasks):
+  `curl -X POST -H 'Content-Type: application/json' -H 'X-Token: dev-ops-token' http://127.0.0.1:8089/ops/queue/replay -d '{"queue":"send","max":50}'`
+- Receipt lookup:
+  `curl -H 'X-Token: dev-ops-token' 'http://127.0.0.1:8089/ops/receipts?message_id=<id>'`
+- Tenant quota snapshot:
+  `curl -H 'X-Token: dev-ops-token' 'http://127.0.0.1:8089/ops/tenants/quota?tenant_id=tenant-1'`
+
 ### Notes
 
 - The example uses `contract.Ctx` (`ctx.W`, `ctx.R`).

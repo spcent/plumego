@@ -103,6 +103,7 @@ func main() {
 - **路由器**：使用 `Get`、`Post` 等注册处理器，或上下文感知变体（`GetCtx`），后者暴露统一的请求上下文包装器。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
 - **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（安全头、防滥用、请求体限制、并发限制）会在设置期间自动注入。恢复/日志/CORS 辅助工具可通过 `core.WithRecovery`、`core.WithLogging`、`core.WithCORS` 启用。生产基线可使用 `core.WithRecommendedMiddleware()` 一键启用 RequestID + Logging + Recovery 的推荐顺序组合。
 - **多租户（实验）**：提供租户隔离、配额管理、策略控制和数据库过滤能力，API 仍处于实验阶段，可能变更。详见[多租户](#多租户)章节。
+- **运维/管理端点**：可选的受保护运维 API，包含队列状态/重放、回执查询、通道健康、租户配额等能力。通过 `core/components/ops` 挂载，并使用令牌或自定义中间件保护；当 `AllowInsecure` 为 false（默认）且未配置鉴权时会拒绝访问。
 - **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
 - **WebSocket 中心**：`ConfigureWebSocket()` 挂载受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `WebSocketConfig` 自定义工作线程数和队列大小。
 - **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，并提供通用 HMAC 验证、重放保护与 IP 白名单。

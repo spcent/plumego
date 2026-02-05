@@ -344,6 +344,92 @@ FROM %s`, mq.TaskStatusQueued, mq.TaskStatusLeased, mq.TaskStatusDead, mq.TaskSt
 	}, nil
 }
 
+// ReplayDLQ moves tasks from the dead-letter state back to queued.
+func (s *SQLStore) ReplayDLQ(ctx context.Context, opts ReplayOptions) (ReplayResult, error) {
+	if s == nil || s.db == nil {
+		return ReplayResult{}, mq.ErrNotInitialized
+	}
+
+	now := opts.Now
+	if now.IsZero() {
+		now = s.nowFunc()
+	}
+	availableAt := opts.AvailableAt
+	if availableAt.IsZero() {
+		availableAt = now
+	}
+
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return ReplayResult{}, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	total, err := s.countDead(ctx, tx)
+	if err != nil {
+		return ReplayResult{}, err
+	}
+	if total == 0 {
+		err = tx.Commit()
+		return ReplayResult{Replayed: 0, Remaining: 0}, err
+	}
+
+	var replayed int
+	if opts.Max <= 0 || opts.Max >= total {
+		query, args := s.buildReplayUpdateAll(availableAt, now, opts.ResetAttempts)
+		res, execErr := tx.ExecContext(ctx, query, args...)
+		if execErr != nil {
+			err = execErr
+			return ReplayResult{}, err
+		}
+		affected, execErr := res.RowsAffected()
+		if execErr != nil {
+			err = execErr
+			return ReplayResult{}, err
+		}
+		replayed = int(affected)
+	} else {
+		ids, selectErr := s.selectDeadIDs(ctx, tx, opts.Max)
+		if selectErr != nil {
+			err = selectErr
+			return ReplayResult{}, err
+		}
+		if len(ids) > 0 {
+			query, args := s.buildReplayUpdate(ids, availableAt, now, opts.ResetAttempts)
+			res, execErr := tx.ExecContext(ctx, query, args...)
+			if execErr != nil {
+				err = execErr
+				return ReplayResult{}, err
+			}
+			affected, execErr := res.RowsAffected()
+			if execErr != nil {
+				err = execErr
+				return ReplayResult{}, err
+			}
+			replayed = int(affected)
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return ReplayResult{}, err
+	}
+
+	remaining := total - replayed
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	return ReplayResult{
+		Replayed:  replayed,
+		Remaining: remaining,
+	}, nil
+}
+
 func (s *SQLStore) expireQueued(ctx context.Context, tx *sql.Tx, now time.Time) error {
 	query := fmt.Sprintf("UPDATE %s SET status = %s, updated_at = %s WHERE status = %s AND expires_at IS NOT NULL AND expires_at <= %s", s.cfg.Table, s.placeholder(1), s.placeholder(2), s.placeholder(3), s.placeholder(4))
 	_, err := tx.ExecContext(ctx, query, mq.TaskStatusExpired, now, mq.TaskStatusQueued, now)
@@ -470,6 +556,86 @@ func (s *SQLStore) buildMoveToDLQ(taskID, consumerID, reason string, now time.Ti
 func (s *SQLStore) buildExtendLease(taskID, consumerID string, leaseUntil, now time.Time) (string, []any) {
 	query := fmt.Sprintf("UPDATE %s SET lease_until = %s, updated_at = %s WHERE id = %s AND lease_owner = %s AND status = %s AND lease_until >= %s", s.cfg.Table, s.placeholder(1), s.placeholder(2), s.placeholder(3), s.placeholder(4), s.placeholder(5), s.placeholder(6))
 	args := []any{leaseUntil, now, taskID, consumerID, mq.TaskStatusLeased, now}
+	return query, args
+}
+
+func (s *SQLStore) countDead(ctx context.Context, tx *sql.Tx) (int, error) {
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE status = %s", s.cfg.Table, s.placeholder(1))
+	row := tx.QueryRowContext(ctx, query, mq.TaskStatusDead)
+	var total int
+	if err := row.Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+func (s *SQLStore) selectDeadIDs(ctx context.Context, tx *sql.Tx, limit int) ([]string, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	query := fmt.Sprintf("SELECT id FROM %s WHERE status = %s ORDER BY updated_at ASC LIMIT %s FOR UPDATE", s.cfg.Table, s.placeholder(1), s.placeholder(2))
+	rows, err := tx.QueryContext(ctx, query, mq.TaskStatusDead, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0, limit)
+	for rows.Next() {
+		var id string
+		if scanErr := rows.Scan(&id); scanErr != nil {
+			return nil, scanErr
+		}
+		ids = append(ids, id)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+func (s *SQLStore) buildReplayUpdateAll(availableAt, now time.Time, resetAttempts bool) (string, []any) {
+	args := make([]any, 0, 4)
+	idx := 1
+
+	query := fmt.Sprintf("UPDATE %s SET status = %s, available_at = %s, lease_owner = NULL, lease_until = NULL, updated_at = %s", s.cfg.Table, s.placeholder(idx), s.placeholder(idx+1), s.placeholder(idx+2))
+	args = append(args, mq.TaskStatusQueued, availableAt, now)
+	idx += 3
+
+	if resetAttempts {
+		query += fmt.Sprintf(", attempts = %s", s.placeholder(idx))
+		args = append(args, 0)
+		idx++
+	}
+
+	query += fmt.Sprintf(" WHERE status = %s", s.placeholder(idx))
+	args = append(args, mq.TaskStatusDead)
+
+	return query, args
+}
+
+func (s *SQLStore) buildReplayUpdate(ids []string, availableAt, now time.Time, resetAttempts bool) (string, []any) {
+	args := make([]any, 0, 4+len(ids))
+	idx := 1
+
+	query := fmt.Sprintf("UPDATE %s SET status = %s, available_at = %s, lease_owner = NULL, lease_until = NULL, updated_at = %s", s.cfg.Table, s.placeholder(idx), s.placeholder(idx+1), s.placeholder(idx+2))
+	args = append(args, mq.TaskStatusQueued, availableAt, now)
+	idx += 3
+
+	if resetAttempts {
+		query += fmt.Sprintf(", attempts = %s", s.placeholder(idx))
+		args = append(args, 0)
+		idx++
+	}
+
+	placeholders := make([]string, 0, len(ids))
+	for _, id := range ids {
+		placeholders = append(placeholders, s.placeholder(idx))
+		args = append(args, id)
+		idx++
+	}
+	query += fmt.Sprintf(" WHERE id IN (%s)", strings.Join(placeholders, ", "))
+
 	return query, args
 }
 

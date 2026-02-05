@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/core/components/ops"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/message"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/pipeline"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/routing"
@@ -28,6 +29,7 @@ import (
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/net/mq"
 	mqstore "github.com/spcent/plumego/net/mq/store"
+	plumrouter "github.com/spcent/plumego/router"
 	storedb "github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/store/idempotency"
 	kvstore "github.com/spcent/plumego/store/kv"
@@ -58,7 +60,32 @@ func main() {
 	routePolicyProvider := tenant.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
 	router := &routing.PolicyRouter{Provider: routePolicyProvider}
 
-	queue := mq.NewTaskQueue(mqstore.NewMemory(mqstore.MemConfig{}), mq.WithQueueMetricsCollector(collector))
+	tenantConfig := tenant.NewInMemoryConfigManager()
+	tenantConfig.SetTenantConfig(tenant.Config{
+		TenantID: "tenant-1",
+		Quota: tenant.QuotaConfig{
+			Limits: []tenant.QuotaLimit{
+				{Window: tenant.QuotaWindowDay, Requests: 200000},
+			},
+		},
+	})
+	tenantConfig.SetTenantConfig(tenant.Config{
+		TenantID: "tenant-2",
+		Quota: tenant.QuotaConfig{
+			Limits: []tenant.QuotaLimit{
+				{Window: tenant.QuotaWindowDay, Requests: 200000},
+			},
+		},
+	})
+	quotaStore := tenant.NewInMemoryQuotaStore()
+	quotaManager := tenant.NewWindowQuotaManager(tenantConfig, quotaStore)
+
+	queueStore := mqstore.NewMemory(mqstore.MemConfig{})
+	queue := mq.NewTaskQueue(queueStore, mq.WithQueueMetricsCollector(collector))
+	var queueReplayer mqstore.DLQReplayer
+	if replayer, ok := any(queueStore).(mqstore.DLQReplayer); ok {
+		queueReplayer = replayer
+	}
 	worker := mq.NewWorker(queue, mq.WorkerConfig{
 		ConsumerID:       "sms-worker",
 		Concurrency:      2,
@@ -105,6 +132,10 @@ func main() {
 		message.ExampleSendHandler(idemStore, repo, router, queue),
 		logger,
 	)
+	handler = tenantmw.TenantQuota(tenantmw.TenantQuotaOptions{
+		Manager: quotaManager,
+		Hooks:   tenant.Hooks{},
+	})(handler)
 	handler = tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
 		HeaderName: "X-Tenant-ID",
 	})(handler)
@@ -121,6 +152,108 @@ func main() {
 		message.ExampleReceiptHandler(repo, smsMetrics),
 		logger,
 	))
+
+	queueName := "send"
+	opsHooks := ops.Hooks{
+		QueueStats: func(ctx context.Context, queueID string) (ops.QueueStats, error) {
+			if queueID != "" && queueID != queueName {
+				return ops.QueueStats{}, fmt.Errorf("unknown queue %q", queueID)
+			}
+			stats, err := queue.Stats(ctx)
+			if err != nil {
+				return ops.QueueStats{}, err
+			}
+			return ops.QueueStats{
+				Queue:     queueName,
+				Queued:    stats.Queued,
+				Leased:    stats.Leased,
+				Dead:      stats.Dead,
+				Expired:   stats.Expired,
+				UpdatedAt: time.Now().UTC(),
+			}, nil
+		},
+		QueueList: func(ctx context.Context) ([]string, error) {
+			return []string{queueName}, nil
+		},
+		QueueReplay: func(ctx context.Context, req ops.QueueReplayRequest) (ops.QueueReplayResult, error) {
+			if req.Queue != "" && req.Queue != queueName {
+				return ops.QueueReplayResult{}, fmt.Errorf("unknown queue %q", req.Queue)
+			}
+			if queueReplayer == nil {
+				return ops.QueueReplayResult{}, fmt.Errorf("queue replay not supported")
+			}
+			result, err := queueReplayer.ReplayDLQ(ctx, mqstore.ReplayOptions{
+				Max:           req.Max,
+				ResetAttempts: true,
+			})
+			if err != nil {
+				return ops.QueueReplayResult{}, err
+			}
+			return ops.QueueReplayResult{
+				Queue:     queueName,
+				Requested: req.Max,
+				Replayed:  result.Replayed,
+				Remaining: result.Remaining,
+			}, nil
+		},
+		ReceiptLookup: func(ctx context.Context, messageID string) (ops.ReceiptRecord, error) {
+			msg, found, err := repo.Get(ctx, messageID)
+			if err != nil {
+				return ops.ReceiptRecord{}, err
+			}
+			if !found {
+				return ops.ReceiptRecord{
+					MessageID: messageID,
+					Status:    "not_found",
+					Details:   map[string]any{"found": false},
+				}, nil
+			}
+			record := ops.ReceiptRecord{
+				MessageID: msg.ID,
+				Status:    string(msg.Status),
+				Provider:  msg.Provider,
+				UpdatedAt: msg.UpdatedAt,
+				Details: map[string]any{
+					"attempts":     msg.Attempts,
+					"max_attempts": msg.MaxAttempts,
+				},
+			}
+			if msg.ProviderMsgID != "" {
+				record.Details["provider_message_id"] = msg.ProviderMsgID
+			}
+			if msg.ReasonCode != "" {
+				record.Details["reason_code"] = msg.ReasonCode
+			}
+			if msg.ReasonDetail != "" {
+				record.Details["reason_detail"] = msg.ReasonDetail
+			}
+			if !msg.NextAttemptAt.IsZero() {
+				record.Details["next_attempt_at"] = msg.NextAttemptAt
+			}
+			if msg.Status == message.StatusDelivered {
+				record.DeliveredAt = msg.UpdatedAt
+			}
+			return record, nil
+		},
+		TenantQuota: func(ctx context.Context, tenantID string) (ops.TenantQuotaSnapshot, error) {
+			return buildTenantQuotaSnapshot(ctx, tenantID, tenantConfig, quotaStore)
+		},
+	}
+	opsComponent := ops.NewComponent(ops.Options{
+		Enabled:  true,
+		BasePath: "/ops",
+		Logger:   logger,
+		Auth: ops.AuthConfig{
+			Token:         strings.TrimSpace(os.Getenv("SMS_GATEWAY_OPS_TOKEN")),
+			AllowInsecure: getenvBool("SMS_GATEWAY_OPS_INSECURE", false),
+		},
+		Hooks: opsHooks,
+	})
+	opsRouter := plumrouter.NewRouter()
+	opsComponent.RegisterRoutes(opsRouter)
+	mux.Handle("/ops", opsRouter)
+	mux.Handle("/ops/", opsRouter)
+
 	server := &http.Server{
 		Handler: mux,
 	}
@@ -273,6 +406,21 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
+func getenvBool(key string, fallback bool) bool {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	switch strings.ToLower(value) {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
 func waitUntil(ctx context.Context, timeout time.Duration, fn func() bool) {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -317,5 +465,118 @@ func reportQueueMetrics(ctx context.Context, queue *mq.TaskQueue, reporter *smsg
 				Expired: stats.Expired,
 			})
 		}
+	}
+}
+
+func buildTenantQuotaSnapshot(ctx context.Context, tenantID string, manager tenant.ConfigManager, store any) (ops.TenantQuotaSnapshot, error) {
+	snapshot := ops.TenantQuotaSnapshot{
+		TenantID:  tenantID,
+		UpdatedAt: time.Now().UTC(),
+	}
+
+	if manager == nil {
+		snapshot.Details = map[string]any{"configured": false}
+		return snapshot, nil
+	}
+
+	cfg, err := manager.GetTenantConfig(ctx, tenantID)
+	if err != nil {
+		if err == tenant.ErrTenantNotFound {
+			snapshot.Details = map[string]any{"found": false}
+			return snapshot, nil
+		}
+		return snapshot, err
+	}
+
+	limits := normalizeQuotaLimits(cfg.Quota)
+	now := time.Now().UTC()
+
+	type usageReader interface {
+		Usage(tenantID string, window tenant.QuotaWindow, windowStart time.Time) (tenant.QuotaUsage, bool)
+	}
+	var reader usageReader
+	if store != nil {
+		if typed, ok := store.(usageReader); ok {
+			reader = typed
+		}
+	}
+
+	snapshot.Limits = make([]ops.QuotaLimit, 0, len(limits))
+	snapshot.Usage = make([]ops.QuotaUsage, 0, len(limits))
+
+	for _, limit := range limits {
+		snapshot.Limits = append(snapshot.Limits, ops.QuotaLimit{
+			Window:   string(limit.Window),
+			Requests: limit.Requests,
+			Tokens:   limit.Tokens,
+		})
+
+		start, end := quotaWindowBounds(now, limit.Window)
+		usage := ops.QuotaUsage{
+			Window:      string(limit.Window),
+			WindowStart: start,
+			WindowEnd:   end,
+		}
+		if reader != nil {
+			if current, ok := reader.Usage(tenantID, limit.Window, start); ok {
+				usage.Requests = current.Requests
+				usage.Tokens = current.Tokens
+			}
+		}
+		snapshot.Usage = append(snapshot.Usage, usage)
+	}
+
+	return snapshot, nil
+}
+
+func normalizeQuotaLimits(cfg tenant.QuotaConfig) []tenant.QuotaLimit {
+	if len(cfg.Limits) > 0 {
+		limits := make([]tenant.QuotaLimit, 0, len(cfg.Limits))
+		for _, limit := range cfg.Limits {
+			if !isValidQuotaWindow(limit.Window) {
+				continue
+			}
+			limits = append(limits, limit)
+		}
+		return limits
+	}
+
+	if cfg.RequestsPerMinute > 0 || cfg.TokensPerMinute > 0 {
+		return []tenant.QuotaLimit{{
+			Window:   tenant.QuotaWindowMinute,
+			Requests: cfg.RequestsPerMinute,
+			Tokens:   cfg.TokensPerMinute,
+		}}
+	}
+
+	return nil
+}
+
+func isValidQuotaWindow(window tenant.QuotaWindow) bool {
+	switch window {
+	case tenant.QuotaWindowMinute, tenant.QuotaWindowHour, tenant.QuotaWindowDay, tenant.QuotaWindowMonth:
+		return true
+	default:
+		return false
+	}
+}
+
+func quotaWindowBounds(now time.Time, window tenant.QuotaWindow) (time.Time, time.Time) {
+	now = now.UTC()
+	switch window {
+	case tenant.QuotaWindowHour:
+		start := now.Truncate(time.Hour)
+		return start, start.Add(time.Hour)
+	case tenant.QuotaWindowDay:
+		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		return start, start.Add(24 * time.Hour)
+	case tenant.QuotaWindowMonth:
+		start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		return start, start.AddDate(0, 1, 0)
+	case tenant.QuotaWindowMinute:
+		fallthrough
+	default:
+		start := now.Truncate(time.Minute)
+		return start, start.Add(time.Minute)
 	}
 }

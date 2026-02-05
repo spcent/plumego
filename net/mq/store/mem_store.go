@@ -212,6 +212,62 @@ func (m *MemStore) Stats(_ context.Context) (mq.Stats, error) {
 	return stats, nil
 }
 
+// ReplayDLQ moves tasks from the dead-letter state back to queued.
+func (m *MemStore) ReplayDLQ(_ context.Context, opts ReplayOptions) (ReplayResult, error) {
+	if m == nil {
+		return ReplayResult{}, mq.ErrNotInitialized
+	}
+
+	now := opts.Now
+	if now.IsZero() {
+		now = m.nowFunc()
+	}
+	availableAt := opts.AvailableAt
+	if availableAt.IsZero() {
+		availableAt = now
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	dead := make([]*memRecord, 0)
+	for _, rec := range m.tasks {
+		if rec.status == mq.TaskStatusDead {
+			dead = append(dead, rec)
+		}
+	}
+
+	if len(dead) == 0 {
+		return ReplayResult{Replayed: 0, Remaining: 0}, nil
+	}
+
+	sort.Slice(dead, func(i, j int) bool {
+		return dead[i].task.UpdatedAt.Before(dead[j].task.UpdatedAt)
+	})
+
+	limit := opts.Max
+	if limit <= 0 || limit > len(dead) {
+		limit = len(dead)
+	}
+
+	for i := 0; i < limit; i++ {
+		rec := dead[i]
+		rec.status = mq.TaskStatusQueued
+		rec.task.LeaseOwner = ""
+		rec.task.LeaseUntil = time.Time{}
+		rec.task.AvailableAt = availableAt
+		rec.task.UpdatedAt = now
+		if opts.ResetAttempts {
+			rec.task.Attempts = 0
+		}
+	}
+
+	return ReplayResult{
+		Replayed:  limit,
+		Remaining: len(dead) - limit,
+	}, nil
+}
+
 func dedupeKey(tenantID, dedupe string) string {
 	return tenantID + ":" + dedupe
 }

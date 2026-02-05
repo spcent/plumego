@@ -49,6 +49,25 @@ type SQLStore struct {
 	nowFunc func() time.Time
 }
 
+// ReplayOptions configures DLQ replay behavior.
+type ReplayOptions struct {
+	Max           int
+	Now           time.Time
+	AvailableAt   time.Time
+	ResetAttempts bool
+}
+
+// ReplayResult reports DLQ replay results.
+type ReplayResult struct {
+	Replayed  int
+	Remaining int
+}
+
+// DLQReplayer exposes DLQ replay operations when supported.
+type DLQReplayer interface {
+	ReplayDLQ(ctx context.Context, opts ReplayOptions) (ReplayResult, error)
+}
+
 type MemConfig struct {
 	Now func() time.Time
 }
