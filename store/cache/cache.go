@@ -253,6 +253,24 @@ func (mc *MemoryCache) startCleanup() {
 	}()
 }
 
+// removeExpiredItem removes an expired item and updates metrics.
+// Returns true if the item was removed.
+func (mc *MemoryCache) removeExpiredItem(key any, item cacheItem) bool {
+	if !expired(item.expiration) {
+		return false
+	}
+
+	mc.store.Delete(key)
+	mc.updateMetrics(func(m *MetricsCollector) {
+		m.Expired++
+		m.CurrentSize--
+		if m.CurrentMemory >= uint64(len(item.value)) {
+			m.CurrentMemory -= uint64(len(item.value))
+		}
+	})
+	return true
+}
+
 // cleanupExpired removes expired items from the cache.
 // To avoid O(N) scan on every cleanup cycle, we limit the number of items checked.
 func (mc *MemoryCache) cleanupExpired() {
@@ -267,16 +285,7 @@ func (mc *MemoryCache) cleanupExpired() {
 		checked++
 
 		item := value.(cacheItem)
-		if expired(item.expiration) {
-			mc.store.Delete(key)
-			mc.updateMetrics(func(m *MetricsCollector) {
-				m.Expired++
-				m.CurrentSize--
-				if m.CurrentMemory >= uint64(len(item.value)) {
-					m.CurrentMemory -= uint64(len(item.value))
-				}
-			})
-		}
+		mc.removeExpiredItem(key, item)
 		return true
 	})
 }
@@ -289,6 +298,18 @@ func (mc *MemoryCache) validateKey(key string) error {
 	if mc.config.MaxKeyLength > 0 && len(key) > mc.config.MaxKeyLength {
 		return fmt.Errorf("%w: key length %d exceeds maximum %d", ErrKeyTooLong, len(key), mc.config.MaxKeyLength)
 	}
+
+	// Prevent cache key pollution by rejecting keys with control characters
+	// These characters could be used to bypass tenant isolation or manipulate logging
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		// Reject ASCII control characters (0x00-0x1F, 0x7F)
+		// and newlines which could pollute logs or break key formatting
+		if c < 0x20 || c == 0x7F {
+			return fmt.Errorf("%w: key contains invalid control character at position %d", ErrInvalidConfig, i)
+		}
+	}
+
 	return nil
 }
 
@@ -336,15 +357,7 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 	}
 
 	item := val.(cacheItem)
-	if expired(item.expiration) {
-		mc.store.Delete(key)
-		mc.updateMetrics(func(m *MetricsCollector) {
-			m.Expired++
-			m.CurrentSize--
-			if m.CurrentMemory >= uint64(len(item.value)) {
-				m.CurrentMemory -= uint64(len(item.value))
-			}
-		})
+	if mc.removeExpiredItem(key, item) {
 		return nil, ErrNotFound
 	}
 
@@ -435,15 +448,7 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 	}
 
 	item := val.(cacheItem)
-	if expired(item.expiration) {
-		mc.store.Delete(key)
-		mc.updateMetrics(func(m *MetricsCollector) {
-			m.Expired++
-			m.CurrentSize--
-			if m.CurrentMemory >= uint64(len(item.value)) {
-				m.CurrentMemory -= uint64(len(item.value))
-			}
-		})
+	if mc.removeExpiredItem(key, item) {
 		return false, nil
 	}
 
@@ -550,90 +555,96 @@ func (mc *MemoryCache) Close() error {
 	return nil
 }
 
+// isSafeContentType checks if a content type is safe to cache to prevent XSS.
+// Only caches JSON and other structured data formats, not HTML or scripts.
+func isSafeContentType(contentType string) bool {
+	// Extract the media type without parameters
+	mediaType := contentType
+	if idx := strings.Index(contentType, ";"); idx >= 0 {
+		mediaType = strings.TrimSpace(contentType[:idx])
+	}
+
+	// Allow JSON and other safe structured formats
+	safeTypes := []string{
+		"application/json",
+		"application/xml",
+		"text/xml",
+		"application/pdf",
+		"image/",
+		"video/",
+		"audio/",
+	}
+
+	for _, safe := range safeTypes {
+		if strings.HasPrefix(mediaType, safe) || strings.HasSuffix(mediaType, "+json") || strings.HasSuffix(mediaType, "+xml") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// cachedHandler is the core HTTP cache handler implementation.
+// Only caches safe content types (JSON, XML, images, etc.) to prevent stored XSS attacks.
+func cachedHandler(c Cache, ttl time.Duration, keyFn func(*http.Request) string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := keyFn(r)
+
+		// Try to get from cache
+		if data, err := c.Get(r.Context(), key); err == nil {
+			resp, err := decodeCachedResponse(data)
+			if err == nil {
+				writeCachedResponse(w, resp)
+				return
+			}
+			// Cache is corrupted, delete it
+			_ = c.Delete(r.Context(), key)
+		}
+
+		// Cache miss or corrupted, call the handler
+		recorder := httptest.NewRecorder()
+		next.ServeHTTP(recorder, r)
+
+		// Capture body once for writing and optional caching
+		bodyBytes := recorder.Body.Bytes()
+
+		copyHeaders(w.Header(), recorder.Header())
+		w.Header().Set("X-Cache", "MISS")
+		w.WriteHeader(recorder.Code)
+		_, _ = w.Write(bodyBytes)
+
+		// Only cache successful responses with safe content types to prevent XSS
+		contentType := recorder.Header().Get("Content-Type")
+		if recorder.Code >= 200 && recorder.Code < 300 && isSafeContentType(contentType) {
+			resp := cachedResponse{
+				Status: recorder.Code,
+				Header: cloneHeader(recorder.Header()),
+				Body:   bodyBytes,
+			}
+			if encoded, err := encodeCachedResponse(resp); err == nil {
+				_ = c.Set(r.Context(), key, encoded, ttl)
+			}
+		}
+	})
+}
+
 // Cached decorates an http.Handler with cache read/write logic.
+// Only caches safe content types (JSON, XML, images, etc.) to prevent stored XSS attacks.
 func Cached(c Cache, ttl time.Duration, keyFn func(*http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			key := keyFn(r)
-
-			if data, err := c.Get(r.Context(), key); err == nil {
-				resp, err := decodeCachedResponse(data)
-				if err == nil {
-					writeCachedResponse(w, resp)
-					return
-				}
-				_ = c.Delete(r.Context(), key)
-			}
-
-			recorder := httptest.NewRecorder()
-			next.ServeHTTP(recorder, r)
-
-			copyHeaders(w.Header(), recorder.Header())
-			w.Header().Set("X-Cache", "MISS")
-			w.WriteHeader(recorder.Code)
-			_, _ = w.Write(recorder.Body.Bytes())
-
-			if recorder.Code == http.StatusOK {
-				resp := cachedResponse{
-					Status: recorder.Code,
-					Header: cloneHeader(recorder.Header()),
-					Body:   recorder.Body.Bytes(),
-				}
-				if encoded, err := encodeCachedResponse(resp); err == nil {
-					_ = c.Set(r.Context(), key, encoded, ttl)
-				}
-			}
-		})
+		return cachedHandler(c, ttl, keyFn, next)
 	}
 }
 
 // CachedWithConfig decorates an http.Handler with configurable cache logic.
+// Only caches safe content types (JSON, XML, images, etc.) to prevent stored XSS attacks.
 func CachedWithConfig(c Cache, config Config, keyFn func(*http.Request) string) func(http.Handler) http.Handler {
+	ttl := config.DefaultTTL
+	if ttl == 0 {
+		ttl = 10 * time.Minute
+	}
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			key := keyFn(r)
-
-			// Try to get from cache
-			if data, err := c.Get(r.Context(), key); err == nil {
-				resp, err := decodeCachedResponse(data)
-				if err == nil {
-					writeCachedResponse(w, resp)
-					return
-				}
-				// Cache is corrupted, delete it
-				_ = c.Delete(r.Context(), key)
-			}
-
-			// Cache miss or corrupted, call the handler
-			recorder := httptest.NewRecorder()
-			next.ServeHTTP(recorder, r)
-
-			// Capture body once for writing and optional caching
-			bodyBytes := recorder.Body.Bytes()
-
-			copyHeaders(w.Header(), recorder.Header())
-			w.Header().Set("X-Cache", "MISS")
-			w.WriteHeader(recorder.Code)
-			_, _ = w.Write(bodyBytes)
-
-			// Only cache successful JSON responses to reduce XSS surface
-			contentType := recorder.Header().Get("Content-Type")
-			isJSON := strings.HasPrefix(contentType, "application/json") || strings.HasSuffix(contentType, "+json")
-			if recorder.Code >= 200 && recorder.Code < 300 && isJSON {
-				resp := cachedResponse{
-					Status: recorder.Code,
-					Header: cloneHeader(recorder.Header()),
-					Body:   bodyBytes,
-				}
-				if encoded, err := encodeCachedResponse(resp); err == nil {
-					ttl := config.DefaultTTL
-					if ttl == 0 {
-						ttl = 10 * time.Minute
-					}
-					_ = c.Set(r.Context(), key, encoded, ttl)
-				}
-			}
-		})
+		return cachedHandler(c, ttl, keyFn, next)
 	}
 }
 
