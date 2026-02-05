@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/go-version"
+	"github.com/spcent/plumego/utils/semver"
 )
 
 // LocalAgentRegistry implements AgentRegistry with local file system storage.
@@ -45,7 +45,7 @@ func (r *LocalAgentRegistry) Publish(ctx context.Context, metadata *AgentMetadat
 	defer r.mu.Unlock()
 
 	// Validate version
-	if _, err := version.NewVersion(metadata.Version); err != nil {
+	if _, err := semver.Parse(metadata.Version); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidVersion, err)
 	}
 
@@ -207,13 +207,13 @@ func (r *LocalAgentRegistry) ListVersions(ctx context.Context, id string) ([]str
 		return nil, fmt.Errorf("failed to read agent directory: %w", err)
 	}
 
-	var versions []*version.Version
+	var versions []*semver.Version
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
-		v, err := version.NewVersion(entry.Name())
+		v, err := semver.Parse(entry.Name())
 		if err != nil {
 			continue
 		}
@@ -221,7 +221,7 @@ func (r *LocalAgentRegistry) ListVersions(ctx context.Context, id string) ([]str
 	}
 
 	// Sort versions
-	sort.Sort(version.Collection(versions))
+	semver.Sort(versions)
 
 	// Convert to strings
 	var result []string
@@ -483,7 +483,7 @@ func (r *LocalWorkflowRegistry) Publish(ctx context.Context, template *WorkflowT
 	defer r.mu.Unlock()
 
 	// Validate version
-	if _, err := version.NewVersion(template.Version); err != nil {
+	if _, err := semver.Parse(template.Version); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidVersion, err)
 	}
 
@@ -640,13 +640,13 @@ func (r *LocalWorkflowRegistry) ListVersions(ctx context.Context, id string) ([]
 		return nil, fmt.Errorf("failed to read workflow directory: %w", err)
 	}
 
-	var versions []*version.Version
+	var versions []*semver.Version
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
-		v, err := version.NewVersion(entry.Name())
+		v, err := semver.Parse(entry.Name())
 		if err != nil {
 			continue
 		}
@@ -654,7 +654,7 @@ func (r *LocalWorkflowRegistry) ListVersions(ctx context.Context, id string) ([]
 	}
 
 	// Sort versions
-	sort.Sort(version.Collection(versions))
+	semver.Sort(versions)
 
 	// Convert to strings
 	var result []string

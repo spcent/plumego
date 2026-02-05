@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hashicorp/go-version"
+	"github.com/spcent/plumego/utils/semver"
 )
 
 // Validator validates agent metadata and workflow templates.
@@ -93,7 +93,7 @@ func (v *Validator) ValidateAgent(metadata *AgentMetadata) *ValidationResult {
 	if metadata.Version == "" {
 		result.AddError("version", "Version is required")
 	} else {
-		if _, err := version.NewVersion(metadata.Version); err != nil {
+		if _, err := semver.Parse(metadata.Version); err != nil {
 			result.AddError("version", fmt.Sprintf("Invalid semantic version: %v", err))
 		}
 	}
@@ -187,7 +187,7 @@ func (v *Validator) ValidateWorkflow(template *WorkflowTemplate) *ValidationResu
 	if template.Version == "" {
 		result.AddError("version", "Version is required")
 	} else {
-		if _, err := version.NewVersion(template.Version); err != nil {
+		if _, err := semver.Parse(template.Version); err != nil {
 			result.AddError("version", fmt.Sprintf("Invalid semantic version: %v", err))
 		}
 	}
@@ -310,7 +310,7 @@ func isValidDependency(dep string) bool {
 		return false
 	}
 
-	_, err := version.NewVersion(ver)
+	_, err := semver.Parse(ver)
 	return err == nil
 }
 
