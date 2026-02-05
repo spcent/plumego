@@ -106,6 +106,7 @@ func main() {
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
 - **WebSocket Hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint, plus an optional broadcast endpoint (protected by a shared secret). Customize worker count and queue size via `WebSocketConfig`.
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures plus generic HMAC verification with replay protection and IP allowlists.
+- **Migrations**: Optional SQL schemas for modules/examples live in `docs/migrations/` (see notes for sms-gateway `sent_at` backfill).
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
 
 ## Multi-Tenancy

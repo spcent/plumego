@@ -87,6 +87,8 @@ The service stays running until you stop it. Try:
   `curl -X POST http://127.0.0.1:8089/v1/messages -H 'X-Tenant-ID: tenant-1' -H 'Idempotency-Key: demo-1' -d '{"to":"+10000000001","body":"hello"}'`
 - Failure → retry → DLQ:
   `curl -X POST http://127.0.0.1:8089/v1/messages -H 'X-Tenant-ID: tenant-2' -H 'Idempotency-Key: demo-2' -d '{"to":"+10000000002","body":"fail","max_attempts":2}'`
+- Receipt update (emit receipt delay metric):
+  `curl -X POST http://127.0.0.1:8089/v1/receipts -H 'Content-Type: application/json' -d '{"message_id":"<id-from-send>","delivered_at":"2026-02-05T12:00:00Z"}'`
 
 Run the test-only pipeline check:
 
@@ -113,3 +115,4 @@ You will need a Go SQL driver (e.g. `pgx`, `pq`, or `mysql`) in your build.
 - Replace the `Repository` implementation with your persistence layer.
 - For production, use the SQL idempotency store and apply the migrations in `docs/migrations/`.
 - The demo emits basic HTTP/DB/MQ metrics and trace IDs via `metrics.OpenTelemetryTracer`.
+- SMS gateway-specific metrics (queue depth, send latency, provider results, retries, status distribution) are reported through `metrics/smsgateway`.

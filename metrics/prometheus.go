@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,6 +57,13 @@ type PrometheusCollector struct {
 	durations map[labelKey]latencyStats
 	startTime time.Time
 
+	smsQueueDepth     map[smsKey]float64
+	smsSendLatency    map[smsKey]latencyStats
+	smsReceiptDelay   map[smsKey]latencyStats
+	smsProviderResult map[smsKey]uint64
+	smsRetry          map[smsKey]uint64
+	smsStatus         map[smsKey]uint64
+
 	// Base collector for unified interface
 	base     *BaseMetricsCollector
 	baseOnce sync.Once
@@ -79,6 +87,13 @@ func NewPrometheusCollector(namespace string) *PrometheusCollector {
 		durations: make(map[labelKey]latencyStats),
 		startTime: time.Now(),
 		maxMemory: 10000, // Default: allow up to 10k unique label combinations
+
+		smsQueueDepth:     make(map[smsKey]float64),
+		smsSendLatency:    make(map[smsKey]latencyStats),
+		smsReceiptDelay:   make(map[smsKey]latencyStats),
+		smsProviderResult: make(map[smsKey]uint64),
+		smsRetry:          make(map[smsKey]uint64),
+		smsStatus:         make(map[smsKey]uint64),
 	}
 }
 
@@ -157,6 +172,7 @@ func (p *PrometheusCollector) Observe(_ context.Context, m observability.Request
 func (p *PrometheusCollector) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests, durations, uptime := p.snapshot()
+		smsSnapshot := p.snapshotSMSGateway()
 
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 
@@ -203,6 +219,10 @@ func (p *PrometheusCollector) Handler() http.Handler {
 			totalRequests += count
 		}
 		fmt.Fprintf(w, "%s_http_requests_total_all %d\n", p.namespace, totalRequests)
+
+		if smsSnapshot != nil {
+			p.writeSMSGatewayMetrics(w, smsSnapshot)
+		}
 	})
 }
 
@@ -261,6 +281,12 @@ func (p *PrometheusCollector) Clear() {
 	p.requests = make(map[labelKey]uint64)
 	p.durations = make(map[labelKey]latencyStats)
 	p.startTime = time.Now()
+	p.smsQueueDepth = make(map[smsKey]float64)
+	p.smsSendLatency = make(map[smsKey]latencyStats)
+	p.smsReceiptDelay = make(map[smsKey]latencyStats)
+	p.smsProviderResult = make(map[smsKey]uint64)
+	p.smsRetry = make(map[smsKey]uint64)
+	p.smsStatus = make(map[smsKey]uint64)
 
 	if p.base != nil {
 		p.base.Clear()
@@ -275,6 +301,10 @@ func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
 			p.Observe(ctx, metrics)
 			return
 		}
+	}
+	if record.Type == MetricSMSGateway {
+		p.observeSMSGateway(record)
+		return
 	}
 
 	// For other metric types, use the base collector
@@ -397,6 +427,256 @@ func httpMetricsFromRecord(record MetricRecord) (observability.RequestMetrics, b
 		Status:   status,
 		Duration: record.Duration,
 	}, true
+}
+
+type smsKey struct {
+	queue    string
+	state    string
+	provider string
+	tenant   string
+	result   string
+	status   string
+	attempt  string
+}
+
+type smsSnapshot struct {
+	queueDepth     map[smsKey]float64
+	sendLatency    map[smsKey]latencyStats
+	receiptDelay   map[smsKey]latencyStats
+	providerResult map[smsKey]uint64
+	retry          map[smsKey]uint64
+	status         map[smsKey]uint64
+}
+
+func (p *PrometheusCollector) observeSMSGateway(record MetricRecord) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	key := smsKey{
+		queue:    record.Labels["queue"],
+		state:    record.Labels["state"],
+		provider: record.Labels["provider"],
+		tenant:   record.Labels["tenant"],
+		result:   record.Labels["result"],
+		status:   record.Labels["status"],
+		attempt:  record.Labels["attempt"],
+	}
+
+	switch record.Name {
+	case "queue_depth":
+		if p.maxMemory > 0 && len(p.smsQueueDepth) >= p.maxMemory {
+			p.evictOneSMSGauge(p.smsQueueDepth)
+		}
+		p.smsQueueDepth[key] = record.Value
+	case "send_latency":
+		p.observeSMSLatency(p.smsSendLatency, key, record)
+	case "receipt_delay":
+		p.observeSMSLatency(p.smsReceiptDelay, key, record)
+	case "provider_result":
+		p.observeSMSCounter(&p.smsProviderResult, key, record)
+	case "retry":
+		p.observeSMSCounter(&p.smsRetry, key, record)
+	case "status":
+		p.observeSMSCounter(&p.smsStatus, key, record)
+	default:
+	}
+}
+
+func (p *PrometheusCollector) observeSMSLatency(target map[smsKey]latencyStats, key smsKey, record MetricRecord) {
+	if p.maxMemory > 0 && len(target) >= p.maxMemory {
+		p.evictOneSMSLatency(target)
+	}
+
+	duration := record.Duration
+	if duration <= 0 {
+		if record.Value > 0 {
+			duration = time.Duration(record.Value) * time.Millisecond
+		}
+	}
+	seconds := duration.Seconds()
+
+	stats := target[key]
+	stats.count++
+	stats.sum += seconds
+	if stats.count == 1 || seconds < stats.min {
+		stats.min = seconds
+	}
+	if stats.count == 1 || seconds > stats.max {
+		stats.max = seconds
+	}
+	target[key] = stats
+}
+
+func (p *PrometheusCollector) observeSMSCounter(target *map[smsKey]uint64, key smsKey, record MetricRecord) {
+	if p.maxMemory > 0 && len(*target) >= p.maxMemory {
+		p.evictOneSMSCounter(*target)
+	}
+	inc := uint64(1)
+	if record.Value > 0 {
+		inc = uint64(record.Value)
+	}
+	(*target)[key] += inc
+}
+
+func (p *PrometheusCollector) snapshotSMSGateway() *smsSnapshot {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if len(p.smsQueueDepth) == 0 && len(p.smsSendLatency) == 0 && len(p.smsProviderResult) == 0 && len(p.smsRetry) == 0 && len(p.smsStatus) == 0 && len(p.smsReceiptDelay) == 0 {
+		return nil
+	}
+
+	copyQueue := make(map[smsKey]float64, len(p.smsQueueDepth))
+	for k, v := range p.smsQueueDepth {
+		copyQueue[k] = v
+	}
+	copySend := make(map[smsKey]latencyStats, len(p.smsSendLatency))
+	for k, v := range p.smsSendLatency {
+		copySend[k] = v
+	}
+	copyReceipt := make(map[smsKey]latencyStats, len(p.smsReceiptDelay))
+	for k, v := range p.smsReceiptDelay {
+		copyReceipt[k] = v
+	}
+	copyProvider := make(map[smsKey]uint64, len(p.smsProviderResult))
+	for k, v := range p.smsProviderResult {
+		copyProvider[k] = v
+	}
+	copyRetry := make(map[smsKey]uint64, len(p.smsRetry))
+	for k, v := range p.smsRetry {
+		copyRetry[k] = v
+	}
+	copyStatus := make(map[smsKey]uint64, len(p.smsStatus))
+	for k, v := range p.smsStatus {
+		copyStatus[k] = v
+	}
+
+	return &smsSnapshot{
+		queueDepth:     copyQueue,
+		sendLatency:    copySend,
+		receiptDelay:   copyReceipt,
+		providerResult: copyProvider,
+		retry:          copyRetry,
+		status:         copyStatus,
+	}
+}
+
+func (p *PrometheusCollector) writeSMSGatewayMetrics(w http.ResponseWriter, snap *smsSnapshot) {
+	if snap == nil {
+		return
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "# HELP %s_sms_gateway_queue_depth Current queue depth by state.\n", p.namespace)
+	fmt.Fprintf(w, "# TYPE %s_sms_gateway_queue_depth gauge\n", p.namespace)
+	for key, val := range snap.queueDepth {
+		fmt.Fprintf(w, "%s_sms_gateway_queue_depth%s %.0f\n", p.namespace, formatSMSLabels(key, []string{"queue", "state"}), val)
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "# HELP %s_sms_gateway_send_latency_seconds Send latency summary by provider.\n", p.namespace)
+	fmt.Fprintf(w, "# TYPE %s_sms_gateway_send_latency_seconds summary\n", p.namespace)
+	for key, stats := range snap.sendLatency {
+		labels := formatSMSLabels(key, []string{"tenant", "provider"})
+		fmt.Fprintf(w, "%s_sms_gateway_send_latency_seconds_sum%s %.9f\n", p.namespace, labels, stats.sum)
+		fmt.Fprintf(w, "%s_sms_gateway_send_latency_seconds_count%s %d\n", p.namespace, labels, stats.count)
+		fmt.Fprintf(w, "%s_sms_gateway_send_latency_seconds_min%s %.9f\n", p.namespace, labels, stats.min)
+		fmt.Fprintf(w, "%s_sms_gateway_send_latency_seconds_max%s %.9f\n", p.namespace, labels, stats.max)
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "# HELP %s_sms_gateway_receipt_delay_seconds Receipt delay summary by provider.\n", p.namespace)
+	fmt.Fprintf(w, "# TYPE %s_sms_gateway_receipt_delay_seconds summary\n", p.namespace)
+	for key, stats := range snap.receiptDelay {
+		labels := formatSMSLabels(key, []string{"tenant", "provider"})
+		fmt.Fprintf(w, "%s_sms_gateway_receipt_delay_seconds_sum%s %.9f\n", p.namespace, labels, stats.sum)
+		fmt.Fprintf(w, "%s_sms_gateway_receipt_delay_seconds_count%s %d\n", p.namespace, labels, stats.count)
+		fmt.Fprintf(w, "%s_sms_gateway_receipt_delay_seconds_min%s %.9f\n", p.namespace, labels, stats.min)
+		fmt.Fprintf(w, "%s_sms_gateway_receipt_delay_seconds_max%s %.9f\n", p.namespace, labels, stats.max)
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "# HELP %s_sms_gateway_provider_result_total Provider send results.\n", p.namespace)
+	fmt.Fprintf(w, "# TYPE %s_sms_gateway_provider_result_total counter\n", p.namespace)
+	for key, val := range snap.providerResult {
+		fmt.Fprintf(w, "%s_sms_gateway_provider_result_total%s %d\n", p.namespace, formatSMSLabels(key, []string{"tenant", "provider", "result"}), val)
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "# HELP %s_sms_gateway_retry_total Retry attempts by provider.\n", p.namespace)
+	fmt.Fprintf(w, "# TYPE %s_sms_gateway_retry_total counter\n", p.namespace)
+	for key, val := range snap.retry {
+		fmt.Fprintf(w, "%s_sms_gateway_retry_total%s %d\n", p.namespace, formatSMSLabels(key, []string{"tenant", "provider", "attempt"}), val)
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "# HELP %s_sms_gateway_status_total Message status transitions.\n", p.namespace)
+	fmt.Fprintf(w, "# TYPE %s_sms_gateway_status_total counter\n", p.namespace)
+	for key, val := range snap.status {
+		fmt.Fprintf(w, "%s_sms_gateway_status_total%s %d\n", p.namespace, formatSMSLabels(key, []string{"tenant", "status"}), val)
+	}
+}
+
+func (p *PrometheusCollector) evictOneSMSGauge(target map[smsKey]float64) {
+	for key := range target {
+		delete(target, key)
+		return
+	}
+}
+
+func (p *PrometheusCollector) evictOneSMSLatency(target map[smsKey]latencyStats) {
+	for key := range target {
+		delete(target, key)
+		return
+	}
+}
+
+func (p *PrometheusCollector) evictOneSMSCounter(target map[smsKey]uint64) {
+	for key := range target {
+		delete(target, key)
+		return
+	}
+}
+
+func formatSMSLabels(key smsKey, order []string) string {
+	if len(order) == 0 {
+		return ""
+	}
+	var parts []string
+	for _, label := range order {
+		value := ""
+		switch label {
+		case "queue":
+			value = key.queue
+		case "state":
+			value = key.state
+		case "provider":
+			value = key.provider
+		case "tenant":
+			value = key.tenant
+		case "result":
+			value = key.result
+		case "status":
+			value = key.status
+		case "attempt":
+			value = key.attempt
+		}
+		if value == "" {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=\"%s\"", label, escapeLabelValue(value)))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "{" + strings.Join(parts, ",") + "}"
+}
+
+func escapeLabelValue(value string) string {
+	value = strings.ReplaceAll(value, "\\", "\\\\")
+	value = strings.ReplaceAll(value, "\"", "\\\"")
+	value = strings.ReplaceAll(value, "\n", "\\n")
+	return value
 }
 
 func sortedKeys[T any](m map[labelKey]T) []labelKey {

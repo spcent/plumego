@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS sms_messages (
   attempts         INT NOT NULL DEFAULT 0,
   max_attempts     INT NOT NULL DEFAULT 5,
   next_attempt_at  TIMESTAMP NULL,
+  sent_at          TIMESTAMP NULL,
   provider_msg_id  VARCHAR(128) NULL,
   idempotency_key  VARCHAR(128) NULL,
   version          INT NOT NULL DEFAULT 0,

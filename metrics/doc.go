@@ -118,6 +118,9 @@
 //	IPC Metrics:
 //	  - MetricIPCAccept, MetricIPCDial, MetricIPCRead, MetricIPCWrite, MetricIPCClose
 //
+//	SMS Gateway Metrics:
+//	  - MetricSMSGateway
+//
 // # Prometheus Integration
 //
 // The PrometheusCollector exposes metrics in Prometheus exposition format:

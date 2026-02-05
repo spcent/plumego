@@ -99,7 +99,7 @@ func (r *SQLRepository) Get(ctx context.Context, id string) (Message, bool, erro
 	}
 
 	query := fmt.Sprintf(`SELECT id, tenant_id, provider, status, reason_code, reason_detail,
-    attempts, max_attempts, next_attempt_at, provider_msg_id, idempotency_key, version, created_at, updated_at
+    attempts, max_attempts, next_attempt_at, sent_at, provider_msg_id, idempotency_key, version, created_at, updated_at
     FROM %s WHERE id = %s`, r.cfg.Table, r.placeholder(1))
 	row := r.db.QueryRowContext(ctx, query, id)
 
@@ -109,6 +109,7 @@ func (r *SQLRepository) Get(ctx context.Context, id string) (Message, bool, erro
 	var reasonCode sql.NullString
 	var reasonDetail sql.NullString
 	var nextAttempt sql.NullTime
+	var sentAt sql.NullTime
 	var providerMsgID sql.NullString
 	var idempotencyKey sql.NullString
 	if err := row.Scan(
@@ -121,6 +122,7 @@ func (r *SQLRepository) Get(ctx context.Context, id string) (Message, bool, erro
 		&msg.Attempts,
 		&msg.MaxAttempts,
 		&nextAttempt,
+		&sentAt,
 		&providerMsgID,
 		&idempotencyKey,
 		&msg.Version,
@@ -146,6 +148,9 @@ func (r *SQLRepository) Get(ctx context.Context, id string) (Message, bool, erro
 	if nextAttempt.Valid {
 		msg.NextAttemptAt = nextAttempt.Time
 	}
+	if sentAt.Valid {
+		msg.SentAt = sentAt.Time
+	}
 	if providerMsgID.Valid {
 		msg.ProviderMsgID = providerMsgID.String
 	}
@@ -166,17 +171,34 @@ func (r *SQLRepository) UpdateStatus(ctx context.Context, id string, from Status
 	}
 
 	now := r.now()
-	query := fmt.Sprintf(`UPDATE %s SET status = %s, reason_code = %s, reason_detail = %s,
+	var res sql.Result
+	var err error
+	if to == StatusSent {
+		query := fmt.Sprintf(`UPDATE %s SET status = %s, reason_code = %s, reason_detail = %s,
+    sent_at = %s, updated_at = %s, version = version + 1 WHERE id = %s AND status = %s`,
+			r.cfg.Table,
+			r.placeholder(1),
+			r.placeholder(2),
+			r.placeholder(3),
+			r.placeholder(4),
+			r.placeholder(5),
+			r.placeholder(6),
+			r.placeholder(7),
+		)
+		res, err = r.db.ExecContext(ctx, query, string(to), nullString(string(reason.Code)), nullString(reason.Detail), now, now, id, string(from))
+	} else {
+		query := fmt.Sprintf(`UPDATE %s SET status = %s, reason_code = %s, reason_detail = %s,
     updated_at = %s, version = version + 1 WHERE id = %s AND status = %s`,
-		r.cfg.Table,
-		r.placeholder(1),
-		r.placeholder(2),
-		r.placeholder(3),
-		r.placeholder(4),
-		r.placeholder(5),
-		r.placeholder(6),
-	)
-	res, err := r.db.ExecContext(ctx, query, string(to), nullString(string(reason.Code)), nullString(reason.Detail), now, id, string(from))
+			r.cfg.Table,
+			r.placeholder(1),
+			r.placeholder(2),
+			r.placeholder(3),
+			r.placeholder(4),
+			r.placeholder(5),
+			r.placeholder(6),
+		)
+		res, err = r.db.ExecContext(ctx, query, string(to), nullString(string(reason.Code)), nullString(reason.Detail), now, id, string(from))
+	}
 	if err != nil {
 		return err
 	}
@@ -307,6 +329,7 @@ func (r *SQLRepository) buildInsert(msg Message) (string, []any) {
 		"attempts",
 		"max_attempts",
 		"next_attempt_at",
+		"sent_at",
 		"provider_msg_id",
 		"idempotency_key",
 		"version",
@@ -329,6 +352,7 @@ func (r *SQLRepository) buildInsert(msg Message) (string, []any) {
 		msg.Attempts,
 		msg.MaxAttempts,
 		nullTime(msg.NextAttemptAt),
+		nullTime(msg.SentAt),
 		nullString(msg.ProviderMsgID),
 		nullString(msg.IdempotencyKey),
 		msg.Version,
@@ -368,4 +392,3 @@ func isDuplicateError(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique") || strings.Contains(msg, "constraint")
 }
-

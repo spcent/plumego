@@ -233,6 +233,88 @@ func TestPrometheusCollectorMetricsFormat(t *testing.T) {
 	}
 }
 
+func TestPrometheusCollectorSMSGatewayMetrics(t *testing.T) {
+	collector := NewPrometheusCollector("plumego_test")
+
+	ctx := context.Background()
+	collector.Record(ctx, MetricRecord{
+		Type:  MetricSMSGateway,
+		Name:  "queue_depth",
+		Value: 3,
+		Labels: MetricLabels{
+			"queue": "send",
+			"state": "queued",
+		},
+	})
+	collector.Record(ctx, MetricRecord{
+		Type:     MetricSMSGateway,
+		Name:     "send_latency",
+		Value:    150,
+		Duration: 150 * time.Millisecond,
+		Labels: MetricLabels{
+			"tenant":   "tenant-1",
+			"provider": "provider-a",
+		},
+	})
+	collector.Record(ctx, MetricRecord{
+		Type:  MetricSMSGateway,
+		Name:  "provider_result",
+		Value: 1,
+		Labels: MetricLabels{
+			"tenant":   "tenant-1",
+			"provider": "provider-a",
+			"result":   "success",
+		},
+	})
+	collector.Record(ctx, MetricRecord{
+		Type:  MetricSMSGateway,
+		Name:  "retry",
+		Value: 1,
+		Labels: MetricLabels{
+			"tenant":   "tenant-1",
+			"provider": "provider-a",
+			"attempt":  "2",
+		},
+	})
+	collector.Record(ctx, MetricRecord{
+		Type:  MetricSMSGateway,
+		Name:  "status",
+		Value: 1,
+		Labels: MetricLabels{
+			"tenant": "tenant-1",
+			"status": "sent",
+		},
+	})
+	collector.Record(ctx, MetricRecord{
+		Type:     MetricSMSGateway,
+		Name:     "receipt_delay",
+		Value:    2000,
+		Duration: 2 * time.Second,
+		Labels: MetricLabels{
+			"tenant":   "tenant-1",
+			"provider": "provider-a",
+		},
+	})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	collector.Handler().ServeHTTP(rr, req)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "plumego_test_sms_gateway_queue_depth") {
+		t.Fatalf("expected sms gateway queue depth metric")
+	}
+	if !strings.Contains(body, "plumego_test_sms_gateway_send_latency_seconds_sum") {
+		t.Fatalf("expected send latency metric")
+	}
+	if !strings.Contains(body, "plumego_test_sms_gateway_provider_result_total") {
+		t.Fatalf("expected provider result metric")
+	}
+	if !strings.Contains(body, "plumego_test_sms_gateway_receipt_delay_seconds_sum") {
+		t.Fatalf("expected receipt delay metric")
+	}
+}
+
 func TestPrometheusCollectorEmptyNamespace(t *testing.T) {
 	collector := NewPrometheusCollector("")
 

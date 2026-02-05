@@ -23,6 +23,7 @@ import (
 	"github.com/spcent/plumego/examples/sms-gateway/internal/tasks"
 	logpkg "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/metrics/smsgateway"
 	"github.com/spcent/plumego/middleware/observability"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/net/mq"
@@ -34,7 +35,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	tracer := metrics.NewOpenTelemetryTracer("sms-gateway")
 	collector := tracer
@@ -58,17 +60,20 @@ func main() {
 
 	queue := mq.NewTaskQueue(mqstore.NewMemory(mqstore.MemConfig{}), mq.WithQueueMetricsCollector(collector))
 	worker := mq.NewWorker(queue, mq.WorkerConfig{
-		ConsumerID:      "sms-worker",
-		Concurrency:     2,
-		PollInterval:    100 * time.Millisecond,
-		RetryPolicy:     mq.ExponentialBackoff{Base: 200 * time.Millisecond, Max: 2 * time.Second, Factor: 2},
-		ShutdownTimeout: 3 * time.Second,
+		ConsumerID:       "sms-worker",
+		Concurrency:      2,
+		PollInterval:     100 * time.Millisecond,
+		RetryPolicy:      mq.ExponentialBackoff{Base: 200 * time.Millisecond, Max: 2 * time.Second, Factor: 2},
+		ShutdownTimeout:  3 * time.Second,
 		MetricsCollector: collector,
 	})
 
+	smsMetrics := smsgateway.NewReporter(collector)
+
 	processor := &pipeline.Processor{
-		Repo:   repo,
-		Router: router,
+		Repo:    repo,
+		Router:  router,
+		Metrics: smsMetrics,
 		Providers: map[string]pipeline.ProviderSender{
 			"provider-a":    &pipeline.MockProvider{Name: "provider-a", FailFirstN: 1},
 			"provider-b":    &pipeline.MockProvider{Name: "provider-b"},
@@ -90,6 +95,8 @@ func main() {
 		_ = worker.Stop(context.Background())
 	}()
 
+	go reportQueueMetrics(ctx, queue, smsMetrics, 2*time.Second)
+
 	idemStore, cleanup := newIdempotencyStore()
 	defer cleanup()
 
@@ -110,6 +117,10 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/v1/messages", handler)
+	mux.Handle("/v1/receipts", contract.AdaptCtxHandler(
+		message.ExampleReceiptHandler(repo, smsMetrics),
+		logger,
+	))
 	server := &http.Server{
 		Handler: mux,
 	}
@@ -281,4 +292,30 @@ func waitForSignal(ctx context.Context, server *http.Server) {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = server.Shutdown(shutdownCtx)
+}
+
+func reportQueueMetrics(ctx context.Context, queue *mq.TaskQueue, reporter *smsgateway.Reporter, interval time.Duration) {
+	if reporter == nil || queue == nil {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			stats, err := queue.Stats(ctx)
+			if err != nil {
+				continue
+			}
+			reporter.RecordQueueDepth(ctx, "send", smsgateway.QueueStats{
+				Queued:  stats.Queued,
+				Leased:  stats.Leased,
+				Dead:    stats.Dead,
+				Expired: stats.Expired,
+			})
+		}
+	}
 }

@@ -31,6 +31,7 @@ type Message struct {
 	Attempts       int
 	MaxAttempts    int
 	NextAttemptAt  time.Time
+	SentAt         time.Time
 	ProviderMsgID  string
 	IdempotencyKey string
 	Version        int

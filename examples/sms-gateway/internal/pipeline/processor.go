@@ -3,10 +3,12 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spcent/plumego/examples/sms-gateway/internal/message"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/routing"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/tasks"
+	"github.com/spcent/plumego/metrics/smsgateway"
 	"github.com/spcent/plumego/net/mq"
 )
 
@@ -16,6 +18,7 @@ type Processor struct {
 	Router    *routing.PolicyRouter
 	Providers map[string]ProviderSender
 	Hooks     []message.TransitionHook
+	Metrics   *smsgateway.Reporter
 	OnFailure func(ctx context.Context, msg message.Message, task mq.Task, err error)
 	OnDLQ     func(ctx context.Context, msg message.Message, task mq.Task, err error)
 }
@@ -73,14 +76,28 @@ func (p *Processor) Handle(ctx context.Context, task mq.Task) error {
 	if err := message.ApplyAndPersist(ctx, p.Repo, &msg, message.StatusSending, message.Reason{}, p.Hooks...); err != nil {
 		return err
 	}
+	if p.Metrics != nil {
+		p.Metrics.RecordStatus(ctx, msg.TenantID, string(message.StatusSending))
+	}
 
+	start := time.Now()
 	if err := sender.Send(ctx, payload); err != nil {
+		if p.Metrics != nil {
+			p.Metrics.RecordSendLatency(ctx, msg.TenantID, payload.Provider, time.Since(start), err)
+			p.Metrics.RecordProviderResult(ctx, msg.TenantID, payload.Provider, false)
+			if task.Attempts > 1 {
+				p.Metrics.RecordRetry(ctx, msg.TenantID, payload.Provider, task.Attempts)
+			}
+		}
 		reason := message.Reason{
 			Code:      message.ReasonProviderTransient,
 			Detail:    err.Error(),
 			Retryable: true,
 		}
 		_ = message.ApplyAndPersist(ctx, p.Repo, &msg, message.StatusFailed, reason, p.Hooks...)
+		if p.Metrics != nil {
+			p.Metrics.RecordStatus(ctx, msg.TenantID, string(message.StatusFailed))
+		}
 		if p.OnFailure != nil {
 			p.OnFailure(ctx, msg, task, err)
 		}
@@ -99,15 +116,37 @@ func (p *Processor) Handle(ctx context.Context, task mq.Task) error {
 		return err
 	}
 
-	return message.ApplyAndPersist(ctx, p.Repo, &msg, message.StatusSent, message.Reason{}, p.Hooks...)
+	if p.Metrics != nil {
+		p.Metrics.RecordSendLatency(ctx, msg.TenantID, payload.Provider, time.Since(start), nil)
+		p.Metrics.RecordProviderResult(ctx, msg.TenantID, payload.Provider, true)
+	}
+	if err := message.ApplyAndPersist(ctx, p.Repo, &msg, message.StatusSent, message.Reason{}, p.Hooks...); err != nil {
+		return err
+	}
+	if p.Metrics != nil {
+		p.Metrics.RecordStatus(ctx, msg.TenantID, string(message.StatusSent))
+	}
+	return nil
 }
 
 func (p *Processor) ensureQueued(ctx context.Context, msg *message.Message) error {
 	switch msg.Status {
 	case message.StatusAccepted:
-		return message.ApplyAndPersist(ctx, p.Repo, msg, message.StatusQueued, message.Reason{}, p.Hooks...)
+		if err := message.ApplyAndPersist(ctx, p.Repo, msg, message.StatusQueued, message.Reason{}, p.Hooks...); err != nil {
+			return err
+		}
+		if p.Metrics != nil {
+			p.Metrics.RecordStatus(ctx, msg.TenantID, string(message.StatusQueued))
+		}
+		return nil
 	case message.StatusFailed:
-		return message.ApplyAndPersist(ctx, p.Repo, msg, message.StatusQueued, message.Reason{}, p.Hooks...)
+		if err := message.ApplyAndPersist(ctx, p.Repo, msg, message.StatusQueued, message.Reason{}, p.Hooks...); err != nil {
+			return err
+		}
+		if p.Metrics != nil {
+			p.Metrics.RecordStatus(ctx, msg.TenantID, string(message.StatusQueued))
+		}
+		return nil
 	case message.StatusQueued, message.StatusSending, message.StatusSent, message.StatusDelivered:
 		return nil
 	default:

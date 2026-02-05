@@ -61,6 +61,9 @@ func (r *MemoryRepository) UpdateStatus(ctx context.Context, id string, from Sta
 	msg.Status = to
 	msg.ReasonCode = reason.Code
 	msg.ReasonDetail = reason.Detail
+	if to == StatusSent && msg.SentAt.IsZero() {
+		msg.SentAt = time.Now().UTC()
+	}
 	msg.UpdatedAt = time.Now().UTC()
 	msg.Version++
 	r.messages[id] = msg
