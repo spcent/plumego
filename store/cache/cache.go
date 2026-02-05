@@ -613,8 +613,10 @@ func CachedWithConfig(c Cache, config Config, keyFn func(*http.Request) string) 
 			w.WriteHeader(recorder.Code)
 			_, _ = w.Write(recorder.Body.Bytes())
 
-			// Only cache successful responses
-			if recorder.Code >= 200 && recorder.Code < 300 {
+			// Only cache successful JSON responses to reduce XSS surface
+			contentType := recorder.Header().Get("Content-Type")
+			isJSON := strings.HasPrefix(contentType, "application/json") || strings.HasSuffix(contentType, "+json")
+			if recorder.Code >= 200 && recorder.Code < 300 && isJSON {
 				resp := cachedResponse{
 					Status: recorder.Code,
 					Header: cloneHeader(recorder.Header()),
