@@ -68,6 +68,27 @@ func (p *imageProcessor) Thumbnail(src io.Reader, maxWidth, maxHeight int) (io.R
 	width := bounds.Dx()
 	height := bounds.Dy()
 
+	// Don't upscale small images
+	if width <= maxWidth && height <= maxHeight {
+		// Return original image without resizing
+		buf := new(bytes.Buffer)
+		var err error
+		switch format {
+		case "jpeg":
+			err = jpeg.Encode(buf, img, &jpeg.Options{Quality: 85})
+		case "png":
+			err = png.Encode(buf, img)
+		case "gif":
+			err = gif.Encode(buf, img, nil)
+		default:
+			err = fmt.Errorf("unsupported format: %s", format)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return buf, nil
+	}
+
 	// Calculate new dimensions maintaining aspect ratio
 	var newWidth, newHeight int
 	if width > height {

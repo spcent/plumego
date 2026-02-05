@@ -328,11 +328,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Upload(w, r)
 	case method == http.MethodGet && strings.HasPrefix(path, "/files/"):
 		parts := strings.Split(strings.TrimPrefix(path, "/files/"), "/")
-		if len(parts) == 1:
+		if len(parts) == 1 {
 			h.Download(w, r)
-		} else if len(parts) == 2 && parts[1] == "info":
+		} else if len(parts) == 2 && parts[1] == "info" {
 			h.GetInfo(w, r)
-		} else if len(parts) == 2 && parts[1] == "url":
+		} else if len(parts) == 2 && parts[1] == "url" {
 			h.GetURL(w, r)
 		} else {
 			h.writeError(w, http.StatusNotFound, "not found")
