@@ -81,6 +81,24 @@ Apply the migrations in `docs/migrations/sms_gateway_messages_*.sql` first.
 You can override the table name with `SMS_GATEWAY_MESSAGE_TABLE`.
 You will also need a Go SQL driver (e.g. `pgx`, `pq`, or `mysql`) in your build.
 
+### Optional SQL task deduper
+
+To enable SQL-backed task deduplication (prevents reprocessing after restarts),
+set:
+
+```bash
+SMS_GATEWAY_MQ_DEDUPE_DRIVER=postgres \
+SMS_GATEWAY_MQ_DEDUPE_DSN="postgres://user:pass@localhost:5432/sms?sslmode=disable" \
+go run ./examples/sms-gateway
+```
+
+This uses the `idempotency_keys` table by default. Apply the migrations in
+`docs/migrations/idempotency_*.sql` first. You can override:
+
+- `SMS_GATEWAY_MQ_DEDUPE_TABLE`
+- `SMS_GATEWAY_MQ_DEDUPE_PREFIX`
+- `SMS_GATEWAY_MQ_DEDUPE_TTL` (e.g. `24h`)
+
 The service stays running until you stop it. Try:
 
 - Success:
@@ -105,6 +123,15 @@ SMS_GATEWAY_SQL_IT=1 \
 SMS_GATEWAY_MESSAGE_DRIVER=postgres \
 SMS_GATEWAY_MESSAGE_DSN="postgres://user:pass@localhost:5432/sms?sslmode=disable" \
 go test ./examples/sms-gateway -run TestSMSGatewaySQLPersistence
+```
+
+Run the SQL-backed deduper test:
+
+```bash
+SMS_GATEWAY_SQL_IT=1 \
+SMS_GATEWAY_MQ_DEDUPE_DRIVER=postgres \
+SMS_GATEWAY_MQ_DEDUPE_DSN="postgres://user:pass@localhost:5432/sms?sslmode=disable" \
+go test ./examples/sms-gateway -run TestSMSGatewaySQLDeduper
 ```
 
 You will need a Go SQL driver (e.g. `pgx`, `pq`, or `mysql`) in your build.

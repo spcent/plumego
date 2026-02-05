@@ -97,6 +97,23 @@ worker := mq.NewWorker(queue, mq.WorkerConfig{
 })
 ```
 
+Or use the SQL-backed deduper (requires `idempotency_keys` migration):
+
+```go
+db, _ := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+deduper := mq.NewSQLDeduper(db, mq.SQLDeduperConfig{
+    Dialect:    idempotency.DialectPostgres,
+    Prefix:     "mq-dedupe",
+    DefaultTTL: 24 * time.Hour,
+})
+
+worker := mq.NewWorker(queue, mq.WorkerConfig{
+    ConsumerID: "worker-1",
+    Deduper:    deduper,
+    DedupeTTL:  24 * time.Hour,
+})
+```
+
 ### Queue Metrics
 
 ```go

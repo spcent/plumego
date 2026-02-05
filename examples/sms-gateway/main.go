@@ -86,6 +86,10 @@ func main() {
 	if replayer, ok := any(queueStore).(mqstore.DLQReplayer); ok {
 		queueReplayer = replayer
 	}
+
+	deduper, dedupeTTL, dedupeCleanup := newTaskDeduper(ctx)
+	defer dedupeCleanup()
+
 	worker := mq.NewWorker(queue, mq.WorkerConfig{
 		ConsumerID:       "sms-worker",
 		Concurrency:      2,
@@ -93,6 +97,8 @@ func main() {
 		RetryPolicy:      mq.ExponentialBackoff{Base: 200 * time.Millisecond, Max: 2 * time.Second, Factor: 2},
 		ShutdownTimeout:  3 * time.Second,
 		MetricsCollector: collector,
+		Deduper:          deduper,
+		DedupeTTL:        dedupeTTL,
 	})
 
 	smsMetrics := smsgateway.NewReporter(collector)
@@ -421,6 +427,19 @@ func getenvBool(key string, fallback bool) bool {
 	}
 }
 
+func getenvDuration(key string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		log.Printf("invalid duration %s=%q, using default %s", key, value, fallback)
+		return fallback
+	}
+	return parsed
+}
+
 func waitUntil(ctx context.Context, timeout time.Duration, fn func() bool) {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -465,6 +484,48 @@ func reportQueueMetrics(ctx context.Context, queue *mq.TaskQueue, reporter *smsg
 				Expired: stats.Expired,
 			})
 		}
+	}
+}
+
+func newTaskDeduper(ctx context.Context) (mq.TaskDeduper, time.Duration, func()) {
+	dsn := strings.TrimSpace(os.Getenv("SMS_GATEWAY_MQ_DEDUPE_DSN"))
+	if dsn == "" {
+		return nil, 0, func() {}
+	}
+
+	driver := strings.TrimSpace(getenv("SMS_GATEWAY_MQ_DEDUPE_DRIVER", "postgres"))
+	db, err := sql.Open(driver, dsn)
+	if err != nil {
+		log.Fatalf("open dedupe db: %v", err)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		log.Fatalf("ping dedupe db: %v", err)
+	}
+
+	ttl := getenvDuration("SMS_GATEWAY_MQ_DEDUPE_TTL", 24*time.Hour)
+	cfg := mq.SQLDeduperConfig{
+		Dialect:    dedupeDialectFromDriver(driver),
+		Table:      strings.TrimSpace(os.Getenv("SMS_GATEWAY_MQ_DEDUPE_TABLE")),
+		Prefix:     strings.TrimSpace(getenv("SMS_GATEWAY_MQ_DEDUPE_PREFIX", "mq-dedupe")),
+		DefaultTTL: ttl,
+	}
+
+	log.Printf("sms-gateway mq deduper: sql driver=%s table=%s", driver, cfg.Table)
+
+	return mq.NewSQLDeduper(db, cfg), ttl, func() {
+		_ = db.Close()
+	}
+}
+
+func dedupeDialectFromDriver(driver string) idempotency.Dialect {
+	switch strings.ToLower(strings.TrimSpace(driver)) {
+	case "postgres", "pgx", "pgxpool", "pq":
+		return idempotency.DialectPostgres
+	case "mysql", "mariadb":
+		return idempotency.DialectMySQL
+	default:
+		return idempotency.DialectPostgres
 	}
 }
 
