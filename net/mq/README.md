@@ -29,7 +29,8 @@ A high-performance, feature-rich in-process message broker for Go applications.
 - **Schema**: See `docs/MQ_TASK_QUEUE_SCHEMA.md` for recommended SQL tables
 - **Attempt audit**: Optional attempt logging via `SQLConfig.EnableAttemptLog`
 - **Metrics**: Queue operations emit `ObserveMQ` with `queue_*` operations
-- **Graceful shutdown**: In-flight tasks are released if shutdown times out
+- **Graceful shutdown**: Stop drains in-flight tasks; timed-out shutdown releases leases
+- **Duplicate protection**: Optional `TaskDeduper` hook to skip tasks already processed
 
 ### Durable Task Queue (Quick Start)
 
@@ -57,6 +58,43 @@ _ = queue.Enqueue(context.Background(), mq.Task{
     TenantID: "tenant-a",
     Payload:  []byte(`{\"to\":\"13800000000\"}`),
 }, mq.EnqueueOptions{})
+```
+
+### Duplicate Protection (Optional)
+
+Provide a `TaskDeduper` to skip tasks already completed (helpful after retries or restarts):
+
+```go
+type memoryDeduper struct{ seen sync.Map }
+func (d *memoryDeduper) IsCompleted(ctx context.Context, key string) (bool, error) {
+    _, ok := d.seen.Load(key)
+    return ok, nil
+}
+func (d *memoryDeduper) MarkCompleted(ctx context.Context, key string, ttl time.Duration) error {
+    d.seen.Store(key, struct{}{})
+    return nil
+}
+
+worker := mq.NewWorker(queue, mq.WorkerConfig{
+    ConsumerID: "worker-1",
+    Deduper:    &memoryDeduper{},
+})
+```
+
+Use the built-in KV adapter for persistence with TTL:
+
+```go
+kv, _ := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/mq-dedupe"})
+deduper := mq.NewKVDeduper(kv, mq.KVDeduperConfig{
+    Prefix:     "mq-dedupe",
+    DefaultTTL: 24 * time.Hour,
+})
+
+worker := mq.NewWorker(queue, mq.WorkerConfig{
+    ConsumerID: "worker-1",
+    Deduper:    deduper,
+    DedupeTTL:  24 * time.Hour,
+})
 ```
 
 ### Queue Metrics

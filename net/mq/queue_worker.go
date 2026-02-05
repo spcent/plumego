@@ -24,6 +24,10 @@ type WorkerConfig struct {
 	LeaseExtendInterval time.Duration
 	ShutdownTimeout     time.Duration
 	MetricsCollector    metrics.MetricsCollector
+	Deduper             TaskDeduper
+	DedupeKeyFunc       func(Task) string
+	DedupeTTL           time.Duration
+	DedupeErrorHook     func(ctx context.Context, task Task, err error)
 }
 
 type Worker struct {
@@ -32,15 +36,19 @@ type Worker struct {
 	mu       sync.RWMutex
 	handlers map[string]TaskHandler
 
-	tasksCh  chan Task
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-	started  atomic.Bool
-	inflight atomic.Int64
+	tasksCh    chan Task
+	runCtx     context.Context
+	runCancel  context.CancelFunc
+	pollCtx    context.Context
+	pollCancel context.CancelFunc
+	wg         sync.WaitGroup
+	started    atomic.Bool
+	inflight   atomic.Int64
 
 	inflightMu    sync.Mutex
 	inflightTasks map[string]Task
+	pollDone      chan struct{}
+	closeOnce     sync.Once
 }
 
 func NewWorker(q *TaskQueue, cfg WorkerConfig) *Worker {
@@ -72,10 +80,14 @@ func (w *Worker) Start(ctx context.Context) {
 	}
 
 	w.config = normalizeWorkerConfig(w.config)
-	w.ctx, w.cancel = context.WithCancel(ctx)
+	w.runCtx, w.runCancel = context.WithCancel(ctx)
+	w.pollCtx, w.pollCancel = context.WithCancel(ctx)
 	w.tasksCh = make(chan Task, w.config.MaxInflight)
 	if w.inflightTasks == nil {
 		w.inflightTasks = make(map[string]Task)
+	}
+	if w.pollDone == nil {
+		w.pollDone = make(chan struct{})
 	}
 
 	w.wg.Add(1)
@@ -94,9 +106,6 @@ func (w *Worker) Stop(ctx context.Context) error {
 	if !w.started.Load() {
 		return nil
 	}
-	if w.cancel != nil {
-		w.cancel()
-	}
 
 	if ctx == nil {
 		ctx = context.Background()
@@ -106,8 +115,20 @@ func (w *Worker) Stop(ctx context.Context) error {
 		ctx, cancel = context.WithTimeout(ctx, w.config.ShutdownTimeout)
 		defer cancel()
 	}
+
+	if w.pollCancel != nil {
+		w.pollCancel()
+	}
+
+	if err := waitForPoll(ctx, w.pollDone); err != nil {
+		w.forceStop()
+		return err
+	}
+
+	w.closeTasks()
+
 	if err := waitWithContext(ctx, &w.wg); err != nil {
-		w.releaseInflight(context.Background())
+		w.forceStop()
 		return err
 	}
 	return nil
@@ -115,17 +136,22 @@ func (w *Worker) Stop(ctx context.Context) error {
 
 func (w *Worker) pollLoop() {
 	defer w.wg.Done()
+	defer func() {
+		if w.pollDone != nil {
+			close(w.pollDone)
+		}
+	}()
 
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-w.pollCtx.Done():
 			return
 		default:
 		}
 
 		topics := w.registeredTopics()
 		if len(topics) == 0 {
-			if !sleepWithContext(w.ctx, w.config.PollInterval) {
+			if !sleepWithContext(w.pollCtx, w.config.PollInterval) {
 				return
 			}
 			continue
@@ -133,7 +159,7 @@ func (w *Worker) pollLoop() {
 
 		available := w.config.MaxInflight - int(w.inflight.Load())
 		if available <= 0 {
-			if !sleepWithContext(w.ctx, w.config.PollInterval) {
+			if !sleepWithContext(w.pollCtx, w.config.PollInterval) {
 				return
 			}
 			continue
@@ -144,20 +170,20 @@ func (w *Worker) pollLoop() {
 			limit = available
 		}
 
-		tasks, err := w.queue.Reserve(w.ctx, ReserveOptions{
+		tasks, err := w.queue.Reserve(w.pollCtx, ReserveOptions{
 			Topics:     topics,
 			Limit:      limit,
 			Lease:      w.config.LeaseDuration,
 			ConsumerID: w.config.ConsumerID,
 		})
 		if err != nil {
-			if !sleepWithContext(w.ctx, w.config.PollInterval) {
+			if !sleepWithContext(w.pollCtx, w.config.PollInterval) {
 				return
 			}
 			continue
 		}
 		if len(tasks) == 0 {
-			if !sleepWithContext(w.ctx, w.config.PollInterval) {
+			if !sleepWithContext(w.pollCtx, w.config.PollInterval) {
 				return
 			}
 			continue
@@ -165,7 +191,7 @@ func (w *Worker) pollLoop() {
 
 		for _, task := range tasks {
 			select {
-			case <-w.ctx.Done():
+			case <-w.runCtx.Done():
 				return
 			case w.tasksCh <- task:
 				w.trackInflight(task)
@@ -180,9 +206,12 @@ func (w *Worker) workerLoop() {
 
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-w.runCtx.Done():
 			return
-		case task := <-w.tasksCh:
+		case task, ok := <-w.tasksCh:
+			if !ok {
+				return
+			}
 			w.handleTask(task)
 		}
 	}
@@ -198,6 +227,22 @@ func (w *Worker) handleTask(task Task) {
 		return
 	}
 
+	if w.config.Deduper != nil {
+		key := w.dedupeKey(task)
+		if key != "" {
+			completed, err := w.config.Deduper.IsCompleted(context.Background(), key)
+			if err != nil {
+				if w.config.DedupeErrorHook != nil {
+					w.config.DedupeErrorHook(context.Background(), task, err)
+				}
+			} else if completed {
+				_ = w.queue.Ack(context.Background(), task.ID, w.config.ConsumerID, time.Now())
+				w.observeLatency(task)
+				return
+			}
+		}
+	}
+
 	handler := w.handlerFor(task.Topic)
 	if handler == nil {
 		err := fmt.Errorf("no handler registered for topic %s", task.Topic)
@@ -205,7 +250,7 @@ func (w *Worker) handleTask(task Task) {
 		return
 	}
 
-	taskCtx, cancel := context.WithCancel(w.ctx)
+	taskCtx, cancel := context.WithCancel(w.runCtx)
 	var leaseLost atomic.Bool
 	stopLease := make(chan struct{})
 
@@ -224,6 +269,7 @@ func (w *Worker) handleTask(task Task) {
 	}
 
 	if err == nil {
+		w.markDeduped(task)
 		_ = w.queue.Ack(context.Background(), task.ID, w.config.ConsumerID, time.Now())
 		w.observeLatency(task)
 		return
@@ -371,6 +417,57 @@ func (w *Worker) releaseInflight(ctx context.Context) {
 	}
 }
 
+func (w *Worker) closeTasks() {
+	if w.tasksCh == nil {
+		return
+	}
+	w.closeOnce.Do(func() {
+		close(w.tasksCh)
+	})
+}
+
+func (w *Worker) forceStop() {
+	if w.pollCancel != nil {
+		w.pollCancel()
+	}
+	if w.runCancel != nil {
+		w.runCancel()
+	}
+	w.releaseInflight(context.Background())
+}
+
+func (w *Worker) markDeduped(task Task) {
+	if w.config.Deduper == nil {
+		return
+	}
+	key := w.dedupeKey(task)
+	if key == "" {
+		return
+	}
+	if err := w.config.Deduper.MarkCompleted(context.Background(), key, w.config.DedupeTTL); err != nil {
+		if w.config.DedupeErrorHook != nil {
+			w.config.DedupeErrorHook(context.Background(), task, err)
+		}
+	}
+}
+
+func (w *Worker) dedupeKey(task Task) string {
+	if w.config.DedupeKeyFunc != nil {
+		return w.config.DedupeKeyFunc(task)
+	}
+	key := task.DedupeKey
+	if key == "" {
+		key = task.ID
+	}
+	if key == "" {
+		return ""
+	}
+	if task.TenantID != "" {
+		return task.TenantID + ":" + key
+	}
+	return key
+}
+
 func defaultConsumerID() string {
 	host, _ := os.Hostname()
 	return fmt.Sprintf("worker-%s-%d", host, os.Getpid())
@@ -383,6 +480,18 @@ func waitWithContext(ctx context.Context, wg *sync.WaitGroup) error {
 		close(done)
 	}()
 
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
+	}
+}
+
+func waitForPoll(ctx context.Context, done <-chan struct{}) error {
+	if done == nil {
+		return nil
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
