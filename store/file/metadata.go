@@ -212,9 +212,22 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 	}
 	offset := (query.Page - 1) * query.PageSize
 
+	// Sanitize orderBy to prevent SQL injection by allowing only known columns/directions.
 	orderBy := "created_at DESC"
-	if query.OrderBy != "" {
-		orderBy = query.OrderBy
+	switch query.OrderBy {
+	case "created_at":
+		orderBy = "created_at ASC"
+	case "created_at_desc":
+		orderBy = "created_at DESC"
+	case "name":
+		orderBy = "name ASC"
+	case "name_desc":
+		orderBy = "name DESC"
+	case "size":
+		orderBy = "size ASC"
+	case "size_desc":
+		orderBy = "size DESC"
+	// Add more allowed sort options here as needed, keeping the mapping explicit.
 	}
 
 	listQuery := fmt.Sprintf(`
