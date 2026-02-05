@@ -13,6 +13,7 @@ Plumego’s middleware wraps standard `http.Handler` values. Chain them globally
 - **Concurrency limit**: `middleware.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)` bounds parallel work and queueing.
 - **Rate limit**: `middleware.RateLimit(ratePerSecond, burst, cleanupInterval, maxIdle)` applies an IP-based token bucket.
 - **Auth helpers**: `middleware.SimpleAuth("token")` checks a bearer token header; `middleware.APIKey("X-API-Key", "secret")` validates custom headers.
+- **Bind/Validate**: `bind.BindJSON[T](...)` standardizes request binding, validation, and field-level error responses.
 
 Core wires protective defaults (body/concurrency limits) during setup. Call `app.Use(...)` for additional per-app chains; group-level middleware stacks are appended automatically.
 
@@ -41,6 +42,41 @@ app.GetCtx("/echo/:msg", middleware.WrapCtx(middleware.Timeout(2*time.Second), f
     _ = ctx.Response(http.StatusOK, map[string]any{"echo": ctx.Param("msg")}, nil)
 }))
 ```
+
+### Binding + validation
+```go
+type CreateUserRequest struct {
+    Email    string `json:"email" validate:"required,email"`
+    Password string `json:"password" validate:"required" mask:"true"`
+}
+
+app.Post("/v1/users",
+    bind.BindJSON[CreateUserRequest](bind.JSONOptions{}),
+    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        payload, _ := bind.FromRequest[CreateUserRequest](r)
+        // use payload...
+        w.WriteHeader(http.StatusOK)
+    }),
+)
+```
+
+### Binding with `GetCtx`
+```go
+app.PostCtx("/v1/users", func(ctx *contract.Ctx) {
+    var payload CreateUserRequest
+    if err := ctx.BindAndValidateJSONWithOptions(&payload, contract.BindOptions{
+        DisallowUnknownFields: true,
+        Logger:                ctx.Logger,
+        Redact:                bind.DefaultRedactor().Redact,
+    }); err != nil {
+        contract.WriteBindError(ctx.W, ctx.R, err)
+        return
+    }
+    _ = ctx.Response(http.StatusOK, map[string]any{"ok": true}, nil)
+})
+```
+
+See `examples/bind-example/main.go` for a runnable end-to-end demo.
 
 ## Operational notes
 - Chain order matters: loggers should typically wrap recoveries so panics include request metadata.

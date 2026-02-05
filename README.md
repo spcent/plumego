@@ -105,7 +105,7 @@ func main() {
 - **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
 - **WebSocket Hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint, plus an optional broadcast endpoint (protected by a shared secret). Customize worker count and queue size via `WebSocketConfig`.
-- **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures with deduplication and size limits.
+- **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures plus generic HMAC verification with replay protection and IP allowlists.
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
 
 ## Multi-Tenancy

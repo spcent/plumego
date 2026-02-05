@@ -105,7 +105,7 @@ func main() {
 - **多租户（实验）**：提供租户隔离、配额管理、策略控制和数据库过滤能力，API 仍处于实验阶段，可能变更。详见[多租户](#多租户)章节。
 - **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
 - **WebSocket 中心**：`ConfigureWebSocket()` 挂载受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `WebSocketConfig` 自定义工作线程数和队列大小。
-- **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，带去重和大小限制。
+- **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，并提供通用 HMAC 验证、重放保护与 IP 白名单。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。
 
 ## 多租户

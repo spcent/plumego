@@ -186,6 +186,65 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+### 通用 HMAC 验证（重放保护 + IP 白名单）
+
+```go
+allowlist, _ := webhookin.NewIPAllowlist([]string{"203.0.113.0/24"})
+nonceStore := webhookin.NewMemoryNonceStore(10 * time.Minute)
+
+result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+    Secret:   []byte("shared-secret"),
+    Header:   "X-Signature",
+    Prefix:   "sha256=",
+    Encoding: webhookin.EncodingHex,
+    Replay: webhookin.HMACReplayConfig{
+        TimestampHeader: "X-Timestamp",
+        NonceHeader:     "X-Nonce",
+        Tolerance:       5 * time.Minute,
+        NonceStore:      nonceStore,
+    },
+    IPAllowlist: allowlist,
+})
+if err != nil {
+    http.Error(w, "Invalid signature", webhookin.HTTPStatus(err))
+    return
+}
+payload := result.Body
+```
+
+### 端到端入站处理示例
+
+```go
+allowlist, _ := webhookin.NewIPAllowlist([]string{"203.0.113.0/24"})
+nonceStore := webhookin.NewMemoryNonceStore(10 * time.Minute)
+
+mux := http.NewServeMux()
+mux.Handle("/webhooks/inbound", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+        Secret:   []byte(os.Getenv("WEBHOOK_SECRET")),
+        Header:   "X-Signature",
+        Prefix:   "sha256=",
+        Encoding: webhookin.EncodingHex,
+        Replay: webhookin.HMACReplayConfig{
+            TimestampHeader: "X-Timestamp",
+            NonceHeader:     "X-Nonce",
+            Tolerance:       5 * time.Minute,
+            NonceStore:      nonceStore,
+        },
+        IPAllowlist: allowlist,
+    })
+    if err != nil {
+        http.Error(w, "Invalid signature", webhookin.HTTPStatus(err))
+        return
+    }
+
+    // 处理 result.Body ...
+    w.WriteHeader(http.StatusOK)
+}))
+
+log.Fatal(http.ListenAndServe(":8080", mux))
+```
+
 ## Webhook Out (`net/webhookout`)
 
 ### Features

@@ -13,6 +13,7 @@ Plumego 的中间件与标准 `http.Handler` 兼容，可通过 `app.Use(...)` �
 - **并发限制**：`middleware.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)` 控制并发与排队深度。
 - **限流**：`middleware.RateLimit(ratePerSecond, burst, cleanupInterval, maxIdle)` 基于 IP 的令牌桶实现。
 - **鉴权辅助**：`middleware.SimpleAuth("token")` 校验 Bearer Token；`middleware.APIKey("X-API-Key", "secret")` 校验自定义头。
+- **绑定/校验**：`bind.BindJSON[T](...)` 统一请求绑定、校验与字段级错误返回。
 
 核心在初始化时会自动接入保护性的请求体/并发限制，可按需通过 `app.Use(...)` 或分组中间件追加链路。
 
@@ -41,6 +42,41 @@ app.GetCtx("/echo/:msg", middleware.WrapCtx(middleware.Timeout(2*time.Second), f
     _ = ctx.Response(http.StatusOK, map[string]any{"echo": ctx.Param("msg")}, nil)
 }))
 ```
+
+### 请求绑定 + 校验
+```go
+type CreateUserRequest struct {
+    Email    string `json:"email" validate:"required,email"`
+    Password string `json:"password" validate:"required" mask:"true"`
+}
+
+app.Post("/v1/users",
+    bind.BindJSON[CreateUserRequest](bind.JSONOptions{}),
+    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        payload, _ := bind.FromRequest[CreateUserRequest](r)
+        // 处理 payload ...
+        w.WriteHeader(http.StatusOK)
+    }),
+)
+```
+
+### `GetCtx` 绑定示例
+```go
+app.PostCtx("/v1/users", func(ctx *contract.Ctx) {
+    var payload CreateUserRequest
+    if err := ctx.BindAndValidateJSONWithOptions(&payload, contract.BindOptions{
+        DisallowUnknownFields: true,
+        Logger:                ctx.Logger,
+        Redact:                bind.DefaultRedactor().Redact,
+    }); err != nil {
+        contract.WriteBindError(ctx.W, ctx.R, err)
+        return
+    }
+    _ = ctx.Response(http.StatusOK, map[string]any{"ok": true}, nil)
+})
+```
+
+可运行示例见 `examples/bind-example/main.go`。
 
 ## 运维提示
 - 链路顺序很重要：通常建议日志包裹恢复，以便 panic 日志包含请求上下文。

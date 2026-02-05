@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	logpkg "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/validator"
 )
 
@@ -41,6 +42,40 @@ func (c *Ctx) BindJSON(dst any) error {
 	return nil
 }
 
+// BindJSONWithOptions binds the request JSON body with configurable options.
+func (c *Ctx) BindJSONWithOptions(dst any, opts BindOptions) error {
+	data, err := c.bodyBytes()
+	if err != nil {
+		if errors.Is(err, ErrRequestBodyTooLarge) {
+			return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: err}
+		}
+		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
+	}
+
+	if opts.MaxBodyBytes > 0 && int64(len(data)) > opts.MaxBodyBytes {
+		return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
+	}
+
+	if len(bytes.TrimSpace(data)) == 0 {
+		return &BindError{Status: http.StatusBadRequest, Message: ErrEmptyRequestBody.Error(), Err: ErrEmptyRequestBody}
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if opts.DisallowUnknownFields {
+		decoder.DisallowUnknownFields()
+	}
+
+	if err := decoder.Decode(dst); err != nil {
+		return &BindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: err}
+	}
+
+	if decoder.Decode(&struct{}{}) != io.EOF {
+		return &BindError{Status: http.StatusBadRequest, Message: "unexpected extra JSON data", Err: ErrUnexpectedExtraData}
+	}
+
+	return nil
+}
+
 // BindAndValidateJSON binds the request body to dst and validates it using struct tags.
 func (c *Ctx) BindAndValidateJSON(dst any) error {
 	if err := c.BindJSON(dst); err != nil {
@@ -52,6 +87,58 @@ func (c *Ctx) BindAndValidateJSON(dst any) error {
 	}
 
 	return nil
+}
+
+// BindAndValidateJSONWithOptions binds and validates JSON payloads with configurable options.
+func (c *Ctx) BindAndValidateJSONWithOptions(dst any, opts BindOptions) error {
+	if err := c.BindJSONWithOptions(dst, opts); err != nil {
+		logBindError(c, dst, opts, err)
+		return err
+	}
+
+	if opts.DisableValidation {
+		return nil
+	}
+
+	validate := opts.Validator
+	if validate == nil {
+		validate = validator.Validate
+	}
+	if err := validate(dst); err != nil {
+		bindErr := &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+		logBindError(c, dst, opts, bindErr)
+		return bindErr
+	}
+
+	return nil
+}
+
+func logBindError(c *Ctx, payload any, opts BindOptions, err error) {
+	if c == nil {
+		return
+	}
+	logger := opts.Logger
+	if logger == nil {
+		return
+	}
+
+	fields := logpkg.Fields{
+		"error":    err.Error(),
+		"method":   c.R.Method,
+		"path":     c.R.URL.Path,
+		"trace_id": TraceIDFromContext(c.R.Context()),
+	}
+
+	if v := FieldErrorsFrom(err); len(v) > 0 && payload != nil {
+		if opts.Redact != nil {
+			fields["payload"] = opts.Redact(payload)
+		} else {
+			fields["payload"] = payload
+		}
+		fields["validation_fields"] = v
+	}
+
+	logger.WarnCtx(c.R.Context(), "request binding failed", fields)
 }
 
 func (c *Ctx) bodyBytes() ([]byte, error) {

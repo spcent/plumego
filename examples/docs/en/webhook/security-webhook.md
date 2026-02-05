@@ -23,6 +23,75 @@ app := core.New(core.WithWebhookIn(core.WebhookInConfig{
 - Optional Pub/Sub publication lets you decouple processing from request lifecycles.
 - `MaxBodyBytes` protects against oversized payloads.
 
+### Generic HMAC verification (replay + IP allowlist)
+
+Use the generic verifier for custom providers:
+
+```go
+allowlist, _ := webhookin.NewIPAllowlist([]string{"203.0.113.0/24"})
+nonceStore := webhookin.NewMemoryNonceStore(10 * time.Minute)
+
+result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+    Secret:   []byte("shared-secret"),
+    Header:   "X-Signature",
+    Prefix:   "sha256=",
+    Encoding: webhookin.EncodingHex,
+    Replay: webhookin.HMACReplayConfig{
+        TimestampHeader: "X-Timestamp",
+        NonceHeader:     "X-Nonce",
+        Tolerance:       5 * time.Minute,
+        NonceStore:      nonceStore,
+    },
+    IPAllowlist: allowlist,
+})
+if err != nil {
+    http.Error(w, "invalid signature", webhookin.HTTPStatus(err))
+    return
+}
+payload := result.Body
+```
+
+The verifier supports:
+- HMAC-SHA256/512
+- Timestamp tolerance + nonce replay protection
+- Optional IP allowlist with CIDR support
+- Structured error codes via `webhookin.ErrorCodeOf(err)`
+
+### End-to-end inbound handler
+
+```go
+allowlist, _ := webhookin.NewIPAllowlist([]string{"203.0.113.0/24"})
+nonceStore := webhookin.NewMemoryNonceStore(10 * time.Minute)
+
+mux := http.NewServeMux()
+mux.Handle("/webhooks/inbound", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+        Secret:   []byte(os.Getenv("WEBHOOK_SECRET")),
+        Header:   "X-Signature",
+        Prefix:   "sha256=",
+        Encoding: webhookin.EncodingHex,
+        Replay: webhookin.HMACReplayConfig{
+            TimestampHeader: "X-Timestamp",
+            NonceHeader:     "X-Nonce",
+            Tolerance:       5 * time.Minute,
+            NonceStore:      nonceStore,
+        },
+        IPAllowlist: allowlist,
+    })
+    if err != nil {
+        http.Error(w, "invalid signature", webhookin.HTTPStatus(err))
+        return
+    }
+
+    // process result.Body ...
+    w.WriteHeader(http.StatusOK)
+}))
+
+log.Fatal(http.ListenAndServe(":8080", mux))
+```
+
+For a minimal runnable version, see `examples/webhook_example.go`.
+
 ## Outbound webhooks
 `core.WithWebhookOut` wires the outbound delivery service (backed by an in-memory store in the example, extensible via `webhookout.Service`).
 

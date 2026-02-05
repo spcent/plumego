@@ -60,6 +60,44 @@ app.Use(middleware.SecurityHeaders())
 app.Get("/api/users", middleware.Auth(), handler)
 ```
 
+### Request Binding & Validation
+
+Standardized JSON binding + validation middleware with field-level errors.
+
+```go
+import (
+    "net/http"
+
+    "github.com/spcent/plumego/middleware/bind"
+)
+
+type CreateUserRequest struct {
+    Email    string `json:"email" validate:"required,email"`
+    Password string `json:"password" validate:"required" mask:"true"`
+}
+
+handler := bind.BindJSON[CreateUserRequest](bind.JSONOptions{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    payload, _ := bind.FromRequest[CreateUserRequest](r)
+    // use payload...
+    w.WriteHeader(http.StatusOK)
+}))
+```
+
+For `GetCtx` handlers:
+
+```go
+app.PostCtx("/v1/users", func(ctx *contract.Ctx) {
+    var payload CreateUserRequest
+    if err := ctx.BindAndValidateJSONWithOptions(&payload, contract.BindOptions{
+        DisallowUnknownFields: true,
+        Redact:                bind.DefaultRedactor().Redact,
+    }); err != nil {
+        contract.WriteBindError(ctx.W, ctx.R, err)
+        return
+    }
+})
+```
+
 ### Authentication Middleware
 
 #### BasicAuth
