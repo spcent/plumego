@@ -429,6 +429,22 @@ func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
 
 // buildURL constructs the request URL for S3 operations.
 func (s *S3Storage) buildURL(objectKey string) string {
+	// Normalize and escape the object key to prevent path traversal and
+	// ensure it is safe when included in URLs returned to clients.
+	if objectKey != "" {
+		// Remove any leading slashes to keep the key relative
+		for len(objectKey) > 0 && objectKey[0] == '/' {
+			objectKey = objectKey[1:]
+		}
+		// Clean the path to collapse any ../ or ./ segments
+		cleaned := path.Clean(objectKey)
+		if cleaned == "." {
+			cleaned = ""
+		}
+		// URL-escape the cleaned key so that it is safe in the path component
+		objectKey = url.PathEscape(cleaned)
+	}
+
 	scheme := "https"
 	if !s.useSSL {
 		scheme = "http"
