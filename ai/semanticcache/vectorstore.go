@@ -66,10 +66,10 @@ type VectorStore interface {
 
 // VectorStoreStats tracks vector store performance.
 type VectorStoreStats struct {
-	TotalVectors    int64
-	TotalSearches   int64
+	TotalVectors      int64
+	TotalSearches     int64
 	AverageSimilarity float64
-	LastCleanupAt   time.Time
+	LastCleanupAt     time.Time
 }
 
 // MemoryVectorStore implements in-memory vector storage with linear scan.

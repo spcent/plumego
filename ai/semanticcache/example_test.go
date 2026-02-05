@@ -150,11 +150,11 @@ func Example_customConfiguration() {
 
 	// Custom semantic cache config
 	cacheConfig := &semanticcache.SemanticCacheConfig{
-		SimilarityThreshold: 0.90,        // Higher threshold = more conservative
-		TopK:                10,           // Consider more results
-		EnableExactMatch:    true,         // Enable exact match optimization
+		SimilarityThreshold: 0.90,          // Higher threshold = more conservative
+		TopK:                10,            // Consider more results
+		EnableExactMatch:    true,          // Enable exact match optimization
 		TTL:                 2 * time.Hour, // Longer TTL
-		MaxSize:             5000,         // Larger cache
+		MaxSize:             5000,          // Larger cache
 	}
 
 	// Custom provider config
