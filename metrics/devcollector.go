@@ -575,8 +575,11 @@ func truncateQuery(query string, maxLen int) string {
 
 func dbRedactionRules() []string {
 	return []string{
-		"String literals replaced with '?'",
-		"Numeric literals replaced with '?'",
+		"Single-quoted string literals replaced with '?'",
+		"Double-quoted strings replaced with \"?\"",
+		"Backtick-quoted identifiers replaced with `?`",
+		"SQL comments redacted",
+		"Numeric literals replaced with ?",
 		"Excess whitespace collapsed",
 	}
 }
@@ -589,35 +592,54 @@ func redactSQL(query string) string {
 	var out strings.Builder
 	out.Grow(len(query))
 
-	inSingle := false
-	escapeNext := false
-
 	for i := 0; i < len(query); i++ {
 		ch := query[i]
 
-		if inSingle {
-			if escapeNext {
-				escapeNext = false
-				continue
-			}
-			if ch == '\\' {
-				escapeNext = true
-				continue
-			}
-			if ch == '\'' {
-				inSingle = false
-				out.WriteByte('\'')
-				continue
-			}
-			continue
-		}
-
+		// Single-quoted string literal: 'value' -> '?'
 		if ch == '\'' {
-			inSingle = true
 			out.WriteString("'?'")
+			i = consumeQuoted(query, i, '\'')
 			continue
 		}
 
+		// Double-quoted string/identifier: "value" -> "?"
+		if ch == '"' {
+			out.WriteString("\"?\"")
+			i = consumeQuoted(query, i, '"')
+			continue
+		}
+
+		// Backtick-quoted identifier: `table` -> `?`
+		if ch == '`' {
+			out.WriteString("`?`")
+			i = consumeQuoted(query, i, '`')
+			continue
+		}
+
+		// Single-line comment: -- ... \n
+		if ch == '-' && i+1 < len(query) && query[i+1] == '-' {
+			out.WriteString("-- ?")
+			for i+1 < len(query) && query[i+1] != '\n' {
+				i++
+			}
+			continue
+		}
+
+		// Block comment: /* ... */
+		if ch == '/' && i+1 < len(query) && query[i+1] == '*' {
+			out.WriteString("/* ? */")
+			i += 2
+			for i < len(query) {
+				if query[i] == '*' && i+1 < len(query) && query[i+1] == '/' {
+					i++
+					break
+				}
+				i++
+			}
+			continue
+		}
+
+		// Numeric literal
 		if isNumericStart(query, i) {
 			out.WriteByte('?')
 			i = consumeNumber(query, i) - 1
@@ -628,6 +650,27 @@ func redactSQL(query string) string {
 	}
 
 	return strings.Join(strings.Fields(out.String()), " ")
+}
+
+// consumeQuoted advances past a quoted string starting at position idx.
+// It handles backslash escaping and returns the index of the closing quote,
+// or len(s)-1 if the string is unterminated.
+func consumeQuoted(s string, idx int, quote byte) int {
+	escapeNext := false
+	for i := idx + 1; i < len(s); i++ {
+		if escapeNext {
+			escapeNext = false
+			continue
+		}
+		if s[i] == '\\' {
+			escapeNext = true
+			continue
+		}
+		if s[i] == quote {
+			return i
+		}
+	}
+	return len(s) - 1
 }
 
 func isNumericStart(s string, idx int) bool {

@@ -49,6 +49,8 @@ type latencyStats struct {
 //	// Record metrics
 //	collector.ObserveHTTP(context.Background(), "GET", "/api/users", 200, 100, 50*time.Millisecond)
 type PrometheusCollector struct {
+	baseForwarder // provides ObservePubSub, ObserveMQ, ObserveKV, ObserveIPC, ObserveDB
+
 	namespace string
 	maxMemory int // Maximum number of metric series to store
 
@@ -63,10 +65,6 @@ type PrometheusCollector struct {
 	smsProviderResult map[smsKey]uint64
 	smsRetry          map[smsKey]uint64
 	smsStatus         map[smsKey]uint64
-
-	// Base collector for unified interface
-	base     *BaseMetricsCollector
-	baseOnce sync.Once
 }
 
 // NewPrometheusCollector constructs an in-memory collector with the provided namespace.
@@ -183,7 +181,7 @@ func (p *PrometheusCollector) Handler() http.Handler {
 		reqKeys := sortedKeys(requests)
 		for _, k := range reqKeys {
 			fmt.Fprintf(w, "%s_http_requests_total{method=\"%s\",path=\"%s\",status=\"%s\"} %d\n",
-				p.namespace, k.method, k.path, k.status, requests[k])
+				p.namespace, escapeLabelValue(k.method), escapeLabelValue(k.path), escapeLabelValue(k.status), requests[k])
 		}
 
 		fmt.Fprintln(w)
@@ -193,15 +191,16 @@ func (p *PrometheusCollector) Handler() http.Handler {
 		durKeys := sortedKeys(durations)
 		for _, k := range durKeys {
 			stats := durations[k]
+			em, ep, es := escapeLabelValue(k.method), escapeLabelValue(k.path), escapeLabelValue(k.status)
 			fmt.Fprintf(w, "%s_http_request_duration_seconds_sum{method=\"%s\",path=\"%s\",status=\"%s\"} %.9f\n",
-				p.namespace, k.method, k.path, k.status, stats.sum)
+				p.namespace, em, ep, es, stats.sum)
 			fmt.Fprintf(w, "%s_http_request_duration_seconds_count{method=\"%s\",path=\"%s\",status=\"%s\"} %d\n",
-				p.namespace, k.method, k.path, k.status, stats.count)
+				p.namespace, em, ep, es, stats.count)
 			// Add min and max as additional metrics
 			fmt.Fprintf(w, "%s_http_request_duration_seconds_min{method=\"%s\",path=\"%s\",status=\"%s\"} %.9f\n",
-				p.namespace, k.method, k.path, k.status, stats.min)
+				p.namespace, em, ep, es, stats.min)
 			fmt.Fprintf(w, "%s_http_request_duration_seconds_max{method=\"%s\",path=\"%s\",status=\"%s\"} %.9f\n",
-				p.namespace, k.method, k.path, k.status, stats.max)
+				p.namespace, em, ep, es, stats.max)
 		}
 
 		// Add uptime metric
@@ -288,9 +287,7 @@ func (p *PrometheusCollector) Clear() {
 	p.smsRetry = make(map[smsKey]uint64)
 	p.smsStatus = make(map[smsKey]uint64)
 
-	if p.base != nil {
-		p.base.Clear()
-	}
+	p.clearBase()
 }
 
 // Record implements the unified MetricsCollector interface
@@ -308,7 +305,7 @@ func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
 	}
 
 	// For other metric types, use the base collector
-	p.baseCollector().Record(ctx, record)
+	p.getBase().Record(ctx, record)
 }
 
 // ObserveHTTP implements the unified MetricsCollector interface
@@ -325,29 +322,8 @@ func (p *PrometheusCollector) ObserveHTTP(ctx context.Context, method, path stri
 	p.Observe(ctx, metrics)
 }
 
-// ObservePubSub implements the unified MetricsCollector interface
-func (p *PrometheusCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	p.baseCollector().ObservePubSub(ctx, operation, topic, duration, err)
-}
-
-// ObserveMQ implements the unified MetricsCollector interface
-func (p *PrometheusCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	p.baseCollector().ObserveMQ(ctx, operation, topic, duration, err, panicked)
-}
-
-// ObserveKV implements the unified MetricsCollector interface
-func (p *PrometheusCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	p.baseCollector().ObserveKV(ctx, operation, key, duration, err, hit)
-}
-
-// ObserveIPC implements the unified MetricsCollector interface
-func (p *PrometheusCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	p.baseCollector().ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
-}
-
-func (p *PrometheusCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	p.baseCollector().ObserveDB(ctx, operation, driver, query, rows, duration, err)
-}
+// ObservePubSub, ObserveMQ, ObserveKV, ObserveIPC, ObserveDB are provided
+// by the embedded baseForwarder.
 
 func (p *PrometheusCollector) snapshot() (map[labelKey]uint64, map[labelKey]latencyStats, time.Duration) {
 	p.mu.RLock()
@@ -392,12 +368,6 @@ func (p *PrometheusCollector) evictOldest() {
 	}
 }
 
-func (p *PrometheusCollector) baseCollector() *BaseMetricsCollector {
-	p.baseOnce.Do(func() {
-		p.base = NewBaseMetricsCollector()
-	})
-	return p.base
-}
 
 func httpMetricsFromRecord(record MetricRecord) (observability.RequestMetrics, bool) {
 	if record.Labels == nil {

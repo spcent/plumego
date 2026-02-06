@@ -6,6 +6,74 @@ import (
 	"time"
 )
 
+func TestRedactSQL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "single-quoted string",
+			input:    "SELECT * FROM users WHERE email = 'john@example.com'",
+			expected: "SELECT * FROM users WHERE email = '?'",
+		},
+		{
+			name:     "double-quoted string",
+			input:    `SELECT * FROM users WHERE name = "John"`,
+			expected: `SELECT * FROM users WHERE name = "?"`,
+		},
+		{
+			name:     "backtick identifier",
+			input:    "SELECT `password_hash` FROM `users`",
+			expected: "SELECT `?` FROM `?`",
+		},
+		{
+			name:     "single-line comment",
+			input:    "SELECT * FROM users -- admin password is s3cr3t",
+			expected: "SELECT * FROM users -- ?",
+		},
+		{
+			name:     "block comment",
+			input:    "SELECT /* secret_column */ * FROM users",
+			expected: "SELECT /* ? */ * FROM users",
+		},
+		{
+			name:     "numeric literal",
+			input:    "SELECT * FROM users WHERE id = 12345",
+			expected: "SELECT * FROM users WHERE id = ?",
+		},
+		{
+			name:     "mixed quotes and numbers",
+			input:    `SELECT * FROM users WHERE name = "John" AND age = 30 AND email = 'j@x.com'`,
+			expected: `SELECT * FROM users WHERE name = "?" AND age = ? AND email = '?'`,
+		},
+		{
+			name:     "escaped single quote",
+			input:    "SELECT * FROM users WHERE name = 'O\\'Brien'",
+			expected: "SELECT * FROM users WHERE name = '?'",
+		},
+		{
+			name:     "empty query",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "comment at end with newline",
+			input:    "SELECT 1 -- comment\nSELECT 2",
+			expected: "SELECT ? -- ? SELECT ?",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := redactSQL(tt.input)
+			if got != tt.expected {
+				t.Errorf("redactSQL(%q)\n  got:  %q\n  want: %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestDevCollectorSnapshot(t *testing.T) {
 	cfg := DevCollectorConfig{
 		Window:     time.Minute,

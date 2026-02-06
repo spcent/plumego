@@ -507,3 +507,59 @@ func cloneBreakdown(breakdown map[MetricType]int64) map[MetricType]int64 {
 	}
 	return result
 }
+
+// baseForwarder provides lazy-initialized forwarding of MetricsCollector methods
+// to an underlying BaseMetricsCollector. Embed this in collectors that delegate
+// common observation methods (PubSub, MQ, KV, IPC, DB) to the base implementation.
+type baseForwarder struct {
+	base     *BaseMetricsCollector
+	baseOnce sync.Once
+}
+
+func (f *baseForwarder) getBase() *BaseMetricsCollector {
+	f.baseOnce.Do(func() {
+		f.base = NewBaseMetricsCollector()
+	})
+	return f.base
+}
+
+func (f *baseForwarder) clearBase() {
+	if f.base != nil {
+		f.base.Clear()
+	}
+}
+
+// Record forwards to the base collector.
+func (f *baseForwarder) Record(ctx context.Context, record MetricRecord) {
+	f.getBase().Record(ctx, record)
+}
+
+// ObserveHTTP forwards to the base collector.
+func (f *baseForwarder) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	f.getBase().ObserveHTTP(ctx, method, path, status, bytes, duration)
+}
+
+// ObservePubSub forwards to the base collector.
+func (f *baseForwarder) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+	f.getBase().ObservePubSub(ctx, operation, topic, duration, err)
+}
+
+// ObserveMQ forwards to the base collector.
+func (f *baseForwarder) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
+	f.getBase().ObserveMQ(ctx, operation, topic, duration, err, panicked)
+}
+
+// ObserveKV forwards to the base collector.
+func (f *baseForwarder) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
+	f.getBase().ObserveKV(ctx, operation, key, duration, err, hit)
+}
+
+// ObserveIPC forwards to the base collector.
+func (f *baseForwarder) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
+	f.getBase().ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
+}
+
+// ObserveDB forwards to the base collector.
+func (f *baseForwarder) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+	f.getBase().ObserveDB(ctx, operation, driver, query, rows, duration, err)
+}
