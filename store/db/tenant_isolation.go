@@ -5,10 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/spcent/plumego/tenant"
 )
+
+// validIdentifier matches safe SQL identifier names (alphanumeric and underscores only).
+var validIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // TenantDB wraps sql.DB with automatic tenant filtering for queries.
 // It ensures that all queries are scoped to a specific tenant by automatically
@@ -22,8 +26,14 @@ type TenantDB struct {
 type TenantDBOption func(*TenantDB)
 
 // WithTenantColumn sets the column name for tenant filtering (default: "tenant_id").
+// The column name must be a valid SQL identifier (alphanumeric and underscores only).
 func WithTenantColumn(column string) TenantDBOption {
 	return func(tdb *TenantDB) {
+		if !validIdentifier.MatchString(column) {
+			// Reject invalid column names to prevent SQL injection.
+			// Keep the default value.
+			return
+		}
 		tdb.tenantColumn = column
 	}
 }
@@ -69,8 +79,15 @@ func (tdb *TenantDB) QueryContext(ctx context.Context, tenantID string, query st
 }
 
 // QueryRowFromContext extracts tenant from context and executes a single-row query.
+// Returns an error-producing Row if tenant ID is not found in context.
 func (tdb *TenantDB) QueryRowFromContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
 	tenantID := tenant.TenantIDFromContext(ctx)
+	if tenantID == "" {
+		// Return a Row that will produce an error when scanned, via a cancelled context.
+		cancelledCtx, cancel := context.WithCancel(ctx)
+		cancel()
+		return tdb.db.QueryRowContext(cancelledCtx, "SELECT 1")
+	}
 	return tdb.QueryRowContext(ctx, tenantID, query, args...)
 }
 
@@ -123,19 +140,12 @@ func (tdb *TenantDB) addTenantFilter(query string, tenantID string, args []inter
 	whereClause := fmt.Sprintf("%s = ?", tdb.tenantColumn)
 	newArgs := append([]interface{}{tenantID}, args...)
 
-	if strings.Contains(queryLower, " where ") {
-		// Existing WHERE clause - add AND condition
-		whereIdx := -1
-		if idx := strings.Index(query, "WHERE"); idx != -1 {
-			whereIdx = idx
-		} else if idx := strings.Index(query, "where"); idx != -1 {
-			whereIdx = idx
-		}
-
-		if whereIdx != -1 {
-			filteredQuery := query[:whereIdx] + "WHERE " + whereClause + " AND " + query[whereIdx+5:]
-			return filteredQuery, newArgs
-		}
+	if whereIdx := indexCaseInsensitive(query, " WHERE "); whereIdx != -1 {
+		// Existing WHERE clause - add AND condition after WHERE keyword
+		keywordStart := whereIdx + 1 // skip leading space
+		keywordEnd := keywordStart + 5
+		filteredQuery := query[:keywordStart] + "WHERE " + whereClause + " AND " + query[keywordEnd+1:]
+		return filteredQuery, newArgs
 	}
 
 	// No WHERE clause - add one
@@ -156,14 +166,8 @@ func (tdb *TenantDB) addTenantFilter(query string, tenantID string, args []inter
 func (tdb *TenantDB) addTenantToUpdate(query string, tenantID string, args []interface{}) (string, []interface{}) {
 	whereClause := fmt.Sprintf("%s = ?", tdb.tenantColumn)
 
-	// Find WHERE clause
-	whereIdx := -1
-	if idx := strings.Index(query, "WHERE"); idx != -1 {
-		whereIdx = idx
-	} else if idx := strings.Index(query, "where"); idx != -1 {
-		whereIdx = idx
-	}
-
+	// Find WHERE clause (case-insensitive)
+	whereIdx := indexCaseInsensitive(query, " WHERE ")
 	if whereIdx != -1 {
 		// Has WHERE clause - insert tenant filter at the beginning
 		// Query: UPDATE users SET email = ? WHERE name = ?
@@ -171,8 +175,10 @@ func (tdb *TenantDB) addTenantToUpdate(query string, tenantID string, args []int
 		// Result: UPDATE users SET email = ? WHERE tenant_id = ? AND name = ?
 		// New Args: [email, tenantID, name]
 
+		keywordStart := whereIdx + 1 // skip leading space
+
 		// Count placeholders before WHERE to know where to insert tenantID arg
-		beforeWhere := query[:whereIdx]
+		beforeWhere := query[:keywordStart]
 		setPlaceholders := strings.Count(beforeWhere, "?")
 
 		// Insert tenant arg after SET parameters
@@ -181,7 +187,7 @@ func (tdb *TenantDB) addTenantToUpdate(query string, tenantID string, args []int
 		newArgs = append(newArgs, tenantID)                  // tenant_id
 		newArgs = append(newArgs, args[setPlaceholders:]...) // WHERE parameters
 
-		filteredQuery := query[:whereIdx] + "WHERE " + whereClause + " AND " + query[whereIdx+5:]
+		filteredQuery := query[:keywordStart] + "WHERE " + whereClause + " AND " + query[keywordStart+6:]
 		return filteredQuery, newArgs
 	}
 
@@ -249,6 +255,9 @@ func ValidateQuery(query string, tenantColumn string) error {
 	if strings.Contains(queryLower, "truncate") {
 		return errors.New("TRUNCATE not allowed in tenant-scoped queries")
 	}
+	if strings.Contains(queryLower, "alter table") {
+		return errors.New("ALTER TABLE not allowed in tenant-scoped queries")
+	}
 
 	// For SELECT/UPDATE/DELETE, warn if no WHERE clause
 	if strings.HasPrefix(queryLower, "select") ||
@@ -259,13 +268,26 @@ func ValidateQuery(query string, tenantColumn string) error {
 			return fmt.Errorf("query missing WHERE clause - potential cross-tenant data leak")
 		}
 
-		// Check if tenant column is mentioned
-		if !strings.Contains(queryLower, strings.ToLower(tenantColumn)) {
+		// Check that tenant column appears in a WHERE clause context,
+		// not just anywhere in the query string.
+		whereIdx := strings.Index(queryLower, "where")
+		if whereIdx == -1 {
 			return fmt.Errorf("query missing %s filter - potential cross-tenant data leak", tenantColumn)
+		}
+
+		afterWhere := queryLower[whereIdx:]
+		if !strings.Contains(afterWhere, strings.ToLower(tenantColumn)) {
+			return fmt.Errorf("query missing %s filter in WHERE clause - potential cross-tenant data leak", tenantColumn)
 		}
 	}
 
 	return nil
+}
+
+// indexCaseInsensitive finds the first occurrence of substr in s, case-insensitively.
+// Returns -1 if not found.
+func indexCaseInsensitive(s, substr string) int {
+	return strings.Index(strings.ToUpper(s), strings.ToUpper(substr))
 }
 
 // RawDB returns the underlying *sql.DB for admin queries that bypass tenant filtering.

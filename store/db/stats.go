@@ -214,29 +214,7 @@ func (a *DBStatsAggregator) GetTopSlowTables(n int) []TableStat {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
-	tables := make([]TableStat, 0, len(a.byTable))
-	for name, stats := range a.byTable {
-		tables = append(tables, TableStat{
-			Table:        name,
-			SlowQueries:  stats.SlowQueries,
-			AvgDuration:  stats.AvgDuration,
-			TotalQueries: stats.TotalQueries,
-		})
-	}
-
-	// Sort by slow query count descending
-	for i := 0; i < len(tables); i++ {
-		for j := i + 1; j < len(tables); j++ {
-			if tables[j].SlowQueries > tables[i].SlowQueries {
-				tables[i], tables[j] = tables[j], tables[i]
-			}
-		}
-	}
-
-	if n > len(tables) {
-		n = len(tables)
-	}
-	return tables[:n]
+	return a.getTopSlowTablesLocked(n)
 }
 
 // TableStat represents statistics for a single table.

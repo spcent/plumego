@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -50,7 +51,7 @@ func NewDBTenantConfigManager(db *sql.DB, options ...DBTenantConfigOption) *DBTe
 
 // GetTenantConfig retrieves tenant configuration from database (with optional caching).
 func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID string) (tenant.Config, error) {
-	if m == nil || m.db == nil {
+	if m == nil {
 		return tenant.Config{}, tenant.ErrTenantNotFound
 	}
 
@@ -59,6 +60,10 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 		if cfg, ok := m.cache.Get(tenantID); ok {
 			return cfg, nil
 		}
+	}
+
+	if m.db == nil {
+		return tenant.Config{}, tenant.ErrTenantNotFound
 	}
 
 	// Query database
@@ -91,20 +96,8 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 	}
 
 	// Parse JSON fields
-	if allowedModelsJSON.Valid {
-		if err := json.Unmarshal([]byte(allowedModelsJSON.String), &cfg.Policy.AllowedModels); err != nil {
-			return tenant.Config{}, err
-		}
-	}
-	if allowedToolsJSON.Valid {
-		if err := json.Unmarshal([]byte(allowedToolsJSON.String), &cfg.Policy.AllowedTools); err != nil {
-			return tenant.Config{}, err
-		}
-	}
-	if metadataJSON.Valid {
-		if err := json.Unmarshal([]byte(metadataJSON.String), &cfg.Metadata); err != nil {
-			return tenant.Config{}, err
-		}
+	if err := parseTenantConfigJSON(&cfg, allowedModelsJSON, allowedToolsJSON, metadataJSON); err != nil {
+		return tenant.Config{}, err
 	}
 
 	cfg.UpdatedAt = updatedAt
@@ -248,14 +241,8 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 		}
 
 		// Parse JSON fields
-		if allowedModelsJSON.Valid {
-			json.Unmarshal([]byte(allowedModelsJSON.String), &cfg.Policy.AllowedModels)
-		}
-		if allowedToolsJSON.Valid {
-			json.Unmarshal([]byte(allowedToolsJSON.String), &cfg.Policy.AllowedTools)
-		}
-		if metadataJSON.Valid {
-			json.Unmarshal([]byte(metadataJSON.String), &cfg.Metadata)
+		if err := parseTenantConfigJSON(&cfg, allowedModelsJSON, allowedToolsJSON, metadataJSON); err != nil {
+			return nil, fmt.Errorf("parsing tenant %s config: %w", cfg.TenantID, err)
 		}
 
 		cfg.UpdatedAt = updatedAt
@@ -281,6 +268,26 @@ func (m *DBTenantConfigManager) PolicyConfig(ctx context.Context, tenantID strin
 		return tenant.PolicyConfig{}, err
 	}
 	return cfg.Policy, nil
+}
+
+// parseTenantConfigJSON parses the JSON fields from database NullString values into a tenant.Config.
+func parseTenantConfigJSON(cfg *tenant.Config, allowedModelsJSON, allowedToolsJSON, metadataJSON sql.NullString) error {
+	if allowedModelsJSON.Valid {
+		if err := json.Unmarshal([]byte(allowedModelsJSON.String), &cfg.Policy.AllowedModels); err != nil {
+			return fmt.Errorf("parsing allowed_models: %w", err)
+		}
+	}
+	if allowedToolsJSON.Valid {
+		if err := json.Unmarshal([]byte(allowedToolsJSON.String), &cfg.Policy.AllowedTools); err != nil {
+			return fmt.Errorf("parsing allowed_tools: %w", err)
+		}
+	}
+	if metadataJSON.Valid {
+		if err := json.Unmarshal([]byte(metadataJSON.String), &cfg.Metadata); err != nil {
+			return fmt.Errorf("parsing metadata: %w", err)
+		}
+	}
+	return nil
 }
 
 // tenantCache is a simple LRU cache for tenant configurations.
