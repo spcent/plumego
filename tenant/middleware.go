@@ -2,9 +2,47 @@ package tenant
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
+
+// ErrInvalidTenantID indicates a tenant ID failed validation.
+var ErrInvalidTenantID = errors.New("invalid tenant ID")
+
+// maxTenantIDLength is the maximum allowed length for a tenant ID.
+const maxTenantIDLength = 255
+
+// ValidateTenantID checks that a tenant ID is well-formed.
+// Valid tenant IDs contain only alphanumeric characters, hyphens,
+// underscores, and periods, with a maximum length of 255 bytes.
+func ValidateTenantID(id string) error {
+	if id == "" {
+		return ErrTenantNotFound
+	}
+	if len(id) > maxTenantIDLength {
+		return fmt.Errorf("%w: exceeds maximum length of %d", ErrInvalidTenantID, maxTenantIDLength)
+	}
+	if !utf8.ValidString(id) {
+		return fmt.Errorf("%w: contains invalid UTF-8", ErrInvalidTenantID)
+	}
+	for _, c := range id {
+		if !isValidTenantIDChar(c) {
+			return fmt.Errorf("%w: contains invalid character %q", ErrInvalidTenantID, c)
+		}
+	}
+	return nil
+}
+
+func isValidTenantIDChar(c rune) bool {
+	return (c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		c == '-' || c == '_' || c == '.'
+}
 
 // Middleware creates an HTTP middleware for multi-tenancy
 //
@@ -38,6 +76,12 @@ func Middleware(config MiddlewareConfig) func(http.Handler) http.Handler {
 				return
 			}
 
+			// Validate tenant ID format
+			if err := ValidateTenantID(tenantID); err != nil {
+				writeTenantError(w, http.StatusBadRequest, "Invalid tenant ID format")
+				return
+			}
+
 			// Add tenant ID to context
 			ctx := ContextWithTenantID(r.Context(), tenantID)
 
@@ -49,9 +93,9 @@ func Middleware(config MiddlewareConfig) func(http.Handler) http.Handler {
 				}
 				result, err := config.QuotaManager.Allow(ctx, tenantID, quotaReq)
 				if err != nil || !result.Allowed {
-					w.Header().Set("X-RateLimit-Remaining", string(rune(result.RemainingRequests)))
+					w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(result.RemainingRequests))
 					if result.RetryAfter > 0 {
-						w.Header().Set("Retry-After", string(rune(result.RetryAfter.Seconds())))
+						w.Header().Set("Retry-After", strconv.Itoa(int(result.RetryAfter.Seconds())))
 					}
 
 					writeTenantError(w, http.StatusTooManyRequests, "Quota exceeded")
@@ -141,26 +185,42 @@ func (c *MiddlewareConfig) extractTenantID(r *http.Request) (string, error) {
 // TenantExtractor extracts tenant ID from a request
 type TenantExtractor func(*http.Request) (string, error)
 
-// FromHeader creates an extractor that reads from a header
-func FromHeader(headerName string) TenantExtractor {
+// fromRequestValue creates a TenantExtractor from a function that reads
+// a string value from the request. This eliminates duplication across
+// header/query/cookie extractors.
+func fromRequestValue(extract func(*http.Request) string) TenantExtractor {
 	return func(r *http.Request) (string, error) {
-		tenantID := r.Header.Get(headerName)
-		if tenantID == "" {
+		v := extract(r)
+		if v == "" {
 			return "", ErrTenantNotFound
 		}
-		return tenantID, nil
+		return v, nil
 	}
+}
+
+// FromHeader creates an extractor that reads from a header
+func FromHeader(headerName string) TenantExtractor {
+	return fromRequestValue(func(r *http.Request) string {
+		return r.Header.Get(headerName)
+	})
 }
 
 // FromQuery creates an extractor that reads from a query parameter
 func FromQuery(paramName string) TenantExtractor {
-	return func(r *http.Request) (string, error) {
-		tenantID := r.URL.Query().Get(paramName)
-		if tenantID == "" {
-			return "", ErrTenantNotFound
+	return fromRequestValue(func(r *http.Request) string {
+		return r.URL.Query().Get(paramName)
+	})
+}
+
+// FromCookie creates an extractor that reads from a cookie
+func FromCookie(cookieName string) TenantExtractor {
+	return fromRequestValue(func(r *http.Request) string {
+		cookie, err := r.Cookie(cookieName)
+		if err != nil {
+			return ""
 		}
-		return tenantID, nil
-	}
+		return cookie.Value
+	})
 }
 
 // FromSubdomain creates an extractor that parses from subdomain
@@ -183,41 +243,30 @@ func FromSubdomain() TenantExtractor {
 	}
 }
 
-// FromJWT creates an extractor that reads from JWT claims
-// Note: This requires the request to have been authenticated first
-// The JWT claims should be stored in the request context
-func FromJWT(claimName string) TenantExtractor {
+// FromContextValue creates an extractor that reads from a context value.
+// This is useful for integrating with authentication middleware that stores
+// parsed claims (e.g., JWT) in the request context.
+//
+// Example:
+//
+//	// With a JWT middleware that stores claims under a context key:
+//	tenant.FromContextValue(jwtClaimsKey, func(v any) string {
+//		claims, ok := v.(map[string]any)
+//		if !ok { return "" }
+//		id, _ := claims["tenant_id"].(string)
+//		return id
+//	})
+func FromContextValue(key any, extract func(any) string) TenantExtractor {
 	return func(r *http.Request) (string, error) {
-		// This is a placeholder - actual implementation depends on
-		// how JWT claims are stored in the context
-		// Users should implement this based on their auth middleware
-
-		// Example if using a specific context key:
-		// claims, ok := r.Context().Value("jwt_claims").(map[string]interface{})
-		// if !ok {
-		//     return "", ErrTenantNotFound
-		// }
-		// tenantID, ok := claims[claimName].(string)
-		// if !ok {
-		//     return "", ErrTenantNotFound
-		// }
-		// return tenantID, nil
-
-		return "", ErrTenantNotFound
-	}
-}
-
-// FromCookie creates an extractor that reads from a cookie
-func FromCookie(cookieName string) TenantExtractor {
-	return func(r *http.Request) (string, error) {
-		cookie, err := r.Cookie(cookieName)
-		if err != nil {
+		v := r.Context().Value(key)
+		if v == nil {
 			return "", ErrTenantNotFound
 		}
-		if cookie.Value == "" {
+		id := extract(v)
+		if id == "" {
 			return "", ErrTenantNotFound
 		}
-		return cookie.Value, nil
+		return id, nil
 	}
 }
 

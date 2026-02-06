@@ -147,7 +147,7 @@ func (l *TokenBucketRateLimiter) Allow(ctx context.Context, tenantID string, req
 		elapsed = 0
 	}
 	if elapsed > 0 && bucket.refillRate > 0 {
-		bucket.tokens = minFloat(float64(bucket.capacity), bucket.tokens+elapsed*float64(bucket.refillRate))
+		bucket.tokens = min(float64(bucket.capacity), bucket.tokens+elapsed*float64(bucket.refillRate))
 		bucket.last = req.Now
 	}
 
@@ -197,11 +197,4 @@ func (l *TokenBucketRateLimiter) getBucket(tenantID string) *tokenBucket {
 	newBucket := &tokenBucket{}
 	loaded, _ := l.buckets.LoadOrStore(tenantID, newBucket)
 	return loaded.(*tokenBucket)
-}
-
-func minFloat(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
 }
