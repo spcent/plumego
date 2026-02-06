@@ -315,6 +315,50 @@ func TestPrometheusCollectorSMSGatewayMetrics(t *testing.T) {
 	}
 }
 
+func TestPrometheusCollectorLabelEscaping(t *testing.T) {
+	collector := NewPrometheusCollector("test")
+
+	// Attempt metric injection via path containing newline and fake metric
+	collector.Observe(context.Background(), observability.RequestMetrics{
+		Method:   "GET",
+		Path:     "/api\ninjected_metric{x=\"y\"} 999",
+		Status:   http.StatusOK,
+		Duration: 10 * time.Millisecond,
+	})
+	// Attempt label breakout via quote in path
+	collector.Observe(context.Background(), observability.RequestMetrics{
+		Method:   "GET",
+		Path:     `/api"},{evil="true"}`,
+		Status:   http.StatusOK,
+		Duration: 10 * time.Millisecond,
+	})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	collector.Handler().ServeHTTP(rr, req)
+	body := rr.Body.String()
+
+	// Verify newlines are escaped: the label value should contain literal \n (not a real newline)
+	// so "injected_metric" stays inside the label value, not on its own line as a fake metric.
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(line, "injected_metric") {
+			t.Fatalf("metric injection via newline: fake metric on its own line:\n%s", line)
+		}
+	}
+
+	// Verify quotes are escaped: the output should contain backslash-quote sequences
+	// which prevent label breakout. In the Prometheus format, \" keeps the quote
+	// inside the label value rather than terminating it.
+	if !strings.Contains(body, "\\\"") {
+		t.Fatalf("expected escaped quotes in label value, got:\n%s", body)
+	}
+
+	// The escaped newline (\n as literal characters) should appear in the output
+	if !strings.Contains(body, "\\n") {
+		t.Fatalf("expected escaped newline in label value, got:\n%s", body)
+	}
+}
+
 func TestPrometheusCollectorEmptyNamespace(t *testing.T) {
 	collector := NewPrometheusCollector("")
 
