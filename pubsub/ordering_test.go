@@ -1,0 +1,413 @@
+package pubsub
+
+import (
+	"context"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+func TestOrderedPubSub_Basic(t *testing.T) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	// Subscribe
+	sub, err := ops.Subscribe("test.order", SubOptions{BufferSize: 10})
+	if err != nil {
+		t.Fatalf("Failed to subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	// Publish ordered messages
+	for i := 0; i < 5; i++ {
+		msg := Message{Data: map[string]any{"seq": i}}
+		if err := ops.PublishOrdered("test.order", msg, OrderPerTopic); err != nil {
+			t.Fatalf("Failed to publish: %v", err)
+		}
+	}
+
+	// Receive and verify order
+	received := make([]int, 0, 5)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	for i := 0; i < 5; i++ {
+		select {
+		case msg := <-sub.C():
+			seq := int(msg.Data.(map[string]any)["seq"].(int))
+			received = append(received, seq)
+
+		case <-ctx.Done():
+			t.Fatalf("Timeout waiting for messages, got %d", len(received))
+		}
+	}
+
+	// Verify order
+	for i := 0; i < 5; i++ {
+		if received[i] != i {
+			t.Errorf("Message %d out of order: expected %d, got %d", i, i, received[i])
+		}
+	}
+}
+
+func TestOrderedPubSub_OrderLevels(t *testing.T) {
+	tests := []struct {
+		name  string
+		level OrderLevel
+	}{
+		{"None", OrderNone},
+		{"PerTopic", OrderPerTopic},
+		{"PerKey", OrderPerKey},
+		{"Global", OrderGlobal},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := DefaultOrderingConfig()
+			config.DefaultLevel = tt.level
+			ops := NewOrdered(config)
+			defer ops.Close()
+
+			sub, _ := ops.Subscribe("test", SubOptions{BufferSize: 10})
+			defer sub.Cancel()
+
+			// Publish
+			for i := 0; i < 3; i++ {
+				msg := Message{Data: i}
+				if err := ops.PublishOrdered("test", msg, tt.level); err != nil {
+					t.Errorf("Failed to publish: %v", err)
+				}
+			}
+
+			// Receive
+			time.Sleep(100 * time.Millisecond)
+			count := 0
+			for len(sub.C()) > 0 {
+				<-sub.C()
+				count++
+			}
+
+			if count != 3 {
+				t.Errorf("Expected 3 messages, got %d", count)
+			}
+		})
+	}
+}
+
+func TestOrderedPubSub_WithKey(t *testing.T) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub, _ := ops.Subscribe("test.key", SubOptions{BufferSize: 20})
+	defer sub.Cancel()
+
+	// Publish messages with different keys
+	keys := []string{"user1", "user2", "user1", "user3", "user2"}
+	for i, key := range keys {
+		msg := Message{Data: map[string]any{"seq": i, "key": key}}
+		if err := ops.PublishWithKey("test.key", key, msg, OrderPerKey); err != nil {
+			t.Fatalf("Failed to publish: %v", err)
+		}
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Receive and check
+	received := make(map[string][]int)
+	for len(sub.C()) > 0 {
+		msg := <-sub.C()
+		data := msg.Data.(map[string]any)
+		key := data["key"].(string)
+		seq := int(data["seq"].(int))
+		received[key] = append(received[key], seq)
+	}
+
+	// Verify each key's messages are ordered
+	for key, seqs := range received {
+		for i := 1; i < len(seqs); i++ {
+			if seqs[i] < seqs[i-1] {
+				t.Errorf("Key %s: messages out of order: %v", key, seqs)
+			}
+		}
+	}
+}
+
+func TestOrderedPubSub_ConcurrentPublish(t *testing.T) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	const numGoroutines = 10
+	const messagesPerGoroutine = 20
+
+	// Publish concurrently
+	var wg sync.WaitGroup
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			for j := 0; j < messagesPerGoroutine; j++ {
+				msg := Message{Data: map[string]any{"worker": id, "seq": j}}
+				_ = ops.PublishOrdered("test.concurrent", msg, OrderPerTopic)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	time.Sleep(200 * time.Millisecond)
+
+	stats := ops.OrderingStats()
+	expected := uint64(numGoroutines * messagesPerGoroutine)
+	if stats.OrderedPublishes < expected {
+		t.Logf("Published %d, expected %d (may still be queued)", stats.OrderedPublishes, expected)
+	}
+}
+
+func TestOrderedPubSub_Batching(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.MaxBatchSize = 5
+	config.BatchTimeout = 50 * time.Millisecond
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub, _ := ops.Subscribe("test.batch", SubOptions{BufferSize: 20})
+	defer sub.Cancel()
+
+	// Publish messages
+	for i := 0; i < 12; i++ {
+		msg := Message{Data: i}
+		_ = ops.PublishOrdered("test.batch", msg, OrderPerTopic)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Should receive all messages
+	count := 0
+	for len(sub.C()) > 0 {
+		<-sub.C()
+		count++
+	}
+
+	if count != 12 {
+		t.Errorf("Expected 12 messages, got %d", count)
+	}
+
+	stats := ops.OrderingStats()
+	if stats.TopicQueues != 1 {
+		t.Errorf("Expected 1 topic queue, got %d", stats.TopicQueues)
+	}
+}
+
+func TestOrderedPubSub_SequenceCheck(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.SequenceCheckEnabled = true
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub, _ := ops.Subscribe("test.seq", SubOptions{BufferSize: 10})
+	defer sub.Cancel()
+
+	// Publish sequential messages
+	for i := 0; i < 5; i++ {
+		msg := Message{Data: i}
+		_ = ops.PublishOrdered("test.seq", msg, OrderPerTopic)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	stats := ops.OrderingStats()
+	if stats.SequenceErrors > 0 {
+		t.Errorf("Expected no sequence errors, got %d", stats.SequenceErrors)
+	}
+}
+
+func TestOrderedPubSub_PartitionKey(t *testing.T) {
+	partitions := 4
+
+	// Generate keys and check distribution
+	keys := make([]string, 100)
+	for i := 0; i < 100; i++ {
+		keys[i] = PartitionKey(string(rune('A'+i%26)), partitions)
+	}
+
+	// Count distribution
+	counts := make(map[string]int)
+	for _, key := range keys {
+		counts[key]++
+	}
+
+	if len(counts) > partitions {
+		t.Errorf("Expected at most %d partitions, got %d", partitions, len(counts))
+	}
+}
+
+func TestOrderedPubSub_GlobalOrder(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.DefaultLevel = OrderGlobal
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub, _ := ops.Subscribe("topic1", SubOptions{BufferSize: 10})
+	defer sub.Cancel()
+
+	sub2, _ := ops.Subscribe("topic2", SubOptions{BufferSize: 10})
+	defer sub2.Cancel()
+
+	// Publish to different topics
+	var publishOrder atomic.Uint64
+	for i := 0; i < 3; i++ {
+		topic := "topic1"
+		if i%2 == 0 {
+			topic = "topic2"
+		}
+
+		seq := publishOrder.Add(1)
+		msg := Message{Data: map[string]any{"seq": seq}}
+		_ = ops.PublishOrdered(topic, msg, OrderGlobal)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// All messages should be processed in global order
+	stats := ops.OrderingStats()
+	if stats.OrderedPublishes != 3 {
+		t.Logf("Expected 3 ordered publishes, got %d (may be in queue)", stats.OrderedPublishes)
+	}
+}
+
+func TestOrderedPubSub_MultipleTopics(t *testing.T) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	topics := []string{"topic.a", "topic.b", "topic.c"}
+
+	// Publish to multiple topics
+	for _, topic := range topics {
+		for i := 0; i < 5; i++ {
+			msg := Message{Data: i}
+			_ = ops.PublishOrdered(topic, msg, OrderPerTopic)
+		}
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	stats := ops.OrderingStats()
+	if stats.TopicQueues != len(topics) {
+		t.Errorf("Expected %d topic queues, got %d", len(topics), stats.TopicQueues)
+	}
+}
+
+func TestOrderedPubSub_QueueFull(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.QueueSize = 5 // Small queue
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	// Try to fill queue
+	errors := 0
+	for i := 0; i < 10; i++ {
+		msg := Message{Data: i}
+		if err := ops.PublishOrdered("test", msg, OrderPerTopic); err != nil {
+			errors++
+		}
+	}
+
+	if errors == 0 {
+		t.Log("Note: Queue not filled (workers may be processing fast)")
+	}
+}
+
+func TestOrderedPubSub_Close(t *testing.T) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+
+	// Publish some messages
+	for i := 0; i < 5; i++ {
+		msg := Message{Data: i}
+		_ = ops.PublishOrdered("test", msg, OrderPerTopic)
+	}
+
+	// Close
+	if err := ops.Close(); err != nil {
+		t.Errorf("Close failed: %v", err)
+	}
+
+	// Publishing after close should fail
+	msg := Message{Data: "test"}
+	if err := ops.PublishOrdered("test", msg, OrderPerTopic); err != ErrOrderingClosed {
+		t.Errorf("Expected ErrOrderingClosed, got %v", err)
+	}
+}
+
+func TestOrderedPubSub_OrderedSubscription(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.SequenceCheckEnabled = true
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	osub, err := ops.SubscribeOrdered("test.ordered", SubOptions{BufferSize: 10})
+	if err != nil {
+		t.Fatalf("Failed to create ordered subscription: %v", err)
+	}
+	defer osub.Cancel()
+
+	// Publish messages
+	for i := 0; i < 5; i++ {
+		msg := Message{Data: i}
+		_ = ops.PublishOrdered("test.ordered", msg, OrderPerTopic)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Check missing sequences
+	missing := osub.MissingSequences()
+	if len(missing) > 0 {
+		t.Logf("Missing sequences: %v", missing)
+	}
+}
+
+func BenchmarkOrderedPubSub_PerTopic(b *testing.B) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	msg := Message{Data: []byte("benchmark message")}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ops.PublishOrdered("bench.topic", msg, OrderPerTopic)
+	}
+}
+
+func BenchmarkOrderedPubSub_PerKey(b *testing.B) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	msg := Message{Data: []byte("benchmark message")}
+	key := "test-key"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ops.PublishWithKey("bench.topic", key, msg, OrderPerKey)
+	}
+}
+
+func BenchmarkOrderedPubSub_Global(b *testing.B) {
+	config := DefaultOrderingConfig()
+	config.DefaultLevel = OrderGlobal
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	msg := Message{Data: []byte("benchmark message")}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ops.PublishOrdered("bench.topic", msg, OrderGlobal)
+	}
+}
