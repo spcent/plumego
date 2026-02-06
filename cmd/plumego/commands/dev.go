@@ -71,7 +71,7 @@ func (c *DevCmd) Flags() []Flag {
 	return []Flag{
 		{Name: "dir", Default: ".", Usage: "Project directory"},
 		{Name: "addr", Default: ":8080", Usage: "Application listen address (sets APP_ADDR)"},
-		{Name: "dashboard-addr", Default: ":9999", Usage: "Dashboard listen address"},
+		{Name: "dashboard-addr", Default: "127.0.0.1:9999", Usage: "Dashboard listen address"},
 		{Name: "watch", Default: "**/*.go", Usage: "Watch patterns (comma-separated)"},
 		{Name: "exclude", Default: "", Usage: "Exclude patterns (comma-separated)"},
 		{Name: "debounce", Default: "500ms", Usage: "Debounce duration for file changes"},
@@ -97,7 +97,7 @@ func parseDevArgs(args []string) (devOptions, error) {
 	opts := devOptions{}
 	fs.StringVar(&opts.dir, "dir", ".", "Project directory")
 	fs.StringVar(&opts.addr, "addr", ":8080", "Application listen address")
-	fs.StringVar(&opts.dashboardAddr, "dashboard-addr", ":9999", "Dashboard listen address")
+	fs.StringVar(&opts.dashboardAddr, "dashboard-addr", "127.0.0.1:9999", "Dashboard listen address")
 	fs.StringVar(&opts.watchPatterns, "watch", "**/*.go", "Watch patterns")
 	fs.StringVar(&opts.excludePatterns, "exclude", "", "Exclude patterns")
 	fs.StringVar(&opts.debounceStr, "debounce", "500ms", "Debounce duration")
@@ -122,15 +122,9 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		return out.Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
 	}
 
-	// Get absolute directory
-	absDir, err := filepath.Abs(opts.dir)
+	absDir, err := resolveDir(opts.dir)
 	if err != nil {
-		return out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
-	}
-
-	// Check if directory exists
-	if _, err := os.Stat(absDir); os.IsNotExist(err) {
-		return out.Error(fmt.Sprintf("directory not found: %s", absDir), 1)
+		return out.Error(err.Error(), 1)
 	}
 
 	if err := emitDevStart(out, absDir, opts.addr, opts.dashboardAddr); err != nil {

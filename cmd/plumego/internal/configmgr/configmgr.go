@@ -28,6 +28,30 @@ type ValidationIssue struct {
 	Message string `json:"message" yaml:"message"`
 }
 
+// ParseEnvFile reads a .env-style file and returns key-value pairs.
+// Lines starting with '#' and blank lines are skipped.
+func ParseEnvFile(path string) (map[string]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	vars := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			vars[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+	return vars, scanner.Err()
+}
+
 // LoadConfig loads configuration from files and environment
 func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 	config := &Config{
@@ -37,24 +61,7 @@ func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 
 	// Load from env file
 	envPath := filepath.Join(dir, envFile)
-	envVars := make(map[string]string)
-
-	if file, err := os.Open(envPath); err == nil {
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if strings.HasPrefix(line, "#") || line == "" {
-				continue
-			}
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				key := strings.TrimSpace(parts[0])
-				value := strings.TrimSpace(parts[1])
-				envVars[key] = value
-			}
-		}
-	}
+	envVars, _ := ParseEnvFile(envPath)
 
 	// App configuration
 	appConfig := make(map[string]any)
@@ -167,21 +174,9 @@ func ValidateConfig(dir, envFile string) ValidationResult {
 			Message: fmt.Sprintf("%s file not found (optional)", envFile),
 		})
 	} else {
-		// Validate env file content
-		envVars := make(map[string]string)
-		if file, err := os.Open(envPath); err == nil {
-			defer file.Close()
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if strings.HasPrefix(line, "#") || line == "" {
-					continue
-				}
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					envVars[parts[0]] = parts[1]
-				}
-			}
+		envVars, _ := ParseEnvFile(envPath)
+		if envVars == nil {
+			envVars = make(map[string]string)
 		}
 
 		// Check for required secrets
@@ -238,49 +233,58 @@ JWT_EXPIRY=15m
 	return created, nil
 }
 
-// GetEnvVars returns all environment variables
+// GetEnvVars returns all environment variables, with sensitive values redacted.
 func GetEnvVars(dir, envFile string) map[string]any {
 	result := make(map[string]any)
 
 	envPath := filepath.Join(dir, envFile)
-	envVars := make(map[string]string)
-
-	if file, err := os.Open(envPath); err == nil {
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if strings.HasPrefix(line, "#") || line == "" {
-				continue
-			}
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				envVars[parts[0]] = parts[1]
-			}
-		}
+	envVars, _ := ParseEnvFile(envPath)
+	if envVars == nil {
+		envVars = make(map[string]string)
 	}
 
-	result["file"] = envVars
+	redactedFile := make(map[string]string, len(envVars))
+	for k, v := range envVars {
+		if isSensitiveKey(k) {
+			redactedFile[k] = "***REDACTED***"
+		} else {
+			redactedFile[k] = v
+		}
+	}
+	result["file"] = redactedFile
 
 	// Get system environment variables
 	systemEnv := make(map[string]string)
 	for _, env := range os.Environ() {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) == 2 {
-			// Only include APP_*, WS_*, JWT_*, DB_*, REDIS_* prefixes
 			key := parts[0]
 			if strings.HasPrefix(key, "APP_") ||
 				strings.HasPrefix(key, "WS_") ||
 				strings.HasPrefix(key, "JWT_") ||
 				strings.HasPrefix(key, "DB_") ||
 				strings.HasPrefix(key, "REDIS_") {
-				systemEnv[key] = parts[1]
+				if isSensitiveKey(key) {
+					systemEnv[key] = "***REDACTED***"
+				} else {
+					systemEnv[key] = parts[1]
+				}
 			}
 		}
 	}
 	result["system"] = systemEnv
 
 	return result
+}
+
+// isSensitiveKey returns true if the env var key likely holds a secret.
+func isSensitiveKey(key string) bool {
+	upper := strings.ToUpper(key)
+	return strings.Contains(upper, "SECRET") ||
+		strings.Contains(upper, "PASSWORD") ||
+		strings.Contains(upper, "TOKEN") ||
+		strings.Contains(upper, "KEY") ||
+		strings.Contains(upper, "DB_URL")
 }
 
 func getConfigValue(key string, envVars map[string]string, resolve bool) string {

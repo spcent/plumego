@@ -69,15 +69,9 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	// Get absolute directory
-	absDir, err := filepath.Abs(*dir)
+	absDir, err := resolveDir(*dir)
 	if err != nil {
-		return ctx.Out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
-	}
-
-	// Check if directory exists
-	if _, err := os.Stat(absDir); os.IsNotExist(err) {
-		return ctx.Out.Error(fmt.Sprintf("directory not found: %s", absDir), 1)
+		return ctx.Out.Error(err.Error(), 1)
 	}
 
 	// Build test arguments

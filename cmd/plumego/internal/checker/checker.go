@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/spcent/plumego/cmd/plumego/internal/configmgr"
 )
 
 // CheckResult represents the overall health check result
@@ -141,27 +143,14 @@ func CheckSecurity(dir, envFile string) CheckDetail {
 	requiredSecrets := []string{"WS_SECRET", "JWT_SECRET"}
 
 	envPath := filepath.Join(dir, envFile)
-	envVars := make(map[string]bool)
-
-	// Try to read .env file
-	if file, err := os.Open(envPath); err == nil {
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if strings.HasPrefix(line, "#") || line == "" {
-				continue
-			}
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				envVars[parts[0]] = true
-			}
-		}
+	envVars, _ := configmgr.ParseEnvFile(envPath)
+	if envVars == nil {
+		envVars = make(map[string]string)
 	}
 
 	// Check environment variables
 	for _, secret := range requiredSecrets {
-		hasEnvVar := envVars[secret]
+		_, hasEnvVar := envVars[secret]
 		hasSystemEnv := os.Getenv(secret) != ""
 
 		if !hasEnvVar && !hasSystemEnv {

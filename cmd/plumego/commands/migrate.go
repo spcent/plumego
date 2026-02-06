@@ -148,33 +148,43 @@ func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, dri
 	}
 }
 
-func (c *MigrateCmd) reportStatus(out *output.Formatter, migrations []migrate.Migration, applied []migrate.AppliedMigration) error {
-	appliedMap := make(map[string]migrate.AppliedMigration)
+// appliedVersionSet builds a set of version strings from applied migrations.
+func appliedVersionSet(applied []migrate.AppliedMigration) map[string]struct{} {
+	set := make(map[string]struct{}, len(applied))
 	for _, entry := range applied {
-		appliedMap[entry.Version] = entry
+		set[entry.Version] = struct{}{}
 	}
+	return set
+}
 
-	var pending []map[string]any
-	for _, migration := range migrations {
-		if _, ok := appliedMap[migration.Version]; ok {
-			continue
+// pendingMigrations returns migrations not yet applied.
+func pendingMigrations(migrations []migrate.Migration, applied []migrate.AppliedMigration) []migrate.Migration {
+	set := appliedVersionSet(applied)
+	var pending []migrate.Migration
+	for _, m := range migrations {
+		if _, ok := set[m.Version]; !ok {
+			pending = append(pending, m)
 		}
-		pending = append(pending, map[string]any{
-			"version": migration.Version,
-			"name":    migration.Name,
-			"up_path": migration.UpPath,
-		})
 	}
+	return pending
+}
 
-	currentVersion := ""
-	if len(applied) > 0 {
-		currentVersion = applied[len(applied)-1].Version
+func (c *MigrateCmd) reportStatus(out *output.Formatter, migrations []migrate.Migration, applied []migrate.AppliedMigration) error {
+	pending := pendingMigrations(migrations, applied)
+
+	var pendingInfo []map[string]any
+	for _, m := range pending {
+		pendingInfo = append(pendingInfo, map[string]any{
+			"version": m.Version,
+			"name":    m.Name,
+			"up_path": m.UpPath,
+		})
 	}
 
 	result := map[string]any{
 		"applied":         applied,
-		"pending":         pending,
-		"current_version": currentVersion,
+		"pending":         pendingInfo,
+		"current_version": latestVersion(applied),
 		"total":           len(migrations),
 	}
 
@@ -182,18 +192,7 @@ func (c *MigrateCmd) reportStatus(out *output.Formatter, migrations []migrate.Mi
 }
 
 func (c *MigrateCmd) applyUp(out *output.Formatter, ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
-	appliedMap := make(map[string]struct{})
-	for _, entry := range applied {
-		appliedMap[entry.Version] = struct{}{}
-	}
-
-	var pending []migrate.Migration
-	for _, migration := range migrations {
-		if _, ok := appliedMap[migration.Version]; ok {
-			continue
-		}
-		pending = append(pending, migration)
-	}
+	pending := pendingMigrations(migrations, applied)
 
 	if steps > 0 && len(pending) > steps {
 		pending = pending[:steps]
@@ -295,19 +294,11 @@ func latestVersion(applied []migrate.AppliedMigration) string {
 }
 
 func pendingVersions(migrations []migrate.Migration, applied []migrate.AppliedMigration) []string {
-	appliedSet := make(map[string]struct{})
-	for _, entry := range applied {
-		appliedSet[entry.Version] = struct{}{}
+	pending := pendingMigrations(migrations, applied)
+	versions := make([]string, len(pending))
+	for i, m := range pending {
+		versions[i] = m.Version
 	}
-
-	var pending []string
-	for _, migration := range migrations {
-		if _, ok := appliedSet[migration.Version]; ok {
-			continue
-		}
-		pending = append(pending, migration.Version)
-	}
-
-	sort.Strings(pending)
-	return pending
+	sort.Strings(versions)
+	return versions
 }
