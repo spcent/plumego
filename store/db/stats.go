@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+const (
+	OP_SELECT = "SELECT"
+	OP_UPDATE = "UPDATE"
+	OP_INSERT = "INSERT"
+	OP_DELETE = "DELETE"
+)
+
 // QueryStats tracks statistics for database queries.
 type QueryStats struct {
 	// Query metrics
@@ -99,6 +106,17 @@ func (a *DBStatsAggregator) RecordQuery(operation, query string, duration time.D
 func (a *DBStatsAggregator) updateStats(stats *QueryStats, operation string, duration time.Duration, err error, now time.Time) {
 	stats.TotalQueries++
 	stats.LastUpdate = now
+	operation = strings.TrimSpace(strings.ToUpper(operation))
+	switch operation {
+	case OP_SELECT:
+		stats.SelectQueries++
+	case OP_INSERT:
+		stats.InsertQueries++
+	case OP_UPDATE:
+		stats.UpdateQueries++
+	case OP_DELETE:
+		stats.DeleteQueries++
+	}
 
 	if err == nil {
 		stats.SuccessQueries++
@@ -128,13 +146,13 @@ func (a *DBStatsAggregator) updateStats(stats *QueryStats, operation string, dur
 
 func (a *DBStatsAggregator) updateQueryType(stats *QueryStats, queryType string) {
 	switch queryType {
-	case "SELECT":
+	case OP_SELECT:
 		stats.SelectQueries++
-	case "INSERT":
+	case OP_INSERT:
 		stats.InsertQueries++
-	case "UPDATE":
+	case OP_UPDATE:
 		stats.UpdateQueries++
-	case "DELETE":
+	case OP_DELETE:
 		stats.DeleteQueries++
 	}
 }
@@ -146,17 +164,17 @@ func detectQueryType(query string) string {
 
 	query = strings.TrimSpace(strings.ToUpper(query))
 
-	if strings.HasPrefix(query, "SELECT") {
-		return "SELECT"
+	if strings.HasPrefix(query, OP_SELECT) {
+		return OP_SELECT
 	}
-	if strings.HasPrefix(query, "INSERT") {
-		return "INSERT"
+	if strings.HasPrefix(query, OP_INSERT) {
+		return OP_INSERT
 	}
-	if strings.HasPrefix(query, "UPDATE") {
-		return "UPDATE"
+	if strings.HasPrefix(query, OP_UPDATE) {
+		return OP_UPDATE
 	}
-	if strings.HasPrefix(query, "DELETE") {
-		return "DELETE"
+	if strings.HasPrefix(query, OP_DELETE) {
+		return OP_DELETE
 	}
 
 	return ""
@@ -335,7 +353,7 @@ func extractTableName(query string) string {
 	query = strings.TrimSpace(strings.ToUpper(query))
 
 	// Handle SELECT
-	if strings.HasPrefix(query, "SELECT") {
+	if strings.HasPrefix(query, OP_SELECT) {
 		if idx := strings.Index(query, "FROM"); idx != -1 {
 			rest := strings.TrimSpace(query[idx+4:])
 			parts := strings.Fields(rest)
@@ -355,7 +373,7 @@ func extractTableName(query string) string {
 	}
 
 	// Handle UPDATE
-	if strings.HasPrefix(query, "UPDATE") {
+	if strings.HasPrefix(query, OP_UPDATE) {
 		rest := strings.TrimSpace(query[6:])
 		parts := strings.Fields(rest)
 		if len(parts) > 0 {

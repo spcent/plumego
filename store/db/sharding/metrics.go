@@ -404,7 +404,7 @@ func (m *MetricsCollector) PrometheusMetrics() string {
 }
 
 func formatPrometheusMetric(name string, value uint64) string {
-	return formatUint64(value) + "\n"
+	return name + " " + formatUint64(value) + "\n"
 }
 
 func formatPrometheusMetricWithLabels(name string, value uint64, labels map[string]string) string {
