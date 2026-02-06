@@ -141,14 +141,16 @@ func Metrics(next RoundTripperFunc) RoundTripperFunc {
 
 // Client is a wrapper around http.Client with retry, timeout, and backoff support.
 type Client struct {
-	client         *http.Client
-	retryCount     int
-	retryWait      time.Duration
-	maxRetryWait   time.Duration
-	retryPolicy    RetryPolicy
-	defaultTimeout time.Duration
-	middlewares    []Middleware
-	retryCheck     func(*http.Request) bool
+	client          *http.Client
+	retryCount      int
+	retryWait       time.Duration
+	maxRetryWait    time.Duration
+	retryPolicy     RetryPolicy
+	defaultTimeout  time.Duration
+	middlewares     []Middleware
+	retryCheck      func(*http.Request) bool
+	ssrfProtection  *SSRFProtection
+	enableSSRFCheck bool
 }
 
 // Option defines a functional option for Client
@@ -207,6 +209,23 @@ func WithMiddleware(mw Middleware) Option {
 func WithTransport(transport http.RoundTripper) Option {
 	return func(c *Client) {
 		c.client.Transport = transport
+	}
+}
+
+// WithSSRFProtection enables SSRF protection with the given configuration.
+func WithSSRFProtection(protection SSRFProtection) Option {
+	return func(c *Client) {
+		c.ssrfProtection = &protection
+		c.enableSSRFCheck = true
+	}
+}
+
+// WithDefaultSSRFProtection enables SSRF protection with secure defaults.
+func WithDefaultSSRFProtection() Option {
+	return func(c *Client) {
+		defaults := DefaultSSRFProtection()
+		c.ssrfProtection = &defaults
+		c.enableSSRFCheck = true
 	}
 }
 
@@ -300,6 +319,13 @@ func backoffWithJitter(base time.Duration, attempt int, max time.Duration) time.
 
 // doRequest executes an HTTP request with retry and policy control.
 func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Response, error) {
+	// SSRF protection - validate URL before making request
+	if c.enableSSRFCheck && c.ssrfProtection != nil {
+		if err := ValidateURL(req.URL.String(), *c.ssrfProtection); err != nil {
+			return nil, err
+		}
+	}
+
 	cfg := &requestConfig{
 		retryCount:  &c.retryCount,
 		retryPolicy: c.retryPolicy,
