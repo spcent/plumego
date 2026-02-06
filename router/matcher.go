@@ -185,23 +185,16 @@ func (rm *RouteMatcher) findChildForPath(parent *node, path string) *node {
 	return nil
 }
 
-// findParamChild finds a param child node if exists.
-// Parameter nodes are identified by paths starting with ":".
-// This method uses indices for O(1) lookup when available.
-//
-// Parameters:
-//   - parent: Parent node to search in
-//
-// Returns:
-//   - *node: Parameter child node, or nil if not found
-func (rm *RouteMatcher) findParamChild(parent *node) *node {
+// findChildByByte finds a child node whose path starts with the given byte.
+// Uses indices for O(1) lookup when available, falls back to linear search.
+func (rm *RouteMatcher) findChildByByte(parent *node, b byte) *node {
 	if parent == nil || len(parent.children) == 0 {
 		return nil
 	}
 
 	// Use indices for fast lookup if available
 	if len(parent.indices) > 0 {
-		idx := strings.IndexByte(parent.indices, ':')
+		idx := strings.IndexByte(parent.indices, b)
 		if idx >= 0 && idx < len(parent.children) {
 			return parent.children[idx]
 		}
@@ -210,41 +203,19 @@ func (rm *RouteMatcher) findParamChild(parent *node) *node {
 
 	// Fallback to linear search
 	for i := range parent.children {
-		if len(parent.children[i].path) > 0 && parent.children[i].path[0] == ':' {
+		if len(parent.children[i].path) > 0 && parent.children[i].path[0] == b {
 			return parent.children[i]
 		}
 	}
 	return nil
 }
 
-// findWildChild finds a wildcard child node if exists.
-// Wildcard nodes are identified by paths starting with "*".
-// This method uses indices for O(1) lookup when available.
-//
-// Parameters:
-//   - parent: Parent node to search in
-//
-// Returns:
-//   - *node: Wildcard child node, or nil if not found
+// findParamChild finds a param child node (path starting with ":").
+func (rm *RouteMatcher) findParamChild(parent *node) *node {
+	return rm.findChildByByte(parent, ':')
+}
+
+// findWildChild finds a wildcard child node (path starting with "*").
 func (rm *RouteMatcher) findWildChild(parent *node) *node {
-	if parent == nil || len(parent.children) == 0 {
-		return nil
-	}
-
-	// Use indices for fast lookup if available
-	if len(parent.indices) > 0 {
-		idx := strings.IndexByte(parent.indices, '*')
-		if idx >= 0 && idx < len(parent.children) {
-			return parent.children[idx]
-		}
-		return nil
-	}
-
-	// Fallback to linear search
-	for i := range parent.children {
-		if len(parent.children[i].path) > 0 && parent.children[i].path[0] == '*' {
-			return parent.children[i]
-		}
-	}
-	return nil
+	return rm.findChildByByte(parent, '*')
 }

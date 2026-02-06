@@ -450,28 +450,22 @@ func (r *Router) pathMatchesPattern(path, pattern string, params map[string]stri
 	// Check each part
 	for i, patternPart := range patternParts {
 		if strings.HasPrefix(patternPart, "*") {
+			// Wildcard - matches everything from here
 			return true
 		}
 		if i >= len(pathParts) {
 			return false
 		}
 
-		pathPart := pathParts[i]
-
 		if strings.HasPrefix(patternPart, ":") {
 			// Parameter - should match the value in params
 			paramName := patternPart[1:]
-			if params[paramName] != pathPart {
+			if params[paramName] != pathParts[i] {
 				return false
 			}
-		} else if strings.HasPrefix(patternPart, "*") {
-			// Wildcard - matches everything
-			return true
-		} else {
+		} else if patternPart != pathParts[i] {
 			// Static part - must match exactly
-			if patternPart != pathPart {
-				return false
-			}
+			return false
 		}
 	}
 
