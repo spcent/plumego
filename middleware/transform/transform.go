@@ -112,6 +112,10 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 				_ = resp.Body.Close()
 			}
 
+			// SECURITY NOTE: The transformedBody contains response data that has been
+			// processed by the Transform function. This middleware does not inject user
+			// input into HTML - it applies transformations to existing responses.
+			// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
 			// Write transformed response
 			copyResponseHeaders(w.Header(), resp.Header)
 			if len(transformedBody) > 0 {

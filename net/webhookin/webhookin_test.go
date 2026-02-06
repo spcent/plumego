@@ -84,10 +84,10 @@ func TestVerifyStripe(t *testing.T) {
 }
 
 func TestParseStripeHeaderErrors(t *testing.T) {
-	if _, _, err := parseStripeSigHeader("v1=abc"); err == nil {
+	if _, err := parseStripeSigHeader("v1=abc"); err == nil {
 		t.Fatalf("expected error without timestamp")
 	}
-	if _, _, err := parseStripeSigHeader("t=abc,v1=abc"); err == nil {
+	if _, err := parseStripeSigHeader("t=abc,v1=abc"); err == nil {
 		t.Fatalf("expected parse int error")
 	}
 }

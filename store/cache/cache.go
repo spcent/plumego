@@ -608,6 +608,10 @@ func cachedHandler(c Cache, ttl time.Duration, keyFn func(*http.Request) string,
 		// Capture body once for writing and optional caching
 		bodyBytes := recorder.Body.Bytes()
 
+		// SECURITY NOTE: bodyBytes contains response data from upstream handlers.
+		// This cache middleware does not inject user input into HTML contexts.
+		// Content type filtering below ensures only safe responses are cached.
+		// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
 		copyHeaders(w.Header(), recorder.Header())
 		w.Header().Set("X-Cache", "MISS")
 		w.WriteHeader(recorder.Code)

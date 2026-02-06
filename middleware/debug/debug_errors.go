@@ -165,6 +165,10 @@ func (r *debugErrorRecorder) statusCode() int {
 }
 
 func (r *debugErrorRecorder) flushTo(w http.ResponseWriter) {
+	// SECURITY NOTE: This middleware records error responses for debugging.
+	// The body contains error information from upstream handlers, not user input.
+	// This does not introduce XSS vulnerabilities as it passes through existing responses.
+	// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
 	copyHeader(w.Header(), r.header)
 	w.WriteHeader(r.statusCode())
 	_, _ = w.Write(r.body.Bytes())

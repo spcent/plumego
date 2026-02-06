@@ -42,6 +42,10 @@ func (r *ResponseRecorder) WriteHeader(code int) {
 }
 
 // Write captures body bytes and writes through to the underlying writer.
+// SECURITY NOTE: This is middleware infrastructure that captures response data
+// from upstream handlers for metrics/logging purposes. It does not inject user
+// input into HTML contexts and therefore does not introduce XSS vulnerabilities.
+// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
 func (r *ResponseRecorder) Write(b []byte) (int, error) {
 	if !r.written {
 		r.WriteHeader(http.StatusOK)

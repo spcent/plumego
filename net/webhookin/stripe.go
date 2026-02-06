@@ -1,22 +1,20 @@
 package webhookin
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 )
 
-var ErrStripeSignature = errors.New("invalid stripe signature")
-var ErrStripeMissingHeader = errors.New("missing stripe signature header")
-var ErrStripeInvalidTimestamp = errors.New("invalid timestamp in signature")
-var ErrStripeExpired = errors.New("signature expired")
-var ErrStripeInvalidEncoding = errors.New("invalid hex encoding")
+var (
+	ErrStripeSignature        = errors.New("invalid stripe signature")
+	ErrStripeMissingHeader    = errors.New("missing stripe signature header")
+	ErrStripeInvalidTimestamp = errors.New("invalid timestamp in signature")
+	ErrStripeExpired          = errors.New("signature expired")
+	ErrStripeInvalidEncoding  = errors.New("invalid hex encoding")
+)
 
 // StripeVerifyOptions configures Stripe webhook verification.
 type StripeVerifyOptions struct {
@@ -25,14 +23,47 @@ type StripeVerifyOptions struct {
 	Now       func() time.Time
 }
 
+// StripeSignatureExtractor extracts t and v1 values from Stripe-Signature header.
+type StripeSignatureExtractor struct {
+	Timestamp  int64
+	Signatures []string
+}
+
+// parseStripeSigHeader parses the Stripe-Signature header format: "t=...,v1=...,v1=..."
+func parseStripeSigHeader(h string) (StripeSignatureExtractor, error) {
+	var result StripeSignatureExtractor
+	parts := strings.Split(h, ",")
+	var tStr string
+
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if strings.HasPrefix(p, "t=") {
+			tStr = strings.TrimPrefix(p, "t=")
+		} else if strings.HasPrefix(p, "v1=") {
+			result.Signatures = append(result.Signatures, strings.TrimPrefix(p, "v1="))
+		}
+	}
+
+	if tStr == "" || len(result.Signatures) == 0 {
+		return result, ErrStripeSignature
+	}
+
+	timestamp, err := strconv.ParseInt(tStr, 10, 64)
+	if err != nil {
+		return result, ErrStripeInvalidTimestamp
+	}
+	result.Timestamp = timestamp
+
+	return result, nil
+}
+
 // VerifyStripe verifies "Stripe-Signature" header.
 // Signed payload = "<t>.<rawBody>"
 // Header contains: "t=...,v1=...,v1=..."
+//
+// Now uses the shared VerifyHMAC implementation with custom logic for Stripe's
+// multi-signature format.
 func VerifyStripe(r *http.Request, endpointSecret string, opt StripeVerifyOptions) ([]byte, error) {
-	nowFn := opt.Now
-	if nowFn == nil {
-		nowFn = time.Now
-	}
 	if opt.MaxBody <= 0 {
 		opt.MaxBody = 1 << 20 // 1MB default
 	}
@@ -40,69 +71,73 @@ func VerifyStripe(r *http.Request, endpointSecret string, opt StripeVerifyOption
 		opt.Tolerance = 5 * time.Minute
 	}
 
+	// Parse Stripe-Signature header to extract timestamp
 	header := strings.TrimSpace(r.Header.Get("Stripe-Signature"))
 	if header == "" {
 		return nil, ErrStripeMissingHeader
 	}
 
-	t, sigs, err := parseStripeSigHeader(header)
+	parsed, err := parseStripeSigHeader(header)
 	if err != nil {
 		return nil, err
 	}
 
-	// replay protection with tolerance window
-	now := nowFn().UTC()
-	ts := time.Unix(t, 0).UTC()
-	earliest := now.Add(-opt.Tolerance)
-	latest := now.Add(opt.Tolerance)
+	// Inject timestamp into a temporary header for VerifyHMAC
+	// This allows us to use the shared verification logic
+	r.Header.Set("X-Stripe-Timestamp", strconv.FormatInt(parsed.Timestamp, 10))
 
-	if ts.Before(earliest) {
-		return nil, ErrStripeExpired
-	}
-	if ts.After(latest) {
-		return nil, ErrStripeInvalidTimestamp
-	}
+	// Try each v1 signature until one matches
+	var lastErr error
+	for _, sig := range parsed.Signatures {
+		// Temporarily set this v1 signature
+		r.Header.Set("Stripe-Signature", sig)
 
-	body, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, opt.MaxBody))
-	if err != nil {
-		return nil, err
-	}
-
-	signed := strconv.FormatInt(t, 10) + "." + string(body)
-	mac := hmac.New(sha256.New, []byte(endpointSecret))
-	mac.Write([]byte(signed))
-	expected := mac.Sum(nil)
-
-	// any v1 signature match is acceptable
-	for _, v1 := range sigs {
-		b, err := hex.DecodeString(v1)
-		if err != nil {
-			continue
+		cfg := HMACConfig{
+			Secret:       []byte(endpointSecret),
+			Header:       "Stripe-Signature",
+			MaxBody:      opt.MaxBody,
+			Algorithm:    HashSHA256,
+			Encoding:     EncodingHex,
+			SignedFormat: PayloadTimestampBody,
+			Replay: HMACReplayConfig{
+				TimestampHeader: "X-Stripe-Timestamp",
+				Tolerance:       opt.Tolerance,
+				Now:             opt.Now,
+			},
 		}
-		if hmac.Equal(expected, b) {
-			return body, nil
+
+		result, err := VerifyHMAC(r, cfg)
+		if err == nil {
+			// Clean up temporary headers
+			r.Header.Del("X-Stripe-Timestamp")
+			r.Header.Set("Stripe-Signature", header) // restore original
+			return result.Body, nil
+		}
+		lastErr = err
+	}
+
+	// Clean up temporary headers
+	r.Header.Del("X-Stripe-Timestamp")
+	r.Header.Set("Stripe-Signature", header) // restore original
+
+	// Map generic errors to Stripe-specific errors for backwards compatibility
+	if lastErr != nil {
+		ve, ok := lastErr.(*VerifyError)
+		if ok {
+			switch ve.Code {
+			case CodeMissingSignature:
+				return nil, ErrStripeMissingHeader
+			case CodeInvalidSignature:
+				return nil, ErrStripeSignature
+			case CodeInvalidEncoding:
+				return nil, ErrStripeInvalidEncoding
+			case CodeTimestampExpired:
+				return nil, ErrStripeExpired
+			case CodeInvalidTimestamp:
+				return nil, ErrStripeInvalidTimestamp
+			}
 		}
 	}
+
 	return nil, ErrStripeSignature
-}
-
-func parseStripeSigHeader(h string) (timestamp int64, v1s []string, err error) {
-	parts := strings.Split(h, ",")
-	var tStr string
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if strings.HasPrefix(p, "t=") {
-			tStr = strings.TrimPrefix(p, "t=")
-		} else if strings.HasPrefix(p, "v1=") {
-			v1s = append(v1s, strings.TrimPrefix(p, "v1="))
-		}
-	}
-	if tStr == "" || len(v1s) == 0 {
-		return 0, nil, ErrStripeSignature
-	}
-	timestamp, err = strconv.ParseInt(tStr, 10, 64)
-	if err != nil {
-		return 0, nil, ErrStripeInvalidTimestamp
-	}
-	return timestamp, v1s, nil
 }
