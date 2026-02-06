@@ -108,7 +108,7 @@ func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	utils.EnsureNoSniff(w.Header())
 	w.WriteHeader(http.StatusServiceUnavailable)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"error":   "Service Unavailable",
 		"message": "Circuit breaker is open. The service is temporarily unavailable.",
 		"circuit": cb.Name(),
@@ -123,7 +123,7 @@ func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	utils.EnsureNoSniff(w.Header())
 	w.WriteHeader(http.StatusTooManyRequests)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"error":   "Too Many Requests",
 		"message": "Circuit breaker is in half-open state. Too many concurrent requests.",
 		"circuit": cb.Name(),

@@ -229,7 +229,7 @@ func (h *AdminHandler) ListTenants(ctx *plumego.Context) {
 		response = append(response, toTenantResponse(config))
 	}
 
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"tenants": response,
 		"count":   len(response),
 	})

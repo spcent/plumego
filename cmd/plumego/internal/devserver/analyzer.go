@@ -53,9 +53,9 @@ func (a *Analyzer) GetRoutes() ([]RouteInfo, error) {
 	var response struct {
 		Data struct {
 			Routes []struct {
-				Method string                 `json:"method"`
-				Path   string                 `json:"path"`
-				Meta   map[string]interface{} `json:"meta"`
+				Method string         `json:"method"`
+				Path   string         `json:"path"`
+				Meta   map[string]any `json:"meta"`
 			} `json:"routes"`
 		} `json:"data"`
 	}
@@ -114,7 +114,7 @@ func (a *Analyzer) ProbeEndpoints() []RouteInfo {
 }
 
 // GetAppInfo fetches application information
-func (a *Analyzer) GetAppInfo() (map[string]interface{}, error) {
+func (a *Analyzer) GetAppInfo() (map[string]any, error) {
 	configURL := a.appURL + "/_debug/config"
 
 	client := &http.Client{
@@ -127,7 +127,7 @@ func (a *Analyzer) GetAppInfo() (map[string]interface{}, error) {
 	}
 	defer resp.Body.Close()
 
-	var config map[string]interface{}
+	var config map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
@@ -136,7 +136,7 @@ func (a *Analyzer) GetAppInfo() (map[string]interface{}, error) {
 }
 
 // HealthCheck checks if the application is healthy
-func (a *Analyzer) HealthCheck() (bool, map[string]interface{}, error) {
+func (a *Analyzer) HealthCheck() (bool, map[string]any, error) {
 	healthURL := a.appURL + "/health"
 
 	client := &http.Client{
@@ -151,10 +151,10 @@ func (a *Analyzer) HealthCheck() (bool, map[string]interface{}, error) {
 
 	healthy := resp.StatusCode == http.StatusOK
 
-	var details map[string]interface{}
+	var details map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {
 		// Health endpoint might not return JSON
-		details = map[string]interface{}{
+		details = map[string]any{
 			"status": resp.Status,
 		}
 	}

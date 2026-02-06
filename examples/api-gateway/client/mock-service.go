@@ -26,7 +26,7 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"status":  "healthy",
 			"service": serviceName,
 			"port":    port,
@@ -43,8 +43,8 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"users": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"users": []map[string]any{
 				{"id": 1, "name": "Alice", "email": "alice@example.com"},
 				{"id": 2, "name": "Bob", "email": "bob@example.com"},
 			},
@@ -62,7 +62,7 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"id":      123,
 			"name":    "John Doe",
 			"email":   "john@example.com",
@@ -75,8 +75,8 @@ func main() {
 	mux.HandleFunc("/orders", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"orders": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"orders": []map[string]any{
 				{"id": 1, "product": "Laptop", "price": 999.99},
 				{"id": 2, "product": "Mouse", "price": 29.99},
 			},
@@ -89,8 +89,8 @@ func main() {
 	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"products": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"products": []map[string]any{
 				{"id": 1, "name": "Laptop", "price": 999.99},
 				{"id": 2, "name": "Mouse", "price": 29.99},
 				{"id": 3, "name": "Keyboard", "price": 79.99},

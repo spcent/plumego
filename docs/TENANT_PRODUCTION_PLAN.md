@@ -313,13 +313,13 @@ type TenantDB struct {
 }
 
 // QueryContext automatically adds WHERE tenant_id = ?
-func (tdb *TenantDB) QueryContext(ctx context.Context, tenantID string, query string, args ...interface{}) (*sql.Rows, error)
+func (tdb *TenantDB) QueryContext(ctx context.Context, tenantID string, query string, args ...any) (*sql.Rows, error)
 
 // ExecContext automatically adds WHERE tenant_id = ?
-func (tdb *TenantDB) ExecContext(ctx context.Context, tenantID string, query string, args ...interface{}) (sql.Result, error)
+func (tdb *TenantDB) ExecContext(ctx context.Context, tenantID string, query string, args ...any) (sql.Result, error)
 
 // QueryFromContext extracts tenant from context
-func (tdb *TenantDB) QueryFromContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+func (tdb *TenantDB) QueryFromContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
     tenantID := tenant.TenantIDFromContext(ctx)
     return tdb.QueryContext(ctx, tenantID, query, args...)
 }
@@ -328,7 +328,7 @@ func (tdb *TenantDB) QueryFromContext(ctx context.Context, query string, args ..
 **Helper Functions**:
 ```go
 // AddTenantFilter injects tenant_id filter into SQL
-func AddTenantFilter(query string, tenantID string, tenantColumn string) (string, []interface{})
+func AddTenantFilter(query string, tenantID string, tenantColumn string) (string, []any)
 
 // ValidateQuery checks for missing tenant filter (safety check)
 func ValidateQuery(query string, tenantColumn string) error
@@ -362,7 +362,7 @@ type TenantShardRouter struct {
 
 func (r *TenantShardRouter) ShardForTenant(tenantID string) (*Shard, error)
 
-func (r *TenantShardRouter) QueryTenant(ctx context.Context, tenantID string, query string, args ...interface{}) (*sql.Rows, error)
+func (r *TenantShardRouter) QueryTenant(ctx context.Context, tenantID string, query string, args ...any) (*sql.Rows, error)
 ```
 
 **Acceptance Criteria**:
@@ -533,13 +533,13 @@ type TenantCache struct {
     prefix string
 }
 
-func (tc *TenantCache) Get(ctx context.Context, key string) (interface{}, error) {
+func (tc *TenantCache) Get(ctx context.Context, key string) (any, error) {
     tenantID := tenant.TenantIDFromContext(ctx)
     fullKey := fmt.Sprintf("%s:%s:%s", tc.prefix, tenantID, key)
     return tc.cache.Get(ctx, fullKey)
 }
 
-func (tc *TenantCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error
+func (tc *TenantCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error
 ```
 
 **Acceptance Criteria**:

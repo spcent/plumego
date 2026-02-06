@@ -93,7 +93,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		ThumbWidth:    thumbWidth,
 		ThumbHeight:   thumbHeight,
 		UploadedBy:    userID,
-		Metadata:      make(map[string]interface{}),
+		Metadata:      make(map[string]any),
 	}
 
 	// Upload file
@@ -248,7 +248,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build response
-	resp := map[string]interface{}{
+	resp := map[string]any{
 		"items":      files,
 		"total":      total,
 		"page":       query.Page,
@@ -303,7 +303,7 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 }
 
 // writeJSON writes a JSON response.
-func (h *Handler) writeJSON(w http.ResponseWriter, status int, data interface{}) {
+func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
@@ -311,7 +311,7 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, data interface{})
 
 // writeError writes an error response.
 func (h *Handler) writeError(w http.ResponseWriter, status int, message string) {
-	h.writeJSON(w, status, map[string]interface{}{
+	h.writeJSON(w, status, map[string]any{
 		"error":   http.StatusText(status),
 		"message": message,
 	})

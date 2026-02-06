@@ -255,7 +255,7 @@ func (ps *InProcPubSub) Drain(ctx context.Context) error {
 //		fmt.Printf("Received: %v\n", msg.Data)
 //	}
 func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, error) {
-	return ps.subscribeInternal(nil, topic, opts, false)
+	return ps.subscribeInternal(context.Background(), topic, opts, false)
 }
 
 // SubscribeWithContext creates a subscription that is cancelled when the context is done.
@@ -287,7 +287,7 @@ func (ps *InProcPubSub) SubscribeWithContext(ctx context.Context, topic string, 
 //		Policy:     pubsub.DropOldest,
 //	})
 func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
-	return ps.subscribeInternal(nil, pattern, opts, true)
+	return ps.subscribeInternal(context.Background(), pattern, opts, true)
 }
 
 // SubscribePatternWithContext creates a pattern subscription that is cancelled when the context is done.
@@ -401,7 +401,7 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 //
 //	err := ps.Publish("user.created", msg)
 func (ps *InProcPubSub) Publish(topic string, msg Message) error {
-	return ps.publishInternal(nil, topic, msg, false)
+	return ps.publishInternal(context.Background(), topic, msg, false)
 }
 
 // PublishWithContext publishes a message with context support.
@@ -425,7 +425,7 @@ func (ps *InProcPubSub) PublishWithContext(ctx context.Context, topic string, ms
 //	// Fire-and-forget publish
 //	err := ps.PublishAsync("user.created", msg)
 func (ps *InProcPubSub) PublishAsync(topic string, msg Message) error {
-	return ps.publishInternal(nil, topic, msg, true)
+	return ps.publishInternal(context.Background(), topic, msg, true)
 }
 
 // PublishBatch publishes multiple messages to a topic atomically.

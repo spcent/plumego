@@ -65,7 +65,7 @@ func (d *fakeDashboard) BuildAndRun(context.Context) error {
 
 func (d *fakeDashboard) Rebuild(context.Context) error { return nil }
 
-func (d *fakeDashboard) PublishEvent(string, interface{}) {}
+func (d *fakeDashboard) PublishEvent(string, any) {}
 
 func (d *fakeDashboard) GetPubSub() *pubsub.InProcPubSub { return d.pubsub }
 

@@ -157,7 +157,7 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int64, error) {
 	// Build WHERE conditions
 	conditions := []string{"deleted_at IS NULL"}
-	args := []interface{}{}
+	args := []any{}
 	argIndex := 1
 
 	if query.TenantID != "" {

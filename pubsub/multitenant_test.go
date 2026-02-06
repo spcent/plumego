@@ -130,7 +130,7 @@ func TestMultiTenant_PublishRateQuota(t *testing.T) {
 		err := mtps.Publish("tenant1", "test", msg)
 		if err == nil {
 			successCount++
-		} else if err == ErrQuotaExceeded || err != nil && err.Error() == "quota exceeded: publish rate limit exceeded" {
+		} else if err == ErrQuotaExceeded || err.Error() == "quota exceeded: publish rate limit exceeded" {
 			quotaErrors++
 		}
 	}

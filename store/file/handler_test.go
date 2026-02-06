@@ -405,7 +405,7 @@ func TestHandler_List(t *testing.T) {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	json.NewDecoder(w.Body).Decode(&result)
 
 	if int(result["total"].(float64)) != 2 {

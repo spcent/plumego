@@ -90,7 +90,7 @@ func AdminAPIKeyMiddleware(apiKey string) func(http.Handler) http.Handler {
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"error":   http.StatusText(status),
 		"message": message,
 		"status":  status,
@@ -100,11 +100,11 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 // AdminHandlers provides admin API handlers
 type AdminHandlers struct {
 	cfg              *Config
-	metricsCollector interface{} // metrics.MetricsCollector
+	metricsCollector any // metrics.MetricsCollector
 }
 
 // NewAdminHandlers creates admin API handlers
-func NewAdminHandlers(cfg *Config, metricsCollector interface{}) *AdminHandlers {
+func NewAdminHandlers(cfg *Config, metricsCollector any) *AdminHandlers {
 	return &AdminHandlers{
 		cfg:              cfg,
 		metricsCollector: metricsCollector,
@@ -113,18 +113,18 @@ func NewAdminHandlers(cfg *Config, metricsCollector interface{}) *AdminHandlers 
 
 // HandleStats returns gateway statistics
 func (h *AdminHandlers) HandleStats(w http.ResponseWriter, r *http.Request) {
-	stats := map[string]interface{}{
-		"gateway": map[string]interface{}{
+	stats := map[string]any{
+		"gateway": map[string]any{
 			"addr":           h.cfg.Server.Addr,
 			"debug":          h.cfg.Server.Debug,
 			"uptime_seconds": time.Since(startTime).Seconds(),
 		},
-		"services": map[string]interface{}{
-			"user":    map[string]interface{}{"enabled": h.cfg.Services.UserService.Enabled, "targets": len(h.cfg.Services.UserService.Targets)},
-			"order":   map[string]interface{}{"enabled": h.cfg.Services.OrderService.Enabled, "targets": len(h.cfg.Services.OrderService.Targets)},
-			"product": map[string]interface{}{"enabled": h.cfg.Services.ProductService.Enabled, "targets": len(h.cfg.Services.ProductService.Targets)},
+		"services": map[string]any{
+			"user":    map[string]any{"enabled": h.cfg.Services.UserService.Enabled, "targets": len(h.cfg.Services.UserService.Targets)},
+			"order":   map[string]any{"enabled": h.cfg.Services.OrderService.Enabled, "targets": len(h.cfg.Services.OrderService.Targets)},
+			"product": map[string]any{"enabled": h.cfg.Services.ProductService.Enabled, "targets": len(h.cfg.Services.ProductService.Targets)},
 		},
-		"features": map[string]interface{}{
+		"features": map[string]any{
 			"auth":             h.cfg.Auth.Enabled,
 			"metrics":          h.cfg.Metrics.Enabled,
 			"rate_limit":       h.cfg.RateLimit.Enabled,
@@ -140,11 +140,11 @@ func (h *AdminHandlers) HandleStats(w http.ResponseWriter, r *http.Request) {
 
 // HandleHealth returns detailed health check
 func (h *AdminHandlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
-	health := map[string]interface{}{
+	health := map[string]any{
 		"status":    "healthy",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
-		"checks": map[string]interface{}{
-			"server": map[string]interface{}{"status": "ok"},
+		"checks": map[string]any{
+			"server": map[string]any{"status": "ok"},
 		},
 	}
 
@@ -155,12 +155,12 @@ func (h *AdminHandlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 // HandleConfig returns current configuration (sanitized)
 func (h *AdminHandlers) HandleConfig(w http.ResponseWriter, r *http.Request) {
 	// Sanitize sensitive data
-	sanitized := map[string]interface{}{
-		"server": map[string]interface{}{
+	sanitized := map[string]any{
+		"server": map[string]any{
 			"addr":  h.cfg.Server.Addr,
 			"debug": h.cfg.Server.Debug,
 		},
-		"auth": map[string]interface{}{
+		"auth": map[string]any{
 			"enabled":           h.cfg.Auth.Enabled,
 			"token_header":      h.cfg.Auth.TokenHeader,
 			"access_token_ttl":  h.cfg.Auth.AccessTokenTTL,
@@ -169,7 +169,7 @@ func (h *AdminHandlers) HandleConfig(w http.ResponseWriter, r *http.Request) {
 			// JWT secret is NOT exposed
 		},
 		"security": h.cfg.Security,
-		"tls": map[string]interface{}{
+		"tls": map[string]any{
 			"enabled": h.cfg.TLS.Enabled,
 			// Cert/key paths are NOT exposed
 		},

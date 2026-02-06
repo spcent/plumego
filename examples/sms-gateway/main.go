@@ -364,7 +364,7 @@ func extractMessageID(data []byte) string {
 }
 
 func sendRequest(baseURL, tenantID, to, body string, maxAttempts int) (string, error) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"to":   to,
 		"body": body,
 	}

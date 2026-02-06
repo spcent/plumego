@@ -44,7 +44,7 @@ func Middleware(registry *protocol.Registry) func(http.Handler) http.Handler {
 				URL:      r.URL.String(),
 				Headers:  convertHeaders(r.Header),
 				Body:     r.Body,
-				Metadata: make(map[string]interface{}),
+				Metadata: make(map[string]any),
 			}
 
 			// Try to find adapter
@@ -162,7 +162,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 				URL:      r.URL.String(),
 				Headers:  convertHeaders(r.Header),
 				Body:     bytes.NewReader(body),
-				Metadata: make(map[string]interface{}),
+				Metadata: make(map[string]any),
 			}
 
 			// Try to find adapter

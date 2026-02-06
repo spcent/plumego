@@ -102,8 +102,8 @@ func (r *GRPCRequest) Body() io.Reader {
 }
 
 // Metadata returns gRPC metadata as generic map
-func (r *GRPCRequest) Metadata() map[string]interface{} {
-	m := make(map[string]interface{})
+func (r *GRPCRequest) Metadata() map[string]any {
+	m := make(map[string]any)
 	if r.Meta != nil {
 		m["service"] = r.Meta.Service
 		m["method"] = r.Meta.Method
@@ -151,8 +151,8 @@ func (r *GRPCResponse) Body() io.Reader {
 }
 
 // Metadata returns gRPC metadata
-func (r *GRPCResponse) Metadata() map[string]interface{} {
-	m := make(map[string]interface{})
+func (r *GRPCResponse) Metadata() map[string]any {
+	m := make(map[string]any)
 	if r.Meta != nil {
 		m["service"] = r.Meta.Service
 		m["method"] = r.Meta.Method

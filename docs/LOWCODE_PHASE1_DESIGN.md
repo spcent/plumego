@@ -216,7 +216,7 @@ type Metadata struct {
     Name        string                 `json:"name" db:"name"`
     DisplayName string                 `json:"display_name" db:"display_name"`
     Description string                 `json:"description" db:"description"`
-    Schema      map[string]interface{} `json:"schema" db:"schema"` // JSONB
+    Schema      map[string]any `json:"schema" db:"schema"` // JSONB
     Version     int                    `json:"version" db:"version"`
     Status      MetadataStatus         `json:"status" db:"status"`
     Tags        []string               `json:"tags" db:"tags"`
@@ -232,7 +232,7 @@ type MetadataVersion struct {
     ID         int64                  `json:"id" db:"id"`
     MetadataID string                 `json:"metadata_id" db:"metadata_id"`
     Version    int                    `json:"version" db:"version"`
-    Schema     map[string]interface{} `json:"schema" db:"schema"`
+    Schema     map[string]any `json:"schema" db:"schema"`
     ChangeLog  string                 `json:"change_log" db:"change_log"`
     CreatedBy  string                 `json:"created_by" db:"created_by"`
     CreatedAt  time.Time              `json:"created_at" db:"created_at"`
@@ -294,7 +294,7 @@ type Manager interface {
     GetDependencies(ctx context.Context, metadataID string) ([]*MetadataDependency, error)
 
     // Validate 验证元数据Schema
-    Validate(ctx context.Context, metaType MetadataType, schema map[string]interface{}) error
+    Validate(ctx context.Context, metaType MetadataType, schema map[string]any) error
 
     // Export 导出元数据
     Export(ctx context.Context, tenantID string, ids []string) ([]byte, error)
@@ -546,7 +546,7 @@ func (m *DBManager) invalidateCache(tenantID, id string) {
 func (m *DBManager) List(ctx context.Context, query MetadataQuery) ([]*Metadata, int64, error) {
     // 构建WHERE条件
     conditions := []string{"tenant_id = $1"}
-    args := []interface{}{query.TenantID}
+    args := []any{query.TenantID}
     argIndex := 2
 
     if query.Type != "" {
@@ -673,7 +673,7 @@ func NewValidator() *Validator {
 }
 
 // Validate 验证元数据Schema
-func (v *Validator) Validate(metaType MetadataType, schema map[string]interface{}) error {
+func (v *Validator) Validate(metaType MetadataType, schema map[string]any) error {
     schemaValidator, ok := v.schemas[metaType]
     if !ok {
         return fmt.Errorf("no validator for type: %s", metaType)
@@ -985,7 +985,7 @@ func (h *Handler) List(ctx *contract.Context) {
         return
     }
 
-    ctx.JSON(http.StatusOK, map[string]interface{}{
+    ctx.JSON(http.StatusOK, map[string]any{
         "items": results,
         "total": total,
         "page":  query.Page,
@@ -1019,9 +1019,9 @@ meta := &metadata.Metadata{
     Name:        "product",
     DisplayName: "产品",
     Description: "产品信息管理",
-    Schema: map[string]interface{}{
+    Schema: map[string]any{
         "table_name": "products",
-        "fields": []map[string]interface{}{
+        "fields": []map[string]any{
             {
                 "name":     "name",
                 "type":     "string",
@@ -1045,7 +1045,7 @@ meta := &metadata.Metadata{
                 "comment": "状态",
             },
         },
-        "indexes": []map[string]interface{}{
+        "indexes": []map[string]any{
             {
                 "name":   "idx_name",
                 "fields": []string{"name"},
@@ -1152,7 +1152,7 @@ type Field struct {
     Scale     int         `json:"scale,omitempty"`
     Nullable  bool        `json:"nullable"`
     Unique    bool        `json:"unique"`
-    Default   interface{} `json:"default,omitempty"`
+    Default   any `json:"default,omitempty"`
     Comment   string      `json:"comment,omitempty"`
 }
 
@@ -1201,19 +1201,19 @@ type Manager interface {
     AlterTable(ctx context.Context, tenantID, metadataID string, oldSchema, newSchema *EntitySchema) error
 
     // Insert 插入数据
-    Insert(ctx context.Context, tenantID, tableName string, data map[string]interface{}) (string, error)
+    Insert(ctx context.Context, tenantID, tableName string, data map[string]any) (string, error)
 
     // Update 更新数据
-    Update(ctx context.Context, tenantID, tableName, id string, data map[string]interface{}) error
+    Update(ctx context.Context, tenantID, tableName, id string, data map[string]any) error
 
     // Delete 删除数据 (软删除)
     Delete(ctx context.Context, tenantID, tableName, id string) error
 
     // Get 获取单条数据
-    Get(ctx context.Context, tenantID, tableName, id string) (map[string]interface{}, error)
+    Get(ctx context.Context, tenantID, tableName, id string) (map[string]any, error)
 
     // List 查询列表
-    List(ctx context.Context, tenantID, tableName string, query QueryOptions) ([]map[string]interface{}, int64, error)
+    List(ctx context.Context, tenantID, tableName string, query QueryOptions) ([]map[string]any, int64, error)
 
     // GetTableSchema 获取表结构
     GetTableSchema(ctx context.Context, tenantID, tableName string) (*EntitySchema, error)
@@ -1221,7 +1221,7 @@ type Manager interface {
 
 // QueryOptions 查询选项
 type QueryOptions struct {
-    Filters  map[string]interface{} `json:"filters"`  // 过滤条件
+    Filters  map[string]any `json:"filters"`  // 过滤条件
     Sorts    []SortOption           `json:"sorts"`    // 排序
     Page     int                    `json:"page"`
     PageSize int                    `json:"page_size"`
@@ -1297,12 +1297,12 @@ func (b *SQLBuilder) BuildCreateIndexSQL(tenantID string, tableName string, inde
 }
 
 // BuildInsertSQL 构建插入SQL
-func (b *SQLBuilder) BuildInsertSQL(tenantID, tableName string, data map[string]interface{}) (string, []interface{}) {
+func (b *SQLBuilder) BuildInsertSQL(tenantID, tableName string, data map[string]any) (string, []any) {
     fullTableName := b.getTableName(tenantID, tableName)
 
     var columns []string
     var placeholders []string
-    var values []interface{}
+    var values []any
 
     i := 1
     for col, val := range data {
@@ -1323,11 +1323,11 @@ func (b *SQLBuilder) BuildInsertSQL(tenantID, tableName string, data map[string]
 }
 
 // BuildUpdateSQL 构建更新SQL
-func (b *SQLBuilder) BuildUpdateSQL(tenantID, tableName, id string, data map[string]interface{}) (string, []interface{}) {
+func (b *SQLBuilder) BuildUpdateSQL(tenantID, tableName, id string, data map[string]any) (string, []any) {
     fullTableName := b.getTableName(tenantID, tableName)
 
     var sets []string
-    var values []interface{}
+    var values []any
 
     i := 1
     for col, val := range data {
@@ -1353,7 +1353,7 @@ func (b *SQLBuilder) BuildUpdateSQL(tenantID, tableName, id string, data map[str
 }
 
 // BuildSelectSQL 构建查询SQL
-func (b *SQLBuilder) BuildSelectSQL(tenantID, tableName string, opts QueryOptions) (string, []interface{}) {
+func (b *SQLBuilder) BuildSelectSQL(tenantID, tableName string, opts QueryOptions) (string, []any) {
     fullTableName := b.getTableName(tenantID, tableName)
 
     // 字段
@@ -1364,7 +1364,7 @@ func (b *SQLBuilder) BuildSelectSQL(tenantID, tableName string, opts QueryOption
 
     // WHERE条件
     where := []string{"tenant_id = $1", "deleted_at IS NULL"}
-    args := []interface{}{tenantID}
+    args := []any{tenantID}
     argIndex := 2
 
     for col, val := range opts.Filters {
@@ -1533,7 +1533,7 @@ func (m *CRUDManager) CreateTable(ctx context.Context, tenantID, metadataID stri
 }
 
 // Insert 插入数据
-func (m *CRUDManager) Insert(ctx context.Context, tenantID, tableName string, data map[string]interface{}) (string, error) {
+func (m *CRUDManager) Insert(ctx context.Context, tenantID, tableName string, data map[string]any) (string, error) {
     // 添加系统字段
     data["tenant_id"] = tenantID
     data["created_at"] = time.Now()
@@ -1558,7 +1558,7 @@ func (m *CRUDManager) Insert(ctx context.Context, tenantID, tableName string, da
 }
 
 // Update 更新数据
-func (m *CRUDManager) Update(ctx context.Context, tenantID, tableName, id string, data map[string]interface{}) error {
+func (m *CRUDManager) Update(ctx context.Context, tenantID, tableName, id string, data map[string]any) error {
     // 移除系统字段
     delete(data, "id")
     delete(data, "tenant_id")
@@ -1605,7 +1605,7 @@ func (m *CRUDManager) Delete(ctx context.Context, tenantID, tableName, id string
 }
 
 // Get 获取单条数据
-func (m *CRUDManager) Get(ctx context.Context, tenantID, tableName, id string) (map[string]interface{}, error) {
+func (m *CRUDManager) Get(ctx context.Context, tenantID, tableName, id string) (map[string]any, error) {
     fullTableName := m.builder.getTableName(tenantID, tableName)
 
     query := fmt.Sprintf(
@@ -1627,12 +1627,12 @@ func (m *CRUDManager) Get(ctx context.Context, tenantID, tableName, id string) (
 }
 
 // List 查询列表
-func (m *CRUDManager) List(ctx context.Context, tenantID, tableName string, opts QueryOptions) ([]map[string]interface{}, int64, error) {
+func (m *CRUDManager) List(ctx context.Context, tenantID, tableName string, opts QueryOptions) ([]map[string]any, int64, error) {
     fullTableName := m.builder.getTableName(tenantID, tableName)
 
     // 查询总数
     countWhere := "tenant_id = $1 AND deleted_at IS NULL"
-    countArgs := []interface{}{tenantID}
+    countArgs := []any{tenantID}
 
     var total int64
     countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s", fullTableName, countWhere)
@@ -1649,7 +1649,7 @@ func (m *CRUDManager) List(ctx context.Context, tenantID, tableName string, opts
     }
     defer rows.Close()
 
-    var results []map[string]interface{}
+    var results []map[string]any
     for rows.Next() {
         row, err := m.scanRow(rows)
         if err != nil {
@@ -1662,14 +1662,14 @@ func (m *CRUDManager) List(ctx context.Context, tenantID, tableName string, opts
 }
 
 // scanRow 扫描行数据
-func (m *CRUDManager) scanRow(rows *sql.Rows) (map[string]interface{}, error) {
+func (m *CRUDManager) scanRow(rows *sql.Rows) (map[string]any, error) {
     cols, err := rows.Columns()
     if err != nil {
         return nil, err
     }
 
-    values := make([]interface{}, len(cols))
-    valuePtrs := make([]interface{}, len(cols))
+    values := make([]any, len(cols))
+    valuePtrs := make([]any, len(cols))
     for i := range values {
         valuePtrs[i] = &values[i]
     }
@@ -1678,7 +1678,7 @@ func (m *CRUDManager) scanRow(rows *sql.Rows) (map[string]interface{}, error) {
         return nil, err
     }
 
-    result := make(map[string]interface{})
+    result := make(map[string]any)
     for i, col := range cols {
         val := values[i]
 
@@ -1692,7 +1692,7 @@ func (m *CRUDManager) scanRow(rows *sql.Rows) (map[string]interface{}, error) {
         switch v := val.(type) {
         case []byte:
             // 尝试解析JSON
-            var jsonVal interface{}
+            var jsonVal any
             if err := json.Unmarshal(v, &jsonVal); err == nil {
                 result[col] = jsonVal
             } else {
@@ -1739,7 +1739,7 @@ func (h *Handler) Insert(ctx *contract.Context) {
     tenantID := tenant.TenantIDFromContext(ctx.Request.Context())
     entityName := ctx.Param("entity")
 
-    var data map[string]interface{}
+    var data map[string]any
     if err := ctx.BindJSON(&data); err != nil {
         ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
         return
@@ -1764,7 +1764,7 @@ func (h *Handler) Update(ctx *contract.Context) {
     entityName := ctx.Param("entity")
     id := ctx.Param("id")
 
-    var data map[string]interface{}
+    var data map[string]any
     if err := ctx.BindJSON(&data); err != nil {
         ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
         return
@@ -1834,7 +1834,7 @@ func (h *Handler) List(ctx *contract.Context) {
         return
     }
 
-    ctx.JSON(http.StatusOK, map[string]interface{}{
+    ctx.JSON(http.StatusOK, map[string]any{
         "items": results,
         "total": total,
         "page":  opts.Page,
@@ -1911,7 +1911,7 @@ type File struct {
     Extension     string                 `json:"extension" db:"extension"`
     Hash          string                 `json:"hash" db:"hash"`
     StorageType   StorageType            `json:"storage_type" db:"storage_type"`
-    Metadata      map[string]interface{} `json:"metadata" db:"metadata"`
+    Metadata      map[string]any `json:"metadata" db:"metadata"`
     ThumbnailPath string                 `json:"thumbnail_path" db:"thumbnail_path"`
     UploadedBy    string                 `json:"uploaded_by" db:"uploaded_by"`
     CreatedAt     time.Time              `json:"created_at" db:"created_at"`
@@ -1926,7 +1926,7 @@ type UploadOptions struct {
     MimeType      string
     UploadedBy    string
     GenerateThumb bool                   // 是否生成缩略图
-    Metadata      map[string]interface{}
+    Metadata      map[string]any
 }
 
 // Storage 存储接口
@@ -2965,8 +2965,8 @@ type LogEntry struct {
     ResourceType string                 `json:"resource_type" db:"resource_type"`
     ResourceID   string                 `json:"resource_id" db:"resource_id"`
     ResourceName string                 `json:"resource_name" db:"resource_name"`
-    OldValue     map[string]interface{} `json:"old_value,omitempty" db:"old_value"`
-    NewValue     map[string]interface{} `json:"new_value,omitempty" db:"new_value"`
+    OldValue     map[string]any `json:"old_value,omitempty" db:"old_value"`
+    NewValue     map[string]any `json:"new_value,omitempty" db:"new_value"`
     IPAddress    string                 `json:"ip_address" db:"ip_address"`
     UserAgent    string                 `json:"user_agent" db:"user_agent"`
     Status       string                 `json:"status" db:"status"`
@@ -3073,7 +3073,7 @@ func (l *DBLogger) Log(ctx context.Context, entry *LogEntry) error {
 func (l *DBLogger) Query(ctx context.Context, opts QueryOptions) ([]*LogEntry, int64, error) {
     // 构建WHERE条件
     conditions := []string{"tenant_id = $1"}
-    args := []interface{}{opts.TenantID}
+    args := []any{opts.TenantID}
     argIndex := 2
 
     if opts.UserID != "" {
@@ -3674,9 +3674,9 @@ func TestMetadataManager_Create(t *testing.T) {
         Type:        metadata.TypeEntity,
         Name:        "product",
         DisplayName: "产品",
-        Schema: map[string]interface{}{
+        Schema: map[string]any{
             "table_name": "products",
-            "fields": []map[string]interface{}{
+            "fields": []map[string]any{
                 {
                     "name": "name",
                     "type": "string",
@@ -3700,9 +3700,9 @@ func TestMetadataManager_Validate(t *testing.T) {
     validator := metadata.NewValidator()
 
     // 测试有效Schema
-    validSchema := map[string]interface{}{
+    validSchema := map[string]any{
         "table_name": "users",
-        "fields": []map[string]interface{}{
+        "fields": []map[string]any{
             {
                 "name": "email",
                 "type": "string",
@@ -3714,8 +3714,8 @@ func TestMetadataManager_Validate(t *testing.T) {
     assert.NoError(t, err)
 
     // 测试无效Schema
-    invalidSchema := map[string]interface{}{
-        "fields": []map[string]interface{}{},
+    invalidSchema := map[string]any{
+        "fields": []map[string]any{},
     }
 
     err = validator.Validate(metadata.TypeEntity, invalidSchema)
@@ -3771,7 +3771,7 @@ func BenchmarkInsert(b *testing.B) {
     manager := model.NewCRUDManager(db, nil)
     ctx := context.Background()
 
-    data := map[string]interface{}{
+    data := map[string]any{
         "name":  "test product",
         "price": 99.99,
     }

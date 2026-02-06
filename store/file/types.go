@@ -19,7 +19,7 @@ type File struct {
 	Height        int                    `json:"height,omitempty" db:"height"`
 	ThumbnailPath string                 `json:"thumbnail_path,omitempty" db:"thumbnail_path"`
 	StorageType   string                 `json:"storage_type" db:"storage_type"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+	Metadata      map[string]any `json:"metadata,omitempty" db:"metadata"`
 	UploadedBy    string                 `json:"uploaded_by" db:"uploaded_by"`
 	CreatedAt     time.Time              `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time              `json:"updated_at" db:"updated_at"`
@@ -38,7 +38,7 @@ type PutOptions struct {
 	GenerateThumb bool                   // Whether to generate thumbnail
 	ThumbWidth    int                    // Thumbnail width (default 200)
 	ThumbHeight   int                    // Thumbnail height (default 200)
-	Metadata      map[string]interface{} // Additional metadata
+	Metadata      map[string]any // Additional metadata
 }
 
 // FileStat contains basic file information.

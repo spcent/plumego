@@ -70,7 +70,7 @@ func TestIntegration_DatabaseMetadata(t *testing.T) {
 		UploadedBy:  "test-user",
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
-		Metadata:    map[string]interface{}{"custom_field": "custom_value"},
+		Metadata:    map[string]any{"custom_field": "custom_value"},
 	}
 
 	if err := metadata.Save(ctx, testFile); err != nil {

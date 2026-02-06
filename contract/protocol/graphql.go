@@ -65,10 +65,10 @@ type GraphQLRequest struct {
 	OperationName string `json:"operationName,omitempty"`
 
 	// Variables is the optional variables map
-	Variables map[string]interface{} `json:"variables,omitempty"`
+	Variables map[string]any `json:"variables,omitempty"`
 
 	// Extensions is optional extensions map (for persisted queries, etc.)
-	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	Extensions map[string]any `json:"extensions,omitempty"`
 
 	// HeaderMap holds HTTP headers
 	HeaderMap map[string][]string `json:"-"`
@@ -99,8 +99,8 @@ func (r *GraphQLRequest) Body() io.Reader {
 }
 
 // Metadata returns GraphQL-specific metadata
-func (r *GraphQLRequest) Metadata() map[string]interface{} {
-	m := make(map[string]interface{})
+func (r *GraphQLRequest) Metadata() map[string]any {
+	m := make(map[string]any)
 	m["query"] = r.Query
 	m["operation_name"] = r.OperationName
 	m["variables"] = r.Variables
@@ -126,13 +126,13 @@ func (r *GraphQLRequest) Metadata() map[string]interface{} {
 //	}
 type GraphQLResponse struct {
 	// Data holds the response data
-	Data interface{} `json:"data,omitempty"`
+	Data any `json:"data,omitempty"`
 
 	// Errors holds any GraphQL errors
 	Errors []GraphQLError `json:"errors,omitempty"`
 
 	// Extensions holds optional extensions (timing, tracing, etc.)
-	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	Extensions map[string]any `json:"extensions,omitempty"`
 
 	// Status is the HTTP status code
 	Status int `json:"-"`
@@ -153,10 +153,10 @@ type GraphQLError struct {
 	Locations []GraphQLLocation `json:"locations,omitempty"`
 
 	// Path indicates the path to the field that caused the error
-	Path []interface{} `json:"path,omitempty"`
+	Path []any `json:"path,omitempty"`
 
 	// Extensions holds additional error information
-	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	Extensions map[string]any `json:"extensions,omitempty"`
 }
 
 // GraphQLLocation represents a location in a GraphQL document
@@ -189,8 +189,8 @@ func (r *GraphQLResponse) Body() io.Reader {
 }
 
 // Metadata returns GraphQL-specific metadata
-func (r *GraphQLResponse) Metadata() map[string]interface{} {
-	m := make(map[string]interface{})
+func (r *GraphQLResponse) Metadata() map[string]any {
+	m := make(map[string]any)
 	if len(r.Errors) > 0 {
 		m["has_errors"] = true
 		m["error_count"] = len(r.Errors)
@@ -219,7 +219,7 @@ type GraphQLExecutor interface {
 // Users can use this for implementing custom directive handling
 type GraphQLDirective struct {
 	Name      string
-	Arguments map[string]interface{}
+	Arguments map[string]any
 }
 
 // GraphQLIntrospectionQuery is the standard introspection query

@@ -155,7 +155,7 @@ func (d *Dashboard) subscribeEvents() {
 	go func() {
 		for msg := range sub.C() {
 			// Create a simple event message
-			event := map[string]interface{}{
+			event := map[string]any{
 				"type":      msg.Topic,
 				"timestamp": time.Now().Format(time.RFC3339),
 				"data":      msg.Data,
@@ -247,17 +247,17 @@ func (d *Dashboard) Rebuild(ctx context.Context) error {
 // HTTP Handlers
 
 func (d *Dashboard) handleStatus(ctx *plumego.Context) {
-	status := map[string]interface{}{
-		"dashboard": map[string]interface{}{
+	status := map[string]any{
+		"dashboard": map[string]any{
 			"url":    fmt.Sprintf("http://localhost%s", d.dashboardAddr),
 			"uptime": time.Since(d.startTime).String(),
 		},
-		"app": map[string]interface{}{
+		"app": map[string]any{
 			"url":     fmt.Sprintf("http://localhost%s", d.appAddr),
 			"running": d.runner.IsRunning(),
 			"pid":     d.getAppPID(),
 		},
-		"project": map[string]interface{}{
+		"project": map[string]any{
 			"dir": d.projectDir,
 		},
 	}
@@ -268,7 +268,7 @@ func (d *Dashboard) handleStatus(ctx *plumego.Context) {
 func (d *Dashboard) handleHealth(ctx *plumego.Context) {
 	healthy := d.runner.IsRunning()
 
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"healthy": healthy,
 		"checks": map[string]string{
 			"app": func() string {
@@ -283,14 +283,14 @@ func (d *Dashboard) handleHealth(ctx *plumego.Context) {
 
 func (d *Dashboard) handleBuild(ctx *plumego.Context) {
 	if err := d.builder.Build(); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"success": false,
 			"error":   err.Error(),
 		})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Build completed successfully",
 	})
@@ -300,14 +300,14 @@ func (d *Dashboard) handleRestart(ctx *plumego.Context) {
 	bgCtx := context.Background()
 
 	if err := d.Rebuild(bgCtx); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"success": false,
 			"error":   err.Error(),
 		})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application restarted successfully",
 	})
@@ -315,14 +315,14 @@ func (d *Dashboard) handleRestart(ctx *plumego.Context) {
 
 func (d *Dashboard) handleStop(ctx *plumego.Context) {
 	if err := d.runner.Stop(); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"success": false,
 			"error":   err.Error(),
 		})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application stopped successfully",
 	})
@@ -330,7 +330,7 @@ func (d *Dashboard) handleStop(ctx *plumego.Context) {
 
 func (d *Dashboard) handleRoutes(ctx *plumego.Context) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"error": "Application is not running",
 		})
 		return
@@ -342,7 +342,7 @@ func (d *Dashboard) handleRoutes(ctx *plumego.Context) {
 		// Fallback to probing if debug endpoint is not available
 		routes = d.analyzer.ProbeEndpoints()
 		if len(routes) == 0 {
-			ctx.JSON(http.StatusOK, map[string]interface{}{
+			ctx.JSON(http.StatusOK, map[string]any{
 				"routes": []RouteInfo{},
 				"error":  "Could not fetch routes: " + err.Error(),
 			})
@@ -350,7 +350,7 @@ func (d *Dashboard) handleRoutes(ctx *plumego.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"routes": routes,
 		"count":  len(routes),
 	})
@@ -358,7 +358,7 @@ func (d *Dashboard) handleRoutes(ctx *plumego.Context) {
 
 func (d *Dashboard) handleConfig(ctx *plumego.Context) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"error": "Application is not running",
 		})
 		return
@@ -366,7 +366,7 @@ func (d *Dashboard) handleConfig(ctx *plumego.Context) {
 
 	config, err := d.analyzer.GetAppInfo()
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"error": "Could not fetch config: " + err.Error(),
 		})
 		return
@@ -376,12 +376,12 @@ func (d *Dashboard) handleConfig(ctx *plumego.Context) {
 }
 
 func (d *Dashboard) handleMetrics(ctx *plumego.Context) {
-	metrics := map[string]interface{}{
-		"dashboard": map[string]interface{}{
+	metrics := map[string]any{
+		"dashboard": map[string]any{
 			"uptime":    time.Since(d.startTime).Seconds(),
 			"startTime": d.startTime.Format(time.RFC3339),
 		},
-		"app": map[string]interface{}{
+		"app": map[string]any{
 			"running": d.runner.IsRunning(),
 			"pid":     d.getAppPID(),
 		},
@@ -393,16 +393,16 @@ func (d *Dashboard) handleMetrics(ctx *plumego.Context) {
 	if d.runner.IsRunning() {
 		healthy, details, err := d.analyzer.HealthCheck()
 		if err == nil {
-			metrics["app"].(map[string]interface{})["healthy"] = healthy
-			metrics["app"].(map[string]interface{})["healthDetails"] = details
+			metrics["app"].(map[string]any)["healthy"] = healthy
+			metrics["app"].(map[string]any)["healthDetails"] = details
 		}
 
 		if devMetrics, err := d.analyzer.GetDevMetrics(); err == nil {
-			metrics["app"].(map[string]interface{})["requests"] = devMetrics.HTTP
-			metrics["app"].(map[string]interface{})["db"] = devMetrics.DB
+			metrics["app"].(map[string]any)["requests"] = devMetrics.HTTP
+			metrics["app"].(map[string]any)["db"] = devMetrics.DB
 			alerts, thresholds = evaluateRequestAlerts(&devMetrics.HTTP)
 		} else {
-			metrics["app"].(map[string]interface{})["requests_error"] = err.Error()
+			metrics["app"].(map[string]any)["requests_error"] = err.Error()
 		}
 	}
 
@@ -414,7 +414,7 @@ func (d *Dashboard) handleMetrics(ctx *plumego.Context) {
 
 func (d *Dashboard) handleMetricsClear(ctx *plumego.Context) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"success": false,
 			"error":   "Application is not running",
 		})
@@ -422,27 +422,27 @@ func (d *Dashboard) handleMetricsClear(ctx *plumego.Context) {
 	}
 
 	if err := d.analyzer.ClearDevMetrics(); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"success": false,
 			"error":   err.Error(),
 		})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"success": true,
 	})
 }
 
 func (d *Dashboard) handlePprofTypes(ctx *plumego.Context) {
-	ctx.JSON(http.StatusOK, map[string]interface{}{
+	ctx.JSON(http.StatusOK, map[string]any{
 		"types": pprofProfiles(),
 	})
 }
 
 func (d *Dashboard) handlePprofRaw(ctx *plumego.Context) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"error": "Application is not running",
 		})
 		return
@@ -450,7 +450,7 @@ func (d *Dashboard) handlePprofRaw(ctx *plumego.Context) {
 
 	profileType, seconds, err := parsePprofRequest(ctx)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+		ctx.JSON(http.StatusBadRequest, map[string]any{
 			"error": err.Error(),
 		})
 		return
@@ -458,14 +458,14 @@ func (d *Dashboard) handlePprofRaw(ctx *plumego.Context) {
 
 	payload, contentType, err := d.analyzer.FetchPprof(profileType, seconds)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"error": err.Error(),
 		})
 		return
 	}
 
 	if download := strings.TrimSpace(ctx.Query.Get("download")); download == "0" || strings.EqualFold(download, "false") {
-		ctx.JSON(http.StatusOK, map[string]interface{}{
+		ctx.JSON(http.StatusOK, map[string]any{
 			"type":         profileType,
 			"seconds":      seconds,
 			"content_type": contentType,
@@ -485,7 +485,7 @@ func (d *Dashboard) handlePprofRaw(ctx *plumego.Context) {
 
 func (d *Dashboard) handleAPITest(ctx *plumego.Context) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"success": false,
 			"error":   "Application is not running",
 		})
@@ -494,7 +494,7 @@ func (d *Dashboard) handleAPITest(ctx *plumego.Context) {
 
 	var req APITestRequest
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+		ctx.JSON(http.StatusBadRequest, map[string]any{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -503,7 +503,7 @@ func (d *Dashboard) handleAPITest(ctx *plumego.Context) {
 
 	resp, err := d.analyzer.DoAPITest(req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+		ctx.JSON(http.StatusBadRequest, map[string]any{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -532,7 +532,7 @@ func (d *Dashboard) getAppPID() int {
 }
 
 // PublishEvent publishes an event to the event bus
-func (d *Dashboard) PublishEvent(eventType string, data interface{}) {
+func (d *Dashboard) PublishEvent(eventType string, data any) {
 	d.pubsub.Publish(eventType, pubsub.Message{
 		Topic: eventType,
 		Data:  data,

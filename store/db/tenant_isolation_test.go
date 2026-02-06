@@ -211,7 +211,7 @@ func TestAddTenantFilter_SelectWithWhere(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"SELECT * FROM users WHERE active = ?",
 		"t-123",
-		[]interface{}{true},
+		[]any{true},
 	)
 
 	expected := "SELECT * FROM users WHERE tenant_id = ? AND active = ?"
@@ -301,7 +301,7 @@ func TestAddTenantFilter_DeleteWithWhere(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"DELETE FROM users WHERE id = ?",
 		"t-123",
-		[]interface{}{42},
+		[]any{42},
 	)
 
 	expected := "DELETE FROM users WHERE tenant_id = ? AND id = ?"
@@ -320,7 +320,7 @@ func TestAddTenantFilter_CaseInsensitiveWhere(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"SELECT * FROM users where active = ?",
 		"t-123",
-		[]interface{}{true},
+		[]any{true},
 	)
 
 	expected := "SELECT * FROM users WHERE tenant_id = ? AND active = ?"
@@ -338,7 +338,7 @@ func TestAddTenantFilter_MixedCaseWhere(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"SELECT * FROM users Where active = ?",
 		"t-123",
-		[]interface{}{true},
+		[]any{true},
 	)
 
 	expected := "SELECT * FROM users WHERE tenant_id = ? AND active = ?"
@@ -358,7 +358,7 @@ func TestAddTenantToInsert(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"INSERT INTO users (name, email) VALUES (?, ?)",
 		"t-123",
-		[]interface{}{"alice", "alice@example.com"},
+		[]any{"alice", "alice@example.com"},
 	)
 
 	expected := "INSERT INTO users (name, email, tenant_id) VALUES (?, ?, ?)"
@@ -396,7 +396,7 @@ func TestAddTenantToInsert_NoColumnList(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"INSERT INTO users VALUES (?, ?)",
 		"t-123",
-		[]interface{}{"alice", "alice@example.com"},
+		[]any{"alice", "alice@example.com"},
 	)
 
 	// No column list to modify - returned as-is
@@ -416,7 +416,7 @@ func TestAddTenantToUpdate_WithWhere(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"UPDATE users SET email = ? WHERE name = ?",
 		"t-123",
-		[]interface{}{"new@example.com", "alice"},
+		[]any{"new@example.com", "alice"},
 	)
 
 	expected := "UPDATE users SET email = ? WHERE tenant_id = ? AND name = ?"
@@ -437,7 +437,7 @@ func TestAddTenantToUpdate_WithoutWhere(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"UPDATE users SET active = ?",
 		"t-123",
-		[]interface{}{false},
+		[]any{false},
 	)
 
 	expected := "UPDATE users SET active = ? WHERE tenant_id = ?"
@@ -458,7 +458,7 @@ func TestAddTenantToUpdate_CaseInsensitiveWhere(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"UPDATE users SET email = ? where name = ?",
 		"t-123",
-		[]interface{}{"new@example.com", "alice"},
+		[]any{"new@example.com", "alice"},
 	)
 
 	expected := "UPDATE users SET email = ? WHERE tenant_id = ? AND name = ?"
@@ -476,7 +476,7 @@ func TestAddTenantToUpdate_MultipleSetParams(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"UPDATE users SET email = ?, name = ? WHERE id = ?",
 		"t-123",
-		[]interface{}{"new@example.com", "bob", 42},
+		[]any{"new@example.com", "bob", 42},
 	)
 
 	expected := "UPDATE users SET email = ?, name = ? WHERE tenant_id = ? AND id = ?"
@@ -689,7 +689,7 @@ func TestAddTenantFilter_CustomColumn(t *testing.T) {
 	query, args := tdb.addTenantFilter(
 		"SELECT * FROM users WHERE active = ?",
 		"org-456",
-		[]interface{}{true},
+		[]any{true},
 	)
 
 	expected := "SELECT * FROM users WHERE org_id = ? AND active = ?"

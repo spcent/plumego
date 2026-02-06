@@ -145,7 +145,7 @@ func TestProgressUpdate(t *testing.T) {
 		}
 
 		// Check that timestamp is formatted correctly
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal(data, &result); err != nil {
 			t.Fatalf("Unmarshal failed: %v", err)
 		}
@@ -404,4 +404,3 @@ func TestGetStepType(t *testing.T) {
 		})
 	}
 }
-

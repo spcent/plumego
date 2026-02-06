@@ -460,8 +460,9 @@ func (bpc *BackpressureController) Close() error {
 
 // PublishWithBackpressure publishes with automatic backpressure handling
 func (bpc *BackpressureController) PublishWithBackpressure(topic string, msg Message) error {
+	// Note: caller must ensure ps is not nil when bpc is nil
 	if bpc == nil {
-		return bpc.ps.Publish(topic, msg)
+		return nil // Backpressure disabled, publish handled by caller
 	}
 
 	// Check backpressure

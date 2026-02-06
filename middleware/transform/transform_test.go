@@ -113,7 +113,7 @@ func TestRemoveQueryParam(t *testing.T) {
 func TestRenameJSONRequestField(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		var data map[string]interface{}
+		var data map[string]any
 		json.Unmarshal(body, &data)
 
 		if _, exists := data["oldField"]; exists {
@@ -143,7 +143,7 @@ func TestRenameJSONRequestField(t *testing.T) {
 func TestModifyJSONRequest(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		var data map[string]interface{}
+		var data map[string]any
 		json.Unmarshal(body, &data)
 
 		if data["modified"] != true {
@@ -155,7 +155,7 @@ func TestModifyJSONRequest(t *testing.T) {
 
 	middleware := Middleware(Config{
 		RequestTransformers: []RequestTransformer{
-			ModifyJSONRequest(func(data map[string]interface{}) error {
+			ModifyJSONRequest(func(data map[string]any) error {
 				data["modified"] = true
 				return nil
 			}),
@@ -264,7 +264,7 @@ func TestRenameJSONResponseField(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"oldField": "value",
 		})
 	})
@@ -279,7 +279,7 @@ func TestRenameJSONResponseField(t *testing.T) {
 	w := httptest.NewRecorder()
 	middleware(handler).ServeHTTP(w, req)
 
-	var data map[string]interface{}
+	var data map[string]any
 	json.Unmarshal(w.Body.Bytes(), &data)
 
 	if _, exists := data["oldField"]; exists {
@@ -295,14 +295,14 @@ func TestModifyJSONResponse(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"original": "value",
 		})
 	})
 
 	middleware := Middleware(Config{
 		ResponseTransformers: []ResponseTransformer{
-			ModifyJSONResponse(func(data map[string]interface{}) error {
+			ModifyJSONResponse(func(data map[string]any) error {
 				data["modified"] = true
 				return nil
 			}),
@@ -313,7 +313,7 @@ func TestModifyJSONResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	middleware(handler).ServeHTTP(w, req)
 
-	var data map[string]interface{}
+	var data map[string]any
 	json.Unmarshal(w.Body.Bytes(), &data)
 
 	if data["modified"] != true {
@@ -325,7 +325,7 @@ func TestWrapJSONResponse(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"data": "value",
 		})
 	})
@@ -340,10 +340,10 @@ func TestWrapJSONResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	middleware(handler).ServeHTTP(w, req)
 
-	var response map[string]interface{}
+	var response map[string]any
 	json.Unmarshal(w.Body.Bytes(), &response)
 
-	result, ok := response["result"].(map[string]interface{})
+	result, ok := response["result"].(map[string]any)
 	if !ok {
 		t.Error("Expected response to be wrapped in result key")
 	}

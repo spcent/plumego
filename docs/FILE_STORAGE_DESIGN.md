@@ -219,7 +219,7 @@ type File struct {
     Height        int                    `json:"height,omitempty" db:"height"`
     ThumbnailPath string                 `json:"thumbnail_path,omitempty" db:"thumbnail_path"`
     StorageType   string                 `json:"storage_type" db:"storage_type"`
-    Metadata      map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+    Metadata      map[string]any `json:"metadata,omitempty" db:"metadata"`
     UploadedBy    string                 `json:"uploaded_by" db:"uploaded_by"`
     CreatedAt     time.Time              `json:"created_at" db:"created_at"`
     UpdatedAt     time.Time              `json:"updated_at" db:"updated_at"`
@@ -238,7 +238,7 @@ type PutOptions struct {
     GenerateThumb bool                   // 是否生成缩略图
     ThumbWidth    int                    // 缩略图宽度（默认200）
     ThumbHeight   int                    // 缩略图高度（默认200）
-    Metadata      map[string]interface{} // 附加元数据
+    Metadata      map[string]any // 附加元数据
 }
 
 // FileStat 文件状态信息
@@ -1912,7 +1912,7 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int64, error) {
     // 构建WHERE条件
     conditions := []string{"deleted_at IS NULL"}
-    args := []interface{}{}
+    args := []any{}
     argIndex := 1
 
     if query.TenantID != "" {

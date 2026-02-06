@@ -19,13 +19,13 @@ const (
 
 // Event is a generic event structure
 type Event struct {
-	Type      string      `json:"type"`
-	Timestamp time.Time   `json:"timestamp"`
-	Data      interface{} `json:"data,omitempty"`
+	Type      string    `json:"type"`
+	Timestamp time.Time `json:"timestamp"`
+	Data      anyta,omitempty"`
 }
 
 // NewEvent creates a new event
-func NewEvent(eventType string, data interface{}) Event {
+func NewEvent(eventType string, data any) Event {
 	return Event{
 		Type:      eventType,
 		Timestamp: time.Now(),

@@ -228,8 +228,8 @@ func isJSONContentType(contentType string) bool {
 	return strings.Contains(lower, "application/json") || strings.Contains(lower, "+json")
 }
 
-func decodeJSONObject(body []byte) (map[string]interface{}, bool) {
-	var data map[string]interface{}
+func decodeJSONObject(body []byte) (map[string]any, bool) {
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, false
 	}
@@ -291,7 +291,7 @@ func RenameJSONRequestField(from, to string) RequestTransformer {
 }
 
 // ModifyJSONRequest applies a custom function to modify JSON request body
-func ModifyJSONRequest(modifier func(map[string]interface{}) error) RequestTransformer {
+func ModifyJSONRequest(modifier func(map[string]any) error) RequestTransformer {
 	return func(r *http.Request) error {
 		if !isJSONContentType(r.Header.Get("Content-Type")) {
 			return nil
@@ -393,7 +393,7 @@ func RenameJSONResponseField(from, to string) ResponseTransformer {
 }
 
 // ModifyJSONResponse applies a custom function to modify JSON response body
-func ModifyJSONResponse(modifier func(map[string]interface{}) error) ResponseTransformer {
+func ModifyJSONResponse(modifier func(map[string]any) error) ResponseTransformer {
 	return func(r *http.Response) error {
 		if !isJSONContentType(r.Header.Get("Content-Type")) {
 			return nil
@@ -439,14 +439,14 @@ func WrapJSONResponse(wrapperKey string) ResponseTransformer {
 		}
 		_ = r.Body.Close()
 
-		var data interface{}
+		var data any
 		if err := json.Unmarshal(body, &data); err != nil {
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			return nil
 		}
 
 		// Wrap data
-		wrapped := map[string]interface{}{
+		wrapped := map[string]any{
 			wrapperKey: data,
 		}
 

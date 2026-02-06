@@ -13,10 +13,10 @@ import (
 
 // WorkflowRequest represents a request to execute a workflow.
 type WorkflowRequest struct {
-	WorkflowID string                     `json:"workflow_id"`
-	Name       string                     `json:"name"`
-	Steps      []map[string]interface{}   `json:"steps,omitempty"`
-	Metadata   map[string]string          `json:"metadata,omitempty"`
+	WorkflowID string            `json:"workflow_id"`
+	Name       string            `json:"name"`
+	Steps      []map[string]any  `json:"steps,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
 // Handler provides HTTP handlers for streaming workflows.
@@ -110,7 +110,7 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send final result
-	jsonData, _ := json.Marshal(map[string]interface{}{
+	jsonData, _ := json.Marshal(map[string]any{
 		"event":         "result",
 		"success":       err == nil,
 		"results_count": len(results),

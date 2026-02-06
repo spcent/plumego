@@ -84,7 +84,7 @@ type HTTPRequest struct {
 	Body    io.Reader
 
 	// Metadata holds protocol-specific metadata
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 // Request represents a protocol-specific request
@@ -103,7 +103,7 @@ type Request interface {
 	// Examples:
 	//   - gRPC: service name, authority, timeout
 	//   - GraphQL: operation name, variables
-	Metadata() map[string]interface{}
+	Metadata() map[string]any
 }
 
 // Response represents a protocol-specific response
@@ -118,7 +118,7 @@ type Response interface {
 	Body() io.Reader
 
 	// Metadata returns protocol-specific metadata
-	Metadata() map[string]interface{}
+	Metadata() map[string]any
 }
 
 // ResponseWriter provides a way to write HTTP responses

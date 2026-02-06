@@ -59,7 +59,7 @@ func NewTenantDB(db *sql.DB, options ...TenantDBOption) *TenantDB {
 }
 
 // QueryFromContext extracts tenant from context and executes a query with automatic filtering.
-func (tdb *TenantDB) QueryFromContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+func (tdb *TenantDB) QueryFromContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	tenantID := tenant.TenantIDFromContext(ctx)
 	if tenantID == "" {
 		return nil, errors.New("tenant ID not found in context")
@@ -69,7 +69,7 @@ func (tdb *TenantDB) QueryFromContext(ctx context.Context, query string, args ..
 }
 
 // QueryContext executes a query with automatic tenant filtering.
-func (tdb *TenantDB) QueryContext(ctx context.Context, tenantID string, query string, args ...interface{}) (*sql.Rows, error) {
+func (tdb *TenantDB) QueryContext(ctx context.Context, tenantID string, query string, args ...any) (*sql.Rows, error) {
 	if tdb == nil || tdb.db == nil {
 		return nil, errors.New("database not initialized")
 	}
@@ -80,7 +80,7 @@ func (tdb *TenantDB) QueryContext(ctx context.Context, tenantID string, query st
 
 // QueryRowFromContext extracts tenant from context and executes a single-row query.
 // Returns an error-producing Row if tenant ID is not found in context.
-func (tdb *TenantDB) QueryRowFromContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+func (tdb *TenantDB) QueryRowFromContext(ctx context.Context, query string, args ...any) *sql.Row {
 	tenantID := tenant.TenantIDFromContext(ctx)
 	if tenantID == "" {
 		// Return a Row that will produce an error when scanned, via a cancelled context.
@@ -92,7 +92,7 @@ func (tdb *TenantDB) QueryRowFromContext(ctx context.Context, query string, args
 }
 
 // QueryRowContext executes a single-row query with automatic tenant filtering.
-func (tdb *TenantDB) QueryRowContext(ctx context.Context, tenantID string, query string, args ...interface{}) *sql.Row {
+func (tdb *TenantDB) QueryRowContext(ctx context.Context, tenantID string, query string, args ...any) *sql.Row {
 	if tdb == nil || tdb.db == nil {
 		// Return a row that will error when scanned
 		return &sql.Row{}
@@ -103,7 +103,7 @@ func (tdb *TenantDB) QueryRowContext(ctx context.Context, tenantID string, query
 }
 
 // ExecFromContext extracts tenant from context and executes a statement.
-func (tdb *TenantDB) ExecFromContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (tdb *TenantDB) ExecFromContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	tenantID := tenant.TenantIDFromContext(ctx)
 	if tenantID == "" {
 		return nil, errors.New("tenant ID not found in context")
@@ -113,7 +113,7 @@ func (tdb *TenantDB) ExecFromContext(ctx context.Context, query string, args ...
 }
 
 // ExecContext executes a statement with automatic tenant filtering.
-func (tdb *TenantDB) ExecContext(ctx context.Context, tenantID string, query string, args ...interface{}) (sql.Result, error) {
+func (tdb *TenantDB) ExecContext(ctx context.Context, tenantID string, query string, args ...any) (sql.Result, error) {
 	if tdb == nil || tdb.db == nil {
 		return nil, errors.New("database not initialized")
 	}
@@ -123,7 +123,7 @@ func (tdb *TenantDB) ExecContext(ctx context.Context, tenantID string, query str
 }
 
 // addTenantFilter injects tenant_id filter into SQL query.
-func (tdb *TenantDB) addTenantFilter(query string, tenantID string, args []interface{}) (string, []interface{}) {
+func (tdb *TenantDB) addTenantFilter(query string, tenantID string, args []any) (string, []any) {
 	queryLower := strings.ToLower(strings.TrimSpace(query))
 
 	// For INSERT statements, add tenant_id to the column list
@@ -138,7 +138,7 @@ func (tdb *TenantDB) addTenantFilter(query string, tenantID string, args []inter
 
 	// For SELECT, DELETE - add WHERE clause filter (tenant_id at beginning)
 	whereClause := fmt.Sprintf("%s = ?", tdb.tenantColumn)
-	newArgs := append([]interface{}{tenantID}, args...)
+	newArgs := append([]any{tenantID}, args...)
 
 	if whereIdx := indexCaseInsensitive(query, " WHERE "); whereIdx != -1 {
 		// Existing WHERE clause - add AND condition after WHERE keyword
@@ -163,7 +163,7 @@ func (tdb *TenantDB) addTenantFilter(query string, tenantID string, args []inter
 
 // addTenantToUpdate adds tenant_id filter to UPDATE statements.
 // For UPDATE, the tenant_id parameter should go after SET parameters but before WHERE parameters.
-func (tdb *TenantDB) addTenantToUpdate(query string, tenantID string, args []interface{}) (string, []interface{}) {
+func (tdb *TenantDB) addTenantToUpdate(query string, tenantID string, args []any) (string, []any) {
 	whereClause := fmt.Sprintf("%s = ?", tdb.tenantColumn)
 
 	// Find WHERE clause (case-insensitive)
@@ -182,7 +182,7 @@ func (tdb *TenantDB) addTenantToUpdate(query string, tenantID string, args []int
 		setPlaceholders := strings.Count(beforeWhere, "?")
 
 		// Insert tenant arg after SET parameters
-		newArgs := make([]interface{}, 0, len(args)+1)
+		newArgs := make([]any, 0, len(args)+1)
 		newArgs = append(newArgs, args[:setPlaceholders]...) // SET parameters
 		newArgs = append(newArgs, tenantID)                  // tenant_id
 		newArgs = append(newArgs, args[setPlaceholders:]...) // WHERE parameters
@@ -200,7 +200,7 @@ func (tdb *TenantDB) addTenantToUpdate(query string, tenantID string, args []int
 }
 
 // addTenantToInsert adds tenant_id to INSERT statements.
-func (tdb *TenantDB) addTenantToInsert(query string, tenantID string, args []interface{}) (string, []interface{}) {
+func (tdb *TenantDB) addTenantToInsert(query string, tenantID string, args []any) (string, []any) {
 	// Simple implementation: assumes INSERT INTO table (col1, col2) VALUES (?, ?)
 	// In production, you might want a more robust SQL parser
 

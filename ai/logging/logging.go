@@ -49,11 +49,11 @@ func (l Level) String() string {
 // Field represents a structured log field (key-value pair).
 type Field struct {
 	Key   string
-	Value interface{}
+	Value any
 }
 
 // Fields creates a slice of fields from key-value pairs.
-func Fields(keyValues ...interface{}) []Field {
+func Fields(keyValues ...any) []Field {
 	if len(keyValues)%2 != 0 {
 		panic("Fields requires an even number of arguments")
 	}
@@ -99,14 +99,14 @@ type Logger interface {
 // NoOpLogger is a logger that does nothing (for disabled logging).
 type NoOpLogger struct{}
 
-func (n *NoOpLogger) Debug(msg string, fields ...Field)          {}
-func (n *NoOpLogger) Info(msg string, fields ...Field)           {}
-func (n *NoOpLogger) Warn(msg string, fields ...Field)           {}
-func (n *NoOpLogger) Error(msg string, fields ...Field)          {}
-func (n *NoOpLogger) Fatal(msg string, fields ...Field)          { os.Exit(1) }
-func (n *NoOpLogger) With(fields ...Field) Logger                { return n }
-func (n *NoOpLogger) WithContext(ctx context.Context) Logger     { return n }
-func (n *NoOpLogger) SetLevel(level Level)                       {}
+func (n *NoOpLogger) Debug(msg string, fields ...Field)      {}
+func (n *NoOpLogger) Info(msg string, fields ...Field)       {}
+func (n *NoOpLogger) Warn(msg string, fields ...Field)       {}
+func (n *NoOpLogger) Error(msg string, fields ...Field)      {}
+func (n *NoOpLogger) Fatal(msg string, fields ...Field)      { os.Exit(1) }
+func (n *NoOpLogger) With(fields ...Field) Logger            { return n }
+func (n *NoOpLogger) WithContext(ctx context.Context) Logger { return n }
+func (n *NoOpLogger) SetLevel(level Level)                   {}
 
 // ConsoleLogger is a structured logger that writes to stdout/stderr.
 type ConsoleLogger struct {
@@ -275,7 +275,7 @@ func (cl *ConsoleLogger) log(level Level, msg string, fields []Field) {
 
 // writeJSON writes a log message in JSON format
 func (cl *ConsoleLogger) writeJSON(w io.Writer, level Level, msg string, fields []Field) {
-	entry := map[string]interface{}{
+	entry := map[string]any{
 		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 		"level":     level.String(),
 		"message":   msg,

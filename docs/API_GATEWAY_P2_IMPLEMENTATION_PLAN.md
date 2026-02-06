@@ -658,14 +658,14 @@ type Request interface {
     Method() string
     Headers() map[string][]string
     Body() io.Reader
-    Metadata() map[string]interface{}
+    Metadata() map[string]any
 }
 
 type Response interface {
     StatusCode() int
     Headers() map[string][]string
     Body() io.Reader
-    Metadata() map[string]interface{}
+    Metadata() map[string]any
 }
 ```
 
@@ -717,7 +717,7 @@ type GraphQLAdapter interface {
 type GraphQLRequest struct {
     Query         string                 `json:"query"`
     OperationName string                 `json:"operationName,omitempty"`
-    Variables     map[string]interface{} `json:"variables,omitempty"`
+    Variables     map[string]any `json:"variables,omitempty"`
 }
 ```
 
@@ -981,7 +981,7 @@ func RenameJSONField(from, to string) RequestTransformer {
         r.Body.Close()
 
         // Parse JSON
-        var data map[string]interface{}
+        var data map[string]any
         json.Unmarshal(body, &data)
 
         // Rename field

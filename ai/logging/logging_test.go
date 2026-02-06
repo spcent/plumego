@@ -102,7 +102,7 @@ func TestConsoleLogger_JSON(t *testing.T) {
 	}
 
 	// Parse JSON
-	var entry map[string]interface{}
+	var entry map[string]any
 	if err := json.Unmarshal([]byte(output), &entry); err != nil {
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestConsoleLogger_With(t *testing.T) {
 	child.Info("test message", Fields("action", "create")...)
 
 	output := buf.String()
-	var entry map[string]interface{}
+	var entry map[string]any
 	if err := json.Unmarshal([]byte(output), &entry); err != nil {
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestConsoleLogger_WithContext(t *testing.T) {
 	child.Info("test message")
 
 	output := buf.String()
-	var entry map[string]interface{}
+	var entry map[string]any
 	if err := json.Unmarshal([]byte(output), &entry); err != nil {
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
