@@ -26,9 +26,15 @@ func NewComponent(svc *Service, prefix string) *Component {
 }
 
 func (c *Component) RegisterRoutes(r *router.Router) {
+	// Send
 	r.PostCtx(c.prefix+"/send", c.svc.HandleSend)
 	r.PostCtx(c.prefix+"/batch", c.svc.HandleBatchSend)
+	// Query
 	r.GetCtx(c.prefix+"/stats", c.svc.HandleStats)
+	r.GetCtx(c.prefix+"/receipts", c.svc.HandleListReceipts)
+	r.GetCtx(c.prefix+"/:id/receipt", c.svc.HandleGetReceipt)
+	// Operations
+	r.GetCtx(c.prefix+"/channels", c.svc.HandleChannelHealth)
 }
 
 func (c *Component) RegisterMiddleware(_ *middleware.Registry) {}
@@ -48,6 +54,15 @@ func (c *Component) Health() (string, health.HealthStatus) {
 	}
 	if stats.Dead > 100 {
 		return "messaging", health.HealthStatus{Status: health.StatusDegraded, Message: "high dead-letter count"}
+	}
+	// Check channel health.
+	for _, ch := range c.svc.Monitor().Status() {
+		if ch.State == ChannelUnhealthy {
+			return "messaging", health.HealthStatus{
+				Status:  health.StatusDegraded,
+				Message: string(ch.Channel) + " channel unhealthy: " + ch.Error,
+			}
+		}
 	}
 	return "messaging", health.HealthStatus{Status: health.StatusHealthy}
 }

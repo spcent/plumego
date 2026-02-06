@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
@@ -14,13 +15,7 @@ func (s *Service) HandleSend(ctx *contract.Ctx) {
 		return
 	}
 	if err := s.Send(ctx.R.Context(), req); err != nil {
-		status := http.StatusUnprocessableEntity
-		code := "VALIDATION_ERROR"
-		if isProviderError(err) {
-			status = http.StatusBadGateway
-			code = "PROVIDER_ERROR"
-		}
-		ctx.ErrorJSON(status, code, err.Error(), nil)
+		writeServiceError(ctx, err)
 		return
 	}
 	ctx.JSON(http.StatusAccepted, map[string]string{
@@ -54,23 +49,52 @@ func (s *Service) HandleStats(ctx *contract.Ctx) {
 	ctx.JSON(http.StatusOK, stats)
 }
 
-func isProviderError(err error) bool {
-	if err == nil {
-		return false
+// HandleGetReceipt is the HTTP handler for GET /messages/:id/receipt.
+func (s *Service) HandleGetReceipt(ctx *contract.Ctx) {
+	id, ok := ctx.Param("id")
+	if !ok || id == "" {
+		ctx.ErrorJSON(http.StatusBadRequest, "MISSING_ID", "message id is required", nil)
+		return
 	}
-	return errorIs(err, ErrProviderFailure)
+	receipt, found := s.receipts.Get(id)
+	if !found {
+		ctx.ErrorJSON(http.StatusNotFound, "NOT_FOUND", "receipt not found", nil)
+		return
+	}
+	ctx.JSON(http.StatusOK, receipt)
 }
 
-func errorIs(err, target error) bool {
-	for err != nil {
-		if err == target {
-			return true
-		}
-		u, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = u.Unwrap()
+// HandleListReceipts is the HTTP handler for GET /messages/receipts.
+func (s *Service) HandleListReceipts(ctx *contract.Ctx) {
+	filter := ReceiptFilter{
+		Channel:  Channel(ctx.R.URL.Query().Get("channel")),
+		Status:   ctx.R.URL.Query().Get("status"),
+		TenantID: ctx.R.URL.Query().Get("tenant_id"),
 	}
-	return false
+	receipts := s.receipts.List(filter)
+	ctx.JSON(http.StatusOK, map[string]any{
+		"receipts": receipts,
+		"count":    len(receipts),
+	})
+}
+
+// HandleChannelHealth is the HTTP handler for GET /messages/channels.
+func (s *Service) HandleChannelHealth(ctx *contract.Ctx) {
+	statuses := s.monitor.Status()
+	ctx.JSON(http.StatusOK, map[string]any{
+		"channels": statuses,
+	})
+}
+
+func writeServiceError(ctx *contract.Ctx, err error) {
+	status := http.StatusUnprocessableEntity
+	code := "VALIDATION_ERROR"
+	if errors.Is(err, ErrProviderFailure) {
+		status = http.StatusBadGateway
+		code = "PROVIDER_ERROR"
+	} else if errors.Is(err, ErrQuotaExceeded) {
+		status = http.StatusTooManyRequests
+		code = "QUOTA_EXCEEDED"
+	}
+	ctx.ErrorJSON(status, code, err.Error(), nil)
 }

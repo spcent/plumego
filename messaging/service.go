@@ -9,6 +9,7 @@ import (
 	"time"
 
 	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/net/mq"
 	"github.com/spcent/plumego/net/mq/store"
 	"github.com/spcent/plumego/pubsub"
@@ -30,6 +31,11 @@ type Service struct {
 
 	sms   SMSProvider
 	email EmailProvider
+
+	receipts ReceiptStore
+	quota    *QuotaChecker
+	monitor  *ChannelMonitor
+	metrics  *metricsWrapper
 
 	totalSent   atomic.Int64
 	totalFailed atomic.Int64
@@ -56,6 +62,15 @@ type Config struct {
 	// Logger; optional.
 	Logger log.StructuredLogger
 
+	// ReceiptStore for persisting delivery receipts; nil uses in-memory default.
+	Receipts ReceiptStore
+
+	// QuotaChecker for per-tenant send limits; nil disables quota enforcement.
+	Quota *QuotaChecker
+
+	// MetricsCollector for observability; nil disables metrics.
+	MetricsCollector metrics.MetricsCollector
+
 	// Worker tuning.
 	WorkerConcurrency int
 	WorkerMaxInflight int
@@ -72,6 +87,9 @@ func New(cfg Config) *Service {
 	}
 	if cfg.WorkerMaxInflight <= 0 {
 		cfg.WorkerMaxInflight = cfg.WorkerConcurrency * 2
+	}
+	if cfg.Receipts == nil {
+		cfg.Receipts = NewMemReceiptStore(0)
 	}
 
 	queue := mq.NewTaskQueue(cfg.TaskStore)
@@ -93,6 +111,8 @@ func New(cfg Config) *Service {
 	}
 	worker := mq.NewWorker(queue, workerCfg)
 
+	monitor := NewChannelMonitor(cfg.SMS, cfg.Email, cfg.Logger)
+
 	svc := &Service{
 		queue:     queue,
 		worker:    worker,
@@ -103,6 +123,10 @@ func New(cfg Config) *Service {
 		logger:    cfg.Logger,
 		sms:       cfg.SMS,
 		email:     cfg.Email,
+		receipts:  cfg.Receipts,
+		quota:     cfg.Quota,
+		monitor:   monitor,
+		metrics:   newMetrics(cfg.MetricsCollector),
 	}
 
 	if cfg.SMS != nil {
@@ -118,10 +142,19 @@ func New(cfg Config) *Service {
 // Templates returns the template engine for registration.
 func (s *Service) Templates() *TemplateEngine { return s.templates }
 
+// Receipts returns the receipt store for direct queries.
+func (s *Service) Receipts() ReceiptStore { return s.receipts }
+
+// Monitor returns the channel health monitor.
+func (s *Service) Monitor() *ChannelMonitor { return s.monitor }
+
 // Start launches the worker pool and registers scheduled jobs.
 func (s *Service) Start(ctx context.Context) error {
 	s.worker.Start(ctx)
 	s.registerScheduledJobs()
+	if s.monitor != nil {
+		s.monitor.RegisterJobs(s.scheduler)
+	}
 	return nil
 }
 
@@ -130,12 +163,26 @@ func (s *Service) Stop(ctx context.Context) error {
 	return s.worker.Stop(ctx)
 }
 
-// Send validates and enqueues a single message.
+// Send validates, checks quota, and enqueues a single message.
 func (s *Service) Send(ctx context.Context, req SendRequest) error {
 	if err := s.validate(req); err != nil {
+		if s.metrics.enabled() {
+			s.metrics.ObserveValidation(ctx, req.Channel)
+		}
 		return err
 	}
-	return s.enqueue(ctx, req)
+	if err := s.checkQuota(ctx, req); err != nil {
+		return err
+	}
+	start := time.Now()
+	err := s.enqueue(ctx, req)
+	if s.metrics.enabled() {
+		s.metrics.ObserveEnqueue(ctx, req.Channel, time.Since(start), err)
+	}
+	if err == nil {
+		s.saveReceipt(req, "queued", "", "")
+	}
+	return err
 }
 
 // SendBatch validates and enqueues multiple messages, returning a summary.
@@ -147,11 +194,17 @@ func (s *Service) SendBatch(ctx context.Context, batch BatchRequest) BatchResult
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", req.ID, err))
 			continue
 		}
+		if err := s.checkQuota(ctx, req); err != nil {
+			result.Rejected++
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", req.ID, err))
+			continue
+		}
 		if err := s.enqueue(ctx, req); err != nil {
 			result.Rejected++
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", req.ID, err))
 			continue
 		}
+		s.saveReceipt(req, "queued", "", "")
 		result.Accepted++
 	}
 	return result
@@ -174,6 +227,13 @@ func (s *Service) Stats(ctx context.Context) (ServiceStats, error) {
 }
 
 // --- internal ---
+
+func (s *Service) checkQuota(ctx context.Context, req SendRequest) error {
+	if s.quota == nil {
+		return nil
+	}
+	return s.quota.Allow(ctx, req.TenantID)
+}
 
 func (s *Service) validate(req SendRequest) error {
 	if strings.TrimSpace(req.To) == "" {
@@ -258,16 +318,25 @@ func (s *Service) handleSMS(ctx context.Context, task mq.Task) error {
 		return err
 	}
 
+	start := time.Now()
 	result, err := s.sms.Send(ctx, SMSMessage{
 		To:   req.To,
 		Body: body,
 	})
+	elapsed := time.Since(start)
+
 	if err != nil {
 		s.totalFailed.Add(1)
+		s.monitor.RecordFailure(ChannelSMS, err)
+		s.metrics.ObserveSend(ctx, ChannelSMS, s.sms.Name(), elapsed, err)
+		s.updateReceipt(req.ID, "failed", "", err.Error(), task.Attempts)
 		return fmt.Errorf("%w: %v", ErrProviderFailure, err)
 	}
 
 	s.totalSent.Add(1)
+	s.monitor.RecordSuccess(ChannelSMS, elapsed)
+	s.metrics.ObserveSend(ctx, ChannelSMS, s.sms.Name(), elapsed, nil)
+	s.updateReceipt(req.ID, "sent", result.ProviderID, "", task.Attempts)
 	s.publishResult(SendResult{
 		RequestID:  req.ID,
 		Channel:    ChannelSMS,
@@ -290,18 +359,27 @@ func (s *Service) handleEmail(ctx context.Context, task mq.Task) error {
 		return err
 	}
 
+	start := time.Now()
 	result, err := s.email.Send(ctx, EmailMessage{
 		To:      req.To,
 		Subject: req.Subject,
 		Body:    body,
 		HTML:    req.HTML,
 	})
+	elapsed := time.Since(start)
+
 	if err != nil {
 		s.totalFailed.Add(1)
+		s.monitor.RecordFailure(ChannelEmail, err)
+		s.metrics.ObserveSend(ctx, ChannelEmail, s.email.Name(), elapsed, err)
+		s.updateReceipt(req.ID, "failed", "", err.Error(), task.Attempts)
 		return fmt.Errorf("%w: %v", ErrProviderFailure, err)
 	}
 
 	s.totalSent.Add(1)
+	s.monitor.RecordSuccess(ChannelEmail, elapsed)
+	s.metrics.ObserveSend(ctx, ChannelEmail, s.email.Name(), elapsed, nil)
+	s.updateReceipt(req.ID, "sent", result.MessageID, "", task.Attempts)
 	s.publishResult(SendResult{
 		RequestID:  req.ID,
 		Channel:    ChannelEmail,
@@ -311,6 +389,44 @@ func (s *Service) handleEmail(ctx context.Context, task mq.Task) error {
 		Attempts:   task.Attempts,
 	})
 	return nil
+}
+
+func (s *Service) saveReceipt(req SendRequest, status, providerID, errMsg string) {
+	if s.receipts == nil {
+		return
+	}
+	_ = s.receipts.Save(Receipt{
+		ID:         req.ID,
+		Channel:    req.Channel,
+		To:         req.To,
+		Status:     status,
+		ProviderID: providerID,
+		Error:      errMsg,
+		TenantID:   req.TenantID,
+		QueuedAt:   time.Now(),
+	})
+}
+
+func (s *Service) updateReceipt(id, status, providerID, errMsg string, attempts int) {
+	if s.receipts == nil {
+		return
+	}
+	r, ok := s.receipts.Get(id)
+	if !ok {
+		return
+	}
+	r.Status = status
+	r.Attempts = attempts
+	if providerID != "" {
+		r.ProviderID = providerID
+	}
+	if errMsg != "" {
+		r.Error = errMsg
+	}
+	if status == "sent" {
+		r.SentAt = time.Now()
+	}
+	_ = s.receipts.Save(r)
 }
 
 func (s *Service) publishResult(result SendResult) {
