@@ -233,7 +233,7 @@ func TestMetricsCollectorWithSlowQueryDetection(t *testing.T) {
 	)
 
 	// Record a slow query
-	collector.ObserveDB(nil, "query", "postgres", "SELECT * FROM users", 10, 200*time.Millisecond, nil)
+	collector.ObserveDB(t.Context(), "query", "postgres", "SELECT * FROM users", 10, 200*time.Millisecond, nil)
 
 	// Verify it was forwarded to base collector
 	if base.DBCallCount() != 1 {

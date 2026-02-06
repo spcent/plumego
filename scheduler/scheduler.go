@@ -1233,10 +1233,12 @@ func (s *Scheduler) cancelJobLocked(id JobID, j *job) {
 // resumeJobLocked resumes a paused job and reschedules it. Must be called with s.mu held.
 func (s *Scheduler) resumeJobLocked(j *job) {
 	j.paused.Store(false)
-	if j.kind == jobKindCron {
+
+	switch j.kind {
+	case jobKindCron:
 		j.runAt = j.cron.Next(s.clock.Now())
 		s.pushScheduleLocked(j, j.runAt)
-	} else if j.kind == jobKindDelay {
+	case jobKindDelay:
 		s.pushScheduleLocked(j, j.runAt)
 	}
 }
