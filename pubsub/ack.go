@@ -23,6 +23,20 @@ type AckableSubscription interface {
 
 	// PendingCount returns the number of messages pending acknowledgment.
 	PendingCount() int
+
+	// DeadLetterCount returns the number of messages in the dead letter queue.
+	DeadLetterCount() int
+
+	// DeadLetterMessages returns all messages currently in the dead letter queue.
+	DeadLetterMessages() []DeadLetterMessage
+
+	// ReprocessDeadLetters republishes dead letter messages to their original topics.
+	// An optional filter selects which messages to reprocess; nil reprocesses all.
+	// Returns the number of successfully reprocessed messages.
+	ReprocessDeadLetters(filter func(DeadLetterMessage) bool) int
+
+	// ClearDeadLetters removes all messages from the dead letter queue.
+	ClearDeadLetters()
 }
 
 // ackableSubscriber implements AckableSubscription.
@@ -36,6 +50,7 @@ type ackableSubscriber struct {
 	deadLetter *InProcPubSub
 	dlTopic    string
 	ps         *InProcPubSub
+	dlq        *deadLetterQueue
 }
 
 // pendingMessage tracks a message awaiting acknowledgment.
@@ -59,6 +74,12 @@ type AckOptions struct {
 
 	// DeadLetterPubSub is the pubsub for dead letter messages (nil = same pubsub)
 	DeadLetterPubSub *InProcPubSub
+
+	// DLQConfig provides additional configuration for the local dead letter queue.
+	// When set (non-zero), a local dead letter queue is created to store failed
+	// messages for later inspection and reprocessing.
+	// If DLQConfig.Topic is empty, DeadLetterTopic is used as the topic.
+	DLQConfig DeadLetterConfig
 }
 
 // DefaultAckOptions returns default ack options.
@@ -95,6 +116,15 @@ func (ps *InProcPubSub) SubscribeAckable(topic string, subOpts SubOptions, ackOp
 	}
 	if ackSub.deadLetter == nil {
 		ackSub.deadLetter = ps
+	}
+
+	// Create local dead letter queue when configured
+	dlqConfig := ackOpts.DLQConfig
+	if dlqConfig.Topic == "" && ackSub.dlTopic != "" {
+		dlqConfig.Topic = ackSub.dlTopic
+	}
+	if dlqConfig.Topic != "" || dlqConfig.MaxSize > 0 || dlqConfig.TTL > 0 || dlqConfig.OnDeadLetter != nil {
+		ackSub.dlq = newDeadLetterQueue(dlqConfig)
 	}
 
 	return ackSub, nil
@@ -269,7 +299,7 @@ func (as *ackableSubscriber) Cancel() {
 
 // sendToDeadLetter sends a message to the dead letter queue.
 func (as *ackableSubscriber) sendToDeadLetter(msg Message, reason string) {
-	if as.dlTopic == "" {
+	if as.dlTopic == "" && as.dlq == nil {
 		return
 	}
 
@@ -281,7 +311,15 @@ func (as *ackableSubscriber) sendToDeadLetter(msg Message, reason string) {
 	msg.Meta["X-Original-Topic"] = msg.Topic
 	msg.Meta["X-Dead-Letter-Time"] = time.Now().UTC().Format(time.RFC3339)
 
-	_ = as.deadLetter.Publish(as.dlTopic, msg)
+	// Store in local dead letter queue
+	if as.dlq != nil {
+		as.dlq.Add(msg, reason)
+	}
+
+	// Publish to dead letter topic
+	if as.dlTopic != "" {
+		_ = as.deadLetter.Publish(as.dlTopic, msg)
+	}
 }
 
 // DeadLetterConfig configures dead letter queue behavior.
@@ -302,13 +340,13 @@ type DeadLetterConfig struct {
 // deadLetterQueue manages dead letter messages.
 type deadLetterQueue struct {
 	mu       sync.RWMutex
-	messages []deadLetterMessage
+	messages []DeadLetterMessage
 	config   DeadLetterConfig
 	sequence atomic.Uint64
 }
 
-// deadLetterMessage represents a message in the dead letter queue.
-type deadLetterMessage struct {
+// DeadLetterMessage represents a message in the dead letter queue.
+type DeadLetterMessage struct {
 	Message   Message
 	Reason    string
 	Timestamp time.Time
@@ -318,7 +356,7 @@ type deadLetterMessage struct {
 // newDeadLetterQueue creates a new dead letter queue.
 func newDeadLetterQueue(config DeadLetterConfig) *deadLetterQueue {
 	return &deadLetterQueue{
-		messages: make([]deadLetterMessage, 0),
+		messages: make([]DeadLetterMessage, 0),
 		config:   config,
 	}
 }
@@ -330,7 +368,7 @@ func (dlq *deadLetterQueue) Add(msg Message, reason string) {
 
 	seq := dlq.sequence.Add(1)
 
-	dm := deadLetterMessage{
+	dm := DeadLetterMessage{
 		Message:   msg,
 		Reason:    reason,
 		Timestamp: time.Now(),
@@ -351,11 +389,11 @@ func (dlq *deadLetterQueue) Add(msg Message, reason string) {
 }
 
 // List returns all dead letter messages.
-func (dlq *deadLetterQueue) List() []deadLetterMessage {
+func (dlq *deadLetterQueue) List() []DeadLetterMessage {
 	dlq.mu.RLock()
 	defer dlq.mu.RUnlock()
 
-	result := make([]deadLetterMessage, len(dlq.messages))
+	result := make([]DeadLetterMessage, len(dlq.messages))
 	copy(result, dlq.messages)
 	return result
 }
@@ -375,11 +413,11 @@ func (dlq *deadLetterQueue) Clear() {
 }
 
 // Reprocess moves messages back to their original topics.
-func (dlq *deadLetterQueue) Reprocess(ps *InProcPubSub, filter func(dm deadLetterMessage) bool) int {
+func (dlq *deadLetterQueue) Reprocess(ps *InProcPubSub, filter func(dm DeadLetterMessage) bool) int {
 	dlq.mu.Lock()
 	defer dlq.mu.Unlock()
 
-	var remaining []deadLetterMessage
+	var remaining []DeadLetterMessage
 	var reprocessed int
 
 	for _, dm := range dlq.messages {
@@ -407,4 +445,37 @@ func (dlq *deadLetterQueue) Reprocess(ps *InProcPubSub, filter func(dm deadLette
 
 	dlq.messages = remaining
 	return reprocessed
+}
+
+// DeadLetterCount returns the number of messages in the dead letter queue.
+func (as *ackableSubscriber) DeadLetterCount() int {
+	if as.dlq == nil {
+		return 0
+	}
+	return as.dlq.Count()
+}
+
+// DeadLetterMessages returns all messages currently in the dead letter queue.
+func (as *ackableSubscriber) DeadLetterMessages() []DeadLetterMessage {
+	if as.dlq == nil {
+		return nil
+	}
+	return as.dlq.List()
+}
+
+// ReprocessDeadLetters republishes dead letter messages to their original topics.
+// An optional filter selects which messages to reprocess; nil reprocesses all.
+// Returns the number of successfully reprocessed messages.
+func (as *ackableSubscriber) ReprocessDeadLetters(filter func(DeadLetterMessage) bool) int {
+	if as.dlq == nil {
+		return 0
+	}
+	return as.dlq.Reprocess(as.ps, filter)
+}
+
+// ClearDeadLetters removes all messages from the dead letter queue.
+func (as *ackableSubscriber) ClearDeadLetters() {
+	if as.dlq != nil {
+		as.dlq.Clear()
+	}
 }
