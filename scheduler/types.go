@@ -270,16 +270,38 @@ func RetryExponential(maxAttempts int, base time.Duration, maxBackoff time.Durat
 		Kind:        "exponential",
 		BaseDelay:   base,
 		Backoff: func(attempt int) time.Duration {
-			if attempt <= 1 {
-				return base
-			}
-			backoff := base << (attempt - 1)
-			if maxBackoff > 0 && backoff > maxBackoff {
-				return maxBackoff
-			}
-			return backoff
+			return safeExponentialBackoff(base, maxBackoff, attempt)
 		},
 	}
+}
+
+// safeExponentialBackoff calculates exponential backoff without integer overflow.
+// When the shift amount is too large (>= 63 bits) or the result overflows
+// (becomes negative), it returns maxBackoff (or base if maxBackoff is 0).
+func safeExponentialBackoff(base, maxBackoff time.Duration, attempt int) time.Duration {
+	if attempt <= 1 {
+		return base
+	}
+	shift := attempt - 1
+	if shift >= 63 || base > (1<<62)/time.Duration(1<<shift) {
+		// Overflow would occur; clamp to maxBackoff
+		if maxBackoff > 0 {
+			return maxBackoff
+		}
+		return base
+	}
+	backoff := base << shift
+	if backoff <= 0 {
+		// Overflow produced negative or zero; clamp
+		if maxBackoff > 0 {
+			return maxBackoff
+		}
+		return base
+	}
+	if maxBackoff > 0 && backoff > maxBackoff {
+		return maxBackoff
+	}
+	return backoff
 }
 
 func serializeRetry(policy RetryPolicy) RetrySpec {
@@ -312,14 +334,7 @@ func hydrateRetry(spec RetrySpec) RetryPolicy {
 			return policy
 		}
 		policy.Backoff = func(attempt int) time.Duration {
-			if attempt <= 1 {
-				return policy.BaseDelay
-			}
-			backoff := policy.BaseDelay << (attempt - 1)
-			if policy.MaxBackoff > 0 && backoff > policy.MaxBackoff {
-				return policy.MaxBackoff
-			}
-			return backoff
+			return safeExponentialBackoff(policy.BaseDelay, policy.MaxBackoff, attempt)
 		}
 	}
 	return policy

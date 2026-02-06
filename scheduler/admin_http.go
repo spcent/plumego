@@ -65,6 +65,12 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 		http.NotFound(w, r)
 		return
 	}
+	// Validate job ID length to prevent abuse via extremely long path segments.
+	const maxJobIDLen = 256
+	if len(parts[0]) > maxJobIDLen {
+		http.Error(w, "job ID too long", http.StatusBadRequest)
+		return
+	}
 	id := JobID(parts[0])
 
 	if len(parts) == 1 {

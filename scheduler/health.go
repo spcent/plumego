@@ -11,14 +11,14 @@ type HealthSnapshot struct {
 
 // Health returns a snapshot of scheduler load.
 func (s *Scheduler) Health() HealthSnapshot {
-	s.mu.Lock()
+	s.mu.RLock()
 	running := 0
 	for _, j := range s.jobs {
 		if j.running.Load() {
 			running++
 		}
 	}
-	s.mu.Unlock()
+	s.mu.RUnlock()
 
 	stats := s.Stats()
 	return HealthSnapshot{

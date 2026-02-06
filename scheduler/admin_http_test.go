@@ -60,7 +60,7 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delay running: %v", err)
 	}
-	if !waitForAdminState(s, "admin-running", JobStateRunning, 500*time.Millisecond) {
+	if !waitForState(t, s, "admin-running", JobStateRunning, 500*time.Millisecond) {
 		t.Fatalf("expected admin-running to reach running state")
 	}
 
@@ -85,16 +85,4 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 		t.Fatalf("expected admin-running to be in running jobs list")
 	}
 	close(block)
-}
-
-func waitForAdminState(s *Scheduler, id JobID, state JobState, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		status, ok := s.Status(id)
-		if ok && status.State == state {
-			return true
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	return false
 }
