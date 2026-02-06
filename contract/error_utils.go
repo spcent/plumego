@@ -175,74 +175,47 @@ func (eh *ErrorHandler) WithTrace(err error, r *http.Request) error {
 	})
 }
 
-// ValidationError creates a validation error with context
-func (eh *ErrorHandler) ValidationError(field, message string, params map[string]any) APIError {
-	err := NewValidationError(field, message)
+// withDetails merges additional params into an APIError's Details map.
+func withDetails(err APIError, params map[string]any) APIError {
 	for k, v := range params {
 		err.Details[k] = v
 	}
-
 	return err
+}
+
+// ValidationError creates a validation error with context
+func (eh *ErrorHandler) ValidationError(field, message string, params map[string]any) APIError {
+	return withDetails(NewValidationError(field, message), params)
 }
 
 // NotFoundError creates a not found error with context
 func (eh *ErrorHandler) NotFoundError(resource string, params map[string]any) APIError {
-	err := NewNotFoundError(resource)
-	for k, v := range params {
-		err.Details[k] = v
-	}
-
-	return err
+	return withDetails(NewNotFoundError(resource), params)
 }
 
 // UnauthorizedError creates an unauthorized error with context
 func (eh *ErrorHandler) UnauthorizedError(message string, params map[string]any) APIError {
-	err := NewUnauthorizedError(message)
-	for k, v := range params {
-		err.Details[k] = v
-	}
-
-	return err
+	return withDetails(NewUnauthorizedError(message), params)
 }
 
 // ForbiddenError creates a forbidden error with context
 func (eh *ErrorHandler) ForbiddenError(message string, params map[string]any) APIError {
-	err := NewForbiddenError(message)
-	for k, v := range params {
-		err.Details[k] = v
-	}
-
-	return err
+	return withDetails(NewForbiddenError(message), params)
 }
 
 // TimeoutError creates a timeout error with context
 func (eh *ErrorHandler) TimeoutError(message string, params map[string]any) APIError {
-	err := NewTimeoutError(message)
-	for k, v := range params {
-		err.Details[k] = v
-	}
-
-	return err
+	return withDetails(NewTimeoutError(message), params)
 }
 
 // InternalError creates an internal error with context
 func (eh *ErrorHandler) InternalError(message string, params map[string]any) APIError {
-	err := NewInternalError(message)
-	for k, v := range params {
-		err.Details[k] = v
-	}
-
-	return err
+	return withDetails(NewInternalError(message), params)
 }
 
 // RateLimitError creates a rate limit error with context
 func (eh *ErrorHandler) RateLimitError(message string, params map[string]any) APIError {
-	err := NewRateLimitError(message)
-	for k, v := range params {
-		err.Details[k] = v
-	}
-
-	return err
+	return withDetails(NewRateLimitError(message), params)
 }
 
 // SafeExecute executes a function and handles any errors safely

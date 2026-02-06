@@ -40,6 +40,45 @@ func TestErrorJSON(t *testing.T) {
 	}
 }
 
+func TestErrorJSONCategoryFromStatus(t *testing.T) {
+	tests := []struct {
+		name             string
+		status           int
+		expectedCategory ErrorCategory
+	}{
+		{"bad request", http.StatusBadRequest, CategoryClient},
+		{"unauthorized", http.StatusUnauthorized, CategoryAuthentication},
+		{"forbidden", http.StatusForbidden, CategoryAuthentication},
+		{"not found", http.StatusNotFound, CategoryClient},
+		{"too many requests", http.StatusTooManyRequests, CategoryRateLimit},
+		{"request timeout", http.StatusRequestTimeout, CategoryTimeout},
+		{"internal server error", http.StatusInternalServerError, CategoryServer},
+		{"unprocessable entity (fallback)", http.StatusUnprocessableEntity, CategoryClient},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/test", nil)
+			ctx := NewCtx(w, r, nil)
+
+			err := ctx.ErrorJSON(tt.status, "TEST", "test message", nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			var response APIError
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatalf("failed to parse response: %v", err)
+			}
+
+			if response.Category != tt.expectedCategory {
+				t.Errorf("status %d: expected category %q, got %q", tt.status, tt.expectedCategory, response.Category)
+			}
+		})
+	}
+}
+
 func TestRedirect(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
@@ -57,6 +96,45 @@ func TestRedirect(t *testing.T) {
 	location := w.Header().Get("Location")
 	if location != "/redirect" {
 		t.Errorf("expected location '/redirect', got '%s'", location)
+	}
+}
+
+func TestSafeRedirect(t *testing.T) {
+	tests := []struct {
+		name        string
+		location    string
+		host        string
+		expectError bool
+	}{
+		{"relative path", "/dashboard", "example.com", false},
+		{"relative path with query", "/search?q=test", "example.com", false},
+		{"same-origin absolute", "http://example.com/path", "example.com", false},
+		{"same-origin https", "https://example.com/path", "example.com", false},
+		{"external URL", "https://evil.com/phish", "example.com", true},
+		{"protocol-relative URL", "//evil.com/path", "example.com", true},
+		{"external with path", "https://attacker.com/fake-login", "example.com", true},
+		{"javascript scheme", "javascript:alert(1)", "example.com", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/test", nil)
+			r.Host = tt.host
+			ctx := NewCtx(w, r, nil)
+
+			err := ctx.SafeRedirect(http.StatusFound, tt.location)
+
+			if tt.expectError && err == nil {
+				t.Errorf("expected error for %q, got nil", tt.location)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error for %q: %v", tt.location, err)
+			}
+			if tt.expectError && err != nil && !errors.Is(err, ErrUnsafeRedirect) {
+				t.Errorf("expected ErrUnsafeRedirect, got %v", err)
+			}
+		})
 	}
 }
 

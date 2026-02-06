@@ -192,6 +192,37 @@ func TestFormatError(t *testing.T) {
 	}
 }
 
+// TestErrorHandlerConvenienceMethods tests the deduplicated ErrorHandler methods
+func TestErrorHandlerConvenienceMethods(t *testing.T) {
+	eh := NewErrorHandler(nil)
+	params := map[string]any{"extra": "context"}
+
+	tests := []struct {
+		name     string
+		err      APIError
+		wantCode string
+	}{
+		{"validation", eh.ValidationError("email", "required", params), "VALIDATION_ERROR"},
+		{"not found", eh.NotFoundError("user", params), "RESOURCE_NOT_FOUND"},
+		{"unauthorized", eh.UnauthorizedError("bad token", params), "UNAUTHORIZED"},
+		{"forbidden", eh.ForbiddenError("no access", params), "FORBIDDEN"},
+		{"timeout", eh.TimeoutError("too slow", params), "TIMEOUT"},
+		{"internal", eh.InternalError("oops", params), "INTERNAL_ERROR"},
+		{"rate limit", eh.RateLimitError("slow down", params), "RATE_LIMITED"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.err.Code != tt.wantCode {
+				t.Errorf("expected code %q, got %q", tt.wantCode, tt.err.Code)
+			}
+			if tt.err.Details["extra"] != "context" {
+				t.Errorf("expected extra param to be merged into details")
+			}
+		})
+	}
+}
+
 // Helper types and functions
 
 type temporaryError struct {

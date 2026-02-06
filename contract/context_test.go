@@ -337,3 +337,148 @@ func TestStreamChunkSizeValidation(t *testing.T) {
 		t.Fatalf("expected invalid chunk size error, got %v", err)
 	}
 }
+
+func TestSSESanitizeField(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"clean string", "hello", "hello"},
+		{"newline in middle", "hello\nworld", "helloworld"},
+		{"carriage return", "hello\rworld", "helloworld"},
+		{"crlf", "hello\r\nworld", "helloworld"},
+		{"multiple newlines", "a\nb\nc", "abc"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeSSEField(tt.input)
+			if result != tt.expected {
+				t.Errorf("sanitizeSSEField(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSSEWriterSanitizesFields(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	sw, err := NewSSEWriter(recorder)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Test that newlines in ID and Event are stripped
+	event := SSEEvent{
+		ID:    "id\n:injected",
+		Event: "type\n:injected",
+		Data:  "safe data",
+	}
+
+	if err := sw.Write(event); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	body := recorder.Body.String()
+
+	// ID should have newlines stripped
+	if strings.Contains(body, "id: id\n") {
+		t.Error("SSE ID field should have newlines stripped")
+	}
+	if !strings.Contains(body, "id: id:injected") {
+		t.Errorf("expected sanitized ID, got: %q", body)
+	}
+
+	// Event should have newlines stripped
+	if strings.Contains(body, "event: type\n") {
+		t.Error("SSE Event field should have newlines stripped")
+	}
+	if !strings.Contains(body, "event: type:injected") {
+		t.Errorf("expected sanitized Event, got: %q", body)
+	}
+}
+
+func TestSSEWriterMultiLineData(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	sw, err := NewSSEWriter(recorder)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Multi-line data should be split into multiple "data:" lines per SSE spec
+	event := SSEEvent{
+		Data: "line1\nline2\nline3",
+	}
+
+	if err := sw.Write(event); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	body := recorder.Body.String()
+
+	// Each line should be its own data: field
+	if !strings.Contains(body, "data: line1\n") {
+		t.Errorf("expected 'data: line1\\n' in output, got: %q", body)
+	}
+	if !strings.Contains(body, "data: line2\n") {
+		t.Errorf("expected 'data: line2\\n' in output, got: %q", body)
+	}
+	if !strings.Contains(body, "data: line3\n") {
+		t.Errorf("expected 'data: line3\\n' in output, got: %q", body)
+	}
+
+	// Should NOT contain the raw unsplit data
+	if strings.Contains(body, "data: line1\nline2") {
+		t.Error("multi-line data should be split into separate data: fields")
+	}
+}
+
+func TestSSEWriterInjectionPrevention(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	sw, err := NewSSEWriter(recorder)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Attempt injection via ID field:
+	// Without sanitization, "id123\n\ndata: malicious" would inject a fake event
+	event := SSEEvent{
+		ID:    "id123\n\ndata: malicious",
+		Event: "msg",
+		Data:  "legitimate",
+	}
+
+	if err := sw.Write(event); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	body := recorder.Body.String()
+
+	// The output should contain exactly one well-formed event.
+	// Newlines in ID are stripped, so injection attempt is neutralized.
+	// The id field should be on a single line without breaks.
+	lines := strings.Split(body, "\n")
+
+	idLineCount := 0
+	dataLineCount := 0
+	for _, line := range lines {
+		if strings.HasPrefix(line, "id: ") {
+			idLineCount++
+		}
+		if strings.HasPrefix(line, "data: ") {
+			dataLineCount++
+		}
+	}
+
+	if idLineCount != 1 {
+		t.Errorf("expected exactly 1 id line, got %d in output: %q", idLineCount, body)
+	}
+	// Only the legitimate data line should exist
+	if dataLineCount != 1 {
+		t.Errorf("expected exactly 1 data line (legitimate only), got %d in output: %q", dataLineCount, body)
+	}
+}
