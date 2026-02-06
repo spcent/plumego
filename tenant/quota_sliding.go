@@ -83,8 +83,8 @@ func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, 
 		retryAfter := window.calculateRetryAfter(now, cfg.RequestsPerMinute, true)
 		return QuotaResult{
 			Allowed:           false,
-			RemainingRequests: max(0, cfg.RequestsPerMinute-currentRequests),
-			RemainingTokens:   max(0, cfg.TokensPerMinute-currentTokens),
+			RemainingRequests: remaining(cfg.RequestsPerMinute, currentRequests),
+			RemainingTokens:   remaining(cfg.TokensPerMinute, currentTokens),
 			RetryAfter:        retryAfter,
 		}, nil
 	}
@@ -94,8 +94,8 @@ func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, 
 		retryAfter := window.calculateRetryAfter(now, cfg.TokensPerMinute, false)
 		return QuotaResult{
 			Allowed:           false,
-			RemainingRequests: max(0, cfg.RequestsPerMinute-currentRequests),
-			RemainingTokens:   max(0, cfg.TokensPerMinute-currentTokens),
+			RemainingRequests: remaining(cfg.RequestsPerMinute, currentRequests),
+			RemainingTokens:   remaining(cfg.TokensPerMinute, currentTokens),
 			RetryAfter:        retryAfter,
 		}, nil
 	}
@@ -113,15 +113,15 @@ func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, 
 
 	return QuotaResult{
 		Allowed:           true,
-		RemainingRequests: max(0, cfg.RequestsPerMinute-currentRequests-req.Requests),
-		RemainingTokens:   max(0, cfg.TokensPerMinute-currentTokens-req.Tokens),
+		RemainingRequests: remaining(cfg.RequestsPerMinute, currentRequests+req.Requests),
+		RemainingTokens:   remaining(cfg.TokensPerMinute, currentTokens+req.Tokens),
 		RetryAfter:        0,
 	}, nil
 }
 
 // cleanup removes entries older than the cutoff time.
 func (w *slidingWindow) cleanup(cutoff time.Time) {
-	// Clean up request times
+	// Clean up request times using binary search
 	idx := sort.Search(len(w.requestTimes), func(i int) bool {
 		return w.requestTimes[i].After(cutoff)
 	})
@@ -129,8 +129,8 @@ func (w *slidingWindow) cleanup(cutoff time.Time) {
 		w.requestTimes = w.requestTimes[idx:]
 	}
 
-	// Clean up token usage
-	tokenIdx := 0
+	// Clean up token usage - find first entry after cutoff
+	tokenIdx := -1
 	for i, usage := range w.tokenUsage {
 		if usage.time.After(cutoff) {
 			tokenIdx = i
@@ -139,6 +139,9 @@ func (w *slidingWindow) cleanup(cutoff time.Time) {
 	}
 	if tokenIdx > 0 {
 		w.tokenUsage = w.tokenUsage[tokenIdx:]
+	} else if tokenIdx < 0 && len(w.tokenUsage) > 0 {
+		// All entries are expired, clear the slice
+		w.tokenUsage = w.tokenUsage[:0]
 	}
 
 	w.lastCleanup = time.Now()
@@ -173,12 +176,4 @@ func (w *slidingWindow) calculateRetryAfter(now time.Time, limit int, isRequest 
 	}
 
 	return 0
-}
-
-// max returns the maximum of two integers.
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
