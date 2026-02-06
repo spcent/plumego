@@ -45,7 +45,7 @@ func TestTenantIDFromContext_Missing(t *testing.T) {
 
 func TestTenantIDFromContext_Nil(t *testing.T) {
 	// Nil context should return empty string (not panic)
-	tenantID := TenantIDFromContext(nil)
+	tenantID := TenantIDFromContext(t.Context())
 	if tenantID != "" {
 		t.Errorf("expected empty string for nil context, got %s", tenantID)
 	}
@@ -54,7 +54,7 @@ func TestTenantIDFromContext_Nil(t *testing.T) {
 func TestContextWithTenantID_Nil(t *testing.T) {
 	// Nil context should create background context
 	tenantID := "test-tenant"
-	ctx := ContextWithTenantID(nil, tenantID)
+	ctx := ContextWithTenantID(t.Context(), tenantID)
 
 	if ctx == nil {
 		t.Fatal("expected non-nil context")
