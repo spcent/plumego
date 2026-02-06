@@ -1,13 +1,14 @@
 package tenant
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // ErrInvalidTenantID indicates a tenant ID failed validation.
@@ -283,13 +284,13 @@ func Chain(extractors ...TenantExtractor) TenantExtractor {
 	}
 }
 
-// writeTenantError writes a tenant-related error response
+// writeTenantError writes a tenant-related error response using the standard
+// contract.WriteError format for consistency across the codebase.
 func writeTenantError(w http.ResponseWriter, statusCode int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error":   http.StatusText(statusCode),
-		"message": message,
+	contract.WriteError(w, nil, contract.APIError{
+		Status:   statusCode,
+		Code:     http.StatusText(statusCode),
+		Message:  message,
+		Category: contract.CategoryForStatus(statusCode),
 	})
 }

@@ -72,8 +72,10 @@ func joinOrDefault(slice []string, def string) string {
 
 // CORS provides basic CORS support with wildcard origin.
 //
-// This middleware allows all origins and provides basic CORS headers.
-// For production use, consider using CORSWithOptions with specific origins.
+// WARNING: This middleware allows ALL origins ("*") and is intended for
+// development and testing only. Do NOT use in production — it exposes your
+// API to cross-origin requests from any website.
+// For production, use [CORSWithOptions] with explicit allowed origins.
 //
 // Example:
 //

@@ -62,7 +62,7 @@ func Defaults() Config {
 		Core: core.AppConfig{
 			Addr:    ":8080",
 			EnvFile: ".env",
-			Debug:   true,
+			Debug:   false,
 		},
 		WebSocketSecret: "dev-secret",
 		GitHubSecret:    "dev-github-secret",
