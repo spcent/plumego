@@ -101,14 +101,7 @@ func (hm *healthManager) GetComponentHealth(name string) (*ComponentHealth, bool
 		return nil, false
 	}
 
-	// Return a copy to prevent external modification
-	healthCopy := *health
-	healthCopy.HealthStatus.Details = make(map[string]any, len(health.HealthStatus.Details))
-	for k, v := range health.HealthStatus.Details {
-		healthCopy.HealthStatus.Details[k] = v
-	}
-
-	return &healthCopy, true
+	return copyComponentHealth(health), true
 }
 
 // GetAllHealth returns the health status of all components.
@@ -118,12 +111,7 @@ func (hm *healthManager) GetAllHealth() map[string]*ComponentHealth {
 
 	result := make(map[string]*ComponentHealth)
 	for name, health := range hm.health {
-		healthCopy := *health
-		healthCopy.HealthStatus.Details = make(map[string]any, len(health.HealthStatus.Details))
-		for k, v := range health.HealthStatus.Details {
-			healthCopy.HealthStatus.Details[k] = v
-		}
-		result[name] = &healthCopy
+		result[name] = copyComponentHealth(health)
 	}
 
 	return result
@@ -308,35 +296,7 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 		hm.applyRetentionPolicy()
 	}
 
-	// Calculate overall health without calling GetOverallHealth to avoid deadlock
-	// We already have the lock, so we can compute it directly
-	overallHealthy := true
-	var overallMessages []string
-
-	for _, health := range hm.health {
-		if health.Status != StatusHealthy {
-			overallHealthy = false
-			if health.Message != "" {
-				overallMessages = append(overallMessages, fmt.Sprintf("%s: %s", health.Status, health.Message))
-			}
-		}
-	}
-
-	overallStatus := StatusHealthy
-	if !overallHealthy {
-		overallStatus = StatusDegraded
-		for _, health := range hm.health {
-			if health.Status == StatusUnhealthy {
-				overallStatus = StatusUnhealthy
-				break
-			}
-		}
-	}
-
-	var overallMessage string
-	if len(overallMessages) > 0 {
-		overallMessage = fmt.Sprintf("Issues detected: %v", overallMessages)
-	}
+	overallStatus, overallMessage := calculateOverallStatus(hm.health)
 
 	hm.lastCheckTime = timestamp
 	hm.lastCheckDuration = duration
@@ -368,34 +328,7 @@ func (hm *healthManager) GetOverallHealth() HealthStatus {
 	hm.mu.RLock()
 	defer hm.mu.RUnlock()
 
-	allHealthy := true
-	var messages []string
-
-	for _, health := range hm.health {
-		if health.Status != StatusHealthy {
-			allHealthy = false
-			if health.Message != "" {
-				messages = append(messages, fmt.Sprintf("%s: %s", health.Status, health.Message))
-			}
-		}
-	}
-
-	status := StatusHealthy
-	if !allHealthy {
-		status = StatusDegraded
-		// Check if any component is unhealthy (not just degraded)
-		for _, health := range hm.health {
-			if health.Status == StatusUnhealthy {
-				status = StatusUnhealthy
-				break
-			}
-		}
-	}
-
-	var message string
-	if len(messages) > 0 {
-		message = fmt.Sprintf("Issues detected: %v", messages)
-	}
+	status, message := calculateOverallStatus(hm.health)
 
 	return HealthStatus{
 		Status:       status,

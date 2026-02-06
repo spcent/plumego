@@ -193,23 +193,6 @@ func (hm *healthManager) ForceCleanup() {
 
 // getOverallState determines the overall health state from component healths.
 func getOverallState(healths map[string]*ComponentHealth) HealthState {
-	hasUnhealthy := false
-	hasDegraded := false
-
-	for _, health := range healths {
-		switch health.Status {
-		case StatusUnhealthy:
-			hasUnhealthy = true
-		case StatusDegraded:
-			hasDegraded = true
-		}
-	}
-
-	if hasUnhealthy {
-		return StatusUnhealthy
-	}
-	if hasDegraded {
-		return StatusDegraded
-	}
-	return StatusHealthy
+	state, _ := calculateOverallStatus(healths)
+	return state
 }
