@@ -7,8 +7,37 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
+
+// ErrSSEInvalidField is returned when an SSE event field contains invalid characters.
+var ErrSSEInvalidField = errors.New("SSE event field contains invalid characters (newlines not allowed in id/event)")
+
+// sanitizeSSEField strips newline characters from SSE id and event fields
+// to prevent protocol injection attacks.
+func sanitizeSSEField(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}
+
+// writeSSEData writes SSE data field, correctly handling multi-line data
+// by prefixing each line with "data: " per the SSE specification.
+func writeSSEData(w http.ResponseWriter, data string) error {
+	lines := strings.Split(data, "\n")
+	for _, line := range lines {
+		line = strings.TrimRight(line, "\r")
+		if _, err := fmt.Fprintf(w, "data: %s\n", line); err != nil {
+			return err
+		}
+	}
+	// End the event with an extra newline
+	if _, err := fmt.Fprint(w, "\n"); err != nil {
+		return err
+	}
+	return nil
+}
 
 // SSEEvent represents a Server-Sent Event.
 type SSEEvent struct {
@@ -38,24 +67,31 @@ func NewSSEWriter(w http.ResponseWriter) (*SSEWriter, error) {
 }
 
 // Write writes an SSE event to the response.
+// ID and Event fields are sanitized to prevent protocol injection (newlines stripped).
+// Data fields with newlines are correctly split into multiple "data:" lines per the SSE spec.
 func (sw *SSEWriter) Write(event SSEEvent) error {
 	if event.ID != "" {
-		if _, err := fmt.Fprintf(sw.w, "id: %s\n", event.ID); err != nil {
+		if _, err := fmt.Fprintf(sw.w, "id: %s\n", sanitizeSSEField(event.ID)); err != nil {
 			return err
 		}
 	}
 	if event.Event != "" {
-		if _, err := fmt.Fprintf(sw.w, "event: %s\n", event.Event); err != nil {
-			return err
-		}
-	}
-	if event.Data != "" {
-		if _, err := fmt.Fprintf(sw.w, "data: %s\n\n", event.Data); err != nil {
+		if _, err := fmt.Fprintf(sw.w, "event: %s\n", sanitizeSSEField(event.Event)); err != nil {
 			return err
 		}
 	}
 	if event.Retry > 0 {
-		if _, err := fmt.Fprintf(sw.w, "retry: %d\n\n", int(event.Retry.Milliseconds())); err != nil {
+		if _, err := fmt.Fprintf(sw.w, "retry: %d\n", int(event.Retry.Milliseconds())); err != nil {
+			return err
+		}
+	}
+	if event.Data != "" {
+		if err := writeSSEData(sw.w, event.Data); err != nil {
+			return err
+		}
+	} else {
+		// Empty data still needs the terminating double newline
+		if _, err := fmt.Fprint(sw.w, "\n"); err != nil {
 			return err
 		}
 	}
@@ -102,6 +138,13 @@ func validateChunkSize(chunkSize int) error {
 	return nil
 }
 
+// flush attempts to flush the response writer if it supports http.Flusher.
+func (c *Ctx) flush() {
+	if f, ok := c.W.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 // RespondWithSSE starts a Server-Sent Events response.
 // Returns an SSEWriter for sending events, or an error if SSE is not supported.
 func (c *Ctx) RespondWithSSE() (*SSEWriter, error) {
@@ -136,9 +179,7 @@ func (c *Ctx) StreamJSON(items []any) error {
 		if err := encoder.Encode(item); err != nil {
 			return err
 		}
-		if f, ok := c.W.(http.Flusher); ok {
-			f.Flush()
-		}
+		c.flush()
 	}
 
 	return nil
@@ -160,9 +201,7 @@ func (c *Ctx) StreamText(lines []string) error {
 		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
 			return err
 		}
-		if f, ok := c.W.(http.Flusher); ok {
-			f.Flush()
-		}
+		c.flush()
 	}
 
 	return nil
@@ -315,9 +354,7 @@ func (c *Ctx) StreamJSONWithGenerator(generator func() (any, error)) error {
 		if err := encoder.Encode(item); err != nil {
 			return err
 		}
-		if f, ok := c.W.(http.Flusher); ok {
-			f.Flush()
-		}
+		c.flush()
 	}
 
 	return nil
@@ -347,9 +384,7 @@ func (c *Ctx) StreamTextWithGenerator(generator func() (string, error)) error {
 		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
 			return err
 		}
-		if f, ok := c.W.(http.Flusher); ok {
-			f.Flush()
-		}
+		c.flush()
 	}
 
 	return nil
@@ -441,16 +476,12 @@ func (c *Ctx) StreamJSONChunked(items []any, chunkSize int) error {
 
 		// Flush after each chunk
 		if (i+1)%chunkSize == 0 {
-			if f, ok := c.W.(http.Flusher); ok {
-				f.Flush()
-			}
+			c.flush()
 		}
 	}
 
 	// Final flush
-	if f, ok := c.W.(http.Flusher); ok {
-		f.Flush()
-	}
+	c.flush()
 
 	return nil
 }
@@ -477,16 +508,12 @@ func (c *Ctx) StreamTextChunked(lines []string, chunkSize int) error {
 
 		// Flush after each chunk
 		if (i+1)%chunkSize == 0 {
-			if f, ok := c.W.(http.Flusher); ok {
-				f.Flush()
-			}
+			c.flush()
 		}
 	}
 
 	// Final flush
-	if f, ok := c.W.(http.Flusher); ok {
-		f.Flush()
-	}
+	c.flush()
 
 	return nil
 }
@@ -515,16 +542,12 @@ func (c *Ctx) StreamSSEChunked(events []SSEEvent, chunkSize int) error {
 
 		// Flush after each chunk
 		if (i+1)%chunkSize == 0 {
-			if f, ok := c.W.(http.Flusher); ok {
-				f.Flush()
-			}
+			c.flush()
 		}
 	}
 
 	// Final flush
-	if f, ok := c.W.(http.Flusher); ok {
-		f.Flush()
-	}
+	c.flush()
 
 	return nil
 }
@@ -565,9 +588,7 @@ func (c *Ctx) StreamJSONWithRetry(generator func() (any, error), maxRetries int,
 		if err := encoder.Encode(item); err != nil {
 			return err
 		}
-		if f, ok := c.W.(http.Flusher); ok {
-			f.Flush()
-		}
+		c.flush()
 	}
 
 	return nil
@@ -608,9 +629,7 @@ func (c *Ctx) StreamTextWithRetry(generator func() (string, error), maxRetries i
 		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
 			return err
 		}
-		if f, ok := c.W.(http.Flusher); ok {
-			f.Flush()
-		}
+		c.flush()
 	}
 
 	return nil
