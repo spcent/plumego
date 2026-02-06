@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/utils"
 )
 
 // MiddlewareAdapter adapts a unified MetricsCollector to the observability.MetricsCollector interface.
@@ -85,7 +86,7 @@ func (rw *responseWriter) WriteHeader(status int) {
 
 // Write captures the number of bytes written.
 func (rw *responseWriter) Write(b []byte) (int, error) {
-	n, err := rw.ResponseWriter.Write(b)
+	n, err := utils.SafeWrite(rw.ResponseWriter, b)
 	rw.bytes += n
 	return n, err
 }

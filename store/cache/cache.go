@@ -44,6 +44,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/utils"
 )
 
 var (
@@ -614,8 +616,9 @@ func cachedHandler(c Cache, ttl time.Duration, keyFn func(*http.Request) string,
 		// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
 		copyHeaders(w.Header(), recorder.Header())
 		w.Header().Set("X-Cache", "MISS")
+		utils.EnsureNoSniff(w.Header())
 		w.WriteHeader(recorder.Code)
-		_, _ = w.Write(bodyBytes)
+		_, _ = utils.SafeWrite(w, bodyBytes)
 
 		// Only cache successful responses with safe content types to prevent XSS
 		contentType := recorder.Header().Get("Content-Type")
@@ -745,6 +748,7 @@ func writeCachedResponse(w http.ResponseWriter, resp cachedResponse) {
 	if status == 0 {
 		status = http.StatusOK
 	}
+	utils.EnsureNoSniff(w.Header())
 	w.WriteHeader(status)
-	_, _ = w.Write(resp.Body)
+	_, _ = utils.SafeWrite(w, resp.Body)
 }

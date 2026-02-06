@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/utils"
 )
 
 // TracingMiddleware adds distributed tracing support
@@ -144,7 +146,7 @@ func (cr *cacheRecorder) WriteHeader(statusCode int) {
 
 func (cr *cacheRecorder) Write(b []byte) (int, error) {
 	cr.body.Write(b)
-	return cr.ResponseWriter.Write(b)
+	return utils.SafeWrite(cr.ResponseWriter, b)
 }
 
 // responseCache implements a simple in-memory cache

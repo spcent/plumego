@@ -35,6 +35,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/spcent/plumego/utils"
 )
 
 // RequestTransformer modifies an HTTP request
@@ -123,9 +125,10 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			} else {
 				w.Header().Del("Content-Length")
 			}
+			utils.EnsureNoSniff(w.Header())
 			w.WriteHeader(resp.StatusCode)
 			if len(transformedBody) > 0 {
-				_, _ = w.Write(transformedBody)
+				_, _ = utils.SafeWrite(w, transformedBody)
 			}
 		})
 	}

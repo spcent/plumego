@@ -3,6 +3,8 @@ package circuitbreaker
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/spcent/plumego/utils"
 )
 
 // Middleware creates a circuit breaker middleware
@@ -96,13 +98,14 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	if !w.written {
 		w.WriteHeader(http.StatusOK)
 	}
-	return w.ResponseWriter.Write(b)
+	return utils.SafeWrite(w.ResponseWriter, b)
 }
 
 // writeCircuitOpenResponse writes a 503 response when circuit is open
 func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
+	utils.EnsureNoSniff(w.Header())
 	w.WriteHeader(http.StatusServiceUnavailable)
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -117,6 +120,7 @@ func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
+	utils.EnsureNoSniff(w.Header())
 	w.WriteHeader(http.StatusTooManyRequests)
 
 	json.NewEncoder(w).Encode(map[string]interface{}{

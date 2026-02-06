@@ -10,6 +10,7 @@ import (
 	"github.com/spcent/plumego/contract"
 	log "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/utils"
 	"github.com/spcent/plumego/utils/httpx"
 )
 
@@ -335,7 +336,7 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 	// not user input. This middleware does not modify response content
 	// and therefore does not introduce XSS vulnerabilities.
 	// XSS protection should be implemented in handlers that generate HTML content.
-	n, err := r.ResponseWriter.Write(p)
+	n, err := utils.SafeWrite(r.ResponseWriter, p)
 	r.bytes += n
 	return n, err
 }

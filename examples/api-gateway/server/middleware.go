@@ -8,6 +8,7 @@ import (
 
 	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/utils"
 )
 
 // AccessLogMiddleware provides structured logging for all requests
@@ -72,7 +73,7 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	if !rw.wroteHeader {
 		rw.WriteHeader(http.StatusOK)
 	}
-	n, err := rw.ResponseWriter.Write(b)
+	n, err := utils.SafeWrite(rw.ResponseWriter, b)
 	rw.bytesWritten += n
 	return n, err
 }
