@@ -276,15 +276,25 @@ func TestMiddleware_ErrorResponseFormat(t *testing.T) {
 	rr := httptest.NewRecorder()
 	wrapped.ServeHTTP(rr, req)
 
+	// Response uses the standard contract.WriteError format:
+	// {"error": {"status": 400, "code": "...", "message": "..."}}
 	var body map[string]interface{}
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("response body is not valid JSON: %v", err)
 	}
-	if _, ok := body["error"]; !ok {
-		t.Error("expected 'error' field in response")
+	errObj, ok := body["error"]
+	if !ok {
+		t.Fatal("expected 'error' field in response")
 	}
-	if _, ok := body["message"]; !ok {
-		t.Error("expected 'message' field in response")
+	errMap, ok := errObj.(map[string]interface{})
+	if !ok {
+		t.Fatal("expected 'error' field to be an object")
+	}
+	if _, ok := errMap["message"]; !ok {
+		t.Error("expected 'message' field in error object")
+	}
+	if _, ok := errMap["code"]; !ok {
+		t.Error("expected 'code' field in error object")
 	}
 }
 

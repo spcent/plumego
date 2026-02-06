@@ -1,8 +1,10 @@
 package glog
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
-	"math/rand"
+	mathrand "math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -43,7 +45,7 @@ var (
 
 // TraceIDGenerator encapsulates the state for trace ID generation
 type TraceIDGenerator struct {
-	rng        *rand.Rand
+	rng        *mathrand.Rand
 	lastMs     atomic.Int64
 	seq        atomic.Int32
 	randomPool []int32
@@ -51,10 +53,20 @@ type TraceIDGenerator struct {
 	poolMu     sync.Mutex
 }
 
+// cryptoSeed returns a cryptographically secure seed for math/rand.
+func cryptoSeed() int64 {
+	var buf [8]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		// Fallback to time-based seed if crypto/rand fails (should not happen)
+		return time.Now().UnixNano()
+	}
+	return int64(binary.LittleEndian.Uint64(buf[:]))
+}
+
 // NewTraceIDGenerator creates a new trace ID generator with pre-generated random pool
 func NewTraceIDGenerator() *TraceIDGenerator {
 	g := &TraceIDGenerator{
-		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
+		rng:        mathrand.New(mathrand.NewSource(cryptoSeed())),
 		randomPool: make([]int32, randomPoolSize), // Pre-generate random numbers
 	}
 
@@ -137,7 +149,7 @@ func (g *TraceIDGenerator) ensureInitialized() {
 	defer g.poolMu.Unlock()
 
 	if g.rng == nil {
-		g.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+		g.rng = mathrand.New(mathrand.NewSource(cryptoSeed()))
 	}
 	if len(g.randomPool) == 0 {
 		g.randomPool = make([]int32, randomPoolSize)
@@ -170,7 +182,7 @@ func (g *TraceIDGenerator) refreshRandomPool() {
 	defer g.poolMu.Unlock()
 
 	if g.rng == nil {
-		g.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+		g.rng = mathrand.New(mathrand.NewSource(cryptoSeed()))
 	}
 	for i := range g.randomPool {
 		g.randomPool[i] = int32(g.rng.Intn(randMax))
@@ -182,7 +194,7 @@ func (g *TraceIDGenerator) randomFallback() int {
 	defer g.poolMu.Unlock()
 
 	if g.rng == nil {
-		g.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+		g.rng = mathrand.New(mathrand.NewSource(cryptoSeed()))
 	}
 	return g.rng.Intn(randMax)
 }
