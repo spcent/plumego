@@ -137,6 +137,12 @@ type InProcPubSub struct {
 	drainMu    sync.RWMutex
 	drainCond  *sync.Cond
 	pendingOps atomic.Int64
+
+	// message scheduler for delayed delivery
+	scheduler *messageScheduler
+
+	// TTL manager for message expiration
+	ttlMgr *ttlManager
 }
 
 // New creates a new InProcPubSub instance.
@@ -170,6 +176,14 @@ func New(opts ...Option) *InProcPubSub {
 	ps.drainCond = sync.NewCond(&ps.drainMu)
 	ps.nextID.Store(0)
 
+	if config.EnableScheduler {
+		ps.scheduler = newMessageScheduler(ps)
+	}
+
+	if config.EnableTTL {
+		ps.ttlMgr = newTTLManager(ps, config.TTLCleanupInterval)
+	}
+
 	return ps
 }
 
@@ -191,6 +205,14 @@ func New(opts ...Option) *InProcPubSub {
 func (ps *InProcPubSub) Close() error {
 	if ps.closed.Swap(true) {
 		return nil
+	}
+
+	// Stop scheduler and TTL manager before closing subscriptions
+	if ps.scheduler != nil {
+		ps.scheduler.Close()
+	}
+	if ps.ttlMgr != nil {
+		ps.ttlMgr.Close()
 	}
 
 	// Wait for pending operations
@@ -549,6 +571,15 @@ func (ps *InProcPubSub) publishInternal(ctx context.Context, topic string, msg M
 
 // doPublish performs the actual message delivery.
 func (ps *InProcPubSub) doPublish(topic string, msg Message) {
+	// Check TTL expiration from message metadata
+	if ps.ttlMgr != nil && msg.Meta != nil {
+		if expiresAt, ok := msg.Meta["X-Message-ExpiresAt"]; ok {
+			if t, err := time.Parse(time.RFC3339Nano, expiresAt); err == nil && time.Now().After(t) {
+				return
+			}
+		}
+	}
+
 	// Get topic subscribers
 	subs := ps.shards.getTopicSubscribers(topic)
 
@@ -832,6 +863,114 @@ func (ps *InProcPubSub) recordMetrics(operation, topic string, duration time.Dur
 	}
 	ctx := context.Background()
 	collector.ObservePubSub(ctx, operation, topic, duration, err)
+}
+
+// PublishDelayed schedules a message for delivery after the specified delay.
+// Requires the scheduler to be enabled via WithScheduler() option.
+// Returns a schedule ID that can be used to cancel the scheduled message.
+func (ps *InProcPubSub) PublishDelayed(topic string, msg Message, delay time.Duration) (uint64, error) {
+	if ps.closed.Load() {
+		return 0, ErrPublishToClosed
+	}
+	if ps.scheduler == nil {
+		return 0, ErrSchedulerDisabled
+	}
+
+	topic = strings.TrimSpace(topic)
+	if topic == "" {
+		return 0, ErrInvalidTopic
+	}
+
+	msg.Topic = topic
+	if msg.Time.IsZero() {
+		msg.Time = time.Now().UTC()
+	}
+
+	id := ps.scheduler.Schedule(topic, msg, delay)
+	return id, nil
+}
+
+// PublishAt schedules a message for delivery at a specific time.
+// Requires the scheduler to be enabled via WithScheduler() option.
+// Returns a schedule ID that can be used to cancel the scheduled message.
+func (ps *InProcPubSub) PublishAt(topic string, msg Message, at time.Time) (uint64, error) {
+	if ps.closed.Load() {
+		return 0, ErrPublishToClosed
+	}
+	if ps.scheduler == nil {
+		return 0, ErrSchedulerDisabled
+	}
+
+	topic = strings.TrimSpace(topic)
+	if topic == "" {
+		return 0, ErrInvalidTopic
+	}
+
+	msg.Topic = topic
+	if msg.Time.IsZero() {
+		msg.Time = time.Now().UTC()
+	}
+
+	id := ps.scheduler.ScheduleAt(topic, msg, at)
+	return id, nil
+}
+
+// CancelScheduled cancels a previously scheduled message by its schedule ID.
+// Returns true if the message was found and cancelled.
+func (ps *InProcPubSub) CancelScheduled(id uint64) bool {
+	if ps.scheduler == nil {
+		return false
+	}
+	return ps.scheduler.Cancel(id)
+}
+
+// ScheduledCount returns the number of messages pending scheduled delivery.
+func (ps *InProcPubSub) ScheduledCount() int {
+	if ps.scheduler == nil {
+		return 0
+	}
+	return ps.scheduler.PendingCount()
+}
+
+// PublishWithTTL publishes a message with a time-to-live. The message will be
+// skipped during delivery if it has expired (useful with delayed delivery).
+// Requires the TTL manager to be enabled via WithTTL() option.
+func (ps *InProcPubSub) PublishWithTTL(topic string, msg Message, ttl time.Duration) error {
+	if ps.closed.Load() {
+		return ErrPublishToClosed
+	}
+	if ps.ttlMgr == nil {
+		return ErrTTLDisabled
+	}
+
+	topic = strings.TrimSpace(topic)
+	if topic == "" {
+		return ErrInvalidTopic
+	}
+
+	if msg.ID == "" {
+		msg.ID = generateCorrelationID()
+	}
+
+	// Add TTL metadata
+	if msg.Meta == nil {
+		msg.Meta = make(map[string]string)
+	}
+	msg.Meta["X-Message-TTL"] = ttl.String()
+	msg.Meta["X-Message-ExpiresAt"] = time.Now().Add(ttl).UTC().Format(time.RFC3339Nano)
+
+	// Track in TTL manager
+	ps.ttlMgr.Track(topic, msg.ID, ttl)
+
+	return ps.Publish(topic, msg)
+}
+
+// GetTTLStats returns statistics from the TTL manager.
+func (ps *InProcPubSub) GetTTLStats() TTLStats {
+	if ps.ttlMgr == nil {
+		return TTLStats{}
+	}
+	return ps.ttlMgr.Stats()
 }
 
 // Ensure InProcPubSub implements all interfaces

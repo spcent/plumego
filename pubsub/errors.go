@@ -63,6 +63,12 @@ var (
 
 	// ErrNoResponse is returned when no response is received
 	ErrNoResponse = errors.New("no response received")
+
+	// ErrSchedulerDisabled is returned when delayed publish is attempted without enabling the scheduler
+	ErrSchedulerDisabled = errors.New("message scheduler not enabled, use WithScheduler() option")
+
+	// ErrTTLDisabled is returned when TTL publish is attempted without enabling the TTL manager
+	ErrTTLDisabled = errors.New("TTL manager not enabled, use WithTTL() option")
 )
 
 // PubSubError is a structured error type for pubsub operations.

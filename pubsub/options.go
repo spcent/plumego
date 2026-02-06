@@ -35,6 +35,19 @@ type Config struct {
 
 	// OnPanic is called when a panic is recovered (if EnablePanicRecovery is true)
 	OnPanic func(topic string, subID uint64, recovered any)
+
+	// EnableScheduler enables the message scheduler for delayed message delivery.
+	// When enabled, PublishDelayed and PublishAt methods become available.
+	EnableScheduler bool
+
+	// EnableTTL enables the TTL manager for message expiration tracking.
+	// When enabled, PublishWithTTL method becomes available and expired messages
+	// are skipped during delivery.
+	EnableTTL bool
+
+	// TTLCleanupInterval is how often the TTL manager checks for expired entries (default: 1m).
+	// Only used when EnableTTL is true.
+	TTLCleanupInterval time.Duration
 }
 
 // Hooks contains lifecycle event callbacks.
@@ -139,5 +152,26 @@ func WithPanicRecovery(enable bool) Option {
 func WithOnPanic(handler func(topic string, subID uint64, recovered any)) Option {
 	return func(c *Config) {
 		c.OnPanic = handler
+	}
+}
+
+// WithScheduler enables the message scheduler for delayed message delivery.
+// This allows using PublishDelayed and PublishAt to schedule messages for future delivery.
+func WithScheduler() Option {
+	return func(c *Config) {
+		c.EnableScheduler = true
+	}
+}
+
+// WithTTL enables the TTL manager for message expiration tracking.
+// Messages published via PublishWithTTL will be automatically skipped during delivery
+// if they have expired. The optional cleanupInterval controls how often expired
+// tracking entries are cleaned up (default: 1 minute).
+func WithTTL(cleanupInterval ...time.Duration) Option {
+	return func(c *Config) {
+		c.EnableTTL = true
+		if len(cleanupInterval) > 0 && cleanupInterval[0] > 0 {
+			c.TTLCleanupInterval = cleanupInterval[0]
+		}
 	}
 }
