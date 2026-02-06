@@ -12,6 +12,10 @@ import (
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
 
+// maxInspectResponseBytes limits inspect response bodies to 10 MiB
+// to prevent OOM from malicious or misconfigured servers.
+const maxInspectResponseBytes = 10 << 20
+
 type InspectCmd struct{}
 
 func (c *InspectCmd) Name() string {
@@ -61,13 +65,11 @@ func (c *InspectCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	// Parse timeout
 	timeout, err := time.ParseDuration(*timeoutStr)
 	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid timeout: %v", err), 1)
 	}
 
-	// Get subcommand
 	subcommand := "health"
 	if fs.NArg() > 0 {
 		subcommand = fs.Arg(0)
@@ -83,18 +85,85 @@ func (c *InspectCmd) Run(ctx *Context, args []string) error {
 	case "metrics":
 		return inspectMetrics(ctx.Out, client, *url, *auth)
 	case "routes":
-		return inspectRoutes(ctx.Out, client, *url, *auth)
+		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_routes", "Routes retrieved")
 	case "config":
-		return inspectConfig(ctx.Out, client, *url, *auth)
+		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_config", "Configuration retrieved")
 	case "info":
-		return inspectInfo(ctx.Out, client, *url, *auth)
+		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_info", "Application info retrieved")
 	default:
 		return ctx.Out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
 }
 
+// doInspectRequest performs an HTTP GET with optional auth and a bounded body read.
+// The response body is always closed before returning.
+func doInspectRequest(client *http.Client, url, auth string) ([]byte, int, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if auth != "" {
+		req.Header.Set("Authorization", auth)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxInspectResponseBytes))
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	return body, resp.StatusCode, nil
+}
+
+// fetchSingleEndpoint fetches one endpoint and returns the parsed JSON result.
+func fetchSingleEndpoint(out *output.Formatter, client *http.Client, baseURL, auth, path, successMsg string) error {
+	url := strings.TrimSuffix(baseURL, "/") + path
+
+	body, statusCode, err := doInspectRequest(client, url, auth)
+	if err != nil {
+		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
+	}
+
+	if statusCode != http.StatusOK {
+		return out.Error(fmt.Sprintf("unexpected status: %d", statusCode), 1)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(body, &data); err != nil {
+		return out.Error(fmt.Sprintf("failed to parse response: %v", err), 1)
+	}
+
+	return out.Success(successMsg, data)
+}
+
+// probeEndpoints tries a list of endpoints and returns the first that responds.
+func probeEndpoints(client *http.Client, baseURL, auth string, endpoints []string) (body []byte, statusCode int, endpoint string, err error) {
+	var lastErr error
+	for _, ep := range endpoints {
+		url := strings.TrimSuffix(baseURL, "/") + ep
+
+		b, code, reqErr := doInspectRequest(client, url, auth)
+		if reqErr != nil {
+			lastErr = reqErr
+			continue
+		}
+
+		return b, code, ep, nil
+	}
+
+	if lastErr != nil {
+		return nil, 0, "", lastErr
+	}
+	return nil, 0, "", fmt.Errorf("no endpoints responded")
+}
+
 func inspectHealth(out *output.Formatter, client *http.Client, baseURL, auth string) error {
-	// Try common health endpoints
 	endpoints := []string{
 		"/health",
 		"/healthz",
@@ -103,229 +172,61 @@ func inspectHealth(out *output.Formatter, client *http.Client, baseURL, auth str
 		"/_health",
 	}
 
-	var lastErr error
-	for _, endpoint := range endpoints {
-		url := strings.TrimSuffix(baseURL, "/") + endpoint
-
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			continue
-		}
-
-		if auth != "" {
-			req.Header.Set("Authorization", auth)
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		// Try to parse as JSON
-		var healthData map[string]any
-		if err := json.Unmarshal(body, &healthData); err == nil {
-			healthData["endpoint"] = endpoint
-			healthData["status_code"] = resp.StatusCode
-
-			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-				return out.Success("Application is healthy", healthData)
-			} else {
-				return out.Error("Application is unhealthy", 1, healthData)
-			}
-		}
-
-		// Not JSON, return as text
-		result := map[string]any{
-			"endpoint":    endpoint,
-			"status_code": resp.StatusCode,
-			"body":        string(body),
-		}
-
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return out.Success("Application is healthy", result)
-		} else {
-			return out.Error("Application is unhealthy", 1, result)
-		}
+	body, statusCode, endpoint, err := probeEndpoints(client, baseURL, auth, endpoints)
+	if err != nil {
+		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
 	}
 
-	if lastErr != nil {
-		return out.Error(fmt.Sprintf("failed to connect: %v", lastErr), 1)
+	var healthData map[string]any
+	if jsonErr := json.Unmarshal(body, &healthData); jsonErr == nil {
+		healthData["endpoint"] = endpoint
+		healthData["status_code"] = statusCode
+
+		if statusCode >= 200 && statusCode < 300 {
+			return out.Success("Application is healthy", healthData)
+		}
+		return out.Error("Application is unhealthy", 1, healthData)
 	}
 
-	return out.Error("no health endpoints found", 1)
+	result := map[string]any{
+		"endpoint":    endpoint,
+		"status_code": statusCode,
+		"body":        string(body),
+	}
+
+	if statusCode >= 200 && statusCode < 300 {
+		return out.Success("Application is healthy", result)
+	}
+	return out.Error("Application is unhealthy", 1, result)
 }
 
 func inspectMetrics(out *output.Formatter, client *http.Client, baseURL, auth string) error {
-	// Try common metrics endpoints
 	endpoints := []string{
 		"/metrics",
 		"/_metrics",
 		"/debug/metrics",
 	}
 
-	var lastErr error
-	for _, endpoint := range endpoints {
-		url := strings.TrimSuffix(baseURL, "/") + endpoint
-
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			continue
-		}
-
-		if auth != "" {
-			req.Header.Set("Authorization", auth)
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		// Try to parse as JSON
-		var metricsData map[string]any
-		if err := json.Unmarshal(body, &metricsData); err == nil {
-			metricsData["endpoint"] = endpoint
-			return out.Success("Metrics retrieved", metricsData)
-		}
-
-		// Return as text (e.g., Prometheus format)
-		result := map[string]any{
-			"endpoint": endpoint,
-			"format":   "text",
-			"data":     string(body),
-		}
-
-		return out.Success("Metrics retrieved", result)
-	}
-
-	if lastErr != nil {
-		return out.Error(fmt.Sprintf("failed to fetch metrics: %v", lastErr), 1)
-	}
-
-	return out.Error("no metrics endpoints found", 1)
-}
-
-func inspectRoutes(out *output.Formatter, client *http.Client, baseURL, auth string) error {
-	url := strings.TrimSuffix(baseURL, "/") + "/_routes"
-
-	req, err := http.NewRequest("GET", url, nil)
+	body, statusCode, endpoint, err := probeEndpoints(client, baseURL, auth, endpoints)
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to create request: %v", err), 1)
+		return out.Error(fmt.Sprintf("failed to fetch metrics: %v", err), 1)
 	}
 
-	if auth != "" {
-		req.Header.Set("Authorization", auth)
+	if statusCode != http.StatusOK {
+		return out.Error("no metrics endpoints found", 1)
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return out.Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
+	var metricsData map[string]any
+	if jsonErr := json.Unmarshal(body, &metricsData); jsonErr == nil {
+		metricsData["endpoint"] = endpoint
+		return out.Success("Metrics retrieved", metricsData)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to read response: %v", err), 1)
+	result := map[string]any{
+		"endpoint": endpoint,
+		"format":   "text",
+		"data":     string(body),
 	}
 
-	var routesData map[string]any
-	if err := json.Unmarshal(body, &routesData); err != nil {
-		return out.Error(fmt.Sprintf("failed to parse response: %v", err), 1)
-	}
-
-	return out.Success("Routes retrieved", routesData)
-}
-
-func inspectConfig(out *output.Formatter, client *http.Client, baseURL, auth string) error {
-	url := strings.TrimSuffix(baseURL, "/") + "/_config"
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to create request: %v", err), 1)
-	}
-
-	if auth != "" {
-		req.Header.Set("Authorization", auth)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return out.Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to read response: %v", err), 1)
-	}
-
-	var configData map[string]any
-	if err := json.Unmarshal(body, &configData); err != nil {
-		return out.Error(fmt.Sprintf("failed to parse response: %v", err), 1)
-	}
-
-	return out.Success("Configuration retrieved", configData)
-}
-
-func inspectInfo(out *output.Formatter, client *http.Client, baseURL, auth string) error {
-	url := strings.TrimSuffix(baseURL, "/") + "/_info"
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to create request: %v", err), 1)
-	}
-
-	if auth != "" {
-		req.Header.Set("Authorization", auth)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return out.Error(fmt.Sprintf("unexpected status: %d", resp.StatusCode), 1)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to read response: %v", err), 1)
-	}
-
-	var infoData map[string]any
-	if err := json.Unmarshal(body, &infoData); err != nil {
-		return out.Error(fmt.Sprintf("failed to parse response: %v", err), 1)
-	}
-
-	return out.Success("Application info retrieved", infoData)
+	return out.Success("Metrics retrieved", result)
 }
