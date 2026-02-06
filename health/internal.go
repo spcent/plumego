@@ -3,6 +3,8 @@ package health
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
 	"time"
 )
 
@@ -106,4 +108,70 @@ func sleepWithContext(ctx context.Context, delay time.Duration) bool {
 type componentCheckResult struct {
 	Name  string
 	Error error
+}
+
+// requireManager checks that the manager is not nil and sends an error response
+// if it is. Returns true if the manager is available, false if it is nil.
+func requireManager(manager HealthManager, w http.ResponseWriter, r *http.Request) bool {
+	if manager == nil {
+		sendErrorResponse(w, r, http.StatusServiceUnavailable,
+			"HEALTH_MANAGER_UNAVAILABLE", "Health manager is not configured", "")
+		return false
+	}
+	return true
+}
+
+// httpStatusForHealth maps a HealthState to the appropriate HTTP status code.
+func httpStatusForHealth(state HealthState) int {
+	switch state {
+	case StatusUnhealthy:
+		return http.StatusServiceUnavailable
+	case StatusDegraded:
+		return http.StatusPartialContent
+	default:
+		return http.StatusOK
+	}
+}
+
+// copyComponentHealth returns a shallow copy of ComponentHealth with a cloned Details map.
+func copyComponentHealth(src *ComponentHealth) *ComponentHealth {
+	dst := *src
+	dst.HealthStatus.Details = make(map[string]any, len(src.HealthStatus.Details))
+	for k, v := range src.HealthStatus.Details {
+		dst.HealthStatus.Details[k] = v
+	}
+	return &dst
+}
+
+// calculateOverallStatus determines the aggregate HealthState and message from a set of component healths.
+func calculateOverallStatus(healths map[string]*ComponentHealth) (HealthState, string) {
+	allHealthy := true
+	var messages []string
+
+	for _, h := range healths {
+		if h.Status != StatusHealthy {
+			allHealthy = false
+			if h.Message != "" {
+				messages = append(messages, fmt.Sprintf("%s: %s", h.Status, h.Message))
+			}
+		}
+	}
+
+	if allHealthy {
+		return StatusHealthy, ""
+	}
+
+	status := StatusDegraded
+	for _, h := range healths {
+		if h.Status == StatusUnhealthy {
+			status = StatusUnhealthy
+			break
+		}
+	}
+
+	var message string
+	if len(messages) > 0 {
+		message = fmt.Sprintf("Issues detected: %v", messages)
+	}
+	return status, message
 }

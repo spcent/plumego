@@ -13,9 +13,7 @@ import (
 // HealthHistoryHandler creates a handler that returns health check history.
 func HealthHistoryHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
+		if !requireManager(manager, w, r) {
 			return
 		}
 
@@ -28,9 +26,7 @@ func HealthHistoryHandler(manager HealthManager) http.Handler {
 // HealthHistoryExportHandler creates a handler that exports health check history in various formats.
 func HealthHistoryExportHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
+		if !requireManager(manager, w, r) {
 			return
 		}
 
@@ -53,6 +49,11 @@ func HealthHistoryExportHandler(manager HealthManager) http.Handler {
 		// Parse state filter
 		if stateStr := r.URL.Query().Get("state"); stateStr != "" {
 			state := HealthState(stateStr)
+			if !isValidHealthState(state) {
+				sendErrorResponse(w, r, http.StatusBadRequest, "INVALID_STATE",
+					"Valid states: healthy, degraded, unhealthy", "")
+				return
+			}
 			query.State = &state
 		}
 
@@ -129,9 +130,7 @@ func exportHistoryToCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 // HealthHistoryStatsHandler returns statistics about health history.
 func HealthHistoryStatsHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
+		if !requireManager(manager, w, r) {
 			return
 		}
 

@@ -1,10 +1,10 @@
 package health
 
 import (
-	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"runtime/debug"
-	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -18,12 +18,11 @@ const (
 
 // ErrorResponse represents a standardized error response.
 type ErrorResponse struct {
-	Error      string    `json:"error"`
-	Code       string    `json:"code,omitempty"`
-	Message    string    `json:"message,omitempty"`
-	Timestamp  time.Time `json:"timestamp"`
-	RequestID  string    `json:"request_id,omitempty"`
-	StackTrace string    `json:"stack_trace,omitempty"`
+	Error     string    `json:"error"`
+	Code      string    `json:"code,omitempty"`
+	Message   string    `json:"message,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+	RequestID string    `json:"request_id,omitempty"`
 }
 
 // HealthResponse represents a standardized health response.
@@ -85,14 +84,7 @@ func HealthHandler(manager HealthManager) http.Handler {
 			return
 		}
 
-		// Determine response code based on health status
-		code := http.StatusOK
-		switch health.Status {
-		case StatusUnhealthy:
-			code = http.StatusServiceUnavailable
-		case StatusDegraded:
-			code = http.StatusPartialContent
-		}
+		code := httpStatusForHealth(health.Status)
 
 		// Create enhanced response
 		response := HealthResponse{
@@ -113,9 +105,7 @@ func HealthHandler(manager HealthManager) http.Handler {
 // ComponentHealthHandler creates a handler for checking specific component health.
 func ComponentHealthHandler(manager HealthManager, componentName string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
+		if !requireManager(manager, w, r) {
 			return
 		}
 
@@ -133,24 +123,14 @@ func ComponentHealthHandler(manager HealthManager, componentName string) http.Ha
 			return
 		}
 
-		code := http.StatusOK
-		switch health.Status {
-		case StatusUnhealthy:
-			code = http.StatusServiceUnavailable
-		case StatusDegraded:
-			code = http.StatusPartialContent
-		}
-
-		_ = contract.WriteJSON(w, code, health)
+		_ = contract.WriteJSON(w, httpStatusForHealth(health.Status), health)
 	})
 }
 
 // AllComponentsHealthHandler creates a handler for checking all components health.
 func AllComponentsHealthHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
+		if !requireManager(manager, w, r) {
 			return
 		}
 
@@ -177,9 +157,7 @@ func LiveHandler() http.Handler {
 // ComponentsListHandler creates a handler that lists all registered components.
 func ComponentsListHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
+		if !requireManager(manager, w, r) {
 			return
 		}
 
@@ -216,31 +194,23 @@ func extractRequestID(r *http.Request) string {
 // sendErrorResponse sends a standardized error response.
 func sendErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int, code, message, requestID string) {
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	errorResp := ErrorResponse{
-		Error:     http.StatusText(statusCode),
-		Code:      code,
-		Message:   message,
-		Timestamp: time.Now(),
-		RequestID: requestID,
-	}
 
-	if isDevelopment() {
-		errorResp.StackTrace = string(debug.Stack())
+	details := map[string]any{
+		"error":     http.StatusText(statusCode),
+		"timestamp": time.Now(),
+	}
+	if requestID != "" {
+		details["request_id"] = requestID
 	}
 
 	apiErr := contract.APIError{
 		Status:   statusCode,
-		Code:     errorResp.Code,
-		Message:  errorResp.Message,
+		Code:     code,
+		Message:  message,
 		Category: contract.CategoryForStatus(statusCode),
-		Details: map[string]any{
-			"error":       errorResp.Error,
-			"timestamp":   errorResp.Timestamp,
-			"request_id":  errorResp.RequestID,
-			"stack_trace": errorResp.StackTrace,
-		},
+		Details:  details,
 	}
-	if requestID != "" && apiErr.TraceID == "" {
+	if requestID != "" {
 		apiErr.TraceID = requestID
 	}
 	contract.WriteError(w, r, apiErr)
@@ -248,8 +218,7 @@ func sendErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int, c
 
 // handlePanic handles panics in HTTP handlers gracefully.
 func handlePanic(w http.ResponseWriter, r *http.Request, panicValue any, requestID string) {
-	// Log the panic (in a real application, you'd use proper logging)
-	fmt.Printf("Panic in health handler: %v\nStack: %s\n", panicValue, debug.Stack())
+	log.Printf("[PANIC] health handler panic: %v\n%s", panicValue, debug.Stack())
 
 	sendErrorResponse(w, r, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR",
 		"Internal server error occurred", requestID)
@@ -257,6 +226,5 @@ func handlePanic(w http.ResponseWriter, r *http.Request, panicValue any, request
 
 // isDevelopment checks if the application is running in development mode.
 func isDevelopment() bool {
-	// Simple check - in real applications, this might check environment variables
-	return strings.Contains(strings.ToLower(GetBuildInfo().Version), "dev")
+	return os.Getenv("APP_ENV") == "development"
 }

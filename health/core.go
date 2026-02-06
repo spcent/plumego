@@ -100,3 +100,13 @@ type HealthManager interface {
 func (hs HealthState) isReady() bool {
 	return hs == StatusHealthy || hs == StatusDegraded
 }
+
+// isValidHealthState checks whether a HealthState value is one of the known states.
+func isValidHealthState(state HealthState) bool {
+	switch state {
+	case StatusHealthy, StatusDegraded, StatusUnhealthy:
+		return true
+	default:
+		return false
+	}
+}

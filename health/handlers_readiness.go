@@ -29,9 +29,7 @@ func ReadinessHandler() http.Handler {
 // It returns HTTP 200 when ready and 503 otherwise.
 func ReadinessHandlerWithManager(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", "")
+		if !requireManager(manager, w, r) {
 			return
 		}
 
