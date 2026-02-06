@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+func waitFor(timeout time.Duration, condition func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return true
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	return condition()
+}
+
 func TestPersistentPubSub_Basic(t *testing.T) {
 	dir := t.TempDir()
 
@@ -95,8 +106,10 @@ func TestPersistentPubSub_Restore(t *testing.T) {
 	}
 	defer pps2.Close()
 
-	// Wait a bit for async restore
-	time.Sleep(100 * time.Millisecond)
+	// Wait for async restore callback processing.
+	waitFor(120*time.Millisecond, func() bool {
+		return pps2.PersistenceStats().RestoreCount == uint64(len(messages)) && len(restored) == len(messages)
+	})
 
 	// Check restored messages
 	stats := pps2.PersistenceStats()
@@ -141,7 +154,11 @@ func TestPersistentPubSub_DurabilityLevels(t *testing.T) {
 				t.Fatalf("Failed to publish: %v", err)
 			}
 
-			time.Sleep(100 * time.Millisecond) // Allow async flush
+			if tt.expectWAL {
+				waitFor(120*time.Millisecond, func() bool {
+					return pps.PersistenceStats().WALWrites > 0
+				})
+			}
 			pps.Close()
 
 			stats := pps.PersistenceStats()
@@ -219,8 +236,6 @@ func TestPersistentPubSub_WALRotation(t *testing.T) {
 		_ = pps.Publish("test", msg)
 	}
 
-	time.Sleep(200 * time.Millisecond) // Allow rotation
-
 	// Check for multiple WAL files
 	walFiles, _ := filepath.Glob(filepath.Join(dir, "wal-*.log"))
 	if len(walFiles) < 1 {
@@ -270,7 +285,6 @@ func TestPersistentPubSub_CRCVerification(t *testing.T) {
 	}
 	defer pps2.Close()
 
-	time.Sleep(100 * time.Millisecond)
 }
 
 func TestPersistentPubSub_Concurrency(t *testing.T) {
@@ -312,7 +326,9 @@ func TestPersistentPubSub_Concurrency(t *testing.T) {
 		<-done
 	}
 
-	time.Sleep(200 * time.Millisecond) // Allow flush
+	waitFor(220*time.Millisecond, func() bool {
+		return pps.PersistenceStats().WALWrites == uint64(numGoroutines*messagesPerGoroutine)
+	})
 
 	stats := pps.PersistenceStats()
 	expected := uint64(numGoroutines * messagesPerGoroutine)
@@ -339,13 +355,11 @@ func TestPersistentPubSub_Cleanup(t *testing.T) {
 	// Create multiple snapshots
 	for i := 0; i < 3; i++ {
 		_ = pps.Snapshot()
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(110 * time.Millisecond)
 	}
 
 	// Trigger cleanup
 	pps.cleanup()
-
-	time.Sleep(100 * time.Millisecond)
 
 	// Check that old snapshots are cleaned
 	snaps, _ := filepath.Glob(filepath.Join(dir, "snapshot-*.json"))

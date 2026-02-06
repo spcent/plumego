@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+func waitUntil(timeout time.Duration, condition func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return true
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	return condition()
+}
+
 func TestOrderedPubSub_Basic(t *testing.T) {
 	config := DefaultOrderingConfig()
 	ops := NewOrdered(config)
@@ -82,7 +93,7 @@ func TestOrderedPubSub_OrderLevels(t *testing.T) {
 			}
 
 			// Receive
-			time.Sleep(100 * time.Millisecond)
+			waitUntil(120*time.Millisecond, func() bool { return len(sub.C()) >= 3 })
 			count := 0
 			for len(sub.C()) > 0 {
 				<-sub.C()
@@ -113,7 +124,7 @@ func TestOrderedPubSub_WithKey(t *testing.T) {
 		}
 	}
 
-	time.Sleep(200 * time.Millisecond)
+	waitUntil(180*time.Millisecond, func() bool { return len(sub.C()) >= len(keys) })
 
 	// Receive and check
 	received := make(map[string][]int)
@@ -158,11 +169,13 @@ func TestOrderedPubSub_ConcurrentPublish(t *testing.T) {
 	}
 
 	wg.Wait()
-	time.Sleep(200 * time.Millisecond)
 
 	stats := ops.OrderingStats()
 	expected := uint64(numGoroutines * messagesPerGoroutine)
-	if stats.OrderedPublishes < expected {
+	if !waitUntil(180*time.Millisecond, func() bool {
+		return ops.OrderingStats().OrderedPublishes >= expected
+	}) {
+		stats = ops.OrderingStats()
 		t.Logf("Published %d, expected %d (may still be queued)", stats.OrderedPublishes, expected)
 	}
 }
@@ -183,7 +196,7 @@ func TestOrderedPubSub_Batching(t *testing.T) {
 		_ = ops.PublishOrdered("test.batch", msg, OrderPerTopic)
 	}
 
-	time.Sleep(200 * time.Millisecond)
+	waitUntil(180*time.Millisecond, func() bool { return len(sub.C()) >= 12 })
 
 	// Should receive all messages
 	count := 0
@@ -217,7 +230,7 @@ func TestOrderedPubSub_SequenceCheck(t *testing.T) {
 		_ = ops.PublishOrdered("test.seq", msg, OrderPerTopic)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	waitUntil(120*time.Millisecond, func() bool { return ops.OrderingStats().OrderedPublishes >= 5 })
 
 	stats := ops.OrderingStats()
 	if stats.SequenceErrors > 0 {
@@ -270,7 +283,7 @@ func TestOrderedPubSub_GlobalOrder(t *testing.T) {
 		_ = ops.PublishOrdered(topic, msg, OrderGlobal)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	waitUntil(120*time.Millisecond, func() bool { return ops.OrderingStats().OrderedPublishes >= 3 })
 
 	// All messages should be processed in global order
 	stats := ops.OrderingStats()
@@ -294,7 +307,9 @@ func TestOrderedPubSub_MultipleTopics(t *testing.T) {
 		}
 	}
 
-	time.Sleep(200 * time.Millisecond)
+	waitUntil(120*time.Millisecond, func() bool {
+		return ops.OrderingStats().TopicQueues == len(topics)
+	})
 
 	stats := ops.OrderingStats()
 	if stats.TopicQueues != len(topics) {
@@ -362,7 +377,7 @@ func TestOrderedPubSub_OrderedSubscription(t *testing.T) {
 		_ = ops.PublishOrdered("test.ordered", msg, OrderPerTopic)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	waitUntil(120*time.Millisecond, func() bool { return len(osub.C()) >= 5 })
 
 	// Check missing sequences
 	missing := osub.MissingSequences()

@@ -7,6 +7,7 @@ import (
 )
 
 func TestReplayStore_Basic(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -53,6 +54,7 @@ func TestReplayStore_Basic(t *testing.T) {
 }
 
 func TestReplayStore_TimeRangeQuery(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -119,6 +121,7 @@ func TestReplayStore_TimeRangeQuery(t *testing.T) {
 }
 
 func TestReplayStore_TopicFilter(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -167,6 +170,7 @@ func TestReplayStore_TopicFilter(t *testing.T) {
 }
 
 func TestReplayStore_MessageIDQuery(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -226,6 +230,7 @@ func TestReplayStore_MessageIDQuery(t *testing.T) {
 }
 
 func TestReplayStore_GetByID(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -274,6 +279,7 @@ func TestReplayStore_GetByID(t *testing.T) {
 }
 
 func TestReplayStore_Replay(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -342,6 +348,7 @@ func TestReplayStore_Replay(t *testing.T) {
 }
 
 func TestReplayStore_Pagination(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -400,6 +407,7 @@ func TestReplayStore_Pagination(t *testing.T) {
 }
 
 func TestReplayStore_Sorting(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -458,6 +466,7 @@ func TestReplayStore_Sorting(t *testing.T) {
 }
 
 func TestReplayStore_Archive(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -505,6 +514,7 @@ func TestReplayStore_Archive(t *testing.T) {
 }
 
 func TestReplayStore_ArchiveCompression(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -556,6 +566,7 @@ func TestReplayStore_ArchiveCompression(t *testing.T) {
 }
 
 func TestReplayStore_MaxMessages(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -594,6 +605,7 @@ func TestReplayStore_MaxMessages(t *testing.T) {
 }
 
 func TestReplayStore_InvalidTimeRange(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -623,6 +635,7 @@ func TestReplayStore_InvalidTimeRange(t *testing.T) {
 }
 
 func TestReplayStore_Stats(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -667,6 +680,7 @@ func TestReplayStore_Stats(t *testing.T) {
 }
 
 func TestReplayStore_Close(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 

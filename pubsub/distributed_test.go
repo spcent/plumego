@@ -7,6 +7,7 @@ import (
 )
 
 func TestDistributedPubSub_Basic(t *testing.T) {
+	t.Parallel()
 	// Create two nodes
 	config1 := DefaultClusterConfig("node1", "127.0.0.1:17001")
 	config1.Peers = []string{"127.0.0.1:17002"}
@@ -52,6 +53,7 @@ func TestDistributedPubSub_Basic(t *testing.T) {
 }
 
 func TestDistributedPubSub_GlobalPublish(t *testing.T) {
+	t.Parallel()
 	// Create two nodes
 	config1 := DefaultClusterConfig("node1", "127.0.0.1:17011")
 	config1.Peers = []string{"127.0.0.1:17012"}
@@ -114,6 +116,7 @@ func TestDistributedPubSub_GlobalPublish(t *testing.T) {
 }
 
 func TestDistributedPubSub_Heartbeat(t *testing.T) {
+	t.Parallel()
 	config := DefaultClusterConfig("test-node", "127.0.0.1:17021")
 	config.HeartbeatInterval = 100 * time.Millisecond
 	config.HeartbeatTimeout = 300 * time.Millisecond
@@ -153,6 +156,7 @@ func TestDistributedPubSub_Heartbeat(t *testing.T) {
 }
 
 func TestDistributedPubSub_NodeFailure(t *testing.T) {
+	t.Parallel()
 	// Create three nodes
 	config1 := DefaultClusterConfig("node1", "127.0.0.1:17031")
 	config1.Peers = []string{"127.0.0.1:17032", "127.0.0.1:17033"}
@@ -212,6 +216,7 @@ func TestDistributedPubSub_NodeFailure(t *testing.T) {
 }
 
 func TestDistributedPubSub_LocalTopics(t *testing.T) {
+	t.Parallel()
 	config := DefaultClusterConfig("test", "127.0.0.1:17041")
 
 	dps, err := NewDistributed(config)
@@ -245,6 +250,7 @@ func TestDistributedPubSub_LocalTopics(t *testing.T) {
 }
 
 func TestDistributedPubSub_ClusterStats(t *testing.T) {
+	t.Parallel()
 	config := DefaultClusterConfig("stats-test", "127.0.0.1:17051")
 
 	dps, err := NewDistributed(config)
@@ -268,6 +274,7 @@ func TestDistributedPubSub_ClusterStats(t *testing.T) {
 }
 
 func TestDistributedPubSub_ConcurrentPublish(t *testing.T) {
+	t.Parallel()
 	config1 := DefaultClusterConfig("node1", "127.0.0.1:17061")
 	config1.Peers = []string{"127.0.0.1:17062"}
 
@@ -318,6 +325,7 @@ func TestDistributedPubSub_ConcurrentPublish(t *testing.T) {
 }
 
 func TestDistributedPubSub_MultipleSubscribers(t *testing.T) {
+	t.Parallel()
 	config1 := DefaultClusterConfig("pub", "127.0.0.1:17071")
 	config1.Peers = []string{"127.0.0.1:17072"}
 
@@ -378,6 +386,7 @@ done:
 }
 
 func TestDistributedPubSub_InvalidConfig(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		config ClusterConfig

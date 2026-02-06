@@ -26,20 +26,20 @@ var (
 type AuditOperation string
 
 const (
-	OpPublish           AuditOperation = "publish"
-	OpSubscribe         AuditOperation = "subscribe"
-	OpUnsubscribe       AuditOperation = "unsubscribe"
-	OpPatternSubscribe  AuditOperation = "pattern_subscribe"
-	OpMessageDelivered  AuditOperation = "message_delivered"
-	OpMessageDropped    AuditOperation = "message_dropped"
-	OpTopicCreated      AuditOperation = "topic_created"
-	OpTopicDeleted      AuditOperation = "topic_deleted"
-	OpClose             AuditOperation = "close"
-	OpError             AuditOperation = "error"
-	OpConfigChange      AuditOperation = "config_change"
-	OpRetry             AuditOperation = "retry"
-	OpArchive           AuditOperation = "archive"
-	OpReplay            AuditOperation = "replay"
+	OpPublish          AuditOperation = "publish"
+	OpSubscribe        AuditOperation = "subscribe"
+	OpUnsubscribe      AuditOperation = "unsubscribe"
+	OpPatternSubscribe AuditOperation = "pattern_subscribe"
+	OpMessageDelivered AuditOperation = "message_delivered"
+	OpMessageDropped   AuditOperation = "message_dropped"
+	OpTopicCreated     AuditOperation = "topic_created"
+	OpTopicDeleted     AuditOperation = "topic_deleted"
+	OpClose            AuditOperation = "close"
+	OpError            AuditOperation = "error"
+	OpConfigChange     AuditOperation = "config_change"
+	OpRetry            AuditOperation = "retry"
+	OpArchive          AuditOperation = "archive"
+	OpReplay           AuditOperation = "replay"
 )
 
 // AuditConfig configures the audit logging system
@@ -162,13 +162,13 @@ type AuditQuery struct {
 
 // AuditStats provides audit log statistics
 type AuditStats struct {
-	TotalEntries    atomic.Uint64
-	SuccessfulOps   atomic.Uint64
-	FailedOps       atomic.Uint64
-	BytesWritten    atomic.Uint64
-	CurrentLogSize  int64
-	LogRotations    atomic.Uint64
-	VerifyFailures  atomic.Uint64
+	TotalEntries   atomic.Uint64
+	SuccessfulOps  atomic.Uint64
+	FailedOps      atomic.Uint64
+	BytesWritten   atomic.Uint64
+	CurrentLogSize int64
+	LogRotations   atomic.Uint64
+	VerifyFailures atomic.Uint64
 }
 
 // AuditLogger manages immutable audit logging
@@ -637,9 +637,21 @@ func (al *AuditLogger) Verify() error {
 	return nil
 }
 
-// Stats returns audit log statistics
-func (al *AuditLogger) Stats() AuditStats {
-	return al.stats
+// Stats returns audit log statistics.
+func (al *AuditLogger) Stats() *AuditStats {
+	stats := &AuditStats{}
+	stats.TotalEntries.Store(al.stats.TotalEntries.Load())
+	stats.SuccessfulOps.Store(al.stats.SuccessfulOps.Load())
+	stats.FailedOps.Store(al.stats.FailedOps.Load())
+	stats.BytesWritten.Store(al.stats.BytesWritten.Load())
+	stats.LogRotations.Store(al.stats.LogRotations.Load())
+	stats.VerifyFailures.Store(al.stats.VerifyFailures.Load())
+
+	al.logFileMu.Lock()
+	stats.CurrentLogSize = al.stats.CurrentLogSize
+	al.logFileMu.Unlock()
+
+	return stats
 }
 
 // Close stops the audit logger and flushes pending writes

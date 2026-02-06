@@ -670,9 +670,13 @@ func (rs *ReplayStore) LoadArchive(filename string) error {
 	return nil
 }
 
-// Stats returns replay store statistics
-func (rs *ReplayStore) Stats() ReplayStats {
-	stats := rs.stats
+// Stats returns replay store statistics.
+func (rs *ReplayStore) Stats() *ReplayStats {
+	stats := &ReplayStats{}
+	stats.TotalMessages.Store(rs.stats.TotalMessages.Load())
+	stats.ArchivedMessages.Store(rs.stats.ArchivedMessages.Load())
+	stats.ReplayedMessages.Store(rs.stats.ReplayedMessages.Load())
+	stats.TotalSize.Store(rs.stats.TotalSize.Load())
 
 	// Calculate oldest and newest
 	rs.timeIndexMu.RLock()

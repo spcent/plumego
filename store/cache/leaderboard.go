@@ -174,6 +174,25 @@ func (lbc *MemoryLeaderboardCache) Close() error {
 	return lbc.MemoryCache.Close()
 }
 
+// Clear removes all regular cache entries and all leaderboard data.
+func (lbc *MemoryLeaderboardCache) Clear(ctx context.Context) error {
+	if err := lbc.MemoryCache.Clear(ctx); err != nil {
+		return err
+	}
+
+	lbc.leaderboards.Range(func(key, value any) bool {
+		ss := value.(*sortedSet)
+		ss.mu.Lock()
+		ss.skipList.clear()
+		clear(ss.scores)
+		ss.mu.Unlock()
+		lbc.leaderboards.Delete(key)
+		return true
+	})
+
+	return nil
+}
+
 // cleanupLoop periodically removes expired leaderboards
 func (lbc *MemoryLeaderboardCache) cleanupLoop() {
 	defer lbc.wg.Done()
@@ -585,20 +604,20 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByRank(ctx context.Context, key stri
 		return 0, nil
 	}
 
-	// Remove from skip list and score map
+	// Remove from score map first, then delete the range in skip list once.
 	for _, node := range nodes {
-		ss.skipList.delete(node.member, node.score)
 		delete(ss.scores, node.member)
 	}
+	deleted := ss.skipList.deleteRangeByRank(start, stop)
 
 	// Update metrics
 	if lbc.config.EnableMetrics {
 		lbc.metrics.mu.Lock()
-		lbc.metrics.ZRems += uint64(len(nodes))
+		lbc.metrics.ZRems += uint64(deleted)
 		lbc.metrics.mu.Unlock()
 	}
 
-	return int64(len(nodes)), nil
+	return deleted, nil
 }
 
 // ZRemRangeByScore removes members with scores in the specified range
@@ -627,20 +646,20 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key str
 		return 0, nil
 	}
 
-	// Remove from skip list and score map
+	// Remove from score map first, then delete the score range in skip list once.
 	for _, node := range nodes {
-		ss.skipList.delete(node.member, node.score)
 		delete(ss.scores, node.member)
 	}
+	deleted := ss.skipList.deleteRangeByScore(min, max)
 
 	// Update metrics
 	if lbc.config.EnableMetrics {
 		lbc.metrics.mu.Lock()
-		lbc.metrics.ZRems += uint64(len(nodes))
+		lbc.metrics.ZRems += uint64(deleted)
 		lbc.metrics.mu.Unlock()
 	}
 
-	return int64(len(nodes)), nil
+	return deleted, nil
 }
 
 // GetLeaderboardMetrics returns a snapshot of leaderboard metrics

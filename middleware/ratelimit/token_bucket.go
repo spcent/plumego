@@ -74,6 +74,13 @@ type Store interface {
 	DeleteBucket(key string) error
 }
 
+// AtomicTokenStore extends Store with atomic token consumption semantics.
+// Implementations should perform refill + consume as one critical section.
+type AtomicTokenStore interface {
+	Store
+	TakeToken(key string, capacity, refillRate int64, now time.Time) (allowed bool, bucket Bucket, err error)
+}
+
 // Bucket represents a token bucket
 type Bucket struct {
 	// Tokens is the current number of tokens
@@ -98,36 +105,23 @@ func TokenBucket(config Config) func(http.Handler) http.Handler {
 			// Generate key
 			key := cfg.KeyFunc(r)
 
-			// Get or create bucket
-			bucket, err := cfg.Store.GetBucket(key)
-			if err != nil || bucket == nil {
-				// Create new bucket
-				bucket = &Bucket{
-					Tokens:     cfg.Capacity,
-					LastRefill: time.Now(),
-					Capacity:   cfg.Capacity,
-					RefillRate: cfg.RefillRate,
-				}
-			}
-
-			// Refill tokens based on elapsed time
 			now := time.Now()
-			elapsed := now.Sub(bucket.LastRefill).Seconds()
-			newTokens := int64(elapsed * float64(bucket.RefillRate))
-
-			if newTokens > 0 {
-				bucket.Tokens = min(bucket.Capacity, bucket.Tokens+newTokens)
-				bucket.LastRefill = now
+			var (
+				bucket  Bucket
+				allowed bool
+				err     error
+			)
+			if atomicStore, ok := cfg.Store.(AtomicTokenStore); ok {
+				allowed, bucket, err = atomicStore.TakeToken(key, cfg.Capacity, cfg.RefillRate, now)
+			} else {
+				allowed, bucket, err = consumeTokenNonAtomic(cfg, key, now)
+			}
+			if err != nil {
+				http.Error(w, "Rate limiter internal error", http.StatusInternalServerError)
+				return
 			}
 
-			// Check if we have tokens
-			if bucket.Tokens >= 1 {
-				// Consume token
-				bucket.Tokens--
-
-				// Update bucket
-				cfg.Store.UpdateBucket(key, bucket)
-
+			if allowed {
 				// Add rate limit headers
 				w.Header().Set("X-RateLimit-Limit", strconv.FormatInt(bucket.Capacity, 10))
 				w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(bucket.Tokens, 10))
@@ -161,6 +155,39 @@ func TokenBucket(config Config) func(http.Handler) http.Handler {
 			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 		})
 	}
+}
+
+func consumeTokenNonAtomic(cfg *Config, key string, now time.Time) (bool, Bucket, error) {
+	bucket, err := cfg.Store.GetBucket(key)
+	if err != nil {
+		return false, Bucket{}, err
+	}
+	if bucket == nil {
+		bucket = &Bucket{
+			Tokens:     cfg.Capacity,
+			LastRefill: now,
+			Capacity:   cfg.Capacity,
+			RefillRate: cfg.RefillRate,
+		}
+	}
+
+	elapsed := now.Sub(bucket.LastRefill).Seconds()
+	newTokens := int64(elapsed * float64(bucket.RefillRate))
+	if newTokens > 0 {
+		bucket.Tokens = min(bucket.Capacity, bucket.Tokens+newTokens)
+		bucket.LastRefill = now
+	}
+
+	allowed := bucket.Tokens >= 1
+	if allowed {
+		bucket.Tokens--
+	}
+
+	if err := cfg.Store.UpdateBucket(key, bucket); err != nil {
+		return false, Bucket{}, err
+	}
+
+	return allowed, *bucket, nil
 }
 
 func (c *Config) withDefaults() *Config {
@@ -312,4 +339,35 @@ func (s *MemoryStore) Count() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.buckets)
+}
+
+// TakeToken atomically refills and consumes a single token for the key.
+func (s *MemoryStore) TakeToken(key string, capacity, refillRate int64, now time.Time) (bool, Bucket, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	bucket, exists := s.buckets[key]
+	if !exists {
+		bucket = &Bucket{
+			Tokens:     capacity,
+			LastRefill: now,
+			Capacity:   capacity,
+			RefillRate: refillRate,
+		}
+		s.buckets[key] = bucket
+	}
+
+	elapsed := now.Sub(bucket.LastRefill).Seconds()
+	newTokens := int64(elapsed * float64(bucket.RefillRate))
+	if newTokens > 0 {
+		bucket.Tokens = min(bucket.Capacity, bucket.Tokens+newTokens)
+		bucket.LastRefill = now
+	}
+
+	if bucket.Tokens < 1 {
+		return false, *bucket, nil
+	}
+
+	bucket.Tokens--
+	return true, *bucket, nil
 }

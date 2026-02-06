@@ -82,11 +82,11 @@ func DefaultBackpressureConfig() BackpressureConfig {
 
 // BackpressureSignal represents a backpressure event
 type BackpressureSignal struct {
-	Topic         string
-	SubscriberID  string
-	BufferUsage   float64
-	DroppedCount  uint64
-	Timestamp     time.Time
+	Topic        string
+	SubscriberID string
+	BufferUsage  float64
+	DroppedCount uint64
+	Timestamp    time.Time
 }
 
 // BackpressureStats provides backpressure statistics
@@ -424,13 +424,22 @@ func (bpc *BackpressureController) ResetSlowStart() {
 	bpc.stats.CurrentRate.Store(int64(bpc.currentRate))
 }
 
-// Stats returns backpressure statistics
-func (bpc *BackpressureController) Stats() BackpressureStats {
+// Stats returns backpressure statistics.
+func (bpc *BackpressureController) Stats() *BackpressureStats {
 	if bpc == nil {
-		return BackpressureStats{}
+		return &BackpressureStats{}
 	}
 
-	return bpc.stats
+	stats := &BackpressureStats{}
+	stats.ActivePressure.Store(bpc.stats.ActivePressure.Load())
+	stats.SignalCount.Store(bpc.stats.SignalCount.Load())
+	stats.ThrottledPublish.Store(bpc.stats.ThrottledPublish.Load())
+	stats.BlockedPublish.Store(bpc.stats.BlockedPublish.Load())
+	stats.CurrentRate.Store(bpc.stats.CurrentRate.Load())
+	stats.TargetRate.Store(bpc.stats.TargetRate.Load())
+	stats.PressureLevel.Store(bpc.stats.PressureLevel.Load())
+
+	return stats
 }
 
 // Close stops the backpressure controller

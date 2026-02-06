@@ -6,6 +6,7 @@ import (
 )
 
 func TestBackpressure_Basic(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -41,6 +42,7 @@ func TestBackpressure_Basic(t *testing.T) {
 }
 
 func TestBackpressure_PolicyNone(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -66,6 +68,7 @@ func TestBackpressure_PolicyNone(t *testing.T) {
 }
 
 func TestBackpressure_PolicyThrottle(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -108,6 +111,7 @@ func TestBackpressure_PolicyThrottle(t *testing.T) {
 }
 
 func TestBackpressure_PolicyBlock(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -150,6 +154,7 @@ func TestBackpressure_PolicyBlock(t *testing.T) {
 }
 
 func TestBackpressure_PressureRelease(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -191,6 +196,7 @@ func TestBackpressure_PressureRelease(t *testing.T) {
 }
 
 func TestBackpressure_GetPressureLevel(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -215,6 +221,7 @@ func TestBackpressure_GetPressureLevel(t *testing.T) {
 }
 
 func TestBackpressure_MultipleTopics(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -263,6 +270,7 @@ func TestBackpressure_MultipleTopics(t *testing.T) {
 }
 
 func TestBackpressure_SlowStart(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -294,6 +302,7 @@ func TestBackpressure_SlowStart(t *testing.T) {
 }
 
 func TestBackpressure_SlowStartWithPressure(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -332,6 +341,7 @@ func TestBackpressure_SlowStartWithPressure(t *testing.T) {
 }
 
 func TestBackpressure_ResetSlowStart(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -357,6 +367,7 @@ func TestBackpressure_ResetSlowStart(t *testing.T) {
 }
 
 func TestBackpressure_Callback(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -399,6 +410,7 @@ func TestBackpressure_Callback(t *testing.T) {
 }
 
 func TestBackpressure_Stats(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -436,6 +448,7 @@ func TestBackpressure_Stats(t *testing.T) {
 }
 
 func TestBackpressure_PublishWithBackpressure(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -465,6 +478,7 @@ func TestBackpressure_PublishWithBackpressure(t *testing.T) {
 }
 
 func TestBackpressure_Disabled(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 
@@ -480,6 +494,7 @@ func TestBackpressure_Disabled(t *testing.T) {
 }
 
 func TestBackpressure_Close(t *testing.T) {
+	t.Parallel()
 	ps := New()
 	defer ps.Close()
 

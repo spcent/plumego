@@ -2,7 +2,6 @@ package cache
 
 import (
 	"math/rand"
-	"time"
 )
 
 const (
@@ -10,11 +9,6 @@ const (
 	probability  = 0.25 // Probability for level promotion (matching Redis)
 	maxRandLevel = maxLevel - 1
 )
-
-// init initializes the random seed for level generation
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // skipListNode represents a node in the skip list
 type skipListNode struct {
@@ -62,7 +56,7 @@ func newSkipListNode(level int32, member string, score float64) *skipListNode {
 // Uses P=0.25 probability (same as Redis)
 func randomLevel() int32 {
 	level := int32(1)
-	for rand.Float64() < probability && level < maxLevel {
+	for rand.Float64() < probability && level <= maxRandLevel {
 		level++
 	}
 	return level

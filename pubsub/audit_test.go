@@ -248,7 +248,9 @@ func TestAuditLogger_Query_TimeRange(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	midpoint := time.Now()
+	firstWindowEnd := time.Now()
+	time.Sleep(2 * time.Millisecond)
+	secondWindowStart := time.Now()
 
 	// Log second batch
 	for i := 0; i < 3; i++ {
@@ -261,7 +263,7 @@ func TestAuditLogger_Query_TimeRange(t *testing.T) {
 	// Query first half
 	results, err := al.Query(AuditQuery{
 		StartTime: start,
-		EndTime:   midpoint,
+		EndTime:   firstWindowEnd,
 	})
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
@@ -273,7 +275,7 @@ func TestAuditLogger_Query_TimeRange(t *testing.T) {
 
 	// Query second half
 	results, err = al.Query(AuditQuery{
-		StartTime: midpoint,
+		StartTime: secondWindowStart,
 		EndTime:   end,
 	})
 	if err != nil {

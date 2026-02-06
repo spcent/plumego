@@ -121,40 +121,40 @@ type EnhancedDLQ struct {
 
 // EnhancedDLQMessage represents a message in the enhanced DLQ
 type EnhancedDLQMessage struct {
-	ID             string
-	OriginalMsg    Message
-	OriginalTopic  string
-	Reason         string
-	Timestamp      time.Time
-	Sequence       uint64
-	RetryCount     int
-	LastRetry      time.Time
-	NextRetry      time.Time
-	IsArchived     bool
-	ArchiveTime    time.Time
-	Tags           map[string]string
-	Priority       int
+	ID            string
+	OriginalMsg   Message
+	OriginalTopic string
+	Reason        string
+	Timestamp     time.Time
+	Sequence      uint64
+	RetryCount    int
+	LastRetry     time.Time
+	NextRetry     time.Time
+	IsArchived    bool
+	ArchiveTime   time.Time
+	Tags          map[string]string
+	Priority      int
 }
 
 // DLQAlert represents an alert notification
 type DLQAlert struct {
-	Level      string
-	Message    string
-	Count      int
-	Threshold  int
-	Reason     string
-	Timestamp  time.Time
-	Affected   []string
+	Level     string
+	Message   string
+	Count     int
+	Threshold int
+	Reason    string
+	Timestamp time.Time
+	Affected  []string
 }
 
 // DLQStats holds DLQ statistics
 type DLQStats struct {
-	TotalMessages    atomic.Uint64
-	ArchivedMessages atomic.Uint64
-	RetriedMessages  atomic.Uint64
+	TotalMessages     atomic.Uint64
+	ArchivedMessages  atomic.Uint64
+	RetriedMessages   atomic.Uint64
 	SuccessfulRetries atomic.Uint64
-	FailedRetries    atomic.Uint64
-	AlertsTriggered  atomic.Uint64
+	FailedRetries     atomic.Uint64
+	AlertsTriggered   atomic.Uint64
 }
 
 // DLQQueryOptions defines query parameters
@@ -591,9 +591,16 @@ func (dlq *EnhancedDLQ) Clear() {
 	dlq.retryTimerMu.Unlock()
 }
 
-// Stats returns DLQ statistics
-func (dlq *EnhancedDLQ) Stats() DLQStats {
-	return dlq.stats
+// Stats returns DLQ statistics.
+func (dlq *EnhancedDLQ) Stats() *DLQStats {
+	stats := &DLQStats{}
+	stats.TotalMessages.Store(dlq.stats.TotalMessages.Load())
+	stats.ArchivedMessages.Store(dlq.stats.ArchivedMessages.Load())
+	stats.RetriedMessages.Store(dlq.stats.RetriedMessages.Load())
+	stats.SuccessfulRetries.Store(dlq.stats.SuccessfulRetries.Load())
+	stats.FailedRetries.Store(dlq.stats.FailedRetries.Load())
+	stats.AlertsTriggered.Store(dlq.stats.AlertsTriggered.Load())
+	return stats
 }
 
 // Count returns current message count

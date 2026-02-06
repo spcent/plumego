@@ -162,6 +162,102 @@ func TestSkipListCount(t *testing.T) {
 	}
 }
 
+func TestSkipListDeleteRangeByRank(t *testing.T) {
+	sl := newSkipList()
+	sl.insert("player1", 100.0)
+	sl.insert("player2", 95.0)
+	sl.insert("player3", 90.0)
+	sl.insert("player4", 85.0)
+	sl.insert("player5", 80.0)
+
+	deleted := sl.deleteRangeByRank(1, 3)
+	if deleted != 3 {
+		t.Fatalf("expected 3 deleted, got %d", deleted)
+	}
+	if sl.length != 2 {
+		t.Fatalf("expected length 2, got %d", sl.length)
+	}
+
+	if _, ok := sl.getScore("player2"); ok {
+		t.Error("player2 should be removed")
+	}
+	if _, ok := sl.getScore("player3"); ok {
+		t.Error("player3 should be removed")
+	}
+	if _, ok := sl.getScore("player4"); ok {
+		t.Error("player4 should be removed")
+	}
+
+	nodes := sl.getRange(0, 10, false)
+	if len(nodes) != 2 {
+		t.Fatalf("expected 2 remaining nodes, got %d", len(nodes))
+	}
+	if nodes[0].member != "player5" || nodes[1].member != "player1" {
+		t.Fatalf("unexpected remaining members: %s, %s", nodes[0].member, nodes[1].member)
+	}
+}
+
+func TestSkipListDeleteRangeByScore(t *testing.T) {
+	sl := newSkipList()
+	sl.insert("player1", 100.0)
+	sl.insert("player2", 95.0)
+	sl.insert("player3", 90.0)
+	sl.insert("player4", 85.0)
+	sl.insert("player5", 80.0)
+
+	deleted := sl.deleteRangeByScore(85.0, 95.0)
+	if deleted != 3 {
+		t.Fatalf("expected 3 deleted, got %d", deleted)
+	}
+	if sl.length != 2 {
+		t.Fatalf("expected length 2, got %d", sl.length)
+	}
+
+	if _, ok := sl.getScore("player2"); ok {
+		t.Error("player2 should be removed")
+	}
+	if _, ok := sl.getScore("player3"); ok {
+		t.Error("player3 should be removed")
+	}
+	if _, ok := sl.getScore("player4"); ok {
+		t.Error("player4 should be removed")
+	}
+
+	nodes := sl.getRange(0, 10, false)
+	if len(nodes) != 2 {
+		t.Fatalf("expected 2 remaining nodes, got %d", len(nodes))
+	}
+	if nodes[0].member != "player5" || nodes[1].member != "player1" {
+		t.Fatalf("unexpected remaining members: %s, %s", nodes[0].member, nodes[1].member)
+	}
+}
+
+func TestSkipListClear(t *testing.T) {
+	sl := newSkipList()
+	sl.insert("player1", 100.0)
+	sl.insert("player2", 90.0)
+
+	sl.clear()
+
+	if sl.length != 0 {
+		t.Fatalf("expected length 0 after clear, got %d", sl.length)
+	}
+	if sl.level != 1 {
+		t.Fatalf("expected level 1 after clear, got %d", sl.level)
+	}
+	if sl.tail != nil {
+		t.Fatal("expected tail nil after clear")
+	}
+	if sl.header == nil {
+		t.Fatal("expected header initialized after clear")
+	}
+
+	sl.insert("player3", 120.0)
+	if sl.length != 1 {
+		t.Fatalf("expected length 1 after reinsert, got %d", sl.length)
+	}
+}
+
 func TestLeaderboardCacheBasicOperations(t *testing.T) {
 	config := DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
@@ -470,6 +566,16 @@ func TestLeaderboardCacheZRemRange(t *testing.T) {
 	if card != 3 {
 		t.Errorf("expected cardinality 3, got %d", card)
 	}
+
+	if _, err := lbc.ZScore(ctx, "game:scores", "player5"); err != ErrMemberNotFound {
+		t.Errorf("expected ErrMemberNotFound for player5, got %v", err)
+	}
+	if _, err := lbc.ZScore(ctx, "game:scores", "player4"); err != ErrMemberNotFound {
+		t.Errorf("expected ErrMemberNotFound for player4, got %v", err)
+	}
+	if score, err := lbc.ZScore(ctx, "game:scores", "player1"); err != nil || score != 100.0 {
+		t.Errorf("expected player1 score 100.0, got score=%f err=%v", score, err)
+	}
 }
 
 func TestLeaderboardCacheZRemRangeByScore(t *testing.T) {
@@ -511,6 +617,53 @@ func TestLeaderboardCacheZRemRangeByScore(t *testing.T) {
 	}
 	if card != 2 {
 		t.Errorf("expected cardinality 2, got %d", card)
+	}
+
+	if _, err := lbc.ZScore(ctx, "game:scores", "player5"); err != ErrMemberNotFound {
+		t.Errorf("expected ErrMemberNotFound for player5, got %v", err)
+	}
+	if _, err := lbc.ZScore(ctx, "game:scores", "player3"); err != ErrMemberNotFound {
+		t.Errorf("expected ErrMemberNotFound for player3, got %v", err)
+	}
+	if score, err := lbc.ZScore(ctx, "game:scores", "player1"); err != nil || score != 100.0 {
+		t.Errorf("expected player1 score 100.0, got score=%f err=%v", score, err)
+	}
+}
+
+func TestLeaderboardCacheClear(t *testing.T) {
+	config := DefaultConfig()
+	lbConfig := DefaultLeaderboardConfig()
+
+	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	defer lbc.Close()
+
+	ctx := context.Background()
+
+	if err := lbc.Set(ctx, "plain:key", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100.0}); err != nil {
+		t.Fatalf("ZAdd failed: %v", err)
+	}
+
+	if err := lbc.Clear(ctx); err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+
+	if _, err := lbc.Get(ctx, "plain:key"); err != ErrNotFound {
+		t.Errorf("expected ErrNotFound for plain:key, got %v", err)
+	}
+
+	card, err := lbc.ZCard(ctx, "game:scores")
+	if err != nil {
+		t.Fatalf("ZCard failed: %v", err)
+	}
+	if card != 0 {
+		t.Fatalf("expected cardinality 0 after clear, got %d", card)
+	}
+
+	if _, err := lbc.ZScore(ctx, "game:scores", "player1"); err != ErrLeaderboardNotFound {
+		t.Errorf("expected ErrLeaderboardNotFound after clear, got %v", err)
 	}
 }
 

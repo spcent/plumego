@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -168,13 +167,7 @@ func DetectDocumentFormat(path string) DocumentFormat {
 
 // GetMimeType returns the MIME type for a format.
 func GetMimeType(format string) string {
-	mimeType := mime.TypeByExtension("." + format)
-	if mimeType != "" {
-		return mimeType
-	}
-
-	// Fallback mappings
-	switch format {
+	switch strings.ToLower(strings.TrimPrefix(format, ".")) {
 	case "jpeg", "jpg":
 		return "image/jpeg"
 	case "png":
@@ -186,7 +179,7 @@ func GetMimeType(format string) string {
 	case "mp3":
 		return "audio/mpeg"
 	case "wav":
-		return "audio/wav"
+		return "audio/vnd.wave"
 	case "ogg":
 		return "audio/ogg"
 	case "mp4":
