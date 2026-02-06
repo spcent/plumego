@@ -196,6 +196,12 @@ func serveFromDirectory(w http.ResponseWriter, req *http.Request, root any) bool
 	// Construct the full path inside the given directory
 	fullPath := filepath.Join(dir, cleanPath)
 
+	// Security: verify the resolved path is within the root directory (prevents symlink escape)
+	if !isPathWithinRoot(dir, fullPath) {
+		http.NotFound(w, req)
+		return true
+	}
+
 	// Check if the file exists
 	if handleStaticFileError(w, req, checkFileExists(fullPath)) {
 		return true
@@ -219,15 +225,25 @@ func serveFromFileSystem(w http.ResponseWriter, req *http.Request, root any) boo
 		return true
 	}
 
-	// Try to open the file
+	// Open the file
 	f, err := fs.Open(cleanPath)
 	if handleStaticFileError(w, req, err) {
 		return true
 	}
 	defer f.Close()
 
-	// Use http.FileServer logic by stripping the prefix
-	http.FileServer(fs).ServeHTTP(w, req)
+	info, err := f.Stat()
+	if handleStaticFileError(w, req, err) {
+		return true
+	}
+
+	// Serve the file content directly instead of re-opening via FileServer
+	if seeker, ok := f.(io.ReadSeeker); ok {
+		http.ServeContent(w, req, info.Name(), info.ModTime(), seeker)
+	} else {
+		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+		io.Copy(w, f)
+	}
 	return true
 }
 
@@ -235,6 +251,36 @@ func serveFromFileSystem(w http.ResponseWriter, req *http.Request, root any) boo
 func checkFileExists(path string) error {
 	_, err := os.Stat(path)
 	return err
+}
+
+// isPathWithinRoot verifies that resolvedPath is within rootDir after resolving symlinks.
+// This prevents symlink-based directory traversal attacks.
+func isPathWithinRoot(rootDir, resolvedPath string) bool {
+	absRoot, err := filepath.Abs(rootDir)
+	if err != nil {
+		return false
+	}
+	// Resolve symlinks on root
+	realRoot, err := filepath.EvalSymlinks(absRoot)
+	if err != nil {
+		// If root itself doesn't exist, deny
+		return false
+	}
+
+	absPath, err := filepath.Abs(resolvedPath)
+	if err != nil {
+		return false
+	}
+	// Resolve symlinks on the target path
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		// File doesn't exist yet (checked later), allow the check to pass
+		// so the caller can return a proper 404
+		return true
+	}
+
+	// Ensure the resolved path is within the root
+	return strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) || realPath == realRoot
 }
 
 // registerStaticRoute is a generic function that registers static file routes
@@ -255,6 +301,49 @@ func (r *Router) registerStaticRouteWithConfig(config StaticConfig, handler func
 	})
 }
 
+// isExtensionAllowed checks if a file path's extension is in the allowed list.
+// Returns true if the extension is allowed or if the allowed list is empty.
+func isExtensionAllowed(path string, allowedExtensions []string) bool {
+	if len(allowedExtensions) == 0 {
+		return true
+	}
+	ext := strings.ToLower(filepath.Ext(path))
+	for _, allowed := range allowedExtensions {
+		if ext == strings.ToLower(allowed) {
+			return true
+		}
+	}
+	return false
+}
+
+// setCacheHeaders sets Cache-Control and ETag headers on the response.
+// Returns true if a 304 Not Modified was sent (caller should return).
+func setCacheHeaders(w http.ResponseWriter, req *http.Request, info os.FileInfo, config StaticConfig) bool {
+	if config.CacheControl != "" {
+		w.Header().Set("Cache-Control", config.CacheControl)
+	}
+	if config.EnableETag {
+		etag := generateETag(info)
+		w.Header().Set("ETag", etag)
+		if match := req.Header.Get("If-None-Match"); match == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return true
+		}
+	}
+	return false
+}
+
+// serveFileContent serves file content with seeking support, using ServeContent
+// when possible, falling back to raw copy for non-seekable files.
+func serveFileContent(w http.ResponseWriter, req *http.Request, f http.File, info os.FileInfo) {
+	if seeker, ok := f.(io.ReadSeeker); ok {
+		http.ServeContent(w, req, info.Name(), info.ModTime(), seeker)
+	} else {
+		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+		io.Copy(w, f)
+	}
+}
+
 // serveFromDirectoryWithConfig serves files from a local directory with configuration
 func serveFromDirectoryWithConfig(w http.ResponseWriter, req *http.Request, config StaticConfig) bool {
 	dir, ok := config.Root.(string)
@@ -272,23 +361,18 @@ func serveFromDirectoryWithConfig(w http.ResponseWriter, req *http.Request, conf
 		return true
 	}
 
-	// Check allowed extensions
-	if len(config.AllowedExtensions) > 0 {
-		ext := strings.ToLower(filepath.Ext(cleanPath))
-		allowed := false
-		for _, allowedExt := range config.AllowedExtensions {
-			if ext == strings.ToLower(allowedExt) {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			http.NotFound(w, req)
-			return true
-		}
+	if !isExtensionAllowed(cleanPath, config.AllowedExtensions) {
+		http.NotFound(w, req)
+		return true
 	}
 
 	fullPath := filepath.Join(dir, cleanPath)
+
+	// Security: verify the resolved path is within the root directory (prevents symlink escape)
+	if !isPathWithinRoot(dir, fullPath) {
+		http.NotFound(w, req)
+		return true
+	}
 
 	// Check if file exists
 	info, err := os.Stat(fullPath)
@@ -334,21 +418,8 @@ func serveStaticFile(w http.ResponseWriter, req *http.Request, path string, conf
 		return
 	}
 
-	// Set cache headers
-	if config.CacheControl != "" {
-		w.Header().Set("Cache-Control", config.CacheControl)
-	}
-
-	// Generate and set ETag if enabled
-	if config.EnableETag {
-		etag := generateETag(info)
-		w.Header().Set("ETag", etag)
-
-		// Check If-None-Match
-		if match := req.Header.Get("If-None-Match"); match == etag {
-			w.WriteHeader(http.StatusNotModified)
-			return
-		}
+	if setCacheHeaders(w, req, info, config) {
+		return
 	}
 
 	http.ServeContent(w, req, info.Name(), info.ModTime(), f)
@@ -371,20 +442,9 @@ func serveFromFileSystemWithConfig(w http.ResponseWriter, req *http.Request, con
 		return true
 	}
 
-	// Check allowed extensions
-	if len(config.AllowedExtensions) > 0 {
-		ext := strings.ToLower(filepath.Ext(cleanPath))
-		allowed := false
-		for _, allowedExt := range config.AllowedExtensions {
-			if ext == strings.ToLower(allowedExt) {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			http.NotFound(w, req)
-			return true
-		}
+	if !isExtensionAllowed(cleanPath, config.AllowedExtensions) {
+		http.NotFound(w, req)
+		return true
 	}
 
 	// Try to open the file
@@ -439,31 +499,11 @@ func serveFromFS(w http.ResponseWriter, req *http.Request, fs http.FileSystem, p
 		return
 	}
 
-	// Set cache headers
-	if config.CacheControl != "" {
-		w.Header().Set("Cache-Control", config.CacheControl)
+	if setCacheHeaders(w, req, info, config) {
+		return
 	}
 
-	// Generate and set ETag if enabled
-	if config.EnableETag {
-		etag := generateETag(info)
-		w.Header().Set("ETag", etag)
-
-		// Check If-None-Match
-		if match := req.Header.Get("If-None-Match"); match == etag {
-			w.WriteHeader(http.StatusNotModified)
-			return
-		}
-	}
-
-	// For files that support seeking
-	if seeker, ok := f.(io.ReadSeeker); ok {
-		http.ServeContent(w, req, info.Name(), info.ModTime(), seeker)
-	} else {
-		// Fallback for non-seekable files
-		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
-		io.Copy(w, f)
-	}
+	serveFileContent(w, req, f, info)
 }
 
 // generateETag generates an ETag based on file info

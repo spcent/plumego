@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -877,14 +878,19 @@ func (r *Router) URL(name string, params ...string) string {
 		if strings.HasPrefix(part, ":") {
 			paramName := part[1:]
 			if val, ok := paramMap[paramName]; ok {
-				resultParts = append(resultParts, val)
+				resultParts = append(resultParts, url.PathEscape(val))
 			} else {
 				resultParts = append(resultParts, part) // Keep original if not provided
 			}
 		} else if strings.HasPrefix(part, "*") {
 			paramName := part[1:]
 			if val, ok := paramMap[paramName]; ok {
-				resultParts = append(resultParts, val)
+				// Wildcard values may contain slashes (e.g., file paths), so don't escape slashes
+				segments := strings.Split(val, "/")
+				for i, seg := range segments {
+					segments[i] = url.PathEscape(seg)
+				}
+				resultParts = append(resultParts, strings.Join(segments, "/"))
 			} else {
 				resultParts = append(resultParts, "") // Empty for wildcard if not provided
 			}
@@ -1253,13 +1259,13 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Check exact route cache first for better performance (no lock needed)
 	cacheKey := req.Method + ":" + cachePath
 	if cachedResult, exists := r.routeCache.Get(cacheKey); exists {
-		r.handleCachedRouteMatch(w, req, cachedResult)
+		r.serveCachedMatch(w, req, cachedResult, nil)
 		return
 	}
 
 	// Check pattern cache for parameterized routes (no lock needed)
 	if cachedResult, paramValues, exists := r.routeCache.GetByPattern(req.Method, cachePath); exists {
-		r.handleCachedPatternMatch(w, req, cachedResult, paramValues)
+		r.serveCachedMatch(w, req, cachedResult, paramValues)
 		return
 	}
 
@@ -1306,15 +1312,8 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
 	// Validate parameters if validations are registered
-	fullPath := r.prefix + path
 	if params != nil {
-		if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
-			contract.WriteError(w, req, contract.APIError{
-				Status:   http.StatusBadRequest,
-				Code:     "VALIDATION_ERROR",
-				Message:  err.Error(),
-				Category: contract.CategoryValidation,
-			})
+		if r.writeValidationError(w, req, params) {
 			return
 		}
 	}
@@ -1405,34 +1404,19 @@ func (r *Router) normalizePath(path string) string {
 	return strings.Trim(path, "/")
 }
 
-// handleCachedRouteMatch handles requests using cached route matching results
-func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request, result *MatchResult) {
-	// Build parameter map
-	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
-
-	if result.RouteMethod == "" {
-		result.RouteMethod = req.Method
-	}
-	if result.RoutePattern == "" {
-		path := r.normalizePath(req.URL.Path)
-		if path == "/" {
-			result.RoutePattern = "/"
-		} else {
-			result.RoutePattern = "/" + path
-		}
+// serveCachedMatch handles requests using cached matching results.
+// It validates parameters and applies middleware before serving.
+// The paramValues argument overrides result.ParamValues when non-nil
+// (used by pattern cache where values are extracted at lookup time).
+func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *MatchResult, paramValues []string) {
+	if paramValues == nil {
+		paramValues = result.ParamValues
 	}
 
-	// Validate parameters if validations are registered
+	params := r.buildParamMap(paramValues, result.ParamKeys)
+
 	if params != nil {
-		path := r.normalizePath(req.URL.Path)
-		fullPath := r.prefix + path
-		if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
-			contract.WriteError(w, req, contract.APIError{
-				Status:   http.StatusBadRequest,
-				Code:     "VALIDATION_ERROR",
-				Message:  err.Error(),
-				Category: contract.CategoryValidation,
-			})
+		if r.writeValidationError(w, req, params) {
 			return
 		}
 	}
@@ -1440,27 +1424,21 @@ func (r *Router) handleCachedRouteMatch(w http.ResponseWriter, req *http.Request
 	r.applyMiddlewareAndServe(w, req, params, result)
 }
 
-// handleCachedPatternMatch handles requests using cached pattern matching results
-func (r *Router) handleCachedPatternMatch(w http.ResponseWriter, req *http.Request, result *MatchResult, paramValues []string) {
-	// Build parameter map using cached keys and extracted values
-	params := r.buildParamMap(paramValues, result.ParamKeys)
-
-	// Validate parameters if validations are registered
-	if params != nil {
-		path := r.normalizePath(req.URL.Path)
-		fullPath := r.prefix + path
-		if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
-			contract.WriteError(w, req, contract.APIError{
-				Status:   http.StatusBadRequest,
-				Code:     "VALIDATION_ERROR",
-				Message:  err.Error(),
-				Category: contract.CategoryValidation,
-			})
-			return
-		}
+// writeValidationError validates route parameters and writes a 400 error if validation fails.
+// Returns true if an error was written (caller should return), false otherwise.
+func (r *Router) writeValidationError(w http.ResponseWriter, req *http.Request, params map[string]string) bool {
+	path := r.normalizePath(req.URL.Path)
+	fullPath := r.prefix + path
+	if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
+		contract.WriteError(w, req, contract.APIError{
+			Status:   http.StatusBadRequest,
+			Code:     "VALIDATION_ERROR",
+			Message:  err.Error(),
+			Category: contract.CategoryValidation,
+		})
+		return true
 	}
-
-	r.applyMiddlewareAndServe(w, req, params, result)
+	return false
 }
 
 // buildParamMap creates a parameter map from values and keys
@@ -1517,8 +1495,6 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	ctx = context.WithValue(ctx, contract.RequestContextKey{}, existingRC)
 	if ctx != req.Context() {
 		reqWithParams = req.WithContext(ctx)
-		*req = *reqWithParams
-		reqWithParams = req
 	}
 
 	if result == nil {
