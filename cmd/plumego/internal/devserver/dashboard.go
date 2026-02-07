@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -110,6 +111,7 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	})
 
 	// API endpoints (without Group - register directly)
+	d.app.GetCtx("/api/info", d.handleInfo)
 	d.app.GetCtx("/api/status", d.handleStatus)
 	d.app.GetCtx("/api/health", d.handleHealth)
 	d.app.GetCtx("/api/routes", d.handleRoutes)
@@ -188,7 +190,39 @@ func (d *Dashboard) Start(ctx context.Context) error {
 	// Wait a bit for server to start
 	time.Sleep(500 * time.Millisecond)
 
+	// Publish initial dashboard info event
+	d.publishDashboardInfo()
+
+	// Re-publish dashboard info on app lifecycle changes
+	d.subscribeLifecycleForInfo()
+
 	return nil
+}
+
+// publishDashboardInfo publishes the current dashboard info via pubsub.
+func (d *Dashboard) publishDashboardInfo() {
+	d.pubsub.Publish(EventDashboard, pubsub.Message{
+		Topic: EventDashboard,
+		Data:  d.getDashboardInfo(),
+	})
+}
+
+// subscribeLifecycleForInfo re-publishes dashboard info when app state changes.
+func (d *Dashboard) subscribeLifecycleForInfo() {
+	patterns := []string{EventAppStart, EventAppStop, EventAppRestart}
+	for _, pattern := range patterns {
+		sub, err := d.pubsub.Subscribe(pattern, pubsub.SubOptions{})
+		if err != nil {
+			continue
+		}
+		go func() {
+			for range sub.C() {
+				// Small delay to let the runner state settle
+				time.Sleep(100 * time.Millisecond)
+				d.publishDashboardInfo()
+			}
+		}()
+	}
 }
 
 // Stop stops the dashboard server
@@ -246,19 +280,26 @@ func (d *Dashboard) Rebuild(ctx context.Context) error {
 
 // HTTP Handlers
 
+func (d *Dashboard) handleInfo(ctx *plumego.Context) {
+	ctx.JSON(http.StatusOK, d.getDashboardInfo())
+}
+
 func (d *Dashboard) handleStatus(ctx *plumego.Context) {
+	info := d.getDashboardInfo()
 	status := map[string]any{
 		"dashboard": map[string]any{
-			"url":    fmt.Sprintf("http://localhost%s", d.dashboardAddr),
-			"uptime": time.Since(d.startTime).String(),
+			"version": info.Version,
+			"url":     info.DashboardURL,
+			"uptime":  info.Uptime,
 		},
 		"app": map[string]any{
-			"url":     fmt.Sprintf("http://localhost%s", d.appAddr),
-			"running": d.runner.IsRunning(),
-			"pid":     d.getAppPID(),
+			"url":     info.AppURL,
+			"running": info.AppRunning,
+			"pid":     info.AppPID,
 		},
 		"project": map[string]any{
-			"dir": d.projectDir,
+			"dir":        info.ProjectDir,
+			"go_version": info.GoVersion,
 		},
 	}
 
@@ -521,6 +562,12 @@ func (d *Dashboard) getDashboardInfo() DashboardInfo {
 		DashboardURL: fmt.Sprintf("http://localhost%s", d.dashboardAddr),
 		AppURL:       fmt.Sprintf("http://localhost%s", d.appAddr),
 		Uptime:       time.Since(d.startTime).String(),
+		UptimeMS:     time.Since(d.startTime).Milliseconds(),
+		StartTime:    d.startTime.Format(time.RFC3339),
+		ProjectDir:   d.projectDir,
+		GoVersion:    runtime.Version(),
+		AppRunning:   d.runner.IsRunning(),
+		AppPID:       d.getAppPID(),
 	}
 }
 
