@@ -281,7 +281,7 @@ func createTestClusterDB(t *testing.T, shardCount int) *ClusterDB {
 	}
 
 	// Use custom opener that creates stub databases
-	stubOpener := func(driver, dsn string) (*sql.DB, error) {
+	stubOpener := func(_, _ string) (*sql.DB, error) {
 		connector := &stubConnector{
 			conn: &stubConn{},
 		}

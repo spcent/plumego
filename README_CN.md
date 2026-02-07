@@ -384,7 +384,7 @@ if err := app.ConfigureObservability(obs); err != nil {
 
 ## 开发服务器与仪表盘
 
-`plumego` CLI 包含一个强大的开发服务器，它本身就是使用 plumego 框架构建的（狗粮原则）。它提供热重载、实时监控和 Web 仪表盘，大大提升开发体验。
+`plumego` CLI 包含一个强大的开发服务器，它本身就是使用 plumego 框架构建的。它提供热重载、实时监控和 Web 仪表盘，大大提升开发体验。
 
 仪表盘**默认启用** - 只需运行 `plumego dev` 即可开始使用。
 

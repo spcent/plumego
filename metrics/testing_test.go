@@ -263,7 +263,8 @@ func Example_mockCollector_embedding() {
 
 	// Override only the method you want to test
 	// This is done by defining the method on customMock
-	_ = mock // Use the mock in your tests
+	_ = mock
+	_ = mock.NoopCollector
 }
 
 // Example_mockCollector_hooks demonstrates using hooks

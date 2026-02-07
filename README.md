@@ -385,7 +385,7 @@ Use `config.Get*` helpers (see `config/env.go`) or Go's `flag` package to transf
 
 ## Development Server with Dashboard
 
-The `plumego` CLI includes a powerful development server built with the plumego framework itself (dogfooding). It provides hot reload, real-time monitoring, and a web-based dashboard for enhanced development experience.
+The `plumego` CLI includes a powerful development server built with the plumego framework itself. It provides hot reload, real-time monitoring, and a web-based dashboard for enhanced development experience.
 
 The dashboard is **enabled by default** - simply run `plumego dev` to get started.
 

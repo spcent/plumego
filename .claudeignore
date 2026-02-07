@@ -1,0 +1,239 @@
+# .claudeignore for Go projects
+# This file tells Claude Code which files/directories to ignore to save tokens
+
+# ====================
+# Go Build Artifacts
+# ====================
+# Compiled binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Build directories
+/bin/
+/build/
+/dist/
+/_build/
+/out/
+
+# ====================
+# Dependencies
+# ====================
+# Vendor directory (usually large and not needed for analysis)
+/vendor/
+
+# Go module download cache
+go.sum
+
+# ====================
+# IDE & Editor Files
+# ====================
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs (GoLand, IntelliJ)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw[a-z]
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ====================
+# Testing & Coverage
+# ====================
+# Coverage reports (can be large and not useful for Claude)
+*.coverprofile
+coverage.txt
+coverage.html
+coverage.out
+cover.out
+coverage/
+
+# Benchmark results
+*.bench
+benchmarks/
+
+# ====================
+# Documentation
+# ====================
+# Markdown files (exclude unless you need Claude to read them)
+# Uncomment if you want Claude to skip docs
+# *.md
+# /docs/
+# /doc/
+
+# Generated API documentation
+/api-docs/
+/godoc/
+
+# ====================
+# Examples & Demos
+# ====================
+# Example code (usually not needed for core development)
+/examples/
+/_examples/
+/example/
+/demo/
+/demos/
+/samples/
+
+# ====================
+# Temporary & Cache Files
+# ====================
+# Temporary directories
+/tmp/
+/temp/
+/.tmp/
+
+# Log files
+*.log
+/logs/
+
+# Cache
+*.cache
+.cache/
+
+# ====================
+# CI/CD & Deployment
+# ====================
+# GitHub Actions
+/.github/
+
+# GitLab CI
+.gitlab-ci.yml
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Kubernetes
+/k8s/
+*.yaml
+*.yml
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# ====================
+# Git & Version Control
+# ====================
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# ====================
+# OS Generated Files
+# ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ====================
+# Security & Secrets
+# ====================
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Private keys
+*.pem
+*.key
+*.cert
+*.crt
+
+# Credentials
+credentials.json
+secrets.yaml
+
+# ====================
+# Project Specific
+# ====================
+# Add your project-specific ignores here
+
+# Generated code (if you use code generation)
+# *_generated.go
+# /generated/
+
+# Mock files (if you don't need Claude to analyze them)
+# *_mock.go
+# /mocks/
+
+# Migration files (if not needed for current task)
+# /migrations/
+
+# Scripts (if not needed)
+# /scripts/
+
+# Config files (if not needed for core logic)
+# /config/
+# *.toml
+# *.yaml
+# *.json
+
+# ====================
+# Optional Optimizations
+# ====================
+# Uncomment these if you want more aggressive token saving
+
+# All test files (uncomment if you handle tests separately)
+# *_test.go
+
+# All README files
+# README*
+
+# License files
+# LICENSE*
+
+# Changelog
+# CHANGELOG*
+
+# Makefile (if not needed)
+# Makefile
+# makefile
+
+# Go mod (if you don't need dependency info)
+# go.mod
