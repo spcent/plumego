@@ -143,6 +143,9 @@ type InProcPubSub struct {
 
 	// TTL manager for message expiration
 	ttlMgr *ttlManager
+
+	// topic history for message retention
+	history *topicHistory
 }
 
 // New creates a new InProcPubSub instance.
@@ -182,6 +185,10 @@ func New(opts ...Option) *InProcPubSub {
 
 	if config.EnableTTL {
 		ps.ttlMgr = newTTLManager(ps, config.TTLCleanupInterval)
+	}
+
+	if config.EnableHistory {
+		ps.history = newTopicHistory(config.HistoryConfig)
 	}
 
 	return ps
@@ -484,6 +491,12 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 			ps.config.Hooks.OnPublish(topic, &clonedMsg)
 		}
 
+		// Record message in history
+		if ps.history != nil {
+			h := ps.history.GetOrCreate(topic, 0)
+			h.Add(clonedMsg)
+		}
+
 		// Deliver to exact topic subscribers
 		for _, s := range subs {
 			ps.deliver(s, clonedMsg)
@@ -578,6 +591,12 @@ func (ps *InProcPubSub) doPublish(topic string, msg Message) {
 				return
 			}
 		}
+	}
+
+	// Record message in history
+	if ps.history != nil {
+		h := ps.history.GetOrCreate(topic, 0)
+		h.Add(msg)
 	}
 
 	// Get topic subscribers
@@ -973,6 +992,98 @@ func (ps *InProcPubSub) GetTTLStats() TTLStats {
 	return ps.ttlMgr.Stats()
 }
 
+// GetTopicHistory returns all retained messages for a topic (oldest first).
+// Requires history to be enabled via WithHistory() option.
+func (ps *InProcPubSub) GetTopicHistory(topic string) ([]Message, error) {
+	if ps.history == nil {
+		return nil, ErrHistoryDisabled
+	}
+
+	h := ps.history.Get(topic)
+	if h == nil {
+		return nil, nil
+	}
+	return h.GetAll(), nil
+}
+
+// GetTopicHistorySince returns messages added after the given sequence number.
+// Requires history to be enabled via WithHistory() option.
+func (ps *InProcPubSub) GetTopicHistorySince(topic string, sequence uint64) ([]Message, error) {
+	if ps.history == nil {
+		return nil, ErrHistoryDisabled
+	}
+
+	h := ps.history.Get(topic)
+	if h == nil {
+		return nil, nil
+	}
+	return h.GetSince(sequence), nil
+}
+
+// GetRecentMessages returns the last N messages for a topic (oldest first).
+// Requires history to be enabled via WithHistory() option.
+func (ps *InProcPubSub) GetRecentMessages(topic string, count int) ([]Message, error) {
+	if ps.history == nil {
+		return nil, ErrHistoryDisabled
+	}
+
+	h := ps.history.Get(topic)
+	if h == nil {
+		return nil, nil
+	}
+	return h.GetLast(count), nil
+}
+
+// GetTopicHistoryByTTL returns messages not older than the given TTL duration.
+// Requires history to be enabled via WithHistory() option.
+func (ps *InProcPubSub) GetTopicHistoryByTTL(topic string, ttl time.Duration) ([]Message, error) {
+	if ps.history == nil {
+		return nil, ErrHistoryDisabled
+	}
+
+	h := ps.history.Get(topic)
+	if h == nil {
+		return nil, nil
+	}
+	return h.GetWithTTL(ttl), nil
+}
+
+// ClearTopicHistory removes all retained messages for a topic.
+// Requires history to be enabled via WithHistory() option.
+func (ps *InProcPubSub) ClearTopicHistory(topic string) error {
+	if ps.history == nil {
+		return ErrHistoryDisabled
+	}
+
+	ps.history.Delete(topic)
+	return nil
+}
+
+// TopicHistoryStats returns history statistics for all topics with retained messages.
+// Requires history to be enabled via WithHistory() option.
+func (ps *InProcPubSub) TopicHistoryStats() (map[string]HistoryStats, error) {
+	if ps.history == nil {
+		return nil, ErrHistoryDisabled
+	}
+
+	return ps.history.Stats(), nil
+}
+
+// TopicHistorySequence returns the current sequence number for a topic's history.
+// Returns 0 if no history exists for the topic.
+// Requires history to be enabled via WithHistory() option.
+func (ps *InProcPubSub) TopicHistorySequence(topic string) (uint64, error) {
+	if ps.history == nil {
+		return 0, ErrHistoryDisabled
+	}
+
+	h := ps.history.Get(topic)
+	if h == nil {
+		return 0, nil
+	}
+	return h.CurrentSequence(), nil
+}
+
 // Ensure InProcPubSub implements all interfaces
 var (
 	_ PubSub          = (*InProcPubSub)(nil)
@@ -980,4 +1091,5 @@ var (
 	_ ContextPubSub   = (*InProcPubSub)(nil)
 	_ BatchPubSub     = (*InProcPubSub)(nil)
 	_ DrainablePubSub = (*InProcPubSub)(nil)
+	_ HistoryPubSub   = (*InProcPubSub)(nil)
 )

@@ -254,6 +254,34 @@ type DrainablePubSub interface {
 	Drain(ctx context.Context) error
 }
 
+// HistoryPubSub extends PubSub with per-topic message history retention.
+// It allows querying previously published messages for late subscriber catch-up,
+// debugging, and lightweight audit trails.
+type HistoryPubSub interface {
+	PubSub
+
+	// GetTopicHistory returns all retained messages for a topic (oldest first).
+	GetTopicHistory(topic string) ([]Message, error)
+
+	// GetTopicHistorySince returns messages added after the given sequence number.
+	GetTopicHistorySince(topic string, sequence uint64) ([]Message, error)
+
+	// GetRecentMessages returns the last N messages for a topic (oldest first).
+	GetRecentMessages(topic string, count int) ([]Message, error)
+
+	// GetTopicHistoryByTTL returns messages not older than the given TTL duration.
+	GetTopicHistoryByTTL(topic string, ttl time.Duration) ([]Message, error)
+
+	// ClearTopicHistory removes all retained messages for a topic.
+	ClearTopicHistory(topic string) error
+
+	// TopicHistoryStats returns history statistics for all topics.
+	TopicHistoryStats() (map[string]HistoryStats, error)
+
+	// TopicHistorySequence returns the current sequence number for a topic.
+	TopicHistorySequence(topic string) (uint64, error)
+}
+
 // DefaultSubOptions returns production-ready default options.
 //
 // Example:

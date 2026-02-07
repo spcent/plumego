@@ -69,6 +69,9 @@ var (
 
 	// ErrTTLDisabled is returned when TTL publish is attempted without enabling the TTL manager
 	ErrTTLDisabled = errors.New("TTL manager not enabled, use WithTTL() option")
+
+	// ErrHistoryDisabled is returned when history operations are attempted without enabling history
+	ErrHistoryDisabled = errors.New("topic history not enabled, use WithHistory() option")
 )
 
 // PubSubError is a structured error type for pubsub operations.
