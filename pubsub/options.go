@@ -55,6 +55,11 @@ type Config struct {
 	// via SubOptions.UseRingBuffer.
 	EnableRingBuffer bool
 
+	// EnableRequestReply enables the request-reply manager for efficient RPC-style
+	// communication over pubsub. When enabled, a shared reply subscription is used
+	// instead of creating a temporary subscription per request.
+	EnableRequestReply bool
+
 	// EnableHistory enables per-topic message history retention.
 	// When enabled, published messages are stored in a circular buffer per topic,
 	// allowing late subscribers to catch up on recent messages.
@@ -197,7 +202,17 @@ func WithTTL(cleanupInterval ...time.Duration) Option {
 // performance under high contention and eliminates potential spin-loop issues.
 func WithRingBuffer() Option {
 	return func(c *Config) {
-		c.EnableRingBuffer = true
+    c.EnableRingBuffer = true
+  }
+}
+
+// WithRequestReply enables the request-reply manager for efficient RPC-style
+// communication over pubsub. Instead of creating a temporary subscription per
+// request, a shared reply subscription is maintained, reducing overhead for
+// high-frequency request-reply workloads.
+func WithRequestReply() Option {
+	return func(c *Config) {
+		c.EnableRequestReply = true
 	}
 }
 

@@ -173,24 +173,29 @@ func (ps *InProcPubSub) Reply(reqMsg Message, respMsg Message) error {
 }
 
 // Request sends a message and waits for a response.
-// This creates a temporary subscription for the reply.
+// If the request-reply manager is enabled (via WithRequestReply()), uses the shared
+// reply subscription for efficient multiplexed request handling. Otherwise, creates
+// a temporary subscription per request.
 func (ps *InProcPubSub) Request(ctx context.Context, topic string, msg Message) (Message, error) {
 	if ps.closed.Load() {
 		return Message{}, ErrClosed
 	}
 
-	// Generate unique reply topic and correlation ID
+	// Use request manager if enabled
+	if ps.requestMgr != nil {
+		return ps.requestMgr.Request(ctx, topic, msg)
+	}
+
+	// Fallback: create a temporary subscription for the reply
 	replyTopic := generateReplyTopic()
 	correlationID := generateCorrelationID()
 
-	// Set up message metadata
 	if msg.Meta == nil {
 		msg.Meta = make(map[string]string)
 	}
 	msg.Meta[ReplyToHeader] = replyTopic
 	msg.Meta[CorrelationIDHeader] = correlationID
 
-	// Subscribe to reply topic
 	replySub, err := ps.Subscribe(replyTopic, SubOptions{
 		BufferSize: 1,
 		Policy:     DropNewest,
@@ -200,12 +205,10 @@ func (ps *InProcPubSub) Request(ctx context.Context, topic string, msg Message) 
 	}
 	defer replySub.Cancel()
 
-	// Publish the request
 	if err := ps.Publish(topic, msg); err != nil {
 		return Message{}, err
 	}
 
-	// Wait for response
 	select {
 	case resp := <-replySub.C():
 		return resp, nil
@@ -219,6 +222,19 @@ func (ps *InProcPubSub) RequestWithTimeout(topic string, msg Message, timeout ti
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return ps.Request(ctx, topic, msg)
+}
+
+// PendingRequests returns the number of in-flight requests waiting for replies.
+// Requires the request-reply manager to be enabled via WithRequestReply().
+func (ps *InProcPubSub) PendingRequests() (int, error) {
+	if ps.requestMgr == nil {
+		return 0, ErrRequestReplyDisabled
+	}
+
+	ps.requestMgr.mu.RLock()
+	n := len(ps.requestMgr.pending)
+	ps.requestMgr.mu.RUnlock()
+	return n, nil
 }
 
 // IsRequest checks if a message is a request that expects a reply.
