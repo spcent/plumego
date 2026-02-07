@@ -72,6 +72,9 @@ var (
 
 	// ErrHistoryDisabled is returned when history operations are attempted without enabling history
 	ErrHistoryDisabled = errors.New("topic history not enabled, use WithHistory() option")
+
+	// ErrRequestReplyDisabled is returned when request-reply operations are attempted without enabling the request manager
+	ErrRequestReplyDisabled = errors.New("request-reply manager not enabled, use WithRequestReply() option")
 )
 
 // PubSubError is a structured error type for pubsub operations.
