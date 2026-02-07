@@ -271,3 +271,57 @@ func (sm *shardedMap) patternExists(pattern string) bool {
 	defer s.mu.RUnlock()
 	return len(s.patterns[pattern]) > 0
 }
+
+// ShardStat contains statistics for a single shard.
+type ShardStat struct {
+	// Index is the shard index.
+	Index int `json:"index"`
+
+	// TopicCount is the number of distinct topics in this shard.
+	TopicCount int `json:"topic_count"`
+
+	// PatternCount is the number of distinct patterns in this shard.
+	PatternCount int `json:"pattern_count"`
+
+	// SubscriberCount is the total number of subscribers (topic + pattern) in this shard.
+	SubscriberCount int `json:"subscriber_count"`
+}
+
+// shardStats returns per-shard statistics across all shards.
+func (sm *shardedMap) shardStats() []ShardStat {
+	stats := make([]ShardStat, sm.shardCount)
+	for i, s := range sm.shards {
+		s.mu.RLock()
+		subCount := 0
+		for _, subs := range s.topics {
+			subCount += len(subs)
+		}
+		for _, subs := range s.patterns {
+			subCount += len(subs)
+		}
+		stats[i] = ShardStat{
+			Index:           i,
+			TopicCount:      len(s.topics),
+			PatternCount:    len(s.patterns),
+			SubscriberCount: subCount,
+		}
+		s.mu.RUnlock()
+	}
+	return stats
+}
+
+// topicShardMapping returns a map of active topic/pattern names to their shard indices.
+func (sm *shardedMap) topicShardMapping() map[string]int {
+	mapping := make(map[string]int)
+	for _, s := range sm.shards {
+		s.mu.RLock()
+		for topic := range s.topics {
+			mapping[topic] = sm.getShardIndex(topic)
+		}
+		for pattern := range s.patterns {
+			mapping[pattern] = sm.getShardIndex(pattern)
+		}
+		s.mu.RUnlock()
+	}
+	return mapping
+}
