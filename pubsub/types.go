@@ -121,6 +121,11 @@ type SubOptions struct {
 	// If Filter returns false, the message is not delivered to this subscriber.
 	// Filter is called under the subscriber's lock, so keep it fast.
 	Filter func(msg Message) bool
+
+	// UseRingBuffer enables ring buffer for this subscriber's DropOldest policy.
+	// When enabled, uses an O(1) circular buffer instead of channel drain-and-retry.
+	// Only effective when Policy is DropOldest.
+	UseRingBuffer bool
 }
 
 // SubscriptionStats contains statistics for a subscription.

@@ -24,6 +24,10 @@ type subscriber struct {
 	pattern bool
 	done    chan struct{}
 
+	// Ring buffer for O(1) DropOldest (nil when not using ring buffer)
+	ringBuf  *ringBuffer
+	pumpDone chan struct{}
+
 	// Statistics
 	received atomic.Uint64
 	dropped  atomic.Uint64
@@ -54,6 +58,14 @@ func (s *subscriber) Done() <-chan struct{} { return s.done }
 
 // Stats returns subscription statistics.
 func (s *subscriber) Stats() SubscriptionStats {
+	if s.ringBuf != nil {
+		return SubscriptionStats{
+			Received: s.received.Load(),
+			Dropped:  s.dropped.Load(),
+			QueueLen: s.ringBuf.Len(),
+			QueueCap: s.ringBuf.Cap(),
+		}
+	}
 	return SubscriptionStats{
 		Received: s.received.Load(),
 		Dropped:  s.dropped.Load(),
@@ -70,12 +82,23 @@ func (s *subscriber) Cancel() {
 			s.mu.Unlock()
 			return
 		}
-		close(s.ch)
+		if s.ringBuf != nil {
+			// For ring buffer subscribers, close the ring buffer.
+			// The pump goroutine will close s.ch when it exits.
+			s.ringBuf.Close()
+		} else {
+			close(s.ch)
+		}
 		close(s.done)
 		if s.cancel != nil {
 			s.cancel()
 		}
 		s.mu.Unlock()
+
+		// Wait for pump goroutine to finish if using ring buffer
+		if s.pumpDone != nil {
+			<-s.pumpDone
+		}
 
 		// Call hook before removing
 		if s.ps.config.Hooks.OnUnsubscribe != nil {
@@ -84,6 +107,41 @@ func (s *subscriber) Cancel() {
 
 		s.ps.removeSubscriber(s.topic, s.id, s.pattern)
 	})
+}
+
+// pumpRingBuffer moves messages from the ring buffer to the output channel.
+// It runs as a background goroutine for ring buffer–based subscribers.
+func (s *subscriber) pumpRingBuffer() {
+	defer close(s.ch)
+	defer close(s.pumpDone)
+
+	for {
+		// Drain all available messages from ring buffer
+		for {
+			if s.closed.Load() {
+				return
+			}
+			msg, ok := s.ringBuf.Pop()
+			if !ok {
+				break
+			}
+			select {
+			case s.ch <- msg:
+			case <-s.done:
+				return
+			}
+		}
+
+		// Wait for new messages or closure
+		select {
+		case _, ok := <-s.ringBuf.Notify():
+			if !ok {
+				return // ring buffer closed
+			}
+		case <-s.done:
+			return
+		}
+	}
 }
 
 // InProcPubSub is an in-memory pubsub implementation.
@@ -371,12 +429,21 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 	sub := &subscriber{
 		id:      id,
 		topic:   topic,
-		ch:      make(chan Message, opts.BufferSize),
 		opts:    opts,
 		ps:      ps,
 		pattern: isPattern,
 		done:    make(chan struct{}),
 		cancel:  cancel,
+	}
+
+	// Use ring buffer for DropOldest when enabled
+	if opts.UseRingBuffer && opts.Policy == DropOldest {
+		sub.ringBuf = newRingBuffer(opts.BufferSize)
+		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
+		sub.pumpDone = make(chan struct{})
+		go sub.pumpRingBuffer()
+	} else {
+		sub.ch = make(chan Message, opts.BufferSize)
 	}
 
 	// Add to sharded map
@@ -735,8 +802,28 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 }
 
 // deliverDropOldest drops the oldest message if buffer is full.
-// This implementation is thread-safe and handles the race condition properly.
+// When the subscriber has a ring buffer, it uses O(1) push with automatic eviction.
+// Otherwise, it falls back to the channel drain-and-retry loop.
 func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopic string) bool {
+	// Fast path: ring buffer provides O(1) DropOldest
+	if s.ringBuf != nil {
+		dropped, wasDropped := s.ringBuf.Push(msg)
+		if wasDropped {
+			ps.metrics.incDropped(metricTopic, DropOldest)
+			s.dropped.Add(1)
+			if ps.config.Hooks.OnDrop != nil {
+				ps.config.Hooks.OnDrop(metricTopic, s.id, &dropped, DropOldest)
+			}
+		}
+		ps.metrics.incDelivered(metricTopic)
+		s.received.Add(1)
+		if ps.config.Hooks.OnDeliver != nil {
+			ps.config.Hooks.OnDeliver(metricTopic, s.id, &msg)
+		}
+		return false
+	}
+
+	// Fallback: channel-based drain-and-retry
 	for {
 		select {
 		case s.ch <- msg:
@@ -849,6 +936,11 @@ func (ps *InProcPubSub) normalizeSubOptions(opts SubOptions) SubOptions {
 	// Validate timeout
 	if opts.Policy == BlockWithTimeout && opts.BlockTimeout <= 0 {
 		opts.BlockTimeout = ps.config.DefaultBlockTimeout
+	}
+
+	// Propagate config-level ring buffer setting
+	if ps.config.EnableRingBuffer && opts.Policy == DropOldest {
+		opts.UseRingBuffer = true
 	}
 
 	return opts
