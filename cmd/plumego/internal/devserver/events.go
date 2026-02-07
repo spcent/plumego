@@ -73,4 +73,10 @@ type DashboardInfo struct {
 	DashboardURL string `json:"dashboard_url"`
 	AppURL       string `json:"app_url"`
 	Uptime       string `json:"uptime"`
+	UptimeMS     int64  `json:"uptime_ms"`
+	StartTime    string `json:"start_time"`
+	ProjectDir   string `json:"project_dir"`
+	GoVersion    string `json:"go_version"`
+	AppRunning   bool   `json:"app_running"`
+	AppPID       int    `json:"app_pid,omitempty"`
 }

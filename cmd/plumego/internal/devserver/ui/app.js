@@ -269,9 +269,15 @@ function handleBuildFail(data) {
 }
 
 function handleDashboardInfo(data) {
-    const { uptime } = data;
-    if (uptime) {
-        elements.uptime.textContent = uptime;
+    if (!data) return;
+    if (data.uptime) {
+        elements.uptime.textContent = data.uptime;
+    }
+    if (data.app_running !== undefined) {
+        const pid = data.app_pid || 0;
+        if (data.app_running) {
+            updateAppStatus('running', pid);
+        }
     }
 }
 
