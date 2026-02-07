@@ -344,7 +344,7 @@ func (cg *consumerGroup) triggerRebalance() {
 	defer cancel()
 
 	if err := cg.rebalance(ctx); err != nil {
-		// Log error but continue
+		return
 	}
 
 	cg.generation.Add(1)
@@ -352,6 +352,11 @@ func (cg *consumerGroup) triggerRebalance() {
 
 // rebalance performs the actual rebalancing
 func (cg *consumerGroup) rebalance(ctx context.Context) error {
+	// Check context before acquiring locks
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	cg.consumersMu.RLock()
 	cg.assignmentMu.Lock()
 	defer cg.consumersMu.RUnlock()
@@ -365,6 +370,11 @@ func (cg *consumerGroup) rebalance(ctx context.Context) error {
 		}
 	}
 
+	// Check context after collecting topics
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Create partitions for each topic
 	for topic := range topics {
 		partitions := make([]int, cg.config.MaxPartitions)
@@ -372,6 +382,11 @@ func (cg *consumerGroup) rebalance(ctx context.Context) error {
 			partitions[i] = i
 		}
 		cg.partitions[topic] = partitions
+	}
+
+	// Check context before performing assignment
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Perform assignment based on strategy
@@ -386,6 +401,11 @@ func (cg *consumerGroup) rebalance(ctx context.Context) error {
 		cg.assignConsistentHash()
 	default:
 		return ErrInvalidAssignment
+	}
+
+	// Check context after assignment
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Update consumer assignments
