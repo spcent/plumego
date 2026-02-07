@@ -146,6 +146,9 @@ type InProcPubSub struct {
 
 	// topic history for message retention
 	history *topicHistory
+
+	// request-reply manager for efficient RPC-style communication
+	requestMgr *requestManager
 }
 
 // New creates a new InProcPubSub instance.
@@ -191,6 +194,10 @@ func New(opts ...Option) *InProcPubSub {
 		ps.history = newTopicHistory(config.HistoryConfig)
 	}
 
+	if config.EnableRequestReply {
+		ps.requestMgr = newRequestManager(ps)
+	}
+
 	return ps
 }
 
@@ -214,7 +221,10 @@ func (ps *InProcPubSub) Close() error {
 		return nil
 	}
 
-	// Stop scheduler and TTL manager before closing subscriptions
+	// Stop request manager, scheduler and TTL manager before closing subscriptions
+	if ps.requestMgr != nil {
+		ps.requestMgr.Close()
+	}
 	if ps.scheduler != nil {
 		ps.scheduler.Close()
 	}
@@ -1103,10 +1113,11 @@ func (ps *InProcPubSub) TopicHistorySequence(topic string) (uint64, error) {
 
 // Ensure InProcPubSub implements all interfaces
 var (
-	_ PubSub          = (*InProcPubSub)(nil)
-	_ PatternPubSub   = (*InProcPubSub)(nil)
-	_ ContextPubSub   = (*InProcPubSub)(nil)
-	_ BatchPubSub     = (*InProcPubSub)(nil)
-	_ DrainablePubSub = (*InProcPubSub)(nil)
-	_ HistoryPubSub   = (*InProcPubSub)(nil)
+	_ PubSub             = (*InProcPubSub)(nil)
+	_ PatternPubSub      = (*InProcPubSub)(nil)
+	_ ContextPubSub      = (*InProcPubSub)(nil)
+	_ BatchPubSub        = (*InProcPubSub)(nil)
+	_ DrainablePubSub    = (*InProcPubSub)(nil)
+	_ HistoryPubSub      = (*InProcPubSub)(nil)
+	_ RequestReplyPubSub = (*InProcPubSub)(nil)
 )

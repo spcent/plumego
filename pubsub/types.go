@@ -282,6 +282,40 @@ type HistoryPubSub interface {
 	TopicHistorySequence(topic string) (uint64, error)
 }
 
+// RequestReplyPubSub extends PubSub with request-reply pattern support.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/pubsub"
+//
+//	ps := pubsub.New(pubsub.WithRequestReply())
+//	defer ps.Close()
+//
+//	// Responder
+//	sub, _ := ps.Subscribe("math.add", pubsub.DefaultSubOptions())
+//	go func() {
+//		for msg := range sub.C() {
+//			if pubsub.IsRequest(msg) {
+//				ps.Reply(msg, pubsub.Message{Data: "result"})
+//			}
+//		}
+//	}()
+//
+//	// Requester
+//	resp, err := ps.RequestWithTimeout("math.add", pubsub.Message{Data: "2+3"}, time.Second)
+type RequestReplyPubSub interface {
+	PubSub
+
+	// Request sends a message and waits for a response.
+	Request(ctx context.Context, topic string, msg Message) (Message, error)
+
+	// RequestWithTimeout sends a message and waits for a response with timeout.
+	RequestWithTimeout(topic string, msg Message, timeout time.Duration) (Message, error)
+
+	// Reply sends a reply to a request message.
+	Reply(reqMsg Message, respMsg Message) error
+}
+
 // DefaultSubOptions returns production-ready default options.
 //
 // Example:

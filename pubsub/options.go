@@ -49,6 +49,11 @@ type Config struct {
 	// Only used when EnableTTL is true.
 	TTLCleanupInterval time.Duration
 
+	// EnableRequestReply enables the request-reply manager for efficient RPC-style
+	// communication over pubsub. When enabled, a shared reply subscription is used
+	// instead of creating a temporary subscription per request.
+	EnableRequestReply bool
+
 	// EnableHistory enables per-topic message history retention.
 	// When enabled, published messages are stored in a circular buffer per topic,
 	// allowing late subscribers to catch up on recent messages.
@@ -182,6 +187,16 @@ func WithTTL(cleanupInterval ...time.Duration) Option {
 		if len(cleanupInterval) > 0 && cleanupInterval[0] > 0 {
 			c.TTLCleanupInterval = cleanupInterval[0]
 		}
+	}
+}
+
+// WithRequestReply enables the request-reply manager for efficient RPC-style
+// communication over pubsub. Instead of creating a temporary subscription per
+// request, a shared reply subscription is maintained, reducing overhead for
+// high-frequency request-reply workloads.
+func WithRequestReply() Option {
+	return func(c *Config) {
+		c.EnableRequestReply = true
 	}
 }
 
