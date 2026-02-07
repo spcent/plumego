@@ -12,6 +12,7 @@ import (
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/net/mq"
 	"github.com/spcent/plumego/net/mq/store"
+	webhookout "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/scheduler"
 	"github.com/spcent/plumego/security/input"
@@ -36,6 +37,7 @@ type Service struct {
 	quota    *QuotaChecker
 	monitor  *ChannelMonitor
 	metrics  *metricsWrapper
+	webhook  *WebhookNotifier
 
 	totalSent   atomic.Int64
 	totalFailed atomic.Int64
@@ -70,6 +72,10 @@ type Config struct {
 
 	// MetricsCollector for observability; nil disables metrics.
 	MetricsCollector metrics.MetricsCollector
+
+	// Webhook is the outbound webhook service for delivery notifications.
+	// When set together with Bus, a WebhookNotifier is created automatically.
+	Webhook *webhookout.Service
 
 	// Worker tuning.
 	WorkerConcurrency int
@@ -113,6 +119,11 @@ func New(cfg Config) *Service {
 
 	monitor := NewChannelMonitor(cfg.SMS, cfg.Email, cfg.Logger)
 
+	var wh *WebhookNotifier
+	if cfg.Bus != nil && cfg.Webhook != nil {
+		wh = NewWebhookNotifier(cfg.Bus, cfg.Webhook, cfg.Logger)
+	}
+
 	svc := &Service{
 		queue:     queue,
 		worker:    worker,
@@ -127,6 +138,7 @@ func New(cfg Config) *Service {
 		quota:     cfg.Quota,
 		monitor:   monitor,
 		metrics:   newMetrics(cfg.MetricsCollector),
+		webhook:   wh,
 	}
 
 	if cfg.SMS != nil {
@@ -148,18 +160,27 @@ func (s *Service) Receipts() ReceiptStore { return s.receipts }
 // Monitor returns the channel health monitor.
 func (s *Service) Monitor() *ChannelMonitor { return s.monitor }
 
-// Start launches the worker pool and registers scheduled jobs.
+// Start launches the worker pool, registers scheduled jobs,
+// and starts the webhook notifier (if configured).
 func (s *Service) Start(ctx context.Context) error {
 	s.worker.Start(ctx)
 	s.registerScheduledJobs()
 	if s.monitor != nil {
 		s.monitor.RegisterJobs(s.scheduler)
 	}
+	if s.webhook != nil {
+		if err := s.webhook.Start(ctx); err != nil && s.logger != nil {
+			s.logger.Warn("webhook notifier start failed", log.Fields{"error": err.Error()})
+		}
+	}
 	return nil
 }
 
-// Stop drains the worker pool.
+// Stop drains the worker pool and stops the webhook notifier.
 func (s *Service) Stop(ctx context.Context) error {
+	if s.webhook != nil {
+		s.webhook.Stop()
+	}
 	return s.worker.Stop(ctx)
 }
 
@@ -307,10 +328,19 @@ func (s *Service) renderBody(req SendRequest) (string, error) {
 	return "", ErrMissingBody
 }
 
-func (s *Service) handleSMS(ctx context.Context, task mq.Task) error {
+// deliverTask is the unified handler for both SMS and email task processing.
+// It unmarshals the request, renders the body, calls the channel-specific
+// sendFn, and records metrics, receipts, and results.
+func (s *Service) deliverTask(
+	ctx context.Context,
+	task mq.Task,
+	channel Channel,
+	providerName string,
+	sendFn func(ctx context.Context, req SendRequest, body string) (providerID string, err error),
+) error {
 	var req SendRequest
 	if err := json.Unmarshal(task.Payload, &req); err != nil {
-		return fmt.Errorf("messaging: unmarshal sms task: %w", err)
+		return fmt.Errorf("messaging: unmarshal %s task: %w", channel, err)
 	}
 
 	body, err := s.renderBody(req)
@@ -319,76 +349,69 @@ func (s *Service) handleSMS(ctx context.Context, task mq.Task) error {
 	}
 
 	start := time.Now()
-	result, err := s.sms.Send(ctx, SMSMessage{
-		To:   req.To,
-		Body: body,
-	})
+	providerID, err := sendFn(ctx, req, body)
 	elapsed := time.Since(start)
 
 	if err != nil {
 		s.totalFailed.Add(1)
-		s.monitor.RecordFailure(ChannelSMS, err)
-		s.metrics.ObserveSend(ctx, ChannelSMS, s.sms.Name(), elapsed, err)
-		s.updateReceipt(req.ID, "failed", "", err.Error(), task.Attempts)
+		s.monitor.RecordFailure(channel, err)
+		s.metrics.ObserveSend(ctx, channel, providerName, elapsed, err)
+		s.updateReceipt(req.ID, "failed", "", providerName, err.Error(), task.Attempts)
 		return fmt.Errorf("%w: %v", ErrProviderFailure, err)
 	}
 
 	s.totalSent.Add(1)
-	s.monitor.RecordSuccess(ChannelSMS, elapsed)
-	s.metrics.ObserveSend(ctx, ChannelSMS, s.sms.Name(), elapsed, nil)
-	s.updateReceipt(req.ID, "sent", result.ProviderID, "", task.Attempts)
+	s.monitor.RecordSuccess(channel, elapsed)
+	s.metrics.ObserveSend(ctx, channel, providerName, elapsed, nil)
+	s.updateReceipt(req.ID, "sent", providerID, providerName, "", task.Attempts)
 	s.publishResult(SendResult{
 		RequestID:  req.ID,
-		Channel:    ChannelSMS,
+		Channel:    channel,
 		Status:     "sent",
-		ProviderID: result.ProviderID,
+		ProviderID: providerID,
 		SentAt:     time.Now(),
 		Attempts:   task.Attempts,
 	})
 	return nil
 }
 
+func (s *Service) handleSMS(ctx context.Context, task mq.Task) error {
+	return s.deliverTask(ctx, task, ChannelSMS, s.sms.Name(),
+		func(ctx context.Context, req SendRequest, body string) (string, error) {
+			result, err := s.sms.Send(ctx, SMSMessage{To: req.To, Body: body})
+			if err != nil {
+				return "", err
+			}
+			return result.ProviderID, nil
+		})
+}
+
 func (s *Service) handleEmail(ctx context.Context, task mq.Task) error {
-	var req SendRequest
-	if err := json.Unmarshal(task.Payload, &req); err != nil {
-		return fmt.Errorf("messaging: unmarshal email task: %w", err)
+	return s.deliverTask(ctx, task, ChannelEmail, s.email.Name(),
+		func(ctx context.Context, req SendRequest, body string) (string, error) {
+			result, err := s.email.Send(ctx, EmailMessage{
+				To: req.To, Subject: req.Subject, Body: body, HTML: req.HTML,
+			})
+			if err != nil {
+				return "", err
+			}
+			return result.MessageID, nil
+		})
+}
+
+// providerNameFor returns the provider name for a channel.
+func (s *Service) providerNameFor(ch Channel) string {
+	switch ch {
+	case ChannelSMS:
+		if s.sms != nil {
+			return s.sms.Name()
+		}
+	case ChannelEmail:
+		if s.email != nil {
+			return s.email.Name()
+		}
 	}
-
-	body, err := s.renderBody(req)
-	if err != nil {
-		return err
-	}
-
-	start := time.Now()
-	result, err := s.email.Send(ctx, EmailMessage{
-		To:      req.To,
-		Subject: req.Subject,
-		Body:    body,
-		HTML:    req.HTML,
-	})
-	elapsed := time.Since(start)
-
-	if err != nil {
-		s.totalFailed.Add(1)
-		s.monitor.RecordFailure(ChannelEmail, err)
-		s.metrics.ObserveSend(ctx, ChannelEmail, s.email.Name(), elapsed, err)
-		s.updateReceipt(req.ID, "failed", "", err.Error(), task.Attempts)
-		return fmt.Errorf("%w: %v", ErrProviderFailure, err)
-	}
-
-	s.totalSent.Add(1)
-	s.monitor.RecordSuccess(ChannelEmail, elapsed)
-	s.metrics.ObserveSend(ctx, ChannelEmail, s.email.Name(), elapsed, nil)
-	s.updateReceipt(req.ID, "sent", result.MessageID, "", task.Attempts)
-	s.publishResult(SendResult{
-		RequestID:  req.ID,
-		Channel:    ChannelEmail,
-		Status:     "sent",
-		ProviderID: result.MessageID,
-		SentAt:     time.Now(),
-		Attempts:   task.Attempts,
-	})
-	return nil
+	return ""
 }
 
 func (s *Service) saveReceipt(req SendRequest, status, providerID, errMsg string) {
@@ -401,13 +424,14 @@ func (s *Service) saveReceipt(req SendRequest, status, providerID, errMsg string
 		To:         req.To,
 		Status:     status,
 		ProviderID: providerID,
+		Provider:   s.providerNameFor(req.Channel),
 		Error:      errMsg,
 		TenantID:   req.TenantID,
 		QueuedAt:   time.Now(),
 	})
 }
 
-func (s *Service) updateReceipt(id, status, providerID, errMsg string, attempts int) {
+func (s *Service) updateReceipt(id, status, providerID, provider, errMsg string, attempts int) {
 	if s.receipts == nil {
 		return
 	}
@@ -417,6 +441,7 @@ func (s *Service) updateReceipt(id, status, providerID, errMsg string, attempts 
 	}
 	r.Status = status
 	r.Attempts = attempts
+	r.Provider = provider
 	if providerID != "" {
 		r.ProviderID = providerID
 	}

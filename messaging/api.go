@@ -3,6 +3,7 @@ package messaging
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/spcent/plumego/contract"
 )
@@ -66,10 +67,21 @@ func (s *Service) HandleGetReceipt(ctx *contract.Ctx) {
 
 // HandleListReceipts is the HTTP handler for GET /messages/receipts.
 func (s *Service) HandleListReceipts(ctx *contract.Ctx) {
+	q := ctx.R.URL.Query()
 	filter := ReceiptFilter{
-		Channel:  Channel(ctx.R.URL.Query().Get("channel")),
-		Status:   ctx.R.URL.Query().Get("status"),
-		TenantID: ctx.R.URL.Query().Get("tenant_id"),
+		Channel:  Channel(q.Get("channel")),
+		Status:   q.Get("status"),
+		TenantID: q.Get("tenant_id"),
+	}
+	if v := q.Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			filter.Limit = n
+		}
+	}
+	if v := q.Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			filter.Offset = n
+		}
 	}
 	receipts := s.receipts.List(filter)
 	ctx.JSON(http.StatusOK, map[string]any{

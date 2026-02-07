@@ -9,6 +9,19 @@ import (
 	phttp "github.com/spcent/plumego/net/http"
 )
 
+// newHTTPProviderClient creates a phttp.Client pre-configured with
+// SSRF protection, retry policy, and timeout — shared by all HTTP providers.
+func newHTTPProviderClient(timeout time.Duration, maxRetries int) *phttp.Client {
+	return phttp.New(
+		phttp.WithTimeout(timeout),
+		phttp.WithRetryCount(maxRetries),
+		phttp.WithDefaultSSRFProtection(),
+		phttp.WithRetryPolicy(phttp.StatusCodeRetryPolicy{
+			Codes: []int{500, 502, 503, 504, 429},
+		}),
+	)
+}
+
 // HTTPSMSProvider implements SMSProvider using an HTTP API gateway.
 type HTTPSMSProvider struct {
 	client  *phttp.Client
@@ -34,16 +47,8 @@ func NewHTTPSMSProvider(cfg HTTPSMSProviderConfig) *HTTPSMSProvider {
 	if maxRetries <= 0 {
 		maxRetries = 2
 	}
-	client := phttp.New(
-		phttp.WithTimeout(timeout),
-		phttp.WithRetryCount(maxRetries),
-		phttp.WithDefaultSSRFProtection(),
-		phttp.WithRetryPolicy(phttp.StatusCodeRetryPolicy{
-			Codes: []int{500, 502, 503, 504, 429},
-		}),
-	)
 	return &HTTPSMSProvider{
-		client:  client,
+		client:  newHTTPProviderClient(timeout, maxRetries),
 		baseURL: cfg.BaseURL,
 		apiKey:  cfg.APIKey,
 	}
@@ -93,16 +98,8 @@ func NewHTTPEmailProvider(cfg HTTPEmailProviderConfig) *HTTPEmailProvider {
 	if maxRetries <= 0 {
 		maxRetries = 2
 	}
-	client := phttp.New(
-		phttp.WithTimeout(timeout),
-		phttp.WithRetryCount(maxRetries),
-		phttp.WithDefaultSSRFProtection(),
-		phttp.WithRetryPolicy(phttp.StatusCodeRetryPolicy{
-			Codes: []int{500, 502, 503, 504, 429},
-		}),
-	)
 	return &HTTPEmailProvider{
-		client:  client,
+		client:  newHTTPProviderClient(timeout, maxRetries),
 		baseURL: cfg.BaseURL,
 		apiKey:  cfg.APIKey,
 	}

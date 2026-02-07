@@ -68,6 +68,16 @@ func (l *RateLimiter) refill() {
 	l.last = l.last.Add(time.Duration(periods) * l.interval)
 }
 
+// rateLimitedSend waits for a token then delegates to the inner send function.
+// Used by both RateLimitedSMSProvider and RateLimitedEmailProvider to avoid
+// duplicating the wait-then-send pattern.
+func rateLimitedSend[M any, R any](ctx context.Context, limiter *RateLimiter, inner func(context.Context, M) (*R, error), msg M) (*R, error) {
+	if err := limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	return inner(ctx, msg)
+}
+
 // RateLimitedSMSProvider wraps an SMSProvider with rate limiting.
 type RateLimitedSMSProvider struct {
 	inner   SMSProvider
@@ -85,10 +95,7 @@ func NewRateLimitedSMSProvider(inner SMSProvider, maxPerSecond int) *RateLimited
 func (p *RateLimitedSMSProvider) Name() string { return p.inner.Name() }
 
 func (p *RateLimitedSMSProvider) Send(ctx context.Context, msg SMSMessage) (*SMSResult, error) {
-	if err := p.limiter.Wait(ctx); err != nil {
-		return nil, err
-	}
-	return p.inner.Send(ctx, msg)
+	return rateLimitedSend(ctx, p.limiter, p.inner.Send, msg)
 }
 
 // RateLimitedEmailProvider wraps an EmailProvider with rate limiting.
@@ -108,8 +115,5 @@ func NewRateLimitedEmailProvider(inner EmailProvider, maxPerSecond int) *RateLim
 func (p *RateLimitedEmailProvider) Name() string { return p.inner.Name() }
 
 func (p *RateLimitedEmailProvider) Send(ctx context.Context, msg EmailMessage) (*EmailResult, error) {
-	if err := p.limiter.Wait(ctx); err != nil {
-		return nil, err
-	}
-	return p.inner.Send(ctx, msg)
+	return rateLimitedSend(ctx, p.limiter, p.inner.Send, msg)
 }

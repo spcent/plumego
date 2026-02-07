@@ -5,6 +5,28 @@ import (
 	"fmt"
 )
 
+// failoverSend implements the core failover loop for any provider type.
+// It tries each sender in order; the first success wins. If all fail,
+// it returns ErrProviderFailure wrapping the last error.
+func failoverSend[M any, R any](ctx context.Context, senders []func(context.Context, M) (*R, error), msg M) (*R, error) {
+	var lastErr error
+	for _, send := range senders {
+		result, err := send(ctx, msg)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		// Context cancelled means caller gave up; stop trying.
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("%w: all providers failed: %v", ErrProviderFailure, lastErr)
+	}
+	return nil, fmt.Errorf("%w: no providers configured", ErrProviderFailure)
+}
+
 // FailoverSMSProvider tries providers in order until one succeeds.
 // This provides automatic failover when the primary gateway is down.
 type FailoverSMSProvider struct {
@@ -25,22 +47,11 @@ func (p *FailoverSMSProvider) Name() string {
 }
 
 func (p *FailoverSMSProvider) Send(ctx context.Context, msg SMSMessage) (*SMSResult, error) {
-	var lastErr error
-	for _, provider := range p.providers {
-		result, err := provider.Send(ctx, msg)
-		if err == nil {
-			return result, nil
-		}
-		lastErr = err
-		// Context cancelled means caller gave up; stop trying.
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
+	senders := make([]func(context.Context, SMSMessage) (*SMSResult, error), len(p.providers))
+	for i, prov := range p.providers {
+		senders[i] = prov.Send
 	}
-	if lastErr != nil {
-		return nil, fmt.Errorf("%w: all providers failed: %v", ErrProviderFailure, lastErr)
-	}
-	return nil, fmt.Errorf("%w: no providers configured", ErrProviderFailure)
+	return failoverSend(ctx, senders, msg)
 }
 
 // FailoverEmailProvider tries providers in order until one succeeds.
@@ -61,19 +72,9 @@ func (p *FailoverEmailProvider) Name() string {
 }
 
 func (p *FailoverEmailProvider) Send(ctx context.Context, msg EmailMessage) (*EmailResult, error) {
-	var lastErr error
-	for _, provider := range p.providers {
-		result, err := provider.Send(ctx, msg)
-		if err == nil {
-			return result, nil
-		}
-		lastErr = err
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
+	senders := make([]func(context.Context, EmailMessage) (*EmailResult, error), len(p.providers))
+	for i, prov := range p.providers {
+		senders[i] = prov.Send
 	}
-	if lastErr != nil {
-		return nil, fmt.Errorf("%w: all providers failed: %v", ErrProviderFailure, lastErr)
-	}
-	return nil, fmt.Errorf("%w: no providers configured", ErrProviderFailure)
+	return failoverSend(ctx, senders, msg)
 }
