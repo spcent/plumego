@@ -49,6 +49,12 @@ type Config struct {
 	// Only used when EnableTTL is true.
 	TTLCleanupInterval time.Duration
 
+	// EnableRingBuffer enables ring buffer for all DropOldest policy subscribers.
+	// When enabled, DropOldest subscribers use an O(1) circular buffer instead
+	// of the channel drain-and-retry loop. Individual subscribers can also opt in
+	// via SubOptions.UseRingBuffer.
+	EnableRingBuffer bool
+
 	// EnableRequestReply enables the request-reply manager for efficient RPC-style
 	// communication over pubsub. When enabled, a shared reply subscription is used
 	// instead of creating a temporary subscription per request.
@@ -188,6 +194,16 @@ func WithTTL(cleanupInterval ...time.Duration) Option {
 			c.TTLCleanupInterval = cleanupInterval[0]
 		}
 	}
+}
+
+// WithRingBuffer enables ring buffer for all DropOldest policy subscribers.
+// When enabled, DropOldest subscribers use an O(1) circular buffer with a pump
+// goroutine instead of the channel drain-and-retry loop. This provides better
+// performance under high contention and eliminates potential spin-loop issues.
+func WithRingBuffer() Option {
+	return func(c *Config) {
+    c.EnableRingBuffer = true
+  }
 }
 
 // WithRequestReply enables the request-reply manager for efficient RPC-style
