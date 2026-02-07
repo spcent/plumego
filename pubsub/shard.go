@@ -8,9 +8,10 @@ import (
 // shard represents a partition of topics/patterns.
 // Each shard has its own lock to reduce contention.
 type shard struct {
-	mu       sync.RWMutex
-	topics   map[string]map[uint64]*subscriber
-	patterns map[string]map[uint64]*subscriber
+	mu           sync.RWMutex
+	topics       map[string]map[uint64]*subscriber
+	patterns     map[string]map[uint64]*subscriber
+	mqttPatterns *mqttPatternSubscribers
 }
 
 // shardedMap manages multiple shards for reduced lock contention.
@@ -33,8 +34,9 @@ func newShardedMap(shardCount int) *shardedMap {
 	shards := make([]*shard, shardCount)
 	for i := 0; i < shardCount; i++ {
 		shards[i] = &shard{
-			topics:   make(map[string]map[uint64]*subscriber),
-			patterns: make(map[string]map[uint64]*subscriber),
+			topics:       make(map[string]map[uint64]*subscriber),
+			patterns:     make(map[string]map[uint64]*subscriber),
+			mqttPatterns: newMQTTPatternSubscribers(),
 		}
 	}
 
@@ -137,6 +139,75 @@ func (sm *shardedMap) removePattern(pattern string, id uint64) bool {
 		return true
 	}
 	return false
+}
+
+// addMQTTPattern adds a subscriber for an MQTT pattern in the appropriate shard.
+func (sm *shardedMap) addMQTTPattern(pattern string, id uint64, sub *subscriber) {
+	s := sm.getShard(pattern)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.mqttPatterns.Add(pattern, id, sub)
+}
+
+// removeMQTTPattern removes a subscriber from an MQTT pattern.
+func (sm *shardedMap) removeMQTTPattern(pattern string, id uint64) bool {
+	s := sm.getShard(pattern)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mqttPatterns.Remove(pattern, id)
+}
+
+// getMQTTPatternMatches returns all MQTT pattern subscribers that match a given topic.
+// This scans all shards since MQTT patterns can be in any shard.
+func (sm *shardedMap) getMQTTPatternMatches(topic string) []*subscriber {
+	var result []*subscriber
+	for _, s := range sm.shards {
+		s.mu.RLock()
+		matched := s.mqttPatterns.Match(topic)
+		s.mu.RUnlock()
+		result = append(result, matched...)
+	}
+	return result
+}
+
+// getMQTTPatternSubscriberCount returns the number of subscribers for an MQTT pattern.
+func (sm *shardedMap) getMQTTPatternSubscriberCount(pattern string) int {
+	s := sm.getShard(pattern)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.mqttPatterns.Count(pattern)
+}
+
+// mqttPatternExists checks if an MQTT pattern has any subscribers.
+func (sm *shardedMap) mqttPatternExists(pattern string) bool {
+	s := sm.getShard(pattern)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.mqttPatterns.Count(pattern) > 0
+}
+
+// hasAnyMQTTPatterns checks if any MQTT pattern subscriptions exist across all shards.
+func (sm *shardedMap) hasAnyMQTTPatterns() bool {
+	for _, s := range sm.shards {
+		s.mu.RLock()
+		n := len(s.mqttPatterns.patterns)
+		s.mu.RUnlock()
+		if n > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// listMQTTPatterns returns all MQTT patterns with subscribers.
+func (sm *shardedMap) listMQTTPatterns() []string {
+	var patterns []string
+	for _, s := range sm.shards {
+		s.mu.RLock()
+		patterns = append(patterns, s.mqttPatterns.List()...)
+		s.mu.RUnlock()
+	}
+	return patterns
 }
 
 // getTopicSubscribers returns a snapshot of subscribers for a topic.
@@ -247,9 +318,11 @@ func (sm *shardedMap) collectAllSubscribers() []*subscriber {
 				all = append(all, sub)
 			}
 		}
+		all = append(all, s.mqttPatterns.All()...)
 		// Clear maps
 		s.topics = make(map[string]map[uint64]*subscriber)
 		s.patterns = make(map[string]map[uint64]*subscriber)
+		s.mqttPatterns.Clear()
 		s.mu.Unlock()
 	}
 
@@ -294,10 +367,10 @@ type ShardStat struct {
 	// TopicCount is the number of distinct topics in this shard.
 	TopicCount int `json:"topic_count"`
 
-	// PatternCount is the number of distinct patterns in this shard.
+	// PatternCount is the number of distinct patterns (glob + MQTT) in this shard.
 	PatternCount int `json:"pattern_count"`
 
-	// SubscriberCount is the total number of subscribers (topic + pattern) in this shard.
+	// SubscriberCount is the total number of subscribers (topic + pattern + MQTT) in this shard.
 	SubscriberCount int `json:"subscriber_count"`
 }
 
@@ -313,10 +386,13 @@ func (sm *shardedMap) shardStats() []ShardStat {
 		for _, subs := range s.patterns {
 			subCount += len(subs)
 		}
+		mqttPatternCount := len(s.mqttPatterns.patterns)
+		mqttSubCount := len(s.mqttPatterns.All())
+		subCount += mqttSubCount
 		stats[i] = ShardStat{
 			Index:           i,
 			TopicCount:      len(s.topics),
-			PatternCount:    len(s.patterns),
+			PatternCount:    len(s.patterns) + mqttPatternCount,
 			SubscriberCount: subCount,
 		}
 		s.mu.RUnlock()
@@ -334,6 +410,9 @@ func (sm *shardedMap) topicShardMapping() map[string]int {
 		}
 		for pattern := range s.patterns {
 			mapping[pattern] = sm.getShardIndex(pattern)
+		}
+		for _, mqttPattern := range s.mqttPatterns.List() {
+			mapping[mqttPattern] = sm.getShardIndex(mqttPattern)
 		}
 		s.mu.RUnlock()
 	}
