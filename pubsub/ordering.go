@@ -11,10 +11,10 @@ import (
 
 // Ordering errors
 var (
-	ErrOrderingClosed     = errors.New("ordering system is closed")
-	ErrInvalidOrderLevel  = errors.New("invalid order level")
-	ErrSequenceGap        = errors.New("sequence number gap detected")
-	ErrOutOfOrderMessage  = errors.New("out of order message")
+	ErrOrderingClosed    = errors.New("ordering system is closed")
+	ErrInvalidOrderLevel = errors.New("invalid order level")
+	ErrSequenceGap       = errors.New("sequence number gap detected")
+	ErrOutOfOrderMessage = errors.New("out of order message")
 )
 
 // OrderLevel defines the level of ordering guarantee
@@ -100,6 +100,9 @@ type OrderedPubSub struct {
 	sequenceErrors   atomic.Uint64
 }
 
+// globalQueueIdentifier is the identifier used for the global ordering queue.
+const globalQueueIdentifier = "__global__"
+
 // orderedQueue represents a FIFO queue for ordered messages
 type orderedQueue struct {
 	ch        chan orderedMessage
@@ -109,6 +112,11 @@ type orderedQueue struct {
 	batchSize int
 	timer     *time.Timer
 	closed    atomic.Bool
+
+	// Per-queue statistics
+	processed      atomic.Uint64
+	batchFlushes   atomic.Uint64
+	sequenceErrors atomic.Uint64
 }
 
 // orderedMessage wraps a message with ordering metadata
@@ -161,7 +169,7 @@ func NewOrdered(config OrderingConfig, opts ...Option) *OrderedPubSub {
 	// Create global queue if needed
 	if config.DefaultLevel == OrderGlobal {
 		ops.globalQueue = ops.createQueue(config.MaxBatchSize)
-		ops.startQueueWorker(ops.globalQueue, "")
+		ops.startQueueWorker(ops.globalQueue, globalQueueIdentifier)
 	}
 
 	return ops
@@ -211,7 +219,7 @@ func (ops *OrderedPubSub) PublishWithKey(topic, key string, msg Message, level O
 	case OrderGlobal:
 		if ops.globalQueue == nil {
 			ops.globalQueue = ops.createQueue(ops.config.MaxBatchSize)
-			ops.startQueueWorker(ops.globalQueue, "")
+			ops.startQueueWorker(ops.globalQueue, globalQueueIdentifier)
 		}
 		queue = ops.globalQueue
 
@@ -308,7 +316,13 @@ func (ops *OrderedPubSub) startQueueWorker(queue *orderedQueue, identifier strin
 	}()
 }
 
-// processQueue processes messages from an ordered queue
+// processQueue processes messages from an ordered queue.
+// The identifier parameter represents the ordering key for this queue:
+//   - For OrderPerTopic: the topic name
+//   - For OrderPerKey: the partition key
+//   - For OrderGlobal: globalQueueIdentifier
+//
+// It is used for sequence verification and per-queue statistics tracking.
 func (ops *OrderedPubSub) processQueue(queue *orderedQueue, identifier string) {
 	ticker := time.NewTicker(ops.config.BatchTimeout)
 	defer ticker.Stop()
@@ -318,7 +332,7 @@ func (ops *OrderedPubSub) processQueue(queue *orderedQueue, identifier string) {
 		case om, ok := <-queue.ch:
 			if !ok {
 				// Queue closed, flush remaining
-				ops.flushBatch(queue)
+				ops.flushBatch(queue, identifier)
 				return
 			}
 
@@ -329,22 +343,26 @@ func (ops *OrderedPubSub) processQueue(queue *orderedQueue, identifier string) {
 			queue.mu.Unlock()
 
 			if shouldFlush {
-				ops.flushBatch(queue)
+				ops.flushBatch(queue, identifier)
 			}
 
 		case <-ticker.C:
 			// Periodic flush
-			ops.flushBatch(queue)
+			ops.flushBatch(queue, identifier)
 
 		case <-ops.ctx.Done():
-			ops.flushBatch(queue)
+			ops.flushBatch(queue, identifier)
 			return
 		}
 	}
 }
 
-// flushBatch flushes a batch of messages
-func (ops *OrderedPubSub) flushBatch(queue *orderedQueue) {
+// flushBatch flushes a batch of messages for the queue identified by identifier.
+// The identifier is used as the sequence tracking key, ensuring that:
+//   - Per-topic queues track sequences by topic name
+//   - Per-key queues track sequences by partition key
+//   - Global queue uses a single shared sequence space
+func (ops *OrderedPubSub) flushBatch(queue *orderedQueue, identifier string) {
 	queue.mu.Lock()
 	if len(queue.batch) == 0 {
 		queue.mu.Unlock()
@@ -355,13 +373,15 @@ func (ops *OrderedPubSub) flushBatch(queue *orderedQueue) {
 	queue.batch = make([]orderedMessage, 0, queue.batchSize)
 	queue.mu.Unlock()
 
+	queue.batchFlushes.Add(1)
+
 	// Publish in order
 	for _, om := range batch {
 		// Verify sequence if enabled
 		if ops.config.SequenceCheckEnabled {
-			if err := ops.verifySequence(om); err != nil {
+			if err := ops.verifySequence(om, identifier); err != nil {
 				ops.sequenceErrors.Add(1)
-				// Log but continue
+				queue.sequenceErrors.Add(1)
 				continue
 			}
 		}
@@ -369,23 +389,23 @@ func (ops *OrderedPubSub) flushBatch(queue *orderedQueue) {
 		// Publish
 		_ = ops.InProcPubSub.Publish(om.topic, om.message)
 		ops.orderedPublishes.Add(1)
+		queue.processed.Add(1)
 	}
 }
 
-// verifySequence verifies message sequence
-func (ops *OrderedPubSub) verifySequence(om orderedMessage) error {
-	key := om.topic
-	if om.key != "" {
-		key = om.key
-	}
-
+// verifySequence verifies message sequence using the queue identifier as the
+// sequence tracking key. This ensures correct behavior across all ordering levels:
+//   - OrderPerTopic: identifier is the topic, so sequences are tracked per-topic
+//   - OrderPerKey: identifier is the partition key, so sequences are tracked per-key
+//   - OrderGlobal: identifier is globalQueueIdentifier, so all messages share one sequence space
+func (ops *OrderedPubSub) verifySequence(om orderedMessage, identifier string) error {
 	ops.sequencesMu.Lock()
-	tracker, exists := ops.sequences[key]
+	tracker, exists := ops.sequences[identifier]
 	if !exists {
 		tracker = &sequenceTracker{
 			missing: make(map[uint64]bool),
 		}
-		ops.sequences[key] = tracker
+		ops.sequences[identifier] = tracker
 	}
 	ops.sequencesMu.Unlock()
 
@@ -455,15 +475,42 @@ func (ops *OrderedPubSub) Close() error {
 	return ops.InProcPubSub.Close()
 }
 
-// OrderingStats returns ordering statistics
+// OrderingStats returns ordering statistics including per-queue metrics.
 func (ops *OrderedPubSub) OrderingStats() OrderingStats {
+	queueStats := make(map[string]QueueStat)
+
 	ops.topicQueuesMu.RLock()
 	topicQueues := len(ops.topicQueues)
+	for id, q := range ops.topicQueues {
+		queueStats[id] = QueueStat{
+			Processed:      q.processed.Load(),
+			BatchFlushes:   q.batchFlushes.Load(),
+			SequenceErrors: q.sequenceErrors.Load(),
+			Pending:        len(q.ch),
+		}
+	}
 	ops.topicQueuesMu.RUnlock()
 
 	ops.keyQueuesMu.RLock()
 	keyQueues := len(ops.keyQueues)
+	for id, q := range ops.keyQueues {
+		queueStats[id] = QueueStat{
+			Processed:      q.processed.Load(),
+			BatchFlushes:   q.batchFlushes.Load(),
+			SequenceErrors: q.sequenceErrors.Load(),
+			Pending:        len(q.ch),
+		}
+	}
 	ops.keyQueuesMu.RUnlock()
+
+	if ops.globalQueue != nil {
+		queueStats[globalQueueIdentifier] = QueueStat{
+			Processed:      ops.globalQueue.processed.Load(),
+			BatchFlushes:   ops.globalQueue.batchFlushes.Load(),
+			SequenceErrors: ops.globalQueue.sequenceErrors.Load(),
+			Pending:        len(ops.globalQueue.ch),
+		}
+	}
 
 	return OrderingStats{
 		OrderedPublishes: ops.orderedPublishes.Load(),
@@ -471,6 +518,7 @@ func (ops *OrderedPubSub) OrderingStats() OrderingStats {
 		SequenceErrors:   ops.sequenceErrors.Load(),
 		TopicQueues:      topicQueues,
 		KeyQueues:        keyQueues,
+		QueueStats:       queueStats,
 	}
 }
 
@@ -481,6 +529,27 @@ type OrderingStats struct {
 	SequenceErrors   uint64
 	TopicQueues      int
 	KeyQueues        int
+
+	// QueueStats contains per-queue statistics keyed by identifier.
+	// For topic queues the key is the topic name, for key queues
+	// it is the partition key, and for the global queue it is
+	// globalQueueIdentifier ("__global__").
+	QueueStats map[string]QueueStat
+}
+
+// QueueStat holds statistics for a single ordered queue.
+type QueueStat struct {
+	// Processed is the number of messages successfully published from this queue.
+	Processed uint64
+
+	// BatchFlushes is the number of batch flush operations performed.
+	BatchFlushes uint64
+
+	// SequenceErrors is the number of sequence verification failures.
+	SequenceErrors uint64
+
+	// Pending is the current number of messages waiting in the queue channel.
+	Pending int
 }
 
 // OrderedSubscription wraps a subscription with sequence verification

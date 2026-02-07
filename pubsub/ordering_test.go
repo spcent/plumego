@@ -386,6 +386,231 @@ func TestOrderedPubSub_OrderedSubscription(t *testing.T) {
 	}
 }
 
+func TestOrderedPubSub_QueueStatsPerTopic(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.MaxBatchSize = 5
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub, _ := ops.Subscribe("stats.topic", SubOptions{BufferSize: 20})
+	defer sub.Cancel()
+
+	// Publish messages
+	for i := 0; i < 10; i++ {
+		msg := Message{Data: i}
+		_ = ops.PublishOrdered("stats.topic", msg, OrderPerTopic)
+	}
+
+	waitUntil(200*time.Millisecond, func() bool {
+		return ops.OrderingStats().OrderedPublishes >= 10
+	})
+
+	stats := ops.OrderingStats()
+
+	// Should have per-queue stats for "stats.topic"
+	if stats.QueueStats == nil {
+		t.Fatal("QueueStats should not be nil")
+	}
+
+	qs, exists := stats.QueueStats["stats.topic"]
+	if !exists {
+		t.Fatal("Expected QueueStats entry for 'stats.topic'")
+	}
+
+	if qs.Processed != 10 {
+		t.Errorf("Expected 10 processed, got %d", qs.Processed)
+	}
+
+	if qs.BatchFlushes == 0 {
+		t.Error("Expected at least one batch flush")
+	}
+}
+
+func TestOrderedPubSub_QueueStatsPerKey(t *testing.T) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub, _ := ops.Subscribe("key.topic", SubOptions{BufferSize: 20})
+	defer sub.Cancel()
+
+	keys := []string{"keyA", "keyB"}
+	for _, key := range keys {
+		for i := 0; i < 5; i++ {
+			msg := Message{Data: map[string]any{"key": key, "seq": i}}
+			_ = ops.PublishWithKey("key.topic", key, msg, OrderPerKey)
+		}
+	}
+
+	waitUntil(200*time.Millisecond, func() bool {
+		return ops.OrderingStats().OrderedPublishes >= 10
+	})
+
+	stats := ops.OrderingStats()
+	if stats.KeyQueues != 2 {
+		t.Errorf("Expected 2 key queues, got %d", stats.KeyQueues)
+	}
+
+	for _, key := range keys {
+		qs, exists := stats.QueueStats[key]
+		if !exists {
+			t.Errorf("Expected QueueStats entry for key %q", key)
+			continue
+		}
+		if qs.Processed != 5 {
+			t.Errorf("Key %q: expected 5 processed, got %d", key, qs.Processed)
+		}
+	}
+}
+
+func TestOrderedPubSub_QueueStatsGlobal(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.DefaultLevel = OrderGlobal
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub1, _ := ops.Subscribe("g.topic1", SubOptions{BufferSize: 10})
+	defer sub1.Cancel()
+	sub2, _ := ops.Subscribe("g.topic2", SubOptions{BufferSize: 10})
+	defer sub2.Cancel()
+
+	// Publish to multiple topics through the global queue
+	for i := 0; i < 3; i++ {
+		_ = ops.PublishOrdered("g.topic1", Message{Data: i}, OrderGlobal)
+		_ = ops.PublishOrdered("g.topic2", Message{Data: i}, OrderGlobal)
+	}
+
+	waitUntil(200*time.Millisecond, func() bool {
+		return ops.OrderingStats().OrderedPublishes >= 6
+	})
+
+	stats := ops.OrderingStats()
+
+	qs, exists := stats.QueueStats[globalQueueIdentifier]
+	if !exists {
+		t.Fatal("Expected QueueStats entry for global queue")
+	}
+
+	if qs.Processed != 6 {
+		t.Errorf("Expected 6 processed in global queue, got %d", qs.Processed)
+	}
+
+	if qs.BatchFlushes == 0 {
+		t.Error("Expected at least one batch flush for global queue")
+	}
+}
+
+func TestOrderedPubSub_GlobalSequenceCheck(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.DefaultLevel = OrderGlobal
+	config.SequenceCheckEnabled = true
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub1, _ := ops.Subscribe("seq.topic1", SubOptions{BufferSize: 10})
+	defer sub1.Cancel()
+	sub2, _ := ops.Subscribe("seq.topic2", SubOptions{BufferSize: 10})
+	defer sub2.Cancel()
+
+	// Publish to different topics through the global queue
+	for i := 0; i < 5; i++ {
+		topic := "seq.topic1"
+		if i%2 == 0 {
+			topic = "seq.topic2"
+		}
+		_ = ops.PublishOrdered(topic, Message{Data: i}, OrderGlobal)
+	}
+
+	waitUntil(200*time.Millisecond, func() bool {
+		return ops.OrderingStats().OrderedPublishes >= 5
+	})
+
+	stats := ops.OrderingStats()
+	// All messages share a single global sequence space via globalQueueIdentifier,
+	// so there should be no sequence errors.
+	if stats.SequenceErrors > 0 {
+		t.Errorf("Expected no sequence errors for global ordering, got %d", stats.SequenceErrors)
+	}
+}
+
+func TestOrderedPubSub_MultipleTopicQueueStats(t *testing.T) {
+	config := DefaultOrderingConfig()
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	topics := []string{"multi.a", "multi.b", "multi.c"}
+	for _, topic := range topics {
+		sub, _ := ops.Subscribe(topic, SubOptions{BufferSize: 20})
+		defer sub.Cancel()
+
+		for i := 0; i < 4; i++ {
+			msg := Message{Data: i}
+			_ = ops.PublishOrdered(topic, msg, OrderPerTopic)
+		}
+	}
+
+	waitUntil(200*time.Millisecond, func() bool {
+		return ops.OrderingStats().OrderedPublishes >= 12
+	})
+
+	stats := ops.OrderingStats()
+
+	if len(stats.QueueStats) != len(topics) {
+		t.Errorf("Expected %d queue stats entries, got %d", len(topics), len(stats.QueueStats))
+	}
+
+	for _, topic := range topics {
+		qs, exists := stats.QueueStats[topic]
+		if !exists {
+			t.Errorf("Missing QueueStats entry for topic %q", topic)
+			continue
+		}
+		if qs.Processed != 4 {
+			t.Errorf("Topic %q: expected 4 processed, got %d", topic, qs.Processed)
+		}
+	}
+}
+
+func TestOrderedPubSub_SequenceCheckPerKey(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.SequenceCheckEnabled = true
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	sub, _ := ops.Subscribe("seqkey.topic", SubOptions{BufferSize: 20})
+	defer sub.Cancel()
+
+	// Publish messages with different keys
+	keys := []string{"alpha", "beta"}
+	for _, key := range keys {
+		for i := 0; i < 5; i++ {
+			msg := Message{Data: map[string]any{"key": key, "seq": i}}
+			_ = ops.PublishWithKey("seqkey.topic", key, msg, OrderPerKey)
+		}
+	}
+
+	waitUntil(200*time.Millisecond, func() bool {
+		return ops.OrderingStats().OrderedPublishes >= 10
+	})
+
+	stats := ops.OrderingStats()
+	if stats.SequenceErrors > 0 {
+		t.Errorf("Expected no sequence errors, got %d", stats.SequenceErrors)
+	}
+
+	// Each key should have its own queue stats
+	for _, key := range keys {
+		qs, exists := stats.QueueStats[key]
+		if !exists {
+			t.Errorf("Missing QueueStats for key %q", key)
+			continue
+		}
+		if qs.SequenceErrors != 0 {
+			t.Errorf("Key %q: expected 0 sequence errors, got %d", key, qs.SequenceErrors)
+		}
+	}
+}
+
 func BenchmarkOrderedPubSub_PerTopic(b *testing.B) {
 	config := DefaultOrderingConfig()
 	ops := NewOrdered(config)
