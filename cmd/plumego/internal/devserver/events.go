@@ -21,7 +21,7 @@ const (
 type Event struct {
 	Type      string    `json:"type"`
 	Timestamp time.Time `json:"timestamp"`
-	Data      anyta,omitempty"`
+	Data      any       `json:"data,omitempty"`
 }
 
 // NewEvent creates a new event

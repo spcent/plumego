@@ -323,7 +323,7 @@ func (c *%sComponent) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("{\"status\":\"ok\"}"))
 }
-`, pkg, name, name, name, name, name, name, name, name, strings.ToLower(name), name, name, name, name, strings.ToLower(name), strings.ToLower(name), name, strings.ToLower(name))
+`, pkg, name, name, name, name, name, name, name, name, strings.ToLower(name), name, name, name, name, strings.ToLower(name), strings.ToLower(name), name)
 }
 
 func generateComponentTestCode(name, pkg string) string {

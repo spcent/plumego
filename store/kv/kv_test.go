@@ -1859,13 +1859,14 @@ func TestGetExpirationRetryEdgeCase(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 
-			if id%3 == 0 {
+			switch id % 3 {
+			case 0:
 				// Set with short TTL
 				kv.Set(key, []byte(fmt.Sprintf("value_%d", id)), 10*time.Millisecond)
-			} else if id%3 == 1 {
+			case 1:
 				// Try to get
 				kv.Get(key)
-			} else {
+			default:
 				// Wait a bit then get
 				time.Sleep(15 * time.Millisecond)
 				kv.Get(key)

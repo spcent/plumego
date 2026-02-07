@@ -81,7 +81,7 @@ func (d *Dashboard) handleConfigEditSave(ctx *plumego.Context) {
 	}
 
 	if req.Restart {
-		if err := d.Rebuild(ctx.Request.Context()); err != nil {
+		if err := d.Rebuild(ctx.R.Context()); err != nil {
 			ctx.JSON(500, map[string]any{"error": err.Error()})
 			return
 		}

@@ -126,7 +126,7 @@ func getTemplateContent(file, name, module, template string) string {
 func getMainGoContent(module, template string) string {
 	switch template {
 	case "minimal":
-		return fmt.Sprintf(`package main
+		return `package main
 
 import (
 	"log"
@@ -156,7 +156,7 @@ func main() {
 		log.Fatal(err)
 	}
 }
-`)
+`
 	default:
 		return getMainGoContent(module, "minimal")
 	}

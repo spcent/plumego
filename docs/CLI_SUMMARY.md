@@ -97,8 +97,7 @@ cmd/plumego/
 │   ├── migrate.go            # Database migrations
 │   ├── test.go               # Test runner
 │   ├── build.go              # Build utilities
-│   ├── inspect.go            # Runtime inspection
-│   └── stubs.go              # Stub registry (legacy placeholder)
+│   └── inspect.go            # Runtime inspection
 └── internal/
     ├── output/
     │   └── formatter.go      # Output formatting (JSON/YAML/Text)

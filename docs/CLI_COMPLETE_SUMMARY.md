@@ -471,8 +471,7 @@ cmd/plumego/
 │   ├── test.go                    # 测试运行
 │   ├── build.go                   # 构建工具
 │   ├── inspect.go                 # 运行时检查
-│   ├── version.go                 # 版本信息
-│   └── stubs.go                   # 兼容/占位
+│   └── version.go                 # 版本信息
 └── internal/
     ├── output/
     │   └── formatter.go           # JSON/YAML/Text 输出

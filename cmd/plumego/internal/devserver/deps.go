@@ -114,7 +114,7 @@ func (d *Dashboard) handleDeps(ctx *plumego.Context) {
 	refresh := strings.TrimSpace(ctx.Query.Get("refresh"))
 	refreshEnabled := refresh == "1" || strings.EqualFold(refresh, "true")
 
-	timeoutCtx, cancel := context.WithTimeout(ctx.Request.Context(), 15*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(ctx.R.Context(), 15*time.Second)
 	defer cancel()
 
 	graph, err := d.depsCache.Get(timeoutCtx, d.projectDir, refreshEnabled)

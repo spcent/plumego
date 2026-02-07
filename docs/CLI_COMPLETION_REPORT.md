@@ -60,8 +60,7 @@ cmd/plumego/
 │   ├── test.go                     # Test runner
 │   ├── inspect.go                  # Runtime inspection
 │   ├── dev.go                      # Dev server
-│   ├── version.go                  # Version info
-│   └── stubs.go                    # (now just a comment)
+│   └── version.go                  # Version info
 │
 ├── internal/                       # Internal packages
 │   ├── output/                     # Output formatting
