@@ -50,12 +50,7 @@ func (m *ModStrategy) Shard(key any, numShards int) (int, error) {
 		return 0, err
 	}
 
-	// Handle negative numbers by taking absolute value
-	if id < 0 {
-		id = -id
-	}
-
-	return int(id % int64(numShards)), nil
+	return normalizeShardIndex(int(id), numShards), nil
 }
 
 // ShardRange calculates which shards contain data in the given range.
@@ -100,11 +95,7 @@ func (m *ModStrategy) ShardRange(start, end any, numShards int) ([]int, error) {
 	// Calculate which shards are affected
 	shardSet := make(map[int]struct{})
 	for id := startID; id <= endID; id++ {
-		shardIdx := int((id % int64(numShards)))
-		if shardIdx < 0 {
-			shardIdx = -shardIdx
-		}
-		shardSet[shardIdx] = struct{}{}
+		shardSet[normalizeShardIndex(int(id), numShards)] = struct{}{}
 	}
 
 	// Convert set to sorted slice

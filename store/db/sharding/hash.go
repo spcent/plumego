@@ -57,7 +57,7 @@ func (h *HashStrategy) Shard(key any, numShards int) (int, error) {
 	}
 
 	hash := h.hashFunc(bytes)
-	return int(hash % uint64(numShards)), nil
+	return normalizeShardIndex(int(hash), numShards), nil
 }
 
 // ShardRange calculates which shards might contain data in the given range.

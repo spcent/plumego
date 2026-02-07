@@ -5,6 +5,143 @@ import (
 	"time"
 )
 
+// TestNormalizeShardIndex tests the normalizeShardIndex helper function.
+func TestNormalizeShardIndex(t *testing.T) {
+	tests := []struct {
+		name      string
+		idx       int
+		numShards int
+		want      int
+	}{
+		{
+			name:      "positive within range",
+			idx:       2,
+			numShards: 4,
+			want:      2,
+		},
+		{
+			name:      "positive exact boundary",
+			idx:       4,
+			numShards: 4,
+			want:      0,
+		},
+		{
+			name:      "positive exceeds range",
+			idx:       7,
+			numShards: 4,
+			want:      3,
+		},
+		{
+			name:      "zero index",
+			idx:       0,
+			numShards: 4,
+			want:      0,
+		},
+		{
+			name:      "negative index",
+			idx:       -3,
+			numShards: 4,
+			want:      3,
+		},
+		{
+			name:      "negative exceeds range",
+			idx:       -7,
+			numShards: 4,
+			want:      3,
+		},
+		{
+			name:      "large positive",
+			idx:       1000003,
+			numShards: 4,
+			want:      3,
+		},
+		{
+			name:      "large negative",
+			idx:       -1000003,
+			numShards: 4,
+			want:      3,
+		},
+		{
+			name:      "single shard",
+			idx:       42,
+			numShards: 1,
+			want:      0,
+		},
+		{
+			name:      "negative with single shard",
+			idx:       -42,
+			numShards: 1,
+			want:      0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeShardIndex(tt.idx, tt.numShards)
+			if got != tt.want {
+				t.Errorf("normalizeShardIndex(%d, %d) = %d, want %d", tt.idx, tt.numShards, got, tt.want)
+			}
+			if got < 0 || got >= tt.numShards {
+				t.Errorf("normalizeShardIndex(%d, %d) = %d, out of range [0, %d)", tt.idx, tt.numShards, got, tt.numShards)
+			}
+		})
+	}
+}
+
+// TestValidateShardKey tests the validateShardKey helper function.
+func TestValidateShardKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		key     any
+		wantErr bool
+	}{
+		{name: "string key", key: "test", wantErr: false},
+		{name: "int key", key: 42, wantErr: false},
+		{name: "int64 key", key: int64(42), wantErr: false},
+		{name: "uint64 key", key: uint64(42), wantErr: false},
+		{name: "byte slice key", key: []byte("test"), wantErr: false},
+		{name: "struct key", key: struct{}{}, wantErr: false},
+		{name: "nil key", key: nil, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateShardKey(tt.key)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateShardKey(%v) error = %v, wantErr %v", tt.key, err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && err != ErrNilShardKey {
+				t.Errorf("validateShardKey(nil) should return ErrNilShardKey, got %v", err)
+			}
+		})
+	}
+}
+
+// TestValidateNumShards tests the validateNumShards helper function.
+func TestValidateNumShards(t *testing.T) {
+	tests := []struct {
+		name      string
+		numShards int
+		wantErr   bool
+	}{
+		{name: "positive", numShards: 4, wantErr: false},
+		{name: "one", numShards: 1, wantErr: false},
+		{name: "large", numShards: 1024, wantErr: false},
+		{name: "zero", numShards: 0, wantErr: true},
+		{name: "negative", numShards: -1, wantErr: true},
+		{name: "large negative", numShards: -100, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateNumShards(tt.numShards)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateNumShards(%d) error = %v, wantErr %v", tt.numShards, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestHashStrategy tests the hash-based sharding strategy.
 func TestHashStrategy(t *testing.T) {
 	strategy := NewHashStrategy()
