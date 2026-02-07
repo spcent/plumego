@@ -269,6 +269,233 @@ func TestDiagnosticInfo_ContainsShardData(t *testing.T) {
 	}
 }
 
+func TestTopicExists_EmptyShardedMap(t *testing.T) {
+	sm := newShardedMap(16)
+	if sm.topicExists("nonexistent") {
+		t.Fatal("expected topicExists to return false for empty map")
+	}
+}
+
+func TestTopicExists_AfterSubscribe(t *testing.T) {
+	ps := New(WithShardCount(8))
+	defer ps.Close()
+
+	if ps.TopicExists("user.created") {
+		t.Fatal("expected TopicExists false before subscribe")
+	}
+
+	sub, err := ps.Subscribe("user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+
+	if !ps.TopicExists("user.created") {
+		t.Fatal("expected TopicExists true after subscribe")
+	}
+
+	// Should not affect other topics
+	if ps.TopicExists("user.deleted") {
+		t.Fatal("expected TopicExists false for unrelated topic")
+	}
+
+	sub.Cancel()
+
+	if ps.TopicExists("user.created") {
+		t.Fatal("expected TopicExists false after cancel")
+	}
+}
+
+func TestTopicExists_MultipleSubscribers(t *testing.T) {
+	ps := New(WithShardCount(4))
+	defer ps.Close()
+
+	sub1, err := ps.Subscribe("events", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe 1: %v", err)
+	}
+	sub2, err := ps.Subscribe("events", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe 2: %v", err)
+	}
+
+	if !ps.TopicExists("events") {
+		t.Fatal("expected TopicExists true with 2 subs")
+	}
+
+	sub1.Cancel()
+	// Still one subscriber left
+	if !ps.TopicExists("events") {
+		t.Fatal("expected TopicExists true with 1 sub remaining")
+	}
+
+	sub2.Cancel()
+	if ps.TopicExists("events") {
+		t.Fatal("expected TopicExists false after all subs cancelled")
+	}
+}
+
+func TestPatternExists_EmptyShardedMap(t *testing.T) {
+	sm := newShardedMap(16)
+	if sm.patternExists("user.*") {
+		t.Fatal("expected patternExists to return false for empty map")
+	}
+}
+
+func TestPatternExists_AfterSubscribe(t *testing.T) {
+	ps := New(WithShardCount(8))
+	defer ps.Close()
+
+	if ps.PatternExists("user.*") {
+		t.Fatal("expected PatternExists false before subscribe")
+	}
+
+	sub, err := ps.SubscribePattern("user.*", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe pattern: %v", err)
+	}
+
+	if !ps.PatternExists("user.*") {
+		t.Fatal("expected PatternExists true after subscribe")
+	}
+
+	// Should not match a different pattern
+	if ps.PatternExists("order.*") {
+		t.Fatal("expected PatternExists false for different pattern")
+	}
+
+	sub.Cancel()
+
+	if ps.PatternExists("user.*") {
+		t.Fatal("expected PatternExists false after cancel")
+	}
+}
+
+func TestHasSubscribers_ExactMatch(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	if ps.HasSubscribers("user.created") {
+		t.Fatal("expected HasSubscribers false with no subs")
+	}
+
+	sub, err := ps.Subscribe("user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+
+	if !ps.HasSubscribers("user.created") {
+		t.Fatal("expected HasSubscribers true for exact match")
+	}
+
+	if ps.HasSubscribers("user.deleted") {
+		t.Fatal("expected HasSubscribers false for unrelated topic")
+	}
+
+	sub.Cancel()
+}
+
+func TestHasSubscribers_PatternMatch(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	sub, err := ps.SubscribePattern("user.*", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe pattern: %v", err)
+	}
+
+	// "user.created" should match the "user.*" pattern
+	if !ps.HasSubscribers("user.created") {
+		t.Fatal("expected HasSubscribers true via pattern match")
+	}
+
+	// "order.placed" should not match "user.*"
+	if ps.HasSubscribers("order.placed") {
+		t.Fatal("expected HasSubscribers false for non-matching topic")
+	}
+
+	sub.Cancel()
+
+	if ps.HasSubscribers("user.created") {
+		t.Fatal("expected HasSubscribers false after pattern cancel")
+	}
+}
+
+func TestHasSubscribers_BothExactAndPattern(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	sub1, err := ps.Subscribe("user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe topic: %v", err)
+	}
+	sub2, err := ps.SubscribePattern("user.*", SubOptions{BufferSize: 4, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe pattern: %v", err)
+	}
+
+	if !ps.HasSubscribers("user.created") {
+		t.Fatal("expected HasSubscribers true (exact + pattern)")
+	}
+
+	// Cancel exact sub; pattern still matches
+	sub1.Cancel()
+	if !ps.HasSubscribers("user.created") {
+		t.Fatal("expected HasSubscribers true (pattern still matches)")
+	}
+
+	// Cancel pattern sub
+	sub2.Cancel()
+	if ps.HasSubscribers("user.created") {
+		t.Fatal("expected HasSubscribers false after all cancelled")
+	}
+}
+
+func TestHasAnyPatterns(t *testing.T) {
+	sm := newShardedMap(8)
+
+	if sm.hasAnyPatterns() {
+		t.Fatal("expected hasAnyPatterns false on empty map")
+	}
+
+	sub := &subscriber{
+		id:   1,
+		ch:   make(chan Message, 1),
+		done: make(chan struct{}),
+	}
+	sm.addPattern("user.*", 1, sub)
+
+	if !sm.hasAnyPatterns() {
+		t.Fatal("expected hasAnyPatterns true after adding pattern")
+	}
+
+	sm.removePattern("user.*", 1)
+
+	if sm.hasAnyPatterns() {
+		t.Fatal("expected hasAnyPatterns false after removing pattern")
+	}
+}
+
+func TestPublishOptimization_NoSubscribers(t *testing.T) {
+	ps := New(WithShardCount(4))
+	defer ps.Close()
+
+	// Publishing to a topic with no subscribers should still succeed
+	err := ps.Publish("no.subs", Message{ID: "m1", Data: "test"})
+	if err != nil {
+		t.Fatalf("publish with no subscribers: %v", err)
+	}
+
+	// Metrics should still track the publish
+	snapshot := ps.Snapshot()
+	tm, ok := snapshot.Topics["no.subs"]
+	if !ok {
+		t.Fatal("expected topic in metrics snapshot")
+	}
+	if tm.PublishTotal != 1 {
+		t.Fatalf("expected 1 publish, got %d", tm.PublishTotal)
+	}
+}
+
 func TestNextPowerOf2(t *testing.T) {
 	tests := []struct {
 		input    int

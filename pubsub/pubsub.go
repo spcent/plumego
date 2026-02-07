@@ -485,9 +485,15 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 		}
 	}
 
-	// Get subscribers once
-	subs := ps.shards.getTopicSubscribers(topic)
-	patterns := ps.shards.getAllPatterns()
+	// Get subscribers once; skip expensive lookups when no subscribers exist
+	var subs []*subscriber
+	if ps.shards.topicExists(topic) {
+		subs = ps.shards.getTopicSubscribers(topic)
+	}
+	var patterns []patternSnapshot
+	if ps.shards.hasAnyPatterns() {
+		patterns = ps.shards.getAllPatterns()
+	}
 
 	ps.pendingOps.Add(1)
 	defer ps.pendingOps.Add(-1)
@@ -513,7 +519,9 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 		}
 
 		// Deliver to pattern subscribers
-		ps.deliverToPatterns(patterns, topic, clonedMsg)
+		if len(patterns) > 0 {
+			ps.deliverToPatterns(patterns, topic, clonedMsg)
+		}
 	}
 
 	return nil
@@ -609,17 +617,27 @@ func (ps *InProcPubSub) doPublish(topic string, msg Message) {
 		h.Add(msg)
 	}
 
-	// Get topic subscribers
-	subs := ps.shards.getTopicSubscribers(topic)
+	// Fast path: skip subscriber lookup when no subscribers exist
+	hasTopicSubs := ps.shards.topicExists(topic)
+	hasPatternSubs := ps.shards.hasAnyPatterns()
+
+	if !hasTopicSubs && !hasPatternSubs {
+		return
+	}
 
 	// Deliver to exact topic subscribers
-	for _, s := range subs {
-		ps.deliver(s, msg)
+	if hasTopicSubs {
+		subs := ps.shards.getTopicSubscribers(topic)
+		for _, s := range subs {
+			ps.deliver(s, msg)
+		}
 	}
 
 	// Get and deliver to pattern subscribers
-	patterns := ps.shards.getAllPatterns()
-	ps.deliverToPatterns(patterns, topic, msg)
+	if hasPatternSubs {
+		patterns := ps.shards.getAllPatterns()
+		ps.deliverToPatterns(patterns, topic, msg)
+	}
 }
 
 // deliverToPatterns delivers a message to all matching pattern subscribers.
@@ -654,6 +672,41 @@ func (ps *InProcPubSub) GetSubscriberCount(topic string) int {
 // GetPatternSubscriberCount returns the number of subscribers for a pattern.
 func (ps *InProcPubSub) GetPatternSubscriberCount(pattern string) int {
 	return ps.shards.getPatternSubscriberCount(pattern)
+}
+
+// TopicExists checks if a topic has any active subscribers.
+// This is a lightweight check that only acquires a read lock on one shard.
+func (ps *InProcPubSub) TopicExists(topic string) bool {
+	return ps.shards.topicExists(topic)
+}
+
+// PatternExists checks if a pattern has any active subscribers.
+// This is a lightweight check that only acquires a read lock on one shard.
+func (ps *InProcPubSub) PatternExists(pattern string) bool {
+	return ps.shards.patternExists(pattern)
+}
+
+// HasSubscribers checks if publishing to the given topic would reach any subscriber,
+// either through an exact topic match or a matching pattern subscription.
+func (ps *InProcPubSub) HasSubscribers(topic string) bool {
+	// Fast path: check exact topic subscribers
+	if ps.shards.topicExists(topic) {
+		return true
+	}
+
+	// Slow path: check pattern subscribers
+	patterns := ps.shards.getAllPatterns()
+	for _, entry := range patterns {
+		if strings.ContainsAny(entry.pattern, "*?[]\\") {
+			if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+				return true
+			}
+		} else if entry.pattern == topic {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ListTopics returns all active topics.
