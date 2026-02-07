@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -415,6 +416,9 @@ func (b *BaseMetricsCollector) ObserveDB(ctx context.Context, operation, driver,
 	if rows > 0 {
 		labels[labelRows] = fmt.Sprintf("%d", rows)
 	}
+	if table := extractTable(query); table != "" {
+		labels[labelTable] = table
+	}
 
 	record := MetricRecord{
 		Type:     metricType,
@@ -506,6 +510,89 @@ func cloneBreakdown(breakdown map[MetricType]int64) map[MetricType]int64 {
 		result[key] = value
 	}
 	return result
+}
+
+// extractTable attempts to extract the primary table name from a SQL query.
+// It handles common patterns: SELECT ... FROM, INSERT INTO, UPDATE, DELETE FROM,
+// CREATE/ALTER/DROP/TRUNCATE TABLE, REPLACE INTO, and MERGE INTO.
+// Returns an empty string if no table name can be determined.
+func extractTable(query string) string {
+	fields := strings.Fields(query)
+	if len(fields) == 0 {
+		return ""
+	}
+
+	for i := 0; i < len(fields); i++ {
+		upper := strings.ToUpper(fields[i])
+		switch upper {
+		case "FROM", "INTO":
+			// SELECT ... FROM table, INSERT INTO table, DELETE FROM table,
+			// MERGE INTO table, REPLACE INTO table
+			if i+1 < len(fields) {
+				next := fields[i+1]
+				// Skip subqueries
+				if strings.HasPrefix(next, "(") {
+					continue
+				}
+				return cleanTableName(next)
+			}
+		case "UPDATE":
+			// UPDATE table SET ...
+			if i+1 < len(fields) {
+				return cleanTableName(fields[i+1])
+			}
+		case "TABLE":
+			// CREATE TABLE, ALTER TABLE, DROP TABLE, TRUNCATE TABLE
+			next := i + 1
+			// Skip IF [NOT] EXISTS
+			if next < len(fields) && strings.EqualFold(fields[next], "IF") {
+				next++
+				if next < len(fields) && strings.EqualFold(fields[next], "NOT") {
+					next++
+				}
+				if next < len(fields) && strings.EqualFold(fields[next], "EXISTS") {
+					next++
+				}
+			}
+			if next < len(fields) {
+				return cleanTableName(fields[next])
+			}
+		}
+	}
+
+	return ""
+}
+
+// cleanTableName removes surrounding quotes, trailing punctuation, and
+// extracts the table part from schema-qualified identifiers (schema.table).
+func cleanTableName(s string) string {
+	// Remove trailing punctuation (comma, semicolon, parenthesis)
+	s = strings.TrimRight(s, ",;()")
+	if s == "" {
+		return ""
+	}
+
+	s = unquoteIdent(s)
+
+	// Handle schema.table -> take only the table part
+	if idx := strings.LastIndexByte(s, '.'); idx >= 0 && idx+1 < len(s) {
+		s = unquoteIdent(s[idx+1:])
+	}
+
+	return s
+}
+
+// unquoteIdent removes surrounding quote characters from an identifier.
+func unquoteIdent(s string) string {
+	if len(s) >= 2 {
+		first, last := s[0], s[len(s)-1]
+		if (first == '"' && last == '"') ||
+			(first == '`' && last == '`') ||
+			(first == '[' && last == ']') {
+			s = s[1 : len(s)-1]
+		}
+	}
+	return s
 }
 
 // baseForwarder provides lazy-initialized forwarding of MetricsCollector methods

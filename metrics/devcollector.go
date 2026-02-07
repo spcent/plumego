@@ -77,6 +77,7 @@ type DevHTTPSnapshot struct {
 type DevDBQuerySample struct {
 	Operation    string    `json:"operation"`
 	Driver       string    `json:"driver"`
+	Table        string    `json:"table,omitempty"`
 	Query        string    `json:"query"`
 	QueryPreview string    `json:"query_preview,omitempty"`
 	Redacted     bool      `json:"redacted"`
@@ -89,6 +90,7 @@ type DevDBQuerySample struct {
 type DevDBSeries struct {
 	Operation  string          `json:"operation"`
 	Driver     string          `json:"driver"`
+	Table      string          `json:"table,omitempty"`
 	Count      int64           `json:"count"`
 	ErrorCount int64           `json:"error_count"`
 	Duration   AggregatorStats `json:"duration_ms"`
@@ -101,6 +103,7 @@ type DevDBSnapshot struct {
 	StartedAt time.Time            `json:"started_at"`
 	Total     DevDBSeries          `json:"total"`
 	Series    []DevDBSeries        `json:"series"`
+	Tables    []DevDBSeries        `json:"tables,omitempty"`
 	Slow      []DevDBQuerySample   `json:"slow"`
 	Redaction DevDBRedactionConfig `json:"redaction"`
 }
@@ -127,12 +130,13 @@ type DevCollector struct {
 	series  map[string]*httpSeries
 	samples []DevRequestSample
 
-	dbTotal     *dbSeries
-	dbSeries    map[string]*dbSeries
-	dbSlow      []DevDBQuerySample
-	dbSlowMS    float64
-	dbMaxSlow   int
-	dbMaxSeries int
+	dbTotal       *dbSeries
+	dbSeries      map[string]*dbSeries
+	dbTableSeries map[string]*dbSeries
+	dbSlow        []DevDBQuerySample
+	dbSlowMS      float64
+	dbMaxSlow     int
+	dbMaxSeries   int
 }
 
 // NewDevCollector creates a new dev metrics collector with the provided config.
@@ -161,21 +165,22 @@ func NewDevCollector(cfg DevCollectorConfig) *DevCollector {
 	}
 
 	return &DevCollector{
-		base:        NewBaseMetricsCollector(),
-		startedAt:   time.Now(),
-		window:      cfg.Window,
-		maxSamples:  cfg.MaxSamples,
-		maxSeries:   cfg.MaxSeries,
-		maxValues:   cfg.MaxValues,
-		total:       newHTTPSeries("ALL", "ALL", cfg.MaxValues),
-		series:      make(map[string]*httpSeries),
-		samples:     make([]DevRequestSample, 0, cfg.MaxSamples),
-		dbTotal:     newDBSeries("ALL", "ALL", cfg.MaxValues),
-		dbSeries:    make(map[string]*dbSeries),
-		dbSlow:      make([]DevDBQuerySample, 0, cfg.DBMaxSlow),
-		dbSlowMS:    cfg.DBSlowMS,
-		dbMaxSlow:   cfg.DBMaxSlow,
-		dbMaxSeries: cfg.DBMaxSeries,
+		base:          NewBaseMetricsCollector(),
+		startedAt:     time.Now(),
+		window:        cfg.Window,
+		maxSamples:    cfg.MaxSamples,
+		maxSeries:     cfg.MaxSeries,
+		maxValues:     cfg.MaxValues,
+		total:         newHTTPSeries("ALL", "ALL", cfg.MaxValues),
+		series:        make(map[string]*httpSeries),
+		samples:       make([]DevRequestSample, 0, cfg.MaxSamples),
+		dbTotal:       newDBSeries("ALL", "ALL", cfg.MaxValues),
+		dbSeries:      make(map[string]*dbSeries),
+		dbTableSeries: make(map[string]*dbSeries),
+		dbSlow:        make([]DevDBQuerySample, 0, cfg.DBMaxSlow),
+		dbSlowMS:      cfg.DBSlowMS,
+		dbMaxSlow:     cfg.DBMaxSlow,
+		dbMaxSeries:   cfg.DBMaxSeries,
 	}
 }
 
@@ -225,10 +230,22 @@ func (d *DevCollector) DBSnapshot() DevDBSnapshot {
 		return series[i].Count > series[j].Count
 	})
 
+	tables := make([]DevDBSeries, 0, len(d.dbTableSeries))
+	for _, s := range d.dbTableSeries {
+		tables = append(tables, s.snapshot())
+	}
+
+	sort.Slice(tables, func(i, j int) bool {
+		if tables[i].Count == tables[j].Count {
+			return tables[i].Table < tables[j].Table
+		}
+		return tables[i].Count > tables[j].Count
+	})
+
 	slow := make([]DevDBQuerySample, len(d.dbSlow))
 	copy(slow, d.dbSlow)
 
-	return DevDBSnapshot{
+	snap := DevDBSnapshot{
 		StartedAt: d.startedAt,
 		Total:     d.dbTotal.snapshot(),
 		Series:    series,
@@ -238,6 +255,10 @@ func (d *DevCollector) DBSnapshot() DevDBSnapshot {
 			Rules:   dbRedactionRules(),
 		},
 	}
+	if len(tables) > 0 {
+		snap.Tables = tables
+	}
+	return snap
 }
 
 // Record implements MetricsCollector.
@@ -322,6 +343,7 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 	durationMS := duration.Seconds() * 1000
 	now := time.Now()
 	errorHit := err != nil
+	table := extractTable(query)
 
 	key := dbSeriesKey(operation, driver)
 
@@ -333,7 +355,7 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 	series := d.dbSeries[key]
 	if series == nil {
 		if d.dbMaxSeries > 0 && len(d.dbSeries) >= d.dbMaxSeries {
-			d.appendDBSlowLocked(operation, driver, query, durationMS, err, now)
+			d.appendDBSlowLocked(operation, driver, table, query, durationMS, err, now)
 			return
 		}
 		series = newDBSeries(operation, driver, d.maxValues)
@@ -341,7 +363,22 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 	}
 
 	series.record(operation, driver, durationMS, float64(rows), errorHit, now)
-	d.appendDBSlowLocked(operation, driver, query, durationMS, err, now)
+
+	// Track per-table aggregation
+	if table != "" {
+		ts := d.dbTableSeries[table]
+		if ts == nil {
+			if d.dbMaxSeries <= 0 || len(d.dbTableSeries) < d.dbMaxSeries {
+				ts = newDBTableSeries(table, d.maxValues)
+				d.dbTableSeries[table] = ts
+			}
+		}
+		if ts != nil {
+			ts.record(operation, driver, durationMS, float64(rows), errorHit, now)
+		}
+	}
+
+	d.appendDBSlowLocked(operation, driver, table, query, durationMS, err, now)
 }
 
 // GetStats implements MetricsCollector.
@@ -365,6 +402,7 @@ func (d *DevCollector) Clear() {
 	d.samples = d.samples[:0]
 	d.dbTotal = newDBSeries("ALL", "ALL", d.maxValues)
 	d.dbSeries = make(map[string]*dbSeries)
+	d.dbTableSeries = make(map[string]*dbSeries)
 	d.dbSlow = d.dbSlow[:0]
 	d.startedAt = time.Now()
 }
@@ -534,7 +572,7 @@ func (b *statBucket) snapshot() AggregatorStats {
 	return stats
 }
 
-func (d *DevCollector) appendDBSlowLocked(operation, driver, query string, durationMS float64, err error, now time.Time) {
+func (d *DevCollector) appendDBSlowLocked(operation, driver, table, query string, durationMS float64, err error, now time.Time) {
 	if d.dbSlowMS <= 0 || durationMS < d.dbSlowMS {
 		return
 	}
@@ -548,6 +586,7 @@ func (d *DevCollector) appendDBSlowLocked(operation, driver, query string, durat
 	sample := DevDBQuerySample{
 		Operation:    operation,
 		Driver:       driver,
+		Table:        table,
 		Query:        redacted,
 		QueryPreview: preview,
 		Redacted:     true,
@@ -708,6 +747,7 @@ func consumeNumber(s string, idx int) int {
 type dbSeries struct {
 	operation  string
 	driver     string
+	table      string
 	count      int64
 	errorCount int64
 	duration   *statBucket
@@ -721,6 +761,14 @@ func newDBSeries(operation, driver string, maxValues int) *dbSeries {
 		driver:    driver,
 		duration:  newStatBucket(maxValues),
 		rows:      newStatBucket(maxValues),
+	}
+}
+
+func newDBTableSeries(table string, maxValues int) *dbSeries {
+	return &dbSeries{
+		table:    table,
+		duration: newStatBucket(maxValues),
+		rows:     newStatBucket(maxValues),
 	}
 }
 
@@ -744,6 +792,7 @@ func (s *dbSeries) snapshot() DevDBSeries {
 	return DevDBSeries{
 		Operation:  s.operation,
 		Driver:     s.driver,
+		Table:      s.table,
 		Count:      s.count,
 		ErrorCount: s.errorCount,
 		Duration:   s.duration.snapshot(),

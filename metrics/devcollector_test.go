@@ -115,3 +115,106 @@ func TestDevCollectorSnapshot(t *testing.T) {
 		t.Fatalf("expected slow query sample")
 	}
 }
+
+func TestDevCollectorDBTableSeries(t *testing.T) {
+	cfg := DevCollectorConfig{
+		Window:      time.Minute,
+		MaxSamples:  10,
+		MaxSeries:   10,
+		MaxValues:   100,
+		DBMaxSlow:   10,
+		DBSlowMS:    1000, // high threshold so we don't trigger slow query
+		DBMaxSeries: 10,
+	}
+
+	collector := NewDevCollector(cfg)
+	ctx := context.Background()
+
+	// Record queries against different tables
+	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users WHERE id = 1", 1, 10*time.Millisecond, nil)
+	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users WHERE active = true", 5, 20*time.Millisecond, nil)
+	collector.ObserveDB(ctx, "exec", "postgres", "INSERT INTO orders (user_id, total) VALUES (1, 100)", 1, 15*time.Millisecond, nil)
+	collector.ObserveDB(ctx, "exec", "postgres", "UPDATE products SET stock = 0 WHERE id = 5", 1, 25*time.Millisecond, nil)
+
+	snap := collector.DBSnapshot()
+
+	// Verify total
+	if snap.Total.Count != 4 {
+		t.Fatalf("expected total count 4, got %d", snap.Total.Count)
+	}
+
+	// Verify table series exist
+	if len(snap.Tables) != 3 {
+		t.Fatalf("expected 3 table series (users, orders, products), got %d", len(snap.Tables))
+	}
+
+	// Tables should be sorted by count descending
+	// "users" has 2 queries, "orders" and "products" have 1 each
+	if snap.Tables[0].Table != "users" {
+		t.Errorf("expected first table to be 'users', got %q", snap.Tables[0].Table)
+	}
+	if snap.Tables[0].Count != 2 {
+		t.Errorf("expected users count 2, got %d", snap.Tables[0].Count)
+	}
+}
+
+func TestDevCollectorDBSlowQueryTable(t *testing.T) {
+	cfg := DevCollectorConfig{
+		Window:      time.Minute,
+		MaxSamples:  10,
+		MaxSeries:   10,
+		MaxValues:   100,
+		DBMaxSlow:   10,
+		DBSlowMS:    1, // 1ms threshold
+		DBMaxSeries: 10,
+	}
+
+	collector := NewDevCollector(cfg)
+	ctx := context.Background()
+
+	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users WHERE id = 1", 1, 5*time.Millisecond, nil)
+
+	snap := collector.DBSnapshot()
+	if len(snap.Slow) == 0 {
+		t.Fatalf("expected slow query sample")
+	}
+
+	if snap.Slow[0].Table != "users" {
+		t.Errorf("expected slow query table 'users', got %q", snap.Slow[0].Table)
+	}
+}
+
+func TestDevCollectorDBTableSeriesClear(t *testing.T) {
+	cfg := DefaultDevCollectorConfig()
+	collector := NewDevCollector(cfg)
+	ctx := context.Background()
+
+	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users", 1, 10*time.Millisecond, nil)
+
+	snap := collector.DBSnapshot()
+	if len(snap.Tables) == 0 {
+		t.Fatalf("expected table series before clear")
+	}
+
+	collector.Clear()
+
+	snap = collector.DBSnapshot()
+	if len(snap.Tables) != 0 {
+		t.Fatalf("expected no table series after clear, got %d", len(snap.Tables))
+	}
+}
+
+func TestDevCollectorDBTableNoQuery(t *testing.T) {
+	cfg := DefaultDevCollectorConfig()
+	collector := NewDevCollector(cfg)
+	ctx := context.Background()
+
+	// Operations without SQL (ping, connect, close) should not create table series
+	collector.ObserveDB(ctx, "ping", "postgres", "", 0, 2*time.Millisecond, nil)
+	collector.ObserveDB(ctx, "connect", "postgres", "", 0, 5*time.Millisecond, nil)
+
+	snap := collector.DBSnapshot()
+	if len(snap.Tables) != 0 {
+		t.Fatalf("expected no table series for operations without queries, got %d", len(snap.Tables))
+	}
+}
