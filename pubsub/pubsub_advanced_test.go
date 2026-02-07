@@ -1,9 +1,12 @@
 package pubsub
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/metrics"
 )
 
 // TestPubSub_Performance tests optimized performance
@@ -351,4 +354,206 @@ func TestPubSub_PressureHandling(t *testing.T) {
 	if len(tm.DroppedByPolicy) == 0 {
 		t.Errorf("Expected some dropped messages under pressure")
 	}
+}
+
+// TestPublishWithContext_CancelledContext tests that PublishWithContext returns
+// an error immediately when the context is already cancelled.
+func TestPublishWithContext_CancelledContext(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	sub, err := ps.Subscribe("ctx.test", SubOptions{BufferSize: 8, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	err = ps.PublishWithContext(ctx, "ctx.test", Message{ID: "m1", Data: "hello"})
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+	if err != context.Canceled {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	// No message should have been delivered
+	select {
+	case msg := <-sub.C():
+		t.Fatalf("expected no message, got %+v", msg)
+	case <-time.After(50 * time.Millisecond):
+		// expected
+	}
+}
+
+// TestPublishWithContext_DeadlineExceeded tests that PublishWithContext returns
+// an error when the context deadline has already passed.
+func TestPublishWithContext_DeadlineExceeded(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	sub, err := ps.Subscribe("ctx.deadline", SubOptions{BufferSize: 8, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	err = ps.PublishWithContext(ctx, "ctx.deadline", Message{ID: "m1"})
+	if err == nil {
+		t.Fatal("expected error from expired deadline, got nil")
+	}
+	if err != context.DeadlineExceeded {
+		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
+	}
+}
+
+// TestPublishWithContext_ValidContext tests that PublishWithContext works
+// normally with a valid (non-cancelled) context.
+func TestPublishWithContext_ValidContext(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	sub, err := ps.Subscribe("ctx.valid", SubOptions{BufferSize: 8, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	ctx := context.Background()
+	err = ps.PublishWithContext(ctx, "ctx.valid", Message{ID: "m1", Data: "hello"})
+	if err != nil {
+		t.Fatalf("publish with valid context: %v", err)
+	}
+
+	select {
+	case got := <-sub.C():
+		if got.ID != "m1" {
+			t.Fatalf("expected message ID m1, got %s", got.ID)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timeout waiting for message")
+	}
+}
+
+// TestPublishWithContext_BlockWithTimeoutRespectsContext tests that a
+// BlockWithTimeout subscriber respects context cancellation during delivery.
+func TestPublishWithContext_BlockWithTimeoutRespectsContext(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	// Create subscriber with very small buffer and long block timeout
+	sub, err := ps.Subscribe("ctx.block", SubOptions{
+		BufferSize:   1,
+		Policy:       BlockWithTimeout,
+		BlockTimeout: 5 * time.Second, // long timeout
+	})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	// Fill the buffer
+	err = ps.Publish("ctx.block", Message{ID: "fill"})
+	if err != nil {
+		t.Fatalf("fill publish: %v", err)
+	}
+
+	// Publish with a short-lived context while buffer is full.
+	// The context cancellation should unblock the delivery rather than
+	// waiting for the full 5s BlockTimeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err = ps.PublishWithContext(ctx, "ctx.block", Message{ID: "blocked"})
+	elapsed := time.Since(start)
+
+	// Should complete within context timeout, not the 5s block timeout
+	if elapsed >= 2*time.Second {
+		t.Fatalf("publish took too long (%v), context cancellation was not respected", elapsed)
+	}
+
+	// No error expected because publishInternal itself returns nil (delivery drop is handled internally)
+	if err != nil {
+		t.Logf("publish returned: %v (elapsed: %v)", err, elapsed)
+	}
+}
+
+// TestPublishWithContext_AsyncCancelledContext tests that async publish
+// respects a cancelled context.
+func TestPublishWithContext_AsyncCancelledContext(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	sub, err := ps.Subscribe("ctx.async", SubOptions{BufferSize: 8, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	// publishInternal with async=true and cancelled context
+	err = ps.publishInternal(ctx, "ctx.async", Message{ID: "m1"}, true)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+	if err != context.Canceled {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+}
+
+// TestPublishWithContext_ContextValuesPropagated tests that context values
+// are available in the metrics collector.
+func TestPublishWithContext_ContextValuesPropagated(t *testing.T) {
+	type ctxKey string
+	const key ctxKey = "trace-id"
+
+	var capturedCtx context.Context
+	collector := &testMetricsCollector{
+		onObservePubSub: func(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+			capturedCtx = ctx
+		},
+	}
+
+	ps := New(WithMetricsCollector(collector))
+	defer ps.Close()
+
+	_, err := ps.Subscribe("ctx.values", SubOptions{BufferSize: 8, Policy: DropOldest})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+
+	ctx := context.WithValue(context.Background(), key, "abc-123")
+	err = ps.PublishWithContext(ctx, "ctx.values", Message{ID: "m1"})
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	if capturedCtx == nil {
+		t.Fatal("metrics collector did not receive context")
+	}
+	if v, ok := capturedCtx.Value(key).(string); !ok || v != "abc-123" {
+		t.Fatalf("expected trace-id=abc-123, got %v", capturedCtx.Value(key))
+	}
+}
+
+// testMetricsCollector is a test helper that implements metrics.MetricsCollector
+// with callback hooks for verifying context propagation.
+type testMetricsCollector struct {
+	metrics.BaseMetricsCollector
+	onObservePubSub func(ctx context.Context, operation, topic string, duration time.Duration, err error)
+}
+
+func (c *testMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+	if c.onObservePubSub != nil {
+		c.onObservePubSub(ctx, operation, topic, duration, err)
+	}
+	c.BaseMetricsCollector.ObservePubSub(ctx, operation, topic, duration, err)
 }

@@ -397,7 +397,7 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 	start := time.Now()
 	var err error
 	defer func() {
-		ps.recordMetrics("subscribe", topic, time.Since(start), err)
+		ps.recordMetrics(ctx, "subscribe", topic, time.Since(start), err)
 	}()
 
 	if ps.closed.Load() {
@@ -565,6 +565,7 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 	ps.pendingOps.Add(1)
 	defer ps.pendingOps.Add(-1)
 
+	bgCtx := context.Background()
 	for _, msg := range msgs {
 		clonedMsg := cloneMessage(msg)
 		ps.metrics.incPublish(topic)
@@ -582,12 +583,12 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 
 		// Deliver to exact topic subscribers
 		for _, s := range subs {
-			ps.deliver(s, clonedMsg)
+			ps.deliver(bgCtx, s, clonedMsg)
 		}
 
 		// Deliver to pattern subscribers
 		if len(patterns) > 0 {
-			ps.deliverToPatterns(patterns, topic, clonedMsg)
+			ps.deliverToPatterns(bgCtx, patterns, topic, clonedMsg)
 		}
 	}
 
@@ -618,8 +619,14 @@ func (ps *InProcPubSub) publishInternal(ctx context.Context, topic string, msg M
 		if async {
 			opName = "publish_async"
 		}
-		ps.recordMetrics(opName, topic, time.Since(start), err)
+		ps.recordMetrics(ctx, opName, topic, time.Since(start), err)
 	}()
+
+	// Check context cancellation early
+	if ctx.Err() != nil {
+		err = ctx.Err()
+		return err
+	}
 
 	if ps.closed.Load() {
 		err = ErrPublishToClosed
@@ -647,28 +654,33 @@ func (ps *InProcPubSub) publishInternal(ctx context.Context, topic string, msg M
 	}
 
 	if async {
-		// Use worker pool for async publish
+		// Use worker pool for async publish with context cancellation support
 		ps.pendingOps.Add(1)
-		submitted := ps.workerPool.Submit(func() {
+		submitted := ps.workerPool.SubmitWithContext(ctx, func() {
 			defer ps.pendingOps.Add(-1)
-			ps.doPublish(topic, msg)
+			ps.doPublish(ctx, topic, msg)
 		})
 		if !submitted {
 			ps.pendingOps.Add(-1)
+			// Context cancelled or worker pool closed
+			if ctx.Err() != nil {
+				err = ctx.Err()
+				return err
+			}
 			// Worker pool is closed, do sync publish
-			ps.doPublish(topic, msg)
+			ps.doPublish(ctx, topic, msg)
 		}
 	} else {
 		ps.pendingOps.Add(1)
 		defer ps.pendingOps.Add(-1)
-		ps.doPublish(topic, msg)
+		ps.doPublish(ctx, topic, msg)
 	}
 
 	return nil
 }
 
 // doPublish performs the actual message delivery.
-func (ps *InProcPubSub) doPublish(topic string, msg Message) {
+func (ps *InProcPubSub) doPublish(ctx context.Context, topic string, msg Message) {
 	// Check TTL expiration from message metadata
 	if ps.ttlMgr != nil && msg.Meta != nil {
 		if expiresAt, ok := msg.Meta["X-Message-ExpiresAt"]; ok {
@@ -676,6 +688,11 @@ func (ps *InProcPubSub) doPublish(topic string, msg Message) {
 				return
 			}
 		}
+	}
+
+	// Check context cancellation before delivery
+	if ctx.Err() != nil {
+		return
 	}
 
 	// Record message in history
@@ -696,20 +713,27 @@ func (ps *InProcPubSub) doPublish(topic string, msg Message) {
 	if hasTopicSubs {
 		subs := ps.shards.getTopicSubscribers(topic)
 		for _, s := range subs {
-			ps.deliver(s, msg)
+			if ctx.Err() != nil {
+				return
+			}
+			ps.deliver(ctx, s, msg)
 		}
 	}
 
 	// Get and deliver to pattern subscribers
 	if hasPatternSubs {
 		patterns := ps.shards.getAllPatterns()
-		ps.deliverToPatterns(patterns, topic, msg)
+		ps.deliverToPatterns(ctx, patterns, topic, msg)
 	}
 }
 
 // deliverToPatterns delivers a message to all matching pattern subscribers.
-func (ps *InProcPubSub) deliverToPatterns(patterns []patternSnapshot, topic string, msg Message) {
+func (ps *InProcPubSub) deliverToPatterns(ctx context.Context, patterns []patternSnapshot, topic string, msg Message) {
 	for _, entry := range patterns {
+		if ctx.Err() != nil {
+			return
+		}
+
 		// Fast path: check if pattern contains wildcards
 		var matched bool
 		if strings.ContainsAny(entry.pattern, "*?[]\\") {
@@ -725,7 +749,10 @@ func (ps *InProcPubSub) deliverToPatterns(patterns []patternSnapshot, topic stri
 
 		if matched {
 			for _, s := range entry.subs {
-				ps.deliver(s, msg)
+				if ctx.Err() != nil {
+					return
+				}
+				ps.deliver(ctx, s, msg)
 			}
 		}
 	}
@@ -801,7 +828,7 @@ func (ps *InProcPubSub) removeSubscriber(topic string, id uint64, pattern bool) 
 }
 
 // deliver handles message delivery to a subscriber with backpressure policy.
-func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
+func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message) {
 	// Panic recovery
 	if ps.config.EnablePanicRecovery {
 		defer func() {
@@ -848,7 +875,7 @@ func (ps *InProcPubSub) deliver(s *subscriber, msg Message) {
 	case DropNewest:
 		cancelSub = ps.deliverDropNewest(s, msg, metricTopic)
 	case BlockWithTimeout:
-		cancelSub = ps.deliverBlockWithTimeout(s, msg, metricTopic)
+		cancelSub = ps.deliverBlockWithTimeout(ctx, s, msg, metricTopic)
 	case CloseSubscriber:
 		cancelSub = ps.deliverCloseSubscriber(s, msg, metricTopic)
 	default:
@@ -935,8 +962,8 @@ func (ps *InProcPubSub) deliverDropNewest(s *subscriber, msg Message, metricTopi
 	}
 }
 
-// deliverBlockWithTimeout blocks until timeout or success.
-func (ps *InProcPubSub) deliverBlockWithTimeout(s *subscriber, msg Message, metricTopic string) bool {
+// deliverBlockWithTimeout blocks until timeout, context cancellation, or success.
+func (ps *InProcPubSub) deliverBlockWithTimeout(ctx context.Context, s *subscriber, msg Message, metricTopic string) bool {
 	timeout := s.opts.BlockTimeout
 	if timeout <= 0 {
 		timeout = ps.config.DefaultBlockTimeout
@@ -954,6 +981,13 @@ func (ps *InProcPubSub) deliverBlockWithTimeout(s *subscriber, msg Message, metr
 		}
 		return false
 	case <-timer.C:
+		ps.metrics.incDropped(metricTopic, BlockWithTimeout)
+		s.dropped.Add(1)
+		if ps.config.Hooks.OnDrop != nil {
+			ps.config.Hooks.OnDrop(metricTopic, s.id, &msg, BlockWithTimeout)
+		}
+		return false
+	case <-ctx.Done():
 		ps.metrics.incDropped(metricTopic, BlockWithTimeout)
 		s.dropped.Add(1)
 		if ps.config.Hooks.OnDrop != nil {
@@ -1047,12 +1081,11 @@ func (ps *InProcPubSub) TopicShardMapping() map[string]int {
 }
 
 // recordMetrics records metrics using the unified collector.
-func (ps *InProcPubSub) recordMetrics(operation, topic string, duration time.Duration, err error) {
+func (ps *InProcPubSub) recordMetrics(ctx context.Context, operation, topic string, duration time.Duration, err error) {
 	collector := ps.config.MetricsCollector
 	if collector == nil {
 		return
 	}
-	ctx := context.Background()
 	collector.ObservePubSub(ctx, operation, topic, duration, err)
 }
 
