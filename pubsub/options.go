@@ -48,6 +48,15 @@ type Config struct {
 	// TTLCleanupInterval is how often the TTL manager checks for expired entries (default: 1m).
 	// Only used when EnableTTL is true.
 	TTLCleanupInterval time.Duration
+
+	// EnableHistory enables per-topic message history retention.
+	// When enabled, published messages are stored in a circular buffer per topic,
+	// allowing late subscribers to catch up on recent messages.
+	EnableHistory bool
+
+	// HistoryConfig configures topic history behavior.
+	// Only used when EnableHistory is true.
+	HistoryConfig HistoryConfig
 }
 
 // Hooks contains lifecycle event callbacks.
@@ -172,6 +181,23 @@ func WithTTL(cleanupInterval ...time.Duration) Option {
 		c.EnableTTL = true
 		if len(cleanupInterval) > 0 && cleanupInterval[0] > 0 {
 			c.TTLCleanupInterval = cleanupInterval[0]
+		}
+	}
+}
+
+// WithHistory enables per-topic message history retention.
+// Published messages are stored in a circular buffer per topic, allowing
+// late subscribers to catch up on recent messages via GetTopicHistory,
+// GetTopicHistorySince, and GetRecentMessages methods.
+//
+// If no config is provided, DefaultHistoryConfig() is used.
+func WithHistory(configs ...HistoryConfig) Option {
+	return func(c *Config) {
+		c.EnableHistory = true
+		if len(configs) > 0 {
+			c.HistoryConfig = configs[0]
+		} else {
+			c.HistoryConfig = DefaultHistoryConfig()
 		}
 	}
 }
