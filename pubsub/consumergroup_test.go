@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -416,6 +417,154 @@ func TestConsumerGroup_PartitionAssignment(t *testing.T) {
 	// Each consumer should have some partitions assigned
 	if len(c1.assignedParts) == 0 && len(c2.assignedParts) == 0 {
 		t.Log("Note: Partitions not yet assigned (may be async)")
+	}
+}
+
+func TestConsumerGroup_RebalanceCancelledContext(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("ctx-cancel-group")
+	_ = cgm.CreateGroup(config)
+
+	// Join a consumer so there is work to do during rebalance
+	c1, _ := cgm.JoinGroup("ctx-cancel-group", "c1", []string{"test.topic"})
+	defer c1.Close()
+
+	time.Sleep(100 * time.Millisecond) // Wait for initial rebalance
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["ctx-cancel-group"]
+	cgm.groupsMu.RUnlock()
+
+	genBefore := group.generation.Load()
+
+	// Call rebalance with an already-cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	err := group.rebalance(ctx)
+	if err == nil {
+		t.Error("Expected error from rebalance with cancelled context")
+	}
+	if err != context.Canceled {
+		t.Errorf("Expected context.Canceled, got %v", err)
+	}
+
+	// Generation should not have changed since we called rebalance directly
+	// and it returned an error
+	genAfter := group.generation.Load()
+	if genAfter != genBefore {
+		t.Errorf("Generation should not change on failed rebalance: before=%d, after=%d", genBefore, genAfter)
+	}
+}
+
+func TestConsumerGroup_RebalanceTimedOutContext(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("ctx-timeout-group")
+	_ = cgm.CreateGroup(config)
+
+	c1, _ := cgm.JoinGroup("ctx-timeout-group", "c1", []string{"test.topic"})
+	defer c1.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["ctx-timeout-group"]
+	cgm.groupsMu.RUnlock()
+
+	// Call rebalance with an already-expired timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
+	time.Sleep(time.Millisecond) // Ensure timeout has expired
+
+	err := group.rebalance(ctx)
+	if err == nil {
+		t.Error("Expected error from rebalance with expired context")
+	}
+	if err != context.DeadlineExceeded {
+		t.Errorf("Expected context.DeadlineExceeded, got %v", err)
+	}
+}
+
+func TestConsumerGroup_TriggerRebalanceNoGenIncrementOnCancel(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("trigger-cancel-group")
+	config.RebalanceTimeout = time.Nanosecond // Extremely short timeout to force expiry
+	_ = cgm.CreateGroup(config)
+
+	c1, _ := cgm.JoinGroup("trigger-cancel-group", "c1", []string{"test.topic"})
+	defer c1.Close()
+
+	time.Sleep(200 * time.Millisecond) // Wait for initial rebalance to settle
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["trigger-cancel-group"]
+	cgm.groupsMu.RUnlock()
+
+	genBefore := group.generation.Load()
+
+	// Now cancel the group's root context so new rebalances fail
+	group.cancel()
+
+	// Trigger a rebalance - it should fail since group ctx is cancelled
+	group.rebalancing.Store(false) // Reset rebalancing flag
+	group.triggerRebalance()
+
+	time.Sleep(50 * time.Millisecond)
+
+	genAfter := group.generation.Load()
+	if genAfter != genBefore {
+		t.Errorf("Generation should not increment when rebalance fails: before=%d, after=%d", genBefore, genAfter)
+	}
+}
+
+func TestConsumerGroup_RebalanceSuccessWithValidContext(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("ctx-valid-group")
+	_ = cgm.CreateGroup(config)
+
+	c1, _ := cgm.JoinGroup("ctx-valid-group", "c1", []string{"test.topic"})
+	c2, _ := cgm.JoinGroup("ctx-valid-group", "c2", []string{"test.topic"})
+	defer c1.Close()
+	defer c2.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["ctx-valid-group"]
+	cgm.groupsMu.RUnlock()
+
+	// Rebalance with a valid context should succeed
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := group.rebalance(ctx)
+	if err != nil {
+		t.Fatalf("Expected no error from rebalance with valid context, got %v", err)
+	}
+
+	// Verify assignments were made
+	group.assignmentMu.RLock()
+	hasAssignments := len(group.assignments) > 0
+	group.assignmentMu.RUnlock()
+
+	if !hasAssignments {
+		t.Error("Expected assignments to be created after successful rebalance")
 	}
 }
 
