@@ -12,17 +12,26 @@ import (
 	"github.com/spcent/plumego/metrics"
 )
 
+// subKind distinguishes the type of subscription.
+type subKind int
+
+const (
+	subKindTopic   subKind = iota // exact topic subscription
+	subKindPattern                // glob/filepath pattern subscription
+	subKindMQTT                   // MQTT-style pattern subscription
+)
+
 // subscriber represents a subscription to a topic.
 type subscriber struct {
-	id      uint64
-	topic   string
-	ch      chan Message
-	opts    SubOptions
-	closed  atomic.Bool
-	once    sync.Once
-	mu      sync.Mutex
-	pattern bool
-	done    chan struct{}
+	id     uint64
+	topic  string
+	ch     chan Message
+	opts   SubOptions
+	closed atomic.Bool
+	once   sync.Once
+	mu     sync.Mutex
+	kind   subKind
+	done   chan struct{}
 
 	// Ring buffer for O(1) DropOldest (nil when not using ring buffer)
 	ringBuf  *ringBuffer
@@ -105,7 +114,7 @@ func (s *subscriber) Cancel() {
 			s.ps.config.Hooks.OnUnsubscribe(s.topic, s.id)
 		}
 
-		s.ps.removeSubscriber(s.topic, s.id, s.pattern)
+		s.ps.removeSubscriber(s.topic, s.id, s.kind)
 	})
 }
 
@@ -392,6 +401,39 @@ func (ps *InProcPubSub) SubscribePatternWithContext(ctx context.Context, pattern
 	return ps.subscribeInternal(ctx, pattern, opts, true)
 }
 
+// SubscribeMQTT creates a new subscription using MQTT-style topic patterns.
+//
+// MQTT pattern rules:
+//   - "/" is the level separator
+//   - "+" matches exactly one level (e.g., "a/+/c" matches "a/b/c" but not "a/b/d/c")
+//   - "#" matches zero or more levels and must be the last character (e.g., "a/#" matches "a", "a/b", "a/b/c")
+//
+// Example:
+//
+//	ps := pubsub.New()
+//	defer ps.Close()
+//
+//	// Subscribe to all sensor temperature readings
+//	sub, err := ps.SubscribeMQTT("devices/+/temperature", pubsub.SubOptions{
+//		BufferSize: 16,
+//		Policy:     pubsub.DropOldest,
+//	})
+//	if err != nil {
+//		// Handle error
+//	}
+//	defer sub.Cancel()
+//
+//	// Subscribe to all device events
+//	sub2, err := ps.SubscribeMQTT("devices/#", pubsub.DefaultSubOptions())
+func (ps *InProcPubSub) SubscribeMQTT(pattern string, opts SubOptions) (Subscription, error) {
+	return ps.subscribeMQTTInternal(context.Background(), pattern, opts)
+}
+
+// SubscribeMQTTWithContext creates an MQTT pattern subscription that is cancelled when the context is done.
+func (ps *InProcPubSub) SubscribeMQTTWithContext(ctx context.Context, pattern string, opts SubOptions) (Subscription, error) {
+	return ps.subscribeMQTTInternal(ctx, pattern, opts)
+}
+
 // subscribeInternal is the internal implementation for all subscribe methods.
 func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opts SubOptions, isPattern bool) (Subscription, error) {
 	start := time.Now()
@@ -436,14 +478,19 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 		ctx, cancel = context.WithCancel(ctx)
 	}
 
+	kind := subKindTopic
+	if isPattern {
+		kind = subKindPattern
+	}
+
 	sub := &subscriber{
-		id:      id,
-		topic:   topic,
-		opts:    opts,
-		ps:      ps,
-		pattern: isPattern,
-		done:    make(chan struct{}),
-		cancel:  cancel,
+		id:     id,
+		topic:  topic,
+		opts:   opts,
+		ps:     ps,
+		kind:   kind,
+		done:   make(chan struct{}),
+		cancel: cancel,
 	}
 
 	// Use ring buffer for DropOldest when enabled
@@ -467,6 +514,87 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 	// Call hook
 	if ps.config.Hooks.OnSubscribe != nil {
 		ps.config.Hooks.OnSubscribe(topic, id)
+	}
+
+	// Handle context cancellation
+	if ctx != nil {
+		go func() {
+			select {
+			case <-ctx.Done():
+				sub.Cancel()
+			case <-sub.done:
+			}
+		}()
+	}
+
+	return sub, nil
+}
+
+// subscribeMQTTInternal is the internal implementation for MQTT subscribe methods.
+func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern string, opts SubOptions) (Subscription, error) {
+	start := time.Now()
+	var err error
+	defer func() {
+		ps.recordMetrics(ctx, "subscribe_mqtt", pattern, time.Since(start), err)
+	}()
+
+	if ps.closed.Load() {
+		err = ErrSubscribeToClosed
+		return nil, err
+	}
+
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		err = ErrInvalidPattern
+		return nil, err
+	}
+
+	// Validate MQTT pattern syntax
+	if validErr := ValidateMQTTPattern(pattern); validErr != nil {
+		err = validErr
+		return nil, err
+	}
+
+	opts = ps.normalizeSubOptions(opts)
+	if opts.BufferSize < 1 {
+		err = ErrBufferTooSmall
+		return nil, err
+	}
+
+	id := ps.nextID.Add(1)
+
+	var cancel context.CancelFunc
+	if ctx != nil {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+
+	sub := &subscriber{
+		id:     id,
+		topic:  pattern,
+		opts:   opts,
+		ps:     ps,
+		kind:   subKindMQTT,
+		done:   make(chan struct{}),
+		cancel: cancel,
+	}
+
+	// Use ring buffer for DropOldest when enabled
+	if opts.UseRingBuffer && opts.Policy == DropOldest {
+		sub.ringBuf = newRingBuffer(opts.BufferSize)
+		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
+		sub.pumpDone = make(chan struct{})
+		go sub.pumpRingBuffer()
+	} else {
+		sub.ch = make(chan Message, opts.BufferSize)
+	}
+
+	// Add to sharded map
+	ps.shards.addMQTTPattern(pattern, id, sub)
+	ps.metrics.addSubs(pattern, 1)
+
+	// Call hook
+	if ps.config.Hooks.OnSubscribe != nil {
+		ps.config.Hooks.OnSubscribe(pattern, id)
 	}
 
 	// Handle context cancellation
@@ -561,6 +689,10 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 	if ps.shards.hasAnyPatterns() {
 		patterns = ps.shards.getAllPatterns()
 	}
+	var mqttSubs []*subscriber
+	if ps.shards.hasAnyMQTTPatterns() {
+		mqttSubs = ps.shards.getMQTTPatternMatches(topic)
+	}
 
 	ps.pendingOps.Add(1)
 	defer ps.pendingOps.Add(-1)
@@ -586,9 +718,14 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 			ps.deliver(bgCtx, s, clonedMsg)
 		}
 
-		// Deliver to pattern subscribers
+		// Deliver to glob pattern subscribers
 		if len(patterns) > 0 {
 			ps.deliverToPatterns(bgCtx, patterns, topic, clonedMsg)
+		}
+
+		// Deliver to MQTT pattern subscribers
+		for _, s := range mqttSubs {
+			ps.deliver(bgCtx, s, clonedMsg)
 		}
 	}
 
@@ -704,8 +841,9 @@ func (ps *InProcPubSub) doPublish(ctx context.Context, topic string, msg Message
 	// Fast path: skip subscriber lookup when no subscribers exist
 	hasTopicSubs := ps.shards.topicExists(topic)
 	hasPatternSubs := ps.shards.hasAnyPatterns()
+	hasMQTTSubs := ps.shards.hasAnyMQTTPatterns()
 
-	if !hasTopicSubs && !hasPatternSubs {
+	if !hasTopicSubs && !hasPatternSubs && !hasMQTTSubs {
 		return
 	}
 
@@ -720,10 +858,21 @@ func (ps *InProcPubSub) doPublish(ctx context.Context, topic string, msg Message
 		}
 	}
 
-	// Get and deliver to pattern subscribers
+	// Get and deliver to glob pattern subscribers
 	if hasPatternSubs {
 		patterns := ps.shards.getAllPatterns()
 		ps.deliverToPatterns(ctx, patterns, topic, msg)
+	}
+
+	// Get and deliver to MQTT pattern subscribers
+	if hasMQTTSubs {
+		mqttSubs := ps.shards.getMQTTPatternMatches(topic)
+		for _, s := range mqttSubs {
+			if ctx.Err() != nil {
+				return
+			}
+			ps.deliver(ctx, s, msg)
+		}
 	}
 }
 
@@ -768,6 +917,11 @@ func (ps *InProcPubSub) GetPatternSubscriberCount(pattern string) int {
 	return ps.shards.getPatternSubscriberCount(pattern)
 }
 
+// GetMQTTSubscriberCount returns the number of subscribers for an MQTT pattern.
+func (ps *InProcPubSub) GetMQTTSubscriberCount(pattern string) int {
+	return ps.shards.getMQTTPatternSubscriberCount(pattern)
+}
+
 // TopicExists checks if a topic has any active subscribers.
 // This is a lightweight check that only acquires a read lock on one shard.
 func (ps *InProcPubSub) TopicExists(topic string) bool {
@@ -780,15 +934,20 @@ func (ps *InProcPubSub) PatternExists(pattern string) bool {
 	return ps.shards.patternExists(pattern)
 }
 
+// MQTTPatternExists checks if an MQTT pattern has any active subscribers.
+func (ps *InProcPubSub) MQTTPatternExists(pattern string) bool {
+	return ps.shards.mqttPatternExists(pattern)
+}
+
 // HasSubscribers checks if publishing to the given topic would reach any subscriber,
-// either through an exact topic match or a matching pattern subscription.
+// either through an exact topic match, a matching glob pattern, or a matching MQTT pattern subscription.
 func (ps *InProcPubSub) HasSubscribers(topic string) bool {
 	// Fast path: check exact topic subscribers
 	if ps.shards.topicExists(topic) {
 		return true
 	}
 
-	// Slow path: check pattern subscribers
+	// Check glob pattern subscribers
 	patterns := ps.shards.getAllPatterns()
 	for _, entry := range patterns {
 		if strings.ContainsAny(entry.pattern, "*?[]\\") {
@@ -796,6 +955,14 @@ func (ps *InProcPubSub) HasSubscribers(topic string) bool {
 				return true
 			}
 		} else if entry.pattern == topic {
+			return true
+		}
+	}
+
+	// Check MQTT pattern subscribers
+	if ps.shards.hasAnyMQTTPatterns() {
+		mqttSubs := ps.shards.getMQTTPatternMatches(topic)
+		if len(mqttSubs) > 0 {
 			return true
 		}
 	}
@@ -817,11 +984,21 @@ func (ps *InProcPubSub) ListPatterns() []string {
 	return patterns
 }
 
+// ListMQTTPatterns returns all active MQTT subscription patterns.
+func (ps *InProcPubSub) ListMQTTPatterns() []string {
+	patterns := ps.shards.listMQTTPatterns()
+	sort.Strings(patterns)
+	return patterns
+}
+
 // removeSubscriber removes subscription from the sharded map.
-func (ps *InProcPubSub) removeSubscriber(topic string, id uint64, pattern bool) {
-	if pattern {
+func (ps *InProcPubSub) removeSubscriber(topic string, id uint64, kind subKind) {
+	switch kind {
+	case subKindPattern:
 		ps.shards.removePattern(topic, id)
-	} else {
+	case subKindMQTT:
+		ps.shards.removeMQTTPattern(topic, id)
+	default:
 		ps.shards.removeTopic(topic, id)
 	}
 	ps.metrics.addSubs(topic, -1)
@@ -842,7 +1019,7 @@ func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message)
 	}
 
 	metricTopic := s.topic
-	if s.pattern {
+	if s.kind != subKindTopic {
 		metricTopic = msg.Topic
 	}
 
@@ -1293,6 +1470,7 @@ func (ps *InProcPubSub) TopicHistorySequence(topic string) (uint64, error) {
 var (
 	_ PubSub             = (*InProcPubSub)(nil)
 	_ PatternPubSub      = (*InProcPubSub)(nil)
+	_ MQTTPubSub         = (*InProcPubSub)(nil)
 	_ ContextPubSub      = (*InProcPubSub)(nil)
 	_ BatchPubSub        = (*InProcPubSub)(nil)
 	_ DrainablePubSub    = (*InProcPubSub)(nil)

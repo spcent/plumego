@@ -226,6 +226,29 @@ type PatternPubSub interface {
 	SubscribePattern(pattern string, opts SubOptions) (Subscription, error)
 }
 
+// MQTTPubSub extends PubSub with MQTT-style pattern subscriptions.
+//
+// MQTT patterns use "/" as a level separator with two wildcards:
+//   - "+" matches exactly one level (e.g., "devices/+/temp" matches "devices/sensor1/temp")
+//   - "#" matches zero or more levels (must be last, e.g., "devices/#" matches "devices/sensor1/temp")
+//
+// Example:
+//
+//	var ps pubsub.MQTTPubSub = pubsub.New()
+//	defer ps.Close()
+//
+//	// Subscribe to all sensor temperature readings
+//	sub, err := ps.SubscribeMQTT("devices/+/temperature", pubsub.DefaultSubOptions())
+//
+//	// Subscribe to all events under a device
+//	sub2, err := ps.SubscribeMQTT("devices/sensor1/#", pubsub.DefaultSubOptions())
+type MQTTPubSub interface {
+	PubSub
+
+	// SubscribeMQTT creates a new subscription using MQTT-style topic patterns.
+	SubscribeMQTT(pattern string, opts SubOptions) (Subscription, error)
+}
+
 // ContextPubSub extends PatternPubSub with context-aware operations.
 type ContextPubSub interface {
 	PatternPubSub

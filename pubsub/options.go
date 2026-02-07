@@ -202,8 +202,8 @@ func WithTTL(cleanupInterval ...time.Duration) Option {
 // performance under high contention and eliminates potential spin-loop issues.
 func WithRingBuffer() Option {
 	return func(c *Config) {
-    c.EnableRingBuffer = true
-  }
+		c.EnableRingBuffer = true
+	}
 }
 
 // WithRequestReply enables the request-reply manager for efficient RPC-style
