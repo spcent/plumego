@@ -1,10 +1,13 @@
 package health
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -25,6 +28,18 @@ type ErrorResponse struct {
 	RequestID string    `json:"request_id,omitempty"`
 }
 
+// RuntimeInfo contains runtime diagnostics included in development mode.
+type RuntimeInfo struct {
+	GoVersion    string `json:"go_version"`
+	NumGoroutine int    `json:"num_goroutine"`
+	NumCPU       int    `json:"num_cpu"`
+	GOARCH       string `json:"goarch"`
+	GOOS         string `json:"goos"`
+	MemAlloc     uint64 `json:"mem_alloc_bytes"`
+	MemSys       uint64 `json:"mem_sys_bytes"`
+	NumGC        uint32 `json:"num_gc"`
+}
+
 // HealthResponse represents a standardized health response.
 type HealthResponse struct {
 	HealthStatus `json:",inline"`
@@ -32,6 +47,7 @@ type HealthResponse struct {
 	RequestID    string          `json:"request_id,omitempty"`
 	BuildInfo    BuildInfo       `json:"build_info,omitempty"`
 	Readiness    ReadinessStatus `json:"readiness,omitempty"`
+	Runtime      *RuntimeInfo    `json:"runtime,omitempty"`
 }
 
 // HealthHandler creates a comprehensive health check handler with enhanced error handling.
@@ -93,6 +109,11 @@ func HealthHandler(manager HealthManager) http.Handler {
 			RequestID:    requestID,
 			BuildInfo:    GetBuildInfo(),
 			Readiness:    GetReadiness(),
+		}
+
+		// Include runtime diagnostics in development mode
+		if isDevelopment() {
+			response.Runtime = getRuntimeInfo()
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -217,14 +238,109 @@ func sendErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int, c
 }
 
 // handlePanic handles panics in HTTP handlers gracefully.
+// In development mode, the panic value and stack trace are included in the
+// response body so that developers can diagnose the issue without checking
+// server logs. In production, only a generic error message is returned.
 func handlePanic(w http.ResponseWriter, r *http.Request, panicValue any, requestID string) {
-	log.Printf("[PANIC] health handler panic: %v\n%s", panicValue, debug.Stack())
+	stack := string(debug.Stack())
+	log.Printf("[PANIC] health handler panic: %v\n%s", panicValue, stack)
+
+	if isDevelopment() {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
+		details := map[string]any{
+			"error":     http.StatusText(http.StatusInternalServerError),
+			"timestamp": time.Now(),
+			"panic":     fmt.Sprintf("%v", panicValue),
+			"stack":     stack,
+		}
+		if requestID != "" {
+			details["request_id"] = requestID
+		}
+
+		apiErr := contract.APIError{
+			Status:   http.StatusInternalServerError,
+			Code:     "INTERNAL_SERVER_ERROR",
+			Message:  fmt.Sprintf("panic: %v", panicValue),
+			Category: contract.CategoryForStatus(http.StatusInternalServerError),
+			Details:  details,
+		}
+		if requestID != "" {
+			apiErr.TraceID = requestID
+		}
+		contract.WriteError(w, r, apiErr)
+		return
+	}
 
 	sendErrorResponse(w, r, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR",
 		"Internal server error occurred", requestID)
 }
 
 // isDevelopment checks if the application is running in development mode.
+// It returns true when either APP_ENV is set to "development" or APP_DEBUG
+// is set to "true". The core lifecycle sets APP_DEBUG when debug mode is
+// enabled via core.WithDebug().
 func isDevelopment() bool {
-	return os.Getenv("APP_ENV") == "development"
+	if strings.EqualFold(os.Getenv("APP_ENV"), "development") {
+		return true
+	}
+	return strings.EqualFold(os.Getenv("APP_DEBUG"), "true")
+}
+
+// getRuntimeInfo collects current Go runtime diagnostics.
+func getRuntimeInfo() *RuntimeInfo {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return &RuntimeInfo{
+		GoVersion:    runtime.Version(),
+		NumGoroutine: runtime.NumGoroutine(),
+		NumCPU:       runtime.NumCPU(),
+		GOARCH:       runtime.GOARCH,
+		GOOS:         runtime.GOOS,
+		MemAlloc:     m.Alloc,
+		MemSys:       m.Sys,
+		NumGC:        m.NumGC,
+	}
+}
+
+// DebugHealthHandler creates a handler that returns comprehensive system
+// diagnostics. This handler only responds in development mode; in production
+// it returns 404 Not Found to avoid leaking internal details.
+func DebugHealthHandler(manager HealthManager) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !isDevelopment() {
+			http.NotFound(w, r)
+			return
+		}
+
+		startTime := time.Now()
+		requestID := extractRequestID(r)
+
+		ri := getRuntimeInfo()
+
+		response := map[string]any{
+			"request_id":    requestID,
+			"timestamp":     time.Now(),
+			"build_info":    GetBuildInfo(),
+			"readiness":     GetReadiness(),
+			"runtime":       ri,
+			"response_time": time.Since(startTime).String(),
+		}
+
+		if manager != nil {
+			ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
+			defer cancel()
+
+			overall := manager.CheckAllComponents(ctx)
+			allHealth := manager.GetAllHealth()
+			config := manager.GetConfig()
+
+			response["health"] = overall
+			response["components"] = allHealth
+			response["config"] = config
+		}
+
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		_ = contract.WriteJSON(w, http.StatusOK, response)
+	})
 }
