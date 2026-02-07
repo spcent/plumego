@@ -251,6 +251,125 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 	}
 }
 
+func TestExtractTable(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		// SELECT
+		{"select from", "SELECT * FROM users", "users"},
+		{"select from with alias", "SELECT u.id FROM users u WHERE u.id = 1", "users"},
+		{"select from schema qualified", "SELECT * FROM public.users", "users"},
+		{"select from quoted", `SELECT * FROM "users"`, "users"},
+		{"select from backtick quoted", "SELECT * FROM `users`", "users"},
+		{"select from bracket quoted", "SELECT * FROM [users]", "users"},
+		{"select from schema quoted", `SELECT * FROM public."Users"`, "Users"},
+		{"select from subquery", "SELECT * FROM (SELECT id FROM users) sub", "users"},
+		// INSERT
+		{"insert into", "INSERT INTO orders (id, total) VALUES (1, 100)", "orders"},
+		{"insert into schema", "INSERT INTO sales.orders (id) VALUES (1)", "orders"},
+		{"insert into quoted", `INSERT INTO "Orders" (id) VALUES (1)`, "Orders"},
+		// UPDATE
+		{"update", "UPDATE products SET price = 10 WHERE id = 1", "products"},
+		{"update schema", "UPDATE inventory.products SET qty = 0", "products"},
+		{"update quoted", "UPDATE `products` SET price = 10", "products"},
+		// DELETE
+		{"delete from", "DELETE FROM sessions WHERE expired = true", "sessions"},
+		{"delete from schema", "DELETE FROM auth.sessions WHERE id = 1", "sessions"},
+		// DDL
+		{"create table", "CREATE TABLE metrics (id INT PRIMARY KEY)", "metrics"},
+		{"create table if not exists", "CREATE TABLE IF NOT EXISTS metrics (id INT)", "metrics"},
+		{"alter table", "ALTER TABLE users ADD COLUMN email TEXT", "users"},
+		{"drop table", "DROP TABLE temp_data", "temp_data"},
+		{"drop table if exists", "DROP TABLE IF EXISTS temp_data", "temp_data"},
+		{"truncate table", "TRUNCATE TABLE logs", "logs"},
+		// Other DML
+		{"replace into", "REPLACE INTO cache (key, value) VALUES ('k', 'v')", "cache"},
+		{"merge into", "MERGE INTO target USING source ON target.id = source.id", "target"},
+		// Case insensitive
+		{"lowercase keywords", "select * from users where id = 1", "users"},
+		{"mixed case", "Select * From Users Where Id = 1", "Users"},
+		// Edge cases
+		{"empty query", "", ""},
+		{"no table", "SELECT 1", ""},
+		{"ping", "SELECT 1 AS ping", ""},
+		{"begin", "BEGIN", ""},
+		{"commit", "COMMIT", ""},
+		{"trailing semicolon", "SELECT * FROM users;", "users"},
+		{"trailing comma", "DELETE FROM orders, items", "orders"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractTable(tt.query)
+			if got != tt.want {
+				t.Errorf("extractTable(%q) = %q, want %q", tt.query, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCleanTableName(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"plain", "users", "users"},
+		{"double quoted", `"users"`, "users"},
+		{"backtick quoted", "`users`", "users"},
+		{"bracket quoted", "[users]", "users"},
+		{"schema qualified", "public.users", "users"},
+		{"schema quoted table", `public."Users"`, "Users"},
+		{"trailing semicolon", "users;", "users"},
+		{"trailing comma", "users,", "users"},
+		{"trailing paren", "users(", "users"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanTableName(tt.input)
+			if got != tt.want {
+				t.Errorf("cleanTableName(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBaseMetricsCollector_ObserveDB_LabelTable(t *testing.T) {
+	tests := []struct {
+		name      string
+		query     string
+		wantTable string
+	}{
+		{"select query", "SELECT * FROM users WHERE id = 1", "users"},
+		{"insert query", "INSERT INTO orders (id) VALUES (1)", "orders"},
+		{"update query", "UPDATE products SET price = 10", "products"},
+		{"delete query", "DELETE FROM sessions", "sessions"},
+		{"no table", "SELECT 1", ""},
+		{"empty query", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			collector := NewBaseMetricsCollector()
+			collector.ObserveDB(context.Background(), "query", "postgres", tt.query, 0, 10*time.Millisecond, nil)
+
+			records := collector.GetRecords()
+			if len(records) != 1 {
+				t.Fatalf("expected 1 record, got %d", len(records))
+			}
+
+			tableLabel := records[0].Labels[labelTable]
+			if tableLabel != tt.wantTable {
+				t.Errorf("expected table label %q, got %q", tt.wantTable, tableLabel)
+			}
+		})
+	}
+}
+
 func TestBaseMetricsCollector_ObserveDB_DefaultOperation(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	ctx := context.Background()
