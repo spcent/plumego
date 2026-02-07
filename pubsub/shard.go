@@ -272,6 +272,20 @@ func (sm *shardedMap) patternExists(pattern string) bool {
 	return len(s.patterns[pattern]) > 0
 }
 
+// hasAnyPatterns checks if any pattern subscriptions exist across all shards.
+// It short-circuits as soon as it finds one, making it cheaper than getAllPatterns.
+func (sm *shardedMap) hasAnyPatterns() bool {
+	for _, s := range sm.shards {
+		s.mu.RLock()
+		n := len(s.patterns)
+		s.mu.RUnlock()
+		if n > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // ShardStat contains statistics for a single shard.
 type ShardStat struct {
 	// Index is the shard index.
