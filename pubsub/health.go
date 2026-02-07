@@ -189,16 +189,10 @@ func (ps *InProcPubSub) DiagnosticInfo() map[string]any {
 	}
 
 	// Shard info
-	shardInfo := make([]map[string]int, ps.shards.shardCount)
-	for i, s := range ps.shards.shards {
-		s.mu.RLock()
-		shardInfo[i] = map[string]int{
-			"topics":   len(s.topics),
-			"patterns": len(s.patterns),
-		}
-		s.mu.RUnlock()
-	}
-	info["shards"] = shardInfo
+	info["shards"] = ps.shards.shardStats()
+
+	// Topic-to-shard mapping
+	info["topic_shard_mapping"] = ps.shards.topicShardMapping()
 
 	// Worker pool info
 	if ps.workerPool != nil {

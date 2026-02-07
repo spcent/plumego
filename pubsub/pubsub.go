@@ -874,6 +874,23 @@ func (ps *InProcPubSub) Config() Config {
 	return ps.config
 }
 
+// TopicShard returns the shard index that a topic or pattern is assigned to.
+// This is useful for diagnostics and understanding topic distribution across shards.
+func (ps *InProcPubSub) TopicShard(topic string) int {
+	return ps.shards.getShardIndex(topic)
+}
+
+// ShardStats returns per-shard statistics for monitoring shard balance and distribution.
+func (ps *InProcPubSub) ShardStats() []ShardStat {
+	return ps.shards.shardStats()
+}
+
+// TopicShardMapping returns a map of all active topics and patterns to their shard indices.
+// This is useful for understanding how topics are distributed across shards.
+func (ps *InProcPubSub) TopicShardMapping() map[string]int {
+	return ps.shards.topicShardMapping()
+}
+
 // recordMetrics records metrics using the unified collector.
 func (ps *InProcPubSub) recordMetrics(operation, topic string, duration time.Duration, err error) {
 	collector := ps.config.MetricsCollector
