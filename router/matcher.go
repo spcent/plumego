@@ -69,7 +69,9 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 	}
 
 	current := rm.root
-	paramValues := make([]string, 0, len(parts))
+	// Use pooled slice for parameter values to avoid per-request allocation
+	pvPtr := GetParamValues()
+	paramValues := *pvPtr
 
 	for i, pathSegment := range parts {
 		// Reject empty path segments (e.g., from double slashes /users//123)
@@ -83,6 +85,8 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 				break
 			}
 			// Empty segment with no wildcard = no match
+			*pvPtr = paramValues
+			PutParamValues(pvPtr)
 			return nil
 		}
 
@@ -108,18 +112,32 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 		}
 
 		// No match found
+		*pvPtr = paramValues
+		PutParamValues(pvPtr)
 		return nil
 	}
 
 	// Check if we found a valid handler
 	if current == nil || current.handler == nil {
+		*pvPtr = paramValues
+		PutParamValues(pvPtr)
 		return nil
 	}
+
+	// Copy param values out of the pooled slice so we can return it to the pool.
+	// For zero params this is a nil slice (no allocation).
+	var resultParams []string
+	if len(paramValues) > 0 {
+		resultParams = make([]string, len(paramValues))
+		copy(resultParams, paramValues)
+	}
+	*pvPtr = paramValues
+	PutParamValues(pvPtr)
 
 	// Return match result with direct middleware slice
 	return &MatchResult{
 		Handler:          current.handler,
-		ParamValues:      paramValues,
+		ParamValues:      resultParams,
 		ParamKeys:        current.paramKeys,
 		RouteMiddlewares: current.middlewares,
 		RoutePattern:     current.fullPath,
