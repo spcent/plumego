@@ -546,8 +546,8 @@ func (r *Router) Register(registrars ...RouteRegistrar) {
 //	admin.Use(middleware.AuthRequired())
 //	admin.Get("/dashboard", dashboardHandler)
 func (r *Router) Group(prefix string) *Router {
-	// Create full prefix by combining with parent's prefix
-	fullPrefix := r.prefix + prefix
+	// Normalize and combine with parent's prefix
+	fullPrefix := normalizeGroupPrefix(r.prefix, prefix)
 
 	return &Router{
 		prefix:            fullPrefix,
@@ -562,6 +562,47 @@ func (r *Router) Group(prefix string) *Router {
 		routeMeta:         r.routeMeta,
 		namedRoutes:       r.namedRoutes, // Share named routes with parent
 	}
+}
+
+// GroupFunc creates a new route group with the given prefix and invokes
+// the callback function with the group router. This is a convenience method
+// for defining scoped route groups inline.
+//
+// Example:
+//
+//	r.GroupFunc("/api/v1", func(v1 *Router) {
+//	    v1.Use(rateLimitMiddleware)
+//	    v1.Get("/users", listUsersHandler)
+//
+//	    v1.GroupFunc("/admin", func(admin *Router) {
+//	        admin.Use(authMiddleware)
+//	        admin.Get("/dashboard", dashboardHandler)
+//	    })
+//	})
+func (r *Router) GroupFunc(prefix string, fn func(*Router)) *Router {
+	g := r.Group(prefix)
+	fn(g)
+	return g
+}
+
+// normalizeGroupPrefix combines a parent prefix and a child prefix,
+// ensuring the result has a leading slash, no trailing slash, and no
+// double slashes from concatenation.
+func normalizeGroupPrefix(parent, child string) string {
+	// Ensure child has leading slash
+	if child != "" && child[0] != '/' {
+		child = "/" + child
+	}
+	// Remove trailing slash from child
+	child = strings.TrimRight(child, "/")
+	// Remove trailing slash from parent before joining
+	parent = strings.TrimRight(parent, "/")
+
+	combined := parent + child
+	if combined == "" {
+		return ""
+	}
+	return combined
 }
 
 // AddRoute adds a route to the router with the given method, path and handler.

@@ -477,3 +477,410 @@ func TestRouterCtxHandler(t *testing.T) {
 		t.Fatalf("expected param to be available, got %+v", payload)
 	}
 }
+
+// --- Enhanced Route Group Tests ---
+
+func TestGroupPrefixNormalization(t *testing.T) {
+	tests := []struct {
+		name       string
+		parent     string
+		child      string
+		wantPrefix string
+	}{
+		{"basic", "/api", "/v1", "/api/v1"},
+		{"trailing slash parent", "/api/", "/v1", "/api/v1"},
+		{"trailing slash child", "/api", "/v1/", "/api/v1"},
+		{"both trailing slashes", "/api/", "/v1/", "/api/v1"},
+		{"child missing leading slash", "/api", "v1", "/api/v1"},
+		{"empty parent", "", "/v1", "/v1"},
+		{"empty child", "/api", "", "/api"},
+		{"both empty", "", "", ""},
+		{"root child", "/api", "/", "/api"},
+		{"deep nesting", "/a/b", "/c/d", "/a/b/c/d"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeGroupPrefix(tt.parent, tt.child)
+			if got != tt.wantPrefix {
+				t.Errorf("normalizeGroupPrefix(%q, %q) = %q, want %q",
+					tt.parent, tt.child, got, tt.wantPrefix)
+			}
+		})
+	}
+}
+
+func TestGroupNoPrefixDoubleSlash(t *testing.T) {
+	r := NewRouter()
+
+	// Trailing slash on group prefix should not produce double slashes
+	api := r.Group("/api/")
+	v1 := api.Group("/v1/")
+
+	v1.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+
+	req := httptest.NewRequest("GET", "/api/v1/users", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK || w.Body.String() != "ok" {
+		t.Errorf("expected 200/ok, got %d/%q", w.Code, w.Body.String())
+	}
+}
+
+func TestGroupMissingLeadingSlash(t *testing.T) {
+	r := NewRouter()
+
+	api := r.Group("api") // no leading slash
+	api.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("pong"))
+	})
+
+	req := httptest.NewRequest("GET", "/api/ping", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK || w.Body.String() != "pong" {
+		t.Errorf("expected 200/pong, got %d/%q", w.Code, w.Body.String())
+	}
+}
+
+func TestGroupEmptyPrefix(t *testing.T) {
+	r := NewRouter()
+
+	// Empty prefix group should behave like root
+	g := r.Group("")
+	g.GetFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK || w.Body.String() != "ok" {
+		t.Errorf("expected 200/ok, got %d/%q", w.Code, w.Body.String())
+	}
+}
+
+func TestDeepNestedGroups(t *testing.T) {
+	r := NewRouter()
+
+	// 4 levels of nesting
+	api := r.Group("/api")
+	v1 := api.Group("/v1")
+	users := v1.Group("/users")
+	settings := users.Group("/settings")
+
+	settings.GetFunc("/theme", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("dark"))
+	})
+
+	req := httptest.NewRequest("GET", "/api/v1/users/settings/theme", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK || w.Body.String() != "dark" {
+		t.Errorf("expected 200/dark, got %d/%q", w.Code, w.Body.String())
+	}
+}
+
+func TestDeepNestedGroupMiddlewareOrder(t *testing.T) {
+	r := NewRouter()
+	var order []string
+
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "root")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	api := r.Group("/api")
+	api.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "api")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	v1 := api.Group("/v1")
+	v1.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "v1")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	users := v1.Group("/users")
+	users.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			order = append(order, "users")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	users.GetFunc("/:id", func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+		w.Write([]byte("ok"))
+	})
+
+	order = []string{}
+	req := httptest.NewRequest("GET", "/api/v1/users/42", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	expected := []string{"root", "api", "v1", "users", "handler"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected middleware order %v, got %v", expected, order)
+	}
+}
+
+func TestSiblingGroupMiddlewareIsolation(t *testing.T) {
+	r := NewRouter()
+
+	admin := r.Group("/admin")
+	admin.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Admin", "true")
+			next.ServeHTTP(w, r)
+		})
+	})
+	admin.GetFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("admin"))
+	})
+
+	public := r.Group("/public")
+	public.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Public", "true")
+			next.ServeHTTP(w, r)
+		})
+	})
+	public.GetFunc("/page", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("public"))
+	})
+
+	// Admin group should have X-Admin but not X-Public
+	req := httptest.NewRequest("GET", "/admin/dashboard", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Header().Get("X-Admin") != "true" {
+		t.Error("expected X-Admin header on admin route")
+	}
+	if w.Header().Get("X-Public") != "" {
+		t.Error("admin route should not have X-Public header")
+	}
+
+	// Public group should have X-Public but not X-Admin
+	req = httptest.NewRequest("GET", "/public/page", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Header().Get("X-Public") != "true" {
+		t.Error("expected X-Public header on public route")
+	}
+	if w.Header().Get("X-Admin") != "" {
+		t.Error("public route should not have X-Admin header")
+	}
+}
+
+func TestGroupWithPathParams(t *testing.T) {
+	r := NewRouter()
+
+	api := r.Group("/api/v1")
+	users := api.Group("/users")
+	users.GetFunc("/:id/posts/:postID", func(w http.ResponseWriter, r *http.Request) {
+		id, _ := contract.Param(r, "id")
+		postID, _ := contract.Param(r, "postID")
+		w.Write([]byte(id + ":" + postID))
+	})
+
+	req := httptest.NewRequest("GET", "/api/v1/users/42/posts/99", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK || w.Body.String() != "42:99" {
+		t.Errorf("expected 200/42:99, got %d/%q", w.Code, w.Body.String())
+	}
+}
+
+func TestGroupRootHandler(t *testing.T) {
+	r := NewRouter()
+
+	api := r.Group("/api")
+	// Register handler at the group root (empty path)
+	api.GetFunc("", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("api-root"))
+	})
+	api.GetFunc("/info", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("api-info"))
+	})
+
+	tests := []struct {
+		path     string
+		expected string
+	}{
+		{"/api", "api-root"},
+		{"/api/info", "api-info"},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest("GET", tt.path, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Body.String() != tt.expected {
+			t.Errorf("[GET %s] expected %q, got %q", tt.path, tt.expected, w.Body.String())
+		}
+	}
+}
+
+func TestGroupMultipleMethods(t *testing.T) {
+	r := NewRouter()
+
+	api := r.Group("/api")
+	api.GetFunc("/items", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("list"))
+	})
+	api.PostFunc("/items", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("create"))
+	})
+	api.PutFunc("/items/:id", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("update"))
+	})
+	api.DeleteFunc("/items/:id", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("delete"))
+	})
+
+	tests := []struct {
+		method   string
+		path     string
+		expected string
+	}{
+		{"GET", "/api/items", "list"},
+		{"POST", "/api/items", "create"},
+		{"PUT", "/api/items/1", "update"},
+		{"DELETE", "/api/items/1", "delete"},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest(tt.method, tt.path, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Body.String() != tt.expected {
+			t.Errorf("[%s %s] expected %q, got %q", tt.method, tt.path, tt.expected, w.Body.String())
+		}
+	}
+}
+
+func TestGroupFunc(t *testing.T) {
+	r := NewRouter()
+
+	r.GroupFunc("/api/v1", func(v1 *Router) {
+		v1.GetFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("ok"))
+		})
+
+		v1.GroupFunc("/users", func(users *Router) {
+			users.GetFunc("/:id", func(w http.ResponseWriter, r *http.Request) {
+				id, _ := contract.Param(r, "id")
+				w.Write([]byte("user-" + id))
+			})
+		})
+	})
+
+	tests := []struct {
+		path     string
+		expected string
+	}{
+		{"/api/v1/status", "ok"},
+		{"/api/v1/users/5", "user-5"},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest("GET", tt.path, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK || w.Body.String() != tt.expected {
+			t.Errorf("[GET %s] expected 200/%q, got %d/%q",
+				tt.path, tt.expected, w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestGroupFuncWithMiddleware(t *testing.T) {
+	r := NewRouter()
+	var order []string
+
+	r.GroupFunc("/api", func(api *Router) {
+		api.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, "api-mw")
+				next.ServeHTTP(w, r)
+			})
+		})
+
+		api.GroupFunc("/v1", func(v1 *Router) {
+			v1.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					order = append(order, "v1-mw")
+					next.ServeHTTP(w, r)
+				})
+			})
+
+			v1.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, "handler")
+				w.Write([]byte("pong"))
+			})
+		})
+	})
+
+	order = []string{}
+	req := httptest.NewRequest("GET", "/api/v1/ping", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	expected := []string{"api-mw", "v1-mw", "handler"}
+	if !slicesEqual(order, expected) {
+		t.Fatalf("expected middleware order %v, got %v", expected, order)
+	}
+}
+
+func TestGroupFuncReturnsGroup(t *testing.T) {
+	r := NewRouter()
+
+	v1 := r.GroupFunc("/api/v1", func(v1 *Router) {
+		v1.GetFunc("/inside", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("inside"))
+		})
+	})
+
+	// Can still add routes after GroupFunc returns
+	v1.GetFunc("/outside", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("outside"))
+	})
+
+	tests := []struct {
+		path     string
+		expected string
+	}{
+		{"/api/v1/inside", "inside"},
+		{"/api/v1/outside", "outside"},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest("GET", tt.path, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Body.String() != tt.expected {
+			t.Errorf("[GET %s] expected %q, got %q", tt.path, tt.expected, w.Body.String())
+		}
+	}
+}
