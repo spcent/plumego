@@ -4,8 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strconv"
+	"strings"
 
 	logpkg "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/validator"
@@ -111,6 +119,134 @@ func (c *Ctx) BindAndValidateJSONWithOptions(dst any, opts BindOptions) error {
 	}
 
 	return nil
+}
+
+// ShouldBindJSON is an alias for BindJSON. It binds the request JSON body to dst
+// and returns the error for the caller to handle. The naming follows the convention
+// where "Should" methods return errors without writing a response.
+func (c *Ctx) ShouldBindJSON(dst any) error {
+	return c.BindJSON(dst)
+}
+
+// BindQuery binds URL query parameters to the provided struct using the "query" struct tag.
+// It supports string, int, int64, float64, bool, and slice-of-string fields.
+// Fields without a "query" tag are skipped. A tag value of "-" also skips the field.
+func (c *Ctx) BindQuery(dst any) error {
+	return bindQuery(c.Query, dst)
+}
+
+// bindQuery maps URL query values to struct fields using the "query" struct tag.
+func bindQuery(values url.Values, dst any) error {
+	rv := reflect.ValueOf(dst)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return &BindError{Status: http.StatusBadRequest, Message: "bind destination must be a non-nil pointer to a struct"}
+	}
+	rv = rv.Elem()
+	if rv.Kind() != reflect.Struct {
+		return &BindError{Status: http.StatusBadRequest, Message: "bind destination must be a pointer to a struct"}
+	}
+
+	rt := rv.Type()
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		tag := field.Tag.Get("query")
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		// Split tag to get the name (ignore options like omitempty for now)
+		name := strings.SplitN(tag, ",", 2)[0]
+		queryVal := values.Get(name)
+		queryVals := values[name]
+
+		fv := rv.Field(i)
+		if !fv.CanSet() {
+			continue
+		}
+
+		if err := setFieldFromQuery(fv, queryVal, queryVals); err != nil {
+			return &BindError{
+				Status:  http.StatusBadRequest,
+				Message: fmt.Sprintf("invalid query parameter %q: %v", name, err),
+				Err:     err,
+			}
+		}
+	}
+
+	return nil
+}
+
+// setFieldFromQuery assigns a query value to a struct field based on its type.
+func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
+	if val == "" && len(vals) == 0 {
+		return nil
+	}
+
+	switch fv.Kind() {
+	case reflect.String:
+		fv.SetString(val)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return err
+		}
+		fv.SetInt(n)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		n, err := strconv.ParseUint(val, 10, 64)
+		if err != nil {
+			return err
+		}
+		fv.SetUint(n)
+	case reflect.Float32, reflect.Float64:
+		n, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return err
+		}
+		fv.SetFloat(n)
+	case reflect.Bool:
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			return err
+		}
+		fv.SetBool(b)
+	case reflect.Slice:
+		if fv.Type().Elem().Kind() == reflect.String {
+			fv.Set(reflect.ValueOf(vals))
+		}
+	}
+	return nil
+}
+
+// FormFile returns the first file for the provided form key.
+// It is a convenience wrapper around http.Request.FormFile.
+func (c *Ctx) FormFile(name string) (*multipart.FileHeader, error) {
+	_, fh, err := c.R.FormFile(name)
+	return fh, err
+}
+
+// SaveUploadedFile copies an uploaded file to a destination path on disk.
+// Parent directories are created automatically if they do not exist.
+func (c *Ctx) SaveUploadedFile(file *multipart.FileHeader, dst string) error {
+	src, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	if dir := filepath.Dir(dst); dir != "." {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return err
+		}
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, src)
+	return err
 }
 
 func logBindError(c *Ctx, payload any, opts BindOptions, err error) {

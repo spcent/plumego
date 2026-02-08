@@ -60,6 +60,10 @@ type Ctx struct {
 	compressionEnabled atomic.Bool
 	cancel             context.CancelFunc
 	aborted            atomic.Bool
+
+	// Middleware data storage
+	mu    sync.RWMutex
+	store map[string]any
 }
 
 // BindError represents an error that occurred while binding a request body.
@@ -322,6 +326,36 @@ func (c *Ctx) MustParam(key string) (string, error) {
 		return "", errors.New("missing param: " + key)
 	}
 	return val, nil
+}
+
+// Set stores a key-value pair in the context for sharing data between middleware and handlers.
+// It is safe for concurrent use.
+func (c *Ctx) Set(key string, value any) {
+	c.mu.Lock()
+	if c.store == nil {
+		c.store = make(map[string]any)
+	}
+	c.store[key] = value
+	c.mu.Unlock()
+}
+
+// Get retrieves a value from the context store. The boolean indicates whether the key was present.
+// It is safe for concurrent use.
+func (c *Ctx) Get(key string) (any, bool) {
+	c.mu.RLock()
+	val, ok := c.store[key]
+	c.mu.RUnlock()
+	return val, ok
+}
+
+// MustGet retrieves a value from the context store and panics if the key does not exist.
+// Use this only when the key is guaranteed to have been set by prior middleware.
+func (c *Ctx) MustGet(key string) any {
+	val, ok := c.Get(key)
+	if !ok {
+		panic("contract.Ctx: missing key " + key)
+	}
+	return val
 }
 
 // GetRequestDuration returns the time since the request started.
