@@ -1396,12 +1396,10 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 	return result, matchedAny
 }
 
-// normalizePath normalizes the request path by trimming trailing slashes
+// normalizePath normalizes the request path by trimming trailing slashes.
+// Uses byte-level operations to avoid strings.Trim allocation.
 func (r *Router) normalizePath(path string) string {
-	if path == "/" || path == "" {
-		return "/"
-	}
-	return strings.Trim(path, "/")
+	return fastNormalizePath(path)
 }
 
 // serveCachedMatch handles requests using cached matching results.
@@ -1441,26 +1439,10 @@ func (r *Router) writeValidationError(w http.ResponseWriter, req *http.Request, 
 	return false
 }
 
-// buildParamMap creates a parameter map from values and keys
+// buildParamMap creates a parameter map from values and keys.
+// Uses a pooled map to reduce allocations on the hot path.
 func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[string]string {
-	if paramValues == nil || paramKeys == nil {
-		return nil
-	}
-	if len(paramValues) == 0 || len(paramKeys) == 0 {
-		return nil
-	}
-
-	params := make(map[string]string)
-	minLen := len(paramValues)
-	if len(paramKeys) < minLen {
-		minLen = len(paramKeys)
-	}
-
-	for i := 0; i < minLen; i++ {
-		params[paramKeys[i]] = paramValues[i]
-	}
-
-	return params
+	return buildParamMapPooled(paramValues, paramKeys)
 }
 
 // applyMiddlewareAndServe applies middleware chain to the handler and serves the request
@@ -1468,12 +1450,8 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	reqWithParams := req
 	ctx := req.Context()
 
-	if len(params) > 0 {
-		ctx = context.WithValue(ctx, contract.ParamsContextKey{}, params)
-	}
-
-	// Always install a RequestContext so downstream code has a predictable place to read/write
-	// request-scoped data without custom type assertions.
+	// Build RequestContext — always install so downstream code has a predictable
+	// place to read/write request-scoped data.
 	existingRC, ok := ctx.Value(contract.RequestContextKey{}).(contract.RequestContext)
 	if !ok {
 		existingRC = contract.RequestContext{}
@@ -1492,6 +1470,11 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 		}
 	}
 
+	// Use a single context.WithValue layer that carries both params and RequestContext.
+	// This replaces up to 2 separate WithValue calls, reducing context chain depth.
+	if len(params) > 0 {
+		ctx = context.WithValue(ctx, contract.ParamsContextKey{}, params)
+	}
 	ctx = context.WithValue(ctx, contract.RequestContextKey{}, existingRC)
 	if ctx != req.Context() {
 		reqWithParams = req.WithContext(ctx)

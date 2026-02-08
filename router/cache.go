@@ -24,8 +24,9 @@ type CacheEntry struct {
 
 // PatternCacheEntry represents a cached route pattern for parameterized routes
 type PatternCacheEntry struct {
-	pattern string       // Route pattern like /users/:id
-	result  *MatchResult // Cached match result (without param values)
+	pattern     string             // Route pattern like /users/:id
+	result      *MatchResult       // Cached match result (without param values)
+	precompiled precompiledPattern // Pre-split pattern for fast matching
 }
 
 // RouteCache implements a simple LRU cache for route matching results
@@ -102,14 +103,37 @@ func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string,
 		return nil, nil, false
 	}
 
-	pathParts := strings.Split(strings.Trim(path, "/"), "/")
+	// Use pooled buffer for path splitting to avoid allocation
+	bufPtr := pathBufPool.Get().(*[]string)
+	buf := *bufPtr
+	numParts := fastSplitPath(path, buf)
+	pathParts := buf[:numParts]
 
-	for _, entry := range patterns {
-		if paramValues, ok := matchPattern(entry.pattern, pathParts); ok {
+	// Use pooled buffer for extracted parameter values
+	paramBufPtr := matchParamBufPool.Get().(*[]string)
+	paramBuf := *paramBufPtr
+
+	for i := range patterns {
+		entry := &patterns[i]
+		if paramCount, ok := matchPrecompiled(&entry.precompiled, pathParts, paramBuf); ok {
+			// Copy params out of the pooled buffer before returning it
+			paramValues := make([]string, paramCount)
+			copy(paramValues, paramBuf[:paramCount])
+
+			*bufPtr = buf
+			pathBufPool.Put(bufPtr)
+			*paramBufPtr = paramBuf
+			matchParamBufPool.Put(paramBufPtr)
+
 			atomic.AddUint64(&rc.hits, 1)
 			return entry.result, paramValues, true
 		}
 	}
+
+	*bufPtr = buf
+	pathBufPool.Put(bufPtr)
+	*paramBufPtr = paramBuf
+	matchParamBufPool.Put(paramBufPtr)
 
 	return nil, nil, false
 }
@@ -209,9 +233,13 @@ func (rc *RouteCache) SetPattern(method, pattern string, result *MatchResult) {
 		}
 	}
 
-	// Add new pattern entry
+	// Add new pattern entry with precompiled parts for fast matching
 	// Sort by specificity (more segments = higher priority)
-	entry := PatternCacheEntry{pattern: pattern, result: result}
+	entry := PatternCacheEntry{
+		pattern:     pattern,
+		result:      result,
+		precompiled: newPrecompiledPattern(pattern),
+	}
 	inserted := false
 
 	newPatternSegments := countSegments(pattern)
