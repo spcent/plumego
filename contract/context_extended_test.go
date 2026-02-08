@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -615,6 +616,412 @@ func TestCtxConfigDefaults(t *testing.T) {
 	_, err = ctx.bodyBytes()
 	if err != nil {
 		t.Fatalf("unexpected error with zero config: %v", err)
+	}
+}
+
+func TestShouldBindJSON(t *testing.T) {
+	body := bytes.NewBufferString(`{"name":"demo","age":30}`)
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
+
+	var payload struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		t.Fatalf("expected successful bind, got %v", err)
+	}
+	if payload.Name != "demo" || payload.Age != 30 {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+}
+
+func TestShouldBindJSONError(t *testing.T) {
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("")), nil)
+
+	var payload struct{ Name string }
+	err := ctx.ShouldBindJSON(&payload)
+	if err == nil {
+		t.Fatal("expected error for empty body")
+	}
+	var bindErr *BindError
+	if !errors.As(err, &bindErr) {
+		t.Fatalf("expected BindError, got %T", err)
+	}
+}
+
+func TestBindQuery(t *testing.T) {
+	type filter struct {
+		Name   string   `query:"name"`
+		Page   int      `query:"page"`
+		Limit  int64    `query:"limit"`
+		Score  float64  `query:"score"`
+		Active bool     `query:"active"`
+		Tags   []string `query:"tags"`
+		Ignore string   // no query tag
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/?name=alice&page=2&limit=50&score=9.5&active=true&tags=go&tags=http", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	var f filter
+	if err := ctx.BindQuery(&f); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if f.Name != "alice" {
+		t.Errorf("expected name=alice, got %s", f.Name)
+	}
+	if f.Page != 2 {
+		t.Errorf("expected page=2, got %d", f.Page)
+	}
+	if f.Limit != 50 {
+		t.Errorf("expected limit=50, got %d", f.Limit)
+	}
+	if f.Score != 9.5 {
+		t.Errorf("expected score=9.5, got %f", f.Score)
+	}
+	if !f.Active {
+		t.Error("expected active=true")
+	}
+	if len(f.Tags) != 2 || f.Tags[0] != "go" || f.Tags[1] != "http" {
+		t.Errorf("expected tags=[go http], got %v", f.Tags)
+	}
+	if f.Ignore != "" {
+		t.Error("field without query tag should not be set")
+	}
+}
+
+func TestBindQueryMissingParams(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	type filter struct {
+		Name string `query:"name"`
+		Page int    `query:"page"`
+	}
+
+	var f filter
+	if err := ctx.BindQuery(&f); err != nil {
+		t.Fatalf("missing params should not error, got %v", err)
+	}
+	if f.Name != "" || f.Page != 0 {
+		t.Error("missing params should leave zero values")
+	}
+}
+
+func TestBindQueryInvalidType(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/?page=notanumber", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	type filter struct {
+		Page int `query:"page"`
+	}
+
+	var f filter
+	err := ctx.BindQuery(&f)
+	if err == nil {
+		t.Fatal("expected error for invalid int")
+	}
+	var bindErr *BindError
+	if !errors.As(err, &bindErr) {
+		t.Fatalf("expected BindError, got %T", err)
+	}
+	if bindErr.Status != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", bindErr.Status)
+	}
+}
+
+func TestBindQueryNonPointer(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	type filter struct{ Name string }
+	var f filter
+	err := ctx.BindQuery(f) // not a pointer
+	if err == nil {
+		t.Fatal("expected error for non-pointer")
+	}
+}
+
+func TestBindQueryDashTag(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/?skip=yes", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	type filter struct {
+		Skip string `query:"-"`
+	}
+
+	var f filter
+	if err := ctx.BindQuery(&f); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f.Skip != "" {
+		t.Error("field with tag '-' should be skipped")
+	}
+}
+
+func TestSetCookie(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx := NewCtx(w, httptest.NewRequest(http.MethodGet, "/", nil), nil)
+
+	ctx.SetCookie("session", "abc123", 3600, "/app", "example.com", true, true)
+
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("expected 1 cookie, got %d", len(cookies))
+	}
+	c := cookies[0]
+	if c.Name != "session" || c.Value != "abc123" {
+		t.Errorf("unexpected cookie: %v", c)
+	}
+	if c.MaxAge != 3600 {
+		t.Errorf("expected MaxAge=3600, got %d", c.MaxAge)
+	}
+	if c.Path != "/app" {
+		t.Errorf("expected Path=/app, got %s", c.Path)
+	}
+	if c.Domain != "example.com" {
+		t.Errorf("expected Domain=example.com, got %s", c.Domain)
+	}
+	if !c.Secure || !c.HttpOnly {
+		t.Error("expected Secure and HttpOnly to be true")
+	}
+}
+
+func TestSetCookieDefaultPath(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx := NewCtx(w, httptest.NewRequest(http.MethodGet, "/", nil), nil)
+
+	ctx.SetCookie("token", "xyz", 0, "", "", false, false)
+
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("expected 1 cookie, got %d", len(cookies))
+	}
+	if cookies[0].Path != "/" {
+		t.Errorf("expected default path '/', got %s", cookies[0].Path)
+	}
+}
+
+func TestCookie(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: "abc123"})
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	val, err := ctx.Cookie("session")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "abc123" {
+		t.Errorf("expected abc123, got %s", val)
+	}
+}
+
+func TestCookieNotFound(t *testing.T) {
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
+
+	_, err := ctx.Cookie("missing")
+	if !errors.Is(err, http.ErrNoCookie) {
+		t.Fatalf("expected ErrNoCookie, got %v", err)
+	}
+}
+
+func TestBindQueryUint(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/?count=42", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	type filter struct {
+		Count uint `query:"count"`
+	}
+
+	var f filter
+	if err := ctx.BindQuery(&f); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f.Count != 42 {
+		t.Errorf("expected count=42, got %d", f.Count)
+	}
+}
+
+func TestFormFile(t *testing.T) {
+	// Build a multipart form with a file
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, err := writer.CreateFormFile("upload", "test.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	part.Write([]byte("file content here"))
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	fh, err := ctx.FormFile("upload")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fh.Filename != "test.txt" {
+		t.Errorf("expected filename test.txt, got %s", fh.Filename)
+	}
+	if fh.Size != int64(len("file content here")) {
+		t.Errorf("expected size %d, got %d", len("file content here"), fh.Size)
+	}
+}
+
+func TestFormFileMissing(t *testing.T) {
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	_, err := ctx.FormFile("missing")
+	if err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestSaveUploadedFile(t *testing.T) {
+	// Build a multipart form with a file
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, err := writer.CreateFormFile("upload", "test.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := "saved file content"
+	part.Write([]byte(content))
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	fh, err := ctx.FormFile("upload")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dst := t.TempDir() + "/subdir/saved.txt"
+	if err := ctx.SaveUploadedFile(fh, dst); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read saved file: %v", err)
+	}
+	if string(data) != content {
+		t.Errorf("expected %q, got %q", content, string(data))
+	}
+}
+
+func TestSetGet(t *testing.T) {
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
+
+	// Get on empty store returns false
+	val, ok := ctx.Get("missing")
+	if ok || val != nil {
+		t.Fatalf("expected no value for missing key, got %v", val)
+	}
+
+	// Set and Get
+	ctx.Set("user", "alice")
+	val, ok = ctx.Get("user")
+	if !ok || val != "alice" {
+		t.Fatalf("expected alice, got %v (ok=%v)", val, ok)
+	}
+
+	// Overwrite
+	ctx.Set("user", "bob")
+	val, ok = ctx.Get("user")
+	if !ok || val != "bob" {
+		t.Fatalf("expected bob after overwrite, got %v", val)
+	}
+
+	// Different types
+	ctx.Set("count", 42)
+	ctx.Set("active", true)
+	ctx.Set("data", map[string]int{"x": 1})
+
+	if v, _ := ctx.Get("count"); v != 42 {
+		t.Fatalf("expected 42, got %v", v)
+	}
+	if v, _ := ctx.Get("active"); v != true {
+		t.Fatalf("expected true, got %v", v)
+	}
+	if v, _ := ctx.Get("data"); v == nil {
+		t.Fatal("expected non-nil map")
+	}
+
+	// Nil value is a valid stored value
+	ctx.Set("nilval", nil)
+	val, ok = ctx.Get("nilval")
+	if !ok {
+		t.Fatal("expected key to exist even with nil value")
+	}
+	if val != nil {
+		t.Fatalf("expected nil value, got %v", val)
+	}
+}
+
+func TestMustGetPanics(t *testing.T) {
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
+
+	// MustGet on existing key
+	ctx.Set("key", "val")
+	if v := ctx.MustGet("key"); v != "val" {
+		t.Fatalf("expected val, got %v", v)
+	}
+
+	// MustGet on missing key should panic
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for missing key")
+		}
+		msg, ok := r.(string)
+		if !ok || !strings.Contains(msg, "missing key") {
+			t.Fatalf("unexpected panic value: %v", r)
+		}
+	}()
+	ctx.MustGet("nonexistent")
+}
+
+func TestSetGetConcurrent(t *testing.T) {
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
+
+	done := make(chan struct{})
+	const n = 100
+
+	// Concurrent writers
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			ctx.Set("key", i)
+			done <- struct{}{}
+		}(i)
+	}
+
+	// Concurrent readers
+	for i := 0; i < n; i++ {
+		go func() {
+			ctx.Get("key")
+			done <- struct{}{}
+		}()
+	}
+
+	for i := 0; i < 2*n; i++ {
+		<-done
+	}
+
+	// Final value should exist
+	_, ok := ctx.Get("key")
+	if !ok {
+		t.Fatal("expected key to be present after concurrent writes")
 	}
 }
 

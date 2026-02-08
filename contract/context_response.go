@@ -126,3 +126,29 @@ func (c *Ctx) File(path string) error {
 	http.ServeFile(c.W, c.R, path)
 	return nil
 }
+
+// SetCookie adds a Set-Cookie header to the response.
+func (c *Ctx) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool) {
+	if path == "" {
+		path = "/"
+	}
+	http.SetCookie(c.W, &http.Cookie{
+		Name:     name,
+		Value:    value,
+		MaxAge:   maxAge,
+		Path:     path,
+		Domain:   domain,
+		Secure:   secure,
+		HttpOnly: httpOnly,
+	})
+}
+
+// Cookie returns the named cookie from the request.
+// If the cookie is not found, it returns http.ErrNoCookie.
+func (c *Ctx) Cookie(name string) (string, error) {
+	cookie, err := c.R.Cookie(name)
+	if err != nil {
+		return "", err
+	}
+	return cookie.Value, nil
+}
