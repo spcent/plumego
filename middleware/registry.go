@@ -46,8 +46,10 @@ type Registry struct {
 }
 
 // NewRegistry creates an empty middleware registry.
+// The internal slice is pre-allocated with a small capacity to reduce
+// allocations during the typical startup registration phase.
 func NewRegistry() *Registry {
-	return &Registry{middlewares: make([]Middleware, 0)}
+	return &Registry{middlewares: make([]Middleware, 0, 8)}
 }
 
 // Use appends middleware to the end of the registry.
@@ -100,6 +102,14 @@ func (r *Registry) Prepend(middlewares ...Middleware) {
 	stack = append(stack, r.middlewares...)
 
 	r.middlewares = stack
+}
+
+// Len returns the number of registered middlewares.
+func (r *Registry) Len() int {
+	if r == nil {
+		return 0
+	}
+	return len(r.middlewares)
 }
 
 // Middlewares returns a copy of the registered middleware slice to

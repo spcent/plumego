@@ -233,6 +233,201 @@ func TestChainShortCircuit(t *testing.T) {
 	}
 }
 
+func TestChainLen(t *testing.T) {
+	chain := NewChain()
+	if chain.Len() != 0 {
+		t.Fatalf("expected 0, got %d", chain.Len())
+	}
+
+	noop := func(next http.Handler) http.Handler { return next }
+	chain.Use(noop).Use(noop).Use(noop)
+	if chain.Len() != 3 {
+		t.Fatalf("expected 3, got %d", chain.Len())
+	}
+}
+
+func TestRegistryLen(t *testing.T) {
+	reg := NewRegistry()
+	if reg.Len() != 0 {
+		t.Fatalf("expected 0, got %d", reg.Len())
+	}
+
+	noop := func(next http.Handler) http.Handler { return next }
+	reg.Use(noop, noop)
+	if reg.Len() != 2 {
+		t.Fatalf("expected 2, got %d", reg.Len())
+	}
+
+	reg.Prepend(noop)
+	if reg.Len() != 3 {
+		t.Fatalf("expected 3, got %d", reg.Len())
+	}
+}
+
+func TestRegistryNilSafety(t *testing.T) {
+	var reg *Registry
+	// All nil-receiver methods must not panic.
+	reg.Use(func(next http.Handler) http.Handler { return next })
+	reg.Prepend(func(next http.Handler) http.Handler { return next })
+	if reg.Len() != 0 {
+		t.Fatal("nil registry Len should be 0")
+	}
+	if reg.Middlewares() != nil {
+		t.Fatal("nil registry Middlewares should be nil")
+	}
+}
+
+func TestChainUseAfterConstruction(t *testing.T) {
+	var order []string
+
+	mw := func(name string) Middleware {
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, name)
+				next.ServeHTTP(w, r)
+			})
+		}
+	}
+
+	chain := NewChain(mw("a"))
+	chain.Use(mw("b"))
+	chain.Use(mw("c"))
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+	})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	chain.Apply(handler).ServeHTTP(httptest.NewRecorder(), req)
+
+	expected := []string{"a", "b", "c", "handler"}
+	if !equalStringSlice(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestRegistryPrependOrder(t *testing.T) {
+	var order []string
+
+	mw := func(name string) Middleware {
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, name)
+				next.ServeHTTP(w, r)
+			})
+		}
+	}
+
+	reg := NewRegistry()
+	reg.Use(mw("b"))
+	reg.Use(mw("c"))
+	reg.Prepend(mw("a"))
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+	})
+
+	chain := NewChain(reg.Middlewares()...)
+	req := httptest.NewRequest("GET", "/", nil)
+	chain.Apply(handler).ServeHTTP(httptest.NewRecorder(), req)
+
+	expected := []string{"a", "b", "c", "handler"}
+	if !equalStringSlice(order, expected) {
+		t.Fatalf("expected %v, got %v", expected, order)
+	}
+}
+
+func TestFromFuncMiddleware(t *testing.T) {
+	fm := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Func", "yes")
+			next(w, r)
+		}
+	}
+
+	mw := FromFuncMiddleware(fm)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	mw(handler).ServeHTTP(rr, req)
+
+	if rr.Header().Get("X-Func") != "yes" {
+		t.Error("expected X-Func header from FromFuncMiddleware")
+	}
+}
+
+// --- Benchmarks ---
+
+func noopMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+	})
+}
+
+var benchHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+func BenchmarkChainApply(b *testing.B) {
+	sizes := []int{1, 5, 10, 20}
+	for _, n := range sizes {
+		mws := make([]Middleware, n)
+		for i := range mws {
+			mws[i] = noopMiddleware
+		}
+		b.Run(benchName(n), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				NewChain(mws...).Apply(benchHandler)
+			}
+		})
+	}
+}
+
+func BenchmarkChainServeHTTP(b *testing.B) {
+	sizes := []int{1, 5, 10, 20}
+	req := httptest.NewRequest("GET", "/", nil)
+	for _, n := range sizes {
+		mws := make([]Middleware, n)
+		for i := range mws {
+			mws[i] = noopMiddleware
+		}
+		handler := NewChain(mws...).Apply(benchHandler)
+		b.Run(benchName(n), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				handler.ServeHTTP(httptest.NewRecorder(), req)
+			}
+		})
+	}
+}
+
+func BenchmarkRegistryUse(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		reg := NewRegistry()
+		for range 10 {
+			reg.Use(noopMiddleware)
+		}
+	}
+}
+
+func benchName(n int) string {
+	switch n {
+	case 1:
+		return "1mw"
+	case 5:
+		return "5mw"
+	case 10:
+		return "10mw"
+	case 20:
+		return "20mw"
+	default:
+		return "Nmw"
+	}
+}
+
 func equalStringSlice(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

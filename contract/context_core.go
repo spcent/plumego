@@ -46,6 +46,11 @@ type Ctx struct {
 	Deadline time.Time
 	Config   *RequestConfig
 
+	// Errors collects non-fatal errors encountered during request processing.
+	// Middleware and handlers can append errors without immediately aborting,
+	// and downstream code can inspect them for logging or aggregated responses.
+	Errors []error
+
 	// Request state tracking
 	startedAt          time.Time
 	bodySize           atomic.Int64
@@ -54,6 +59,7 @@ type Ctx struct {
 	bodyReadOnce       sync.Once
 	compressionEnabled atomic.Bool
 	cancel             context.CancelFunc
+	aborted            atomic.Bool
 }
 
 // BindError represents an error that occurred while binding a request body.
@@ -267,6 +273,39 @@ func (c *Ctx) Close() {
 	}
 	c.cancel()
 	c.cancel = nil
+}
+
+// Abort marks the context as aborted. Subsequent middleware or handlers
+// should check IsAborted and skip processing when true. It also cancels
+// the underlying request context so that long-running operations are
+// notified via context.Done().
+func (c *Ctx) Abort() {
+	if c.aborted.CompareAndSwap(false, true) {
+		if c.cancel != nil {
+			c.cancel()
+		}
+	}
+}
+
+// AbortWithStatus is a convenience that writes the HTTP status code and
+// then marks the context as aborted.
+func (c *Ctx) AbortWithStatus(code int) {
+	c.W.WriteHeader(code)
+	c.Abort()
+}
+
+// IsAborted reports whether Abort has been called on this context.
+func (c *Ctx) IsAborted() bool {
+	return c.aborted.Load()
+}
+
+// Error appends a non-fatal error to the context's Errors slice and
+// returns the same error for convenient inline use.
+func (c *Ctx) Error(err error) error {
+	if err != nil {
+		c.Errors = append(c.Errors, err)
+	}
+	return err
 }
 
 func (c *Ctx) Param(key string) (string, bool) {
