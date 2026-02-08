@@ -49,9 +49,13 @@ type Chain struct {
 }
 
 // NewChain creates a new middleware chain.
+// The initial middlewares are copied into a slice with extra capacity
+// to reduce allocations when additional middlewares are added via Use.
 func NewChain(middlewares ...Middleware) *Chain {
+	mws := make([]Middleware, len(middlewares), len(middlewares)+4)
+	copy(mws, middlewares)
 	return &Chain{
-		middlewares: middlewares,
+		middlewares: mws,
 	}
 }
 
@@ -62,8 +66,14 @@ func (c *Chain) Use(middleware Middleware) *Chain {
 	return c
 }
 
+// Len returns the number of middlewares in the chain.
+func (c *Chain) Len() int {
+	return len(c.middlewares)
+}
+
 // Apply applies the middleware chain to an http.Handler.
-// The middlewares are applied in reverse order (last added runs first).
+// The middlewares are applied in reverse order so they execute in
+// registration order (first added wraps outermost).
 func (c *Chain) Apply(h http.Handler) http.Handler {
 	for i := len(c.middlewares) - 1; i >= 0; i-- {
 		h = c.middlewares[i](h)
@@ -75,9 +85,11 @@ func (c *Chain) Apply(h http.Handler) http.Handler {
 // The middlewares are applied in reverse order (last added runs first).
 func (c *Chain) ApplyFunc(h http.HandlerFunc) http.HandlerFunc {
 	wrapped := c.Apply(h)
-	return func(w http.ResponseWriter, r *http.Request) {
-		wrapped.ServeHTTP(w, r)
+	// Avoid an extra closure when the result is already an http.HandlerFunc.
+	if hf, ok := wrapped.(http.HandlerFunc); ok {
+		return hf
 	}
+	return wrapped.ServeHTTP
 }
 
 // FromFuncMiddleware converts a func(http.HandlerFunc) http.HandlerFunc to Middleware.

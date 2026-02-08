@@ -1,6 +1,8 @@
 package plumego
 
 import (
+	"net/http"
+
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/middleware/cors"
@@ -20,6 +22,11 @@ type Context = contract.Ctx
 
 // ContextHandlerFunc is the handler signature that receives a *Context.
 type ContextHandlerFunc = contract.CtxHandlerFunc
+
+// HandlerFunc is the standard net/http handler function signature.
+// Re-exported for convenience so callers can use plumego.HandlerFunc
+// without importing net/http directly.
+type HandlerFunc = http.HandlerFunc
 
 // Component hooks into routing, middleware, and lifecycle events.
 type Component = core.Component
