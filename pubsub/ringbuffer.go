@@ -73,7 +73,8 @@ func (rb *ringBuffer) Pop() (Message, bool) {
 	rb.mu.Lock()
 	defer rb.mu.Unlock()
 
-	if rb.count == 0 || rb.closed {
+	// A closed buffer can still be drained; closure only blocks new pushes.
+	if rb.count == 0 {
 		return Message{}, false
 	}
 

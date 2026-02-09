@@ -164,10 +164,17 @@ func TestRingBuffer_Close(t *testing.T) {
 		t.Fatalf("expected len 1 (pre-close message), got %d", rb.Len())
 	}
 
-	// Pop on closed buffer should fail
-	_, ok := rb.Pop()
+	// Pop on closed buffer should still drain pre-close messages
+	msg, ok := rb.Pop()
+	if !ok {
+		t.Fatal("expected pop on closed buffer to drain existing message")
+	}
+	if msg.ID != "m0" {
+		t.Fatalf("expected m0, got %s", msg.ID)
+	}
+	_, ok = rb.Pop()
 	if ok {
-		t.Fatal("pop on closed should fail")
+		t.Fatal("expected no more messages after draining closed buffer")
 	}
 
 	// Double close should not panic
