@@ -568,6 +568,299 @@ func TestConsumerGroup_RebalanceSuccessWithValidContext(t *testing.T) {
 	}
 }
 
+func TestConsumerGroup_StickyPreservesAssignments(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("sticky-preserve")
+	config.Strategy = Sticky
+	config.MaxPartitions = 8
+	_ = cgm.CreateGroup(config)
+
+	c1, _ := cgm.JoinGroup("sticky-preserve", "c1", []string{"test"})
+	c2, _ := cgm.JoinGroup("sticky-preserve", "c2", []string{"test"})
+	defer c1.Close()
+	defer c2.Close()
+
+	time.Sleep(200 * time.Millisecond)
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["sticky-preserve"]
+	cgm.groupsMu.RUnlock()
+
+	// Capture assignments after initial rebalance.
+	group.assignmentMu.RLock()
+	initial := make(map[int]string, len(group.assignments["test"]))
+	for p, owner := range group.assignments["test"] {
+		initial[p] = owner
+	}
+	group.assignmentMu.RUnlock()
+
+	if len(initial) != 8 {
+		t.Fatalf("Expected 8 partition assignments, got %d", len(initial))
+	}
+
+	// Trigger another rebalance with the same consumers — assignments should stay identical.
+	ctx := context.Background()
+	group.consumersMu.RLock()
+	group.assignmentMu.Lock()
+	group.assignSticky()
+	after := make(map[int]string, len(group.assignments["test"]))
+	for p, owner := range group.assignments["test"] {
+		after[p] = owner
+	}
+	group.assignmentMu.Unlock()
+	group.consumersMu.RUnlock()
+
+	for p, owner := range initial {
+		if after[p] != owner {
+			t.Errorf("Partition %d changed from %s to %s on no-op rebalance", p, owner, after[p])
+		}
+	}
+	_ = ctx
+}
+
+func TestConsumerGroup_StickyMinimalMovement(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("sticky-move")
+	config.Strategy = Sticky
+	config.MaxPartitions = 12
+	_ = cgm.CreateGroup(config)
+
+	c1, _ := cgm.JoinGroup("sticky-move", "c1", []string{"test"})
+	c2, _ := cgm.JoinGroup("sticky-move", "c2", []string{"test"})
+
+	time.Sleep(200 * time.Millisecond)
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["sticky-move"]
+	cgm.groupsMu.RUnlock()
+
+	// Capture initial assignments (2 consumers, 12 partitions → 6 each).
+	group.assignmentMu.RLock()
+	before := make(map[int]string, len(group.assignments["test"]))
+	for p, owner := range group.assignments["test"] {
+		before[p] = owner
+	}
+	group.assignmentMu.RUnlock()
+
+	// Add a third consumer.
+	c3, _ := cgm.JoinGroup("sticky-move", "c3", []string{"test"})
+
+	time.Sleep(200 * time.Millisecond)
+
+	group.assignmentMu.RLock()
+	afterAdd := make(map[int]string, len(group.assignments["test"]))
+	for p, owner := range group.assignments["test"] {
+		afterAdd[p] = owner
+	}
+	group.assignmentMu.RUnlock()
+
+	// Count how many partitions moved.
+	moved := 0
+	for p, ownerBefore := range before {
+		if afterAdd[p] != ownerBefore {
+			moved++
+		}
+	}
+
+	// With 12 partitions and 3 consumers, c3 should get 4 partitions.
+	// So exactly 4 partitions should move. Allow some slack but it should not
+	// exceed the ideal number significantly.
+	if moved > 6 {
+		t.Errorf("Too many partitions moved: %d (expected <= 6)", moved)
+	}
+	t.Logf("Partitions moved when adding c3: %d out of 12", moved)
+
+	// All 12 partitions should still be assigned.
+	if len(afterAdd) != 12 {
+		t.Errorf("Expected 12 assignments, got %d", len(afterAdd))
+	}
+
+	// Cleanup.
+	c1.Close()
+	c2.Close()
+	c3.Close()
+}
+
+func TestConsumerGroup_StickyConsumerLeaves(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("sticky-leave")
+	config.Strategy = Sticky
+	config.MaxPartitions = 9
+	_ = cgm.CreateGroup(config)
+
+	c1, _ := cgm.JoinGroup("sticky-leave", "c1", []string{"test"})
+	_, _ = cgm.JoinGroup("sticky-leave", "c2", []string{"test"})
+	c3, _ := cgm.JoinGroup("sticky-leave", "c3", []string{"test"})
+
+	time.Sleep(200 * time.Millisecond)
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["sticky-leave"]
+	cgm.groupsMu.RUnlock()
+
+	// Capture assignments before c2 leaves.
+	group.assignmentMu.RLock()
+	before := make(map[int]string, len(group.assignments["test"]))
+	for p, owner := range group.assignments["test"] {
+		before[p] = owner
+	}
+	group.assignmentMu.RUnlock()
+
+	// Remove c2.
+	_ = cgm.LeaveGroup("sticky-leave", "c2")
+
+	time.Sleep(200 * time.Millisecond)
+
+	group.assignmentMu.RLock()
+	after := make(map[int]string, len(group.assignments["test"]))
+	for p, owner := range group.assignments["test"] {
+		after[p] = owner
+	}
+	group.assignmentMu.RUnlock()
+
+	// Partitions that were on c1 or c3 should stay with them.
+	for p, ownerBefore := range before {
+		if ownerBefore == "c2" {
+			continue // These must be reassigned.
+		}
+		if after[p] != ownerBefore {
+			t.Errorf("Partition %d moved from %s to %s (should have stayed)", p, ownerBefore, after[p])
+		}
+	}
+
+	// All 9 partitions should be assigned to c1 or c3 now.
+	if len(after) != 9 {
+		t.Errorf("Expected 9 assignments, got %d", len(after))
+	}
+	for p, owner := range after {
+		if owner != "c1" && owner != "c3" {
+			t.Errorf("Partition %d assigned to removed consumer %s", p, owner)
+		}
+	}
+
+	c1.Close()
+	c3.Close()
+}
+
+func TestConsumerGroup_StickyBalancesLoad(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("sticky-balance")
+	config.Strategy = Sticky
+	config.MaxPartitions = 10
+	_ = cgm.CreateGroup(config)
+
+	c1, _ := cgm.JoinGroup("sticky-balance", "c1", []string{"test"})
+	c2, _ := cgm.JoinGroup("sticky-balance", "c2", []string{"test"})
+	c3, _ := cgm.JoinGroup("sticky-balance", "c3", []string{"test"})
+
+	time.Sleep(200 * time.Millisecond)
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["sticky-balance"]
+	cgm.groupsMu.RUnlock()
+
+	// Count partitions per consumer — should be 4, 3, 3 or 3, 4, 3, etc.
+	group.assignmentMu.RLock()
+	counts := make(map[string]int)
+	for _, owner := range group.assignments["test"] {
+		counts[owner]++
+	}
+	group.assignmentMu.RUnlock()
+
+	for _, id := range []string{"c1", "c2", "c3"} {
+		c := counts[id]
+		if c < 3 || c > 4 {
+			t.Errorf("Consumer %s has %d partitions, expected 3 or 4", id, c)
+		}
+	}
+
+	total := counts["c1"] + counts["c2"] + counts["c3"]
+	if total != 10 {
+		t.Errorf("Total assignments %d, expected 10", total)
+	}
+
+	c1.Close()
+	c2.Close()
+	c3.Close()
+}
+
+func TestConsumerGroup_StickyNoConsumers(t *testing.T) {
+	cg := &consumerGroup{
+		config: ConsumerGroupConfig{
+			MaxPartitions: 4,
+		},
+		consumers:   make(map[string]*groupConsumer),
+		partitions:  map[string][]int{"test": {0, 1, 2, 3}},
+		assignments: map[string]map[int]string{"test": {0: "old", 1: "old"}},
+	}
+
+	cg.assignSticky()
+
+	for topic, m := range cg.assignments {
+		if len(m) != 0 {
+			t.Errorf("Expected empty assignments for topic %s, got %d", topic, len(m))
+		}
+	}
+}
+
+func TestConsumerGroup_StickyMultipleTopics(t *testing.T) {
+	ps := New()
+	defer ps.Close()
+
+	cgm := NewConsumerGroupManager(ps)
+
+	config := DefaultConsumerGroupConfig("sticky-multi")
+	config.Strategy = Sticky
+	config.MaxPartitions = 6
+	_ = cgm.CreateGroup(config)
+
+	c1, _ := cgm.JoinGroup("sticky-multi", "c1", []string{"topicA", "topicB"})
+	c2, _ := cgm.JoinGroup("sticky-multi", "c2", []string{"topicA", "topicB"})
+
+	time.Sleep(200 * time.Millisecond)
+
+	cgm.groupsMu.RLock()
+	group := cgm.groups["sticky-multi"]
+	cgm.groupsMu.RUnlock()
+
+	group.assignmentMu.RLock()
+	for _, topic := range []string{"topicA", "topicB"} {
+		assignments := group.assignments[topic]
+		if len(assignments) != 6 {
+			t.Errorf("Topic %s: expected 6 assignments, got %d", topic, len(assignments))
+		}
+		counts := map[string]int{}
+		for _, owner := range assignments {
+			counts[owner]++
+		}
+		for id, c := range counts {
+			if c != 3 {
+				t.Errorf("Topic %s: consumer %s has %d partitions, expected 3", topic, id, c)
+			}
+		}
+	}
+	group.assignmentMu.RUnlock()
+
+	c1.Close()
+	c2.Close()
+}
+
 func BenchmarkConsumerGroup_Join(b *testing.B) {
 	ps := New()
 	defer ps.Close()

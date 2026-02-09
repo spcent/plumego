@@ -98,7 +98,7 @@ type consumerGroup struct {
 	consumers   map[string]*groupConsumer
 	consumersMu sync.RWMutex
 
-	partitions   map[string][]int // topic -> partition IDs
+	partitions   map[string][]int          // topic -> partition IDs
 	assignments  map[string]map[int]string // topic -> partition -> consumerID
 	offsets      map[string]map[int]uint64 // topic -> partition -> offset
 	assignmentMu sync.RWMutex
@@ -451,11 +451,117 @@ func (cg *consumerGroup) assignRoundRobin() {
 	}
 }
 
-// assignSticky implements sticky assignment (tries to preserve previous assignments)
+// assignSticky implements sticky assignment (tries to preserve previous assignments).
+// It keeps existing partition-to-consumer mappings where the consumer still exists,
+// revokes the minimum necessary for balance, then distributes unassigned partitions.
 func (cg *consumerGroup) assignSticky() {
-	// For now, fallback to round-robin
-	// TODO: Implement true sticky assignment with history
-	cg.assignRoundRobin()
+	consumerIDs := make([]string, 0, len(cg.consumers))
+	for id := range cg.consumers {
+		consumerIDs = append(consumerIDs, id)
+	}
+	sort.Strings(consumerIDs)
+
+	if len(consumerIDs) == 0 {
+		for topic := range cg.assignments {
+			cg.assignments[topic] = make(map[int]string)
+		}
+		return
+	}
+
+	consumerSet := make(map[string]bool, len(consumerIDs))
+	for _, id := range consumerIDs {
+		consumerSet[id] = true
+	}
+
+	for topic, partitions := range cg.partitions {
+		prev := cg.assignments[topic]
+		if prev == nil {
+			prev = make(map[int]string)
+		}
+
+		numPartitions := len(partitions)
+		numConsumers := len(consumerIDs)
+		minParts := numPartitions / numConsumers
+		extraSlots := numPartitions % numConsumers // this many consumers get minParts+1
+
+		// Compute per-consumer target: the first extraSlots consumers (sorted)
+		// may hold minParts+1; the rest hold minParts. But to minimize movement,
+		// we decide which consumers get the extra slot based on who already has more.
+		target := make(map[string]int, numConsumers)
+		for _, id := range consumerIDs {
+			target[id] = minParts
+		}
+
+		// Phase 1: Retain valid assignments, track counts per consumer.
+		counts := make(map[string]int, numConsumers)
+		kept := make(map[int]string, numPartitions)
+
+		for _, p := range partitions {
+			owner, ok := prev[p]
+			if ok && consumerSet[owner] {
+				kept[p] = owner
+				counts[owner]++
+			}
+		}
+
+		// Decide which consumers get the extra partition. Prefer consumers that
+		// already have more, to minimize movement.
+		if extraSlots > 0 {
+			type ccount struct {
+				id    string
+				count int
+			}
+			sorted := make([]ccount, len(consumerIDs))
+			for i, id := range consumerIDs {
+				sorted[i] = ccount{id, counts[id]}
+			}
+			// Sort by current count descending, then by ID ascending for stability.
+			sort.Slice(sorted, func(i, j int) bool {
+				if sorted[i].count != sorted[j].count {
+					return sorted[i].count > sorted[j].count
+				}
+				return sorted[i].id < sorted[j].id
+			})
+			for i := 0; i < extraSlots; i++ {
+				target[sorted[i].id] = minParts + 1
+			}
+		}
+
+		// Phase 2: Revoke partitions from consumers above their target.
+		// Iterate partitions in order for determinism; revoke the last-seen
+		// partitions of over-assigned consumers.
+		var unassigned []int
+		for _, p := range partitions {
+			owner, ok := kept[p]
+			if !ok {
+				unassigned = append(unassigned, p)
+				continue
+			}
+			if counts[owner] > target[owner] {
+				delete(kept, p)
+				counts[owner]--
+				unassigned = append(unassigned, p)
+			}
+		}
+
+		// Phase 3: Distribute unassigned partitions to least-loaded consumers.
+		sort.Ints(unassigned)
+
+		for _, p := range unassigned {
+			best := consumerIDs[0]
+			bestCount := counts[best]
+			for _, id := range consumerIDs[1:] {
+				if counts[id] < bestCount {
+					best = id
+					bestCount = counts[id]
+				}
+			}
+			kept[p] = best
+			counts[best]++
+		}
+
+		cg.assignments[topic] = kept
+	}
 }
 
 // assignRange implements range assignment
@@ -665,10 +771,10 @@ func (gc *groupConsumer) shouldProcess(msg Message) bool {
 
 // ConsumerGroupStats holds consumer group statistics
 type ConsumerGroupStats struct {
-	GroupID        string
-	Consumers      int
-	Generation     uint64
-	Rebalancing    bool
+	GroupID         string
+	Consumers       int
+	Generation      uint64
+	Rebalancing     bool
 	TotalRebalances uint64
 	TotalCommits    uint64
 	Errors          uint64
