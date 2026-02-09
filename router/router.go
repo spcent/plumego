@@ -1325,7 +1325,12 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			r.mu.RUnlock()
 			if len(allowed) > 0 {
 				w.Header().Set("Allow", strings.Join(allowed, ", "))
-				http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+				contract.WriteError(w, req, contract.APIError{
+					Status:   http.StatusMethodNotAllowed,
+					Code:     "METHOD_NOT_ALLOWED",
+					Message:  http.StatusText(http.StatusMethodNotAllowed),
+					Category: contract.CategoryClient,
+				})
 				return
 			}
 		}

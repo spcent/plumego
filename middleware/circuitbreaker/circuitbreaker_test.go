@@ -668,11 +668,19 @@ func TestMiddleware5xxCountsAsFailure(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode response body: %v", err)
 	}
-	if body["error"] != "Service Unavailable" {
-		t.Errorf("body error = %v, want %q", body["error"], "Service Unavailable")
+	errorObj, ok := body["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("body[error] is not a map: %v", body["error"])
 	}
-	if body["circuit"] != "5xx-test" {
-		t.Errorf("body circuit = %v, want %q", body["circuit"], "5xx-test")
+	if errorObj["code"] != "CIRCUIT_OPEN" {
+		t.Errorf("error code = %v, want %q", errorObj["code"], "CIRCUIT_OPEN")
+	}
+	details, ok := errorObj["details"].(map[string]any)
+	if !ok {
+		t.Fatalf("error details is not a map: %v", errorObj["details"])
+	}
+	if details["circuit"] != "5xx-test" {
+		t.Errorf("details circuit = %v, want %q", details["circuit"], "5xx-test")
 	}
 
 	// Verify X-Circuit-Breaker-State header

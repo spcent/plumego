@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Event represents a single SSE event.
@@ -232,7 +234,7 @@ func Handle(handler Handler) http.HandlerFunc {
 		// Create stream
 		stream, err := NewStream(r.Context(), w)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			contract.WriteError(w, r, contract.NewInternalError(err.Error()))
 			return
 		}
 		defer stream.Close()

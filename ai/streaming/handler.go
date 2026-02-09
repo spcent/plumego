@@ -9,6 +9,7 @@ import (
 
 	"github.com/spcent/plumego/ai/orchestration"
 	"github.com/spcent/plumego/ai/sse"
+	"github.com/spcent/plumego/contract"
 )
 
 // WorkflowRequest represents a request to execute a workflow.
@@ -39,14 +40,14 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 		workflowID = r.URL.Query().Get("id")
 	}
 	if workflowID == "" {
-		http.Error(w, "workflow_id required", http.StatusBadRequest)
+		contract.WriteError(w, r, contract.NewValidationError("workflow_id", "workflow_id required"))
 		return
 	}
 
 	// Create SSE stream
 	stream, err := sse.NewStream(r.Context(), w)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create SSE stream: %v", err), http.StatusInternalServerError)
+		contract.WriteError(w, r, contract.NewInternalError(fmt.Sprintf("Failed to create SSE stream: %v", err)))
 		return
 	}
 
@@ -74,26 +75,26 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 // HandleExecute handles HTTP POST requests to execute workflows with streaming.
 func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "Method not allowed", Category: contract.CategoryClient})
 		return
 	}
 
 	// Parse request
 	var req WorkflowRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid request: %v", err), http.StatusBadRequest)
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "INVALID_REQUEST", Message: fmt.Sprintf("Invalid request: %v", err), Category: contract.CategoryClient})
 		return
 	}
 
 	if req.WorkflowID == "" {
-		http.Error(w, "workflow_id required", http.StatusBadRequest)
+		contract.WriteError(w, r, contract.NewValidationError("workflow_id", "workflow_id required"))
 		return
 	}
 
 	// Create SSE stream
 	stream, err := sse.NewStream(r.Context(), w)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create SSE stream: %v", err), http.StatusInternalServerError)
+		contract.WriteError(w, r, contract.NewInternalError(fmt.Sprintf("Failed to create SSE stream: %v", err)))
 		return
 	}
 
@@ -155,7 +156,7 @@ func HandleWithCallback(
 		// Create workflow from callback
 		workflow, err := callback(r.Context())
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to create workflow: %v", err), http.StatusInternalServerError)
+			contract.WriteError(w, r, contract.NewInternalError(fmt.Sprintf("Failed to create workflow: %v", err)))
 			return
 		}
 

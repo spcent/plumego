@@ -51,7 +51,7 @@ func TestAuth(t *testing.T) {
 			authToken:      "secret123",
 			requestToken:   "wrong-token",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"unauthorized","message":"Invalid or missing authentication token"}`,
+			expectedBody:   `{"error":{"code":"UNAUTHORIZED","message":"Invalid or missing authentication token","category":"auth_error","details":{"type":"unauthorized"}}}` + "\n",
 			shouldCallNext: false,
 		},
 		{
@@ -59,7 +59,7 @@ func TestAuth(t *testing.T) {
 			authToken:      "secret123",
 			requestToken:   "",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"unauthorized","message":"Invalid or missing authentication token"}`,
+			expectedBody:   `{"error":{"code":"UNAUTHORIZED","message":"Invalid or missing authentication token","category":"auth_error","details":{"type":"unauthorized"}}}` + "\n",
 			shouldCallNext: false,
 		},
 		{
@@ -67,7 +67,7 @@ func TestAuth(t *testing.T) {
 			authToken:      "secret123",
 			requestToken:   "",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"unauthorized","message":"Invalid or missing authentication token"}`,
+			expectedBody:   `{"error":{"code":"UNAUTHORIZED","message":"Invalid or missing authentication token","category":"auth_error","details":{"type":"unauthorized"}}}` + "\n",
 			shouldCallNext: false,
 		},
 	}

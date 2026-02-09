@@ -126,7 +126,11 @@ func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
 		t.Fatalf("expected status %d for bypassed large response, got %d", http.StatusInternalServerError, rr.Code)
 	}
 
-	if rr.Body.String() != "response too large for timeout buffering\n" {
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Error.Message != "response too large for timeout buffering" {
 		t.Fatalf("unexpected body: %q", rr.Body.String())
 	}
 }

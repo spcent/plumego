@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Config holds the proxy configuration
@@ -173,14 +175,21 @@ type ErrorHandlerFunc func(w http.ResponseWriter, r *http.Request, err error)
 func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case err == ErrNoBackends || err == ErrNoHealthyBackends:
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte("Service Unavailable"))
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusServiceUnavailable,
+			Code:     "SERVICE_UNAVAILABLE",
+			Message:  "Service Unavailable",
+			Category: contract.CategoryServer,
+		})
 	case err == ErrBackendTimeout:
-		w.WriteHeader(http.StatusGatewayTimeout)
-		w.Write([]byte("Gateway Timeout"))
+		contract.WriteError(w, r, contract.NewTimeoutError("Gateway Timeout"))
 	default:
-		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte("Bad Gateway"))
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusBadGateway,
+			Code:     "BAD_GATEWAY",
+			Message:  "Bad Gateway",
+			Category: contract.CategoryServer,
+		})
 	}
 }
 

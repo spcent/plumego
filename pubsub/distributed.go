@@ -12,16 +12,18 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Distributed errors
 var (
-	ErrClusterNotJoined    = errors.New("not joined to cluster")
-	ErrNodeNotFound        = errors.New("node not found")
-	ErrNodeUnhealthy       = errors.New("node is unhealthy")
-	ErrBroadcastFailed     = errors.New("broadcast failed")
-	ErrConsensusTimeout    = errors.New("consensus timeout")
-	ErrInvalidNodeConfig   = errors.New("invalid node configuration")
+	ErrClusterNotJoined  = errors.New("not joined to cluster")
+	ErrNodeNotFound      = errors.New("node not found")
+	ErrNodeUnhealthy     = errors.New("node is unhealthy")
+	ErrBroadcastFailed   = errors.New("broadcast failed")
+	ErrConsensusTimeout  = errors.New("consensus timeout")
+	ErrInvalidNodeConfig = errors.New("invalid node configuration")
 )
 
 // ClusterConfig configures the distributed cluster
@@ -73,12 +75,12 @@ func DefaultClusterConfig(nodeID, listenAddr string) ClusterConfig {
 
 // ClusterNode represents a node in the cluster
 type ClusterNode struct {
-	ID         string    `json:"id"`
-	Addr       string    `json:"addr"`
-	LastSeen   time.Time `json:"last_seen"`
-	Healthy    bool      `json:"healthy"`
-	Topics     []string  `json:"topics"`
-	Version    string    `json:"version"`
+	ID       string    `json:"id"`
+	Addr     string    `json:"addr"`
+	LastSeen time.Time `json:"last_seen"`
+	Healthy  bool      `json:"healthy"`
+	Topics   []string  `json:"topics"`
+	Version  string    `json:"version"`
 }
 
 // DistributedPubSub wraps InProcPubSub with distributed capabilities
@@ -88,9 +90,9 @@ type DistributedPubSub struct {
 	config ClusterConfig
 
 	// Cluster state
-	nodes    map[string]*ClusterNode
-	nodesMu  sync.RWMutex
-	joined   atomic.Bool
+	nodes   map[string]*ClusterNode
+	nodesMu sync.RWMutex
+	joined  atomic.Bool
 
 	// HTTP server for cluster API
 	httpServer *http.Server
@@ -525,7 +527,12 @@ func (dps *DistributedPubSub) checkNodeHealth() {
 
 func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusMethodNotAllowed,
+			Code:     "METHOD_NOT_ALLOWED",
+			Message:  "method not allowed",
+			Category: contract.CategoryClient,
+		})
 		return
 	}
 
@@ -541,13 +548,23 @@ func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Reques
 
 func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusMethodNotAllowed,
+			Code:     "METHOD_NOT_ALLOWED",
+			Message:  "method not allowed",
+			Category: contract.CategoryClient,
+		})
 		return
 	}
 
 	var payload heartbeatPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusBadRequest,
+			Code:     "INVALID_PAYLOAD",
+			Message:  "invalid payload",
+			Category: contract.CategoryClient,
+		})
 		return
 	}
 
@@ -583,19 +600,29 @@ func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Req
 
 func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusMethodNotAllowed,
+			Code:     "METHOD_NOT_ALLOWED",
+			Message:  "method not allowed",
+			Category: contract.CategoryClient,
+		})
 		return
 	}
 
 	var cm clusterMessage
 	if err := json.NewDecoder(r.Body).Decode(&cm); err != nil {
-		http.Error(w, "invalid message", http.StatusBadRequest)
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusBadRequest,
+			Code:     "INVALID_MESSAGE",
+			Message:  "invalid message",
+			Category: contract.CategoryClient,
+		})
 		return
 	}
 
 	// Publish locally
 	if err := dps.InProcPubSub.Publish(cm.Topic, cm.Message); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		contract.WriteError(w, r, contract.NewInternalError(err.Error()))
 		dps.clusterErrors.Add(1)
 		return
 	}
@@ -608,7 +635,12 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 
 func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusMethodNotAllowed,
+			Code:     "METHOD_NOT_ALLOWED",
+			Message:  "method not allowed",
+			Category: contract.CategoryClient,
+		})
 		return
 	}
 

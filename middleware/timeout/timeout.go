@@ -111,7 +111,7 @@ func TimeoutWithConfig(cfg TimeoutConfig) middleware.Middleware {
 			select {
 			case <-done:
 				if tw.Overflowed() {
-					http.Error(w, "response exceeded buffer limit", http.StatusInternalServerError)
+					contract.WriteError(w, r, contract.NewInternalError("response exceeded buffer limit"))
 					return
 				}
 				tw.WriteTo(w)
@@ -207,7 +207,7 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
 	// If bypass mode was used, we cannot replay the response
 	if w.bypassUsed {
-		http.Error(dst, "response too large for timeout buffering", http.StatusInternalServerError)
+		contract.WriteError(dst, nil, contract.NewInternalError("response too large for timeout buffering"))
 		return
 	}
 

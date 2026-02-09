@@ -30,6 +30,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Config holds token bucket rate limiter configuration
@@ -117,7 +119,7 @@ func TokenBucket(config Config) func(http.Handler) http.Handler {
 				allowed, bucket, err = consumeTokenNonAtomic(cfg, key, now)
 			}
 			if err != nil {
-				http.Error(w, "Rate limiter internal error", http.StatusInternalServerError)
+				contract.WriteError(w, r, contract.NewInternalError("Rate limiter internal error"))
 				return
 			}
 
@@ -152,7 +154,7 @@ func TokenBucket(config Config) func(http.Handler) http.Handler {
 			w.Header().Set("Retry-After", strconv.FormatInt(int64(retryAfter.Seconds())+1, 10))
 
 			// Return 429 Too Many Requests
-			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			contract.WriteError(w, r, contract.NewRateLimitError("Rate limit exceeded"))
 		})
 	}
 }
