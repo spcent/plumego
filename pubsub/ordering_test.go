@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -383,6 +384,60 @@ func TestOrderedPubSub_OrderedSubscription(t *testing.T) {
 	missing := osub.MissingSequences()
 	if len(missing) > 0 {
 		t.Logf("Missing sequences: %v", missing)
+	}
+}
+
+func TestOrderedPubSub_ReceiveVerifiesSequence(t *testing.T) {
+	config := DefaultOrderingConfig()
+	config.SequenceCheckEnabled = true
+	ops := NewOrdered(config)
+	defer ops.Close()
+
+	osub, err := ops.SubscribeOrdered("test.recv.seq", SubOptions{BufferSize: 10})
+	if err != nil {
+		t.Fatalf("Failed to create ordered subscription: %v", err)
+	}
+	defer osub.Cancel()
+
+	// Publish ordered messages
+	for i := 0; i < 5; i++ {
+		msg := Message{Data: i}
+		if err := ops.PublishOrdered("test.recv.seq", msg, OrderPerTopic); err != nil {
+			t.Fatalf("Failed to publish: %v", err)
+		}
+	}
+
+	// Receive all messages via Receive and verify sequence metadata is present
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var lastSeq uint64
+	for i := 0; i < 5; i++ {
+		msg, err := osub.Receive(ctx)
+		if err != nil {
+			t.Fatalf("Receive %d failed: %v", i, err)
+		}
+
+		seqStr, ok := msg.Meta[MetaKeySequence]
+		if !ok {
+			t.Fatalf("Message %d missing sequence metadata", i)
+		}
+
+		seq, err := strconv.ParseUint(seqStr, 10, 64)
+		if err != nil {
+			t.Fatalf("Message %d: invalid sequence %q: %v", i, seqStr, err)
+		}
+
+		if seq <= lastSeq && i > 0 {
+			t.Errorf("Message %d: sequence %d <= previous %d", i, seq, lastSeq)
+		}
+		lastSeq = seq
+	}
+
+	// After in-order delivery, there should be no missing sequences
+	missing := osub.MissingSequences()
+	if len(missing) != 0 {
+		t.Errorf("Expected no missing sequences, got %v", missing)
 	}
 }
 
