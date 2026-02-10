@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"hash/fnv"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,9 @@ var (
 	ErrSequenceGap       = errors.New("sequence number gap detected")
 	ErrOutOfOrderMessage = errors.New("out of order message")
 )
+
+// MetaKeySequence is the message metadata key for the ordering sequence number.
+const MetaKeySequence = "X-Message-Sequence"
 
 // OrderLevel defines the level of ordering guarantee
 type OrderLevel int
@@ -386,6 +390,12 @@ func (ops *OrderedPubSub) flushBatch(queue *orderedQueue, identifier string) {
 			}
 		}
 
+		// Stamp sequence into message metadata so subscribers can verify
+		if om.message.Meta == nil {
+			om.message.Meta = make(map[string]string, 1)
+		}
+		om.message.Meta[MetaKeySequence] = strconv.FormatUint(om.sequence, 10)
+
 		// Publish
 		_ = ops.InProcPubSub.Publish(om.topic, om.message)
 		ops.orderedPublishes.Add(1)
@@ -559,27 +569,21 @@ type OrderedSubscription struct {
 	topic   string
 }
 
-// SubscribeOrdered creates a subscription with sequence verification
+// SubscribeOrdered creates a subscription with sequence verification.
+// Each ordered subscription gets its own sequence tracker so that
+// subscriber-side verification is independent of publisher-side checks.
 func (ops *OrderedPubSub) SubscribeOrdered(topic string, opts SubOptions) (*OrderedSubscription, error) {
 	sub, err := ops.Subscribe(topic, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	ops.sequencesMu.Lock()
-	tracker, exists := ops.sequences[topic]
-	if !exists {
-		tracker = &sequenceTracker{
-			missing: make(map[uint64]bool),
-		}
-		ops.sequences[topic] = tracker
-	}
-	ops.sequencesMu.Unlock()
-
 	return &OrderedSubscription{
 		Subscription: sub,
-		tracker:      tracker,
-		topic:        topic,
+		tracker: &sequenceTracker{
+			missing: make(map[uint64]bool),
+		},
+		topic: topic,
 	}, nil
 }
 
@@ -591,7 +595,28 @@ func (os *OrderedSubscription) Receive(ctx context.Context) (Message, error) {
 			return Message{}, ErrClosed
 		}
 
-		// TODO: Verify sequence from message metadata
+		// Verify sequence from message metadata
+		if seqStr, ok := msg.Meta[MetaKeySequence]; ok {
+			seq, err := strconv.ParseUint(seqStr, 10, 64)
+			if err == nil {
+				os.tracker.mu.Lock()
+				expected := os.tracker.lastSequence + 1
+				if seq < expected {
+					os.tracker.mu.Unlock()
+					return msg, ErrOutOfOrderMessage
+				}
+				if seq > expected {
+					// Gap detected — record missing sequence numbers
+					for s := expected; s < seq; s++ {
+						os.tracker.missing[s] = true
+					}
+				}
+				delete(os.tracker.missing, seq)
+				os.tracker.lastSequence = seq
+				os.tracker.mu.Unlock()
+			}
+		}
+
 		return msg, nil
 
 	case <-ctx.Done():
