@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -81,8 +82,7 @@ func (am *SimpleAuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		// Check if token matches expected token
 		if subtle.ConstantTimeCompare([]byte(token), []byte(am.authToken)) != 1 {
 			w.Header().Set("WWW-Authenticate", "Bearer realm=\""+am.realm+"\"")
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error":"unauthorized","message":"Invalid or missing authentication token"}`))
+			contract.WriteError(w, r, contract.NewUnauthorizedError("Invalid or missing authentication token"))
 			return
 		}
 

@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	nethttp "github.com/spcent/plumego/net/http"
 )
 
@@ -179,7 +180,12 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 			if c.config.OnError != nil {
 				c.config.OnError(key, inflight.err)
 			}
-			http.Error(w, "Upstream request failed", http.StatusBadGateway)
+			contract.WriteError(w, r, contract.APIError{
+				Status:   http.StatusBadGateway,
+				Code:     "UPSTREAM_FAILED",
+				Message:  "Upstream request failed",
+				Category: contract.CategoryServer,
+			})
 			return
 		}
 
@@ -197,7 +203,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		inflight.waiters--
 		c.mu.Unlock()
 
-		http.Error(w, "Upstream request timeout", http.StatusGatewayTimeout)
+		contract.WriteError(w, r, contract.NewTimeoutError("Upstream request timeout"))
 	}
 }
 

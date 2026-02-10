@@ -1,9 +1,9 @@
 package circuitbreaker
 
 import (
-	"encoding/json"
 	"net/http"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/utils"
 )
 
@@ -103,31 +103,33 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 
 // writeCircuitOpenResponse writes a 503 response when circuit is open
 func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	utils.EnsureNoSniff(w.Header())
-	w.WriteHeader(http.StatusServiceUnavailable)
-
-	json.NewEncoder(w).Encode(map[string]any{
-		"error":   "Service Unavailable",
-		"message": "Circuit breaker is open. The service is temporarily unavailable.",
-		"circuit": cb.Name(),
-		"state":   cb.State().String(),
+	contract.WriteError(w, nil, contract.APIError{
+		Status:   http.StatusServiceUnavailable,
+		Code:     "CIRCUIT_OPEN",
+		Message:  "Circuit breaker is open. The service is temporarily unavailable.",
+		Category: contract.CategoryServer,
+		Details: map[string]any{
+			"circuit": cb.Name(),
+			"state":   cb.State().String(),
+		},
 	})
 }
 
 // writeTooManyRequestsResponse writes a 429 response for rate limiting
 func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	utils.EnsureNoSniff(w.Header())
-	w.WriteHeader(http.StatusTooManyRequests)
-
-	json.NewEncoder(w).Encode(map[string]any{
-		"error":   "Too Many Requests",
-		"message": "Circuit breaker is in half-open state. Too many concurrent requests.",
-		"circuit": cb.Name(),
-		"state":   cb.State().String(),
+	contract.WriteError(w, nil, contract.APIError{
+		Status:   http.StatusTooManyRequests,
+		Code:     "RATE_LIMITED",
+		Message:  "Circuit breaker is in half-open state. Too many concurrent requests.",
+		Category: contract.CategoryRateLimit,
+		Details: map[string]any{
+			"circuit": cb.Name(),
+			"state":   cb.State().String(),
+		},
 	})
 }
 

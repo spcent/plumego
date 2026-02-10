@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // AdminHandler exposes minimal management endpoints over net/http.
@@ -28,7 +30,7 @@ func (h *AdminHandler) WithPrefix(prefix string) *AdminHandler {
 // ServeHTTP implements http.Handler.
 func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h == nil || h.scheduler == nil {
-		http.Error(w, "scheduler not configured", http.StatusServiceUnavailable)
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: "scheduler not configured", Category: contract.CategoryServer})
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, h.prefix)
@@ -68,14 +70,14 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 	// Validate job ID length to prevent abuse via extremely long path segments.
 	const maxJobIDLen = 256
 	if len(parts[0]) > maxJobIDLen {
-		http.Error(w, "job ID too long", http.StatusBadRequest)
+		contract.WriteError(w, r, contract.NewValidationError("job_id", "job ID too long"))
 		return
 	}
 	id := JobID(parts[0])
 
 	if len(parts) == 1 {
 		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
 			return
 		}
 		status, ok := h.scheduler.Status(id)
@@ -89,7 +91,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 
 	action := parts[1]
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
 		return
 	}
 	switch action {

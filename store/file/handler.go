@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Handler provides HTTP endpoints for file operations.
@@ -57,7 +59,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	// Extract tenant ID from context
 	tenantID, ok := ctx.Value("tenant_id").(string)
 	if !ok || tenantID == "" {
-		h.writeError(w, http.StatusBadRequest, "missing tenant_id in context")
+		h.writeError(w, r, http.StatusBadRequest, "missing tenant_id in context")
 		return
 	}
 
@@ -66,14 +68,14 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Parse multipart form
 	if err := r.ParseMultipartForm(h.maxSize); err != nil {
-		h.writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to parse form: %v", err))
+		h.writeError(w, r, http.StatusBadRequest, fmt.Sprintf("failed to parse form: %v", err))
 		return
 	}
 
 	// Get file from form
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, fmt.Sprintf("missing file: %v", err))
+		h.writeError(w, r, http.StatusBadRequest, fmt.Sprintf("missing file: %v", err))
 		return
 	}
 	defer file.Close()
@@ -99,7 +101,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	// Upload file
 	result, err := h.storage.Put(ctx, opts)
 	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("upload failed: %v", err))
+		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("upload failed: %v", err))
 		return
 	}
 
@@ -114,7 +116,7 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
-		h.writeError(w, http.StatusBadRequest, "missing file id")
+		h.writeError(w, r, http.StatusBadRequest, "missing file id")
 		return
 	}
 
@@ -122,9 +124,9 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
 		if err == ErrNotFound {
-			h.writeError(w, http.StatusNotFound, "file not found")
+			h.writeError(w, r, http.StatusNotFound, "file not found")
 		} else {
-			h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
+			h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
 		}
 		return
 	}
@@ -135,7 +137,7 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	// Get file content
 	reader, err := h.storage.Get(ctx, fileMeta.Path)
 	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to read file: %v", err))
+		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to read file: %v", err))
 		return
 	}
 	defer reader.Close()
@@ -158,7 +160,7 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
-		h.writeError(w, http.StatusBadRequest, "missing file id")
+		h.writeError(w, r, http.StatusBadRequest, "missing file id")
 		return
 	}
 
@@ -166,9 +168,9 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
 		if err == ErrNotFound {
-			h.writeError(w, http.StatusNotFound, "file not found")
+			h.writeError(w, r, http.StatusNotFound, "file not found")
 		} else {
-			h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
+			h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
 		}
 		return
 	}
@@ -183,16 +185,16 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
-		h.writeError(w, http.StatusBadRequest, "missing file id")
+		h.writeError(w, r, http.StatusBadRequest, "missing file id")
 		return
 	}
 
 	// Soft delete in metadata
 	if err := h.metadata.Delete(ctx, fileID); err != nil {
 		if err == ErrNotFound {
-			h.writeError(w, http.StatusNotFound, "file not found")
+			h.writeError(w, r, http.StatusNotFound, "file not found")
 		} else {
-			h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("delete failed: %v", err))
+			h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("delete failed: %v", err))
 		}
 		return
 	}
@@ -243,7 +245,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	// Query files
 	files, total, err := h.metadata.List(ctx, query)
 	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("list failed: %v", err))
+		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("list failed: %v", err))
 		return
 	}
 
@@ -266,7 +268,7 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
-		h.writeError(w, http.StatusBadRequest, "missing file id")
+		h.writeError(w, r, http.StatusBadRequest, "missing file id")
 		return
 	}
 
@@ -282,9 +284,9 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
 		if err == ErrNotFound {
-			h.writeError(w, http.StatusNotFound, "file not found")
+			h.writeError(w, r, http.StatusNotFound, "file not found")
 		} else {
-			h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
+			h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
 		}
 		return
 	}
@@ -292,7 +294,7 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	// Get URL from storage
 	url, err := h.storage.GetURL(ctx, fileMeta.Path, expiry)
 	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to generate url: %v", err))
+		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to generate url: %v", err))
 		return
 	}
 
@@ -310,10 +312,12 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
 }
 
 // writeError writes an error response.
-func (h *Handler) writeError(w http.ResponseWriter, status int, message string) {
-	h.writeJSON(w, status, map[string]any{
-		"error":   http.StatusText(status),
-		"message": message,
+func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, status int, message string) {
+	contract.WriteError(w, r, contract.APIError{
+		Status:   status,
+		Code:     http.StatusText(status),
+		Message:  message,
+		Category: contract.CategoryForStatus(status),
 	})
 }
 
@@ -335,13 +339,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else if len(parts) == 2 && parts[1] == "url" {
 			h.GetURL(w, r)
 		} else {
-			h.writeError(w, http.StatusNotFound, "not found")
+			h.writeError(w, r, http.StatusNotFound, "not found")
 		}
 	case method == http.MethodDelete && strings.HasPrefix(path, "/files/"):
 		h.Delete(w, r)
 	case method == http.MethodGet && path == "/files":
 		h.List(w, r)
 	default:
-		h.writeError(w, http.StatusNotFound, "not found")
+		h.writeError(w, r, http.StatusNotFound, "not found")
 	}
 }

@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // computeAcceptKey computes the WebSocket accept key
@@ -92,31 +94,31 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		metricsMutex.Lock()
 		securityMetrics.RejectedConnections++
 		metricsMutex.Unlock()
-		http.Error(w, "forbidden origin", http.StatusForbidden)
+		contract.WriteError(w, r, contract.NewForbiddenError("forbidden origin"))
 		return
 	}
 
 	// Basic HTTP validation first
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
 		return
 	}
 	if !headerContains(r.Header, "Connection", "Upgrade") || !headerContains(r.Header, "Upgrade", "websocket") {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "bad request", Category: contract.CategoryClient})
 		return
 	}
 
 	// Validate WebSocket key
 	key := r.Header.Get("Sec-WebSocket-Key")
 	if key == "" {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "bad request", Category: contract.CategoryClient})
 		return
 	}
 	if err := ValidateWebSocketKey(key); err != nil {
 		metricsMutex.Lock()
 		securityMetrics.InvalidWebSocketKeys++
 		metricsMutex.Unlock()
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: err.Error(), Category: contract.CategoryClient})
 		return
 	}
 	// auth: room and JWT
@@ -130,7 +132,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		metricsMutex.Lock()
 		securityMetrics.RejectedConnections++
 		metricsMutex.Unlock()
-		http.Error(w, "forbidden: bad room password", http.StatusForbidden)
+		contract.WriteError(w, r, contract.NewForbiddenError("forbidden: bad room password"))
 		return
 	}
 	if err := cfg.Hub.CanJoin(room); err != nil {
@@ -138,7 +140,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		if errors.Is(err, ErrRoomFull) {
 			status = http.StatusTooManyRequests
 		}
-		http.Error(w, err.Error(), status)
+		contract.WriteError(w, r, contract.APIError{Status: status, Code: "JOIN_DENIED", Message: err.Error(), Category: contract.CategoryClient})
 		return
 	}
 	// check token if present
@@ -155,7 +157,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			metricsMutex.Lock()
 			securityMetrics.RejectedConnections++
 			metricsMutex.Unlock()
-			http.Error(w, "forbidden: invalid token", http.StatusForbidden)
+			contract.WriteError(w, r, contract.NewForbiddenError("forbidden: invalid token"))
 			return
 		}
 		// Extract user information from JWT payload
@@ -167,12 +169,12 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	accept := computeAcceptKey(key)
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		http.Error(w, "server does not support hijacking", http.StatusInternalServerError)
+		contract.WriteError(w, r, contract.NewInternalError("server does not support hijacking"))
 		return
 	}
 	conn, buf, err := hj.Hijack()
 	if err != nil {
-		http.Error(w, "hijack failed", http.StatusInternalServerError)
+		contract.WriteError(w, r, contract.NewInternalError("hijack failed"))
 		return
 	}
 	resp := "HTTP/1.1 101 Switching Protocols\r\n" +
