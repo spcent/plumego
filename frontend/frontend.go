@@ -296,6 +296,36 @@ type handler struct {
 	mimeTypes     map[string]string
 }
 
+// statusCodeWriter wraps http.ResponseWriter to enforce a specific HTTP status
+// code when serving custom error or not-found pages. http.ServeContent always
+// writes 200 (or 206/304), so this wrapper intercepts the WriteHeader call and
+// replaces any 2xx code with the desired error status while passing through
+// 3xx and other codes unchanged.
+type statusCodeWriter struct {
+	http.ResponseWriter
+	code        int
+	wroteHeader bool
+}
+
+func (s *statusCodeWriter) WriteHeader(code int) {
+	if !s.wroteHeader {
+		s.wroteHeader = true
+		// Replace 2xx success codes with the desired error/not-found status.
+		// Pass through 304 Not Modified, 416 Range Not Satisfiable, etc.
+		if code >= 200 && code < 300 {
+			code = s.code
+		}
+		s.ResponseWriter.WriteHeader(code)
+	}
+}
+
+func (s *statusCodeWriter) Write(b []byte) (int, error) {
+	if !s.wroteHeader {
+		s.WriteHeader(s.code)
+	}
+	return s.ResponseWriter.Write(b)
+}
+
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		contract.WriteError(w, r, contract.APIError{
@@ -312,7 +342,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Handle root path
 	if requestPath == "/" {
 		if h.prefix == "/" {
-			if !h.serveFile(w, r, h.indexFile) {
+			if served, err := h.serveFile(w, r, h.indexFile); err != nil {
+				h.serveError(w, r, "internal server error", http.StatusInternalServerError)
+			} else if !served {
 				h.serveNotFound(w, r)
 			}
 			return
@@ -324,7 +356,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Handle exact prefix match (e.g. /app)
 	if requestPath == h.prefix {
-		if !h.serveFile(w, r, h.indexFile) {
+		if served, err := h.serveFile(w, r, h.indexFile); err != nil {
+			h.serveError(w, r, "internal server error", http.StatusInternalServerError)
+		} else if !served {
 			h.serveNotFound(w, r)
 		}
 		return
@@ -346,7 +380,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// If relative path is empty after trimming, serve index
 	if relativePath == "" {
-		if !h.serveFile(w, r, h.indexFile) {
+		if served, err := h.serveFile(w, r, h.indexFile); err != nil {
+			h.serveError(w, r, "internal server error", http.StatusInternalServerError)
+		} else if !served {
 			h.serveNotFound(w, r)
 		}
 		return
@@ -356,7 +392,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cleanedPath := path.Clean(relativePath)
 	if cleanedPath == "." || cleanedPath == ".." || strings.Contains(cleanedPath, "..") {
 		if h.fallback {
-			if !h.serveFile(w, r, h.indexFile) {
+			if served, err := h.serveFile(w, r, h.indexFile); err != nil {
+				h.serveError(w, r, "internal server error", http.StatusInternalServerError)
+			} else if !served {
 				h.serveNotFound(w, r)
 			}
 			return
@@ -369,9 +407,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	filePath := filepath.ToSlash(cleanedPath)
 
 	// Try to serve the requested file, fall back to index
-	if !h.serveFile(w, r, filePath) {
+	served, err := h.serveFile(w, r, filePath)
+	if err != nil {
+		h.serveError(w, r, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !served {
 		if h.fallback {
-			if !h.serveFile(w, r, h.indexFile) {
+			if served, err = h.serveFile(w, r, h.indexFile); err != nil {
+				h.serveError(w, r, "internal server error", http.StatusInternalServerError)
+			} else if !served {
 				h.serveNotFound(w, r)
 			}
 			return
@@ -380,7 +425,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath string) bool {
+// serveFile attempts to serve the specified file. Return values:
+//   - (true, nil):  file was served, response written
+//   - (false, nil): file not found, no response written; caller should fall back or serve 404
+//   - (false, err): server-side IO error, no response written; caller should call serveError
+func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath string) (bool, error) {
 	// Try pre-compressed files first
 	if preFile, preStat, encoding := h.tryPrecompressed(r, filePath); preFile != nil {
 		defer preFile.Close()
@@ -408,19 +457,22 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath str
 
 		// Serve the pre-compressed file
 		http.ServeContent(w, r, path.Base(filePath), preStat.ModTime(), preFile)
-		return true
+		return true, nil
 	}
 
 	// Open the original file
 	f, err := h.fs.Open(filePath)
 	if err != nil {
-		return false
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("open %q: %w", filePath, err)
 	}
 	defer f.Close()
 
 	stat, err := f.Stat()
 	if err != nil {
-		return false
+		return false, fmt.Errorf("stat %q: %w", filePath, err)
 	}
 
 	if stat.IsDir() {
@@ -447,7 +499,7 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath str
 
 	// Use http.ServeContent for proper content serving
 	http.ServeContent(w, r, path.Base(filePath), stat.ModTime(), f)
-	return true
+	return true, nil
 }
 
 func (h *handler) applyHeaders(w http.ResponseWriter) {
@@ -490,20 +542,27 @@ func copyHeaders(headers map[string]string) map[string]string {
 	return copied
 }
 
-// serveNotFound serves a custom 404 page or falls back to http.NotFound
+// serveNotFound serves a custom 404 page or falls back to http.NotFound.
+// When a custom page is configured it is served with a 404 status code
+// (not 200) via statusCodeWriter.
 func (h *handler) serveNotFound(w http.ResponseWriter, r *http.Request) {
 	if h.notFoundPage != "" {
-		if h.serveFile(w, r, h.notFoundPage) {
+		sw := &statusCodeWriter{ResponseWriter: w, code: http.StatusNotFound}
+		if served, _ := h.serveFile(sw, r, h.notFoundPage); served {
 			return
 		}
 	}
 	http.NotFound(w, r)
 }
 
-// serveError serves a custom error page or falls back to http.Error
+// serveError serves a custom 5xx error page or falls back to http.Error.
+// When a custom page is configured it is served with the given error status
+// code (not 200) via statusCodeWriter. Errors from loading the error page
+// itself are ignored to avoid recursion; http.Error is used as the fallback.
 func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message string, code int) {
 	if h.errorPage != "" && code >= 500 {
-		if h.serveFile(w, r, h.errorPage) {
+		sw := &statusCodeWriter{ResponseWriter: w, code: code}
+		if served, _ := h.serveFile(sw, r, h.errorPage); served {
 			return
 		}
 	}
