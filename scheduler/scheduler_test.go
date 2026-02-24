@@ -1614,3 +1614,163 @@ func TestDeadLetterQueue(t *testing.T) {
 		}
 	})
 }
+
+// TestReplaceExistingCleansUpDependencyMaps verifies that replacing a job via
+// ReplaceExisting() fully cleans up the old job's dependency tracking (Bug #1).
+func TestReplaceExistingCleansUpDependencyMaps(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	triggered := make(chan struct{}, 4)
+
+	// Register dep-a as a dependency.
+	_, err := s.Delay("dep-a", 5*time.Second, func(ctx context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("dep-a: %v", err)
+	}
+
+	// Register dep-b to depend on dep-a.
+	_, err = s.Delay("dep-b", 5*time.Second, func(ctx context.Context) error {
+		triggered <- struct{}{}
+		return nil
+	}, WithDependsOn(DependencyFailureContinue, "dep-a"))
+	if err != nil {
+		t.Fatalf("dep-b: %v", err)
+	}
+
+	// Replace dep-b with a job that has NO dependencies.
+	_, err = s.Delay("dep-b", 5*time.Second, func(ctx context.Context) error {
+		return nil
+	}, ReplaceExisting())
+	if err != nil {
+		t.Fatalf("replace dep-b: %v", err)
+	}
+
+	// dep-b's old dependents entry under dep-a must be gone.
+	// After replacement, dep-b must NOT appear as a dependent of dep-a.
+	s.mu.RLock()
+	deps := s.dependents["dep-a"]
+	s.mu.RUnlock()
+	for _, d := range deps {
+		if d == "dep-b" {
+			t.Fatal("old dep-b still present in dependents[dep-a] after replacement")
+		}
+	}
+
+	// dep-b's own dependencyStatus entry should also be removed.
+	s.mu.RLock()
+	_, ok := s.dependencyStatus["dep-b"]
+	s.mu.RUnlock()
+	if ok {
+		t.Fatal("old dep-b still in dependencyStatus after replacement")
+	}
+}
+
+// TestDependencyFailureContinueDoesNotCorruptStatus verifies that
+// DependencyFailureContinue does not write true into dependencyStatus for
+// the failed dependency (Bug #2).
+func TestDependencyFailureContinueDoesNotCorruptStatus(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	depErr := errors.New("dep failure")
+	depRan := make(chan struct{}, 1)
+	depBRan := make(chan struct{}, 1)
+
+	// dep-a always fails.
+	_, err := s.Delay("dep-a", 10*time.Millisecond, func(ctx context.Context) error {
+		depRan <- struct{}{}
+		return depErr
+	}, WithRetryPolicy(RetryPolicy{MaxAttempts: 1}))
+	if err != nil {
+		t.Fatalf("dep-a: %v", err)
+	}
+
+	// dep-b continues even when dep-a fails.
+	_, err = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+		depBRan <- struct{}{}
+		return nil
+	}, WithDependsOn(DependencyFailureContinue, "dep-a"))
+	if err != nil {
+		t.Fatalf("dep-b: %v", err)
+	}
+
+	// Wait for dep-a to run.
+	select {
+	case <-depRan:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dep-a did not run")
+	}
+	// Wait for dep-b to run (Continue policy should allow it).
+	select {
+	case <-depBRan:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dep-b did not run after dep-a failed with DependencyFailureContinue")
+	}
+
+	// dep-a's status must remain false (failed), NOT been poisoned to true.
+	time.Sleep(50 * time.Millisecond) // let execute() finish updating state
+	s.mu.RLock()
+	status, ok := s.dependencyStatus["dep-a"]
+	s.mu.RUnlock()
+	if ok && status {
+		t.Fatal("DependencyFailureContinue incorrectly set dependencyStatus[dep-a] = true")
+	}
+}
+
+// TestDependencyFailureSkipDelayJobMarkedFailed verifies that a delay job
+// waiting on a dependency that fails with the Skip policy is marked as failed
+// rather than left in limbo (Bug #3).
+func TestDependencyFailureSkipDelayJobMarkedFailed(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	depRan := make(chan struct{}, 1)
+
+	// dep-a always fails.
+	_, err := s.Delay("dep-a", 10*time.Millisecond, func(ctx context.Context) error {
+		depRan <- struct{}{}
+		return errors.New("dep failure")
+	}, WithRetryPolicy(RetryPolicy{MaxAttempts: 1}))
+	if err != nil {
+		t.Fatalf("dep-a: %v", err)
+	}
+
+	// dep-b skips execution when dep-a fails.
+	executed := make(chan struct{}, 1)
+	_, err = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+		executed <- struct{}{}
+		return nil
+	}, WithDependsOn(DependencyFailureSkip, "dep-a"))
+	if err != nil {
+		t.Fatalf("dep-b: %v", err)
+	}
+
+	// Wait for dep-a to run.
+	select {
+	case <-depRan:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dep-a did not run")
+	}
+
+	// dep-b must NOT execute.
+	select {
+	case <-executed:
+		t.Fatal("dep-b should not have executed when DependencyFailureSkip")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	// dep-b must be marked as failed (not limbo).
+	time.Sleep(50 * time.Millisecond)
+	status, ok := s.Status("dep-b")
+	if !ok {
+		// If the job was cleaned up from s.jobs that is also acceptable.
+		return
+	}
+	if status.State != JobStateFailed {
+		t.Fatalf("expected dep-b state=failed, got %s", status.State)
+	}
+}

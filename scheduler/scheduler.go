@@ -646,8 +646,10 @@ func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec,
 		if !jobOpts.Replace && !existing.canceled.Load() {
 			return "", ErrJobExists
 		}
-		existing.canceled.Store(true)
-		s.setJobStateLocked(existing, JobStateCanceled)
+		// Use cancelJobLocked to ensure full cleanup: dependency maps,
+		// dependents reverse-index, and the persistence store are all
+		// cleared before the replacement job is registered.
+		s.cancelJobLocked(id, existing)
 	}
 
 	j := &job{
@@ -1231,12 +1233,22 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 					"failed_dependency": failedJob.id,
 				})
 			}
-			if depJob.kind == jobKindCron {
+			switch depJob.kind {
+			case jobKindCron:
+				// Reschedule cron job at its next natural trigger time.
 				next := depJob.cron.Next(s.clock.Now())
 				depJob.runAt = next
 				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
 				s.queue.PushSchedule(&scheduleItem{runAt: next, job: depJob})
 				s.wakeScheduler()
+			case jobKindDelay:
+				// A delay job runs once; if its dependency failed and the
+				// policy is Skip, mark it as failed so it doesn't stay
+				// in s.jobs forever without ever executing.
+				s.setJobStateLocked(depJob, JobStateFailed)
+				if s.store != nil {
+					_ = s.store.Delete(depJobID)
+				}
 			}
 
 		case DependencyFailureCancel:
@@ -1255,8 +1267,12 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 					"failed_dependency": failedJob.id,
 				})
 			}
-			s.dependencyStatus[failedJob.id] = true
-			if s.allDependenciesMetLocked(depJob) {
+			// DependencyFailureContinue: treat the failed dependency as
+			// satisfied for this scheduling decision only. Do NOT write
+			// true into dependencyStatus — the failed job still failed.
+			// Instead check whether all OTHER dependencies are met and
+			// allow the dependent to run regardless of this failure.
+			if s.allDependenciesMetExceptLocked(depJob, failedJob.id) {
 				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
 				s.queue.PushSchedule(&scheduleItem{runAt: depJob.runAt, job: depJob})
 				s.wakeScheduler()
@@ -1362,6 +1378,23 @@ func (s *Scheduler) resumeJobLocked(j *job) {
 // Must be called with s.mu held.
 func (s *Scheduler) allDependenciesMetLocked(j *job) bool {
 	for _, requiredDepID := range j.options.Dependencies {
+		if status, ok := s.dependencyStatus[requiredDepID]; !ok || !status {
+			return false
+		}
+	}
+	return true
+}
+
+// allDependenciesMetExceptLocked is like allDependenciesMetLocked but skips
+// the dependency identified by exceptID. Used for DependencyFailureContinue:
+// the failed dependency is ignored so the dependent job can still proceed if
+// all other dependencies are satisfied.
+// Must be called with s.mu held.
+func (s *Scheduler) allDependenciesMetExceptLocked(j *job, exceptID JobID) bool {
+	for _, requiredDepID := range j.options.Dependencies {
+		if requiredDepID == exceptID {
+			continue // intentionally ignore this dependency's outcome
+		}
 		if status, ok := s.dependencyStatus[requiredDepID]; !ok || !status {
 			return false
 		}
