@@ -125,7 +125,7 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if flagVerbose {
+	if ctx.Verbose {
 		ctx.Out.Verbose(fmt.Sprintf("Running: go %s", strings.Join(testArgs, " ")))
 	}
 

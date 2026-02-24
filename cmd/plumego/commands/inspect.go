@@ -61,7 +61,8 @@ func (c *InspectCmd) Run(ctx *Context, args []string) error {
 	auth := fs.String("auth", "", "Authentication token")
 	timeoutStr := fs.String("timeout", "10s", "Request timeout")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
@@ -71,8 +72,12 @@ func (c *InspectCmd) Run(ctx *Context, args []string) error {
 	}
 
 	subcommand := "health"
-	if fs.NArg() > 0 {
-		subcommand = fs.Arg(0)
+	if len(positionals) > 0 {
+		subcommand = positionals[0]
+		positionals = positionals[1:]
+	}
+	if len(positionals) > 0 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
 	}
 
 	client := &http.Client{

@@ -3,7 +3,11 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
@@ -120,5 +124,103 @@ func TestCLI_ConfigValidateExitCode(t *testing.T) {
 	}
 	if len(payload.Errors) == 0 {
 		t.Fatalf("expected at least one error, got none")
+	}
+}
+
+func TestCLI_UnknownCommandExitCode(t *testing.T) {
+	_, _, err := runCLI(t, []string{"unknown-command"}, "")
+	if err == nil {
+		t.Fatalf("expected error for unknown command")
+	}
+
+	code, ok := output.ExitCode(err)
+	if !ok || code != 1 {
+		t.Fatalf("expected exit code 1, got %d (ok=%v)", code, ok)
+	}
+}
+
+func TestCLI_GlobalFlagsDoNotLeakAcrossRuns(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"--quiet", "version"}, "")
+	if err != nil {
+		t.Fatalf("quiet version command failed: %v", err)
+	}
+	if strings.TrimSpace(stdout) != "" {
+		t.Fatalf("expected no output in quiet mode, got: %s", stdout)
+	}
+
+	stdout, _, err = runCLI(t, []string{"version"}, "")
+	if err != nil {
+		t.Fatalf("version command failed: %v", err)
+	}
+	if strings.TrimSpace(stdout) == "" {
+		t.Fatal("expected output after quiet run, got empty output")
+	}
+}
+
+func TestCLI_MigrateCreateParsesFlagsAfterSubcommand(t *testing.T) {
+	tmpDir := t.TempDir()
+	migrationDir := filepath.Join(tmpDir, "db", "migrations")
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"migrate", "create", "add_users_table", "--dir", migrationDir,
+	}, "")
+	if err != nil {
+		t.Fatalf("migrate create failed: %v", err)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Directory string `json:"directory"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" {
+		t.Fatalf("expected success status, got %q", payload.Status)
+	}
+
+	absDir, err := filepath.Abs(migrationDir)
+	if err != nil {
+		t.Fatalf("failed to resolve migration dir: %v", err)
+	}
+	if payload.Data.Directory != absDir {
+		t.Fatalf("expected migration directory %q, got %q", absDir, payload.Data.Directory)
+	}
+}
+
+func TestCLI_InspectParsesFlagsAfterSubcommand(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/health" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"inspect", "health", "--url", server.URL,
+	}, "")
+	if err != nil {
+		t.Fatalf("inspect health failed: %v", err)
+	}
+
+	var payload struct {
+		Status string         `json:"status"`
+		Data   map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" {
+		t.Fatalf("expected success status, got %q", payload.Status)
+	}
+	if payload.Data["endpoint"] != "/health" {
+		t.Fatalf("expected endpoint /health, got %v", payload.Data["endpoint"])
 	}
 }

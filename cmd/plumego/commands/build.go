@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -113,15 +114,34 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	// Run build
 	cmd := exec.Command("go", buildArgs...)
 	cmd.Dir = absDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var stdoutBuf bytes.Buffer
+	var stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
 
-	if flagVerbose {
+	if ctx.Verbose {
 		ctx.Out.Verbose(fmt.Sprintf("Building: go %s", strings.Join(buildArgs, " ")))
 	}
 
+	buildCommand := fmt.Sprintf("go %s", strings.Join(buildArgs, " "))
 	if err := cmd.Run(); err != nil {
-		return ctx.Out.Error(fmt.Sprintf("build failed: %v", err), 1)
+		buildOutput := strings.TrimSpace(stdoutBuf.String() + "\n" + stderrBuf.String())
+		if ctx.Out.Format() == "text" && !ctx.Out.IsQuiet() && buildOutput != "" {
+			_ = ctx.Out.Textf("%s\n", buildOutput)
+		}
+
+		errData := map[string]any{
+			"command": buildCommand,
+		}
+		if buildOutput != "" {
+			errData["output"] = buildOutput
+		}
+		return ctx.Out.Error(fmt.Sprintf("build failed: %v", err), 1, errData)
+	}
+
+	buildOutput := strings.TrimSpace(stdoutBuf.String() + "\n" + stderrBuf.String())
+	if ctx.Out.Format() == "text" && !ctx.Out.IsQuiet() && buildOutput != "" {
+		_ = ctx.Out.Textf("%s\n", buildOutput)
 	}
 
 	buildTime := time.Since(startTime)
@@ -146,6 +166,9 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 
 	if *tags != "" {
 		result["build_tags"] = strings.Split(*tags, ",")
+	}
+	if buildOutput != "" {
+		result["build_output"] = buildOutput
 	}
 
 	return ctx.Out.Success("Build completed successfully", result)

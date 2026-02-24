@@ -1,18 +1,10 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
-)
-
-// Global flags
-var (
-	flagFormat  string
-	flagQuiet   bool
-	flagVerbose bool
-	flagNoColor bool
-	flagEnvFile string
 )
 
 // RootCmd represents the base command
@@ -70,64 +62,91 @@ func (r *RootCmd) Register(cmd Command) {
 // Run executes the command
 func (r *RootCmd) Run(args []string) error {
 	// Parse global flags
-	args = r.parseGlobalFlags(args)
+	global, args, err := r.parseGlobalFlags(args)
+	if err != nil {
+		return r.formatter.Error(fmt.Sprintf("invalid global flags: %v", err), 1)
+	}
 
 	// Configure formatter
-	r.formatter.SetFormat(flagFormat)
-	r.formatter.SetQuiet(flagQuiet)
-	r.formatter.SetVerbose(flagVerbose)
-	r.formatter.SetColor(!flagNoColor)
+	r.formatter.SetFormat(global.Format)
+	r.formatter.SetQuiet(global.Quiet)
+	r.formatter.SetVerbose(global.Verbose)
+	r.formatter.SetColor(!global.NoColor)
 
 	if len(args) == 0 {
 		return r.showHelp()
 	}
 
 	cmdName := args[0]
+	if cmdName == "help" || cmdName == "--help" || cmdName == "-h" {
+		return r.showHelp()
+	}
+
 	cmd, ok := r.subcommands[cmdName]
 	if !ok {
-		return r.showHelp()
+		return r.formatter.Error(fmt.Sprintf("unknown command: %s", cmdName), 1, map[string]any{
+			"command": cmdName,
+			"hint":    "run plumego --help",
+		})
 	}
 
 	ctx := &Context{
 		Out:     r.formatter,
-		EnvFile: flagEnvFile,
+		EnvFile: global.EnvFile,
+		Verbose: global.Verbose,
+		Quiet:   global.Quiet,
+		Format:  global.Format,
 	}
 
 	return cmd.Run(ctx, args[1:])
 }
 
-func (r *RootCmd) parseGlobalFlags(args []string) []string {
-	// Simple flag parsing for demonstration
-	// In production, use pflag or similar
+type globalFlags struct {
+	Format  string
+	Quiet   bool
+	Verbose bool
+	NoColor bool
+	EnvFile string
+}
+
+func defaultGlobalFlags() globalFlags {
+	return globalFlags{
+		Format:  "json",
+		EnvFile: ".env",
+	}
+}
+
+func (r *RootCmd) parseGlobalFlags(args []string) (globalFlags, []string, error) {
+	global := defaultGlobalFlags()
 	remaining := []string{}
-	flagFormat = "json"
-	flagEnvFile = ".env"
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch arg {
 		case "--format", "-f":
-			if i+1 < len(args) {
-				flagFormat = args[i+1]
-				i++
+			if i+1 >= len(args) {
+				return global, nil, fmt.Errorf("%s requires a value", arg)
 			}
+			global.Format = args[i+1]
+			i++
 		case "--quiet", "-q":
-			flagQuiet = true
+			global.Quiet = true
 		case "--verbose", "-v":
-			flagVerbose = true
+			global.Verbose = true
 		case "--no-color":
-			flagNoColor = true
+			global.NoColor = true
 		case "--env-file":
-			if i+1 < len(args) {
-				flagEnvFile = args[i+1]
-				i++
+			if i+1 >= len(args) {
+				return global, nil, fmt.Errorf("%s requires a value", arg)
 			}
+			global.EnvFile = args[i+1]
+			i++
 		default:
 			remaining = append(remaining, arg)
 		}
 	}
 
-	return remaining
+	return global, remaining, nil
 }
 
 func (r *RootCmd) showHelp() error {

@@ -58,15 +58,17 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	driver := fs.String("driver", "", "Database driver name")
 	steps := fs.Int("steps", 0, "Number of migrations to apply/rollback (0 = all)")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
 	out := ctx.Out
 
 	subcommand := "status"
-	if fs.NArg() > 0 {
-		subcommand = fs.Arg(0)
+	if len(positionals) > 0 {
+		subcommand = positionals[0]
+		positionals = positionals[1:]
 	}
 
 	absDir, err := filepath.Abs(*dir)
@@ -77,8 +79,11 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	switch subcommand {
 	case "create":
 		name := ""
-		if fs.NArg() > 1 {
-			name = fs.Arg(1)
+		if len(positionals) > 0 {
+			name = positionals[0]
+		}
+		if len(positionals) > 1 {
+			return out.Error(fmt.Sprintf("unexpected arguments: %v", positionals[1:]), 1)
 		}
 		if name == "" {
 			return out.Error("migration name is required", 1)
@@ -99,6 +104,9 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 
 		return out.Success("Migration files created", result)
 	case "status", "up", "down":
+		if len(positionals) > 0 {
+			return out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
+		}
 		if *driver == "" || *dbURL == "" {
 			return out.Error("driver and db-url are required", 1)
 		}
