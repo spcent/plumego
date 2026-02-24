@@ -3,6 +3,7 @@ package scheduler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/spcent/plumego/contract"
@@ -47,14 +48,25 @@ func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case r.Method == http.MethodGet && path == "/jobs":
 		query := parseJobQuery(r)
-		if query != nil {
-			writeJSON(w, http.StatusOK, h.scheduler.QueryJobs(*query).Jobs)
-			return
-		}
-		writeJSON(w, http.StatusOK, h.scheduler.List())
+		result := h.scheduler.QueryJobs(query)
+		// Return the jobs slice for backward compatibility.
+		// The total count is available in the X-Total-Count header.
+		w.Header().Set("X-Total-Count", strconv.Itoa(result.Total))
+		writeJSON(w, http.StatusOK, result.Jobs)
 		return
 	case strings.HasPrefix(path, "/jobs/"):
 		h.handleJob(w, r, strings.TrimPrefix(path, "/jobs/"))
+		return
+	// Dead letter queue endpoints
+	case r.Method == http.MethodGet && path == "/dlq":
+		writeJSON(w, http.StatusOK, h.scheduler.ListDeadLetters())
+		return
+	case r.Method == http.MethodDelete && path == "/dlq":
+		count := h.scheduler.ClearDeadLetters()
+		writeJSON(w, http.StatusOK, map[string]int{"cleared": count})
+		return
+	case strings.HasPrefix(path, "/dlq/"):
+		h.handleDLQEntry(w, r, strings.TrimPrefix(path, "/dlq/"))
 		return
 	default:
 		http.NotFound(w, r)
@@ -118,25 +130,117 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 	}
 }
 
-func parseJobQuery(r *http.Request) *JobQuery {
+// handleDLQEntry handles per-entry dead letter queue operations.
+func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, suffix string) {
+	const maxJobIDLen = 256
+	id := strings.Trim(suffix, "/")
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if len(id) > maxJobIDLen {
+		contract.WriteError(w, r, contract.NewValidationError("job_id", "job ID too long"))
+		return
+	}
+	jobID := JobID(id)
+
+	switch r.Method {
+	case http.MethodGet:
+		entry, ok := h.scheduler.GetDeadLetter(jobID)
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, entry)
+	case http.MethodDelete:
+		if !h.scheduler.DeleteDeadLetter(jobID) {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+	default:
+		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
+	}
+}
+
+// parseJobQuery builds a JobQuery from URL query parameters.
+// Supported parameters:
+//
+//	state=running&state=failed  — filter by job state (repeatable)
+//	group=mygroup               — filter by group
+//	tag=t1&tag=t2               — filter by tags (all must match)
+//	kind=cron&kind=delay        — filter by kind (repeatable)
+//	running=true                — filter by running flag
+//	paused=false                — filter by paused flag
+//	order_by=next_run           — sort field: id, next_run, last_run, group
+//	asc=false                   — sort direction (default true)
+//	limit=50                    — max results
+//	offset=0                    — pagination offset
+func parseJobQuery(r *http.Request) JobQuery {
+	var q JobQuery
 	if r == nil {
-		return nil
+		return q
 	}
 	values := r.URL.Query()
-	stateValues := values["state"]
-	if len(stateValues) == 0 {
-		return nil
-	}
-	states := make([]JobState, 0, len(stateValues))
-	for _, value := range stateValues {
-		if state := parseJobState(value); state != "" {
-			states = append(states, state)
+
+	// States
+	for _, v := range values["state"] {
+		if s := parseJobState(v); s != "" {
+			q.States = append(q.States, s)
 		}
 	}
-	if len(states) == 0 {
-		return nil
+
+	// Group
+	q.Group = values.Get("group")
+
+	// Tags (all must be present)
+	q.Tags = values["tag"]
+
+	// Kinds
+	for _, k := range values["kind"] {
+		k = strings.ToLower(k)
+		if k == "cron" || k == "delay" {
+			q.Kinds = append(q.Kinds, k)
+		}
 	}
-	return &JobQuery{States: states}
+
+	// Running / Paused boolean filters
+	if v := values.Get("running"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err == nil {
+			q.Running = &b
+		}
+	}
+	if v := values.Get("paused"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err == nil {
+			q.Paused = &b
+		}
+	}
+
+	// Sorting
+	q.OrderBy = values.Get("order_by")
+	q.Ascending = true
+	if v := values.Get("asc"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err == nil {
+			q.Ascending = b
+		}
+	}
+
+	// Pagination
+	if v := values.Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			q.Limit = n
+		}
+	}
+	if v := values.Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			q.Offset = n
+		}
+	}
+
+	return q
 }
 
 func parseJobState(value string) JobState {

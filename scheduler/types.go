@@ -413,6 +413,7 @@ type JobStatus struct {
 	Paused        bool
 	Running       bool
 	Kind          string
+	CronExpr      string // Non-empty for cron jobs; reconstructed from spec.
 	OverlapPolicy OverlapPolicy
 	Group         string
 	Tags          []string

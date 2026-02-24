@@ -18,6 +18,55 @@ const (
 	CronYearly      = "0 0 1 1 *"
 )
 
+// Expr returns the original cron expression string for this spec.
+// For @every specs it returns "@every <duration>".
+// For standard cron fields it reconstructs the expression.
+func (c CronSpec) Expr() string {
+	if c.interval > 0 {
+		return "@every " + c.interval.String()
+	}
+	if len(c.minutes) == 0 {
+		return ""
+	}
+	hasSec := len(c.seconds) > 0 && !(len(c.seconds) == 1 && c.seconds[0] == 0)
+	if hasSec {
+		return cronFieldStr(c.seconds, 0, 59) + " " +
+			cronFieldStr(c.minutes, 0, 59) + " " +
+			cronFieldStr(c.hours, 0, 23) + " " +
+			cronFieldStr(c.dom, 1, 31) + " " +
+			cronFieldStr(c.months, 1, 12) + " " +
+			cronFieldStr(c.dow, 0, 6)
+	}
+	return cronFieldStr(c.minutes, 0, 59) + " " +
+		cronFieldStr(c.hours, 0, 23) + " " +
+		cronFieldStr(c.dom, 1, 31) + " " +
+		cronFieldStr(c.months, 1, 12) + " " +
+		cronFieldStr(c.dow, 0, 6)
+}
+
+// cronFieldStr reconstructs a cron field string from an expanded values slice.
+// Returns "*" when the field covers the full range.
+func cronFieldStr(values []int, min, max int) string {
+	full := buildRange(min, max, 1)
+	if len(values) == len(full) {
+		allMatch := true
+		for i, v := range values {
+			if v != full[i] {
+				allMatch = false
+				break
+			}
+		}
+		if allMatch {
+			return "*"
+		}
+	}
+	parts := make([]string, len(values))
+	for i, v := range values {
+		parts[i] = strconv.Itoa(v)
+	}
+	return strings.Join(parts, ",")
+}
+
 // CronSpec represents a parsed cron expression (minute, hour, dom, month, dow).
 type CronSpec struct {
 	seconds  []int

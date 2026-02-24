@@ -11,16 +11,18 @@ type Store interface {
 
 // StoredJob captures the serialized form of a scheduled job.
 type StoredJob struct {
-	ID        JobID
-	Kind      string
-	RunAt     time.Time
-	TaskName  string
-	Group     string
-	Tags      []string
-	Timeout   time.Duration
-	Overlap   OverlapPolicy
-	Retry     RetrySpec
-	CreatedAt time.Time
+	ID               JobID
+	Kind             string
+	RunAt            time.Time
+	TaskName         string
+	Group            string
+	Tags             []string
+	Timeout          time.Duration
+	Overlap          OverlapPolicy
+	Retry            RetrySpec
+	CreatedAt        time.Time
+	Dependencies     []JobID
+	DependencyPolicy DependencyFailurePolicy
 }
 
 // RetrySpec is a serializable retry policy.

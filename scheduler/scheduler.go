@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -19,12 +20,18 @@ const (
 
 // Scheduler coordinates cron, delayed, and retryable jobs.
 type Scheduler struct {
-	mu     sync.RWMutex
-	jobs   map[JobID]*job
-	queue  scheduleHeap
-	wakeCh chan struct{}
-	stopCh chan struct{}
-	closed bool
+	mu      sync.RWMutex
+	jobs    map[JobID]*job
+	queue   scheduleHeap
+	wakeCh  chan struct{}
+	stopCh  chan struct{}
+	closed  bool
+	started bool // guards against multiple Start() calls
+
+	// stopCtx is cancelled when the scheduler is stopped, allowing
+	// running tasks to detect shutdown when no per-job timeout is set.
+	stopCtx    context.Context
+	stopCancel context.CancelFunc
 
 	workerCount  int
 	workCh       chan *runRequest
@@ -127,6 +134,7 @@ func WithDeadLetterQueue(maxSize int) Option {
 
 // New constructs a Scheduler.
 func New(opts ...Option) *Scheduler {
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &Scheduler{
 		jobs:             make(map[JobID]*job),
 		queue:            scheduleHeap{},
@@ -140,6 +148,8 @@ func New(opts ...Option) *Scheduler {
 		backpressure:     DefaultBackpressureConfig(),
 		dependents:       make(map[JobID][]JobID),
 		dependencyStatus: make(map[JobID]bool),
+		stopCtx:          ctx,
+		stopCancel:       cancel,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -150,7 +160,16 @@ func New(opts ...Option) *Scheduler {
 }
 
 // Start launches scheduler goroutines.
+// Calling Start more than once on the same Scheduler is a no-op.
 func (s *Scheduler) Start() {
+	s.mu.Lock()
+	if s.started || s.closed {
+		s.mu.Unlock()
+		return
+	}
+	s.started = true
+	s.mu.Unlock()
+
 	s.loadPersisted()
 	s.wg.Add(1)
 	go s.runLoop()
@@ -184,6 +203,7 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	}
 	s.closed = true
 	close(s.stopCh)
+	s.stopCancel() // signal running tasks via stopCtx
 	s.mu.Unlock()
 
 	done := make(chan struct{})
@@ -514,7 +534,7 @@ func (s *Scheduler) QueryJobs(query JobQuery) JobQueryResult {
 
 // sortJobStatuses sorts job statuses based on the specified field and direction.
 func sortJobStatuses(jobs []JobStatus, orderBy string, ascending bool) {
-	less := func(i, j int) bool {
+	sort.Slice(jobs, func(i, j int) bool {
 		switch orderBy {
 		case "id":
 			if ascending {
@@ -539,17 +559,7 @@ func sortJobStatuses(jobs []JobStatus, orderBy string, ascending bool) {
 		default:
 			return false
 		}
-	}
-
-	// Simple bubble sort (good enough for scheduler use case)
-	n := len(jobs)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			if less(j+1, j) {
-				jobs[j], jobs[j+1] = jobs[j+1], jobs[j]
-			}
-		}
-	}
+	})
 }
 
 func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec, runAt time.Time, opts ...JobOption) (JobID, error) {
@@ -557,7 +567,7 @@ func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec,
 		return "", ErrTaskNil
 	}
 	if id == "" {
-		id = JobID(fmt.Sprintf("job-%d", time.Now().UnixNano()))
+		id = JobID(fmt.Sprintf("job-%d", s.clock.Now().UnixNano()))
 	}
 	jobOpts := defaultJobOptions()
 	for _, opt := range opts {
@@ -590,7 +600,7 @@ func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec,
 	}
 	if kind == jobKindCron {
 		j.runAt = spec.Next(s.clock.Now())
-		j.cronExpr = specString(spec)
+		j.cronExpr = spec.Expr()
 	}
 	if kind == jobKindDelay && runAt.Before(s.clock.Now()) {
 		j.runAt = s.clock.Now()
@@ -703,7 +713,7 @@ func (s *Scheduler) dispatch(j *job) {
 	}
 
 	if j.options.OverlapPolicy == SkipIfRunning && !j.running.CompareAndSwap(false, true) {
-		s.scheduleNext(j, time.Now())
+		s.scheduleNext(j, s.clock.Now())
 		return
 	}
 	if j.options.OverlapPolicy == SerialQueue {
@@ -714,7 +724,7 @@ func (s *Scheduler) dispatch(j *job) {
 		}
 	}
 
-	req := &runRequest{job: j, enqueuedAt: time.Now()}
+	req := &runRequest{job: j, enqueuedAt: s.clock.Now()}
 
 	// Handle backpressure based on configured policy
 	switch s.backpressure.Policy {
@@ -815,14 +825,16 @@ func (s *Scheduler) worker() {
 }
 
 func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
-	ctx := context.Background()
+	// Derive execution context from the scheduler's stop context so that
+	// running tasks are notified when the scheduler shuts down.
+	ctx := s.stopCtx
 	cancel := func() {}
 	if j.options.Timeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, j.options.Timeout)
 	}
-	queueDelay := time.Since(enqueuedAt)
+	queueDelay := s.clock.Now().Sub(enqueuedAt)
 	s.stats.addQueueDelay(queueDelay)
-	start := time.Now()
+	start := s.clock.Now()
 	s.mu.Lock()
 	attempt := j.nextAttempt
 	scheduledAt := j.runAt
@@ -857,13 +869,15 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	j.lastError = err
 	s.mu.Unlock()
 
+	elapsed := s.clock.Now().Sub(start)
+
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			s.stats.incTimeout()
 		}
 		s.stats.incFailure()
 		if s.metricsSink != nil {
-			s.metricsSink.ObserveRun(j.id, time.Since(start), err, queueDelay)
+			s.metricsSink.ObserveRun(j.id, elapsed, err, queueDelay)
 		}
 		// Mark dependency as failed
 		s.mu.Lock()
@@ -877,7 +891,7 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 
 	s.stats.incSuccess()
 	if s.metricsSink != nil {
-		s.metricsSink.ObserveRun(j.id, time.Since(start), nil, queueDelay)
+		s.metricsSink.ObserveRun(j.id, elapsed, nil, queueDelay)
 	}
 	s.mu.Lock()
 	j.nextAttempt = 1
@@ -890,7 +904,7 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	pending := j.options.OverlapPolicy == SerialQueue && j.pending.Swap(false)
 	if pending {
 		s.setJobStateIfIdleLocked(j, JobStateScheduled)
-		s.queue.PushSchedule(&scheduleItem{runAt: time.Now(), job: j})
+		s.queue.PushSchedule(&scheduleItem{runAt: s.clock.Now(), job: j})
 		s.wakeScheduler()
 	}
 	s.mu.Unlock()
@@ -996,11 +1010,6 @@ func (s *Scheduler) handleRetriesExhausted(j *job, err error, attempts int, dead
 	}
 }
 
-func specString(spec CronSpec) string {
-	_ = spec
-	return "cron"
-}
-
 func jobStatusFrom(j *job) JobStatus {
 	kind := "delay"
 	if j.kind == jobKindCron {
@@ -1015,6 +1024,7 @@ func jobStatusFrom(j *job) JobStatus {
 		Paused:        j.paused.Load(),
 		Running:       j.running.Load(),
 		Kind:          kind,
+		CronExpr:      j.cronExpr,
 		OverlapPolicy: j.options.OverlapPolicy,
 		Group:         j.options.Group,
 		Tags:          append([]string(nil), j.options.Tags...),
@@ -1034,16 +1044,18 @@ func (s *Scheduler) persistJobLocked(j *job) {
 		return
 	}
 	job := StoredJob{
-		ID:        j.id,
-		Kind:      "delay",
-		RunAt:     j.runAt,
-		TaskName:  j.options.TaskName,
-		Group:     j.options.Group,
-		Tags:      append([]string(nil), j.options.Tags...),
-		Timeout:   j.options.Timeout,
-		Overlap:   j.options.OverlapPolicy,
-		Retry:     serializeRetry(j.options.RetryPolicy),
-		CreatedAt: s.clock.Now(),
+		ID:               j.id,
+		Kind:             "delay",
+		RunAt:            j.runAt,
+		TaskName:         j.options.TaskName,
+		Group:            j.options.Group,
+		Tags:             append([]string(nil), j.options.Tags...),
+		Timeout:          j.options.Timeout,
+		Overlap:          j.options.OverlapPolicy,
+		Retry:            serializeRetry(j.options.RetryPolicy),
+		CreatedAt:        s.clock.Now(),
+		Dependencies:     append([]JobID(nil), j.options.Dependencies...),
+		DependencyPolicy: j.options.DependencyPolicy,
 	}
 	_ = s.store.Save(job)
 }
@@ -1074,6 +1086,9 @@ func (s *Scheduler) loadPersisted() {
 			WithTags(item.Tags...),
 			WithTaskName(item.TaskName),
 			ReplaceExisting(),
+		}
+		if len(item.Dependencies) > 0 {
+			opts = append(opts, WithDependsOn(item.DependencyPolicy, item.Dependencies...))
 		}
 		_, _ = s.Schedule(item.ID, item.RunAt, task, opts...)
 	}
@@ -1176,15 +1191,20 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 // addToDeadLetterQueue adds a failed job to the dead letter queue.
 func (s *Scheduler) addToDeadLetterQueue(j *job, err error, attempts int) {
 	now := s.clock.Now()
+	errMsg := ""
+	if err != nil {
+		errMsg = err.Error()
+	}
 	entry := DeadLetterEntry{
-		JobID:       j.id,
-		Error:       err,
-		Attempts:    attempts,
-		FirstFailed: now,
-		LastFailed:  now,
-		TaskName:    j.options.TaskName,
-		Group:       j.options.Group,
-		Tags:        j.options.Tags,
+		JobID:        j.id,
+		Error:        err,
+		ErrorMessage: errMsg,
+		Attempts:     attempts,
+		FirstFailed:  now,
+		LastFailed:   now,
+		TaskName:     j.options.TaskName,
+		Group:        j.options.Group,
+		Tags:         j.options.Tags,
 	}
 	s.dlq.Add(entry)
 }
@@ -1227,6 +1247,24 @@ func (s *Scheduler) cancelJobLocked(id JobID, j *job) {
 	s.setJobStateLocked(j, JobStateCanceled)
 	if s.store != nil {
 		_ = s.store.Delete(id)
+	}
+	// Clean up dependency tracking to prevent memory leaks.
+	delete(s.dependents, id)
+	delete(s.dependencyStatus, id)
+	// Remove this job from the dependents lists of its own dependencies.
+	for _, depID := range j.options.Dependencies {
+		deps := s.dependents[depID]
+		filtered := deps[:0]
+		for _, d := range deps {
+			if d != id {
+				filtered = append(filtered, d)
+			}
+		}
+		if len(filtered) == 0 {
+			delete(s.dependents, depID)
+		} else {
+			s.dependents[depID] = filtered
+		}
 	}
 }
 
