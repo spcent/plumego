@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -68,6 +69,14 @@ func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/dlq/"):
 		h.handleDLQEntry(w, r, strings.TrimPrefix(path, "/dlq/"))
 		return
+	// Bulk group operations: POST /scheduler/groups/{group}/{action}
+	case r.Method == http.MethodPost && strings.HasPrefix(path, "/groups/"):
+		h.handleGroupAction(w, r, strings.TrimPrefix(path, "/groups/"))
+		return
+	// Bulk tag operations: POST /scheduler/tags/{tag}/{action}
+	case r.Method == http.MethodPost && strings.HasPrefix(path, "/tags/"):
+		h.handleTagAction(w, r, strings.TrimPrefix(path, "/tags/"))
+		return
 	default:
 		http.NotFound(w, r)
 	}
@@ -125,6 +134,16 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "canceled"})
+	case "trigger":
+		if err := h.scheduler.TriggerNow(id); err != nil {
+			if errors.Is(err, ErrJobNotFound) {
+				http.NotFound(w, r)
+				return
+			}
+			contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "TRIGGER_FAILED", Message: err.Error(), Category: contract.CategoryClient})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "triggered"})
 	default:
 		http.NotFound(w, r)
 	}
@@ -160,6 +179,56 @@ func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, su
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 	default:
 		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
+	}
+}
+
+// handleGroupAction handles bulk operations on a job group.
+// Path: /groups/{group}/{action}  Method: POST
+// Supported actions: pause, resume, cancel
+func (h *AdminHandler) handleGroupAction(w http.ResponseWriter, r *http.Request, suffix string) {
+	parts := strings.SplitN(strings.Trim(suffix, "/"), "/", 2)
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	group, action := parts[0], parts[1]
+	switch action {
+	case "pause":
+		n := h.scheduler.PauseByGroup(group)
+		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+	case "resume":
+		n := h.scheduler.ResumeByGroup(group)
+		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+	case "cancel":
+		n := h.scheduler.CancelByGroup(group)
+		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+// handleTagAction handles bulk operations on jobs sharing a tag.
+// Path: /tags/{tag}/{action}  Method: POST
+// Supported actions: pause, resume, cancel
+func (h *AdminHandler) handleTagAction(w http.ResponseWriter, r *http.Request, suffix string) {
+	parts := strings.SplitN(strings.Trim(suffix, "/"), "/", 2)
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	tag, action := parts[0], parts[1]
+	switch action {
+	case "pause":
+		n := h.scheduler.PauseByTags(tag)
+		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+	case "resume":
+		n := h.scheduler.ResumeByTags(tag)
+		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+	case "cancel":
+		n := h.scheduler.CancelByTags(tag)
+		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+	default:
+		http.NotFound(w, r)
 	}
 }
 

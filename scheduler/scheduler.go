@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sort"
 	"sync"
 	"time"
@@ -259,6 +260,66 @@ func (s *Scheduler) Schedule(id JobID, runAt time.Time, task TaskFunc, opts ...J
 // Delay registers a job to run after the specified delay.
 func (s *Scheduler) Delay(id JobID, delay time.Duration, task TaskFunc, opts ...JobOption) (JobID, error) {
 	return s.Schedule(id, s.clock.Now().Add(delay), task, opts...)
+}
+
+// TriggerNow immediately queues a job for execution regardless of its next
+// scheduled time. For cron jobs the normal schedule is not affected; the job
+// will also run at its next cron-calculated time. For delay jobs the
+// behaviour is equivalent to re-running an already-queued job.
+//
+// Returns ErrJobNotFound if the job does not exist, ErrSchedulerClosed if
+// the scheduler has been stopped.
+func (s *Scheduler) TriggerNow(id JobID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return ErrSchedulerClosed
+	}
+	j, exists := s.jobs[id]
+	if !exists || j.canceled.Load() {
+		return ErrJobNotFound
+	}
+	if j.paused.Load() {
+		return fmt.Errorf("scheduler: job %q is paused", id)
+	}
+	s.queue.PushSchedule(&scheduleItem{runAt: s.clock.Now(), job: j})
+	s.wakeScheduler()
+	return nil
+}
+
+// UpdateCron updates the cron expression of a registered cron job.
+// The new schedule takes effect immediately; the next run time is recalculated
+// from now. Returns ErrJobNotFound if the job does not exist or is not a cron
+// job. Returns an error if the new expression cannot be parsed.
+func (s *Scheduler) UpdateCron(id JobID, spec string) error {
+	parsed, err := ParseCronSpec(spec)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return ErrSchedulerClosed
+	}
+	j, exists := s.jobs[id]
+	if !exists || j.canceled.Load() {
+		return ErrJobNotFound
+	}
+	if j.kind != jobKindCron {
+		return fmt.Errorf("scheduler: job %q is not a cron job", id)
+	}
+	j.cron = parsed
+	j.cronExpr = parsed.Expr()
+	next := parsed.Next(s.clock.Now())
+	if next.IsZero() {
+		return fmt.Errorf("scheduler: new spec %q yields no future run time", spec)
+	}
+	j.runAt = next
+	if !j.paused.Load() {
+		s.queue.PushSchedule(&scheduleItem{runAt: next, job: j})
+		s.wakeScheduler()
+	}
+	return nil
 }
 
 // Cancel removes a job from the scheduler.
@@ -663,8 +724,7 @@ func (s *Scheduler) runLoop() {
 			}
 		}
 
-		now := s.clock.Now()
-		wait := time.Until(item.runAt)
+		wait := item.runAt.Sub(s.clock.Now())
 		if wait > 0 {
 			timer := time.NewTimer(wait)
 			select {
@@ -677,6 +737,9 @@ func (s *Scheduler) runLoop() {
 				return
 			}
 		}
+
+		// Sample clock after the wait so popDue sees an accurate "now".
+		now := s.clock.Now()
 
 		// Dispatch due items
 		for {
@@ -803,6 +866,10 @@ func (s *Scheduler) scheduleNext(j *job, base time.Time) {
 	if next.IsZero() {
 		return
 	}
+	// Apply jitter: randomise execution start within [0, Jitter).
+	if j.options.Jitter > 0 {
+		next = next.Add(time.Duration(rand.Int63n(int64(j.options.Jitter))))
+	}
 	j.runAt = next
 	s.setJobStateIfIdleLocked(j, JobStateScheduled)
 	s.queue.PushSchedule(&scheduleItem{runAt: next, job: j})
@@ -872,8 +939,13 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	elapsed := s.clock.Now().Sub(start)
 
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			// Per-job timeout fired.
 			s.stats.incTimeout()
+		case errors.Is(err, context.Canceled):
+			// Scheduler shutting down; do not count as a task timeout.
+			s.stats.incCanceled()
 		}
 		s.stats.incFailure()
 		if s.metricsSink != nil {
@@ -895,21 +967,26 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	}
 	s.mu.Lock()
 	j.nextAttempt = 1
-	if j.kind == jobKindDelay {
+	j.runCount++
+	maxRunsReached := j.options.MaxRuns > 0 && j.runCount >= int64(j.options.MaxRuns)
+	if j.kind == jobKindDelay || maxRunsReached {
 		s.setJobStateLocked(j, JobStateCompleted)
+	}
+	if maxRunsReached {
+		s.cancelJobLocked(j.id, j)
 	}
 	// Mark dependency as succeeded
 	s.dependencyStatus[j.id] = true
 	// Use atomic operation to read and clear pending flag
 	pending := j.options.OverlapPolicy == SerialQueue && j.pending.Swap(false)
-	if pending {
+	if pending && !maxRunsReached {
 		s.setJobStateIfIdleLocked(j, JobStateScheduled)
 		s.queue.PushSchedule(&scheduleItem{runAt: s.clock.Now(), job: j})
 		s.wakeScheduler()
 	}
 	s.mu.Unlock()
 
-	if j.kind == jobKindCron && !pending {
+	if j.kind == jobKindCron && !pending && !maxRunsReached {
 		s.scheduleNext(j, start)
 	}
 	if j.kind == jobKindDelay && s.store != nil {
@@ -1204,7 +1281,7 @@ func (s *Scheduler) addToDeadLetterQueue(j *job, err error, attempts int) {
 		LastFailed:   now,
 		TaskName:     j.options.TaskName,
 		Group:        j.options.Group,
-		Tags:         j.options.Tags,
+		Tags:         append([]string(nil), j.options.Tags...), // defensive copy
 	}
 	s.dlq.Add(entry)
 }

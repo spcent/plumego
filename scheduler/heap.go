@@ -21,15 +21,16 @@ type job struct {
 	runAt       time.Time
 	fn          TaskFunc
 	options     JobOptions
-	paused      atomic.Bool // Changed to atomic.Bool to prevent race condition in dispatch
-	canceled    atomic.Bool // Changed to atomic.Bool to prevent race condition in dispatch
+	paused      atomic.Bool // atomic to prevent race condition in dispatch
+	canceled    atomic.Bool // atomic to prevent race condition in dispatch
 	nextAttempt int
 	running     atomic.Bool
 	lastRun     time.Time
 	lastError   error
-	pending     atomic.Bool // Changed to atomic.Bool to prevent race condition between dispatch and execute
+	pending     atomic.Bool // atomic to prevent race between dispatch and execute
 	state       JobState
 	stateAt     time.Time
+	runCount    int64 // total successful executions; protected by scheduler mu
 }
 
 type runRequest struct {
