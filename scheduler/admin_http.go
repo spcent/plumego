@@ -297,14 +297,22 @@ func parseJobQuery(r *http.Request) JobQuery {
 		}
 	}
 
-	// Pagination
+	// Pagination (cap values to sane limits to prevent excessive allocation).
+	const maxLimit = 10_000
+	const maxOffset = 1_000_000
 	if v := values.Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			if n > maxLimit {
+				n = maxLimit
+			}
 			q.Limit = n
 		}
 	}
 	if v := values.Get("offset"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			if n > maxOffset {
+				n = maxOffset
+			}
 			q.Offset = n
 		}
 	}

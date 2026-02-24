@@ -279,6 +279,10 @@ func (s *Scheduler) TriggerNow(id JobID) error {
 	if !exists || j.canceled.Load() {
 		return ErrJobNotFound
 	}
+	// Delay jobs are one-shot; reject TriggerNow once they've completed.
+	if j.kind == jobKindDelay && j.state == JobStateCompleted {
+		return fmt.Errorf("scheduler: delay job %q has already completed", id)
+	}
 	if j.paused.Load() {
 		return fmt.Errorf("scheduler: job %q is paused", id)
 	}
@@ -849,6 +853,16 @@ func (s *Scheduler) handleBackpressure(j *job) {
 	if s.backpressure.OnBackpressure != nil {
 		s.backpressure.OnBackpressure(j.id)
 	}
+	// dispatch() set running=true via CAS before calling us, but the job never
+	// actually executed. Clear the flag so the job can be dispatched again.
+	if j.options.OverlapPolicy == SkipIfRunning || j.options.OverlapPolicy == SerialQueue {
+		j.running.Store(false)
+	}
+	// Reschedule cron jobs for their next occurrence so they are not silently
+	// lost when the worker pool is saturated.
+	if j.kind == jobKindCron {
+		s.scheduleNext(j, s.clock.Now())
+	}
 }
 
 func (s *Scheduler) scheduleNext(j *job, base time.Time) {
@@ -979,9 +993,12 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	}
 	// Mark dependency as succeeded
 	s.dependencyStatus[j.id] = true
-	// Use atomic operation to read and clear pending flag
+	// Use atomic operation to read and clear pending flag.
+	// Guard with !j.running.Load(): if dispatch() stole the running slot between
+	// j.running.Store(false) (line above) and here, the pending execution is
+	// already handled by that dispatch — don't re-queue again.
 	pending := j.options.OverlapPolicy == SerialQueue && j.pending.Swap(false)
-	if pending && !maxRunsReached {
+	if pending && !maxRunsReached && !j.running.Load() {
 		s.setJobStateIfIdleLocked(j, JobStateScheduled)
 		s.queue.PushSchedule(&scheduleItem{runAt: s.clock.Now(), job: j})
 		s.wakeScheduler()
@@ -1148,28 +1165,53 @@ func (s *Scheduler) loadPersisted() {
 		s.logError("scheduler load persisted jobs failed", err)
 		return
 	}
+
+	// Two-pass loading: first restore jobs without dependencies so that
+	// dependency targets exist when the second pass runs.
+	var withDeps []StoredJob
 	for _, item := range stored {
 		if item.TaskName == "" {
 			continue
 		}
+		if s.lookupTask(item.TaskName) == nil {
+			continue
+		}
+		if len(item.Dependencies) > 0 {
+			withDeps = append(withDeps, item)
+			continue
+		}
+		_, _ = s.Schedule(item.ID, item.RunAt, s.lookupTask(item.TaskName), s.buildLoadOpts(item)...)
+	}
+
+	// Second pass: jobs with dependencies (their targets are now registered).
+	for _, item := range withDeps {
 		task := s.lookupTask(item.TaskName)
 		if task == nil {
 			continue
 		}
-		retry := hydrateRetry(item.Retry)
-		opts := []JobOption{
-			WithTimeout(item.Timeout),
-			WithOverlapPolicy(item.Overlap),
-			WithRetryPolicy(retry),
-			WithGroup(item.Group),
-			WithTags(item.Tags...),
-			WithTaskName(item.TaskName),
-			ReplaceExisting(),
+		opts := append(s.buildLoadOpts(item), WithDependsOn(item.DependencyPolicy, item.Dependencies...))
+		if _, err := s.Schedule(item.ID, item.RunAt, task, opts...); err != nil {
+			if s.logger != nil {
+				s.logger.Warn("scheduler: failed to restore job with dependencies", log.Fields{
+					"job_id":       item.ID,
+					"dependencies": item.Dependencies,
+					"error":        err.Error(),
+				})
+			}
 		}
-		if len(item.Dependencies) > 0 {
-			opts = append(opts, WithDependsOn(item.DependencyPolicy, item.Dependencies...))
-		}
-		_, _ = s.Schedule(item.ID, item.RunAt, task, opts...)
+	}
+}
+
+// buildLoadOpts constructs the JobOption slice for a persisted job (without dependencies).
+func (s *Scheduler) buildLoadOpts(item StoredJob) []JobOption {
+	return []JobOption{
+		WithTimeout(item.Timeout),
+		WithOverlapPolicy(item.Overlap),
+		WithRetryPolicy(hydrateRetry(item.Retry)),
+		WithGroup(item.Group),
+		WithTags(item.Tags...),
+		WithTaskName(item.TaskName),
+		ReplaceExisting(),
 	}
 }
 

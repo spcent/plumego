@@ -95,11 +95,19 @@ func (d *DeadLetterQueue) List() []DeadLetterEntry {
 func (d *DeadLetterQueue) Delete(jobID JobID) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if _, exists := d.entries[jobID]; exists {
-		delete(d.entries, jobID)
-		return true
+	if _, exists := d.entries[jobID]; !exists {
+		return false
 	}
-	return false
+	delete(d.entries, jobID)
+	// Remove from the order slice so it does not accumulate stale entries that
+	// would hold memory and slow down the FIFO eviction scan in Add.
+	for i, id := range d.order {
+		if id == jobID {
+			d.order = append(d.order[:i], d.order[i+1:]...)
+			break
+		}
+	}
+	return true
 }
 
 // Clear removes all dead letter entries.

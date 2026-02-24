@@ -1723,6 +1723,156 @@ func TestDependencyFailureContinueDoesNotCorruptStatus(t *testing.T) {
 // TestDependencyFailureSkipDelayJobMarkedFailed verifies that a delay job
 // waiting on a dependency that fails with the Skip policy is marked as failed
 // rather than left in limbo (Bug #3).
+// ─── Fix regression tests (round 4) ──────────────────────────────────────────
+
+// TestTriggerNowCompletedDelayJob verifies that TriggerNow returns an error
+// when called on a delay job that has already completed (one-shot semantics).
+func TestTriggerNowCompletedDelayJob(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	done := make(chan struct{})
+	_, err := s.Delay("one-shot", 0, func(ctx context.Context) error {
+		close(done)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Delay: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("one-shot job did not complete in time")
+	}
+	// Allow state transition to propagate.
+	time.Sleep(20 * time.Millisecond)
+
+	if err := s.TriggerNow("one-shot"); err == nil {
+		t.Fatal("expected error when calling TriggerNow on a completed delay job")
+	}
+}
+
+// TestBackpressureReleasesRunningFlag verifies that when a job with SerialQueue
+// overlap policy is dropped due to backpressure, the running flag is released
+// so the job can be dispatched again on its next cycle.
+func TestBackpressureReleasesRunningFlag(t *testing.T) {
+	// Block the single worker so the queue fills immediately.
+	block := make(chan struct{})
+	s := New(WithWorkers(1), WithQueueSize(1), WithBackpressure(BackpressureConfig{Policy: BackpressureDrop}))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	blocker := make(chan struct{})
+	_, err := s.Delay("blocker", 0, func(ctx context.Context) error {
+		close(blocker)
+		// Block until the test releases us or the scheduler shuts down.
+		select {
+		case <-block:
+		case <-ctx.Done():
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Delay blocker: %v", err)
+	}
+
+	// Wait until blocker is actually running, occupying the one worker slot.
+	select {
+	case <-blocker:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("blocker did not start")
+	}
+
+	// Now add a SerialQueue cron job whose first dispatch will hit backpressure.
+	var runs atomic.Int32
+	_, err = s.AddCron("serial-job", "@every 20ms", func(ctx context.Context) error {
+		runs.Add(1)
+		return nil
+	}, WithOverlapPolicy(SerialQueue))
+	if err != nil {
+		t.Fatalf("AddCron: %v", err)
+	}
+
+	// Unblock the worker; serial-job should now be dispatchable.
+	close(block)
+
+	time.Sleep(200 * time.Millisecond)
+	if runs.Load() == 0 {
+		t.Fatal("serial-job never executed after backpressure was released; running flag may be stuck")
+	}
+}
+
+// TestDLQDeleteRemovesFromOrderSlice verifies that Delete() keeps the order
+// slice compact so that FIFO eviction remains efficient and memory is freed.
+func TestDLQDeleteRemovesFromOrderSlice(t *testing.T) {
+	q := NewDeadLetterQueue(10)
+
+	for i := 0; i < 5; i++ {
+		q.Add(DeadLetterEntry{
+			JobID:       JobID(fmt.Sprintf("job-%d", i)),
+			FirstFailed: time.Now(),
+			LastFailed:  time.Now(),
+		})
+	}
+
+	q.Delete("job-2")
+
+	// The order slice should now have 4 elements, not 5.
+	q.mu.RLock()
+	orderLen := len(q.order)
+	q.mu.RUnlock()
+	if orderLen != 4 {
+		t.Fatalf("expected order slice length 4 after Delete, got %d", orderLen)
+	}
+	if q.Size() != 4 {
+		t.Fatalf("expected DLQ size 4, got %d", q.Size())
+	}
+}
+
+// TestLoadPersistedTwoPass verifies that jobs with dependencies are correctly
+// restored from a persistent store even if they are listed before their
+// dependency targets.
+func TestLoadPersistedTwoPass(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Persist dep-b (depends on dep-a) BEFORE dep-a so that a naive
+	// single-pass loader would fail (dep-a not yet registered).
+	_ = store.Save(StoredJob{
+		ID:               "dep-b",
+		TaskName:         "task-b",
+		RunAt:            time.Now().Add(10 * time.Millisecond),
+		Dependencies:     []JobID{"dep-a"},
+		DependencyPolicy: DependencyFailureSkip,
+	})
+	_ = store.Save(StoredJob{
+		ID:       "dep-a",
+		TaskName: "task-a",
+		RunAt:    time.Now().Add(10 * time.Millisecond),
+	})
+
+	var aRan, bRan atomic.Int32
+	s := New(WithWorkers(2), WithStore(store))
+	if err := s.RegisterTask("task-a", func(ctx context.Context) error { aRan.Add(1); return nil }); err != nil {
+		t.Fatalf("RegisterTask task-a: %v", err)
+	}
+	if err := s.RegisterTask("task-b", func(ctx context.Context) error { bRan.Add(1); return nil }); err != nil {
+		t.Fatalf("RegisterTask task-b: %v", err)
+	}
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	time.Sleep(300 * time.Millisecond)
+
+	if aRan.Load() == 0 {
+		t.Fatal("dep-a (no dependencies) was not restored and executed")
+	}
+	if bRan.Load() == 0 {
+		t.Fatal("dep-b (with dep-a dependency) was not restored and executed")
+	}
+}
+
 func TestDependencyFailureSkipDelayJobMarkedFailed(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
