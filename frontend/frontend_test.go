@@ -888,6 +888,120 @@ func TestCustomNotFoundPage(t *testing.T) {
 	}
 }
 
+// errOnPathFS wraps http.FileSystem and returns os.ErrPermission for a specific
+// path, simulating a server-side IO error (not a "file not found" error).
+type errOnPathFS struct {
+	base    http.FileSystem
+	errPath string
+}
+
+func (f *errOnPathFS) Open(name string) (http.File, error) {
+	if name == f.errPath {
+		return nil, os.ErrPermission
+	}
+	return f.base.Open(name)
+}
+
+// TestCustomErrorPage verifies that when a server IO error occurs and an error
+// page is configured, the error page is served with the correct 500 status code.
+func TestCustomErrorPage(t *testing.T) {
+	dir := t.TempDir()
+
+	write := func(p, content string) {
+		full := filepath.Join(dir, p)
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", p, err)
+		}
+	}
+
+	write("index.html", "<html>home</html>")
+	write("500.html", "<html>Server Error</html>")
+
+	// Wrap the real FS with one that returns a permission error for "bad-file".
+	fs := &errOnPathFS{base: http.Dir(dir), errPath: "bad-file"}
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, fs, WithErrorPage("500.html"), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/bad-file", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 status, got: %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Server Error") {
+		t.Fatalf("expected error page content, got: %q", rec.Body.String())
+	}
+}
+
+// TestCustomErrorPageFallback verifies that when the custom error page itself
+// is missing, serveError falls back to the plain http.Error response.
+func TestCustomErrorPageFallback(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>home</html>"), 0o644); err != nil {
+		t.Fatalf("write index: %v", err)
+	}
+	// 500.html intentionally not created.
+
+	fs := &errOnPathFS{base: http.Dir(dir), errPath: "bad-file"}
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, fs, WithErrorPage("500.html"), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/bad-file", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 status, got: %d", rec.Code)
+	}
+	// Body should be the default http.Error message, not a custom page.
+	if strings.Contains(rec.Body.String(), "Server Error") {
+		t.Fatalf("should not serve missing error page, got: %q", rec.Body.String())
+	}
+}
+
+// TestCustomNotFoundPageStatus verifies that a custom 404 page is served with
+// the correct 404 status code rather than 200 OK.
+func TestCustomNotFoundPageStatus(t *testing.T) {
+	dir := t.TempDir()
+
+	write := func(p, content string) {
+		full := filepath.Join(dir, p)
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", p, err)
+		}
+	}
+
+	write("index.html", "<html>home</html>")
+	write("404.html", "<html>Custom 404 Page</html>")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir,
+		WithNotFoundPage("404.html"),
+		WithFallback(false),
+	); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 status, got: %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Custom 404 Page") {
+		t.Fatalf("expected custom 404 page content, got: %q", rec.Body.String())
+	}
+}
+
 func TestCustomMIMETypes(t *testing.T) {
 	dir := t.TempDir()
 
