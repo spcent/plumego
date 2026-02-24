@@ -34,8 +34,8 @@ const (
 	LinearBackoff
 )
 
-// EnhancedDLQConfig configures the enhanced dead letter queue
-type EnhancedDLQConfig struct {
+// DLQConfig configures the enhanced dead letter queue
+type DLQConfig struct {
 	// Topic for dead letter messages
 	Topic string
 
@@ -73,9 +73,9 @@ type EnhancedDLQConfig struct {
 	ArchiveAfter time.Duration
 }
 
-// DefaultEnhancedDLQConfig returns default configuration
-func DefaultEnhancedDLQConfig(topic string) EnhancedDLQConfig {
-	return EnhancedDLQConfig{
+// DefaultDLQConfig returns default configuration
+func DefaultDLQConfig(topic string) DLQConfig {
+	return DLQConfig{
 		Topic:             topic,
 		MaxSize:           10000,
 		TTL:               7 * 24 * time.Hour,
@@ -90,23 +90,23 @@ func DefaultEnhancedDLQConfig(topic string) EnhancedDLQConfig {
 	}
 }
 
-// EnhancedDLQ provides advanced dead letter queue functionality
-type EnhancedDLQ struct {
-	config EnhancedDLQConfig
+// DLQ provides advanced dead letter queue functionality
+type DLQ struct {
+	config DLQConfig
 	ps     *InProcPubSub
 
 	// Message storage
-	messages   map[string]*EnhancedDLQMessage
+	messages   map[string]*DLQMessage
 	messagesMu sync.RWMutex
 	sequence   atomic.Uint64
 
 	// Retry management
-	retryQueue   chan *EnhancedDLQMessage
+	retryQueue   chan *DLQMessage
 	retryTimers  map[string]*time.Timer
 	retryTimerMu sync.Mutex
 
 	// Archive
-	archived   []*EnhancedDLQMessage
+	archived   []*DLQMessage
 	archivedMu sync.RWMutex
 
 	// Metrics
@@ -119,8 +119,8 @@ type EnhancedDLQ struct {
 	closed atomic.Bool
 }
 
-// EnhancedDLQMessage represents a message in the enhanced DLQ
-type EnhancedDLQMessage struct {
+// DLQMessage represents a message in the DLQ
+type DLQMessage struct {
 	ID            string
 	OriginalMsg   Message
 	OriginalTopic string
@@ -185,17 +185,17 @@ type DLQQueryOptions struct {
 	Tags map[string]string
 }
 
-// NewEnhancedDLQ creates a new enhanced dead letter queue
-func NewEnhancedDLQ(ps *InProcPubSub, config EnhancedDLQConfig) *EnhancedDLQ {
+// NewDLQ creates a new enhanced dead letter queue
+func NewDLQ(ps *InProcPubSub, config DLQConfig) *DLQ {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	dlq := &EnhancedDLQ{
+	dlq := &DLQ{
 		config:      config,
 		ps:          ps,
-		messages:    make(map[string]*EnhancedDLQMessage),
-		retryQueue:  make(chan *EnhancedDLQMessage, 100),
+		messages:    make(map[string]*DLQMessage),
+		retryQueue:  make(chan *DLQMessage, 100),
 		retryTimers: make(map[string]*time.Timer),
-		archived:    make([]*EnhancedDLQMessage, 0),
+		archived:    make([]*DLQMessage, 0),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -207,7 +207,7 @@ func NewEnhancedDLQ(ps *InProcPubSub, config EnhancedDLQConfig) *EnhancedDLQ {
 }
 
 // Add adds a message to the DLQ
-func (dlq *EnhancedDLQ) Add(originalMsg Message, originalTopic, reason string) error {
+func (dlq *DLQ) Add(originalMsg Message, originalTopic, reason string) error {
 	if dlq.closed.Load() {
 		return ErrDLQClosed
 	}
@@ -218,7 +218,7 @@ func (dlq *EnhancedDLQ) Add(originalMsg Message, originalTopic, reason string) e
 	// Generate unique ID
 	msgID := fmt.Sprintf("dlq-%d-%s", time.Now().UnixNano(), generateCorrelationID())
 
-	msg := &EnhancedDLQMessage{
+	msg := &DLQMessage{
 		ID:            msgID,
 		OriginalMsg:   originalMsg,
 		OriginalTopic: originalTopic,
@@ -265,7 +265,7 @@ func (dlq *EnhancedDLQ) Add(originalMsg Message, originalTopic, reason string) e
 }
 
 // Get retrieves a message by ID
-func (dlq *EnhancedDLQ) Get(msgID string) (*EnhancedDLQMessage, error) {
+func (dlq *DLQ) Get(msgID string) (*DLQMessage, error) {
 	dlq.messagesMu.RLock()
 	defer dlq.messagesMu.RUnlock()
 
@@ -280,11 +280,11 @@ func (dlq *EnhancedDLQ) Get(msgID string) (*EnhancedDLQMessage, error) {
 }
 
 // Query searches messages with filters
-func (dlq *EnhancedDLQ) Query(opts DLQQueryOptions) ([]*EnhancedDLQMessage, error) {
+func (dlq *DLQ) Query(opts DLQQueryOptions) ([]*DLQMessage, error) {
 	dlq.messagesMu.RLock()
 	defer dlq.messagesMu.RUnlock()
 
-	results := make([]*EnhancedDLQMessage, 0)
+	results := make([]*DLQMessage, 0)
 
 	// Filter messages
 	for _, msg := range dlq.messages {
@@ -319,7 +319,7 @@ func (dlq *EnhancedDLQ) Query(opts DLQQueryOptions) ([]*EnhancedDLQMessage, erro
 }
 
 // matchesFilter checks if message matches query filters
-func (dlq *EnhancedDLQ) matchesFilter(msg *EnhancedDLQMessage, opts DLQQueryOptions) bool {
+func (dlq *DLQ) matchesFilter(msg *DLQMessage, opts DLQQueryOptions) bool {
 	// Time range
 	if !opts.StartTime.IsZero() && msg.Timestamp.Before(opts.StartTime) {
 		return false
@@ -354,7 +354,7 @@ func (dlq *EnhancedDLQ) matchesFilter(msg *EnhancedDLQMessage, opts DLQQueryOpti
 }
 
 // sortMessages sorts messages by specified field
-func (dlq *EnhancedDLQ) sortMessages(messages []*EnhancedDLQMessage, sortBy string) {
+func (dlq *DLQ) sortMessages(messages []*DLQMessage, sortBy string) {
 	switch sortBy {
 	case "timestamp":
 		sort.Slice(messages, func(i, j int) bool {
@@ -377,7 +377,7 @@ func (dlq *EnhancedDLQ) sortMessages(messages []*EnhancedDLQMessage, sortBy stri
 }
 
 // Retry manually retries a specific message
-func (dlq *EnhancedDLQ) Retry(msgID string) error {
+func (dlq *DLQ) Retry(msgID string) error {
 	dlq.messagesMu.Lock()
 	msg, exists := dlq.messages[msgID]
 	if !exists {
@@ -390,7 +390,7 @@ func (dlq *EnhancedDLQ) Retry(msgID string) error {
 }
 
 // RetryBatch retries multiple messages
-func (dlq *EnhancedDLQ) RetryBatch(msgIDs []string) (succeeded, failed int) {
+func (dlq *DLQ) RetryBatch(msgIDs []string) (succeeded, failed int) {
 	for _, msgID := range msgIDs {
 		if err := dlq.Retry(msgID); err == nil {
 			succeeded++
@@ -402,7 +402,7 @@ func (dlq *EnhancedDLQ) RetryBatch(msgIDs []string) (succeeded, failed int) {
 }
 
 // RetryAll retries all messages matching filter
-func (dlq *EnhancedDLQ) RetryAll(opts DLQQueryOptions) (succeeded, failed int) {
+func (dlq *DLQ) RetryAll(opts DLQQueryOptions) (succeeded, failed int) {
 	messages, err := dlq.Query(opts)
 	if err != nil {
 		return 0, 0
@@ -420,7 +420,7 @@ func (dlq *EnhancedDLQ) RetryAll(opts DLQQueryOptions) (succeeded, failed int) {
 }
 
 // retryMessage attempts to reprocess a message
-func (dlq *EnhancedDLQ) retryMessage(msg *EnhancedDLQMessage) error {
+func (dlq *DLQ) retryMessage(msg *DLQMessage) error {
 	dlq.stats.RetriedMessages.Add(1)
 
 	// Publish back to original topic
@@ -455,7 +455,7 @@ func (dlq *EnhancedDLQ) retryMessage(msg *EnhancedDLQMessage) error {
 }
 
 // scheduleRetry schedules a message for retry
-func (dlq *EnhancedDLQ) scheduleRetry(msg *EnhancedDLQMessage) {
+func (dlq *DLQ) scheduleRetry(msg *DLQMessage) {
 	delay := dlq.calculateRetryDelay(msg.RetryCount)
 	msg.NextRetry = time.Now().Add(delay)
 
@@ -479,7 +479,7 @@ func (dlq *EnhancedDLQ) scheduleRetry(msg *EnhancedDLQMessage) {
 }
 
 // calculateRetryDelay calculates retry delay based on strategy
-func (dlq *EnhancedDLQ) calculateRetryDelay(retryCount int) time.Duration {
+func (dlq *DLQ) calculateRetryDelay(retryCount int) time.Duration {
 	switch dlq.config.RetryStrategy {
 	case FixedDelay:
 		return dlq.config.InitialRetryDelay
@@ -506,7 +506,7 @@ func (dlq *EnhancedDLQ) calculateRetryDelay(retryCount int) time.Duration {
 }
 
 // archiveMessage moves a message to archive
-func (dlq *EnhancedDLQ) archiveMessage(msg *EnhancedDLQMessage) {
+func (dlq *DLQ) archiveMessage(msg *DLQMessage) {
 	msg.IsArchived = true
 	msg.ArchiveTime = time.Now()
 
@@ -520,9 +520,9 @@ func (dlq *EnhancedDLQ) archiveMessage(msg *EnhancedDLQMessage) {
 }
 
 // evictOldest removes oldest messages to stay within size limit
-func (dlq *EnhancedDLQ) evictOldest() {
+func (dlq *DLQ) evictOldest() {
 	// Find oldest message
-	var oldest *EnhancedDLQMessage
+	var oldest *DLQMessage
 	for _, msg := range dlq.messages {
 		if oldest == nil || msg.Timestamp.Before(oldest.Timestamp) {
 			oldest = msg
@@ -535,7 +535,7 @@ func (dlq *EnhancedDLQ) evictOldest() {
 }
 
 // checkAlertThreshold checks if alert should be triggered
-func (dlq *EnhancedDLQ) checkAlertThreshold() {
+func (dlq *DLQ) checkAlertThreshold() {
 	count := len(dlq.messages)
 
 	if count >= dlq.config.AlertThreshold && dlq.config.AlertCallback != nil {
@@ -555,7 +555,7 @@ func (dlq *EnhancedDLQ) checkAlertThreshold() {
 }
 
 // Delete removes a message from DLQ
-func (dlq *EnhancedDLQ) Delete(msgID string) error {
+func (dlq *DLQ) Delete(msgID string) error {
 	dlq.messagesMu.Lock()
 	defer dlq.messagesMu.Unlock()
 
@@ -577,11 +577,11 @@ func (dlq *EnhancedDLQ) Delete(msgID string) error {
 }
 
 // Clear removes all messages
-func (dlq *EnhancedDLQ) Clear() {
+func (dlq *DLQ) Clear() {
 	dlq.messagesMu.Lock()
 	defer dlq.messagesMu.Unlock()
 
-	dlq.messages = make(map[string]*EnhancedDLQMessage)
+	dlq.messages = make(map[string]*DLQMessage)
 
 	dlq.retryTimerMu.Lock()
 	for _, timer := range dlq.retryTimers {
@@ -592,7 +592,7 @@ func (dlq *EnhancedDLQ) Clear() {
 }
 
 // Stats returns DLQ statistics.
-func (dlq *EnhancedDLQ) Stats() *DLQStats {
+func (dlq *DLQ) Stats() *DLQStats {
 	stats := &DLQStats{}
 	stats.TotalMessages.Store(dlq.stats.TotalMessages.Load())
 	stats.ArchivedMessages.Store(dlq.stats.ArchivedMessages.Load())
@@ -604,14 +604,14 @@ func (dlq *EnhancedDLQ) Stats() *DLQStats {
 }
 
 // Count returns current message count
-func (dlq *EnhancedDLQ) Count() int {
+func (dlq *DLQ) Count() int {
 	dlq.messagesMu.RLock()
 	defer dlq.messagesMu.RUnlock()
 	return len(dlq.messages)
 }
 
 // startWorkers starts background workers
-func (dlq *EnhancedDLQ) startWorkers() {
+func (dlq *DLQ) startWorkers() {
 	// Retry processor
 	dlq.wg.Add(1)
 	go func() {
@@ -650,7 +650,7 @@ func (dlq *EnhancedDLQ) startWorkers() {
 }
 
 // cleanupExpired removes expired and old messages
-func (dlq *EnhancedDLQ) cleanupExpired() {
+func (dlq *DLQ) cleanupExpired() {
 	now := time.Now()
 
 	dlq.messagesMu.Lock()
@@ -671,7 +671,7 @@ func (dlq *EnhancedDLQ) cleanupExpired() {
 }
 
 // Close closes the DLQ
-func (dlq *EnhancedDLQ) Close() error {
+func (dlq *DLQ) Close() error {
 	if dlq.closed.Swap(true) {
 		return nil
 	}

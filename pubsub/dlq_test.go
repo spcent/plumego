@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-func TestEnhancedDLQ_Basic(t *testing.T) {
+func TestDLQ_Basic(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = NoRetry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add message
@@ -33,13 +33,13 @@ func TestEnhancedDLQ_Basic(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_Query(t *testing.T) {
+func TestDLQ_Query(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = NoRetry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add multiple messages
@@ -70,13 +70,13 @@ func TestEnhancedDLQ_Query(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_TimeRangeQuery(t *testing.T) {
+func TestDLQ_TimeRangeQuery(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = NoRetry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	start := time.Now()
@@ -102,13 +102,13 @@ func TestEnhancedDLQ_TimeRangeQuery(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_Sorting(t *testing.T) {
+func TestDLQ_Sorting(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = NoRetry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add messages with different retry counts
@@ -139,7 +139,7 @@ func TestEnhancedDLQ_Sorting(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_Retry(t *testing.T) {
+func TestDLQ_Retry(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
@@ -147,9 +147,9 @@ func TestEnhancedDLQ_Retry(t *testing.T) {
 	sub, _ := ps.Subscribe("retry.target", SubOptions{BufferSize: 10})
 	defer sub.Cancel()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = NoRetry // Manual retry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add message
@@ -191,15 +191,15 @@ func TestEnhancedDLQ_Retry(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_ExponentialBackoff(t *testing.T) {
+func TestDLQ_ExponentialBackoff(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = ExponentialBackoff
 	config.InitialRetryDelay = 100 * time.Millisecond
 	config.MaxRetryDelay = 1 * time.Second
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Test delay calculation
@@ -226,18 +226,18 @@ func TestEnhancedDLQ_ExponentialBackoff(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_AutoRetry(t *testing.T) {
+func TestDLQ_AutoRetry(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
 	// Subscribe to target (will fail first time)
 	var receiveCount atomic.Int32
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = ExponentialBackoff
 	config.InitialRetryDelay = 100 * time.Millisecond
 	config.MaxRetryAttempts = 3
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add message
@@ -264,16 +264,16 @@ func TestEnhancedDLQ_AutoRetry(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_RetryBatch(t *testing.T) {
+func TestDLQ_RetryBatch(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
 	sub, _ := ps.Subscribe("batch.target", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = NoRetry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add multiple messages
@@ -307,18 +307,18 @@ func TestEnhancedDLQ_RetryBatch(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_AlertThreshold(t *testing.T) {
+func TestDLQ_AlertThreshold(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
 	var alertTriggered atomic.Bool
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.AlertThreshold = 3
 	config.AlertCallback = func(alert DLQAlert) {
 		alertTriggered.Store(true)
 	}
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add messages to exceed threshold
@@ -339,14 +339,14 @@ func TestEnhancedDLQ_AlertThreshold(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_MaxSize(t *testing.T) {
+func TestDLQ_MaxSize(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.MaxSize = 5
 	config.RetryStrategy = NoRetry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add more than max size
@@ -370,14 +370,14 @@ func TestEnhancedDLQ_MaxSize(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_Archive(t *testing.T) {
+func TestDLQ_Archive(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.MaxRetryAttempts = 2
 	config.RetryStrategy = NoRetry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add message
@@ -427,12 +427,12 @@ func TestEnhancedDLQ_Archive(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_Delete(t *testing.T) {
+func TestDLQ_Delete(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
-	dlq := NewEnhancedDLQ(ps, config)
+	config := DefaultDLQConfig("dlq.test")
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add message
@@ -464,12 +464,12 @@ func TestEnhancedDLQ_Delete(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_Clear(t *testing.T) {
+func TestDLQ_Clear(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
-	dlq := NewEnhancedDLQ(ps, config)
+	config := DefaultDLQConfig("dlq.test")
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add multiple messages
@@ -492,15 +492,15 @@ func TestEnhancedDLQ_Clear(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_LinearBackoff(t *testing.T) {
+func TestDLQ_LinearBackoff(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = LinearBackoff
 	config.InitialRetryDelay = 100 * time.Millisecond
 	config.MaxRetryDelay = 500 * time.Millisecond
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Test linear backoff
@@ -529,16 +529,16 @@ func TestEnhancedDLQ_LinearBackoff(t *testing.T) {
 	}
 }
 
-func TestEnhancedDLQ_RetryAll(t *testing.T) {
+func TestDLQ_RetryAll(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
 	sub, _ := ps.Subscribe("retry.all", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
-	config := DefaultEnhancedDLQConfig("dlq.test")
+	config := DefaultDLQConfig("dlq.test")
 	config.RetryStrategy = NoRetry
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Add messages with different reasons
@@ -576,10 +576,10 @@ func BenchmarkEnhancedDLQ_Add(b *testing.B) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.bench")
+	config := DefaultDLQConfig("dlq.bench")
 	config.RetryStrategy = NoRetry
 	config.EnableAlerts = false
-	dlq := NewEnhancedDLQ(ps, config)
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	msg := Message{Data: []byte("benchmark message")}
@@ -594,8 +594,8 @@ func BenchmarkEnhancedDLQ_Query(b *testing.B) {
 	ps := New()
 	defer ps.Close()
 
-	config := DefaultEnhancedDLQConfig("dlq.bench")
-	dlq := NewEnhancedDLQ(ps, config)
+	config := DefaultDLQConfig("dlq.bench")
+	dlq := NewDLQ(ps, config)
 	defer dlq.Close()
 
 	// Pre-populate
