@@ -1723,6 +1723,90 @@ func TestDependencyFailureContinueDoesNotCorruptStatus(t *testing.T) {
 // TestDependencyFailureSkipDelayJobMarkedFailed verifies that a delay job
 // waiting on a dependency that fails with the Skip policy is marked as failed
 // rather than left in limbo (Bug #3).
+// ─── Fix regression tests (round 5) ──────────────────────────────────────────
+
+// TestCancelDependencyNotifiesDependents verifies that canceling a job that
+// other jobs are waiting for applies DependencyFailurePolicy rather than
+// leaving the dependents in limbo indefinitely.
+func TestCancelDependencyNotifiesDependents(t *testing.T) {
+	t.Run("policy=Cancel", func(t *testing.T) {
+		s := New(WithWorkers(2))
+		s.Start()
+		defer func() { _ = s.Stop(context.Background()) }()
+
+		block := make(chan struct{})
+		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
+		var bRan atomic.Int32
+		_, _ = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+			bRan.Add(1)
+			return nil
+		}, WithDependsOn(DependencyFailureCancel, "dep-a"))
+
+		s.Cancel("dep-a")
+		close(block)
+		time.Sleep(150 * time.Millisecond)
+
+		if bRan.Load() != 0 {
+			t.Fatal("dep-b should not run when dependency is canceled (Cancel policy)")
+		}
+		status, ok := s.Status("dep-b")
+		if !ok || status.State != JobStateCanceled {
+			t.Fatalf("expected dep-b state=canceled, got state=%s ok=%v", status.State, ok)
+		}
+	})
+
+	t.Run("policy=Skip_delay", func(t *testing.T) {
+		s := New(WithWorkers(2))
+		s.Start()
+		defer func() { _ = s.Stop(context.Background()) }()
+
+		block := make(chan struct{})
+		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
+		var bRan atomic.Int32
+		_, _ = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+			bRan.Add(1)
+			return nil
+		}, WithDependsOn(DependencyFailureSkip, "dep-a"))
+
+		s.Cancel("dep-a")
+		close(block)
+		time.Sleep(150 * time.Millisecond)
+
+		if bRan.Load() != 0 {
+			t.Fatal("dep-b should not run when dependency is canceled (Skip policy)")
+		}
+		status, ok := s.Status("dep-b")
+		if !ok {
+			return // cleaned up from s.jobs, acceptable
+		}
+		if status.State != JobStateFailed {
+			t.Fatalf("expected dep-b state=failed, got %s", status.State)
+		}
+	})
+
+	t.Run("policy=Continue", func(t *testing.T) {
+		s := New(WithWorkers(2))
+		s.Start()
+		defer func() { _ = s.Stop(context.Background()) }()
+
+		block := make(chan struct{})
+		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
+		var bRan atomic.Int32
+		_, _ = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+			bRan.Add(1)
+			return nil
+		}, WithDependsOn(DependencyFailureContinue, "dep-a"))
+
+		s.Cancel("dep-a")
+		close(block)
+		time.Sleep(150 * time.Millisecond)
+
+		if bRan.Load() != 1 {
+			t.Fatalf("expected dep-b to run once (Continue policy), ran %d times", bRan.Load())
+		}
+	})
+}
+
 // ─── Fix regression tests (round 4) ──────────────────────────────────────────
 
 // TestTriggerNowCompletedDelayJob verifies that TriggerNow returns an error

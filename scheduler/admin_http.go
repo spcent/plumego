@@ -31,7 +31,7 @@ func (h *AdminHandler) WithPrefix(prefix string) *AdminHandler {
 
 // ServeHTTP implements http.Handler.
 func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h == nil || h.scheduler == nil {
+	if h.scheduler == nil {
 		contract.WriteError(w, r, contract.APIError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: "scheduler not configured", Category: contract.CategoryServer})
 		return
 	}

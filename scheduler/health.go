@@ -25,13 +25,18 @@ func (s *Scheduler) Health() HealthSnapshot {
 			scheduled++
 		}
 	}
+	// Read channel metrics inside the same read lock so the snapshot is
+	// temporally consistent with the job counts above.
+	queued := len(s.workCh)
+	queueSize := cap(s.workCh)
+	workerCount := s.workerCount
 	s.mu.RUnlock()
 
 	stats := s.Stats()
 	return HealthSnapshot{
-		Queued:        len(s.workCh),
-		Workers:       s.workerCount,
-		QueueSize:     cap(s.workCh),
+		Queued:        queued,
+		Workers:       workerCount,
+		QueueSize:     queueSize,
 		Dropped:       stats.Dropped,
 		RunningJobs:   running,
 		TotalJobs:     total,

@@ -816,9 +816,8 @@ func (s *Scheduler) dispatch(j *job) {
 		}
 
 	case BackpressureBlockTimeout:
-		// Block with timeout
 		if s.backpressure.Timeout <= 0 {
-			// Fallback to drop if timeout is not configured
+			// No timeout configured — fall back to non-blocking drop.
 			select {
 			case s.workCh <- req:
 				s.stats.incQueued()
@@ -826,18 +825,16 @@ func (s *Scheduler) dispatch(j *job) {
 			default:
 				s.handleBackpressure(j)
 			}
-			return
-		}
-
-		timer := time.NewTimer(s.backpressure.Timeout)
-		defer timer.Stop()
-
-		select {
-		case s.workCh <- req:
-			s.stats.incQueued()
-		case <-timer.C:
-			s.handleBackpressure(j)
-		case <-s.stopCh:
+		} else {
+			timer := time.NewTimer(s.backpressure.Timeout)
+			defer timer.Stop()
+			select {
+			case s.workCh <- req:
+				s.stats.incQueued()
+			case <-timer.C:
+				s.handleBackpressure(j)
+			case <-s.stopCh:
+			}
 		}
 	}
 }
@@ -1180,7 +1177,14 @@ func (s *Scheduler) loadPersisted() {
 			withDeps = append(withDeps, item)
 			continue
 		}
-		_, _ = s.Schedule(item.ID, item.RunAt, s.lookupTask(item.TaskName), s.buildLoadOpts(item)...)
+		if _, err := s.Schedule(item.ID, item.RunAt, s.lookupTask(item.TaskName), s.buildLoadOpts(item)...); err != nil {
+			if s.logger != nil {
+				s.logger.Warn("scheduler: failed to restore job", log.Fields{
+					"job_id": item.ID,
+					"error":  err.Error(),
+				})
+			}
+		}
 	}
 
 	// Second pass: jobs with dependencies (their targets are now registered).
@@ -1383,6 +1387,11 @@ func (s *Scheduler) cancelJobLocked(id JobID, j *job) {
 	if s.store != nil {
 		_ = s.store.Delete(id)
 	}
+	// Notify dependent jobs that were waiting for this job before cleaning
+	// up the dependents map entry, so we still have the list of waiters.
+	if deps := s.dependents[id]; len(deps) > 0 {
+		s.notifyDependentsCanceledLocked(id, deps)
+	}
 	// Clean up dependency tracking to prevent memory leaks.
 	delete(s.dependents, id)
 	delete(s.dependencyStatus, id)
@@ -1399,6 +1408,60 @@ func (s *Scheduler) cancelJobLocked(id JobID, j *job) {
 			delete(s.dependents, depID)
 		} else {
 			s.dependents[depID] = filtered
+		}
+	}
+}
+
+// notifyDependentsCanceledLocked applies DependencyFailurePolicy to each job
+// that was waiting for canceledID to complete. Called from cancelJobLocked;
+// s.mu must be held.
+func (s *Scheduler) notifyDependentsCanceledLocked(canceledID JobID, dependentIDs []JobID) {
+	for _, depJobID := range dependentIDs {
+		depJob, exists := s.jobs[depJobID]
+		if !exists || depJob.canceled.Load() {
+			continue
+		}
+		switch depJob.options.DependencyPolicy {
+		case DependencyFailureSkip:
+			if s.logger != nil {
+				s.logger.Warn("skipping dependent job due to dependency cancellation", log.Fields{
+					"job_id":              depJobID,
+					"canceled_dependency": canceledID,
+				})
+			}
+			switch depJob.kind {
+			case jobKindCron:
+				next := depJob.cron.Next(s.clock.Now())
+				depJob.runAt = next
+				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
+				s.queue.PushSchedule(&scheduleItem{runAt: next, job: depJob})
+				s.wakeScheduler()
+			case jobKindDelay:
+				s.setJobStateLocked(depJob, JobStateFailed)
+				if s.store != nil {
+					_ = s.store.Delete(depJobID)
+				}
+			}
+		case DependencyFailureCancel:
+			if s.logger != nil {
+				s.logger.Warn("canceling dependent job due to dependency cancellation", log.Fields{
+					"job_id":              depJobID,
+					"canceled_dependency": canceledID,
+				})
+			}
+			s.cancelJobLocked(depJobID, depJob)
+		case DependencyFailureContinue:
+			if s.logger != nil {
+				s.logger.Info("continuing dependent job despite dependency cancellation", log.Fields{
+					"job_id":              depJobID,
+					"canceled_dependency": canceledID,
+				})
+			}
+			if s.allDependenciesMetExceptLocked(depJob, canceledID) {
+				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
+				s.queue.PushSchedule(&scheduleItem{runAt: depJob.runAt, job: depJob})
+				s.wakeScheduler()
+			}
 		}
 	}
 }
