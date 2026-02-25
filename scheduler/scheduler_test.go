@@ -2133,3 +2133,53 @@ func TestDependencyFailureSkipDelayJobMarkedFailed(t *testing.T) {
 		t.Fatalf("expected dep-b state=failed, got %s", status.State)
 	}
 }
+
+// TestDependencyRunsAfterDependencyRetrySuccess verifies that a dependent job
+// is NOT notified of failure on the first failed attempt of its dependency.
+// If the dependency eventually succeeds (on a retry), the dependent must execute.
+func TestDependencyRunsAfterDependencyRetrySuccess(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	var attempt atomic.Int32
+
+	// dep-a fails on attempt 1 and succeeds on attempt 2.
+	depRan := make(chan struct{}, 1)
+	_, err := s.Delay("dep-a", 0, func(ctx context.Context) error {
+		n := attempt.Add(1)
+		if n == 1 {
+			return errors.New("transient error")
+		}
+		depRan <- struct{}{}
+		return nil
+	}, WithRetryPolicy(RetryPolicy{MaxAttempts: 2, Backoff: func(int) time.Duration { return 10 * time.Millisecond }}))
+	if err != nil {
+		t.Fatalf("dep-a: %v", err)
+	}
+
+	// dep-b depends on dep-a. It should run after dep-a succeeds on retry.
+	executed := make(chan struct{}, 1)
+	_, err = s.Delay("dep-b", 0, func(ctx context.Context) error {
+		executed <- struct{}{}
+		return nil
+	}, WithDependsOn(DependencyFailureContinue, "dep-a"))
+	if err != nil {
+		t.Fatalf("dep-b: %v", err)
+	}
+
+	// Wait for dep-a to complete (including retry).
+	select {
+	case <-depRan:
+	case <-time.After(2 * time.Second):
+		t.Fatal("dep-a did not succeed within timeout")
+	}
+
+	// dep-b must execute because dep-a ultimately succeeded.
+	select {
+	case <-executed:
+		// Good: dependent ran after dependency succeeded on retry.
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dep-b did not execute after dep-a succeeded on retry")
+	}
+}

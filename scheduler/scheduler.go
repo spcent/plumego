@@ -964,12 +964,6 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 		if s.metricsSink != nil {
 			s.metricsSink.ObserveRun(j.id, elapsed, err, queueDelay)
 		}
-		// Mark dependency as failed
-		s.mu.Lock()
-		s.dependencyStatus[j.id] = false
-		s.mu.Unlock()
-		// Handle dependent jobs on failure
-		s.handleDependentJobsOnFailure(j)
 		s.handleFailure(j, err)
 		return
 	}
@@ -1108,6 +1102,13 @@ func (s *Scheduler) handleRetriesExhausted(j *job, err error, attempts int, dead
 	if j.kind == jobKindDelay && s.store != nil {
 		_ = s.store.Delete(j.id)
 	}
+	// Only notify dependents of failure after all retry attempts are exhausted.
+	// Moving this here (rather than on every failure) prevents dependents from
+	// being marked failed when the job succeeds on a subsequent retry attempt.
+	s.mu.Lock()
+	s.dependencyStatus[j.id] = false
+	s.mu.Unlock()
+	s.handleDependentJobsOnFailure(j)
 }
 
 func jobStatusFrom(j *job) JobStatus {
