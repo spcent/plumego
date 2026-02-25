@@ -1723,6 +1723,131 @@ func TestDependencyFailureContinueDoesNotCorruptStatus(t *testing.T) {
 // TestDependencyFailureSkipDelayJobMarkedFailed verifies that a delay job
 // waiting on a dependency that fails with the Skip policy is marked as failed
 // rather than left in limbo (Bug #3).
+// ─── Fix regression tests (round 6) ──────────────────────────────────────────
+
+// TestCronDOWOnlySchedule verifies that a cron expression with a restricted
+// day-of-week and a wildcard day-of-month fires only on the specified weekday,
+// not every day. ("0 0 * * 0" must produce Sundays only, not daily.)
+func TestCronDOWOnlySchedule(t *testing.T) {
+	// Start from a known Wednesday, 2025-01-08 00:00:00 UTC
+	base := time.Date(2025, 1, 8, 0, 0, 0, 0, time.UTC) // Wednesday
+
+	spec, err := ParseCronSpec("0 0 * * 0") // midnight every Sunday
+	if err != nil {
+		t.Fatalf("ParseCronSpec: %v", err)
+	}
+
+	next := spec.Next(base)
+	// Next Sunday from Wed 8 Jan is 12 Jan
+	want := time.Date(2025, 1, 12, 0, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Fatalf("expected next Sunday %v, got %v", want, next)
+	}
+	// Second call must jump to the following Sunday (19 Jan), not the next day.
+	next2 := spec.Next(next)
+	want2 := time.Date(2025, 1, 19, 0, 0, 0, 0, time.UTC)
+	if !next2.Equal(want2) {
+		t.Fatalf("expected second Sunday %v, got %v", want2, next2)
+	}
+}
+
+// TestCronDOMOnlySchedule verifies that a restricted day-of-month with a
+// wildcard day-of-week fires only on that calendar day, not every weekday.
+// ("0 9 15 * *" must produce the 15th of each month only.)
+func TestCronDOMOnlySchedule(t *testing.T) {
+	// Start from 14 Jan 2025 (Tuesday).
+	base := time.Date(2025, 1, 14, 9, 0, 0, 0, time.UTC)
+
+	spec, err := ParseCronSpec("0 9 15 * *") // 9 AM on the 15th of every month
+	if err != nil {
+		t.Fatalf("ParseCronSpec: %v", err)
+	}
+
+	next := spec.Next(base)
+	want := time.Date(2025, 1, 15, 9, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Fatalf("expected 15 Jan 09:00, got %v", next)
+	}
+	// Next after the 15th should be 15 Feb.
+	next2 := spec.Next(next)
+	want2 := time.Date(2025, 2, 15, 9, 0, 0, 0, time.UTC)
+	if !next2.Equal(want2) {
+		t.Fatalf("expected 15 Feb 09:00, got %v", next2)
+	}
+}
+
+// TestCronBothDOMAndDOWRestricted verifies OR semantics when both DOM and DOW
+// are restricted (Vixie cron: "30 4 1,15 * 5" fires on the 1st, 15th, and
+// every Friday).
+func TestCronBothDOMAndDOWRestricted(t *testing.T) {
+	spec, err := ParseCronSpec("30 4 1,15 * 5") // 04:30 on 1st, 15th, or any Friday
+	if err != nil {
+		t.Fatalf("ParseCronSpec: %v", err)
+	}
+
+	// 2025-01-01 is a Wednesday — next match should be Friday 3 Jan (DOW=5).
+	base := time.Date(2025, 1, 1, 5, 0, 0, 0, time.UTC)
+	next := spec.Next(base)
+	if next.Day() != 3 || next.Weekday() != time.Friday {
+		t.Fatalf("expected Friday 3 Jan, got %v", next)
+	}
+}
+
+// TestMaxRunsPreservesCompletedState verifies that when WithMaxRuns is reached
+// the job ends up in JobStateCompleted (not JobStateCanceled), and that a
+// dependent job is triggered as a successful completion.
+func TestMaxRunsPreservesCompletedState(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	var runs atomic.Int32
+	_, err := s.AddCron("limited", "@every 20ms", func(ctx context.Context) error {
+		runs.Add(1)
+		return nil
+	}, WithMaxRuns(2))
+	if err != nil {
+		t.Fatalf("AddCron: %v", err)
+	}
+
+	time.Sleep(300 * time.Millisecond)
+
+	status, ok := s.Status("limited")
+	if !ok {
+		t.Fatal("job not found after MaxRuns")
+	}
+	if status.State != JobStateCompleted {
+		t.Fatalf("expected state=completed after MaxRuns, got %s", status.State)
+	}
+	if runs.Load() < 2 {
+		t.Fatalf("expected at least 2 runs, got %d", runs.Load())
+	}
+}
+
+// TestMaxRunsTriggersDependents verifies that when a job hits MaxRuns its
+// dependents are triggered as a SUCCESS, not as a cancellation failure.
+func TestMaxRunsTriggersDependents(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	_, _ = s.AddCron("producer", "@every 20ms", func(ctx context.Context) error {
+		return nil
+	}, WithMaxRuns(1))
+
+	var consumerRan atomic.Int32
+	_, _ = s.Delay("consumer", 0, func(ctx context.Context) error {
+		consumerRan.Add(1)
+		return nil
+	}, WithDependsOn(DependencyFailureCancel, "producer"))
+
+	time.Sleep(300 * time.Millisecond)
+
+	if consumerRan.Load() != 1 {
+		t.Fatalf("expected consumer to run once after producer hit MaxRuns, ran %d times", consumerRan.Load())
+	}
+}
+
 // ─── Fix regression tests (round 5) ──────────────────────────────────────────
 
 // TestCancelDependencyNotifiesDependents verifies that canceling a job that

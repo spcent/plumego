@@ -75,6 +75,8 @@ type CronSpec struct {
 	dom      []int
 	months   []int
 	dow      []int
+	domStar  bool           // true when the day-of-month field was an unrestricted "*"
+	dowStar  bool           // true when the day-of-week field was an unrestricted "*"
 	location *time.Location // Time zone for scheduling
 	interval time.Duration  // For @every syntax
 }
@@ -162,6 +164,12 @@ func ParseCronSpecWithLocation(expr string, loc *time.Location) (CronSpec, error
 		return CronSpec{}, fmt.Errorf("day-of-week: %w", err)
 	}
 
+	// Track whether DOM/DOW were wildcards so Next() can apply correct Vixie
+	// cron semantics: when only one of the two is restricted the other is
+	// ignored; OR behaviour applies only when both are restricted.
+	domStar := strings.TrimSpace(fields[offset+2]) == "*"
+	dowStar := strings.TrimSpace(fields[offset+4]) == "*"
+
 	return CronSpec{
 		seconds:  seconds,
 		minutes:  minutes,
@@ -169,6 +177,8 @@ func ParseCronSpecWithLocation(expr string, loc *time.Location) (CronSpec, error
 		dom:      dom,
 		months:   months,
 		dow:      dow,
+		domStar:  domStar,
+		dowStar:  dowStar,
 		location: loc,
 	}, nil
 }
@@ -271,12 +281,25 @@ func (c CronSpec) Next(after time.Time) time.Time {
 			next = time.Date(next.Year(), next.Month()+1, 1, 0, 0, 0, 0, next.Location())
 			continue
 		}
-		// Standard cron: day-of-month and day-of-week are OR, not AND
-		// Match if either condition is satisfied
+		// Vixie cron day-matching semantics:
+		//   • Both DOM and DOW unrestricted ("*"): always match.
+		//   • Only DOM restricted: match by DOM only (ignore DOW).
+		//   • Only DOW restricted: match by DOW only (ignore DOM).
+		//   • Both restricted: match if EITHER matches (OR behaviour).
 		domMatch := containsInt(c.dom, next.Day())
 		dowMatch := containsInt(c.dow, int(next.Weekday()))
-
-		if !domMatch && !dowMatch {
+		var dayMatch bool
+		switch {
+		case c.domStar && c.dowStar:
+			dayMatch = true
+		case c.domStar:
+			dayMatch = dowMatch
+		case c.dowStar:
+			dayMatch = domMatch
+		default:
+			dayMatch = domMatch || dowMatch
+		}
+		if !dayMatch {
 			next = time.Date(next.Year(), next.Month(), next.Day(), 0, 0, 0, 0, next.Location()).AddDate(0, 0, 1)
 			continue
 		}

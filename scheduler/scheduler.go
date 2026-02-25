@@ -985,10 +985,7 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	if j.kind == jobKindDelay || maxRunsReached {
 		s.setJobStateLocked(j, JobStateCompleted)
 	}
-	if maxRunsReached {
-		s.cancelJobLocked(j.id, j)
-	}
-	// Mark dependency as succeeded
+	// Mark dependency as succeeded so dependent-job checks see the correct status.
 	s.dependencyStatus[j.id] = true
 	// Use atomic operation to read and clear pending flag.
 	// Guard with !j.running.Load(): if dispatch() stole the running slot between
@@ -1009,8 +1006,18 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 		_ = s.store.Delete(j.id)
 	}
 
-	// Trigger dependent jobs on success
+	// Trigger dependent jobs on success. Must happen BEFORE retireJobLocked so
+	// that the dependents map entry for this job is still intact.
 	s.triggerDependentJobs(j.id)
+
+	// Retire the job after dependents have been triggered. retireJobLocked only
+	// stops future scheduling; it preserves the Completed state and does not
+	// re-notify dependents (they were already handled above as a success).
+	if maxRunsReached {
+		s.mu.Lock()
+		s.retireJobLocked(j.id, j)
+		s.mu.Unlock()
+	}
 }
 
 func (s *Scheduler) handleFailure(j *job, err error) {
@@ -1396,6 +1403,41 @@ func (s *Scheduler) cancelJobLocked(id JobID, j *job) {
 	delete(s.dependents, id)
 	delete(s.dependencyStatus, id)
 	// Remove this job from the dependents lists of its own dependencies.
+	for _, depID := range j.options.Dependencies {
+		deps := s.dependents[depID]
+		filtered := deps[:0]
+		for _, d := range deps {
+			if d != id {
+				filtered = append(filtered, d)
+			}
+		}
+		if len(filtered) == 0 {
+			delete(s.dependents, depID)
+		} else {
+			s.dependents[depID] = filtered
+		}
+	}
+}
+
+// retireJobLocked is called when a job has exhausted its MaxRuns quota after a
+// SUCCESSFUL execution. Unlike cancelJobLocked it:
+//   - Preserves the JobStateCompleted state (does not overwrite with Canceled).
+//   - Does not notify dependents via DependencyFailurePolicy; the caller has
+//     already set dependencyStatus[id]=true and triggerDependentJobs will handle
+//     them as a normal successful completion.
+//   - Still cleans up the schedule queue slot, store entry, and dependency maps
+//     so the job does not run again.
+//
+// Must be called with s.mu held.
+func (s *Scheduler) retireJobLocked(id JobID, j *job) {
+	j.canceled.Store(true)
+	// State is already JobStateCompleted — do not override.
+	if s.store != nil {
+		_ = s.store.Delete(id)
+	}
+	// Clean up dependency tracking (same as cancelJobLocked, minus dependent notification).
+	delete(s.dependents, id)
+	delete(s.dependencyStatus, id)
 	for _, depID := range j.options.Dependencies {
 		deps := s.dependents[depID]
 		filtered := deps[:0]
