@@ -15,6 +15,7 @@ type Deduplicator struct {
 	maxSize    int
 	cleanupInt time.Duration
 	stopCh     chan struct{}
+	closeOnce  sync.Once
 }
 
 // dedupEntry stores dedup entry data.
@@ -203,9 +204,9 @@ func (d *Deduplicator) Clear() {
 	d.order.Init()
 }
 
-// Close stops the deduplicator.
+// Close stops the deduplicator. Safe to call multiple times.
 func (d *Deduplicator) Close() {
-	close(d.stopCh)
+	d.closeOnce.Do(func() { close(d.stopCh) })
 }
 
 // cleanupLoop periodically removes expired entries.

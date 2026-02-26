@@ -415,7 +415,13 @@ func TestConsumerGroup_PartitionAssignment(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Each consumer should have some partitions assigned
-	if len(c1.assignedParts) == 0 && len(c2.assignedParts) == 0 {
+	c1.assignedPartsMu.RLock()
+	c1Parts := len(c1.assignedParts)
+	c1.assignedPartsMu.RUnlock()
+	c2.assignedPartsMu.RLock()
+	c2Parts := len(c2.assignedParts)
+	c2.assignedPartsMu.RUnlock()
+	if c1Parts == 0 && c2Parts == 0 {
 		t.Log("Note: Partitions not yet assigned (may be async)")
 	}
 }

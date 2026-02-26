@@ -113,16 +113,17 @@ type consumerGroup struct {
 
 // groupConsumer represents a consumer in a group
 type groupConsumer struct {
-	id             string
-	group          *consumerGroup
-	topics         []string
-	assignedParts  map[string][]int // topic -> partitions
-	subscription   Subscription
-	lastHeartbeat  time.Time
-	heartbeatMu    sync.Mutex
-	messageChannel chan Message
-	closed         atomic.Bool
-	dispatcherDone chan struct{} // closed when startDispatcher goroutine exits
+	id              string
+	group           *consumerGroup
+	topics          []string
+	assignedParts   map[string][]int // topic -> partitions, guarded by assignedPartsMu
+	assignedPartsMu sync.RWMutex
+	subscription    Subscription
+	lastHeartbeat   time.Time
+	heartbeatMu     sync.Mutex
+	messageChannel  chan Message
+	closed          atomic.Bool
+	dispatcherDone  chan struct{} // closed when startDispatcher goroutine exits
 }
 
 // NewConsumerGroupManager creates a new consumer group manager
@@ -410,17 +411,28 @@ func (cg *consumerGroup) rebalance(ctx context.Context) error {
 		return err
 	}
 
-	// Update consumer assignments
-	for _, consumer := range cg.consumers {
-		consumer.assignedParts = make(map[string][]int)
-	}
-
+	// Build new partition assignments per consumer without holding per-consumer locks.
+	newParts := make(map[string]map[string][]int) // consumerID -> topic -> partitions
 	for topic, partAssignments := range cg.assignments {
 		for partition, consumerID := range partAssignments {
-			if consumer, exists := cg.consumers[consumerID]; exists {
-				consumer.assignedParts[topic] = append(consumer.assignedParts[topic], partition)
+			if _, exists := cg.consumers[consumerID]; exists {
+				if newParts[consumerID] == nil {
+					newParts[consumerID] = make(map[string][]int)
+				}
+				newParts[consumerID][topic] = append(newParts[consumerID][topic], partition)
 			}
 		}
+	}
+
+	// Apply atomically to each consumer under its own lock.
+	for id, consumer := range cg.consumers {
+		parts := newParts[id]
+		if parts == nil {
+			parts = make(map[string][]int)
+		}
+		consumer.assignedPartsMu.Lock()
+		consumer.assignedParts = parts
+		consumer.assignedPartsMu.Unlock()
 	}
 
 	return nil

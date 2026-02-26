@@ -201,14 +201,20 @@ func (as *ackableSubscriber) handleTimeout(msgID string) {
 	pm.timer = time.AfterFunc(as.ackTimeout, func() {
 		as.handleTimeout(msgID)
 	})
+	msg := pm.msg
 	as.mu.Unlock()
 
-	// Redeliver to subscriber channel (non-blocking)
-	select {
-	case as.subscriber.ch <- pm.msg:
-	default:
-		// Channel full, message will be redelivered on next timeout
+	// Redeliver to subscriber channel (non-blocking).
+	// Hold s.mu to synchronize with Cancel(), which closes s.ch under the same lock.
+	as.subscriber.mu.Lock()
+	if !as.subscriber.closed.Load() {
+		select {
+		case as.subscriber.ch <- msg:
+		default:
+			// Channel full, message will be redelivered on next timeout
+		}
 	}
+	as.subscriber.mu.Unlock()
 }
 
 // Ack acknowledges a message.
@@ -265,13 +271,19 @@ func (as *ackableSubscriber) Nack(msgID string, requeue bool) error {
 	pm.timer = time.AfterFunc(as.ackTimeout, func() {
 		as.handleTimeout(msgID)
 	})
+	msg := pm.msg
 	as.mu.Unlock()
 
-	// Redeliver immediately
-	select {
-	case as.subscriber.ch <- pm.msg:
-	default:
+	// Redeliver immediately.
+	// Hold s.mu to synchronize with Cancel(), which closes s.ch under the same lock.
+	as.subscriber.mu.Lock()
+	if !as.subscriber.closed.Load() {
+		select {
+		case as.subscriber.ch <- msg:
+		default:
+		}
 	}
+	as.subscriber.mu.Unlock()
 
 	return nil
 }

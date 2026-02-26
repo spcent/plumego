@@ -425,6 +425,21 @@ func (ps *InProcPubSub) SubscribeMQTTWithContext(ctx context.Context, pattern st
 	return ps.subscribeMQTTInternal(ctx, pattern, opts)
 }
 
+// initSubscriberChannel sets up the subscriber's message channel.
+// When UseRingBuffer is enabled with DropOldest policy, a ring buffer is used
+// together with an unbuffered channel driven by a pump goroutine.
+// Otherwise a plain buffered channel is created.
+func initSubscriberChannel(sub *subscriber, opts SubOptions) {
+	if opts.UseRingBuffer && opts.Policy == DropOldest {
+		sub.ringBuf = newRingBuffer(opts.BufferSize)
+		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
+		sub.pumpDone = make(chan struct{})
+		go sub.pumpRingBuffer()
+	} else {
+		sub.ch = make(chan Message, opts.BufferSize)
+	}
+}
+
 // subscribeInternal is the internal implementation for all subscribe methods.
 func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opts SubOptions, isPattern bool) (Subscription, error) {
 	start := time.Now()
@@ -484,15 +499,7 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 		cancel: cancel,
 	}
 
-	// Use ring buffer for DropOldest when enabled
-	if opts.UseRingBuffer && opts.Policy == DropOldest {
-		sub.ringBuf = newRingBuffer(opts.BufferSize)
-		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
-		sub.pumpDone = make(chan struct{})
-		go sub.pumpRingBuffer()
-	} else {
-		sub.ch = make(chan Message, opts.BufferSize)
-	}
+	initSubscriberChannel(sub, opts)
 
 	// Add to sharded map
 	if isPattern {
@@ -569,15 +576,7 @@ func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern strin
 		cancel: cancel,
 	}
 
-	// Use ring buffer for DropOldest when enabled
-	if opts.UseRingBuffer && opts.Policy == DropOldest {
-		sub.ringBuf = newRingBuffer(opts.BufferSize)
-		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
-		sub.pumpDone = make(chan struct{})
-		go sub.pumpRingBuffer()
-	} else {
-		sub.ch = make(chan Message, opts.BufferSize)
-	}
+	initSubscriberChannel(sub, opts)
 
 	// Add to sharded map
 	ps.shards.addMQTTPattern(pattern, id, sub)
@@ -939,14 +938,15 @@ func (ps *InProcPubSub) HasSubscribers(topic string) bool {
 	}
 
 	// Check glob pattern subscribers
-	patterns := ps.shards.getAllPatterns()
-	for _, entry := range patterns {
-		if strings.ContainsAny(entry.pattern, "*?[]\\") {
-			if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+	if ps.shards.hasAnyPatterns() {
+		for _, entry := range ps.shards.getAllPatterns() {
+			if strings.ContainsAny(entry.pattern, "*?[]\\") {
+				if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+					return true
+				}
+			} else if entry.pattern == topic {
 				return true
 			}
-		} else if entry.pattern == topic {
-			return true
 		}
 	}
 
