@@ -84,13 +84,11 @@ func (s *subscriber) Stats() SubscriptionStats {
 }
 
 // Cancel unsubscribes and closes the channel.
+// sync.Once guarantees this runs at most once; no secondary closed check needed.
 func (s *subscriber) Cancel() {
 	s.once.Do(func() {
 		s.mu.Lock()
-		if s.closed.Swap(true) {
-			s.mu.Unlock()
-			return
-		}
+		s.closed.Store(true)
 		if s.ringBuf != nil {
 			// For ring buffer subscribers, close the ring buffer.
 			// The pump goroutine will close s.ch when it exits.
@@ -120,16 +118,15 @@ func (s *subscriber) Cancel() {
 
 // pumpRingBuffer moves messages from the ring buffer to the output channel.
 // It runs as a background goroutine for ring buffer–based subscribers.
+// Termination is driven exclusively by s.done and ringBuf.Notify() closure,
+// avoiding the redundant s.closed.Load() poll in the inner drain loop.
 func (s *subscriber) pumpRingBuffer() {
 	defer close(s.ch)
 	defer close(s.pumpDone)
 
 	for {
-		// Drain all available messages from ring buffer
+		// Drain all available messages from ring buffer.
 		for {
-			if s.closed.Load() {
-				return
-			}
 			msg, ok := s.ringBuf.Pop()
 			if !ok {
 				break
@@ -141,11 +138,11 @@ func (s *subscriber) pumpRingBuffer() {
 			}
 		}
 
-		// Wait for new messages or closure
+		// Wait for new messages or closure.
 		select {
 		case _, ok := <-s.ringBuf.Notify():
 			if !ok {
-				return // ring buffer closed
+				return // ring buffer closed by Cancel()
 			}
 		case <-s.done:
 			return
@@ -199,11 +196,8 @@ type InProcPubSub struct {
 	workerPool *workerPool
 
 	// draining state
-	draining   atomic.Bool
-	drainWg    sync.WaitGroup
-	drainMu    sync.RWMutex
-	drainCond  *sync.Cond
-	pendingOps atomic.Int64
+	draining atomic.Bool
+	drainWg  sync.WaitGroup
 
 	// message scheduler for delayed delivery
 	scheduler *messageScheduler
@@ -246,7 +240,6 @@ func New(opts ...Option) *InProcPubSub {
 		config:     config,
 		workerPool: newWorkerPool(config.WorkerPoolSize),
 	}
-	ps.drainCond = sync.NewCond(&ps.drainMu)
 	ps.nextID.Store(0)
 
 	if config.EnableScheduler {
@@ -320,12 +313,10 @@ func (ps *InProcPubSub) Drain(ctx context.Context) error {
 	ps.draining.Store(true)
 	defer ps.draining.Store(false)
 
-	// Wait for pending operations
+	// Wait for all in-flight operations via WaitGroup instead of polling.
 	done := make(chan struct{})
 	go func() {
-		for ps.pendingOps.Load() > 0 {
-			time.Sleep(10 * time.Millisecond)
-		}
+		ps.drainWg.Wait()
 		close(done)
 	}()
 
@@ -694,8 +685,8 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 		mqttSubs = ps.shards.getMQTTPatternMatches(topic)
 	}
 
-	ps.pendingOps.Add(1)
-	defer ps.pendingOps.Add(-1)
+	ps.drainWg.Add(1)
+	defer ps.drainWg.Done()
 
 	bgCtx := context.Background()
 	for _, msg := range msgs {
@@ -792,13 +783,13 @@ func (ps *InProcPubSub) publishInternal(ctx context.Context, topic string, msg M
 
 	if async {
 		// Use worker pool for async publish with context cancellation support
-		ps.pendingOps.Add(1)
+		ps.drainWg.Add(1)
 		submitted := ps.workerPool.SubmitWithContext(ctx, func() {
-			defer ps.pendingOps.Add(-1)
+			defer ps.drainWg.Done()
 			ps.doPublish(ctx, topic, msg)
 		})
 		if !submitted {
-			ps.pendingOps.Add(-1)
+			ps.drainWg.Done()
 			// Context cancelled or worker pool closed
 			if ctx.Err() != nil {
 				err = ctx.Err()
@@ -808,8 +799,8 @@ func (ps *InProcPubSub) publishInternal(ctx context.Context, topic string, msg M
 			ps.doPublish(ctx, topic, msg)
 		}
 	} else {
-		ps.pendingOps.Add(1)
-		defer ps.pendingOps.Add(-1)
+		ps.drainWg.Add(1)
+		defer ps.drainWg.Done()
 		ps.doPublish(ctx, topic, msg)
 	}
 
@@ -1038,6 +1029,19 @@ func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message)
 		return
 	}
 
+	// BlockWithTimeout must not hold s.mu while blocking on the channel send,
+	// otherwise every concurrent deliver call to this subscriber serialises on
+	// the lock for up to the full block timeout.  Handle it outside the lock.
+	if s.opts.Policy == BlockWithTimeout {
+		if s.closed.Load() {
+			return
+		}
+		if ps.deliverBlockWithTimeout(ctx, s, msg, metricTopic) {
+			s.Cancel()
+		}
+		return
+	}
+
 	s.mu.Lock()
 	if s.closed.Load() {
 		s.mu.Unlock()
@@ -1051,8 +1055,6 @@ func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message)
 		cancelSub = ps.deliverDropOldest(s, msg, metricTopic)
 	case DropNewest:
 		cancelSub = ps.deliverDropNewest(s, msg, metricTopic)
-	case BlockWithTimeout:
-		cancelSub = ps.deliverBlockWithTimeout(ctx, s, msg, metricTopic)
 	case CloseSubscriber:
 		cancelSub = ps.deliverCloseSubscriber(s, msg, metricTopic)
 	default:
@@ -1092,6 +1094,11 @@ func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopi
 
 	// Fallback: channel-based drain-and-retry
 	for {
+		// Guard against racing with Cancel(): if the subscriber closed while we
+		// were spinning, stop instead of looping forever.
+		if s.closed.Load() {
+			return false
+		}
 		select {
 		case s.ch <- msg:
 			ps.metrics.incDelivered(metricTopic)
@@ -1113,7 +1120,7 @@ func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopi
 				}
 				// Continue loop to try sending again
 			default:
-				// Channel was emptied by consumer, try sending again
+				// Channel was emptied by consumer between the two selects; retry.
 			}
 		}
 	}

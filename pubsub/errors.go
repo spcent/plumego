@@ -75,6 +75,10 @@ var (
 
 	// ErrRequestReplyDisabled is returned when request-reply operations are attempted without enabling the request manager
 	ErrRequestReplyDisabled = errors.New("request-reply manager not enabled, use WithRequestReply() option")
+
+	// ErrOrderedQueueFull is returned when an ordered queue is at capacity.
+	// Callers may retry with backoff or apply a different OrderLevel.
+	ErrOrderedQueueFull = errors.New("ordered queue full")
 )
 
 // PubSubError is a structured error type for pubsub operations.

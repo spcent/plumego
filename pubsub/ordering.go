@@ -3,7 +3,6 @@ package pubsub
 import (
 	"context"
 	"errors"
-	"hash/fnv"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -250,8 +249,8 @@ func (ops *OrderedPubSub) PublishWithKey(topic, key string, msg Message, level O
 		return ErrOrderingClosed
 
 	default:
-		// Queue full - either block or drop
-		return errors.New("ordered queue full")
+		// Queue full - caller should retry with backoff or use a different OrderLevel.
+		return ErrOrderedQueueFull
 	}
 }
 
@@ -441,12 +440,18 @@ func (ops *OrderedPubSub) verifySequence(om orderedMessage, identifier string) e
 	return nil
 }
 
-// PartitionKey generates a partition key from a value
+// PartitionKey generates a deterministic partition key from a value.
+// partitions must be > 0.  The returned string is the decimal representation
+// of the partition index (0 to partitions-1), so it is always valid ASCII.
 func PartitionKey(value string, partitions int) string {
-	h := fnv.New32a()
-	h.Write([]byte(value))
-	partition := int(h.Sum32()) % partitions
-	return string(rune('0' + partition))
+	if partitions <= 0 {
+		partitions = 1
+	}
+	partition := int(fnv32a(value)) % partitions
+	if partition < 0 {
+		partition = -partition
+	}
+	return strconv.Itoa(partition)
 }
 
 // Close closes the ordered pubsub
