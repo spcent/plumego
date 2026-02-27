@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -289,6 +290,7 @@ func (sm *shardedMap) getAllPatterns() []patternSnapshot {
 			}
 			result = append(result, patternSnapshot{
 				pattern: pattern,
+				isGlob:  strings.ContainsAny(pattern, "*?[]\\"),
 				subs:    snapshot,
 			})
 		}
@@ -366,6 +368,26 @@ func (sm *shardedMap) topicExists(topic string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.topics[topic]) > 0
+}
+
+// getTopicSubscribersIfAny returns a subscriber snapshot in a single lock
+// acquisition, combining the existence check and snapshot into one operation.
+// Returns nil when there are no subscribers (avoids a second lock in callers
+// that would otherwise call topicExists then getTopicSubscribers separately).
+func (sm *shardedMap) getTopicSubscribersIfAny(topic string) []*subscriber {
+	s := sm.getShard(topic)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	subs := s.topics[topic]
+	if len(subs) == 0 {
+		return nil
+	}
+	result := make([]*subscriber, 0, len(subs))
+	for _, sub := range subs {
+		result = append(result, sub)
+	}
+	return result
 }
 
 // patternExists checks if a pattern has any subscribers.

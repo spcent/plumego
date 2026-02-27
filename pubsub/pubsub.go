@@ -50,6 +50,7 @@ type subscriber struct {
 
 type patternSnapshot struct {
 	pattern string
+	isGlob  bool // true when pattern contains glob metacharacters (*?[]\\)
 	subs    []*subscriber
 }
 
@@ -670,11 +671,8 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 		}
 	}
 
-	// Get subscribers once; skip expensive lookups when no subscribers exist
-	var subs []*subscriber
-	if ps.shards.topicExists(topic) {
-		subs = ps.shards.getTopicSubscribers(topic)
-	}
+	// Single lock acquisition per topic: combines existence check and snapshot.
+	subs := ps.shards.getTopicSubscribersIfAny(topic)
 	var patterns []patternSnapshot
 	if ps.shards.hasAnyPatterns() {
 		patterns = ps.shards.getAllPatterns()
@@ -828,24 +826,21 @@ func (ps *InProcPubSub) doPublish(ctx context.Context, topic string, msg Message
 		h.Add(msg)
 	}
 
-	// Fast path: skip subscriber lookup when no subscribers exist
-	hasTopicSubs := ps.shards.topicExists(topic)
 	hasPatternSubs := ps.shards.hasAnyPatterns()
 	hasMQTTSubs := ps.shards.hasAnyMQTTPatterns()
 
-	if !hasTopicSubs && !hasPatternSubs && !hasMQTTSubs {
+	// Single lock acquisition: combines existence check and subscriber snapshot.
+	subs := ps.shards.getTopicSubscribersIfAny(topic)
+	if subs == nil && !hasPatternSubs && !hasMQTTSubs {
 		return
 	}
 
 	// Deliver to exact topic subscribers
-	if hasTopicSubs {
-		subs := ps.shards.getTopicSubscribers(topic)
-		for _, s := range subs {
-			if ctx.Err() != nil {
-				return
-			}
-			ps.deliver(ctx, s, msg)
+	for _, s := range subs {
+		if ctx.Err() != nil {
+			return
 		}
+		ps.deliver(ctx, s, msg)
 	}
 
 	// Get and deliver to glob pattern subscribers
@@ -873,16 +868,15 @@ func (ps *InProcPubSub) deliverToPatterns(ctx context.Context, patterns []patter
 			return
 		}
 
-		// Fast path: check if pattern contains wildcards
+		// isGlob is pre-computed at snapshot time to avoid ContainsAny on every publish.
 		var matched bool
-		if strings.ContainsAny(entry.pattern, "*?[]\\") {
+		if entry.isGlob {
 			var err error
 			matched, err = path.Match(entry.pattern, topic)
 			if err != nil {
 				matched = false
 			}
 		} else {
-			// No wildcards - just compare strings
 			matched = entry.pattern == topic
 		}
 
@@ -940,7 +934,7 @@ func (ps *InProcPubSub) HasSubscribers(topic string) bool {
 	// Check glob pattern subscribers
 	if ps.shards.hasAnyPatterns() {
 		for _, entry := range ps.shards.getAllPatterns() {
-			if strings.ContainsAny(entry.pattern, "*?[]\\") {
+			if entry.isGlob {
 				if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
 					return true
 				}
@@ -1032,10 +1026,8 @@ func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message)
 	// BlockWithTimeout must not hold s.mu while blocking on the channel send,
 	// otherwise every concurrent deliver call to this subscriber serialises on
 	// the lock for up to the full block timeout.  Handle it outside the lock.
+	// (closed check above already covers this path)
 	if s.opts.Policy == BlockWithTimeout {
-		if s.closed.Load() {
-			return
-		}
 		if ps.deliverBlockWithTimeout(ctx, s, msg, metricTopic) {
 			s.Cancel()
 		}
