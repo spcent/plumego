@@ -254,16 +254,13 @@ func (bpc *BackpressureController) CheckPublish(topic string) error {
 
 	case BackpressureBlock:
 		bpc.stats.BlockedPublish.Add(1)
-		// Wait for pressure to reduce or timeout
+		// Poll until pressure clears or the deadline expires.
 		deadline := time.Now().Add(bpc.config.BlockTimeout)
-		ticker := time.NewTicker(50 * time.Millisecond)
-		defer ticker.Stop()
-
 		for time.Now().Before(deadline) {
 			if !tp.active.Load() {
 				return nil
 			}
-			<-ticker.C
+			time.Sleep(50 * time.Millisecond)
 		}
 
 		// Still under pressure after timeout

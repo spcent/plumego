@@ -256,7 +256,10 @@ func New(opts ...Option) *InProcPubSub {
 	}
 
 	if config.EnableRequestReply {
-		ps.requestMgr = newRequestManager(ps)
+		rm, err := newRequestManager(ps)
+		if err == nil {
+			ps.requestMgr = rm
+		}
 	}
 
 	return ps

@@ -98,8 +98,9 @@ type MultiTenantPubSub struct {
 
 // tenantData holds per-tenant state
 type tenantData struct {
-	config TenantConfig
-	usage  TenantUsage
+	config   TenantConfig
+	configMu sync.RWMutex // protects config reads and writes
+	usage    TenantUsage
 
 	// Rate limiting
 	tokens       atomic.Int64
@@ -187,7 +188,9 @@ func (mtps *MultiTenantPubSub) UpdateQuota(tenantID string, quota TenantQuota) e
 		return ErrTenantNotFound
 	}
 
+	tenant.configMu.Lock()
 	tenant.config.Quota = quota
+	tenant.configMu.Unlock()
 	return nil
 }
 
@@ -217,7 +220,10 @@ func (mtps *MultiTenantPubSub) Publish(tenantID, topic string, msg Message) erro
 	}
 
 	// Check if tenant is enabled
-	if !tenant.config.Enabled {
+	tenant.configMu.RLock()
+	enabled := tenant.config.Enabled
+	tenant.configMu.RUnlock()
+	if !enabled {
 		return fmt.Errorf("tenant %s is disabled", tenantID)
 	}
 
@@ -254,9 +260,12 @@ func (mtps *MultiTenantPubSub) Subscribe(tenantID, topic string, opts SubOptions
 	}
 
 	// Check subscription quota
-	if tenant.config.Quota.MaxSubscriptions > 0 {
+	tenant.configMu.RLock()
+	maxSubs := tenant.config.Quota.MaxSubscriptions
+	tenant.configMu.RUnlock()
+	if maxSubs > 0 {
 		currentSubs := tenant.usage.ActiveSubs.Load()
-		if currentSubs >= int64(tenant.config.Quota.MaxSubscriptions) {
+		if currentSubs >= int64(maxSubs) {
 			tenant.usage.QuotaViolations.Add(1)
 			return nil, fmt.Errorf("%w: max subscriptions reached", ErrQuotaExceeded)
 		}
@@ -285,7 +294,9 @@ func (mtps *MultiTenantPubSub) Subscribe(tenantID, topic string, opts SubOptions
 
 // enforcePublishQuota checks and enforces publish quotas
 func (mtps *MultiTenantPubSub) enforcePublishQuota(tenant *tenantData, msg Message) error {
+	tenant.configMu.RLock()
 	quota := tenant.config.Quota
+	tenant.configMu.RUnlock()
 
 	// Check message size
 	if quota.MaxMessageSize > 0 {
@@ -312,19 +323,16 @@ func (mtps *MultiTenantPubSub) enforcePublishQuota(tenant *tenantData, msg Messa
 		}
 		tenant.lastRefillMu.Unlock()
 
-		// Try to consume a token
-		tokens := tenant.tokens.Load()
-		if tokens <= 0 {
-			return fmt.Errorf("%w: publish rate limit exceeded", ErrQuotaExceeded)
-		}
-
-		if !tenant.tokens.CompareAndSwap(tokens, tokens-1) {
-			// Retry once
-			tokens = tenant.tokens.Load()
+		// Try to consume a token using a CAS loop to prevent over-decrement.
+		for {
+			tokens := tenant.tokens.Load()
 			if tokens <= 0 {
 				return fmt.Errorf("%w: publish rate limit exceeded", ErrQuotaExceeded)
 			}
-			tenant.tokens.Add(-1)
+			if tenant.tokens.CompareAndSwap(tokens, tokens-1) {
+				break
+			}
+			// CAS lost the race; reload and retry.
 		}
 	}
 

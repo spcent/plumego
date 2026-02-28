@@ -24,14 +24,16 @@ type requestManager struct {
 	ps         *InProcPubSub
 	replyTopic string
 	replySub   Subscription
+	done       chan struct{} // closed by Close() to unblock waiting Request calls
 }
 
 // newRequestManager creates a new request manager.
-func newRequestManager(ps *InProcPubSub) *requestManager {
+func newRequestManager(ps *InProcPubSub) (*requestManager, error) {
 	rm := &requestManager{
 		pending:    make(map[string]chan Message),
 		ps:         ps,
 		replyTopic: generateReplyTopic(),
+		done:       make(chan struct{}),
 	}
 
 	// Subscribe to reply topic
@@ -40,14 +42,14 @@ func newRequestManager(ps *InProcPubSub) *requestManager {
 		Policy:     DropNewest,
 	})
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	rm.replySub = sub
 
 	// Start reply handler
 	go rm.handleReplies()
 
-	return rm
+	return rm, nil
 }
 
 // generateReplyTopic generates a unique reply topic.
@@ -103,6 +105,8 @@ func (rm *requestManager) Request(ctx context.Context, topic string, msg Message
 	select {
 	case resp := <-respCh:
 		return resp, nil
+	case <-rm.done:
+		return Message{}, ErrClosed
 	case <-ctx.Done():
 		return Message{}, ctx.Err()
 	}
@@ -143,10 +147,13 @@ func (rm *requestManager) Close() {
 		rm.replySub.Cancel()
 	}
 
+	// Close done first so all pending Request calls unblock via ErrClosed.
+	// We must NOT close the individual respCh channels here: handleReplies may
+	// hold an RLock reference to a respCh and attempt a send concurrently with
+	// this Close, causing a send-on-closed-channel panic.
+	close(rm.done)
+
 	rm.mu.Lock()
-	for _, ch := range rm.pending {
-		close(ch)
-	}
 	rm.pending = make(map[string]chan Message)
 	rm.mu.Unlock()
 }
