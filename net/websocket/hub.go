@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"log"
 	"os"
 	"sync"
@@ -386,7 +387,17 @@ func (h *Hub) startSecurityMonitor() {
 					h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
 				}
 			case <-h.quit:
-				return
+				// Drain remaining security events before exiting.
+				for {
+					select {
+					case event := <-h.securityEvents:
+						if h.config.EnableDebugLogging {
+							h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
+						}
+					default:
+						return
+					}
+				}
 			}
 		}
 	}()
@@ -433,6 +444,92 @@ func (h *Hub) Stop() {
 	}
 	close(h.quit)
 	h.wg.Wait()
+}
+
+// Shutdown gracefully closes all open connections and then stops the hub.
+//
+// It collects every unique connection across all rooms, calls Close() on each
+// one (which sends a WebSocket close frame and tears down the TCP connection),
+// and finally calls Stop() to drain in-flight jobs and shut down workers.
+//
+// ctx controls the overall deadline for the close loop. If the context is
+// cancelled before all connections are closed, Shutdown returns ctx.Err()
+// immediately (the hub is still stopped by the deferred Stop).
+//
+// Example:
+//
+//	import (
+//	    "context"
+//	    "time"
+//	    "github.com/spcent/plumego/net/websocket"
+//	)
+//
+//	hub := websocket.NewHub(4, 1024)
+//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//	defer cancel()
+//	if err := hub.Shutdown(ctx); err != nil {
+//	    log.Printf("shutdown incomplete: %v", err)
+//	}
+func (h *Hub) Shutdown(ctx context.Context) error {
+	// Collect all unique connections under the read lock.
+	h.mu.RLock()
+	seen := make(map[*Conn]struct{})
+	for _, rs := range h.rooms {
+		for c := range rs {
+			seen[c] = struct{}{}
+		}
+	}
+	h.mu.RUnlock()
+
+	// Close each connection, respecting context cancellation.
+	for c := range seen {
+		select {
+		case <-ctx.Done():
+			h.Stop()
+			return ctx.Err()
+		default:
+		}
+		c.Close()
+	}
+
+	h.Stop()
+	return nil
+}
+
+// RangeConns calls fn for each non-closed connection in room.
+//
+// The iteration stops when fn returns false or all connections are visited.
+// fn is called outside the hub lock, so it is safe to perform I/O or call
+// other hub methods inside it.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/net/websocket"
+//
+//	hub.RangeConns("chat-room", func(c *websocket.Conn) bool {
+//	    if userID, ok := c.GetMetadata("user_id"); ok {
+//	        fmt.Println("connected:", userID)
+//	    }
+//	    return true // continue
+//	})
+func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
+	// Take a snapshot under the read lock so fn is called without holding it.
+	conns := h.getConnList()
+	defer h.putConnList(conns)
+
+	h.mu.RLock()
+	for c := range h.rooms[room] {
+		if !c.IsClosed() {
+			*conns = append(*conns, c)
+		}
+	}
+	h.mu.RUnlock()
+
+	for _, c := range *conns {
+		if !fn(c) {
+			break
+		}
+	}
 }
 
 // TryJoin registers a connection in a room when limits allow it.

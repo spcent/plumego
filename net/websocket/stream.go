@@ -18,6 +18,14 @@ type streamReader struct {
 	readMu  sync.Mutex
 }
 
+// streamReaderPool recycles streamReader instances to reduce per-message
+// heap allocation. Because streamReader embeds a bytes.Buffer, pooling also
+// reuses the buffer's internal backing array, saving an extra allocation for
+// every received frame.
+var streamReaderPool = sync.Pool{
+	New: func() any { return new(streamReader) },
+}
+
 func (sr *streamReader) Read(p []byte) (int, error) {
 	sr.readMu.Lock()
 	defer sr.readMu.Unlock()
@@ -83,6 +91,9 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 }
 
 func (sr *streamReader) Close() error {
+	// Nil the parent pointer so the pool doesn't hold a reference to the Conn.
+	sr.parent = nil
+	streamReaderPool.Put(sr)
 	return nil
 }
 
@@ -100,11 +111,14 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 		}
 		switch op {
 		case OpcodeText, OpcodeBinary:
-			// If fin == true and small, can return a reader that contains payload and EOF immediately
-			sr := &streamReader{
-				parent: c,
-				op:     0,
-			}
+			// Get a pooled reader and reset all fields from any prior use.
+			sr := streamReaderPool.Get().(*streamReader)
+			sr.parent = c
+			sr.op = 0
+			sr.done = false
+			sr.readErr = nil
+			sr.buf.Reset() // keeps the backing array; avoids re-allocation
+
 			// write payload into buffer
 			sr.buf.Write(payload)
 			if fin {

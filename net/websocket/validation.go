@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -20,6 +21,22 @@ var (
 	// ErrEmptyMessage is returned when message is empty but shouldn't be.
 	ErrEmptyMessage = errors.New("websocket: empty message")
 )
+
+// sqlInjectionPatterns is a pre-allocated slice of lowercase SQL injection indicator
+// patterns used by ContainsDangerousPatterns. Defined once at package level to avoid
+// a heap allocation on every call.
+var sqlInjectionPatterns = [][]byte{
+	[]byte("union select"), []byte("union all select"),
+	[]byte("; drop "), []byte("; delete "), []byte("; update "), []byte("; insert "),
+	[]byte("' or '1'='1"), []byte("\" or \"1\"=\"1"),
+	[]byte("'; --"), []byte("\"; --"),
+}
+
+// sanitizerBuilderPool reuses strings.Builder instances in SanitizeForLogging to
+// reduce GC pressure in high-log-volume scenarios.
+var sanitizerBuilderPool = sync.Pool{
+	New: func() any { return new(strings.Builder) },
+}
 
 // MessageValidationConfig defines validation rules for WebSocket messages.
 type MessageValidationConfig struct {
@@ -153,8 +170,10 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 		s = strings.ToValidUTF8(s, "�")
 	}
 
-	// Replace control characters with spaces (except newlines and tabs)
-	var cleaned strings.Builder
+	// Replace control characters with spaces (except newlines and tabs).
+	// Reuse a pooled strings.Builder to reduce allocator pressure.
+	cleaned := sanitizerBuilderPool.Get().(*strings.Builder)
+	cleaned.Reset()
 	cleaned.Grow(len(s))
 	for _, r := range s {
 		// Keep printable characters, newlines, and tabs
@@ -168,6 +187,8 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 	}
 
 	result := cleaned.String()
+	sanitizerBuilderPool.Put(cleaned)
+
 	if truncated {
 		result += "..."
 	}
@@ -204,13 +225,7 @@ func ContainsDangerousPatterns(data []byte) bool {
 	}
 
 	// Check for SQL injection patterns (basic detection)
-	sqlKeywords := [][]byte{
-		[]byte("union select"), []byte("union all select"),
-		[]byte("; drop "), []byte("; delete "), []byte("; update "), []byte("; insert "),
-		[]byte("' or '1'='1"), []byte("\" or \"1\"=\"1"),
-		[]byte("'; --"), []byte("\"; --"),
-	}
-	for _, keyword := range sqlKeywords {
+	for _, keyword := range sqlInjectionPatterns {
 		if bytes.Contains(lower, keyword) {
 			return true
 		}
