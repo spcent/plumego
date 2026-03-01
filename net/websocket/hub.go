@@ -354,7 +354,17 @@ func (h *Hub) startWorkers() {
 						}
 					}
 				case <-h.quit:
-					return
+					// Drain remaining jobs so in-flight messages are not silently dropped.
+					// No new sends arrive after Stop() sets stopped=true before closing quit,
+					// so this loop terminates as soon as the buffered channel is empty.
+					for {
+						select {
+						case j := <-h.jobQueue:
+							_ = j.conn.WriteMessage(j.op, j.data)
+						default:
+							return
+						}
+					}
 				}
 			}
 		}(i)

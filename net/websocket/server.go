@@ -10,10 +10,17 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 )
+
+// msgBufPool reuses bytes.Buffer instances across the per-connection read goroutines
+// to reduce allocator pressure from per-message buffer creation.
+var msgBufPool = sync.Pool{
+	New: func() any { return new(bytes.Buffer) },
+}
 
 // computeAcceptKey computes the WebSocket accept key
 func computeAcceptKey(key string) string {
@@ -207,6 +214,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 
 	// Read frames from the client and broadcast to the room.
 	go func() {
+		validationCfg := DefaultMessageValidationConfig()
 		for {
 			op, rstream, err := c.ReadMessageStream()
 			if err != nil {
@@ -216,10 +224,26 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 				c.Close()
 				return
 			}
-			buf := &bytes.Buffer{}
+			buf := msgBufPool.Get().(*bytes.Buffer)
+			buf.Reset()
 			_, _ = io.Copy(buf, rstream)
 			_ = rstream.Close()
-			cfg.Hub.BroadcastRoom(room, op, buf.Bytes())
+
+			// Validate text messages before broadcasting.
+			if op == OpcodeText {
+				if err := ValidateTextMessage(buf.Bytes(), validationCfg); err != nil {
+					cfg.Hub.logger.Printf("dropped invalid text message: %v", err)
+					msgBufPool.Put(buf)
+					continue
+				}
+			}
+
+			// Copy data before returning buf to pool; BroadcastRoom enqueues
+			// it asynchronously so the pool buffer must not be reused yet.
+			data := make([]byte, buf.Len())
+			copy(data, buf.Bytes())
+			msgBufPool.Put(buf)
+			cfg.Hub.BroadcastRoom(room, op, data)
 		}
 	}()
 }

@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"unicode/utf8"
@@ -186,30 +187,31 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 // This is a heuristic check and may have false positives.
 // Use for additional security layers, not as the only validation.
 func ContainsDangerousPatterns(data []byte) bool {
-	s := string(data)
-	lowerS := strings.ToLower(s)
-
-	// Check for ANSI escape sequences
-	if strings.Contains(s, "\x1b[") || strings.Contains(s, "\033[") {
+	// Check for ANSI escape sequences directly on raw bytes (no allocation).
+	if bytes.Contains(data, []byte("\x1b[")) {
 		return true
 	}
 
-	// Check for HTML/XML tags (case-insensitive)
-	if strings.Contains(lowerS, "<script") || strings.Contains(lowerS, "</script") ||
-		strings.Contains(lowerS, "<iframe") || strings.Contains(lowerS, "javascript:") ||
-		strings.Contains(lowerS, "onerror=") || strings.Contains(lowerS, "onload=") {
+	// Lowercase once for all case-insensitive checks below.
+	// bytes.ToLower allocates a single copy — cheaper than string(data)+strings.ToLower.
+	lower := bytes.ToLower(data)
+
+	// Check for HTML/XML tags and dangerous JS patterns (case-insensitive)
+	if bytes.Contains(lower, []byte("<script")) || bytes.Contains(lower, []byte("</script")) ||
+		bytes.Contains(lower, []byte("<iframe")) || bytes.Contains(lower, []byte("javascript:")) ||
+		bytes.Contains(lower, []byte("onerror=")) || bytes.Contains(lower, []byte("onload=")) {
 		return true
 	}
 
 	// Check for SQL injection patterns (basic detection)
-	sqlKeywords := []string{
-		"union select", "union all select",
-		"; drop ", "; delete ", "; update ", "; insert ",
-		"' or '1'='1", "\" or \"1\"=\"1",
-		"'; --", "\"; --",
+	sqlKeywords := [][]byte{
+		[]byte("union select"), []byte("union all select"),
+		[]byte("; drop "), []byte("; delete "), []byte("; update "), []byte("; insert "),
+		[]byte("' or '1'='1"), []byte("\" or \"1\"=\"1"),
+		[]byte("'; --"), []byte("\"; --"),
 	}
 	for _, keyword := range sqlKeywords {
-		if strings.Contains(lowerS, keyword) {
+		if bytes.Contains(lower, keyword) {
 			return true
 		}
 	}
