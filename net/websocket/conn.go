@@ -130,8 +130,8 @@ type Conn struct {
 	closeC    chan struct{}
 
 	readLimit  int64
-	pingPeriod time.Duration
-	pongWait   time.Duration
+	pingPeriod atomic.Int64 // stores time.Duration as int64 nanoseconds
+	pongWait   atomic.Int64 // stores time.Duration as int64 nanoseconds
 	lastPong   int64
 
 	// User information (set after authentication)
@@ -153,25 +153,38 @@ type Conn struct {
 //
 //	// Create connection with drop behavior
 //	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
+// NewConn creates a Conn after handshake, allocating its own buffered I/O.
+//
+// For server-side connections obtained via http.Hijacker, prefer
+// newConnFromHijack to reuse the bufio.ReadWriter that the HTTP server
+// already created, avoiding a redundant allocation.
 func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
+	return newConnFromHijack(
+		c,
+		bufio.NewReaderSize(c, defaultBufSize),
+		bufio.NewWriterSize(c, defaultBufSize),
+		queueSize, sendTimeout, behavior,
+	)
+}
+
+// newConnFromHijack creates a Conn using buffers already allocated by the
+// HTTP server's hijack operation, avoiding a redundant allocation pair.
+func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
 	cc := &Conn{
 		conn:          c,
-		br:            bufio.NewReaderSize(c, defaultBufSize),
-		bw:            bufio.NewWriterSize(c, defaultBufSize),
+		br:            br,
+		bw:            bw,
 		sendQueue:     make(chan Outbound, queueSize),
 		sendQueueSize: queueSize,
 		sendTimeout:   sendTimeout,
 		sendBehavior:  behavior,
 		closeC:        make(chan struct{}),
 		readLimit:     16 << 20, // 16MB
-		pingPeriod:    defaultPingPeriod,
-		pongWait:      defaultPongWait,
-		// metadata is sync.Map, no initialization needed
 	}
+	cc.pingPeriod.Store(int64(defaultPingPeriod))
+	cc.pongWait.Store(int64(defaultPongWait))
 	atomic.StoreInt64(&cc.lastPong, time.Now().UnixNano())
-	// start writer pump
 	go cc.writerPump()
-	// start ping/pong monitor
 	go cc.pongMonitor()
 	return cc
 }
@@ -197,12 +210,12 @@ func (c *Conn) SetReadLimit(limit int64) {
 
 // SetPingPeriod sets the ping interval
 func (c *Conn) SetPingPeriod(d time.Duration) {
-	atomic.StoreInt64((*int64)(&c.pingPeriod), int64(d))
+	c.pingPeriod.Store(int64(d))
 }
 
 // SetPongWait sets the pong wait time
 func (c *Conn) SetPongWait(d time.Duration) {
-	atomic.StoreInt64((*int64)(&c.pongWait), int64(d))
+	c.pongWait.Store(int64(d))
 }
 
 // GetLastPong returns the last pong time

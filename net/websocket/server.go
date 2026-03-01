@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -38,15 +37,12 @@ func headerContains(h http.Header, key, val string) bool {
 	return false
 }
 
-// isOriginAllowed checks if the request origin is in the allowed list
-// Returns true if allowedOrigins is nil/empty (skip validation) or contains "*" or the specific origin
+// isOriginAllowed checks if the request origin is in the allowed list.
+// Returns true if allowedOrigins is nil/empty (skip validation) or contains "*" or the specific origin.
 func isOriginAllowed(origin string, allowedOrigins []string) bool {
-	// Skip validation if no origins configured
 	if len(allowedOrigins) == 0 {
 		return true
 	}
-
-	// Check for wildcard
 	for _, allowed := range allowedOrigins {
 		if allowed == "*" {
 			return true
@@ -58,42 +54,45 @@ func isOriginAllowed(origin string, allowedOrigins []string) bool {
 	return false
 }
 
-// ServerConfig configures WebSocket server options
+// ServerConfig configures WebSocket server options.
+//
+// Auth must implement RoomAuthenticator. Use NewSimpleRoomAuth or NewSecureRoomAuth
+// to create a concrete implementation.
 type ServerConfig struct {
 	Hub            *Hub
-	Auth           *simpleRoomAuth
+	Auth           RoomAuthenticator
 	QueueSize      int
 	SendTimeout    time.Duration
 	SendBehavior   SendBehavior
-	AllowedOrigins []string // Allowed origins for CORS, use ["*"] to allow all
+	AllowedOrigins []string // Allowed origins for CORS. Use ["*"] to allow all origins.
 }
 
-// ServeWSWithAuth does the handshake and basic auth checks before accepting connection.
-// Accepts token from Authorization header "Bearer <token>" or ?token= in query.
-// room password from ?room_password= param.
-// onConn will be called when Conn is ready.
-func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth *simpleRoomAuth, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
+// ServeWSWithAuth performs the WebSocket handshake with JWT and room-password
+// authentication. It accepts tokens from the Authorization header
+// ("Bearer <token>") or the ?token= query parameter, and room passwords from
+// the ?room_password= query parameter.
+//
+// Origin validation is explicitly set to allow all origins (["*"]).
+// Use ServeWSWithConfig with a non-empty AllowedOrigins list for strict
+// CSRF protection.
+func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth RoomAuthenticator, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
 	ServeWSWithConfig(w, r, ServerConfig{
 		Hub:            hub,
 		Auth:           auth,
 		QueueSize:      queueSize,
 		SendTimeout:    sendTimeout,
 		SendBehavior:   behavior,
-		AllowedOrigins: nil, // No origin validation for backward compatibility
+		AllowedOrigins: []string{"*"}, // explicit allow-all; callers requiring CSRF protection should use ServeWSWithConfig
 	})
 }
 
-// ServeWSWithConfig does the handshake with full configuration options including origin validation.
-// Accepts token from Authorization header "Bearer <token>" or ?token= in query.
-// room password from ?room_password= param.
-// onConn will be called when Conn is ready.
+// ServeWSWithConfig performs the WebSocket handshake with full configuration
+// options including origin validation (CSRF protection).
 func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig) {
 	// Origin validation (CSRF protection)
 	origin := r.Header.Get("Origin")
 	if origin != "" && !isOriginAllowed(origin, cfg.AllowedOrigins) {
-		metricsMutex.Lock()
-		securityMetrics.RejectedConnections++
-		metricsMutex.Unlock()
+		cfg.Hub.securityRejections.Add(1)
 		contract.WriteError(w, r, contract.NewForbiddenError("forbidden origin"))
 		return
 	}
@@ -115,23 +114,20 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 	if err := ValidateWebSocketKey(key); err != nil {
-		metricsMutex.Lock()
-		securityMetrics.InvalidWebSocketKeys++
-		metricsMutex.Unlock()
+		cfg.Hub.invalidWSKeys.Add(1)
 		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: err.Error(), Category: contract.CategoryClient})
 		return
 	}
-	// auth: room and JWT
+
+	// Auth: room and JWT
 	room := r.URL.Query().Get("room")
 	if room == "" {
 		room = "default"
 	}
-	// check room password
+	// Check room password
 	roomPwd := r.URL.Query().Get("room_password")
 	if !cfg.Auth.CheckRoomPassword(room, roomPwd) {
-		metricsMutex.Lock()
-		securityMetrics.RejectedConnections++
-		metricsMutex.Unlock()
+		cfg.Hub.securityRejections.Add(1)
 		contract.WriteError(w, r, contract.NewForbiddenError("forbidden: bad room password"))
 		return
 	}
@@ -143,7 +139,8 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.APIError{Status: status, Code: "JOIN_DENIED", Message: err.Error(), Category: contract.CategoryClient})
 		return
 	}
-	// check token if present
+
+	// Check token if present
 	token := ""
 	var userInfo *UserInfo
 	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
@@ -154,18 +151,14 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	if token != "" {
 		payload, err := cfg.Auth.VerifyJWT(token)
 		if err != nil {
-			metricsMutex.Lock()
-			securityMetrics.RejectedConnections++
-			metricsMutex.Unlock()
+			cfg.Hub.securityRejections.Add(1)
 			contract.WriteError(w, r, contract.NewForbiddenError("forbidden: invalid token"))
 			return
 		}
-		// Extract user information from JWT payload
 		userInfo = ExtractUserInfo(payload)
-		metricsMutex.Lock()
-		securityMetrics.SuccessfulAuthentications++
-		metricsMutex.Unlock()
+		cfg.Hub.successfulAuths.Add(1)
 	}
+
 	accept := computeAcceptKey(key)
 	hj, ok := w.(http.Hijacker)
 	if !ok {
@@ -177,6 +170,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewInternalError("hijack failed"))
 		return
 	}
+
 	resp := "HTTP/1.1 101 Switching Protocols\r\n" +
 		"Upgrade: websocket\r\n" +
 		"Connection: Upgrade\r\n" +
@@ -191,49 +185,51 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 
-	c := NewConn(conn, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
-	// Set user information if authenticated
+	// Reuse the bufio.ReadWriter returned by Hijack to avoid a redundant
+	// buffer allocation (NewConn would otherwise create default-sized buffers
+	// that are immediately discarded).
+	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
 	c.UserInfo = userInfo
-	// override br/bw with hijacked conn
-	c.br = bufio.NewReaderSize(conn, 8192)
-	c.bw = bufio.NewWriterSize(conn, 8192)
 
-	// register in hub
+	// Register in hub
 	if err := cfg.Hub.TryJoin(room, c); err != nil {
-		conn.Close()
+		// Close the Conn wrapper so writerPump/pongMonitor goroutines stop
+		// cleanly via the closeC channel.
+		c.Close()
 		return
 	}
-	// cleanup on close
+
+	// Cleanup on close: remove from all rooms once the connection is gone.
 	go func() {
 		<-c.closeC
-		cfg.Hub.Leave(room, c)
 		cfg.Hub.RemoveConn(c)
 	}()
-	// spawn a goroutine to read frames and push to room broadcast on completed stream
+
+	// Read frames from the client and broadcast to the room.
 	go func() {
 		for {
 			op, rstream, err := c.ReadMessageStream()
 			if err != nil {
 				if err != io.EOF {
-					log.Println("ReadMessageStream error:", err)
+					cfg.Hub.logger.Printf("ReadMessageStream error: %v", err)
 				}
 				c.Close()
 				return
 			}
-			// For demonstration: stream copy to a buffer but streaming-friendly.
-			// If message is huge, we stream to temp file or process chunk-by-chunk.
 			buf := &bytes.Buffer{}
-			_, _ = io.Copy(buf, rstream) // streaming
+			_, _ = io.Copy(buf, rstream)
 			_ = rstream.Close()
-			// broadcast to room
 			cfg.Hub.BroadcastRoom(room, op, buf.Bytes())
 		}
 	}()
 }
 
-// UpgradeClient performs client-side WebSocket upgrade
-// This is useful for testing or when you need to create a client connection
-func UpgradeClient(url string, header http.Header) (net.Conn, *bufio.ReadWriter, error) {
-	// This is a simplified client upgrade - in production you'd want more features
+// UpgradeClient performs a client-side WebSocket handshake.
+//
+// Deprecated: This function is not implemented and always returns an error.
+// It is retained only for API compatibility. Use a third-party client library
+// (e.g., golang.org/x/net/websocket or nhooyr.io/websocket) for client-side
+// WebSocket connections.
+func UpgradeClient(_ string, _ http.Header) (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, errors.New("client upgrade not implemented")
 }

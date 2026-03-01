@@ -52,11 +52,22 @@ type Hub struct {
 	wg       sync.WaitGroup
 	quit     chan struct{}
 
+	// stopped is set to true by Stop() before closing quit.
+	// BroadcastRoom/BroadcastAll check this to avoid sending on a channel
+	// whose readers have already exited, preventing any post-stop confusion.
+	stopped atomic.Bool
+
 	maxConns     int
 	maxRoomConns int
 	totalConns   atomic.Uint64 // Atomic counter for total active connections
 	accepted     atomic.Uint64
 	rejected     atomic.Uint64
+
+	// Per-hub security/broadcast metrics (replaces global securityMetrics writes)
+	broadcastDropped   atomic.Uint64 // messages dropped due to full job queue
+	securityRejections atomic.Uint64 // connections rejected (origin/auth/capacity)
+	invalidWSKeys      atomic.Uint64 // invalid Sec-WebSocket-Key headers seen
+	successfulAuths    atomic.Uint64 // successful JWT authentications
 
 	// Rate limiting (simple token bucket implementation)
 	rateLimiter *simpleRateLimiter
@@ -86,12 +97,14 @@ func (h *Hub) putConnList(conns *[]*Conn) {
 	h.connListPool.Put(conns)
 }
 
-// simpleRateLimiter implements a basic token bucket rate limiter using only standard library
+// simpleRateLimiter implements a basic token bucket rate limiter using only standard library.
+// The mutex protects all fields; plain integer fields are used since the mutex already
+// provides mutual exclusion (atomic types inside a mutex are redundant).
 type simpleRateLimiter struct {
-	rate       int           // Tokens per second
-	burst      int           // Maximum burst size
-	tokens     atomic.Uint64 // Current tokens (scaled by 1000 for precision)
-	lastRefill atomic.Int64  // Last refill timestamp (nanoseconds)
+	rate       int // Tokens per second
+	burst      int // Maximum burst size
+	tokens     uint64
+	lastRefill int64 // nanoseconds
 	mu         sync.Mutex
 }
 
@@ -103,13 +116,12 @@ func newRateLimiter(rate, burst int) *simpleRateLimiter {
 	if burst <= 0 {
 		burst = rate
 	}
-	rl := &simpleRateLimiter{
-		rate:  rate,
-		burst: burst,
+	return &simpleRateLimiter{
+		rate:       rate,
+		burst:      burst,
+		tokens:     uint64(burst * 1000), // Start with full burst capacity
+		lastRefill: time.Now().UnixNano(),
 	}
-	rl.tokens.Store(uint64(burst * 1000)) // Start with full burst capacity
-	rl.lastRefill.Store(time.Now().UnixNano())
-	return rl
 }
 
 // allow checks if an event can proceed under rate limits
@@ -122,26 +134,22 @@ func (rl *simpleRateLimiter) allow() bool {
 	defer rl.mu.Unlock()
 
 	now := time.Now().UnixNano()
-	last := rl.lastRefill.Load()
-	elapsed := time.Duration(now - last)
+	elapsed := time.Duration(now - rl.lastRefill)
 
 	// Calculate tokens to add based on elapsed time
 	tokensToAdd := int64(elapsed.Seconds() * float64(rl.rate) * 1000)
 	if tokensToAdd > 0 {
-		current := rl.tokens.Load()
 		maxTokens := uint64(rl.burst * 1000)
-		newTokens := current + uint64(tokensToAdd)
-		if newTokens > maxTokens {
-			newTokens = maxTokens
+		rl.tokens += uint64(tokensToAdd)
+		if rl.tokens > maxTokens {
+			rl.tokens = maxTokens
 		}
-		rl.tokens.Store(newTokens)
-		rl.lastRefill.Store(now)
+		rl.lastRefill = now
 	}
 
 	// Try to consume one token
-	current := rl.tokens.Load()
-	if current >= 1000 {
-		rl.tokens.Store(current - 1000)
+	if rl.tokens >= 1000 {
+		rl.tokens -= 1000
 		return true
 	}
 
@@ -227,12 +235,19 @@ type HubConfig struct {
 //	metrics := hub.Metrics()
 //	fmt.Printf("Active: %d, Rooms: %d\n", metrics.ActiveConnections, metrics.Rooms)
 type HubMetrics struct {
+	// ActiveConnections is the sum of (connection × room) registrations.
+	// A connection joined to N rooms contributes N to this count.
 	ActiveConnections  int    `json:"active_connections"`
 	Rooms              int    `json:"rooms"`
 	AcceptedTotal      uint64 `json:"accepted_total"`
 	RejectedTotal      uint64 `json:"rejected_total"`
 	MaxConnections     int    `json:"max_connections"`
 	MaxRoomConnections int    `json:"max_room_connections"`
+	// Per-hub security/broadcast metrics
+	BroadcastDropped   uint64 `json:"broadcast_dropped"`
+	SecurityRejections uint64 `json:"security_rejections"`
+	InvalidWSKeys      uint64 `json:"invalid_ws_keys"`
+	SuccessfulAuths    uint64 `json:"successful_auths"`
 }
 
 // NewHub creates a new WebSocket hub with default configuration.
@@ -383,10 +398,18 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 
 // Stop gracefully shuts down the hub.
 //
+// Stop is idempotent — calling it multiple times is safe.
+//
 // This method:
-//   - Closes the job queue to stop accepting new jobs
-//   - Waits for all workers to finish processing remaining jobs
-//   - Closes all security event channels
+//   - Marks the hub as stopped so new broadcasts are rejected immediately
+//   - Signals all worker goroutines to exit via the quit channel
+//   - Waits for all workers and the security monitor to finish
+//
+// Note: h.jobQueue is intentionally NOT closed here. Workers exit via the quit
+// channel, so closing the queue is unnecessary. More importantly, closing it
+// while a concurrent BroadcastRoom/BroadcastAll is still executing a channel
+// send would cause a panic ("send on closed channel"). The stopped flag prevents
+// new sends after Stop is called.
 //
 // Example:
 //
@@ -395,8 +418,10 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //	hub := websocket.NewHub(4, 1024)
 //	defer hub.Stop()
 func (h *Hub) Stop() {
+	if !h.stopped.CompareAndSwap(false, true) {
+		return // already stopped
+	}
 	close(h.quit)
-	close(h.jobQueue)
 	h.wg.Wait()
 }
 
@@ -517,10 +542,12 @@ func (h *Hub) CanJoin(room string) error {
 	return nil
 }
 
-// Join room (ignores capacity limits).
+// Join registers the connection in the room, silently ignoring any error
+// (e.g. ErrHubFull, ErrRoomFull, ErrRateLimitExceeded).
 //
-// This method is useful when you want to bypass capacity checks.
-// Use with caution as it can lead to resource exhaustion.
+// Use TryJoin when the caller needs to know whether the join succeeded.
+// Join is provided for convenience in scenarios where the application can
+// tolerate a silent no-op (e.g. admin connections in non-production contexts).
 //
 // Example:
 //
@@ -528,7 +555,7 @@ func (h *Hub) CanJoin(room string) error {
 //
 //	hub := websocket.NewHub(4, 1024)
 //	conn := websocket.NewConn(...)
-//	hub.Join("admin-room", conn) // Bypass capacity limits
+//	hub.Join("admin-room", conn)
 func (h *Hub) Join(room string, c *Conn) {
 	_ = h.TryJoin(room, c)
 }
@@ -548,12 +575,16 @@ func (h *Hub) Metrics() HubMetrics {
 	h.mu.RUnlock()
 
 	return HubMetrics{
-		ActiveConnections:  int(h.totalConns.Load()), // Use atomic counter
+		ActiveConnections:  int(h.totalConns.Load()),
 		Rooms:              rooms,
 		AcceptedTotal:      h.accepted.Load(),
 		RejectedTotal:      h.rejected.Load(),
 		MaxConnections:     h.maxConns,
 		MaxRoomConnections: h.maxRoomConns,
+		BroadcastDropped:   h.broadcastDropped.Load(),
+		SecurityRejections: h.securityRejections.Load(),
+		InvalidWSKeys:      h.invalidWSKeys.Load(),
+		SuccessfulAuths:    h.successfulAuths.Load(),
 	}
 }
 
@@ -630,6 +661,10 @@ func (h *Hub) RemoveConn(c *Conn) {
 //	// Broadcast binary data
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeBinary, []byte{0x01, 0x02, 0x03})
 func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
+	if h.stopped.Load() {
+		return
+	}
+
 	// Get a connection list from pool
 	connsList := h.getConnList()
 	defer h.putConnList(connsList)
@@ -683,13 +718,11 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 					}, "error")
 				}
 			}
-			// Debug mode: silently drop (original behavior)
 		}
 	}
 
-	// Production metrics - use atomic operations instead of mutex
 	if h.config.EnableMetrics && dropped > 0 {
-		atomic.AddUint64(&securityMetrics.BroadcastQueueFull, uint64(dropped))
+		h.broadcastDropped.Add(uint64(dropped))
 	}
 }
 
@@ -706,13 +739,18 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 //	// Send system-wide notification
 //	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
+	if h.stopped.Load() {
+		return
+	}
+
 	// Get a connection list from pool
 	connsList := h.getConnList()
 	defer h.putConnList(connsList)
 
-	// Copy all connections while holding read lock
+	// Copy all unique connections while holding read lock.
+	// A connection may be registered in multiple rooms; deduplicate so it receives
+	// each broadcast exactly once.
 	h.mu.RLock()
-	// Pre-allocate slice with estimated capacity if needed
 	estimatedSize := 0
 	for _, rs := range h.rooms {
 		estimatedSize += len(rs)
@@ -721,11 +759,14 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 		*connsList = make([]*Conn, 0, estimatedSize)
 	}
 
+	seen := make(map[*Conn]struct{}, estimatedSize)
 	for _, rs := range h.rooms {
 		for c := range rs {
-			// Only include active connections
 			if !c.IsClosed() {
-				*connsList = append(*connsList, c)
+				if _, dup := seen[c]; !dup {
+					seen[c] = struct{}{}
+					*connsList = append(*connsList, c)
+				}
 			}
 		}
 	}
@@ -758,9 +799,8 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 		}
 	}
 
-	// Production metrics - use atomic operations instead of mutex
 	if h.config.EnableMetrics && dropped > 0 {
-		atomic.AddUint64(&securityMetrics.BroadcastQueueFull, uint64(dropped))
+		h.broadcastDropped.Add(uint64(dropped))
 	}
 }
 

@@ -8,10 +8,12 @@ import (
 	"time"
 )
 
-// WriteMessage enqueues message to sendQueue. Behavior on full queue depends on c.sendBehavior.
-// It waits up to sendTimeout if blocking behavior chosen.
+// WriteMessage enqueues a message to the send queue.
+// Behavior on a full queue depends on c.sendBehavior.
+// It waits up to sendTimeout when SendBlock behavior is chosen.
 //
-// Deprecated: Use WriteMessageContext for better cancellation support.
+// Use WriteMessageContext when you need explicit cancellation or a custom
+// deadline beyond the configured sendTimeout.
 func (c *Conn) WriteMessage(op byte, data []byte) error {
 	ctx := context.Background()
 	if c.sendTimeout > 0 {
@@ -91,7 +93,7 @@ func (c *Conn) WriteJSON(v any) error {
 
 // writerPump consumes sendQueue and writes frames to client. It fragments large messages.
 func (c *Conn) writerPump() {
-	ticker := time.NewTicker(time.Duration(atomic.LoadInt64((*int64)(&c.pingPeriod))))
+	ticker := time.NewTicker(time.Duration(c.pingPeriod.Load()))
 	defer func() {
 		ticker.Stop()
 		c.Close()
@@ -142,7 +144,7 @@ func (c *Conn) writerPump() {
 
 // pongMonitor closes connection if no pong received within pongWait
 func (c *Conn) pongMonitor() {
-	ticker := time.NewTicker(time.Duration(atomic.LoadInt64((*int64)(&c.pingPeriod))) / 2)
+	ticker := time.NewTicker(time.Duration(c.pingPeriod.Load()) / 2)
 	defer ticker.Stop()
 	for {
 		select {
@@ -150,7 +152,7 @@ func (c *Conn) pongMonitor() {
 			return
 		case <-ticker.C:
 			last := time.Unix(0, atomic.LoadInt64(&c.lastPong))
-			if time.Since(last) > time.Duration(atomic.LoadInt64((*int64)(&c.pongWait))) {
+			if time.Since(last) > time.Duration(c.pongWait.Load()) {
 				_ = c.Close()
 				return
 			}

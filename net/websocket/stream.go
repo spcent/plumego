@@ -10,14 +10,12 @@ import (
 
 // streamReader implements io.ReadCloser to stream frames for one message.
 type streamReader struct {
-	parent    *Conn
-	op        byte
-	buf       bytes.Buffer
-	done      bool
-	readErr   error
-	readMu    sync.Mutex
-	closeOnce sync.Once
-	closed    chan struct{}
+	parent  *Conn
+	op      byte
+	buf     bytes.Buffer
+	done    bool
+	readErr error
+	readMu  sync.Mutex
 }
 
 func (sr *streamReader) Read(p []byte) (int, error) {
@@ -85,7 +83,6 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 }
 
 func (sr *streamReader) Close() error {
-	sr.closeOnce.Do(func() { close(sr.closed) })
 	return nil
 }
 
@@ -107,7 +104,6 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 			sr := &streamReader{
 				parent: c,
 				op:     0,
-				closed: make(chan struct{}),
 			}
 			// write payload into buffer
 			sr.buf.Write(payload)

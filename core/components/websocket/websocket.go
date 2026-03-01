@@ -127,7 +127,12 @@ func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 					return
 				}
 
-				c.hub.BroadcastAll(ws.OpcodeText, b)
+				// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
+				if room := r.URL.Query().Get("room"); room != "" {
+					c.hub.BroadcastRoom(room, ws.OpcodeText, b)
+				} else {
+					c.hub.BroadcastAll(ws.OpcodeText, b)
+				}
 				w.WriteHeader(http.StatusNoContent)
 			})
 		}

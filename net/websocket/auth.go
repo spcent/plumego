@@ -13,6 +13,25 @@ import (
 	"github.com/spcent/plumego/security/password"
 )
 
+// RoomAuthenticator is the interface for WebSocket room authentication.
+//
+// Implement this interface to provide custom authentication logic, or use
+// NewSimpleRoomAuth / NewSecureRoomAuth for the built-in implementations.
+//
+// Example:
+//
+//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth.SetRoomPassword("chat", "s3cr3t")
+//
+//	cfg := websocket.ServerConfig{
+//	    Hub:  hub,
+//	    Auth: auth, // *simpleRoomAuth satisfies RoomAuthenticator
+//	}
+type RoomAuthenticator interface {
+	CheckRoomPassword(room, provided string) bool
+	VerifyJWT(token string) (map[string]any, error)
+}
+
 // simpleRoomAuth stores metadata about rooms (password).
 //
 // This is a simple room authentication implementation that uses password-based
@@ -134,7 +153,11 @@ func (s *simpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 	return payload, nil
 }
 
-// ExtractUserInfo extracts UserInfo from JWT payload
+// ExtractUserInfo extracts UserInfo from JWT payload.
+//
+// The "roles" claim is parsed correctly regardless of whether the JWT was
+// decoded into map[string]any (where JSON arrays become []interface{}) or
+// directly into a typed struct.
 func ExtractUserInfo(payload map[string]any) *UserInfo {
 	userInfo := &UserInfo{
 		Claims: payload,
@@ -149,8 +172,17 @@ func ExtractUserInfo(payload map[string]any) *UserInfo {
 	if email, ok := payload["email"].(string); ok {
 		userInfo.Email = email
 	}
-	if roles, ok := payload["roles"].([]string); ok {
-		userInfo.Roles = roles
+	// json.Unmarshal into map[string]any always produces []interface{} for JSON
+	// arrays, never []string. Handle both representations for forward compat.
+	switch v := payload["roles"].(type) {
+	case []interface{}:
+		for _, r := range v {
+			if s, ok := r.(string); ok {
+				userInfo.Roles = append(userInfo.Roles, s)
+			}
+		}
+	case []string:
+		userInfo.Roles = v
 	}
 	return userInfo
 }
