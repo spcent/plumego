@@ -4,7 +4,7 @@ import "sync"
 
 // MemoryStore keeps scheduled jobs in memory.
 type MemoryStore struct {
-	mu   sync.Mutex
+	mu   sync.RWMutex
 	jobs map[JobID]StoredJob
 }
 
@@ -28,8 +28,8 @@ func (m *MemoryStore) Delete(id JobID) error {
 }
 
 func (m *MemoryStore) List() ([]StoredJob, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	out := make([]StoredJob, 0, len(m.jobs))
 	for _, job := range m.jobs {
 		out = append(out, job)

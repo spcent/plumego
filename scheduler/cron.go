@@ -18,6 +18,55 @@ const (
 	CronYearly      = "0 0 1 1 *"
 )
 
+// Expr returns the original cron expression string for this spec.
+// For @every specs it returns "@every <duration>".
+// For standard cron fields it reconstructs the expression.
+func (c CronSpec) Expr() string {
+	if c.interval > 0 {
+		return "@every " + c.interval.String()
+	}
+	if len(c.minutes) == 0 {
+		return ""
+	}
+	hasSec := len(c.seconds) > 0 && !(len(c.seconds) == 1 && c.seconds[0] == 0)
+	if hasSec {
+		return cronFieldStr(c.seconds, 0, 59) + " " +
+			cronFieldStr(c.minutes, 0, 59) + " " +
+			cronFieldStr(c.hours, 0, 23) + " " +
+			cronFieldStr(c.dom, 1, 31) + " " +
+			cronFieldStr(c.months, 1, 12) + " " +
+			cronFieldStr(c.dow, 0, 6)
+	}
+	return cronFieldStr(c.minutes, 0, 59) + " " +
+		cronFieldStr(c.hours, 0, 23) + " " +
+		cronFieldStr(c.dom, 1, 31) + " " +
+		cronFieldStr(c.months, 1, 12) + " " +
+		cronFieldStr(c.dow, 0, 6)
+}
+
+// cronFieldStr reconstructs a cron field string from an expanded values slice.
+// Returns "*" when the field covers the full range.
+func cronFieldStr(values []int, min, max int) string {
+	full := buildRange(min, max, 1)
+	if len(values) == len(full) {
+		allMatch := true
+		for i, v := range values {
+			if v != full[i] {
+				allMatch = false
+				break
+			}
+		}
+		if allMatch {
+			return "*"
+		}
+	}
+	parts := make([]string, len(values))
+	for i, v := range values {
+		parts[i] = strconv.Itoa(v)
+	}
+	return strings.Join(parts, ",")
+}
+
 // CronSpec represents a parsed cron expression (minute, hour, dom, month, dow).
 type CronSpec struct {
 	seconds  []int
@@ -26,6 +75,8 @@ type CronSpec struct {
 	dom      []int
 	months   []int
 	dow      []int
+	domStar  bool           // true when the day-of-month field was an unrestricted "*"
+	dowStar  bool           // true when the day-of-week field was an unrestricted "*"
 	location *time.Location // Time zone for scheduling
 	interval time.Duration  // For @every syntax
 }
@@ -113,6 +164,12 @@ func ParseCronSpecWithLocation(expr string, loc *time.Location) (CronSpec, error
 		return CronSpec{}, fmt.Errorf("day-of-week: %w", err)
 	}
 
+	// Track whether DOM/DOW were wildcards so Next() can apply correct Vixie
+	// cron semantics: when only one of the two is restricted the other is
+	// ignored; OR behaviour applies only when both are restricted.
+	domStar := strings.TrimSpace(fields[offset+2]) == "*"
+	dowStar := strings.TrimSpace(fields[offset+4]) == "*"
+
 	return CronSpec{
 		seconds:  seconds,
 		minutes:  minutes,
@@ -120,6 +177,8 @@ func ParseCronSpecWithLocation(expr string, loc *time.Location) (CronSpec, error
 		dom:      dom,
 		months:   months,
 		dow:      dow,
+		domStar:  domStar,
+		dowStar:  dowStar,
 		location: loc,
 	}, nil
 }
@@ -222,12 +281,25 @@ func (c CronSpec) Next(after time.Time) time.Time {
 			next = time.Date(next.Year(), next.Month()+1, 1, 0, 0, 0, 0, next.Location())
 			continue
 		}
-		// Standard cron: day-of-month and day-of-week are OR, not AND
-		// Match if either condition is satisfied
+		// Vixie cron day-matching semantics:
+		//   • Both DOM and DOW unrestricted ("*"): always match.
+		//   • Only DOM restricted: match by DOM only (ignore DOW).
+		//   • Only DOW restricted: match by DOW only (ignore DOM).
+		//   • Both restricted: match if EITHER matches (OR behaviour).
 		domMatch := containsInt(c.dom, next.Day())
 		dowMatch := containsInt(c.dow, int(next.Weekday()))
-
-		if !domMatch && !dowMatch {
+		var dayMatch bool
+		switch {
+		case c.domStar && c.dowStar:
+			dayMatch = true
+		case c.domStar:
+			dayMatch = dowMatch
+		case c.dowStar:
+			dayMatch = domMatch
+		default:
+			dayMatch = domMatch || dowMatch
+		}
+		if !dayMatch {
 			next = time.Date(next.Year(), next.Month(), next.Day(), 0, 0, 0, 0, next.Location()).AddDate(0, 0, 1)
 			continue
 		}

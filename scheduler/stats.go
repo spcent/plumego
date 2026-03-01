@@ -12,6 +12,7 @@ type schedulerStats struct {
 	failure           atomic.Int64
 	retry             atomic.Int64
 	timeout           atomic.Int64
+	canceled          atomic.Int64 // tasks cancelled by scheduler shutdown
 	queueDelayTotalNs atomic.Int64
 }
 
@@ -39,6 +40,10 @@ func (s *schedulerStats) incTimeout() {
 	s.timeout.Add(1)
 }
 
+func (s *schedulerStats) incCanceled() {
+	s.canceled.Add(1)
+}
+
 func (s *schedulerStats) addQueueDelay(d time.Duration) {
 	s.queueDelayTotalNs.Add(d.Nanoseconds())
 }
@@ -50,8 +55,9 @@ type StatsSnapshot struct {
 	Success       int64
 	Failure       int64
 	Retry         int64
-	Timeout       int64
-	QueueDelayAvg time.Duration
+	Timeout       int64         // tasks that exceeded their per-job timeout
+	Canceled      int64         // tasks cancelled by scheduler shutdown
+	QueueDelayAvg time.Duration // average time spent waiting in the work queue
 }
 
 // Stats returns a snapshot of scheduler stats.
@@ -69,6 +75,7 @@ func (s *Scheduler) Stats() StatsSnapshot {
 		Failure:       s.stats.failure.Load(),
 		Retry:         s.stats.retry.Load(),
 		Timeout:       s.stats.timeout.Load(),
+		Canceled:      s.stats.canceled.Load(),
 		QueueDelayAvg: avg,
 	}
 }

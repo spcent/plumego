@@ -1614,3 +1614,572 @@ func TestDeadLetterQueue(t *testing.T) {
 		}
 	})
 }
+
+// TestReplaceExistingCleansUpDependencyMaps verifies that replacing a job via
+// ReplaceExisting() fully cleans up the old job's dependency tracking (Bug #1).
+func TestReplaceExistingCleansUpDependencyMaps(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	triggered := make(chan struct{}, 4)
+
+	// Register dep-a as a dependency.
+	_, err := s.Delay("dep-a", 5*time.Second, func(ctx context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("dep-a: %v", err)
+	}
+
+	// Register dep-b to depend on dep-a.
+	_, err = s.Delay("dep-b", 5*time.Second, func(ctx context.Context) error {
+		triggered <- struct{}{}
+		return nil
+	}, WithDependsOn(DependencyFailureContinue, "dep-a"))
+	if err != nil {
+		t.Fatalf("dep-b: %v", err)
+	}
+
+	// Replace dep-b with a job that has NO dependencies.
+	_, err = s.Delay("dep-b", 5*time.Second, func(ctx context.Context) error {
+		return nil
+	}, ReplaceExisting())
+	if err != nil {
+		t.Fatalf("replace dep-b: %v", err)
+	}
+
+	// dep-b's old dependents entry under dep-a must be gone.
+	// After replacement, dep-b must NOT appear as a dependent of dep-a.
+	s.mu.RLock()
+	deps := s.dependents["dep-a"]
+	s.mu.RUnlock()
+	for _, d := range deps {
+		if d == "dep-b" {
+			t.Fatal("old dep-b still present in dependents[dep-a] after replacement")
+		}
+	}
+
+	// dep-b's own dependencyStatus entry should also be removed.
+	s.mu.RLock()
+	_, ok := s.dependencyStatus["dep-b"]
+	s.mu.RUnlock()
+	if ok {
+		t.Fatal("old dep-b still in dependencyStatus after replacement")
+	}
+}
+
+// TestDependencyFailureContinueDoesNotCorruptStatus verifies that
+// DependencyFailureContinue does not write true into dependencyStatus for
+// the failed dependency (Bug #2).
+func TestDependencyFailureContinueDoesNotCorruptStatus(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	depErr := errors.New("dep failure")
+	depRan := make(chan struct{}, 1)
+	depBRan := make(chan struct{}, 1)
+
+	// dep-a always fails.
+	_, err := s.Delay("dep-a", 10*time.Millisecond, func(ctx context.Context) error {
+		depRan <- struct{}{}
+		return depErr
+	}, WithRetryPolicy(RetryPolicy{MaxAttempts: 1}))
+	if err != nil {
+		t.Fatalf("dep-a: %v", err)
+	}
+
+	// dep-b continues even when dep-a fails.
+	_, err = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+		depBRan <- struct{}{}
+		return nil
+	}, WithDependsOn(DependencyFailureContinue, "dep-a"))
+	if err != nil {
+		t.Fatalf("dep-b: %v", err)
+	}
+
+	// Wait for dep-a to run.
+	select {
+	case <-depRan:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dep-a did not run")
+	}
+	// Wait for dep-b to run (Continue policy should allow it).
+	select {
+	case <-depBRan:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dep-b did not run after dep-a failed with DependencyFailureContinue")
+	}
+
+	// dep-a's status must remain false (failed), NOT been poisoned to true.
+	time.Sleep(50 * time.Millisecond) // let execute() finish updating state
+	s.mu.RLock()
+	status, ok := s.dependencyStatus["dep-a"]
+	s.mu.RUnlock()
+	if ok && status {
+		t.Fatal("DependencyFailureContinue incorrectly set dependencyStatus[dep-a] = true")
+	}
+}
+
+// TestDependencyFailureSkipDelayJobMarkedFailed verifies that a delay job
+// waiting on a dependency that fails with the Skip policy is marked as failed
+// rather than left in limbo (Bug #3).
+// ─── Fix regression tests (round 6) ──────────────────────────────────────────
+
+// TestCronDOWOnlySchedule verifies that a cron expression with a restricted
+// day-of-week and a wildcard day-of-month fires only on the specified weekday,
+// not every day. ("0 0 * * 0" must produce Sundays only, not daily.)
+func TestCronDOWOnlySchedule(t *testing.T) {
+	// Start from a known Wednesday, 2025-01-08 00:00:00 UTC
+	base := time.Date(2025, 1, 8, 0, 0, 0, 0, time.UTC) // Wednesday
+
+	spec, err := ParseCronSpec("0 0 * * 0") // midnight every Sunday
+	if err != nil {
+		t.Fatalf("ParseCronSpec: %v", err)
+	}
+
+	next := spec.Next(base)
+	// Next Sunday from Wed 8 Jan is 12 Jan
+	want := time.Date(2025, 1, 12, 0, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Fatalf("expected next Sunday %v, got %v", want, next)
+	}
+	// Second call must jump to the following Sunday (19 Jan), not the next day.
+	next2 := spec.Next(next)
+	want2 := time.Date(2025, 1, 19, 0, 0, 0, 0, time.UTC)
+	if !next2.Equal(want2) {
+		t.Fatalf("expected second Sunday %v, got %v", want2, next2)
+	}
+}
+
+// TestCronDOMOnlySchedule verifies that a restricted day-of-month with a
+// wildcard day-of-week fires only on that calendar day, not every weekday.
+// ("0 9 15 * *" must produce the 15th of each month only.)
+func TestCronDOMOnlySchedule(t *testing.T) {
+	// Start from 14 Jan 2025 (Tuesday).
+	base := time.Date(2025, 1, 14, 9, 0, 0, 0, time.UTC)
+
+	spec, err := ParseCronSpec("0 9 15 * *") // 9 AM on the 15th of every month
+	if err != nil {
+		t.Fatalf("ParseCronSpec: %v", err)
+	}
+
+	next := spec.Next(base)
+	want := time.Date(2025, 1, 15, 9, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Fatalf("expected 15 Jan 09:00, got %v", next)
+	}
+	// Next after the 15th should be 15 Feb.
+	next2 := spec.Next(next)
+	want2 := time.Date(2025, 2, 15, 9, 0, 0, 0, time.UTC)
+	if !next2.Equal(want2) {
+		t.Fatalf("expected 15 Feb 09:00, got %v", next2)
+	}
+}
+
+// TestCronBothDOMAndDOWRestricted verifies OR semantics when both DOM and DOW
+// are restricted (Vixie cron: "30 4 1,15 * 5" fires on the 1st, 15th, and
+// every Friday).
+func TestCronBothDOMAndDOWRestricted(t *testing.T) {
+	spec, err := ParseCronSpec("30 4 1,15 * 5") // 04:30 on 1st, 15th, or any Friday
+	if err != nil {
+		t.Fatalf("ParseCronSpec: %v", err)
+	}
+
+	// 2025-01-01 is a Wednesday — next match should be Friday 3 Jan (DOW=5).
+	base := time.Date(2025, 1, 1, 5, 0, 0, 0, time.UTC)
+	next := spec.Next(base)
+	if next.Day() != 3 || next.Weekday() != time.Friday {
+		t.Fatalf("expected Friday 3 Jan, got %v", next)
+	}
+}
+
+// TestMaxRunsPreservesCompletedState verifies that when WithMaxRuns is reached
+// the job ends up in JobStateCompleted (not JobStateCanceled), and that a
+// dependent job is triggered as a successful completion.
+func TestMaxRunsPreservesCompletedState(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	var runs atomic.Int32
+	_, err := s.AddCron("limited", "@every 20ms", func(ctx context.Context) error {
+		runs.Add(1)
+		return nil
+	}, WithMaxRuns(2))
+	if err != nil {
+		t.Fatalf("AddCron: %v", err)
+	}
+
+	time.Sleep(300 * time.Millisecond)
+
+	status, ok := s.Status("limited")
+	if !ok {
+		t.Fatal("job not found after MaxRuns")
+	}
+	if status.State != JobStateCompleted {
+		t.Fatalf("expected state=completed after MaxRuns, got %s", status.State)
+	}
+	if runs.Load() < 2 {
+		t.Fatalf("expected at least 2 runs, got %d", runs.Load())
+	}
+}
+
+// TestMaxRunsTriggersDependents verifies that when a job hits MaxRuns its
+// dependents are triggered as a SUCCESS, not as a cancellation failure.
+func TestMaxRunsTriggersDependents(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	_, _ = s.AddCron("producer", "@every 20ms", func(ctx context.Context) error {
+		return nil
+	}, WithMaxRuns(1))
+
+	var consumerRan atomic.Int32
+	_, _ = s.Delay("consumer", 0, func(ctx context.Context) error {
+		consumerRan.Add(1)
+		return nil
+	}, WithDependsOn(DependencyFailureCancel, "producer"))
+
+	time.Sleep(300 * time.Millisecond)
+
+	if consumerRan.Load() != 1 {
+		t.Fatalf("expected consumer to run once after producer hit MaxRuns, ran %d times", consumerRan.Load())
+	}
+}
+
+// ─── Fix regression tests (round 5) ──────────────────────────────────────────
+
+// TestCancelDependencyNotifiesDependents verifies that canceling a job that
+// other jobs are waiting for applies DependencyFailurePolicy rather than
+// leaving the dependents in limbo indefinitely.
+func TestCancelDependencyNotifiesDependents(t *testing.T) {
+	t.Run("policy=Cancel", func(t *testing.T) {
+		s := New(WithWorkers(2))
+		s.Start()
+		defer func() { _ = s.Stop(context.Background()) }()
+
+		block := make(chan struct{})
+		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
+		var bRan atomic.Int32
+		_, _ = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+			bRan.Add(1)
+			return nil
+		}, WithDependsOn(DependencyFailureCancel, "dep-a"))
+
+		s.Cancel("dep-a")
+		close(block)
+		time.Sleep(150 * time.Millisecond)
+
+		if bRan.Load() != 0 {
+			t.Fatal("dep-b should not run when dependency is canceled (Cancel policy)")
+		}
+		status, ok := s.Status("dep-b")
+		if !ok || status.State != JobStateCanceled {
+			t.Fatalf("expected dep-b state=canceled, got state=%s ok=%v", status.State, ok)
+		}
+	})
+
+	t.Run("policy=Skip_delay", func(t *testing.T) {
+		s := New(WithWorkers(2))
+		s.Start()
+		defer func() { _ = s.Stop(context.Background()) }()
+
+		block := make(chan struct{})
+		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
+		var bRan atomic.Int32
+		_, _ = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+			bRan.Add(1)
+			return nil
+		}, WithDependsOn(DependencyFailureSkip, "dep-a"))
+
+		s.Cancel("dep-a")
+		close(block)
+		time.Sleep(150 * time.Millisecond)
+
+		if bRan.Load() != 0 {
+			t.Fatal("dep-b should not run when dependency is canceled (Skip policy)")
+		}
+		status, ok := s.Status("dep-b")
+		if !ok {
+			return // cleaned up from s.jobs, acceptable
+		}
+		if status.State != JobStateFailed {
+			t.Fatalf("expected dep-b state=failed, got %s", status.State)
+		}
+	})
+
+	t.Run("policy=Continue", func(t *testing.T) {
+		s := New(WithWorkers(2))
+		s.Start()
+		defer func() { _ = s.Stop(context.Background()) }()
+
+		block := make(chan struct{})
+		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
+		var bRan atomic.Int32
+		_, _ = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+			bRan.Add(1)
+			return nil
+		}, WithDependsOn(DependencyFailureContinue, "dep-a"))
+
+		s.Cancel("dep-a")
+		close(block)
+		time.Sleep(150 * time.Millisecond)
+
+		if bRan.Load() != 1 {
+			t.Fatalf("expected dep-b to run once (Continue policy), ran %d times", bRan.Load())
+		}
+	})
+}
+
+// ─── Fix regression tests (round 4) ──────────────────────────────────────────
+
+// TestTriggerNowCompletedDelayJob verifies that TriggerNow returns an error
+// when called on a delay job that has already completed (one-shot semantics).
+func TestTriggerNowCompletedDelayJob(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	done := make(chan struct{})
+	_, err := s.Delay("one-shot", 0, func(ctx context.Context) error {
+		close(done)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Delay: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("one-shot job did not complete in time")
+	}
+	// Allow state transition to propagate.
+	time.Sleep(20 * time.Millisecond)
+
+	if err := s.TriggerNow("one-shot"); err == nil {
+		t.Fatal("expected error when calling TriggerNow on a completed delay job")
+	}
+}
+
+// TestBackpressureReleasesRunningFlag verifies that when a job with SerialQueue
+// overlap policy is dropped due to backpressure, the running flag is released
+// so the job can be dispatched again on its next cycle.
+func TestBackpressureReleasesRunningFlag(t *testing.T) {
+	// Block the single worker so the queue fills immediately.
+	block := make(chan struct{})
+	s := New(WithWorkers(1), WithQueueSize(1), WithBackpressure(BackpressureConfig{Policy: BackpressureDrop}))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	blocker := make(chan struct{})
+	_, err := s.Delay("blocker", 0, func(ctx context.Context) error {
+		close(blocker)
+		// Block until the test releases us or the scheduler shuts down.
+		select {
+		case <-block:
+		case <-ctx.Done():
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Delay blocker: %v", err)
+	}
+
+	// Wait until blocker is actually running, occupying the one worker slot.
+	select {
+	case <-blocker:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("blocker did not start")
+	}
+
+	// Now add a SerialQueue cron job whose first dispatch will hit backpressure.
+	var runs atomic.Int32
+	_, err = s.AddCron("serial-job", "@every 20ms", func(ctx context.Context) error {
+		runs.Add(1)
+		return nil
+	}, WithOverlapPolicy(SerialQueue))
+	if err != nil {
+		t.Fatalf("AddCron: %v", err)
+	}
+
+	// Unblock the worker; serial-job should now be dispatchable.
+	close(block)
+
+	time.Sleep(200 * time.Millisecond)
+	if runs.Load() == 0 {
+		t.Fatal("serial-job never executed after backpressure was released; running flag may be stuck")
+	}
+}
+
+// TestDLQDeleteRemovesFromOrderSlice verifies that Delete() keeps the order
+// slice compact so that FIFO eviction remains efficient and memory is freed.
+func TestDLQDeleteRemovesFromOrderSlice(t *testing.T) {
+	q := NewDeadLetterQueue(10)
+
+	for i := 0; i < 5; i++ {
+		q.Add(DeadLetterEntry{
+			JobID:       JobID(fmt.Sprintf("job-%d", i)),
+			FirstFailed: time.Now(),
+			LastFailed:  time.Now(),
+		})
+	}
+
+	q.Delete("job-2")
+
+	// The order slice should now have 4 elements, not 5.
+	q.mu.RLock()
+	orderLen := len(q.order)
+	q.mu.RUnlock()
+	if orderLen != 4 {
+		t.Fatalf("expected order slice length 4 after Delete, got %d", orderLen)
+	}
+	if q.Size() != 4 {
+		t.Fatalf("expected DLQ size 4, got %d", q.Size())
+	}
+}
+
+// TestLoadPersistedTwoPass verifies that jobs with dependencies are correctly
+// restored from a persistent store even if they are listed before their
+// dependency targets.
+func TestLoadPersistedTwoPass(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Persist dep-b (depends on dep-a) BEFORE dep-a so that a naive
+	// single-pass loader would fail (dep-a not yet registered).
+	_ = store.Save(StoredJob{
+		ID:               "dep-b",
+		TaskName:         "task-b",
+		RunAt:            time.Now().Add(10 * time.Millisecond),
+		Dependencies:     []JobID{"dep-a"},
+		DependencyPolicy: DependencyFailureSkip,
+	})
+	_ = store.Save(StoredJob{
+		ID:       "dep-a",
+		TaskName: "task-a",
+		RunAt:    time.Now().Add(10 * time.Millisecond),
+	})
+
+	var aRan, bRan atomic.Int32
+	s := New(WithWorkers(2), WithStore(store))
+	if err := s.RegisterTask("task-a", func(ctx context.Context) error { aRan.Add(1); return nil }); err != nil {
+		t.Fatalf("RegisterTask task-a: %v", err)
+	}
+	if err := s.RegisterTask("task-b", func(ctx context.Context) error { bRan.Add(1); return nil }); err != nil {
+		t.Fatalf("RegisterTask task-b: %v", err)
+	}
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	time.Sleep(300 * time.Millisecond)
+
+	if aRan.Load() == 0 {
+		t.Fatal("dep-a (no dependencies) was not restored and executed")
+	}
+	if bRan.Load() == 0 {
+		t.Fatal("dep-b (with dep-a dependency) was not restored and executed")
+	}
+}
+
+func TestDependencyFailureSkipDelayJobMarkedFailed(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	depRan := make(chan struct{}, 1)
+
+	// dep-a always fails.
+	_, err := s.Delay("dep-a", 10*time.Millisecond, func(ctx context.Context) error {
+		depRan <- struct{}{}
+		return errors.New("dep failure")
+	}, WithRetryPolicy(RetryPolicy{MaxAttempts: 1}))
+	if err != nil {
+		t.Fatalf("dep-a: %v", err)
+	}
+
+	// dep-b skips execution when dep-a fails.
+	executed := make(chan struct{}, 1)
+	_, err = s.Delay("dep-b", 10*time.Millisecond, func(ctx context.Context) error {
+		executed <- struct{}{}
+		return nil
+	}, WithDependsOn(DependencyFailureSkip, "dep-a"))
+	if err != nil {
+		t.Fatalf("dep-b: %v", err)
+	}
+
+	// Wait for dep-a to run.
+	select {
+	case <-depRan:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dep-a did not run")
+	}
+
+	// dep-b must NOT execute.
+	select {
+	case <-executed:
+		t.Fatal("dep-b should not have executed when DependencyFailureSkip")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	// dep-b must be marked as failed (not limbo).
+	time.Sleep(50 * time.Millisecond)
+	status, ok := s.Status("dep-b")
+	if !ok {
+		// If the job was cleaned up from s.jobs that is also acceptable.
+		return
+	}
+	if status.State != JobStateFailed {
+		t.Fatalf("expected dep-b state=failed, got %s", status.State)
+	}
+}
+
+// TestDependencyRunsAfterDependencyRetrySuccess verifies that a dependent job
+// is NOT notified of failure on the first failed attempt of its dependency.
+// If the dependency eventually succeeds (on a retry), the dependent must execute.
+func TestDependencyRunsAfterDependencyRetrySuccess(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	var attempt atomic.Int32
+
+	// dep-a fails on attempt 1 and succeeds on attempt 2.
+	depRan := make(chan struct{}, 1)
+	_, err := s.Delay("dep-a", 0, func(ctx context.Context) error {
+		n := attempt.Add(1)
+		if n == 1 {
+			return errors.New("transient error")
+		}
+		depRan <- struct{}{}
+		return nil
+	}, WithRetryPolicy(RetryPolicy{MaxAttempts: 2, Backoff: func(int) time.Duration { return 10 * time.Millisecond }}))
+	if err != nil {
+		t.Fatalf("dep-a: %v", err)
+	}
+
+	// dep-b depends on dep-a. It should run after dep-a succeeds on retry.
+	executed := make(chan struct{}, 1)
+	_, err = s.Delay("dep-b", 0, func(ctx context.Context) error {
+		executed <- struct{}{}
+		return nil
+	}, WithDependsOn(DependencyFailureContinue, "dep-a"))
+	if err != nil {
+		t.Fatalf("dep-b: %v", err)
+	}
+
+	// Wait for dep-a to complete (including retry).
+	select {
+	case <-depRan:
+	case <-time.After(2 * time.Second):
+		t.Fatal("dep-a did not succeed within timeout")
+	}
+
+	// dep-b must execute because dep-a ultimately succeeded.
+	select {
+	case <-executed:
+		// Good: dependent ran after dependency succeeded on retry.
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dep-b did not execute after dep-a succeeded on retry")
+	}
+}
