@@ -460,27 +460,29 @@ func (ops *OrderedPubSub) Close() error {
 		return nil
 	}
 
-	// Stop workers
+	// Cancel the context first so workers exit via ctx.Done().
+	// We intentionally do NOT close individual queue channels here: PublishWithKey
+	// uses a non-blocking select with case queue.ch <- om, and sending to a closed
+	// channel panics in Go even when a default case is present.  Workers drain
+	// their in-flight batch on ctx.Done() and exit cleanly without a channel close.
 	ops.cancel()
 
-	// Close all queues
+	// Mark queues closed so PublishWithKey returns ErrOrderingClosed for any
+	// concurrent callers that already passed the ops.closed check.
 	ops.topicQueuesMu.Lock()
 	for _, queue := range ops.topicQueues {
 		queue.closed.Store(true)
-		close(queue.ch)
 	}
 	ops.topicQueuesMu.Unlock()
 
 	ops.keyQueuesMu.Lock()
 	for _, queue := range ops.keyQueues {
 		queue.closed.Store(true)
-		close(queue.ch)
 	}
 	ops.keyQueuesMu.Unlock()
 
 	if ops.globalQueue != nil {
 		ops.globalQueue.closed.Store(true)
-		close(ops.globalQueue.ch)
 	}
 
 	// Wait for workers
