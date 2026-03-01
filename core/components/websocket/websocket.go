@@ -72,7 +72,10 @@ const minWebSocketSecretLen = 32
 
 func NewComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*WebSocketComponent, error) {
 	if len(cfg.Secret) < minWebSocketSecretLen {
-		return nil, fmt.Errorf("websocket secret must be at least %d bytes", minWebSocketSecretLen)
+		return nil, fmt.Errorf(
+			"websocket secret must be at least %d bytes (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)",
+			minWebSocketSecretLen,
+		)
 	}
 
 	hub := ws.NewHubWithConfig(ws.HubConfig{

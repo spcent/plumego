@@ -75,6 +75,14 @@ type InProcBroker struct {
 	txManager          *transactionManager
 	deadLetterManager  *deadLetterManager
 	persistenceManager *persistenceManager
+
+	// cachedMemUsage stores the most recent memory usage reading.
+	// Updated by a background goroutine to avoid STW on every Publish.
+	cachedMemUsage atomic.Uint64
+	memSamplerDone chan struct{}
+
+	// consumerGroupMgr is lazily initialized for InProcPubSub backends.
+	consumerGroupMgr *pubsub.ConsumerGroupManager
 }
 
 // Option configures the broker.
@@ -193,19 +201,48 @@ func (b *InProcBroker) validateTTL(expiresAt time.Time) error {
 // NewInProcBroker wraps the in-process pubsub implementation.
 //
 // Panics if configuration is invalid or persistence initialization fails.
-// Use Config.Validate() beforehand if you need to handle errors gracefully.
+// Use NewInProcBrokerE to receive an error instead of a panic.
 func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
+	broker, err := newInProcBroker(ps, opts...)
+	if err != nil {
+		panic(err.Error())
+	}
+	return broker
+}
+
+// NewInProcBrokerE creates a broker and returns an error instead of panicking
+// on invalid configuration or persistence initialization failures.
+func NewInProcBrokerE(ps pubsub.PubSub, opts ...Option) (*InProcBroker, error) {
+	return newInProcBroker(ps, opts...)
+}
+
+// newInProcBroker is the shared constructor for NewInProcBroker and NewInProcBrokerE.
+func newInProcBroker(ps pubsub.PubSub, opts ...Option) (_ *InProcBroker, retErr error) {
 	if ps == nil {
 		ps = pubsub.New()
 	}
 	broker := &InProcBroker{
-		ps:        ps,
-		config:    DefaultConfig(),
-		startTime: time.Now(),
+		ps:             ps,
+		config:         DefaultConfig(),
+		startTime:      time.Now(),
+		memSamplerDone: make(chan struct{}),
 	}
+
+	// Apply options; capture any panic as an error.
 	for _, opt := range opts {
-		if opt != nil {
+		if opt == nil {
+			continue
+		}
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					retErr = fmt.Errorf("broker option failed: %v", r)
+				}
+			}()
 			opt(broker)
+		}()
+		if retErr != nil {
+			return nil, retErr
 		}
 	}
 
@@ -232,16 +269,56 @@ func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
 	// Initialize persistenceManager if persistence is enabled
 	if broker.config.EnablePersistence {
 		if broker.config.PersistencePath == "" {
-			panic(fmt.Sprintf("invalid broker config: PersistencePath is required when persistence is enabled"))
+			return nil, fmt.Errorf("invalid broker config: PersistencePath is required when persistence is enabled")
 		}
 		backend, err := NewKVPersistence(broker.config.PersistencePath)
 		if err != nil {
-			panic(fmt.Sprintf("failed to initialize persistence: %v", err))
+			return nil, fmt.Errorf("failed to initialize persistence: %w", err)
 		}
 		broker.persistenceManager = newPersistenceManager(broker, backend)
 	}
 
-	return broker
+	// Initialize consumer group manager for InProcPubSub backends.
+	if inproc, ok := ps.(*pubsub.InProcPubSub); ok {
+		broker.consumerGroupMgr = pubsub.NewConsumerGroupManager(inproc)
+	}
+
+	// Start background memory sampler only when a memory limit is configured.
+	// This avoids STW pauses from runtime.ReadMemStats on every Publish call.
+	// Perform an initial synchronous sample so callers see a non-zero value
+	// immediately after construction without waiting for the first tick.
+	if broker.config.MaxMemoryUsage > 0 {
+		broker.sampleMemory()
+		broker.startMemSampler()
+	}
+
+	return broker, nil
+}
+
+// startMemSampler launches a goroutine that periodically samples memory usage
+// and caches the result in cachedMemUsage. Interval: 5s.
+func (b *InProcBroker) startMemSampler() {
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		// Sample once immediately so the cache is populated before first Publish.
+		b.sampleMemory()
+		for {
+			select {
+			case <-ticker.C:
+				b.sampleMemory()
+			case <-b.memSamplerDone:
+				return
+			}
+		}
+	}()
+}
+
+// sampleMemory reads current memory stats and stores them in cachedMemUsage.
+func (b *InProcBroker) sampleMemory() {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	b.cachedMemUsage.Store(ms.Alloc)
 }
 
 // executeWithObservability wraps an operation with observability logic.
@@ -292,49 +369,31 @@ func (b *InProcBroker) Publish(ctx context.Context, topic string, msg Message) e
 // PublishBatch sends multiple messages to a topic in a single operation.
 func (b *InProcBroker) PublishBatch(ctx context.Context, topic string, msgs []Message) error {
 	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
-		// Validate context
-		if ctx != nil {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-		}
-
-		// Validate broker initialization
-		if b == nil || b.ps == nil {
-			return ErrNotInitialized
-		}
-
-		// Validate topic
-		if err := validateTopic(topic); err != nil {
+		if err := b.validatePublishOperation(ctx, topic, nil); err != nil {
 			return err
 		}
 
-		// Validate and filter messages
-		validMsgs := make([]Message, 0, len(msgs))
-		for _, msg := range msgs {
-			if err := validateMessage(msg); err != nil {
+		// Validate each message up-front before touching persistence or pubsub.
+		for i := range msgs {
+			if err := validateMessage(msgs[i]); err != nil {
 				return err
 			}
-			validMsgs = append(validMsgs, msg)
 		}
 
-		// Check memory limit
 		if err := b.checkMemoryLimit(); err != nil {
 			return err
 		}
 
-		// Persist messages if persistence is enabled
+		// Persist messages if persistence is enabled.
 		if b.config.EnablePersistence && b.persistenceManager != nil {
-			for _, msg := range validMsgs {
+			for _, msg := range msgs {
 				if err := b.persistenceManager.saveMessage(ctx, topic, msg); err != nil {
-					// Log error but don't fail the publish
 					b.lastError = fmt.Errorf("failed to persist message: %w", err)
 				}
 			}
 		}
 
-		// Publish all valid messages
-		for _, msg := range validMsgs {
+		for _, msg := range msgs {
 			if err := b.ps.Publish(topic, msg); err != nil {
 				return err
 			}
@@ -349,32 +408,16 @@ func (b *InProcBroker) SubscribeBatch(ctx context.Context, topics []string, opts
 	var subs []Subscription
 
 	err := b.executeWithObservability(ctx, OpSubscribe, "", func() error {
-		// Validate context
-		if ctx != nil {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-		}
-
-		// Validate broker initialization
-		if b == nil || b.ps == nil {
-			return ErrNotInitialized
-		}
-
-		// Subscribe to each topic
 		for _, topic := range topics {
-			if err := validateTopic(topic); err != nil {
+			if err := b.validateSubscribeOperation(ctx, topic); err != nil {
 				return err
 			}
-
 			sub, err := b.ps.Subscribe(topic, opts)
 			if err != nil {
 				return err
 			}
-
 			subs = append(subs, sub)
 		}
-
 		return nil
 	})
 
@@ -424,40 +467,33 @@ func (b *InProcBroker) Subscribe(ctx context.Context, topic string, opts SubOpti
 	return sub, err
 }
 
-// checkMemoryLimit checks if memory usage exceeds the configured limit.
+// checkMemoryLimit checks if cached memory usage exceeds the configured limit.
+// The cache is updated by a background goroutine every 5 seconds to avoid
+// runtime.ReadMemStats STW pauses on every Publish call.
 func (b *InProcBroker) checkMemoryLimit() error {
 	if b.config.MaxMemoryUsage == 0 {
 		return nil // No limit configured
 	}
-
-	// Get current memory usage from runtime
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	// Check if total allocated memory exceeds limit
-	if memStats.Alloc > b.config.MaxMemoryUsage {
+	usage := b.cachedMemUsage.Load()
+	if usage > b.config.MaxMemoryUsage {
 		return fmt.Errorf("%w: memory usage %d bytes exceeds limit %d bytes",
-			ErrMemoryLimitExceeded, memStats.Alloc, b.config.MaxMemoryUsage)
+			ErrMemoryLimitExceeded, usage, b.config.MaxMemoryUsage)
 	}
-
 	return nil
 }
 
-// GetMemoryUsage returns current memory usage in bytes.
+// GetMemoryUsage returns the most recently sampled memory usage in bytes.
+// When no memory limit is configured the value is always 0; call
+// runtime.ReadMemStats directly for an exact on-demand reading.
 func (b *InProcBroker) GetMemoryUsage() uint64 {
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-	return memStats.Alloc
+	return b.cachedMemUsage.Load()
 }
 
 // redeliverMessage re-publishes a message that failed acknowledgment.
-func (b *InProcBroker) redeliverMessage(entry *ackEntry) error {
+func (b *InProcBroker) redeliverMessage(ctx context.Context, entry *ackEntry) error {
 	if b == nil || b.ps == nil {
 		return ErrNotInitialized
 	}
-
-	// Re-publish the message to the same topic
-	ctx := context.Background()
 	return b.Publish(ctx, entry.topic, entry.message)
 }
 
@@ -496,14 +532,13 @@ func (b *InProcBroker) PublishToCluster(ctx context.Context, topic string, msg M
 			return err
 		}
 
-		// TODO: Implement cluster replication logic
-		// This would:
-		// 1. Replicate message to other cluster nodes
-		// 2. Wait for acknowledgments from replicas
-		// 3. Handle replication failures
-		// 4. Maintain consistency across nodes
+		// Delegate to DistributedPubSub when available so the message
+		// is broadcast to all cluster nodes, not just the local instance.
+		if cp, ok := b.ps.(ClusterPublisher); ok {
+			return cp.PublishGlobal(topic, msg)
+		}
 
-		// For now, just publish locally
+		// Fallback: local-only publish (no actual peer replication).
 		return b.ps.Publish(topic, msg)
 	})
 }
@@ -547,42 +582,22 @@ func (b *InProcBroker) SubscribeFromCluster(ctx context.Context, topic string, o
 	return sub, err
 }
 
-// StartMQTTServer starts the MQTT protocol server.
+// StartMQTTServer is not implemented. MQTT protocol bridging is planned but
+// not yet available. Callers should not set EnableMQTT in Config.
 func (b *InProcBroker) StartMQTTServer() error {
 	if b == nil {
 		return ErrNotInitialized
 	}
-
-	if !b.config.EnableMQTT {
-		return fmt.Errorf("%w: MQTT support is disabled", ErrInvalidConfig)
-	}
-
-	// TODO: Implement MQTT server
-	// This would:
-	// 1. Start MQTT broker on configured port
-	// 2. Handle MQTT protocol (CONNECT, PUBLISH, SUBSCRIBE, etc.)
-	// 3. Bridge MQTT messages to internal pubsub
-
-	return nil
+	return fmt.Errorf("%w: MQTT protocol server is not implemented", ErrNotImplemented)
 }
 
-// StartAMQPServer starts the AMQP protocol server.
+// StartAMQPServer is not implemented. AMQP protocol bridging is planned but
+// not yet available. Callers should not set EnableAMQP in Config.
 func (b *InProcBroker) StartAMQPServer() error {
 	if b == nil {
 		return ErrNotInitialized
 	}
-
-	if !b.config.EnableAMQP {
-		return fmt.Errorf("%w: AMQP support is disabled", ErrInvalidConfig)
-	}
-
-	// TODO: Implement AMQP server
-	// This would:
-	// 1. Start AMQP broker on configured port
-	// 2. Handle AMQP protocol (channel, exchange, queue, etc.)
-	// 3. Bridge AMQP messages to internal pubsub
-
-	return nil
+	return fmt.Errorf("%w: AMQP protocol server is not implemented", ErrNotImplemented)
 }
 
 // RecoverMessages recovers persisted messages for a topic.
@@ -628,6 +643,17 @@ func (b *InProcBroker) Close() error {
 		if b == nil || b.ps == nil {
 			return nil // Close is idempotent
 		}
+
+		// Stop background memory sampler if it was started.
+		if b.memSamplerDone != nil {
+			select {
+			case <-b.memSamplerDone:
+				// already closed
+			default:
+				close(b.memSamplerDone)
+			}
+		}
+
 		b.closePriorityDispatchers()
 
 		// Close ack tracker if it exists
@@ -689,4 +715,14 @@ func (b *InProcBroker) observe(ctx context.Context, op Operation, topic string, 
 		// Use the unified interface
 		b.metrics.ObserveMQ(ctx, string(op), topic, duration, err, panicked)
 	}()
+}
+
+// ConsumerGroupManager returns the consumer group manager for the underlying
+// InProcPubSub backend. Returns nil when the backend does not support consumer
+// groups (e.g. a custom pubsub.PubSub implementation).
+func (b *InProcBroker) ConsumerGroupManager() *pubsub.ConsumerGroupManager {
+	if b == nil {
+		return nil
+	}
+	return b.consumerGroupMgr
 }

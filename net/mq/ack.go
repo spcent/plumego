@@ -132,7 +132,7 @@ func (at *ackTracker) handleTimeout(ackID string) {
 
 	if shouldRetry {
 		// Retry: re-publish the message
-		if err := at.broker.redeliverMessage(entry); err != nil {
+		if err := at.broker.redeliverMessage(context.Background(), entry); err != nil {
 			// If retry fails, send to dead letter queue
 			if at.broker.config.EnableDeadLetterQueue {
 				_ = at.broker.PublishToDeadLetter(
@@ -367,7 +367,7 @@ func (b *InProcBroker) Nack(ctx context.Context, topic string, messageID string)
 		}
 
 		// Immediately redeliver the message
-		if err := b.redeliverMessage(entry); err != nil {
+		if err := b.redeliverMessage(ctx, entry); err != nil {
 			return fmt.Errorf("failed to redeliver message: %w", err)
 		}
 

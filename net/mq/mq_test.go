@@ -927,16 +927,16 @@ func TestInProcBrokerProtocolSupport(t *testing.T) {
 		t.Fatalf("expected AMQPPort to be 5672, got %d", updatedCfg2.AMQPPort)
 	}
 
-	// Test starting MQTT server (should succeed even though not fully implemented)
+	// MQTT and AMQP servers are not yet implemented; expect ErrNotImplemented
+	// regardless of whether the protocol is enabled in config.
 	err := broker.StartMQTTServer()
-	if err != nil {
-		t.Fatalf("start MQTT server error: %v", err)
+	if !errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("expected ErrNotImplemented from StartMQTTServer, got %v", err)
 	}
 
-	// Test starting AMQP server (should succeed even though not fully implemented)
 	err = broker2.StartAMQPServer()
-	if err != nil {
-		t.Fatalf("start AMQP server error: %v", err)
+	if !errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("expected ErrNotImplemented from StartAMQPServer, got %v", err)
 	}
 }
 
@@ -1017,16 +1017,16 @@ func TestInProcBrokerProtocolDisabled(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	// Test MQTT server when disabled
+	// Both MQTT and AMQP return ErrNotImplemented regardless of config,
+	// because the protocol servers are not yet implemented.
 	err := broker.StartMQTTServer()
-	if !errors.Is(err, ErrInvalidConfig) {
-		t.Fatalf("expected ErrInvalidConfig for disabled MQTT, got %v", err)
+	if !errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("expected ErrNotImplemented for StartMQTTServer, got %v", err)
 	}
 
-	// Test AMQP server when disabled
 	err = broker.StartAMQPServer()
-	if !errors.Is(err, ErrInvalidConfig) {
-		t.Fatalf("expected ErrInvalidConfig for disabled AMQP, got %v", err)
+	if !errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("expected ErrNotImplemented for StartAMQPServer, got %v", err)
 	}
 }
 
