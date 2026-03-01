@@ -379,11 +379,12 @@ func (bpc *BackpressureController) slowStartWorker() {
 	for {
 		select {
 		case <-ticker.C:
+			bpc.slowStartMu.Lock()
+
 			if !bpc.slowStart {
+				bpc.slowStartMu.Unlock()
 				continue
 			}
-
-			bpc.slowStartMu.Lock()
 
 			// Check if we're under pressure
 			if bpc.stats.ActivePressure.Load() {

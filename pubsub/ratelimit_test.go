@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -240,9 +241,9 @@ func TestRateLimitedPubSub_ConcurrentPublish(t *testing.T) {
 			for j := 0; j < messagesPerGoroutine; j++ {
 				msg := Message{Data: j}
 				if err := rlps.Publish("concurrent", msg); err == ErrRateLimitExceeded {
-					denied++
+					atomic.AddInt32(&denied, 1)
 				} else if err == nil {
-					allowed++
+					atomic.AddInt32(&allowed, 1)
 				}
 			}
 		}()

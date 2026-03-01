@@ -122,6 +122,10 @@ type groupConsumer struct {
 	heartbeatMu    sync.Mutex
 	messageChannel chan Message
 	closed         atomic.Bool
+
+	// Per-consumer context used to signal the dispatcher goroutine to exit.
+	cancel       context.CancelFunc
+	dispatchDone chan struct{}
 }
 
 // NewConsumerGroupManager creates a new consumer group manager
@@ -213,6 +217,7 @@ func (cgm *ConsumerGroupManager) JoinGroup(groupID, consumerID string, topics []
 		return nil, err
 	}
 
+	consumerCtx, cancel := context.WithCancel(context.Background())
 	consumer := &groupConsumer{
 		id:             consumerID,
 		group:          group,
@@ -221,6 +226,8 @@ func (cgm *ConsumerGroupManager) JoinGroup(groupID, consumerID string, topics []
 		subscription:   sub,
 		lastHeartbeat:  time.Now(),
 		messageChannel: make(chan Message, 100),
+		cancel:         cancel,
+		dispatchDone:   make(chan struct{}),
 	}
 
 	group.consumers[consumerID] = consumer
@@ -229,7 +236,7 @@ func (cgm *ConsumerGroupManager) JoinGroup(groupID, consumerID string, topics []
 	go group.triggerRebalance()
 
 	// Start message dispatcher
-	consumer.startDispatcher()
+	consumer.startDispatcher(consumerCtx)
 
 	return consumer, nil
 }
@@ -718,12 +725,20 @@ func (gc *groupConsumer) Close() {
 		gc.subscription.Cancel()
 	}
 
+	// Signal the dispatcher goroutine to exit and wait for it to finish
+	// before closing messageChannel to prevent a send-on-closed-channel panic.
+	gc.cancel()
+	<-gc.dispatchDone
+
 	close(gc.messageChannel)
 }
 
-// startDispatcher starts the message dispatcher for this consumer
-func (gc *groupConsumer) startDispatcher() {
+// startDispatcher starts the message dispatcher for this consumer.
+// ctx is the per-consumer context; when it is cancelled (via Close) the
+// goroutine exits cleanly before messageChannel is closed.
+func (gc *groupConsumer) startDispatcher(ctx context.Context) {
 	go func() {
+		defer close(gc.dispatchDone)
 		for {
 			select {
 			case msg, ok := <-gc.subscription.C():
@@ -735,11 +750,15 @@ func (gc *groupConsumer) startDispatcher() {
 				if gc.shouldProcess(msg) {
 					select {
 					case gc.messageChannel <- msg:
+					case <-ctx.Done():
+						return
 					case <-gc.group.ctx.Done():
 						return
 					}
 				}
 
+			case <-ctx.Done():
+				return
 			case <-gc.group.ctx.Done():
 				return
 			}
