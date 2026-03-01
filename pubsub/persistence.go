@@ -111,6 +111,7 @@ type PersistentPubSub struct {
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
 	closed     atomic.Bool
+	walRotating atomic.Bool // guards against concurrent rotateWAL goroutines
 
 	// Metrics
 	walWrites      atomic.Uint64
@@ -532,10 +533,15 @@ func (pps *PersistentPubSub) writeWAL(topic string, msg Message, durability Dura
 		// Will be flushed by background worker
 	}
 
-	// Check if rotation needed
+	// Check if rotation needed; use CAS to ensure at most one goroutine rotates.
 	pps.walSize.Add(int64(4 + len(entryData)))
 	if pps.walSize.Load() >= pps.config.WALSegmentSize {
-		go pps.rotateWAL()
+		if pps.walRotating.CompareAndSwap(false, true) {
+			go func() {
+				pps.rotateWAL()
+				pps.walRotating.Store(false)
+			}()
+		}
 	}
 
 	return nil

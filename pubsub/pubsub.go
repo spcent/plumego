@@ -50,6 +50,7 @@ type subscriber struct {
 
 type patternSnapshot struct {
 	pattern string
+	isGlob  bool // true when pattern contains glob metacharacters (*?[]\\)
 	subs    []*subscriber
 }
 
@@ -84,13 +85,11 @@ func (s *subscriber) Stats() SubscriptionStats {
 }
 
 // Cancel unsubscribes and closes the channel.
+// sync.Once guarantees this runs at most once; no secondary closed check needed.
 func (s *subscriber) Cancel() {
 	s.once.Do(func() {
 		s.mu.Lock()
-		if s.closed.Swap(true) {
-			s.mu.Unlock()
-			return
-		}
+		s.closed.Store(true)
 		if s.ringBuf != nil {
 			// For ring buffer subscribers, close the ring buffer.
 			// The pump goroutine will close s.ch when it exits.
@@ -120,16 +119,15 @@ func (s *subscriber) Cancel() {
 
 // pumpRingBuffer moves messages from the ring buffer to the output channel.
 // It runs as a background goroutine for ring buffer–based subscribers.
+// Termination is driven exclusively by s.done and ringBuf.Notify() closure,
+// avoiding the redundant s.closed.Load() poll in the inner drain loop.
 func (s *subscriber) pumpRingBuffer() {
 	defer close(s.ch)
 	defer close(s.pumpDone)
 
 	for {
-		// Drain all available messages from ring buffer
+		// Drain all available messages from ring buffer.
 		for {
-			if s.closed.Load() {
-				return
-			}
 			msg, ok := s.ringBuf.Pop()
 			if !ok {
 				break
@@ -141,11 +139,11 @@ func (s *subscriber) pumpRingBuffer() {
 			}
 		}
 
-		// Wait for new messages or closure
+		// Wait for new messages or closure.
 		select {
 		case _, ok := <-s.ringBuf.Notify():
 			if !ok {
-				return // ring buffer closed
+				return // ring buffer closed by Cancel()
 			}
 		case <-s.done:
 			return
@@ -199,11 +197,8 @@ type InProcPubSub struct {
 	workerPool *workerPool
 
 	// draining state
-	draining   atomic.Bool
-	drainWg    sync.WaitGroup
-	drainMu    sync.RWMutex
-	drainCond  *sync.Cond
-	pendingOps atomic.Int64
+	draining atomic.Bool
+	drainWg  sync.WaitGroup
 
 	// message scheduler for delayed delivery
 	scheduler *messageScheduler
@@ -246,7 +241,6 @@ func New(opts ...Option) *InProcPubSub {
 		config:     config,
 		workerPool: newWorkerPool(config.WorkerPoolSize),
 	}
-	ps.drainCond = sync.NewCond(&ps.drainMu)
 	ps.nextID.Store(0)
 
 	if config.EnableScheduler {
@@ -262,7 +256,10 @@ func New(opts ...Option) *InProcPubSub {
 	}
 
 	if config.EnableRequestReply {
-		ps.requestMgr = newRequestManager(ps)
+		rm, err := newRequestManager(ps)
+		if err == nil {
+			ps.requestMgr = rm
+		}
 	}
 
 	return ps
@@ -320,12 +317,10 @@ func (ps *InProcPubSub) Drain(ctx context.Context) error {
 	ps.draining.Store(true)
 	defer ps.draining.Store(false)
 
-	// Wait for pending operations
+	// Wait for all in-flight operations via WaitGroup instead of polling.
 	done := make(chan struct{})
 	go func() {
-		for ps.pendingOps.Load() > 0 {
-			time.Sleep(10 * time.Millisecond)
-		}
+		ps.drainWg.Wait()
 		close(done)
 	}()
 
@@ -434,6 +429,21 @@ func (ps *InProcPubSub) SubscribeMQTTWithContext(ctx context.Context, pattern st
 	return ps.subscribeMQTTInternal(ctx, pattern, opts)
 }
 
+// initSubscriberChannel sets up the subscriber's message channel.
+// When UseRingBuffer is enabled with DropOldest policy, a ring buffer is used
+// together with an unbuffered channel driven by a pump goroutine.
+// Otherwise a plain buffered channel is created.
+func initSubscriberChannel(sub *subscriber, opts SubOptions) {
+	if opts.UseRingBuffer && opts.Policy == DropOldest {
+		sub.ringBuf = newRingBuffer(opts.BufferSize)
+		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
+		sub.pumpDone = make(chan struct{})
+		go sub.pumpRingBuffer()
+	} else {
+		sub.ch = make(chan Message, opts.BufferSize)
+	}
+}
+
 // subscribeInternal is the internal implementation for all subscribe methods.
 func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opts SubOptions, isPattern bool) (Subscription, error) {
 	start := time.Now()
@@ -493,15 +503,7 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 		cancel: cancel,
 	}
 
-	// Use ring buffer for DropOldest when enabled
-	if opts.UseRingBuffer && opts.Policy == DropOldest {
-		sub.ringBuf = newRingBuffer(opts.BufferSize)
-		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
-		sub.pumpDone = make(chan struct{})
-		go sub.pumpRingBuffer()
-	} else {
-		sub.ch = make(chan Message, opts.BufferSize)
-	}
+	initSubscriberChannel(sub, opts)
 
 	// Add to sharded map
 	if isPattern {
@@ -578,15 +580,7 @@ func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern strin
 		cancel: cancel,
 	}
 
-	// Use ring buffer for DropOldest when enabled
-	if opts.UseRingBuffer && opts.Policy == DropOldest {
-		sub.ringBuf = newRingBuffer(opts.BufferSize)
-		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
-		sub.pumpDone = make(chan struct{})
-		go sub.pumpRingBuffer()
-	} else {
-		sub.ch = make(chan Message, opts.BufferSize)
-	}
+	initSubscriberChannel(sub, opts)
 
 	// Add to sharded map
 	ps.shards.addMQTTPattern(pattern, id, sub)
@@ -680,11 +674,8 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 		}
 	}
 
-	// Get subscribers once; skip expensive lookups when no subscribers exist
-	var subs []*subscriber
-	if ps.shards.topicExists(topic) {
-		subs = ps.shards.getTopicSubscribers(topic)
-	}
+	// Single lock acquisition per topic: combines existence check and snapshot.
+	subs := ps.shards.getTopicSubscribersIfAny(topic)
 	var patterns []patternSnapshot
 	if ps.shards.hasAnyPatterns() {
 		patterns = ps.shards.getAllPatterns()
@@ -694,8 +685,8 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 		mqttSubs = ps.shards.getMQTTPatternMatches(topic)
 	}
 
-	ps.pendingOps.Add(1)
-	defer ps.pendingOps.Add(-1)
+	ps.drainWg.Add(1)
+	defer ps.drainWg.Done()
 
 	bgCtx := context.Background()
 	for _, msg := range msgs {
@@ -792,13 +783,13 @@ func (ps *InProcPubSub) publishInternal(ctx context.Context, topic string, msg M
 
 	if async {
 		// Use worker pool for async publish with context cancellation support
-		ps.pendingOps.Add(1)
+		ps.drainWg.Add(1)
 		submitted := ps.workerPool.SubmitWithContext(ctx, func() {
-			defer ps.pendingOps.Add(-1)
+			defer ps.drainWg.Done()
 			ps.doPublish(ctx, topic, msg)
 		})
 		if !submitted {
-			ps.pendingOps.Add(-1)
+			ps.drainWg.Done()
 			// Context cancelled or worker pool closed
 			if ctx.Err() != nil {
 				err = ctx.Err()
@@ -808,8 +799,8 @@ func (ps *InProcPubSub) publishInternal(ctx context.Context, topic string, msg M
 			ps.doPublish(ctx, topic, msg)
 		}
 	} else {
-		ps.pendingOps.Add(1)
-		defer ps.pendingOps.Add(-1)
+		ps.drainWg.Add(1)
+		defer ps.drainWg.Done()
 		ps.doPublish(ctx, topic, msg)
 	}
 
@@ -838,24 +829,21 @@ func (ps *InProcPubSub) doPublish(ctx context.Context, topic string, msg Message
 		h.Add(msg)
 	}
 
-	// Fast path: skip subscriber lookup when no subscribers exist
-	hasTopicSubs := ps.shards.topicExists(topic)
 	hasPatternSubs := ps.shards.hasAnyPatterns()
 	hasMQTTSubs := ps.shards.hasAnyMQTTPatterns()
 
-	if !hasTopicSubs && !hasPatternSubs && !hasMQTTSubs {
+	// Single lock acquisition: combines existence check and subscriber snapshot.
+	subs := ps.shards.getTopicSubscribersIfAny(topic)
+	if subs == nil && !hasPatternSubs && !hasMQTTSubs {
 		return
 	}
 
 	// Deliver to exact topic subscribers
-	if hasTopicSubs {
-		subs := ps.shards.getTopicSubscribers(topic)
-		for _, s := range subs {
-			if ctx.Err() != nil {
-				return
-			}
-			ps.deliver(ctx, s, msg)
+	for _, s := range subs {
+		if ctx.Err() != nil {
+			return
 		}
+		ps.deliver(ctx, s, msg)
 	}
 
 	// Get and deliver to glob pattern subscribers
@@ -883,16 +871,15 @@ func (ps *InProcPubSub) deliverToPatterns(ctx context.Context, patterns []patter
 			return
 		}
 
-		// Fast path: check if pattern contains wildcards
+		// isGlob is pre-computed at snapshot time to avoid ContainsAny on every publish.
 		var matched bool
-		if strings.ContainsAny(entry.pattern, "*?[]\\") {
+		if entry.isGlob {
 			var err error
 			matched, err = path.Match(entry.pattern, topic)
 			if err != nil {
 				matched = false
 			}
 		} else {
-			// No wildcards - just compare strings
 			matched = entry.pattern == topic
 		}
 
@@ -948,14 +935,15 @@ func (ps *InProcPubSub) HasSubscribers(topic string) bool {
 	}
 
 	// Check glob pattern subscribers
-	patterns := ps.shards.getAllPatterns()
-	for _, entry := range patterns {
-		if strings.ContainsAny(entry.pattern, "*?[]\\") {
-			if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+	if ps.shards.hasAnyPatterns() {
+		for _, entry := range ps.shards.getAllPatterns() {
+			if entry.isGlob {
+				if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
+					return true
+				}
+			} else if entry.pattern == topic {
 				return true
 			}
-		} else if entry.pattern == topic {
-			return true
 		}
 	}
 
@@ -1038,6 +1026,17 @@ func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message)
 		return
 	}
 
+	// BlockWithTimeout must not hold s.mu while blocking on the channel send,
+	// otherwise every concurrent deliver call to this subscriber serialises on
+	// the lock for up to the full block timeout.  Handle it outside the lock.
+	// (closed check above already covers this path)
+	if s.opts.Policy == BlockWithTimeout {
+		if ps.deliverBlockWithTimeout(ctx, s, msg, metricTopic) {
+			s.Cancel()
+		}
+		return
+	}
+
 	s.mu.Lock()
 	if s.closed.Load() {
 		s.mu.Unlock()
@@ -1051,8 +1050,6 @@ func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message)
 		cancelSub = ps.deliverDropOldest(s, msg, metricTopic)
 	case DropNewest:
 		cancelSub = ps.deliverDropNewest(s, msg, metricTopic)
-	case BlockWithTimeout:
-		cancelSub = ps.deliverBlockWithTimeout(ctx, s, msg, metricTopic)
 	case CloseSubscriber:
 		cancelSub = ps.deliverCloseSubscriber(s, msg, metricTopic)
 	default:
@@ -1092,6 +1089,11 @@ func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopi
 
 	// Fallback: channel-based drain-and-retry
 	for {
+		// Guard against racing with Cancel(): if the subscriber closed while we
+		// were spinning, stop instead of looping forever.
+		if s.closed.Load() {
+			return false
+		}
 		select {
 		case s.ch <- msg:
 			ps.metrics.incDelivered(metricTopic)
@@ -1113,7 +1115,7 @@ func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopi
 				}
 				// Continue loop to try sending again
 			default:
-				// Channel was emptied by consumer, try sending again
+				// Channel was emptied by consumer between the two selects; retry.
 			}
 		}
 	}

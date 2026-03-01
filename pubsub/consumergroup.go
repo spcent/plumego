@@ -113,15 +113,17 @@ type consumerGroup struct {
 
 // groupConsumer represents a consumer in a group
 type groupConsumer struct {
-	id             string
-	group          *consumerGroup
-	topics         []string
-	assignedParts  map[string][]int // topic -> partitions
-	subscription   Subscription
-	lastHeartbeat  time.Time
-	heartbeatMu    sync.Mutex
-	messageChannel chan Message
-	closed         atomic.Bool
+	id              string
+	group           *consumerGroup
+	topics          []string
+	assignedParts   map[string][]int // topic -> partitions, guarded by assignedPartsMu
+	assignedPartsMu sync.RWMutex
+	subscription    Subscription
+	lastHeartbeat   time.Time
+	heartbeatMu     sync.Mutex
+	messageChannel  chan Message
+	closed          atomic.Bool
+	dispatcherDone  chan struct{} // closed when startDispatcher goroutine exits
 }
 
 // NewConsumerGroupManager creates a new consumer group manager
@@ -221,6 +223,7 @@ func (cgm *ConsumerGroupManager) JoinGroup(groupID, consumerID string, topics []
 		subscription:   sub,
 		lastHeartbeat:  time.Now(),
 		messageChannel: make(chan Message, 100),
+		dispatcherDone: make(chan struct{}),
 	}
 
 	group.consumers[consumerID] = consumer
@@ -408,17 +411,28 @@ func (cg *consumerGroup) rebalance(ctx context.Context) error {
 		return err
 	}
 
-	// Update consumer assignments
-	for _, consumer := range cg.consumers {
-		consumer.assignedParts = make(map[string][]int)
-	}
-
+	// Build new partition assignments per consumer without holding per-consumer locks.
+	newParts := make(map[string]map[string][]int) // consumerID -> topic -> partitions
 	for topic, partAssignments := range cg.assignments {
 		for partition, consumerID := range partAssignments {
-			if consumer, exists := cg.consumers[consumerID]; exists {
-				consumer.assignedParts[topic] = append(consumer.assignedParts[topic], partition)
+			if _, exists := cg.consumers[consumerID]; exists {
+				if newParts[consumerID] == nil {
+					newParts[consumerID] = make(map[string][]int)
+				}
+				newParts[consumerID][topic] = append(newParts[consumerID][topic], partition)
 			}
 		}
+	}
+
+	// Apply atomically to each consumer under its own lock.
+	for id, consumer := range cg.consumers {
+		parts := newParts[id]
+		if parts == nil {
+			parts = make(map[string][]int)
+		}
+		consumer.assignedPartsMu.Lock()
+		consumer.assignedParts = parts
+		consumer.assignedPartsMu.Unlock()
 	}
 
 	return nil
@@ -708,7 +722,10 @@ func (gc *groupConsumer) Heartbeat() {
 	gc.lastHeartbeat = time.Now()
 }
 
-// Close closes the consumer
+// Close closes the consumer.
+// It cancels the subscription (which closes the source channel, causing the
+// dispatcher goroutine to exit), then waits for the dispatcher to finish
+// before closing messageChannel to eliminate the send-on-closed-channel race.
 func (gc *groupConsumer) Close() {
 	if gc.closed.Swap(true) {
 		return
@@ -718,16 +735,30 @@ func (gc *groupConsumer) Close() {
 		gc.subscription.Cancel()
 	}
 
+	// Wait for the dispatcher goroutine to stop before closing the channel it
+	// writes to.  This prevents a send-on-closed-channel data race.
+	if gc.dispatcherDone != nil {
+		<-gc.dispatcherDone
+	}
+
 	close(gc.messageChannel)
 }
 
-// startDispatcher starts the message dispatcher for this consumer
+// startDispatcher starts the message dispatcher for this consumer.
+// It signals dispatcherDone when it exits so that Close() can safely
+// close messageChannel only after no more sends are in-flight.
 func (gc *groupConsumer) startDispatcher() {
 	go func() {
+		defer close(gc.dispatcherDone)
 		for {
 			select {
 			case msg, ok := <-gc.subscription.C():
 				if !ok {
+					return
+				}
+
+				// Stop dispatching once the consumer is marked closed.
+				if gc.closed.Load() {
 					return
 				}
 

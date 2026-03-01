@@ -31,13 +31,6 @@ type topicMetrics struct {
 	dropped        sync.Map // map[string]*atomic.Uint64
 }
 
-// policyNames converts policy to string (cached for performance).
-var policyNames = map[BackpressurePolicy]string{
-	DropOldest:       "drop_oldest",
-	DropNewest:       "drop_newest",
-	BlockWithTimeout: "block_with_timeout",
-	CloseSubscriber:  "close_subscriber",
-}
 
 // ensureTopic gets or creates topic metrics.
 func (m *metricsPubSub) ensureTopic(topic string) *topicMetrics {
@@ -108,8 +101,16 @@ func (m *metricsPubSub) Snapshot() MetricsSnapshot {
 
 // policyName converts policy to human-readable string.
 func policyName(p BackpressurePolicy) string {
-	if name, ok := policyNames[p]; ok {
-		return name
+	switch p {
+	case DropOldest:
+		return "drop_oldest"
+	case DropNewest:
+		return "drop_newest"
+	case BlockWithTimeout:
+		return "block_with_timeout"
+	case CloseSubscriber:
+		return "close_subscriber"
+	default:
+		return "unknown"
 	}
-	return "unknown"
 }

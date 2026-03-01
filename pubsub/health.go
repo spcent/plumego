@@ -114,8 +114,10 @@ func (ps *InProcPubSub) collectHealthMetrics() HealthMetrics {
 		metrics.SubscriberCount += ps.shards.getPatternSubscriberCount(pattern)
 	}
 
-	// Pending operations
-	metrics.PendingAsyncOps = ps.pendingOps.Load()
+	// Pending async operations (active worker pool slots in use)
+	if ps.workerPool != nil {
+		metrics.PendingAsyncOps = int64(ps.workerPool.Size())
+	}
 
 	// Worker pool
 	if ps.workerPool != nil {
@@ -162,8 +164,8 @@ func (ps *InProcPubSub) LivenessCheck() error {
 
 	// Check if worker pool is responsive
 	if ps.workerPool != nil {
-		// If pool is at capacity and pending ops are high, might be unhealthy
-		if ps.workerPool.Available() == 0 && ps.pendingOps.Load() > int64(ps.workerPool.MaxSize()*2) {
+		// If pool is at capacity, the system may be under backpressure.
+		if ps.workerPool.Available() == 0 {
 			return ErrBackpressure
 		}
 	}
@@ -177,7 +179,11 @@ func (ps *InProcPubSub) DiagnosticInfo() map[string]any {
 
 	info["closed"] = ps.closed.Load()
 	info["draining"] = ps.draining.Load()
-	info["pending_ops"] = ps.pendingOps.Load()
+	if ps.workerPool != nil {
+		info["pending_ops"] = ps.workerPool.Size()
+	} else {
+		info["pending_ops"] = 0
+	}
 
 	// Config info
 	info["config"] = map[string]any{

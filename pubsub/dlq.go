@@ -505,18 +505,28 @@ func (dlq *DLQ) calculateRetryDelay(retryCount int) time.Duration {
 	}
 }
 
-// archiveMessage moves a message to archive
+// archiveMessage moves a message to the archive.
+// MUST be called with dlq.messagesMu already held (write lock).
+// It releases and re-acquires the lock around the archivedMu write to avoid
+// nested lock ordering: messagesMu > archivedMu would deadlock against any
+// reader that acquires archivedMu while messagesMu is read-locked.
 func (dlq *DLQ) archiveMessage(msg *DLQMessage) {
 	msg.IsArchived = true
 	msg.ArchiveTime = time.Now()
 
 	delete(dlq.messages, msg.ID)
+	// Release messagesMu before acquiring archivedMu to preserve a consistent
+	// lock ordering and avoid potential deadlocks.
+	dlq.messagesMu.Unlock()
 
 	dlq.archivedMu.Lock()
 	dlq.archived = append(dlq.archived, msg)
 	dlq.archivedMu.Unlock()
 
 	dlq.stats.ArchivedMessages.Add(1)
+
+	// Re-acquire messagesMu so the caller's defer/unlock is still valid.
+	dlq.messagesMu.Lock()
 }
 
 // evictOldest removes oldest messages to stay within size limit
@@ -654,20 +664,32 @@ func (dlq *DLQ) cleanupExpired() {
 	now := time.Now()
 
 	dlq.messagesMu.Lock()
-	defer dlq.messagesMu.Unlock()
+
+	// Collect expired/archivable IDs first to avoid modifying the map while
+	// ranging over it (which is undefined behaviour in Go).
+	var toDelete []string
+	var toArchive []*DLQMessage
 
 	for id, msg := range dlq.messages {
-		// TTL check
 		if dlq.config.TTL > 0 && now.Sub(msg.Timestamp) > dlq.config.TTL {
-			delete(dlq.messages, id)
+			toDelete = append(toDelete, id)
 			continue
 		}
-
-		// Archive old messages
 		if dlq.config.ArchiveAfter > 0 && now.Sub(msg.Timestamp) > dlq.config.ArchiveAfter {
-			dlq.archiveMessage(msg)
+			toArchive = append(toArchive, msg)
 		}
 	}
+
+	for _, id := range toDelete {
+		delete(dlq.messages, id)
+	}
+
+	// archiveMessage releases and re-acquires messagesMu internally.
+	for _, msg := range toArchive {
+		dlq.archiveMessage(msg)
+	}
+
+	dlq.messagesMu.Unlock()
 }
 
 // Close closes the DLQ

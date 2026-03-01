@@ -131,7 +131,7 @@ func (h *messageHistory) GetWithTTL(ttl time.Duration) []Message {
 	}
 
 	cutoff := time.Now().Add(-ttl)
-	var result []Message
+	result := make([]Message, 0, h.count) // pre-allocate upper bound to avoid repeated growth
 
 	for i := 0; i < h.count; i++ {
 		idx := (h.head + i) % h.capacity

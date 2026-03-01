@@ -1,8 +1,9 @@
 package pubsub
 
 import (
-	"hash/fnv"
+	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // shard represents a partition of topics/patterns.
@@ -19,6 +20,10 @@ type shardedMap struct {
 	shards     []*shard
 	shardCount int
 	shardMask  uint32
+
+	// Atomic counters for fast existence checks without scanning all shards.
+	patternCount     atomic.Int64
+	mqttPatternCount atomic.Int64
 }
 
 // newShardedMap creates a new sharded map with the given number of shards.
@@ -61,18 +66,29 @@ func nextPowerOf2(n int) int {
 	return n + 1
 }
 
+// fnv32a computes an inline FNV-1a 32-bit hash of a string without allocating
+// a hasher object or converting the string to []byte.
+func fnv32a(key string) uint32 {
+	const (
+		offset32 = 2166136261
+		prime32  = 16777619
+	)
+	h := uint32(offset32)
+	for i := 0; i < len(key); i++ {
+		h ^= uint32(key[i])
+		h *= prime32
+	}
+	return h
+}
+
 // getShard returns the shard for a given topic/pattern.
 func (sm *shardedMap) getShard(key string) *shard {
-	h := fnv.New32a()
-	h.Write([]byte(key))
-	return sm.shards[h.Sum32()&sm.shardMask]
+	return sm.shards[fnv32a(key)&sm.shardMask]
 }
 
 // getShardIndex returns the shard index for a given topic/pattern.
 func (sm *shardedMap) getShardIndex(key string) int {
-	h := fnv.New32a()
-	h.Write([]byte(key))
-	return int(h.Sum32() & sm.shardMask)
+	return int(fnv32a(key) & sm.shardMask)
 }
 
 // addTopic adds a subscriber to a topic in the appropriate shard.
@@ -91,12 +107,16 @@ func (sm *shardedMap) addTopic(topic string, id uint64, sub *subscriber) {
 func (sm *shardedMap) addPattern(pattern string, id uint64, sub *subscriber) {
 	s := sm.getShard(pattern)
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.patterns[pattern] == nil {
+	isNew := s.patterns[pattern] == nil
+	if isNew {
 		s.patterns[pattern] = make(map[uint64]*subscriber)
 	}
 	s.patterns[pattern][id] = sub
+	s.mu.Unlock()
+
+	if isNew {
+		sm.patternCount.Add(1)
+	}
 }
 
 // removeTopic removes a subscriber from a topic.
@@ -125,36 +145,51 @@ func (sm *shardedMap) removeTopic(topic string, id uint64) bool {
 func (sm *shardedMap) removePattern(pattern string, id uint64) bool {
 	s := sm.getShard(pattern)
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	subs := s.patterns[pattern]
 	if subs == nil {
+		s.mu.Unlock()
 		return true
 	}
 
 	delete(subs, id)
 
-	if len(subs) == 0 {
+	isEmpty := len(subs) == 0
+	if isEmpty {
 		delete(s.patterns, pattern)
-		return true
 	}
-	return false
+	s.mu.Unlock()
+
+	if isEmpty {
+		sm.patternCount.Add(-1)
+	}
+	return isEmpty
 }
 
 // addMQTTPattern adds a subscriber for an MQTT pattern in the appropriate shard.
 func (sm *shardedMap) addMQTTPattern(pattern string, id uint64, sub *subscriber) {
 	s := sm.getShard(pattern)
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	isNew := s.mqttPatterns.Count(pattern) == 0
 	s.mqttPatterns.Add(pattern, id, sub)
+	s.mu.Unlock()
+
+	if isNew {
+		sm.mqttPatternCount.Add(1)
+	}
 }
 
 // removeMQTTPattern removes a subscriber from an MQTT pattern.
 func (sm *shardedMap) removeMQTTPattern(pattern string, id uint64) bool {
 	s := sm.getShard(pattern)
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.mqttPatterns.Remove(pattern, id)
+	isEmpty := s.mqttPatterns.Remove(pattern, id)
+	s.mu.Unlock()
+
+	if isEmpty {
+		sm.mqttPatternCount.Add(-1)
+	}
+	return isEmpty
 }
 
 // getMQTTPatternMatches returns all MQTT pattern subscribers that match a given topic.
@@ -186,17 +221,10 @@ func (sm *shardedMap) mqttPatternExists(pattern string) bool {
 	return s.mqttPatterns.Count(pattern) > 0
 }
 
-// hasAnyMQTTPatterns checks if any MQTT pattern subscriptions exist across all shards.
+// hasAnyMQTTPatterns checks if any MQTT pattern subscriptions exist.
+// This is an O(1) atomic read instead of scanning all shards.
 func (sm *shardedMap) hasAnyMQTTPatterns() bool {
-	for _, s := range sm.shards {
-		s.mu.RLock()
-		n := len(s.mqttPatterns.patterns)
-		s.mu.RUnlock()
-		if n > 0 {
-			return true
-		}
-	}
-	return false
+	return sm.mqttPatternCount.Load() > 0
 }
 
 // listMQTTPatterns returns all MQTT patterns with subscribers.
@@ -262,6 +290,7 @@ func (sm *shardedMap) getAllPatterns() []patternSnapshot {
 			}
 			result = append(result, patternSnapshot{
 				pattern: pattern,
+				isGlob:  strings.ContainsAny(pattern, "*?[]\\"),
 				subs:    snapshot,
 			})
 		}
@@ -326,6 +355,10 @@ func (sm *shardedMap) collectAllSubscribers() []*subscriber {
 		s.mu.Unlock()
 	}
 
+	// Reset atomic counters now that all maps are cleared.
+	sm.patternCount.Store(0)
+	sm.mqttPatternCount.Store(0)
+
 	return all
 }
 
@@ -337,6 +370,26 @@ func (sm *shardedMap) topicExists(topic string) bool {
 	return len(s.topics[topic]) > 0
 }
 
+// getTopicSubscribersIfAny returns a subscriber snapshot in a single lock
+// acquisition, combining the existence check and snapshot into one operation.
+// Returns nil when there are no subscribers (avoids a second lock in callers
+// that would otherwise call topicExists then getTopicSubscribers separately).
+func (sm *shardedMap) getTopicSubscribersIfAny(topic string) []*subscriber {
+	s := sm.getShard(topic)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	subs := s.topics[topic]
+	if len(subs) == 0 {
+		return nil
+	}
+	result := make([]*subscriber, 0, len(subs))
+	for _, sub := range subs {
+		result = append(result, sub)
+	}
+	return result
+}
+
 // patternExists checks if a pattern has any subscribers.
 func (sm *shardedMap) patternExists(pattern string) bool {
 	s := sm.getShard(pattern)
@@ -345,18 +398,10 @@ func (sm *shardedMap) patternExists(pattern string) bool {
 	return len(s.patterns[pattern]) > 0
 }
 
-// hasAnyPatterns checks if any pattern subscriptions exist across all shards.
-// It short-circuits as soon as it finds one, making it cheaper than getAllPatterns.
+// hasAnyPatterns checks if any glob pattern subscriptions exist.
+// This is an O(1) atomic read instead of scanning all shards.
 func (sm *shardedMap) hasAnyPatterns() bool {
-	for _, s := range sm.shards {
-		s.mu.RLock()
-		n := len(s.patterns)
-		s.mu.RUnlock()
-		if n > 0 {
-			return true
-		}
-	}
-	return false
+	return sm.patternCount.Load() > 0
 }
 
 // ShardStat contains statistics for a single shard.

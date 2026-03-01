@@ -38,13 +38,8 @@ func (wp *workerPool) Submit(task func()) bool {
 
 	wp.wg.Add(1)
 
-	// Acquire semaphore
-	select {
-	case wp.sem <- struct{}{}:
-	default:
-		// Pool is at capacity, wait
-		wp.sem <- struct{}{}
-	}
+	// Block until a semaphore slot is available.
+	wp.sem <- struct{}{}
 
 	go func() {
 		defer func() {
