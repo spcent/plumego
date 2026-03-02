@@ -2183,3 +2183,157 @@ func TestDependencyRunsAfterDependencyRetrySuccess(t *testing.T) {
 		t.Fatal("dep-b did not execute after dep-a succeeded on retry")
 	}
 }
+
+func TestDelayTriggerNowInvalidatesPreviousSchedule(t *testing.T) {
+	s := New(WithWorkers(1))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	var runs atomic.Int32
+	_, err := s.Delay("trigger-once", 120*time.Millisecond, func(ctx context.Context) error {
+		runs.Add(1)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("delay: %v", err)
+	}
+
+	time.Sleep(20 * time.Millisecond)
+	if err := s.TriggerNow("trigger-once"); err != nil {
+		t.Fatalf("trigger now: %v", err)
+	}
+
+	time.Sleep(220 * time.Millisecond)
+	if got := runs.Load(); got != 1 {
+		t.Fatalf("expected exactly 1 execution after TriggerNow, got %d", got)
+	}
+}
+
+func TestAddJobRejectsDependencyCycle(t *testing.T) {
+	s := New(WithWorkers(1))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	_, err := s.Delay("job-a", time.Hour, func(context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("add job-a: %v", err)
+	}
+
+	_, err = s.Delay("job-b", time.Hour, func(context.Context) error { return nil }, WithDependsOn(DependencyFailureCancel, "job-a"))
+	if err != nil {
+		t.Fatalf("add job-b: %v", err)
+	}
+
+	_, err = s.Delay(
+		"job-a",
+		time.Hour,
+		func(context.Context) error { return nil },
+		ReplaceExisting(),
+		WithDependsOn(DependencyFailureCancel, "job-b"),
+	)
+	if !errors.Is(err, ErrDependencyCycle) {
+		t.Fatalf("expected ErrDependencyCycle, got %v", err)
+	}
+}
+
+func TestCronTriggerNowKeepsNextScheduledRun(t *testing.T) {
+	s := New(WithWorkers(1))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	runs := make(chan time.Time, 4)
+	_, err := s.AddCron("cron-trigger", "* * * * * *", func(ctx context.Context) error {
+		runs <- time.Now()
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("add cron: %v", err)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+	if err := s.TriggerNow("cron-trigger"); err != nil {
+		t.Fatalf("trigger now: %v", err)
+	}
+
+	select {
+	case <-runs:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("expected immediate triggered cron run")
+	}
+
+	select {
+	case <-runs:
+		// Expected: normal cron schedule should still run.
+	case <-time.After(1500 * time.Millisecond):
+		t.Fatal("expected next cron-scheduled run after TriggerNow")
+	}
+}
+
+func TestReplaceExistingWithInvalidCycleKeepsOriginalJob(t *testing.T) {
+	s := New(WithWorkers(1))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	var oldRuns atomic.Int32
+	_, err := s.AddCron("job-a", "* * * * * *", func(context.Context) error {
+		oldRuns.Add(1)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("add job-a: %v", err)
+	}
+	_, err = s.Delay("job-b", 2*time.Second, func(context.Context) error { return nil }, WithDependsOn(DependencyFailureCancel, "job-a"))
+	if err != nil {
+		t.Fatalf("add job-b: %v", err)
+	}
+
+	_, err = s.AddCron(
+		"job-a",
+		"* * * * * *",
+		func(context.Context) error { return nil },
+		ReplaceExisting(),
+		WithDependsOn(DependencyFailureCancel, "job-b"),
+	)
+	if !errors.Is(err, ErrDependencyCycle) {
+		t.Fatalf("expected ErrDependencyCycle, got %v", err)
+	}
+
+	select {
+	case <-time.After(1200 * time.Millisecond):
+	}
+	if got := oldRuns.Load(); got == 0 {
+		t.Fatal("expected original cron job to remain active after failed replacement")
+	}
+}
+
+func TestWithRandomSeedProducesDeterministicJitterSequence(t *testing.T) {
+	s1 := New(WithRandomSeed(42))
+	s2 := New(WithRandomSeed(42))
+
+	for i := 0; i < 8; i++ {
+		j1 := s1.nextJitter(2 * time.Second)
+		j2 := s2.nextJitter(2 * time.Second)
+		if j1 != j2 {
+			t.Fatalf("expected deterministic jitter at index %d, got %v and %v", i, j1, j2)
+		}
+		if j1 < 0 || j1 >= 2*time.Second {
+			t.Fatalf("jitter out of expected bounds: %v", j1)
+		}
+	}
+}
+
+func TestWithRandomSeedSupportsDifferentSequences(t *testing.T) {
+	s1 := New(WithRandomSeed(1))
+	s2 := New(WithRandomSeed(2))
+
+	different := false
+	for i := 0; i < 8; i++ {
+		if s1.nextJitter(time.Second) != s2.nextJitter(time.Second) {
+			different = true
+			break
+		}
+	}
+	if !different {
+		t.Fatal("expected different seeds to produce different jitter sequences")
+	}
+}
