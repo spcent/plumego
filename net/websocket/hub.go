@@ -201,7 +201,8 @@ type HubConfig struct {
 	// JobQueueSize is the size of the job queue
 	JobQueueSize int
 
-	// MaxConnections is the maximum total connections allowed
+	// MaxConnections is the maximum active room registrations allowed.
+	// A single connection joined to N rooms contributes N registrations.
 	MaxConnections int
 
 	// MaxRoomConnections is the maximum connections per room
@@ -552,6 +553,11 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //		}
 //	}
 func (h *Hub) TryJoin(room string, c *Conn) error {
+	if h.stopped.Load() {
+		h.rejected.Add(1)
+		return ErrHubStopped
+	}
+
 	// Rate limiting check (before acquiring lock for better performance)
 	if h.rateLimiter != nil && !h.rateLimiter.allow() {
 		h.rejected.Add(1)
@@ -632,6 +638,10 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 //	}
 //	// Room has capacity, proceed with join
 func (h *Hub) CanJoin(room string) error {
+	if h.stopped.Load() {
+		return ErrHubStopped
+	}
+
 	// Fast path: check atomic counter for total connections
 	if h.maxConns > 0 && int(h.totalConns.Load()) >= h.maxConns {
 		return ErrHubFull
@@ -667,6 +677,10 @@ func (h *Hub) CanJoin(room string) error {
 //	conn := websocket.NewConn(...)
 //	hub.Join("admin-room", conn)
 func (h *Hub) Join(room string, c *Conn) {
+	if h.stopped.Load() {
+		return
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

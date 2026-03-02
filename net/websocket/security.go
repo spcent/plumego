@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -160,6 +161,15 @@ type SecureRoomAuth struct {
 
 // NewSecureRoomAuth creates a secure room auth with validation
 func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, error) {
+	effectiveSecret := secret
+	if len(cfg.JWTSecret) > 0 {
+		if len(secret) > 0 && !bytes.Equal(secret, cfg.JWTSecret) {
+			return nil, fmt.Errorf("%w: provided secret and config JWTSecret do not match", ErrInvalidConfig)
+		}
+		effectiveSecret = cfg.JWTSecret
+	}
+	cfg.JWTSecret = effectiveSecret
+
 	// Validate config
 	if err := ValidateSecurityConfig(cfg); err != nil {
 		return nil, err
@@ -177,9 +187,15 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 	}
 
 	return &SecureRoomAuth{
-		simpleRoomAuth: NewSimpleRoomAuth(secret),
+		simpleRoomAuth: NewSimpleRoomAuth(effectiveSecret),
 		securityConfig: cfg,
 	}, nil
+}
+
+// MaxMessageSize returns the configured max inbound message size for optional
+// server-side read-limit enforcement.
+func (s *SecureRoomAuth) MaxMessageSize() int64 {
+	return s.securityConfig.MaxMessageSize
 }
 
 // SetRoomPassword overrides with security validation

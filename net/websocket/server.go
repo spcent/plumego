@@ -66,12 +66,73 @@ func isOriginAllowed(origin string, allowedOrigins []string) bool {
 // Auth must implement RoomAuthenticator. Use NewSimpleRoomAuth or NewSecureRoomAuth
 // to create a concrete implementation.
 type ServerConfig struct {
-	Hub            *Hub
-	Auth           RoomAuthenticator
-	QueueSize      int
-	SendTimeout    time.Duration
-	SendBehavior   SendBehavior
-	AllowedOrigins []string // Allowed origins for CORS. Use ["*"] to allow all origins.
+	Hub               *Hub
+	Auth              RoomAuthenticator
+	QueueSize         int
+	SendTimeout       time.Duration
+	SendBehavior      SendBehavior
+	ReadLimit         int64 // Optional max inbound frame payload size. 0 means use defaults.
+	MessageValidation MessageValidationConfig
+	AllowedOrigins    []string // Allowed origins for CORS. Use ["*"] to allow all origins.
+}
+
+type messageSizeProvider interface {
+	MaxMessageSize() int64
+}
+
+func maxIntValue() int64 {
+	return int64(^uint(0) >> 1)
+}
+
+func readLimitToInt(limit int64) int {
+	if limit <= 0 {
+		return 0
+	}
+	maxInt := maxIntValue()
+	if limit > maxInt {
+		return int(maxInt)
+	}
+	return int(limit)
+}
+
+func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
+	if cfg.Hub == nil {
+		return cfg, errors.New("websocket server misconfigured: hub is nil")
+	}
+	if cfg.Auth == nil {
+		return cfg, errors.New("websocket server misconfigured: authenticator is nil")
+	}
+	if cfg.QueueSize < 0 {
+		return cfg, errors.New("websocket server misconfigured: queue size cannot be negative")
+	}
+	if cfg.SendBehavior < SendBlock || cfg.SendBehavior > SendClose {
+		return cfg, errors.New("websocket server misconfigured: invalid send behavior")
+	}
+	if cfg.ReadLimit < 0 {
+		return cfg, errors.New("websocket server misconfigured: read limit cannot be negative")
+	}
+	if cfg.ReadLimit == 0 {
+		if p, ok := cfg.Auth.(messageSizeProvider); ok {
+			if lim := p.MaxMessageSize(); lim > 0 {
+				cfg.ReadLimit = lim
+			}
+		}
+	}
+	return cfg, nil
+}
+
+func resolveValidationConfig(cfg ServerConfig) MessageValidationConfig {
+	validationCfg := cfg.MessageValidation
+	if validationCfg == (MessageValidationConfig{}) {
+		validationCfg = DefaultMessageValidationConfig()
+	}
+	if cfg.ReadLimit > 0 {
+		maxLen := readLimitToInt(cfg.ReadLimit)
+		if maxLen > 0 && (validationCfg.MaxLength == 0 || validationCfg.MaxLength > maxLen) {
+			validationCfg.MaxLength = maxLen
+		}
+	}
+	return validationCfg
 }
 
 // ServeWSWithAuth performs the WebSocket handshake with JWT and room-password
@@ -96,6 +157,13 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth Room
 // ServeWSWithConfig performs the WebSocket handshake with full configuration
 // options including origin validation (CSRF protection).
 func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig) {
+	normalized, err := normalizeServerConfig(cfg)
+	if err != nil {
+		contract.WriteError(w, r, contract.NewInternalError(err.Error()))
+		return
+	}
+	cfg = normalized
+
 	// Origin validation (CSRF protection)
 	origin := r.Header.Get("Origin")
 	if origin != "" && !isOriginAllowed(origin, cfg.AllowedOrigins) {
@@ -196,6 +264,9 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	// buffer allocation (NewConn would otherwise create default-sized buffers
 	// that are immediately discarded).
 	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
+	if cfg.ReadLimit > 0 {
+		c.SetReadLimit(cfg.ReadLimit)
+	}
 	c.UserInfo = userInfo
 
 	// Register in hub
@@ -214,7 +285,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 
 	// Read frames from the client and broadcast to the room.
 	go func() {
-		validationCfg := DefaultMessageValidationConfig()
+		validationCfg := resolveValidationConfig(cfg)
 		for {
 			op, rstream, err := c.ReadMessageStream()
 			if err != nil {
@@ -226,8 +297,19 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			}
 			buf := msgBufPool.Get().(*bytes.Buffer)
 			buf.Reset()
-			_, _ = io.Copy(buf, rstream)
-			_ = rstream.Close()
+			if _, err := io.Copy(buf, rstream); err != nil {
+				_ = rstream.Close()
+				msgBufPool.Put(buf)
+				cfg.Hub.logger.Printf("ReadMessageStream copy error: %v", err)
+				c.Close()
+				return
+			}
+			if err := rstream.Close(); err != nil {
+				msgBufPool.Put(buf)
+				cfg.Hub.logger.Printf("ReadMessageStream close error: %v", err)
+				c.Close()
+				return
+			}
 
 			// Validate text messages before broadcasting.
 			if op == OpcodeText {

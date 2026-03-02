@@ -110,7 +110,10 @@ func (c *Conn) writerPump() {
 			// fragment if needed
 			data := out.Data
 			if len(data) <= maxFragmentSize {
-				_ = c.writeFrame(out.Op, true, data)
+				if err := c.writeFrame(out.Op, true, data); err != nil {
+					c.Close()
+					return
+				}
 				continue
 			}
 			total := len(data)
@@ -142,7 +145,10 @@ func (c *Conn) writerPump() {
 				period = newPeriod
 				ticker.Reset(period)
 			}
-			_ = c.writeFrame(opcodePing, true, []byte("ping"))
+			if err := c.writeFrame(opcodePing, true, []byte("ping")); err != nil {
+				c.Close()
+				return
+			}
 		}
 	}
 }
