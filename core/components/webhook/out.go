@@ -62,9 +62,19 @@ func (c *WebhookOutComponent) RegisterRoutes(r *router.Router) {
 
 func (c *WebhookOutComponent) RegisterMiddleware(_ *middleware.Registry) {}
 
-func (c *WebhookOutComponent) Start(_ context.Context) error { return nil }
+func (c *WebhookOutComponent) Start(ctx context.Context) error {
+	if c.cfg.Enabled && c.cfg.Service != nil {
+		c.cfg.Service.Start(ctx)
+	}
+	return nil
+}
 
-func (c *WebhookOutComponent) Stop(_ context.Context) error { return nil }
+func (c *WebhookOutComponent) Stop(_ context.Context) error {
+	if c.cfg.Enabled && c.cfg.Service != nil {
+		c.cfg.Service.Stop()
+	}
+	return nil
+}
 
 func (c *WebhookOutComponent) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}

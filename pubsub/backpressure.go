@@ -141,6 +141,14 @@ func NewBackpressureController(ps *InProcPubSub, config BackpressureConfig) *Bac
 		return nil
 	}
 
+	// Clamp watermarks to valid range (0.0, 1.0].
+	if config.HighWaterMark <= 0 || config.HighWaterMark > 1.0 {
+		config.HighWaterMark = 0.8
+	}
+	if config.LowWaterMark <= 0 || config.LowWaterMark >= config.HighWaterMark {
+		config.LowWaterMark = config.HighWaterMark / 2
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	bpc := &BackpressureController{

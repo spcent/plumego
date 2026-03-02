@@ -43,6 +43,7 @@ type ttlTracker struct {
 	messages map[string]*ttlEntry // messageID -> entry
 	broker   *InProcBroker
 	stopCh   chan struct{}
+	done     chan struct{} // closed when cleanupLoop exits
 	closed   bool
 }
 
@@ -52,6 +53,7 @@ func newTTLTracker(broker *InProcBroker) *ttlTracker {
 		messages: make(map[string]*ttlEntry),
 		broker:   broker,
 		stopCh:   make(chan struct{}),
+		done:     make(chan struct{}),
 	}
 
 	// Start background cleanup goroutine
@@ -106,6 +108,7 @@ func (tt *ttlTracker) remove(messageID string) {
 
 // cleanupLoop runs in the background and removes expired messages.
 func (tt *ttlTracker) cleanupLoop() {
+	defer close(tt.done)
 	ticker := time.NewTicker(1 * time.Second) // Check every second
 	defer ticker.Stop()
 
@@ -146,17 +149,19 @@ func (tt *ttlTracker) cleanupExpiredMessages() {
 // close stops the cleanup goroutine and clears all tracked messages.
 func (tt *ttlTracker) close() {
 	tt.mu.Lock()
-	defer tt.mu.Unlock()
-
 	if tt.closed {
+		tt.mu.Unlock()
 		return
 	}
-
 	tt.closed = true
 	close(tt.stopCh)
-
-	// Clear all tracked messages
 	tt.messages = make(map[string]*ttlEntry)
+	tt.mu.Unlock()
+
+	// Wait for cleanupLoop to exit before returning, so the caller knows
+	// the goroutine is fully stopped. Must not hold tt.mu here because
+	// cleanupLoop acquires it inside cleanupExpiredMessages.
+	<-tt.done
 }
 
 // stats returns the number of tracked messages and count of expired messages.

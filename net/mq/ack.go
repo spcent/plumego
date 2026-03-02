@@ -132,7 +132,7 @@ func (at *ackTracker) handleTimeout(ackID string) {
 
 	if shouldRetry {
 		// Retry: re-publish the message
-		if err := at.broker.redeliverMessage(entry); err != nil {
+		if err := at.broker.redeliverMessage(context.Background(), entry); err != nil {
 			// If retry fails, send to dead letter queue
 			if at.broker.config.EnableDeadLetterQueue {
 				_ = at.broker.PublishToDeadLetter(
@@ -304,7 +304,7 @@ func (b *InProcBroker) SubscribeWithAck(ctx context.Context, topic string, opts 
 
 // Ack acknowledges a message by ID.
 func (b *InProcBroker) Ack(ctx context.Context, topic string, messageID string) error {
-	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+	return b.executeWithObservability(ctx, OpAck, topic, func() error {
 		// Validate context
 		if ctx != nil {
 			if err := ctx.Err(); err != nil {
@@ -334,7 +334,7 @@ func (b *InProcBroker) Ack(ctx context.Context, topic string, messageID string) 
 
 // Nack negatively acknowledges a message by ID (request re-delivery).
 func (b *InProcBroker) Nack(ctx context.Context, topic string, messageID string) error {
-	return b.executeWithObservability(ctx, OpPublish, topic, func() error {
+	return b.executeWithObservability(ctx, OpNack, topic, func() error {
 		// Validate context
 		if ctx != nil {
 			if err := ctx.Err(); err != nil {
@@ -357,27 +357,24 @@ func (b *InProcBroker) Nack(ctx context.Context, topic string, messageID string)
 			return fmt.Errorf("%w: ack tracker not initialized", ErrNotInitialized)
 		}
 
-		// Get the entry from tracker
-		b.ackTracker.mu.RLock()
+		// Hold write lock for the entire check+remove so that a concurrent
+		// Nack or timeout cannot also remove and redeliver the same entry.
+		b.ackTracker.mu.Lock()
 		entry, exists := b.ackTracker.pending[messageID]
-		b.ackTracker.mu.RUnlock()
-
 		if !exists {
+			b.ackTracker.mu.Unlock()
 			return fmt.Errorf("%w: ack ID %s not found", ErrMessageNotAcked, messageID)
 		}
-
-		// Immediately redeliver the message
-		if err := b.redeliverMessage(entry); err != nil {
-			return fmt.Errorf("failed to redeliver message: %w", err)
-		}
-
-		// Stop the timer and remove from pending
-		b.ackTracker.mu.Lock()
 		if entry.timer != nil {
 			entry.timer.Stop()
 		}
 		delete(b.ackTracker.pending, messageID)
 		b.ackTracker.mu.Unlock()
+
+		// Redeliver without holding the lock (publish may block).
+		if err := b.redeliverMessage(ctx, entry); err != nil {
+			return fmt.Errorf("failed to redeliver message: %w", err)
+		}
 
 		return nil
 	})

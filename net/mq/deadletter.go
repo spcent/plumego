@@ -70,6 +70,27 @@ func (dlm *deadLetterManager) stats() DeadLetterStats {
 	}
 }
 
+// drain removes up to limit messages from the dead letter queue and returns them.
+// A limit of 0 returns all current entries.
+func (dlm *deadLetterManager) drain(limit int) []deadLetterEntry {
+	dlm.mu.Lock()
+	defer dlm.mu.Unlock()
+
+	if dlm.closed || len(dlm.entries) == 0 {
+		return nil
+	}
+
+	n := len(dlm.entries)
+	if limit > 0 && limit < n {
+		n = limit
+	}
+
+	drained := make([]deadLetterEntry, n)
+	copy(drained, dlm.entries[:n])
+	dlm.entries = dlm.entries[n:]
+	return drained
+}
+
 // close shuts down the dead letter manager.
 func (dlm *deadLetterManager) close() {
 	dlm.mu.Lock()
@@ -132,6 +153,59 @@ func (b *InProcBroker) PublishToDeadLetter(ctx context.Context, originalTopic st
 		// Publish to dead letter topic
 		return b.ps.Publish(topic, msg)
 	})
+}
+
+// DrainDeadLetter removes up to limit messages from the dead letter queue and
+// returns them to the caller for inspection or manual reprocessing.
+// Pass limit = 0 to drain all current entries.
+// Returns ErrDeadLetterNotSupported when the DLQ is not enabled.
+func (b *InProcBroker) DrainDeadLetter(ctx context.Context, limit int) ([]Message, error) {
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+	}
+	if b == nil {
+		return nil, ErrNotInitialized
+	}
+	if !b.config.EnableDeadLetterQueue || b.deadLetterManager == nil {
+		return nil, fmt.Errorf("%w: dead letter queue is disabled", ErrDeadLetterNotSupported)
+	}
+
+	entries := b.deadLetterManager.drain(limit)
+	msgs := make([]Message, 0, len(entries))
+	for _, e := range entries {
+		msgs = append(msgs, e.message)
+	}
+	return msgs, nil
+}
+
+// ReplayDeadLetter re-publishes up to limit messages from the dead letter queue
+// back to their original topics so they can be processed again.
+// Pass limit = 0 to replay all current entries.
+// Returns ErrDeadLetterNotSupported when the DLQ is not enabled.
+func (b *InProcBroker) ReplayDeadLetter(ctx context.Context, limit int) error {
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+	if b == nil {
+		return ErrNotInitialized
+	}
+	if !b.config.EnableDeadLetterQueue || b.deadLetterManager == nil {
+		return fmt.Errorf("%w: dead letter queue is disabled", ErrDeadLetterNotSupported)
+	}
+
+	entries := b.deadLetterManager.drain(limit)
+	for _, e := range entries {
+		if err := b.Publish(ctx, e.originalTopic, e.message); err != nil {
+			// Re-add on republish failure to avoid silent data loss.
+			_ = b.deadLetterManager.add(e.originalTopic, e.message,
+				fmt.Sprintf("replay failed: %v", err))
+		}
+	}
+	return nil
 }
 
 // GetDeadLetterStats returns statistics about the dead letter queue.

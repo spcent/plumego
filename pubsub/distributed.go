@@ -3,10 +3,12 @@ package pubsub
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sort"
 	"sync"
@@ -15,6 +17,13 @@ import (
 
 	"github.com/spcent/plumego/contract"
 )
+
+// newListener creates a TCP listener for the given address.
+// Separated for testability and to guarantee the port is bound before
+// any peer registration or heartbeat is sent.
+func newListener(addr string) (net.Listener, error) {
+	return net.Listen("tcp", addr)
+}
 
 // Distributed errors
 var (
@@ -54,6 +63,11 @@ type ClusterConfig struct {
 
 	// HTTPClient for node-to-node communication
 	HTTPClient *http.Client
+
+	// AuthToken is used to authenticate inter-node HTTP requests.
+	// All nodes in a cluster must share the same token. If empty,
+	// cluster endpoints are unauthenticated (not recommended for production).
+	AuthToken string
 }
 
 // DefaultClusterConfig returns default cluster configuration
@@ -71,6 +85,21 @@ func DefaultClusterConfig(nodeID, listenAddr string) ClusterConfig {
 			Timeout: 10 * time.Second,
 		},
 	}
+}
+
+// clusterAuthHeader is the HTTP header used for inter-node authentication.
+const clusterAuthHeader = "X-Cluster-Auth"
+
+// authenticateClusterRequest returns true when the request carries a valid
+// cluster auth token, or when no token is configured (open cluster).
+func (dps *DistributedPubSub) authenticateClusterRequest(r *http.Request) bool {
+	if dps.config.AuthToken == "" {
+		return true // no auth configured
+	}
+	token := r.Header.Get(clusterAuthHeader)
+	// Use constant-time comparison to prevent timing attacks.
+	return len(token) == len(dps.config.AuthToken) &&
+		subtle.ConstantTimeCompare([]byte(token), []byte(dps.config.AuthToken)) == 1
 }
 
 // ClusterNode represents a node in the cluster
@@ -110,10 +139,6 @@ type DistributedPubSub struct {
 	clusterForwards  atomic.Uint64
 	clusterErrors    atomic.Uint64
 	heartbeats       atomic.Uint64
-
-	// Routing
-	topicOwners map[string][]string // topic -> node IDs
-	ownersMu    sync.RWMutex
 }
 
 // clusterMessage represents a message sent between cluster nodes
@@ -170,7 +195,6 @@ func NewDistributed(config ClusterConfig, opts ...Option) (*DistributedPubSub, e
 		InProcPubSub: ps,
 		config:       config,
 		nodes:        make(map[string]*ClusterNode),
-		topicOwners:  make(map[string][]string),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
@@ -210,15 +234,18 @@ func (dps *DistributedPubSub) JoinCluster(ctx context.Context) error {
 		return errors.New("already joined to cluster")
 	}
 
-	// Start HTTP server
+	// Bind the listener before starting the goroutine so the port is ready
+	// before we advertise the address to peers — avoids the fragile sleep.
+	ln, err := newListener(dps.config.ListenAddr)
+	if err != nil {
+		return fmt.Errorf("cluster listener failed: %w", err)
+	}
+
 	dps.wg.Add(1)
 	go func() {
 		defer dps.wg.Done()
-		_ = dps.httpServer.ListenAndServe()
+		_ = dps.httpServer.Serve(ln)
 	}()
-
-	// Wait a bit for server to start
-	time.Sleep(100 * time.Millisecond)
 
 	// Register self
 	dps.nodesMu.Lock()
@@ -341,6 +368,9 @@ func (dps *DistributedPubSub) broadcastMessage(topic string, msg Message) error 
 			}
 
 			req.Header.Set("Content-Type", "application/json")
+			if dps.config.AuthToken != "" {
+				req.Header.Set(clusterAuthHeader, dps.config.AuthToken)
+			}
 
 			resp, err := dps.config.HTTPClient.Do(req)
 			if err != nil {
@@ -404,6 +434,9 @@ func (dps *DistributedPubSub) sendHeartbeat(ctx context.Context, peerAddr string
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	if dps.config.AuthToken != "" {
+		req.Header.Set(clusterAuthHeader, dps.config.AuthToken)
+	}
 
 	resp, err := dps.config.HTTPClient.Do(req)
 	if err != nil {
@@ -535,6 +568,15 @@ func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Reques
 		})
 		return
 	}
+	if !dps.authenticateClusterRequest(r) {
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusUnauthorized,
+			Code:     "UNAUTHORIZED",
+			Message:  "invalid cluster auth token",
+			Category: contract.CategoryAuthentication,
+		})
+		return
+	}
 
 	status := map[string]any{
 		"node_id": dps.config.NodeID,
@@ -553,6 +595,15 @@ func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Req
 			Code:     "METHOD_NOT_ALLOWED",
 			Message:  "method not allowed",
 			Category: contract.CategoryClient,
+		})
+		return
+	}
+	if !dps.authenticateClusterRequest(r) {
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusUnauthorized,
+			Code:     "UNAUTHORIZED",
+			Message:  "invalid cluster auth token",
+			Category: contract.CategoryAuthentication,
 		})
 		return
 	}
@@ -608,6 +659,15 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 		})
 		return
 	}
+	if !dps.authenticateClusterRequest(r) {
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusUnauthorized,
+			Code:     "UNAUTHORIZED",
+			Message:  "invalid cluster auth token",
+			Category: contract.CategoryAuthentication,
+		})
+		return
+	}
 
 	var cm clusterMessage
 	if err := json.NewDecoder(r.Body).Decode(&cm); err != nil {
@@ -640,6 +700,15 @@ func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request)
 			Code:     "METHOD_NOT_ALLOWED",
 			Message:  "method not allowed",
 			Category: contract.CategoryClient,
+		})
+		return
+	}
+	if !dps.authenticateClusterRequest(r) {
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusUnauthorized,
+			Code:     "UNAUTHORIZED",
+			Message:  "invalid cluster auth token",
+			Category: contract.CategoryAuthentication,
 		})
 		return
 	}

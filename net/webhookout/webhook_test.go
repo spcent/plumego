@@ -154,7 +154,7 @@ func TestValidateURL(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateURL(tt.raw, tt.allowPN)
+			err := validateURL(context.Background(), tt.raw, tt.allowPN)
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error")
 			}

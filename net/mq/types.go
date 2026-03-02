@@ -53,6 +53,8 @@ const (
 	OpSubscribe Operation = "subscribe"
 	OpClose     Operation = "close"
 	OpMetrics   Operation = "metrics"
+	OpAck       Operation = "ack"
+	OpNack      Operation = "nack"
 )
 
 // Metrics captures timing and error information for broker actions.
@@ -126,6 +128,9 @@ var (
 
 	// ErrTransactionRolledBack is returned when attempting to use a rolled back transaction.
 	ErrTransactionRolledBack = errors.New("mq: transaction already rolled back")
+
+	// ErrNotImplemented is returned by stub methods that are planned but not yet available.
+	ErrNotImplemented = errors.New("mq: not implemented")
 )
 
 // Broker defines the interface for message queue backends.
@@ -133,6 +138,13 @@ type Broker interface {
 	Publish(ctx context.Context, topic string, msg Message) error
 	Subscribe(ctx context.Context, topic string, opts SubOptions) (Subscription, error)
 	Close() error
+}
+
+// ClusterPublisher is an optional interface that pubsub implementations may
+// satisfy to enable cluster-wide message publishing. DistributedPubSub from
+// the pubsub package implements this interface.
+type ClusterPublisher interface {
+	PublishGlobal(topic string, msg Message) error
 }
 
 // DefaultSubOptions exposes the default subscription settings.

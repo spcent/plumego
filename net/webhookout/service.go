@@ -262,7 +262,7 @@ func (s *Service) CreateTarget(ctx context.Context, t Target) (Target, error) {
 func (s *Service) UpdateTarget(ctx context.Context, id string, patch TargetPatch) (Target, error) {
 	// validate URL if set
 	if patch.URL != nil {
-		if err := validateURL(*patch.URL, s.cfg.AllowPrivateNetwork); err != nil {
+		if err := validateURL(ctx, *patch.URL, s.cfg.AllowPrivateNetwork); err != nil {
 			return Target{}, err
 		}
 	}
@@ -459,7 +459,13 @@ func (s *Service) TriggerEvent(ctx context.Context, e Event) (int, error) {
 				"target_id":   t.ID,
 			}),
 		}
-		raw, _ := json.Marshal(payload)
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			// Event data contains a non-serialisable value; skip this target
+			// rather than sending a corrupt or empty payload.
+			atomic.AddUint64(&s.metrics.SentFail, 1)
+			continue
+		}
 
 		d := Delivery{
 			ID:          deliveryID,
@@ -472,6 +478,9 @@ func (s *Service) TriggerEvent(ctx context.Context, e Event) (int, error) {
 		}
 
 		if _, err := s.store.CreateDelivery(ctx, d); err != nil {
+			// Delivery record could not be persisted; skip this target so we
+			// don't enqueue a task that can never be looked up.
+			atomic.AddUint64(&s.metrics.SentFail, 1)
 			continue
 		}
 		if err := s.enqueue(ctx, Task{DeliveryID: d.ID}); err != nil {
@@ -616,15 +625,19 @@ func (s *Service) handleTask(ctx context.Context, t Task) {
 
 // sendOnce sends a single webhook delivery.
 func (s *Service) sendOnce(ctx context.Context, target Target, d Delivery, raw []byte, attempt int) (int, string, error) {
-	// SSRF check
-	if err := validateURL(target.URL, s.cfg.AllowPrivateNetwork); err != nil {
+	// SSRF check — DNS resolution is done with a short timeout so a slow or
+	// unresponsive resolver cannot block the worker goroutine indefinitely.
+	if err := validateURL(ctx, target.URL, s.cfg.AllowPrivateNetwork); err != nil {
 		return 0, "", err
 	}
 
+	// Apply per-target request timeout via context rather than creating a new
+	// http.Transport on every call (which would prevent TCP connection reuse).
 	timeout := ms(target.TimeoutMs, s.cfg.DefaultTimeout)
-	client := NewHTTPClient(timeout)
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", target.URL, bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(reqCtx, "POST", target.URL, bytes.NewReader(raw))
 	if err != nil {
 		return 0, "", err
 	}
@@ -648,7 +661,7 @@ func (s *Service) sendOnce(ctx context.Context, target Target, d Delivery, raw [
 	req.Header.Set("X-Webhook-Signature", "v1="+sig)
 	req.Header.Set("X-Webhook-Attempt", strconv.Itoa(attempt))
 
-	resp, err := client.Do(req)
+	resp, err := s.http.Do(req)
 	if err != nil {
 		return 0, "", err
 	}
@@ -675,11 +688,17 @@ func validateTarget(t Target) error {
 	if len(t.Events) == 0 {
 		return errors.New("events required")
 	}
-	return validateURL(t.URL, false) // strict by default; allow override at service-level update
+	return validateURL(context.Background(), t.URL, false) // strict by default; allow override at service-level update
 }
 
+// dnsLookupTimeout is the maximum time spent resolving a hostname during SSRF
+// validation. Keeping it short prevents slow DNS from blocking worker goroutines.
+const dnsLookupTimeout = 5 * time.Second
+
 // validateURL validates a webhook URL and checks for private network addresses.
-func validateURL(raw string, allowPrivate bool) error {
+// A context is accepted so the caller can cancel or impose an outer deadline;
+// DNS resolution additionally uses its own short timeout to bound blocking time.
+func validateURL(ctx context.Context, raw string, allowPrivate bool) error {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return errors.New("invalid url")
@@ -698,13 +717,16 @@ func validateURL(raw string, allowPrivate bool) error {
 		return nil
 	}
 
-	ips, err := net.LookupIP(host)
+	// Resolve with a short timeout so a slow resolver cannot block workers.
+	lookupCtx, cancel := context.WithTimeout(ctx, dnsLookupTimeout)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupIPAddr(lookupCtx, host)
 	if err != nil {
-		// if DNS fails, reject to be safe
+		// If DNS fails, reject to be safe (fail-closed).
 		return errors.New("dns lookup failed")
 	}
-	for _, ip := range ips {
-		if isPrivateIP(ip) {
+	for _, addr := range addrs {
+		if isPrivateIP(addr.IP) {
 			return errors.New("private network address not allowed")
 		}
 	}

@@ -117,7 +117,7 @@ func (tm *transactionManager) addMessage(txID string, topic string, msg Message)
 }
 
 // commit commits the transaction, publishing all buffered messages.
-func (tm *transactionManager) commit(txID string) error {
+func (tm *transactionManager) commit(ctx context.Context, txID string) error {
 	tm.mu.Lock()
 	tx, exists := tm.transactions[txID]
 	if !exists {
@@ -145,6 +145,12 @@ func (tm *transactionManager) commit(txID string) error {
 
 	// Publish all buffered messages
 	for _, env := range tx.messages {
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				tx.state = TxStateRolledBack
+				return fmt.Errorf("transaction commit aborted: %w", err)
+			}
+		}
 		if err := tm.broker.ps.Publish(env.topic, env.msg); err != nil {
 			// If publish fails, mark as rolled back
 			tx.state = TxStateRolledBack
@@ -349,7 +355,7 @@ func (b *InProcBroker) CommitTransaction(ctx context.Context, txID string) error
 		}
 
 		// Commit the transaction
-		return b.txManager.commit(txID)
+		return b.txManager.commit(ctx, txID)
 	})
 }
 
