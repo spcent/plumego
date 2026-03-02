@@ -1,6 +1,7 @@
 package db
 
 import (
+	"container/list"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -14,6 +15,9 @@ import (
 
 // DBTenantConfigManager loads tenant configurations from a database.
 // It implements tenant.ConfigManager with optional LRU caching.
+//
+// SQL placeholders use the ? style (compatible with SQLite, MySQL).
+// For PostgreSQL, use a driver that rebinds ? to $N (e.g. pgx with compatibility mode).
 type DBTenantConfigManager struct {
 	db    *sql.DB
 	cache *tenantCache
@@ -22,7 +26,7 @@ type DBTenantConfigManager struct {
 // DBTenantConfigOption configures DBTenantConfigManager.
 type DBTenantConfigOption func(*DBTenantConfigManager)
 
-// WithTenantCache enables LRU caching with specified size and TTL.
+// WithTenantCache enables LRU caching with specified capacity and TTL.
 func WithTenantCache(size int, ttl time.Duration) DBTenantConfigOption {
 	return func(m *DBTenantConfigManager) {
 		m.cache = newTenantCache(size, ttl)
@@ -33,19 +37,15 @@ func WithTenantCache(size int, ttl time.Duration) DBTenantConfigOption {
 //
 // Example:
 //
-//	db, _ := sql.Open("postgres", "...")
+//	db, _ := sql.Open("sqlite3", "./tenants.db")
 //	manager := NewDBTenantConfigManager(db,
 //	    WithTenantCache(1000, 5*time.Minute),
 //	)
 func NewDBTenantConfigManager(db *sql.DB, options ...DBTenantConfigOption) *DBTenantConfigManager {
-	m := &DBTenantConfigManager{
-		db: db,
-	}
-
+	m := &DBTenantConfigManager{db: db}
 	for _, opt := range options {
 		opt(m)
 	}
-
 	return m
 }
 
@@ -55,7 +55,6 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 		return tenant.Config{}, tenant.ErrTenantNotFound
 	}
 
-	// Check cache first
 	if m.cache != nil {
 		if cfg, ok := m.cache.Get(tenantID); ok {
 			return cfg, nil
@@ -66,43 +65,44 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 		return tenant.Config{}, tenant.ErrTenantNotFound
 	}
 
-	// Query database
 	query := `
 		SELECT id, quota_requests_per_minute, quota_tokens_per_minute,
-		       allowed_models, allowed_tools, metadata, updated_at
+		       quota_limits, allowed_models, allowed_tools,
+		       allowed_methods, allowed_paths, metadata, updated_at
 		FROM tenants
-		WHERE id = $1
+		WHERE id = ?
 	`
 
 	var cfg tenant.Config
-	var allowedModelsJSON, allowedToolsJSON, metadataJSON sql.NullString
+	var quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON sql.NullString
+	var allowedMethodsJSON, allowedPathsJSON, metadataJSON sql.NullString
 	var updatedAt time.Time
 
 	err := m.db.QueryRowContext(ctx, query, tenantID).Scan(
 		&cfg.TenantID,
 		&cfg.Quota.RequestsPerMinute,
 		&cfg.Quota.TokensPerMinute,
+		&quotaLimitsJSON,
 		&allowedModelsJSON,
 		&allowedToolsJSON,
+		&allowedMethodsJSON,
+		&allowedPathsJSON,
 		&metadataJSON,
 		&updatedAt,
 	)
-
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return tenant.Config{}, tenant.ErrTenantNotFound
 	}
 	if err != nil {
 		return tenant.Config{}, err
 	}
 
-	// Parse JSON fields
-	if err := parseTenantConfigJSON(&cfg, allowedModelsJSON, allowedToolsJSON, metadataJSON); err != nil {
+	if err := parseTenantConfigJSON(&cfg, quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON, allowedMethodsJSON, allowedPathsJSON, metadataJSON); err != nil {
 		return tenant.Config{}, err
 	}
 
 	cfg.UpdatedAt = updatedAt
 
-	// Cache the result
 	if m.cache != nil {
 		m.cache.Set(tenantID, cfg)
 	}
@@ -116,12 +116,23 @@ func (m *DBTenantConfigManager) SetTenantConfig(ctx context.Context, cfg tenant.
 		return errors.New("database connection not available")
 	}
 
-	// Marshal JSON fields
+	quotaLimits, err := json.Marshal(cfg.Quota.Limits)
+	if err != nil {
+		return err
+	}
 	allowedModels, err := json.Marshal(cfg.Policy.AllowedModels)
 	if err != nil {
 		return err
 	}
 	allowedTools, err := json.Marshal(cfg.Policy.AllowedTools)
+	if err != nil {
+		return err
+	}
+	allowedMethods, err := json.Marshal(cfg.Policy.AllowedMethods)
+	if err != nil {
+		return err
+	}
+	allowedPaths, err := json.Marshal(cfg.Policy.AllowedPaths)
 	if err != nil {
 		return err
 	}
@@ -133,33 +144,38 @@ func (m *DBTenantConfigManager) SetTenantConfig(ctx context.Context, cfg tenant.
 	query := `
 		INSERT INTO tenants (
 			id, quota_requests_per_minute, quota_tokens_per_minute,
-			allowed_models, allowed_tools, metadata, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+			quota_limits, allowed_models, allowed_tools,
+			allowed_methods, allowed_paths, metadata, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id)
 		DO UPDATE SET
-			quota_requests_per_minute = EXCLUDED.quota_requests_per_minute,
-			quota_tokens_per_minute = EXCLUDED.quota_tokens_per_minute,
-			allowed_models = EXCLUDED.allowed_models,
-			allowed_tools = EXCLUDED.allowed_tools,
-			metadata = EXCLUDED.metadata,
-			updated_at = EXCLUDED.updated_at
+			quota_requests_per_minute = excluded.quota_requests_per_minute,
+			quota_tokens_per_minute   = excluded.quota_tokens_per_minute,
+			quota_limits              = excluded.quota_limits,
+			allowed_models            = excluded.allowed_models,
+			allowed_tools             = excluded.allowed_tools,
+			allowed_methods           = excluded.allowed_methods,
+			allowed_paths             = excluded.allowed_paths,
+			metadata                  = excluded.metadata,
+			updated_at                = excluded.updated_at
 	`
 
 	_, err = m.db.ExecContext(ctx, query,
 		cfg.TenantID,
 		cfg.Quota.RequestsPerMinute,
 		cfg.Quota.TokensPerMinute,
+		string(quotaLimits),
 		string(allowedModels),
 		string(allowedTools),
+		string(allowedMethods),
+		string(allowedPaths),
 		string(metadata),
 		time.Now().UTC(),
 	)
-
 	if err != nil {
 		return err
 	}
 
-	// Invalidate cache
 	if m.cache != nil {
 		m.cache.Delete(cfg.TenantID)
 	}
@@ -173,7 +189,7 @@ func (m *DBTenantConfigManager) DeleteTenantConfig(ctx context.Context, tenantID
 		return errors.New("database connection not available")
 	}
 
-	result, err := m.db.ExecContext(ctx, "DELETE FROM tenants WHERE id = $1", tenantID)
+	result, err := m.db.ExecContext(ctx, "DELETE FROM tenants WHERE id = ?", tenantID)
 	if err != nil {
 		return err
 	}
@@ -186,7 +202,6 @@ func (m *DBTenantConfigManager) DeleteTenantConfig(ctx context.Context, tenantID
 		return tenant.ErrTenantNotFound
 	}
 
-	// Invalidate cache
 	if m.cache != nil {
 		m.cache.Delete(tenantID)
 	}
@@ -209,10 +224,11 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 
 	query := `
 		SELECT id, quota_requests_per_minute, quota_tokens_per_minute,
-		       allowed_models, allowed_tools, metadata, updated_at
+		       quota_limits, allowed_models, allowed_tools,
+		       allowed_methods, allowed_paths, metadata, updated_at
 		FROM tenants
 		ORDER BY id
-		LIMIT $1 OFFSET $2
+		LIMIT ? OFFSET ?
 	`
 
 	rows, err := m.db.QueryContext(ctx, query, limit, offset)
@@ -224,15 +240,19 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 	var configs []tenant.Config
 	for rows.Next() {
 		var cfg tenant.Config
-		var allowedModelsJSON, allowedToolsJSON, metadataJSON sql.NullString
+		var quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON sql.NullString
+		var allowedMethodsJSON, allowedPathsJSON, metadataJSON sql.NullString
 		var updatedAt time.Time
 
 		err := rows.Scan(
 			&cfg.TenantID,
 			&cfg.Quota.RequestsPerMinute,
 			&cfg.Quota.TokensPerMinute,
+			&quotaLimitsJSON,
 			&allowedModelsJSON,
 			&allowedToolsJSON,
+			&allowedMethodsJSON,
+			&allowedPathsJSON,
 			&metadataJSON,
 			&updatedAt,
 		)
@@ -240,8 +260,7 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 			return nil, err
 		}
 
-		// Parse JSON fields
-		if err := parseTenantConfigJSON(&cfg, allowedModelsJSON, allowedToolsJSON, metadataJSON); err != nil {
+		if err := parseTenantConfigJSON(&cfg, quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON, allowedMethodsJSON, allowedPathsJSON, metadataJSON); err != nil {
 			return nil, fmt.Errorf("parsing tenant %s config: %w", cfg.TenantID, err)
 		}
 
@@ -270,8 +289,13 @@ func (m *DBTenantConfigManager) PolicyConfig(ctx context.Context, tenantID strin
 	return cfg.Policy, nil
 }
 
-// parseTenantConfigJSON parses the JSON fields from database NullString values into a tenant.Config.
-func parseTenantConfigJSON(cfg *tenant.Config, allowedModelsJSON, allowedToolsJSON, metadataJSON sql.NullString) error {
+// parseTenantConfigJSON parses JSON fields from database NullString values into a tenant.Config.
+func parseTenantConfigJSON(cfg *tenant.Config, quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON, allowedMethodsJSON, allowedPathsJSON, metadataJSON sql.NullString) error {
+	if quotaLimitsJSON.Valid && quotaLimitsJSON.String != "" {
+		if err := json.Unmarshal([]byte(quotaLimitsJSON.String), &cfg.Quota.Limits); err != nil {
+			return fmt.Errorf("parsing quota_limits: %w", err)
+		}
+	}
 	if allowedModelsJSON.Valid {
 		if err := json.Unmarshal([]byte(allowedModelsJSON.String), &cfg.Policy.AllowedModels); err != nil {
 			return fmt.Errorf("parsing allowed_models: %w", err)
@@ -282,6 +306,16 @@ func parseTenantConfigJSON(cfg *tenant.Config, allowedModelsJSON, allowedToolsJS
 			return fmt.Errorf("parsing allowed_tools: %w", err)
 		}
 	}
+	if allowedMethodsJSON.Valid && allowedMethodsJSON.String != "" {
+		if err := json.Unmarshal([]byte(allowedMethodsJSON.String), &cfg.Policy.AllowedMethods); err != nil {
+			return fmt.Errorf("parsing allowed_methods: %w", err)
+		}
+	}
+	if allowedPathsJSON.Valid && allowedPathsJSON.String != "" {
+		if err := json.Unmarshal([]byte(allowedPathsJSON.String), &cfg.Policy.AllowedPaths); err != nil {
+			return fmt.Errorf("parsing allowed_paths: %w", err)
+		}
+	}
 	if metadataJSON.Valid {
 		if err := json.Unmarshal([]byte(metadataJSON.String), &cfg.Metadata); err != nil {
 			return fmt.Errorf("parsing metadata: %w", err)
@@ -290,65 +324,104 @@ func parseTenantConfigJSON(cfg *tenant.Config, allowedModelsJSON, allowedToolsJS
 	return nil
 }
 
-// tenantCache is a simple LRU cache for tenant configurations.
+// ── LRU cache ──────────────────────────────────────────────────────────────
+
+// tenantCache is a TTL-aware LRU cache for tenant configurations.
+// It uses a doubly linked list to maintain access order, evicting the
+// least-recently-used entry when the cache reaches capacity.
 type tenantCache struct {
-	mu      sync.RWMutex
-	entries map[string]*cacheEntry
+	mu      sync.Mutex
+	entries map[string]*list.Element
+	lru     *list.List // front = MRU (most recently used), back = LRU
 	maxSize int
 	ttl     time.Duration
 }
 
-type cacheEntry struct {
+type lruEntry struct {
+	key       string
 	config    tenant.Config
 	expiresAt time.Time
 }
 
 func newTenantCache(maxSize int, ttl time.Duration) *tenantCache {
 	return &tenantCache{
-		entries: make(map[string]*cacheEntry),
+		entries: make(map[string]*list.Element),
+		lru:     list.New(),
 		maxSize: maxSize,
 		ttl:     ttl,
 	}
 }
 
+// Get returns the cached config for tenantID.
+// Expired entries are removed on access (lazy eviction).
 func (c *tenantCache) Get(tenantID string) (tenant.Config, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	entry, ok := c.entries[tenantID]
+	elem, ok := c.entries[tenantID]
 	if !ok {
 		return tenant.Config{}, false
 	}
 
-	// Check expiration
+	entry := elem.Value.(*lruEntry)
+
+	// Expired – remove entry and report cache miss.
 	if time.Now().After(entry.expiresAt) {
+		c.removeElement(elem)
 		return tenant.Config{}, false
 	}
 
+	// Move to front (mark as most recently used).
+	c.lru.MoveToFront(elem)
 	return entry.config, true
 }
 
+// Set stores or updates a config in the cache.
+// If the cache is at capacity, the least-recently-used entry is evicted first.
 func (c *tenantCache) Set(tenantID string, config tenant.Config) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Evict if at max size
-	if len(c.entries) >= c.maxSize {
-		// Simple eviction: remove first entry (should use LRU in production)
-		for k := range c.entries {
-			delete(c.entries, k)
-			break
-		}
+	if elem, ok := c.entries[tenantID]; ok {
+		// Refresh existing entry.
+		c.lru.MoveToFront(elem)
+		e := elem.Value.(*lruEntry)
+		e.config = config
+		e.expiresAt = time.Now().Add(c.ttl)
+		return
 	}
 
-	c.entries[tenantID] = &cacheEntry{
+	// Evict LRU entry when at capacity.
+	if c.lru.Len() >= c.maxSize {
+		c.removeElement(c.lru.Back())
+	}
+
+	e := &lruEntry{
+		key:       tenantID,
 		config:    config,
 		expiresAt: time.Now().Add(c.ttl),
 	}
+	elem := c.lru.PushFront(e)
+	c.entries[tenantID] = elem
 }
 
+// Delete removes a tenant entry from the cache.
 func (c *tenantCache) Delete(tenantID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.entries, tenantID)
+
+	if elem, ok := c.entries[tenantID]; ok {
+		c.removeElement(elem)
+	}
+}
+
+// removeElement removes a list element and its corresponding map entry.
+// Must be called with c.mu held.
+func (c *tenantCache) removeElement(elem *list.Element) {
+	if elem == nil {
+		return
+	}
+	c.lru.Remove(elem)
+	e := elem.Value.(*lruEntry)
+	delete(c.entries, e.key)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/middleware/circuitbreaker"
 	"github.com/spcent/plumego/middleware/proxy"
+	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/tenant"
 )
 
@@ -35,11 +36,14 @@ func main() {
 	// Create /api route group for middleware
 	apiGroup := app.Router().Group("/api")
 
-	// Add tenant middleware to the API group
-	apiGroup.Use(tenant.Middleware(tenant.MiddlewareConfig{
+	// Add tenant middleware to the API group using the canonical middleware/tenant path.
+	// AllowMissing=true so requests without a tenant ID proceed unauthenticated.
+	apiGroup.Use(tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
 		HeaderName:   "X-Tenant-ID",
 		AllowMissing: true,
-		QuotaManager: quotaMgr,
+	}))
+	apiGroup.Use(tenantmw.TenantQuota(tenantmw.TenantQuotaOptions{
+		Manager: quotaMgr,
 	}))
 
 	// Add circuit breaker for all API routes

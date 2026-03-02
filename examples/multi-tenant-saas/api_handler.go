@@ -78,7 +78,7 @@ func (h *APIHandler) ListUsers(ctx *plumego.Context) {
 		users = append(users, user)
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any
+	ctx.JSON(http.StatusOK, map[string]any{
 		"users": users,
 		"count": len(users),
 	})

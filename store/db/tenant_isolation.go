@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"regexp"
@@ -13,6 +14,25 @@ import (
 
 // validIdentifier matches safe SQL identifier names (alphanumeric and underscores only).
 var validIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+// nopConnector is a driver.Connector whose connections always fail immediately.
+// Used to construct error-bearing *sql.Row values without a real DB connection.
+type nopConnector struct{}
+
+func (nopConnector) Connect(context.Context) (driver.Conn, error) {
+	return nil, errors.New("database not initialized")
+}
+
+func (nopConnector) Driver() driver.Driver { return nopDriver{} }
+
+type nopDriver struct{}
+
+func (nopDriver) Open(string) (driver.Conn, error) {
+	return nil, errors.New("database not initialized")
+}
+
+// errOnlyDB is used solely to return error-bearing *sql.Row values.
+var errOnlyDB = sql.OpenDB(nopConnector{})
 
 // TenantDB wraps sql.DB with automatic tenant filtering for queries.
 // It ensures that all queries are scoped to a specific tenant by automatically
@@ -94,8 +114,11 @@ func (tdb *TenantDB) QueryRowFromContext(ctx context.Context, query string, args
 // QueryRowContext executes a single-row query with automatic tenant filtering.
 func (tdb *TenantDB) QueryRowContext(ctx context.Context, tenantID string, query string, args ...any) *sql.Row {
 	if tdb == nil || tdb.db == nil {
-		// Return a row that will error when scanned
-		return &sql.Row{}
+		// Return a Row that will produce an error on Scan via a cancelled context.
+		// &sql.Row{} would panic on Scan; errOnlyDB with a cancelled context is safe.
+		cancelledCtx, cancel := context.WithCancel(ctx)
+		cancel()
+		return errOnlyDB.QueryRowContext(cancelledCtx, "SELECT 1")
 	}
 
 	filteredQuery, filteredArgs := tdb.addTenantFilter(query, tenantID, args)

@@ -5,17 +5,18 @@ import (
 	"time"
 )
 
-// Hooks provides optional callbacks for audit/metrics hooks.
+// Hooks provides optional callbacks for observability and audit integration.
 type Hooks struct {
-	OnResolve func(ctx context.Context, info ResolveInfo)
-	OnPolicy  func(ctx context.Context, info PolicyDecision)
-	OnQuota   func(ctx context.Context, info QuotaDecision)
+	OnResolve   func(ctx context.Context, info ResolveInfo)
+	OnPolicy    func(ctx context.Context, info PolicyDecision)
+	OnQuota     func(ctx context.Context, info QuotaDecision)
+	OnRateLimit func(ctx context.Context, info RateLimitDecision)
 }
 
 // ResolveInfo describes how a tenant id was resolved.
 type ResolveInfo struct {
 	TenantID string
-	Source   string
+	Source   string // "principal", "header", "extractor"
 }
 
 // PolicyDecision describes a policy evaluation outcome.
@@ -42,6 +43,18 @@ type QuotaDecision struct {
 	Status            int
 }
 
+// RateLimitDecision describes a rate limit evaluation outcome.
+type RateLimitDecision struct {
+	TenantID   string
+	Allowed    bool
+	Tokens     int64
+	Remaining  int64
+	Limit      int64
+	Burst      int64
+	RetryAfter time.Duration
+	Status     int
+}
+
 // Resolve invokes the resolve hook when configured.
 func (h Hooks) Resolve(ctx context.Context, info ResolveInfo) {
 	if h.OnResolve != nil {
@@ -60,5 +73,12 @@ func (h Hooks) Policy(ctx context.Context, info PolicyDecision) {
 func (h Hooks) Quota(ctx context.Context, info QuotaDecision) {
 	if h.OnQuota != nil {
 		h.OnQuota(ctx, info)
+	}
+}
+
+// RateLimit invokes the rate limit hook when configured.
+func (h Hooks) RateLimit(ctx context.Context, info RateLimitDecision) {
+	if h.OnRateLimit != nil {
+		h.OnRateLimit(ctx, info)
 	}
 }

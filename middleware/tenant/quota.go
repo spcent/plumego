@@ -46,7 +46,12 @@ func TenantQuota(options TenantQuotaOptions) middleware.Middleware {
 				Now:      time.Now().UTC(),
 			})
 			allowed := err == nil && result.Allowed
-			status := http.StatusTooManyRequests
+
+			// Status reflects the actual outcome: 200 when allowed, 429 when denied.
+			status := http.StatusOK
+			if !allowed {
+				status = http.StatusTooManyRequests
+			}
 
 			options.Hooks.Quota(r.Context(), tenant.QuotaDecision{
 				TenantID:          tenantID,
