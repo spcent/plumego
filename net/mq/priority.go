@@ -65,12 +65,14 @@ type priorityDispatcher struct {
 	cond   *sync.Cond
 	queue  priorityQueue
 	closed bool
+	done   chan struct{} // closed by run() when it exits
 }
 
 func newPriorityDispatcher(b *InProcBroker, topic string) *priorityDispatcher {
 	d := &priorityDispatcher{
 		broker: b,
 		topic:  topic,
+		done:   make(chan struct{}),
 	}
 	d.cond = sync.NewCond(&d.mu)
 	heap.Init(&d.queue)
@@ -102,6 +104,9 @@ func (d *priorityDispatcher) close() {
 	d.cond.Broadcast()
 	d.mu.Unlock()
 
+	// Wait for the dispatch goroutine to finish before draining pending.
+	<-d.done
+
 	for _, env := range pending {
 		if env.done != nil {
 			env.done <- ErrBrokerClosed
@@ -111,6 +116,7 @@ func (d *priorityDispatcher) close() {
 }
 
 func (d *priorityDispatcher) run() {
+	defer close(d.done)
 	for {
 		d.mu.Lock()
 		for !d.closed && len(d.queue) == 0 {

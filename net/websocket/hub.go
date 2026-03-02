@@ -517,10 +517,9 @@ func (h *Hub) CanJoin(room string) error {
 	return nil
 }
 
-// Join room (ignores capacity limits).
-//
-// This method is useful when you want to bypass capacity checks.
-// Use with caution as it can lead to resource exhaustion.
+// Join adds a connection to a room, bypassing capacity limits.
+// Intended for privileged connections (e.g. admin rooms) where hard limits
+// must not apply. For capacity-enforced joins, use TryJoin instead.
 //
 // Example:
 //
@@ -530,7 +529,19 @@ func (h *Hub) CanJoin(room string) error {
 //	conn := websocket.NewConn(...)
 //	hub.Join("admin-room", conn) // Bypass capacity limits
 func (h *Hub) Join(room string, c *Conn) {
-	_ = h.TryJoin(room, c)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	rs, ok := h.rooms[room]
+	if !ok {
+		rs = make(map[*Conn]struct{})
+		h.rooms[room] = rs
+	}
+	if _, exists := rs[c]; !exists {
+		rs[c] = struct{}{}
+		h.totalConns.Add(1)
+		h.accepted.Add(1)
+	}
 }
 
 // Metrics returns a snapshot of hub metrics.

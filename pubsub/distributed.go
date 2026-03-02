@@ -139,10 +139,6 @@ type DistributedPubSub struct {
 	clusterForwards  atomic.Uint64
 	clusterErrors    atomic.Uint64
 	heartbeats       atomic.Uint64
-
-	// Routing
-	topicOwners map[string][]string // topic -> node IDs
-	ownersMu    sync.RWMutex
 }
 
 // clusterMessage represents a message sent between cluster nodes
@@ -199,7 +195,6 @@ func NewDistributed(config ClusterConfig, opts ...Option) (*DistributedPubSub, e
 		InProcPubSub: ps,
 		config:       config,
 		nodes:        make(map[string]*ClusterNode),
-		topicOwners:  make(map[string][]string),
 		ctx:          ctx,
 		cancel:       cancel,
 	}

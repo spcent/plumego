@@ -142,9 +142,11 @@ func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 		},
 	}
 
-	err = c.pub.Publish(topic, msg)
-	if err != nil {
+	if err = c.pub.Publish(topic, msg); err != nil {
 		c.logger.Error("Failed to publish GitHub event", log.Fields{"error": err, "topic": topic, "event_id": delivery})
+		contractio.WriteContractError(ctx, http.StatusInternalServerError, "publish_failed",
+			"failed to forward event to internal bus")
+		return
 	}
 
 	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
@@ -225,9 +227,11 @@ func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 		},
 	}
 
-	err = c.pub.Publish(topic, msg)
-	if err != nil {
+	if err = c.pub.Publish(topic, msg); err != nil {
 		c.logger.Error("Failed to publish Stripe event", log.Fields{"error": err, "topic": topic, "event_id": evtID})
+		contractio.WriteContractError(ctx, http.StatusInternalServerError, "publish_failed",
+			"failed to forward event to internal bus")
+		return
 	}
 
 	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{

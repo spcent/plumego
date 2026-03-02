@@ -53,6 +53,8 @@ const (
 	OpSubscribe Operation = "subscribe"
 	OpClose     Operation = "close"
 	OpMetrics   Operation = "metrics"
+	OpAck       Operation = "ack"
+	OpNack      Operation = "nack"
 )
 
 // Metrics captures timing and error information for broker actions.

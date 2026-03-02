@@ -78,8 +78,9 @@ type InProcBroker struct {
 
 	// cachedMemUsage stores the most recent memory usage reading.
 	// Updated by a background goroutine to avoid STW on every Publish.
-	cachedMemUsage atomic.Uint64
-	memSamplerDone chan struct{}
+	cachedMemUsage   atomic.Uint64
+	memSamplerDone   chan struct{}
+	memSamplerStop   sync.Once // guarantees memSamplerDone is closed exactly once
 
 	// consumerGroupMgr is lazily initialized for InProcPubSub backends.
 	consumerGroupMgr *pubsub.ConsumerGroupManager
@@ -636,22 +637,20 @@ func (b *InProcBroker) ReplayMessages(ctx context.Context, topic string, limit i
 	return nil
 }
 
-// Close shuts down the broker.
-func (b *InProcBroker) Close() error {
-	return b.executeWithObservability(context.Background(), OpClose, "", func() error {
+// CloseWithContext shuts down the broker, respecting the provided context for
+// any persistence operations performed during shutdown.
+func (b *InProcBroker) CloseWithContext(ctx context.Context) error {
+	return b.executeWithObservability(ctx, OpClose, "", func() error {
 		// Validate broker initialization
 		if b == nil || b.ps == nil {
 			return nil // Close is idempotent
 		}
 
 		// Stop background memory sampler if it was started.
+		// sync.Once guarantees the channel is closed exactly once even if
+		// Close() is called concurrently from multiple goroutines.
 		if b.memSamplerDone != nil {
-			select {
-			case <-b.memSamplerDone:
-				// already closed
-			default:
-				close(b.memSamplerDone)
-			}
+			b.memSamplerStop.Do(func() { close(b.memSamplerDone) })
 		}
 
 		b.closePriorityDispatchers()
@@ -685,6 +684,12 @@ func (b *InProcBroker) Close() error {
 
 		return b.ps.Close()
 	})
+}
+
+// Close shuts down the broker using a background context.
+// Use CloseWithContext to propagate a deadline or cancellation to shutdown operations.
+func (b *InProcBroker) Close() error {
+	return b.CloseWithContext(context.Background())
 }
 
 func (b *InProcBroker) handlePanic(ctx context.Context, op Operation, recovered any) error {
