@@ -178,7 +178,6 @@ func TestStreamReaderRead(t *testing.T) {
 	sr := &streamReader{
 		parent: &Conn{},
 		op:     0,
-		closed: make(chan struct{}),
 	}
 
 	sr.done = true
@@ -193,9 +192,7 @@ func TestStreamReaderRead(t *testing.T) {
 }
 
 func TestStreamReaderClose(t *testing.T) {
-	sr := &streamReader{
-		closed: make(chan struct{}),
-	}
+	sr := &streamReader{}
 
 	err := sr.Close()
 	if err != nil {
@@ -353,10 +350,10 @@ func TestWriteMessageUnknownBehavior(t *testing.T) {
 
 func TestWriterPumpFragmentation(t *testing.T) {
 	c := &Conn{
-		sendQueue:  make(chan Outbound, 1),
-		closeC:     make(chan struct{}),
-		pingPeriod: 1 * time.Second,
+		sendQueue: make(chan Outbound, 1),
+		closeC:    make(chan struct{}),
 	}
+	c.pingPeriod.Store(int64(1 * time.Second))
 
 	largeData := bytes.Repeat([]byte("x"), maxFragmentSize*2+100)
 	c.sendQueue <- Outbound{Op: OpcodeBinary, Data: largeData}
@@ -374,15 +371,15 @@ func TestWriterPumpFragmentation(t *testing.T) {
 
 func TestPongMonitor(t *testing.T) {
 	c := &Conn{
-		closeC:     make(chan struct{}),
-		lastPong:   time.Now().Add(-2 * time.Second).UnixNano(),
-		pingPeriod: 10 * time.Millisecond,
-		pongWait:   5 * time.Millisecond,
+		closeC:   make(chan struct{}),
+		lastPong: time.Now().Add(-2 * time.Second).UnixNano(),
 	}
+	c.pingPeriod.Store(int64(10 * time.Millisecond))
+	c.pongWait.Store(int64(5 * time.Millisecond))
 
 	done := make(chan bool)
 	go func() {
-		ticker := time.NewTicker(time.Duration(atomic.LoadInt64((*int64)(&c.pingPeriod))) / 2)
+		ticker := time.NewTicker(time.Duration(c.pingPeriod.Load()) / 2)
 		defer ticker.Stop()
 
 		for {
@@ -392,7 +389,7 @@ func TestPongMonitor(t *testing.T) {
 				return
 			case <-ticker.C:
 				last := time.Unix(0, atomic.LoadInt64(&c.lastPong))
-				if time.Since(last) > time.Duration(atomic.LoadInt64((*int64)(&c.pongWait))) {
+				if time.Since(last) > time.Duration(c.pongWait.Load()) {
 					c.Close()
 				}
 			}
@@ -424,7 +421,6 @@ func TestStreamReaderWithBuffer(t *testing.T) {
 	sr := &streamReader{
 		parent: &Conn{},
 		op:     0,
-		closed: make(chan struct{}),
 	}
 
 	sr.buf.WriteString("testdata")
@@ -466,7 +462,6 @@ func TestStreamReaderReadError(t *testing.T) {
 	sr := &streamReader{
 		parent:  &Conn{},
 		op:      0,
-		closed:  make(chan struct{}),
 		readErr: errors.New("test error"),
 		done:    true,
 	}
