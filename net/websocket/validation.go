@@ -186,13 +186,13 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 		}
 	}
 
+	// Append truncation marker inside the builder before extracting the string
+	// so we avoid a second string allocation from result += "...".
+	if truncated {
+		cleaned.WriteString("...")
+	}
 	result := cleaned.String()
 	sanitizerBuilderPool.Put(cleaned)
-
-	if truncated {
-		result += "..."
-	}
-
 	return result
 }
 

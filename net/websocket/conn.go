@@ -223,6 +223,33 @@ func (c *Conn) GetLastPong() time.Time {
 	return time.Unix(0, atomic.LoadInt64(&c.lastPong))
 }
 
+// WriteClose sends a WebSocket close frame with the given RFC 6455 status code
+// and human-readable reason, then closes the underlying connection.
+//
+// This initiates a proper WebSocket-level closing handshake. Use the Close*
+// constants (CloseNormalClosure, CloseGoingAway, etc.) for the status code.
+// Calling Close() directly skips the close frame and tears down TCP immediately,
+// which is correct for error conditions but not for clean shutdowns.
+//
+// Example:
+//
+//	conn.WriteClose(websocket.CloseNormalClosure, "goodbye")
+//	conn.WriteClose(websocket.CloseGoingAway, "server shutting down")
+func (c *Conn) WriteClose(code uint16, reason string) error {
+	if c.IsClosed() {
+		return ErrConnClosed
+	}
+	// RFC 6455 §5.5.1: close payload is 2-byte big-endian status code followed
+	// by a UTF-8 reason phrase (may be empty).
+	payload := make([]byte, 2+len(reason))
+	binary.BigEndian.PutUint16(payload[:2], code)
+	copy(payload[2:], reason)
+	// Write directly, bypassing sendQueue so the frame is sent even when the
+	// queue is full (e.g. during a slow-consumer shutdown).
+	_ = c.writeFrame(opcodeClose, true, payload)
+	return c.Close()
+}
+
 // ---------------- low-level frame IO ----------------
 
 func (c *Conn) readFrame() (byte, bool, []byte, error) {
@@ -252,11 +279,18 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		if _, err := io.ReadFull(c.br, ext[:]); err != nil {
 			return 0, false, nil, err
 		}
+		// RFC 6455 §5.2: the MSB of a 64-bit payload length MUST be 0.
+		// A negative int64 means the MSB is set; reject to prevent a panic in make().
 		payloadLen = int64(binary.BigEndian.Uint64(ext[:]))
+		if payloadLen < 0 {
+			return 0, false, nil, ErrProtocolError
+		}
 	default:
 		payloadLen = prefix
 	}
 
+	// Reject oversized frames before reading the mask key so we avoid
+	// a 4-byte network round-trip for frames we will reject anyway.
 	if payloadLen > atomic.LoadInt64(&c.readLimit) {
 		return 0, false, nil, ErrPayloadTooLarge
 	}
@@ -270,7 +304,17 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		if _, err := io.ReadFull(c.br, payload); err != nil {
 			return 0, false, nil, err
 		}
-		for i := int64(0); i < payloadLen; i++ {
+		// Unmask the payload. Process 4 bytes per iteration to let the compiler
+		// optimise the loop; avoids the modulo in the byte-by-byte version.
+		n := len(payload)
+		i := 0
+		for ; i+3 < n; i += 4 {
+			payload[i] ^= maskKey[0]
+			payload[i+1] ^= maskKey[1]
+			payload[i+2] ^= maskKey[2]
+			payload[i+3] ^= maskKey[3]
+		}
+		for ; i < n; i++ {
 			payload[i] ^= maskKey[i%4]
 		}
 	}

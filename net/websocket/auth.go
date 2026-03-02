@@ -132,7 +132,10 @@ func (s *simpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 		return nil, ErrInvalidToken
 	}
 	mac := hmac.New(sha256.New, s.jwtSecret)
-	mac.Write([]byte(parts[0] + "." + parts[1]))
+	// "header.payload" is the prefix of the original token string up to the
+	// second dot. Slicing avoids the extra allocation from parts[0]+"."+parts[1].
+	signingLen := len(parts[0]) + 1 + len(parts[1])
+	mac.Write([]byte(token[:signingLen]))
 	expected := mac.Sum(nil)
 	if !hmac.Equal(expected, sig) {
 		return nil, ErrInvalidToken
