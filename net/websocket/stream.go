@@ -30,6 +30,14 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 	sr.readMu.Lock()
 	defer sr.readMu.Unlock()
 
+	// Capture parent once. Close() nils sr.parent, so capturing it here
+	// into a local prevents a nil-dereference if Close() races with Read()
+	// (which is a caller contract violation, but we defend against it anyway).
+	parent := sr.parent
+	if parent == nil {
+		return 0, io.ErrClosedPipe
+	}
+
 	for {
 		if sr.buf.Len() > 0 {
 			return sr.buf.Read(p)
@@ -41,7 +49,7 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			return 0, io.EOF
 		}
 		// need to pull next frame(s) from connection
-		op, fin, payload, err := sr.parent.readFrame()
+		op, fin, payload, err := parent.readFrame()
 		if err != nil {
 			sr.readErr = err
 			sr.done = true
@@ -50,13 +58,13 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 		// control frames may appear in middle
 		switch op {
 		case opcodePing:
-			_ = sr.parent.writeFrame(opcodePong, true, payload)
+			_ = parent.writeFrame(opcodePong, true, payload)
 			continue
 		case opcodePong:
-			atomic.StoreInt64(&sr.parent.lastPong, time.Now().UnixNano())
+			atomic.StoreInt64(&parent.lastPong, time.Now().UnixNano())
 			continue
 		case opcodeClose:
-			_ = sr.parent.writeFrame(opcodeClose, true, payload)
+			_ = parent.writeFrame(opcodeClose, true, payload)
 			sr.readErr = io.EOF
 			sr.done = true
 			return 0, io.EOF
@@ -144,18 +152,24 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 	}
 }
 
-// ReadMessage reads a complete message into memory
+// ReadMessage reads a complete message into memory.
 func (c *Conn) ReadMessage() (byte, []byte, error) {
 	op, stream, err := c.ReadMessageStream()
 	if err != nil {
 		return 0, nil, err
 	}
-	defer stream.Close()
 
-	buf := &bytes.Buffer{}
+	buf := msgBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
 	_, err = io.Copy(buf, stream)
+	_ = stream.Close()
 	if err != nil {
+		msgBufPool.Put(buf)
 		return 0, nil, err
 	}
-	return op, buf.Bytes(), nil
+	// Copy data before returning buf to pool; callers expect to own the slice.
+	data := make([]byte, buf.Len())
+	copy(data, buf.Bytes())
+	msgBufPool.Put(buf)
+	return op, data, nil
 }

@@ -93,7 +93,8 @@ func (c *Conn) WriteJSON(v any) error {
 
 // writerPump consumes sendQueue and writes frames to client. It fragments large messages.
 func (c *Conn) writerPump() {
-	ticker := time.NewTicker(time.Duration(c.pingPeriod.Load()))
+	period := time.Duration(c.pingPeriod.Load())
+	ticker := time.NewTicker(period)
 	defer func() {
 		ticker.Stop()
 		c.Close()
@@ -136,7 +137,11 @@ func (c *Conn) writerPump() {
 				offset = end
 			}
 		case <-ticker.C:
-			// send ping
+			// Pick up any runtime change to ping period made via SetPingPeriod.
+			if newPeriod := time.Duration(c.pingPeriod.Load()); newPeriod != period {
+				period = newPeriod
+				ticker.Reset(period)
+			}
 			_ = c.writeFrame(opcodePing, true, []byte("ping"))
 		}
 	}
@@ -144,13 +149,19 @@ func (c *Conn) writerPump() {
 
 // pongMonitor closes connection if no pong received within pongWait
 func (c *Conn) pongMonitor() {
-	ticker := time.NewTicker(time.Duration(c.pingPeriod.Load()) / 2)
+	period := time.Duration(c.pingPeriod.Load()) / 2
+	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-c.closeC:
 			return
 		case <-ticker.C:
+			// Pick up any runtime change to ping period made via SetPingPeriod.
+			if newPeriod := time.Duration(c.pingPeriod.Load()) / 2; newPeriod != period {
+				period = newPeriod
+				ticker.Reset(period)
+			}
 			last := time.Unix(0, atomic.LoadInt64(&c.lastPong))
 			if time.Since(last) > time.Duration(c.pongWait.Load()) {
 				_ = c.Close()
