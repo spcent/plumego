@@ -14,8 +14,10 @@ var ErrQuotaExceeded = errors.New("quota exceeded")
 type QuotaConfig struct {
 	RequestsPerMinute int
 	TokensPerMinute   int
-	// Limits defines additional quota windows (hour/day/month, etc.).
-	// When non-empty, Limits take precedence over per-minute settings.
+	// Limits defines quota windows (minute/hour/day/month).
+	// When non-empty, Limits take precedence over RequestsPerMinute/TokensPerMinute.
+	// InMemoryQuotaManager enforces only the first valid limit window.
+	// Use WindowQuotaManager for full multi-window enforcement.
 	Limits []QuotaLimit
 }
 
@@ -41,11 +43,15 @@ type QuotaManager interface {
 
 type quotaCounter struct {
 	windowStart time.Time
+	windowEnd   time.Time
 	requests    int
 	tokens      int
 }
 
-// InMemoryQuotaManager is a fixed-window, in-memory quota manager.
+// InMemoryQuotaManager is a single-window in-memory quota manager.
+// It respects QuotaConfig.Limits by using the first valid limit entry.
+// For multi-window enforcement (hour + day + month simultaneously),
+// use WindowQuotaManager with an InMemoryQuotaStore instead.
 type InMemoryQuotaManager struct {
 	mu       sync.Mutex
 	provider QuotaConfigProvider
@@ -61,6 +67,8 @@ func NewInMemoryQuotaManager(provider QuotaConfigProvider) *InMemoryQuotaManager
 }
 
 // Allow checks quota usage for a tenant.
+// It uses normalizeQuotaLimits to resolve the effective limit, honouring
+// QuotaConfig.Limits when set and falling back to RequestsPerMinute/TokensPerMinute.
 func (m *InMemoryQuotaManager) Allow(ctx context.Context, tenantID string, req QuotaRequest) (QuotaResult, error) {
 	if m == nil || m.provider == nil {
 		return QuotaResult{Allowed: true}, nil
@@ -78,21 +86,36 @@ func (m *InMemoryQuotaManager) Allow(ctx context.Context, tenantID string, req Q
 		req.Requests = 1
 	}
 
-	limitRequests := cfg.RequestsPerMinute
-	limitTokens := cfg.TokensPerMinute
+	// Resolve effective limits: Limits array takes precedence.
+	limits := normalizeQuotaLimits(cfg)
+	if len(limits) == 0 {
+		return QuotaResult{Allowed: true}, nil
+	}
+
+	// Use the first limit entry as the active window.
+	// Users needing simultaneous multi-window checks should use WindowQuotaManager.
+	limit := limits[0]
+	limitRequests := limit.Requests
+	limitTokens := limit.Tokens
 
 	if limitRequests <= 0 && limitTokens <= 0 {
 		return QuotaResult{Allowed: true}, nil
 	}
 
-	windowStart := req.Now.Truncate(time.Minute)
+	windowStart := quotaWindowStart(req.Now, limit.Window)
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Evict stale counters periodically to prevent unbounded memory growth.
+	m.evictStaleLocked(req.Now)
+
 	counter := m.counters[tenantID]
 	if counter == nil || !counter.windowStart.Equal(windowStart) {
-		counter = &quotaCounter{windowStart: windowStart}
+		counter = &quotaCounter{
+			windowStart: windowStart,
+			windowEnd:   quotaWindowEnd(windowStart, limit.Window),
+		}
 		m.counters[tenantID] = counter
 	}
 
@@ -100,7 +123,7 @@ func (m *InMemoryQuotaManager) Allow(ctx context.Context, tenantID string, req Q
 	nextTokens := counter.tokens + req.Tokens
 
 	if (limitRequests > 0 && nextRequests > limitRequests) || (limitTokens > 0 && nextTokens > limitTokens) {
-		retryAfter := time.Until(windowStart.Add(time.Minute))
+		retryAfter := time.Until(counter.windowEnd)
 		if retryAfter < 0 {
 			retryAfter = 0
 		}
@@ -120,6 +143,16 @@ func (m *InMemoryQuotaManager) Allow(ctx context.Context, tenantID string, req Q
 		RemainingRequests: remaining(limitRequests, counter.requests),
 		RemainingTokens:   remaining(limitTokens, counter.tokens),
 	}, nil
+}
+
+// evictStaleLocked removes counters whose window has expired.
+// Must be called with m.mu held.
+func (m *InMemoryQuotaManager) evictStaleLocked(now time.Time) {
+	for tenantID, counter := range m.counters {
+		if now.After(counter.windowEnd) {
+			delete(m.counters, tenantID)
+		}
+	}
 }
 
 func remaining(limit, used int) int {

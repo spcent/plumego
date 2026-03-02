@@ -137,6 +137,7 @@ type (
 	TenantRoutePolicyStore    = tenant.RoutePolicyStore
 	TenantRoutePolicyProvider = tenant.RoutePolicyProvider
 	TenantHooks               = tenant.Hooks
+	TenantExtractor           = tenant.TenantExtractor
 	TenantQuotaRequest        = tenant.QuotaRequest
 	TenantQuotaResult         = tenant.QuotaResult
 	TenantPolicyRequest       = tenant.PolicyRequest
@@ -146,6 +147,7 @@ type (
 	TenantResolveInfo         = tenant.ResolveInfo
 	TenantQuotaDecision       = tenant.QuotaDecision
 	TenantPolicyDecision      = tenant.PolicyDecision
+	TenantRateLimitDecision   = tenant.RateLimitDecision
 )
 
 // Tenant configuration and middleware options.
@@ -168,6 +170,13 @@ var (
 	TenantIDFromContext            = tenant.TenantIDFromContext
 	ContextWithTenantID            = tenant.ContextWithTenantID
 	RequestWithTenantID            = tenant.RequestWithTenantID
+	ValidateTenantID              = tenant.ValidateTenantID
+	TenantFromHeader              = tenant.FromHeader
+	TenantFromQuery               = tenant.FromQuery
+	TenantFromCookie              = tenant.FromCookie
+	TenantFromSubdomain           = tenant.FromSubdomain
+	TenantFromContextValue        = tenant.FromContextValue
+	TenantChain                   = tenant.Chain
 )
 
 // Tenant database configuration options.
@@ -191,6 +200,7 @@ var (
 // Tenant errors.
 var (
 	ErrTenantNotFound      = tenant.ErrTenantNotFound
+	ErrInvalidTenantID     = tenant.ErrInvalidTenantID
 	ErrQuotaExceeded       = tenant.ErrQuotaExceeded
 	ErrRateLimitExceeded   = tenant.ErrRateLimitExceeded
 	ErrRoutePolicyNotFound = tenant.ErrRoutePolicyNotFound

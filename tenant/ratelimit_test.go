@@ -21,9 +21,13 @@ func TestInMemoryRateLimitProvider(t *testing.T) {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 
-	_, err = provider.RateLimitConfig(context.Background(), "missing")
-	if err != ErrTenantNotFound {
-		t.Fatalf("expected ErrTenantNotFound, got %v", err)
+	// Unknown tenant returns zero config (unlimited) with no error.
+	cfg, err = provider.RateLimitConfig(context.Background(), "missing")
+	if err != nil {
+		t.Fatalf("expected nil error for unconfigured tenant, got %v", err)
+	}
+	if cfg.RequestsPerSecond != 0 || cfg.Burst != 0 {
+		t.Fatalf("expected zero config for unconfigured tenant, got %+v", cfg)
 	}
 }
 

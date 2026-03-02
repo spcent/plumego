@@ -1,6 +1,7 @@
 package core
 
 import (
+	"net/http"
 	"time"
 
 	log "github.com/spcent/plumego/log"
@@ -316,26 +317,66 @@ func WithTenantConfigManager(manager tenants.ConfigManager) Option {
 	}
 }
 
-// TenantMiddlewareOptions configures tenant middleware chain.
+// TenantMiddlewareOptions configures the tenant middleware chain registered by WithTenantMiddleware.
 type TenantMiddlewareOptions struct {
-	// HeaderName is the HTTP header to extract tenant ID from (default: "X-Tenant-ID")
+	// ── Resolver ─────────────────────────────────────────────────────────────
+
+	// HeaderName is the HTTP header to extract tenant ID from (default: "X-Tenant-ID").
 	HeaderName string
-	// AllowMissing allows requests without tenant ID (default: false)
+	// Extractor is a custom function to extract tenant ID from the request.
+	// When set, takes precedence over HeaderName (Principal check still runs first).
+	Extractor tenants.TenantExtractor
+	// AllowMissing allows requests without tenant ID (default: false).
 	AllowMissing bool
-	// DisablePrincipal disables tenant extraction from Principal (default: false)
+	// DisablePrincipal disables tenant extraction from the authenticated Principal.
 	DisablePrincipal bool
-	// RateLimiter enforces per-tenant rate limits (optional)
+	// OnMissing is called when tenant ID is required but not found.
+	OnMissing func(http.ResponseWriter, *http.Request)
+
+	// ── Rate limiter ──────────────────────────────────────────────────────────
+
+	// RateLimiter enforces per-tenant rate limits (optional).
 	RateLimiter tenants.RateLimiter
-	// QuotaManager enforces per-tenant quota limits (optional)
+	// RateLimitEstimator returns the token cost for a request (default: 1).
+	RateLimitEstimator func(*http.Request) int64
+	// OnRateLimitRejected is called when a request is rejected by the rate limiter.
+	OnRateLimitRejected func(http.ResponseWriter, *http.Request, tenants.RateLimitResult)
+
+	// ── Quota ─────────────────────────────────────────────────────────────────
+
+	// QuotaManager enforces per-tenant quota limits (optional).
 	QuotaManager tenants.QuotaManager
-	// PolicyEvaluator enforces per-tenant policies (optional)
+	// QuotaTokensHeader is the request header carrying the token count
+	// (default: "X-Token-Count").
+	QuotaTokensHeader string
+	// QuotaEstimator returns the token cost for a request.
+	// Takes precedence over QuotaTokensHeader when set.
+	QuotaEstimator func(*http.Request) int
+	// OnQuotaRejected is called when a request is rejected by the quota manager.
+	OnQuotaRejected func(http.ResponseWriter, *http.Request, tenants.QuotaResult)
+
+	// ── Policy ────────────────────────────────────────────────────────────────
+
+	// PolicyEvaluator enforces per-tenant policies (optional).
 	PolicyEvaluator tenants.PolicyEvaluator
-	// Hooks provides callbacks for tenant resolution, quota, and policy events
+	// PolicyModelHeader is the request header carrying the model name
+	// (default: "X-Model").
+	PolicyModelHeader string
+	// PolicyToolHeader is the request header carrying the tool name
+	// (default: "X-Tool").
+	PolicyToolHeader string
+	// OnPolicyDenied is called when a request is denied by the policy evaluator.
+	OnPolicyDenied func(http.ResponseWriter, *http.Request, tenants.PolicyResult)
+
+	// ── Hooks ─────────────────────────────────────────────────────────────────
+
+	// Hooks provides callbacks for tenant resolution, rate limit, quota, and policy events.
 	Hooks tenants.Hooks
 }
 
-// WithTenantMiddleware adds tenant resolution, quota, and policy middleware.
-// This should be used after WithTenantConfigManager.
+// WithTenantMiddleware adds the full tenant middleware chain:
+// resolver → rate limiter → quota → policy.
+// Each stage is only added when the relevant option is non-nil.
 //
 // Example:
 //
@@ -348,35 +389,45 @@ type TenantMiddlewareOptions struct {
 //	)
 func WithTenantMiddleware(options TenantMiddlewareOptions) Option {
 	return func(a *App) {
-		// Add tenant resolver middleware
+		// 1. Tenant resolver — always added.
 		a.Use(tenant.TenantResolver(tenant.TenantResolverOptions{
 			HeaderName:       options.HeaderName,
+			Extractor:        options.Extractor,
 			AllowMissing:     options.AllowMissing,
 			DisablePrincipal: options.DisablePrincipal,
+			OnMissing:        options.OnMissing,
 			Hooks:            options.Hooks,
 		}))
 
-		// Add rate limiting if configured
+		// 2. Rate limiter (optional).
 		if options.RateLimiter != nil {
 			a.Use(tenant.TenantRateLimit(tenant.TenantRateLimitOptions{
-				Limiter: options.RateLimiter,
-				Hooks:   options.Hooks,
+				Limiter:    options.RateLimiter,
+				Estimator:  options.RateLimitEstimator,
+				Hooks:      options.Hooks,
+				OnRejected: options.OnRateLimitRejected,
 			}))
 		}
 
-		// Add quota enforcement if configured
+		// 3. Quota enforcement (optional).
 		if options.QuotaManager != nil {
 			a.Use(tenant.TenantQuota(tenant.TenantQuotaOptions{
-				Manager: options.QuotaManager,
-				Hooks:   options.Hooks,
+				Manager:      options.QuotaManager,
+				TokensHeader: options.QuotaTokensHeader,
+				Estimator:    options.QuotaEstimator,
+				Hooks:        options.Hooks,
+				OnRejected:   options.OnQuotaRejected,
 			}))
 		}
 
-		// Add policy enforcement if configured
+		// 4. Policy enforcement (optional).
 		if options.PolicyEvaluator != nil {
 			a.Use(tenant.TenantPolicy(tenant.TenantPolicyOptions{
-				Evaluator: options.PolicyEvaluator,
-				Hooks:     options.Hooks,
+				Evaluator:   options.PolicyEvaluator,
+				ModelHeader: options.PolicyModelHeader,
+				ToolHeader:  options.PolicyToolHeader,
+				Hooks:       options.Hooks,
+				OnDenied:    options.OnPolicyDenied,
 			}))
 		}
 	}

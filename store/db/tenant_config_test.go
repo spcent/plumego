@@ -234,8 +234,11 @@ func TestTenantCache_ConcurrentAccess(t *testing.T) {
 func TestParseTenantConfigJSON_Valid(t *testing.T) {
 	cfg := &tenant.Config{}
 	err := parseTenantConfigJSON(cfg,
+		sql.NullString{Valid: false},
 		sql.NullString{String: `["gpt-4","claude"]`, Valid: true},
 		sql.NullString{String: `["tool1"]`, Valid: true},
+		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
 		sql.NullString{String: `{"key":"val"}`, Valid: true},
 	)
 	if err != nil {
@@ -258,6 +261,9 @@ func TestParseTenantConfigJSON_NullFields(t *testing.T) {
 		sql.NullString{Valid: false},
 		sql.NullString{Valid: false},
 		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -270,7 +276,10 @@ func TestParseTenantConfigJSON_NullFields(t *testing.T) {
 func TestParseTenantConfigJSON_InvalidModelsJSON(t *testing.T) {
 	cfg := &tenant.Config{}
 	err := parseTenantConfigJSON(cfg,
+		sql.NullString{Valid: false},
 		sql.NullString{String: `{invalid`, Valid: true},
+		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
 		sql.NullString{Valid: false},
 		sql.NullString{Valid: false},
 	)
@@ -283,7 +292,10 @@ func TestParseTenantConfigJSON_InvalidToolsJSON(t *testing.T) {
 	cfg := &tenant.Config{}
 	err := parseTenantConfigJSON(cfg,
 		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
 		sql.NullString{String: `not-json`, Valid: true},
+		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
 		sql.NullString{Valid: false},
 	)
 	if err == nil {
@@ -294,6 +306,9 @@ func TestParseTenantConfigJSON_InvalidToolsJSON(t *testing.T) {
 func TestParseTenantConfigJSON_InvalidMetadataJSON(t *testing.T) {
 	cfg := &tenant.Config{}
 	err := parseTenantConfigJSON(cfg,
+		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
+		sql.NullString{Valid: false},
 		sql.NullString{Valid: false},
 		sql.NullString{Valid: false},
 		sql.NullString{String: `[broken`, Valid: true},

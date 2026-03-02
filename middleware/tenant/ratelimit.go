@@ -34,9 +34,8 @@ func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
 
 			tokens := int64(1)
 			if options.Estimator != nil {
-				tokens = options.Estimator(r)
-				if tokens <= 0 {
-					tokens = 1
+				if t := options.Estimator(r); t > 0 {
+					tokens = t
 				}
 			}
 
@@ -45,7 +44,23 @@ func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
 				Now:    time.Now().UTC(),
 			})
 			allowed := err == nil && result.Allowed
-			status := http.StatusTooManyRequests
+
+			// Status reflects the actual outcome: 200 when allowed, 429 when denied.
+			status := http.StatusOK
+			if !allowed {
+				status = http.StatusTooManyRequests
+			}
+
+			options.Hooks.RateLimit(r.Context(), tenant.RateLimitDecision{
+				TenantID:   tenantID,
+				Allowed:    allowed,
+				Tokens:     tokens,
+				Remaining:  result.Remaining,
+				Limit:      result.Limit,
+				Burst:      result.Burst,
+				RetryAfter: result.RetryAfter,
+				Status:     status,
+			})
 
 			if allowed {
 				next.ServeHTTP(w, r)
