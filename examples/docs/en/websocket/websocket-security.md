@@ -139,19 +139,19 @@ default:
 
 ### 4. Server Integration Security Validation (`server.go`)
 
-Added to `ServeWSWithAuth`:
+Added to `ServeWSWithConfig` (and used by `ServeWSWithAuth` wrapper):
 ```go
 // 1. Validate WebSocket Key
 if err := ValidateWebSocketKey(key); err != nil {
-    securityMetrics.InvalidWebSocketKeys++
-    http.Error(w, err.Error(), http.StatusBadRequest)
+    hubMetrics.InvalidWSKeys++
+    contract.WriteError(w, r, contract.NewBadRequestError(err.Error()))
     return
 }
 
 // 2. Enhanced authentication error handling
 if !auth.CheckRoomPassword(room, roomPwd) {
-    securityMetrics.RejectedConnections++
-    http.Error(w, "forbidden: bad room password", http.StatusForbidden)
+    hubMetrics.SecurityRejections++
+    contract.WriteError(w, r, contract.NewForbiddenError("forbidden: bad room password"))
     return
 }
 
@@ -159,10 +159,10 @@ if !auth.CheckRoomPassword(room, roomPwd) {
 if token != "" {
     payload, err := auth.VerifyJWT(token)
     if err != nil {
-        securityMetrics.RejectedConnections++
+        hubMetrics.SecurityRejections++
         return
     }
-    securityMetrics.SuccessfulAuthentications++
+    hubMetrics.SuccessfulAuths++
 }
 ```
 
@@ -173,9 +173,9 @@ if token != "" {
 type SecurityMetrics struct {
     InvalidJWTSecrets         uint64
     WeakRoomPasswords         uint64
-    InvalidWebSocketKeys      uint64
-    BroadcastQueueFull        uint64
-    RejectedConnections       uint64
+    InvalidWebSocketKeys      uint64 // compatibility-only; use Hub.Metrics().InvalidWSKeys
+    BroadcastQueueFull        uint64 // compatibility-only; use Hub.Metrics().BroadcastDropped
+    RejectedConnections       uint64 // compatibility-only; use Hub.Metrics().SecurityRejections
     SuccessfulAuthentications uint64
 }
 ```
@@ -183,9 +183,9 @@ type SecurityMetrics struct {
 #### Metric Collection Points
 - JWT validation failure → `InvalidJWTSecrets`
 - Weak password setting → `WeakRoomPasswords`
-- Invalid WebSocket Key → `InvalidWebSocketKeys`
-- Broadcast queue full → `BroadcastQueueFull`
-- Connection rejected → `RejectedConnections`
+- Invalid WebSocket Key → `Hub.Metrics().InvalidWSKeys`
+- Broadcast queue full → `Hub.Metrics().BroadcastDropped`
+- Connection rejected → `Hub.Metrics().SecurityRejections`
 - Authentication success → `SuccessfulAuthentications`
 
 ## Usage Examples
@@ -238,18 +238,30 @@ err = auth.SetRoomPassword("admin", "weak")
 ### 3. Monitor Security Metrics
 
 ```go
-// Get security metrics
-metrics := GetSecurityMetrics()
-fmt.Printf("Invalid JWT: %d\n", metrics.InvalidJWTSecrets)
-fmt.Printf("Weak Passwords: %d\n", metrics.WeakRoomPasswords)
-fmt.Printf("Broadcast Queue Full: %d\n", metrics.BroadcastQueueFull)
+// Auth-focused metrics (SecureRoomAuth)
+authMetrics := GetSecurityMetrics()
+fmt.Printf("Invalid JWT: %d\n", authMetrics.InvalidJWTSecrets)
+fmt.Printf("Weak Passwords: %d\n", authMetrics.WeakRoomPasswords)
+
+// Connection / handshake / broadcast metrics (Hub)
+hubMetrics := hub.Metrics()
+fmt.Printf("Invalid WS Keys: %d\n", hubMetrics.InvalidWSKeys)
+fmt.Printf("Security Rejections: %d\n", hubMetrics.SecurityRejections)
+fmt.Printf("Dropped Broadcasts: %d\n", hubMetrics.BroadcastDropped)
 ```
 
 ### 4. Integrate into HTTP Server
 
 ```go
 http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-    websocket.ServeWSWithAuth(w, r, hub, auth, 64, 50*time.Millisecond, websocket.SendBlock)
+    websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+        Hub:            hub,
+        Auth:           auth,
+        QueueSize:      64,
+        SendTimeout:    50 * time.Millisecond,
+        SendBehavior:   websocket.SendBlock,
+        AllowedOrigins: []string{"https://app.example.com"},
+    })
 })
 ```
 
@@ -298,12 +310,17 @@ cfg := HubConfig{
 hub := websocket.NewHubWithConfig(cfg)
 ```
 
-3. **Add security validation**:
+3. **Prefer explicit server configuration**:
 ```go
-// Before ServeWSWithAuth
-if err := websocket.ValidateWebSocketKey(key); err != nil {
-    return
-}
+websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+    Hub:            hub,
+    Auth:           auth,
+    QueueSize:      64,
+    SendTimeout:    50 * time.Millisecond,
+    SendBehavior:   websocket.SendBlock,
+    AllowedOrigins: []string{"https://app.example.com"},
+    ReadLimit:      1 << 20, // 1MB
+})
 ```
 
 ### Configuration Recommendations

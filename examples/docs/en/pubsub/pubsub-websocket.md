@@ -4,7 +4,7 @@ The **pubsub** package and WebSocket helpers deliver lightweight real-time messa
 
 ## Pub/Sub bus
 - Create with `pubsub.New()` and inject via `core.WithPubSub(...)` so other modules (webhooks, WebSocket hub) share the same bus.
-- Topics support wildcards: `in.github.*`, `in.stripe.*`, `ws.broadcast`.
+- Topics support wildcards: `in.github.*`, `in.stripe.*`.
 - Subscribe with context-aware handlers; return errors to surface failures in logs and metrics.
 - Enable the debug snapshot UI by setting `AppConfig.PubSub.Enabled` (or `PUBSUB_DEBUG_ENABLED=true`), which exposes a simple introspection page.
 
@@ -21,18 +21,21 @@ _ = bus.Publish(context.Background(), "orders.created", []byte(`{"id":1}`))
 - Configure through `core.ConfigureWebSocket()` or `core.ConfigureWebSocketWithOptions(core.WebSocketConfig)`.
 - Default route `/ws` expects a JWT signed with `WebSocketConfig.Secret`. Issue tokens from your app or a CLI.
 - Optional broadcast endpoint (default `/_admin/broadcast`) is guarded by the same secret; disable via `BroadcastEnabled`.
-- Tune timing (`WriteWait`, `ReadWait`, `PingInterval`) and buffers (`SendQueueSize`, `HubWorkers`) to match client behavior.
+- Tune capacity and backpressure with `WorkerCount`, `JobQueueSize`, `SendQueueSize`, `SendTimeout`, and `SendBehavior`.
 
 ```go
+import ws "github.com/spcent/plumego/net/websocket"
+
 bus := pubsub.New()
 app := core.New(core.WithPubSub(bus))
 wsCfg := core.DefaultWebSocketConfig()
 wsCfg.Secret = []byte(os.Getenv("WS_SECRET"))
-_, _ = app.ConfigureWebSocketWithOptions(wsCfg)
+hub, _ := app.ConfigureWebSocketWithOptions(wsCfg)
 
 // Fan out inbound events to connected clients.
-bus.Subscribe("in.github.*", func(ctx context.Context, evt pubsub.Event) error {
-    return bus.Publish(ctx, core.WebSocketBroadcastTopic, evt.Payload)
+_ = bus.Subscribe("in.github.*", func(ctx context.Context, evt pubsub.Event) error {
+    hub.BroadcastAll(ws.OpcodeText, evt.Payload)
+    return nil
 })
 ```
 
@@ -45,9 +48,10 @@ bus.Subscribe("in.github.*", func(ctx context.Context, evt pubsub.Event) error {
 ## Operational tips
 - Use `context.WithTimeout` inside subscribers to avoid stuck workers when downstream systems slow down.
 - Namespacing topics (`in.*`, `out.*`, `ws.*`) keeps dashboards and filters organized.
-- Load-test hub buffers; increase `SendQueueSize` and `HubWorkers` if clients burst data or reconnect frequently.
+- Load-test hub buffers; increase `SendQueueSize` and `WorkerCount` if clients burst data or reconnect frequently.
 
 ## Where to look in the repo
 - `pubsub/pubsub.go`: in-process bus implementation.
-- `core/websocket.go`: hub configuration, JWT validation, broadcast handling, topic constants.
+- `core/components/websocket/websocket.go`: component wiring and broadcast endpoint protection.
+- `core/websocket_wrapper.go`: app-level `ConfigureWebSocket*` APIs.
 - `examples/reference/main.go`: wiring inbound webhooks to Pub/Sub and WebSocket broadcasts.

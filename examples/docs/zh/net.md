@@ -409,7 +409,7 @@ cfg.AllowPrivateNetwork = true
 
 ## WebSocket (`net/websocket`)
 
-See [net/websocket/README.md](websocket/README.md) for detailed documentation.
+详见 [docs/modules/net/websocket/README.md](../../../docs/modules/net/websocket/README.md)。
 
 ## Performance Considerations
 

@@ -270,11 +270,14 @@ go func() {
 
 ```go
 // Store custom data
-conn.Metadata["user_id"] = "12345"
-conn.Metadata["role"] = "admin"
+conn.SetMetadata("user_id", "12345")
+conn.SetMetadata("role", "admin")
 
 // Retrieve later
-userID := conn.Metadata["user_id"]
+userID, ok := conn.GetMetadata("user_id")
+if ok {
+    fmt.Println(userID)
+}
 ```
 
 ### Worker Pool Tuning

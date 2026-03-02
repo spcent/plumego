@@ -1,268 +1,102 @@
 # WebSocket Hub
 
-> **Package**: `github.com/spcent/plumego/net/websocket` | **Feature**: Real-time connections
+> **Package**: `github.com/spcent/plumego/net/websocket`
 
 ## Overview
 
-The `websocket` package provides a WebSocket hub with JWT authentication, channel-based broadcasting, connection management, and security features.
+`net/websocket` provides a standard-library-only WebSocket server implementation with:
+
+- RFC6455 frame handling (text/binary/control frames)
+- Room-based broadcast hub with worker pool
+- Bounded per-connection send queues (`SendBlock` / `SendDrop` / `SendClose`)
+- JWT + room-password authentication
+- Optional origin allow-list validation
+- Message validation and connection metadata helpers
 
 ## Quick Start
 
 ```go
-import "github.com/spcent/plumego/net/websocket"
+package main
 
-// Create hub
-hub := websocket.NewHub(
-    websocket.WithJWTSecret(os.Getenv("WS_SECRET")),
-    websocket.WithMaxConnections(10000),
-    websocket.WithPingInterval(30*time.Second),
+import (
+    "net/http"
+    "time"
+
+    "github.com/spcent/plumego/net/websocket"
 )
-go hub.Run()
 
-// Register WebSocket endpoint
-app.Get("/ws", hub.Handler())
+func main() {
+    hub := websocket.NewHubWithConfig(websocket.HubConfig{
+        WorkerCount:        4,
+        JobQueueSize:       1024,
+        MaxConnections:     10000,
+        MaxRoomConnections: 1000,
+    })
+    defer hub.Stop()
 
-// Broadcast to all connections
-hub.Broadcast("channel", []byte(`{"type":"update","data":{}}`))
+    auth := websocket.NewSimpleRoomAuth([]byte("your-32-byte-secret"))
+    auth.SetRoomPassword("chat", "chat-room-password")
 
-// Send to specific user
-hub.SendToUser("user-123", []byte(`{"type":"notification","message":"Hello!"}`))
+    http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+        websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+            Hub:            hub,
+            Auth:           auth,
+            QueueSize:      256,
+            SendTimeout:    200 * time.Millisecond,
+            SendBehavior:   websocket.SendBlock,
+            AllowedOrigins: []string{"https://app.example.com"},
+            ReadLimit:      1 << 20, // 1MB
+        })
+    })
+
+    _ = http.ListenAndServe(":8080", nil)
+}
 ```
 
 ## Authentication
 
-WebSocket connections are authenticated via JWT tokens passed as query parameters:
+Supported by `RoomAuthenticator`:
 
-```
-ws://localhost:8080/ws?token=<jwt-token>
-```
+- `NewSimpleRoomAuth(secret)`
+- `NewSecureRoomAuth(secret, SecurityConfig)`
 
-```go
-hub := websocket.NewHub(
-    websocket.WithJWTSecret(os.Getenv("WS_SECRET")),
-    websocket.WithTokenParam("token"),  // Default: "token"
-    websocket.WithTokenValidator(func(token string) (*Claims, error) {
-        return jwtManager.Verify(token, jwt.TokenTypeAccess)
-    }),
-)
-```
+Handshake input:
 
-**Client-side**:
-```javascript
-const token = await getAuthToken();
-const ws = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
+- room: `?room=chat`
+- room password: `?room_password=...`
+- token: `Authorization: Bearer <token>` or `?token=...`
 
-ws.onopen = () => console.log('Connected');
-ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    handleMessage(msg);
-};
-ws.onclose = (event) => {
-    console.log('Disconnected:', event.code, event.reason);
-    // Reconnect logic
-    setTimeout(() => connect(), 3000);
-};
-```
+## Server Config
 
-## Channels
+`ServeWSWithConfig` uses `ServerConfig`:
 
-Channels enable topic-based message routing:
+- `Hub`, `Auth` (required)
+- `QueueSize`, `SendTimeout`, `SendBehavior`
+- `AllowedOrigins` (empty means allow all)
+- `ReadLimit` (max inbound frame payload size)
+- `MessageValidation` (text-message validation rules)
 
-```go
-// Client subscribes to channels by sending a message
-// {"type": "subscribe", "channels": ["room-123", "notifications"]}
+When `ReadLimit` is set, text-message validation max length is clamped to the same upper bound.
 
-// Server broadcasts to channel
-hub.Broadcast("room-123", []byte(`{"type":"message","content":"Hello room!"}`))
-hub.Broadcast("notifications", []byte(`{"type":"notification","count":5}`))
-```
+## Hub Semantics
 
-### Channel Management
+`MaxConnections` and `GetTotalCount()` are based on **room registrations**.
 
-```go
-// Subscribe a connection to a channel
-hub.Subscribe(connID, "room-123")
+- One connection in one room = 1
+- One connection joined to 3 rooms = 3
 
-// Unsubscribe
-hub.Unsubscribe(connID, "room-123")
+Use `BroadcastRoom(room, op, data)` for room broadcast and `BroadcastAll(op, data)` for global broadcast.
 
-// List connections in a channel
-connections := hub.ChannelConnections("room-123")
-fmt.Printf("Users in room: %d\n", len(connections))
-```
+After `hub.Stop()`, new joins are rejected with `ErrHubStopped`.
 
-## Connection Handlers
+## Conn Helpers
 
-```go
-hub := websocket.NewHub(
-    websocket.WithJWTSecret(secret),
+- `WriteText`, `WriteBinary`, `WriteJSON`, `WriteMessage`
+- `ReadMessage`, `ReadMessageStream`
+- `SetReadLimit`, `SetPingPeriod`, `SetPongWait`
+- `SetMetadata`, `GetMetadata`, `DeleteMetadata`, `RangeMetadata`
 
-    // Called when client connects
-    websocket.OnConnect(func(conn *websocket.Conn) {
-        log.Infof("Client connected: userID=%s", conn.UserID)
+## Notes
 
-        // Send welcome message
-        conn.Send([]byte(`{"type":"connected","message":"Welcome!"}`))
-
-        // Auto-subscribe to user's notification channel
-        hub.Subscribe(conn.ID, "user:"+conn.UserID)
-
-        // Track in presence system
-        presence.SetOnline(conn.UserID)
-    }),
-
-    // Called when client disconnects
-    websocket.OnDisconnect(func(conn *websocket.Conn, err error) {
-        log.Infof("Client disconnected: userID=%s", conn.UserID)
-        presence.SetOffline(conn.UserID)
-    }),
-
-    // Called for each message received from client
-    websocket.OnMessage(func(conn *websocket.Conn, msg []byte) {
-        var event struct {
-            Type string `json:"type"`
-        }
-        json.Unmarshal(msg, &event)
-
-        switch event.Type {
-        case "subscribe":
-            handleSubscribe(hub, conn, msg)
-        case "ping":
-            conn.Send([]byte(`{"type":"pong"}`))
-        case "message":
-            handleMessage(hub, conn, msg)
-        }
-    }),
-)
-```
-
-## Targeted Messaging
-
-```go
-// Send to specific user (all their connections)
-hub.SendToUser("user-123", payload)
-
-// Send to specific connection
-hub.SendToConn(connID, payload)
-
-// Broadcast to channel (all subscribers)
-hub.Broadcast("room-123", payload)
-
-// Broadcast to all connections
-hub.BroadcastAll(payload)
-
-// Broadcast excluding sender
-hub.BroadcastExclude("room-123", senderConnID, payload)
-```
-
-## Connection Info
-
-```go
-// Get connection details
-conn, err := hub.GetConn(connID)
-if err == nil {
-    conn.ID          // Unique connection ID
-    conn.UserID      // Authenticated user ID
-    conn.TenantID    // Tenant (if multi-tenant)
-    conn.Channels    // Subscribed channels
-    conn.RemoteAddr  // Client IP address
-    conn.ConnectedAt // Connection timestamp
-    conn.Metadata    // Custom metadata
-}
-
-// List all active connections
-connections := hub.Connections()
-fmt.Printf("Active connections: %d\n", len(connections))
-
-// Check if user is online
-online := hub.IsUserOnline("user-123")
-```
-
-## Chat Room Example
-
-```go
-type ChatMessage struct {
-    Type    string `json:"type"`
-    Room    string `json:"room"`
-    Content string `json:"content"`
-    UserID  string `json:"user_id"`
-}
-
-hub := websocket.NewHub(
-    websocket.WithJWTSecret(secret),
-    websocket.OnMessage(func(conn *websocket.Conn, msg []byte) {
-        var chatMsg ChatMessage
-        json.Unmarshal(msg, &chatMsg)
-        chatMsg.UserID = conn.UserID
-
-        if chatMsg.Type == "join" {
-            hub.Subscribe(conn.ID, "room:"+chatMsg.Room)
-            // Notify room of new user
-            notification, _ := json.Marshal(map[string]string{
-                "type":   "user_joined",
-                "user":   conn.UserID,
-                "room":   chatMsg.Room,
-            })
-            hub.Broadcast("room:"+chatMsg.Room, notification)
-        } else if chatMsg.Type == "message" {
-            // Broadcast chat message to room
-            response, _ := json.Marshal(chatMsg)
-            hub.Broadcast("room:"+chatMsg.Room, response)
-
-            // Persist to database
-            chatStore.Save(chatMsg)
-        }
-    }),
-)
-```
-
-## Security Configuration
-
-```go
-hub := websocket.NewHub(
-    websocket.WithJWTSecret(secret),
-
-    // Allowed origins (CORS for WebSocket)
-    websocket.WithAllowedOrigins([]string{
-        "https://app.example.com",
-        "https://www.example.com",
-    }),
-
-    // Rate limiting per connection
-    websocket.WithMessageRateLimit(10, time.Second), // 10 msgs/sec
-
-    // Max message size
-    websocket.WithMaxMessageSize(64*1024), // 64KB
-
-    // Connection limits
-    websocket.WithMaxConnections(10000),
-    websocket.WithMaxConnectionsPerUser(5),
-
-    // Timeouts
-    websocket.WithReadTimeout(60*time.Second),
-    websocket.WithWriteTimeout(10*time.Second),
-    websocket.WithPingInterval(30*time.Second),
-)
-```
-
-## Metrics
-
-```go
-// Active connections
-websocket_connections_total
-websocket_connections_active
-
-// Messages
-websocket_messages_received_total
-websocket_messages_sent_total
-
-// Errors
-websocket_auth_failures_total
-websocket_disconnections_total{reason="timeout|error|normal"}
-```
-
-## Related Documentation
-
-- [Net Overview](../README.md) — Network module
-- [Security: JWT](../../security/jwt.md) — Token verification
-- [AI: SSE](../../ai/sse.md) — Alternative for one-way streaming
+- `UpgradeClient` is deprecated and intentionally not implemented.
+- For strict CSRF/origin control, prefer `ServeWSWithConfig` over `ServeWSWithAuth`.

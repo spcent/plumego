@@ -346,34 +346,18 @@ Handle WebSocket connections.
 ```go
 import "github.com/spcent/plumego/net/websocket"
 
-// Upgrade HTTP to WebSocket
+auth := websocket.NewSimpleRoomAuth([]byte("your-secret"))
+
+// Upgrade HTTP to WebSocket and attach to hub
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-    conn, err := websocket.Upgrade(w, r, nil)
-    if err != nil {
-        log.Printf("Upgrade failed: %v", err)
-        return
-    }
-    defer conn.Close()
-
-    // Join to room
-    err = hub.TryJoin("chat-room", conn)
-    if err != nil {
-        log.Printf("Failed to join room: %v", err)
-        return
-    }
-    defer hub.Leave("chat-room", conn)
-
-    // Read messages
-    for {
-        op, data, err := conn.ReadMessage()
-        if err != nil {
-            log.Printf("Read error: %v", err)
-            return
-        }
-
-        // Broadcast to room
-        hub.BroadcastRoom("chat-room", op, data)
-    }
+    websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+        Hub:            hub,
+        Auth:           auth,
+        QueueSize:      64,
+        SendTimeout:    50 * time.Millisecond,
+        SendBehavior:   websocket.SendBlock,
+        AllowedOrigins: []string{"https://app.example.com"},
+    })
 }
 ```
 
@@ -416,11 +400,11 @@ for _, room := range rooms {
     fmt.Printf("Room: %s, Connections: %d\n", room, hub.GetRoomCount(room))
 }
 
-// Get connections in room
-connections := hub.GetConnectionsInRoom("chat-room")
-for _, conn := range connections {
+// Iterate connections in room
+hub.RangeConns("chat-room", func(conn *websocket.Conn) bool {
     conn.WriteMessage(websocket.OpcodeText, []byte("Hello"))
-}
+    return true
+})
 ```
 
 ### Metrics
@@ -434,20 +418,7 @@ metrics := hub.Metrics()
 fmt.Printf("Active: %d, Rooms: %d\n", metrics.ActiveConnections, metrics.Rooms)
 ```
 
-### Security Events
-
-Monitor security events.
-
-```go
-import "github.com/spcent/plumego/net/websocket"
-
-events := hub.SecurityEvents()
-go func() {
-    for event := range events {
-        log.Printf("Security event: %s - %v", event.Type, event.Details)
-    }
-}()
-```
+Security-related telemetry is available via `hub.Metrics()` (`SecurityRejections`, `InvalidWSKeys`, `SuccessfulAuths`, and `BroadcastDropped`).
 
 ---
 

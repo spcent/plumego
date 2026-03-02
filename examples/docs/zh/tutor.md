@@ -207,8 +207,14 @@ func (c *webSocketComponent) RegisterRoutes(r *router.Router) {
         }
         
         r.GetFunc(c.config.WSRoutePath, authMiddleware(func(w http.ResponseWriter, r *http.Request) {
-            ws.ServeWSWithAuth(w, r, c.hub, wsAuth, c.config.SendQueueSize,
-                c.config.SendTimeout, c.config.SendBehavior)
+            ws.ServeWSWithConfig(w, r, ws.ServerConfig{
+                Hub:            c.hub,
+                Auth:           wsAuth,
+                QueueSize:      c.config.SendQueueSize,
+                SendTimeout:    c.config.SendTimeout,
+                SendBehavior:   c.config.SendBehavior,
+                AllowedOrigins: []string{"https://app.example.com"},
+            })
         }))
         
         // ... existing broadcast code ...

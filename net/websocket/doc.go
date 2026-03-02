@@ -18,22 +18,29 @@
 //	import "github.com/spcent/plumego/net/websocket"
 //
 //	// Create a WebSocket hub
-//	hub := websocket.NewHub(websocket.HubConfig{
-//		Workers:            4,
+//	hub := websocket.NewHubWithConfig(websocket.HubConfig{
+//		WorkerCount:        4,
 //		JobQueueSize:       1024,
 //		MaxConnections:     10000,
 //		MaxRoomConnections: 1000,
 //	})
-//	hub.Start()
 //	defer hub.Stop()
 //
-//	// Upgrade HTTP connection to WebSocket
-//	conn, err := websocket.Upgrade(w, r, jwtSecret)
-//	if err != nil {
-//		// Upgrade failed
-//	}
+//	auth := websocket.NewSimpleRoomAuth([]byte("your-32-byte-secret"))
 //
-//	// Join a room and broadcast messages
-//	conn.JoinRoom("chat:general")
-//	hub.BroadcastToRoom("chat:general", []byte("Hello"))
+//	// Serve a WebSocket endpoint with auth and origin checks.
+//	// Inside the package handler, successful connections are registered to rooms.
+//	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+//		websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+//			Hub:            hub,
+//			Auth:           auth,
+//			QueueSize:      256,
+//			SendTimeout:    200 * time.Millisecond,
+//			SendBehavior:   websocket.SendBlock,
+//			AllowedOrigins: []string{"https://app.example.com"},
+//		})
+//	})
+//
+//	// Broadcast to a room
+//	hub.BroadcastRoom("chat:general", websocket.OpcodeText, []byte("Hello"))
 package websocket

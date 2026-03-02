@@ -78,16 +78,35 @@ sender.Send(webhookout.Webhook{
 ### WebSocket
 
 ```go
-import "github.com/spcent/plumego/net/websocket"
+import (
+    "net/http"
+    "os"
+    "time"
 
-hub := websocket.NewHub(
-    websocket.WithJWTSecret(os.Getenv("WS_SECRET")),
-    websocket.WithMaxConnections(10000),
+    "github.com/spcent/plumego/net/websocket"
 )
-go hub.Run()
 
-app.Get("/ws", hub.Handler())
-hub.Broadcast("channel", message)
+hub := websocket.NewHubWithConfig(websocket.HubConfig{
+    WorkerCount:    4,
+    JobQueueSize:   1024,
+    MaxConnections: 10000,
+})
+defer hub.Stop()
+
+auth := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+
+app.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
+    websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+        Hub:            hub,
+        Auth:           auth,
+        QueueSize:      256,
+        SendTimeout:    200 * time.Millisecond,
+        SendBehavior:   websocket.SendBlock,
+        AllowedOrigins: []string{"https://app.example.com"},
+    })
+})
+
+hub.BroadcastRoom("channel", websocket.OpcodeText, message)
 ```
 
 ### Message Queue
