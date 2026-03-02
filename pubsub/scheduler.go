@@ -154,8 +154,12 @@ func (s *messageScheduler) Close() {
 
 // run is the main scheduler loop.
 func (s *messageScheduler) run(ctx context.Context) {
-	timer := time.NewTimer(time.Hour)
-	timer.Stop()
+	// NewTimer(0) fires immediately; draining it once gives us a reusable timer
+	// whose channel is empty and which is safe to Reset later.  This avoids
+	// the original NewTimer(1h)+Stop pattern that held a live hour-long timer
+	// in the runtime heap during startup.
+	timer := time.NewTimer(0)
+	<-timer.C // drain the immediate tick so the channel starts empty
 
 	for {
 		s.mu.Lock()

@@ -117,6 +117,7 @@ type groupConsumer struct {
 	group          *consumerGroup
 	topics         []string
 	assignedParts  map[string][]int // topic -> partitions
+  assignedPartsMu sync.RWMutex
 	subscription   Subscription
 	lastHeartbeat  time.Time
 	heartbeatMu    sync.Mutex
@@ -415,17 +416,28 @@ func (cg *consumerGroup) rebalance(ctx context.Context) error {
 		return err
 	}
 
-	// Update consumer assignments
-	for _, consumer := range cg.consumers {
-		consumer.assignedParts = make(map[string][]int)
-	}
-
+	// Build new partition assignments per consumer without holding per-consumer locks.
+	newParts := make(map[string]map[string][]int) // consumerID -> topic -> partitions
 	for topic, partAssignments := range cg.assignments {
 		for partition, consumerID := range partAssignments {
-			if consumer, exists := cg.consumers[consumerID]; exists {
-				consumer.assignedParts[topic] = append(consumer.assignedParts[topic], partition)
+			if _, exists := cg.consumers[consumerID]; exists {
+				if newParts[consumerID] == nil {
+					newParts[consumerID] = make(map[string][]int)
+				}
+				newParts[consumerID][topic] = append(newParts[consumerID][topic], partition)
 			}
 		}
+	}
+
+	// Apply atomically to each consumer under its own lock.
+	for id, consumer := range cg.consumers {
+		parts := newParts[id]
+		if parts == nil {
+			parts = make(map[string][]int)
+		}
+		consumer.assignedPartsMu.Lock()
+		consumer.assignedParts = parts
+		consumer.assignedPartsMu.Unlock()
 	}
 
 	return nil
@@ -715,7 +727,10 @@ func (gc *groupConsumer) Heartbeat() {
 	gc.lastHeartbeat = time.Now()
 }
 
-// Close closes the consumer
+// Close closes the consumer.
+// It cancels the subscription (which closes the source channel, causing the
+// dispatcher goroutine to exit), then waits for the dispatcher to finish
+// before closing messageChannel to eliminate the send-on-closed-channel race.
 func (gc *groupConsumer) Close() {
 	if gc.closed.Swap(true) {
 		return
@@ -728,7 +743,12 @@ func (gc *groupConsumer) Close() {
 	// Signal the dispatcher goroutine to exit and wait for it to finish
 	// before closing messageChannel to prevent a send-on-closed-channel panic.
 	gc.cancel()
-	<-gc.dispatchDone
+
+	// Wait for the dispatcher goroutine to stop before closing the channel it
+	// writes to.  This prevents a send-on-closed-channel data race.
+	if gc.dispatcherDone != nil {
+		<-gc.dispatcherDone
+	}
 
 	close(gc.messageChannel)
 }
@@ -743,6 +763,11 @@ func (gc *groupConsumer) startDispatcher(ctx context.Context) {
 			select {
 			case msg, ok := <-gc.subscription.C():
 				if !ok {
+					return
+				}
+
+				// Stop dispatching once the consumer is marked closed.
+				if gc.closed.Load() {
 					return
 				}
 

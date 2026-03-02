@@ -52,13 +52,24 @@ type SecurityConfig struct {
 	EnableMetrics bool
 }
 
-// SecurityMetrics tracks security-related metrics
+// SecurityMetrics tracks security-related metrics for SecureRoomAuth.
+//
+// Note: InvalidWebSocketKeys, BroadcastQueueFull, and RejectedConnections are
+// no longer incremented by this package. Equivalent per-hub counters are now
+// available via Hub.Metrics() (InvalidWSKeys, BroadcastDropped, SecurityRejections).
+// These fields are retained for API compatibility only.
 type SecurityMetrics struct {
-	InvalidJWTSecrets         uint64 `json:"invalid_jwt_secrets"`
-	WeakRoomPasswords         uint64 `json:"weak_room_passwords"`
-	InvalidWebSocketKeys      uint64 `json:"invalid_websocket_keys"`
-	BroadcastQueueFull        uint64 `json:"broadcast_queue_full"`
-	RejectedConnections       uint64 `json:"rejected_connections"`
+	// InvalidJWTSecrets counts JWT verifications that failed in SecureRoomAuth.VerifyJWT.
+	InvalidJWTSecrets uint64 `json:"invalid_jwt_secrets"`
+	// WeakRoomPasswords counts rejected weak passwords in SecureRoomAuth.SetRoomPassword.
+	WeakRoomPasswords uint64 `json:"weak_room_passwords"`
+	// InvalidWebSocketKeys is no longer incremented. Use Hub.Metrics().InvalidWSKeys instead.
+	InvalidWebSocketKeys uint64 `json:"invalid_websocket_keys"`
+	// BroadcastQueueFull is no longer incremented. Use Hub.Metrics().BroadcastDropped instead.
+	BroadcastQueueFull uint64 `json:"broadcast_queue_full"`
+	// RejectedConnections is no longer incremented. Use Hub.Metrics().SecurityRejections instead.
+	RejectedConnections uint64 `json:"rejected_connections"`
+	// SuccessfulAuthentications counts successful JWT verifications in SecureRoomAuth.VerifyJWT.
 	SuccessfulAuthentications uint64 `json:"successful_authentications"`
 }
 

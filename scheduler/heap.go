@@ -14,22 +14,24 @@ const (
 )
 
 type job struct {
-	id          JobID
-	kind        jobKind
-	cron        CronSpec
-	cronExpr    string
-	runAt       time.Time
-	fn          TaskFunc
-	options     JobOptions
-	paused      atomic.Bool // Changed to atomic.Bool to prevent race condition in dispatch
-	canceled    atomic.Bool // Changed to atomic.Bool to prevent race condition in dispatch
-	nextAttempt int
-	running     atomic.Bool
-	lastRun     time.Time
-	lastError   error
-	pending     atomic.Bool // Changed to atomic.Bool to prevent race condition between dispatch and execute
-	state       JobState
-	stateAt     time.Time
+	id              JobID
+	kind            jobKind
+	cron            CronSpec
+	cronExpr        string
+	runAt           time.Time
+	fn              TaskFunc
+	options         JobOptions
+	paused          atomic.Bool // atomic to prevent race condition in dispatch
+	canceled        atomic.Bool // atomic to prevent race condition in dispatch
+	nextAttempt     int
+	running         atomic.Bool
+	lastRun         time.Time
+	lastError       error
+	pending         atomic.Bool // atomic to prevent race between dispatch and execute
+	state           JobState
+	stateAt         time.Time
+	runCount        int64 // total successful executions; protected by scheduler mu
+	scheduleVersion uint64
 }
 
 type runRequest struct {
@@ -38,9 +40,10 @@ type runRequest struct {
 }
 
 type scheduleItem struct {
-	runAt time.Time
-	job   *job
-	index int
+	runAt   time.Time
+	job     *job
+	version uint64
+	index   int
 }
 
 type scheduleHeap []*scheduleItem

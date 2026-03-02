@@ -146,19 +146,20 @@ const (
 	// The next opportunity to run is T2 (if the job has finished by then).
 	SkipIfRunning
 
-	// SerialQueue queues the next scheduled execution to run immediately after
-	// the current execution finishes. Multiple pending executions are queued in order.
+	// SerialQueue queues one pending execution to run immediately after the
+	// current execution finishes. Only one catch-up run is retained; earlier
+	// missed triggers are collapsed, not accumulated.
 	//
-	// Use case: Jobs that must not run concurrently but should not skip executions:
-	//   - Database migrations or schema updates
+	// Use case: Jobs that must not run concurrently but should not skip every
+	// execution:
 	//   - Sequential data processing pipelines
 	//   - Jobs that modify shared state
 	//
-	// Behavior: If job started at T0 is still running at T1 and T2, executions for
-	// T1 and T2 are queued and will run sequentially: T0 -> T1 -> T2.
+	// Behavior: If the job started at T0 is still running at T1, T2, and T3,
+	// exactly one catch-up run is queued. Once T0 finishes, the single pending
+	// run executes immediately. T2 and T3 are silently collapsed.
 	//
-	// Caution: Queue can grow unbounded if execution time consistently exceeds interval.
-	// Consider monitoring queue depth or using SkipIfRunning for non-critical jobs.
+	// For strict T0 → T1 → T2 ordering, the task must re-submit each execution.
 	SerialQueue
 )
 
@@ -189,6 +190,13 @@ type JobOptions struct {
 	TaskName         string
 	Dependencies     []JobID
 	DependencyPolicy DependencyFailurePolicy
+	// Jitter adds a random delay [0, Jitter) before each execution.
+	// Useful for spreading load when many jobs share the same schedule.
+	Jitter time.Duration
+	// MaxRuns limits the total number of successful executions.
+	// When reached the job is automatically cancelled.
+	// 0 means unlimited.
+	MaxRuns int
 }
 
 // JobOption mutates JobOptions.
@@ -347,6 +355,30 @@ func Paused() JobOption {
 	}
 }
 
+// WithJitter adds a random delay in the range [0, d) before each execution.
+// This spreads load when many jobs share an identical schedule (thundering herd).
+// Jitter is applied on top of the normal scheduled time; it does not affect
+// the next calculated run time stored in JobStatus.NextRun.
+func WithJitter(d time.Duration) JobOption {
+	return func(opts *JobOptions) {
+		if d > 0 {
+			opts.Jitter = d
+		}
+	}
+}
+
+// WithMaxRuns limits the total number of successful executions for a cron job.
+// When the limit is reached the job cancels itself automatically.
+// Has no effect on delay jobs (which run only once by design).
+// n == 0 means unlimited.
+func WithMaxRuns(n int) JobOption {
+	return func(opts *JobOptions) {
+		if n >= 0 {
+			opts.MaxRuns = n
+		}
+	}
+}
+
 // DependencyFailurePolicy determines what happens when a dependency fails.
 type DependencyFailurePolicy int
 
@@ -413,6 +445,7 @@ type JobStatus struct {
 	Paused        bool
 	Running       bool
 	Kind          string
+	CronExpr      string // Non-empty for cron jobs; reconstructed from spec.
 	OverlapPolicy OverlapPolicy
 	Group         string
 	Tags          []string

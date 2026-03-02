@@ -10,19 +10,33 @@ import (
 
 // streamReader implements io.ReadCloser to stream frames for one message.
 type streamReader struct {
-	parent    *Conn
-	op        byte
-	buf       bytes.Buffer
-	done      bool
-	readErr   error
-	readMu    sync.Mutex
-	closeOnce sync.Once
-	closed    chan struct{}
+	parent  *Conn
+	op      byte
+	buf     bytes.Buffer
+	done    bool
+	readErr error
+	readMu  sync.Mutex
+}
+
+// streamReaderPool recycles streamReader instances to reduce per-message
+// heap allocation. Because streamReader embeds a bytes.Buffer, pooling also
+// reuses the buffer's internal backing array, saving an extra allocation for
+// every received frame.
+var streamReaderPool = sync.Pool{
+	New: func() any { return new(streamReader) },
 }
 
 func (sr *streamReader) Read(p []byte) (int, error) {
 	sr.readMu.Lock()
 	defer sr.readMu.Unlock()
+
+	// Capture parent once. Close() nils sr.parent, so capturing it here
+	// into a local prevents a nil-dereference if Close() races with Read()
+	// (which is a caller contract violation, but we defend against it anyway).
+	parent := sr.parent
+	if parent == nil {
+		return 0, io.ErrClosedPipe
+	}
 
 	for {
 		if sr.buf.Len() > 0 {
@@ -35,7 +49,7 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			return 0, io.EOF
 		}
 		// need to pull next frame(s) from connection
-		op, fin, payload, err := sr.parent.readFrame()
+		op, fin, payload, err := parent.readFrame()
 		if err != nil {
 			sr.readErr = err
 			sr.done = true
@@ -44,13 +58,13 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 		// control frames may appear in middle
 		switch op {
 		case opcodePing:
-			_ = sr.parent.writeFrame(opcodePong, true, payload)
+			_ = parent.writeFrame(opcodePong, true, payload)
 			continue
 		case opcodePong:
-			atomic.StoreInt64(&sr.parent.lastPong, time.Now().UnixNano())
+			atomic.StoreInt64(&parent.lastPong, time.Now().UnixNano())
 			continue
 		case opcodeClose:
-			_ = sr.parent.writeFrame(opcodeClose, true, payload)
+			_ = parent.writeFrame(opcodeClose, true, payload)
 			sr.readErr = io.EOF
 			sr.done = true
 			return 0, io.EOF
@@ -85,7 +99,9 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 }
 
 func (sr *streamReader) Close() error {
-	sr.closeOnce.Do(func() { close(sr.closed) })
+	// Nil the parent pointer so the pool doesn't hold a reference to the Conn.
+	sr.parent = nil
+	streamReaderPool.Put(sr)
 	return nil
 }
 
@@ -103,12 +119,14 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 		}
 		switch op {
 		case OpcodeText, OpcodeBinary:
-			// If fin == true and small, can return a reader that contains payload and EOF immediately
-			sr := &streamReader{
-				parent: c,
-				op:     0,
-				closed: make(chan struct{}),
-			}
+			// Get a pooled reader and reset all fields from any prior use.
+			sr := streamReaderPool.Get().(*streamReader)
+			sr.parent = c
+			sr.op = 0
+			sr.done = false
+			sr.readErr = nil
+			sr.buf.Reset() // keeps the backing array; avoids re-allocation
+
 			// write payload into buffer
 			sr.buf.Write(payload)
 			if fin {
@@ -134,18 +152,24 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 	}
 }
 
-// ReadMessage reads a complete message into memory
+// ReadMessage reads a complete message into memory.
 func (c *Conn) ReadMessage() (byte, []byte, error) {
 	op, stream, err := c.ReadMessageStream()
 	if err != nil {
 		return 0, nil, err
 	}
-	defer stream.Close()
 
-	buf := &bytes.Buffer{}
+	buf := msgBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
 	_, err = io.Copy(buf, stream)
+	_ = stream.Close()
 	if err != nil {
+		msgBufPool.Put(buf)
 		return 0, nil, err
 	}
-	return op, buf.Bytes(), nil
+	// Copy data before returning buf to pool; callers expect to own the slice.
+	data := make([]byte, buf.Len())
+	copy(data, buf.Bytes())
+	msgBufPool.Put(buf)
+	return op, data, nil
 }

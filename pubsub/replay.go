@@ -285,13 +285,15 @@ func (rs *ReplayStore) storeMessage(msg Message) {
 	rs.topicIndex[msg.Topic] = append(rs.topicIndex[msg.Topic], msgID)
 	rs.topicIndexMu.Unlock()
 
-	// Update time index
+	// Update time index: binary search insertion maintains sorted order in O(log n)
+	// rather than re-sorting the whole slice O(n log n) on every message.
 	rs.timeIndexMu.Lock()
-	rs.timeIndex = append(rs.timeIndex, replayMsg)
-	// Keep sorted by timestamp
-	sort.Slice(rs.timeIndex, func(i, j int) bool {
-		return rs.timeIndex[i].Timestamp.Before(rs.timeIndex[j].Timestamp)
+	pos := sort.Search(len(rs.timeIndex), func(i int) bool {
+		return !rs.timeIndex[i].Timestamp.Before(replayMsg.Timestamp)
 	})
+	rs.timeIndex = append(rs.timeIndex, nil)
+	copy(rs.timeIndex[pos+1:], rs.timeIndex[pos:])
+	rs.timeIndex[pos] = replayMsg
 	rs.timeIndexMu.Unlock()
 
 	// Update stats
@@ -526,44 +528,49 @@ func (rs *ReplayStore) archiveWorker() {
 	}
 }
 
-// archiveOldMessages moves old messages to archive
+// archiveOldMessages moves old messages to archive.
+// Locks are acquired sequentially (never two at once) to avoid deadlock with
+// storeMessage→removeOldest which acquires messagesMu→topicIndexMu→timeIndexMu
+// in the same sequential fashion.
 func (rs *ReplayStore) archiveOldMessages() {
 	cutoff := time.Now().Add(-rs.config.RetentionPeriod)
 
-	toArchive := make([]*ReplayMessage, 0)
-
-	rs.messagesMu.Lock()
+	// Phase 1: identify and remove expired entries from the time index.
+	// timeIndex is sorted ascending, so all expired entries form a prefix.
 	rs.timeIndexMu.Lock()
-
-	for i, msg := range rs.timeIndex {
-		if msg.Timestamp.Before(cutoff) {
-			toArchive = append(toArchive, msg)
-			delete(rs.messages, msg.ID)
-
-			// Remove from topic index
-			rs.topicIndexMu.Lock()
-			if ids, ok := rs.topicIndex[msg.Topic]; ok {
-				for j, id := range ids {
-					if id == msg.ID {
-						rs.topicIndex[msg.Topic] = append(ids[:j], ids[j+1:]...)
-						break
-					}
-				}
-			}
-			rs.topicIndexMu.Unlock()
-		} else {
-			// Time index is sorted, so we can stop here
-			rs.timeIndex = rs.timeIndex[i:]
-			break
-		}
+	cutoffIdx := 0
+	for cutoffIdx < len(rs.timeIndex) && rs.timeIndex[cutoffIdx].Timestamp.Before(cutoff) {
+		cutoffIdx++
 	}
-
+	toArchive := make([]*ReplayMessage, cutoffIdx)
+	copy(toArchive, rs.timeIndex[:cutoffIdx])
+	rs.timeIndex = rs.timeIndex[cutoffIdx:]
 	rs.timeIndexMu.Unlock()
-	rs.messagesMu.Unlock()
 
 	if len(toArchive) == 0 {
 		return
 	}
+
+	// Phase 2: remove from messages map.
+	rs.messagesMu.Lock()
+	for _, msg := range toArchive {
+		delete(rs.messages, msg.ID)
+	}
+	rs.messagesMu.Unlock()
+
+	// Phase 3: remove from topic index.
+	rs.topicIndexMu.Lock()
+	for _, msg := range toArchive {
+		if ids, ok := rs.topicIndex[msg.Topic]; ok {
+			for j, id := range ids {
+				if id == msg.ID {
+					rs.topicIndex[msg.Topic] = append(ids[:j], ids[j+1:]...)
+					break
+				}
+			}
+		}
+	}
+	rs.topicIndexMu.Unlock()
 
 	// Write to archive file
 	if err := rs.writeArchive(toArchive); err != nil {

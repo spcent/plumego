@@ -130,8 +130,8 @@ type Conn struct {
 	closeC    chan struct{}
 
 	readLimit  int64
-	pingPeriod time.Duration
-	pongWait   time.Duration
+	pingPeriod atomic.Int64 // stores time.Duration as int64 nanoseconds
+	pongWait   atomic.Int64 // stores time.Duration as int64 nanoseconds
 	lastPong   int64
 
 	// User information (set after authentication)
@@ -153,25 +153,38 @@ type Conn struct {
 //
 //	// Create connection with drop behavior
 //	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
+// NewConn creates a Conn after handshake, allocating its own buffered I/O.
+//
+// For server-side connections obtained via http.Hijacker, prefer
+// newConnFromHijack to reuse the bufio.ReadWriter that the HTTP server
+// already created, avoiding a redundant allocation.
 func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
+	return newConnFromHijack(
+		c,
+		bufio.NewReaderSize(c, defaultBufSize),
+		bufio.NewWriterSize(c, defaultBufSize),
+		queueSize, sendTimeout, behavior,
+	)
+}
+
+// newConnFromHijack creates a Conn using buffers already allocated by the
+// HTTP server's hijack operation, avoiding a redundant allocation pair.
+func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
 	cc := &Conn{
 		conn:          c,
-		br:            bufio.NewReaderSize(c, defaultBufSize),
-		bw:            bufio.NewWriterSize(c, defaultBufSize),
+		br:            br,
+		bw:            bw,
 		sendQueue:     make(chan Outbound, queueSize),
 		sendQueueSize: queueSize,
 		sendTimeout:   sendTimeout,
 		sendBehavior:  behavior,
 		closeC:        make(chan struct{}),
 		readLimit:     16 << 20, // 16MB
-		pingPeriod:    defaultPingPeriod,
-		pongWait:      defaultPongWait,
-		// metadata is sync.Map, no initialization needed
 	}
+	cc.pingPeriod.Store(int64(defaultPingPeriod))
+	cc.pongWait.Store(int64(defaultPongWait))
 	atomic.StoreInt64(&cc.lastPong, time.Now().UnixNano())
-	// start writer pump
 	go cc.writerPump()
-	// start ping/pong monitor
 	go cc.pongMonitor()
 	return cc
 }
@@ -197,17 +210,44 @@ func (c *Conn) SetReadLimit(limit int64) {
 
 // SetPingPeriod sets the ping interval
 func (c *Conn) SetPingPeriod(d time.Duration) {
-	atomic.StoreInt64((*int64)(&c.pingPeriod), int64(d))
+	c.pingPeriod.Store(int64(d))
 }
 
 // SetPongWait sets the pong wait time
 func (c *Conn) SetPongWait(d time.Duration) {
-	atomic.StoreInt64((*int64)(&c.pongWait), int64(d))
+	c.pongWait.Store(int64(d))
 }
 
 // GetLastPong returns the last pong time
 func (c *Conn) GetLastPong() time.Time {
 	return time.Unix(0, atomic.LoadInt64(&c.lastPong))
+}
+
+// WriteClose sends a WebSocket close frame with the given RFC 6455 status code
+// and human-readable reason, then closes the underlying connection.
+//
+// This initiates a proper WebSocket-level closing handshake. Use the Close*
+// constants (CloseNormalClosure, CloseGoingAway, etc.) for the status code.
+// Calling Close() directly skips the close frame and tears down TCP immediately,
+// which is correct for error conditions but not for clean shutdowns.
+//
+// Example:
+//
+//	conn.WriteClose(websocket.CloseNormalClosure, "goodbye")
+//	conn.WriteClose(websocket.CloseGoingAway, "server shutting down")
+func (c *Conn) WriteClose(code uint16, reason string) error {
+	if c.IsClosed() {
+		return ErrConnClosed
+	}
+	// RFC 6455 §5.5.1: close payload is 2-byte big-endian status code followed
+	// by a UTF-8 reason phrase (may be empty).
+	payload := make([]byte, 2+len(reason))
+	binary.BigEndian.PutUint16(payload[:2], code)
+	copy(payload[2:], reason)
+	// Write directly, bypassing sendQueue so the frame is sent even when the
+	// queue is full (e.g. during a slow-consumer shutdown).
+	_ = c.writeFrame(opcodeClose, true, payload)
+	return c.Close()
 }
 
 // ---------------- low-level frame IO ----------------
@@ -239,11 +279,18 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		if _, err := io.ReadFull(c.br, ext[:]); err != nil {
 			return 0, false, nil, err
 		}
+		// RFC 6455 §5.2: the MSB of a 64-bit payload length MUST be 0.
+		// A negative int64 means the MSB is set; reject to prevent a panic in make().
 		payloadLen = int64(binary.BigEndian.Uint64(ext[:]))
+		if payloadLen < 0 {
+			return 0, false, nil, ErrProtocolError
+		}
 	default:
 		payloadLen = prefix
 	}
 
+	// Reject oversized frames before reading the mask key so we avoid
+	// a 4-byte network round-trip for frames we will reject anyway.
 	if payloadLen > atomic.LoadInt64(&c.readLimit) {
 		return 0, false, nil, ErrPayloadTooLarge
 	}
@@ -257,7 +304,17 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		if _, err := io.ReadFull(c.br, payload); err != nil {
 			return 0, false, nil, err
 		}
-		for i := int64(0); i < payloadLen; i++ {
+		// Unmask the payload. Process 4 bytes per iteration to let the compiler
+		// optimise the loop; avoids the modulo in the byte-by-byte version.
+		n := len(payload)
+		i := 0
+		for ; i+3 < n; i += 4 {
+			payload[i] ^= maskKey[0]
+			payload[i+1] ^= maskKey[1]
+			payload[i+2] ^= maskKey[2]
+			payload[i+3] ^= maskKey[3]
+		}
+		for ; i < n; i++ {
 			payload[i] ^= maskKey[i%4]
 		}
 	}

@@ -20,7 +20,8 @@ type PriorityMessage struct {
 	Message  Message
 	Priority int
 	Sequence uint64 // for FIFO within same priority
-	index    int    // heap index
+	index    int    // index in min-heap (priorityQueue)
+	rindex   int    // index in max-heap (evictionQueue)
 }
 
 // priorityQueue implements heap.Interface for priority-based message delivery.
@@ -60,10 +61,50 @@ func (pq *priorityQueue) Pop() any {
 	return item
 }
 
+// evictionQueue is a max-heap by priority (worst item at root) for O(log n) eviction.
+// When priorities are equal the oldest item (lowest Sequence) is evicted first.
+type evictionQueue []*PriorityMessage
+
+func (eq evictionQueue) Len() int { return len(eq) }
+
+func (eq evictionQueue) Less(i, j int) bool {
+	if eq[i].Priority != eq[j].Priority {
+		return eq[i].Priority > eq[j].Priority // highest number = worst = at root
+	}
+	return eq[i].Sequence < eq[j].Sequence // oldest first for FIFO within same level
+}
+
+func (eq evictionQueue) Swap(i, j int) {
+	eq[i], eq[j] = eq[j], eq[i]
+	eq[i].rindex = i
+	eq[j].rindex = j
+}
+
+func (eq *evictionQueue) Push(x any) {
+	n := len(*eq)
+	item := x.(*PriorityMessage)
+	item.rindex = n
+	*eq = append(*eq, item)
+}
+
+func (eq *evictionQueue) Pop() any {
+	old := *eq
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil
+	item.rindex = -1
+	*eq = old[:n-1]
+	return item
+}
+
 // PriorityBuffer is a thread-safe priority queue for messages.
+// It maintains two heaps internally:
+//   - pq: min-heap (highest-priority item at root) for O(log n) dequeue
+//   - eq: max-heap (lowest-priority item at root) for O(log n) eviction
 type PriorityBuffer struct {
 	mu       sync.Mutex
-	pq       priorityQueue
+	pq       priorityQueue  // min-heap: highest priority at root
+	eq       evictionQueue  // max-heap: lowest priority at root
 	capacity int
 	sequence uint64
 	notify   chan struct{}
@@ -77,15 +118,18 @@ func NewPriorityBuffer(capacity int) *PriorityBuffer {
 	}
 	pb := &PriorityBuffer{
 		pq:       make(priorityQueue, 0, capacity),
+		eq:       make(evictionQueue, 0, capacity),
 		capacity: capacity,
 		notify:   make(chan struct{}, 1),
 	}
 	heap.Init(&pb.pq)
+	heap.Init(&pb.eq)
 	return pb
 }
 
 // Push adds a message to the buffer with the given priority.
 // Returns (dropped message, true) if capacity was exceeded.
+// Finding and removing the worst item is O(log n) via the eviction heap.
 func (pb *PriorityBuffer) Push(msg Message, priority int) (*Message, bool) {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
@@ -104,32 +148,22 @@ func (pb *PriorityBuffer) Push(msg Message, priority int) (*Message, bool) {
 	var dropped *Message
 
 	if len(pb.pq) >= pb.capacity {
-		// Drop lowest priority message
-		// Find the lowest priority (highest number)
-		lowestIdx := -1
-		lowestPri := -1
-		lowestSeq := uint64(0)
-
-		for i, m := range pb.pq {
-			if m.Priority > lowestPri || (m.Priority == lowestPri && m.Sequence < lowestSeq) {
-				lowestIdx = i
-				lowestPri = m.Priority
-				lowestSeq = m.Sequence
-			}
-		}
-
-		// Only drop if new message has higher or equal priority
-		if lowestIdx >= 0 && priority <= lowestPri {
-			droppedMsg := pb.pq[lowestIdx].Message
+		// eq[0] is the worst item (highest priority number, oldest sequence on tie).
+		worst := pb.eq[0]
+		if priority <= worst.Priority {
+			// New item is at least as good as the worst: evict the worst.
+			droppedMsg := worst.Message
 			dropped = &droppedMsg
-			heap.Remove(&pb.pq, lowestIdx)
-		} else if lowestIdx >= 0 {
-			// New message has lower priority, drop it instead
+			heap.Remove(&pb.eq, 0)              // O(log n)
+			heap.Remove(&pb.pq, worst.index)    // O(log n)
+		} else {
+			// New item is worse than everything in the buffer: drop it.
 			return &msg, true
 		}
 	}
 
-	heap.Push(&pb.pq, pm)
+	heap.Push(&pb.pq, pm) // O(log n)
+	heap.Push(&pb.eq, pm) // O(log n)
 
 	// Notify waiting consumers
 	select {
@@ -149,7 +183,8 @@ func (pb *PriorityBuffer) Pop() (Message, int, bool) {
 		return Message{}, 0, false
 	}
 
-	pm := heap.Pop(&pb.pq).(*PriorityMessage)
+	pm := heap.Pop(&pb.pq).(*PriorityMessage) // O(log n)
+	heap.Remove(&pb.eq, pm.rindex)            // O(log n): keep eviction heap in sync
 	return pm.Message, pm.Priority, true
 }
 
@@ -212,6 +247,7 @@ func (pb *PriorityBuffer) Drain() []Message {
 		pm := heap.Pop(&pb.pq).(*PriorityMessage)
 		msgs[i] = pm.Message
 	}
+	pb.eq = pb.eq[:0] // eviction heap is now stale; reset it
 	return msgs
 }
 

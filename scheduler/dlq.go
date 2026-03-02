@@ -7,20 +7,24 @@ import (
 
 // DeadLetterEntry represents a job that failed after all retries.
 type DeadLetterEntry struct {
-	JobID       JobID
-	Error       error
-	Attempts    int
-	FirstFailed time.Time
-	LastFailed  time.Time
-	TaskName    string
-	Group       string
-	Tags        []string
+	JobID        JobID
+	Error        error  // runtime error; not included in JSON output
+	ErrorMessage string // string form of Error, safe for JSON serialization
+	Attempts     int
+	FirstFailed  time.Time
+	LastFailed   time.Time
+	TaskName     string
+	Group        string
+	Tags         []string
 }
 
 // DeadLetterQueue manages failed jobs for inspection and requeuing.
+// Internally it maintains a map for O(1) lookup and an ordered slice for O(1)
+// FIFO eviction (oldest entry removed when capacity is exceeded).
 type DeadLetterQueue struct {
 	mu      sync.RWMutex
 	entries map[JobID]*DeadLetterEntry
+	order   []JobID // insertion-order list for O(1) FIFO eviction
 	maxSize int
 }
 
@@ -38,31 +42,29 @@ func (d *DeadLetterQueue) Add(entry DeadLetterEntry) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// Check if entry already exists
+	// Update existing entry in-place (preserve FirstFailed, order unchanged).
 	if existing, exists := d.entries[entry.JobID]; exists {
-		// Update existing entry
 		existing.Error = entry.Error
 		existing.Attempts = entry.Attempts
 		existing.LastFailed = entry.LastFailed
 		return
 	}
 
-	// Check size limit
+	// Evict the oldest entry when at capacity (O(1) using the order slice).
 	if d.maxSize > 0 && len(d.entries) >= d.maxSize {
-		// Remove oldest entry (simple FIFO eviction)
-		var oldestID JobID
-		var oldestTime time.Time
-		for id, e := range d.entries {
-			if oldestTime.IsZero() || e.FirstFailed.Before(oldestTime) {
-				oldestID = id
-				oldestTime = e.FirstFailed
+		for len(d.order) > 0 {
+			oldest := d.order[0]
+			d.order = d.order[1:]
+			if _, exists := d.entries[oldest]; exists {
+				delete(d.entries, oldest)
+				break
 			}
 		}
-		delete(d.entries, oldestID)
 	}
 
-	// Add new entry
+	// Add new entry.
 	d.entries[entry.JobID] = &entry
+	d.order = append(d.order, entry.JobID)
 }
 
 // Get retrieves a dead letter entry by job ID.
@@ -93,11 +95,19 @@ func (d *DeadLetterQueue) List() []DeadLetterEntry {
 func (d *DeadLetterQueue) Delete(jobID JobID) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if _, exists := d.entries[jobID]; exists {
-		delete(d.entries, jobID)
-		return true
+	if _, exists := d.entries[jobID]; !exists {
+		return false
 	}
-	return false
+	delete(d.entries, jobID)
+	// Remove from the order slice so it does not accumulate stale entries that
+	// would hold memory and slow down the FIFO eviction scan in Add.
+	for i, id := range d.order {
+		if id == jobID {
+			d.order = append(d.order[:i], d.order[i+1:]...)
+			break
+		}
+	}
+	return true
 }
 
 // Clear removes all dead letter entries.
@@ -106,6 +116,7 @@ func (d *DeadLetterQueue) Clear() int {
 	defer d.mu.Unlock()
 	count := len(d.entries)
 	d.entries = make(map[JobID]*DeadLetterEntry)
+	d.order = d.order[:0]
 	return count
 }
 

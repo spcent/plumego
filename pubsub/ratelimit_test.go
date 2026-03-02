@@ -231,7 +231,7 @@ func TestRateLimitedPubSub_ConcurrentPublish(t *testing.T) {
 	const messagesPerGoroutine = 20
 
 	var wg sync.WaitGroup
-	var allowed, denied int32
+	var allowed, denied atomic.Int32
 
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
@@ -251,9 +251,9 @@ func TestRateLimitedPubSub_ConcurrentPublish(t *testing.T) {
 
 	wg.Wait()
 
-	t.Logf("Concurrent: Allowed=%d, Denied=%d", allowed, denied)
+	t.Logf("Concurrent: Allowed=%d, Denied=%d", allowed.Load(), denied.Load())
 
-	if allowed == 0 {
+	if allowed.Load() == 0 {
 		t.Error("No messages allowed")
 	}
 }
