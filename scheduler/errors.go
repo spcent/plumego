@@ -29,6 +29,9 @@ var (
 	// ErrDependencyNotFound indicates a dependency job does not exist.
 	ErrDependencyNotFound = errors.New("scheduler: dependency job not found")
 
+	// ErrDependencyCycle indicates dependency relationships would create a cycle.
+	ErrDependencyCycle = errors.New("scheduler: dependency cycle detected")
+
 	// ErrInvalidCronExpr indicates an invalid cron expression.
 	ErrInvalidCronExpr = errors.New("scheduler: invalid cron expression")
 
