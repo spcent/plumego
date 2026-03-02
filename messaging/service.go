@@ -163,11 +163,15 @@ func (s *Service) Monitor() *ChannelMonitor { return s.monitor }
 // Start launches the worker pool, registers scheduled jobs,
 // and starts the webhook notifier (if configured).
 func (s *Service) Start(ctx context.Context) error {
-	s.worker.Start(ctx)
-	s.registerScheduledJobs()
-	if s.monitor != nil {
-		s.monitor.RegisterJobs(s.scheduler)
+	if err := s.registerScheduledJobs(); err != nil {
+		return err
 	}
+	if s.monitor != nil {
+		if err := s.monitor.RegisterJobs(s.scheduler); err != nil {
+			return err
+		}
+	}
+	s.worker.Start(ctx)
 	if s.webhook != nil {
 		if err := s.webhook.Start(ctx); err != nil && s.logger != nil {
 			s.logger.Warn("webhook notifier start failed", log.Fields{"error": err.Error()})
@@ -210,22 +214,15 @@ func (s *Service) Send(ctx context.Context, req SendRequest) error {
 func (s *Service) SendBatch(ctx context.Context, batch BatchRequest) BatchResult {
 	result := BatchResult{Total: len(batch.Requests)}
 	for _, req := range batch.Requests {
-		if err := s.validate(req); err != nil {
+		if err := s.Send(ctx, req); err != nil {
+			id := strings.TrimSpace(req.ID)
+			if id == "" {
+				id = "<missing-id>"
+			}
 			result.Rejected++
-			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", req.ID, err))
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", id, err))
 			continue
 		}
-		if err := s.checkQuota(ctx, req); err != nil {
-			result.Rejected++
-			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", req.ID, err))
-			continue
-		}
-		if err := s.enqueue(ctx, req); err != nil {
-			result.Rejected++
-			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", req.ID, err))
-			continue
-		}
-		s.saveReceipt(req, "queued", "", "")
 		result.Accepted++
 	}
 	return result
@@ -257,6 +254,9 @@ func (s *Service) checkQuota(ctx context.Context, req SendRequest) error {
 }
 
 func (s *Service) validate(req SendRequest) error {
+	if strings.TrimSpace(req.ID) == "" {
+		return ErrMissingID
+	}
 	if strings.TrimSpace(req.To) == "" {
 		return ErrMissingRecipient
 	}
@@ -340,11 +340,17 @@ func (s *Service) deliverTask(
 ) error {
 	var req SendRequest
 	if err := json.Unmarshal(task.Payload, &req); err != nil {
+		s.recordTaskFailure(ctx, task.ID, channel, providerName, err, task.Attempts, 0, false)
 		return fmt.Errorf("messaging: unmarshal %s task: %w", channel, err)
+	}
+	reqID := strings.TrimSpace(req.ID)
+	if reqID == "" {
+		reqID = task.ID
 	}
 
 	body, err := s.renderBody(req)
 	if err != nil {
+		s.recordTaskFailure(ctx, reqID, channel, providerName, err, task.Attempts, 0, false)
 		return err
 	}
 
@@ -353,19 +359,16 @@ func (s *Service) deliverTask(
 	elapsed := time.Since(start)
 
 	if err != nil {
-		s.totalFailed.Add(1)
-		s.monitor.RecordFailure(channel, err)
-		s.metrics.ObserveSend(ctx, channel, providerName, elapsed, err)
-		s.updateReceipt(req.ID, "failed", "", providerName, err.Error(), task.Attempts)
+		s.recordTaskFailure(ctx, reqID, channel, providerName, err, task.Attempts, elapsed, true)
 		return fmt.Errorf("%w: %v", ErrProviderFailure, err)
 	}
 
 	s.totalSent.Add(1)
 	s.monitor.RecordSuccess(channel, elapsed)
 	s.metrics.ObserveSend(ctx, channel, providerName, elapsed, nil)
-	s.updateReceipt(req.ID, "sent", providerID, providerName, "", task.Attempts)
+	s.updateReceipt(reqID, "sent", providerID, providerName, "", task.Attempts)
 	s.publishResult(SendResult{
-		RequestID:  req.ID,
+		RequestID:  reqID,
 		Channel:    channel,
 		Status:     "sent",
 		ProviderID: providerID,
@@ -432,7 +435,7 @@ func (s *Service) saveReceipt(req SendRequest, status, providerID, errMsg string
 }
 
 func (s *Service) updateReceipt(id, status, providerID, provider, errMsg string, attempts int) {
-	if s.receipts == nil {
+	if s.receipts == nil || strings.TrimSpace(id) == "" {
 		return
 	}
 	r, ok := s.receipts.Get(id)
@@ -452,6 +455,31 @@ func (s *Service) updateReceipt(id, status, providerID, provider, errMsg string,
 		r.SentAt = time.Now()
 	}
 	_ = s.receipts.Save(r)
+}
+
+func (s *Service) recordTaskFailure(
+	ctx context.Context,
+	requestID string,
+	channel Channel,
+	provider string,
+	err error,
+	attempts int,
+	duration time.Duration,
+	providerIssue bool,
+) {
+	s.totalFailed.Add(1)
+	if providerIssue && s.monitor != nil {
+		s.monitor.RecordFailure(channel, err)
+	}
+	s.metrics.ObserveSend(ctx, channel, provider, duration, err)
+	s.updateReceipt(requestID, "failed", "", provider, err.Error(), attempts)
+	s.publishResult(SendResult{
+		RequestID: requestID,
+		Channel:   channel,
+		Status:    "failed",
+		Error:     err.Error(),
+		Attempts:  attempts,
+	})
 }
 
 func (s *Service) publishResult(result SendResult) {

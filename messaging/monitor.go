@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -66,16 +67,25 @@ func NewChannelMonitor(sms SMSProvider, email EmailProvider, logger log.Structur
 }
 
 // RegisterJobs adds the probe job to the scheduler.
-func (m *ChannelMonitor) RegisterJobs(sch *scheduler.Scheduler) {
+func (m *ChannelMonitor) RegisterJobs(sch *scheduler.Scheduler) error {
 	if sch == nil {
-		return
+		return nil
 	}
-	sch.AddCron("messaging.channel-probe", "*/2 * * * *", m.probe,
+	if _, err := sch.AddCron("messaging.channel-probe", "*/2 * * * *", m.probe,
 		scheduler.WithTimeout(30*time.Second),
 		scheduler.WithOverlapPolicy(scheduler.SkipIfRunning),
 		scheduler.WithGroup("messaging"),
 		scheduler.WithTags("health"),
-	)
+	); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to register channel probe job", log.Fields{
+				"job_id": "messaging.channel-probe",
+				"error":  err.Error(),
+			})
+		}
+		return fmt.Errorf("messaging: register monitor job messaging.channel-probe: %w", err)
+	}
+	return nil
 }
 
 // Status returns the current status of all channels.

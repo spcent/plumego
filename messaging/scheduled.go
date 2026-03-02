@@ -2,6 +2,8 @@ package messaging
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/spcent/plumego/log"
@@ -10,26 +12,46 @@ import (
 )
 
 // registerScheduledJobs sets up periodic maintenance tasks on the scheduler.
-func (s *Service) registerScheduledJobs() {
+func (s *Service) registerScheduledJobs() error {
 	if s.scheduler == nil {
-		return
+		return nil
 	}
+	var regErrs []error
 
 	// Retry dead-letter tasks every hour.
-	s.scheduler.AddCron("messaging.dlq-retry", "0 * * * *", s.retryDeadLetters,
+	if _, err := s.scheduler.AddCron("messaging.dlq-retry", "0 * * * *", s.retryDeadLetters,
 		scheduler.WithTimeout(5*time.Minute),
 		scheduler.WithOverlapPolicy(scheduler.SkipIfRunning),
 		scheduler.WithGroup("messaging"),
 		scheduler.WithTags("dlq", "retry"),
-	)
+	); err != nil {
+		wrapped := fmt.Errorf("messaging: register scheduled job messaging.dlq-retry: %w", err)
+		regErrs = append(regErrs, wrapped)
+		if s.logger != nil {
+			s.logger.Error("failed to register scheduled job", log.Fields{
+				"job_id": "messaging.dlq-retry",
+				"error":  err.Error(),
+			})
+		}
+	}
 
 	// Log queue stats every 5 minutes.
-	s.scheduler.AddCron("messaging.stats-log", "*/5 * * * *", s.logStats,
+	if _, err := s.scheduler.AddCron("messaging.stats-log", "*/5 * * * *", s.logStats,
 		scheduler.WithTimeout(30*time.Second),
 		scheduler.WithOverlapPolicy(scheduler.SkipIfRunning),
 		scheduler.WithGroup("messaging"),
 		scheduler.WithTags("stats"),
-	)
+	); err != nil {
+		wrapped := fmt.Errorf("messaging: register scheduled job messaging.stats-log: %w", err)
+		regErrs = append(regErrs, wrapped)
+		if s.logger != nil {
+			s.logger.Error("failed to register scheduled job", log.Fields{
+				"job_id": "messaging.stats-log",
+				"error":  err.Error(),
+			})
+		}
+	}
+	return errors.Join(regErrs...)
 }
 
 // retryDeadLetters replays dead-letter tasks back into the queue.

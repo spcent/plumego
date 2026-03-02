@@ -10,10 +10,10 @@ func TestPIIFilter(t *testing.T) {
 	filter := NewPIIFilter()
 
 	tests := []struct {
-		name      string
-		content   string
+		name        string
+		content     string
 		shouldBlock bool
-		label     string
+		label       string
 	}{
 		{
 			name:        "email",
@@ -317,6 +317,26 @@ func TestRedactContent(t *testing.T) {
 	// Should contain redaction markers
 	if !strings.Contains(redacted, "[REDACTED]") {
 		t.Error("Redacted content should contain [REDACTED]")
+	}
+}
+
+func TestRedactContent_UnsortedMatchesNoPanic(t *testing.T) {
+	content := "Contact me at john@example.com or call 555-123-4567"
+	result := &Result{
+		Allowed: false,
+		Matches: []Match{
+			// Intentionally unsorted: phone first, then email.
+			{Pattern: "phone", Start: 36, End: 48},
+			{Pattern: "email", Start: 14, End: 30},
+		},
+	}
+
+	redacted := RedactContent(content, result)
+	if strings.Contains(redacted, "john@example.com") {
+		t.Error("Redacted content should not contain email")
+	}
+	if strings.Contains(redacted, "555-123-4567") {
+		t.Error("Redacted content should not contain phone")
 	}
 }
 

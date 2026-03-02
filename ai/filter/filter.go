@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -182,11 +183,11 @@ type PIIFilter struct {
 func NewPIIFilter() *PIIFilter {
 	return &PIIFilter{
 		patterns: map[string]*regexp.Regexp{
-			"email":        regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`),
-			"phone":        regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`),
-			"ssn":          regexp.MustCompile(`\b\d{3}-\d{2}-\d{4}\b`),
-			"credit_card":  regexp.MustCompile(`\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`),
-			"ip_address":   regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`),
+			"email":       regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`),
+			"phone":       regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`),
+			"ssn":         regexp.MustCompile(`\b\d{3}-\d{2}-\d{4}\b`),
+			"credit_card": regexp.MustCompile(`\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`),
+			"ip_address":  regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`),
 		},
 	}
 }
@@ -234,13 +235,13 @@ type SecretFilter struct {
 func NewSecretFilter() *SecretFilter {
 	return &SecretFilter{
 		patterns: map[string]*regexp.Regexp{
-			"api_key":           regexp.MustCompile(`(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?`),
-			"aws_key":           regexp.MustCompile(`(?i)(AKIA[0-9A-Z]{16})`),
-			"github_token":      regexp.MustCompile(`(?i)(ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,}`),
-			"slack_token":       regexp.MustCompile(`xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}`),
-			"jwt":               regexp.MustCompile(`eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`),
-			"private_key":       regexp.MustCompile(`-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----`),
-			"password":          regexp.MustCompile(`(?i)(password|passwd|pwd)\s*[:=]\s*['"]?([^'"\s]{8,})['"]?`),
+			"api_key":      regexp.MustCompile(`(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?`),
+			"aws_key":      regexp.MustCompile(`(?i)(AKIA[0-9A-Z]{16})`),
+			"github_token": regexp.MustCompile(`(?i)(ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,}`),
+			"slack_token":  regexp.MustCompile(`xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}`),
+			"jwt":          regexp.MustCompile(`eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`),
+			"private_key":  regexp.MustCompile(`-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----`),
+			"password":     regexp.MustCompile(`(?i)(password|passwd|pwd)\s*[:=]\s*['"]?([^'"\s]{8,})['"]?`),
 		},
 	}
 }
@@ -407,18 +408,27 @@ func defaultProfanityList() []string {
 
 // RedactContent redacts sensitive content based on filter results.
 func RedactContent(content string, result *Result) string {
-	if result.Allowed || len(result.Matches) == 0 {
+	if result == nil || result.Allowed || len(result.Matches) == 0 {
 		return content
 	}
 
-	// Sort matches by position (descending) to avoid offset issues
+	// Sort matches by position (descending) to avoid offset issues.
 	matches := make([]Match, len(result.Matches))
 	copy(matches, result.Matches)
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].Start == matches[j].Start {
+			return matches[i].End > matches[j].End
+		}
+		return matches[i].Start > matches[j].Start
+	})
 
 	// Simple redaction: replace matches with [REDACTED]
 	redacted := content
-	for i := len(matches) - 1; i >= 0; i-- {
-		match := matches[i]
+	for _, match := range matches {
+		if match.Start < 0 || match.End < match.Start || match.End > len(redacted) {
+			// Ignore malformed/outdated ranges instead of panicking.
+			continue
+		}
 		redacted = redacted[:match.Start] + "[REDACTED]" + redacted[match.End:]
 	}
 

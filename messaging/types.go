@@ -82,6 +82,7 @@ func topicFor(ch Channel) string {
 
 // Sentinel errors for the messaging package.
 var (
+	ErrMissingID        = errors.New("messaging: id is required")
 	ErrInvalidChannel   = errors.New("messaging: invalid channel")
 	ErrInvalidEmail     = errors.New("messaging: invalid email address")
 	ErrInvalidPhone     = errors.New("messaging: invalid phone number")

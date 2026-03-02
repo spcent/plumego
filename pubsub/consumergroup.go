@@ -113,16 +113,16 @@ type consumerGroup struct {
 
 // groupConsumer represents a consumer in a group
 type groupConsumer struct {
-	id             string
-	group          *consumerGroup
-	topics         []string
-	assignedParts  map[string][]int // topic -> partitions
-  assignedPartsMu sync.RWMutex
-	subscription   Subscription
-	lastHeartbeat  time.Time
-	heartbeatMu    sync.Mutex
-	messageChannel chan Message
-	closed         atomic.Bool
+	id              string
+	group           *consumerGroup
+	topics          []string
+	assignedParts   map[string][]int // topic -> partitions
+	assignedPartsMu sync.RWMutex
+	subscription    Subscription
+	lastHeartbeat   time.Time
+	heartbeatMu     sync.Mutex
+	messageChannel  chan Message
+	closed          atomic.Bool
 
 	// Per-consumer context used to signal the dispatcher goroutine to exit.
 	cancel       context.CancelFunc
@@ -745,9 +745,9 @@ func (gc *groupConsumer) Close() {
 	gc.cancel()
 
 	// Wait for the dispatcher goroutine to stop before closing the channel it
-	// writes to.  This prevents a send-on-closed-channel data race.
-	if gc.dispatcherDone != nil {
-		<-gc.dispatcherDone
+	// writes to. This prevents a send-on-closed-channel data race.
+	if gc.dispatchDone != nil {
+		<-gc.dispatchDone
 	}
 
 	close(gc.messageChannel)

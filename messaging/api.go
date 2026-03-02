@@ -1,11 +1,13 @@
 package messaging
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/net/mq"
 )
 
 // HandleSend is the HTTP handler for POST /messages/send.
@@ -99,14 +101,38 @@ func (s *Service) HandleChannelHealth(ctx *contract.Ctx) {
 }
 
 func writeServiceError(ctx *contract.Ctx, err error) {
-	status := http.StatusUnprocessableEntity
-	code := "VALIDATION_ERROR"
-	if errors.Is(err, ErrProviderFailure) {
-		status = http.StatusBadGateway
-		code = "PROVIDER_ERROR"
-	} else if errors.Is(err, ErrQuotaExceeded) {
-		status = http.StatusTooManyRequests
-		code = "QUOTA_EXCEEDED"
-	}
+	status, code := classifyServiceError(err)
 	ctx.ErrorJSON(status, code, err.Error(), nil)
+}
+
+func classifyServiceError(err error) (int, string) {
+	switch {
+	case errors.Is(err, ErrProviderFailure):
+		return http.StatusBadGateway, "PROVIDER_ERROR"
+	case errors.Is(err, ErrQuotaExceeded):
+		return http.StatusTooManyRequests, "QUOTA_EXCEEDED"
+	case errors.Is(err, mq.ErrDuplicateTask):
+		return http.StatusConflict, "DUPLICATE_MESSAGE"
+	case errors.Is(err, mq.ErrTaskExpired):
+		return http.StatusUnprocessableEntity, "TASK_EXPIRED"
+	case errors.Is(err, mq.ErrNotInitialized):
+		return http.StatusInternalServerError, "SERVICE_UNAVAILABLE"
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return http.StatusGatewayTimeout, "REQUEST_TIMEOUT"
+	case isValidationError(err), errors.Is(err, mq.ErrInvalidConfig):
+		return http.StatusUnprocessableEntity, "VALIDATION_ERROR"
+	default:
+		return http.StatusInternalServerError, "SEND_ERROR"
+	}
+}
+
+func isValidationError(err error) bool {
+	return errors.Is(err, ErrMissingID) ||
+		errors.Is(err, ErrInvalidChannel) ||
+		errors.Is(err, ErrInvalidEmail) ||
+		errors.Is(err, ErrInvalidPhone) ||
+		errors.Is(err, ErrMissingBody) ||
+		errors.Is(err, ErrMissingRecipient) ||
+		errors.Is(err, ErrMissingSubject) ||
+		errors.Is(err, ErrTemplateRender)
 }

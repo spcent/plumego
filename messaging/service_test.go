@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/net/mq/store"
+	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/scheduler"
 )
 
 // --- mock providers ---
@@ -72,6 +75,17 @@ func waitForSent(svc *Service, want int64, timeout time.Duration) bool {
 	return false
 }
 
+func waitForFailed(svc *Service, want int64, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if svc.totalFailed.Load() >= want {
+			return true
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return false
+}
+
 // --- tests ---
 
 func TestValidation_SMS(t *testing.T) {
@@ -84,6 +98,11 @@ func TestValidation_SMS(t *testing.T) {
 		req  SendRequest
 		err  error
 	}{
+		{
+			name: "missing id",
+			req:  SendRequest{Channel: ChannelSMS, To: "+1234567890", Body: "hi"},
+			err:  ErrMissingID,
+		},
 		{
 			name: "missing to",
 			req:  SendRequest{ID: "1", Channel: ChannelSMS, Body: "hi"},
@@ -383,5 +402,171 @@ func TestScheduledSend(t *testing.T) {
 	stats, _ := svc.Stats(ctx)
 	if stats.Queued != 1 {
 		t.Fatalf("queued=%d, want 1", stats.Queued)
+	}
+}
+
+func TestServiceStart_SchedulerRegistrationError(t *testing.T) {
+	sch := scheduler.New()
+	if _, err := sch.AddCron("messaging.dlq-retry", "* * * * *", func(context.Context) error { return nil }); err != nil {
+		t.Fatalf("seed scheduler job: %v", err)
+	}
+
+	svc := New(Config{
+		TaskStore:  store.NewMemory(store.DefaultMemConfig()),
+		SMS:        &mockSMS{},
+		Scheduler:  sch,
+		Receipts:   NewMemReceiptStore(100),
+		ConsumerID: "test-consumer",
+	})
+	err := svc.Start(context.Background())
+	if err == nil {
+		t.Fatal("expected scheduler registration error")
+	}
+	if !errors.Is(err, scheduler.ErrJobExists) {
+		t.Fatalf("expected ErrJobExists, got %v", err)
+	}
+}
+
+func TestDeliverTask_RenderFailureUpdatesReceiptAndPublishesFailedEvent(t *testing.T) {
+	bus := pubsub.New()
+	defer bus.Close()
+	sub, err := bus.Subscribe("messaging.result", pubsub.SubOptions{BufferSize: 16})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	receipts := NewMemReceiptStore(100)
+	svc := New(Config{
+		TaskStore:         store.NewMemory(store.DefaultMemConfig()),
+		SMS:               &mockSMS{},
+		Bus:               bus,
+		Receipts:          receipts,
+		WorkerConcurrency: 1,
+	})
+	ctx := context.Background()
+	if err := svc.Start(ctx); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer svc.Stop(ctx)
+
+	err = svc.Send(ctx, SendRequest{
+		ID:         "render-fail-1",
+		Channel:    ChannelSMS,
+		To:         "+1234567890",
+		Template:   "missing-template",
+		MaxRetries: 1,
+	})
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	if !waitForFailed(svc, 1, 5*time.Second) {
+		t.Fatal("timed out waiting for failed delivery")
+	}
+	receipt, ok := receipts.Get("render-fail-1")
+	if !ok {
+		t.Fatal("receipt not found")
+	}
+	if receipt.Status != "failed" {
+		t.Fatalf("receipt status=%s, want failed", receipt.Status)
+	}
+	if receipt.Error == "" {
+		t.Fatal("expected receipt error")
+	}
+	if svc.Monitor().ChannelHealth(ChannelSMS) != ChannelHealthy {
+		t.Fatalf("expected monitor to stay healthy on render failure, got %s", svc.Monitor().ChannelHealth(ChannelSMS))
+	}
+
+	select {
+	case msg := <-sub.C():
+		raw, ok := msg.Data.(string)
+		if !ok {
+			t.Fatalf("event data type=%T, want string", msg.Data)
+		}
+		var result SendResult
+		if err := json.Unmarshal([]byte(raw), &result); err != nil {
+			t.Fatalf("decode result: %v", err)
+		}
+		if result.RequestID != "render-fail-1" {
+			t.Fatalf("result request_id=%s, want render-fail-1", result.RequestID)
+		}
+		if result.Status != "failed" {
+			t.Fatalf("result status=%s, want failed", result.Status)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for failed event")
+	}
+}
+
+func TestDeliverTask_ProviderFailurePublishesFailedEvent(t *testing.T) {
+	bus := pubsub.New()
+	defer bus.Close()
+	sub, err := bus.Subscribe("messaging.result", pubsub.SubOptions{BufferSize: 16})
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	receipts := NewMemReceiptStore(100)
+	svc := New(Config{
+		TaskStore:         store.NewMemory(store.DefaultMemConfig()),
+		SMS:               &mockSMS{err: errors.New("gateway down")},
+		Bus:               bus,
+		Receipts:          receipts,
+		WorkerConcurrency: 1,
+	})
+	ctx := context.Background()
+	if err := svc.Start(ctx); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer svc.Stop(ctx)
+
+	err = svc.Send(ctx, SendRequest{
+		ID:         "provider-fail-1",
+		Channel:    ChannelSMS,
+		To:         "+1234567890",
+		Body:       "hello",
+		MaxRetries: 1,
+	})
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	if !waitForFailed(svc, 1, 5*time.Second) {
+		t.Fatal("timed out waiting for failed delivery")
+	}
+	if svc.Monitor().ChannelHealth(ChannelSMS) != ChannelDegraded {
+		t.Fatalf("expected degraded monitor state, got %s", svc.Monitor().ChannelHealth(ChannelSMS))
+	}
+	receipt, ok := receipts.Get("provider-fail-1")
+	if !ok {
+		t.Fatal("receipt not found")
+	}
+	if receipt.Status != "failed" {
+		t.Fatalf("receipt status=%s, want failed", receipt.Status)
+	}
+
+	select {
+	case msg := <-sub.C():
+		raw, ok := msg.Data.(string)
+		if !ok {
+			t.Fatalf("event data type=%T, want string", msg.Data)
+		}
+		var result SendResult
+		if err := json.Unmarshal([]byte(raw), &result); err != nil {
+			t.Fatalf("decode result: %v", err)
+		}
+		if result.RequestID != "provider-fail-1" {
+			t.Fatalf("result request_id=%s, want provider-fail-1", result.RequestID)
+		}
+		if result.Status != "failed" {
+			t.Fatalf("result status=%s, want failed", result.Status)
+		}
+		if result.Error == "" {
+			t.Fatal("expected non-empty error in failed result")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for failed event")
 	}
 }

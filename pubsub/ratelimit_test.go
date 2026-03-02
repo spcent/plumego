@@ -241,9 +241,9 @@ func TestRateLimitedPubSub_ConcurrentPublish(t *testing.T) {
 			for j := 0; j < messagesPerGoroutine; j++ {
 				msg := Message{Data: j}
 				if err := rlps.Publish("concurrent", msg); err == ErrRateLimitExceeded {
-					atomic.AddInt32(&denied, 1)
+					denied.Add(1)
 				} else if err == nil {
-					atomic.AddInt32(&allowed, 1)
+					allowed.Add(1)
 				}
 			}
 		}()
