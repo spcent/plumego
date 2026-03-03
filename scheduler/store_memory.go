@@ -16,7 +16,7 @@ func NewMemoryStore() *MemoryStore {
 func (m *MemoryStore) Save(job StoredJob) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.jobs[job.ID] = job
+	m.jobs[job.ID] = cloneStoredJob(job)
 	return nil
 }
 
@@ -32,7 +32,13 @@ func (m *MemoryStore) List() ([]StoredJob, error) {
 	defer m.mu.RUnlock()
 	out := make([]StoredJob, 0, len(m.jobs))
 	for _, job := range m.jobs {
-		out = append(out, job)
+		out = append(out, cloneStoredJob(job))
 	}
 	return out, nil
+}
+
+func cloneStoredJob(job StoredJob) StoredJob {
+	job.Tags = append([]string(nil), job.Tags...)
+	job.Dependencies = append([]JobID(nil), job.Dependencies...)
+	return job
 }

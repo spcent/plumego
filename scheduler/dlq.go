@@ -45,8 +45,12 @@ func (d *DeadLetterQueue) Add(entry DeadLetterEntry) {
 	// Update existing entry in-place (preserve FirstFailed, order unchanged).
 	if existing, exists := d.entries[entry.JobID]; exists {
 		existing.Error = entry.Error
+		existing.ErrorMessage = entry.ErrorMessage
 		existing.Attempts = entry.Attempts
 		existing.LastFailed = entry.LastFailed
+		existing.TaskName = entry.TaskName
+		existing.Group = entry.Group
+		existing.Tags = append([]string(nil), entry.Tags...)
 		return
 	}
 
@@ -63,6 +67,7 @@ func (d *DeadLetterQueue) Add(entry DeadLetterEntry) {
 	}
 
 	// Add new entry.
+	entry.Tags = append([]string(nil), entry.Tags...)
 	d.entries[entry.JobID] = &entry
 	d.order = append(d.order, entry.JobID)
 }
@@ -75,8 +80,8 @@ func (d *DeadLetterQueue) Get(jobID JobID) (*DeadLetterEntry, bool) {
 	if !ok {
 		return nil, false
 	}
-	// Return a copy to prevent external modification
-	entryCopy := *entry
+	// Return a deep copy to prevent external modification.
+	entryCopy := cloneDeadLetterEntry(*entry)
 	return &entryCopy, true
 }
 
@@ -85,8 +90,12 @@ func (d *DeadLetterQueue) List() []DeadLetterEntry {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	result := make([]DeadLetterEntry, 0, len(d.entries))
-	for _, entry := range d.entries {
-		result = append(result, *entry)
+	for _, id := range d.order {
+		entry, exists := d.entries[id]
+		if !exists || entry == nil {
+			continue
+		}
+		result = append(result, cloneDeadLetterEntry(*entry))
 	}
 	return result
 }
@@ -125,4 +134,9 @@ func (d *DeadLetterQueue) Size() int {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return len(d.entries)
+}
+
+func cloneDeadLetterEntry(entry DeadLetterEntry) DeadLetterEntry {
+	entry.Tags = append([]string(nil), entry.Tags...)
+	return entry
 }

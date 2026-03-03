@@ -307,10 +307,6 @@ func (s *Scheduler) TriggerNow(id JobID) error {
 // from now. Returns ErrJobNotFound if the job does not exist or is not a cron
 // job. Returns an error if the new expression cannot be parsed.
 func (s *Scheduler) UpdateCron(id JobID, spec string) error {
-	parsed, err := ParseCronSpec(spec)
-	if err != nil {
-		return err
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -322,6 +318,10 @@ func (s *Scheduler) UpdateCron(id JobID, spec string) error {
 	}
 	if j.kind != jobKindCron {
 		return fmt.Errorf("scheduler: job %q is not a cron job", id)
+	}
+	parsed, err := ParseCronSpecWithLocation(spec, j.cron.location)
+	if err != nil {
+		return err
 	}
 	j.cron = parsed
 	j.cronExpr = parsed.Expr()
@@ -398,6 +398,40 @@ func (s *Scheduler) List() []JobStatus {
 	return out
 }
 
+// PruneTerminalJobs removes terminal jobs from in-memory registry to bound
+// memory growth in long-running processes.
+//
+// A job is considered terminal when its state is completed, failed, or canceled.
+// Running jobs are never pruned. Jobs that still have live dependents are kept.
+//
+// limit controls how many jobs to remove:
+//   - limit <= 0: prune all eligible jobs
+//   - limit > 0: prune at most limit jobs
+//
+// Returns the number of pruned jobs.
+func (s *Scheduler) PruneTerminalJobs(limit int) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pruned := 0
+	for id, j := range s.jobs {
+		if j == nil || j.running.Load() || !isTerminalState(j.state) {
+			continue
+		}
+		if s.hasLiveDependentsLocked(id) {
+			continue
+		}
+		// Mark canceled defensively so stale queued pointers (if any) cannot run.
+		j.canceled.Store(true)
+		delete(s.jobs, id)
+		s.cleanupDependencyTrackingLocked(id, j)
+		pruned++
+		if limit > 0 && pruned >= limit {
+			break
+		}
+	}
+	return pruned
+}
+
 // PauseByGroup pauses all jobs in the specified group.
 // Returns the number of jobs paused.
 func (s *Scheduler) PauseByGroup(group string) int {
@@ -406,14 +440,10 @@ func (s *Scheduler) PauseByGroup(group string) int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	count := 0
-	for _, j := range s.jobs {
-		if j.options.Group == group && !j.paused.Load() {
-			j.paused.Store(true)
-			count++
-		}
-	}
-	return count
+	return s.applyBatchLocked(
+		func(_ JobID, j *job) bool { return j.options.Group == group && !j.paused.Load() },
+		func(_ JobID, j *job) { j.paused.Store(true) },
+	)
 }
 
 // PauseByTags pauses all jobs that have ALL of the specified tags.
@@ -424,14 +454,10 @@ func (s *Scheduler) PauseByTags(tags ...string) int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	count := 0
-	for _, j := range s.jobs {
-		if hasAllTags(j.options.Tags, tags) && !j.paused.Load() {
-			j.paused.Store(true)
-			count++
-		}
-	}
-	return count
+	return s.applyBatchLocked(
+		func(_ JobID, j *job) bool { return hasAllTags(j.options.Tags, tags) && !j.paused.Load() },
+		func(_ JobID, j *job) { j.paused.Store(true) },
+	)
 }
 
 // ResumeByGroup resumes all paused jobs in the specified group.
@@ -442,14 +468,10 @@ func (s *Scheduler) ResumeByGroup(group string) int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	count := 0
-	for _, j := range s.jobs {
-		if j.options.Group == group && j.paused.Load() && !j.canceled.Load() {
-			s.resumeJobLocked(j)
-			count++
-		}
-	}
-	return count
+	return s.applyBatchLocked(
+		func(_ JobID, j *job) bool { return j.options.Group == group && j.paused.Load() && !j.canceled.Load() },
+		func(_ JobID, j *job) { s.resumeJobLocked(j) },
+	)
 }
 
 // ResumeByTags resumes all paused jobs that have ALL of the specified tags.
@@ -460,14 +482,12 @@ func (s *Scheduler) ResumeByTags(tags ...string) int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	count := 0
-	for _, j := range s.jobs {
-		if hasAllTags(j.options.Tags, tags) && j.paused.Load() && !j.canceled.Load() {
-			s.resumeJobLocked(j)
-			count++
-		}
-	}
-	return count
+	return s.applyBatchLocked(
+		func(_ JobID, j *job) bool {
+			return hasAllTags(j.options.Tags, tags) && j.paused.Load() && !j.canceled.Load()
+		},
+		func(_ JobID, j *job) { s.resumeJobLocked(j) },
+	)
 }
 
 // CancelByGroup cancels all jobs in the specified group.
@@ -478,14 +498,10 @@ func (s *Scheduler) CancelByGroup(group string) int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	count := 0
-	for id, j := range s.jobs {
-		if j.options.Group == group {
-			s.cancelJobLocked(id, j)
-			count++
-		}
-	}
-	return count
+	return s.applyBatchLocked(
+		func(_ JobID, j *job) bool { return j.options.Group == group },
+		func(id JobID, j *job) { s.cancelJobLocked(id, j) },
+	)
 }
 
 // CancelByTags cancels all jobs that have ALL of the specified tags.
@@ -496,12 +512,25 @@ func (s *Scheduler) CancelByTags(tags ...string) int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.applyBatchLocked(
+		func(_ JobID, j *job) bool { return hasAllTags(j.options.Tags, tags) },
+		func(id JobID, j *job) { s.cancelJobLocked(id, j) },
+	)
+}
+
+// applyBatchLocked iterates all jobs and applies mutator to matched jobs.
+// s.mu must be held by caller.
+func (s *Scheduler) applyBatchLocked(match func(JobID, *job) bool, mutate func(JobID, *job)) int {
+	if match == nil || mutate == nil {
+		return 0
+	}
 	count := 0
 	for id, j := range s.jobs {
-		if hasAllTags(j.options.Tags, tags) {
-			s.cancelJobLocked(id, j)
-			count++
+		if !match(id, j) {
+			continue
 		}
+		mutate(id, j)
+		count++
 	}
 	return count
 }
@@ -529,49 +558,15 @@ func (s *Scheduler) QueryJobs(query JobQuery) JobQueryResult {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	matcher := newJobQueryMatcher(query)
+
 	// Collect and filter jobs
 	var filtered []JobStatus
 	for _, j := range s.jobs {
 		status := jobStatusFrom(j)
-
-		// Apply filters
-		if query.Group != "" && status.Group != query.Group {
+		if !matcher.match(status) {
 			continue
 		}
-		if len(query.Tags) > 0 && !hasAllTags(status.Tags, query.Tags) {
-			continue
-		}
-		if len(query.Kinds) > 0 {
-			matched := false
-			for _, kind := range query.Kinds {
-				if status.Kind == kind {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-		}
-		if query.Running != nil && status.Running != *query.Running {
-			continue
-		}
-		if query.Paused != nil && status.Paused != *query.Paused {
-			continue
-		}
-		if len(query.States) > 0 {
-			matched := false
-			for _, state := range query.States {
-				if status.State == state {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-		}
-
 		filtered = append(filtered, status)
 	}
 
@@ -610,32 +605,105 @@ func (s *Scheduler) QueryJobs(query JobQuery) JobQueryResult {
 
 // sortJobStatuses sorts job statuses based on the specified field and direction.
 func sortJobStatuses(jobs []JobStatus, orderBy string, ascending bool) {
-	sort.Slice(jobs, func(i, j int) bool {
-		switch orderBy {
-		case "id":
-			if ascending {
-				return jobs[i].ID < jobs[j].ID
-			}
-			return jobs[i].ID > jobs[j].ID
-		case "next_run":
-			if ascending {
-				return jobs[i].NextRun.Before(jobs[j].NextRun)
-			}
-			return jobs[i].NextRun.After(jobs[j].NextRun)
-		case "last_run":
-			if ascending {
-				return jobs[i].LastRun.Before(jobs[j].LastRun)
-			}
-			return jobs[i].LastRun.After(jobs[j].LastRun)
-		case "group":
-			if ascending {
-				return jobs[i].Group < jobs[j].Group
-			}
-			return jobs[i].Group > jobs[j].Group
-		default:
+	less := buildJobStatusLess(orderBy)
+	if less == nil {
+		return
+	}
+	sort.SliceStable(jobs, func(i, j int) bool {
+		if ascending {
+			return less(jobs[i], jobs[j])
+		}
+		return less(jobs[j], jobs[i])
+	})
+}
+
+type jobQueryMatcher struct {
+	group   string
+	tags    []string
+	kinds   map[string]struct{}
+	running *bool
+	paused  *bool
+	states  map[JobState]struct{}
+}
+
+func newJobQueryMatcher(query JobQuery) jobQueryMatcher {
+	m := jobQueryMatcher{
+		group:   query.Group,
+		tags:    query.Tags,
+		running: query.Running,
+		paused:  query.Paused,
+	}
+	if len(query.Kinds) > 0 {
+		m.kinds = make(map[string]struct{}, len(query.Kinds))
+		for _, kind := range query.Kinds {
+			m.kinds[kind] = struct{}{}
+		}
+	}
+	if len(query.States) > 0 {
+		m.states = make(map[JobState]struct{}, len(query.States))
+		for _, state := range query.States {
+			m.states[state] = struct{}{}
+		}
+	}
+	return m
+}
+
+func (m jobQueryMatcher) match(status JobStatus) bool {
+	if m.group != "" && status.Group != m.group {
+		return false
+	}
+	if len(m.tags) > 0 && !hasAllTags(status.Tags, m.tags) {
+		return false
+	}
+	if len(m.kinds) > 0 {
+		if _, ok := m.kinds[status.Kind]; !ok {
 			return false
 		}
-	})
+	}
+	if m.running != nil && status.Running != *m.running {
+		return false
+	}
+	if m.paused != nil && status.Paused != *m.paused {
+		return false
+	}
+	if len(m.states) > 0 {
+		if _, ok := m.states[status.State]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func buildJobStatusLess(orderBy string) func(a, b JobStatus) bool {
+	switch orderBy {
+	case "id":
+		return func(a, b JobStatus) bool {
+			return a.ID < b.ID
+		}
+	case "next_run":
+		return func(a, b JobStatus) bool {
+			if a.NextRun.Equal(b.NextRun) {
+				return a.ID < b.ID
+			}
+			return a.NextRun.Before(b.NextRun)
+		}
+	case "last_run":
+		return func(a, b JobStatus) bool {
+			if a.LastRun.Equal(b.LastRun) {
+				return a.ID < b.ID
+			}
+			return a.LastRun.Before(b.LastRun)
+		}
+	case "group":
+		return func(a, b JobStatus) bool {
+			if a.Group == b.Group {
+				return a.ID < b.ID
+			}
+			return a.Group < b.Group
+		}
+	default:
+		return nil
+	}
 }
 
 func (s *Scheduler) addJob(id JobID, kind jobKind, task TaskFunc, spec CronSpec, runAt time.Time, opts ...JobOption) (JobID, error) {
@@ -1368,60 +1436,7 @@ func (s *Scheduler) handleDependentJobsOnFailure(failedJob *job) {
 		if !exists || depJob.canceled.Load() {
 			continue
 		}
-
-		switch depJob.options.DependencyPolicy {
-		case DependencyFailureSkip:
-			if s.logger != nil {
-				s.logger.Warn("skipping dependent job due to dependency failure", log.Fields{
-					"job_id":            depJobID,
-					"failed_dependency": failedJob.id,
-				})
-			}
-			switch depJob.kind {
-			case jobKindCron:
-				// Reschedule cron job at its next natural trigger time.
-				next := depJob.cron.Next(s.clock.Now())
-				depJob.runAt = next
-				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
-				s.pushScheduleItemLocked(depJob, next, true)
-				s.wakeScheduler()
-			case jobKindDelay:
-				// A delay job runs once; if its dependency failed and the
-				// policy is Skip, mark it as failed so it doesn't stay
-				// in s.jobs forever without ever executing.
-				s.setJobStateLocked(depJob, JobStateFailed)
-				if s.store != nil {
-					_ = s.store.Delete(depJobID)
-				}
-			}
-
-		case DependencyFailureCancel:
-			if s.logger != nil {
-				s.logger.Warn("canceling dependent job due to dependency failure", log.Fields{
-					"job_id":            depJobID,
-					"failed_dependency": failedJob.id,
-				})
-			}
-			s.cancelJobLocked(depJobID, depJob)
-
-		case DependencyFailureContinue:
-			if s.logger != nil {
-				s.logger.Info("continuing dependent job despite dependency failure", log.Fields{
-					"job_id":            depJobID,
-					"failed_dependency": failedJob.id,
-				})
-			}
-			// DependencyFailureContinue: treat the failed dependency as
-			// satisfied for this scheduling decision only. Do NOT write
-			// true into dependencyStatus — the failed job still failed.
-			// Instead check whether all OTHER dependencies are met and
-			// allow the dependent to run regardless of this failure.
-			if s.allDependenciesMetExceptLocked(depJob, failedJob.id) {
-				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
-				s.pushScheduleItemLocked(depJob, depJob.runAt, true)
-				s.wakeScheduler()
-			}
-		}
+		s.applyDependentPolicyLocked(depJobID, depJob, failedJob.id, dependencyEventFailure)
 	}
 }
 
@@ -1491,23 +1506,7 @@ func (s *Scheduler) cancelJobLocked(id JobID, j *job) {
 		s.notifyDependentsCanceledLocked(id, deps)
 	}
 	// Clean up dependency tracking to prevent memory leaks.
-	delete(s.dependents, id)
-	delete(s.dependencyStatus, id)
-	// Remove this job from the dependents lists of its own dependencies.
-	for _, depID := range j.options.Dependencies {
-		deps := s.dependents[depID]
-		filtered := deps[:0]
-		for _, d := range deps {
-			if d != id {
-				filtered = append(filtered, d)
-			}
-		}
-		if len(filtered) == 0 {
-			delete(s.dependents, depID)
-		} else {
-			s.dependents[depID] = filtered
-		}
-	}
+	s.cleanupDependencyTrackingLocked(id, j)
 }
 
 // retireJobLocked is called when a job has exhausted its MaxRuns quota after a
@@ -1527,8 +1526,94 @@ func (s *Scheduler) retireJobLocked(id JobID, j *job) {
 		_ = s.store.Delete(id)
 	}
 	// Clean up dependency tracking (same as cancelJobLocked, minus dependent notification).
-	delete(s.dependents, id)
+	s.cleanupDependencyTrackingLocked(id, j)
+}
+
+// notifyDependentsCanceledLocked applies DependencyFailurePolicy to each job
+// that was waiting for canceledID to complete. Called from cancelJobLocked;
+// s.mu must be held.
+func (s *Scheduler) notifyDependentsCanceledLocked(canceledID JobID, dependentIDs []JobID) {
+	for _, depJobID := range dependentIDs {
+		depJob, exists := s.jobs[depJobID]
+		if !exists || depJob.canceled.Load() {
+			continue
+		}
+		s.applyDependentPolicyLocked(depJobID, depJob, canceledID, dependencyEventCancellation)
+	}
+}
+
+type dependencyEvent struct {
+	noun  string
+	field string
+}
+
+var (
+	dependencyEventFailure      = dependencyEvent{noun: "failure", field: "failed_dependency"}
+	dependencyEventCancellation = dependencyEvent{noun: "cancellation", field: "canceled_dependency"}
+)
+
+func (s *Scheduler) applyDependentPolicyLocked(depJobID JobID, depJob *job, triggerID JobID, event dependencyEvent) {
+	switch depJob.options.DependencyPolicy {
+	case DependencyFailureSkip:
+		s.logDependentPolicy("skipping dependent job due to dependency "+event.noun, depJobID, triggerID, event.field, true)
+		s.skipDependentJobLocked(depJobID, depJob)
+	case DependencyFailureCancel:
+		s.logDependentPolicy("canceling dependent job due to dependency "+event.noun, depJobID, triggerID, event.field, true)
+		s.cancelJobLocked(depJobID, depJob)
+	case DependencyFailureContinue:
+		s.logDependentPolicy("continuing dependent job despite dependency "+event.noun, depJobID, triggerID, event.field, false)
+		// DependencyFailureContinue ignores the triggering dependency outcome for
+		// this scheduling decision only.
+		if s.allDependenciesMetExceptLocked(depJob, triggerID) {
+			s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
+			s.pushScheduleItemLocked(depJob, depJob.runAt, true)
+			s.wakeScheduler()
+		}
+	}
+}
+
+func (s *Scheduler) skipDependentJobLocked(depJobID JobID, depJob *job) {
+	switch depJob.kind {
+	case jobKindCron:
+		// Reschedule cron job at its next natural trigger time.
+		next := depJob.cron.Next(s.clock.Now())
+		depJob.runAt = next
+		s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
+		s.pushScheduleItemLocked(depJob, next, true)
+		s.wakeScheduler()
+	case jobKindDelay:
+		// A delay job runs once; if its dependency is skipped/canceled with Skip
+		// policy, mark it failed and remove persisted entry.
+		s.setJobStateLocked(depJob, JobStateFailed)
+		if s.store != nil {
+			_ = s.store.Delete(depJobID)
+		}
+	}
+}
+
+func (s *Scheduler) logDependentPolicy(msg string, depJobID JobID, triggerID JobID, triggerField string, warn bool) {
+	if s.logger == nil {
+		return
+	}
+	fields := log.Fields{"job_id": depJobID}
+	fields[triggerField] = triggerID
+	if warn {
+		s.logger.Warn(msg, fields)
+		return
+	}
+	s.logger.Info(msg, fields)
+}
+
+func (s *Scheduler) cleanupDependencyTrackingLocked(id JobID, j *job) {
+	s.cleanupDependencyLinksLocked(id, j)
 	delete(s.dependencyStatus, id)
+}
+
+func (s *Scheduler) cleanupDependencyLinksLocked(id JobID, j *job) {
+	delete(s.dependents, id)
+	if j == nil {
+		return
+	}
 	for _, depID := range j.options.Dependencies {
 		deps := s.dependents[depID]
 		filtered := deps[:0]
@@ -1545,57 +1630,36 @@ func (s *Scheduler) retireJobLocked(id JobID, j *job) {
 	}
 }
 
-// notifyDependentsCanceledLocked applies DependencyFailurePolicy to each job
-// that was waiting for canceledID to complete. Called from cancelJobLocked;
-// s.mu must be held.
-func (s *Scheduler) notifyDependentsCanceledLocked(canceledID JobID, dependentIDs []JobID) {
-	for _, depJobID := range dependentIDs {
-		depJob, exists := s.jobs[depJobID]
-		if !exists || depJob.canceled.Load() {
+func (s *Scheduler) hasLiveDependentsLocked(id JobID) bool {
+	deps := s.dependents[id]
+	if len(deps) == 0 {
+		return false
+	}
+	live := deps[:0]
+	for _, depID := range deps {
+		depJob, exists := s.jobs[depID]
+		if !exists || depJob == nil {
 			continue
 		}
-		switch depJob.options.DependencyPolicy {
-		case DependencyFailureSkip:
-			if s.logger != nil {
-				s.logger.Warn("skipping dependent job due to dependency cancellation", log.Fields{
-					"job_id":              depJobID,
-					"canceled_dependency": canceledID,
-				})
-			}
-			switch depJob.kind {
-			case jobKindCron:
-				next := depJob.cron.Next(s.clock.Now())
-				depJob.runAt = next
-				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
-				s.pushScheduleItemLocked(depJob, next, true)
-				s.wakeScheduler()
-			case jobKindDelay:
-				s.setJobStateLocked(depJob, JobStateFailed)
-				if s.store != nil {
-					_ = s.store.Delete(depJobID)
-				}
-			}
-		case DependencyFailureCancel:
-			if s.logger != nil {
-				s.logger.Warn("canceling dependent job due to dependency cancellation", log.Fields{
-					"job_id":              depJobID,
-					"canceled_dependency": canceledID,
-				})
-			}
-			s.cancelJobLocked(depJobID, depJob)
-		case DependencyFailureContinue:
-			if s.logger != nil {
-				s.logger.Info("continuing dependent job despite dependency cancellation", log.Fields{
-					"job_id":              depJobID,
-					"canceled_dependency": canceledID,
-				})
-			}
-			if s.allDependenciesMetExceptLocked(depJob, canceledID) {
-				s.setJobStateIfIdleLocked(depJob, JobStateScheduled)
-				s.pushScheduleItemLocked(depJob, depJob.runAt, true)
-				s.wakeScheduler()
-			}
+		if depJob.canceled.Load() || isTerminalState(depJob.state) {
+			continue
 		}
+		live = append(live, depID)
+	}
+	if len(live) == 0 {
+		delete(s.dependents, id)
+		return false
+	}
+	s.dependents[id] = live
+	return true
+}
+
+func isTerminalState(state JobState) bool {
+	switch state {
+	case JobStateCompleted, JobStateFailed, JobStateCanceled:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -1689,15 +1753,18 @@ func (s *Scheduler) RequeueDeadLetter(jobID JobID, task TaskFunc, opts ...JobOpt
 		return "", ErrJobNotFound
 	}
 
-	// Remove from DLQ
-	s.dlq.Delete(jobID)
-
 	// Re-add the job as a delay task with immediate execution.
 	// Copy opts to avoid mutating the caller's slice.
 	allOpts := make([]JobOption, len(opts)+1)
 	copy(allOpts, opts)
 	allOpts[len(opts)] = ReplaceExisting()
-	return s.Delay(entry.JobID, 0, task, allOpts...)
+	id, err := s.Delay(entry.JobID, 0, task, allOpts...)
+	if err != nil {
+		return "", err
+	}
+	// Remove from DLQ only after the job has been successfully re-registered.
+	s.dlq.Delete(jobID)
+	return id, nil
 }
 
 // DeadLetterQueueSize returns the current size of the dead letter queue.

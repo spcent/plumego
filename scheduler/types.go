@@ -400,7 +400,7 @@ const (
 // dependencies have completed successfully (unless policy overrides this).
 func WithDependsOn(policy DependencyFailurePolicy, dependencies ...JobID) JobOption {
 	return func(opts *JobOptions) {
-		opts.Dependencies = dependencies
+		opts.Dependencies = append([]JobID(nil), dependencies...)
 		opts.DependencyPolicy = policy
 	}
 }

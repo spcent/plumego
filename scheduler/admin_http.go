@@ -10,6 +10,8 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+const maxAdminJobIDLen = 256
+
 // AdminHandler exposes minimal management endpoints over net/http.
 type AdminHandler struct {
 	scheduler *Scheduler
@@ -89,8 +91,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 		return
 	}
 	// Validate job ID length to prevent abuse via extremely long path segments.
-	const maxJobIDLen = 256
-	if len(parts[0]) > maxJobIDLen {
+	if len(parts[0]) > maxAdminJobIDLen {
 		contract.WriteError(w, r, contract.NewValidationError("job_id", "job ID too long"))
 		return
 	}
@@ -98,7 +99,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 
 	if len(parts) == 1 {
 		if r.Method != http.MethodGet {
-			contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
+			writeMethodNotAllowed(w, r)
 			return
 		}
 		status, ok := h.scheduler.Status(id)
@@ -112,7 +113,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 
 	action := parts[1]
 	if r.Method != http.MethodPost {
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
+		writeMethodNotAllowed(w, r)
 		return
 	}
 	switch action {
@@ -151,13 +152,12 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 
 // handleDLQEntry handles per-entry dead letter queue operations.
 func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, suffix string) {
-	const maxJobIDLen = 256
 	id := strings.Trim(suffix, "/")
 	if id == "" {
 		http.NotFound(w, r)
 		return
 	}
-	if len(id) > maxJobIDLen {
+	if len(id) > maxAdminJobIDLen {
 		contract.WriteError(w, r, contract.NewValidationError("job_id", "job ID too long"))
 		return
 	}
@@ -178,7 +178,7 @@ func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, su
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 	default:
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
+		writeMethodNotAllowed(w, r)
 	}
 }
 
@@ -186,50 +186,50 @@ func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, su
 // Path: /groups/{group}/{action}  Method: POST
 // Supported actions: pause, resume, cancel
 func (h *AdminHandler) handleGroupAction(w http.ResponseWriter, r *http.Request, suffix string) {
-	parts := strings.SplitN(strings.Trim(suffix, "/"), "/", 2)
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-		http.NotFound(w, r)
-		return
-	}
-	group, action := parts[0], parts[1]
-	switch action {
-	case "pause":
-		n := h.scheduler.PauseByGroup(group)
-		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
-	case "resume":
-		n := h.scheduler.ResumeByGroup(group)
-		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
-	case "cancel":
-		n := h.scheduler.CancelByGroup(group)
-		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
-	default:
-		http.NotFound(w, r)
-	}
+	h.handleBulkAction(w, r, suffix, bulkActions{
+		pause:  h.scheduler.PauseByGroup,
+		resume: h.scheduler.ResumeByGroup,
+		cancel: h.scheduler.CancelByGroup,
+	})
 }
 
 // handleTagAction handles bulk operations on jobs sharing a tag.
 // Path: /tags/{tag}/{action}  Method: POST
 // Supported actions: pause, resume, cancel
 func (h *AdminHandler) handleTagAction(w http.ResponseWriter, r *http.Request, suffix string) {
+	h.handleBulkAction(w, r, suffix, bulkActions{
+		pause:  func(tag string) int { return h.scheduler.PauseByTags(tag) },
+		resume: func(tag string) int { return h.scheduler.ResumeByTags(tag) },
+		cancel: func(tag string) int { return h.scheduler.CancelByTags(tag) },
+	})
+}
+
+type bulkActions struct {
+	pause  func(string) int
+	resume func(string) int
+	cancel func(string) int
+}
+
+func (h *AdminHandler) handleBulkAction(w http.ResponseWriter, r *http.Request, suffix string, actions bulkActions) {
 	parts := strings.SplitN(strings.Trim(suffix, "/"), "/", 2)
 	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
 		http.NotFound(w, r)
 		return
 	}
-	tag, action := parts[0], parts[1]
+	key, action := parts[0], parts[1]
+	var n int
 	switch action {
 	case "pause":
-		n := h.scheduler.PauseByTags(tag)
-		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+		n = actions.pause(key)
 	case "resume":
-		n := h.scheduler.ResumeByTags(tag)
-		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+		n = actions.resume(key)
 	case "cancel":
-		n := h.scheduler.CancelByTags(tag)
-		writeJSON(w, http.StatusOK, map[string]int{"affected": n})
+		n = actions.cancel(key)
 	default:
 		http.NotFound(w, r)
+		return
 	}
+	writeJSON(w, http.StatusOK, map[string]int{"affected": n})
 }
 
 // parseJobQuery builds a JobQuery from URL query parameters.
@@ -252,72 +252,68 @@ func parseJobQuery(r *http.Request) JobQuery {
 	}
 	values := r.URL.Query()
 
-	// States
-	for _, v := range values["state"] {
-		if s := parseJobState(v); s != "" {
-			q.States = append(q.States, s)
-		}
-	}
-
-	// Group
+	q.States = parseJobStates(values["state"])
 	q.Group = values.Get("group")
-
-	// Tags (all must be present)
-	q.Tags = values["tag"]
-
-	// Kinds
-	for _, k := range values["kind"] {
-		k = strings.ToLower(k)
-		if k == "cron" || k == "delay" {
-			q.Kinds = append(q.Kinds, k)
-		}
-	}
-
-	// Running / Paused boolean filters
-	if v := values.Get("running"); v != "" {
-		b, err := strconv.ParseBool(v)
-		if err == nil {
-			q.Running = &b
-		}
-	}
-	if v := values.Get("paused"); v != "" {
-		b, err := strconv.ParseBool(v)
-		if err == nil {
-			q.Paused = &b
-		}
-	}
-
-	// Sorting
+	q.Tags = append([]string(nil), values["tag"]...)
+	q.Kinds = parseJobKinds(values["kind"])
+	q.Running = parseOptionalBool(values.Get("running"))
+	q.Paused = parseOptionalBool(values.Get("paused"))
 	q.OrderBy = values.Get("order_by")
 	q.Ascending = true
-	if v := values.Get("asc"); v != "" {
-		b, err := strconv.ParseBool(v)
-		if err == nil {
-			q.Ascending = b
-		}
+	if asc := parseOptionalBool(values.Get("asc")); asc != nil {
+		q.Ascending = *asc
 	}
 
-	// Pagination (cap values to sane limits to prevent excessive allocation).
-	const maxLimit = 10_000
-	const maxOffset = 1_000_000
-	if v := values.Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			if n > maxLimit {
-				n = maxLimit
-			}
-			q.Limit = n
-		}
-	}
-	if v := values.Get("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			if n > maxOffset {
-				n = maxOffset
-			}
-			q.Offset = n
-		}
-	}
+	q.Limit = parseOptionalBoundedInt(values.Get("limit"), 10_000)
+	q.Offset = parseOptionalBoundedInt(values.Get("offset"), 1_000_000)
 
 	return q
+}
+
+func parseJobStates(values []string) []JobState {
+	out := make([]JobState, 0, len(values))
+	for _, v := range values {
+		if s := parseJobState(v); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func parseJobKinds(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		k := strings.ToLower(v)
+		if k == "cron" || k == "delay" {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+func parseOptionalBool(value string) *bool {
+	if value == "" {
+		return nil
+	}
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		return nil
+	}
+	return &b
+}
+
+func parseOptionalBoundedInt(value string, max int) int {
+	if value == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil || n < 0 {
+		return 0
+	}
+	if n > max {
+		return max
+	}
+	return n
 }
 
 func parseJobState(value string) JobState {
@@ -339,4 +335,13 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func writeMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
+	contract.WriteError(w, r, contract.APIError{
+		Status:   http.StatusMethodNotAllowed,
+		Code:     "METHOD_NOT_ALLOWED",
+		Message:  "method not allowed",
+		Category: contract.CategoryClient,
+	})
 }

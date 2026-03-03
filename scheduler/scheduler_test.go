@@ -771,6 +771,24 @@ func TestQueryJobs(t *testing.T) {
 	if result.Total != 1 {
 		t.Fatalf("expected 1 job (group-a, not paused), got %d", result.Total)
 	}
+
+	// Test 8: Unknown orderBy should not alter result cardinality.
+	result = sched.QueryJobs(JobQuery{OrderBy: "unknown"})
+	if result.Total != 4 {
+		t.Fatalf("expected total count 4 for unknown orderBy, got %d", result.Total)
+	}
+
+	// Test 9: Filter by state.
+	if !sched.Cancel("cron-b-2") {
+		t.Fatal("expected cancel cron-b-2 to succeed")
+	}
+	result = sched.QueryJobs(JobQuery{States: []JobState{JobStateCanceled}})
+	if result.Total != 1 {
+		t.Fatalf("expected 1 canceled job, got %d", result.Total)
+	}
+	if len(result.Jobs) != 1 || result.Jobs[0].ID != "cron-b-2" {
+		t.Fatalf("expected canceled job cron-b-2, got %+v", result.Jobs)
+	}
 }
 
 func TestJobDependenciesSuccess(t *testing.T) {
@@ -1048,6 +1066,78 @@ func waitForState(t *testing.T, sched *Scheduler, id JobID, state JobState, time
 	return false
 }
 
+func TestPruneTerminalJobs(t *testing.T) {
+	s := New(WithWorkers(2))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	_, err := s.Delay("prune-done-1", 0, func(context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("Delay prune-done-1: %v", err)
+	}
+	_, err = s.Delay("prune-done-2", 0, func(context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("Delay prune-done-2: %v", err)
+	}
+	_, err = s.AddCron("prune-keep-cron", "@every 1h", func(context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("AddCron prune-keep-cron: %v", err)
+	}
+
+	if !waitForState(t, s, "prune-done-1", JobStateCompleted, 500*time.Millisecond) {
+		t.Fatal("expected prune-done-1 to complete")
+	}
+	if !waitForState(t, s, "prune-done-2", JobStateCompleted, 500*time.Millisecond) {
+		t.Fatal("expected prune-done-2 to complete")
+	}
+
+	if pruned := s.PruneTerminalJobs(1); pruned != 1 {
+		t.Fatalf("expected first prune to remove 1 job, got %d", pruned)
+	}
+	if _, ok := s.Status("prune-keep-cron"); !ok {
+		t.Fatal("expected prune-keep-cron to remain after prune")
+	}
+
+	if pruned := s.PruneTerminalJobs(0); pruned != 1 {
+		t.Fatalf("expected second prune to remove remaining 1 terminal job, got %d", pruned)
+	}
+	if _, ok := s.Status("prune-done-1"); ok {
+		t.Fatal("expected prune-done-1 to be pruned")
+	}
+	if _, ok := s.Status("prune-done-2"); ok {
+		t.Fatal("expected prune-done-2 to be pruned")
+	}
+}
+
+func TestPruneTerminalJobsSkipsJobsWithLiveDependents(t *testing.T) {
+	s := New(WithWorkers(1))
+	s.Start()
+	defer func() { _ = s.Stop(context.Background()) }()
+
+	_, err := s.Delay("dep-source", 0, func(context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("Delay dep-source: %v", err)
+	}
+	_, err = s.Delay("dep-waiting", time.Hour, func(context.Context) error { return nil },
+		Paused(),
+		WithDependsOn(DependencyFailureSkip, "dep-source"),
+	)
+	if err != nil {
+		t.Fatalf("Delay dep-waiting: %v", err)
+	}
+
+	if !waitForState(t, s, "dep-source", JobStateCompleted, 500*time.Millisecond) {
+		t.Fatal("expected dep-source to complete")
+	}
+
+	if pruned := s.PruneTerminalJobs(0); pruned != 0 {
+		t.Fatalf("expected no pruning for dep-source with live dependent, got %d", pruned)
+	}
+	if _, ok := s.Status("dep-source"); !ok {
+		t.Fatal("expected dep-source to remain because dependent is still live")
+	}
+}
+
 func TestCronDescriptors(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1141,6 +1231,38 @@ func TestCronWithTimezone(t *testing.T) {
 	// Verify it's in the correct timezone
 	if next.Location().String() != ahead.String() {
 		t.Fatalf("expected timezone %v, got %v", ahead, next.Location())
+	}
+}
+
+func TestUpdateCronPreservesLocation(t *testing.T) {
+	loc := time.FixedZone("TEST+8", 8*3600)
+	sched := New(WithWorkers(1))
+
+	_, err := sched.AddCronWithLocation("tz-cron", "0 9 * * *", func(ctx context.Context) error {
+		return nil
+	}, loc)
+	if err != nil {
+		t.Fatalf("AddCronWithLocation failed: %v", err)
+	}
+
+	before, ok := sched.Status("tz-cron")
+	if !ok {
+		t.Fatal("expected job status before update")
+	}
+	if before.NextRun.Location().String() != loc.String() {
+		t.Fatalf("expected initial location %v, got %v", loc, before.NextRun.Location())
+	}
+
+	if err := sched.UpdateCron("tz-cron", "0 10 * * *"); err != nil {
+		t.Fatalf("UpdateCron failed: %v", err)
+	}
+
+	after, ok := sched.Status("tz-cron")
+	if !ok {
+		t.Fatal("expected job status after update")
+	}
+	if after.NextRun.Location().String() != loc.String() {
+		t.Fatalf("expected location to be preserved as %v, got %v", loc, after.NextRun.Location())
 	}
 }
 
@@ -1526,6 +1648,40 @@ func TestDeadLetterQueue(t *testing.T) {
 		// Verify entry removed from DLQ
 		if sched.DeadLetterQueueSize() != 0 {
 			t.Fatalf("expected DLQ size 0 after requeue, got %d", sched.DeadLetterQueueSize())
+		}
+	})
+
+	t.Run("Requeue keeps DLQ entry on registration failure", func(t *testing.T) {
+		sched := New(
+			WithWorkers(1),
+			WithDeadLetterQueue(10),
+		)
+		sched.Start()
+		defer func() { _ = sched.Stop(context.Background()) }()
+
+		_, err := sched.Delay("fail-keep", 10*time.Millisecond, func(ctx context.Context) error {
+			return fmt.Errorf("intentional failure")
+		}, WithRetryPolicy(RetryPolicy{MaxAttempts: 1}))
+		if err != nil {
+			t.Fatalf("Delay failed: %v", err)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+
+		if sched.DeadLetterQueueSize() != 1 {
+			t.Fatalf("expected DLQ size 1, got %d", sched.DeadLetterQueueSize())
+		}
+
+		_, err = sched.RequeueDeadLetter("fail-keep", nil)
+		if !errors.Is(err, ErrTaskNil) {
+			t.Fatalf("expected ErrTaskNil, got %v", err)
+		}
+
+		if sched.DeadLetterQueueSize() != 1 {
+			t.Fatalf("expected DLQ entry preserved after failed requeue, got size %d", sched.DeadLetterQueueSize())
+		}
+		if _, ok := sched.GetDeadLetter("fail-keep"); !ok {
+			t.Fatal("expected fail-keep to remain in DLQ")
 		}
 	})
 
@@ -2037,6 +2193,55 @@ func TestDLQDeleteRemovesFromOrderSlice(t *testing.T) {
 	}
 	if q.Size() != 4 {
 		t.Fatalf("expected DLQ size 4, got %d", q.Size())
+	}
+}
+
+func TestDLQListReturnsInsertionOrderAndCopies(t *testing.T) {
+	q := NewDeadLetterQueue(10)
+	now := time.Now()
+	q.Add(DeadLetterEntry{
+		JobID:        "job-1",
+		ErrorMessage: "e1",
+		Attempts:     1,
+		FirstFailed:  now,
+		LastFailed:   now,
+		Tags:         []string{"tag-a"},
+	})
+	q.Add(DeadLetterEntry{
+		JobID:        "job-2",
+		ErrorMessage: "e2",
+		Attempts:     1,
+		FirstFailed:  now,
+		LastFailed:   now,
+		Tags:         []string{"tag-b"},
+	})
+
+	items := q.List()
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+	if items[0].JobID != "job-1" || items[1].JobID != "job-2" {
+		t.Fatalf("expected insertion order [job-1, job-2], got [%s, %s]", items[0].JobID, items[1].JobID)
+	}
+
+	// Mutating returned list must not affect internal entries.
+	items[0].Tags[0] = "mutated-list"
+	got, ok := q.Get("job-1")
+	if !ok {
+		t.Fatal("expected job-1 in DLQ")
+	}
+	if got.Tags[0] != "tag-a" {
+		t.Fatalf("expected internal tag tag-a after list mutation, got %s", got.Tags[0])
+	}
+
+	// Mutating returned Get result must not affect subsequent reads.
+	got.Tags[0] = "mutated-get"
+	got2, ok := q.Get("job-1")
+	if !ok {
+		t.Fatal("expected job-1 in DLQ on second get")
+	}
+	if got2.Tags[0] != "tag-a" {
+		t.Fatalf("expected internal tag tag-a after get mutation, got %s", got2.Tags[0])
 	}
 }
 
