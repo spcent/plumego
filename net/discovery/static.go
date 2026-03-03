@@ -30,6 +30,9 @@ type Static struct {
 
 // NewStatic creates a new static discovery with the given service map
 func NewStatic(services map[string][]string) *Static {
+	if services == nil {
+		services = make(map[string][]string)
+	}
 	return &Static{
 		services: services,
 	}

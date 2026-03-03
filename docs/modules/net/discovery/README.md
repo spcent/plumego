@@ -70,17 +70,21 @@ registry := discovery.NewStaticFromEnv(
 For dynamic environments where services register/deregister automatically:
 
 ```go
-registry, err := discovery.NewConsul(discovery.ConsulConfig{
-    Address:    os.Getenv("CONSUL_ADDR"), // "consul:8500"
-    Datacenter: "dc1",
-    Token:      os.Getenv("CONSUL_TOKEN"),
+registry, err := discovery.NewConsul(
+    os.Getenv("CONSUL_ADDR"), // "consul:8500"
+    discovery.ConsulConfig{
+        Datacenter: "dc1",
+        Token:      os.Getenv("CONSUL_TOKEN"),
+        Namespace:  "default", // Consul Enterprise namespace (optional)
 
-    // Health check filtering
-    OnlyHealthy: true,
+        // IncludeUnhealthy: false (default) — only passing/healthy instances returned
+        // Set to true to include unhealthy instances
+        IncludeUnhealthy: false,
 
-    // Polling interval for watching changes
-    WatchInterval: 10 * time.Second,
-})
+        WaitTime: 30 * time.Second, // polling interval for Watch
+        Timeout:  60 * time.Second, // HTTP request timeout
+    },
+)
 ```
 
 ### Register Current Service

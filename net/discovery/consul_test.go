@@ -47,20 +47,22 @@ func TestNewConsul_Defaults(t *testing.T) {
 	if c.config.Scheme != "http" {
 		t.Errorf("Scheme = %q, want %q", c.config.Scheme, "http")
 	}
-	if !c.config.OnlyHealthy {
-		t.Error("OnlyHealthy = false, want true")
+	// Default: only healthy instances are returned (IncludeUnhealthy = false)
+	if c.config.IncludeUnhealthy {
+		t.Error("IncludeUnhealthy = true, want false (healthy only by default)")
 	}
 }
 
 func TestNewConsul_CustomConfig(t *testing.T) {
 	c, err := NewConsul("consul.example.com:8500", ConsulConfig{
-		Datacenter: "us-east-1",
-		Token:      "secret",
-		Namespace:  "production",
-		WaitTime:   10 * time.Second,
-		Timeout:    30 * time.Second,
-		Tag:        "primary",
-		Scheme:     "https",
+		Datacenter:       "us-east-1",
+		Token:            "secret",
+		Namespace:        "production",
+		WaitTime:         10 * time.Second,
+		Timeout:          30 * time.Second,
+		Tag:              "primary",
+		Scheme:           "https",
+		IncludeUnhealthy: true,
 	})
 	if err != nil {
 		t.Fatalf("NewConsul() error = %v", err)
@@ -72,6 +74,9 @@ func TestNewConsul_CustomConfig(t *testing.T) {
 	if c.config.Token != "secret" {
 		t.Errorf("Token = %q, want %q", c.config.Token, "secret")
 	}
+	if c.config.Namespace != "production" {
+		t.Errorf("Namespace = %q, want %q", c.config.Namespace, "production")
+	}
 	if c.config.WaitTime != 10*time.Second {
 		t.Errorf("WaitTime = %v, want %v", c.config.WaitTime, 10*time.Second)
 	}
@@ -81,9 +86,8 @@ func TestNewConsul_CustomConfig(t *testing.T) {
 	if c.config.Tag != "primary" {
 		t.Errorf("Tag = %q, want %q", c.config.Tag, "primary")
 	}
-	// OnlyHealthy is always forced to true
-	if !c.config.OnlyHealthy {
-		t.Error("OnlyHealthy = false, want true")
+	if !c.config.IncludeUnhealthy {
+		t.Error("IncludeUnhealthy = false, want true")
 	}
 }
 
@@ -178,6 +182,66 @@ func TestConsul_Resolve_QueryParams(t *testing.T) {
 	}
 	if !strings.Contains(receivedQuery, "tag=primary") {
 		t.Errorf("query %q missing tag=primary", receivedQuery)
+	}
+}
+
+func TestConsul_Resolve_IncludeUnhealthy(t *testing.T) {
+	var receivedQuery string
+	server := newTestConsulServer(func(w http.ResponseWriter, r *http.Request) {
+		receivedQuery = r.URL.RawQuery
+		json.NewEncoder(w).Encode([]consulServiceEntry{
+			{Service: consulService{Address: "10.0.0.1", Port: 8080}},
+		})
+	})
+	defer server.Close()
+
+	addr := strings.TrimPrefix(server.URL, "http://")
+	c, _ := NewConsul(addr, ConsulConfig{IncludeUnhealthy: true})
+
+	c.Resolve(context.Background(), "svc")
+
+	if strings.Contains(receivedQuery, "passing=true") {
+		t.Errorf("query %q must not contain passing=true when IncludeUnhealthy=true", receivedQuery)
+	}
+}
+
+func TestConsul_Resolve_Namespace(t *testing.T) {
+	var receivedNS string
+	server := newTestConsulServer(func(w http.ResponseWriter, r *http.Request) {
+		receivedNS = r.URL.Query().Get("ns")
+		json.NewEncoder(w).Encode([]consulServiceEntry{
+			{Service: consulService{Address: "10.0.0.1", Port: 8080}},
+		})
+	})
+	defer server.Close()
+
+	addr := strings.TrimPrefix(server.URL, "http://")
+	c, _ := NewConsul(addr, ConsulConfig{Namespace: "production"})
+
+	c.Resolve(context.Background(), "svc")
+
+	if receivedNS != "production" {
+		t.Errorf("ns = %q, want %q", receivedNS, "production")
+	}
+}
+
+func TestConsul_Resolve_NoNamespace(t *testing.T) {
+	var receivedNS string
+	server := newTestConsulServer(func(w http.ResponseWriter, r *http.Request) {
+		receivedNS = r.URL.Query().Get("ns")
+		json.NewEncoder(w).Encode([]consulServiceEntry{
+			{Service: consulService{Address: "10.0.0.1", Port: 8080}},
+		})
+	})
+	defer server.Close()
+
+	addr := strings.TrimPrefix(server.URL, "http://")
+	c, _ := NewConsul(addr, ConsulConfig{})
+
+	c.Resolve(context.Background(), "svc")
+
+	if receivedNS != "" {
+		t.Errorf("ns = %q, want empty (no namespace filter)", receivedNS)
 	}
 }
 
@@ -848,8 +912,8 @@ func TestConsul_Resolve_StatusCodes(t *testing.T) {
 		wantErr    error
 	}{
 		{"404", http.StatusNotFound, ErrServiceNotFound},
-		{"403", http.StatusForbidden, nil},   // generic error
-		{"502", http.StatusBadGateway, nil},  // generic error
+		{"403", http.StatusForbidden, nil},  // generic error
+		{"502", http.StatusBadGateway, nil}, // generic error
 		{"503", http.StatusServiceUnavailable, nil},
 	}
 
@@ -923,7 +987,7 @@ func TestConsulConfig_Defaults(t *testing.T) {
 	if cfg.Scheme != "" {
 		t.Errorf("default Scheme = %q, want empty", cfg.Scheme)
 	}
-	if cfg.OnlyHealthy {
-		t.Error("default OnlyHealthy = true, want false")
+	if cfg.IncludeUnhealthy {
+		t.Error("default IncludeUnhealthy = true, want false")
 	}
 }
