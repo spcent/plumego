@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sync/atomic"
 	"time"
 )
 
@@ -153,9 +152,12 @@ func (c *Conn) writerPump() {
 	}
 }
 
-// pongMonitor closes connection if no pong received within pongWait
+// pongMonitor closes the connection if no pong is received within pongWait.
+// The check interval is pongWait/3 so that a dead connection is detected
+// within at most 4/3 * pongWait of the last failed pong, regardless of how
+// pingPeriod is configured.
 func (c *Conn) pongMonitor() {
-	period := time.Duration(c.pingPeriod.Load()) / 2
+	period := time.Duration(c.pongWait.Load()) / 3
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 	for {
@@ -163,12 +165,12 @@ func (c *Conn) pongMonitor() {
 		case <-c.closeC:
 			return
 		case <-ticker.C:
-			// Pick up any runtime change to ping period made via SetPingPeriod.
-			if newPeriod := time.Duration(c.pingPeriod.Load()) / 2; newPeriod != period {
+			// Pick up any runtime change to pongWait made via SetPongWait.
+			if newPeriod := time.Duration(c.pongWait.Load()) / 3; newPeriod != period {
 				period = newPeriod
 				ticker.Reset(period)
 			}
-			last := time.Unix(0, atomic.LoadInt64(&c.lastPong))
+			last := time.Unix(0, c.lastPong.Load())
 			if time.Since(last) > time.Duration(c.pongWait.Load()) {
 				_ = c.Close()
 				return

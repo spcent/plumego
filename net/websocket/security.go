@@ -7,10 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"strings"
-	"sync"
-	"time"
+	"sync/atomic"
 
 	"github.com/spcent/plumego/security/password"
 )
@@ -53,24 +51,23 @@ type SecurityConfig struct {
 	EnableMetrics bool
 }
 
-// SecurityMetrics tracks security-related metrics for SecureRoomAuth.
+// SecurityMetrics tracks security-related metrics for a SecureRoomAuth instance.
 //
 // Note: InvalidWebSocketKeys, BroadcastQueueFull, and RejectedConnections are
-// no longer incremented by this package. Equivalent per-hub counters are now
-// available via Hub.Metrics() (InvalidWSKeys, BroadcastDropped, SecurityRejections).
-// These fields are retained for API compatibility only.
+// no longer tracked here. Equivalent per-hub counters are available via
+// Hub.Metrics() (InvalidWSKeys, BroadcastDropped, SecurityRejections).
 type SecurityMetrics struct {
-	// InvalidJWTSecrets counts JWT verifications that failed in SecureRoomAuth.VerifyJWT.
+	// InvalidJWTSecrets counts JWT verifications that failed.
 	InvalidJWTSecrets uint64 `json:"invalid_jwt_secrets"`
-	// WeakRoomPasswords counts rejected weak passwords in SecureRoomAuth.SetRoomPassword.
+	// WeakRoomPasswords counts rejected weak passwords.
 	WeakRoomPasswords uint64 `json:"weak_room_passwords"`
-	// InvalidWebSocketKeys is no longer incremented. Use Hub.Metrics().InvalidWSKeys instead.
+	// InvalidWebSocketKeys is no longer tracked. Use Hub.Metrics().InvalidWSKeys instead.
 	InvalidWebSocketKeys uint64 `json:"invalid_websocket_keys"`
-	// BroadcastQueueFull is no longer incremented. Use Hub.Metrics().BroadcastDropped instead.
+	// BroadcastQueueFull is no longer tracked. Use Hub.Metrics().BroadcastDropped instead.
 	BroadcastQueueFull uint64 `json:"broadcast_queue_full"`
-	// RejectedConnections is no longer incremented. Use Hub.Metrics().SecurityRejections instead.
+	// RejectedConnections is no longer tracked. Use Hub.Metrics().SecurityRejections instead.
 	RejectedConnections uint64 `json:"rejected_connections"`
-	// SuccessfulAuthentications counts successful JWT verifications in SecureRoomAuth.VerifyJWT.
+	// SuccessfulAuthentications counts successful JWT verifications.
 	SuccessfulAuthentications uint64 `json:"successful_authentications"`
 }
 
@@ -87,10 +84,6 @@ var (
 	// ErrInvalidConfig is returned when configuration is invalid
 	ErrInvalidConfig = errors.New("invalid security configuration")
 )
-
-// global security metrics (thread-safe)
-var securityMetrics SecurityMetrics
-var metricsMutex sync.RWMutex
 
 // ValidateSecurityConfig validates the security configuration
 func ValidateSecurityConfig(cfg SecurityConfig) error {
@@ -153,10 +146,15 @@ func ValidateRoomPassword(pwd string, config password.PasswordStrengthConfig, en
 	return nil
 }
 
-// SecureRoomAuth extends simpleRoomAuth with security features
+// SecureRoomAuth extends SimpleRoomAuth with security validation and per-instance metrics.
 type SecureRoomAuth struct {
-	*simpleRoomAuth
+	*SimpleRoomAuth
 	securityConfig SecurityConfig
+
+	// Per-instance metrics (lock-free atomics)
+	invalidJWTSecrets         atomic.Uint64
+	weakRoomPasswords         atomic.Uint64
+	successfulAuthentications atomic.Uint64
 }
 
 // NewSecureRoomAuth creates a secure room auth with validation
@@ -187,7 +185,7 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 	}
 
 	return &SecureRoomAuth{
-		simpleRoomAuth: NewSimpleRoomAuth(effectiveSecret),
+		SimpleRoomAuth: NewSimpleRoomAuth(effectiveSecret),
 		securityConfig: cfg,
 	}, nil
 }
@@ -200,51 +198,57 @@ func (s *SecureRoomAuth) MaxMessageSize() int64 {
 
 // SetRoomPassword overrides with security validation
 func (s *SecureRoomAuth) SetRoomPassword(room, pwd string) error {
-	// Validate password strength
 	if err := ValidateRoomPassword(pwd, s.securityConfig.RoomPasswordConfig, s.securityConfig.EnforcePasswordStrength); err != nil {
-		metricsMutex.Lock()
-		securityMetrics.WeakRoomPasswords++
-		metricsMutex.Unlock()
+		s.weakRoomPasswords.Add(1)
 		return err
 	}
-
-	s.simpleRoomAuth.SetRoomPassword(room, pwd)
+	s.SimpleRoomAuth.SetRoomPassword(room, pwd)
 	return nil
 }
 
-// VerifyJWT overrides with additional logging
+// VerifyJWT overrides with additional logging and per-instance metrics
 func (s *SecureRoomAuth) VerifyJWT(token string) (map[string]any, error) {
-	payload, err := s.simpleRoomAuth.VerifyJWT(token)
+	payload, err := s.SimpleRoomAuth.VerifyJWT(token)
 	if err != nil {
 		if s.securityConfig.EnableDebugLogging {
 			log.Printf("JWT verification failed: %v", err)
 		}
-		metricsMutex.Lock()
-		securityMetrics.InvalidJWTSecrets++
-		metricsMutex.Unlock()
+		s.invalidJWTSecrets.Add(1)
 		return nil, err
 	}
-
-	metricsMutex.Lock()
-	securityMetrics.SuccessfulAuthentications++
-	metricsMutex.Unlock()
-
+	s.successfulAuthentications.Add(1)
 	return payload, nil
 }
 
-// GetSecurityMetrics returns current security metrics
-func GetSecurityMetrics() SecurityMetrics {
-	metricsMutex.RLock()
-	defer metricsMutex.RUnlock()
-	return securityMetrics
+// GetMetrics returns a snapshot of this instance's security metrics.
+func (s *SecureRoomAuth) GetMetrics() SecurityMetrics {
+	return SecurityMetrics{
+		InvalidJWTSecrets:         s.invalidJWTSecrets.Load(),
+		WeakRoomPasswords:         s.weakRoomPasswords.Load(),
+		SuccessfulAuthentications: s.successfulAuthentications.Load(),
+	}
 }
 
-// ResetSecurityMetrics resets all security metrics
-func ResetSecurityMetrics() {
-	metricsMutex.Lock()
-	defer metricsMutex.Unlock()
-	securityMetrics = SecurityMetrics{}
+// ResetMetrics resets all per-instance security metrics to zero.
+func (s *SecureRoomAuth) ResetMetrics() {
+	s.invalidJWTSecrets.Store(0)
+	s.weakRoomPasswords.Store(0)
+	s.successfulAuthentications.Store(0)
 }
+
+// GetSecurityMetrics is deprecated. Use (*SecureRoomAuth).GetMetrics() instead.
+//
+// Deprecated: global security metrics were removed. Per-instance metrics are
+// available via (*SecureRoomAuth).GetMetrics(). Hub-level metrics are available
+// via (*Hub).Metrics().
+func GetSecurityMetrics() SecurityMetrics {
+	return SecurityMetrics{}
+}
+
+// ResetSecurityMetrics is deprecated and is now a no-op.
+//
+// Deprecated: global security metrics were removed. Use (*SecureRoomAuth).ResetMetrics().
+func ResetSecurityMetrics() {}
 
 // GenerateSecureSecret generates a cryptographically secure random secret
 func GenerateSecureSecret(length int) ([]byte, error) {
@@ -256,15 +260,4 @@ func GenerateSecureSecret(length int) ([]byte, error) {
 		return nil, err
 	}
 	return secret, nil
-}
-
-// LogSecurityEvent logs security events based on configuration
-func LogSecurityEvent(event string, details map[string]any, cfg SecurityConfig) {
-	if !cfg.EnableDebugLogging {
-		return
-	}
-
-	// In production, this should use structured logging
-	timestamp := time.Now().Format(time.RFC3339)
-	fmt.Fprintf(os.Stderr, "[SECURITY] %s | Event: %s | Details: %v\n", timestamp, event, details)
 }

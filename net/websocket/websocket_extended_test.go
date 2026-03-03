@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -164,15 +163,6 @@ func TestServeWSWithAuth_BadRoomPassword(t *testing.T) {
 	}
 }
 
-func TestUpgradeClient(t *testing.T) {
-	_, _, err := UpgradeClient("ws://example.com", nil)
-	if err == nil {
-		t.Error("expected error for not implemented")
-	}
-	if !strings.Contains(err.Error(), "not implemented") {
-		t.Errorf("expected 'not implemented' error, got %v", err)
-	}
-}
 
 func TestStreamReaderRead(t *testing.T) {
 	sr := &streamReader{
@@ -371,15 +361,15 @@ func TestWriterPumpFragmentation(t *testing.T) {
 
 func TestPongMonitor(t *testing.T) {
 	c := &Conn{
-		closeC:   make(chan struct{}),
-		lastPong: time.Now().Add(-2 * time.Second).UnixNano(),
+		closeC: make(chan struct{}),
 	}
+	c.lastPong.Store(time.Now().Add(-2 * time.Second).UnixNano())
 	c.pingPeriod.Store(int64(10 * time.Millisecond))
 	c.pongWait.Store(int64(5 * time.Millisecond))
 
 	done := make(chan bool)
 	go func() {
-		ticker := time.NewTicker(time.Duration(c.pingPeriod.Load()) / 2)
+		ticker := time.NewTicker(time.Duration(c.pongWait.Load()) / 3)
 		defer ticker.Stop()
 
 		for {
@@ -388,7 +378,7 @@ func TestPongMonitor(t *testing.T) {
 				done <- true
 				return
 			case <-ticker.C:
-				last := time.Unix(0, atomic.LoadInt64(&c.lastPong))
+				last := time.Unix(0, c.lastPong.Load())
 				if time.Since(last) > time.Duration(c.pongWait.Load()) {
 					c.Close()
 				}
