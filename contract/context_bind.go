@@ -25,13 +25,13 @@ func (c *Ctx) BindJSON(dst any) error {
 	data, err := c.bodyBytes()
 	if err != nil {
 		if errors.Is(err, ErrRequestBodyTooLarge) {
-			return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: err}
+			return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
 		}
 		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
 
 	if len(bytes.TrimSpace(data)) == 0 {
-		return &BindError{Status: http.StatusBadRequest, Message: "request body is empty"}
+		return &BindError{Status: http.StatusBadRequest, Message: ErrEmptyRequestBody.Error(), Err: ErrEmptyRequestBody}
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -39,12 +39,12 @@ func (c *Ctx) BindJSON(dst any) error {
 	// decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(dst); err != nil {
-		return &BindError{Status: http.StatusBadRequest, Message: "invalid JSON payload", Err: err}
+		return &BindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: ErrInvalidJSON}
 	}
 
 	// Ensure no trailing data
 	if decoder.Decode(&struct{}{}) != io.EOF {
-		return &BindError{Status: http.StatusBadRequest, Message: "unexpected extra JSON data"}
+		return &BindError{Status: http.StatusBadRequest, Message: ErrUnexpectedExtraData.Error(), Err: ErrUnexpectedExtraData}
 	}
 
 	return nil

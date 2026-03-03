@@ -155,7 +155,7 @@ func TestBindJSONErrors(t *testing.T) {
 	}{
 		{name: "empty", body: "", wantMsg: "request body is empty"},
 		{name: "invalid", body: "{", wantMsg: "invalid JSON payload"},
-		{name: "extra", body: `{"name":"demo"} {}`, wantMsg: "unexpected extra JSON data"},
+		{name: "extra", body: `{"name":"demo"} {}`, wantMsg: "unexpected extra data in request body"},
 	}
 
 	for _, tt := range tests {
