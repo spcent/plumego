@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+// ---------------------------------------------------------------------------
+// Retry policy unit tests
+// ---------------------------------------------------------------------------
+
 func TestCompositeRetryPolicy(t *testing.T) {
 	policy := CompositeRetryPolicy{
 		Policies: []RetryPolicy{
@@ -19,21 +23,13 @@ func TestCompositeRetryPolicy(t *testing.T) {
 		},
 	}
 
-	// Test timeout error
-	err := &timeoutError{}
-	if !policy.ShouldRetry(nil, err, 0) {
+	if !policy.ShouldRetry(nil, mockTimeoutError{}, 0) {
 		t.Error("should retry on timeout error")
 	}
-
-	// Test 500 status
-	resp := &http.Response{StatusCode: 500}
-	if !policy.ShouldRetry(resp, nil, 0) {
+	if !policy.ShouldRetry(&http.Response{StatusCode: 500}, nil, 0) {
 		t.Error("should retry on 500 status")
 	}
-
-	// Test success
-	resp = &http.Response{StatusCode: 200}
-	if policy.ShouldRetry(resp, nil, 0) {
+	if policy.ShouldRetry(&http.Response{StatusCode: 200}, nil, 0) {
 		t.Error("should not retry on success")
 	}
 }
@@ -41,29 +37,26 @@ func TestCompositeRetryPolicy(t *testing.T) {
 func TestAlwaysRetryPolicy(t *testing.T) {
 	policy := AlwaysRetryPolicy{}
 
-	// Test with error
 	if !policy.ShouldRetry(nil, errors.New("test error"), 0) {
 		t.Error("should retry on any error")
 	}
-
-	// Test with 500 status
-	resp := &http.Response{StatusCode: 500}
-	if !policy.ShouldRetry(resp, nil, 0) {
+	if !policy.ShouldRetry(&http.Response{StatusCode: 500}, nil, 0) {
 		t.Error("should retry on 500 status")
 	}
-
-	// Test with success
-	resp = &http.Response{StatusCode: 200}
-	if policy.ShouldRetry(resp, nil, 0) {
+	if policy.ShouldRetry(&http.Response{StatusCode: 200}, nil, 0) {
 		t.Error("should not retry on success")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Client integration tests
+// ---------------------------------------------------------------------------
 
 func TestClientRetryExhausted(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	client := New(
 		WithRetryCount(2),
@@ -82,7 +75,7 @@ func TestClientTimeout(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	client := New(
 		WithTimeout(50*time.Millisecond),
@@ -100,23 +93,20 @@ func TestClientPostError(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("bad request"))
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	client := New()
 	_, err := client.Post(context.Background(), server.URL, []byte("data"), "text/plain")
 	if err == nil {
 		t.Error("expected error for 400 status")
 	}
-
 	if !strings.Contains(err.Error(), "http error") {
 		t.Errorf("expected http error, got: %v", err)
 	}
 }
 
 func TestClientPostJsonMarshalError(t *testing.T) {
-	// Create a channel which cannot be marshaled
-	ch := make(chan int)
-
+	ch := make(chan int) // channels cannot be marshaled to JSON
 	client := New()
 	_, err := client.PostJson(context.Background(), "http://example.com", ch)
 	if err == nil {
@@ -129,11 +119,11 @@ func TestClientRequestContextCancellation(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	client := New()
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
+	cancel() // cancel immediately
 
 	_, err := client.Get(ctx, server.URL)
 	if err == nil {
@@ -142,25 +132,15 @@ func TestClientRequestContextCancellation(t *testing.T) {
 }
 
 func TestClientWithTransport(t *testing.T) {
-	// Create custom transport
-	customTransport := &http.Transport{
-		MaxIdleConns: 100,
-	}
-
-	client := New(
-		WithTransport(customTransport),
-	)
-
+	customTransport := &http.Transport{MaxIdleConns: 100}
+	client := New(WithTransport(customTransport))
 	if client.client.Transport != customTransport {
 		t.Error("custom transport not set")
 	}
 }
 
 func TestWithRequestOptions(t *testing.T) {
-	// Test request-specific timeout
-	cfg := &requestConfig{
-		headers: make(map[string]string),
-	}
+	cfg := &requestConfig{headers: make(map[string]string)}
 
 	timeout := 5 * time.Second
 	WithRequestTimeout(timeout)(cfg)
@@ -168,21 +148,17 @@ func TestWithRequestOptions(t *testing.T) {
 		t.Error("request timeout not set")
 	}
 
-	// Test request-specific retry count
 	count := 5
 	WithRequestRetryCount(count)(cfg)
 	if cfg.retryCount == nil || *cfg.retryCount != count {
 		t.Error("request retry count not set")
 	}
 
-	// Test request-specific retry policy
-	policy := AlwaysRetryPolicy{}
-	WithRequestRetryPolicy(policy)(cfg)
+	WithRequestRetryPolicy(AlwaysRetryPolicy{})(cfg)
 	if cfg.retryPolicy == nil {
 		t.Error("request retry policy not set")
 	}
 
-	// Test header
 	WithHeader("X-Test", "value")(cfg)
 	if cfg.headers["X-Test"] != "value" {
 		t.Error("header not set")
@@ -190,50 +166,20 @@ func TestWithRequestOptions(t *testing.T) {
 }
 
 func TestLoggingMiddleware(t *testing.T) {
-	// Create a test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
-	// Create client with logging middleware
 	client := New(
 		WithMiddleware(Logging),
 		WithTransport(http.DefaultTransport),
 	)
-
-	// Make request
 	_, err := client.Get(context.Background(), server.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// The logging middleware prints to stdout, we can't easily capture it
-	// but we can verify the request succeeded
-}
-
-func TestMetricsMiddleware(t *testing.T) {
-	// Create a test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	}))
-	defer server.Close()
-
-	// Create client with metrics middleware
-	client := New(
-		WithMiddleware(Metrics),
-		WithTransport(http.DefaultTransport),
-	)
-
-	// Make request
-	_, err := client.Get(context.Background(), server.URL)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Metrics middleware is a placeholder, just verify it works
 }
 
 func TestClientRetryOn500(t *testing.T) {
@@ -247,7 +193,7 @@ func TestClientRetryOn500(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("success"))
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	client := New(
 		WithRetryCount(5),
@@ -259,11 +205,9 @@ func TestClientRetryOn500(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if string(resp) != "success" {
 		t.Errorf("unexpected response: %s", string(resp))
 	}
-
 	if attempts != 3 {
 		t.Errorf("expected 3 attempts, got %d", attempts)
 	}
@@ -274,7 +218,7 @@ func TestClientDo(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("custom response"))
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	client := New()
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
@@ -298,7 +242,7 @@ func TestClientWithRequestOptions(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	client := New()
 	resp, err := client.Get(
@@ -310,15 +254,196 @@ func TestClientWithRequestOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if string(resp) != "ok" {
 		t.Errorf("unexpected response: %s", string(resp))
 	}
 }
 
-// Helper types
-type timeoutError struct{}
+func TestClientPatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
+		}
+		body, _ := io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		w.Write(body)
+	}))
+	t.Cleanup(server.Close)
 
-func (e *timeoutError) Error() string   { return "timeout" }
-func (e *timeoutError) Timeout() bool   { return true }
-func (e *timeoutError) Temporary() bool { return true }
+	client := New()
+	resp, err := client.Patch(context.Background(), server.URL, []byte("delta"), "application/json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(resp) != "delta" {
+		t.Errorf("unexpected body: %s", resp)
+	}
+}
+
+func TestClientPatchError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	}))
+	t.Cleanup(server.Close)
+
+	client := New()
+	_, err := client.Patch(context.Background(), server.URL, []byte("x"), "text/plain")
+	if err == nil {
+		t.Error("expected error for 422 status")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// MetricsMiddleware / InMemoryClientMetrics tests
+// ---------------------------------------------------------------------------
+
+func TestMetricsMiddlewareRecordsSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}))
+	t.Cleanup(server.Close)
+
+	m := NewInMemoryClientMetrics()
+	client := New(WithMiddleware(MetricsMiddleware(m)))
+
+	if _, err := client.Get(context.Background(), server.URL); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	snap := m.Snapshot()
+	if snap.TotalRequests != 1 {
+		t.Errorf("expected 1 total request, got %d", snap.TotalRequests)
+	}
+	if snap.ErrorRequests != 0 {
+		t.Errorf("expected 0 errors, got %d", snap.ErrorRequests)
+	}
+	if snap.ByStatus[200] != 1 {
+		t.Errorf("expected 1 request with status 200, got %d", snap.ByStatus[200])
+	}
+	if snap.ByMethod["GET"] != 1 {
+		t.Errorf("expected 1 GET, got %d", snap.ByMethod["GET"])
+	}
+	if snap.TotalDuration <= 0 {
+		t.Error("expected non-zero total duration")
+	}
+}
+
+func TestMetricsMiddlewareRecordsError(t *testing.T) {
+	m := NewInMemoryClientMetrics()
+	client := New(
+		WithTimeout(10*time.Millisecond),
+		WithRetryCount(0),
+		WithMiddleware(MetricsMiddleware(m)),
+	)
+	client.client.Transport = mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+		return nil, mockTimeoutError{}
+	})
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
+	_, _ = client.doRequest(req)
+
+	snap := m.Snapshot()
+	if snap.TotalRequests != 1 {
+		t.Errorf("expected 1 total request, got %d", snap.TotalRequests)
+	}
+	if snap.ErrorRequests != 1 {
+		t.Errorf("expected 1 error request, got %d", snap.ErrorRequests)
+	}
+	// status 0 = no response received
+	if snap.ByStatus[0] != 1 {
+		t.Errorf("expected status 0 for transport error, got %v", snap.ByStatus)
+	}
+}
+
+func TestMetricsMiddlewareInflightZeroAfterRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	m := NewInMemoryClientMetrics()
+	client := New(WithMiddleware(MetricsMiddleware(m)))
+
+	if _, err := client.Get(context.Background(), server.URL); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if snap := m.Snapshot(); snap.Inflight != 0 {
+		t.Errorf("expected 0 in-flight after request, got %d", snap.Inflight)
+	}
+}
+
+func TestMetricsMiddlewareAverageDuration(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	m := NewInMemoryClientMetrics()
+	client := New(WithMiddleware(MetricsMiddleware(m)))
+
+	for i := 0; i < 3; i++ {
+		if _, err := client.Get(context.Background(), server.URL); err != nil {
+			t.Fatalf("request %d failed: %v", i, err)
+		}
+	}
+
+	snap := m.Snapshot()
+	if snap.TotalRequests != 3 {
+		t.Errorf("expected 3 requests, got %d", snap.TotalRequests)
+	}
+	if snap.AverageDuration <= 0 {
+		t.Error("expected positive average duration")
+	}
+}
+
+func TestInMemoryClientMetricsReset(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	m := NewInMemoryClientMetrics()
+	client := New(WithMiddleware(MetricsMiddleware(m)))
+
+	if _, err := client.Get(context.Background(), server.URL); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m.Reset()
+
+	snap := m.Snapshot()
+	if snap.TotalRequests != 0 {
+		t.Errorf("expected 0 after reset, got %d", snap.TotalRequests)
+	}
+	if len(snap.ByStatus) != 0 {
+		t.Errorf("expected empty ByStatus after reset, got %v", snap.ByStatus)
+	}
+}
+
+func TestMetricsMiddlewareMultipleMethods(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	m := NewInMemoryClientMetrics()
+	client := New(WithMiddleware(MetricsMiddleware(m)))
+
+	client.Get(context.Background(), server.URL)
+	client.Post(context.Background(), server.URL, nil, "text/plain")
+	client.Put(context.Background(), server.URL, nil, "text/plain")
+	client.Patch(context.Background(), server.URL, nil, "text/plain")
+	client.Delete(context.Background(), server.URL)
+
+	snap := m.Snapshot()
+	if snap.TotalRequests != 5 {
+		t.Errorf("expected 5 total requests, got %d", snap.TotalRequests)
+	}
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		if snap.ByMethod[method] != 1 {
+			t.Errorf("expected 1 %s request, got %d", method, snap.ByMethod[method])
+		}
+	}
+}
