@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,12 +12,6 @@ import (
 	"time"
 )
 
-type timeoutErr struct{}
-
-func (timeoutErr) Error() string   { return "timeout" }
-func (timeoutErr) Timeout() bool   { return true }
-func (timeoutErr) Temporary() bool { return false }
-
 func TestIsTimeoutError(t *testing.T) {
 	cases := []struct {
 		name string
@@ -27,9 +20,9 @@ func TestIsTimeoutError(t *testing.T) {
 	}{
 		{"nil", nil, false},
 		{"deadline", context.DeadlineExceeded, true},
-		{"netErr", timeoutErr{}, true},
-		{"message", errors.New("request timeout"), true},
-		{"other", errors.New("boom"), false},
+		{"netErr", mockTimeoutError{}, true},
+		{"message", &wrappedErr{"request timeout"}, true},
+		{"other", &wrappedErr{"boom"}, false},
 	}
 
 	for _, tt := range cases {
@@ -41,8 +34,13 @@ func TestIsTimeoutError(t *testing.T) {
 	}
 }
 
+// wrappedErr is a minimal error type used to test the string-matching branch of isTimeoutError.
+type wrappedErr struct{ msg string }
+
+func (e *wrappedErr) Error() string { return e.msg }
+
 func TestBackoffWithJitter(t *testing.T) {
-	// base 10ms, attempt 2 => 40ms cap with jitter in [0.5,1.5)
+	// base=10ms, attempt=2 → raw=40ms; with jitter [0.5,1.5) → [20ms, 60ms)
 	dur := backoffWithJitter(10*time.Millisecond, 2, 100*time.Millisecond)
 	if dur < 5*time.Millisecond || dur >= 60*time.Millisecond {
 		t.Fatalf("unexpected jitter backoff: %s", dur)
@@ -104,10 +102,7 @@ func TestMiddlewareOrderAndHeaders(t *testing.T) {
 
 	client := New(WithMiddleware(mw1), WithMiddleware(mw2))
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-	resp, err := client.doRequest(
-		req,
-		WithHeader("X-Test", "demo"),
-	)
+	resp, err := client.doRequest(req, WithHeader("X-Test", "demo"))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -144,10 +139,13 @@ func TestGetErrorsPropagate(t *testing.T) {
 }
 
 func TestTimeoutRetryPolicy(t *testing.T) {
-	client := New(WithRetryCount(1), WithRetryWait(1*time.Millisecond), WithMaxRetryWait(2*time.Millisecond))
-	// replace transport to simulate timeout errors
-	client.client.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		return nil, timeoutErr{}
+	client := New(
+		WithRetryCount(1),
+		WithRetryWait(1*time.Millisecond),
+		WithMaxRetryWait(2*time.Millisecond),
+	)
+	client.client.Transport = mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+		return nil, mockTimeoutError{}
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
@@ -188,17 +186,13 @@ func TestRetryReplaysBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("post failed: %v", err)
 	}
-
 	if atomic.LoadInt32(&calls) != 2 {
 		t.Fatalf("expected 2 attempts, got %d", calls)
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(bodies) != 2 {
-		t.Fatalf("expected 2 bodies, got %d", len(bodies))
-	}
-	if bodies[0] != "hello" || bodies[1] != "hello" {
+	if len(bodies) != 2 || bodies[0] != "hello" || bodies[1] != "hello" {
 		t.Fatalf("unexpected bodies: %v", bodies)
 	}
 }
@@ -223,14 +217,7 @@ func TestRetryCheckDisablesRetries(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error on server response")
 	}
-
 	if atomic.LoadInt32(&calls) != 1 {
 		t.Fatalf("expected 1 attempt, got %d", calls)
 	}
 }
-
-// roundTripperFunc adapts a func into an http.RoundTripper-like call
-// to be used with the HttpClient internal pipeline.
-type roundTripperFunc func(req *http.Request) (*http.Response, error)
-
-func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return fn(req) }

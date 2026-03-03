@@ -1,30 +1,28 @@
-// Package http provides an HTTP client with automatic retry and backoff.
+// Package http provides a production-ready HTTP client with automatic retry and backoff.
 //
-// This package wraps the standard library's http.Client with intelligent retry logic:
+// The client wraps the standard library's http.Client with:
 //   - Automatic retry for network errors and 5xx responses
-//   - Configurable retry policies (exponential backoff, linear, custom)
-//   - Request timeout handling
-//   - Idempotency-aware retries (safe for GET, PUT, DELETE)
-//   - Jitter to prevent thundering herd
-//
-// The client is designed for reliable HTTP communication in distributed systems
-// where transient failures are common.
+//   - Configurable retry policies (timeout-only, status-code-based, composite, custom)
+//   - Exponential backoff with jitter to prevent thundering herd
+//   - Per-request timeout and retry overrides
+//   - Request body replay for safe retries (GET, PUT, DELETE and POST with GetBody)
+//   - SSRF protection via URL validation before each outbound request
+//   - Pluggable middleware chain (logging, metrics, tracing, etc.)
 //
 // Example usage:
 //
 //	import nethttp "github.com/spcent/plumego/net/http"
 //
-//	// Create client with retry
-//	client := nethttp.NewClient(nethttp.ClientConfig{
-//		Timeout:     10 * time.Second,
-//		MaxRetries:  3,
-//		RetryPolicy: nethttp.ExponentialBackoff(time.Second, 2.0),
-//	})
+//	client := nethttp.New(
+//	    nethttp.WithTimeout(10 * time.Second),
+//	    nethttp.WithRetryCount(3),
+//	    nethttp.WithRetryPolicy(nethttp.StatusCodeRetryPolicy{Codes: []int{500, 502, 503}}),
+//	    nethttp.WithDefaultSSRFProtection(),
+//	)
 //
-//	// Make a request (automatically retries on failure)
-//	resp, err := client.Get("https://api.example.com/data")
+//	body, err := client.Get(ctx, "https://api.example.com/data")
 //	if err != nil {
-//		// All retries failed
+//	    // All retries failed
 //	}
 package http
 
@@ -34,6 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"math"
 	"math/rand"
 	"net"
@@ -42,23 +41,11 @@ import (
 	"time"
 )
 
-// RetryPolicy defines the interface for retry strategy.
+// RetryPolicy determines whether an HTTP request should be retried.
 //
-// Implementations determine whether an HTTP request should be retried based on
-// the response, error, and current attempt number.
+// Implementations receive the response (may be nil on network error), the error
+// (may be nil when a response was received), and the zero-based attempt index.
 type RetryPolicy interface {
-	// ShouldRetry determines if the request should be retried.
-	//
-	// Parameters:
-	//   - resp: The HTTP response (may be nil if request failed before receiving response)
-	//   - err: The error from the request attempt (may be nil if response was received)
-	//   - attempt: The zero-based attempt counter (0 = first attempt, 1 = first retry, etc.)
-	//
-	// Returns true if the request should be retried, false otherwise.
-	//
-	// Note: This method is called AFTER each failed attempt. The attempt parameter
-	// starts at 0 for the initial request attempt, increments to 1 for the first retry,
-	// 2 for the second retry, and so on.
 	ShouldRetry(resp *http.Response, err error, attempt int) bool
 }
 
@@ -69,7 +56,7 @@ func (p TimeoutRetryPolicy) ShouldRetry(resp *http.Response, err error, attempt 
 	return isTimeoutError(err)
 }
 
-// StatusCodeRetryPolicy retries on specific HTTP status codes (e.g., 5xx).
+// StatusCodeRetryPolicy retries when the response status code is in the configured list.
 type StatusCodeRetryPolicy struct {
 	Codes []int
 }
@@ -86,7 +73,7 @@ func (p StatusCodeRetryPolicy) ShouldRetry(resp *http.Response, err error, attem
 	return false
 }
 
-// CompositeRetryPolicy combines multiple retry policies with OR logic.
+// CompositeRetryPolicy combines multiple policies with OR logic: retries if any policy says so.
 type CompositeRetryPolicy struct {
 	Policies []RetryPolicy
 }
@@ -100,46 +87,35 @@ func (p CompositeRetryPolicy) ShouldRetry(resp *http.Response, err error, attemp
 	return false
 }
 
-// AlwaysRetryPolicy retries on any error.
+// AlwaysRetryPolicy retries on any error or 5xx response.
 type AlwaysRetryPolicy struct{}
 
 func (p AlwaysRetryPolicy) ShouldRetry(resp *http.Response, err error, attempt int) bool {
 	return err != nil || (resp != nil && resp.StatusCode >= 500)
 }
 
-// Middleware defines a function that wraps request execution.
+// Middleware wraps request execution. Middlewares are applied in registration order.
 type Middleware func(next RoundTripperFunc) RoundTripperFunc
 
-// RoundTripperFunc is a functional form of http.RoundTripper-like function.
+// RoundTripperFunc is a function that implements the core HTTP transport contract.
 type RoundTripperFunc func(req *http.Request) (*http.Response, error)
 
-// Logging middleware logs request duration and results.
+// Logging returns a middleware that logs each outbound request's method, URL, status, and duration.
 func Logging(next RoundTripperFunc) RoundTripperFunc {
 	return func(req *http.Request) (*http.Response, error) {
 		start := time.Now()
 		resp, err := next(req)
 		dur := time.Since(start)
 		if err != nil {
-			println("HTTP ERR:", err.Error(), "took", dur.String())
+			log.Printf("http client: %s %s error=%v duration=%s", req.Method, req.URL.Host, err, dur)
 		} else {
-			println("HTTP OK:", resp.Status, "took", dur.String())
+			log.Printf("http client: %s %s status=%s duration=%s", req.Method, req.URL.Host, resp.Status, dur)
 		}
 		return resp, err
 	}
 }
 
-// Metrics middleware can be extended to collect metrics.
-func Metrics(next RoundTripperFunc) RoundTripperFunc {
-	return func(req *http.Request) (*http.Response, error) {
-		start := time.Now()
-		resp, err := next(req)
-		// In production, you would send metrics to your monitoring system
-		_ = start // placeholder for metrics
-		return resp, err
-	}
-}
-
-// Client is a wrapper around http.Client with retry, timeout, and backoff support.
+// Client is a wrapper around http.Client with retry, timeout, backoff, and middleware support.
 type Client struct {
 	client          *http.Client
 	retryCount      int
@@ -153,10 +129,10 @@ type Client struct {
 	enableSSRFCheck bool
 }
 
-// Option defines a functional option for Client
+// Option is a functional option for configuring a Client.
 type Option func(*Client)
 
-// WithTimeout sets the client timeout.
+// WithTimeout sets the default timeout for every request.
 func WithTimeout(timeout time.Duration) Option {
 	return func(c *Client) {
 		c.client.Timeout = timeout
@@ -164,55 +140,55 @@ func WithTimeout(timeout time.Duration) Option {
 	}
 }
 
-// WithRetryCount sets the maximum retry attempts.
+// WithRetryCount sets the maximum number of retry attempts (not counting the initial attempt).
 func WithRetryCount(count int) Option {
 	return func(c *Client) {
 		c.retryCount = count
 	}
 }
 
-// WithRetryWait sets the base retry wait duration.
+// WithRetryWait sets the base duration between retries (before jitter).
 func WithRetryWait(wait time.Duration) Option {
 	return func(c *Client) {
 		c.retryWait = wait
 	}
 }
 
-// WithMaxRetryWait sets the maximum retry wait duration.
+// WithMaxRetryWait caps the maximum computed backoff duration.
 func WithMaxRetryWait(max time.Duration) Option {
 	return func(c *Client) {
 		c.maxRetryWait = max
 	}
 }
 
-// WithRetryPolicy sets a custom retry policy.
+// WithRetryPolicy sets the retry decision policy for the client.
 func WithRetryPolicy(policy RetryPolicy) Option {
 	return func(c *Client) {
 		c.retryPolicy = policy
 	}
 }
 
-// WithRetryCheck limits retries based on request attributes.
-// Returning false disables retries for the given request.
+// WithRetryCheck sets a predicate that, when it returns false for a given request,
+// disables retries entirely for that request (e.g., to skip retries on POST).
 func WithRetryCheck(check func(*http.Request) bool) Option {
 	return func(c *Client) {
 		c.retryCheck = check
 	}
 }
 
-// WithMiddleware adds middleware to the client.
+// WithMiddleware appends a middleware to the client's middleware chain.
 func WithMiddleware(mw Middleware) Option {
 	return func(c *Client) { c.middlewares = append(c.middlewares, mw) }
 }
 
-// WithTransport sets a custom transport.
+// WithTransport replaces the underlying http.RoundTripper.
 func WithTransport(transport http.RoundTripper) Option {
 	return func(c *Client) {
 		c.client.Transport = transport
 	}
 }
 
-// WithSSRFProtection enables SSRF protection with the given configuration.
+// WithSSRFProtection enables SSRF URL validation using the given configuration.
 func WithSSRFProtection(protection SSRFProtection) Option {
 	return func(c *Client) {
 		c.ssrfProtection = &protection
@@ -220,7 +196,8 @@ func WithSSRFProtection(protection SSRFProtection) Option {
 	}
 }
 
-// WithDefaultSSRFProtection enables SSRF protection with secure defaults.
+// WithDefaultSSRFProtection enables SSRF protection with secure defaults
+// (blocks private IPs, loopback, link-local; allows only http and https schemes).
 func WithDefaultSSRFProtection() Option {
 	return func(c *Client) {
 		defaults := DefaultSSRFProtection()
@@ -229,7 +206,8 @@ func WithDefaultSSRFProtection() Option {
 	}
 }
 
-// New creates a new Client with provided options.
+// New creates a new Client with the provided options.
+// Default: 3 s timeout, up to 3 retries with 1 s base wait capped at 5 s, timeout-only retry policy.
 func New(opts ...Option) *Client {
 	c := &Client{
 		client: &http.Client{
@@ -244,11 +222,10 @@ func New(opts ...Option) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
-
 	return c
 }
 
-// requestConfig holds per-request configuration.
+// requestConfig holds per-request overrides applied on top of client defaults.
 type requestConfig struct {
 	retryCount  *int
 	retryPolicy RetryPolicy
@@ -257,37 +234,37 @@ type requestConfig struct {
 	retryCheck  func(*http.Request) bool
 }
 
-// RequestOption defines a functional option for individual requests.
+// RequestOption is a functional option for a single request.
 type RequestOption func(*requestConfig)
 
-// WithRequestTimeout sets timeout for a specific request.
+// WithRequestTimeout overrides the timeout for a single request.
 func WithRequestTimeout(timeout time.Duration) RequestOption {
 	return func(c *requestConfig) { c.timeout = &timeout }
 }
 
-// WithRequestRetryCount sets retry count for a specific request.
+// WithRequestRetryCount overrides the retry count for a single request.
 func WithRequestRetryCount(count int) RequestOption {
 	return func(c *requestConfig) { c.retryCount = &count }
 }
 
-// WithRequestRetryPolicy sets retry policy for a specific request.
+// WithRequestRetryPolicy overrides the retry policy for a single request.
 func WithRequestRetryPolicy(p RetryPolicy) RequestOption {
 	return func(c *requestConfig) { c.retryPolicy = p }
 }
 
-// WithRequestRetryCheck limits retries for a specific request.
+// WithRequestRetryCheck overrides the retry check predicate for a single request.
 func WithRequestRetryCheck(check func(*http.Request) bool) RequestOption {
 	return func(c *requestConfig) { c.retryCheck = check }
 }
 
-// WithHeader adds a header to the request.
+// WithHeader adds (or overrides) a header for a single request.
 func WithHeader(key, val string) RequestOption {
 	return func(cfg *requestConfig) {
 		cfg.headers[key] = val
 	}
 }
 
-// isTimeoutError checks if an error is caused by timeout.
+// isTimeoutError reports whether err represents a timeout condition.
 func isTimeoutError(err error) bool {
 	if err == nil {
 		return false
@@ -295,7 +272,6 @@ func isTimeoutError(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
-
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		return true
@@ -303,11 +279,10 @@ func isTimeoutError(err error) bool {
 	if strings.Contains(err.Error(), "timeout") {
 		return true
 	}
-
 	return false
 }
 
-// backoffWithJitter calculates exponential backoff with jitter.
+// backoffWithJitter computes exponential backoff capped at max with ±50% jitter.
 func backoffWithJitter(base time.Duration, attempt int, max time.Duration) time.Duration {
 	backoff := float64(base) * math.Pow(2, float64(attempt))
 	if backoff > float64(max) {
@@ -317,9 +292,9 @@ func backoffWithJitter(base time.Duration, attempt int, max time.Duration) time.
 	return time.Duration(backoff * jitterFactor)
 }
 
-// doRequest executes an HTTP request with retry and policy control.
+// doRequest is the internal dispatcher: applies SSRF check, builds the request config,
+// composes the middleware chain, and delegates to do().
 func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Response, error) {
-	// SSRF protection - validate URL before making request
 	if c.enableSSRFCheck && c.ssrfProtection != nil {
 		if err := ValidateURL(req.URL.String(), *c.ssrfProtection); err != nil {
 			return nil, err
@@ -342,7 +317,6 @@ func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Resp
 		cfg.retryCount = &noRetry
 	}
 
-	// apply headers
 	for k, v := range cfg.headers {
 		req.Header.Set(k, v)
 	}
@@ -351,7 +325,6 @@ func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Resp
 		return nil, err
 	}
 
-	// build middleware chain
 	final := c.do(cfg)
 	for i := len(c.middlewares) - 1; i >= 0; i-- {
 		final = c.middlewares[i](final)
@@ -360,6 +333,7 @@ func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Resp
 	return final(req)
 }
 
+// cancelingBody wraps a response body and cancels the associated context when closed.
 type cancelingBody struct {
 	io.ReadCloser
 	cancel context.CancelFunc
@@ -371,6 +345,8 @@ func (c *cancelingBody) Close() error {
 	return err
 }
 
+// ensureReplayableBody buffers req.Body so that it can be re-read on retry.
+// No-op when Body is nil, GetBody is already set, or retries are disabled.
 func ensureReplayableBody(req *http.Request, retryCount *int) error {
 	if req == nil || req.Body == nil || req.GetBody != nil {
 		return nil
@@ -389,17 +365,16 @@ func ensureReplayableBody(req *http.Request, retryCount *int) error {
 	req.GetBody = func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(body)), nil
 	}
-
 	return nil
 }
 
-func cloneRequest(req *http.Request, ctx context.Context) (*http.Request, error) {
+// cloneRequest produces a shallow clone of req bound to ctx, replaying the body when possible.
+func cloneRequest(ctx context.Context, req *http.Request) (*http.Request, error) {
 	cloned := req.Clone(ctx)
 
 	if req.Body == nil {
 		return cloned, nil
 	}
-
 	if req.GetBody != nil {
 		body, err := req.GetBody()
 		if err != nil {
@@ -408,12 +383,11 @@ func cloneRequest(req *http.Request, ctx context.Context) (*http.Request, error)
 		cloned.Body = body
 		return cloned, nil
 	}
-
 	cloned.Body = req.Body
 	return cloned, nil
 }
 
-// do executes an HTTP request with retry logic.
+// do returns a RoundTripperFunc that executes req with retry logic and per-attempt timeouts.
 func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 	return func(req *http.Request) (*http.Response, error) {
 		retryCount := 0
@@ -423,24 +397,23 @@ func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 
 		for i := 0; i <= retryCount; i++ {
 			ctx, cancel := context.WithTimeout(req.Context(), *cfg.timeout)
-			attemptReq, err := cloneRequest(req, ctx)
+			attemptReq, err := cloneRequest(ctx, req)
 			if err != nil {
 				cancel()
 				return nil, err
 			}
 
 			resp, reqErr := c.client.Do(attemptReq)
-			if reqErr == nil && (resp.StatusCode < 500) {
-				if resp != nil && resp.Body != nil {
-					resp.Body = &cancelingBody{ReadCloser: resp.Body, cancel: cancel}
-				} else {
-					cancel()
-				}
+
+			// Success: response received and not a server error.
+			if reqErr == nil && resp != nil && resp.StatusCode < 500 {
+				resp.Body = &cancelingBody{ReadCloser: resp.Body, cancel: cancel}
 				return resp, nil
 			}
 
 			shouldRetry := cfg.retryPolicy != nil && cfg.retryPolicy.ShouldRetry(resp, reqErr, i)
 			if !shouldRetry || i == retryCount {
+				// Final attempt or no retry: surface the error and cancel on close.
 				if reqErr == nil && resp != nil && resp.StatusCode >= 500 {
 					reqErr = errors.New("http error: " + resp.Status)
 				}
@@ -452,8 +425,8 @@ func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 				return resp, reqErr
 			}
 
+			// Discard current response body before retrying.
 			if resp != nil && resp.Body != nil {
-				// Just close the body without reading - we're retrying anyway
 				_ = resp.Body.Close()
 			}
 			cancel()
@@ -465,46 +438,44 @@ func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 	}
 }
 
-// Get performs a GET request.
+// readResponse drains the body of a successful response and returns its bytes.
+// It returns an error for any status >= 400.
+func readResponse(resp *http.Response) ([]byte, error) {
+	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, errors.New("http error: " + resp.Status)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// Get performs a GET request and returns the response body bytes.
 func (c *Client) Get(ctx context.Context, url string, opts ...RequestOption) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-
 	resp, err := c.doRequest(req, opts...)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, errors.New("http error: " + resp.Status)
-	}
-
-	return io.ReadAll(resp.Body)
+	return readResponse(resp)
 }
 
-// Post performs a POST request.
+// Post performs a POST request with the given body and Content-Type header.
 func (c *Client) Post(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
-
 	req.Header.Set("Content-Type", contentType)
 	resp, err := c.doRequest(req, opts...)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return nil, errors.New("http error: " + resp.Status)
-	}
-
-	return io.ReadAll(resp.Body)
+	return readResponse(resp)
 }
 
-// PostJson performs a POST request with JSON body.
+// PostJson marshals data as JSON and performs a POST request.
 func (c *Client) PostJson(ctx context.Context, url string, data any, opts ...RequestOption) ([]byte, error) {
 	body, err := json.Marshal(data)
 	if err != nil {
@@ -513,46 +484,49 @@ func (c *Client) PostJson(ctx context.Context, url string, data any, opts ...Req
 	return c.Post(ctx, url, body, "application/json", opts...)
 }
 
-// Put performs a PUT request.
+// Put performs a PUT request with the given body and Content-Type header.
 func (c *Client) Put(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
-
 	req.Header.Set("Content-Type", contentType)
 	resp, err := c.doRequest(req, opts...)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return nil, errors.New("http error: " + resp.Status)
-	}
-
-	return io.ReadAll(resp.Body)
+	return readResponse(resp)
 }
 
-// Delete performs a DELETE request.
+// Patch performs a PATCH request with the given body and Content-Type header.
+func (c *Client) Patch(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+	resp, err := c.doRequest(req, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return readResponse(resp)
+}
+
+// Delete performs a DELETE request and returns the response body bytes.
 func (c *Client) Delete(ctx context.Context, url string, opts ...RequestOption) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return nil, err
 	}
-
 	resp, err := c.doRequest(req, opts...)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, errors.New("http error: " + resp.Status)
-	}
-
-	return io.ReadAll(resp.Body)
+	return readResponse(resp)
 }
 
-// Do performs a custom request.
+// Do executes a fully configured *http.Request and returns the raw *http.Response.
+// The caller is responsible for closing the response body.
 func (c *Client) Do(req *http.Request, opts ...RequestOption) (*http.Response, error) {
 	return c.doRequest(req, opts...)
 }

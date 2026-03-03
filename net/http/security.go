@@ -19,6 +19,37 @@ var (
 	ErrInvalidURL = errors.New("invalid url")
 )
 
+// privateIPv4Nets contains pre-parsed private/reserved IPv4 CIDRs.
+// Parsed once at package init to avoid repeated allocation on every call.
+var privateIPv4Nets []*net.IPNet
+
+func init() {
+	cidrs := []string{
+		"10.0.0.0/8",         // RFC1918
+		"172.16.0.0/12",      // RFC1918
+		"192.168.0.0/16",     // RFC1918
+		"127.0.0.0/8",        // Loopback
+		"169.254.0.0/16",     // Link-local
+		"0.0.0.0/8",          // Current network
+		"100.64.0.0/10",      // Shared address space (RFC6598)
+		"192.0.0.0/24",       // IETF Protocol Assignments
+		"192.0.2.0/24",       // TEST-NET-1
+		"198.18.0.0/15",      // Benchmarking
+		"198.51.100.0/24",    // TEST-NET-2
+		"203.0.113.0/24",     // TEST-NET-3
+		"224.0.0.0/4",        // Multicast
+		"240.0.0.0/4",        // Reserved
+		"255.255.255.255/32", // Broadcast
+	}
+	for _, cidr := range cidrs {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic("net/http: invalid built-in CIDR " + cidr + ": " + err.Error())
+		}
+		privateIPv4Nets = append(privateIPv4Nets, ipNet)
+	}
+}
+
 // SSRFProtection defines SSRF protection configuration.
 type SSRFProtection struct {
 	// BlockPrivateIPs blocks requests to private IP addresses
@@ -59,49 +90,26 @@ func DefaultSSRFProtection() SSRFProtection {
 	}
 }
 
-// isPrivateIP checks if an IP address is private.
-// This prevents SSRF attacks targeting internal services.
+// isPrivateIP checks if an IP address is private or reserved.
+// Uses pre-compiled CIDRs to avoid repeated parsing overhead.
 func isPrivateIP(ip net.IP) bool {
 	if ip == nil {
 		return false
 	}
 
-	// Check for private IPv4 ranges
-	privateIPv4Ranges := []string{
-		"10.0.0.0/8",         // RFC1918
-		"172.16.0.0/12",      // RFC1918
-		"192.168.0.0/16",     // RFC1918
-		"127.0.0.0/8",        // Loopback
-		"169.254.0.0/16",     // Link-local
-		"0.0.0.0/8",          // Current network
-		"100.64.0.0/10",      // Shared address space (RFC6598)
-		"192.0.0.0/24",       // IETF Protocol Assignments
-		"192.0.2.0/24",       // TEST-NET-1
-		"198.18.0.0/15",      // Benchmarking
-		"198.51.100.0/24",    // TEST-NET-2
-		"203.0.113.0/24",     // TEST-NET-3
-		"224.0.0.0/4",        // Multicast
-		"240.0.0.0/4",        // Reserved
-		"255.255.255.255/32", // Broadcast
-	}
-
-	for _, cidr := range privateIPv4Ranges {
-		_, ipNet, err := net.ParseCIDR(cidr)
-		if err != nil {
-			continue
-		}
+	for _, ipNet := range privateIPv4Nets {
 		if ipNet.Contains(ip) {
 			return true
 		}
 	}
 
-	// Check for private IPv6 ranges
+	// Check for private IPv6 ranges (only when the address is actually IPv6)
 	if ip.To4() == nil {
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 			return true
 		}
-		// Check for unique local addresses (fc00::/7)
-		if len(ip) == net.IPv6len && ip[0] == 0xfc || ip[0] == 0xfd {
+		// Unique local addresses (fc00::/7): fc00:: through fdff::
+		if len(ip) == net.IPv6len && (ip[0] == 0xfc || ip[0] == 0xfd) {
 			return true
 		}
 	}
@@ -110,13 +118,12 @@ func isPrivateIP(ip net.IP) bool {
 }
 
 // ValidateURL validates a URL against SSRF protection rules.
-// This is the core SSRF防护function that should be called before making any HTTP request.
+// This is the core SSRF protection function that must be called before any outbound HTTP request.
 func ValidateURL(urlStr string, protection SSRFProtection) error {
 	if urlStr == "" {
 		return ErrInvalidURL
 	}
 
-	// Parse URL
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidURL, err)
@@ -144,7 +151,7 @@ func ValidateURL(urlStr string, protection SSRFProtection) error {
 		return fmt.Errorf("%w: empty hostname", ErrInvalidURL)
 	}
 
-	// Check blocked hosts first (takes precedence)
+	// Check blocked hosts first (takes precedence over allowlist)
 	for _, blocked := range protection.BlockedHosts {
 		if strings.EqualFold(hostname, blocked) {
 			return fmt.Errorf("%w: host %q is blocked", ErrSSRFDetected, hostname)
@@ -176,19 +183,13 @@ func ValidateURL(urlStr string, protection SSRFProtection) error {
 		return fmt.Errorf("ssrf: failed to resolve hostname: %w", err)
 	}
 
-	// Check each resolved IP
 	for _, ip := range ips {
-		// Check loopback
 		if protection.BlockLoopback && ip.IsLoopback() {
 			return fmt.Errorf("%w: loopback address %s", ErrSSRFDetected, ip.String())
 		}
-
-		// Check link-local
 		if protection.BlockLinkLocal && (ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()) {
 			return fmt.Errorf("%w: link-local address %s", ErrSSRFDetected, ip.String())
 		}
-
-		// Check private IP
 		if protection.BlockPrivateIPs && isPrivateIP(ip) {
 			return fmt.Errorf("%w: private ip address %s", ErrPrivateIP, ip.String())
 		}
