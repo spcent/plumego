@@ -78,7 +78,7 @@ func (c *Ctx) BindJSONWithOptions(dst any, opts BindOptions) error {
 	}
 
 	if decoder.Decode(&struct{}{}) != io.EOF {
-		return &BindError{Status: http.StatusBadRequest, Message: "unexpected extra JSON data", Err: ErrUnexpectedExtraData}
+		return &BindError{Status: http.StatusBadRequest, Message: ErrUnexpectedExtraData.Error(), Err: ErrUnexpectedExtraData}
 	}
 
 	return nil

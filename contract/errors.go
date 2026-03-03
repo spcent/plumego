@@ -604,12 +604,16 @@ func WrapError(err error, operation, module string, params map[string]any) error
 
 	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
 		// Build merged params without mutating wrapped.
-		mergedParams := make(map[string]any, len(wrapped.Context.Params)+len(params))
-		for k, v := range wrapped.Context.Params {
-			mergedParams[k] = v
-		}
-		for k, v := range params {
-			mergedParams[k] = v
+		// Only allocate if at least one source has entries.
+		var mergedParams map[string]any
+		if len(wrapped.Context.Params) > 0 || len(params) > 0 {
+			mergedParams = make(map[string]any, len(wrapped.Context.Params)+len(params))
+			for k, v := range wrapped.Context.Params {
+				mergedParams[k] = v
+			}
+			for k, v := range params {
+				mergedParams[k] = v
+			}
 		}
 
 		op := wrapped.Context.Operation
@@ -856,16 +860,15 @@ func NewErrorMetrics() *ErrorMetrics {
 
 // RecordError records an error in the metrics. Safe for concurrent use.
 func (em *ErrorMetrics) RecordError(err APIError) {
-	em.mu.Lock()
-	defer em.mu.Unlock()
+	now := time.Now()
 
+	em.mu.Lock()
 	em.TotalErrors++
 	em.ByCategory[err.Category]++
 	em.ByStatus[err.Status]++
-
 	if errorType, ok := err.Details["type"].(ErrorType); ok {
 		em.ByType[errorType]++
 	}
-
-	em.LastErrorTime = time.Now()
+	em.LastErrorTime = now
+	em.mu.Unlock()
 }
