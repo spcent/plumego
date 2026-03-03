@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -61,7 +60,7 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			_ = parent.writeFrame(opcodePong, true, payload)
 			continue
 		case opcodePong:
-			atomic.StoreInt64(&parent.lastPong, time.Now().UnixNano())
+			parent.lastPong.Store(time.Now().UnixNano())
 			continue
 		case opcodeClose:
 			_ = parent.writeFrame(opcodeClose, true, payload)
@@ -140,7 +139,7 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 			_ = c.writeFrame(opcodePong, true, payload)
 			continue
 		case opcodePong:
-			atomic.StoreInt64(&c.lastPong, time.Now().UnixNano())
+			c.lastPong.Store(time.Now().UnixNano())
 			continue
 		case opcodeClose:
 			_ = c.writeFrame(opcodeClose, true, payload)

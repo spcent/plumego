@@ -146,10 +146,11 @@ func (c *WebSocketComponent) RegisterMiddleware(_ *middleware.Registry) {}
 
 func (c *WebSocketComponent) Start(_ context.Context) error { return nil }
 
-func (c *WebSocketComponent) Stop(_ context.Context) error {
+func (c *WebSocketComponent) Stop(ctx context.Context) error {
 	if c.hub != nil {
-		c.hub.Stop()
+		err := c.hub.Shutdown(ctx)
 		c.hub = nil
+		return err
 	}
 	return nil
 }

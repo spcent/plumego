@@ -32,7 +32,7 @@ type RoomAuthenticator interface {
 	VerifyJWT(token string) (map[string]any, error)
 }
 
-// simpleRoomAuth stores metadata about rooms (password).
+// SimpleRoomAuth stores metadata about rooms (password).
 //
 // This is a simple room authentication implementation that uses password-based
 // authentication for room access. It stores hashed passwords for each room.
@@ -48,7 +48,7 @@ type RoomAuthenticator interface {
 //	if auth.CheckRoomPassword("chat-room", "my-secret-password") {
 //		// Allow access
 //	}
-type simpleRoomAuth struct {
+type SimpleRoomAuth struct {
 	roomPasswords map[string]string // room -> password (hashed)
 	mu            sync.RWMutex
 	jwtSecret     []byte // HMAC secret for HS256
@@ -62,8 +62,8 @@ type simpleRoomAuth struct {
 //
 //	secret := []byte("my-jwt-secret")
 //	auth := websocket.NewSimpleRoomAuth(secret)
-func NewSimpleRoomAuth(secret []byte) *simpleRoomAuth {
-	return &simpleRoomAuth{
+func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
+	return &SimpleRoomAuth{
 		roomPasswords: make(map[string]string),
 		jwtSecret:     secret,
 	}
@@ -78,10 +78,9 @@ func NewSimpleRoomAuth(secret []byte) *simpleRoomAuth {
 //
 //	auth := websocket.NewSimpleRoomAuth(secret)
 //	auth.SetRoomPassword("chat-room", "my-secret-password")
-func (s *simpleRoomAuth) SetRoomPassword(room, pwd string) {
+func (s *SimpleRoomAuth) SetRoomPassword(room, pwd string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// Hash password before storing
 	hashed, err := password.HashPassword(pwd)
 	if err != nil {
 		log.Printf("Error hashing room password: %v", err)
@@ -90,11 +89,10 @@ func (s *simpleRoomAuth) SetRoomPassword(room, pwd string) {
 	s.roomPasswords[room] = string(hashed)
 }
 
-func (s *simpleRoomAuth) CheckRoomPassword(room, provided string) bool {
+func (s *SimpleRoomAuth) CheckRoomPassword(room, provided string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if hashed, ok := s.roomPasswords[room]; ok {
-		// Verify hash
 		err := password.CheckPassword(hashed, provided)
 		return err == nil
 	}
@@ -102,8 +100,8 @@ func (s *simpleRoomAuth) CheckRoomPassword(room, provided string) bool {
 	return true
 }
 
-// verifyJWTHS256 verifies HS256 token and returns payload map
-func (s *simpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
+// VerifyJWT verifies an HS256 token and returns the payload map.
+func (s *SimpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, ErrInvalidToken

@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"io"
 	"net"
@@ -9,6 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+// msgBufPool reuses bytes.Buffer instances across read operations
+// to reduce allocator pressure from per-message buffer creation.
+var msgBufPool = sync.Pool{
+	New: func() any { return new(bytes.Buffer) },
+}
 
 // SendBehavior determines behavior on enqueue timeout / full queue.
 //
@@ -126,13 +133,13 @@ type Conn struct {
 	sendBehavior  SendBehavior
 
 	closeOnce sync.Once
-	closed    int32
+	closed    atomic.Int32
 	closeC    chan struct{}
 
-	readLimit  int64
+	readLimit  atomic.Int64
 	pingPeriod atomic.Int64 // stores time.Duration as int64 nanoseconds
 	pongWait   atomic.Int64 // stores time.Duration as int64 nanoseconds
-	lastPong   int64
+	lastPong   atomic.Int64
 
 	// User information (set after authentication)
 	UserInfo *UserInfo
@@ -179,22 +186,22 @@ func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize
 		sendTimeout:   sendTimeout,
 		sendBehavior:  behavior,
 		closeC:        make(chan struct{}),
-		readLimit:     16 << 20, // 16MB
 	}
+	cc.readLimit.Store(16 << 20) // 16MB
 	cc.pingPeriod.Store(int64(defaultPingPeriod))
 	cc.pongWait.Store(int64(defaultPongWait))
-	atomic.StoreInt64(&cc.lastPong, time.Now().UnixNano())
+	cc.lastPong.Store(time.Now().UnixNano())
 	go cc.writerPump()
 	go cc.pongMonitor()
 	return cc
 }
 
-func (c *Conn) IsClosed() bool { return atomic.LoadInt32(&c.closed) == 1 }
+func (c *Conn) IsClosed() bool { return c.closed.Load() == 1 }
 
 func (c *Conn) Close() error {
 	var err error
 	c.closeOnce.Do(func() {
-		atomic.StoreInt32(&c.closed, 1)
+		c.closed.Store(1)
 		close(c.closeC)
 		if c.conn != nil {
 			err = c.conn.Close()
@@ -205,7 +212,7 @@ func (c *Conn) Close() error {
 
 // SetReadLimit sets the maximum message size
 func (c *Conn) SetReadLimit(limit int64) {
-	atomic.StoreInt64(&c.readLimit, limit)
+	c.readLimit.Store(limit)
 }
 
 // SetPingPeriod sets the ping interval
@@ -220,7 +227,7 @@ func (c *Conn) SetPongWait(d time.Duration) {
 
 // GetLastPong returns the last pong time
 func (c *Conn) GetLastPong() time.Time {
-	return time.Unix(0, atomic.LoadInt64(&c.lastPong))
+	return time.Unix(0, c.lastPong.Load())
 }
 
 // WriteClose sends a WebSocket close frame with the given RFC 6455 status code
@@ -291,7 +298,7 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 
 	// Reject oversized frames before reading the mask key so we avoid
 	// a 4-byte network round-trip for frames we will reject anyway.
-	if payloadLen > atomic.LoadInt64(&c.readLimit) {
+	if payloadLen > c.readLimit.Load() {
 		return 0, false, nil, ErrPayloadTooLarge
 	}
 

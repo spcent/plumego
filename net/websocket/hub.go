@@ -135,10 +135,11 @@ func (rl *simpleRateLimiter) allow() bool {
 	defer rl.mu.Unlock()
 
 	now := time.Now().UnixNano()
-	elapsed := time.Duration(now - rl.lastRefill)
+	elapsed := now - rl.lastRefill
 
-	// Calculate tokens to add based on elapsed time
-	tokensToAdd := int64(elapsed.Seconds() * float64(rl.rate) * 1000)
+	// Integer-only token refill: milliTokens per nanosecond = rate/1_000_000.
+	// Avoids float64 arithmetic on the hot connection-accept path.
+	tokensToAdd := elapsed * int64(rl.rate) / 1_000_000
 	if tokensToAdd > 0 {
 		maxTokens := uint64(rl.burst * 1000)
 		rl.tokens += uint64(tokensToAdd)
@@ -782,6 +783,35 @@ func (h *Hub) RemoveConn(c *Conn) {
 	}
 }
 
+// dispatchJobs enqueues send jobs for each connection in conns and tracks drops.
+// label is used only for log/metric messages to identify the broadcast target.
+func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
+	sent, dropped := 0, 0
+	for _, c := range conns {
+		select {
+		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
+			sent++
+		default:
+			dropped++
+			if h.config.RejectOnQueueFull {
+				if h.config.EnableDebugLogging {
+					h.logger.Printf("broadcast queue full: dropped message to %s", label)
+				}
+				if h.config.EnableSecurityMetrics {
+					h.recordSecurityEvent("broadcast_queue_full", map[string]any{
+						"target":  label,
+						"dropped": dropped,
+						"sent":    sent,
+					}, "error")
+				}
+			}
+		}
+	}
+	if h.config.EnableMetrics && dropped > 0 {
+		h.broadcastDropped.Add(uint64(dropped))
+	}
+}
+
 // BroadcastRoom enqueues jobs to jobQueue for workers to send.
 //
 // This method is thread-safe and can be called concurrently from multiple goroutines.
@@ -801,26 +831,19 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 		return
 	}
 
-	// Get a connection list from pool
 	connsList := h.getConnList()
 	defer h.putConnList(connsList)
 
-	// Copy connections while holding read lock to prevent race conditions
 	h.mu.RLock()
 	rs, ok := h.rooms[room]
 	if !ok || len(rs) == 0 {
 		h.mu.RUnlock()
 		return
 	}
-
-	// Grow slice if needed (pool size might be too small)
 	if cap(*connsList) < len(rs) {
 		*connsList = make([]*Conn, 0, len(rs))
 	}
-
-	// Create snapshot of connections to iterate safely
 	for c := range rs {
-		// Only include active connections
 		if !c.IsClosed() {
 			*connsList = append(*connsList, c)
 		}
@@ -830,36 +853,7 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 	if len(*connsList) == 0 {
 		return
 	}
-
-	sent := 0
-	dropped := 0
-
-	// Iterate over snapshot - safe from concurrent modifications
-	for _, c := range *connsList {
-		select {
-		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
-			sent++
-		default:
-			dropped++
-			if h.config.RejectOnQueueFull {
-				// Production mode: log and record metric
-				if h.config.EnableDebugLogging {
-					h.logger.Printf("Broadcast queue full: dropped message to room %s", room)
-				}
-				if h.config.EnableSecurityMetrics {
-					h.recordSecurityEvent("broadcast_queue_full", map[string]any{
-						"room":    room,
-						"dropped": dropped,
-						"sent":    sent,
-					}, "error")
-				}
-			}
-		}
-	}
-
-	if h.config.EnableMetrics && dropped > 0 {
-		h.broadcastDropped.Add(uint64(dropped))
-	}
+	h.dispatchJobs(*connsList, op, data, "room:"+room)
 }
 
 // BroadcastAll broadcasts to all clients.
@@ -879,14 +873,30 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 		return
 	}
 
-	// Get a connection list from pool
 	connsList := h.getConnList()
 	defer h.putConnList(connsList)
 
-	// Copy all unique connections while holding read lock.
-	// A connection may be registered in multiple rooms; deduplicate so it receives
-	// each broadcast exactly once.
 	h.mu.RLock()
+	// Fast path: single room needs no deduplication map.
+	if len(h.rooms) == 1 {
+		for _, rs := range h.rooms {
+			if cap(*connsList) < len(rs) {
+				*connsList = make([]*Conn, 0, len(rs))
+			}
+			for c := range rs {
+				if !c.IsClosed() {
+					*connsList = append(*connsList, c)
+				}
+			}
+		}
+		h.mu.RUnlock()
+		if len(*connsList) > 0 {
+			h.dispatchJobs(*connsList, op, data, "all")
+		}
+		return
+	}
+
+	// Multi-room path: deduplicate connections that span multiple rooms.
 	estimatedSize := 0
 	for _, rs := range h.rooms {
 		estimatedSize += len(rs)
@@ -894,7 +904,6 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 	if cap(*connsList) < estimatedSize {
 		*connsList = make([]*Conn, 0, estimatedSize)
 	}
-
 	seen := make(map[*Conn]struct{}, estimatedSize)
 	for _, rs := range h.rooms {
 		for c := range rs {
@@ -911,33 +920,7 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 	if len(*connsList) == 0 {
 		return
 	}
-
-	sent := 0
-	dropped := 0
-
-	for _, c := range *connsList {
-		select {
-		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
-			sent++
-		default:
-			dropped++
-			if h.config.RejectOnQueueFull {
-				if h.config.EnableDebugLogging {
-					h.logger.Printf("Broadcast queue full: dropped message to all clients")
-				}
-				if h.config.EnableSecurityMetrics {
-					h.recordSecurityEvent("broadcast_all_queue_full", map[string]any{
-						"dropped": dropped,
-						"sent":    sent,
-					}, "error")
-				}
-			}
-		}
-	}
-
-	if h.config.EnableMetrics && dropped > 0 {
-		h.broadcastDropped.Add(uint64(dropped))
-	}
+	h.dispatchJobs(*connsList, op, data, "all")
 }
 
 // GetRoomCount returns the number of connections in a room.

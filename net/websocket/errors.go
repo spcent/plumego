@@ -8,21 +8,13 @@ import (
 // Sentinel errors for common websocket conditions
 var (
 	// Connection errors
-	ErrConnClosed  = errors.New("websocket: connection closed")
-	ErrConnClosing = errors.New("websocket: connection closing")
-	ErrInvalidConn = errors.New("websocket: invalid connection")
+	ErrConnClosed = errors.New("websocket: connection closed")
 
 	// Queue errors
 	ErrQueueFull       = errors.New("websocket: send queue full")
 	ErrQueueFullClosed = errors.New("websocket: send queue full, connection closed")
 
-	// Protocol errors
-	ErrBadHandshake      = errors.New("websocket: bad handshake")
-	ErrBadMethod         = errors.New("websocket: method not GET")
-	ErrBadUpgrade        = errors.New("websocket: missing or bad upgrade header")
-	ErrBadConnection     = errors.New("websocket: missing or bad connection header")
-	ErrBadSecKey         = errors.New("websocket: missing or bad Sec-WebSocket-Key header")
-	ErrBadSecAccept      = errors.New("websocket: bad Sec-WebSocket-Accept header")
+	// Frame/protocol errors (returned from readFrame)
 	ErrPayloadTooLarge   = errors.New("websocket: payload too large")
 	ErrProtocolError     = errors.New("websocket: protocol error")
 	ErrUnmaskedFrame     = errors.New("websocket: unmasked client frame")
@@ -36,11 +28,8 @@ var (
 	ErrRateLimitExceeded = errors.New("websocket: rate limit exceeded")
 
 	// Auth errors
-	ErrInvalidToken    = errors.New("websocket: invalid token")
-	ErrTokenExpired    = errors.New("websocket: token expired")
-	ErrInvalidPassword = errors.New("websocket: invalid password")
-	ErrForbiddenOrigin = errors.New("websocket: forbidden origin")
-	ErrUnauthorized    = errors.New("websocket: unauthorized")
+	ErrInvalidToken = errors.New("websocket: invalid token")
+	ErrTokenExpired = errors.New("websocket: token expired")
 )
 
 // Error types for more detailed error information
@@ -48,7 +37,6 @@ var (
 // CloseError represents a WebSocket close frame.
 type CloseError struct {
 	Code   int
-	Text   string
 	Reason string
 }
 

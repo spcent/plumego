@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -22,8 +21,8 @@ func TestConnConfiguration(t *testing.T) {
 
 	// Test SetReadLimit
 	mockConn.SetReadLimit(32 << 20) // 32MB
-	if atomic.LoadInt64(&mockConn.readLimit) != 32<<20 {
-		t.Errorf("SetReadLimit failed, expected 32MB, got %d", atomic.LoadInt64(&mockConn.readLimit))
+	if mockConn.readLimit.Load() != 32<<20 {
+		t.Errorf("SetReadLimit failed, expected 32MB, got %d", mockConn.readLimit.Load())
 	}
 
 	// Test SetPingPeriod

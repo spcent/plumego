@@ -1,26 +1,17 @@
 package websocket
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 )
-
-// msgBufPool reuses bytes.Buffer instances across the per-connection read goroutines
-// to reduce allocator pressure from per-message buffer creation.
-var msgBufPool = sync.Pool{
-	New: func() any { return new(bytes.Buffer) },
-}
 
 // computeAcceptKey computes the WebSocket accept key
 func computeAcceptKey(key string) string {
@@ -29,15 +20,18 @@ func computeAcceptKey(key string) string {
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-// headerContains checks if a header contains a value (case-insensitive)
+// headerContains reports whether the comma-separated header value contains val
+// (case-insensitive). Iterates without allocating a slice.
 func headerContains(h http.Header, key, val string) bool {
 	v := h.Get(key)
-	if v == "" {
-		return false
-	}
-	parts := strings.Split(v, ",")
-	for _, p := range parts {
-		if strings.EqualFold(strings.TrimSpace(p), val) {
+	for v != "" {
+		var token string
+		if i := strings.IndexByte(v, ','); i >= 0 {
+			token, v = strings.TrimSpace(v[:i]), v[i+1:]
+		} else {
+			token, v = strings.TrimSpace(v), ""
+		}
+		if strings.EqualFold(token, val) {
 			return true
 		}
 	}
@@ -330,12 +324,3 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	}()
 }
 
-// UpgradeClient performs a client-side WebSocket handshake.
-//
-// Deprecated: This function is not implemented and always returns an error.
-// It is retained only for API compatibility. Use a third-party client library
-// (e.g., golang.org/x/net/websocket or nhooyr.io/websocket) for client-side
-// WebSocket connections.
-func UpgradeClient(_ string, _ http.Header) (net.Conn, *bufio.ReadWriter, error) {
-	return nil, nil, errors.New("client upgrade not implemented")
-}

@@ -224,28 +224,50 @@ func TestSecureRoomAuth(t *testing.T) {
 		t.Errorf("VerifyJWT() returned wrong claims: %v", claims)
 	}
 
-	// Test metrics
-	metrics := GetSecurityMetrics()
+	// Test per-instance metrics
+	metrics := auth.GetMetrics()
 	if metrics.SuccessfulAuthentications == 0 {
 		t.Error("Metrics should track successful authentications")
 	}
 }
 
 func TestSecurityMetrics(t *testing.T) {
-	ResetSecurityMetrics()
-
-	metrics := GetSecurityMetrics()
-	if metrics.InvalidJWTSecrets != 0 || metrics.WeakRoomPasswords != 0 {
-		t.Error("ResetSecurityMetrics() failed")
+	secret := make([]byte, 32)
+	cfg := SecurityConfig{
+		JWTSecret:               secret,
+		MinJWTSecretLength:      32,
+		EnforcePasswordStrength: true,
+	}
+	auth, err := NewSecureRoomAuth(secret, cfg)
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth() failed: %v", err)
 	}
 
-	// Simulate some events
-	securityMetrics.InvalidJWTSecrets = 5
-	securityMetrics.WeakRoomPasswords = 3
+	// Metrics should start at zero
+	m := auth.GetMetrics()
+	if m.InvalidJWTSecrets != 0 || m.WeakRoomPasswords != 0 || m.SuccessfulAuthentications != 0 {
+		t.Error("Initial metrics should all be zero")
+	}
 
-	metrics = GetSecurityMetrics()
-	if metrics.InvalidJWTSecrets != 5 || metrics.WeakRoomPasswords != 3 {
-		t.Error("GetSecurityMetrics() returned wrong values")
+	// Trigger an invalid JWT to increment counter
+	_, _ = auth.VerifyJWT("invalid.token.here")
+	m = auth.GetMetrics()
+	if m.InvalidJWTSecrets != 1 {
+		t.Errorf("Expected InvalidJWTSecrets=1, got %d", m.InvalidJWTSecrets)
+	}
+
+	// Trigger a weak password rejection
+	_ = auth.SetRoomPassword("room", "weak")
+	m = auth.GetMetrics()
+	if m.WeakRoomPasswords != 1 {
+		t.Errorf("Expected WeakRoomPasswords=1, got %d", m.WeakRoomPasswords)
+	}
+
+	// Reset and verify
+	auth.ResetMetrics()
+	m = auth.GetMetrics()
+	if m.InvalidJWTSecrets != 0 || m.WeakRoomPasswords != 0 {
+		t.Error("ResetMetrics() did not reset counters")
 	}
 }
 
@@ -309,11 +331,10 @@ func TestHubBroadcastWithSecurity(t *testing.T) {
 	// Give workers time to process
 	time.Sleep(100 * time.Millisecond)
 
-	// Check that metrics were updated
-	metrics := GetSecurityMetrics()
-	// Some messages might have been dropped due to queue full
-	if metrics.BroadcastQueueFull > 0 {
-		t.Logf("Broadcast queue full events: %d", metrics.BroadcastQueueFull)
+	// Check that hub metrics were updated (broadcast drops are tracked per-hub)
+	hubMetrics := hub.Metrics()
+	if hubMetrics.BroadcastDropped > 0 {
+		t.Logf("Broadcast dropped (queue full): %d", hubMetrics.BroadcastDropped)
 	}
 }
 
@@ -364,21 +385,3 @@ func TestHubConnectionLimitsSecurity(t *testing.T) {
 	}
 }
 
-func TestSecurityEventLogging(t *testing.T) {
-	cfg := SecurityConfig{
-		JWTSecret:          make([]byte, 32),
-		MinJWTSecretLength: 32,
-		EnableDebugLogging: true,
-		EnableMetrics:      true,
-		RejectOnQueueFull:  true,
-	}
-
-	// Test event logging
-	details := map[string]any{
-		"test":  "value",
-		"count": 42,
-	}
-
-	// This should not panic
-	LogSecurityEvent("test_event", details, cfg)
-}
