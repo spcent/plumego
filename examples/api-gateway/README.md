@@ -256,9 +256,9 @@ Best for: Production, microservices, dynamic environments
 
 ```go
 sd, err := discovery.NewConsul("localhost:8500", discovery.ConsulConfig{
-    Datacenter:  "dc1",
-    Token:       "secret-token",
-    OnlyHealthy: true,
+    Datacenter: "dc1",
+    Token:      "secret-token",
+    // IncludeUnhealthy: false (default) — only healthy instances are returned
 })
 ```
 

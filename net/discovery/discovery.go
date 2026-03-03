@@ -33,6 +33,7 @@ package discovery
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 var (
@@ -115,8 +116,7 @@ func (i *Instance) URL() string {
 	if scheme == "" {
 		scheme = "http"
 	}
-
-	return scheme + "://" + i.Address + ":" + string(rune(i.Port))
+	return fmt.Sprintf("%s://%s:%d", scheme, i.Address, i.Port)
 }
 
 // HealthChecker defines an optional interface for health checking

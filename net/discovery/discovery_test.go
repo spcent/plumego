@@ -14,20 +14,18 @@ var (
 func TestInstance_URL_DefaultScheme(t *testing.T) {
 	inst := Instance{Address: "localhost", Port: 8080}
 	got := inst.URL()
-	scheme := "http"
-	// URL uses string(rune(port)) which converts port to a unicode character
-	expected := scheme + "://localhost:" + string(rune(8080))
-	if got != expected {
-		t.Errorf("URL() = %q, want %q", got, expected)
+	want := "http://localhost:8080"
+	if got != want {
+		t.Errorf("URL() = %q, want %q", got, want)
 	}
 }
 
 func TestInstance_URL_CustomScheme(t *testing.T) {
 	inst := Instance{Address: "example.com", Port: 443, Scheme: "https"}
 	got := inst.URL()
-	expected := "https://example.com:" + string(rune(443))
-	if got != expected {
-		t.Errorf("URL() = %q, want %q", got, expected)
+	want := "https://example.com:443"
+	if got != want {
+		t.Errorf("URL() = %q, want %q", got, want)
 	}
 }
 
@@ -35,22 +33,22 @@ func TestInstance_URL_Schemes(t *testing.T) {
 	tests := []struct {
 		name   string
 		scheme string
+		port   int
 		want   string
 	}{
-		{"empty defaults to http", "", "http"},
-		{"http", "http", "http"},
-		{"https", "https", "https"},
-		{"ws", "ws", "ws"},
-		{"wss", "wss", "wss"},
+		{"empty defaults to http", "", 80, "http://host:80"},
+		{"http", "http", 80, "http://host:80"},
+		{"https", "https", 443, "https://host:443"},
+		{"ws", "ws", 80, "ws://host:80"},
+		{"wss", "wss", 443, "wss://host:443"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inst := Instance{Address: "host", Port: 80, Scheme: tt.scheme}
+			inst := Instance{Address: "host", Port: tt.port, Scheme: tt.scheme}
 			got := inst.URL()
-			prefix := tt.want + "://host:"
-			if len(got) < len(prefix) || got[:len(prefix)] != prefix {
-				t.Errorf("URL() = %q, want prefix %q", got, prefix)
+			if got != tt.want {
+				t.Errorf("URL() = %q, want %q", got, tt.want)
 			}
 		})
 	}

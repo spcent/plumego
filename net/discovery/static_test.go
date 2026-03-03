@@ -27,8 +27,26 @@ func TestNewStatic_Nil(t *testing.T) {
 	if s == nil {
 		t.Fatal("NewStatic(nil) returned nil")
 	}
-	if s.services != nil {
-		t.Errorf("services = %v, want nil", s.services)
+	// NewStatic(nil) must initialize an empty map to prevent nil map panics on write
+	if s.services == nil {
+		t.Error("services is nil; NewStatic(nil) must initialize an empty map")
+	}
+	if len(s.services) != 0 {
+		t.Errorf("services len = %d, want 0", len(s.services))
+	}
+}
+
+func TestNewStatic_Nil_AddBackend(t *testing.T) {
+	s := NewStatic(nil)
+	// Must not panic when writing to a previously-nil-initialized static
+	s.AddBackend("svc", "http://host:8080")
+
+	backends, err := s.Resolve(context.Background(), "svc")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if len(backends) != 1 || backends[0] != "http://host:8080" {
+		t.Errorf("backends = %v, want [http://host:8080]", backends)
 	}
 }
 

@@ -42,7 +42,7 @@ type ConsulConfig struct {
 	// Token for ACL authentication
 	Token string
 
-	// Namespace for Consul Enterprise (default: "default")
+	// Namespace for Consul Enterprise namespace filtering (sets the ?ns= query parameter)
 	Namespace string
 
 	// WaitTime for long polling (default: 30s)
@@ -51,19 +51,19 @@ type ConsulConfig struct {
 	// Timeout for HTTP requests (default: 60s)
 	Timeout time.Duration
 
-	// OnlyHealthy filters to only return healthy instances (default: true)
-	OnlyHealthy bool
+	// IncludeUnhealthy includes unhealthy instances in results.
+	// Default: false (only healthy instances are returned).
+	IncludeUnhealthy bool
 
 	// Tag filters services by tag
 	Tag string
 
-	// Scheme is the URL scheme (default: "http")
+	// Scheme is the URL scheme for the Consul agent (default: "http")
 	Scheme string
 }
 
 // NewConsul creates a new Consul discovery client
 func NewConsul(address string, config ConsulConfig) (*Consul, error) {
-	// Apply defaults
 	if config.Datacenter == "" {
 		config.Datacenter = "dc1"
 	}
@@ -76,7 +76,6 @@ func NewConsul(address string, config ConsulConfig) (*Consul, error) {
 	if config.Scheme == "" {
 		config.Scheme = "http"
 	}
-	config.OnlyHealthy = true // Default to only healthy
 
 	return &Consul{
 		address:  address,
@@ -86,36 +85,43 @@ func NewConsul(address string, config ConsulConfig) (*Consul, error) {
 	}, nil
 }
 
+// baseURL returns the base URL for Consul API requests
+func (c *Consul) baseURL() string {
+	return c.config.Scheme + "://" + c.address
+}
+
+// doRequest executes an HTTP request with ACL token and Content-Type headers applied
+func (c *Consul) doRequest(ctx context.Context, method, reqURL string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.config.Token != "" {
+		req.Header.Set("X-Consul-Token", c.config.Token)
+	}
+	return c.client.Do(req)
+}
+
 // Resolve returns the list of backend URLs for a service
 func (c *Consul) Resolve(ctx context.Context, serviceName string) ([]string, error) {
-	// Build query URL
-	queryURL := fmt.Sprintf("%s://%s/v1/health/service/%s",
-		c.config.Scheme, c.address, serviceName)
-
 	params := url.Values{}
 	params.Set("dc", c.config.Datacenter)
-	if c.config.OnlyHealthy {
+	if !c.config.IncludeUnhealthy {
 		params.Set("passing", "true")
 	}
 	if c.config.Tag != "" {
 		params.Set("tag", c.config.Tag)
 	}
-
-	queryURL += "?" + params.Encode()
-
-	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", queryURL, nil)
-	if err != nil {
-		return nil, err
+	if c.config.Namespace != "" {
+		params.Set("ns", c.config.Namespace)
 	}
 
-	// Add ACL token if configured
-	if c.config.Token != "" {
-		req.Header.Set("X-Consul-Token", c.config.Token)
-	}
+	queryURL := c.baseURL() + "/v1/health/service/" + url.PathEscape(serviceName) + "?" + params.Encode()
 
-	// Execute request
-	resp, err := c.client.Do(req)
+	resp, err := c.doRequest(ctx, http.MethodGet, queryURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -124,19 +130,12 @@ func (c *Consul) Resolve(ctx context.Context, serviceName string) ([]string, err
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrServiceNotFound
 	}
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("consul returned status %d", resp.StatusCode)
 	}
 
-	// Parse response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	var entries []consulServiceEntry
-	if err := json.Unmarshal(body, &entries); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
 		return nil, err
 	}
 
@@ -144,14 +143,10 @@ func (c *Consul) Resolve(ctx context.Context, serviceName string) ([]string, err
 		return nil, ErrNoInstances
 	}
 
-	// Build backend URLs
 	backends := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		backend := fmt.Sprintf("http://%s:%d",
-			entry.Service.Address, entry.Service.Port)
-		backends = append(backends, backend)
+		backends = append(backends, fmt.Sprintf("http://%s:%d", entry.Service.Address, entry.Service.Port))
 	}
-
 	return backends, nil
 }
 
@@ -160,26 +155,19 @@ func (c *Consul) Watch(ctx context.Context, serviceName string) (<-chan []string
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Check if watcher already exists
 	if watcher, exists := c.watchers[serviceName]; exists {
-		// Subscribe to existing watcher
 		return watcher.subscribe(ctx), nil
 	}
 
-	// Create new watcher
 	watcher := newConsulWatcher(c, serviceName)
 	c.watchers[serviceName] = watcher
-
-	// Start watching
 	go watcher.watch()
 
-	// Subscribe to watcher
 	return watcher.subscribe(ctx), nil
 }
 
 // Register registers a service instance
 func (c *Consul) Register(ctx context.Context, instance Instance) error {
-	// Build registration payload
 	reg := consulRegistration{
 		ID:      instance.ID,
 		Name:    instance.Name,
@@ -189,34 +177,13 @@ func (c *Consul) Register(ctx context.Context, instance Instance) error {
 		Meta:    instance.Metadata,
 	}
 
-	// Note: Health checks can be added via Consul's agent API separately
-	// This simple registration doesn't include health checks
-	// Users can configure health checks in Consul directly
-
-	// Marshal to JSON
 	body, err := json.Marshal(reg)
 	if err != nil {
 		return err
 	}
 
-	// Build URL
-	registerURL := fmt.Sprintf("%s://%s/v1/agent/service/register",
-		c.config.Scheme, c.address)
-
-	// Create request
-	req, err := http.NewRequestWithContext(ctx, "PUT", registerURL,
-		io.NopCloser(bytes.NewReader(body)))
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	if c.config.Token != "" {
-		req.Header.Set("X-Consul-Token", c.config.Token)
-	}
-
-	// Execute request
-	resp, err := c.client.Do(req)
+	resp, err := c.doRequest(ctx, http.MethodPut,
+		c.baseURL()+"/v1/agent/service/register", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -225,25 +192,13 @@ func (c *Consul) Register(ctx context.Context, instance Instance) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("consul returned status %d", resp.StatusCode)
 	}
-
 	return nil
 }
 
 // Deregister removes a service instance
 func (c *Consul) Deregister(ctx context.Context, serviceID string) error {
-	deregisterURL := fmt.Sprintf("%s://%s/v1/agent/service/deregister/%s",
-		c.config.Scheme, c.address, serviceID)
-
-	req, err := http.NewRequestWithContext(ctx, "PUT", deregisterURL, nil)
-	if err != nil {
-		return err
-	}
-
-	if c.config.Token != "" {
-		req.Header.Set("X-Consul-Token", c.config.Token)
-	}
-
-	resp, err := c.client.Do(req)
+	resp, err := c.doRequest(ctx, http.MethodPut,
+		c.baseURL()+"/v1/agent/service/deregister/"+url.PathEscape(serviceID), nil)
 	if err != nil {
 		return err
 	}
@@ -252,44 +207,40 @@ func (c *Consul) Deregister(ctx context.Context, serviceID string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("consul returned status %d", resp.StatusCode)
 	}
-
 	return nil
 }
 
 // Health updates the health status of an instance
+// Consul TTL-based health checks require registering with a TTL check first;
+// use the Consul agent API directly for TTL heartbeats.
 func (c *Consul) Health(ctx context.Context, serviceID string, healthy bool) error {
-	// Consul uses TTL-based health checks
-	// This would require registering with a TTL check first
 	return ErrNotSupported
 }
 
-// Close closes the Consul client
+// Close closes the Consul client and stops all watchers
 func (c *Consul) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Stop all watchers
 	for _, watcher := range c.watchers {
 		watcher.stop()
 	}
-
 	c.watchers = make(map[string]*consulWatcher)
-
 	return nil
 }
 
-// consulServiceEntry represents a Consul service entry
+// consulServiceEntry represents a Consul health service entry
 type consulServiceEntry struct {
 	Service consulService `json:"Service"`
 }
 
-// consulService represents a Consul service
+// consulService holds the address and port from a Consul service entry
 type consulService struct {
 	Address string `json:"Address"`
 	Port    int    `json:"Port"`
 }
 
-// consulRegistration represents a Consul service registration
+// consulRegistration represents a Consul service registration payload
 type consulRegistration struct {
 	ID      string            `json:"ID"`
 	Name    string            `json:"Name"`
@@ -297,26 +248,19 @@ type consulRegistration struct {
 	Port    int               `json:"Port"`
 	Tags    []string          `json:"Tags,omitempty"`
 	Meta    map[string]string `json:"Meta,omitempty"`
-	Check   *consulCheck      `json:"Check,omitempty"`
 }
 
-// consulCheck represents a Consul health check
-type consulCheck struct {
-	HTTP     string `json:"HTTP"`
-	Interval string `json:"Interval"`
-	Timeout  string `json:"Timeout"`
-}
-
-// consulWatcher watches a service for changes
+// consulWatcher watches a service for changes and fans out updates to subscribers
 type consulWatcher struct {
 	consul      *Consul
 	serviceName string
 	subscribers []chan []string
 	stopChan    chan struct{}
+	stopOnce    sync.Once
 	mu          sync.RWMutex
 }
 
-// newConsulWatcher creates a new watcher
+// newConsulWatcher creates a new watcher for the given service
 func newConsulWatcher(consul *Consul, serviceName string) *consulWatcher {
 	return &consulWatcher{
 		consul:      consul,
@@ -326,7 +270,8 @@ func newConsulWatcher(consul *Consul, serviceName string) *consulWatcher {
 	}
 }
 
-// subscribe subscribes to watcher updates
+// subscribe returns a channel that receives backend updates.
+// The channel is closed when ctx is cancelled.
 func (w *consulWatcher) subscribe(ctx context.Context) <-chan []string {
 	ch := make(chan []string, 1)
 
@@ -334,12 +279,10 @@ func (w *consulWatcher) subscribe(ctx context.Context) <-chan []string {
 	w.subscribers = append(w.subscribers, ch)
 	w.mu.Unlock()
 
-	// Remove subscriber when context is done
 	go func() {
 		<-ctx.Done()
 		w.mu.Lock()
 		defer w.mu.Unlock()
-
 		for i, sub := range w.subscribers {
 			if sub == ch {
 				w.subscribers = append(w.subscribers[:i], w.subscribers[i+1:]...)
@@ -352,7 +295,7 @@ func (w *consulWatcher) subscribe(ctx context.Context) <-chan []string {
 	return ch
 }
 
-// watch watches for service changes
+// watch polls Consul at WaitTime intervals and notifies all subscribers on change
 func (w *consulWatcher) watch() {
 	ticker := time.NewTicker(w.consul.config.WaitTime)
 	defer ticker.Stop()
@@ -360,7 +303,6 @@ func (w *consulWatcher) watch() {
 	for {
 		select {
 		case <-ticker.C:
-			// Query for updates
 			ctx, cancel := context.WithTimeout(context.Background(), w.consul.config.Timeout)
 			backends, err := w.consul.Resolve(ctx, w.serviceName)
 			cancel()
@@ -375,7 +317,7 @@ func (w *consulWatcher) watch() {
 	}
 }
 
-// notify sends backends to all subscribers
+// notify sends the current backend list to all subscribers (non-blocking)
 func (w *consulWatcher) notify(backends []string) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -384,12 +326,14 @@ func (w *consulWatcher) notify(backends []string) {
 		select {
 		case ch <- backends:
 		default:
-			// Skip if channel is full
+			// Skip if subscriber channel is full
 		}
 	}
 }
 
-// stop stops the watcher
+// stop stops the watcher. Safe to call multiple times.
 func (w *consulWatcher) stop() {
-	close(w.stopChan)
+	w.stopOnce.Do(func() {
+		close(w.stopChan)
+	})
 }
