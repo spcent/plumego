@@ -139,14 +139,16 @@ func (rl *simpleRateLimiter) allow() bool {
 
 	// Integer-only token refill: milliTokens per nanosecond = rate/1_000_000.
 	// Avoids float64 arithmetic on the hot connection-accept path.
+	// lastRefill is always advanced so that sub-millisecond calls don't silently
+	// accumulate elapsed time and produce a large token burst later.
 	tokensToAdd := elapsed * int64(rl.rate) / 1_000_000
+	rl.lastRefill = now
 	if tokensToAdd > 0 {
 		maxTokens := uint64(rl.burst * 1000)
 		rl.tokens += uint64(tokensToAdd)
 		if rl.tokens > maxTokens {
 			rl.tokens = maxTokens
 		}
-		rl.lastRefill = now
 	}
 
 	// Try to consume one token
@@ -229,6 +231,22 @@ type HubConfig struct {
 }
 
 // HubMetrics describes hub connection metrics.
+//
+// # Metrics layer overview
+//
+// Metrics in this package are split across two layers:
+//
+//   - Hub layer (here): connection counts, broadcast drops, and security events
+//     that the hub observes directly during Join/Broadcast operations.
+//     Retrieved via Hub.Metrics().
+//
+//   - Auth layer (SecureRoomAuth): JWT and room-password counters that are
+//     specific to a single authenticator instance — e.g. invalid JWT secrets
+//     and weak room passwords detected during SetRoomPassword/ValidateConfig.
+//     Retrieved via SecureRoomAuth.GetMetrics().
+//
+// Both layers expose their counters as lock-free atomic.Uint64 fields, so
+// reads are O(1) and do not contend with hot broadcast or auth paths.
 //
 // Example:
 //
@@ -784,8 +802,10 @@ func (h *Hub) RemoveConn(c *Conn) {
 }
 
 // dispatchJobs enqueues send jobs for each connection in conns and tracks drops.
-// label is used only for log/metric messages to identify the broadcast target.
-func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
+// room identifies the target for log/metric messages; an empty string means "all".
+// The label string is constructed only when logging or metrics are enabled, avoiding
+// allocations on the hot broadcast path when both are disabled.
+func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, room string) {
 	sent, dropped := 0, 0
 	for _, c := range conns {
 		select {
@@ -795,11 +815,19 @@ func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
 			dropped++
 			if h.config.RejectOnQueueFull {
 				if h.config.EnableDebugLogging {
-					h.logger.Printf("broadcast queue full: dropped message to %s", label)
+					if room == "" {
+						h.logger.Printf("broadcast queue full: dropped message to all clients")
+					} else {
+						h.logger.Printf("broadcast queue full: dropped message to room %s", room)
+					}
 				}
 				if h.config.EnableSecurityMetrics {
+					target := room
+					if target == "" {
+						target = "all"
+					}
 					h.recordSecurityEvent("broadcast_queue_full", map[string]any{
-						"target":  label,
+						"target":  target,
 						"dropped": dropped,
 						"sent":    sent,
 					}, "error")
@@ -853,7 +881,7 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 	if len(*connsList) == 0 {
 		return
 	}
-	h.dispatchJobs(*connsList, op, data, "room:"+room)
+	h.dispatchJobs(*connsList, op, data, room)
 }
 
 // BroadcastAll broadcasts to all clients.
