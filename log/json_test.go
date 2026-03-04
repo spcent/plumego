@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -33,8 +34,9 @@ func TestNewJSONLogger(t *testing.T) {
 func TestJSONLogger_Info(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewJSONLogger(JSONLoggerConfig{
-		Output: &buf,
-		Level:  INFO,
+		Output:           &buf,
+		Level:            INFO,
+		RespectVerbosity: true,
 	})
 
 	logger.Info("test message", Fields{"key": "value"})
@@ -147,8 +149,9 @@ func TestJSONLogger_WithFields(t *testing.T) {
 func TestJSONLogger_InfoCtx(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewJSONLogger(JSONLoggerConfig{
-		Output: &buf,
-		Level:  INFO,
+		Output:           &buf,
+		Level:            INFO,
+		RespectVerbosity: true,
 	})
 
 	ctx := context.Background()
@@ -314,5 +317,77 @@ func TestJSONLogger_NilFields(t *testing.T) {
 
 	if entry["msg"] != "test message" {
 		t.Errorf("expected msg 'test message', got %v", entry["msg"])
+	}
+}
+
+func TestJSONLogger_DebugVerbosityGate(t *testing.T) {
+	resetGlobalLogger()
+	defer resetGlobalLogger()
+
+	var buf bytes.Buffer
+	logger := NewJSONLogger(JSONLoggerConfig{
+		Output:           &buf,
+		Level:            INFO,
+		RespectVerbosity: true,
+	})
+
+	std.SetVerbose(0)
+	logger.Debug("hidden debug", nil)
+	if strings.TrimSpace(buf.String()) != "" {
+		t.Fatalf("expected debug log to be filtered when verbosity is 0")
+	}
+
+	std.SetVerbose(1)
+	logger.Debug("visible debug", nil)
+
+	var entry map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	if entry["msg"] != "visible debug" {
+		t.Fatalf("expected visible debug message, got %v", entry["msg"])
+	}
+	if entry["level"] != "INFO" {
+		t.Fatalf("expected DEBUG compatibility level INFO, got %v", entry["level"])
+	}
+}
+
+func TestJSONLogger_WithFieldsSharesWriterLock(t *testing.T) {
+	var buf bytes.Buffer
+	base := NewJSONLogger(JSONLoggerConfig{
+		Output: &buf,
+		Level:  INFO,
+	})
+	child := base.WithFields(Fields{"scope": "child"})
+
+	const n = 200
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < n; i++ {
+			base.Info("base", Fields{"idx": i})
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < n; i++ {
+			child.Info("child", Fields{"idx": i})
+		}
+	}()
+
+	wg.Wait()
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 2*n {
+		t.Fatalf("expected %d lines, got %d", 2*n, len(lines))
+	}
+	for i, line := range lines {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatalf("line %d should be valid JSON, err=%v line=%q", i, err, line)
+		}
 	}
 }

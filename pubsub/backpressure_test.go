@@ -5,6 +5,19 @@ import (
 	"time"
 )
 
+func waitForCondition(timeout, interval time.Duration, fn func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		if fn() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(interval)
+	}
+}
+
 func TestBackpressure_Basic(t *testing.T) {
 	t.Parallel()
 	ps := New()
@@ -289,8 +302,10 @@ func TestBackpressure_SlowStart(t *testing.T) {
 		t.Errorf("Expected initial rate 10, got %d", initialRate)
 	}
 
-	// Wait for rate to increase
-	time.Sleep(2 * time.Second)
+	// Wait for at least one slow-start tick.
+	waitForCondition(1300*time.Millisecond, 20*time.Millisecond, func() bool {
+		return bpc.Stats().CurrentRate.Load() > initialRate
+	})
 
 	stats = bpc.Stats()
 	currentRate := stats.CurrentRate.Load()
@@ -314,8 +329,10 @@ func TestBackpressure_SlowStartWithPressure(t *testing.T) {
 	bpc := NewBackpressureController(ps, config)
 	defer bpc.Close()
 
-	// Wait for rate to increase
-	time.Sleep(1 * time.Second)
+	// Wait for at least one slow-start tick.
+	waitForCondition(1300*time.Millisecond, 20*time.Millisecond, func() bool {
+		return bpc.Stats().CurrentRate.Load() > int64(config.SlowStartInitialRate)
+	})
 
 	stats := bpc.Stats()
 	beforePressure := stats.CurrentRate.Load()
@@ -328,8 +345,10 @@ func TestBackpressure_SlowStartWithPressure(t *testing.T) {
 	}
 	bpc.ReportPressure(signal)
 
-	// Wait for slow start to react
-	time.Sleep(2 * time.Second)
+	// Wait for slow start to react.
+	waitForCondition(1300*time.Millisecond, 20*time.Millisecond, func() bool {
+		return bpc.Stats().CurrentRate.Load() < beforePressure
+	})
 
 	stats = bpc.Stats()
 	afterPressure := stats.CurrentRate.Load()
@@ -351,8 +370,10 @@ func TestBackpressure_ResetSlowStart(t *testing.T) {
 	bpc := NewBackpressureController(ps, config)
 	defer bpc.Close()
 
-	// Wait for rate to increase
-	time.Sleep(2 * time.Second)
+	// Wait for at least one slow-start tick.
+	waitForCondition(1300*time.Millisecond, 20*time.Millisecond, func() bool {
+		return bpc.Stats().CurrentRate.Load() > int64(config.SlowStartInitialRate)
+	})
 
 	// Reset slow start
 	bpc.ResetSlowStart()

@@ -76,6 +76,7 @@ func RequestID(opts ...RequestIDOption) middleware.Middleware {
 			}
 
 			ctx := context.WithValue(r.Context(), contract.TraceIDKey{}, id)
+			ctx = log.WithTraceID(ctx, id)
 			if cfg.includeInRequest {
 				r.Header.Set(cfg.headerName, id)
 			}

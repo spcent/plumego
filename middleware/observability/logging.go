@@ -212,6 +212,7 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := ensureTraceID(r)
 			ctx := context.WithValue(r.Context(), contract.TraceIDKey{}, traceID)
+			ctx = log.WithTraceID(ctx, traceID)
 
 			recorder := newResponseRecorder(w)
 			start := time.Now()
@@ -226,6 +227,7 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 				traceID = spanTraceID
 			}
 			ctx = context.WithValue(ctx, contract.TraceIDKey{}, traceID)
+			ctx = log.WithTraceID(ctx, traceID)
 			if spanID != "" && contract.TraceContextFromContext(ctx) == nil {
 				ctx = contract.ContextWithTraceContext(ctx, contract.TraceContext{
 					TraceID: contract.TraceID(traceID),

@@ -12,12 +12,18 @@ const (
 // WithTraceID adds a trace ID to the context.
 // This trace ID will be automatically included in all Context-aware log methods.
 func WithTraceID(ctx context.Context, traceID string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return context.WithValue(ctx, traceIDKey, traceID)
 }
 
 // TraceIDFromContext extracts the trace ID from context.
 // Returns an empty string if no trace ID is present.
 func TraceIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
 	if traceID, ok := ctx.Value(traceIDKey).(string); ok {
 		return traceID
 	}
@@ -27,12 +33,18 @@ func TraceIDFromContext(ctx context.Context) string {
 // WithLogger attaches a logger instance to the context.
 // This allows child functions to retrieve and use the same logger.
 func WithLogger(ctx context.Context, logger StructuredLogger) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return context.WithValue(ctx, loggerKey, logger)
 }
 
 // LoggerFromContext extracts the logger from context.
 // Returns a default gLogger if no logger is present.
 func LoggerFromContext(ctx context.Context) StructuredLogger {
+	if ctx == nil {
+		return NewGLogger()
+	}
 	if logger, ok := ctx.Value(loggerKey).(StructuredLogger); ok {
 		return logger
 	}
@@ -43,6 +55,9 @@ func LoggerFromContext(ctx context.Context) StructuredLogger {
 // If no trace ID is present in the context, it automatically generates one.
 // Returns both the logger and an updated context with trace ID and logger attached.
 func LoggerFromContextOrNew(ctx context.Context) (StructuredLogger, context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if logger, ok := ctx.Value(loggerKey).(StructuredLogger); ok {
 		return logger, ctx
 	}

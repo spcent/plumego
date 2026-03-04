@@ -265,6 +265,34 @@ func TestVmodule(t *testing.T) {
 	}
 }
 
+func TestVmoduleWrapperDepth(t *testing.T) {
+	resetGlobalLogger()
+	std.SetVerbose(0)
+	std.parseVmodule("glog_test=1")
+
+	if !V(1) {
+		t.Fatalf("expected top-level V to honor vmodule for caller file")
+	}
+
+	output := captureOutput(func() {
+		VLog(1, "top-level vmodule")
+	})
+	if !strings.Contains(output, "top-level vmodule") {
+		t.Fatalf("expected top-level VLog to emit message when vmodule allows it")
+	}
+
+	logger := New()
+	logger.SetVerbose(0)
+	logger.parseVmodule("glog_test=1")
+	var buf bytes.Buffer
+	logger.SetOutput(&buf)
+
+	logger.VLog(1, "instance vmodule")
+	if !strings.Contains(buf.String(), "instance vmodule") {
+		t.Fatalf("expected instance VLog to emit message when vmodule allows it")
+	}
+}
+
 // TestLogBacktrace checks stack trace logging selection
 func TestLogBacktrace(t *testing.T) {
 	resetGlobalLogger()

@@ -130,3 +130,33 @@ func TestContextChaining(t *testing.T) {
 		t.Error("expected same logger instance")
 	}
 }
+
+func TestNilContextSafety(t *testing.T) {
+	ctx := WithTraceID(nil, "trace-nil")
+	if got := TraceIDFromContext(ctx); got != "trace-nil" {
+		t.Fatalf("expected trace id from nil context wrapper, got %q", got)
+	}
+
+	logger := NewGLogger()
+	ctx = WithLogger(nil, logger)
+	if got := LoggerFromContext(ctx); got != logger {
+		t.Fatalf("expected logger from nil context wrapper")
+	}
+
+	if got := TraceIDFromContext(nil); got != "" {
+		t.Fatalf("expected empty trace id for nil context, got %q", got)
+	}
+
+	fromNil := LoggerFromContext(nil)
+	if fromNil == nil {
+		t.Fatalf("expected default logger from nil context")
+	}
+
+	newLogger, newCtx := LoggerFromContextOrNew(nil)
+	if newLogger == nil {
+		t.Fatalf("expected logger from nil context")
+	}
+	if TraceIDFromContext(newCtx) == "" {
+		t.Fatalf("expected generated trace id from nil context")
+	}
+}

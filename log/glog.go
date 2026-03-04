@@ -256,59 +256,18 @@ func (l *Logger) stderrWriter() io.Writer {
 }
 
 func (l *Logger) log(level Level, calldepth int, args ...any) {
-	// First check if we should log at this level to avoid unnecessary work
-	l.mu.RLock()
-	shouldLog := level >= l.level
-	l.mu.RUnlock()
-
-	if !shouldLog {
-		return
-	}
-
-	// Get caller information
-	_, file, line, ok := runtime.Caller(calldepth)
-	if !ok {
-		file = "???"
-		line = 1
-	}
-
-	// Format header and message
-	header := l.formatHeader(level, file, line)
-	message := fmt.Sprint(args...)
-	logLine := append(header, message...)
-	logLine = append(logLine, '\n')
-
-	// Get writer and write log
-	l.mu.RLock()
-	writer := l.getLogWriter(level)
-	shouldBacktrace := l.shouldLogBacktrace(file, line)
-	l.mu.RUnlock()
-
-	fmt.Fprint(writer, string(logLine))
-
-	// Return buffer to pool
-	logBufferPool.Put(header[:0])
-
-	// Check if log file needs rotation
-	if l.logDir != "" {
-		l.checkLogRotation(level, int64(len(logLine)))
-	}
-
-	// Handle backtrace if needed
-	if shouldBacktrace {
-		stack := make([]byte, 4096)
-		stack = stack[:runtime.Stack(stack, false)]
-		fmt.Fprint(writer, string(stack))
-	}
-
-	// Handle fatal errors
-	if level == FATAL {
-		l.Flush()
-		os.Exit(1)
-	}
+	l.logInternal(level, calldepth+1, func() string {
+		return fmt.Sprint(args...)
+	})
 }
 
 func (l *Logger) logf(level Level, calldepth int, format string, args ...any) {
+	l.logInternal(level, calldepth+1, func() string {
+		return fmt.Sprintf(format, args...)
+	})
+}
+
+func (l *Logger) logInternal(level Level, calldepth int, messageBuilder func() string) {
 	// First check if we should log at this level to avoid unnecessary work
 	l.mu.RLock()
 	shouldLog := level >= l.level
@@ -327,7 +286,7 @@ func (l *Logger) logf(level Level, calldepth int, format string, args ...any) {
 
 	// Format header and message
 	header := l.formatHeader(level, file, line)
-	message := fmt.Sprintf(format, args...)
+	message := messageBuilder()
 	logLine := append(header, message...)
 	logLine = append(logLine, '\n')
 
@@ -337,21 +296,21 @@ func (l *Logger) logf(level Level, calldepth int, format string, args ...any) {
 	shouldBacktrace := l.shouldLogBacktrace(file, line)
 	l.mu.RUnlock()
 
-	fmt.Fprint(writer, string(logLine))
+	_, _ = writer.Write(logLine)
 
 	// Return buffer to pool
 	logBufferPool.Put(header[:0])
 
 	// Check if log file needs rotation
 	if l.logDir != "" {
-		l.checkLogRotation(level, int64(len(logLine)))
+		_ = l.checkLogRotation(level, int64(len(logLine)))
 	}
 
 	// Handle backtrace if needed
 	if shouldBacktrace {
 		stack := make([]byte, 4096)
 		stack = stack[:runtime.Stack(stack, false)]
-		fmt.Fprint(writer, string(stack))
+		_, _ = writer.Write(stack)
 	}
 
 	// Handle fatal errors
@@ -382,8 +341,8 @@ func (l *Logger) SetVerbose(v int) {
 	l.verbosity = v
 }
 
-func (l *Logger) V(level int) bool {
-	_, file, _, ok := runtime.Caller(1)
+func (l *Logger) vAt(level int, calldepth int) bool {
+	_, file, _, ok := runtime.Caller(calldepth)
 	if !ok {
 		return level <= l.verbosity
 	}
@@ -393,6 +352,10 @@ func (l *Logger) V(level int) bool {
 	l.mu.RUnlock()
 
 	return level <= verbosity
+}
+
+func (l *Logger) V(level int) bool {
+	return l.vAt(level, 3)
 }
 
 func (l *Logger) Info(args ...any) {
@@ -444,13 +407,13 @@ func (l *Logger) Fatalln(args ...any) {
 }
 
 func (l *Logger) VLog(level int, args ...any) {
-	if l.V(level) {
+	if l.vAt(level, 3) {
 		l.log(INFO, 2, args...)
 	}
 }
 
 func (l *Logger) VLogf(level int, format string, args ...any) {
-	if l.V(level) {
+	if l.vAt(level, 3) {
 		l.logf(INFO, 2, format, args...)
 	}
 }
@@ -659,7 +622,7 @@ func (l *Logger) Close() {
 }
 
 func V(level int) bool {
-	return std.V(level)
+	return std.vAt(level, 3)
 }
 
 func Info(args ...any) {
@@ -711,13 +674,13 @@ func Fatalln(args ...any) {
 }
 
 func VLog(level int, args ...any) {
-	if V(level) {
+	if std.vAt(level, 3) {
 		std.log(INFO, 2, args...)
 	}
 }
 
 func VLogf(level int, format string, args ...any) {
-	if V(level) {
+	if std.vAt(level, 3) {
 		std.logf(INFO, 2, format, args...)
 	}
 }

@@ -61,112 +61,69 @@ func (l *gLogger) Stop(ctx context.Context) error {
 }
 
 func (l *gLogger) WithFields(fields Fields) StructuredLogger {
-	merged := make(Fields, len(l.fields)+len(fields))
-	for k, v := range l.fields {
-		merged[k] = v
-	}
-	for k, v := range fields {
-		merged[k] = v
-	}
-	return &gLogger{fields: merged}
+	return &gLogger{fields: mergeFields(l.fields, fields)}
 }
 
 func (l *gLogger) Debug(msg string, fields Fields) {
-	// Check if debug logging is enabled
-	if !V(1) {
+	if !std.vAt(1, 3) {
 		return
 	}
-	l.logWithFields("DEBUG", msg, fields)
+	l.logWithLevel(INFO, msg, fields, nil)
 }
 
 func (l *gLogger) Info(msg string, fields Fields) {
-	l.logWithFields("INFO", msg, fields)
+	l.logWithLevel(INFO, msg, fields, nil)
 }
 
 func (l *gLogger) Warn(msg string, fields Fields) {
-	l.logWithFields("WARN", msg, fields)
+	l.logWithLevel(WARNING, msg, fields, nil)
 }
 
 func (l *gLogger) Error(msg string, fields Fields) {
-	l.logWithFields("ERROR", msg, fields)
+	l.logWithLevel(ERROR, msg, fields, nil)
 }
 
 // DebugCtx logs a debug message with context support.
 func (l *gLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
-	if !V(1) {
+	if !std.vAt(1, 3) {
 		return
 	}
-	l.logWithFieldsAndContext(ctx, "DEBUG", msg, fields)
+	l.logWithLevel(INFO, msg, fields, ctx)
 }
 
 // InfoCtx logs an info message with context support.
 func (l *gLogger) InfoCtx(ctx context.Context, msg string, fields Fields) {
-	l.logWithFieldsAndContext(ctx, "INFO", msg, fields)
+	l.logWithLevel(INFO, msg, fields, ctx)
 }
 
 // WarnCtx logs a warning message with context support.
 func (l *gLogger) WarnCtx(ctx context.Context, msg string, fields Fields) {
-	l.logWithFieldsAndContext(ctx, "WARN", msg, fields)
+	l.logWithLevel(WARNING, msg, fields, ctx)
 }
 
 // ErrorCtx logs an error message with context support.
 func (l *gLogger) ErrorCtx(ctx context.Context, msg string, fields Fields) {
-	l.logWithFieldsAndContext(ctx, "ERROR", msg, fields)
+	l.logWithLevel(ERROR, msg, fields, ctx)
 }
 
-func (l *gLogger) logWithFields(level string, msg string, fields Fields) {
-	combined := l.mergeFields(fields)
-	formatted := l.formatFields(combined)
-	if formatted != "" {
-		msg = msg + " " + formatted
-	}
-
-	switch level {
-	case "DEBUG":
-		Info(msg)
-	case "INFO":
-		Info(msg)
-	case "WARN":
-		Warning(msg)
-	case "ERROR":
-		Error(msg)
-	}
-}
-
-func (l *gLogger) logWithFieldsAndContext(ctx context.Context, level string, msg string, fields Fields) {
-	combined := l.mergeFields(fields)
-
-	// Add trace ID from context if present
+func (l *gLogger) logWithLevel(level Level, msg string, fields Fields, ctx context.Context) {
+	combined := mergeFields(l.fields, fields)
 	if traceID := TraceIDFromContext(ctx); traceID != "" {
 		combined["trace_id"] = traceID
 	}
-
 	formatted := l.formatFields(combined)
 	if formatted != "" {
-		msg = msg + " " + formatted
+		msg += " " + formatted
 	}
 
 	switch level {
-	case "DEBUG":
+	case INFO:
 		Info(msg)
-	case "INFO":
-		Info(msg)
-	case "WARN":
+	case WARNING:
 		Warning(msg)
-	case "ERROR":
+	case ERROR:
 		Error(msg)
 	}
-}
-
-func (l *gLogger) mergeFields(fields Fields) Fields {
-	merged := make(Fields, len(l.fields)+len(fields))
-	for k, v := range l.fields {
-		merged[k] = v
-	}
-	for k, v := range fields {
-		merged[k] = v
-	}
-	return merged
 }
 
 func (l *gLogger) formatFields(fields Fields) string {

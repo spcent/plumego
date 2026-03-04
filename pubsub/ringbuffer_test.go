@@ -774,12 +774,9 @@ func TestPubSub_RingBuffer_HighThroughput(t *testing.T) {
 	defer sub.Cancel()
 
 	const n = 500
-	done := make(chan struct{})
-
 	// Consumer
 	var received atomic.Int64
 	go func() {
-		defer close(done)
 		for range sub.C() {
 			if received.Add(1) >= n {
 				return
@@ -792,16 +789,15 @@ func TestPubSub_RingBuffer_HighThroughput(t *testing.T) {
 		_ = ps.Publish("t", Message{ID: fmt.Sprintf("m%d", i)})
 	}
 
-	select {
-	case <-done:
-		// All messages received
-	case <-time.After(5 * time.Second):
-		// With drops, we may not receive all messages.
-		// Verify we received a reasonable number.
-		got := received.Load()
-		if got < int64(n)/2 {
-			t.Fatalf("received too few: %d/%d", got, n)
-		}
+	deadline := time.Now().Add(800 * time.Millisecond)
+	for received.Load() < int64(n)/2 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	// With drops, we may not receive all messages.
+	// Verify we received a reasonable number.
+	got := received.Load()
+	if got < int64(n)/2 {
+		t.Fatalf("received too few: %d/%d", got, n)
 	}
 }
 
@@ -942,7 +938,7 @@ func TestPubSub_RingBuffer_ConcurrentPublish(t *testing.T) {
 	select {
 	case <-done:
 		// All messages received
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		got := received.Load()
 		if got < int64(total)/2 {
 			t.Fatalf("received too few: %d/%d", got, total)

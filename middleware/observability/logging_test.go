@@ -157,6 +157,9 @@ func TestLoggingAddsStructuredFields(t *testing.T) {
 		if contract.TraceIDFromContext(r.Context()) == "" {
 			t.Fatalf("trace id should be present in context")
 		}
+		if log.TraceIDFromContext(r.Context()) == "" {
+			t.Fatalf("log trace id should be present in context")
+		}
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte("ok"))
 	})
@@ -223,6 +226,9 @@ func TestLoggingGeneratesTraceIDWhenMissing(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if contract.TraceIDFromContext(r.Context()) == "" {
 			t.Fatalf("generated trace id should be in context")
+		}
+		if log.TraceIDFromContext(r.Context()) == "" {
+			t.Fatalf("generated log trace id should be in context")
 		}
 		w.Write([]byte("generated"))
 	})

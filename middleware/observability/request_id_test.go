@@ -6,12 +6,16 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	log "github.com/spcent/plumego/log"
 )
 
 func TestRequestIDUsesHeader(t *testing.T) {
 	handler := RequestID()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := contract.TraceIDFromContext(r.Context()); got != "abc-123" {
 			t.Fatalf("expected trace id to be propagated, got %q", got)
+		}
+		if got := log.TraceIDFromContext(r.Context()); got != "abc-123" {
+			t.Fatalf("expected log trace id to be propagated, got %q", got)
 		}
 	}))
 
@@ -31,6 +35,9 @@ func TestRequestIDUsesFallbackHeader(t *testing.T) {
 		if got := contract.TraceIDFromContext(r.Context()); got != "trace-xyz" {
 			t.Fatalf("expected trace id to be propagated, got %q", got)
 		}
+		if got := log.TraceIDFromContext(r.Context()); got != "trace-xyz" {
+			t.Fatalf("expected log trace id to be propagated, got %q", got)
+		}
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -48,6 +55,9 @@ func TestRequestIDGeneratesWhenMissing(t *testing.T) {
 	handler := RequestID(WithRequestIDGenerator(func() string { return "gen-1" }))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := contract.TraceIDFromContext(r.Context()); got != "gen-1" {
 			t.Fatalf("expected generated trace id, got %q", got)
+		}
+		if got := log.TraceIDFromContext(r.Context()); got != "gen-1" {
+			t.Fatalf("expected generated log trace id, got %q", got)
 		}
 	}))
 

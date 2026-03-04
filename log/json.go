@@ -12,10 +12,11 @@ import (
 // JSONLogger implements StructuredLogger with JSON output format.
 // It's thread-safe and suitable for structured logging in production environments.
 type JSONLogger struct {
-	mu     sync.Mutex
-	output io.Writer
-	level  Level
-	fields Fields
+	mu               *sync.Mutex
+	output           io.Writer
+	level            Level
+	fields           Fields
+	respectVerbosity bool
 }
 
 // JSONLoggerConfig configures a JSONLogger instance.
@@ -26,6 +27,9 @@ type JSONLoggerConfig struct {
 	Level Level
 	// Default fields to include in every log entry
 	Fields Fields
+	// RespectVerbosity applies V(1) filtering to Debug/DebugCtx when enabled.
+	// Default false keeps backward-compatible behavior.
+	RespectVerbosity bool
 }
 
 // NewJSONLogger creates a new JSONLogger with the given configuration.
@@ -33,120 +37,109 @@ func NewJSONLogger(config JSONLoggerConfig) *JSONLogger {
 	if config.Output == nil {
 		config.Output = os.Stdout
 	}
-	if config.Fields == nil {
-		config.Fields = make(Fields)
-	}
 	return &JSONLogger{
-		output: config.Output,
-		level:  config.Level,
-		fields: config.Fields,
+		mu:               &sync.Mutex{},
+		output:           config.Output,
+		level:            config.Level,
+		fields:           cloneFields(config.Fields),
+		respectVerbosity: config.RespectVerbosity,
 	}
 }
 
 // WithFields returns a new logger with additional fields.
 func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
-	merged := make(Fields, len(l.fields)+len(fields))
-	for k, v := range l.fields {
-		merged[k] = v
-	}
-	for k, v := range fields {
-		merged[k] = v
+	mu := l.mu
+	if mu == nil {
+		mu = &sync.Mutex{}
 	}
 	return &JSONLogger{
-		output: l.output,
-		level:  l.level,
-		fields: merged,
+		mu:               mu,
+		output:           l.output,
+		level:            l.level,
+		fields:           mergeFields(l.fields, fields),
+		respectVerbosity: l.respectVerbosity,
 	}
 }
 
 // Debug logs a debug message with optional fields.
 func (l *JSONLogger) Debug(msg string, fields Fields) {
-	l.log(INFO, msg, fields, "") // Map DEBUG to INFO level with verbosity check
+	if l.respectVerbosity && !std.vAt(1, 3) {
+		return
+	}
+	// Keep backward compatibility with glog adapter where debug is emitted as INFO.
+	l.log(INFO, msg, fields, nil)
 }
 
 // Info logs an info message with optional fields.
 func (l *JSONLogger) Info(msg string, fields Fields) {
-	l.log(INFO, msg, fields, "")
+	l.log(INFO, msg, fields, nil)
 }
 
 // Warn logs a warning message with optional fields.
 func (l *JSONLogger) Warn(msg string, fields Fields) {
-	l.log(WARNING, msg, fields, "")
+	l.log(WARNING, msg, fields, nil)
 }
 
 // Error logs an error message with optional fields.
 func (l *JSONLogger) Error(msg string, fields Fields) {
-	l.log(ERROR, msg, fields, "")
+	l.log(ERROR, msg, fields, nil)
 }
 
 // DebugCtx logs a debug message with context and optional fields.
 func (l *JSONLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
-	l.logCtx(ctx, INFO, msg, fields)
+	if l.respectVerbosity && !std.vAt(1, 3) {
+		return
+	}
+	// Keep backward compatibility with glog adapter where debug is emitted as INFO.
+	l.log(INFO, msg, fields, ctx)
 }
 
 // InfoCtx logs an info message with context and optional fields.
 func (l *JSONLogger) InfoCtx(ctx context.Context, msg string, fields Fields) {
-	l.logCtx(ctx, INFO, msg, fields)
+	l.log(INFO, msg, fields, ctx)
 }
 
 // WarnCtx logs a warning message with context and optional fields.
 func (l *JSONLogger) WarnCtx(ctx context.Context, msg string, fields Fields) {
-	l.logCtx(ctx, WARNING, msg, fields)
+	l.log(WARNING, msg, fields, ctx)
 }
 
 // ErrorCtx logs an error message with context and optional fields.
 func (l *JSONLogger) ErrorCtx(ctx context.Context, msg string, fields Fields) {
-	l.logCtx(ctx, ERROR, msg, fields)
+	l.log(ERROR, msg, fields, ctx)
 }
 
-// log is the internal logging method without context.
-func (l *JSONLogger) log(level Level, msg string, fields Fields, traceID string) {
+func (l *JSONLogger) log(level Level, msg string, fields Fields, ctx context.Context) {
 	if level < l.level {
 		return
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	entry := l.buildEntry(level, msg, fields, traceID)
-	l.writeEntry(entry)
-}
-
-// logCtx is the internal logging method with context support.
-func (l *JSONLogger) logCtx(ctx context.Context, level Level, msg string, fields Fields) {
-	if level < l.level {
-		return
+	mu := l.mu
+	if mu == nil {
+		mu = &sync.Mutex{}
+		l.mu = mu
 	}
+	mu.Lock()
+	defer mu.Unlock()
 
-	// Extract trace ID from context
-	traceID := TraceIDFromContext(ctx)
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	entry := l.buildEntry(level, msg, fields, traceID)
+	entry := l.buildEntry(level, msg, fields, ctx)
 	l.writeEntry(entry)
 }
 
 // buildEntry constructs the log entry map.
-func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, traceID string) map[string]any {
+func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, ctx context.Context) map[string]any {
 	entry := make(map[string]any)
 	entry["time"] = time.Now().UTC().Format(time.RFC3339Nano)
 	entry["level"] = levelNames[level]
 	entry["msg"] = msg
 
 	// Add trace ID if present
-	if traceID != "" {
+	if traceID := TraceIDFromContext(ctx); traceID != "" {
 		entry["trace_id"] = traceID
 	}
 
-	// Add default fields
-	for k, v := range l.fields {
-		entry[k] = v
-	}
-
-	// Add message-specific fields (can override defaults)
-	for k, v := range fields {
+	combined := mergeFields(l.fields, fields)
+	for k, v := range combined {
 		entry[k] = v
 	}
 
@@ -171,6 +164,14 @@ func (l *JSONLogger) Start(ctx context.Context) error {
 
 // Stop implements the Lifecycle interface (flushes if output supports it).
 func (l *JSONLogger) Stop(ctx context.Context) error {
+	mu := l.mu
+	if mu == nil {
+		mu = &sync.Mutex{}
+		l.mu = mu
+	}
+	mu.Lock()
+	defer mu.Unlock()
+
 	if syncer, ok := l.output.(interface{ Sync() error }); ok {
 		return syncer.Sync()
 	}

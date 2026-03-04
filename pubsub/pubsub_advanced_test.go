@@ -47,24 +47,26 @@ func TestPubSub_Performance(t *testing.T) {
 	duration := time.Since(start)
 
 	// Verify all subscribers received messages
+	const minPerSubscriber = 100
 	for i, sub := range subs {
 		received := 0
-		// Give more time for all messages to be delivered
-		timeout := time.After(500 * time.Millisecond)
-		for {
+		deadline := time.Now().Add(200 * time.Millisecond)
+		for received < minPerSubscriber {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				break
+			}
 			select {
 			case <-sub.C():
 				received++
-			case <-timeout:
-				t.Logf("Subscriber %d received %d messages", i, received)
-				// With buffer size 100 and 10 subscribers, expect at least 100 messages
-				if received < 100 {
-					t.Errorf("Expected at least 100 messages, got %d", received)
-				}
-				goto done
+			case <-time.After(remaining):
 			}
 		}
-	done:
+		t.Logf("Subscriber %d received %d messages", i, received)
+		// With buffer size 100 and 10 subscribers, expect at least 100 messages.
+		if received < minPerSubscriber {
+			t.Errorf("Expected at least %d messages, got %d", minPerSubscriber, received)
+		}
 	}
 
 	t.Logf("Published %d messages to %d subscribers in %v (%.2f msg/s)",
