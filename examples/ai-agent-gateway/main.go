@@ -49,7 +49,7 @@ func main() {
 		// Wrap with instrumentation
 		instrumentedProvider := instrumentation.NewInstrumentedProvider(claudeProvider, collector)
 		providerMgr.Register(instrumentedProvider)
-		logger.Info("Registered Claude provider with instrumentation", nil)
+		logger.Info("Registered Claude provider with instrumentation")
 	}
 
 	// Create session manager
@@ -84,12 +84,12 @@ func main() {
 	// Note: We create an instrumented cache wrapper for metrics collection
 	// The raw cache is still used for direct stats queries
 	_ = instrumentation.NewInstrumentedMemoryCache(llmCache, collector)
-	logger.Info("Created LLM cache with instrumentation", nil)
+	logger.Info("Created LLM cache with instrumentation")
 
 	// Phase 2: Create orchestration engine (Phase 3: wrapped with instrumentation)
 	orchEngine := orchestration.NewEngine()
 	instrumentedEngine := instrumentation.NewInstrumentedEngine(orchEngine, collector)
-	logger.Info("Created orchestration engine with instrumentation", nil)
+	logger.Info("Created orchestration engine with instrumentation")
 
 	// Create application
 	app := core.New(

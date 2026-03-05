@@ -48,29 +48,29 @@ func (l *TestLogger) WithFields(fields Fields) StructuredLogger {
 	}
 }
 
-func (l *TestLogger) Debug(msg string, fields Fields) { l.capture(DEBUG, msg, fields) }
-func (l *TestLogger) Info(msg string, fields Fields)  { l.capture(INFO, msg, fields) }
-func (l *TestLogger) Warn(msg string, fields Fields)  { l.capture(WARNING, msg, fields) }
-func (l *TestLogger) Error(msg string, fields Fields) { l.capture(ERROR, msg, fields) }
-func (l *TestLogger) Fatal(msg string, fields Fields) {
-	l.capture(FATAL, msg, fields)
+func (l *TestLogger) Debug(msg string, fields ...Fields) { l.capture(DEBUG, msg, firstFields(fields)) }
+func (l *TestLogger) Info(msg string, fields ...Fields)  { l.capture(INFO, msg, firstFields(fields)) }
+func (l *TestLogger) Warn(msg string, fields ...Fields)  { l.capture(WARNING, msg, firstFields(fields)) }
+func (l *TestLogger) Error(msg string, fields ...Fields) { l.capture(ERROR, msg, firstFields(fields)) }
+func (l *TestLogger) Fatal(msg string, fields ...Fields) {
+	l.capture(FATAL, msg, firstFields(fields))
 	os.Exit(1)
 }
 
-func (l *TestLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
-	l.capture(DEBUG, msg, l.withTrace(ctx, fields))
+func (l *TestLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.capture(DEBUG, msg, l.withTrace(ctx, firstFields(fields)))
 }
-func (l *TestLogger) InfoCtx(ctx context.Context, msg string, fields Fields) {
-	l.capture(INFO, msg, l.withTrace(ctx, fields))
+func (l *TestLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.capture(INFO, msg, l.withTrace(ctx, firstFields(fields)))
 }
-func (l *TestLogger) WarnCtx(ctx context.Context, msg string, fields Fields) {
-	l.capture(WARNING, msg, l.withTrace(ctx, fields))
+func (l *TestLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.capture(WARNING, msg, l.withTrace(ctx, firstFields(fields)))
 }
-func (l *TestLogger) ErrorCtx(ctx context.Context, msg string, fields Fields) {
-	l.capture(ERROR, msg, l.withTrace(ctx, fields))
+func (l *TestLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.capture(ERROR, msg, l.withTrace(ctx, firstFields(fields)))
 }
-func (l *TestLogger) FatalCtx(ctx context.Context, msg string, fields Fields) {
-	l.capture(FATAL, msg, l.withTrace(ctx, fields))
+func (l *TestLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.capture(FATAL, msg, l.withTrace(ctx, firstFields(fields)))
 	os.Exit(1)
 }
 

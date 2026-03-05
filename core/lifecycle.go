@@ -166,7 +166,7 @@ func (a *App) startServer() error {
 		<-sig
 
 		health.SetNotReady("draining connections")
-		a.logger.Info("SIGTERM received, shutting down", nil)
+		a.logger.Info("SIGTERM received, shutting down")
 
 		a.mu.RLock()
 		shutdownTimeout := a.config.ShutdownTimeout
@@ -211,7 +211,7 @@ func (a *App) startServer() error {
 	var err error
 	if tlsEnabled {
 		if tlsCertFile == "" || tlsKeyFile == "" {
-			a.logger.Error("TLS enabled but certificate or key file not provided", nil)
+			a.logger.Error("TLS enabled but certificate or key file not provided")
 			return fmt.Errorf("TLS enabled but certificate or key file not provided")
 		}
 		a.logger.Info("HTTPS enabled", log.Fields{"cert": tlsCertFile})
@@ -227,7 +227,7 @@ func (a *App) startServer() error {
 
 	<-idleConnsClosed
 
-	a.logger.Info("Server stopped gracefully", nil)
+	a.logger.Info("Server stopped gracefully")
 	return err
 }
 
@@ -363,7 +363,7 @@ func (a *App) stopComponents(ctx context.Context) {
 				a.logger.WithFields(log.Fields{
 					"component_index": i,
 					"error":           err.Error(),
-				}).Error("failed to stop component", nil)
+				}).Error("failed to stop component")
 			}
 		}
 	})
@@ -383,7 +383,7 @@ func (a *App) stopRunners(ctx context.Context) {
 				a.logger.WithFields(log.Fields{
 					"runner_index": i,
 					"error":        err.Error(),
-				}).Error("failed to stop runner", nil)
+				}).Error("failed to stop runner")
 			}
 		}
 	})

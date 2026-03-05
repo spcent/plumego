@@ -286,7 +286,7 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 				fields["span_id"] = spanID
 			}
 
-			logger.WithFields(fields).Info("request completed", nil)
+			logger.WithFields(fields).Info("request completed")
 		})
 	}
 }

@@ -80,60 +80,60 @@ func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
 }
 
 // Debug logs a debug message with optional fields.
-func (l *JSONLogger) Debug(msg string, fields Fields) {
+func (l *JSONLogger) Debug(msg string, fields ...Fields) {
 	if l.respectVerbosity && !l.vAt(1) {
 		return
 	}
-	l.log(DEBUG, msg, fields, nil)
+	l.log(DEBUG, msg, firstFields(fields), nil)
 }
 
 // Info logs an info message with optional fields.
-func (l *JSONLogger) Info(msg string, fields Fields) {
-	l.log(INFO, msg, fields, nil)
+func (l *JSONLogger) Info(msg string, fields ...Fields) {
+	l.log(INFO, msg, firstFields(fields), nil)
 }
 
 // Warn logs a warning message with optional fields.
-func (l *JSONLogger) Warn(msg string, fields Fields) {
-	l.log(WARNING, msg, fields, nil)
+func (l *JSONLogger) Warn(msg string, fields ...Fields) {
+	l.log(WARNING, msg, firstFields(fields), nil)
 }
 
 // Error logs an error message with optional fields.
-func (l *JSONLogger) Error(msg string, fields Fields) {
-	l.log(ERROR, msg, fields, nil)
+func (l *JSONLogger) Error(msg string, fields ...Fields) {
+	l.log(ERROR, msg, firstFields(fields), nil)
 }
 
 // Fatal logs a fatal message then calls os.Exit(1).
-func (l *JSONLogger) Fatal(msg string, fields Fields) {
-	l.log(FATAL, msg, fields, nil)
+func (l *JSONLogger) Fatal(msg string, fields ...Fields) {
+	l.log(FATAL, msg, firstFields(fields), nil)
 	os.Exit(1)
 }
 
 // DebugCtx logs a debug message with context and optional fields.
-func (l *JSONLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
+func (l *JSONLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
 	if l.respectVerbosity && !l.vAt(1) {
 		return
 	}
-	l.log(DEBUG, msg, fields, ctx)
+	l.log(DEBUG, msg, firstFields(fields), ctx)
 }
 
 // InfoCtx logs an info message with context and optional fields.
-func (l *JSONLogger) InfoCtx(ctx context.Context, msg string, fields Fields) {
-	l.log(INFO, msg, fields, ctx)
+func (l *JSONLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.log(INFO, msg, firstFields(fields), ctx)
 }
 
 // WarnCtx logs a warning message with context and optional fields.
-func (l *JSONLogger) WarnCtx(ctx context.Context, msg string, fields Fields) {
-	l.log(WARNING, msg, fields, ctx)
+func (l *JSONLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.log(WARNING, msg, firstFields(fields), ctx)
 }
 
 // ErrorCtx logs an error message with context and optional fields.
-func (l *JSONLogger) ErrorCtx(ctx context.Context, msg string, fields Fields) {
-	l.log(ERROR, msg, fields, ctx)
+func (l *JSONLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.log(ERROR, msg, firstFields(fields), ctx)
 }
 
 // FatalCtx logs a fatal message with context then calls os.Exit(1).
-func (l *JSONLogger) FatalCtx(ctx context.Context, msg string, fields Fields) {
-	l.log(FATAL, msg, fields, ctx)
+func (l *JSONLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.log(FATAL, msg, firstFields(fields), ctx)
 	os.Exit(1)
 }
 

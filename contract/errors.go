@@ -172,7 +172,7 @@ func ErrorLogger(logger log.StructuredLogger, r *http.Request, err APIError) {
 		fields[k] = v
 	}
 
-	logger.WithFields(fields).Error(err.Message, nil)
+	logger.WithFields(fields).Error(err.Message)
 }
 
 // ErrorBuilder provides a fluent builder for creating APIError instances.

@@ -940,54 +940,61 @@ func (l *testLogger) WithFields(fields glog.Fields) glog.StructuredLogger {
 	return l
 }
 
-func (l *testLogger) Debug(msg string, fields glog.Fields) {
+func firstGlogField(fields []glog.Fields) glog.Fields {
+	if len(fields) > 0 {
+		return fields[0]
+	}
+	return nil
+}
+
+func (l *testLogger) Debug(msg string, fields ...glog.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.logs = append(l.logs, logEntry{level: "debug", msg: msg, fields: copyGlogFields(fields)})
+	l.logs = append(l.logs, logEntry{level: "debug", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) Info(msg string, fields glog.Fields) {
+func (l *testLogger) Info(msg string, fields ...glog.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.logs = append(l.logs, logEntry{level: "info", msg: msg, fields: copyGlogFields(fields)})
+	l.logs = append(l.logs, logEntry{level: "info", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) Warn(msg string, fields glog.Fields) {
+func (l *testLogger) Warn(msg string, fields ...glog.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.logs = append(l.logs, logEntry{level: "warn", msg: msg, fields: copyGlogFields(fields)})
+	l.logs = append(l.logs, logEntry{level: "warn", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) Error(msg string, fields glog.Fields) {
+func (l *testLogger) Error(msg string, fields ...glog.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.logs = append(l.logs, logEntry{level: "error", msg: msg, fields: copyGlogFields(fields)})
+	l.logs = append(l.logs, logEntry{level: "error", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) DebugCtx(ctx context.Context, msg string, fields glog.Fields) {
-	l.Debug(msg, fields)
+func (l *testLogger) DebugCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+	l.Debug(msg, firstGlogField(fields))
 }
 
-func (l *testLogger) InfoCtx(ctx context.Context, msg string, fields glog.Fields) {
-	l.Info(msg, fields)
+func (l *testLogger) InfoCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+	l.Info(msg, firstGlogField(fields))
 }
 
-func (l *testLogger) WarnCtx(ctx context.Context, msg string, fields glog.Fields) {
-	l.Warn(msg, fields)
+func (l *testLogger) WarnCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+	l.Warn(msg, firstGlogField(fields))
 }
 
-func (l *testLogger) ErrorCtx(ctx context.Context, msg string, fields glog.Fields) {
-	l.Error(msg, fields)
+func (l *testLogger) ErrorCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+	l.Error(msg, firstGlogField(fields))
 }
 
-func (l *testLogger) Fatal(msg string, fields glog.Fields) {
+func (l *testLogger) Fatal(msg string, fields ...glog.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.logs = append(l.logs, logEntry{level: "fatal", msg: msg, fields: copyGlogFields(fields)})
+	l.logs = append(l.logs, logEntry{level: "fatal", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) FatalCtx(ctx context.Context, msg string, fields glog.Fields) {
-	l.Fatal(msg, fields)
+func (l *testLogger) FatalCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+	l.Fatal(msg, firstGlogField(fields))
 }
 
 func copyGlogFields(fields glog.Fields) glog.Fields {

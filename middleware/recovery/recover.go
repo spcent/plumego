@@ -65,7 +65,7 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 					Message:  "internal server error",
 					Details:  map[string]any{"panic": rec},
 				})
-				logger.WithFields(log.Fields{"panic": rec, "trace_id": contract.TraceIDFromContext(r.Context())}).Error("panic recovered", nil)
+				logger.WithFields(log.Fields{"panic": rec, "trace_id": contract.TraceIDFromContext(r.Context())}).Error("panic recovered")
 			}
 		}()
 		next.ServeHTTP(w, r)
