@@ -531,7 +531,7 @@ func (m *Manager) Close() error {
 	m.mu.Unlock()
 
 	m.watchWg.Wait()
-	m.logger.Info("Config manager closed", nil)
+	m.logger.Info("Config manager closed")
 	return nil
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/spcent/plumego/ai/filter"
 	"github.com/spcent/plumego/ai/instrumentation"
 	"github.com/spcent/plumego/ai/llmcache"
-	"github.com/spcent/plumego/ai/logging"
 	"github.com/spcent/plumego/ai/metrics"
 	"github.com/spcent/plumego/ai/orchestration"
 	"github.com/spcent/plumego/ai/prompt"
@@ -22,6 +21,7 @@ import (
 	"github.com/spcent/plumego/ai/tokenizer"
 	"github.com/spcent/plumego/ai/tool"
 	"github.com/spcent/plumego/core"
+	glog "github.com/spcent/plumego/log"
 )
 
 func main() {
@@ -35,11 +35,12 @@ func main() {
 	collector := metrics.NewMemoryCollector()
 
 	// Phase 3: Create structured logger
-	logger := logging.NewConsoleLogger(
-		logging.WithLevel(logging.InfoLevel),
-		logging.WithFormat(logging.JSONFormat),
-	)
-	logger.Info("Starting AI Agent Gateway", logging.Fields("version", "phase-3")...)
+	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output:      os.Stdout,
+		ErrorOutput: os.Stderr,
+		Level:       glog.INFO,
+	})
+	logger.Info("Starting AI Agent Gateway", glog.Fields{"version": "phase-3"})
 
 	// Create providers (Phase 3: wrapped with instrumentation)
 	providerMgr := provider.NewManager()

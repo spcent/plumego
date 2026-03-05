@@ -30,20 +30,22 @@ func (l *recordingLogger) WithFields(fields log.Fields) log.StructuredLogger {
 	return l
 }
 
-func (l *recordingLogger) Debug(msg string, fields log.Fields) {}
-func (l *recordingLogger) Info(msg string, fields log.Fields)  {}
-func (l *recordingLogger) Warn(msg string, fields log.Fields)  {}
-func (l *recordingLogger) Error(msg string, fields log.Fields) {
+func (l *recordingLogger) Debug(msg string, fields ...log.Fields) {}
+func (l *recordingLogger) Info(msg string, fields ...log.Fields)  {}
+func (l *recordingLogger) Warn(msg string, fields ...log.Fields)  {}
+func (l *recordingLogger) Error(msg string, fields ...log.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.errCount++
 	l.lastMsg = msg
 }
 
-func (l *recordingLogger) DebugCtx(ctx context.Context, msg string, fields log.Fields) {}
-func (l *recordingLogger) InfoCtx(ctx context.Context, msg string, fields log.Fields)  {}
-func (l *recordingLogger) WarnCtx(ctx context.Context, msg string, fields log.Fields)  {}
-func (l *recordingLogger) ErrorCtx(ctx context.Context, msg string, fields log.Fields) {}
+func (l *recordingLogger) DebugCtx(ctx context.Context, msg string, fields ...log.Fields) {}
+func (l *recordingLogger) InfoCtx(ctx context.Context, msg string, fields ...log.Fields)  {}
+func (l *recordingLogger) WarnCtx(ctx context.Context, msg string, fields ...log.Fields)  {}
+func (l *recordingLogger) ErrorCtx(ctx context.Context, msg string, fields ...log.Fields) {}
+func (l *recordingLogger) Fatal(msg string, fields ...log.Fields)                          {}
+func (l *recordingLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {}
 
 func TestRecoveryMiddleware(t *testing.T) {
 	tests := []struct {

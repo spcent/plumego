@@ -34,47 +34,52 @@ func (m *mockStructuredLogger) WithFields(fields log.Fields) log.StructuredLogge
 	return newLogger
 }
 
-func (m *mockStructuredLogger) Debug(msg string, fields log.Fields) {
+func (m *mockStructuredLogger) Debug(msg string, fields ...log.Fields) {
 	// Not used in this test
 }
 
-func (m *mockStructuredLogger) Info(msg string, fields log.Fields) {
+func (m *mockStructuredLogger) Info(msg string, fields ...log.Fields) {
 	// Not used in this test
 }
 
-func (m *mockStructuredLogger) Warn(msg string, fields log.Fields) {
+func (m *mockStructuredLogger) Warn(msg string, fields ...log.Fields) {
 	// Not used in this test
 }
 
-func (m *mockStructuredLogger) Error(msg string, fields log.Fields) {
+func (m *mockStructuredLogger) Error(msg string, fields ...log.Fields) {
 	if m.onError != nil {
-		// Use the logger's fields (from WithFields) and merge with any additional fields
 		combinedFields := make(log.Fields)
 		for k, v := range m.fields {
 			combinedFields[k] = v
 		}
-		for k, v := range fields {
-			combinedFields[k] = v
+		if len(fields) > 0 {
+			for k, v := range fields[0] {
+				combinedFields[k] = v
+			}
 		}
 		m.onError(msg, combinedFields)
 	}
 }
 
-func (m *mockStructuredLogger) DebugCtx(ctx context.Context, msg string, fields log.Fields) {
+func (m *mockStructuredLogger) DebugCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	// Not used in this test
 }
 
-func (m *mockStructuredLogger) InfoCtx(ctx context.Context, msg string, fields log.Fields) {
+func (m *mockStructuredLogger) InfoCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	// Not used in this test
 }
 
-func (m *mockStructuredLogger) WarnCtx(ctx context.Context, msg string, fields log.Fields) {
+func (m *mockStructuredLogger) WarnCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	// Not used in this test
 }
 
-func (m *mockStructuredLogger) ErrorCtx(ctx context.Context, msg string, fields log.Fields) {
+func (m *mockStructuredLogger) ErrorCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	// Not used in this test
 }
+
+func (m *mockStructuredLogger) Fatal(msg string, fields ...log.Fields) {}
+
+func (m *mockStructuredLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {}
 
 func TestErrorBuilder(t *testing.T) {
 	builder := NewErrorBuilder()
@@ -446,10 +451,7 @@ func TestErrorLogging(t *testing.T) {
 
 	mockLogger := &mockStructuredLogger{
 		onError: func(msg string, fields log.Fields) {
-			loggedFields = make(map[string]any)
-			for k, v := range fields {
-				loggedFields[k] = v
-			}
+			loggedFields = fields
 			loggedMessage = msg
 		},
 	}

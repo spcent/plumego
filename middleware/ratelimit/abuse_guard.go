@@ -211,6 +211,6 @@ func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Deci
 		logger.WithFields(log.Fields{
 			"limit":     decision.Limit,
 			"remaining": decision.Remaining,
-		}).Warn("request rate limited", nil)
+		}).Warn("request rate limited")
 	}
 }

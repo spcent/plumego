@@ -12,9 +12,10 @@ import (
 // JSONLogger implements StructuredLogger with JSON output format.
 // It's thread-safe and suitable for structured logging in production environments.
 type JSONLogger struct {
-	mu               *sync.Mutex
-	writeErrOnce     *sync.Once
+	mu               sync.Mutex
+	writeErrOnce     sync.Once
 	output           io.Writer
+	errorOutput      io.Writer // optional; Error/Fatal go here when non-nil
 	level            Level
 	verbosity        int
 	fields           Fields
@@ -23,14 +24,18 @@ type JSONLogger struct {
 
 // JSONLoggerConfig configures a JSONLogger instance.
 type JSONLoggerConfig struct {
-	// Output destination (defaults to os.Stdout)
+	// Output is the destination for Debug/Info/Warn entries (defaults to os.Stdout).
 	Output io.Writer
-	// Minimum log level (defaults to INFO)
+	// ErrorOutput is an optional separate destination for Error and Fatal entries.
+	// When nil, Error/Fatal entries are written to Output.
+	// Set to os.Stderr to mirror the typical console-logger convention.
+	ErrorOutput io.Writer
+	// Level is the minimum log level (defaults to INFO).
 	Level Level
-	// Default fields to include in every log entry
+	// Fields contains default fields added to every log entry.
 	Fields Fields
 	// RespectVerbosity applies V(1) filtering to Debug/DebugCtx when enabled.
-	// Default false keeps backward-compatible behavior.
+	// Default false keeps backward-compatible behaviour.
 	RespectVerbosity bool
 	// Verbosity controls local debug gating when RespectVerbosity is true.
 	Verbosity int
@@ -42,9 +47,8 @@ func NewJSONLogger(config JSONLoggerConfig) *JSONLogger {
 		config.Output = os.Stdout
 	}
 	return &JSONLogger{
-		mu:               &sync.Mutex{},
-		writeErrOnce:     &sync.Once{},
 		output:           config.Output,
+		errorOutput:      config.ErrorOutput,
 		level:            config.Level,
 		verbosity:        config.Verbosity,
 		fields:           cloneFields(config.Fields),
@@ -52,67 +56,85 @@ func NewJSONLogger(config JSONLoggerConfig) *JSONLogger {
 	}
 }
 
-// WithFields returns a new logger with additional fields.
+// WithFields returns a new logger with additional fields merged in.
+// Each derived logger gets its own independent write-error tracker.
 func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
-	mu := l.mu
-	if mu == nil {
-		mu = &sync.Mutex{}
-	}
+	l.mu.Lock()
+	output := l.output
+	errorOutput := l.errorOutput
+	level := l.level
+	verbosity := l.verbosity
+	respectVerbosity := l.respectVerbosity
+	merged := mergeFields(l.fields, fields)
+	l.mu.Unlock()
+
 	return &JSONLogger{
-		mu:               mu,
-		writeErrOnce:     l.writeErrOnce,
-		output:           l.output,
-		level:            l.level,
-		verbosity:        l.verbosity,
-		fields:           mergeFields(l.fields, fields),
-		respectVerbosity: l.respectVerbosity,
+		output:           output,
+		errorOutput:      errorOutput,
+		level:            level,
+		verbosity:        verbosity,
+		fields:           merged,
+		respectVerbosity: respectVerbosity,
+		// writeErrOnce is zero-value (fresh) for every derived logger
 	}
 }
 
 // Debug logs a debug message with optional fields.
-func (l *JSONLogger) Debug(msg string, fields Fields) {
+func (l *JSONLogger) Debug(msg string, fields ...Fields) {
 	if l.respectVerbosity && !l.vAt(1) {
 		return
 	}
-	l.log(DEBUG, msg, fields, nil)
+	l.log(DEBUG, msg, firstFields(fields), nil)
 }
 
 // Info logs an info message with optional fields.
-func (l *JSONLogger) Info(msg string, fields Fields) {
-	l.log(INFO, msg, fields, nil)
+func (l *JSONLogger) Info(msg string, fields ...Fields) {
+	l.log(INFO, msg, firstFields(fields), nil)
 }
 
 // Warn logs a warning message with optional fields.
-func (l *JSONLogger) Warn(msg string, fields Fields) {
-	l.log(WARNING, msg, fields, nil)
+func (l *JSONLogger) Warn(msg string, fields ...Fields) {
+	l.log(WARNING, msg, firstFields(fields), nil)
 }
 
 // Error logs an error message with optional fields.
-func (l *JSONLogger) Error(msg string, fields Fields) {
-	l.log(ERROR, msg, fields, nil)
+func (l *JSONLogger) Error(msg string, fields ...Fields) {
+	l.log(ERROR, msg, firstFields(fields), nil)
+}
+
+// Fatal logs a fatal message then calls os.Exit(1).
+func (l *JSONLogger) Fatal(msg string, fields ...Fields) {
+	l.log(FATAL, msg, firstFields(fields), nil)
+	os.Exit(1)
 }
 
 // DebugCtx logs a debug message with context and optional fields.
-func (l *JSONLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
+func (l *JSONLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
 	if l.respectVerbosity && !l.vAt(1) {
 		return
 	}
-	l.log(DEBUG, msg, fields, ctx)
+	l.log(DEBUG, msg, firstFields(fields), ctx)
 }
 
 // InfoCtx logs an info message with context and optional fields.
-func (l *JSONLogger) InfoCtx(ctx context.Context, msg string, fields Fields) {
-	l.log(INFO, msg, fields, ctx)
+func (l *JSONLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.log(INFO, msg, firstFields(fields), ctx)
 }
 
 // WarnCtx logs a warning message with context and optional fields.
-func (l *JSONLogger) WarnCtx(ctx context.Context, msg string, fields Fields) {
-	l.log(WARNING, msg, fields, ctx)
+func (l *JSONLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.log(WARNING, msg, firstFields(fields), ctx)
 }
 
 // ErrorCtx logs an error message with context and optional fields.
-func (l *JSONLogger) ErrorCtx(ctx context.Context, msg string, fields Fields) {
-	l.log(ERROR, msg, fields, ctx)
+func (l *JSONLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.log(ERROR, msg, firstFields(fields), ctx)
+}
+
+// FatalCtx logs a fatal message with context then calls os.Exit(1).
+func (l *JSONLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.log(FATAL, msg, firstFields(fields), ctx)
+	os.Exit(1)
 }
 
 func (l *JSONLogger) log(level Level, msg string, fields Fields, ctx context.Context) {
@@ -120,16 +142,11 @@ func (l *JSONLogger) log(level Level, msg string, fields Fields, ctx context.Con
 		return
 	}
 
-	mu := l.mu
-	if mu == nil {
-		mu = &sync.Mutex{}
-		l.mu = mu
-	}
-	mu.Lock()
-	defer mu.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
 	entry := l.buildEntry(level, msg, fields, ctx)
-	l.writeEntry(entry)
+	l.writeEntry(level, entry)
 }
 
 // buildEntry constructs the log entry map.
@@ -151,20 +168,30 @@ func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, ctx cont
 	return entry
 }
 
-// writeEntry marshals and writes the log entry.
-func (l *JSONLogger) writeEntry(entry map[string]any) {
+// writeEntry marshals and writes the log entry to the appropriate output.
+func (l *JSONLogger) writeEntry(level Level, entry map[string]any) {
+	w := l.writerFor(level)
+
 	data, err := json.Marshal(entry)
 	if err != nil {
-		// Fallback to simple error message if marshaling fails
 		data = []byte(`{"level":"ERROR","msg":"failed to marshal log entry"}`)
 	}
-	if err := writeFull(l.output, data); err != nil {
+	if err := writeFull(w, data); err != nil {
 		l.reportWriteError(err)
 		return
 	}
-	if err := writeFull(l.output, []byte("\n")); err != nil {
+	if err := writeFull(w, []byte("\n")); err != nil {
 		l.reportWriteError(err)
 	}
+}
+
+// writerFor returns the appropriate writer for the given level.
+// Error and Fatal go to errorOutput when configured; everything else uses output.
+func (l *JSONLogger) writerFor(level Level) io.Writer {
+	if l.errorOutput != nil && (level == ERROR || level == FATAL) {
+		return l.errorOutput
+	}
+	return l.output
 }
 
 // Start implements the Lifecycle interface (no-op for JSONLogger).
@@ -174,13 +201,8 @@ func (l *JSONLogger) Start(ctx context.Context) error {
 
 // Stop implements the Lifecycle interface (flushes if output supports it).
 func (l *JSONLogger) Stop(ctx context.Context) error {
-	mu := l.mu
-	if mu == nil {
-		mu = &sync.Mutex{}
-		l.mu = mu
-	}
-	mu.Lock()
-	defer mu.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
 	if syncer, ok := l.output.(interface{ Sync() error }); ok {
 		return syncer.Sync()
@@ -193,12 +215,7 @@ func (l *JSONLogger) vAt(level int) bool {
 }
 
 func (l *JSONLogger) reportWriteError(err error) {
-	once := l.writeErrOnce
-	if once == nil {
-		once = &sync.Once{}
-		l.writeErrOnce = once
-	}
-	once.Do(func() {
+	l.writeErrOnce.Do(func() {
 		_, _ = os.Stderr.WriteString("json logger: failed to write log output: " + err.Error() + "\n")
 	})
 }

@@ -805,9 +805,9 @@ func (l *testLifecycleLogger) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (l *testLifecycleLogger) Info(msg string, fields log.Fields)  {}
-func (l *testLifecycleLogger) Error(msg string, fields log.Fields) {}
-func (l *testLifecycleLogger) Debug(msg string, fields log.Fields) {}
+func (l *testLifecycleLogger) Info(msg string, fields ...log.Fields)  {}
+func (l *testLifecycleLogger) Error(msg string, fields ...log.Fields) {}
+func (l *testLifecycleLogger) Debug(msg string, fields ...log.Fields) {}
 
 func TestAppBootWithLoggerLifecycle(t *testing.T) {
 	addr := requireNetwork(t)

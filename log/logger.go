@@ -12,21 +12,29 @@ type Fields map[string]any
 
 // StructuredLogger defines the minimal logging interface used by the application.
 //
-// Implementations can wrap zap/logrus/zerolog/slog or any other logger.
-// The logger should treat a nil Fields map the same as an empty one.
+// All logging methods accept an optional Fields argument. Callers may omit
+// it entirely when there are no extra fields to attach:
+//
+//	logger.Info("server started")
+//	logger.Info("server started", glog.Fields{"addr": ":8080"})
+//
+// Implementations must treat a nil or absent Fields the same as an empty one.
 type StructuredLogger interface {
 	WithFields(fields Fields) StructuredLogger
 
-	Debug(msg string, fields Fields)
-	Info(msg string, fields Fields)
-	Warn(msg string, fields Fields)
-	Error(msg string, fields Fields)
+	Debug(msg string, fields ...Fields)
+	Info(msg string, fields ...Fields)
+	Warn(msg string, fields ...Fields)
+	Error(msg string, fields ...Fields)
+	// Fatal logs a message at FATAL level then calls os.Exit(1).
+	Fatal(msg string, fields ...Fields)
 
-	// Context-aware logging methods that can extract trace IDs and other context values
-	DebugCtx(ctx context.Context, msg string, fields Fields)
-	InfoCtx(ctx context.Context, msg string, fields Fields)
-	WarnCtx(ctx context.Context, msg string, fields Fields)
-	ErrorCtx(ctx context.Context, msg string, fields Fields)
+	// Context-aware variants extract trace IDs and other values from ctx.
+	DebugCtx(ctx context.Context, msg string, fields ...Fields)
+	InfoCtx(ctx context.Context, msg string, fields ...Fields)
+	WarnCtx(ctx context.Context, msg string, fields ...Fields)
+	ErrorCtx(ctx context.Context, msg string, fields ...Fields)
+	FatalCtx(ctx context.Context, msg string, fields ...Fields)
 }
 
 // Lifecycle allows a logger to participate in application start/stop hooks
@@ -34,6 +42,14 @@ type StructuredLogger interface {
 type Lifecycle interface {
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
+}
+
+// firstFields returns the first Fields argument if present, otherwise nil.
+func firstFields(extra []Fields) Fields {
+	if len(extra) > 0 {
+		return extra[0]
+	}
+	return nil
 }
 
 // gLogger adapts the existing glog implementation to the StructuredLogger interface.
@@ -64,46 +80,50 @@ func (l *gLogger) WithFields(fields Fields) StructuredLogger {
 	return &gLogger{fields: mergeFields(l.fields, fields)}
 }
 
-func (l *gLogger) Debug(msg string, fields Fields) {
+func (l *gLogger) Debug(msg string, fields ...Fields) {
 	if !std.vAt(1, 3) {
 		return
 	}
-	l.logWithLevel(DEBUG, msg, fields, nil)
+	l.logWithLevel(DEBUG, msg, firstFields(fields), nil)
 }
 
-func (l *gLogger) Info(msg string, fields Fields) {
-	l.logWithLevel(INFO, msg, fields, nil)
+func (l *gLogger) Info(msg string, fields ...Fields) {
+	l.logWithLevel(INFO, msg, firstFields(fields), nil)
 }
 
-func (l *gLogger) Warn(msg string, fields Fields) {
-	l.logWithLevel(WARNING, msg, fields, nil)
+func (l *gLogger) Warn(msg string, fields ...Fields) {
+	l.logWithLevel(WARNING, msg, firstFields(fields), nil)
 }
 
-func (l *gLogger) Error(msg string, fields Fields) {
-	l.logWithLevel(ERROR, msg, fields, nil)
+func (l *gLogger) Error(msg string, fields ...Fields) {
+	l.logWithLevel(ERROR, msg, firstFields(fields), nil)
 }
 
-// DebugCtx logs a debug message with context support.
-func (l *gLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
+func (l *gLogger) Fatal(msg string, fields ...Fields) {
+	l.logWithLevel(FATAL, msg, firstFields(fields), nil)
+}
+
+func (l *gLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
 	if !std.vAt(1, 3) {
 		return
 	}
-	l.logWithLevel(DEBUG, msg, fields, ctx)
+	l.logWithLevel(DEBUG, msg, firstFields(fields), ctx)
 }
 
-// InfoCtx logs an info message with context support.
-func (l *gLogger) InfoCtx(ctx context.Context, msg string, fields Fields) {
-	l.logWithLevel(INFO, msg, fields, ctx)
+func (l *gLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.logWithLevel(INFO, msg, firstFields(fields), ctx)
 }
 
-// WarnCtx logs a warning message with context support.
-func (l *gLogger) WarnCtx(ctx context.Context, msg string, fields Fields) {
-	l.logWithLevel(WARNING, msg, fields, ctx)
+func (l *gLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.logWithLevel(WARNING, msg, firstFields(fields), ctx)
 }
 
-// ErrorCtx logs an error message with context support.
-func (l *gLogger) ErrorCtx(ctx context.Context, msg string, fields Fields) {
-	l.logWithLevel(ERROR, msg, fields, ctx)
+func (l *gLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.logWithLevel(ERROR, msg, firstFields(fields), ctx)
+}
+
+func (l *gLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.logWithLevel(FATAL, msg, firstFields(fields), ctx)
 }
 
 func (l *gLogger) logWithLevel(level Level, msg string, fields Fields, ctx context.Context) {
@@ -117,12 +137,17 @@ func (l *gLogger) logWithLevel(level Level, msg string, fields Fields, ctx conte
 	}
 
 	switch level {
+	case DEBUG:
+		// calldepth=3: logWithLevel → Debug/DebugCtx → caller
+		std.log(DEBUG, 3, msg)
 	case INFO:
 		Info(msg)
 	case WARNING:
 		Warning(msg)
 	case ERROR:
 		Error(msg)
+	case FATAL:
+		Fatal(msg)
 	}
 }
 

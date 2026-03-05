@@ -45,22 +45,36 @@ func (l *stubLogger) WithFields(fields log.Fields) log.StructuredLogger {
 	return &stubLogger{baseFields: merged, entries: l.entries, mu: l.mu}
 }
 
-func (l *stubLogger) Debug(msg string, fields log.Fields) { l.record(msg, fields) }
-func (l *stubLogger) Info(msg string, fields log.Fields)  { l.record(msg, fields) }
-func (l *stubLogger) Warn(msg string, fields log.Fields)  { l.record(msg, fields) }
-func (l *stubLogger) Error(msg string, fields log.Fields) { l.record(msg, fields) }
+func (l *stubLogger) Debug(msg string, fields ...log.Fields) { l.record(msg, first(fields)) }
+func (l *stubLogger) Info(msg string, fields ...log.Fields)  { l.record(msg, first(fields)) }
+func (l *stubLogger) Warn(msg string, fields ...log.Fields)  { l.record(msg, first(fields)) }
+func (l *stubLogger) Error(msg string, fields ...log.Fields) { l.record(msg, first(fields)) }
 
-func (l *stubLogger) DebugCtx(ctx context.Context, msg string, fields log.Fields) {
-	l.record(msg, fields)
+func (l *stubLogger) DebugCtx(ctx context.Context, msg string, fields ...log.Fields) {
+	l.record(msg, first(fields))
 }
-func (l *stubLogger) InfoCtx(ctx context.Context, msg string, fields log.Fields) {
-	l.record(msg, fields)
+func (l *stubLogger) InfoCtx(ctx context.Context, msg string, fields ...log.Fields) {
+	l.record(msg, first(fields))
 }
-func (l *stubLogger) WarnCtx(ctx context.Context, msg string, fields log.Fields) {
-	l.record(msg, fields)
+func (l *stubLogger) WarnCtx(ctx context.Context, msg string, fields ...log.Fields) {
+	l.record(msg, first(fields))
 }
-func (l *stubLogger) ErrorCtx(ctx context.Context, msg string, fields log.Fields) {
-	l.record(msg, fields)
+func (l *stubLogger) ErrorCtx(ctx context.Context, msg string, fields ...log.Fields) {
+	l.record(msg, first(fields))
+}
+
+func (l *stubLogger) Fatal(msg string, fields ...log.Fields) { l.record(msg, first(fields)) }
+
+func (l *stubLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {
+	l.record(msg, first(fields))
+}
+
+// first returns the first Fields from a variadic slice, or nil.
+func first(fields []log.Fields) log.Fields {
+	if len(fields) > 0 {
+		return fields[0]
+	}
+	return nil
 }
 
 func (l *stubLogger) record(msg string, fields log.Fields) {

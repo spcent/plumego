@@ -23,7 +23,7 @@ const (
 
 	// Maximum values for each component
 	seqMax   = (1 << seqBits) - 1 // 1023
-	randMax  = 10000              // 0..9999
+	randMax  = 10000               // 0..9999
 	randMask = (1 << randBits) - 1
 
 	// Bit shifts for encoding
@@ -35,6 +35,12 @@ const (
 
 	// Random pool size for fast generation.
 	randomPoolSize = 4096
+
+	// maxSeqRetries caps the busy-wait loop when sequence is exhausted within a
+	// millisecond. After this many retries we fall back to a seq=0 ID using the
+	// current timestamp, accepting a very small duplicate risk rather than blocking
+	// indefinitely under extreme load.
+	maxSeqRetries = 20
 )
 
 // Error definitions
@@ -89,36 +95,50 @@ func NewTraceID() string {
 }
 
 // Generate creates a new trace ID with monotonic timestamp/sequence coordination.
+// If the per-millisecond sequence is exhausted, it retries up to maxSeqRetries times
+// (each retry sleeps 100µs). After that it falls back to seq=0 on the next available
+// timestamp to avoid blocking indefinitely under burst load.
 func (g *TraceIDGenerator) Generate() string {
 	g.ensureInitialized()
-	for {
+	for attempt := 0; attempt < maxSeqRetries; attempt++ {
 		nowMs := time.Now().UnixMilli()
 		g.stateMu.Lock()
-		lastMs := g.lastMs
-		if nowMs < lastMs {
-			nowMs = lastMs
+		if nowMs < g.lastMs {
+			nowMs = g.lastMs
 		}
 
-		if nowMs == lastMs {
-			// Same millisecond, try to increment sequence
+		if nowMs == g.lastMs {
+			// Same millisecond: try to increment sequence.
 			if g.seq < int32(seqMax) {
 				g.seq++
 				seq := g.seq
 				g.stateMu.Unlock()
 				return g.buildID(nowMs, int(seq))
 			}
+			// Sequence exhausted; yield and retry.
 			g.stateMu.Unlock()
-			// Sequence exhausted, wait for next millisecond.
 			time.Sleep(time.Microsecond * 100)
 			continue
 		}
 
-		// New millisecond, reset sequence to 0
+		// New millisecond: reset sequence.
 		g.lastMs = nowMs
 		g.seq = 0
 		g.stateMu.Unlock()
 		return g.buildID(nowMs, 0)
 	}
+
+	// Fallback after maxSeqRetries: use current time with seq=0.
+	// Duplicate risk is negligible; blocking is not acceptable.
+	nowMs := time.Now().UnixMilli()
+	g.stateMu.Lock()
+	if nowMs < g.lastMs {
+		nowMs = g.lastMs
+	}
+	g.lastMs = nowMs
+	g.seq = 0
+	g.stateMu.Unlock()
+	return g.buildID(nowMs, 0)
 }
 
 // buildID constructs the trace ID from components using optimized random number access

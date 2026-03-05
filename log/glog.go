@@ -706,6 +706,27 @@ func V(level int) bool {
 	return std.vAt(level, 3)
 }
 
+func Debug(args ...any) {
+	if !std.vAt(1, 2) {
+		return
+	}
+	std.log(DEBUG, 2, args...)
+}
+
+func Debugf(format string, args ...any) {
+	if !std.vAt(1, 2) {
+		return
+	}
+	std.logf(DEBUG, 2, format, args...)
+}
+
+func Debugln(args ...any) {
+	if !std.vAt(1, 2) {
+		return
+	}
+	std.log(DEBUG, 2, fmt.Sprintln(args...))
+}
+
 func Info(args ...any) {
 	std.log(INFO, 2, args...)
 }

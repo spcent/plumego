@@ -291,7 +291,7 @@ func (rl *RateLimiter) rejectRequest(w http.ResponseWriter, r *http.Request, cod
 			"code":               code,
 			"current_concurrent": int64(len(rl.sem)),
 			"current_queue":      int64(len(rl.queue)),
-		}).Warn("request rejected due to concurrency limit", nil)
+		}).Warn("request rejected due to concurrency limit")
 	}
 }
 
@@ -446,7 +446,7 @@ func (rl *RateLimiter) logAdjustment(direction string, oldVal, newVal int64) {
 			"direction": direction,
 			"old_value": oldVal,
 			"new_value": newVal,
-		}).Info("concurrency limit adjusted", nil)
+		}).Info("concurrency limit adjusted")
 	}
 }
 

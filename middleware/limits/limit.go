@@ -108,7 +108,7 @@ func (l *limitedBodyReader) fail() (int, error) {
 			},
 		})
 		if l.logger != nil {
-			l.logger.WithFields(log.Fields{"max_bytes": l.maxBytes, "seen_bytes": l.used}).Warn("request body too large", nil)
+			l.logger.WithFields(log.Fields{"max_bytes": l.maxBytes, "seen_bytes": l.used}).Warn("request body too large")
 		}
 	}
 

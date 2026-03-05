@@ -60,7 +60,7 @@ func (eh *ErrorHandler) HandlePanic(r any) error {
 			"panic":     r,
 			"stack":     string(debug.Stack()),
 			"operation": "panic_recovery",
-		}).Error("Recovered from panic", nil)
+		}).Error("Recovered from panic")
 	}
 
 	return err
@@ -156,7 +156,7 @@ func (eh *ErrorHandler) logError(r *http.Request, err error) {
 		}
 	}
 
-	eh.logger.WithFields(fields).Error(FormatError(err), nil)
+	eh.logger.WithFields(fields).Error(FormatError(err))
 }
 
 // WithTrace adds trace context to an error
