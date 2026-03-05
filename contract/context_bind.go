@@ -25,7 +25,8 @@ func (c *Ctx) BindJSON(dst any) error {
 	data, err := c.bodyBytes()
 	if err != nil {
 		if errors.Is(err, ErrRequestBodyTooLarge) {
-			return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
+			// err IS ErrRequestBodyTooLarge (set directly by bodyBytes); pass through.
+			return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: err}
 		}
 		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
@@ -39,7 +40,8 @@ func (c *Ctx) BindJSON(dst any) error {
 	// decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(dst); err != nil {
-		return &BindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: ErrInvalidJSON}
+		// Preserve the specific JSON parse error while keeping errors.Is(err, ErrInvalidJSON) true.
+		return &BindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: joinSentinel(ErrInvalidJSON, err)}
 	}
 
 	// Ensure no trailing data
@@ -74,7 +76,7 @@ func (c *Ctx) BindJSONWithOptions(dst any, opts BindOptions) error {
 	}
 
 	if err := decoder.Decode(dst); err != nil {
-		return &BindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: err}
+		return &BindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: joinSentinel(ErrInvalidJSON, err)}
 	}
 
 	if decoder.Decode(&struct{}{}) != io.EOF {
@@ -82,6 +84,16 @@ func (c *Ctx) BindJSONWithOptions(dst any, opts BindOptions) error {
 	}
 
 	return nil
+}
+
+// joinSentinel wraps sentinel and cause together so that errors.Is(e, sentinel)
+// is true while the original cause is still reachable for logging and diagnosis.
+// If cause is nil or identical to sentinel, sentinel is returned directly.
+func joinSentinel(sentinel, cause error) error {
+	if cause == nil || cause == sentinel {
+		return sentinel
+	}
+	return fmt.Errorf("%w: %w", sentinel, cause)
 }
 
 // BindAndValidateJSON binds the request body to dst and validates it using struct tags.

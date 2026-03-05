@@ -149,13 +149,14 @@ func TestBindJSONBodyCacheToggle(t *testing.T) {
 
 func TestBindJSONErrors(t *testing.T) {
 	tests := []struct {
-		name    string
-		body    string
-		wantMsg string
+		name        string
+		body        string
+		wantMsg     string
+		wantSentinel error
 	}{
-		{name: "empty", body: "", wantMsg: "request body is empty"},
-		{name: "invalid", body: "{", wantMsg: "invalid JSON payload"},
-		{name: "extra", body: `{"name":"demo"} {}`, wantMsg: "unexpected extra data in request body"},
+		{name: "empty", body: "", wantMsg: "request body is empty", wantSentinel: ErrEmptyRequestBody},
+		{name: "invalid", body: "{", wantMsg: "invalid JSON payload", wantSentinel: ErrInvalidJSON},
+		{name: "extra", body: `{"name":"demo"} {}`, wantMsg: "unexpected extra data in request body", wantSentinel: ErrUnexpectedExtraData},
 	}
 
 	for _, tt := range tests {
@@ -174,6 +175,12 @@ func TestBindJSONErrors(t *testing.T) {
 
 			if bindErr.Message != tt.wantMsg {
 				t.Fatalf("unexpected message: %s", bindErr.Message)
+			}
+
+			// Verify errors.Is works for the sentinel so callers can pattern-match
+			// without string comparisons.
+			if !errors.Is(err, tt.wantSentinel) {
+				t.Fatalf("errors.Is(%v) returned false; want true", tt.wantSentinel)
 			}
 		})
 	}
