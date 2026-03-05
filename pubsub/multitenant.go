@@ -12,10 +12,10 @@ import (
 
 // Quota errors
 var (
-	ErrQuotaExceeded      = errors.New("quota exceeded")
-	ErrTenantNotFound     = errors.New("tenant not found")
+	ErrQuotaExceeded       = errors.New("quota exceeded")
+	ErrTenantNotFound      = errors.New("tenant not found")
 	ErrTenantAlreadyExists = errors.New("tenant already exists")
-	ErrInvalidTenant      = errors.New("invalid tenant ID")
+	ErrInvalidTenant       = errors.New("invalid tenant ID")
 )
 
 // TenantQuota defines resource limits for a tenant
@@ -42,7 +42,7 @@ func DefaultTenantQuota() TenantQuota {
 		MaxPublishRate:   1000,
 		MaxSubscriptions: 100,
 		MaxTopics:        1000,
-		MaxMessageSize:   1024 * 1024, // 1 MB
+		MaxMessageSize:   1024 * 1024,      // 1 MB
 		MaxBandwidth:     10 * 1024 * 1024, // 10 MB/s
 	}
 }
@@ -60,15 +60,15 @@ func UnlimitedQuota() TenantQuota {
 
 // TenantUsage tracks current resource usage
 type TenantUsage struct {
-	PublishCount     atomic.Uint64
-	PublishRate      atomic.Uint64 // Per second
-	ActiveSubs       atomic.Int64
-	TopicsUsed       atomic.Int64
-	BytesPublished   atomic.Uint64
-	BytesPerSecond   atomic.Uint64
-	QuotaViolations  atomic.Uint64
-	LastPublish      time.Time
-	LastPublishMu    sync.RWMutex
+	PublishCount    atomic.Uint64
+	PublishRate     atomic.Uint64 // Per second
+	ActiveSubs      atomic.Int64
+	TopicsUsed      atomic.Int64
+	BytesPublished  atomic.Uint64
+	BytesPerSecond  atomic.Uint64
+	QuotaViolations atomic.Uint64
+	LastPublish     time.Time
+	LastPublishMu   sync.RWMutex
 }
 
 // TenantConfig holds tenant configuration

@@ -163,7 +163,6 @@ func TestServeWSWithAuth_BadRoomPassword(t *testing.T) {
 	}
 }
 
-
 func TestStreamReaderRead(t *testing.T) {
 	sr := &streamReader{
 		parent: &Conn{},

@@ -103,8 +103,8 @@ func (eq *evictionQueue) Pop() any {
 //   - eq: max-heap (lowest-priority item at root) for O(log n) eviction
 type PriorityBuffer struct {
 	mu       sync.Mutex
-	pq       priorityQueue  // min-heap: highest priority at root
-	eq       evictionQueue  // max-heap: lowest priority at root
+	pq       priorityQueue // min-heap: highest priority at root
+	eq       evictionQueue // max-heap: lowest priority at root
 	capacity int
 	sequence uint64
 	notify   chan struct{}
@@ -154,8 +154,8 @@ func (pb *PriorityBuffer) Push(msg Message, priority int) (*Message, bool) {
 			// New item is at least as good as the worst: evict the worst.
 			droppedMsg := worst.Message
 			dropped = &droppedMsg
-			heap.Remove(&pb.eq, 0)              // O(log n)
-			heap.Remove(&pb.pq, worst.index)    // O(log n)
+			heap.Remove(&pb.eq, 0)           // O(log n)
+			heap.Remove(&pb.pq, worst.index) // O(log n)
 		} else {
 			// New item is worse than everything in the buffer: drop it.
 			return &msg, true

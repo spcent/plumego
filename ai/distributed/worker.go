@@ -155,9 +155,9 @@ func (w *Worker) runHeartbeat(ctx context.Context) {
 
 // StepExecutor executes workflow steps.
 type StepExecutor struct {
-	engine    *orchestration.Engine
+	engine       *orchestration.Engine
 	stepRegistry map[string]orchestration.Step
-	mu        sync.RWMutex
+	mu           sync.RWMutex
 }
 
 // NewStepExecutor creates a new step executor.
@@ -208,27 +208,27 @@ func (e *StepExecutor) ExecuteTask(ctx context.Context, task *WorkflowTask) (*or
 
 // WorkerPool manages multiple workers.
 type WorkerPool struct {
-	workers    []*Worker
-	queue      TaskQueue
-	executor   *StepExecutor
-	config     PoolConfig
-	running    atomic.Bool
-	mu         sync.RWMutex
+	workers  []*Worker
+	queue    TaskQueue
+	executor *StepExecutor
+	config   PoolConfig
+	running  atomic.Bool
+	mu       sync.RWMutex
 }
 
 // PoolConfig configures a worker pool.
 type PoolConfig struct {
-	WorkerCount  int
-	Concurrency  int
-	QueueTopic   string
+	WorkerCount int
+	Concurrency int
+	QueueTopic  string
 }
 
 // DefaultPoolConfig returns default pool configuration.
 func DefaultPoolConfig() PoolConfig {
 	return PoolConfig{
-		WorkerCount:  4,
-		Concurrency:  4,
-		QueueTopic:   "distributed:tasks",
+		WorkerCount: 4,
+		Concurrency: 4,
+		QueueTopic:  "distributed:tasks",
 	}
 }
 

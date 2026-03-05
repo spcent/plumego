@@ -47,7 +47,7 @@ func TestEngine_Register_InvalidSyntax(t *testing.T) {
 
 	tmpl := &Template{
 		Name:    "invalid-template",
-		Content: "Hello {{.Name}",  // Missing closing brace
+		Content: "Hello {{.Name}", // Missing closing brace
 	}
 
 	err := engine.Register(context.Background(), tmpl)

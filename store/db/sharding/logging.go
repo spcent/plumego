@@ -56,13 +56,13 @@ func (lr *LoggingRouter) LogQuery(ctx context.Context, query string, shardIndex 
 		fields["error"] = err.Error()
 		lr.logger.ErrorCtx(ctx, "query failed", fields)
 	} else {
-		lr.logger.DebugCtx(ctx, "query executed", fields)
+		lr.logger.InfoCtx(ctx, "query executed", fields)
 	}
 }
 
 // LogShardResolution logs shard resolution with context.
 func (lr *LoggingRouter) LogShardResolution(ctx context.Context, tableName string, shardKey any, shardIndex int) {
-	lr.logger.DebugCtx(ctx, "shard resolved", glog.Fields{
+	lr.logger.InfoCtx(ctx, "shard resolved", glog.Fields{
 		"table":       tableName,
 		"shard_key":   fmt.Sprintf("%v", shardKey),
 		"shard_index": shardIndex,
@@ -80,7 +80,7 @@ func (lr *LoggingRouter) LogCrossShardQuery(ctx context.Context, query string, p
 
 // LogRewrite logs SQL rewriting with context.
 func (lr *LoggingRouter) LogRewrite(ctx context.Context, original string, rewritten string, cached bool) {
-	lr.logger.DebugCtx(ctx, "SQL rewritten", glog.Fields{
+	lr.logger.InfoCtx(ctx, "SQL rewritten", glog.Fields{
 		"original":  original,
 		"rewritten": rewritten,
 		"cached":    cached,

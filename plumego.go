@@ -170,13 +170,13 @@ var (
 	TenantIDFromContext            = tenant.TenantIDFromContext
 	ContextWithTenantID            = tenant.ContextWithTenantID
 	RequestWithTenantID            = tenant.RequestWithTenantID
-	ValidateTenantID              = tenant.ValidateTenantID
-	TenantFromHeader              = tenant.FromHeader
-	TenantFromQuery               = tenant.FromQuery
-	TenantFromCookie              = tenant.FromCookie
-	TenantFromSubdomain           = tenant.FromSubdomain
-	TenantFromContextValue        = tenant.FromContextValue
-	TenantChain                   = tenant.Chain
+	ValidateTenantID               = tenant.ValidateTenantID
+	TenantFromHeader               = tenant.FromHeader
+	TenantFromQuery                = tenant.FromQuery
+	TenantFromCookie               = tenant.FromCookie
+	TenantFromSubdomain            = tenant.FromSubdomain
+	TenantFromContextValue         = tenant.FromContextValue
+	TenantChain                    = tenant.Chain
 )
 
 // Tenant database configuration options.

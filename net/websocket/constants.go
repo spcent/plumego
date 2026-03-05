@@ -25,7 +25,7 @@ const (
 const (
 	guid               = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 	opcodeContinuation = byte(0x0)
-	opcodeText         = OpcodeText  // alias — no duplicate value
+	opcodeText         = OpcodeText   // alias — no duplicate value
 	opcodeBinary       = OpcodeBinary // alias — no duplicate value
 	opcodeClose        = byte(0x8)
 	opcodePing         = byte(0x9)

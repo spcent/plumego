@@ -37,8 +37,8 @@ type RateLimiter interface {
 // a steady average rate. Tokens are added to the bucket at a constant rate,
 // and each request consumes one token.
 type TokenBucketLimiter struct {
-	capacity   int           // Maximum tokens in bucket
-	refillRate float64       // Tokens per second
+	capacity   int     // Maximum tokens in bucket
+	refillRate float64 // Tokens per second
 	buckets    map[string]*bucket
 	mu         sync.RWMutex
 }

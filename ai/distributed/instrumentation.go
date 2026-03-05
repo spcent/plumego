@@ -40,9 +40,9 @@ func (ie *InstrumentedDistributedEngine) ExecuteAsync(
 
 	if ie.collector != nil {
 		tags := map[string]string{
-			"workflow_id":  workflowID,
-			"distributed":  boolToString(options.Distributed),
-			"operation":    "execute_async",
+			"workflow_id": workflowID,
+			"distributed": boolToString(options.Distributed),
+			"operation":   "execute_async",
 		}
 
 		if err != nil {

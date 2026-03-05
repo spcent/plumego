@@ -18,13 +18,32 @@ import (
 type Level int
 
 const (
+	DEBUG Level = -1
+)
+
+const (
 	INFO Level = iota
 	WARNING
 	ERROR
 	FATAL
 )
 
-var levelNames = []string{"INFO", "WARN", "ERROR", "FATAL"}
+type InitConfig struct {
+	LogDir          string
+	AlsoLogToStderr bool
+	LogToStderr     bool
+	Verbosity       int
+	VModule         string
+	LogBacktraceAt  string
+}
+
+var levelNames = map[Level]string{
+	DEBUG:   "DEBUG",
+	INFO:    "INFO",
+	WARNING: "WARN",
+	ERROR:   "ERROR",
+	FATAL:   "FATAL",
+}
 
 var (
 	logDir          = flag.String("log_dir", "", "If non-empty, write log files in this directory")
@@ -67,6 +86,7 @@ type Logger struct {
 	program         string
 	rotationConfig  RotationConfig
 	currentSize     map[Level]int64
+	writeErrOnce    sync.Once
 }
 
 var std = New()
@@ -89,30 +109,44 @@ func Init() {
 		flag.Parse()
 	}
 
+	if err := InitWithConfig(InitConfig{
+		LogDir:          *logDir,
+		AlsoLogToStderr: *alsoLogToStderr,
+		LogToStderr:     *logToStderr,
+		Verbosity:       *verbosity,
+		VModule:         *vmodule,
+		LogBacktraceAt:  *logBacktraceAt,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+	}
+}
+
+func InitWithConfig(cfg InitConfig) error {
 	std.mu.Lock()
 	defer std.mu.Unlock()
 
-	if *logDir != "" {
-		std.logDir = *logDir
+	std.logDir = cfg.LogDir
+	if std.logDir != "" {
 		if err := std.initLogFiles(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize log files: %v\n", err)
+			return err
 		}
 	}
 
-	std.toStderr = *logToStderr
-	std.alsoToStderr = *alsoLogToStderr
+	std.toStderr = cfg.LogToStderr
+	std.alsoToStderr = cfg.AlsoLogToStderr
+	std.verbosity = cfg.Verbosity
+	std.logBacktraceAt = cfg.LogBacktraceAt
 
-	std.verbosity = *verbosity
-
-	if *vmodule != "" {
-		std.parseVmodule(*vmodule)
+	if cfg.VModule != "" {
+		std.parseVmodule(cfg.VModule)
+	} else {
+		std.vmodulePatterns = nil
 	}
-
-	std.logBacktraceAt = *logBacktraceAt
 
 	if std.toStderr {
 		std.output = os.Stderr
 	}
+	return nil
 }
 
 func (l *Logger) initLogFiles() error {
@@ -129,8 +163,9 @@ func (l *Logger) initLogFiles() error {
 	now := time.Now()
 
 	for level := INFO; level <= ERROR; level++ {
+		lname := levelName(level)
 		filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
-			l.program, hostname, levelNames[level],
+			l.program, hostname, lname,
 			now.Year(), now.Month(), now.Day(),
 			now.Hour(), now.Minute(), now.Second(), pid)
 
@@ -141,7 +176,7 @@ func (l *Logger) initLogFiles() error {
 		}
 		l.logFiles[level] = file
 
-		linkName := fmt.Sprintf("%s.%s", l.program, levelNames[level])
+		linkName := fmt.Sprintf("%s.%s", l.program, lname)
 		linkPath := filepath.Join(l.logDir, linkName)
 		os.Remove(linkPath)
 		if err := os.Symlink(filename, linkPath); err != nil {
@@ -207,7 +242,7 @@ func (l *Logger) formatHeader(level Level, file string, line int) []byte {
 	}
 
 	// Build header using buffer
-	buf = append(buf, levelNames[level][0]) // First letter of level
+	buf = append(buf, levelInitial(level)) // First letter of level
 	buf = append(buf, fmt.Sprintf("%02d%02d %02d:%02d:%02d.%06d %7d [%s:%d] ",
 		now.Month(), now.Day(),
 		now.Hour(), now.Minute(), now.Second(),
@@ -296,7 +331,9 @@ func (l *Logger) logInternal(level Level, calldepth int, messageBuilder func() s
 	shouldBacktrace := l.shouldLogBacktrace(file, line)
 	l.mu.RUnlock()
 
-	_, _ = writer.Write(logLine)
+	if err := writeFull(writer, logLine); err != nil {
+		l.reportWriteError(err)
+	}
 
 	// Return buffer to pool
 	logBufferPool.Put(header[:0])
@@ -310,7 +347,9 @@ func (l *Logger) logInternal(level Level, calldepth int, messageBuilder func() s
 	if shouldBacktrace {
 		stack := make([]byte, 4096)
 		stack = stack[:runtime.Stack(stack, false)]
-		_, _ = writer.Write(stack)
+		if err := writeFull(writer, stack); err != nil {
+			l.reportWriteError(err)
+		}
 	}
 
 	// Handle fatal errors
@@ -476,8 +515,9 @@ func (l *Logger) rotateLogFile(level Level) error {
 	pid := os.Getpid()
 	now := time.Now()
 
+	lname := levelName(level)
 	filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
-		l.program, hostname, levelNames[level],
+		l.program, hostname, lname,
 		now.Year(), now.Month(), now.Day(),
 		now.Hour(), now.Minute(), now.Second(), pid)
 
@@ -491,7 +531,7 @@ func (l *Logger) rotateLogFile(level Level) error {
 	l.logFiles[level] = file
 
 	// Update symlink
-	linkName := fmt.Sprintf("%s.%s", l.program, levelNames[level])
+	linkName := fmt.Sprintf("%s.%s", l.program, lname)
 	linkPath := filepath.Join(l.logDir, linkName)
 	os.Remove(linkPath)            // Ignore error
 	os.Symlink(filename, linkPath) // Ignore error for backward compatibility
@@ -594,11 +634,52 @@ func cleanupOldLogs(logDir, program string, config RotationConfig, current map[s
 
 func levelFromFilename(name string) (Level, bool) {
 	for level := INFO; level <= ERROR; level++ {
-		if strings.Contains(name, "."+levelNames[level]+".") {
+		if strings.Contains(name, "."+levelName(level)+".") {
 			return level, true
 		}
 	}
 	return INFO, false
+}
+
+func levelName(level Level) string {
+	if name, ok := levelNames[level]; ok {
+		return name
+	}
+	return "INFO"
+}
+
+func levelInitial(level Level) byte {
+	switch level {
+	case DEBUG:
+		return 'D'
+	case INFO:
+		return 'I'
+	case WARNING:
+		return 'W'
+	case ERROR:
+		return 'E'
+	case FATAL:
+		return 'F'
+	default:
+		return 'I'
+	}
+}
+
+func (l *Logger) reportWriteError(err error) {
+	l.writeErrOnce.Do(func() {
+		fmt.Fprintf(os.Stderr, "glog: failed to write log output: %v\n", err)
+	})
+}
+
+func writeFull(w io.Writer, data []byte) error {
+	n, err := w.Write(data)
+	if err != nil {
+		return err
+	}
+	if n != len(data) {
+		return io.ErrShortWrite
+	}
+	return nil
 }
 
 // SetRotationConfig sets the log rotation configuration

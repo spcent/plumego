@@ -78,6 +78,7 @@ func resetGlobalLogger() {
 	std.logFiles = make(map[Level]*os.File)
 	std.logDir = ""
 	std.program = filepath.Base(os.Args[0])
+	std.writeErrOnce = sync.Once{}
 }
 
 // TestBasicLogging verifies basic logging functions
@@ -183,6 +184,30 @@ func TestLogLevels(t *testing.T) {
 				t.Errorf("Expected shouldLog=%v, got output=%q", tt.shouldLog, output)
 			}
 		})
+	}
+}
+
+func TestDebugLevel(t *testing.T) {
+	resetGlobalLogger()
+	std.SetVerbose(1)
+
+	output := captureOutput(func() {
+		NewGLogger().Debug("debug message", nil)
+	})
+	if !strings.Contains(output, "debug message") {
+		t.Fatalf("expected debug message to be logged when verbosity allows it")
+	}
+	if !strings.HasPrefix(output, "D") {
+		t.Fatalf("expected debug level marker D, got %q", output)
+	}
+
+	std.SetVerbose(1)
+	std.SetLevel(INFO)
+	output = captureOutput(func() {
+		NewGLogger().Debug("filtered debug", nil)
+	})
+	if strings.TrimSpace(output) != "" {
+		t.Fatalf("expected debug message to be filtered when minimum level is INFO")
 	}
 }
 
@@ -534,6 +559,44 @@ func TestFlagIntegration(t *testing.T) {
 
 	if std.logBacktraceAt != "test.go:123" {
 		t.Errorf("Expected logBacktraceAt 'test.go:123', got %s", std.logBacktraceAt)
+	}
+}
+
+func TestInitWithConfig(t *testing.T) {
+	resetGlobalLogger()
+	tempDir := createTempDir(t)
+	defer cleanupTempDir(t, tempDir)
+
+	err := InitWithConfig(InitConfig{
+		LogDir:          tempDir,
+		AlsoLogToStderr: true,
+		LogToStderr:     false,
+		Verbosity:       2,
+		VModule:         "glog_test=3",
+		LogBacktraceAt:  "glog_test.go:123",
+	})
+	if err != nil {
+		t.Fatalf("InitWithConfig returned error: %v", err)
+	}
+	defer std.Close()
+
+	if std.logDir != tempDir {
+		t.Fatalf("expected log dir %s, got %s", tempDir, std.logDir)
+	}
+	if !std.alsoToStderr {
+		t.Fatalf("expected alsoToStderr true")
+	}
+	if std.toStderr {
+		t.Fatalf("expected logToStderr false")
+	}
+	if std.verbosity != 2 {
+		t.Fatalf("expected verbosity 2, got %d", std.verbosity)
+	}
+	if len(std.vmodulePatterns) == 0 {
+		t.Fatalf("expected vmodule patterns to be parsed")
+	}
+	if std.logBacktraceAt != "glog_test.go:123" {
+		t.Fatalf("expected logBacktraceAt to be set")
 	}
 }
 

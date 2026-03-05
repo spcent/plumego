@@ -41,9 +41,13 @@ func TestWithLogger(t *testing.T) {
 func TestLoggerFromContext_Default(t *testing.T) {
 	ctx := context.Background()
 	logger := LoggerFromContext(ctx)
+	logger2 := LoggerFromContext(ctx)
 
 	if logger == nil {
 		t.Error("expected default logger, got nil")
+	}
+	if logger != logger2 {
+		t.Error("expected default logger instance to be reused")
 	}
 
 	// Should return a gLogger instance

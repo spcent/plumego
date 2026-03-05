@@ -501,9 +501,9 @@ func metricsSnapshotHandler(collector *metrics.MemoryCollector) http.HandlerFunc
 
 		// Convert snapshot to a more readable JSON format
 		response := map[string]any{
-			"timestamp": snapshot.Timestamp,
-			"counters":  convertCounters(snapshot.Counters),
-			"gauges":    convertGauges(snapshot.Gauges),
+			"timestamp":  snapshot.Timestamp,
+			"counters":   convertCounters(snapshot.Counters),
+			"gauges":     convertGauges(snapshot.Gauges),
 			"histograms": convertHistograms(snapshot.Histograms),
 		}
 

@@ -91,7 +91,8 @@ func TestKVPersistence_Workflow(t *testing.T) {
 
 func TestKVPersistence_Snapshot(t *testing.T) {
 	ctx := context.Background()
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 
 	persistence := NewKVPersistence(store)
@@ -207,7 +208,8 @@ func TestKVPersistence_Snapshot(t *testing.T) {
 
 func TestKVPersistence_StepResults(t *testing.T) {
 	ctx := context.Background()
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 
 	persistence := NewKVPersistence(store)
@@ -286,7 +288,8 @@ func TestExecutionStatus(t *testing.T) {
 }
 
 func TestKVPersistence_Close(t *testing.T) {
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	persistence := NewKVPersistence(store)
 
 	err := persistence.Close()

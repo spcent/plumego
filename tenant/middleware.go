@@ -3,9 +3,9 @@ package tenant
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"unicode/utf8"
-	"net/http"
 )
 
 // ErrInvalidTenantID indicates a tenant ID failed validation.

@@ -270,8 +270,8 @@ func TestContentBlocksToText(t *testing.T) {
 
 func TestCountTokensApprox(t *testing.T) {
 	blocks := []ContentBlock{
-		{Type: ContentTypeText, Text: "This is a test message"}, // ~6 tokens (24 chars / 4)
-		{Type: ContentTypeImage, Image: &ImageContent{Format: ImageFormatPNG}}, // ~170 tokens
+		{Type: ContentTypeText, Text: "This is a test message"},                              // ~6 tokens (24 chars / 4)
+		{Type: ContentTypeImage, Image: &ImageContent{Format: ImageFormatPNG}},               // ~170 tokens
 		{Type: ContentTypeAudio, Audio: &AudioContent{Format: AudioFormatMP3, Duration: 30}}, // ~30 tokens
 	}
 

@@ -31,7 +31,6 @@ type topicMetrics struct {
 	dropped        sync.Map // map[string]*atomic.Uint64
 }
 
-
 // ensureTopic gets or creates topic metrics.
 func (m *metricsPubSub) ensureTopic(topic string) *topicMetrics {
 	if v, ok := m.topics.Load(topic); ok {

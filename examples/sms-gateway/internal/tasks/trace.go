@@ -75,4 +75,3 @@ func ContextWithTrace(ctx context.Context, task mq.Task) context.Context {
 
 	return ctx
 }
-

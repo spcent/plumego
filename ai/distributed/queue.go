@@ -32,25 +32,25 @@ const (
 
 // WorkflowTask represents a distributed workflow step to be executed.
 type WorkflowTask struct {
-	ID            string                 `json:"id"`
-	ExecutionID   string                 `json:"execution_id"`
-	WorkflowID    string                 `json:"workflow_id"`
-	StepIndex     int                    `json:"step_index"`
-	StepName      string                 `json:"step_name"`
-	WorkflowState map[string]any         `json:"workflow_state"`
-	Priority      int                    `json:"priority"`
-	CreatedAt     time.Time              `json:"created_at"`
-	Timeout       time.Duration          `json:"timeout"`
-	Metadata      map[string]string      `json:"metadata,omitempty"`
+	ID            string            `json:"id"`
+	ExecutionID   string            `json:"execution_id"`
+	WorkflowID    string            `json:"workflow_id"`
+	StepIndex     int               `json:"step_index"`
+	StepName      string            `json:"step_name"`
+	WorkflowState map[string]any    `json:"workflow_state"`
+	Priority      int               `json:"priority"`
+	CreatedAt     time.Time         `json:"created_at"`
+	Timeout       time.Duration     `json:"timeout"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
 // TaskResult represents the result of task execution.
 type TaskResult struct {
-	TaskID       string                       `json:"task_id"`
-	AgentResult  *orchestration.AgentResult   `json:"agent_result"`
-	UpdatedState map[string]any               `json:"updated_state"`
-	Error        string                       `json:"error,omitempty"`
-	CompletedAt  time.Time                    `json:"completed_at"`
+	TaskID       string                     `json:"task_id"`
+	AgentResult  *orchestration.AgentResult `json:"agent_result"`
+	UpdatedState map[string]any             `json:"updated_state"`
+	Error        string                     `json:"error,omitempty"`
+	CompletedAt  time.Time                  `json:"completed_at"`
 }
 
 // TaskHandler is a function that processes a workflow task.

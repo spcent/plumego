@@ -78,9 +78,9 @@ type InProcBroker struct {
 
 	// cachedMemUsage stores the most recent memory usage reading.
 	// Updated by a background goroutine to avoid STW on every Publish.
-	cachedMemUsage   atomic.Uint64
-	memSamplerDone   chan struct{}
-	memSamplerStop   sync.Once // guarantees memSamplerDone is closed exactly once
+	cachedMemUsage atomic.Uint64
+	memSamplerDone chan struct{}
+	memSamplerStop sync.Once // guarantees memSamplerDone is closed exactly once
 
 	// consumerGroupMgr is lazily initialized for InProcPubSub backends.
 	consumerGroupMgr *pubsub.ConsumerGroupManager

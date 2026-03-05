@@ -68,7 +68,7 @@ func (l *gLogger) Debug(msg string, fields Fields) {
 	if !std.vAt(1, 3) {
 		return
 	}
-	l.logWithLevel(INFO, msg, fields, nil)
+	l.logWithLevel(DEBUG, msg, fields, nil)
 }
 
 func (l *gLogger) Info(msg string, fields Fields) {
@@ -88,7 +88,7 @@ func (l *gLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
 	if !std.vAt(1, 3) {
 		return
 	}
-	l.logWithLevel(INFO, msg, fields, ctx)
+	l.logWithLevel(DEBUG, msg, fields, ctx)
 }
 
 // InfoCtx logs an info message with context support.

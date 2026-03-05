@@ -52,9 +52,9 @@ func Tags(keyValues ...string) []Tag {
 // NoOpCollector is a collector that does nothing (for testing/disabled metrics)
 type NoOpCollector struct{}
 
-func (n *NoOpCollector) Counter(name string, value float64, tags ...Tag)          {}
-func (n *NoOpCollector) Gauge(name string, value float64, tags ...Tag)            {}
-func (n *NoOpCollector) Histogram(name string, value float64, tags ...Tag)        {}
+func (n *NoOpCollector) Counter(name string, value float64, tags ...Tag)         {}
+func (n *NoOpCollector) Gauge(name string, value float64, tags ...Tag)           {}
+func (n *NoOpCollector) Histogram(name string, value float64, tags ...Tag)       {}
 func (n *NoOpCollector) Timing(name string, duration time.Duration, tags ...Tag) {}
 
 // MemoryCollector is an in-memory metrics collector.

@@ -194,11 +194,11 @@ func (p *ClaudeProvider) CountTokens(text string) (int, error) {
 // buildRequest builds Claude API request.
 func (p *ClaudeProvider) buildRequest(req *CompletionRequest) (*claudeMessageRequest, error) {
 	claudeReq := &claudeMessageRequest{
-		Model:      req.Model,
-		MaxTokens:  req.MaxTokens,
-		Messages:   make([]claudeMessage, 0, len(req.Messages)),
-		System:     req.System,
-		Stream:     req.Stream,
+		Model:     req.Model,
+		MaxTokens: req.MaxTokens,
+		Messages:  make([]claudeMessage, 0, len(req.Messages)),
+		System:    req.System,
+		Stream:    req.Stream,
 	}
 
 	// Set defaults

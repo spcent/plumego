@@ -46,9 +46,9 @@ type AuthConfig struct {
 
 // Hooks define optional operations hooks.
 type Hooks struct {
-	QueueStats   func(ctx context.Context, queue string) (QueueStats, error)
-	QueueList    func(ctx context.Context) ([]string, error)
-	QueueReplay  func(ctx context.Context, req QueueReplayRequest) (QueueReplayResult, error)
+	QueueStats    func(ctx context.Context, queue string) (QueueStats, error)
+	QueueList     func(ctx context.Context) ([]string, error)
+	QueueReplay   func(ctx context.Context, req QueueReplayRequest) (QueueReplayResult, error)
 	ReceiptLookup func(ctx context.Context, messageID string) (ReceiptRecord, error)
 	ChannelHealth func(ctx context.Context, provider string) (ChannelHealth, error)
 	ChannelList   func(ctx context.Context) ([]string, error)

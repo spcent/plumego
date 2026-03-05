@@ -323,4 +323,3 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		}
 	}()
 }
-

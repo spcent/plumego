@@ -355,7 +355,7 @@ func TestFormatResultAsString(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		 findInString(s, substr)))
+			findInString(s, substr)))
 }
 
 func findInString(s, substr string) bool {

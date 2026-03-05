@@ -195,7 +195,7 @@ func (a *App) enableRecovery() error {
 		return nil
 	}
 
-	if err := a.Use(recovery.RecoveryMiddleware); err != nil {
+	if err := a.Use(recovery.RecoveryWithLogger(a.logger)); err != nil {
 		return err
 	}
 

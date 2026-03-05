@@ -41,11 +41,11 @@ func (t *TokenUsage) Add(other TokenUsage) {
 
 // StreamCounter counts tokens in streaming responses.
 type StreamCounter struct {
-	tokenizer    Tokenizer
-	inputCount   atomic.Int64
-	outputCount  atomic.Int64
-	chunkBuffer  string
-	chunkSize    int
+	tokenizer   Tokenizer
+	inputCount  atomic.Int64
+	outputCount atomic.Int64
+	chunkBuffer string
+	chunkSize   int
 }
 
 // NewStreamCounter creates a new stream counter.

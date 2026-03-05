@@ -23,8 +23,8 @@ func ExampleLocalStorage() {
 
 	// Create local storage
 	storage, err := file.NewLocalStorage(
-		"/tmp/uploads",              // Base directory
-		"http://example.com/files",  // Base URL
+		"/tmp/uploads",             // Base directory
+		"http://example.com/files", // Base URL
 		metadata,
 	)
 	if err != nil {
@@ -36,11 +36,11 @@ func ExampleLocalStorage() {
 	// Upload a file
 	content := bytes.NewReader([]byte("Hello, World!"))
 	result, err := storage.Put(ctx, file.PutOptions{
-		TenantID:      "tenant-123",
-		Reader:        content,
-		FileName:      "hello.txt",
-		ContentType:   "text/plain",
-		UploadedBy:    "user-456",
+		TenantID:    "tenant-123",
+		Reader:      content,
+		FileName:    "hello.txt",
+		ContentType: "text/plain",
+		UploadedBy:  "user-456",
 	})
 	if err != nil {
 		log.Fatal(err)

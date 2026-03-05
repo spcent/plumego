@@ -35,7 +35,7 @@ type ProgressUpdate struct {
 
 	// Progress details
 	Status    ProgressStatus `json:"status"`
-	Progress  float64        `json:"progress"`  // 0.0 to 1.0
+	Progress  float64        `json:"progress"` // 0.0 to 1.0
 	Message   string         `json:"message,omitempty"`
 	Timestamp time.Time      `json:"timestamp"`
 

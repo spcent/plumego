@@ -32,17 +32,17 @@ const (
 
 // ExecutionSnapshot represents a point-in-time snapshot of workflow execution state.
 type ExecutionSnapshot struct {
-	ExecutionID    string                        `json:"execution_id"`
-	WorkflowID     string                        `json:"workflow_id"`
-	State          map[string]any                `json:"state"`
-	CompletedSteps []int                         `json:"completed_steps"` // Indices of completed steps
-	CurrentStep    int                           `json:"current_step"`    // Index of current step
-	Results        []*orchestration.AgentResult  `json:"results"`
-	Status         ExecutionStatus               `json:"status"`
-	Error          string                        `json:"error,omitempty"`
-	CreatedAt      time.Time                     `json:"created_at"`
-	UpdatedAt      time.Time                     `json:"updated_at"`
-	TTL            time.Duration                 `json:"ttl,omitempty"`
+	ExecutionID    string                       `json:"execution_id"`
+	WorkflowID     string                       `json:"workflow_id"`
+	State          map[string]any               `json:"state"`
+	CompletedSteps []int                        `json:"completed_steps"` // Indices of completed steps
+	CurrentStep    int                          `json:"current_step"`    // Index of current step
+	Results        []*orchestration.AgentResult `json:"results"`
+	Status         ExecutionStatus              `json:"status"`
+	Error          string                       `json:"error,omitempty"`
+	CreatedAt      time.Time                    `json:"created_at"`
+	UpdatedAt      time.Time                    `json:"updated_at"`
+	TTL            time.Duration                `json:"ttl,omitempty"`
 }
 
 // WorkflowPersistence defines the interface for persisting workflow definitions and execution state.
@@ -88,10 +88,10 @@ type KVPersistence struct {
 
 // Storage key prefixes
 const (
-	prefixWorkflow  = "distributed:workflow:"
-	prefixSnapshot  = "distributed:snapshot:"
+	prefixWorkflow   = "distributed:workflow:"
+	prefixSnapshot   = "distributed:snapshot:"
 	prefixStepResult = "distributed:step:"
-	prefixExecution = "distributed:execution:"
+	prefixExecution  = "distributed:execution:"
 )
 
 // NewKVPersistence creates a new KV-based workflow persistence layer.
@@ -121,7 +121,7 @@ func (p *KVPersistence) SaveWorkflow(ctx context.Context, wf *orchestration.Work
 	}
 
 	key := prefixWorkflow + wf.ID
-	return p.store.Set( key, jsonData, 0) // No TTL for workflow definitions
+	return p.store.Set(key, jsonData, 0) // No TTL for workflow definitions
 }
 
 // LoadWorkflow loads a workflow definition by ID.
@@ -131,7 +131,7 @@ func (p *KVPersistence) LoadWorkflow(ctx context.Context, id string) (*orchestra
 	}
 
 	key := prefixWorkflow + id
-	data, err := p.store.Get( key)
+	data, err := p.store.Get(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load workflow %s: %w", id, err)
 	}
@@ -161,7 +161,7 @@ func (p *KVPersistence) DeleteWorkflow(ctx context.Context, id string) error {
 	}
 
 	key := prefixWorkflow + id
-	return p.store.Delete( key)
+	return p.store.Delete(key)
 }
 
 // SaveSnapshot persists an execution state snapshot.
@@ -185,13 +185,13 @@ func (p *KVPersistence) SaveSnapshot(ctx context.Context, snapshot *ExecutionSna
 		ttl = 24 * time.Hour // Default 24 hour retention
 	}
 
-	if err := p.store.Set( key, jsonData, ttl); err != nil {
+	if err := p.store.Set(key, jsonData, ttl); err != nil {
 		return fmt.Errorf("failed to save snapshot: %w", err)
 	}
 
 	// Also index by workflow ID for listing
 	indexKey := prefixExecution + snapshot.WorkflowID + ":" + snapshot.ExecutionID
-	return p.store.Set( indexKey, []byte(snapshot.ExecutionID), ttl)
+	return p.store.Set(indexKey, []byte(snapshot.ExecutionID), ttl)
 }
 
 // LoadSnapshot loads an execution state snapshot by execution ID.
@@ -201,7 +201,7 @@ func (p *KVPersistence) LoadSnapshot(ctx context.Context, executionID string) (*
 	}
 
 	key := prefixSnapshot + executionID
-	data, err := p.store.Get( key)
+	data, err := p.store.Get(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load snapshot %s: %w", executionID, err)
 	}
@@ -221,7 +221,7 @@ func (p *KVPersistence) DeleteSnapshot(ctx context.Context, executionID string) 
 	}
 
 	key := prefixSnapshot + executionID
-	return p.store.Delete( key)
+	return p.store.Delete(key)
 }
 
 // SaveStepResult persists a step execution result.
@@ -239,7 +239,7 @@ func (p *KVPersistence) SaveStepResult(ctx context.Context, executionID string, 
 	}
 
 	key := fmt.Sprintf("%s%s:%d", prefixStepResult, executionID, stepIndex)
-	return p.store.Set( key, jsonData, 24*time.Hour) // 24 hour retention
+	return p.store.Set(key, jsonData, 24*time.Hour) // 24 hour retention
 }
 
 // LoadStepResults loads all step results for an execution.
@@ -257,7 +257,7 @@ func (p *KVPersistence) LoadStepResults(ctx context.Context, executionID string)
 
 	results := make([]*orchestration.AgentResult, 0, len(keys))
 	for _, key := range keys {
-		data, err := p.store.Get( key)
+		data, err := p.store.Get(key)
 		if err != nil {
 			continue // Skip missing keys
 		}
@@ -307,7 +307,7 @@ func (p *KVPersistence) CleanupExpired(ctx context.Context, before time.Time) (i
 
 	count := 0
 	for _, key := range keys {
-		data, err := p.store.Get( key)
+		data, err := p.store.Get(key)
 		if err != nil {
 			continue
 		}
@@ -319,7 +319,7 @@ func (p *KVPersistence) CleanupExpired(ctx context.Context, before time.Time) (i
 
 		// Delete if updated before the cutoff time
 		if snapshot.UpdatedAt.Before(before) {
-			if err := p.store.Delete( key); err == nil {
+			if err := p.store.Delete(key); err == nil {
 				count++
 			}
 		}

@@ -368,7 +368,6 @@ func (p *PrometheusCollector) evictOldest() {
 	}
 }
 
-
 func httpMetricsFromRecord(record MetricRecord) (observability.RequestMetrics, bool) {
 	if record.Labels == nil {
 		return observability.RequestMetrics{}, false

@@ -1,6 +1,7 @@
 package recovery
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,7 +9,41 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	log "github.com/spcent/plumego/log"
 )
+
+type recordingLogger struct {
+	mu       sync.Mutex
+	errCount int
+	lastMsg  string
+	last     log.Fields
+}
+
+func (l *recordingLogger) WithFields(fields log.Fields) log.StructuredLogger {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	cp := make(log.Fields, len(fields))
+	for k, v := range fields {
+		cp[k] = v
+	}
+	l.last = cp
+	return l
+}
+
+func (l *recordingLogger) Debug(msg string, fields log.Fields) {}
+func (l *recordingLogger) Info(msg string, fields log.Fields)  {}
+func (l *recordingLogger) Warn(msg string, fields log.Fields)  {}
+func (l *recordingLogger) Error(msg string, fields log.Fields) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.errCount++
+	l.lastMsg = msg
+}
+
+func (l *recordingLogger) DebugCtx(ctx context.Context, msg string, fields log.Fields) {}
+func (l *recordingLogger) InfoCtx(ctx context.Context, msg string, fields log.Fields)  {}
+func (l *recordingLogger) WarnCtx(ctx context.Context, msg string, fields log.Fields)  {}
+func (l *recordingLogger) ErrorCtx(ctx context.Context, msg string, fields log.Fields) {}
 
 func TestRecoveryMiddleware(t *testing.T) {
 	tests := []struct {
@@ -158,6 +193,34 @@ func TestRecoveryMiddleware_DifferentMethods(t *testing.T) {
 				t.Errorf("method %s: expected status 500, got %d", method, w.Code)
 			}
 		})
+	}
+}
+
+func TestRecoveryWithLogger_UsesInjectedLogger(t *testing.T) {
+	logger := &recordingLogger{}
+	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("logger panic")
+	})
+
+	handler := RecoveryWithLogger(logger)(panicHandler)
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", w.Code)
+	}
+
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+	if logger.errCount != 1 {
+		t.Fatalf("expected injected logger to record one error, got %d", logger.errCount)
+	}
+	if logger.lastMsg != "panic recovered" {
+		t.Fatalf("expected panic recovered message, got %q", logger.lastMsg)
+	}
+	if logger.last["panic"] != "logger panic" {
+		t.Fatalf("expected panic field to be logged, got %v", logger.last["panic"])
 	}
 }
 

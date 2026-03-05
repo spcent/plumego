@@ -9,6 +9,7 @@
 Key capabilities:
 - Structured fields via `log.Fields`
 - Context-aware logging with `trace_id` propagation
+- Explicit `DEBUG/INFO/WARN/ERROR` levels
 - Two built-in implementations:
   - `NewGLogger()` for glog-style text output and file rotation
   - `NewJSONLogger(...)` for JSON output
@@ -72,6 +73,8 @@ logger := log.NewJSONLogger(log.JSONLoggerConfig{
     },
     // Optional: make Debug/DebugCtx follow V(1) filtering.
     RespectVerbosity: true,
+    // Local verbosity threshold used by JSON logger.
+    Verbosity: 1,
 })
 
 logger.Warn("downstream latency high", log.Fields{
@@ -97,11 +100,25 @@ reqLogger.InfoCtx(ctx, "business event", log.Fields{"trace_id": traceID})
 
 ## Levels and Verbosity
 
-`Debug` logs are gated by verbosity (`V(1)`).
+`Debug` logs emit at `DEBUG` level and are gated by verbosity (`V(1)` by default patterns).
 
 ```go
 if log.V(1) {
     log.VLog(1, "diagnostic message")
+}
+```
+
+You can configure global glog behavior without relying on process-wide flag parsing:
+
+```go
+if err := log.InitWithConfig(log.InitConfig{
+    LogDir:          "/var/log/myapp",
+    LogToStderr:     false,
+    AlsoLogToStderr: true,
+    Verbosity:       1,
+    VModule:         "router=2,core=1",
+}); err != nil {
+    panic(err)
 }
 ```
 

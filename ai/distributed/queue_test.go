@@ -2,9 +2,9 @@ package distributed
 
 import (
 	"context"
-	"testing"
-	"path/filepath"
 	kv "github.com/spcent/plumego/store/kv"
+	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/spcent/plumego/ai/orchestration"
@@ -17,7 +17,8 @@ func TestMQTaskQueue_Enqueue(t *testing.T) {
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 	persistence := NewKVPersistence(store)
 
@@ -71,7 +72,8 @@ func TestMQTaskQueue_Subscribe(t *testing.T) {
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 	persistence := NewKVPersistence(store)
 
@@ -149,7 +151,8 @@ func TestMQTaskQueue_TaskStatus(t *testing.T) {
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 	persistence := NewKVPersistence(store)
 
@@ -187,7 +190,8 @@ func TestMQTaskQueue_Results(t *testing.T) {
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 	persistence := NewKVPersistence(store)
 

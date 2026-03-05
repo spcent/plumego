@@ -384,4 +384,3 @@ func TestHubConnectionLimitsSecurity(t *testing.T) {
 		t.Errorf("Expected 2 rejections, got %d", metrics.RejectedTotal)
 	}
 }
-

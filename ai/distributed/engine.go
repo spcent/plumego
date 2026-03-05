@@ -257,15 +257,15 @@ func (e *DistributedEngine) executeStepDistributed(
 ) (*orchestration.AgentResult, error) {
 	// Create task
 	task := &WorkflowTask{
-		ID:          fmt.Sprintf("%s-%d", execCtx.executionID, stepIndex),
-		ExecutionID: execCtx.executionID,
-		WorkflowID:  execCtx.workflowID,
-		StepIndex:   stepIndex,
-		StepName:    step.Name(),
+		ID:            fmt.Sprintf("%s-%d", execCtx.executionID, stepIndex),
+		ExecutionID:   execCtx.executionID,
+		WorkflowID:    execCtx.workflowID,
+		StepIndex:     stepIndex,
+		StepName:      step.Name(),
 		WorkflowState: execCtx.snapshot.State,
-		Priority:    5,
-		CreatedAt:   time.Now(),
-		Timeout:     options.Timeout,
+		Priority:      5,
+		CreatedAt:     time.Now(),
+		Timeout:       options.Timeout,
 	}
 
 	// Enqueue task

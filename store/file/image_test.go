@@ -128,13 +128,13 @@ func TestImageProcessor_Thumbnail(t *testing.T) {
 	proc := NewImageProcessor()
 
 	tests := []struct {
-		name        string
-		srcWidth    int
-		srcHeight   int
-		maxWidth    int
-		maxHeight   int
-		wantWidth   int
-		wantHeight  int
+		name       string
+		srcWidth   int
+		srcHeight  int
+		maxWidth   int
+		maxHeight  int
+		wantWidth  int
+		wantHeight int
 	}{
 		{
 			name:       "landscape image",

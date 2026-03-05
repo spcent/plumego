@@ -13,8 +13,10 @@ import (
 // It's thread-safe and suitable for structured logging in production environments.
 type JSONLogger struct {
 	mu               *sync.Mutex
+	writeErrOnce     *sync.Once
 	output           io.Writer
 	level            Level
+	verbosity        int
 	fields           Fields
 	respectVerbosity bool
 }
@@ -30,6 +32,8 @@ type JSONLoggerConfig struct {
 	// RespectVerbosity applies V(1) filtering to Debug/DebugCtx when enabled.
 	// Default false keeps backward-compatible behavior.
 	RespectVerbosity bool
+	// Verbosity controls local debug gating when RespectVerbosity is true.
+	Verbosity int
 }
 
 // NewJSONLogger creates a new JSONLogger with the given configuration.
@@ -39,8 +43,10 @@ func NewJSONLogger(config JSONLoggerConfig) *JSONLogger {
 	}
 	return &JSONLogger{
 		mu:               &sync.Mutex{},
+		writeErrOnce:     &sync.Once{},
 		output:           config.Output,
 		level:            config.Level,
+		verbosity:        config.Verbosity,
 		fields:           cloneFields(config.Fields),
 		respectVerbosity: config.RespectVerbosity,
 	}
@@ -54,8 +60,10 @@ func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
 	}
 	return &JSONLogger{
 		mu:               mu,
+		writeErrOnce:     l.writeErrOnce,
 		output:           l.output,
 		level:            l.level,
+		verbosity:        l.verbosity,
 		fields:           mergeFields(l.fields, fields),
 		respectVerbosity: l.respectVerbosity,
 	}
@@ -63,11 +71,10 @@ func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
 
 // Debug logs a debug message with optional fields.
 func (l *JSONLogger) Debug(msg string, fields Fields) {
-	if l.respectVerbosity && !std.vAt(1, 3) {
+	if l.respectVerbosity && !l.vAt(1) {
 		return
 	}
-	// Keep backward compatibility with glog adapter where debug is emitted as INFO.
-	l.log(INFO, msg, fields, nil)
+	l.log(DEBUG, msg, fields, nil)
 }
 
 // Info logs an info message with optional fields.
@@ -87,11 +94,10 @@ func (l *JSONLogger) Error(msg string, fields Fields) {
 
 // DebugCtx logs a debug message with context and optional fields.
 func (l *JSONLogger) DebugCtx(ctx context.Context, msg string, fields Fields) {
-	if l.respectVerbosity && !std.vAt(1, 3) {
+	if l.respectVerbosity && !l.vAt(1) {
 		return
 	}
-	// Keep backward compatibility with glog adapter where debug is emitted as INFO.
-	l.log(INFO, msg, fields, ctx)
+	l.log(DEBUG, msg, fields, ctx)
 }
 
 // InfoCtx logs an info message with context and optional fields.
@@ -128,19 +134,18 @@ func (l *JSONLogger) log(level Level, msg string, fields Fields, ctx context.Con
 
 // buildEntry constructs the log entry map.
 func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, ctx context.Context) map[string]any {
-	entry := make(map[string]any)
-	entry["time"] = time.Now().UTC().Format(time.RFC3339Nano)
-	entry["level"] = levelNames[level]
-	entry["msg"] = msg
-
-	// Add trace ID if present
-	if traceID := TraceIDFromContext(ctx); traceID != "" {
-		entry["trace_id"] = traceID
-	}
-
 	combined := mergeFields(l.fields, fields)
+	entry := make(map[string]any, len(combined)+4)
 	for k, v := range combined {
 		entry[k] = v
+	}
+
+	// Reserved keys are always controlled by logger internals.
+	entry["time"] = time.Now().UTC().Format(time.RFC3339Nano)
+	entry["level"] = levelName(level)
+	entry["msg"] = msg
+	if traceID := TraceIDFromContext(ctx); traceID != "" {
+		entry["trace_id"] = traceID
 	}
 
 	return entry
@@ -153,8 +158,13 @@ func (l *JSONLogger) writeEntry(entry map[string]any) {
 		// Fallback to simple error message if marshaling fails
 		data = []byte(`{"level":"ERROR","msg":"failed to marshal log entry"}`)
 	}
-	l.output.Write(data)
-	l.output.Write([]byte("\n"))
+	if err := writeFull(l.output, data); err != nil {
+		l.reportWriteError(err)
+		return
+	}
+	if err := writeFull(l.output, []byte("\n")); err != nil {
+		l.reportWriteError(err)
+	}
 }
 
 // Start implements the Lifecycle interface (no-op for JSONLogger).
@@ -176,4 +186,19 @@ func (l *JSONLogger) Stop(ctx context.Context) error {
 		return syncer.Sync()
 	}
 	return nil
+}
+
+func (l *JSONLogger) vAt(level int) bool {
+	return level <= l.verbosity
+}
+
+func (l *JSONLogger) reportWriteError(err error) {
+	once := l.writeErrOnce
+	if once == nil {
+		once = &sync.Once{}
+		l.writeErrOnce = once
+	}
+	once.Do(func() {
+		_, _ = os.Stderr.WriteString("json logger: failed to write log output: " + err.Error() + "\n")
+	})
 }

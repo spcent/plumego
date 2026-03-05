@@ -160,6 +160,7 @@ type Conn struct {
 //
 //	// Create connection with drop behavior
 //	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
+//
 // NewConn creates a Conn after handshake, allocating its own buffered I/O.
 //
 // For server-side connections obtained via http.Hijacker, prefer

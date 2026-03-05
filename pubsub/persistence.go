@@ -107,19 +107,19 @@ type PersistentPubSub struct {
 	lastSnap   time.Time
 
 	// Background workers
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         sync.WaitGroup
-	closed     atomic.Bool
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
+	closed      atomic.Bool
 	walRotating atomic.Bool // guards against concurrent rotateWAL goroutines
 
 	// Metrics
-	walWrites      atomic.Uint64
-	walFlushes     atomic.Uint64
-	snapshots      atomic.Uint64
-	restoreCount   atomic.Uint64
-	walBytesWrite  atomic.Int64
-	persistErrors  atomic.Uint64
+	walWrites     atomic.Uint64
+	walFlushes    atomic.Uint64
+	snapshots     atomic.Uint64
+	restoreCount  atomic.Uint64
+	walBytesWrite atomic.Int64
+	persistErrors atomic.Uint64
 }
 
 // walEntry represents a single WAL entry
@@ -133,11 +133,11 @@ type walEntry struct {
 
 // snapshotData represents a complete system snapshot
 type snapshotData struct {
-	Version       int                      `json:"version"`
-	Timestamp     time.Time                `json:"timestamp"`
-	WALSequence   uint64                   `json:"wal_sequence"`
-	Messages      []persistedMessage       `json:"messages"`
-	Subscriptions []persistedSubscription  `json:"subscriptions"`
+	Version       int                     `json:"version"`
+	Timestamp     time.Time               `json:"timestamp"`
+	WALSequence   uint64                  `json:"wal_sequence"`
+	Messages      []persistedMessage      `json:"messages"`
+	Subscriptions []persistedSubscription `json:"subscriptions"`
 }
 
 type persistedMessage struct {

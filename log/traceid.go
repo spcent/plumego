@@ -46,11 +46,12 @@ var (
 // TraceIDGenerator encapsulates the state for trace ID generation
 type TraceIDGenerator struct {
 	rng        *mathrand.Rand
-	lastMs     atomic.Int64
-	seq        atomic.Int32
+	stateMu    sync.Mutex
+	lastMs     int64
+	seq        int32
 	randomPool []int32
 	poolIdx    atomic.Int32
-	poolMu     sync.Mutex
+	poolMu     sync.RWMutex
 }
 
 // cryptoSeed returns a cryptographically secure seed for math/rand.
@@ -87,38 +88,35 @@ func NewTraceID() string {
 	return globalGen.Generate()
 }
 
-// Generate creates a new trace ID using optimized atomic operations
+// Generate creates a new trace ID with monotonic timestamp/sequence coordination.
 func (g *TraceIDGenerator) Generate() string {
 	g.ensureInitialized()
 	for {
 		nowMs := time.Now().UnixMilli()
-		lastMs := g.lastMs.Load()
+		g.stateMu.Lock()
+		lastMs := g.lastMs
 		if nowMs < lastMs {
 			nowMs = lastMs
 		}
 
 		if nowMs == lastMs {
 			// Same millisecond, try to increment sequence
-			for {
-				currentSeq := g.seq.Load()
-				if currentSeq < int32(seqMax) {
-					// Try to atomically increment sequence
-					if g.seq.CompareAndSwap(currentSeq, currentSeq+1) {
-						return g.buildID(nowMs, int(currentSeq+1))
-					}
-					// CAS failed, retry
-					continue
-				}
-				// Sequence exhausted, wait for next millisecond
-				time.Sleep(time.Microsecond * 100) // Short sleep to reduce CPU usage
-				break
+			if g.seq < int32(seqMax) {
+				g.seq++
+				seq := g.seq
+				g.stateMu.Unlock()
+				return g.buildID(nowMs, int(seq))
 			}
+			g.stateMu.Unlock()
+			// Sequence exhausted, wait for next millisecond.
+			time.Sleep(time.Microsecond * 100)
 			continue
 		}
 
 		// New millisecond, reset sequence to 0
-		g.lastMs.Store(nowMs)
-		g.seq.Store(0)
+		g.lastMs = nowMs
+		g.seq = 0
+		g.stateMu.Unlock()
 		return g.buildID(nowMs, 0)
 	}
 }
@@ -162,7 +160,9 @@ func (g *TraceIDGenerator) ensureInitialized() {
 func (g *TraceIDGenerator) randomValue() int {
 	g.ensureInitialized()
 
+	g.poolMu.RLock()
 	poolSize := len(g.randomPool)
+	g.poolMu.RUnlock()
 	if poolSize == 0 {
 		return g.randomFallback()
 	}
@@ -174,7 +174,10 @@ func (g *TraceIDGenerator) randomValue() int {
 		g.refreshRandomPool()
 	}
 
-	return int(g.randomPool[pos])
+	g.poolMu.RLock()
+	v := int(g.randomPool[pos])
+	g.poolMu.RUnlock()
+	return v
 }
 
 func (g *TraceIDGenerator) refreshRandomPool() {

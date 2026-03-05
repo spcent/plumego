@@ -2,9 +2,9 @@ package distributed
 
 import (
 	"context"
-	"testing"
-	"path/filepath"
 	kv "github.com/spcent/plumego/store/kv"
+	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/spcent/plumego/ai/orchestration"
@@ -61,7 +61,8 @@ func TestWorker_StartStop(t *testing.T) {
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 	persistence := NewKVPersistence(store)
 
@@ -132,9 +133,9 @@ func TestStepExecutor(t *testing.T) {
 		}
 
 		testStep := &orchestration.SequentialStep{
-			StepName: "test-step",
-			Agent:    testAgent,
-			InputFn:  func(state map[string]any) string { return "test input" },
+			StepName:  "test-step",
+			Agent:     testAgent,
+			InputFn:   func(state map[string]any) string { return "test input" },
 			OutputKey: "result",
 		}
 
@@ -142,11 +143,11 @@ func TestStepExecutor(t *testing.T) {
 
 		// Execute task
 		task := &WorkflowTask{
-			ID:          "task-1",
-			ExecutionID: "exec-1",
-			WorkflowID:  "wf-1",
-			StepIndex:   0,
-			StepName:    "test-step",
+			ID:            "task-1",
+			ExecutionID:   "exec-1",
+			WorkflowID:    "wf-1",
+			StepIndex:     0,
+			StepName:      "test-step",
 			WorkflowState: map[string]any{},
 		}
 
@@ -170,10 +171,10 @@ func TestStepExecutor(t *testing.T) {
 
 	t.Run("ExecuteNonexistentStep", func(t *testing.T) {
 		task := &WorkflowTask{
-			ID:          "task-2",
-			ExecutionID: "exec-1",
-			WorkflowID:  "wf-1",
-			StepName:    "nonexistent-step",
+			ID:            "task-2",
+			ExecutionID:   "exec-1",
+			WorkflowID:    "wf-1",
+			StepName:      "nonexistent-step",
 			WorkflowState: map[string]any{},
 		}
 
@@ -196,7 +197,8 @@ func TestWorkerPool(t *testing.T) {
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 	persistence := NewKVPersistence(store)
 
@@ -338,7 +340,8 @@ func TestWorker_HandleTask(t *testing.T) {
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	tmpDir := t.TempDir(); store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
+	tmpDir := t.TempDir()
+	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
 	persistence := NewKVPersistence(store)
 
@@ -367,12 +370,12 @@ func TestWorker_HandleTask(t *testing.T) {
 
 	t.Run("HandleValidTask", func(t *testing.T) {
 		task := &WorkflowTask{
-			ID:          "task-1",
-			ExecutionID: "exec-1",
-			WorkflowID:  "wf-1",
-			StepName:    "test-step",
+			ID:            "task-1",
+			ExecutionID:   "exec-1",
+			WorkflowID:    "wf-1",
+			StepName:      "test-step",
 			WorkflowState: map[string]any{},
-			Timeout:     5 * time.Second,
+			Timeout:       5 * time.Second,
 		}
 
 		result, err := worker.handleTask(ctx, task)

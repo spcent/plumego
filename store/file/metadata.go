@@ -227,7 +227,7 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 		orderBy = "size ASC"
 	case "size_desc":
 		orderBy = "size DESC"
-	// Add more allowed sort options here as needed, keeping the mapping explicit.
+		// Add more allowed sort options here as needed, keeping the mapping explicit.
 	}
 
 	listQuery := fmt.Sprintf(`

@@ -22,14 +22,14 @@ const (
 
 // ContentBlock represents a block of content in a message.
 type ContentBlock struct {
-	Type       ContentType     `json:"type"`
-	Text       string          `json:"text,omitempty"`
-	Image      *ImageContent   `json:"image,omitempty"`
-	Audio      *AudioContent   `json:"audio,omitempty"`
-	Video      *VideoContent   `json:"video,omitempty"`
+	Type       ContentType      `json:"type"`
+	Text       string           `json:"text,omitempty"`
+	Image      *ImageContent    `json:"image,omitempty"`
+	Audio      *AudioContent    `json:"audio,omitempty"`
+	Video      *VideoContent    `json:"video,omitempty"`
 	Document   *DocumentContent `json:"document,omitempty"`
-	ToolUse    *ToolUse        `json:"tool_use,omitempty"`
-	ToolResult *ToolResult     `json:"tool_result,omitempty"`
+	ToolUse    *ToolUse         `json:"tool_use,omitempty"`
+	ToolResult *ToolResult      `json:"tool_result,omitempty"`
 }
 
 // ImageFormat represents image format.
@@ -54,7 +54,7 @@ const (
 type ImageContent struct {
 	Format    ImageFormat `json:"format"`
 	Source    ImageSource `json:"source"`
-	Data      []byte      `json:"data,omitempty"`      // Base64 encoded in JSON
+	Data      []byte      `json:"data,omitempty"` // Base64 encoded in JSON
 	URL       string      `json:"url,omitempty"`
 	Width     int         `json:"width,omitempty"`
 	Height    int         `json:"height,omitempty"`
@@ -114,16 +114,16 @@ const (
 
 // VideoContent represents video content.
 type VideoContent struct {
-	Format     VideoFormat `json:"format"`
-	Data       []byte      `json:"data,omitempty"`
-	URL        string      `json:"url,omitempty"`
-	Duration   float64     `json:"duration,omitempty"` // seconds
-	Width      int         `json:"width,omitempty"`
-	Height     int         `json:"height,omitempty"`
-	FrameRate  float64     `json:"frame_rate,omitempty"` // fps
-	MimeType   string      `json:"mime_type,omitempty"`
-	SizeBytes  int64       `json:"size_bytes,omitempty"`
-	Thumbnail  *ImageContent `json:"thumbnail,omitempty"`
+	Format    VideoFormat   `json:"format"`
+	Data      []byte        `json:"data,omitempty"`
+	URL       string        `json:"url,omitempty"`
+	Duration  float64       `json:"duration,omitempty"` // seconds
+	Width     int           `json:"width,omitempty"`
+	Height    int           `json:"height,omitempty"`
+	FrameRate float64       `json:"frame_rate,omitempty"` // fps
+	MimeType  string        `json:"mime_type,omitempty"`
+	SizeBytes int64         `json:"size_bytes,omitempty"`
+	Thumbnail *ImageContent `json:"thumbnail,omitempty"`
 }
 
 // Base64String returns the base64-encoded string representation.
@@ -138,14 +138,14 @@ func (v *VideoContent) Base64String() string {
 type DocumentFormat string
 
 const (
-	DocumentFormatPDF   DocumentFormat = "pdf"
-	DocumentFormatDOCX  DocumentFormat = "docx"
-	DocumentFormatTXT   DocumentFormat = "txt"
-	DocumentFormatHTML  DocumentFormat = "html"
-	DocumentFormatMD    DocumentFormat = "markdown"
-	DocumentFormatCSV   DocumentFormat = "csv"
-	DocumentFormatJSON  DocumentFormat = "json"
-	DocumentFormatXML   DocumentFormat = "xml"
+	DocumentFormatPDF  DocumentFormat = "pdf"
+	DocumentFormatDOCX DocumentFormat = "docx"
+	DocumentFormatTXT  DocumentFormat = "txt"
+	DocumentFormatHTML DocumentFormat = "html"
+	DocumentFormatMD   DocumentFormat = "markdown"
+	DocumentFormatCSV  DocumentFormat = "csv"
+	DocumentFormatJSON DocumentFormat = "json"
+	DocumentFormatXML  DocumentFormat = "xml"
 )
 
 // DocumentContent represents document content.

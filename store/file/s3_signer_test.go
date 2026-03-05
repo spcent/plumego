@@ -157,9 +157,9 @@ func TestS3Signer_PresignRequest_ExpiryValidation(t *testing.T) {
 	signer := NewS3Signer("access-key", "secret-key", "us-east-1")
 
 	tests := []struct {
-		name        string
-		expiry      time.Duration
-		wantExpiry  string
+		name       string
+		expiry     time.Duration
+		wantExpiry string
 	}{
 		{
 			name:       "valid expiry",
@@ -272,8 +272,8 @@ func TestS3Signer_BuildCanonicalHeaders(t *testing.T) {
 	signer := NewS3Signer("access-key", "secret-key", "us-east-1")
 
 	headers := http.Header{
-		"Content-Type":       []string{"application/json"},
-		"X-Amz-Date":         []string{"20260205T123000Z"},
+		"Content-Type":         []string{"application/json"},
+		"X-Amz-Date":           []string{"20260205T123000Z"},
 		"X-Amz-Content-Sha256": []string{"abc123"},
 	}
 	host := "bucket.s3.amazonaws.com"

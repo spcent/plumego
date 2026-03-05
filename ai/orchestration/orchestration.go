@@ -13,26 +13,26 @@ import (
 
 // Agent represents a single AI agent with a specific role.
 type Agent struct {
-	ID          string
-	Name        string
-	Description string
-	Provider    provider.Provider
-	Model       string
+	ID           string
+	Name         string
+	Description  string
+	Provider     provider.Provider
+	Model        string
 	SystemPrompt string
-	Temperature float64
-	MaxTokens   int
-	Tools       []provider.Tool
+	Temperature  float64
+	MaxTokens    int
+	Tools        []provider.Tool
 }
 
 // AgentResult represents the result of an agent execution.
 type AgentResult struct {
-	AgentID   string
-	Input     string
-	Output    string
-	Error     error
-	StartTime time.Time
-	EndTime   time.Time
-	Duration  time.Duration
+	AgentID    string
+	Input      string
+	Output     string
+	Error      error
+	StartTime  time.Time
+	EndTime    time.Time
+	Duration   time.Duration
 	TokenUsage tokenizer.TokenUsage
 }
 
@@ -54,9 +54,9 @@ type Step interface {
 
 // SequentialStep executes an agent and waits for completion.
 type SequentialStep struct {
-	StepName string
-	Agent    *Agent
-	InputFn  func(state map[string]any) string
+	StepName  string
+	Agent     *Agent
+	InputFn   func(state map[string]any) string
 	OutputKey string
 }
 
@@ -86,9 +86,9 @@ func (s *SequentialStep) Name() string {
 
 // ParallelStep executes multiple agents concurrently.
 type ParallelStep struct {
-	StepName string
-	Agents   []*Agent
-	InputFn  func(state map[string]any) []string
+	StepName   string
+	Agents     []*Agent
+	InputFn    func(state map[string]any) []string
 	OutputKeys []string
 }
 

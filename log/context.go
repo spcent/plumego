@@ -1,12 +1,20 @@
 package glog
 
-import "context"
+import (
+	"context"
+	"sync"
+)
 
 type contextKey int
 
 const (
 	traceIDKey contextKey = iota
 	loggerKey
+)
+
+var (
+	defaultLoggerOnce sync.Once
+	defaultLogger     StructuredLogger
 )
 
 // WithTraceID adds a trace ID to the context.
@@ -43,12 +51,12 @@ func WithLogger(ctx context.Context, logger StructuredLogger) context.Context {
 // Returns a default gLogger if no logger is present.
 func LoggerFromContext(ctx context.Context) StructuredLogger {
 	if ctx == nil {
-		return NewGLogger()
+		return getDefaultLogger()
 	}
 	if logger, ok := ctx.Value(loggerKey).(StructuredLogger); ok {
 		return logger
 	}
-	return NewGLogger()
+	return getDefaultLogger()
 }
 
 // LoggerFromContextOrNew extracts the logger from context, or creates a new one.
@@ -70,4 +78,11 @@ func LoggerFromContextOrNew(ctx context.Context) (StructuredLogger, context.Cont
 	logger := NewGLogger()
 	ctx = WithLogger(ctx, logger)
 	return logger, ctx
+}
+
+func getDefaultLogger() StructuredLogger {
+	defaultLoggerOnce.Do(func() {
+		defaultLogger = NewGLogger()
+	})
+	return defaultLogger
 }

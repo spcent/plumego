@@ -52,15 +52,15 @@ type CircuitBreaker struct {
 	name string
 
 	// Configuration
-	maxFailures    int           // Max failures before opening
-	timeout        time.Duration // Request timeout
-	resetTimeout   time.Duration // Time to wait before half-open
+	maxFailures  int           // Max failures before opening
+	timeout      time.Duration // Request timeout
+	resetTimeout time.Duration // Time to wait before half-open
 
 	// State
-	state        State
-	failures     int
-	successes    int
-	lastFailTime time.Time
+	state           State
+	failures        int
+	successes       int
+	lastFailTime    time.Time
 	lastStateChange time.Time
 
 	// Callbacks
@@ -71,20 +71,20 @@ type CircuitBreaker struct {
 
 // Config configures a circuit breaker.
 type Config struct {
-	Name           string
-	MaxFailures    int
-	Timeout        time.Duration
-	ResetTimeout   time.Duration
-	OnStateChange  func(from, to State)
+	Name          string
+	MaxFailures   int
+	Timeout       time.Duration
+	ResetTimeout  time.Duration
+	OnStateChange func(from, to State)
 }
 
 // NewCircuitBreaker creates a new circuit breaker.
 func NewCircuitBreaker(name string, maxFailures int, resetTimeout time.Duration) *CircuitBreaker {
 	return &CircuitBreaker{
-		name:         name,
-		maxFailures:  maxFailures,
-		resetTimeout: resetTimeout,
-		state:        StateClosed,
+		name:            name,
+		maxFailures:     maxFailures,
+		resetTimeout:    resetTimeout,
+		state:           StateClosed,
 		lastStateChange: time.Now(),
 	}
 }
@@ -92,12 +92,12 @@ func NewCircuitBreaker(name string, maxFailures int, resetTimeout time.Duration)
 // NewCircuitBreakerWithConfig creates a circuit breaker with custom config.
 func NewCircuitBreakerWithConfig(config Config) *CircuitBreaker {
 	return &CircuitBreaker{
-		name:          config.Name,
-		maxFailures:   config.MaxFailures,
-		timeout:       config.Timeout,
-		resetTimeout:  config.ResetTimeout,
-		state:         StateClosed,
-		onStateChange: config.OnStateChange,
+		name:            config.Name,
+		maxFailures:     config.MaxFailures,
+		timeout:         config.Timeout,
+		resetTimeout:    config.ResetTimeout,
+		state:           StateClosed,
+		onStateChange:   config.OnStateChange,
 		lastStateChange: time.Now(),
 	}
 }

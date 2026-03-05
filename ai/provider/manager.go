@@ -188,11 +188,11 @@ func (r *CostOptimizedRouter) Route(ctx context.Context, req *CompletionRequest,
 type TaskType string
 
 const (
-	TaskTypeCoding      TaskType = "coding"
-	TaskTypeAnalysis    TaskType = "analysis"
-	TaskTypeConversation TaskType = "conversation"
+	TaskTypeCoding        TaskType = "coding"
+	TaskTypeAnalysis      TaskType = "analysis"
+	TaskTypeConversation  TaskType = "conversation"
 	TaskTypeSummarization TaskType = "summarization"
-	TaskTypeTranslation TaskType = "translation"
+	TaskTypeTranslation   TaskType = "translation"
 )
 
 // TaskBasedRouter routes based on task complexity and type.
@@ -205,11 +205,11 @@ type TaskBasedRouter struct {
 func NewTaskBasedRouter() *TaskBasedRouter {
 	return &TaskBasedRouter{
 		taskModels: map[TaskType][]string{
-			TaskTypeCoding:       {"claude-3-opus", "gpt-4"},
-			TaskTypeAnalysis:     {"claude-3-opus", "claude-3-sonnet"},
-			TaskTypeConversation: {"claude-3-sonnet", "gpt-3.5-turbo"},
+			TaskTypeCoding:        {"claude-3-opus", "gpt-4"},
+			TaskTypeAnalysis:      {"claude-3-opus", "claude-3-sonnet"},
+			TaskTypeConversation:  {"claude-3-sonnet", "gpt-3.5-turbo"},
 			TaskTypeSummarization: {"claude-3-haiku", "gpt-3.5-turbo"},
-			TaskTypeTranslation:  {"claude-3-sonnet", "gpt-4"},
+			TaskTypeTranslation:   {"claude-3-sonnet", "gpt-4"},
 		},
 	}
 }
@@ -291,7 +291,7 @@ func (r *TaskBasedRouter) inferTaskType(req *CompletionRequest) TaskType {
 
 // FallbackRouter provides automatic failover to backup providers.
 type FallbackRouter struct {
-	primary Router
+	primary  Router
 	fallback Router
 }
 

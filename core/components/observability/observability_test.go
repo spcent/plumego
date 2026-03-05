@@ -467,7 +467,7 @@ func TestConfigureMetricsWithNilSetCollector(t *testing.T) {
 // noHandlerCollector implements MetricsCollector but does NOT have a Handler() method.
 type noHandlerCollector struct{}
 
-func (c *noHandlerCollector) Record(_ context.Context, _ metrics.MetricRecord)            {}
+func (c *noHandlerCollector) Record(_ context.Context, _ metrics.MetricRecord) {}
 func (c *noHandlerCollector) ObserveHTTP(_ context.Context, _, _ string, _, _ int, _ time.Duration) {
 }
 func (c *noHandlerCollector) ObservePubSub(_ context.Context, _, _ string, _ time.Duration, _ error) {
