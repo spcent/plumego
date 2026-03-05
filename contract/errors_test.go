@@ -76,6 +76,10 @@ func (m *mockStructuredLogger) ErrorCtx(ctx context.Context, msg string, fields 
 	// Not used in this test
 }
 
+func (m *mockStructuredLogger) Fatal(msg string, fields log.Fields) {}
+
+func (m *mockStructuredLogger) FatalCtx(ctx context.Context, msg string, fields log.Fields) {}
+
 func TestErrorBuilder(t *testing.T) {
 	builder := NewErrorBuilder()
 

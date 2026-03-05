@@ -15,6 +15,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	glog "github.com/spcent/plumego/log"
 )
 
 // Level represents the severity of a log message.
@@ -220,19 +222,25 @@ func (cl *ConsoleLogger) With(fields ...Field) Logger {
 	}
 }
 
-// WithContext implements Logger
+// WithContext implements Logger.
+// Extracts trace_id written by glog.WithTraceID and any request_id from context.
 func (cl *ConsoleLogger) WithContext(ctx context.Context) Logger {
-	// Extract common context values
-	fields := []Field{}
+	var fields []Field
 
-	// Check for common context keys (request ID, trace ID, etc.)
-	if requestID := ctx.Value("request_id"); requestID != nil {
-		fields = append(fields, Field{Key: "request_id", Value: requestID})
-	}
-	if traceID := ctx.Value("trace_id"); traceID != nil {
+	// Use glog.TraceIDFromContext to read the typed context key set by glog.WithTraceID.
+	// This ensures interoperability with the core log package's trace propagation.
+	if traceID := glog.TraceIDFromContext(ctx); traceID != "" {
 		fields = append(fields, Field{Key: "trace_id", Value: traceID})
 	}
 
+	// Also support plain string-keyed request_id for callers that attach it directly.
+	if requestID, _ := ctx.Value("request_id").(string); requestID != "" {
+		fields = append(fields, Field{Key: "request_id", Value: requestID})
+	}
+
+	if len(fields) == 0 {
+		return cl
+	}
 	return cl.With(fields...)
 }
 
@@ -276,9 +284,9 @@ func (cl *ConsoleLogger) log(level Level, msg string, fields []Field) {
 // writeJSON writes a log message in JSON format
 func (cl *ConsoleLogger) writeJSON(w io.Writer, level Level, msg string, fields []Field) {
 	entry := map[string]any{
-		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
-		"level":     level.String(),
-		"message":   msg,
+		"time":  time.Now().UTC().Format(time.RFC3339Nano),
+		"level": level.String(),
+		"msg":   msg,
 	}
 
 	for _, field := range fields {
@@ -288,7 +296,7 @@ func (cl *ConsoleLogger) writeJSON(w io.Writer, level Level, msg string, fields 
 	data, err := json.Marshal(entry)
 	if err != nil {
 		// Fallback to simple output
-		fmt.Fprintf(w, `{"timestamp":"%s","level":"%s","message":"%s","error":"failed to marshal fields"}%s`,
+		fmt.Fprintf(w, `{"time":"%s","level":"%s","msg":"%s","error":"failed to marshal fields"}%s`,
 			time.Now().UTC().Format(time.RFC3339Nano), level.String(), msg, "\n")
 		return
 	}
@@ -318,9 +326,10 @@ func (cl *ConsoleLogger) writeText(w io.Writer, level Level, msg string, fields 
 
 // BufferedLogger is an in-memory logger for testing.
 type BufferedLogger struct {
-	entries []LogEntry
-	level   Level
-	mu      sync.RWMutex
+	entries    []LogEntry
+	level      Level
+	baseFields []Field
+	mu         sync.RWMutex
 }
 
 // LogEntry represents a single log entry.
@@ -334,8 +343,9 @@ type LogEntry struct {
 // NewBufferedLogger creates a new buffered logger.
 func NewBufferedLogger() *BufferedLogger {
 	return &BufferedLogger{
-		entries: []LogEntry{},
-		level:   DebugLevel,
+		entries:    []LogEntry{},
+		level:      DebugLevel,
+		baseFields: []Field{},
 	}
 }
 
@@ -364,11 +374,21 @@ func (bl *BufferedLogger) Fatal(msg string, fields ...Field) {
 	bl.log(FatalLevel, msg, fields)
 }
 
-// With implements Logger
+// With implements Logger — returns a new BufferedLogger with merged base fields.
+// The child logger has its own independent entry buffer.
 func (bl *BufferedLogger) With(fields ...Field) Logger {
-	// For buffered logger, we just return the same logger
-	// In a more advanced implementation, this could create a child logger
-	return bl
+	bl.mu.RLock()
+	merged := make([]Field, len(bl.baseFields)+len(fields))
+	copy(merged, bl.baseFields)
+	copy(merged[len(bl.baseFields):], fields)
+	level := bl.level
+	bl.mu.RUnlock()
+
+	return &BufferedLogger{
+		entries:    []LogEntry{},
+		level:      level,
+		baseFields: merged,
+	}
 }
 
 // WithContext implements Logger
@@ -383,7 +403,7 @@ func (bl *BufferedLogger) SetLevel(level Level) {
 	bl.level = level
 }
 
-// log adds an entry to the buffer
+// log adds an entry to the buffer, merging baseFields with call-time fields.
 func (bl *BufferedLogger) log(level Level, msg string, fields []Field) {
 	bl.mu.Lock()
 	defer bl.mu.Unlock()
@@ -392,10 +412,14 @@ func (bl *BufferedLogger) log(level Level, msg string, fields []Field) {
 		return
 	}
 
+	allFields := make([]Field, len(bl.baseFields)+len(fields))
+	copy(allFields, bl.baseFields)
+	copy(allFields[len(bl.baseFields):], fields)
+
 	bl.entries = append(bl.entries, LogEntry{
 		Level:     level,
 		Message:   msg,
-		Fields:    fields,
+		Fields:    allFields,
 		Timestamp: time.Now(),
 	})
 }

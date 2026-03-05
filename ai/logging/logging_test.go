@@ -111,8 +111,8 @@ func TestConsoleLogger_JSON(t *testing.T) {
 		t.Errorf("level = %v, want INFO", entry["level"])
 	}
 
-	if entry["message"] != "test message" {
-		t.Errorf("message = %v, want 'test message'", entry["message"])
+	if entry["msg"] != "test message" {
+		t.Errorf("msg = %v, want 'test message'", entry["msg"])
 	}
 
 	if entry["key1"] != "value1" {

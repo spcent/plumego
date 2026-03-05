@@ -63,6 +63,12 @@ func (l *stubLogger) ErrorCtx(ctx context.Context, msg string, fields log.Fields
 	l.record(msg, fields)
 }
 
+func (l *stubLogger) Fatal(msg string, fields log.Fields) { l.record(msg, fields) }
+
+func (l *stubLogger) FatalCtx(ctx context.Context, msg string, fields log.Fields) {
+	l.record(msg, fields)
+}
+
 func (l *stubLogger) record(msg string, fields log.Fields) {
 	merged := make(log.Fields, len(l.baseFields)+len(fields))
 	for k, v := range l.baseFields {

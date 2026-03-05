@@ -980,6 +980,16 @@ func (l *testLogger) ErrorCtx(ctx context.Context, msg string, fields glog.Field
 	l.Error(msg, fields)
 }
 
+func (l *testLogger) Fatal(msg string, fields glog.Fields) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logs = append(l.logs, logEntry{level: "fatal", msg: msg, fields: copyGlogFields(fields)})
+}
+
+func (l *testLogger) FatalCtx(ctx context.Context, msg string, fields glog.Fields) {
+	l.Fatal(msg, fields)
+}
+
 func copyGlogFields(fields glog.Fields) glog.Fields {
 	result := make(glog.Fields)
 	for k, v := range fields {
