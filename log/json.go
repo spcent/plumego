@@ -15,6 +15,7 @@ type JSONLogger struct {
 	mu               sync.Mutex
 	writeErrOnce     sync.Once
 	output           io.Writer
+	errorOutput      io.Writer // optional; Error/Fatal go here when non-nil
 	level            Level
 	verbosity        int
 	fields           Fields
@@ -23,14 +24,18 @@ type JSONLogger struct {
 
 // JSONLoggerConfig configures a JSONLogger instance.
 type JSONLoggerConfig struct {
-	// Output destination (defaults to os.Stdout)
+	// Output is the destination for Debug/Info/Warn entries (defaults to os.Stdout).
 	Output io.Writer
-	// Minimum log level (defaults to INFO)
+	// ErrorOutput is an optional separate destination for Error and Fatal entries.
+	// When nil, Error/Fatal entries are written to Output.
+	// Set to os.Stderr to mirror the typical console-logger convention.
+	ErrorOutput io.Writer
+	// Level is the minimum log level (defaults to INFO).
 	Level Level
-	// Default fields to include in every log entry
+	// Fields contains default fields added to every log entry.
 	Fields Fields
 	// RespectVerbosity applies V(1) filtering to Debug/DebugCtx when enabled.
-	// Default false keeps backward-compatible behavior.
+	// Default false keeps backward-compatible behaviour.
 	RespectVerbosity bool
 	// Verbosity controls local debug gating when RespectVerbosity is true.
 	Verbosity int
@@ -43,6 +48,7 @@ func NewJSONLogger(config JSONLoggerConfig) *JSONLogger {
 	}
 	return &JSONLogger{
 		output:           config.Output,
+		errorOutput:      config.ErrorOutput,
 		level:            config.Level,
 		verbosity:        config.Verbosity,
 		fields:           cloneFields(config.Fields),
@@ -55,6 +61,7 @@ func NewJSONLogger(config JSONLoggerConfig) *JSONLogger {
 func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
 	l.mu.Lock()
 	output := l.output
+	errorOutput := l.errorOutput
 	level := l.level
 	verbosity := l.verbosity
 	respectVerbosity := l.respectVerbosity
@@ -63,6 +70,7 @@ func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
 
 	return &JSONLogger{
 		output:           output,
+		errorOutput:      errorOutput,
 		level:            level,
 		verbosity:        verbosity,
 		fields:           merged,
@@ -138,7 +146,7 @@ func (l *JSONLogger) log(level Level, msg string, fields Fields, ctx context.Con
 	defer l.mu.Unlock()
 
 	entry := l.buildEntry(level, msg, fields, ctx)
-	l.writeEntry(entry)
+	l.writeEntry(level, entry)
 }
 
 // buildEntry constructs the log entry map.
@@ -160,19 +168,30 @@ func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, ctx cont
 	return entry
 }
 
-// writeEntry marshals and writes the log entry.
-func (l *JSONLogger) writeEntry(entry map[string]any) {
+// writeEntry marshals and writes the log entry to the appropriate output.
+func (l *JSONLogger) writeEntry(level Level, entry map[string]any) {
+	w := l.writerFor(level)
+
 	data, err := json.Marshal(entry)
 	if err != nil {
 		data = []byte(`{"level":"ERROR","msg":"failed to marshal log entry"}`)
 	}
-	if err := writeFull(l.output, data); err != nil {
+	if err := writeFull(w, data); err != nil {
 		l.reportWriteError(err)
 		return
 	}
-	if err := writeFull(l.output, []byte("\n")); err != nil {
+	if err := writeFull(w, []byte("\n")); err != nil {
 		l.reportWriteError(err)
 	}
+}
+
+// writerFor returns the appropriate writer for the given level.
+// Error and Fatal go to errorOutput when configured; everything else uses output.
+func (l *JSONLogger) writerFor(level Level) io.Writer {
+	if l.errorOutput != nil && (level == ERROR || level == FATAL) {
+		return l.errorOutput
+	}
+	return l.output
 }
 
 // Start implements the Lifecycle interface (no-op for JSONLogger).

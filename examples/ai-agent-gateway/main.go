@@ -12,7 +12,6 @@ import (
 	"github.com/spcent/plumego/ai/filter"
 	"github.com/spcent/plumego/ai/instrumentation"
 	"github.com/spcent/plumego/ai/llmcache"
-	"github.com/spcent/plumego/ai/logging"
 	"github.com/spcent/plumego/ai/metrics"
 	"github.com/spcent/plumego/ai/orchestration"
 	"github.com/spcent/plumego/ai/prompt"
@@ -22,6 +21,7 @@ import (
 	"github.com/spcent/plumego/ai/tokenizer"
 	"github.com/spcent/plumego/ai/tool"
 	"github.com/spcent/plumego/core"
+	glog "github.com/spcent/plumego/log"
 )
 
 func main() {
@@ -35,11 +35,12 @@ func main() {
 	collector := metrics.NewMemoryCollector()
 
 	// Phase 3: Create structured logger
-	logger := logging.NewConsoleLogger(
-		logging.WithLevel(logging.InfoLevel),
-		logging.WithFormat(logging.JSONFormat),
-	)
-	logger.Info("Starting AI Agent Gateway", logging.Fields("version", "phase-3")...)
+	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		Output:      os.Stdout,
+		ErrorOutput: os.Stderr,
+		Level:       glog.INFO,
+	})
+	logger.Info("Starting AI Agent Gateway", glog.Fields{"version": "phase-3"})
 
 	// Create providers (Phase 3: wrapped with instrumentation)
 	providerMgr := provider.NewManager()
@@ -48,7 +49,7 @@ func main() {
 		// Wrap with instrumentation
 		instrumentedProvider := instrumentation.NewInstrumentedProvider(claudeProvider, collector)
 		providerMgr.Register(instrumentedProvider)
-		logger.Info("Registered Claude provider with instrumentation")
+		logger.Info("Registered Claude provider with instrumentation", nil)
 	}
 
 	// Create session manager
@@ -83,12 +84,12 @@ func main() {
 	// Note: We create an instrumented cache wrapper for metrics collection
 	// The raw cache is still used for direct stats queries
 	_ = instrumentation.NewInstrumentedMemoryCache(llmCache, collector)
-	logger.Info("Created LLM cache with instrumentation")
+	logger.Info("Created LLM cache with instrumentation", nil)
 
 	// Phase 2: Create orchestration engine (Phase 3: wrapped with instrumentation)
 	orchEngine := orchestration.NewEngine()
 	instrumentedEngine := instrumentation.NewInstrumentedEngine(orchEngine, collector)
-	logger.Info("Created orchestration engine with instrumentation")
+	logger.Info("Created orchestration engine with instrumentation", nil)
 
 	// Create application
 	app := core.New(
