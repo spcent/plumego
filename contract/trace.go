@@ -528,10 +528,12 @@ func (t *Tracer) StartChildSpan(ctx context.Context, parentSpan *Span, name stri
 		Attributes: make(map[string]any),
 	}
 
-	// Apply options
+	// Apply options. Pass a stub trace so options that only modify span fields
+	// (e.g. WithSpanKind) work correctly. Trace-level attributes in the stub
+	// are discarded; callers should set those on the root trace instead.
+	stubTrace := &Trace{Attributes: make(map[string]any)}
 	for _, option := range options {
-		// Options might need to access parent span
-		option(&Trace{}, span)
+		option(stubTrace, span)
 	}
 
 	sampled := false

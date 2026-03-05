@@ -51,42 +51,27 @@ func BindErrorToAPIError(err error) APIError {
 	category := CategoryValidation
 	errorType := ErrTypeValidation
 
-	var bindErr *BindError
-	if errors.As(err, &bindErr) && bindErr != nil && bindErr.Message != "" {
-		switch bindErr.Message {
-		case ErrRequestBodyTooLarge.Error():
-			status = http.StatusRequestEntityTooLarge
-			code = "REQUEST_BODY_TOO_LARGE"
-			message = ErrRequestBodyTooLarge.Error()
-		case ErrEmptyRequestBody.Error():
-			code = "EMPTY_BODY"
-			message = ErrEmptyRequestBody.Error()
-		case ErrInvalidJSON.Error():
-			code = "INVALID_JSON"
-			message = ErrInvalidJSON.Error()
-		case ErrUnexpectedExtraData.Error(), "unexpected extra JSON data":
-			code = "UNEXPECTED_EXTRA_DATA"
-			message = ErrUnexpectedExtraData.Error()
-		default:
-			if len(fields) == 0 {
-				message = bindErr.Message
-			}
-		}
-	}
-
-	if errors.Is(err, ErrRequestBodyTooLarge) {
+	switch {
+	case errors.Is(err, ErrRequestBodyTooLarge):
 		status = http.StatusRequestEntityTooLarge
 		code = "REQUEST_BODY_TOO_LARGE"
 		message = ErrRequestBodyTooLarge.Error()
-	} else if errors.Is(err, ErrEmptyRequestBody) {
+	case errors.Is(err, ErrEmptyRequestBody):
 		code = "EMPTY_BODY"
 		message = ErrEmptyRequestBody.Error()
-	} else if errors.Is(err, ErrInvalidJSON) {
+	case errors.Is(err, ErrInvalidJSON):
 		code = "INVALID_JSON"
 		message = ErrInvalidJSON.Error()
-	} else if errors.Is(err, ErrUnexpectedExtraData) {
+	case errors.Is(err, ErrUnexpectedExtraData):
 		code = "UNEXPECTED_EXTRA_DATA"
 		message = ErrUnexpectedExtraData.Error()
+	default:
+		if len(fields) == 0 {
+			var bindErr *BindError
+			if errors.As(err, &bindErr) && bindErr != nil && bindErr.Message != "" {
+				message = bindErr.Message
+			}
+		}
 	}
 
 	if len(fields) > 0 {

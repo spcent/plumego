@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/spcent/plumego/log"
@@ -539,7 +540,9 @@ func IsRetryableError(err APIError) bool {
 }
 
 // ErrorMetrics represents metrics for error tracking and monitoring.
+// All methods are safe for concurrent use.
 type ErrorMetrics struct {
+	mu            sync.Mutex
 	TotalErrors   int64                   `json:"total_errors"`
 	ByCategory    map[ErrorCategory]int64 `json:"by_category"`
 	ByType        map[ErrorType]int64     `json:"by_type"`
@@ -591,31 +594,47 @@ func NewWrappedError(err error, operation, module string, params map[string]any)
 	}
 }
 
-// WrapError wraps an existing error with additional context
+// WrapError wraps an existing error with additional context.
+// If err is already a *WrappedErrorWithContext, a new value is created that merges
+// the existing and new context rather than mutating the original.
 func WrapError(err error, operation, module string, params map[string]any) error {
 	if err == nil {
 		return nil
 	}
 
-	// If already wrapped, add to the chain
 	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
-		// Add operation to existing context if not set
-		if wrapped.Context.Operation == "" && operation != "" {
-			wrapped.Context.Operation = operation
-		}
-		if wrapped.Context.Module == "" && module != "" {
-			wrapped.Context.Module = module
-		}
-		// Merge params
-		if params != nil {
-			if wrapped.Context.Params == nil {
-				wrapped.Context.Params = make(map[string]any)
+		// Build merged params without mutating wrapped.
+		// Only allocate if at least one source has entries.
+		var mergedParams map[string]any
+		if len(wrapped.Context.Params) > 0 || len(params) > 0 {
+			mergedParams = make(map[string]any, len(wrapped.Context.Params)+len(params))
+			for k, v := range wrapped.Context.Params {
+				mergedParams[k] = v
 			}
 			for k, v := range params {
-				wrapped.Context.Params[k] = v
+				mergedParams[k] = v
 			}
 		}
-		return wrapped
+
+		op := wrapped.Context.Operation
+		if op == "" {
+			op = operation
+		}
+		mod := wrapped.Context.Module
+		if mod == "" {
+			mod = module
+		}
+
+		return &WrappedErrorWithContext{
+			Err:     wrapped.Err,
+			Message: wrapped.Message,
+			When:    wrapped.When,
+			Context: ErrorContext{
+				Operation: op,
+				Module:    mod,
+				Params:    mergedParams,
+			},
+		}
 	}
 
 	return NewWrappedError(err, operation, module, params)
@@ -839,15 +858,17 @@ func NewErrorMetrics() *ErrorMetrics {
 	}
 }
 
-// RecordError records an error in the metrics.
+// RecordError records an error in the metrics. Safe for concurrent use.
 func (em *ErrorMetrics) RecordError(err APIError) {
+	now := time.Now()
+
+	em.mu.Lock()
 	em.TotalErrors++
 	em.ByCategory[err.Category]++
 	em.ByStatus[err.Status]++
-
 	if errorType, ok := err.Details["type"].(ErrorType); ok {
 		em.ByType[errorType]++
 	}
-
-	em.LastErrorTime = time.Now()
+	em.LastErrorTime = now
+	em.mu.Unlock()
 }

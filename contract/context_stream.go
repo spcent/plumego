@@ -106,11 +106,11 @@ func (c *Ctx) streamContext() context.Context {
 	return c.R.Context()
 }
 
-func checkStreamContext(ctx context.Context) error {
-	if ctx == nil {
-		return nil
+func validateChunkSize(chunkSize int) error {
+	if chunkSize <= 0 {
+		return ErrInvalidChunkSize
 	}
-	return ctx.Err()
+	return nil
 }
 
 func sleepWithContext(ctx context.Context, delay time.Duration) error {
@@ -131,19 +131,146 @@ func sleepWithContext(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-func validateChunkSize(chunkSize int) error {
-	if chunkSize <= 0 {
-		return ErrInvalidChunkSize
-	}
-	return nil
-}
-
 // flush attempts to flush the response writer if it supports http.Flusher.
 func (c *Ctx) flush() {
 	if f, ok := c.W.(http.Flusher); ok {
 		f.Flush()
 	}
 }
+
+// --- Generic internal streaming helpers ---
+
+// initStream sets content-type headers, writes 200 OK, and returns the request context.
+// It is the common setup step for all non-SSE streaming methods.
+func (c *Ctx) initStream(contentType string) (context.Context, error) {
+	ctx := c.streamContext()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	c.W.Header().Set("Content-Type", contentType)
+	c.W.WriteHeader(http.StatusOK)
+	return ctx, nil
+}
+
+// streamFromSlice iterates a slice, calling write for each element.
+// Context cancellation is checked before every write.
+func streamFromSlice[T any](ctx context.Context, items []T, write func(T) error) error {
+	for _, item := range items {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := write(item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// streamFromChan reads from ch until it is closed or ctx is cancelled.
+func streamFromChan[T any](ctx context.Context, ch <-chan T, write func(T) error) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case item, ok := <-ch:
+			if !ok {
+				return nil
+			}
+			if err := write(item); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// streamFromGen calls gen in a loop until it returns io.EOF or ctx is cancelled.
+func streamFromGen[T any](ctx context.Context, gen func() (T, error), write func(T) error) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		item, err := gen()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := write(item); err != nil {
+			return err
+		}
+	}
+}
+
+// streamFromSliceChunked writes items and calls flush every chunkSize elements and at the end.
+func streamFromSliceChunked[T any](ctx context.Context, items []T, chunkSize int, write func(T) error, flush func()) error {
+	for i, item := range items {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := write(item); err != nil {
+			return err
+		}
+		if (i+1)%chunkSize == 0 {
+			flush()
+		}
+	}
+	flush()
+	return nil
+}
+
+// streamFromGenWithRetry calls gen in a loop, retrying up to maxRetries times on transient errors.
+func streamFromGenWithRetry[T any](ctx context.Context, gen func() (T, error), maxRetries int, delay time.Duration, write func(T) error) error {
+	retries := 0
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		item, err := gen()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			if retries < maxRetries {
+				if err := sleepWithContext(ctx, delay); err != nil {
+					return err
+				}
+				retries++
+				continue
+			}
+			return err
+		}
+		retries = 0
+		if err := write(item); err != nil {
+			return err
+		}
+	}
+}
+
+// jsonWrite returns a write function that encodes items as JSON and flushes immediately.
+func (c *Ctx) jsonWrite() func(any) error {
+	enc := json.NewEncoder(c.W)
+	return func(v any) error {
+		if err := enc.Encode(v); err != nil {
+			return err
+		}
+		c.flush()
+		return nil
+	}
+}
+
+// textWrite returns a write function that writes a text line and flushes immediately.
+func (c *Ctx) textWrite() func(string) error {
+	return func(line string) error {
+		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
+			return err
+		}
+		c.flush()
+		return nil
+	}
+}
+
+// --- SSE API ---
 
 // RespondWithSSE starts a Server-Sent Events response.
 // Returns an SSEWriter for sending events, or an error if SSE is not supported.
@@ -152,527 +279,224 @@ func (c *Ctx) RespondWithSSE() (*SSEWriter, error) {
 	c.W.Header().Set("Cache-Control", "no-cache")
 	c.W.Header().Set("Connection", "keep-alive")
 	c.W.WriteHeader(http.StatusOK)
-
 	return NewSSEWriter(c.W)
 }
 
-// RespondWithEventSource starts an event stream response.
-// This is an alias for RespondWithSSE.
-func (c *Ctx) RespondWithEventSource() (*SSEWriter, error) {
-	return c.RespondWithSSE()
-}
-
-// StreamJSON streams JSON data line by line.
-func (c *Ctx) StreamJSON(items []any) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	c.W.Header().Set("Content-Type", "application/x-ndjson")
-	c.W.WriteHeader(http.StatusOK)
-
-	encoder := json.NewEncoder(c.W)
-	for _, item := range items {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		if err := encoder.Encode(item); err != nil {
-			return err
-		}
-		c.flush()
-	}
-
-	return nil
-}
-
-// StreamText streams text data line by line.
-func (c *Ctx) StreamText(lines []string) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	c.W.WriteHeader(http.StatusOK)
-
-	for _, line := range lines {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
-			return err
-		}
-		c.flush()
-	}
-
-	return nil
-}
-
-// StreamBinary streams binary data in chunks.
-func (c *Ctx) StreamBinary(reader io.Reader, chunkSize int) error {
-	if err := validateChunkSize(chunkSize); err != nil {
-		return err
-	}
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	c.W.Header().Set("Content-Type", "application/octet-stream")
-	c.W.WriteHeader(http.StatusOK)
-
-	buf := make([]byte, chunkSize)
-	for {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		n, err := reader.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-
-		if n > 0 {
-			if err := checkStreamContext(ctx); err != nil {
-				return err
-			}
-			if _, err := c.W.Write(buf[:n]); err != nil {
-				return err
-			}
-			if f, ok := c.W.(http.Flusher); ok {
-				f.Flush()
-			}
-		}
-	}
-
-	return nil
-}
-
-// StreamJSONWithChannel streams JSON data from a channel.
-func (c *Ctx) StreamJSONWithChannel(itemChan <-chan any) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	c.W.Header().Set("Content-Type", "application/x-ndjson")
-	c.W.WriteHeader(http.StatusOK)
-
-	encoder := json.NewEncoder(c.W)
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case item, ok := <-itemChan:
-			if !ok {
-				return nil
-			}
-			if err := encoder.Encode(item); err != nil {
-				return err
-			}
-			if f, ok := c.W.(http.Flusher); ok {
-				f.Flush()
-			}
-		}
-	}
-}
-
-// StreamTextWithChannel streams text data from a channel.
-func (c *Ctx) StreamTextWithChannel(lineChan <-chan string) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	c.W.WriteHeader(http.StatusOK)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case line, ok := <-lineChan:
-			if !ok {
-				return nil
-			}
-			if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
-				return err
-			}
-			if f, ok := c.W.(http.Flusher); ok {
-				f.Flush()
-			}
-		}
-	}
-}
-
-// StreamSSEWithChannel streams Server-Sent Events from a channel.
-func (c *Ctx) StreamSSEWithChannel(eventChan <-chan SSEEvent) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	sseWriter, err := c.RespondWithSSE()
-	if err != nil {
-		return err
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case event, ok := <-eventChan:
-			if !ok {
-				return nil
-			}
-			if err := sseWriter.Write(event); err != nil {
-				return err
-			}
-		}
-	}
-}
-
-// StreamJSONWithGenerator streams JSON data using a generator function.
-func (c *Ctx) StreamJSONWithGenerator(generator func() (any, error)) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	c.W.Header().Set("Content-Type", "application/x-ndjson")
-	c.W.WriteHeader(http.StatusOK)
-
-	encoder := json.NewEncoder(c.W)
-	for {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		item, err := generator()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-
-		if err := encoder.Encode(item); err != nil {
-			return err
-		}
-		c.flush()
-	}
-
-	return nil
-}
-
-// StreamTextWithGenerator streams text data using a generator function.
-func (c *Ctx) StreamTextWithGenerator(generator func() (string, error)) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	c.W.WriteHeader(http.StatusOK)
-
-	for {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		line, err := generator()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-
-		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
-			return err
-		}
-		c.flush()
-	}
-
-	return nil
-}
-
-// StreamSSEWithGenerator streams Server-Sent Events using a generator function.
-func (c *Ctx) StreamSSEWithGenerator(generator func() (SSEEvent, error)) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
-		return err
-	}
-	sseWriter, err := c.RespondWithSSE()
-	if err != nil {
-		return err
-	}
-
-	for {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		event, err := generator()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-
-		if err := sseWriter.Write(event); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// IsSSESupported checks if the response writer supports SSE.
+// IsSSESupported reports whether the response writer supports SSE flushing.
 func (c *Ctx) IsSSESupported() bool {
 	_, ok := c.W.(http.Flusher)
 	return ok
 }
 
-// SetSSEHeaders sets the standard SSE headers.
+// SetSSEHeaders sets the standard SSE response headers without writing the status line.
 func (c *Ctx) SetSSEHeaders() {
 	c.W.Header().Set("Content-Type", "text/event-stream")
 	c.W.Header().Set("Cache-Control", "no-cache")
 	c.W.Header().Set("Connection", "keep-alive")
 }
 
-// SetEventSourceHeaders sets the standard event source headers.
-func (c *Ctx) SetEventSourceHeaders() {
-	c.SetSSEHeaders()
-}
-
 // WriteSSE writes a single SSE event and flushes.
 func (c *Ctx) WriteSSE(event SSEEvent) error {
-	sseWriter, err := NewSSEWriter(c.W)
+	sw, err := NewSSEWriter(c.W)
 	if err != nil {
 		return err
 	}
-	return sseWriter.Write(event)
+	return sw.Write(event)
 }
 
-// WriteEventSource writes a single event source event and flushes.
-func (c *Ctx) WriteEventSource(event SSEEvent) error {
-	return c.WriteSSE(event)
+// --- Slice-based streaming ---
+
+// StreamJSON streams items as newline-delimited JSON, flushing after each item.
+func (c *Ctx) StreamJSON(items []any) error {
+	ctx, err := c.initStream("application/x-ndjson")
+	if err != nil {
+		return err
+	}
+	return streamFromSlice(ctx, items, c.jsonWrite())
 }
 
-// StreamJSONChunked streams JSON data in chunks with custom chunk size.
+// StreamText streams lines of text, flushing after each line.
+func (c *Ctx) StreamText(lines []string) error {
+	ctx, err := c.initStream("text/plain; charset=utf-8")
+	if err != nil {
+		return err
+	}
+	return streamFromSlice(ctx, lines, c.textWrite())
+}
+
+// StreamBinary streams binary data in chunks of the given size.
+func (c *Ctx) StreamBinary(reader io.Reader, chunkSize int) error {
+	if err := validateChunkSize(chunkSize); err != nil {
+		return err
+	}
+	ctx, err := c.initStream("application/octet-stream")
+	if err != nil {
+		return err
+	}
+	buf := make([]byte, chunkSize)
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		n, readErr := reader.Read(buf)
+		if n > 0 {
+			if _, err := c.W.Write(buf[:n]); err != nil {
+				return err
+			}
+			c.flush()
+		}
+		if readErr == io.EOF {
+			return nil
+		}
+		if readErr != nil {
+			return readErr
+		}
+	}
+}
+
+// --- Channel-based streaming ---
+
+// StreamJSONWithChannel streams JSON items from a channel, flushing after each item.
+func (c *Ctx) StreamJSONWithChannel(itemChan <-chan any) error {
+	ctx, err := c.initStream("application/x-ndjson")
+	if err != nil {
+		return err
+	}
+	return streamFromChan(ctx, itemChan, c.jsonWrite())
+}
+
+// StreamTextWithChannel streams text lines from a channel, flushing after each line.
+func (c *Ctx) StreamTextWithChannel(lineChan <-chan string) error {
+	ctx, err := c.initStream("text/plain; charset=utf-8")
+	if err != nil {
+		return err
+	}
+	return streamFromChan(ctx, lineChan, c.textWrite())
+}
+
+// StreamSSEWithChannel streams Server-Sent Events from a channel.
+func (c *Ctx) StreamSSEWithChannel(eventChan <-chan SSEEvent) error {
+	ctx := c.streamContext()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sw, err := c.RespondWithSSE()
+	if err != nil {
+		return err
+	}
+	return streamFromChan(ctx, eventChan, sw.Write)
+}
+
+// --- Generator-based streaming ---
+
+// StreamJSONWithGenerator streams JSON items from a generator function until it returns io.EOF.
+func (c *Ctx) StreamJSONWithGenerator(generator func() (any, error)) error {
+	ctx, err := c.initStream("application/x-ndjson")
+	if err != nil {
+		return err
+	}
+	return streamFromGen(ctx, generator, c.jsonWrite())
+}
+
+// StreamTextWithGenerator streams text lines from a generator function until it returns io.EOF.
+func (c *Ctx) StreamTextWithGenerator(generator func() (string, error)) error {
+	ctx, err := c.initStream("text/plain; charset=utf-8")
+	if err != nil {
+		return err
+	}
+	return streamFromGen(ctx, generator, c.textWrite())
+}
+
+// StreamSSEWithGenerator streams Server-Sent Events from a generator function until it returns io.EOF.
+func (c *Ctx) StreamSSEWithGenerator(generator func() (SSEEvent, error)) error {
+	ctx := c.streamContext()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sw, err := c.RespondWithSSE()
+	if err != nil {
+		return err
+	}
+	return streamFromGen(ctx, generator, sw.Write)
+}
+
+// --- Chunked streaming ---
+
+// StreamJSONChunked streams JSON items, flushing every chunkSize items.
 func (c *Ctx) StreamJSONChunked(items []any, chunkSize int) error {
 	if err := validateChunkSize(chunkSize); err != nil {
 		return err
 	}
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
+	ctx, err := c.initStream("application/x-ndjson")
+	if err != nil {
 		return err
 	}
-	c.W.Header().Set("Content-Type", "application/x-ndjson")
-	c.W.WriteHeader(http.StatusOK)
-
-	encoder := json.NewEncoder(c.W)
-	for i, item := range items {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		if err := encoder.Encode(item); err != nil {
-			return err
-		}
-
-		// Flush after each chunk
-		if (i+1)%chunkSize == 0 {
-			c.flush()
-		}
-	}
-
-	// Final flush
-	c.flush()
-
-	return nil
+	enc := json.NewEncoder(c.W)
+	return streamFromSliceChunked(ctx, items, chunkSize, enc.Encode, c.flush)
 }
 
-// StreamTextChunked streams text data in chunks with custom chunk size.
+// StreamTextChunked streams text lines, flushing every chunkSize lines.
 func (c *Ctx) StreamTextChunked(lines []string, chunkSize int) error {
 	if err := validateChunkSize(chunkSize); err != nil {
 		return err
 	}
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
+	ctx, err := c.initStream("text/plain; charset=utf-8")
+	if err != nil {
 		return err
 	}
-	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	c.W.WriteHeader(http.StatusOK)
-
-	for i, line := range lines {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
-			return err
-		}
-
-		// Flush after each chunk
-		if (i+1)%chunkSize == 0 {
-			c.flush()
-		}
+	write := func(line string) error {
+		_, err := fmt.Fprintf(c.W, "%s\n", line)
+		return err
 	}
-
-	// Final flush
-	c.flush()
-
-	return nil
+	return streamFromSliceChunked(ctx, lines, chunkSize, write, c.flush)
 }
 
-// StreamSSEChunked streams Server-Sent Events in chunks with custom chunk size.
+// StreamSSEChunked streams Server-Sent Events, flushing every chunkSize events.
+// Note: SSEWriter.Write already flushes after each event; the chunk flush is an additional guarantee.
 func (c *Ctx) StreamSSEChunked(events []SSEEvent, chunkSize int) error {
 	if err := validateChunkSize(chunkSize); err != nil {
 		return err
 	}
 	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	sseWriter, err := c.RespondWithSSE()
+	sw, err := c.RespondWithSSE()
 	if err != nil {
 		return err
 	}
-
-	for i, event := range events {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		if err := sseWriter.Write(event); err != nil {
-			return err
-		}
-
-		// Flush after each chunk
-		if (i+1)%chunkSize == 0 {
-			c.flush()
-		}
-	}
-
-	// Final flush
-	c.flush()
-
-	return nil
+	return streamFromSliceChunked(ctx, events, chunkSize, sw.Write, c.flush)
 }
 
-// StreamJSONWithRetry streams JSON data with retry logic on error.
+// --- Streaming with retry ---
+
+// StreamJSONWithRetry streams JSON items from a generator, retrying up to maxRetries times on error.
 func (c *Ctx) StreamJSONWithRetry(generator func() (any, error), maxRetries int, retryDelay time.Duration) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
+	ctx, err := c.initStream("application/x-ndjson")
+	if err != nil {
 		return err
 	}
-	c.W.Header().Set("Content-Type", "application/x-ndjson")
-	c.W.WriteHeader(http.StatusOK)
-
-	encoder := json.NewEncoder(c.W)
-	retries := 0
-
-	for {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		item, err := generator()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			if retries < maxRetries {
-				if err := sleepWithContext(ctx, retryDelay); err != nil {
-					return err
-				}
-				retries++
-				continue
-			}
-			return err
-		}
-
-		retries = 0 // Reset retries on success
-
-		if err := encoder.Encode(item); err != nil {
-			return err
-		}
-		c.flush()
-	}
-
-	return nil
+	return streamFromGenWithRetry(ctx, generator, maxRetries, retryDelay, c.jsonWrite())
 }
 
-// StreamTextWithRetry streams text data with retry logic on error.
+// StreamTextWithRetry streams text lines from a generator, retrying up to maxRetries times on error.
 func (c *Ctx) StreamTextWithRetry(generator func() (string, error), maxRetries int, retryDelay time.Duration) error {
-	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
+	ctx, err := c.initStream("text/plain; charset=utf-8")
+	if err != nil {
 		return err
 	}
-	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	c.W.WriteHeader(http.StatusOK)
-
-	retries := 0
-
-	for {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		line, err := generator()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			if retries < maxRetries {
-				if err := sleepWithContext(ctx, retryDelay); err != nil {
-					return err
-				}
-				retries++
-				continue
-			}
-			return err
-		}
-
-		retries = 0 // Reset retries on success
-
-		if _, err := fmt.Fprintf(c.W, "%s\n", line); err != nil {
-			return err
-		}
-		c.flush()
-	}
-
-	return nil
+	return streamFromGenWithRetry(ctx, generator, maxRetries, retryDelay, c.textWrite())
 }
 
-// StreamSSEWithRetry streams Server-Sent Events with retry logic on error.
+// StreamSSEWithRetry streams Server-Sent Events from a generator, retrying up to maxRetries times on error.
 func (c *Ctx) StreamSSEWithRetry(generator func() (SSEEvent, error), maxRetries int, retryDelay time.Duration) error {
 	ctx := c.streamContext()
-	if err := checkStreamContext(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	sseWriter, err := c.RespondWithSSE()
+	sw, err := c.RespondWithSSE()
 	if err != nil {
 		return err
 	}
-
-	retries := 0
-
-	for {
-		if err := checkStreamContext(ctx); err != nil {
-			return err
-		}
-		event, err := generator()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			if retries < maxRetries {
-				if err := sleepWithContext(ctx, retryDelay); err != nil {
-					return err
-				}
-				retries++
-				continue
-			}
-			return err
-		}
-
-		retries = 0 // Reset retries on success
-
-		if err := sseWriter.Write(event); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return streamFromGenWithRetry(ctx, generator, maxRetries, retryDelay, sw.Write)
 }
