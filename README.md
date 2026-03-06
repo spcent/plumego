@@ -1,5 +1,7 @@
 # Plumego — Standard Library Web Toolkit
 
+![plumego logo](docs/branding/logo-v1/final/svg/plumego-primary-horizontal-light.svg)
+
 [![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)

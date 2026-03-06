@@ -1,5 +1,7 @@
 # Plumego — 仅基于golang标准库的 Web 工具包
 
+![plumego logo](docs/branding/logo-v1/final/svg/plumego-primary-horizontal-light.svg)
+
 [![Go 版本](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![版本](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
 [![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)

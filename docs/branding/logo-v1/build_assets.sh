@@ -174,43 +174,7 @@ generate_svg() {
   done
 }
 
-generate_png_set() {
-  local input_svg="$1"
-  local output_dir="$2"
-  local base_name="$3"
-  mkdir -p "$output_dir"
-
-  local tmp_dir tmp_png
-  tmp_dir="$(mktemp -d)"
-  tmp_png="$tmp_dir/${base_name}.png"
-
-  if ! python3 -m cairosvg "$input_svg" -o "$tmp_png" >/dev/null 2>&1; then
-    echo "failed to render PNG from $input_svg with CairoSVG" >&2
-    rm -rf "$tmp_dir"
-    exit 1
-  fi
-
-  for size in 1024 512 256 128; do
-    local out_png="$output_dir/${base_name}-${size}.png"
-    cp "$tmp_png" "$out_png"
-    sips -z "$size" "$size" "$out_png" >/dev/null
-  done
-
-  rm -rf "$tmp_dir"
-}
-
-generate_png() {
-  local design
-  for design in monogram toolkit wordmark; do
-    for svg in "$ROOT/$design/svg"/*.svg; do
-      local stem
-      stem="$(basename "${svg%.svg}")"
-      generate_png_set "$svg" "$ROOT/$design/png" "$stem"
-    done
-  done
-}
-
-assemble_final() {
+assemble_final_svg() {
   cp "$ROOT/wordmark/svg/wordmark-horizontal-color.svg" "$ROOT/final/svg/plumego-primary-horizontal-light.svg"
   cp "$ROOT/wordmark/svg/wordmark-horizontal-reverse.svg" "$ROOT/final/svg/plumego-primary-horizontal-dark.svg"
   cp "$ROOT/wordmark/svg/wordmark-square-color.svg" "$ROOT/final/svg/plumego-primary-square-light.svg"
@@ -220,16 +184,10 @@ assemble_final() {
   cp "$ROOT/monogram/svg/monogram-horizontal-reverse.svg" "$ROOT/final/svg/plumego-backup-horizontal-dark.svg"
   cp "$ROOT/monogram/svg/monogram-square-color.svg" "$ROOT/final/svg/plumego-backup-square-light.svg"
   cp "$ROOT/monogram/svg/monogram-square-reverse.svg" "$ROOT/final/svg/plumego-backup-square-dark.svg"
-
-  for svg in "$ROOT/final/svg"/*.svg; do
-    local stem
-    stem="$(basename "${svg%.svg}")"
-    generate_png_set "$svg" "$ROOT/final/png" "$stem"
-  done
 }
 
 generate_svg
-generate_png
-assemble_final
+assemble_final_svg
+python3 "$ROOT/render_png.py"
 
 echo "Brand assets generated under: $ROOT"
