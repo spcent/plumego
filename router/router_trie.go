@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+// This file contains low-level path and cache helpers used by trie matching.
+
 // Optimized path normalization without strings.Trim allocation.
 // Returns the path with leading/trailing slashes removed.
 // For the root path "/" it returns "/".
@@ -53,11 +55,10 @@ func fastBuildCacheKey(method, path string) string {
 // precompiledPattern stores a pre-split pattern for fast matching
 // without repeated string splitting on every cache lookup.
 type precompiledPattern struct {
-	pattern      string   // Original pattern string
-	parts        []string // Pre-split pattern parts
-	paramIndices []int    // Indices of parameter parts (starting with ':')
-	wildcardIdx  int      // Index of wildcard part (-1 if none)
-	numParts     int      // Length of parts slice
+	pattern     string   // Original pattern string
+	parts       []string // Pre-split pattern parts
+	wildcardIdx int      // Index of wildcard part (-1 if none)
+	numParts    int      // Length of parts slice
 }
 
 func newPrecompiledPattern(pattern string) precompiledPattern {
@@ -73,9 +74,6 @@ func newPrecompiledPattern(pattern string) precompiledPattern {
 		if len(part) > 0 && part[0] == '*' {
 			pp.wildcardIdx = i
 			break
-		}
-		if len(part) > 0 && part[0] == ':' {
-			pp.paramIndices = append(pp.paramIndices, i)
 		}
 	}
 

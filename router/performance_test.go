@@ -85,7 +85,7 @@ func BenchmarkRouterComparison(b *testing.B) {
 
 			// Test with caching enabled
 			b.Run("WithCache", func(b *testing.B) {
-				r := NewRouterWithCache(100)
+				r := NewRouterWithCacheCapacity(100)
 				for _, route := range tt.routes {
 					r.AddRoute(route.method, route.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusOK)
@@ -212,7 +212,7 @@ func BenchmarkParameterValidation(b *testing.B) {
 // TestOptimizedRouterFeatures validates all optimization features work together
 func TestOptimizedRouterFeatures(t *testing.T) {
 	// Create router with all features
-	r := NewRouterWithCache(50)
+	r := NewRouterWithCacheCapacity(50)
 
 	// Add validation
 	validation := NewRouteValidation().

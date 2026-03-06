@@ -141,6 +141,7 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 		ParamKeys:        current.paramKeys,
 		RouteMiddlewares: current.middlewares,
 		RoutePattern:     current.fullPath,
+		Validation:       current.validation,
 	}
 }
 

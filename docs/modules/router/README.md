@@ -4,7 +4,7 @@
 > **Stability**: High - Routing API is stable
 > **Go Version**: 1.24+
 
-The `router` package provides a fast, flexible HTTP router built on a radix tree (trie) data structure. It supports path parameters, route groups, middleware binding, and reverse routing.
+The `router` package provides a fast, flexible HTTP router built on a radix tree (trie) data structure. It supports path parameters, route groups, middleware binding, reverse routing, and route-level metadata and validation.
 
 ---
 
@@ -57,42 +57,22 @@ func main() {
 
 ### 1. Router
 
-The `Router` struct manages all routes and performs request matching.
+The public `Router` type is a scoped view over shared routing state. The root
+router and all groups share one internal `routerState`.
 
-```go
-type Router struct {
-    // Routes organized by HTTP method
-    trees map[string]*node
-    // Named routes for reverse routing
-    routes map[string]*Route
-}
-```
+### 2. Route Graph
 
-### 2. Route
-
-A `Route` represents a single endpoint:
-
-```go
-type Route struct {
-    Method      string
-    Path        string
-    Handler     http.Handler
-    Middleware  []func(http.Handler) http.Handler
-    Name        string
-}
-```
+Routes are stored in per-method tries. The trie is the source of truth for
+request matching.
 
 ### 3. Group
 
-A `Group` provides hierarchical route organization:
+A group adds:
 
-```go
-type Group struct {
-    prefix     string
-    router     *Router
-    middleware []func(http.Handler) http.Handler
-}
-```
+- a path prefix
+- a middleware layer
+
+It does not own a separate route tree.
 
 ### 4. Path Parameters
 
@@ -120,6 +100,7 @@ path := plumego.Param(r, "path") // "docs/readme.md"
 | **[Reverse Routing](reverse-routing.md)** | URL generation from route names |
 | **[Middleware Binding](middleware-binding.md)** | Per-route and per-group middleware |
 | **[Trie Router](trie-router.md)** | Internal algorithm and performance |
+| **[Architecture](architecture.md)** | Internal layers, state ownership, cache and validation rules |
 | **[Advanced Patterns](advanced-patterns.md)** | Custom matchers, constraints |
 
 ---

@@ -92,14 +92,79 @@ func (rc *RouteCache) Get(key string) (*MatchResult, bool) {
 	return value, true
 }
 
+// Lookup performs a single cache lookup across exact and parameterized routes.
+// It records one hit or one miss for the entire lookup.
+func (rc *RouteCache) Lookup(method, path, key string) (*MatchResult, []string, bool) {
+	rc.mu.RLock()
+	element, exists := rc.cache[key]
+	if exists {
+		isAtFront := element == rc.list.Front()
+		value := element.Value.(*CacheEntry).value
+		rc.mu.RUnlock()
+
+		if !isAtFront {
+			rc.mu.Lock()
+			if elem, ok := rc.cache[key]; ok && elem == element {
+				rc.list.MoveToFront(elem)
+			}
+			rc.mu.Unlock()
+		}
+
+		atomic.AddUint64(&rc.hits, 1)
+		return value, nil, true
+	}
+	rc.mu.RUnlock()
+
+	rc.patternMu.RLock()
+	patterns, exists := rc.patternCache[method]
+	if !exists || len(patterns) == 0 {
+		rc.patternMu.RUnlock()
+		atomic.AddUint64(&rc.misses, 1)
+		return nil, nil, false
+	}
+
+	bufPtr := pathBufPool.Get().(*[]string)
+	buf := *bufPtr
+	numParts := fastSplitPath(path, buf)
+	pathParts := buf[:numParts]
+
+	paramBufPtr := matchParamBufPool.Get().(*[]string)
+	paramBuf := *paramBufPtr
+
+	for i := range patterns {
+		entry := patterns[i]
+		if paramCount, ok := matchPrecompiled(&entry.precompiled, pathParts, paramBuf); ok {
+			paramValues := make([]string, paramCount)
+			copy(paramValues, paramBuf[:paramCount])
+			rc.patternMu.RUnlock()
+
+			*bufPtr = buf
+			pathBufPool.Put(bufPtr)
+			*paramBufPtr = paramBuf
+			matchParamBufPool.Put(paramBufPtr)
+
+			atomic.AddUint64(&rc.hits, 1)
+			return entry.result, paramValues, true
+		}
+	}
+	rc.patternMu.RUnlock()
+
+	*bufPtr = buf
+	pathBufPool.Put(bufPtr)
+	*paramBufPtr = paramBuf
+	matchParamBufPool.Put(paramBufPtr)
+
+	atomic.AddUint64(&rc.misses, 1)
+	return nil, nil, false
+}
+
 // GetByPattern tries to match a path against cached patterns for parameterized routes
 // Returns the match result and extracted parameter values if found
 func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string, bool) {
 	rc.patternMu.RLock()
 	patterns, exists := rc.patternCache[method]
-	rc.patternMu.RUnlock()
-
 	if !exists || len(patterns) == 0 {
+		rc.patternMu.RUnlock()
 		return nil, nil, false
 	}
 
@@ -114,11 +179,12 @@ func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string,
 	paramBuf := *paramBufPtr
 
 	for i := range patterns {
-		entry := &patterns[i]
+		entry := patterns[i]
 		if paramCount, ok := matchPrecompiled(&entry.precompiled, pathParts, paramBuf); ok {
 			// Copy params out of the pooled buffer before returning it
 			paramValues := make([]string, paramCount)
 			copy(paramValues, paramBuf[:paramCount])
+			rc.patternMu.RUnlock()
 
 			*bufPtr = buf
 			pathBufPool.Put(bufPtr)
@@ -129,6 +195,7 @@ func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string,
 			return entry.result, paramValues, true
 		}
 	}
+	rc.patternMu.RUnlock()
 
 	*bufPtr = buf
 	pathBufPool.Put(bufPtr)
@@ -136,56 +203,6 @@ func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string,
 	matchParamBufPool.Put(paramBufPtr)
 
 	return nil, nil, false
-}
-
-// matchPattern checks if path parts match a pattern and extracts parameter values
-func matchPattern(pattern string, pathParts []string) ([]string, bool) {
-	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
-
-	// Check for wildcard
-	hasWildcard := false
-	wildcardIdx := -1
-	for i, part := range patternParts {
-		if strings.HasPrefix(part, "*") {
-			hasWildcard = true
-			wildcardIdx = i
-			break
-		}
-	}
-
-	if !hasWildcard {
-		if len(pathParts) != len(patternParts) {
-			return nil, false
-		}
-	} else {
-		if len(pathParts) < wildcardIdx {
-			return nil, false
-		}
-	}
-
-	var paramValues []string
-
-	for i, patternPart := range patternParts {
-		if strings.HasPrefix(patternPart, "*") {
-			// Wildcard matches rest of path
-			paramValues = append(paramValues, strings.Join(pathParts[i:], "/"))
-			return paramValues, true
-		}
-
-		if i >= len(pathParts) {
-			return nil, false
-		}
-
-		if strings.HasPrefix(patternPart, ":") {
-			// Parameter - capture value
-			paramValues = append(paramValues, pathParts[i])
-		} else if patternPart != pathParts[i] {
-			// Static part must match exactly
-			return nil, false
-		}
-	}
-
-	return paramValues, true
 }
 
 // Set adds a route match result to the cache
@@ -233,8 +250,9 @@ func (rc *RouteCache) SetPattern(method, pattern string, result *MatchResult) {
 		}
 	}
 
-	// Add new pattern entry with precompiled parts for fast matching
-	// Sort by specificity (more segments = higher priority)
+	// Add new pattern entry with precompiled parts for fast matching.
+	// Sort by specificity so cache lookup mirrors trie matching:
+	// more static segments first, then params, wildcard last.
 	entry := PatternCacheEntry{
 		pattern:     pattern,
 		result:      result,
@@ -242,9 +260,9 @@ func (rc *RouteCache) SetPattern(method, pattern string, result *MatchResult) {
 	}
 	inserted := false
 
-	newPatternSegments := countSegments(pattern)
+	newPatternScore := patternSpecificityScore(pattern)
 	for i, existing := range patterns {
-		if countSegments(existing.pattern) < newPatternSegments {
+		if patternSpecificityScore(existing.pattern) < newPatternScore {
 			// Insert before this entry
 			patterns = append(patterns[:i], append([]PatternCacheEntry{entry}, patterns[i:]...)...)
 			inserted = true
@@ -257,6 +275,25 @@ func (rc *RouteCache) SetPattern(method, pattern string, result *MatchResult) {
 	}
 
 	rc.patternCache[method] = patterns
+}
+
+func patternSpecificityScore(pattern string) int {
+	if pattern == "/" || pattern == "" {
+		return 0
+	}
+
+	score := 0
+	for _, part := range strings.Split(strings.Trim(pattern, "/"), "/") {
+		switch {
+		case strings.HasPrefix(part, "*"):
+			score += 1
+		case strings.HasPrefix(part, ":"):
+			score += 10
+		default:
+			score += 100
+		}
+	}
+	return score
 }
 
 // countSegments counts the number of segments in a path pattern
@@ -345,15 +382,16 @@ type CacheStats struct {
 	HitRate        float64 // Hit rate (hits / total)
 }
 
-// WithCache creates a router option that enables route caching
-func WithCache(capacity int) RouterOption {
+// WithCacheCapacity creates a router option that overrides route cache capacity.
+// NewRouter already enables caching with DefaultCacheCapacity.
+func WithCacheCapacity(capacity int) RouterOption {
 	return func(r *Router) {
-		r.routeCache = NewRouteCache(capacity)
+		r.state.routeCache = NewRouteCache(capacity)
 	}
 }
 
-// NewRouterWithCache creates a new router with route caching enabled
-func NewRouterWithCache(capacity int, opts ...RouterOption) *Router {
-	allOpts := append([]RouterOption{WithCache(capacity)}, opts...)
+// NewRouterWithCacheCapacity creates a new router with an explicit route cache capacity.
+func NewRouterWithCacheCapacity(capacity int, opts ...RouterOption) *Router {
+	allOpts := append([]RouterOption{WithCacheCapacity(capacity)}, opts...)
 	return NewRouter(allOpts...)
 }

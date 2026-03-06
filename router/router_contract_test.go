@@ -68,7 +68,7 @@ func TestMethodNotAllowedRoot(t *testing.T) {
 }
 
 func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
-	r := NewRouter(WithMethodNotAllowed(true), WithCache(10))
+	r := NewRouter(WithMethodNotAllowed(true), WithCacheCapacity(10))
 	r.GetFunc("/only", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
@@ -136,7 +136,7 @@ func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
 }
 
 func TestAnyFallbackWithCache(t *testing.T) {
-	r := NewRouter(WithCache(10))
+	r := NewRouter(WithCacheCapacity(10))
 	r.Any("/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
@@ -325,7 +325,7 @@ func TestGroupParamDoesNotMatchEncodedSlash(t *testing.T) {
 }
 
 func TestRouteCacheDoesNotLeakParams(t *testing.T) {
-	r := NewRouter(WithCache(10))
+	r := NewRouter(WithCacheCapacity(10))
 	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte(id))
@@ -379,7 +379,7 @@ func TestMiddlewareShortCircuitStopsHandler(t *testing.T) {
 }
 
 func TestCachedMatchPreservesMiddlewareOrder(t *testing.T) {
-	r := NewRouter(WithCache(10))
+	r := NewRouter(WithCacheCapacity(10))
 	var order []string
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -422,7 +422,7 @@ func TestCachedMatchPreservesMiddlewareOrder(t *testing.T) {
 }
 
 func TestCachedMatchPreservesNestedGroupOrder(t *testing.T) {
-	r := NewRouter(WithCache(10))
+	r := NewRouter(WithCacheCapacity(10))
 	var order []string
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -558,7 +558,7 @@ func TestRouteContextVisibleToOuterMiddleware(t *testing.T) {
 }
 
 func TestRouteCacheNormalizesTrailingSlash(t *testing.T) {
-	r := NewRouter(WithCache(10))
+	r := NewRouter(WithCacheCapacity(10))
 	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -577,13 +577,13 @@ func TestRouteCacheNormalizesTrailingSlash(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	if size := r.routeCache.Size(); size != 1 {
+	if size := r.state.routeCache.Size(); size != 1 {
 		t.Fatalf("expected cache size 1, got %d", size)
 	}
 }
 
 func TestRouteCacheInvalidatesOnMiddlewareChange(t *testing.T) {
-	r := NewRouter(WithCache(10))
+	r := NewRouter(WithCacheCapacity(10))
 	var order []string
 
 	mw1 := func(next http.Handler) http.Handler {
@@ -629,7 +629,7 @@ func TestRouteCacheInvalidatesOnMiddlewareChange(t *testing.T) {
 }
 
 func TestRouteCacheSeparatesByHostAndMethod(t *testing.T) {
-	r := NewRouter(WithCache(10))
+	r := NewRouter(WithCacheCapacity(10))
 	r.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -663,7 +663,7 @@ func TestRouteCacheSeparatesByHostAndMethod(t *testing.T) {
 
 	// Note: Cache size may be less than 3 due to cache eviction policy
 	// The important thing is that different hosts and methods are cached separately
-	size := r.routeCache.Size()
+	size := r.state.routeCache.Size()
 	if size < 2 {
 		t.Fatalf("expected cache size at least 2, got %d", size)
 	}

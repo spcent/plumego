@@ -1,12 +1,7 @@
 package router
 
 import (
-	"context"
-	"fmt"
-	"io"
 	"net/http"
-	"net/url"
-	"sort"
 	"strings"
 	"sync"
 
@@ -212,13 +207,31 @@ type node struct {
 	children    []*node                 // child nodes
 	handler     Handler                 // handler for this node
 	paramKeys   []string                // parameter keys for this node
-	priority    int                     // priority for this node (higher = more specific)
 	middlewares []middleware.Middleware // middlewares specific to the route
+	validation  *RouteValidation        // route parameter validation
 }
 
 type route struct {
 	Method string
 	Path   string
+}
+
+// routerState is the shared mutable state for the root router and all groups.
+// Group routers carry only local prefix and middleware layering; all route trees,
+// named routes, metadata, validations, and runtime caches live here.
+type routerState struct {
+	trees            map[string]*node
+	registrars       []RouteRegistrar
+	routes           map[string][]route
+	frozen           bool
+	mu               sync.RWMutex
+	logger           log.StructuredLogger
+	routeCache       *RouteCache
+	routeValidations map[string]map[string]*RouteValidation
+	routeMeta        map[string]map[string]RouteMeta
+	namedRoutes      map[string]*NamedRoute
+	methodNotAllowed bool
+	metricsCollector metrics.MetricsCollector
 }
 
 // Router represents an HTTP router with path-based routing and middleware support.
@@ -251,21 +264,10 @@ type route struct {
 //	// Start HTTP server
 //	http.ListenAndServe(":8080", r)
 type Router struct {
-	prefix            string                      // Group prefix for route grouping
-	trees             map[string]*node            // Method -> root node (Radix tree)
-	registrars        []RouteRegistrar            // Route registrars for modular registration
-	routes            map[string][]route          // Registered routes for debugging
-	frozen            bool                        // Whether router is frozen (no new routes)
-	mu                sync.RWMutex                // Mutex for concurrent access
-	parent            *Router                     // Parent router for groups
-	middlewareManager *MiddlewareManager          // Middleware management
-	logger            log.StructuredLogger        // Logger for contextual handlers
-	routeCache        *RouteCache                 // Route matching cache for performance
-	routeValidations  map[string]*RouteValidation // Route parameter validations
-	validationIndex   map[string][]validationEntry
-	routeMeta         map[string]RouteMeta
-	namedRoutes       map[string]*NamedRoute // Named routes for URL generation
-	methodNotAllowed  bool
+	prefix            string
+	parent            *Router
+	middlewareManager *MiddlewareManager
+	state             *routerState
 }
 
 // RouterOption defines a function type for router configuration options.
@@ -370,7 +372,7 @@ func WithRouteDeprecated(deprecated bool) RouteOption {
 func WithLogger(logger log.StructuredLogger) RouterOption {
 	return func(r *Router) {
 		if logger != nil {
-			r.logger = logger
+			r.state.logger = logger
 		}
 	}
 }
@@ -378,12 +380,13 @@ func WithLogger(logger log.StructuredLogger) RouterOption {
 // WithMethodNotAllowed enables returning 405 with Allow header when path matches another method.
 func WithMethodNotAllowed(enabled bool) RouterOption {
 	return func(r *Router) {
-		r.methodNotAllowed = enabled
+		r.state.methodNotAllowed = enabled
 	}
 }
 
 // NewRouter creates a new Router instance with default configuration.
 // The router is ready to accept route registrations immediately after creation.
+// Route caching is enabled by default with DefaultCacheCapacity.
 //
 // Parameters:
 //   - opts: Optional router configuration options
@@ -404,17 +407,18 @@ func WithMethodNotAllowed(enabled bool) RouterOption {
 //	)
 func NewRouter(opts ...RouterOption) *Router {
 	r := &Router{
-		trees:             make(map[string]*node),
-		routes:            make(map[string][]route),
 		prefix:            "",
 		parent:            nil,
 		middlewareManager: NewMiddlewareManager(),
-		logger:            log.NewGLogger(),
-		routeValidations:  make(map[string]*RouteValidation),
-		validationIndex:   make(map[string][]validationEntry),
-		routeMeta:         make(map[string]RouteMeta),
-		namedRoutes:       make(map[string]*NamedRoute),
-		routeCache:        NewRouteCache(DefaultCacheCapacity),
+		state: &routerState{
+			trees:            make(map[string]*node),
+			routes:           make(map[string][]route),
+			logger:           log.NewGLogger(),
+			routeValidations: make(map[string]map[string]*RouteValidation),
+			routeMeta:        make(map[string]map[string]RouteMeta),
+			namedRoutes:      make(map[string]*NamedRoute),
+			routeCache:       NewRouteCache(DefaultCacheCapacity),
+		},
 	}
 
 	// Apply options
@@ -436,24 +440,24 @@ func NewRouter(opts ...RouterOption) *Router {
 //	r := router.NewRouter()
 //	r.SetLogger(customLogger)
 func (r *Router) SetLogger(logger log.StructuredLogger) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.state.mu.Lock()
+	defer r.state.mu.Unlock()
 
-	r.logger = logger
+	r.state.logger = logger
 }
 
 // SetMethodNotAllowed toggles 405 responses when another method matches the path.
 func (r *Router) SetMethodNotAllowed(enabled bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.methodNotAllowed = enabled
+	r.state.mu.Lock()
+	defer r.state.mu.Unlock()
+	r.state.methodNotAllowed = enabled
 }
 
 // MethodNotAllowedEnabled reports whether 405 handling is enabled.
 func (r *Router) MethodNotAllowedEnabled() bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.methodNotAllowed
+	r.state.mu.RLock()
+	defer r.state.mu.RUnlock()
+	return r.state.methodNotAllowed
 }
 
 // Freeze prevents the router from accepting new route registrations.
@@ -466,9 +470,9 @@ func (r *Router) MethodNotAllowedEnabled() bool {
 //	r.Get("/users", handler)
 //	r.Freeze() // No more routes can be added
 func (r *Router) Freeze() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.frozen = true
+	r.state.mu.Lock()
+	defer r.state.mu.Unlock()
+	r.state.frozen = true
 }
 
 // Register adds route registrars to the router.
@@ -494,12 +498,12 @@ func (r *Router) Register(registrars ...RouteRegistrar) {
 	// This prevents deadlock when reg.Register(r) calls back into AddRoute
 	var newRegistrars []RouteRegistrar
 
-	r.mu.RLock()
+	r.state.mu.RLock()
 	seen := make(map[RouteRegistrar]bool)
-	for _, registrar := range r.registrars {
+	for _, registrar := range r.state.registrars {
 		seen[registrar] = true
 	}
-	r.mu.RUnlock()
+	r.state.mu.RUnlock()
 
 	// Find new registrars
 	for _, registrar := range registrars {
@@ -512,534 +516,14 @@ func (r *Router) Register(registrars ...RouteRegistrar) {
 	// Register new registrars
 	for _, registrar := range newRegistrars {
 		// Add to registrars list
-		r.mu.Lock()
-		r.registrars = append(r.registrars, registrar)
-		r.mu.Unlock()
+		r.state.mu.Lock()
+		r.state.registrars = append(r.state.registrars, registrar)
+		r.state.mu.Unlock()
 
 		// Call Register without holding the lock
 		// This allows registrar.Register(r) to call AddRoute safely
 		registrar.Register(r)
 	}
-}
-
-// Group creates a new router group with the given prefix.
-// Groups allow you to share a common path prefix and middleware across multiple routes.
-// Child groups inherit the parent's prefix and can add their own middleware.
-//
-// Parameters:
-//   - prefix: The path prefix for the group (e.g., "/api/v1")
-//
-// Returns:
-//   - *Router: A new router group
-//
-// Example:
-//
-//	r := router.NewRouter()
-//
-//	// Create API group with shared prefix
-//	api := r.Group("/api/v1")
-//	api.Get("/users", listUsersHandler)
-//	api.Get("/users/:id", getUserHandler)
-//
-//	// Create admin group with additional middleware
-//	admin := api.Group("/admin")
-//	admin.Use(middleware.AuthRequired())
-//	admin.Get("/dashboard", dashboardHandler)
-func (r *Router) Group(prefix string) *Router {
-	// Normalize and combine with parent's prefix
-	fullPrefix := normalizeGroupPrefix(r.prefix, prefix)
-
-	return &Router{
-		prefix:            fullPrefix,
-		trees:             r.trees,
-		routes:            r.routes,
-		parent:            r,
-		frozen:            r.frozen,
-		middlewareManager: NewMiddlewareManager(),
-		logger:            r.logger,
-		routeValidations:  r.routeValidations,
-		validationIndex:   r.validationIndex,
-		routeMeta:         r.routeMeta,
-		namedRoutes:       r.namedRoutes, // Share named routes with parent
-	}
-}
-
-// GroupFunc creates a new route group with the given prefix and invokes
-// the callback function with the group router. This is a convenience method
-// for defining scoped route groups inline.
-//
-// Example:
-//
-//	r.GroupFunc("/api/v1", func(v1 *Router) {
-//	    v1.Use(rateLimitMiddleware)
-//	    v1.Get("/users", listUsersHandler)
-//
-//	    v1.GroupFunc("/admin", func(admin *Router) {
-//	        admin.Use(authMiddleware)
-//	        admin.Get("/dashboard", dashboardHandler)
-//	    })
-//	})
-func (r *Router) GroupFunc(prefix string, fn func(*Router)) *Router {
-	g := r.Group(prefix)
-	fn(g)
-	return g
-}
-
-// normalizeGroupPrefix combines a parent prefix and a child prefix,
-// ensuring the result has a leading slash, no trailing slash, and no
-// double slashes from concatenation.
-func normalizeGroupPrefix(parent, child string) string {
-	// Ensure child has leading slash
-	if child != "" && child[0] != '/' {
-		child = "/" + child
-	}
-	// Remove trailing slash from child
-	child = strings.TrimRight(child, "/")
-	// Remove trailing slash from parent before joining
-	parent = strings.TrimRight(parent, "/")
-
-	combined := parent + child
-	if combined == "" {
-		return ""
-	}
-	return combined
-}
-
-// AddRoute adds a route to the router with the given method, path and handler.
-// This is the core method for route registration. Routes are stored in a Radix tree
-// for efficient matching. Path parameters are denoted with ":" (e.g., "/users/:id")
-// and wildcards with "*" (e.g., "/files/*path").
-//
-// Parameters:
-//   - method: HTTP method (GET, POST, PUT, DELETE, PATCH, ANY)
-//   - path: URL path (can include parameters)
-//   - handler: HTTP handler for the route
-//
-// Returns:
-//   - error: Error if route registration fails (duplicate, frozen, etc.)
-//
-// Example:
-//
-//	r := router.NewRouter()
-//	r.AddRoute("GET", "/users", listUsersHandler)
-//	r.AddRoute("GET", "/users/:id", getUserHandler)
-//	r.AddRoute("GET", "/files/*path", fileHandler)
-//
-//	// Or use convenience methods
-//	r.Get("/users", listUsersHandler)
-//	r.Get("/users/:id", getUserHandler)
-func (r *Router) AddRoute(method, path string, handler Handler) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.frozen {
-		return contract.WrapError(
-			fmt.Errorf("router is frozen, cannot add route after freeze"),
-			"add_route",
-			"router",
-			map[string]any{
-				"method": method,
-				"path":   path,
-			},
-		)
-	}
-
-	// Combine with group prefix
-	fullPath := r.fullPath(path)
-	if fullPath == "" {
-		fullPath = "/"
-	}
-
-	if r.trees[method] == nil {
-		r.trees[method] = &node{}
-	}
-
-	current := r.trees[method]
-	current.priority++
-
-	// Start with root path
-	if fullPath == "/" {
-		if current.handler != nil {
-			return contract.WrapError(
-				fmt.Errorf("duplicate route registration: %s /", method),
-				"add_route",
-				"router",
-				map[string]any{
-					"method": method,
-					"path":   fullPath,
-				},
-			)
-		}
-		current.handler = handler
-		current.fullPath = fullPath
-		r.routes[method] = append(r.routes[method], route{Method: method, Path: fullPath})
-		return nil
-	}
-
-	segments := compilePathSegments(fullPath)
-	paramKeys := make([]string, 0, len(segments))
-
-	// Add each segment to the trie
-	for _, seg := range segments {
-		if seg.isParam {
-			paramKeys = append(paramKeys, seg.paramName)
-			child := r.findParamChild(current)
-			if child != nil {
-				if child.paramName == "" {
-					child.paramName = seg.paramName
-				} else if child.paramName != seg.paramName {
-					return contract.WrapError(
-						fmt.Errorf("route conflict: parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName),
-						"add_route",
-						"router",
-						map[string]any{
-							"method": method,
-							"path":   fullPath,
-						},
-					)
-				}
-				current = child
-				current.priority++
-				continue
-			}
-
-			child = &node{
-				path:      ":",
-				paramName: seg.paramName,
-			}
-			r.insertChild(current, child)
-			current = child
-			current.priority++
-			continue
-		}
-
-		if seg.isWild {
-			paramKeys = append(paramKeys, seg.paramName)
-			child := r.findWildChild(current)
-			if child != nil {
-				if child.paramName == "" {
-					child.paramName = seg.paramName
-				} else if child.paramName != seg.paramName {
-					return contract.WrapError(
-						fmt.Errorf("route conflict: wildcard parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName),
-						"add_route",
-						"router",
-						map[string]any{
-							"method": method,
-							"path":   fullPath,
-						},
-					)
-				}
-				current = child
-				current.priority++
-				continue
-			}
-
-			child = &node{
-				path:      "*",
-				paramName: seg.paramName,
-			}
-			r.insertChild(current, child)
-			current = child
-			current.priority++
-			continue
-		}
-
-		// Find or create static child node
-		child := r.findChild(current, seg.raw)
-		if child == nil {
-			child = &node{
-				path: seg.raw,
-			}
-			r.insertChild(current, child)
-		}
-
-		current = child
-		current.priority++
-	}
-
-	// Set handler for the final node
-	if current.handler != nil {
-		return contract.WrapError(
-			fmt.Errorf("duplicate route registration: %s %s", method, fullPath),
-			"add_route",
-			"router",
-			map[string]any{
-				"method": method,
-				"path":   fullPath,
-			},
-		)
-	}
-	current.handler = handler
-	current.paramKeys = paramKeys
-	current.fullPath = fullPath
-	current.middlewares = r.routeMiddlewares()
-
-	r.routes[method] = append(r.routes[method], route{Method: method, Path: fullPath})
-	return nil
-}
-
-// AddRouteWithOptions adds a route and attaches metadata options.
-// This method combines route registration with metadata attachment in a single call.
-//
-// Parameters:
-//   - method: HTTP method
-//   - path: URL path
-//   - handler: HTTP handler
-//   - opts: Route metadata options
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	r.AddRouteWithOptions(
-//	    "GET",
-//	    "/users",
-//	    listUsersHandler,
-//	    router.WithRouteName("list_users"),
-//	    router.WithRouteTags("users", "api"),
-//	)
-func (r *Router) AddRouteWithOptions(method, path string, handler Handler, opts ...RouteOption) error {
-	if err := r.AddRoute(method, path, handler); err != nil {
-		return err
-	}
-	if len(opts) == 0 {
-		return nil
-	}
-	meta := RouteMeta{}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&meta)
-		}
-	}
-	r.SetRouteMeta(method, path, meta)
-	return nil
-}
-
-// SetRouteMeta sets metadata for a route.
-// This is useful for attaching documentation, tags, or other metadata to routes
-// for API generation, documentation, or monitoring purposes.
-// If the metadata includes a Name, the route will be registered as a named route
-// for reverse URL generation.
-//
-// Parameters:
-//   - method: HTTP method
-//   - path: URL path
-//   - meta: Route metadata
-//
-// Example:
-//
-//	meta := RouteMeta{
-//	    Name: "list_users",
-//	    Tags: []string{"users", "api"},
-//	}
-//	r.SetRouteMeta("GET", "/users", meta)
-func (r *Router) SetRouteMeta(method, path string, meta RouteMeta) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.routeMeta == nil {
-		r.routeMeta = make(map[string]RouteMeta)
-	}
-	key := r.routeKey(method, path)
-	r.routeMeta[key] = meta
-
-	// Register named route if name is provided
-	if meta.Name != "" {
-		fullPath := r.fullPath(path)
-		r.registerNamedRoute(meta.Name, method, fullPath)
-	}
-}
-
-// registerNamedRoute registers a named route for reverse URL generation
-func (r *Router) registerNamedRoute(name, method, pattern string) {
-	if r.namedRoutes == nil {
-		r.namedRoutes = make(map[string]*NamedRoute)
-	}
-
-	// Parse parameter positions
-	paramPos := make(map[string]int)
-	parts := strings.Split(strings.Trim(pattern, "/"), "/")
-	pos := 0
-	for _, part := range parts {
-		if strings.HasPrefix(part, ":") {
-			paramPos[part[1:]] = pos
-			pos++
-		} else if strings.HasPrefix(part, "*") {
-			paramPos[part[1:]] = pos
-			pos++
-		}
-	}
-
-	r.namedRoutes[name] = &NamedRoute{
-		Method:   method,
-		Pattern:  pattern,
-		ParamPos: paramPos,
-	}
-}
-
-// URL generates a URL for a named route with the given parameters.
-// Parameters are passed as alternating key-value pairs.
-//
-// Parameters:
-//   - name: The name of the route
-//   - params: Alternating parameter names and values (key1, val1, key2, val2, ...)
-//
-// Returns:
-//   - string: The generated URL, or empty string if route not found
-//
-// Example:
-//
-//	r.Get("/users/:id", getUserHandler, router.WithRouteName("user.show"))
-//	url := r.URL("user.show", "id", "123") // returns "/users/123"
-//
-//	r.Get("/files/*path", fileHandler, router.WithRouteName("files"))
-//	url := r.URL("files", "path", "docs/readme.md") // returns "/files/docs/readme.md"
-func (r *Router) URL(name string, params ...string) string {
-	r.mu.RLock()
-	namedRoute, exists := r.namedRoutes[name]
-	r.mu.RUnlock()
-
-	if !exists {
-		return ""
-	}
-
-	// Build parameter map from variadic arguments
-	paramMap := make(map[string]string)
-	for i := 0; i < len(params)-1; i += 2 {
-		paramMap[params[i]] = params[i+1]
-	}
-
-	// Replace parameters in pattern
-	result := namedRoute.Pattern
-	parts := strings.Split(strings.Trim(result, "/"), "/")
-	resultParts := make([]string, 0, len(parts))
-
-	for _, part := range parts {
-		if strings.HasPrefix(part, ":") {
-			paramName := part[1:]
-			if val, ok := paramMap[paramName]; ok {
-				resultParts = append(resultParts, url.PathEscape(val))
-			} else {
-				resultParts = append(resultParts, part) // Keep original if not provided
-			}
-		} else if strings.HasPrefix(part, "*") {
-			paramName := part[1:]
-			if val, ok := paramMap[paramName]; ok {
-				// Wildcard values may contain slashes (e.g., file paths), so don't escape slashes
-				segments := strings.Split(val, "/")
-				for i, seg := range segments {
-					segments[i] = url.PathEscape(seg)
-				}
-				resultParts = append(resultParts, strings.Join(segments, "/"))
-			} else {
-				resultParts = append(resultParts, "") // Empty for wildcard if not provided
-			}
-		} else {
-			resultParts = append(resultParts, part)
-		}
-	}
-
-	return "/" + strings.Join(resultParts, "/")
-}
-
-// URLMust generates a URL for a named route and panics if the route doesn't exist.
-// This is useful during application initialization where missing routes should be fatal.
-//
-// Parameters:
-//   - name: The name of the route
-//   - params: Alternating parameter names and values
-//
-// Returns:
-//   - string: The generated URL
-//
-// Panics:
-//   - If the named route doesn't exist
-func (r *Router) URLMust(name string, params ...string) string {
-	url := r.URL(name, params...)
-	if url == "" {
-		panic(fmt.Sprintf("named route %q not found", name))
-	}
-	return url
-}
-
-// HasRoute checks if a named route exists.
-//
-// Parameters:
-//   - name: The name of the route to check
-//
-// Returns:
-//   - bool: True if the route exists
-func (r *Router) HasRoute(name string) bool {
-	r.mu.RLock()
-	_, exists := r.namedRoutes[name]
-	r.mu.RUnlock()
-	return exists
-}
-
-// NamedRoutes returns a copy of all registered named routes.
-// This is useful for debugging and documentation generation.
-//
-// Returns:
-//   - map[string]*NamedRoute: Copy of all named routes
-func (r *Router) NamedRoutes() map[string]*NamedRoute {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	result := make(map[string]*NamedRoute, len(r.namedRoutes))
-	for k, v := range r.namedRoutes {
-		// Create a copy
-		paramPos := make(map[string]int, len(v.ParamPos))
-		for pk, pv := range v.ParamPos {
-			paramPos[pk] = pv
-		}
-		result[k] = &NamedRoute{
-			Method:   v.Method,
-			Pattern:  v.Pattern,
-			ParamPos: paramPos,
-		}
-	}
-	return result
-}
-
-// Routes returns a snapshot of all registered routes with metadata.
-// This method is useful for debugging, documentation generation, and monitoring.
-// The returned slice is sorted by method and path for consistent output.
-//
-// Returns:
-//   - []RouteInfo: List of all registered routes with metadata
-//
-// Example:
-//
-//	routes := r.Routes()
-//	for _, route := range routes {
-//	    fmt.Printf("%s %s %v\n", route.Method, route.Path, route.Meta.Tags)
-//	}
-func (r *Router) Routes() []RouteInfo {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	infos := make([]RouteInfo, 0)
-	for _, routes := range r.routes {
-		for _, entry := range routes {
-			key := entry.Method + " " + entry.Path
-			meta := r.routeMeta[key]
-			infos = append(infos, RouteInfo{
-				Method: entry.Method,
-				Path:   entry.Path,
-				Meta:   meta,
-			})
-		}
-	}
-
-	sort.Slice(infos, func(i, j int) bool {
-		if infos[i].Method == infos[j].Method {
-			return infos[i].Path < infos[j].Path
-		}
-		return infos[i].Method < infos[j].Method
-	})
-
-	return infos
 }
 
 func (r *Router) routeMiddlewares() []middleware.Middleware {
@@ -1108,9 +592,9 @@ func (r *Router) Use(middlewares ...middleware.Middleware) {
 //	prometheusCollector := metrics.NewPrometheusCollector()
 //	r.SetMetricsCollector(prometheusCollector)
 func (r *Router) SetMetricsCollector(collector metrics.MetricsCollector) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.middlewareManager.metrics = collector
+	r.state.mu.Lock()
+	defer r.state.mu.Unlock()
+	r.state.metricsCollector = collector
 }
 
 // GetMetricsCollector returns the current metrics collector.
@@ -1126,9 +610,9 @@ func (r *Router) SetMetricsCollector(collector metrics.MetricsCollector) {
 //	    collector.IncrementCounter("route_requests", map[string]string{"route": "/users"})
 //	}
 func (r *Router) GetMetricsCollector() metrics.MetricsCollector {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.middlewareManager.metrics
+	r.state.mu.RLock()
+	defer r.state.mu.RUnlock()
+	return r.state.metricsCollector
 }
 
 // CacheStats returns statistics about the route cache.
@@ -1144,10 +628,10 @@ func (r *Router) GetMetricsCollector() metrics.MetricsCollector {
 //	fmt.Printf("Exact entries: %d, Pattern entries: %d\n",
 //	    stats.ExactEntries, stats.PatternEntries)
 func (r *Router) CacheStats() CacheStats {
-	if r.routeCache == nil {
+	if r.state.routeCache == nil {
 		return CacheStats{}
 	}
-	return r.routeCache.Stats()
+	return r.state.routeCache.Stats()
 }
 
 // ClearCache clears all cached route matching results.
@@ -1158,8 +642,8 @@ func (r *Router) CacheStats() CacheStats {
 //
 //	r.ClearCache()
 func (r *Router) ClearCache() {
-	if r.routeCache != nil {
-		r.routeCache.Clear()
+	if r.state.routeCache != nil {
+		r.state.routeCache.Clear()
 	}
 }
 
@@ -1168,10 +652,10 @@ func (r *Router) ClearCache() {
 // Returns:
 //   - int: Total number of cached entries (exact + pattern)
 func (r *Router) CacheSize() int {
-	if r.routeCache == nil {
+	if r.state.routeCache == nil {
 		return 0
 	}
-	return r.routeCache.Size()
+	return r.state.routeCache.Size()
 }
 
 // findChild finds a child node with the given path segment
@@ -1256,11 +740,10 @@ func (r *Router) addCtxRoute(method, path string, h contract.CtxHandlerFunc) err
 		})
 	}
 
-	return r.AddRoute(method, path, contract.AdaptCtxHandler(h, r.logger))
-}
-
-func (r *Router) routeKey(method, path string) string {
-	return method + " " + r.fullPath(path)
+	r.state.mu.RLock()
+	logger := r.state.logger
+	r.state.mu.RUnlock()
+	return r.AddRoute(method, path, contract.AdaptCtxHandler(h, logger))
 }
 
 func (r *Router) fullPath(path string) string {
@@ -1271,757 +754,48 @@ func (r *Router) fullPath(path string) string {
 	return fullPath
 }
 
-// ServeHTTP implements http.Handler and handles incoming HTTP requests.
-// This method is the entry point for all HTTP requests and performs route matching,
-// parameter extraction, validation, and middleware execution.
-//
-// Parameters:
-//   - w: HTTP response writer
-//   - req: HTTP request
-//
-// Example:
-//
-//	r := router.NewRouter()
-//	r.Get("/users", listUsersHandler)
-//
-//	// Start HTTP server
-//	http.ListenAndServe(":8080", r)
-//
-//	// Or use with other handlers
-//	http.Handle("/", r)
-func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// Parse and normalize request path first
-	path := r.normalizePath(req.URL.Path)
-	cachePath := path
-	if path != "/" {
-		cachePath = "/" + path
+func (r *Router) metaFor(method, pattern string) RouteMeta {
+	pattern = normalizeStoredPattern(pattern)
+	if byMethod, ok := r.state.routeMeta[method]; ok {
+		return byMethod[pattern]
 	}
-
-	// Check exact route cache first for better performance (no lock needed)
-	cacheKey := req.Method + ":" + cachePath
-	if cachedResult, exists := r.routeCache.Get(cacheKey); exists {
-		r.serveCachedMatch(w, req, cachedResult, nil)
-		return
-	}
-
-	// Check pattern cache for parameterized routes (no lock needed)
-	if cachedResult, paramValues, exists := r.routeCache.GetByPattern(req.Method, cachePath); exists {
-		r.serveCachedMatch(w, req, cachedResult, paramValues)
-		return
-	}
-
-	// Perform route matching with minimal lock time
-	result, matchedAny := r.matchRoute(req.Method, path)
-
-	if result == nil {
-		// Need lock to check methodNotAllowed setting and trees
-		r.mu.RLock()
-		methodNotAllowed := r.methodNotAllowed
-		r.mu.RUnlock()
-
-		if methodNotAllowed {
-			r.mu.RLock()
-			allowed := r.allowedMethods(path)
-			r.mu.RUnlock()
-			if len(allowed) > 0 {
-				w.Header().Set("Allow", strings.Join(allowed, ", "))
-				contract.WriteError(w, req, contract.APIError{
-					Status:   http.StatusMethodNotAllowed,
-					Code:     "METHOD_NOT_ALLOWED",
-					Message:  http.StatusText(http.StatusMethodNotAllowed),
-					Category: contract.CategoryClient,
-				})
-				return
-			}
-		}
-		http.NotFound(w, req)
-		return
-	}
-
-	// Set route metadata
-	if result.RouteMethod == "" {
-		if matchedAny {
-			result.RouteMethod = ANY
-		} else {
-			result.RouteMethod = req.Method
-		}
-	}
-	if result.RoutePattern == "" {
-		if path == "/" {
-			result.RoutePattern = "/"
-		} else {
-			result.RoutePattern = "/" + path
-		}
-	}
-
-	// Build parameter map
-	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
-
-	// Validate parameters if validations are registered
-	if params != nil {
-		if r.writeValidationError(w, req, params) {
-			return
-		}
-	}
-
-	// Cache the matching result using appropriate strategy
-	if result.RoutePattern != "" && IsParameterized(result.RoutePattern) {
-		r.routeCache.SetPattern(req.Method, result.RoutePattern, result)
-	} else {
-		r.routeCache.Set(cacheKey, result)
-	}
-
-	// No lock needed for middleware execution
-	r.applyMiddlewareAndServe(w, req, params, result)
+	return RouteMeta{}
 }
 
-// matchRoute performs route matching with minimal lock time
-// Returns the match result and whether it matched the ANY method
-func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	// Handle root path specially
-	if path == "/" {
-		tree := r.trees[method]
-		if tree != nil && tree.handler != nil {
-			return &MatchResult{
-				Handler:          tree.handler,
-				RouteMiddlewares: tree.middlewares,
-				RoutePattern:     "/",
-				RouteMethod:      method,
-			}, false
-		}
-		// Try ANY method
-		if method != ANY {
-			if anyTree := r.trees[ANY]; anyTree != nil && anyTree.handler != nil {
-				return &MatchResult{
-					Handler:          anyTree.handler,
-					RouteMiddlewares: anyTree.middlewares,
-					RoutePattern:     "/",
-					RouteMethod:      ANY,
-				}, true
-			}
-		}
-		return nil, false
+func (r *Router) setMeta(method, pattern string, meta RouteMeta) {
+	pattern = normalizeStoredPattern(pattern)
+	if r.state.routeMeta == nil {
+		r.state.routeMeta = make(map[string]map[string]RouteMeta)
 	}
-
-	// Find route tree
-	tree := r.trees[method]
-	if tree == nil {
-		tree = r.trees[ANY]
-		if tree == nil {
-			return nil, false
-		}
+	if r.state.routeMeta[method] == nil {
+		r.state.routeMeta[method] = make(map[string]RouteMeta)
 	}
-
-	// Use pooled path parts
-	partsPtr := SplitPathToParts(path)
-	parts := *partsPtr
-	defer PutPathParts(partsPtr)
-
-	// Try to match
-	matcher := GetRouteMatcher(tree)
-	result := matcher.Match(parts)
-	PutRouteMatcher(matcher)
-
-	matchedAny := false
-
-	// Try ANY method if specific method didn't match
-	if result == nil && method != ANY {
-		if anyTree := r.trees[ANY]; anyTree != nil {
-			anyMatcher := GetRouteMatcher(anyTree)
-			result = anyMatcher.Match(parts)
-			PutRouteMatcher(anyMatcher)
-			if result != nil {
-				matchedAny = true
-			}
-		}
-	}
-
-	return result, matchedAny
+	r.state.routeMeta[method][pattern] = meta
 }
 
-// normalizePath normalizes the request path by trimming trailing slashes.
-// Uses byte-level operations to avoid strings.Trim allocation.
-func (r *Router) normalizePath(path string) string {
-	return fastNormalizePath(path)
-}
-
-// serveCachedMatch handles requests using cached matching results.
-// It validates parameters and applies middleware before serving.
-// The paramValues argument overrides result.ParamValues when non-nil
-// (used by pattern cache where values are extracted at lookup time).
-func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *MatchResult, paramValues []string) {
-	if paramValues == nil {
-		paramValues = result.ParamValues
-	}
-
-	params := r.buildParamMap(paramValues, result.ParamKeys)
-
-	if params != nil {
-		if r.writeValidationError(w, req, params) {
-			return
-		}
-	}
-
-	r.applyMiddlewareAndServe(w, req, params, result)
-}
-
-// writeValidationError validates route parameters and writes a 400 error if validation fails.
-// Returns true if an error was written (caller should return), false otherwise.
-func (r *Router) writeValidationError(w http.ResponseWriter, req *http.Request, params map[string]string) bool {
-	path := r.normalizePath(req.URL.Path)
-	fullPath := r.prefix + path
-	if err := r.validateRouteParams(req.Method, fullPath, params); err != nil {
-		contract.WriteError(w, req, contract.APIError{
-			Status:   http.StatusBadRequest,
-			Code:     "VALIDATION_ERROR",
-			Message:  err.Error(),
-			Category: contract.CategoryValidation,
-		})
-		return true
-	}
-	return false
-}
-
-// buildParamMap creates a parameter map from values and keys.
-// Uses a pooled map to reduce allocations on the hot path.
-func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[string]string {
-	return buildParamMapPooled(paramValues, paramKeys)
-}
-
-// applyMiddlewareAndServe applies middleware chain to the handler and serves the request
-func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *MatchResult) {
-	reqWithParams := req
-	ctx := req.Context()
-
-	// Build RequestContext — always install so downstream code has a predictable
-	// place to read/write request-scoped data.
-	existingRC, ok := ctx.Value(contract.RequestContextKey{}).(contract.RequestContext)
-	if !ok {
-		existingRC = contract.RequestContext{}
-	}
-
-	if len(params) > 0 {
-		existingRC.Params = params
-	}
-	if result != nil {
-		if result.RoutePattern != "" {
-			existingRC.RoutePattern = result.RoutePattern
-		}
-		meta := r.routeMeta[r.routeKey(result.RouteMethod, result.RoutePattern)]
-		if meta.Name != "" {
-			existingRC.RouteName = meta.Name
-		}
-	}
-
-	// Use a single context.WithValue layer that carries both params and RequestContext.
-	// This replaces up to 2 separate WithValue calls, reducing context chain depth.
-	if len(params) > 0 {
-		ctx = context.WithValue(ctx, contract.ParamsContextKey{}, params)
-	}
-	ctx = context.WithValue(ctx, contract.RequestContextKey{}, existingRC)
-	if ctx != req.Context() {
-		reqWithParams = req.WithContext(ctx)
-	}
-
-	if result == nil {
-		return
-	}
-
-	version := r.middlewareManager.Version()
-	if cached, ok := result.loadCached(version); ok {
-		cached.ServeHTTP(w, reqWithParams)
-		return
-	}
-
-	// Combine middleware slices directly
-	allMiddlewares := r.middlewareManager.GetMiddlewares()
-	combined := make([]middleware.Middleware, 0, len(allMiddlewares)+len(result.RouteMiddlewares))
-	combined = append(combined, allMiddlewares...)
-	combined = append(combined, result.RouteMiddlewares...)
-
-	if len(combined) == 0 {
-		result.Handler.ServeHTTP(w, reqWithParams)
-		return
-	}
-
-	chain := middleware.NewChain(combined...)
-	wrappedHandler := chain.Apply(result.Handler)
-	result.storeCached(version, wrappedHandler)
-	wrappedHandler.ServeHTTP(w, reqWithParams)
-}
-
-func (r *Router) allowedMethods(path string) []string {
-	normalized := path
-	if normalized == "" {
-		normalized = "/"
-	}
-
-	allowed := make([]string, 0, len(r.trees))
-
-	if normalized == "/" {
-		for method, tree := range r.trees {
-			if method == ANY || tree == nil {
-				continue
-			}
-			if tree.handler != nil {
-				allowed = append(allowed, method)
-			}
-		}
-	} else {
-		// Use pooled path parts
-		partsPtr := SplitPathToParts(normalized)
-		parts := *partsPtr
-
-		for method, tree := range r.trees {
-			if method == ANY || tree == nil {
-				continue
-			}
-			matcher := GetRouteMatcher(tree)
-			if matcher.Match(parts) != nil {
-				allowed = append(allowed, method)
-			}
-			PutRouteMatcher(matcher)
-		}
-
-		PutPathParts(partsPtr)
-	}
-
-	if len(allowed) > 1 {
-		sort.Strings(allowed)
-	}
-	return allowed
-}
-
-// compilePathSegments parses a URL path into route segments
-func compilePathSegments(path string) []segment {
-	if path == "/" {
-		return nil
-	}
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	segments := make([]segment, 0, len(parts))
-	for _, segmentPart := range parts {
-		if strings.HasPrefix(segmentPart, ":") {
-			segments = append(segments, segment{
-				raw:       segmentPart,
-				isParam:   true,
-				paramName: segmentPart[1:],
-			})
-		} else if strings.HasPrefix(segmentPart, "*") {
-			segments = append(segments, segment{
-				raw:       segmentPart,
-				isWild:    true,
-				paramName: segmentPart[1:],
-			})
-		} else {
-			segments = append(segments, segment{raw: segmentPart})
-		}
-	}
-	return segments
-}
-
-// --- Helper API ---
-
-// HTTP method-specific route registration
-// These convenience methods return errors for proper error handling.
-
-// Get registers a GET route with the given path and handler.
-// GET requests are used to retrieve resources.
-//
-// Parameters:
-//   - path: URL path (can include parameters like "/users/:id")
-//   - handler: HTTP handler
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.Get("/users", listUsersHandler); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) Get(path string, handler Handler) error { return r.AddRoute(GET, path, handler) }
-
-// Post registers a POST route with the given path and handler.
-// POST requests are used to create new resources.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: HTTP handler
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.Post("/users", createUserHandler); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) Post(path string, handler Handler) error { return r.AddRoute(POST, path, handler) }
-
-// Put registers a PUT route with the given path and handler.
-// PUT requests are used to replace existing resources.
-//
-// Parameters:
-//   - path: URL path (typically includes resource ID like "/users/:id")
-//   - handler: HTTP handler
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.Put("/users/:id", updateUserHandler); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) Put(path string, handler Handler) error { return r.AddRoute(PUT, path, handler) }
-
-// Delete registers a DELETE route with the given path and handler.
-// DELETE requests are used to remove resources.
-//
-// Parameters:
-//   - path: URL path (typically includes resource ID like "/users/:id")
-//   - handler: HTTP handler
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.Delete("/users/:id", deleteUserHandler); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) Delete(path string, handler Handler) error {
-	return r.AddRoute(DELETE, path, handler)
-}
-
-// Patch registers a PATCH route with the given path and handler.
-// PATCH requests are used for partial updates to resources.
-//
-// Parameters:
-//   - path: URL path (typically includes resource ID like "/users/:id")
-//   - handler: HTTP handler
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.Patch("/users/:id", patchUserHandler); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) Patch(path string, handler Handler) error { return r.AddRoute(PATCH, path, handler) }
-
-// Any registers a route that accepts any HTTP method with the given path and handler.
-// This is useful for catch-all routes or when you want to handle all methods the same way.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: HTTP handler
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.Any("/health", healthCheckHandler); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) Any(path string, handler Handler) error { return r.AddRoute(ANY, path, handler) }
-
-// Options registers an OPTIONS route with the given path and handler.
-// OPTIONS requests are used to describe communication options for the target resource.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: HTTP handler
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.Options("/users", optionsHandler); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) Options(path string, handler Handler) error {
-	return r.AddRoute("OPTIONS", path, handler)
-}
-
-// Head registers a HEAD route with the given path and handler.
-// HEAD requests are identical to GET requests but without the response body.
-//
-// Parameters:
-//   - path: URL path
-//   - handler: HTTP handler
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.Head("/users", headHandler); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) Head(path string, handler Handler) error { return r.AddRoute("HEAD", path, handler) }
-
-// Context-aware handler registration helpers
-// These methods register routes with context-aware handlers that receive
-// a request context and can access route parameters and other request-scoped data.
-
-// GetCtx registers a GET route with a context-aware handler.
-func (r *Router) GetCtx(path string, handler contract.CtxHandlerFunc) error {
-	return r.addCtxRoute(GET, path, handler)
-}
-
-// PostCtx registers a POST route with a context-aware handler.
-func (r *Router) PostCtx(path string, handler contract.CtxHandlerFunc) error {
-	return r.addCtxRoute(POST, path, handler)
-}
-
-// PutCtx registers a PUT route with a context-aware handler.
-func (r *Router) PutCtx(path string, handler contract.CtxHandlerFunc) error {
-	return r.addCtxRoute(PUT, path, handler)
-}
-
-// DeleteCtx registers a DELETE route with a context-aware handler.
-func (r *Router) DeleteCtx(path string, handler contract.CtxHandlerFunc) error {
-	return r.addCtxRoute(DELETE, path, handler)
-}
-
-// PatchCtx registers a PATCH route with a context-aware handler.
-func (r *Router) PatchCtx(path string, handler contract.CtxHandlerFunc) error {
-	return r.addCtxRoute(PATCH, path, handler)
-}
-
-// AnyCtx registers a route that accepts any HTTP method with a context-aware handler.
-func (r *Router) AnyCtx(path string, handler contract.CtxHandlerFunc) error {
-	return r.addCtxRoute(ANY, path, handler)
-}
-
-// HandleFunc registers a standard http.HandlerFunc for the given path and method.
-func (r *Router) HandleFunc(method, path string, h http.HandlerFunc) error {
-	return r.AddRoute(method, path, h)
-}
-
-// Handle registers a standard http.Handler for the given path and method.
-func (r *Router) Handle(method, path string, h http.Handler) error {
-	return r.AddRoute(method, path, h)
-}
-
-// HandleWithOptions registers a standard http.Handler for the given path and method with metadata.
-func (r *Router) HandleWithOptions(method, path string, h http.Handler, opts ...RouteOption) error {
-	return r.AddRouteWithOptions(method, path, h, opts...)
-}
-
-// GetFunc registers a GET route with a standard http.HandlerFunc.
-func (r *Router) GetFunc(path string, h http.HandlerFunc) error {
-	return r.HandleFunc(GET, path, h)
-}
-
-// PostFunc registers a POST route with a standard http.HandlerFunc.
-func (r *Router) PostFunc(path string, h http.HandlerFunc) error {
-	return r.HandleFunc(POST, path, h)
-}
-
-// PutFunc registers a PUT route with a standard http.HandlerFunc.
-//
-// Parameters:
-//   - path: URL path
-//   - h: Standard http.HandlerFunc
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.PutFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-//	    w.Write([]byte("Updated"))
-//	}); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) PutFunc(path string, h http.HandlerFunc) error {
-	return r.HandleFunc(PUT, path, h)
-}
-
-// DeleteFunc registers a DELETE route with a standard http.HandlerFunc.
-//
-// Parameters:
-//   - path: URL path
-//   - h: Standard http.HandlerFunc
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.DeleteFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-//	    w.Write([]byte("Deleted"))
-//	}); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) DeleteFunc(path string, h http.HandlerFunc) error {
-	return r.HandleFunc(DELETE, path, h)
-}
-
-// PatchFunc registers a PATCH route with a standard http.HandlerFunc.
-//
-// Parameters:
-//   - path: URL path
-//   - h: Standard http.HandlerFunc
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.PatchFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-//	    w.Write([]byte("Patched"))
-//	}); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) PatchFunc(path string, h http.HandlerFunc) error {
-	return r.HandleFunc(PATCH, path, h)
-}
-
-// AnyFunc registers a route for any HTTP method with a standard http.HandlerFunc.
-//
-// Parameters:
-//   - path: URL path
-//   - h: Standard http.HandlerFunc
-//
-// Returns:
-//   - error: Error if route registration fails
-//
-// Example:
-//
-//	if err := r.AnyFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
-//	    w.Write([]byte("Webhook received"))
-//	}); err != nil {
-//	    log.Fatal(err)
-//	}
-func (r *Router) AnyFunc(path string, h http.HandlerFunc) error {
-	return r.HandleFunc(ANY, path, h)
-}
-
-// Resource registers REST-style routes for a resource.
-// This method automatically creates standard REST endpoints for a resource controller.
-//
-// Parameters:
-//   - path: Base path for the resource (e.g., "/users")
-//   - c: ResourceController implementation
-//
-// Returns:
-//   - error: Error if any route registration fails
-//
-// Example:
-//
-//	type UserController struct{}
-//
-//	func (uc *UserController) Index(w http.ResponseWriter, r *http.Request) {
-//	    // List all users
-//	}
-//
-//	func (uc *UserController) Show(w http.ResponseWriter, r *http.Request) {
-//	    // Get specific user
-//	}
-//
-//	// ... implement other methods
-//
-//	r := router.NewRouter()
-//	if err := r.Resource("/users", &UserController{}); err != nil {
-//	    log.Fatal(err)
-//	}
-//
-// This creates the following routes:
-//   - GET    /users          -> Index
-//   - POST   /users          -> Create
-//   - GET    /users/:id      -> Show
-//   - PUT    /users/:id      -> Update
-//   - DELETE /users/:id      -> Delete
-//   - PATCH  /users/:id      -> Patch
-//   - OPTIONS /users         -> Options
-//   - OPTIONS /users/:id     -> Options
-//   - HEAD   /users          -> Head
-//   - HEAD   /users/:id      -> Head
-func (r *Router) Resource(path string, c ResourceController) error {
-	path = strings.TrimSuffix(path, "/")
-
-	if err := r.Get(path, http.HandlerFunc(c.Index)); err != nil {
-		return err
-	}
-	if err := r.Post(path, http.HandlerFunc(c.Create)); err != nil {
-		return err
-	}
-	if err := r.Get(path+"/:id", http.HandlerFunc(c.Show)); err != nil {
-		return err
-	}
-	if err := r.Put(path+"/:id", http.HandlerFunc(c.Update)); err != nil {
-		return err
-	}
-	if err := r.Delete(path+"/:id", http.HandlerFunc(c.Delete)); err != nil {
-		return err
-	}
-	if err := r.Patch(path+"/:id", http.HandlerFunc(c.Patch)); err != nil {
-		return err
-	}
-	if err := r.Options(path, http.HandlerFunc(c.Options)); err != nil {
-		return err
-	}
-	if err := r.Options(path+"/:id", http.HandlerFunc(c.Options)); err != nil {
-		return err
-	}
-	if err := r.Head(path, http.HandlerFunc(c.Head)); err != nil {
-		return err
-	}
-	if err := r.Head(path+"/:id", http.HandlerFunc(c.Head)); err != nil {
-		return err
+func (r *Router) validationFor(method, pattern string) *RouteValidation {
+	pattern = normalizeStoredPattern(pattern)
+	if byMethod, ok := r.state.routeValidations[method]; ok {
+		return byMethod[pattern]
 	}
 	return nil
 }
 
-// Print prints all registered routes grouped by method.
-// Wildcard routes are marked specially. This is useful for debugging and
-// understanding the routing structure.
-//
-// Parameters:
-//   - w: io.Writer to write the output to
-//
-// Example:
-//
-//	r := router.NewRouter()
-//	r.Get("/users", handler)
-//	r.Get("/files/*path", fileHandler)
-//
-//	// Print to stdout
-//	r.Print(os.Stdout)
-//
-// Output:
-//
-//	Registered Routes:
-//	GET    /users
-//	GET    /files/*path   [wildcard]
-func (r *Router) Print(w io.Writer) {
-	fmt.Fprintln(w, "Registered Routes:")
-
-	methods := make([]string, 0, len(r.routes))
-	for method := range r.routes {
-		methods = append(methods, method)
+func (r *Router) setValidation(method, pattern string, validation *RouteValidation) {
+	pattern = normalizeStoredPattern(pattern)
+	if r.state.routeValidations == nil {
+		r.state.routeValidations = make(map[string]map[string]*RouteValidation)
 	}
-	sort.Strings(methods)
-
-	for _, method := range methods {
-		routes := r.routes[method]
-		sort.Slice(routes, func(i, j int) bool { return routes[i].Path < routes[j].Path })
-
-		for _, route := range routes {
-			label := route.Path
-			if strings.Contains(route.Path, "/*") {
-				label += "   [wildcard]"
-			}
-			fmt.Fprintf(w, "%-6s %s\n", route.Method, label)
-		}
+	if r.state.routeValidations[method] == nil {
+		r.state.routeValidations[method] = make(map[string]*RouteValidation)
 	}
+	r.state.routeValidations[method][pattern] = validation
+}
+
+func normalizeStoredPattern(pattern string) string {
+	pattern = strings.TrimRight(pattern, "/")
+	if pattern == "" {
+		return "/"
+	}
+	return pattern
 }

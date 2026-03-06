@@ -14,6 +14,7 @@ type MatchResult struct {
 	RouteMiddlewares []middleware.Middleware // Now using direct type instead of any
 	RoutePattern     string
 	RouteMethod      string
+	Validation       *RouteValidation
 	cache            atomic.Value
 }
 

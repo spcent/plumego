@@ -80,11 +80,6 @@ type RouteValidation struct {
 	Params map[string]ParamValidator
 }
 
-type validationEntry struct {
-	pattern    string
-	validation *RouteValidation
-}
-
 // NewRouteValidation creates a new route validation
 func NewRouteValidation() *RouteValidation {
 	return &RouteValidation{
@@ -298,8 +293,14 @@ func (cv *CustomValidator) Validate(name, value string) error {
 // WithValidation creates a router option that enables route validation
 func WithValidation(validations map[string]*RouteValidation) RouterOption {
 	return func(r *Router) {
-		r.routeValidations = validations
-		r.validationIndex = buildValidationIndex(validations)
+		r.state.routeValidations = make(map[string]map[string]*RouteValidation)
+		for key, validation := range validations {
+			parts := strings.SplitN(key, " ", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			r.setValidation(parts[0], parts[1], validation)
+		}
 	}
 }
 
@@ -323,26 +324,14 @@ func WithValidation(validations map[string]*RouteValidation) RouterOption {
 //	)
 func WithValidationRule(method, path string, validation *RouteValidation) RouterOption {
 	return func(r *Router) {
-		if r.routeValidations == nil {
-			r.routeValidations = make(map[string]*RouteValidation)
-		}
-		key := method + " " + path
-		r.routeValidations[key] = validation
-		r.validationIndex = buildValidationIndex(r.routeValidations)
+		r.setValidation(method, path, validation)
 	}
 }
 
 // AddValidation adds a validation rule for a specific route
 func (r *Router) AddValidation(method, path string, validation *RouteValidation) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.routeValidations == nil {
-		r.routeValidations = make(map[string]*RouteValidation)
-	}
-	if r.validationIndex == nil {
-		r.validationIndex = make(map[string][]validationEntry)
-	}
+	r.state.mu.Lock()
+	defer r.state.mu.Unlock()
 
 	// Normalize the path for consistent lookup
 	normalizedPath := strings.TrimRight(path, "/")
@@ -350,124 +339,10 @@ func (r *Router) AddValidation(method, path string, validation *RouteValidation)
 		normalizedPath = "/"
 	}
 
-	key := method + " " + r.prefix + normalizedPath
-	r.routeValidations[key] = validation
+	pattern := r.prefix + normalizedPath
+	r.setValidation(method, pattern, validation)
 
-	fullPath := r.prefix + normalizedPath
-	if strings.Contains(fullPath, ":") || strings.Contains(fullPath, "*") {
-		entries := r.validationIndex[method]
-		for i := range entries {
-			if entries[i].pattern == fullPath {
-				entries[i].validation = validation
-				r.validationIndex[method] = entries
-				return
-			}
-		}
-		r.validationIndex[method] = append(entries, validationEntry{
-			pattern:    fullPath,
-			validation: validation,
-		})
+	if routeNode := r.findRouteNodeLocked(method, pattern); routeNode != nil {
+		routeNode.validation = validation
 	}
-}
-
-// validateRouteParams validates route parameters against registered validations
-func (r *Router) validateRouteParams(method, path string, params map[string]string) error {
-	if r.routeValidations == nil {
-		return nil
-	}
-
-	// Normalize the path for consistent lookup
-	normalizedPath := strings.TrimRight(path, "/")
-	if normalizedPath == "" {
-		normalizedPath = "/"
-	}
-
-	// Try exact match first
-	key := method + " " + normalizedPath
-	if validation, exists := r.routeValidations[key]; exists {
-		return validation.Validate(params)
-	}
-
-	// Try to find validation for parameterized paths
-	if entries, exists := r.validationIndex[method]; exists {
-		for _, entry := range entries {
-			// This is a simple pattern matching - in production you'd want something more robust
-			if r.pathMatchesPattern(normalizedPath, entry.pattern, params) {
-				return entry.validation.Validate(params)
-			}
-		}
-	}
-
-	return nil
-}
-
-func buildValidationIndex(validations map[string]*RouteValidation) map[string][]validationEntry {
-	index := make(map[string][]validationEntry)
-	for key, validation := range validations {
-		parts := strings.SplitN(key, " ", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		method := parts[0]
-		path := parts[1]
-		if strings.Contains(path, ":") || strings.Contains(path, "*") {
-			index[method] = append(index[method], validationEntry{
-				pattern:    path,
-				validation: validation,
-			})
-		}
-	}
-	return index
-}
-
-// pathMatchesPattern checks if a concrete path matches a pattern with parameters
-func (r *Router) pathMatchesPattern(path, pattern string, params map[string]string) bool {
-	// If pattern has no parameters, do exact match
-	if !strings.Contains(pattern, ":") && !strings.Contains(pattern, "*") {
-		return path == pattern
-	}
-
-	// Split both paths
-	pathParts := strings.Split(strings.Trim(path, "/"), "/")
-	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
-
-	wildIndex := -1
-	for i, part := range patternParts {
-		if strings.HasPrefix(part, "*") {
-			wildIndex = i
-			break
-		}
-	}
-
-	if wildIndex == -1 {
-		if len(pathParts) != len(patternParts) {
-			return false
-		}
-	} else if len(pathParts) < wildIndex+1 {
-		return false
-	}
-
-	// Check each part
-	for i, patternPart := range patternParts {
-		if strings.HasPrefix(patternPart, "*") {
-			// Wildcard - matches everything from here
-			return true
-		}
-		if i >= len(pathParts) {
-			return false
-		}
-
-		if strings.HasPrefix(patternPart, ":") {
-			// Parameter - should match the value in params
-			paramName := patternPart[1:]
-			if params[paramName] != pathParts[i] {
-				return false
-			}
-		} else if patternPart != pathParts[i] {
-			// Static part - must match exactly
-			return false
-		}
-	}
-
-	return true
 }

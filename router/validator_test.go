@@ -87,3 +87,39 @@ func TestRouteValidationCache(t *testing.T) {
 		t.Fatalf("expected 400 on cached invalid param, got %d", rec.Code)
 	}
 }
+
+func TestRouteValidationAnyRoute(t *testing.T) {
+	r := NewRouter()
+
+	validation := NewRouteValidation().AddParam("id", PositiveIntValidator)
+	r.AddValidation(ANY, "/users/:id", validation)
+
+	r.AnyFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/users/abc", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid param on ANY route, got %d", rec.Code)
+	}
+}
+
+func TestGroupCanServeHTTPDirectly(t *testing.T) {
+	r := NewRouter()
+	api := r.Group("/api")
+
+	api.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ping", nil)
+	rec := httptest.NewRecorder()
+	api.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 when serving through group router, got %d", rec.Code)
+	}
+}

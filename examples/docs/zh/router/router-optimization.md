@@ -67,11 +67,11 @@
 
 ```go
 // 创建带缓存的路由器
-r := router.NewRouterWithCache(100)
+r := router.NewRouterWithCacheCapacity(100)
 
 // 使用配置选项
 r := router.NewRouter(
-    router.WithCache(50),
+    router.WithCacheCapacity(50),
     router.WithLogger(customLogger),
     router.WithValidation(validations),
 )
@@ -148,7 +148,7 @@ result, found := cache.Get("GET /users/123")
 
 ```go
 // 高性能场景
-r := router.NewRouterWithCache(1000)
+r := router.NewRouterWithCacheCapacity(1000)
 
 // 安全敏感场景
 r := router.NewRouter()
@@ -158,7 +158,7 @@ r.AddValidation("GET", "/api/users/:id", validation)
 
 // 高并发场景
 r := router.NewRouter(
-    router.WithCache(5000),
+    router.WithCacheCapacity(5000),
     router.WithLogger(customLogger),
 )
 ```

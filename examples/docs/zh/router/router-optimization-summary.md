@@ -21,9 +21,9 @@
 #### 1.2 路由缓存系统 (router.go)
 - **新增路由缓存功能**：
   - 引入`RouterOption`模式，支持可配置的路由器选项
-  - 添加`WithCache(size int)`选项启用路由匹配结果缓存
+  - 添加`WithCacheCapacity(size int)`选项配置路由匹配缓存容量
   - 实现简单的LRU缓存淘汰策略
-  - 提供`NewRouterWithCache()`便捷构造函数
+  - 提供`NewRouterWithCacheCapacity()`便捷构造函数
 
 - **缓存性能对比**：
   - 基准测试显示缓存对复杂路由场景有轻微性能提升
@@ -94,11 +94,11 @@ BenchmarkNestedParamRoute-10          	  928522	      1330 ns/op	    2008 B/op	 
 r := router.NewRouter()
 
 // 带缓存的路由器
-r := router.NewRouterWithCache(100)
+r := router.NewRouterWithCacheCapacity(100)
 
 // 自定义配置
 r := router.NewRouter(
-    router.WithCache(50),
+    router.WithCacheCapacity(50),
     router.WithLogger(customLogger),
 )
 ```
@@ -152,8 +152,8 @@ type MyController struct {
 
 ### 新增API
 - `NewRouter(...RouterOption)` - 支持选项的构造函数
-- `NewRouterWithCache(size int)` - 便捷缓存构造函数
-- `WithCache(size int)` - 缓存配置选项
+- `NewRouterWithCacheCapacity(size int)` - 便捷缓存构造函数
+- `WithCacheCapacity(size int)` - 缓存容量配置选项
 - `WithLogger(logger)` - 日志配置选项
 
 ## 最佳实践建议
@@ -161,13 +161,13 @@ type MyController struct {
 ### 1. 生产环境部署
 ```go
 // 推荐：启用适当大小的缓存
-r := router.NewRouterWithCache(1000)
+r := router.NewRouterWithCacheCapacity(1000)
 ```
 
 ### 2. 高并发场景
 ```go
 // 缓存可以减少重复路由匹配的计算开销
-r := router.NewRouterWithCache(5000)
+r := router.NewRouterWithCacheCapacity(5000)
 ```
 
 ### 3. 调试和监控

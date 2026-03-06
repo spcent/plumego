@@ -67,11 +67,11 @@ This optimization comprehensively enhanced the performance, security, and functi
 
 ```go
 // Create router with cache
-r := router.NewRouterWithCache(100)
+r := router.NewRouterWithCacheCapacity(100)
 
 // Use configuration options
 r := router.NewRouter(
-    router.WithCache(50),
+    router.WithCacheCapacity(50),
     router.WithLogger(customLogger),
     router.WithValidation(validations),
 )
@@ -148,7 +148,7 @@ result, found := cache.Get("GET /users/123")
 
 ```go
 // High-performance scenario
-r := router.NewRouterWithCache(1000)
+r := router.NewRouterWithCacheCapacity(1000)
 
 // Security-sensitive scenario
 r := router.NewRouter()
@@ -158,7 +158,7 @@ r.AddValidation("GET", "/api/users/:id", validation)
 
 // High-concurrency scenario
 r := router.NewRouter(
-    router.WithCache(5000),
+    router.WithCacheCapacity(5000),
     router.WithLogger(customLogger),
 )
 ```

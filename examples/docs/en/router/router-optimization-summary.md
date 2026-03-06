@@ -21,9 +21,9 @@ This optimization comprehensively improved the performance, security, and code s
 #### 1.2 Route Caching System (router.go)
 - **New route caching functionality**:
   - Introduced `RouterOption` pattern for configurable router options
-  - Added `WithCache(size int)` option to enable route matching result caching
+  - Added `WithCacheCapacity(size int)` option to configure route matching cache capacity
   - Implemented simple LRU cache eviction strategy
-  - Provided `NewRouterWithCache()` convenience constructor
+  - Provided `NewRouterWithCacheCapacity()` convenience constructor
 
 - **Cache performance comparison**:
   - Benchmark tests show slight performance improvement for complex route scenarios
@@ -94,11 +94,11 @@ BenchmarkNestedParamRoute-10          	  928522	      1330 ns/op	    2008 B/op	 
 r := router.NewRouter()
 
 // Router with cache
-r := router.NewRouterWithCache(100)
+r := router.NewRouterWithCacheCapacity(100)
 
 // Custom configuration
 r := router.NewRouter(
-    router.WithCache(50),
+    router.WithCacheCapacity(50),
     router.WithLogger(customLogger),
 )
 ```
@@ -152,8 +152,8 @@ Prefer `contract.WriteResponse` / `BaseResourceController.Response` for standard
 
 ### New APIs
 - `NewRouter(...RouterOption)` - Option-supporting constructor
-- `NewRouterWithCache(size int)` - Convenient cache constructor
-- `WithCache(size int)` - Cache configuration option
+- `NewRouterWithCacheCapacity(size int)` - Convenient cache constructor
+- `WithCacheCapacity(size int)` - Cache capacity configuration option
 - `WithLogger(logger)` - Logger configuration option
 
 ## Best Practices Recommendations
@@ -161,13 +161,13 @@ Prefer `contract.WriteResponse` / `BaseResourceController.Response` for standard
 ### 1. Production Environment Deployment
 ```go
 // Recommended: Enable appropriate cache size
-r := router.NewRouterWithCache(1000)
+r := router.NewRouterWithCacheCapacity(1000)
 ```
 
 ### 2. High-Concurrency Scenarios
 ```go
 // Cache can reduce computational overhead for repeated route matching
-r := router.NewRouterWithCache(5000)
+r := router.NewRouterWithCacheCapacity(5000)
 ```
 
 ### 3. Debugging and Monitoring
