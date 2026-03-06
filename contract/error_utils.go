@@ -219,14 +219,20 @@ func (eh *ErrorHandler) RateLimitError(message string, params map[string]any) AP
 }
 
 // SafeExecute executes a function and handles any errors safely
-func (eh *ErrorHandler) SafeExecute(fn func() error, operation, module string, params map[string]any) error {
+func (eh *ErrorHandler) SafeExecute(fn func() error, operation, module string, params map[string]any) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			eh.HandlePanic(r)
+			panicErr := eh.HandlePanic(r)
+			if panicErr == nil {
+				panicErr = PanicToError(r)
+			}
+			if err == nil {
+				err = WrapError(panicErr, operation, module, params)
+			}
 		}
 	}()
 
-	err := fn()
+	err = fn()
 	if err != nil {
 		return WrapError(err, operation, module, params)
 	}
@@ -234,20 +240,24 @@ func (eh *ErrorHandler) SafeExecute(fn func() error, operation, module string, p
 }
 
 // SafeExecuteWithResult executes a function that returns a result and error
-func SafeExecuteWithResult[T any](fn func() (T, error), operation, module string, params map[string]any) (T, error) {
-	var zero T
+func SafeExecuteWithResult[T any](fn func() (T, error), operation, module string, params map[string]any) (result T, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			// Log panic but don't return it since we can't change the signature
+			panicErr := PanicToError(r)
 			if eh := getGlobalErrorHandler(); eh != nil {
-				eh.HandlePanic(r)
+				if handled := eh.HandlePanic(r); handled != nil {
+					panicErr = handled
+				}
+			}
+			if err == nil {
+				err = WrapError(panicErr, operation, module, params)
 			}
 		}
 	}()
 
-	result, err := fn()
+	result, err = fn()
 	if err != nil {
-		return zero, WrapError(err, operation, module, params)
+		return result, WrapError(err, operation, module, params)
 	}
 	return result, nil
 }

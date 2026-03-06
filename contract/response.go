@@ -3,6 +3,8 @@ package contract
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/spcent/plumego/utils/pool"
 )
 
 // Response represents a standardized success response payload.
@@ -18,9 +20,18 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) error {
 	if w == nil {
 		return ErrResponseWriterNil
 	}
+
+	// Encode first to avoid writing headers/body when serialization fails.
+	buf := pool.GetBuffer()
+	defer pool.PutBuffer(buf)
+	if err := json.NewEncoder(buf).Encode(payload); err != nil {
+		return err
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	return json.NewEncoder(w).Encode(payload)
+	_, err := w.Write(buf.Bytes())
+	return err
 }
 
 // WriteResponse writes a standardized success response and injects trace id when available.

@@ -54,7 +54,7 @@ func TestErrorJSONCategoryFromStatus(t *testing.T) {
 		{"too many requests", http.StatusTooManyRequests, CategoryRateLimit},
 		{"request timeout", http.StatusRequestTimeout, CategoryTimeout},
 		{"internal server error", http.StatusInternalServerError, CategoryServer},
-		{"unprocessable entity (fallback)", http.StatusUnprocessableEntity, CategoryClient},
+		{"unprocessable entity", http.StatusUnprocessableEntity, CategoryBusiness},
 	}
 
 	for _, tt := range tests {

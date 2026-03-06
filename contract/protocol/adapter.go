@@ -36,6 +36,7 @@ package protocol
 import (
 	"context"
 	"io"
+	"sync"
 )
 
 // ProtocolAdapter converts HTTP requests to/from other protocols
@@ -136,6 +137,7 @@ type ResponseWriter interface {
 
 // Registry manages protocol adapters
 type Registry struct {
+	mu       sync.RWMutex
 	adapters []ProtocolAdapter
 }
 
@@ -148,13 +150,19 @@ func NewRegistry() *Registry {
 
 // Register adds a protocol adapter to the registry
 func (r *Registry) Register(adapter ProtocolAdapter) {
+	r.mu.Lock()
 	r.adapters = append(r.adapters, adapter)
+	r.mu.Unlock()
 }
 
 // Find returns the first adapter that can handle the request
 // Returns nil if no adapter is found
 func (r *Registry) Find(req *HTTPRequest) ProtocolAdapter {
-	for _, adapter := range r.adapters {
+	r.mu.RLock()
+	adapters := make([]ProtocolAdapter, len(r.adapters))
+	copy(adapters, r.adapters)
+	r.mu.RUnlock()
+	for _, adapter := range adapters {
 		if adapter.Handles(req) {
 			return adapter
 		}
@@ -164,10 +172,16 @@ func (r *Registry) Find(req *HTTPRequest) ProtocolAdapter {
 
 // Adapters returns all registered adapters
 func (r *Registry) Adapters() []ProtocolAdapter {
-	return r.adapters
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	adapters := make([]ProtocolAdapter, len(r.adapters))
+	copy(adapters, r.adapters)
+	return adapters
 }
 
 // Count returns the number of registered adapters
 func (r *Registry) Count() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return len(r.adapters)
 }

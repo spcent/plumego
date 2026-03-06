@@ -648,6 +648,7 @@ if !guard.Allow(clientIP) {
 - Add tests alongside code changes
 - Update documentation when changing APIs
 - Use `contract.WriteError` for error responses
+- Prefer `contract.GetDefaultRequestConfig()` / `contract.SetDefaultRequestConfig(...)` over mutating shared request defaults in place
 - Follow the functional options pattern
 
 ### Don't

@@ -275,11 +275,15 @@ func (c *Ctx) textWrite() func(string) error {
 // RespondWithSSE starts a Server-Sent Events response.
 // Returns an SSEWriter for sending events, or an error if SSE is not supported.
 func (c *Ctx) RespondWithSSE() (*SSEWriter, error) {
+	sw, err := NewSSEWriter(c.W)
+	if err != nil {
+		return nil, err
+	}
 	c.W.Header().Set("Content-Type", "text/event-stream")
 	c.W.Header().Set("Cache-Control", "no-cache")
 	c.W.Header().Set("Connection", "keep-alive")
 	c.W.WriteHeader(http.StatusOK)
-	return NewSSEWriter(c.W)
+	return sw, nil
 }
 
 // IsSSESupported reports whether the response writer supports SSE flushing.

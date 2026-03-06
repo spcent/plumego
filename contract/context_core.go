@@ -209,12 +209,29 @@ var DefaultRequestConfig = &RequestConfig{
 	RequestTimeout:    30 * time.Second,
 }
 
-func defaultRequestConfig() *RequestConfig {
+var defaultRequestConfigMu sync.RWMutex
+
+// SetDefaultRequestConfig atomically replaces the default request configuration.
+// Passing nil resets defaults to an empty config snapshot.
+func SetDefaultRequestConfig(cfg *RequestConfig) {
+	defaultRequestConfigMu.Lock()
+	DefaultRequestConfig = cfg
+	defaultRequestConfigMu.Unlock()
+}
+
+// GetDefaultRequestConfig returns a copy of the current default request configuration.
+func GetDefaultRequestConfig() *RequestConfig {
+	defaultRequestConfigMu.RLock()
+	defer defaultRequestConfigMu.RUnlock()
 	if DefaultRequestConfig == nil {
 		return &RequestConfig{}
 	}
 	cfg := *DefaultRequestConfig
 	return &cfg
+}
+
+func defaultRequestConfig() *RequestConfig {
+	return GetDefaultRequestConfig()
 }
 
 // newCtxWithLogger allows injecting a logger while keeping NewCtx minimal for compatibility.
@@ -307,7 +324,9 @@ func (c *Ctx) IsAborted() bool {
 // returns the same error for convenient inline use.
 func (c *Ctx) Error(err error) error {
 	if err != nil {
+		c.mu.Lock()
 		c.Errors = append(c.Errors, err)
+		c.mu.Unlock()
 	}
 	return err
 }

@@ -121,10 +121,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(err.Status)
-
-	_ = json.NewEncoder(w).Encode(ErrorResponse{Error: err})
+	_ = WriteJSON(w, err.Status, ErrorResponse{Error: err})
 }
 
 // CategoryForStatus maps an HTTP status to a default error category.
@@ -136,7 +133,9 @@ func CategoryForStatus(status int) ErrorCategory {
 		return CategoryRateLimit
 	case http.StatusRequestTimeout:
 		return CategoryTimeout
-	case http.StatusBadRequest, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity:
+	case http.StatusUnprocessableEntity:
+		return CategoryBusiness
+	case http.StatusBadRequest, http.StatusNotFound, http.StatusConflict:
 		return CategoryClient
 	default:
 		if status >= http.StatusInternalServerError {
@@ -509,6 +508,11 @@ func ParseErrorFromResponse(resp *http.Response) (APIError, error) {
 			Message:  fmt.Sprintf("failed to parse error response: %v", err),
 			Category: CategoryServer,
 		}, nil
+	}
+
+	// Status is not serialized in APIError payloads, so restore it from HTTP response.
+	if errorResp.Error.Status == 0 {
+		errorResp.Error.Status = resp.StatusCode
 	}
 
 	return errorResp.Error, nil

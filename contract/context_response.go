@@ -1,14 +1,11 @@
 package contract
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/spcent/plumego/utils/pool"
 )
 
 var (
@@ -42,20 +39,7 @@ func (c *Ctx) Response(status int, data any, meta map[string]any) error {
 
 // JSON writes a JSON response with the given status code.
 func (c *Ctx) JSON(status int, data any) error {
-	c.W.Header().Set("Content-Type", "application/json")
-	c.W.WriteHeader(status)
-
-	// Use pooled buffer for encoding to reduce allocations
-	buf := pool.GetBuffer()
-	defer pool.PutBuffer(buf)
-
-	if err := json.NewEncoder(buf).Encode(data); err != nil {
-		return err
-	}
-
-	// Write the buffer content to response writer
-	_, err := c.W.Write(buf.Bytes())
-	return err
+	return WriteJSON(c.W, status, data)
 }
 
 // Text writes a plain text response with the given status code.

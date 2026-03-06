@@ -307,6 +307,26 @@ func TestHTTPStatusFromCategory(t *testing.T) {
 	}
 }
 
+func TestCategoryForStatus(t *testing.T) {
+	tests := []struct {
+		status   int
+		expected ErrorCategory
+	}{
+		{http.StatusUnauthorized, CategoryAuthentication},
+		{http.StatusTooManyRequests, CategoryRateLimit},
+		{http.StatusRequestTimeout, CategoryTimeout},
+		{http.StatusUnprocessableEntity, CategoryBusiness},
+		{http.StatusBadRequest, CategoryClient},
+		{http.StatusInternalServerError, CategoryServer},
+	}
+
+	for _, tt := range tests {
+		if got := CategoryForStatus(tt.status); got != tt.expected {
+			t.Fatalf("status %d: expected category %s, got %s", tt.status, tt.expected, got)
+		}
+	}
+}
+
 func TestErrorClassification(t *testing.T) {
 	clientErr := APIError{Status: http.StatusBadRequest}
 	serverErr := APIError{Status: http.StatusInternalServerError}
@@ -532,6 +552,9 @@ func TestParseErrorFromResponse(t *testing.T) {
 
 	if parsedErr.Code != "RESOURCE_NOT_FOUND" {
 		t.Fatalf("expected parsed error code to match")
+	}
+	if parsedErr.Status != http.StatusNotFound {
+		t.Fatalf("expected parsed error status to match response status")
 	}
 
 	if parsedErr.Category != CategoryClient {

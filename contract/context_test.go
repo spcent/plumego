@@ -149,9 +149,9 @@ func TestBindJSONBodyCacheToggle(t *testing.T) {
 
 func TestBindJSONErrors(t *testing.T) {
 	tests := []struct {
-		name        string
-		body        string
-		wantMsg     string
+		name         string
+		body         string
+		wantMsg      string
 		wantSentinel error
 	}{
 		{name: "empty", body: "", wantMsg: "request body is empty", wantSentinel: ErrEmptyRequestBody},
@@ -254,6 +254,32 @@ func TestNewCtxAppliesRequestTimeout(t *testing.T) {
 	}
 }
 
+func TestDefaultRequestConfigAccessors(t *testing.T) {
+	original := DefaultRequestConfig
+	t.Cleanup(func() {
+		DefaultRequestConfig = original
+	})
+
+	cfg := &RequestConfig{
+		MaxBodySize:     1024,
+		EnableBodyCache: false,
+		RequestTimeout:  2 * time.Second,
+	}
+	SetDefaultRequestConfig(cfg)
+
+	got := GetDefaultRequestConfig()
+	if got.MaxBodySize != 1024 || got.EnableBodyCache {
+		t.Fatalf("unexpected config snapshot: %+v", got)
+	}
+
+	// Mutating returned value must not mutate global defaults.
+	got.MaxBodySize = 2048
+	got2 := GetDefaultRequestConfig()
+	if got2.MaxBodySize != 1024 {
+		t.Fatalf("expected isolated snapshot, got %+v", got2)
+	}
+}
+
 func TestParamsAndRequestContextHelpers(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(context.WithValue(context.Background(), ParamsContextKey{}, map[string]string{"id": "42"}))
 	if val, ok := Param(req, "id"); !ok || val != "42" {
@@ -342,6 +368,43 @@ func TestStreamChunkSizeValidation(t *testing.T) {
 
 	if err := ctx.StreamTextChunked([]string{"line"}, -1); !errors.Is(err, ErrInvalidChunkSize) {
 		t.Fatalf("expected invalid chunk size error, got %v", err)
+	}
+}
+
+type nonFlusherResponseWriter struct {
+	header http.Header
+	code   int
+	body   bytes.Buffer
+}
+
+func (w *nonFlusherResponseWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *nonFlusherResponseWriter) Write(p []byte) (int, error) {
+	return w.body.Write(p)
+}
+
+func (w *nonFlusherResponseWriter) WriteHeader(statusCode int) {
+	w.code = statusCode
+}
+
+func TestRespondWithSSENotSupportedDoesNotWriteHeaders(t *testing.T) {
+	w := &nonFlusherResponseWriter{}
+	ctx := NewCtx(w, httptest.NewRequest(http.MethodGet, "/", nil), nil)
+
+	_, err := ctx.RespondWithSSE()
+	if !errors.Is(err, ErrSSENotSupported) {
+		t.Fatalf("expected ErrSSENotSupported, got %v", err)
+	}
+	if w.code != 0 {
+		t.Fatalf("expected no status written, got %d", w.code)
+	}
+	if got := w.Header().Get("Content-Type"); got != "" {
+		t.Fatalf("expected no content type header written, got %q", got)
 	}
 }
 

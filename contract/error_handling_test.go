@@ -3,6 +3,7 @@ package contract
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -220,6 +221,36 @@ func TestErrorHandlerConvenienceMethods(t *testing.T) {
 				t.Errorf("expected extra param to be merged into details")
 			}
 		})
+	}
+}
+
+func TestSafeExecuteReturnsErrorOnPanic(t *testing.T) {
+	eh := NewErrorHandler(nil)
+	err := eh.SafeExecute(func() error {
+		panic("boom")
+	}, "test_op", "test_module", map[string]any{"id": 1})
+
+	if err == nil {
+		t.Fatal("expected panic to be converted to error")
+	}
+	if !strings.Contains(err.Error(), "panic") {
+		t.Fatalf("expected panic details in error, got %v", err)
+	}
+}
+
+func TestSafeExecuteWithResultReturnsErrorOnPanic(t *testing.T) {
+	value, err := SafeExecuteWithResult(func() (int, error) {
+		panic("boom")
+	}, "test_op", "test_module", map[string]any{"id": 1})
+
+	if value != 0 {
+		t.Fatalf("expected zero value on panic, got %d", value)
+	}
+	if err == nil {
+		t.Fatal("expected panic to be converted to error")
+	}
+	if !strings.Contains(err.Error(), "panic") {
+		t.Fatalf("expected panic details in error, got %v", err)
 	}
 }
 
