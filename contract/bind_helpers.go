@@ -46,7 +46,7 @@ func BindErrorToAPIError(err error) APIError {
 	fields := FieldErrorsFrom(err)
 
 	status := http.StatusBadRequest
-	code := "REQUEST_BIND_ERROR"
+	code := CodeRequestBindError
 	message := "invalid request payload"
 	category := CategoryValidation
 	errorType := ErrTypeValidation
@@ -54,28 +54,31 @@ func BindErrorToAPIError(err error) APIError {
 	switch {
 	case errors.Is(err, ErrRequestBodyTooLarge):
 		status = http.StatusRequestEntityTooLarge
-		code = "REQUEST_BODY_TOO_LARGE"
+		code = CodeRequestBodyTooLarge
 		message = ErrRequestBodyTooLarge.Error()
 	case errors.Is(err, ErrEmptyRequestBody):
-		code = "EMPTY_BODY"
+		code = CodeEmptyBody
 		message = ErrEmptyRequestBody.Error()
 	case errors.Is(err, ErrInvalidJSON):
-		code = "INVALID_JSON"
+		code = CodeInvalidJSON
 		message = ErrInvalidJSON.Error()
 	case errors.Is(err, ErrUnexpectedExtraData):
-		code = "UNEXPECTED_EXTRA_DATA"
+		code = CodeUnexpectedExtraData
 		message = ErrUnexpectedExtraData.Error()
 	default:
 		if len(fields) == 0 {
 			var bindErr *BindError
 			if errors.As(err, &bindErr) && bindErr != nil && bindErr.Message != "" {
 				message = bindErr.Message
+				if bindErr.Err != nil {
+					code = CodeRequestBodyReadFailed
+				}
 			}
 		}
 	}
 
 	if len(fields) > 0 {
-		code = "VALIDATION_ERROR"
+		code = CodeValidationError
 		message = "validation failed"
 	}
 

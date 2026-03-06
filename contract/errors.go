@@ -386,7 +386,7 @@ func NewValidationError(field, message string) APIError {
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
 		Type(ErrTypeValidation).
-		Code("VALIDATION_ERROR").
+		Code(CodeValidationError).
 		Message(fmt.Sprintf("validation failed for field '%s': %s", field, message)).
 		Detail("field", field).
 		Detail("validation_message", message).
@@ -398,7 +398,7 @@ func NewNotFoundError(resource string) APIError {
 		Status(http.StatusNotFound).
 		Category(CategoryClient).
 		Type(ErrTypeNotFound).
-		Code("RESOURCE_NOT_FOUND").
+		Code(CodeResourceNotFound).
 		Message(fmt.Sprintf("resource '%s' not found", resource)).
 		Detail("resource", resource).
 		Build()
@@ -412,7 +412,7 @@ func NewUnauthorizedError(message string) APIError {
 		Status(http.StatusUnauthorized).
 		Category(CategoryAuthentication).
 		Type(ErrTypeUnauthorized).
-		Code("UNAUTHORIZED").
+		Code(CodeUnauthorized).
 		Message(message).
 		Build()
 }
@@ -425,7 +425,7 @@ func NewForbiddenError(message string) APIError {
 		Status(http.StatusForbidden).
 		Category(CategoryAuthentication).
 		Type(ErrTypeForbidden).
-		Code("FORBIDDEN").
+		Code(CodeForbidden).
 		Message(message).
 		Build()
 }
@@ -438,7 +438,7 @@ func NewTimeoutError(message string) APIError {
 		Status(http.StatusRequestTimeout).
 		Category(CategoryTimeout).
 		Type(ErrTypeTimeout).
-		Code("TIMEOUT").
+		Code(CodeTimeout).
 		Message(message).
 		Build()
 }
@@ -451,7 +451,7 @@ func NewInternalError(message string) APIError {
 		Status(http.StatusInternalServerError).
 		Category(CategoryServer).
 		Type(ErrTypeInternal).
-		Code("INTERNAL_ERROR").
+		Code(CodeInternalError).
 		Message(message).
 		Build()
 }
@@ -464,7 +464,7 @@ func NewRateLimitError(message string) APIError {
 		Status(http.StatusTooManyRequests).
 		Category(CategoryRateLimit).
 		Type(ErrTypeRateLimited).
-		Code("RATE_LIMITED").
+		Code(CodeRateLimited).
 		Message(message).
 		Build()
 }
