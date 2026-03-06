@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="plumego wordmark square bw">
+  <rect width="1024" height="1024" rx="168" fill="#FFFFFF"/>
+  <text x="122" y="556" fill="#111111" font-size="228" font-family="Avenir Next, SF Pro Display, Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="-6">plume</text>
+  <text x="590" y="556" fill="#111111" font-size="228" font-family="Avenir Next, SF Pro Display, Segoe UI, Arial, sans-serif" font-weight="800" letter-spacing="-8">go</text>
+  <path d="M128 636H896" stroke="#111111" stroke-opacity="0.2" stroke-width="20" stroke-linecap="round"/>
+</svg>

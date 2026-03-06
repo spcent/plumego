@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="plumego monogram square bw">
+  <rect width="1024" height="1024" rx="168" fill="#FFFFFF"/>
+  <rect x="168" y="168" width="688" height="688" rx="140" fill="none" stroke="#111111" stroke-width="34"/>
+  <path d="M362 268v488" stroke="#111111" stroke-width="68" stroke-linecap="round"/>
+  <path d="M362 318h208c108 0 180 62 180 156s-72 156-180 156H362" fill="none" stroke="#111111" stroke-width="68" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="624" cy="473" r="20" fill="#FFFFFF"/>
+  <circle cx="672" cy="473" r="20" fill="#FFFFFF"/>
+  <circle cx="648" cy="432" r="20" fill="#FFFFFF"/>
+  <circle cx="648" cy="514" r="20" fill="#FFFFFF"/>
+  <circle cx="707" cy="432" r="20" fill="#FFFFFF"/>
+</svg>

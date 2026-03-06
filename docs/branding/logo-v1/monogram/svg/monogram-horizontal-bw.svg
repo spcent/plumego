@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" role="img" aria-label="plumego monogram horizontal bw">
+  <rect width="1600" height="600" rx="72" fill="#FFFFFF"/>
+  <rect x="92" y="92" width="416" height="416" rx="92" fill="none" stroke="#111111" stroke-width="24"/>
+  <path d="M196 150v300" stroke="#111111" stroke-width="38" stroke-linecap="round"/>
+  <path d="M196 182h132c72 0 120 38 120 96s-48 96-120 96H196" fill="none" stroke="#111111" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="368" cy="274" r="12" fill="#FFFFFF"/>
+  <circle cx="396" cy="274" r="12" fill="#FFFFFF"/>
+  <circle cx="382" cy="250" r="12" fill="#FFFFFF"/>
+  <circle cx="382" cy="298" r="12" fill="#FFFFFF"/>
+  <circle cx="416" cy="250" r="12" fill="#FFFFFF"/>
+  <text x="592" y="348" fill="#111111" font-size="176" font-family="Avenir Next, SF Pro Display, Segoe UI, Arial, sans-serif" font-weight="700" letter-spacing="-3">plumego</text>
+</svg>
