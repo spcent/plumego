@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -113,6 +114,7 @@ type FileSource struct {
 	path     string
 	format   string
 	watch    bool
+	mu       sync.Mutex // protects lastData and lastMod
 	lastData map[string]any
 	lastMod  time.Time
 }
@@ -134,10 +136,12 @@ func (f *FileSource) Load(ctx context.Context) (map[string]any, error) {
 		return nil, err
 	}
 
+	f.mu.Lock()
 	f.lastData = data
 	if info, err := os.Stat(f.path); err == nil {
 		f.lastMod = info.ModTime()
 	}
+	f.mu.Unlock()
 	return data, nil
 }
 
@@ -162,29 +166,42 @@ func (f *FileSource) Watch(ctx context.Context) <-chan WatchResult {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if info, err := os.Stat(f.path); err == nil {
-					if info.ModTime().After(f.lastMod) {
-						data, err := f.loadFile()
-						if err != nil {
-							select {
-							case results <- WatchResult{Err: fmt.Errorf("failed to load updated file: %w", err)}:
-							case <-ctx.Done():
-								return
-							}
-							continue
-						}
+				info, statErr := os.Stat(f.path)
+				if statErr != nil {
+					continue
+				}
 
-						if !mapsEqual(f.lastData, data) {
-							f.lastData = data
-							f.lastMod = info.ModTime()
-							select {
-							case results <- WatchResult{Data: data}:
-							case <-ctx.Done():
-								return
-							}
-						} else {
-							f.lastMod = info.ModTime()
-						}
+				f.mu.Lock()
+				modChanged := info.ModTime().After(f.lastMod)
+				f.mu.Unlock()
+
+				if !modChanged {
+					continue
+				}
+
+				data, err := f.loadFile()
+				if err != nil {
+					select {
+					case results <- WatchResult{Err: fmt.Errorf("failed to load updated file: %w", err)}:
+					case <-ctx.Done():
+						return
+					}
+					continue
+				}
+
+				f.mu.Lock()
+				changed := !mapsEqual(f.lastData, data)
+				if changed {
+					f.lastData = data
+				}
+				f.lastMod = info.ModTime()
+				f.mu.Unlock()
+
+				if changed {
+					select {
+					case results <- WatchResult{Data: data}:
+					case <-ctx.Done():
+						return
 					}
 				}
 			}
@@ -230,27 +247,13 @@ func (f *FileSource) loadJSON(content []byte) (map[string]any, error) {
 // loadEnvFile loads environment file format.
 func (f *FileSource) loadEnvFile(content []byte) (map[string]any, error) {
 	data := make(map[string]any)
-	lines := strings.Split(string(content), "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+	for _, line := range strings.Split(string(content), "\n") {
+		key, value, ok := parseEnvLine(line)
+		if !ok {
 			continue
 		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		value = strings.Trim(value, `"'`)
-
-		key = toSnakeCase(key)
-		data[key] = value
+		data[toSnakeCase(key)] = value
 	}
-
 	return data, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/spcent/plumego/contract"
@@ -45,7 +46,8 @@ func (csm *ConfigSchemaManager) Register(key string, entry ConfigSchemaEntry) {
 	csm.schemas[key] = entry
 }
 
-// ValidateAll validates all configuration against registered schemas
+// ValidateAll validates all configuration against registered schemas.
+// It does NOT modify the input map; use ValidateAndApplyDefaults for that.
 func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.APIError {
 	var errors []contract.APIError
 
@@ -65,28 +67,24 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.AP
 			continue
 		}
 
-		// Apply default if missing
-		if !exists && schema.Default != nil {
-			config[key] = schema.Default
+		// Fields with defaults that are missing are valid — skip validators
+		if !exists {
 			continue
 		}
 
-		// Run validators
-		if exists {
-			for _, validator := range schema.Validators {
-				if err := validator.Validate(value, key); err != nil {
-					// Convert to APIError
-					apiErr := contract.NewErrorBuilder().
-						Status(400).
-						Category(contract.CategoryValidation).
-						Type(contract.ErrTypeValidation).
-						Code("CONFIG_VALIDATION_FAILED").
-						Message(err.Error()).
-						Detail("key", key).
-						Detail("value", value).
-						Build()
-					errors = append(errors, apiErr)
-				}
+		// Run validators on present values
+		for _, validator := range schema.Validators {
+			if err := validator.Validate(value, key); err != nil {
+				apiErr := contract.NewErrorBuilder().
+					Status(400).
+					Category(contract.CategoryValidation).
+					Type(contract.ErrTypeValidation).
+					Code("CONFIG_VALIDATION_FAILED").
+					Message(err.Error()).
+					Detail("key", key).
+					Detail("value", value).
+					Build()
+				errors = append(errors, apiErr)
 			}
 		}
 	}
@@ -142,11 +140,19 @@ func (csm *ConfigSchemaManager) ListSchemas() []ConfigSchemaEntry {
 	return schemas
 }
 
-// ValidateAndApplyDefaults validates configuration and applies defaults
+// ValidateAndApplyDefaults validates configuration and returns a new map with
+// default values applied for missing optional fields. The original map is not modified.
 func (csm *ConfigSchemaManager) ValidateAndApplyDefaults(config map[string]any) (map[string]any, []contract.APIError) {
-	result := make(map[string]any)
+	result := make(map[string]any, len(config))
 	for k, v := range config {
 		result[k] = v
+	}
+
+	// Apply defaults for missing fields (only for non-required fields)
+	for key, schema := range csm.schemas {
+		if _, exists := result[key]; !exists && schema.Default != nil {
+			result[key] = schema.Default
+		}
 	}
 
 	errors := csm.ValidateAll(result)
@@ -209,19 +215,22 @@ func (m *MaxLength) Name() string {
 
 // Pattern validator ensures string matches regex pattern
 type Pattern struct {
-	Pattern string
-	regex   *regexp.Regexp
+	Pattern  string
+	once     sync.Once
+	regex    *regexp.Regexp
+	compileErr error
 }
 
 func (p *Pattern) compile() error {
-	if p.regex == nil {
+	p.once.Do(func() {
 		compiled, err := regexp.Compile(p.Pattern)
 		if err != nil {
-			return fmt.Errorf("invalid pattern %s: %w", p.Pattern, err)
+			p.compileErr = fmt.Errorf("invalid pattern %s: %w", p.Pattern, err)
+			return
 		}
 		p.regex = compiled
-	}
-	return nil
+	})
+	return p.compileErr
 }
 
 func (p *Pattern) Validate(value any, key string) error {
