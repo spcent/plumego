@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/health"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/cors"

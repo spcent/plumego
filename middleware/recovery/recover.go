@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	contract "github.com/spcent/plumego/contract"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 )
 

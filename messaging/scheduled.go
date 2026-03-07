@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/net/mq/store"
 	"github.com/spcent/plumego/scheduler"
 )

@@ -5,24 +5,24 @@ import (
 	"fmt"
 	"time"
 
-	glog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 // LoggingRouter wraps a router with structured logging for database sharding operations.
-// It uses the plumego/log/glog.StructuredLogger interface for flexible logging backends.
+// It uses the plumego/log/log.StructuredLogger interface for flexible logging backends.
 type LoggingRouter struct {
 	router *Router
-	logger glog.StructuredLogger
+	logger log.StructuredLogger
 }
 
 // NewLoggingRouter creates a new logging router with optional logger.
 // If logger is nil, it creates a default JSONLogger suitable for production use.
-func NewLoggingRouter(router *Router, logger glog.StructuredLogger) *LoggingRouter {
+func NewLoggingRouter(router *Router, logger log.StructuredLogger) *LoggingRouter {
 	if logger == nil {
 		// Default to JSON logger for sharding operations
-		logger = glog.NewJSONLogger(glog.JSONLoggerConfig{
-			Level: glog.INFO,
-			Fields: glog.Fields{
+		logger = log.NewJSONLogger(log.JSONLoggerConfig{
+			Level: log.INFO,
+			Fields: log.Fields{
 				"component": "sharding",
 			},
 		})
@@ -35,7 +35,7 @@ func NewLoggingRouter(router *Router, logger glog.StructuredLogger) *LoggingRout
 }
 
 // Logger returns the underlying logger instance.
-func (lr *LoggingRouter) Logger() glog.StructuredLogger {
+func (lr *LoggingRouter) Logger() log.StructuredLogger {
 	return lr.logger
 }
 
@@ -46,7 +46,7 @@ func (lr *LoggingRouter) Router() *Router {
 
 // LogQuery logs query execution with context, automatically capturing trace IDs.
 func (lr *LoggingRouter) LogQuery(ctx context.Context, query string, shardIndex int, latency time.Duration, err error) {
-	fields := glog.Fields{
+	fields := log.Fields{
 		"query":       query,
 		"shard_index": shardIndex,
 		"latency_ms":  latency.Milliseconds(),
@@ -62,7 +62,7 @@ func (lr *LoggingRouter) LogQuery(ctx context.Context, query string, shardIndex 
 
 // LogShardResolution logs shard resolution with context.
 func (lr *LoggingRouter) LogShardResolution(ctx context.Context, tableName string, shardKey any, shardIndex int) {
-	lr.logger.InfoCtx(ctx, "shard resolved", glog.Fields{
+	lr.logger.InfoCtx(ctx, "shard resolved", log.Fields{
 		"table":       tableName,
 		"shard_key":   fmt.Sprintf("%v", shardKey),
 		"shard_index": shardIndex,
@@ -72,7 +72,7 @@ func (lr *LoggingRouter) LogShardResolution(ctx context.Context, tableName strin
 // LogCrossShardQuery logs cross-shard queries with context.
 // These are typically less performant and should be monitored.
 func (lr *LoggingRouter) LogCrossShardQuery(ctx context.Context, query string, policy string) {
-	lr.logger.WarnCtx(ctx, "cross-shard query", glog.Fields{
+	lr.logger.WarnCtx(ctx, "cross-shard query", log.Fields{
 		"query":  query,
 		"policy": policy,
 	})
@@ -80,7 +80,7 @@ func (lr *LoggingRouter) LogCrossShardQuery(ctx context.Context, query string, p
 
 // LogRewrite logs SQL rewriting with context.
 func (lr *LoggingRouter) LogRewrite(ctx context.Context, original string, rewritten string, cached bool) {
-	lr.logger.InfoCtx(ctx, "SQL rewritten", glog.Fields{
+	lr.logger.InfoCtx(ctx, "SQL rewritten", log.Fields{
 		"original":  original,
 		"rewritten": rewritten,
 		"cached":    cached,

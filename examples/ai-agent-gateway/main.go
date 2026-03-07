@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	stdlog "log"
 	"net/http"
 	"os"
 	"time"
@@ -21,26 +21,26 @@ import (
 	"github.com/spcent/plumego/ai/tokenizer"
 	"github.com/spcent/plumego/ai/tool"
 	"github.com/spcent/plumego/core"
-	glog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 func main() {
 	// Get API key from environment
 	apiKey := os.Getenv("CLAUDE_API_KEY")
 	if apiKey == "" {
-		log.Println("Warning: CLAUDE_API_KEY not set, using mock provider")
+		stdlog.Println("Warning: CLAUDE_API_KEY not set, using mock provider")
 	}
 
 	// Phase 3: Create metrics collector
 	collector := metrics.NewMemoryCollector()
 
 	// Phase 3: Create structured logger
-	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+	logger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output:      os.Stdout,
 		ErrorOutput: os.Stderr,
-		Level:       glog.INFO,
+		Level:       log.INFO,
 	})
-	logger.Info("Starting AI Agent Gateway", glog.Fields{"version": "phase-3"})
+	logger.Info("Starting AI Agent Gateway", log.Fields{"version": "phase-3"})
 
 	// Create providers (Phase 3: wrapped with instrumentation)
 	providerMgr := provider.NewManager()
@@ -68,7 +68,7 @@ func main() {
 	promptStorage := prompt.NewMemoryStorage()
 	promptEngine := prompt.NewEngine(promptStorage)
 	if err := prompt.LoadBuiltinTemplates(promptEngine); err != nil {
-		log.Printf("Warning: Failed to load builtin templates: %v", err)
+		stdlog.Printf("Warning: Failed to load builtin templates: %v", err)
 	}
 
 	// Phase 2: Create content filters
@@ -119,25 +119,25 @@ func main() {
 	app.Get("/metrics", promExporter.Handler())
 	app.Get("/api/metrics/snapshot", metricsSnapshotHandler(collector))
 
-	log.Println("🤖 AI Agent Gateway (Phase 1 + 2 + 3) starting on http://localhost:8080")
-	log.Println("\nPhase 1 Endpoints:")
-	log.Println("  POST /api/sessions - Create a new session")
-	log.Println("  POST /api/sessions/:id/messages - Send a message")
-	log.Println("  GET  /api/sessions/:id/stream - Stream responses (SSE)")
-	log.Println("  GET  /api/tools - List available tools")
-	log.Println("\nPhase 2 Endpoints:")
-	log.Println("  GET  /api/templates - List prompt templates")
-	log.Println("  POST /api/templates/render - Render a template")
-	log.Println("  POST /api/filter - Filter content for PII/secrets")
-	log.Println("  GET  /api/cache/stats - LLM cache statistics")
-	log.Println("  POST /api/workflows/:id/execute - Execute a workflow")
-	log.Println("  GET  /api/workflows - List available workflows")
-	log.Println("\nPhase 3 Endpoints (NEW!):")
-	log.Println("  GET  /metrics - Prometheus metrics (Prometheus text format)")
-	log.Println("  GET  /api/metrics/snapshot - Metrics snapshot (JSON)")
+	stdlog.Println("🤖 AI Agent Gateway (Phase 1 + 2 + 3) starting on http://localhost:8080")
+	stdlog.Println("\nPhase 1 Endpoints:")
+	stdlog.Println("  POST /api/sessions - Create a new session")
+	stdlog.Println("  POST /api/sessions/:id/messages - Send a message")
+	stdlog.Println("  GET  /api/sessions/:id/stream - Stream responses (SSE)")
+	stdlog.Println("  GET  /api/tools - List available tools")
+	stdlog.Println("\nPhase 2 Endpoints:")
+	stdlog.Println("  GET  /api/templates - List prompt templates")
+	stdlog.Println("  POST /api/templates/render - Render a template")
+	stdlog.Println("  POST /api/filter - Filter content for PII/secrets")
+	stdlog.Println("  GET  /api/cache/stats - LLM cache statistics")
+	stdlog.Println("  POST /api/workflows/:id/execute - Execute a workflow")
+	stdlog.Println("  GET  /api/workflows - List available workflows")
+	stdlog.Println("\nPhase 3 Endpoints (NEW!):")
+	stdlog.Println("  GET  /metrics - Prometheus metrics (Prometheus text format)")
+	stdlog.Println("  GET  /api/metrics/snapshot - Metrics snapshot (JSON)")
 
 	if err := app.Boot(); err != nil {
-		log.Fatal(err)
+		stdlog.Fatal(err)
 	}
 }
 

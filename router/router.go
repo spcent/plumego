@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/spcent/plumego/contract"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 )

@@ -27,7 +27,7 @@
 package config
 
 import (
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 // ConfigManager is an alias for Manager for backward compatibility.

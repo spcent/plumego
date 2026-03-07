@@ -1,4 +1,4 @@
-package glog
+package log
 
 import (
 	"flag"
@@ -18,14 +18,11 @@ import (
 type Level int
 
 const (
-	DEBUG Level = -1
-)
-
-const (
-	INFO Level = iota
-	WARNING
-	ERROR
-	FATAL
+	DEBUG   Level = -1
+	INFO    Level = 0
+	WARNING Level = 1
+	ERROR   Level = 2
+	FATAL   Level = 3
 )
 
 type InitConfig struct {
@@ -87,7 +84,14 @@ type Logger struct {
 	rotationConfig  RotationConfig
 	currentSize     map[Level]int64
 	writeErrOnce    sync.Once
+	// cachedWriters caches the per-level io.Writer (possibly an io.MultiWriter)
+	// so getLogWriter does not allocate on every log call.
+	// Invalidated whenever logFiles, alsoToStderr, toStderr, or output changes.
+	cachedWriters map[Level]io.Writer
 }
+
+// pid is cached at package init to avoid a getpid syscall on every log line.
+var pid = os.Getpid()
 
 var std = New()
 
@@ -146,6 +150,7 @@ func InitWithConfig(cfg InitConfig) error {
 	if std.toStderr {
 		std.output = os.Stderr
 	}
+	std.rebuildWriterCache()
 	return nil
 }
 
@@ -159,7 +164,7 @@ func (l *Logger) initLogFiles() error {
 		hostname = "unknown"
 	}
 
-	pid := os.Getpid()
+	currentPID := pid
 	now := time.Now()
 
 	for level := INFO; level <= ERROR; level++ {
@@ -167,7 +172,7 @@ func (l *Logger) initLogFiles() error {
 		filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
 			l.program, hostname, lname,
 			now.Year(), now.Month(), now.Day(),
-			now.Hour(), now.Minute(), now.Second(), pid)
+			now.Hour(), now.Minute(), now.Second(), currentPID)
 
 		logPath := filepath.Join(l.logDir, filename)
 		file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -247,40 +252,60 @@ func (l *Logger) formatHeader(level Level, file string, line int) []byte {
 		now.Month(), now.Day(),
 		now.Hour(), now.Minute(), now.Second(),
 		now.Nanosecond()/1000,
-		os.Getpid(),
+		pid,
 		file, line)...)
 
 	return buf
 }
 
+// rebuildWriterCache pre-computes the effective io.Writer for each log level
+// and stores it in cachedWriters. Must be called under l.mu write lock whenever
+// logFiles, alsoToStderr, toStderr, or output changes.
+func (l *Logger) rebuildWriterCache() {
+	if l.toStderr {
+		// All levels go to stderr; no need to cache per-level.
+		l.cachedWriters = nil
+		return
+	}
+	cache := make(map[Level]io.Writer, 4)
+	for level := INFO; level <= FATAL; level++ {
+		var writers []io.Writer
+		if l.logDir != "" && l.logFiles[level] != nil {
+			writers = append(writers, l.logFiles[level])
+			for lv := INFO; lv < level; lv++ {
+				if l.logFiles[lv] != nil {
+					writers = append(writers, l.logFiles[lv])
+				}
+			}
+		}
+		if l.alsoToStderr {
+			writers = append(writers, l.stderrWriter())
+		}
+		if len(writers) == 0 {
+			writers = append(writers, l.stderrWriter())
+		}
+		if len(writers) == 1 {
+			cache[level] = writers[0]
+		} else {
+			cache[level] = io.MultiWriter(writers...)
+		}
+	}
+	l.cachedWriters = cache
+}
+
+// getLogWriter returns the effective io.Writer for the given level.
+// Must be called with at least l.mu read lock held.
 func (l *Logger) getLogWriter(level Level) io.Writer {
-	var writers []io.Writer
 	if l.toStderr {
 		return l.stderrWriter()
 	}
-
-	if l.logDir != "" && l.logFiles[level] != nil {
-		writers = append(writers, l.logFiles[level])
-		for lv := INFO; lv < level; lv++ {
-			if l.logFiles[lv] != nil {
-				writers = append(writers, l.logFiles[lv])
-			}
+	if l.cachedWriters != nil {
+		if w, ok := l.cachedWriters[level]; ok {
+			return w
 		}
 	}
-
-	if l.alsoToStderr {
-		writers = append(writers, l.stderrWriter())
-	}
-
-	if len(writers) == 0 {
-		writers = append(writers, l.stderrWriter())
-	}
-
-	if len(writers) == 1 {
-		return writers[0]
-	}
-
-	return io.MultiWriter(writers...)
+	// Fallback (should not happen if rebuildWriterCache is called on every config change).
+	return l.stderrWriter()
 }
 
 func (l *Logger) stderrWriter() io.Writer {
@@ -372,6 +397,7 @@ func (l *Logger) SetOutput(w io.Writer) {
 		w = os.Stderr
 	}
 	l.output = w
+	l.rebuildWriterCache()
 }
 
 func (l *Logger) SetVerbose(v int) {
@@ -512,14 +538,14 @@ func (l *Logger) rotateLogFile(level Level) error {
 		hostname = "unknown"
 	}
 
-	pid := os.Getpid()
+	currentPID := pid
 	now := time.Now()
 
 	lname := levelName(level)
 	filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
 		l.program, hostname, lname,
 		now.Year(), now.Month(), now.Day(),
-		now.Hour(), now.Minute(), now.Second(), pid)
+		now.Hour(), now.Minute(), now.Second(), currentPID)
 
 	logPath := filepath.Join(l.logDir, filename)
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -530,11 +556,19 @@ func (l *Logger) rotateLogFile(level Level) error {
 	// Update log file map
 	l.logFiles[level] = file
 
-	// Update symlink
+	// The log file changed, so cached writers for this level are stale.
+	l.rebuildWriterCache()
+
+	// Update symlink to point to the newest log file.
+	// Symlink creation is best-effort: failures are logged to stderr but do not
+	// abort the rotation because the log file itself was opened successfully.
 	linkName := fmt.Sprintf("%s.%s", l.program, lname)
 	linkPath := filepath.Join(l.logDir, linkName)
-	os.Remove(linkPath)            // Ignore error
-	os.Symlink(filename, linkPath) // Ignore error for backward compatibility
+	os.Remove(linkPath) // ignore removal error; the next Symlink may still succeed
+	if err := os.Symlink(filename, linkPath); err != nil {
+		// Write directly to stderr to avoid recursion through the logger.
+		fmt.Fprintf(os.Stderr, "log: failed to update symlink %s → %s: %v\n", linkPath, filename, err)
+	}
 
 	return nil
 }

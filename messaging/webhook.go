@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/pubsub"
 
 	webhookout "github.com/spcent/plumego/net/webhookout"

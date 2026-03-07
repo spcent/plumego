@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 // ErrorCategory describes the high-level class of an API error for observability.

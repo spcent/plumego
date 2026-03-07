@@ -6,7 +6,7 @@ import (
 	"github.com/spcent/plumego/core/components/builtin"
 	"github.com/spcent/plumego/core/components/pubsubdebug"
 	"github.com/spcent/plumego/core/components/webhook"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/pubsub"
 )
 

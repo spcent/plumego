@@ -2,7 +2,7 @@ package core
 
 import (
 	"github.com/spcent/plumego/core/components/websocket"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	ws "github.com/spcent/plumego/net/websocket"
 )
 

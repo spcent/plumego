@@ -5,7 +5,7 @@ import (
 	"runtime/debug"
 	"sync/atomic"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 // ErrorHandler provides unified error handling utilities

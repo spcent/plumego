@@ -2,7 +2,7 @@ package core
 
 import (
 	webhook "github.com/spcent/plumego/core/components/webhook"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/pubsub"
 )
 

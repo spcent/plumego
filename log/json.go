@@ -1,4 +1,4 @@
-package glog
+package log
 
 import (
 	"context"
@@ -56,30 +56,37 @@ func NewJSONLogger(config JSONLoggerConfig) *JSONLogger {
 	}
 }
 
+// With is a convenience shortcut for WithFields(Fields{key: value}).
+func (l *JSONLogger) With(key string, value any) StructuredLogger {
+	return l.WithFields(Fields{key: value})
+}
+
 // WithFields returns a new logger with additional fields merged in.
 // Each derived logger gets its own independent write-error tracker.
+// The fields, outputs, level and verbosity are snapshotted at call time.
 func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
+	// These fields are immutable after construction, so a single lock snapshot
+	// is sufficient; no risk of partial reads.
 	l.mu.Lock()
-	output := l.output
-	errorOutput := l.errorOutput
-	level := l.level
-	verbosity := l.verbosity
-	respectVerbosity := l.respectVerbosity
 	merged := mergeFields(l.fields, fields)
-	l.mu.Unlock()
-
-	return &JSONLogger{
-		output:           output,
-		errorOutput:      errorOutput,
-		level:            level,
-		verbosity:        verbosity,
+	child := &JSONLogger{
+		output:           l.output,
+		errorOutput:      l.errorOutput,
+		level:            l.level,
+		verbosity:        l.verbosity,
 		fields:           merged,
-		respectVerbosity: respectVerbosity,
+		respectVerbosity: l.respectVerbosity,
 		// writeErrOnce is zero-value (fresh) for every derived logger
 	}
+	l.mu.Unlock()
+	return child
 }
 
 // Debug logs a debug message with optional fields.
+// When RespectVerbosity is enabled in JSONLoggerConfig, Debug is gated on the
+// local Verbosity field (default 0). This differs from gLogger which uses the
+// global glog -v flag; the two implementations intentionally use separate
+// verbosity sources to remain decoupled.
 func (l *JSONLogger) Debug(msg string, fields ...Fields) {
 	if l.respectVerbosity && !l.vAt(1) {
 		return
@@ -138,20 +145,36 @@ func (l *JSONLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields)
 }
 
 func (l *JSONLogger) log(level Level, msg string, fields Fields, ctx context.Context) {
-	if level < l.level {
+	// Snapshot the minimum level under the lock so a concurrent SetLevel()
+	// cannot race with this read (go race detector would flag the plain read).
+	l.mu.Lock()
+	minLevel := l.level
+	l.mu.Unlock()
+	if level < minLevel {
 		return
 	}
 
+	// Build the entry and marshal it outside the lock to reduce contention.
+	entry := l.buildEntry(level, msg, fields, ctx)
+	data, err := json.Marshal(entry)
+	if err != nil {
+		data = []byte(`{"level":"ERROR","msg":"failed to marshal log entry"}`)
+	}
+
+	// Only the actual write to the io.Writer is serialised.
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	entry := l.buildEntry(level, msg, fields, ctx)
-	l.writeEntry(level, entry)
+	l.writeRaw(level, data)
 }
 
-// buildEntry constructs the log entry map.
+// buildEntry constructs the log entry map. Called without the mutex held.
 func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, ctx context.Context) map[string]any {
-	combined := mergeFields(l.fields, fields)
+	// Snapshot base fields under lock so WithFields-derived loggers are safe.
+	l.mu.Lock()
+	baseFields := l.fields
+	l.mu.Unlock()
+
+	combined := mergeFields(baseFields, fields)
 	entry := make(map[string]any, len(combined)+4)
 	for k, v := range combined {
 		entry[k] = v
@@ -168,14 +191,10 @@ func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, ctx cont
 	return entry
 }
 
-// writeEntry marshals and writes the log entry to the appropriate output.
-func (l *JSONLogger) writeEntry(level Level, entry map[string]any) {
+// writeRaw writes pre-marshalled JSON data to the appropriate output.
+// Must be called with l.mu held.
+func (l *JSONLogger) writeRaw(level Level, data []byte) {
 	w := l.writerFor(level)
-
-	data, err := json.Marshal(entry)
-	if err != nil {
-		data = []byte(`{"level":"ERROR","msg":"failed to marshal log entry"}`)
-	}
 	if err := writeFull(w, data); err != nil {
 		l.reportWriteError(err)
 		return
@@ -199,15 +218,42 @@ func (l *JSONLogger) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop implements the Lifecycle interface (flushes if output supports it).
+// Stop implements the Lifecycle interface (flushes both outputs if they support it).
 func (l *JSONLogger) Stop(ctx context.Context) error {
 	l.mu.Lock()
-	defer l.mu.Unlock()
+	out := l.output
+	errOut := l.errorOutput
+	l.mu.Unlock()
 
-	if syncer, ok := l.output.(interface{ Sync() error }); ok {
-		return syncer.Sync()
+	var firstErr error
+	if syncer, ok := out.(interface{ Sync() error }); ok {
+		if err := syncer.Sync(); err != nil && firstErr == nil {
+			firstErr = err
+		}
 	}
-	return nil
+	if errOut != nil && errOut != out {
+		if syncer, ok := errOut.(interface{ Sync() error }); ok {
+			if err := syncer.Sync(); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
+}
+
+// SetLevel changes the minimum log level at runtime.
+// It is safe to call concurrently with logging.
+func (l *JSONLogger) SetLevel(level Level) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.level = level
+}
+
+// Level returns the current minimum log level.
+func (l *JSONLogger) Level() Level {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.level
 }
 
 func (l *JSONLogger) vAt(level int) bool {

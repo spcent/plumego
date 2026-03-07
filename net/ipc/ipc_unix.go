@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"context"
-	glog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"net"
 	"os"
 	"path/filepath"
@@ -138,7 +138,7 @@ func (s *unixServer) AcceptWithContext(ctx context.Context) (Client, error) {
 
 	// Log and record metrics
 	if config.Logger != nil {
-		fields := glog.Fields{
+		fields := log.Fields{
 			"operation": "accept",
 			"addr":      s.Addr(),
 			"transport": transport,
@@ -284,7 +284,7 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 
 	// Log and record metrics
 	if config.Logger != nil {
-		fields := glog.Fields{
+		fields := log.Fields{
 			"operation": "dial",
 			"addr":      addr,
 			"transport": transport,
@@ -339,7 +339,7 @@ func (c *unixClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, 
 
 	// Log and record metrics
 	if config.Logger != nil && err != nil {
-		config.Logger.Error("IPC write failed", glog.Fields{
+		config.Logger.Error("IPC write failed", log.Fields{
 			"operation": "write",
 			"bytes":     n,
 			"duration":  duration,
@@ -383,7 +383,7 @@ func (c *unixClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, er
 
 	// Log and record metrics (only log errors to avoid excessive logging)
 	if config.Logger != nil && err != nil && err != io.EOF {
-		config.Logger.Error("IPC read failed", glog.Fields{
+		config.Logger.Error("IPC read failed", log.Fields{
 			"operation": "read",
 			"bytes":     n,
 			"duration":  duration,

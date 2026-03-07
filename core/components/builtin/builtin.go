@@ -8,7 +8,7 @@ import (
 	"github.com/spcent/plumego/core/components/pubsubdebug"
 	"github.com/spcent/plumego/core/components/webhook"
 	"github.com/spcent/plumego/health"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"

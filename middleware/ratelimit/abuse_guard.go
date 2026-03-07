@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/security/abuse"
 	"github.com/spcent/plumego/utils/httpx"

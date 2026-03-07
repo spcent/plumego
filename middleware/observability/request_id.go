@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 )
 
