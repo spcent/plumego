@@ -15,19 +15,31 @@ import (
 
 var errConfigClosed = errors.New("config manager is closed")
 
+// isClosedChan reports whether a WatchResult channel is already closed
+// by performing a non-blocking receive. Used to skip non-watchable sources.
+func isClosedChan(ch <-chan WatchResult) bool {
+	select {
+	case _, ok := <-ch:
+		return !ok
+	default:
+		return false
+	}
+}
+
 // WatcherCallback represents a configuration change callback.
 type WatcherCallback func(oldValue, newValue any)
 
 // Manager manages application configuration with dependency injection.
 type Manager struct {
-	sources  []Source
-	data     map[string]any
-	mu       sync.RWMutex
-	watchers map[string][]WatcherCallback
-	ctx      context.Context
-	cancel   context.CancelFunc
-	watchWg  sync.WaitGroup
-	logger   log.StructuredLogger
+	sources    []Source
+	data       map[string]any
+	sourceData map[string]map[string]any // tracks each source's last known data
+	mu         sync.RWMutex
+	watchers   map[string][]WatcherCallback
+	ctx        context.Context
+	cancel     context.CancelFunc
+	watchWg    sync.WaitGroup
+	logger     log.StructuredLogger
 }
 
 // NewManager creates a new Manager instance.
@@ -37,12 +49,13 @@ func NewManager(logger log.StructuredLogger) *Manager {
 		logger = log.NewGLogger()
 	}
 	return &Manager{
-		sources:  make([]Source, 0),
-		data:     make(map[string]any),
-		watchers: make(map[string][]WatcherCallback),
-		ctx:      ctx,
-		cancel:   cancel,
-		logger:   logger,
+		sources:    make([]Source, 0),
+		data:       make(map[string]any),
+		sourceData: make(map[string]map[string]any),
+		watchers:   make(map[string][]WatcherCallback),
+		ctx:        ctx,
+		cancel:     cancel,
+		logger:     logger,
 	}
 }
 
@@ -74,9 +87,10 @@ func (m *Manager) Load(ctx context.Context) error {
 		return err
 	}
 
+	allSourceData := make(map[string]map[string]any, len(sources))
 	data := make(map[string]any)
 	for _, source := range sources {
-		sourceData, err := source.Load(ctx)
+		sd, err := source.Load(ctx)
 		if err != nil {
 			m.logger.Error("Failed to load configuration", log.Fields{
 				"source": source.Name(),
@@ -85,7 +99,8 @@ func (m *Manager) Load(ctx context.Context) error {
 			return fmt.Errorf("failed to load from source %s: %w", source.Name(), err)
 		}
 
-		normalized := normalizeData(sourceData, m.logger)
+		normalized := normalizeData(sd, m.logger)
+		allSourceData[source.Name()] = normalized
 		for key, value := range normalized {
 			data[key] = value
 		}
@@ -102,6 +117,7 @@ func (m *Manager) Load(ctx context.Context) error {
 		return errConfigClosed
 	}
 	m.data = data
+	m.sourceData = allSourceData
 	m.mu.Unlock()
 
 	return nil
@@ -119,12 +135,13 @@ func (m *Manager) LoadBestEffort(ctx context.Context) error {
 		return err
 	}
 
+	allSourceData := make(map[string]map[string]any, len(sources))
 	data := make(map[string]any)
 	loaded := 0
 	var lastErr error
 
 	for _, source := range sources {
-		sourceData, err := source.Load(ctx)
+		sd, err := source.Load(ctx)
 		if err != nil {
 			lastErr = err
 			m.logger.Error("Failed to load configuration", log.Fields{
@@ -135,7 +152,8 @@ func (m *Manager) LoadBestEffort(ctx context.Context) error {
 		}
 
 		loaded++
-		normalized := normalizeData(sourceData, m.logger)
+		normalized := normalizeData(sd, m.logger)
+		allSourceData[source.Name()] = normalized
 		for key, value := range normalized {
 			data[key] = value
 		}
@@ -156,6 +174,7 @@ func (m *Manager) LoadBestEffort(ctx context.Context) error {
 		return errConfigClosed
 	}
 	m.data = data
+	m.sourceData = allSourceData
 	m.mu.Unlock()
 
 	return nil
@@ -188,12 +207,14 @@ func (m *Manager) Get(key string) string {
 }
 
 // GetString retrieves a configuration value as string with default.
+// Returns defaultValue when the key does not exist; returns the stored value
+// (including empty string) when the key exists.
 func (m *Manager) GetString(key, defaultValue string) string {
-	value := m.Get(key)
-	if value == "" {
+	value, exists := m.getValue(key)
+	if !exists {
 		return defaultValue
 	}
-	return strings.TrimSpace(value)
+	return strings.TrimSpace(toString(value))
 }
 
 // GetInt retrieves a configuration value as int.
@@ -228,6 +249,59 @@ func (m *Manager) GetDurationMs(key string, defaultValueMs int) time.Duration {
 	return time.Duration(m.GetInt(key, defaultValueMs)) * time.Millisecond
 }
 
+// Has reports whether a configuration key exists (regardless of its value).
+func (m *Manager) Has(key string) bool {
+	_, exists := m.getValue(key)
+	return exists
+}
+
+// GetStringSlice retrieves a configuration value as a string slice,
+// splitting on sep. If the key does not exist, defaultValue is returned.
+// Example: KEY=a,b,c with sep="," returns ["a","b","c"].
+func (m *Manager) GetStringSlice(key, sep string, defaultValue []string) []string {
+	value, exists := m.getValue(key)
+	if !exists {
+		return defaultValue
+	}
+	raw := strings.TrimSpace(toString(value))
+	if raw == "" {
+		return defaultValue
+	}
+	parts := strings.Split(raw, sep)
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			result = append(result, s)
+		}
+	}
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
+}
+
+// GetDuration retrieves a configuration value as time.Duration.
+// The value may be expressed as a Go duration string (e.g. "30s", "5m", "1h")
+// or as a plain integer interpreted as milliseconds for backward compatibility.
+func (m *Manager) GetDuration(key string, defaultValue time.Duration) time.Duration {
+	value, exists := m.getValue(key)
+	if !exists {
+		return defaultValue
+	}
+	s := strings.TrimSpace(toString(value))
+	if s == "" {
+		return defaultValue
+	}
+	if d, err := time.ParseDuration(s); err == nil {
+		return d
+	}
+	// Fallback: treat as milliseconds integer
+	if ms := toInt(value, -1); ms >= 0 {
+		return time.Duration(ms) * time.Millisecond
+	}
+	return defaultValue
+}
+
 // GetAll returns all configuration as a map.
 func (m *Manager) GetAll() map[string]any {
 	m.mu.RLock()
@@ -258,18 +332,6 @@ func (m *Manager) String(key string, defaultValue string, validators ...Validato
 // Int returns a type-safe int configuration with optional validation.
 func (m *Manager) Int(key string, defaultValue int, validators ...Validator) (int, error) {
 	value := m.GetInt(key, defaultValue)
-
-	hasRangeValidator := false
-	for _, validator := range validators {
-		if _, ok := validator.(*Range); ok {
-			hasRangeValidator = true
-			break
-		}
-	}
-
-	if !hasRangeValidator {
-		validators = append(validators, &Range{Min: -2147483648, Max: 2147483647})
-	}
 
 	for _, validator := range validators {
 		if err := validator.Validate(value, key); err != nil {
@@ -360,6 +422,11 @@ func (m *Manager) StartWatchers(ctx context.Context) error {
 	for _, source := range sources {
 		results := source.Watch(ctx)
 
+		// Skip sources that don't support watching (they return a closed channel)
+		if isClosedChan(results) {
+			continue
+		}
+
 		m.watchWg.Add(1)
 		go func(src Source, results <-chan WatchResult) {
 			defer m.watchWg.Done()
@@ -390,31 +457,55 @@ func (m *Manager) StartWatchers(ctx context.Context) error {
 }
 
 // handleSourceUpdate handles configuration updates from a source.
+// It re-merges all known source data so that keys removed from the updated
+// source are also removed from the effective configuration (no stale keys).
 func (m *Manager) handleSourceUpdate(sourceName string, newData map[string]any) {
-	if len(newData) == 0 {
-		return
-	}
-
 	newData = normalizeData(newData, m.logger)
-	if len(newData) == 0 {
-		return
-	}
 
 	m.mu.Lock()
 
+	// Update this source's snapshot
+	m.sourceData[sourceName] = newData
+
+	// Re-merge: registered sources in declaration order (last wins), then any
+	// unregistered sources (e.g. from direct handleSourceUpdate calls in tests).
+	merged := make(map[string]any)
+	registered := make(map[string]bool, len(m.sources))
+	for _, src := range m.sources {
+		registered[src.Name()] = true
+		for key, value := range m.sourceData[src.Name()] {
+			merged[key] = value
+		}
+	}
+	// Include snapshots from sources not in m.sources
+	for name, data := range m.sourceData {
+		if !registered[name] {
+			for key, value := range data {
+				merged[key] = value
+			}
+		}
+	}
+
+	// Detect changes against current effective data
 	changes := make(map[string]struct{})
 	oldValues := make(map[string]any)
-	for key, newValue := range newData {
+
+	for key, newValue := range merged {
 		oldValue, exists := m.data[key]
 		if !exists || !valuesEqual(oldValue, newValue) {
 			changes[key] = struct{}{}
 			oldValues[key] = oldValue
 		}
 	}
-
-	for key, value := range newData {
-		m.data[key] = value
+	// Detect keys that were removed entirely
+	for key, oldValue := range m.data {
+		if _, stillPresent := merged[key]; !stillPresent {
+			changes[key] = struct{}{}
+			oldValues[key] = oldValue
+		}
 	}
+
+	m.data = merged
 
 	if len(changes) > 0 {
 		keyWatchers := make(map[string][]WatcherCallback, len(changes))
@@ -425,12 +516,10 @@ func (m *Manager) handleSourceUpdate(sourceName string, newData map[string]any) 
 				keyWatchers[key] = copied
 			}
 		}
-
 		globalWatchers := append([]WatcherCallback(nil), m.watchers["*"]...)
-
 		m.mu.Unlock()
 
-		m.notifyWatchers(changes, oldValues, newData, keyWatchers, globalWatchers)
+		m.notifyWatchers(changes, oldValues, merged, keyWatchers, globalWatchers)
 		m.logger.Info("Configuration updated", log.Fields{
 			"source":  sourceName,
 			"changes": len(changes),

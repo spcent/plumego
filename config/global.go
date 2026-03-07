@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -13,10 +12,10 @@ import (
 
 // Global configuration instance for package-level convenience functions.
 var (
-	globalConfig   *Manager
-	globalConfigMu sync.RWMutex
-	globalInitOnce sync.Once
-	globalInitErr  error
+	globalConfig        *Manager
+	globalConfigMu      sync.RWMutex
+	globalInitialized   bool // protected by globalConfigMu
+	globalInitErr       error
 )
 
 // LoadEnvFile loads environment variables from a file.
@@ -31,20 +30,10 @@ func LoadEnvFile(filepath string, overwrite bool) error {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+		key, value, ok := parseEnvLine(scanner.Text())
+		if !ok {
 			continue
 		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		value = strings.Trim(value, `"'`)
-
 		if overwrite || os.Getenv(key) == "" {
 			os.Setenv(key, value)
 		}
@@ -59,48 +48,61 @@ func LoadEnv(filepath string, overwrite bool) error {
 }
 
 // InitDefault initializes the global config with environment and file sources.
+// It is idempotent: subsequent calls return the error from the first invocation.
 func InitDefault() error {
-	globalInitOnce.Do(func() {
-		globalConfigMu.Lock()
-		defer globalConfigMu.Unlock()
+	// Fast path — already initialized
+	globalConfigMu.RLock()
+	if globalInitialized {
+		err := globalInitErr
+		globalConfigMu.RUnlock()
+		return err
+	}
+	globalConfigMu.RUnlock()
 
-		logger := log.NewGLogger()
-		globalConfig = NewManager(logger)
+	// Slow path — initialize under write lock
+	globalConfigMu.Lock()
+	defer globalConfigMu.Unlock()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+	if globalInitialized { // double-checked locking
+		return globalInitErr
+	}
 
-		globalConfig.AddSource(NewEnvSource(""))
+	logger := log.NewGLogger()
+	globalConfig = NewManager(logger)
 
-		configFiles := []string{
-			".env",
-			".env.local",
-			"config.env",
-			"config.json",
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-		for _, configFile := range configFiles {
-			if info, err := os.Stat(configFile); err == nil && !info.IsDir() {
-				if info.Size() > 1024*1024 {
-					logger.Warn("Skipping large config file", log.Fields{
-						"file": configFile,
-						"size": info.Size(),
-					})
-					continue
-				}
+	globalConfig.AddSource(NewEnvSource(""))
 
-				switch {
-				case strings.HasSuffix(configFile, ".json"):
-					globalConfig.AddSource(NewFileSource(configFile, FormatJSON, true))
-				case strings.HasSuffix(configFile, ".env"):
-					globalConfig.AddSource(NewFileSource(configFile, FormatEnv, true))
-				}
+	configFiles := []string{
+		".env",
+		".env.local",
+		"config.env",
+		"config.json",
+	}
+
+	for _, configFile := range configFiles {
+		if info, err := os.Stat(configFile); err == nil && !info.IsDir() {
+			if info.Size() > 1024*1024 {
+				logger.Warn("Skipping large config file", log.Fields{
+					"file": configFile,
+					"size": info.Size(),
+				})
+				continue
+			}
+
+			switch {
+			case len(configFile) > 5 && configFile[len(configFile)-5:] == ".json":
+				globalConfig.AddSource(NewFileSource(configFile, FormatJSON, true))
+			case len(configFile) > 4 && configFile[len(configFile)-4:] == ".env":
+				globalConfig.AddSource(NewFileSource(configFile, FormatEnv, true))
 			}
 		}
+	}
 
-		globalInitErr = globalConfig.Load(ctx)
-	})
-
+	globalInitErr = globalConfig.Load(ctx)
+	globalInitialized = true
 	return globalInitErr
 }
 
@@ -132,13 +134,17 @@ func GetGlobalConfig() *Manager {
 }
 
 // SetGlobalConfig sets a custom global config instance.
+// Passing a non-nil manager marks initialization as complete (further calls to
+// InitDefault are no-ops). Passing nil resets the state so that the next call
+// to InitDefault or GetGlobalConfig will re-initialize from environment/files.
 // This is primarily useful for testing.
 func SetGlobalConfig(config *Manager) {
 	globalConfigMu.Lock()
 	defer globalConfigMu.Unlock()
 	globalConfig = config
 	globalInitErr = nil
-	globalInitOnce = sync.Once{}
+	// nil means "reset" — allow InitDefault to run again
+	globalInitialized = config != nil
 }
 
 // Package-level convenience functions that use the global config.
@@ -166,6 +172,22 @@ func GetFloat(key string, defaultValue float64) float64 {
 // GetDurationMs gets a configuration value as duration (milliseconds) with default.
 func GetDurationMs(key string, defaultValueMs int) time.Duration {
 	return GetGlobalConfig().GetDurationMs(key, defaultValueMs)
+}
+
+// Has reports whether a configuration key exists in the global config.
+func Has(key string) bool {
+	return GetGlobalConfig().Has(key)
+}
+
+// GetStringSlice gets a configuration value as a string slice split by sep.
+func GetStringSlice(key, sep string, defaultValue []string) []string {
+	return GetGlobalConfig().GetStringSlice(key, sep, defaultValue)
+}
+
+// GetDuration gets a configuration value as time.Duration.
+// Accepts Go duration strings ("30s", "5m") or plain integer milliseconds.
+func GetDuration(key string, defaultValue time.Duration) time.Duration {
+	return GetGlobalConfig().GetDuration(key, defaultValue)
 }
 
 // Set sets an environment variable and reloads the global config.

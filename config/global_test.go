@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -439,8 +438,7 @@ func TestLoadEnvFileErrors(t *testing.T) {
 
 func TestInitDefault(t *testing.T) {
 	// Reset global state
-	globalInitOnce = sync.Once{}
-	globalConfig = nil
+	SetGlobalConfig(nil)
 
 	// Test InitDefault with no config files
 	err := InitDefault()

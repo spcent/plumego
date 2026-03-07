@@ -218,6 +218,41 @@ func valuesEqual(a, b any) bool {
 	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
 }
 
+// parseEnvLine parses a single line from an .env file.
+// Returns key, value, and ok=true for valid assignment lines.
+// Blank lines and # comments return ok=false.
+// Quoted values (single or double) have their surrounding quotes stripped and
+// escaped inner quotes unescaped.
+func parseEnvLine(line string) (key, value string, ok bool) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return "", "", false
+	}
+
+	idx := strings.IndexByte(line, '=')
+	if idx < 0 {
+		return "", "", false
+	}
+
+	key = strings.TrimSpace(line[:idx])
+	if key == "" {
+		return "", "", false
+	}
+
+	value = strings.TrimSpace(line[idx+1:])
+
+	// Strip surrounding quotes and unescape inner escaped quotes
+	if len(value) >= 2 {
+		q := value[0]
+		if (q == '"' || q == '\'') && value[len(value)-1] == q {
+			value = value[1 : len(value)-1]
+			value = strings.ReplaceAll(value, fmt.Sprintf("\\%c", q), string(q))
+		}
+	}
+
+	return key, value, true
+}
+
 // Key normalization utilities.
 
 // normalizeKey converts a configuration key to normalized form (lowercase snake_case).
@@ -229,18 +264,37 @@ func normalizeKey(key string) string {
 	return strings.ToLower(toSnakeCase(key))
 }
 
-// toSnakeCase converts CamelCase to snake_case.
+// toSnakeCase converts CamelCase or UPPER_SNAKE to lowercase snake_case.
+// It correctly handles consecutive uppercase acronyms:
+//
+//	HTTPSPort   → https_port
+//	AppURL      → app_url
+//	GetHTTPSConfig → get_https_config
+//	APP_NAME    → app_name  (already snake_case, just lowercased)
 func toSnakeCase(s string) string {
 	if s == "" {
 		return s
 	}
 
+	runes := []rune(s)
+	n := len(runes)
 	var result []rune
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			if s[i-1] >= 'a' && s[i-1] <= 'z' {
-				result = append(result, '_')
-			}
+
+	for i, r := range runes {
+		upper := r >= 'A' && r <= 'Z'
+		if !upper {
+			result = append(result, r)
+			continue
+		}
+
+		prevLower := i > 0 && runes[i-1] >= 'a' && runes[i-1] <= 'z'
+		// Next char exists and is lowercase (e.g. the 'o' in "Port" after "HTTPS")
+		nextLower := i+1 < n && runes[i+1] >= 'a' && runes[i+1] <= 'z'
+		// Previous char is uppercase and not '_' (we're inside an acronym run)
+		prevUpper := i > 0 && runes[i-1] >= 'A' && runes[i-1] <= 'Z'
+
+		if i > 0 && (prevLower || (nextLower && prevUpper)) {
+			result = append(result, '_')
 		}
 		result = append(result, r)
 	}

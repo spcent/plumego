@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 )
@@ -477,11 +476,8 @@ func TestGlobalFunctions(t *testing.T) {
 		}
 	}()
 
-	// Clear any existing global config
+	// Clear any existing global config (also resets globalInitialized)
 	SetGlobalConfig(nil)
-
-	// Reset init once for testing
-	globalInitOnce = sync.Once{}
 
 	// Set up test environment
 	os.Setenv("GLOBAL_TEST", "global_value")
