@@ -145,7 +145,12 @@ func (l *JSONLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields)
 }
 
 func (l *JSONLogger) log(level Level, msg string, fields Fields, ctx context.Context) {
-	if level < l.level {
+	// Snapshot the minimum level under the lock so a concurrent SetLevel()
+	// cannot race with this read (go race detector would flag the plain read).
+	l.mu.Lock()
+	minLevel := l.level
+	l.mu.Unlock()
+	if level < minLevel {
 		return
 	}
 

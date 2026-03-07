@@ -7,6 +7,14 @@ import (
 	"strings"
 )
 
+// Compile-time checks that all concrete logger types satisfy StructuredLogger.
+var (
+	_ StructuredLogger = (*gLogger)(nil)
+	_ StructuredLogger = (*JSONLogger)(nil)
+	_ StructuredLogger = (*TestLogger)(nil)
+	_ StructuredLogger = (*NoOpLogger)(nil)
+)
+
 // Fields represents structured log fields to attach to a log entry.
 type Fields map[string]any
 
