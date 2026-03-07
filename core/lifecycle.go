@@ -16,7 +16,7 @@ import (
 
 	"github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/health"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 )
 

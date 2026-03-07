@@ -121,7 +121,7 @@ import (
 	"sync"
 	"time"
 
-	glog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 )
 
@@ -173,7 +173,7 @@ type Config struct {
 	KeepAlivePeriod     time.Duration            // TCP keepalive period. Default: 30s. Only applies to TCP connections.
 	WindowsSecuritySDDL string                   // Windows security descriptor (SDDL string). Windows only. Empty = default security.
 	Metrics             metrics.MetricsCollector // Optional metrics collector
-	Logger              glog.StructuredLogger    // Optional structured logger
+	Logger              log.StructuredLogger    // Optional structured logger
 }
 
 // DefaultConfig returns default configuration
@@ -266,7 +266,7 @@ func WithMetrics(m metrics.MetricsCollector) Option {
 }
 
 // WithLogger sets the structured logger
-func WithLogger(l glog.StructuredLogger) Option {
+func WithLogger(l log.StructuredLogger) Option {
 	return func(c *Config) {
 		c.Logger = l
 	}

@@ -1,4 +1,4 @@
-package glog
+package log
 
 import (
 	"flag"
@@ -18,14 +18,11 @@ import (
 type Level int
 
 const (
-	DEBUG Level = -1
-)
-
-const (
-	INFO Level = iota
-	WARNING
-	ERROR
-	FATAL
+	DEBUG   Level = -1
+	INFO    Level = 0
+	WARNING Level = 1
+	ERROR   Level = 2
+	FATAL   Level = 3
 )
 
 type InitConfig struct {
@@ -88,6 +85,9 @@ type Logger struct {
 	currentSize     map[Level]int64
 	writeErrOnce    sync.Once
 }
+
+// pid is cached at package init to avoid a getpid syscall on every log line.
+var pid = os.Getpid()
 
 var std = New()
 
@@ -159,7 +159,7 @@ func (l *Logger) initLogFiles() error {
 		hostname = "unknown"
 	}
 
-	pid := os.Getpid()
+	currentPID := pid
 	now := time.Now()
 
 	for level := INFO; level <= ERROR; level++ {
@@ -167,7 +167,7 @@ func (l *Logger) initLogFiles() error {
 		filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
 			l.program, hostname, lname,
 			now.Year(), now.Month(), now.Day(),
-			now.Hour(), now.Minute(), now.Second(), pid)
+			now.Hour(), now.Minute(), now.Second(), currentPID)
 
 		logPath := filepath.Join(l.logDir, filename)
 		file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -247,7 +247,7 @@ func (l *Logger) formatHeader(level Level, file string, line int) []byte {
 		now.Month(), now.Day(),
 		now.Hour(), now.Minute(), now.Second(),
 		now.Nanosecond()/1000,
-		os.Getpid(),
+		pid,
 		file, line)...)
 
 	return buf
@@ -512,14 +512,14 @@ func (l *Logger) rotateLogFile(level Level) error {
 		hostname = "unknown"
 	}
 
-	pid := os.Getpid()
+	currentPID := pid
 	now := time.Now()
 
 	lname := levelName(level)
 	filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
 		l.program, hostname, lname,
 		now.Year(), now.Month(), now.Day(),
-		now.Hour(), now.Minute(), now.Second(), pid)
+		now.Hour(), now.Minute(), now.Second(), currentPID)
 
 	logPath := filepath.Join(l.logDir, filename)
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)

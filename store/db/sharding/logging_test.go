@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	glog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/store/db/rw"
 )
 
@@ -42,9 +42,9 @@ func TestLoggingRouter_Creation(t *testing.T) {
 
 	t.Run("with custom logger", func(t *testing.T) {
 		var buf bytes.Buffer
-		logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+		logger := log.NewJSONLogger(log.JSONLoggerConfig{
 			Output: &buf,
-			Level:  glog.INFO,
+			Level:  log.INFO,
 		})
 
 		loggingRouter := NewLoggingRouter(router, logger)
@@ -57,9 +57,9 @@ func TestLoggingRouter_Creation(t *testing.T) {
 
 func TestLoggingRouter_LogQuery(t *testing.T) {
 	var buf bytes.Buffer
-	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+	logger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output: &buf,
-		Level:  glog.INFO,
+		Level:  log.INFO,
 	})
 
 	// Create minimal router
@@ -126,9 +126,9 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 
 func TestLoggingRouter_LogShardResolution(t *testing.T) {
 	var buf bytes.Buffer
-	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+	logger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output: &buf,
-		Level:  glog.INFO,
+		Level:  log.INFO,
 	})
 
 	connector := &stubConnector{conn: &stubConn{}}
@@ -168,9 +168,9 @@ func TestLoggingRouter_LogShardResolution(t *testing.T) {
 
 func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 	var buf bytes.Buffer
-	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+	logger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output: &buf,
-		Level:  glog.WARNING,
+		Level:  log.WARNING,
 	})
 
 	connector := &stubConnector{conn: &stubConn{}}
@@ -210,9 +210,9 @@ func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 
 func TestLoggingRouter_LogRewrite(t *testing.T) {
 	var buf bytes.Buffer
-	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+	logger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output: &buf,
-		Level:  glog.INFO,
+		Level:  log.INFO,
 	})
 
 	connector := &stubConnector{conn: &stubConn{}}
@@ -256,9 +256,9 @@ func TestLoggingRouter_LogRewrite(t *testing.T) {
 
 func TestLoggingRouter_WithTraceID(t *testing.T) {
 	var buf bytes.Buffer
-	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+	logger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output: &buf,
-		Level:  glog.INFO,
+		Level:  log.INFO,
 	})
 
 	connector := &stubConnector{conn: &stubConn{}}
@@ -274,7 +274,7 @@ func TestLoggingRouter_WithTraceID(t *testing.T) {
 	// Create context with trace ID
 	ctx := context.Background()
 	traceID := "test-trace-123"
-	ctx = glog.WithTraceID(ctx, traceID)
+	ctx = log.WithTraceID(ctx, traceID)
 
 	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
 
@@ -300,10 +300,10 @@ func TestLoggingRouter_DefaultFields(t *testing.T) {
 	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
 	// Create a custom logger with buffer and default fields
-	customLogger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+	customLogger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output: &buf,
-		Level:  glog.INFO,
-		Fields: glog.Fields{"component": "sharding"},
+		Level:  log.INFO,
+		Fields: log.Fields{"component": "sharding"},
 	})
 	loggingRouter := NewLoggingRouter(router, customLogger)
 
@@ -322,9 +322,9 @@ func TestLoggingRouter_DefaultFields(t *testing.T) {
 
 func BenchmarkLoggingRouter_LogQuery(b *testing.B) {
 	var buf bytes.Buffer
-	logger := glog.NewJSONLogger(glog.JSONLoggerConfig{
+	logger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output: &buf,
-		Level:  glog.INFO,
+		Level:  log.INFO,
 	})
 
 	connector := &stubConnector{conn: &stubConn{}}

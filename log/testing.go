@@ -1,4 +1,4 @@
-package glog
+package log
 
 import (
 	"context"
@@ -16,19 +16,38 @@ type LogEntry struct {
 	Time    time.Time
 }
 
+// sharedEntries holds the captured log entries shared between a root TestLogger
+// and all loggers derived from it via WithFields.
+type sharedEntries struct {
+	mu      sync.RWMutex
+	entries []LogEntry
+}
+
 // TestLogger is an in-memory StructuredLogger designed for unit tests.
 // It captures every log entry so assertions can inspect what was logged.
+// All loggers derived via WithFields share the same entry store as the root,
+// so assertions on the root logger see output from all derived loggers.
 // TestLogger is safe for concurrent use.
+//
+// By default Fatal/FatalCtx call os.Exit(1) after capturing the entry.
+// Set FatalHook to override this behaviour in tests that need to assert on
+// fatal messages without terminating the process:
+//
+//	tl := log.NewTestLogger()
+//	tl.FatalHook = func(msg string) { panic("fatal: " + msg) }
 type TestLogger struct {
-	mu         sync.RWMutex
-	entries    []LogEntry
+	shared     *sharedEntries
 	level      Level
 	baseFields Fields
+	// FatalHook is called instead of os.Exit(1) when a Fatal/FatalCtx message
+	// is logged. When nil, os.Exit(1) is called (production-safe default).
+	FatalHook func(msg string)
 }
 
 // NewTestLogger creates a TestLogger that captures all levels.
 func NewTestLogger() *TestLogger {
 	return &TestLogger{
+		shared:     &sharedEntries{},
 		level:      DEBUG,
 		baseFields: Fields{},
 	}
@@ -36,15 +55,19 @@ func NewTestLogger() *TestLogger {
 
 // --- StructuredLogger interface ---
 
-func (l *TestLogger) WithFields(fields Fields) StructuredLogger {
-	l.mu.RLock()
-	merged := mergeFields(l.baseFields, fields)
-	level := l.level
-	l.mu.RUnlock()
+// With is a convenience shortcut for WithFields(Fields{key: value}).
+func (l *TestLogger) With(key string, value any) StructuredLogger {
+	return l.WithFields(Fields{key: value})
+}
 
+// WithFields returns a derived logger that shares the same entry store and FatalHook.
+// Entries logged via the child are visible through the root's Entries() etc.
+func (l *TestLogger) WithFields(fields Fields) StructuredLogger {
 	return &TestLogger{
-		level:      level,
-		baseFields: merged,
+		shared:     l.shared, // shared with parent – child entries are visible on root
+		level:      l.level,
+		baseFields: mergeFields(l.baseFields, fields),
+		FatalHook:  l.FatalHook,
 	}
 }
 
@@ -54,7 +77,7 @@ func (l *TestLogger) Warn(msg string, fields ...Fields)  { l.capture(WARNING, ms
 func (l *TestLogger) Error(msg string, fields ...Fields) { l.capture(ERROR, msg, firstFields(fields)) }
 func (l *TestLogger) Fatal(msg string, fields ...Fields) {
 	l.capture(FATAL, msg, firstFields(fields))
-	os.Exit(1)
+	l.handleFatal(msg)
 }
 
 func (l *TestLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
@@ -71,40 +94,41 @@ func (l *TestLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields)
 }
 func (l *TestLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
 	l.capture(FATAL, msg, l.withTrace(ctx, firstFields(fields)))
-	os.Exit(1)
+	l.handleFatal(msg)
 }
 
 // --- Test assertion helpers ---
 
-// Entries returns a snapshot of all captured log entries.
+// Entries returns a snapshot of all captured log entries, including those
+// written by loggers derived via WithFields.
 func (l *TestLogger) Entries() []LogEntry {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	cp := make([]LogEntry, len(l.entries))
-	copy(cp, l.entries)
+	l.shared.mu.RLock()
+	defer l.shared.mu.RUnlock()
+	cp := make([]LogEntry, len(l.shared.entries))
+	copy(cp, l.shared.entries)
 	return cp
 }
 
-// Clear removes all captured entries.
+// Clear removes all captured entries from the shared store.
 func (l *TestLogger) Clear() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.entries = l.entries[:0]
+	l.shared.mu.Lock()
+	defer l.shared.mu.Unlock()
+	l.shared.entries = l.shared.entries[:0]
 }
 
 // Count returns the total number of captured entries.
 func (l *TestLogger) Count() int {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return len(l.entries)
+	l.shared.mu.RLock()
+	defer l.shared.mu.RUnlock()
+	return len(l.shared.entries)
 }
 
 // CountByLevel returns the number of entries at the given level.
 func (l *TestLogger) CountByLevel(level Level) int {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
+	l.shared.mu.RLock()
+	defer l.shared.mu.RUnlock()
 	n := 0
-	for _, e := range l.entries {
+	for _, e := range l.shared.entries {
 		if e.Level == level {
 			n++
 		}
@@ -115,9 +139,9 @@ func (l *TestLogger) CountByLevel(level Level) int {
 // HasEntry returns true if at least one entry matches the level and contains
 // substr in its message.
 func (l *TestLogger) HasEntry(level Level, substr string) bool {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	for _, e := range l.entries {
+	l.shared.mu.RLock()
+	defer l.shared.mu.RUnlock()
+	for _, e := range l.shared.entries {
 		if e.Level == level && strings.Contains(e.Message, substr) {
 			return true
 		}
@@ -128,28 +152,38 @@ func (l *TestLogger) HasEntry(level Level, substr string) bool {
 // LastEntry returns the most recently captured entry and true.
 // Returns a zero LogEntry and false when nothing has been logged yet.
 func (l *TestLogger) LastEntry() (LogEntry, bool) {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	if len(l.entries) == 0 {
+	l.shared.mu.RLock()
+	defer l.shared.mu.RUnlock()
+	if len(l.shared.entries) == 0 {
 		return LogEntry{}, false
 	}
-	return l.entries[len(l.entries)-1], true
+	return l.shared.entries[len(l.shared.entries)-1], true
 }
 
 // --- internals ---
 
+// handleFatal invokes FatalHook when set; otherwise terminates the process.
+func (l *TestLogger) handleFatal(msg string) {
+	if l.FatalHook != nil {
+		l.FatalHook(msg)
+		return
+	}
+	os.Exit(1)
+}
+
 func (l *TestLogger) capture(level Level, msg string, fields Fields) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	if level < l.level {
 		return
 	}
-	l.entries = append(l.entries, LogEntry{
+	entry := LogEntry{
 		Level:   level,
 		Message: msg,
 		Fields:  mergeFields(l.baseFields, fields),
 		Time:    time.Now(),
-	})
+	}
+	l.shared.mu.Lock()
+	defer l.shared.mu.Unlock()
+	l.shared.entries = append(l.shared.entries, entry)
 }
 
 func (l *TestLogger) withTrace(ctx context.Context, fields Fields) Fields {

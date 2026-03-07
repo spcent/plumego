@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 func TestRequestIDUsesHeader(t *testing.T) {

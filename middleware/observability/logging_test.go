@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	contract "github.com/spcent/plumego/contract"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 type logEntry struct {
@@ -43,6 +43,10 @@ func (l *stubLogger) WithFields(fields log.Fields) log.StructuredLogger {
 		merged[k] = v
 	}
 	return &stubLogger{baseFields: merged, entries: l.entries, mu: l.mu}
+}
+
+func (l *stubLogger) With(key string, value any) log.StructuredLogger {
+	return l.WithFields(log.Fields{key: value})
 }
 
 func (l *stubLogger) Debug(msg string, fields ...log.Fields) { l.record(msg, first(fields)) }

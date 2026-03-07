@@ -13,7 +13,7 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core/internal/contractio"
 	"github.com/spcent/plumego/health"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"

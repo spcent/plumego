@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 // RequestContext contains request-scoped data that should be shared across middleware and handlers.

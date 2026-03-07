@@ -1,4 +1,4 @@
-package glog
+package log
 
 // cloneFields returns a shallow copy of fields.
 func cloneFields(fields Fields) Fields {

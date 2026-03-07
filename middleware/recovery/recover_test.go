@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 type recordingLogger struct {
@@ -28,6 +28,10 @@ func (l *recordingLogger) WithFields(fields log.Fields) log.StructuredLogger {
 	}
 	l.last = cp
 	return l
+}
+
+func (l *recordingLogger) With(key string, value any) log.StructuredLogger {
+	return l.WithFields(log.Fields{key: value})
 }
 
 func (l *recordingLogger) Debug(msg string, fields ...log.Fields) {}

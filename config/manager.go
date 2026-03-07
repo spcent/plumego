@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 var errConfigClosed = errors.New("config manager is closed")

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/utils"
 	"github.com/spcent/plumego/utils/httpx"
@@ -267,7 +267,6 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 
 			fields := log.Fields{
 				"trace_id":    traceID,
-				"request_id":  traceID,
 				"method":      metricsData.Method,
 				"path":        metricsData.Path,
 				"status":      metricsData.Status,

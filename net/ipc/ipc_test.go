@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	stdlog "log"
 	"net"
 	"os"
 	"path/filepath"
@@ -14,7 +14,7 @@ import (
 	"sync"
 	"testing"
 
-	glog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"time"
 )
@@ -30,7 +30,7 @@ func ExampleServer() {
 
 	server, err := NewServerWithConfig("test_socket", config)
 	if err != nil {
-		log.Fatal(err)
+		stdlog.Fatal(err)
 	}
 	defer server.Close()
 
@@ -41,7 +41,7 @@ func ExampleServer() {
 		for {
 			client, acceptErr := server.Accept()
 			if acceptErr != nil {
-				log.Printf("Accept error: %v", acceptErr)
+				stdlog.Printf("Accept error: %v", acceptErr)
 				return
 			}
 
@@ -53,7 +53,7 @@ func ExampleServer() {
 	// Client connection example
 	client, err := DialWithConfig(server.Addr(), config)
 	if err != nil {
-		log.Fatal(err)
+		stdlog.Fatal(err)
 	}
 	defer client.Close()
 
@@ -61,7 +61,7 @@ func ExampleServer() {
 	data := []byte("Hello, IPC!")
 	n, err := client.WriteWithTimeout(data, 5*time.Second)
 	if err != nil {
-		log.Fatal(err)
+		stdlog.Fatal(err)
 	}
 	fmt.Printf("Sent %d bytes\n", n)
 
@@ -69,7 +69,7 @@ func ExampleServer() {
 	buf := make([]byte, 1024)
 	n, err = client.ReadWithTimeout(buf, 5*time.Second)
 	if err != nil {
-		log.Fatal(err)
+		stdlog.Fatal(err)
 	}
 	fmt.Printf("Received: %s\n", string(buf[:n]))
 }
@@ -933,72 +933,76 @@ type testLogger struct {
 type logEntry struct {
 	level  string
 	msg    string
-	fields glog.Fields
+	fields log.Fields
 }
 
-func (l *testLogger) WithFields(fields glog.Fields) glog.StructuredLogger {
+func (l *testLogger) WithFields(fields log.Fields) log.StructuredLogger {
 	return l
 }
 
-func firstGlogField(fields []glog.Fields) glog.Fields {
+func (l *testLogger) With(_ string, _ any) log.StructuredLogger {
+	return l
+}
+
+func firstGlogField(fields []log.Fields) log.Fields {
 	if len(fields) > 0 {
 		return fields[0]
 	}
 	return nil
 }
 
-func (l *testLogger) Debug(msg string, fields ...glog.Fields) {
+func (l *testLogger) Debug(msg string, fields ...log.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.logs = append(l.logs, logEntry{level: "debug", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) Info(msg string, fields ...glog.Fields) {
+func (l *testLogger) Info(msg string, fields ...log.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.logs = append(l.logs, logEntry{level: "info", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) Warn(msg string, fields ...glog.Fields) {
+func (l *testLogger) Warn(msg string, fields ...log.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.logs = append(l.logs, logEntry{level: "warn", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) Error(msg string, fields ...glog.Fields) {
+func (l *testLogger) Error(msg string, fields ...log.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.logs = append(l.logs, logEntry{level: "error", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) DebugCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+func (l *testLogger) DebugCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	l.Debug(msg, firstGlogField(fields))
 }
 
-func (l *testLogger) InfoCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+func (l *testLogger) InfoCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	l.Info(msg, firstGlogField(fields))
 }
 
-func (l *testLogger) WarnCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+func (l *testLogger) WarnCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	l.Warn(msg, firstGlogField(fields))
 }
 
-func (l *testLogger) ErrorCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+func (l *testLogger) ErrorCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	l.Error(msg, firstGlogField(fields))
 }
 
-func (l *testLogger) Fatal(msg string, fields ...glog.Fields) {
+func (l *testLogger) Fatal(msg string, fields ...log.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.logs = append(l.logs, logEntry{level: "fatal", msg: msg, fields: copyGlogFields(firstGlogField(fields))})
 }
 
-func (l *testLogger) FatalCtx(ctx context.Context, msg string, fields ...glog.Fields) {
+func (l *testLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {
 	l.Fatal(msg, firstGlogField(fields))
 }
 
-func copyGlogFields(fields glog.Fields) glog.Fields {
-	result := make(glog.Fields)
+func copyGlogFields(fields log.Fields) log.Fields {
+	result := make(log.Fields)
 	for k, v := range fields {
 		result[k] = v
 	}

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 // LogSMSProvider is a development/testing provider that logs SMS messages

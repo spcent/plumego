@@ -1,4 +1,4 @@
-package glog
+package log
 
 import (
 	"context"
@@ -20,7 +20,13 @@ type Fields map[string]any
 //
 // Implementations must treat a nil or absent Fields the same as an empty one.
 type StructuredLogger interface {
+	// WithFields returns a new logger with the given fields merged into every
+	// subsequent log entry. The original logger is not modified.
 	WithFields(fields Fields) StructuredLogger
+
+	// With is a convenience shortcut for WithFields(Fields{key: value}).
+	// Prefer WithFields when attaching multiple fields at once.
+	With(key string, value any) StructuredLogger
 
 	Debug(msg string, fields ...Fields)
 	Info(msg string, fields ...Fields)
@@ -80,6 +86,13 @@ func (l *gLogger) WithFields(fields Fields) StructuredLogger {
 	return &gLogger{fields: mergeFields(l.fields, fields)}
 }
 
+func (l *gLogger) With(key string, value any) StructuredLogger {
+	return l.WithFields(Fields{key: value})
+}
+
+// Debug logs at DEBUG level.
+// Unlike JSONLogger (which checks its own local verbosity), gLogger gates Debug
+// on the global glog verbosity flag (-v). Both require at least V(1) to emit.
 func (l *gLogger) Debug(msg string, fields ...Fields) {
 	if !std.vAt(1, 3) {
 		return
@@ -103,6 +116,8 @@ func (l *gLogger) Fatal(msg string, fields ...Fields) {
 	l.logWithLevel(FATAL, msg, firstFields(fields), nil)
 }
 
+// DebugCtx logs at DEBUG level with context.
+// Verbosity is gated on the global glog flag, consistent with Debug.
 func (l *gLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
 	if !std.vAt(1, 3) {
 		return
@@ -136,19 +151,9 @@ func (l *gLogger) logWithLevel(level Level, msg string, fields Fields, ctx conte
 		msg += " " + formatted
 	}
 
-	switch level {
-	case DEBUG:
-		// calldepth=3: logWithLevel → Debug/DebugCtx → caller
-		std.log(DEBUG, 3, msg)
-	case INFO:
-		Info(msg)
-	case WARNING:
-		Warning(msg)
-	case ERROR:
-		Error(msg)
-	case FATAL:
-		Fatal(msg)
-	}
+	// calldepth=3: std.log adds 1 → logInternal calls runtime.Caller(4)
+	// Frame 0: logInternal, 1: std.log, 2: logWithLevel, 3: public method (Info/Error/…), 4: actual caller
+	std.log(level, 3, msg)
 }
 
 func (l *gLogger) formatFields(fields Fields) string {

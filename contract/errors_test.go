@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 // mockStructuredLogger implements StructuredLogger for testing
@@ -32,6 +32,10 @@ func (m *mockStructuredLogger) WithFields(fields log.Fields) log.StructuredLogge
 		newLogger.fields[k] = v
 	}
 	return newLogger
+}
+
+func (m *mockStructuredLogger) With(key string, value any) log.StructuredLogger {
+	return m.WithFields(log.Fields{key: value})
 }
 
 func (m *mockStructuredLogger) Debug(msg string, fields ...log.Fields) {

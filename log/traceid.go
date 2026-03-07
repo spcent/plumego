@@ -1,4 +1,4 @@
-package glog
+package log
 
 import (
 	"crypto/rand"
@@ -21,10 +21,12 @@ const (
 	randBits = 14
 	seqBits  = 10
 
-	// Maximum values for each component
-	seqMax   = (1 << seqBits) - 1 // 1023
-	randMax  = 10000               // 0..9999
-	randMask = (1 << randBits) - 1
+	// Maximum values for each component.
+	// randMask covers the full 14-bit random field (0..16383).
+	// randMax is derived from randMask so generation and decoding are consistent.
+	seqMax   = (1 << seqBits) - 1  // 1023
+	randMask = (1 << randBits) - 1 // 16383
+	randMax  = randMask + 1        // 16384 – upper bound for rand.Intn, fills all 14 bits
 
 	// Bit shifts for encoding
 	shiftRand = seqBits
@@ -239,8 +241,8 @@ func DecodeTraceID(id string) (unixMilli int64, r int, seqVal int, err error) {
 	r = int((v >> shiftRand) & uint64(randMask))
 	ts := (v >> shiftTS) & ((uint64(1) << tsBits) - 1)
 
-	// Validate decoded values
-	if r < 0 || r >= randMax {
+	// Validate decoded values: rand component must fit within the 14-bit mask.
+	if r < 0 || r > randMask {
 		return 0, 0, 0, errOutOfRange
 	}
 

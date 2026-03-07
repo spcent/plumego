@@ -14,7 +14,7 @@ import (
 	"time"
 	"unsafe"
 
-	glog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 var (
@@ -125,7 +125,7 @@ func (s *tcpServer) AcceptWithContext(ctx context.Context) (Client, error) {
 
 	// Log and record metrics
 	if config.Logger != nil {
-		fields := glog.Fields{
+		fields := log.Fields{
 			"operation": "accept",
 			"addr":      s.Addr(),
 			"transport": "tcp",
@@ -255,7 +255,7 @@ func (s *winServer) AcceptWithContext(ctx context.Context) (Client, error) {
 
 	// Log and record metrics
 	if config.Logger != nil {
-		fields := glog.Fields{
+		fields := log.Fields{
 			"operation": "accept",
 			"addr":      s.pipeName,
 			"transport": "pipe",
@@ -342,7 +342,7 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 
 		// Log and record metrics
 		if config.Logger != nil {
-			fields := glog.Fields{
+			fields := log.Fields{
 				"operation": "dial",
 				"addr":      pipeName,
 				"transport": "pipe",
@@ -380,7 +380,7 @@ func dialPlatformWithContext(ctx context.Context, addr string, config *Config) (
 
 	// Log and record metrics
 	if config.Logger != nil {
-		fields := glog.Fields{
+		fields := log.Fields{
 			"operation": "dial",
 			"addr":      addr,
 			"transport": "tcp",
@@ -601,7 +601,7 @@ func (c *winClient) WriteWithTimeout(data []byte, timeout time.Duration) (int, e
 
 	// Log and record metrics
 	if config.Logger != nil && err != nil {
-		config.Logger.Error("IPC write failed", glog.Fields{
+		config.Logger.Error("IPC write failed", log.Fields{
 			"operation": "write",
 			"bytes":     n,
 			"duration":  duration,
@@ -656,7 +656,7 @@ func (c *winClient) ReadWithTimeout(buf []byte, timeout time.Duration) (int, err
 
 	// Log and record metrics (only log errors to avoid excessive logging)
 	if config.Logger != nil && err != nil && err != io.EOF {
-		config.Logger.Error("IPC read failed", glog.Fields{
+		config.Logger.Error("IPC read failed", log.Fields{
 			"operation": "read",
 			"bytes":     n,
 			"duration":  duration,

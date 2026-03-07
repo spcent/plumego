@@ -1,4 +1,4 @@
-package glog
+package log
 
 import (
 	"context"
@@ -13,8 +13,10 @@ const (
 )
 
 var (
-	defaultLoggerOnce sync.Once
-	defaultLogger     StructuredLogger
+	defaultLoggerMu      sync.RWMutex
+	defaultLoggerOnce    sync.Once
+	defaultLogger        StructuredLogger
+	defaultLoggerFactory func() StructuredLogger
 )
 
 // WithTraceID adds a trace ID to the context.
@@ -79,7 +81,7 @@ func LoggerFromContextOrNew(ctx context.Context) (StructuredLogger, context.Cont
 		ctx = WithTraceID(ctx, NewTraceID())
 	}
 
-	logger := NewGLogger()
+	logger := newLogger()
 	ctx = WithLogger(ctx, logger)
 	return logger, ctx
 }
@@ -94,14 +96,55 @@ func NewRequestLogger(ctx context.Context) (StructuredLogger, context.Context) {
 	}
 	traceID := NewTraceID()
 	ctx = WithTraceID(ctx, traceID)
-	logger := NewGLogger()
+	logger := newLogger()
 	ctx = WithLogger(ctx, logger)
 	return logger, ctx
 }
 
+// SetDefaultLogger replaces the logger returned by LoggerFromContext when no
+// logger is stored in the context, and used by LoggerFromContextOrNew and
+// NewRequestLogger when creating a new request-scoped logger.
+// Must be called before the first request is processed; not safe for
+// concurrent use with logging.
+func SetDefaultLogger(l StructuredLogger) {
+	defaultLoggerMu.Lock()
+	defer defaultLoggerMu.Unlock()
+	defaultLogger = l
+	// Reset once so that subsequent calls to getDefaultLogger pick up the new value.
+	defaultLoggerOnce = sync.Once{}
+}
+
+// SetDefaultLoggerFactory sets a factory function used to create new loggers in
+// LoggerFromContextOrNew and NewRequestLogger. When set, each call to those
+// functions produces a fresh logger via the factory rather than reusing the
+// singleton defaultLogger.
+// Must be called before the first request; not safe for concurrent use with logging.
+func SetDefaultLoggerFactory(f func() StructuredLogger) {
+	defaultLoggerMu.Lock()
+	defer defaultLoggerMu.Unlock()
+	defaultLoggerFactory = f
+}
+
+func newLogger() StructuredLogger {
+	defaultLoggerMu.RLock()
+	factory := defaultLoggerFactory
+	defaultLoggerMu.RUnlock()
+	if factory != nil {
+		return factory()
+	}
+	return getDefaultLogger()
+}
+
 func getDefaultLogger() StructuredLogger {
 	defaultLoggerOnce.Do(func() {
-		defaultLogger = NewGLogger()
+		defaultLoggerMu.Lock()
+		if defaultLogger == nil {
+			defaultLogger = NewGLogger()
+		}
+		defaultLoggerMu.Unlock()
 	})
-	return defaultLogger
+	defaultLoggerMu.RLock()
+	l := defaultLogger
+	defaultLoggerMu.RUnlock()
+	return l
 }

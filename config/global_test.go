@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/log"
 )
 
 func TestGetBool(t *testing.T) {
