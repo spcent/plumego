@@ -120,6 +120,6 @@ app := plumego.New(
 - See `examples/` for focused examples on routing, middleware, caching, and more
 - Read the source at `core/`, `router/`, and `contract/` for API details
 
-## Compatibility Note
+## Canonical Note
 
-`GetCtx`, `PostCtx`, and related `*Ctx` helpers remain available as compatibility adapters for existing codebases. New onboarding examples in this guide use the standard `net/http` handler style as the canonical pattern.
+Plumego's application route registration uses the standard `net/http` handler shape as the canonical and only supported style for `core.App` APIs.

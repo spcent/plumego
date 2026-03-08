@@ -112,22 +112,26 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	})
 
 	// API endpoints (without Group - register directly)
-	d.app.Get("/api/info", contract.AdaptCtxHandler(d.handleInfo, d.app.Logger()))
-	d.app.Get("/api/status", contract.AdaptCtxHandler(d.handleStatus, d.app.Logger()))
-	d.app.Get("/api/health", contract.AdaptCtxHandler(d.handleHealth, d.app.Logger()))
-	d.app.Get("/api/routes", contract.AdaptCtxHandler(d.handleRoutes, d.app.Logger()))
-	d.app.Get("/api/config", contract.AdaptCtxHandler(d.handleConfig, d.app.Logger()))
-	d.app.Get("/api/config/edit", contract.AdaptCtxHandler(d.handleConfigEditGet, d.app.Logger()))
-	d.app.Post("/api/config/edit", contract.AdaptCtxHandler(d.handleConfigEditSave, d.app.Logger()))
-	d.app.Get("/api/metrics", contract.AdaptCtxHandler(d.handleMetrics, d.app.Logger()))
-	d.app.Post("/api/metrics/clear", contract.AdaptCtxHandler(d.handleMetricsClear, d.app.Logger()))
-	d.app.Get("/api/deps", contract.AdaptCtxHandler(d.handleDeps, d.app.Logger()))
-	d.app.Get("/api/pprof/types", contract.AdaptCtxHandler(d.handlePprofTypes, d.app.Logger()))
-	d.app.Get("/api/pprof/raw", contract.AdaptCtxHandler(d.handlePprofRaw, d.app.Logger()))
-	d.app.Post("/api/test", contract.AdaptCtxHandler(d.handleAPITest, d.app.Logger()))
-	d.app.Post("/api/build", contract.AdaptCtxHandler(d.handleBuild, d.app.Logger()))
-	d.app.Post("/api/restart", contract.AdaptCtxHandler(d.handleRestart, d.app.Logger()))
-	d.app.Post("/api/stop", contract.AdaptCtxHandler(d.handleStop, d.app.Logger()))
+	adaptCtx := func(handler plumego.ContextHandlerFunc) http.HandlerFunc {
+		return contract.AdaptCtxHandler(handler, d.app.Logger()).ServeHTTP
+	}
+
+	d.app.Get("/api/info", adaptCtx(d.handleInfo))
+	d.app.Get("/api/status", adaptCtx(d.handleStatus))
+	d.app.Get("/api/health", adaptCtx(d.handleHealth))
+	d.app.Get("/api/routes", adaptCtx(d.handleRoutes))
+	d.app.Get("/api/config", adaptCtx(d.handleConfig))
+	d.app.Get("/api/config/edit", adaptCtx(d.handleConfigEditGet))
+	d.app.Post("/api/config/edit", adaptCtx(d.handleConfigEditSave))
+	d.app.Get("/api/metrics", adaptCtx(d.handleMetrics))
+	d.app.Post("/api/metrics/clear", adaptCtx(d.handleMetricsClear))
+	d.app.Get("/api/deps", adaptCtx(d.handleDeps))
+	d.app.Get("/api/pprof/types", adaptCtx(d.handlePprofTypes))
+	d.app.Get("/api/pprof/raw", adaptCtx(d.handlePprofRaw))
+	d.app.Post("/api/test", adaptCtx(d.handleAPITest))
+	d.app.Post("/api/build", adaptCtx(d.handleBuild))
+	d.app.Post("/api/restart", adaptCtx(d.handleRestart))
+	d.app.Post("/api/stop", adaptCtx(d.handleStop))
 
 	// Static UI files
 	router := d.app.Router()

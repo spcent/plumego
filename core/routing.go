@@ -36,6 +36,25 @@ func (a *App) registerRoute(method, path string, handler http.Handler) {
 	}
 }
 
+// =========================================================
+// Canonical handler registration — standard library style
+//
+// These are the primary route registration methods. Use
+// http.HandlerFunc as the handler type for all new routes.
+// This is the only style shown in quick-start guides and
+// canonical examples.
+// =========================================================
+
+// HandleFunc registers a handler function for the given path (any HTTP method).
+func (a *App) HandleFunc(pattern string, handler http.HandlerFunc) {
+	a.registerRoute(router.ANY, pattern, handler)
+}
+
+// Handle registers a handler for the given path (any HTTP method).
+func (a *App) Handle(pattern string, handler http.Handler) {
+	a.registerRoute(router.ANY, pattern, handler)
+}
+
 // Get registers a GET route with the given handler.
 func (a *App) Get(path string, handler http.HandlerFunc) {
 	a.registerRoute(router.GET, path, handler)
