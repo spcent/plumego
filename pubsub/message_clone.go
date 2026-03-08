@@ -2,6 +2,11 @@ package pubsub
 
 import "reflect"
 
+// maxCloneDepth is the maximum recursion depth for cloneValue.
+// Structs or pointer chains deeper than this limit are returned as-is (shallow
+// copy) to prevent stack overflows on cyclic or deeply-nested data.
+const maxCloneDepth = 32
+
 // Cloner is an interface for types that can clone themselves.
 type Cloner interface {
 	Clone() any
@@ -169,8 +174,8 @@ func cloneData(data any) any {
 		return cp
 	}
 
-	// Slow path: use reflection
-	cloned, ok := cloneValue(reflect.ValueOf(data))
+	// Slow path: use reflection (depth starts at 0)
+	cloned, ok := cloneValue(reflect.ValueOf(data), 0)
 	if ok && cloned.IsValid() {
 		return cloned.Interface()
 	}
@@ -178,8 +183,16 @@ func cloneData(data any) any {
 }
 
 // cloneValue creates a deep copy using reflection.
-func cloneValue(v reflect.Value) (reflect.Value, bool) {
+// depth tracks the current recursion level; when it reaches maxCloneDepth the
+// original value is returned unchanged to prevent stack overflows on cyclic or
+// deeply-nested data structures.
+func cloneValue(v reflect.Value, depth int) (reflect.Value, bool) {
 	if !v.IsValid() {
+		return v, true
+	}
+
+	// Depth guard: return original to avoid stack overflow on cyclic structs.
+	if depth >= maxCloneDepth {
 		return v, true
 	}
 
@@ -188,7 +201,7 @@ func cloneValue(v reflect.Value) (reflect.Value, bool) {
 		if v.IsNil() {
 			return v, true
 		}
-		cloned, _ := cloneValue(v.Elem())
+		cloned, _ := cloneValue(v.Elem(), depth+1)
 		if !cloned.IsValid() {
 			return v, true
 		}
@@ -208,7 +221,7 @@ func cloneValue(v reflect.Value) (reflect.Value, bool) {
 		if v.IsNil() {
 			return v, true
 		}
-		cloned, _ := cloneValue(v.Elem())
+		cloned, _ := cloneValue(v.Elem(), depth+1)
 		if !cloned.IsValid() {
 			return v, true
 		}
@@ -233,7 +246,7 @@ func cloneValue(v reflect.Value) (reflect.Value, bool) {
 		for iter.Next() {
 			key := iter.Key()
 			value := iter.Value()
-			clonedValue, _ := cloneValue(value)
+			clonedValue, _ := cloneValue(value, depth+1)
 			if !clonedValue.IsValid() {
 				clonedValue = value
 			}
@@ -261,7 +274,7 @@ func cloneValue(v reflect.Value) (reflect.Value, bool) {
 		}
 		for i := 0; i < v.Len(); i++ {
 			elem := v.Index(i)
-			clonedElem, _ := cloneValue(elem)
+			clonedElem, _ := cloneValue(elem, depth+1)
 			if !clonedElem.IsValid() {
 				clonedElem = elem
 			}
@@ -282,7 +295,7 @@ func cloneValue(v reflect.Value) (reflect.Value, bool) {
 		out := reflect.New(v.Type()).Elem()
 		for i := 0; i < v.Len(); i++ {
 			elem := v.Index(i)
-			clonedElem, _ := cloneValue(elem)
+			clonedElem, _ := cloneValue(elem, depth+1)
 			if !clonedElem.IsValid() {
 				clonedElem = elem
 			}
@@ -311,7 +324,7 @@ func cloneValue(v reflect.Value) (reflect.Value, bool) {
 				continue
 			}
 
-			clonedField, _ := cloneValue(field)
+			clonedField, _ := cloneValue(field, depth+1)
 			if !clonedField.IsValid() {
 				clonedField = field
 			}

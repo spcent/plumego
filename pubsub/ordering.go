@@ -17,6 +17,10 @@ var (
 	ErrOutOfOrderMessage = errors.New("out of order message")
 )
 
+// maxMissingSequences caps the number of sequence gaps tracked per queue to
+// prevent unbounded memory growth when messages are permanently lost.
+const maxMissingSequences = 10_000
+
 // MetaKeySequence is the message metadata key for the ordering sequence number.
 const MetaKeySequence = "X-Message-Sequence"
 
@@ -334,7 +338,10 @@ func (ops *OrderedPubSub) processQueue(queue *orderedQueue, identifier string) {
 		select {
 		case om, ok := <-queue.ch:
 			if !ok {
-				// Queue closed, flush remaining
+				// queue.ch is never explicitly closed (closing a channel that has a
+				// concurrent non-blocking sender would panic). Workers exit via
+				// ctx.Done() instead. This branch is here for safety completeness
+				// but is unreachable in normal operation.
 				ops.flushBatch(queue, identifier)
 				return
 			}
@@ -427,8 +434,13 @@ func (ops *OrderedPubSub) verifySequence(om orderedMessage, identifier string) e
 	}
 
 	if om.sequence > expected {
-		// Gap detected - mark as missing
+		// Gap detected - record missing sequences up to the cap.
+		// If the cap is reached we stop tracking further gaps to prevent
+		// unbounded memory growth from permanently lost messages.
 		for seq := expected; seq < om.sequence; seq++ {
+			if len(tracker.missing) >= maxMissingSequences {
+				break
+			}
 			tracker.missing[seq] = true
 		}
 	}

@@ -2,18 +2,24 @@ package pubsub
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 // ringBuffer is a thread-safe ring buffer for messages.
 // It provides O(1) push/pop operations with proper DropOldest semantics.
+// count is maintained as both a plain int (under mu) for push/pop logic and as
+// an atomic int32 so that Len() can be read without acquiring the mutex.
 type ringBuffer struct {
 	mu       sync.Mutex
 	buf      []Message
 	head     int  // index of the oldest message
 	tail     int  // index where next message will be written
-	count    int  // current number of messages
+	count    int  // current number of messages (protected by mu)
 	capacity int  // maximum capacity
 	closed   bool // whether the buffer is closed
+
+	// atomicCount mirrors count for lock-free Len() reads.
+	atomicCount atomic.Int32
 
 	// Notification channel for consumers
 	notify chan struct{}
@@ -49,14 +55,17 @@ func (rb *ringBuffer) Push(msg Message) (Message, bool) {
 		// Buffer is full, drop the oldest message
 		dropped = rb.buf[rb.head]
 		wasDropped = true
+		rb.buf[rb.head] = Message{} // clear for GC
 		rb.head = (rb.head + 1) % rb.capacity
 		rb.count--
+		rb.atomicCount.Add(-1)
 	}
 
 	// Add the new message
 	rb.buf[rb.tail] = msg
 	rb.tail = (rb.tail + 1) % rb.capacity
 	rb.count++
+	rb.atomicCount.Add(1)
 
 	// Notify waiting consumers
 	select {
@@ -82,15 +91,15 @@ func (rb *ringBuffer) Pop() (Message, bool) {
 	rb.buf[rb.head] = Message{} // Clear reference for GC
 	rb.head = (rb.head + 1) % rb.capacity
 	rb.count--
+	rb.atomicCount.Add(-1)
 
 	return msg, true
 }
 
 // Len returns the current number of messages in the buffer.
+// Uses an atomic load so callers (e.g. Stats()) do not need to acquire the mutex.
 func (rb *ringBuffer) Len() int {
-	rb.mu.Lock()
-	defer rb.mu.Unlock()
-	return rb.count
+	return int(rb.atomicCount.Load())
 }
 
 // Cap returns the capacity of the buffer.
@@ -142,6 +151,7 @@ func (rb *ringBuffer) Drain() []Message {
 	rb.head = 0
 	rb.tail = 0
 	rb.count = 0
+	rb.atomicCount.Store(0)
 
 	return msgs
 }
