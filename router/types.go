@@ -48,12 +48,9 @@ func (mr *MatchResult) storeCached(version uint64, handler Handler) {
 	mr.cache.Store(cachedHandler{version: version, handler: handler})
 }
 
-// RouteMeta describes route metadata for debugging/observability.
+// RouteMeta describes route metadata used for reverse URL generation.
 type RouteMeta struct {
-	Name        string   `json:"name,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Deprecated  bool     `json:"deprecated,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 // RouteInfo describes a registered route with metadata.

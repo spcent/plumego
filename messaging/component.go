@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
@@ -27,14 +28,14 @@ func NewComponent(svc *Service, prefix string) *Component {
 
 func (c *Component) RegisterRoutes(r *router.Router) {
 	// Send
-	r.PostCtx(c.prefix+"/send", c.svc.HandleSend)
-	r.PostCtx(c.prefix+"/batch", c.svc.HandleBatchSend)
+	r.Post(c.prefix+"/send", contract.AdaptCtxHandler(c.svc.HandleSend, r.Logger()))
+	r.Post(c.prefix+"/batch", contract.AdaptCtxHandler(c.svc.HandleBatchSend, r.Logger()))
 	// Query
-	r.GetCtx(c.prefix+"/stats", c.svc.HandleStats)
-	r.GetCtx(c.prefix+"/receipts", c.svc.HandleListReceipts)
-	r.GetCtx(c.prefix+"/:id/receipt", c.svc.HandleGetReceipt)
+	r.Get(c.prefix+"/stats", contract.AdaptCtxHandler(c.svc.HandleStats, r.Logger()))
+	r.Get(c.prefix+"/receipts", contract.AdaptCtxHandler(c.svc.HandleListReceipts, r.Logger()))
+	r.Get(c.prefix+"/:id/receipt", contract.AdaptCtxHandler(c.svc.HandleGetReceipt, r.Logger()))
 	// Operations
-	r.GetCtx(c.prefix+"/channels", c.svc.HandleChannelHealth)
+	r.Get(c.prefix+"/channels", contract.AdaptCtxHandler(c.svc.HandleChannelHealth, r.Logger()))
 }
 
 func (c *Component) RegisterMiddleware(_ *middleware.Registry) {}

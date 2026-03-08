@@ -48,7 +48,7 @@ func (l *recordingLogger) DebugCtx(ctx context.Context, msg string, fields ...lo
 func (l *recordingLogger) InfoCtx(ctx context.Context, msg string, fields ...log.Fields)  {}
 func (l *recordingLogger) WarnCtx(ctx context.Context, msg string, fields ...log.Fields)  {}
 func (l *recordingLogger) ErrorCtx(ctx context.Context, msg string, fields ...log.Fields) {}
-func (l *recordingLogger) Fatal(msg string, fields ...log.Fields)                          {}
+func (l *recordingLogger) Fatal(msg string, fields ...log.Fields)                         {}
 func (l *recordingLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {}
 
 func TestRecoveryMiddleware(t *testing.T) {

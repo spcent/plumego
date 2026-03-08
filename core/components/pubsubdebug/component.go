@@ -40,7 +40,7 @@ func (c *PubSubDebugComponent) RegisterRoutes(r *router.Router) {
 			path = "/_debug/pubsub"
 		}
 
-		r.GetCtx(path, func(ctx *contract.Ctx) {
+		r.Get(path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 			if pub == nil {
 				contractio.WriteContractError(ctx, http.StatusInternalServerError, "missing_pubsub", "pubsub is not configured")
 				return
@@ -54,7 +54,7 @@ func (c *PubSubDebugComponent) RegisterRoutes(r *router.Router) {
 			}
 
 			contractio.WriteContractError(ctx, http.StatusNotImplemented, "not_supported", "pubsub snapshot not supported by this implementation")
-		})
+		}, r.Logger()))
 	})
 }
 

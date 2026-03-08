@@ -2,7 +2,6 @@ package router
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,13 +14,13 @@ func TestBasicRoutes(t *testing.T) {
 	// Reset global router
 	r := NewRouter()
 
-	r.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
-	})
+	}))
 
-	r.PostFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/echo", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("echo"))
-	})
+	}))
 
 	tests := []struct {
 		method   string
@@ -48,16 +47,16 @@ func TestBasicRoutes(t *testing.T) {
 func TestParamRoutes(t *testing.T) {
 	r := NewRouter()
 
-	r.GetFunc("/hello/:name", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name, _ := contract.Param(r, "name")
 		ctxParams := contract.ParamsFromContext(r.Context())
 		if ctxParams["name"] != name {
 			t.Fatalf("context params mismatch: got %s want %s", ctxParams["name"], name)
 		}
 		w.Write([]byte("Hello " + name))
-	})
+	}))
 
-	r.GetFunc("/users/:id/books/:bookId", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id/books/:bookId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		bookID, _ := contract.Param(r, "bookId")
 		ctxParams := contract.ParamsFromContext(r.Context())
@@ -65,7 +64,7 @@ func TestParamRoutes(t *testing.T) {
 			t.Fatalf("context params mismatch: %v", ctxParams)
 		}
 		w.Write([]byte("User " + id + " Book " + bookID))
-	})
+	}))
 
 	tests := []struct {
 		path     string
@@ -91,7 +90,7 @@ func TestParamRoutes(t *testing.T) {
 func TestParamsInjectedIntoContext(t *testing.T) {
 	r := NewRouter()
 
-	r.GetFunc("/hello/:name", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctxParams := contract.ParamsFromContext(r.Context())
 		if ctxParams == nil {
 			t.Fatalf("expected params in context")
@@ -106,7 +105,7 @@ func TestParamsInjectedIntoContext(t *testing.T) {
 			t.Fatalf("context params mismatch: got %s want %s", ctxParams["name"], paramVal)
 		}
 		w.Write([]byte(ctxParams["name"]))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/hello/Alice", nil)
 	w := httptest.NewRecorder()
@@ -121,7 +120,7 @@ func TestParamsInjectedIntoContext(t *testing.T) {
 func TestRequestContextHelpers(t *testing.T) {
 	r := NewRouter()
 
-	r.GetFunc("/hello/:name", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := contract.RequestContextFrom(r.Context())
 		name, _ := contract.Param(r, "name")
 		if rc.Params["name"] != name {
@@ -137,7 +136,7 @@ func TestRequestContextHelpers(t *testing.T) {
 		}
 
 		w.Write([]byte(rc.Params["name"]))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/hello/Carol", nil)
 	w := httptest.NewRecorder()
@@ -152,7 +151,7 @@ func TestRequestContextHelpers(t *testing.T) {
 func TestContextHandlerRegistration(t *testing.T) {
 	r := NewRouter()
 
-	r.GetFunc("/ctx/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/ctx/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := contract.RequestContextFrom(r.Context())
 		if rc.Params == nil {
 			t.Fatalf("expected RequestContext to be present")
@@ -168,7 +167,7 @@ func TestContextHandlerRegistration(t *testing.T) {
 		}
 
 		w.Write([]byte(paramVal))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/ctx/42", nil)
 	w := httptest.NewRecorder()
@@ -202,9 +201,9 @@ func TestAnyRoute(t *testing.T) {
 func TestAnyRootFallback(t *testing.T) {
 	r := NewRouter()
 
-	r.GetFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/docs", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("docs"))
-	})
+	}))
 
 	r.Any("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("home"))
@@ -269,20 +268,20 @@ func TestRouteGroup(t *testing.T) {
 	v1 := api.Group("/v1")
 	v2 := api.Group("/v2")
 
-	v1.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	v1.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		ctxParams := contract.ParamsFromContext(r.Context())
 		if ctxParams["id"] != id {
 			t.Fatalf("expected id in context")
 		}
 		w.Write([]byte("User " + id))
-	})
-	v1.PostFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	v1.Post("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Create User"))
-	})
-	v2.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	v2.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Users v2"))
-	})
+	}))
 
 	tests := []struct {
 		method   string
@@ -318,9 +317,9 @@ func TestRouteGroupMiddlewares(t *testing.T) {
 		})
 	})
 
-	api.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	api.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/api/ping", nil)
 	w := httptest.NewRecorder()
@@ -345,13 +344,13 @@ func TestRouteGroupMiddlewareIsolation(t *testing.T) {
 		})
 	})
 
-	api.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	api.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
-	})
+	}))
 
-	r.GetFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/api/ping", nil)
 	w := httptest.NewRecorder()
@@ -398,10 +397,10 @@ func TestNestedGroupMiddlewareOrder(t *testing.T) {
 		})
 	})
 
-	v1.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	v1.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "handler")
 		w.Write([]byte("pong"))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/api/v1/ping", nil)
 	w := httptest.NewRecorder()
@@ -431,7 +430,7 @@ func TestRouteMetadata(t *testing.T) {
 
 	err := r.AddRouteWithOptions("GET", "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}), WithRouteName("ping"), WithRouteTags("health", "status"))
+	}), WithRouteName("ping"))
 	if err != nil {
 		t.Fatalf("add route failed: %v", err)
 	}
@@ -444,37 +443,6 @@ func TestRouteMetadata(t *testing.T) {
 	route := routes[0]
 	if route.Meta.Name != "ping" {
 		t.Fatalf("expected name 'ping', got %q", route.Meta.Name)
-	}
-	if len(route.Meta.Tags) != 2 || route.Meta.Tags[0] != "health" {
-		t.Fatalf("unexpected tags: %v", route.Meta.Tags)
-	}
-}
-
-func TestRouterCtxHandler(t *testing.T) {
-	r := NewRouter()
-	r.GetCtx("/hello/:name", func(ctx *contract.Ctx) {
-		_ = ctx.JSON(http.StatusOK, map[string]string{
-			"name":  ctx.Params["name"],
-			"trace": ctx.TraceID,
-		})
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/hello/gopher", nil)
-	recorder := httptest.NewRecorder()
-
-	r.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status 200 got %d", recorder.Code)
-	}
-
-	var payload map[string]string
-	if err := json.NewDecoder(recorder.Body).Decode(&payload); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-
-	if payload["name"] != "gopher" {
-		t.Fatalf("expected param to be available, got %+v", payload)
 	}
 }
 
@@ -517,9 +485,9 @@ func TestGroupNoPrefixDoubleSlash(t *testing.T) {
 	api := r.Group("/api/")
 	v1 := api.Group("/v1/")
 
-	v1.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	v1.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/api/v1/users", nil)
 	w := httptest.NewRecorder()
@@ -534,9 +502,9 @@ func TestGroupMissingLeadingSlash(t *testing.T) {
 	r := NewRouter()
 
 	api := r.Group("api") // no leading slash
-	api.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	api.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/api/ping", nil)
 	w := httptest.NewRecorder()
@@ -552,9 +520,9 @@ func TestGroupEmptyPrefix(t *testing.T) {
 
 	// Empty prefix group should behave like root
 	g := r.Group("")
-	g.GetFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	g.Get("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
@@ -574,9 +542,9 @@ func TestDeepNestedGroups(t *testing.T) {
 	users := v1.Group("/users")
 	settings := users.Group("/settings")
 
-	settings.GetFunc("/theme", func(w http.ResponseWriter, r *http.Request) {
+	settings.Get("/theme", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("dark"))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/api/v1/users/settings/theme", nil)
 	w := httptest.NewRecorder()
@@ -622,10 +590,10 @@ func TestDeepNestedGroupMiddlewareOrder(t *testing.T) {
 		})
 	})
 
-	users.GetFunc("/:id", func(w http.ResponseWriter, r *http.Request) {
+	users.Get("/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "handler")
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	order = []string{}
 	req := httptest.NewRequest("GET", "/api/v1/users/42", nil)
@@ -648,9 +616,9 @@ func TestSiblingGroupMiddlewareIsolation(t *testing.T) {
 			next.ServeHTTP(w, r)
 		})
 	})
-	admin.GetFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+	admin.Get("/dashboard", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("admin"))
-	})
+	}))
 
 	public := r.Group("/public")
 	public.Use(func(next http.Handler) http.Handler {
@@ -659,9 +627,9 @@ func TestSiblingGroupMiddlewareIsolation(t *testing.T) {
 			next.ServeHTTP(w, r)
 		})
 	})
-	public.GetFunc("/page", func(w http.ResponseWriter, r *http.Request) {
+	public.Get("/page", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("public"))
-	})
+	}))
 
 	// Admin group should have X-Admin but not X-Public
 	req := httptest.NewRequest("GET", "/admin/dashboard", nil)
@@ -693,11 +661,11 @@ func TestGroupWithPathParams(t *testing.T) {
 
 	api := r.Group("/api/v1")
 	users := api.Group("/users")
-	users.GetFunc("/:id/posts/:postID", func(w http.ResponseWriter, r *http.Request) {
+	users.Get("/:id/posts/:postID", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		postID, _ := contract.Param(r, "postID")
 		w.Write([]byte(id + ":" + postID))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/api/v1/users/42/posts/99", nil)
 	w := httptest.NewRecorder()
@@ -713,12 +681,12 @@ func TestGroupRootHandler(t *testing.T) {
 
 	api := r.Group("/api")
 	// Register handler at the group root (empty path)
-	api.GetFunc("", func(w http.ResponseWriter, r *http.Request) {
+	api.Get("", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("api-root"))
-	})
-	api.GetFunc("/info", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	api.Get("/info", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("api-info"))
-	})
+	}))
 
 	tests := []struct {
 		path     string
@@ -743,18 +711,18 @@ func TestGroupMultipleMethods(t *testing.T) {
 	r := NewRouter()
 
 	api := r.Group("/api")
-	api.GetFunc("/items", func(w http.ResponseWriter, r *http.Request) {
+	api.Get("/items", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("list"))
-	})
-	api.PostFunc("/items", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	api.Post("/items", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("create"))
-	})
-	api.PutFunc("/items/:id", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	api.Put("/items/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("update"))
-	})
-	api.DeleteFunc("/items/:id", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	api.Delete("/items/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("delete"))
-	})
+	}))
 
 	tests := []struct {
 		method   string
@@ -782,15 +750,15 @@ func TestGroupFunc(t *testing.T) {
 	r := NewRouter()
 
 	r.GroupFunc("/api/v1", func(v1 *Router) {
-		v1.GetFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		v1.Get("/status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("ok"))
-		})
+		}))
 
 		v1.GroupFunc("/users", func(users *Router) {
-			users.GetFunc("/:id", func(w http.ResponseWriter, r *http.Request) {
+			users.Get("/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				id, _ := contract.Param(r, "id")
 				w.Write([]byte("user-" + id))
-			})
+			}))
 		})
 	})
 
@@ -834,10 +802,10 @@ func TestGroupFuncWithMiddleware(t *testing.T) {
 				})
 			})
 
-			v1.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+			v1.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				order = append(order, "handler")
 				w.Write([]byte("pong"))
-			})
+			}))
 		})
 	})
 
@@ -856,15 +824,15 @@ func TestGroupFuncReturnsGroup(t *testing.T) {
 	r := NewRouter()
 
 	v1 := r.GroupFunc("/api/v1", func(v1 *Router) {
-		v1.GetFunc("/inside", func(w http.ResponseWriter, r *http.Request) {
+		v1.Get("/inside", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("inside"))
-		})
+		}))
 	})
 
 	// Can still add routes after GroupFunc returns
-	v1.GetFunc("/outside", func(w http.ResponseWriter, r *http.Request) {
+	v1.Get("/outside", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("outside"))
-	})
+	}))
 
 	tests := []struct {
 		path     string

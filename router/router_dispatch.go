@@ -246,12 +246,12 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	reqWithParams = req.WithContext(ctx)
 
 	// Obtain the handler (possibly from cache).
-	version := r.middlewareManager.Version()
+	version := r.middlewareManager.getVersion()
 	var handler http.Handler
 	if cached, ok := result.loadCached(version); ok {
 		handler = cached
 	} else {
-		allMiddlewares := r.middlewareManager.GetMiddlewares()
+		allMiddlewares := r.middlewareManager.getMiddlewares()
 		combined := make([]middleware.Middleware, 0, len(allMiddlewares)+len(result.RouteMiddlewares))
 		combined = append(combined, allMiddlewares...)
 		combined = append(combined, result.RouteMiddlewares...)

@@ -6,49 +6,6 @@ import (
 	"testing"
 )
 
-func TestHandleFunc(t *testing.T) {
-	app := New()
-
-	called := false
-	app.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	rr := httptest.NewRecorder()
-	app.ServeHTTP(rr, req)
-
-	if !called {
-		t.Error("handler was not called")
-	}
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", rr.Code)
-	}
-}
-
-func TestHandle(t *testing.T) {
-	app := New()
-
-	called := false
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	app.Handle("/test", handler)
-
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	rr := httptest.NewRecorder()
-	app.ServeHTTP(rr, req)
-
-	if !called {
-		t.Error("handler was not called")
-	}
-}
-
 func TestGetPostPutDeletePatch(t *testing.T) {
 	tests := []struct {
 		method   string

@@ -88,13 +88,13 @@ func (e *EnvSource) Name() string {
 
 // FileSource implements Source for configuration files.
 type FileSource struct {
-	path         string
-	format       string
-	watch        bool
+	path          string
+	format        string
+	watch         bool
 	watchInterval time.Duration // polling interval; defaults to time.Second
-	mu           sync.Mutex    // protects lastData and lastMod
-	lastData     map[string]any
-	lastMod      time.Time
+	mu            sync.Mutex    // protects lastData and lastMod
+	lastData      map[string]any
+	lastMod       time.Time
 }
 
 // NewFileSource creates a new file configuration source.

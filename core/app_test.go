@@ -29,10 +29,10 @@ func (s *stubComponent) RegisterRoutes(r *router.Router) {
 		s.path = "/stub"
 	}
 
-	r.GetFunc(s.path, func(w http.ResponseWriter, _ *http.Request) {
+	r.Get(s.path, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
-	})
+	}))
 }
 
 func (s *stubComponent) RegisterMiddleware(reg *middleware.Registry) {
@@ -118,7 +118,7 @@ func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("router"))
 	})
-	app.HandleFunc("/mux", func(w http.ResponseWriter, r *http.Request) {
+	app.Get("/mux", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("mux"))
 	})

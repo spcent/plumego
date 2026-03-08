@@ -83,22 +83,22 @@ func TestOptimizedMatcher(t *testing.T) {
 	r := NewRouter()
 
 	// Register various types of routes
-	r.GetFunc("/static/path", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/static/path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("static"))
-	})
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte("user-" + id))
-	})
-	r.GetFunc("/users/:id/posts/:postId", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	r.Get("/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		postId, _ := contract.Param(r, "postId")
 		w.Write([]byte(fmt.Sprintf("user-%s-post-%s", id, postId)))
-	})
-	r.GetFunc("/files/*filepath", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	r.Get("/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filepath, _ := contract.Param(r, "filepath")
 		w.Write([]byte("file-" + filepath))
-	})
+	}))
 
 	tests := []struct {
 		name     string

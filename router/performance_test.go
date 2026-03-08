@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+
+	"github.com/spcent/plumego/routeparam"
 )
 
 // BenchmarkRouterComparison compares performance between old and new router implementations
@@ -179,14 +181,14 @@ func BenchmarkParameterValidation(b *testing.B) {
 
 	// Add route with validation
 	validation := NewRouteValidation().
-		AddParam("id", PositiveIntValidator).
-		AddParam("email", EmailValidator)
+		AddParam("id", routeparam.PositiveInt).
+		AddParam("email", routeparam.UUID)
 
 	r.AddValidation("GET", "/users/:id", validation)
 
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	// Test requests
 	tests := []struct {
@@ -216,19 +218,19 @@ func TestOptimizedRouterFeatures(t *testing.T) {
 
 	// Add validation
 	validation := NewRouteValidation().
-		AddParam("id", PositiveIntValidator)
+		AddParam("id", routeparam.PositiveInt)
 	r.AddValidation("GET", "/users/:id", validation)
 
 	// Register routes
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte("user-" + id))
-	})
+	}))
 
-	r.GetFunc("/posts/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/posts/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte("post-" + id))
-	})
+	}))
 
 	// Test 1: Valid parameter
 	req := httptest.NewRequest("GET", "/users/123", nil)
@@ -347,10 +349,11 @@ func TestCacheEviction(t *testing.T) {
 
 // TestValidationRules validates parameter validation
 func TestValidationRules(t *testing.T) {
+	emailValidator := routeparam.MustRegex(`^[^@]+@[^@]+\.[^@]+$`)
 	validation := NewRouteValidation().
-		AddParam("id", PositiveIntValidator).
-		AddParam("email", EmailValidator).
-		AddParam("name", NewLengthValidator(1, 50))
+		AddParam("id", routeparam.PositiveInt).
+		AddParam("email", emailValidator).
+		AddParam("name", routeparam.NewLength(1, 50))
 
 	tests := []struct {
 		name    string

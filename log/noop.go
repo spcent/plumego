@@ -22,7 +22,7 @@ type NoOpLogger struct {
 // NewNoOpLogger returns a NoOpLogger that implements StructuredLogger.
 func NewNoOpLogger() *NoOpLogger { return &NoOpLogger{} }
 
-func (n *NoOpLogger) WithFields(_ Fields) StructuredLogger { return n }
+func (n *NoOpLogger) WithFields(_ Fields) StructuredLogger  { return n }
 func (n *NoOpLogger) With(_ string, _ any) StructuredLogger { return n }
 
 func (n *NoOpLogger) Debug(_ string, _ ...Fields) {}

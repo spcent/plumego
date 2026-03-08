@@ -2,7 +2,6 @@ package router
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -17,30 +16,30 @@ func TestAdvancedRouteMatching(t *testing.T) {
 	r := NewRouter()
 
 	// Register various route types
-	r.GetFunc("/static/path", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/static/path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("static"))
-	})
+	}))
 
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte("user-" + id))
-	})
+	}))
 
-	r.GetFunc("/users/:id/posts/:postId", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		postId, _ := contract.Param(r, "postId")
 		w.Write([]byte(fmt.Sprintf("user-%s-post-%s", id, postId)))
-	})
+	}))
 
-	r.GetFunc("/files/*filepath", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filepath, _ := contract.Param(r, "filepath")
 		w.Write([]byte("file-" + filepath))
-	})
+	}))
 
-	r.PostFunc("/any/*path", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path, _ := contract.Param(r, "path")
 		w.Write([]byte("any-" + path))
-	})
+	}))
 
 	tests := []struct {
 		name     string
@@ -103,10 +102,10 @@ func TestMiddlewareChain(t *testing.T) {
 		})
 	})
 
-	api.GetFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+	api.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "handler")
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	// Test API route
 	order = []string{}
@@ -124,7 +123,7 @@ func TestMiddlewareChain(t *testing.T) {
 func TestContextPropagation(t *testing.T) {
 	r := NewRouter()
 
-	r.GetFunc("/test/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/test/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check params in context
 		params := contract.ParamsFromContext(r.Context())
 		if params["id"] != "123" {
@@ -144,7 +143,7 @@ func TestContextPropagation(t *testing.T) {
 		}
 
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest("GET", "/test/123", nil)
 	rec := httptest.NewRecorder()
@@ -158,7 +157,7 @@ func TestContextPropagation(t *testing.T) {
 // TestRouteConflict tests duplicate route detection
 func TestRouteConflict(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/test", func(w http.ResponseWriter, r *http.Request) {})
+	r.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	// Should return error on duplicate
 	err := r.AddRoute("GET", "/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
@@ -174,19 +173,19 @@ func TestRouterGroupNesting(t *testing.T) {
 	v1 := r.Group("/api/v1")
 	v2 := r.Group("/api/v2")
 
-	v1.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	v1.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("v1-users"))
-	})
+	}))
 
-	v2.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	v2.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("v2-users"))
-	})
+	}))
 
 	// Nested group
 	v1Admin := v1.Group("/admin")
-	v1Admin.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	v1Admin.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("v1-admin-users"))
-	})
+	}))
 
 	tests := []struct {
 		path     string
@@ -207,65 +206,6 @@ func TestRouterGroupNesting(t *testing.T) {
 				t.Errorf("path %s: expected %q, got %q", tt.path, tt.expected, body)
 			}
 		})
-	}
-}
-
-// TestResourceControllerAdvanced tests extended resource controller functionality
-func TestResourceControllerAdvanced(t *testing.T) {
-	type TestResource struct {
-		BaseResourceController
-	}
-
-	ctrl := &TestResource{
-		BaseResourceController: *NewBaseResourceController("test"),
-	}
-
-	// Override some methods
-	ctrl.ResourceName = "advanced"
-
-	r := NewRouter()
-	if err := r.Resource("/advanced", ctrl); err != nil {
-		t.Fatalf("Resource registration failed: %v", err)
-	}
-
-	// Test OPTIONS for CORS
-	req := httptest.NewRequest("OPTIONS", "/advanced", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNoContent {
-		t.Errorf("OPTIONS should return 204, got %d", rec.Code)
-	}
-
-	if rec.Header().Get("Access-Control-Allow-Methods") == "" {
-		t.Error("CORS headers not set")
-	}
-
-	// Test HEAD
-	req = httptest.NewRequest("HEAD", "/advanced", nil)
-	rec = httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("HEAD should return 200, got %d", rec.Code)
-	}
-
-	// Test default not implemented methods
-	req = httptest.NewRequest("GET", "/advanced/123", nil)
-	rec = httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotImplemented {
-		t.Errorf("Show should return 501, got %d", rec.Code)
-	}
-
-	var resp contract.ErrorResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-
-	if resp.Error.Code != http.StatusText(http.StatusNotImplemented) {
-		t.Errorf("expected code %q, got %q", http.StatusText(http.StatusNotImplemented), resp.Error.Code)
 	}
 }
 
@@ -298,10 +238,10 @@ func TestStaticFileSecurity(t *testing.T) {
 func TestConcurrentRequests(t *testing.T) {
 	r := NewRouter()
 
-	r.GetFunc("/concurrent/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/concurrent/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte(id))
-	})
+	}))
 
 	done := make(chan bool)
 	iterations := 100
@@ -334,10 +274,10 @@ func TestConcurrentRequests(t *testing.T) {
 func TestRouterPrint(t *testing.T) {
 	r := NewRouter()
 
-	_ = r.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {})
-	_ = r.PostFunc("/users", func(w http.ResponseWriter, r *http.Request) {})
-	_ = r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {})
-	_ = r.AnyFunc("/any/*path", func(w http.ResponseWriter, r *http.Request) {})
+	r.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	r.Post("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	r.Any("/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	var buf bytes.Buffer
 	r.Print(&buf)
@@ -356,41 +296,6 @@ func TestRouterPrint(t *testing.T) {
 	if !strings.Contains(output, "[wildcard]") {
 		t.Error("Print output missing wildcard marker")
 	}
-}
-
-// TestRegisterMethod tests the Register method with RouteRegistrar
-type testRegistrar struct {
-	called bool
-}
-
-func (tr *testRegistrar) Register(r *Router) {
-	tr.called = true
-	_ = r.GetFunc("/registered", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("registered"))
-	})
-}
-
-func TestRegisterMethod(t *testing.T) {
-	r := NewRouter()
-	reg := &testRegistrar{}
-
-	r.Register(reg)
-
-	if !reg.called {
-		t.Error("Register method did not call Register on registrar")
-	}
-
-	// Test route was added
-	req := httptest.NewRequest("GET", "/registered", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Error("registered route not working")
-	}
-
-	// Test duplicate registrar is ignored
-	r.Register(reg)
 }
 
 // TestSetLogger tests logger configuration

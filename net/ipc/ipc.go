@@ -173,7 +173,7 @@ type Config struct {
 	KeepAlivePeriod     time.Duration            // TCP keepalive period. Default: 30s. Only applies to TCP connections.
 	WindowsSecuritySDDL string                   // Windows security descriptor (SDDL string). Windows only. Empty = default security.
 	Metrics             metrics.MetricsCollector // Optional metrics collector
-	Logger              log.StructuredLogger    // Optional structured logger
+	Logger              log.StructuredLogger     // Optional structured logger
 }
 
 // DefaultConfig returns default configuration

@@ -150,12 +150,12 @@ func (c *Component) RegisterRoutes(r *router.Router) {
 			group.Use(mw)
 		}
 
-		group.GetCtx("", c.handleSummary)
-		group.GetCtx("/queue", c.handleQueueStats)
-		group.PostCtx("/queue/replay", c.handleQueueReplay)
-		group.GetCtx("/receipts", c.handleReceiptLookup)
-		group.GetCtx("/channels", c.handleChannelHealth)
-		group.GetCtx("/tenants/quota", c.handleTenantQuota)
+		group.Get("", contract.AdaptCtxHandler(c.handleSummary, group.Logger()))
+		group.Get("/queue", contract.AdaptCtxHandler(c.handleQueueStats, group.Logger()))
+		group.Post("/queue/replay", contract.AdaptCtxHandler(c.handleQueueReplay, group.Logger()))
+		group.Get("/receipts", contract.AdaptCtxHandler(c.handleReceiptLookup, group.Logger()))
+		group.Get("/channels", contract.AdaptCtxHandler(c.handleChannelHealth, group.Logger()))
+		group.Get("/tenants/quota", contract.AdaptCtxHandler(c.handleTenantQuota, group.Logger()))
 	})
 }
 
