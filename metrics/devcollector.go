@@ -384,9 +384,14 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 // GetStats implements MetricsCollector.
 func (d *DevCollector) GetStats() CollectorStats {
 	if d == nil {
-		return CollectorStats{}
+		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
 	}
-	return d.base.GetStats()
+
+	stats := d.base.GetStats()
+	if stats.ActiveSeries == 0 && len(stats.TypeBreakdown) > 0 {
+		stats.ActiveSeries = len(stats.TypeBreakdown)
+	}
+	return stats
 }
 
 // Clear implements MetricsCollector.
