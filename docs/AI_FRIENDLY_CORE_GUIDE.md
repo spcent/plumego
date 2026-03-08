@@ -179,7 +179,7 @@ A Plumego context abstraction, if kept, must remain a thin request helper, not a
 
 ## Rule 5: Explicit data flow over implicit bind pipelines
 
-The bind package currently provides `BindJSON[T]` that parses JSON, validates it, and stores the result in request context for later access through `FromRequest`/`FromContext`.
+The bind package provides `BindJSON[T]` as a compatibility middleware that parses JSON and validates payloads, but canonical HTTP handlers should decode directly from `r.Body`.
 
 This is useful, but it creates implicit data flow.
 

@@ -26,17 +26,13 @@ app := core.New(
 
 ## Request Processing
 
-### 2. Bind (`middleware/bind`)
+> Policy: do not implement middleware that injects business DTOs into request context for regular HTTP handlers. Use explicit decode + validation in handlers.
 
-Automatic request body binding.
+### Bind (`middleware/bind`) — compatibility only
 
-```go
-import "github.com/spcent/plumego/middleware/bind"
+`middleware/bind` exists for compatibility scenarios. New HTTP handlers should decode JSON explicitly with `json.NewDecoder(r.Body).Decode(&req)`, validate near decode, and return errors through `contract.WriteError`.
 
-app.Use(bind.New())
-```
-
-### 3. Limits (`middleware/limits`)
+### 2. Limits (`middleware/limits`)
 
 Request size and duration limits.
 
@@ -50,7 +46,7 @@ app.Use(limits.New(limits.Config{
 }))
 ```
 
-### 4. Timeout (`middleware/timeout`)
+### 3. Timeout (`middleware/timeout`)
 
 Request timeout handling.
 
@@ -64,7 +60,7 @@ app.Use(timeout.New(30 * time.Second))
 
 ## Caching & Performance
 
-### 5. Cache (`middleware/cache`)
+### 4. Cache (`middleware/cache`)
 
 HTTP caching with ETag and Cache-Control.
 
@@ -77,7 +73,7 @@ app.Use(cache.New(cache.Config{
 }))
 ```
 
-### 6. Coalesce (`middleware/coalesce`)
+### 5. Coalesce (`middleware/coalesce`)
 
 Request coalescing/deduplication.
 
@@ -87,7 +83,7 @@ import "github.com/spcent/plumego/middleware/coalesce"
 app.Use(coalesce.New())
 ```
 
-### 7. Compression (`middleware/compression`)
+### 6. Compression (`middleware/compression`)
 
 Response compression (gzip, brotli).
 
@@ -105,7 +101,7 @@ app := core.New(
 
 ## Resilience
 
-### 8. CircuitBreaker (`middleware/circuitbreaker`)
+### 7. CircuitBreaker (`middleware/circuitbreaker`)
 
 Circuit breaker pattern for fault tolerance.
 
@@ -119,7 +115,7 @@ app.Use(circuitbreaker.New(circuitbreaker.Config{
 }))
 ```
 
-### 9. RateLimit (`middleware/ratelimit`)
+### 8. RateLimit (`middleware/ratelimit`)
 
 Rate limiting.
 
@@ -134,7 +130,7 @@ app := core.New(
 )
 ```
 
-### 10. Recovery (`middleware/recovery`)
+### 9. Recovery (`middleware/recovery`)
 
 Panic recovery.
 
@@ -150,7 +146,7 @@ app := core.New(
 
 ## Cross-Origin & Protocol
 
-### 11. CORS (`middleware/cors`)
+### 10. CORS (`middleware/cors`)
 
 Cross-Origin Resource Sharing.
 
@@ -168,7 +164,7 @@ app := core.New(
 )
 ```
 
-### 12. Protocol (`middleware/protocol`)
+### 11. Protocol (`middleware/protocol`)
 
 Protocol adaptation (HTTP, gRPC, GraphQL).
 
@@ -178,7 +174,7 @@ import "github.com/spcent/plumego/middleware/protocol"
 app.Use(protocol.New())
 ```
 
-### 13. Versioning (`middleware/versioning`)
+### 12. Versioning (`middleware/versioning`)
 
 API versioning.
 
@@ -195,7 +191,7 @@ app.Use(versioning.New(versioning.Config{
 
 ## Observability
 
-### 14. Observability (`middleware/observability`)
+### 13. Observability (`middleware/observability`)
 
 Metrics, tracing, and logging.
 
@@ -214,7 +210,7 @@ app := core.New(
 
 ## Proxy & Routing
 
-### 15. Proxy (`middleware/proxy`)
+### 14. Proxy (`middleware/proxy`)
 
 Reverse proxy.
 
@@ -225,7 +221,7 @@ target, _ := url.Parse("http://backend:8080")
 app.Use(proxy.New(target))
 ```
 
-### 16. Tenant (`middleware/tenant`)
+### 15. Tenant (`middleware/tenant`)
 
 Multi-tenancy routing.
 
@@ -243,7 +239,7 @@ app := core.New(
 
 ## Security
 
-### 17. Security (`middleware/security`)
+### 16. Security (`middleware/security`)
 
 Security headers (CSP, HSTS, etc.).
 
@@ -257,7 +253,7 @@ app := core.New(
 
 ## Transformation
 
-### 18. Transform (`middleware/transform`)
+### 17. Transform (`middleware/transform`)
 
 Response transformation.
 
@@ -273,7 +269,7 @@ app.Use(transform.New(transform.Config{
 
 ## Development
 
-### 19. Debug (`middleware/debug`)
+### 18. Debug (`middleware/debug`)
 
 Debug utilities.
 

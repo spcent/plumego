@@ -79,7 +79,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 | Middleware | Package | Description |
 |------------|---------|-------------|
-| **Bind** | `middleware/bind` | Automatic request binding |
+| **Bind** | `middleware/bind` | Compatibility only; avoid DTO injection middleware in new code |
 | **Limits** | `middleware/limits` | Request size/duration limits |
 | **Timeout** | `middleware/timeout` | Request timeout handling |
 
@@ -137,6 +137,14 @@ func loggingMiddleware(next http.Handler) http.Handler {
 | Middleware | Package | Description |
 |------------|---------|-------------|
 | **Debug** | `middleware/debug` | Debug utilities |
+
+---
+
+### Request DTO policy
+
+For new HTTP entrypoints, decode request JSON explicitly in handlers with `json.NewDecoder(r.Body).Decode(&req)`, validate near decode, and write failures through `contract.WriteError`.
+
+Do **not** use middleware to inject business DTOs into request context.
 
 ---
 
