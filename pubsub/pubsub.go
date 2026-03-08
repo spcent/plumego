@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -483,8 +484,13 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 
 	id := ps.nextID.Add(1)
 
+	// Only set up context cancellation machinery when ctx can actually be cancelled.
+	// context.Background() and context.TODO() never cancel, so skip the goroutine
+	// and WithCancel allocation to avoid unnecessary resource consumption.
+	needsCtxWatch := ctx != nil && ctx != context.Background() && ctx != context.TODO()
+
 	var cancel context.CancelFunc
-	if ctx != nil {
+	if needsCtxWatch {
 		ctx, cancel = context.WithCancel(ctx)
 	}
 
@@ -518,8 +524,8 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 		ps.config.Hooks.OnSubscribe(topic, id)
 	}
 
-	// Handle context cancellation
-	if ctx != nil {
+	// Watch for context cancellation only when the context can actually be cancelled.
+	if needsCtxWatch {
 		go func() {
 			select {
 			case <-ctx.Done():
@@ -565,8 +571,11 @@ func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern strin
 
 	id := ps.nextID.Add(1)
 
+	// Only set up context cancellation machinery when ctx can actually be cancelled.
+	needsCtxWatch := ctx != nil && ctx != context.Background() && ctx != context.TODO()
+
 	var cancel context.CancelFunc
-	if ctx != nil {
+	if needsCtxWatch {
 		ctx, cancel = context.WithCancel(ctx)
 	}
 
@@ -591,8 +600,8 @@ func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern strin
 		ps.config.Hooks.OnSubscribe(pattern, id)
 	}
 
-	// Handle context cancellation
-	if ctx != nil {
+	// Watch for context cancellation only when the context can actually be cancelled.
+	if needsCtxWatch {
 		go func() {
 			select {
 			case <-ctx.Done():
@@ -690,6 +699,15 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 
 	bgCtx := context.Background()
 	for _, msg := range msgs {
+		// TTL check: consistent with doPublish to prevent silent bypass of expiration.
+		if ps.ttlMgr != nil && msg.Meta != nil {
+			if expiresAt, ok := msg.Meta["X-Message-ExpiresAt"]; ok {
+				if t, err := time.Parse(time.RFC3339Nano, expiresAt); err == nil && time.Now().After(t) {
+					continue // skip expired message
+				}
+			}
+		}
+
 		clonedMsg := cloneMessage(msg)
 		ps.metrics.incPublish(topic)
 
@@ -1088,7 +1106,7 @@ func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopi
 	}
 
 	// Fallback: channel-based drain-and-retry
-	for {
+	for spinCount := 0; ; spinCount++ {
 		// Guard against racing with Cancel(): if the subscriber closed while we
 		// were spinning, stop instead of looping forever.
 		if s.closed.Load() {
@@ -1115,8 +1133,14 @@ func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopi
 				}
 				// Continue loop to try sending again
 			default:
-				// Channel was emptied by consumer between the two selects; retry.
+				// Channel was emptied by the consumer between the two selects.
+				// Yield the CPU to avoid a tight spin under heavy contention.
+				runtime.Gosched()
 			}
+		}
+		// Yield more aggressively every 64 iterations under sustained contention.
+		if spinCount > 0 && spinCount%64 == 0 {
+			runtime.Gosched()
 		}
 	}
 }

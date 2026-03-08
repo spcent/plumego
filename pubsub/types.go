@@ -261,6 +261,9 @@ type ContextPubSub interface {
 
 	// SubscribePatternWithContext creates a pattern subscription that is cancelled when the context is done.
 	SubscribePatternWithContext(ctx context.Context, pattern string, opts SubOptions) (Subscription, error)
+
+	// SubscribeMQTTWithContext creates an MQTT pattern subscription that is cancelled when the context is done.
+	SubscribeMQTTWithContext(ctx context.Context, pattern string, opts SubOptions) (Subscription, error)
 }
 
 // BatchPubSub extends ContextPubSub with batch operations.

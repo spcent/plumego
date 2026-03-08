@@ -51,9 +51,26 @@ func (m *metricsPubSub) incDelivered(topic string) {
 	m.ensureTopic(topic).deliveredTotal.Add(1)
 }
 
-// addSubs modifies subscriber count (can be negative).
+// addSubs modifies subscriber count. The gauge is clamped to zero to prevent
+// underflow when Close() cancels all subscriptions after clearing the shard
+// map (causing removeSubscriber to decrement counters that are already at 0).
 func (m *metricsPubSub) addSubs(topic string, delta int64) {
-	m.ensureTopic(topic).subsGauge.Add(delta)
+	tm := m.ensureTopic(topic)
+	if delta >= 0 {
+		tm.subsGauge.Add(delta)
+		return
+	}
+	// Clamp to 0: loop with CAS to avoid racing with concurrent increments.
+	for {
+		old := tm.subsGauge.Load()
+		next := old + delta
+		if next < 0 {
+			next = 0
+		}
+		if tm.subsGauge.CompareAndSwap(old, next) {
+			return
+		}
+	}
 }
 
 // incDropped increments dropped counter for a policy.
