@@ -218,3 +218,61 @@ func TestDevCollectorDBTableNoQuery(t *testing.T) {
 		t.Fatalf("expected no table series for operations without queries, got %d", len(snap.Tables))
 	}
 }
+
+func TestDevCollectorDurationUnitConsistency(t *testing.T) {
+	tests := []struct {
+		name           string
+		observe        func(*DevCollector, context.Context, time.Duration)
+		expectedRecord int
+		assertSnapshot func(*testing.T, *DevCollector, time.Duration)
+	}{
+		{
+			name: "http",
+			observe: func(c *DevCollector, ctx context.Context, d time.Duration) {
+				c.ObserveHTTP(ctx, "GET", "/unit", 200, 256, d)
+			},
+			expectedRecord: 1,
+			assertSnapshot: func(t *testing.T, c *DevCollector, d time.Duration) {
+				snap := c.Snapshot()
+				expectedMS := d.Seconds() * 1000
+				if snap.Total.Duration.Mean != expectedMS {
+					t.Fatalf("expected HTTP snapshot mean %.3fms, got %.3f", expectedMS, snap.Total.Duration.Mean)
+				}
+			},
+		},
+		{
+			name: "db",
+			observe: func(c *DevCollector, ctx context.Context, d time.Duration) {
+				c.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users", 1, d, nil)
+			},
+			expectedRecord: 1,
+			assertSnapshot: func(t *testing.T, c *DevCollector, d time.Duration) {
+				snap := c.DBSnapshot()
+				expectedMS := d.Seconds() * 1000
+				if snap.Total.Duration.Mean != expectedMS {
+					t.Fatalf("expected DB snapshot mean %.3fms, got %.3f", expectedMS, snap.Total.Duration.Mean)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			collector := NewDevCollector(DefaultDevCollectorConfig())
+			duration := 125 * time.Millisecond
+			tt.observe(collector, context.Background(), duration)
+
+			records := collector.base.GetRecords()
+			if len(records) != tt.expectedRecord {
+				t.Fatalf("expected %d base records, got %d", tt.expectedRecord, len(records))
+			}
+			for i, record := range records {
+				if record.Value != duration.Seconds() {
+					t.Fatalf("record %d: expected %f seconds, got %f", i, duration.Seconds(), record.Value)
+				}
+			}
+
+			tt.assertSnapshot(t, collector, duration)
+		})
+	}
+}

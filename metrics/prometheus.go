@@ -457,10 +457,19 @@ func (p *PrometheusCollector) observeSMSLatency(target map[smsKey]latencyStats, 
 	}
 
 	duration := record.Duration
-	if duration <= 0 {
-		if record.Value > 0 {
-			duration = time.Duration(record.Value) * time.Millisecond
+	if duration <= 0 && record.Value > 0 {
+		seconds := record.Value
+		stats := target[key]
+		stats.count++
+		stats.sum += seconds
+		if stats.count == 1 || seconds < stats.min {
+			stats.min = seconds
 		}
+		if stats.count == 1 || seconds > stats.max {
+			stats.max = seconds
+		}
+		target[key] = stats
+		return
 	}
 	seconds := duration.Seconds()
 

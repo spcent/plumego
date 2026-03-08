@@ -80,13 +80,19 @@ const (
 
 // MetricRecord represents a single metric record
 type MetricRecord struct {
-	Type      MetricType
-	Name      string
+	Type MetricType
+	Name string
+	// Value uses seconds as the canonical unit for duration/latency metrics.
+	// Non-duration metrics (for example counters or queue depth) may use domain-specific units.
 	Value     float64
 	Labels    MetricLabels
 	Timestamp time.Time
 	Duration  time.Duration
 	Error     error
+}
+
+func durationValueSeconds(duration time.Duration) float64 {
+	return duration.Seconds()
 }
 
 // MetricsCollector is the unified interface for collecting metrics across all modules
@@ -210,7 +216,7 @@ func (b *BaseMetricsCollector) ObserveHTTP(ctx context.Context, method, path str
 	record := MetricRecord{
 		Type:  MetricHTTPRequest,
 		Name:  "http_request",
-		Value: float64(duration.Milliseconds()),
+		Value: durationValueSeconds(duration),
 		Labels: MetricLabels{
 			labelMethod: method,
 			labelPath:   path,
@@ -311,7 +317,7 @@ func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key str
 	record := MetricRecord{
 		Type:     metricType,
 		Name:     "kv_" + operation,
-		Value:    float64(duration.Milliseconds()),
+		Value:    durationValueSeconds(duration),
 		Labels:   labels,
 		Duration: duration,
 		Error:    err,
@@ -329,7 +335,7 @@ func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key str
 		hitRecord := MetricRecord{
 			Type:     hitType,
 			Name:     "kv_" + operation + "_" + map[bool]string{true: "hit", false: "miss"}[hit],
-			Value:    float64(duration.Milliseconds()),
+			Value:    durationValueSeconds(duration),
 			Labels:   labels,
 			Duration: duration,
 			Error:    err,
@@ -370,7 +376,7 @@ func (b *BaseMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, 
 	record := MetricRecord{
 		Type:     metricType,
 		Name:     "ipc_" + operation,
-		Value:    float64(duration.Microseconds()),
+		Value:    durationValueSeconds(duration),
 		Labels:   labels,
 		Duration: duration,
 		Error:    err,
@@ -423,7 +429,7 @@ func (b *BaseMetricsCollector) ObserveDB(ctx context.Context, operation, driver,
 	record := MetricRecord{
 		Type:     metricType,
 		Name:     "db_" + operation,
-		Value:    float64(duration.Milliseconds()),
+		Value:    durationValueSeconds(duration),
 		Labels:   labels,
 		Duration: duration,
 		Error:    err,

@@ -181,8 +181,8 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 				t.Errorf("expected duration %v, got %v", tt.duration, record.Duration)
 			}
 
-			// Verify value (should be milliseconds)
-			expectedValue := float64(tt.duration.Milliseconds())
+			// Verify value (canonical duration unit is seconds)
+			expectedValue := tt.duration.Seconds()
 			if record.Value != expectedValue {
 				t.Errorf("expected value %f, got %f", expectedValue, record.Value)
 			}
@@ -417,5 +417,61 @@ func TestBaseMetricsCollector_ObserveDB_Multiple(t *testing.T) {
 
 	if stats.TypeBreakdown[MetricDBPing] != 1 {
 		t.Errorf("expected 1 ping record, got %d", stats.TypeBreakdown[MetricDBPing])
+	}
+}
+
+func TestBaseMetricsCollector_DurationValueUnitSeconds(t *testing.T) {
+	tests := []struct {
+		name          string
+		observe       func(*BaseMetricsCollector, context.Context, time.Duration)
+		expectedCount int
+	}{
+		{
+			name: "http",
+			observe: func(c *BaseMetricsCollector, ctx context.Context, d time.Duration) {
+				c.ObserveHTTP(ctx, "GET", "/unit", 200, 123, d)
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "kv_get_hit",
+			observe: func(c *BaseMetricsCollector, ctx context.Context, d time.Duration) {
+				c.ObserveKV(ctx, "get", "key", d, nil, true)
+			},
+			expectedCount: 2,
+		},
+		{
+			name: "ipc",
+			observe: func(c *BaseMetricsCollector, ctx context.Context, d time.Duration) {
+				c.ObserveIPC(ctx, "read", "/tmp/app.sock", "unix", 256, d, nil)
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "db",
+			observe: func(c *BaseMetricsCollector, ctx context.Context, d time.Duration) {
+				c.ObserveDB(ctx, "query", "postgres", "SELECT 1", 1, d, nil)
+			},
+			expectedCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			collector := NewBaseMetricsCollector()
+			duration := 125 * time.Millisecond
+			tt.observe(collector, context.Background(), duration)
+
+			records := collector.GetRecords()
+			if len(records) != tt.expectedCount {
+				t.Fatalf("expected %d records, got %d", tt.expectedCount, len(records))
+			}
+
+			for i, record := range records {
+				if record.Value != duration.Seconds() {
+					t.Fatalf("record %d: expected value %f seconds, got %f", i, duration.Seconds(), record.Value)
+				}
+			}
+		})
 	}
 }
