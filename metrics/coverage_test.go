@@ -124,8 +124,8 @@ func TestPrometheusCollectorEvictionEdgeCases(t *testing.T) {
 	})
 
 	stats := collector.GetStats()
-	if stats.Series > 1 {
-		t.Fatalf("expected at most 1 series after eviction, got %d", stats.Series)
+	if stats.ActiveSeries > 1 {
+		t.Fatalf("expected at most 1 series after eviction, got %d", stats.ActiveSeries)
 	}
 }
 
@@ -144,11 +144,11 @@ func TestPrometheusCollectorMultipleMetricsPerLabel(t *testing.T) {
 	}
 
 	stats := collector.GetStats()
-	if stats.TotalRequests != 5 {
-		t.Fatalf("expected 5 total requests, got %d", stats.TotalRequests)
+	if stats.TotalRecords != 5 {
+		t.Fatalf("expected 5 total requests, got %d", stats.TotalRecords)
 	}
-	if stats.AverageLatency == 0 {
-		t.Fatalf("expected non-zero average latency")
+	if stats.TypeBreakdown[MetricHTTPRequest] == 0 {
+		t.Fatalf("expected HTTP type breakdown to be populated")
 	}
 }
 
@@ -203,8 +203,8 @@ func TestPrometheusCollectorObserveContext(t *testing.T) {
 	})
 
 	stats := collector.GetStats()
-	if stats.TotalRequests != 1 {
-		t.Fatalf("expected 1 request, got %d", stats.TotalRequests)
+	if stats.TotalRecords != 1 {
+		t.Fatalf("expected 1 request, got %d", stats.TotalRecords)
 	}
 }
 
@@ -242,8 +242,8 @@ func TestPrometheusSnapshotConcurrency(t *testing.T) {
 	}
 
 	stats := collector.GetStats()
-	if stats.TotalRequests != 50 {
-		t.Fatalf("expected 50 requests, got %d", stats.TotalRequests)
+	if stats.TotalRecords != 50 {
+		t.Fatalf("expected 50 requests, got %d", stats.TotalRecords)
 	}
 }
 
@@ -392,8 +392,8 @@ func TestPrometheusEvictionWithZeroRequests(t *testing.T) {
 	})
 
 	stats := collector.GetStats()
-	if stats.TotalRequests != 1 {
-		t.Fatalf("expected 1 request after eviction test, got %d", stats.TotalRequests)
+	if stats.TotalRecords != 1 {
+		t.Fatalf("expected 1 request after eviction test, got %d", stats.TotalRecords)
 	}
 }
 
@@ -449,7 +449,7 @@ func TestPrometheusEvictionLeastUsed(t *testing.T) {
 
 	stats := collector.GetStats()
 	// Should have at most 3 series
-	if stats.Series > 3 {
-		t.Fatalf("expected at most 3 series, got %d", stats.Series)
+	if stats.ActiveSeries > 3 {
+		t.Fatalf("expected at most 3 series, got %d", stats.ActiveSeries)
 	}
 }
