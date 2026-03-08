@@ -16,16 +16,11 @@ type ReadinessStatus struct {
 // Global readiness management (for backward compatibility with external packages)
 var (
 	readinessMu     sync.RWMutex
-	globalReadiness ReadinessStatus
-)
-
-func init() {
 	globalReadiness = ReadinessStatus{
-		Ready:     false,
-		Reason:    "starting",
-		Timestamp: time.Now(),
+		Ready:  false,
+		Reason: "starting",
 	}
-}
+)
 
 // updateReadiness updates the global readiness status.
 func updateReadiness(status ReadinessStatus) {

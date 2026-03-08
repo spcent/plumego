@@ -110,37 +110,43 @@ func (a *App) Any(path string, handler http.HandlerFunc) {
 // =========================================================
 
 // GetCtx registers a GET route with a context-aware handler.
-// Compatibility adapter: prefer Get with http.HandlerFunc for new code.
+//
+// Deprecated: use Get with http.HandlerFunc for new code.
 func (a *App) GetCtx(path string, handler contract.CtxHandlerFunc) {
 	a.registerCtxRoute(router.GET, path, handler)
 }
 
 // PostCtx registers a POST route with a context-aware handler.
-// Compatibility adapter: prefer Post with http.HandlerFunc for new code.
+//
+// Deprecated: use Post with http.HandlerFunc for new code.
 func (a *App) PostCtx(path string, handler contract.CtxHandlerFunc) {
 	a.registerCtxRoute(router.POST, path, handler)
 }
 
 // PutCtx registers a PUT route with a context-aware handler.
-// Compatibility adapter: prefer Put with http.HandlerFunc for new code.
+//
+// Deprecated: use Put with http.HandlerFunc for new code.
 func (a *App) PutCtx(path string, handler contract.CtxHandlerFunc) {
 	a.registerCtxRoute(router.PUT, path, handler)
 }
 
 // DeleteCtx registers a DELETE route with a context-aware handler.
-// Compatibility adapter: prefer Delete with http.HandlerFunc for new code.
+//
+// Deprecated: use Delete with http.HandlerFunc for new code.
 func (a *App) DeleteCtx(path string, handler contract.CtxHandlerFunc) {
 	a.registerCtxRoute(router.DELETE, path, handler)
 }
 
 // PatchCtx registers a PATCH route with a context-aware handler.
-// Compatibility adapter: prefer Patch with http.HandlerFunc for new code.
+//
+// Deprecated: use Patch with http.HandlerFunc for new code.
 func (a *App) PatchCtx(path string, handler contract.CtxHandlerFunc) {
 	a.registerCtxRoute(router.PATCH, path, handler)
 }
 
 // AnyCtx registers a route for any HTTP method with a context-aware handler.
-// Compatibility adapter: prefer Any with http.HandlerFunc for new code.
+//
+// Deprecated: use Any with http.HandlerFunc for new code.
 func (a *App) AnyCtx(path string, handler contract.CtxHandlerFunc) {
 	a.registerCtxRoute(router.ANY, path, handler)
 }
@@ -157,37 +163,43 @@ func (a *App) AnyCtx(path string, handler contract.CtxHandlerFunc) {
 // =========================================================
 
 // GetHandler registers a GET route with an http.Handler.
-// Compatibility adapter: prefer Get with http.HandlerFunc for new code.
+//
+// Deprecated: use Get with http.HandlerFunc for new code.
 func (a *App) GetHandler(path string, handler router.Handler) {
 	a.registerRoute(router.GET, path, handler)
 }
 
 // PostHandler registers a POST route with an http.Handler.
-// Compatibility adapter: prefer Post with http.HandlerFunc for new code.
+//
+// Deprecated: use Post with http.HandlerFunc for new code.
 func (a *App) PostHandler(path string, handler router.Handler) {
 	a.registerRoute(router.POST, path, handler)
 }
 
 // PutHandler registers a PUT route with an http.Handler.
-// Compatibility adapter: prefer Put with http.HandlerFunc for new code.
+//
+// Deprecated: use Put with http.HandlerFunc for new code.
 func (a *App) PutHandler(path string, handler router.Handler) {
 	a.registerRoute(router.PUT, path, handler)
 }
 
 // DeleteHandler registers a DELETE route with an http.Handler.
-// Compatibility adapter: prefer Delete with http.HandlerFunc for new code.
+//
+// Deprecated: use Delete with http.HandlerFunc for new code.
 func (a *App) DeleteHandler(path string, handler router.Handler) {
 	a.registerRoute(router.DELETE, path, handler)
 }
 
 // PatchHandler registers a PATCH route with an http.Handler.
-// Compatibility adapter: prefer Patch with http.HandlerFunc for new code.
+//
+// Deprecated: use Patch with http.HandlerFunc for new code.
 func (a *App) PatchHandler(path string, handler router.Handler) {
 	a.registerRoute(router.PATCH, path, handler)
 }
 
 // AnyHandler registers a route for any HTTP method with an http.Handler.
-// Compatibility adapter: prefer Any with http.HandlerFunc for new code.
+//
+// Deprecated: use Any with http.HandlerFunc for new code.
 func (a *App) AnyHandler(path string, handler router.Handler) {
 	a.registerRoute(router.ANY, path, handler)
 }
