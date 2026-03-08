@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -176,6 +175,7 @@ func toBool(value any, defaultValue bool) bool {
 }
 
 // parseBool parses a string to bool with common true/false representations.
+// Returns defaultValue for unrecognised strings.
 func parseBool(value string, defaultValue bool) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "1", "true", "yes", "y", "on", "t":
@@ -184,6 +184,18 @@ func parseBool(value string, defaultValue bool) bool {
 		return false
 	default:
 		return defaultValue
+	}
+}
+
+// parseBoolErr is the error-returning variant of parseBool used by setField.
+func parseBoolErr(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on", "t":
+		return true, nil
+	case "0", "false", "no", "n", "off", "f":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value: %q", value)
 	}
 }
 
@@ -241,12 +253,12 @@ func parseEnvLine(line string) (key, value string, ok bool) {
 
 	value = strings.TrimSpace(line[idx+1:])
 
-	// Strip surrounding quotes and unescape inner escaped quotes
+	// Strip surrounding quotes and unescape inner escaped quotes.
 	if len(value) >= 2 {
 		q := value[0]
 		if (q == '"' || q == '\'') && value[len(value)-1] == q {
 			value = value[1 : len(value)-1]
-			value = strings.ReplaceAll(value, fmt.Sprintf("\\%c", q), string(q))
+			value = strings.ReplaceAll(value, string([]byte{'\\', q}), string(q))
 		}
 	}
 
@@ -276,6 +288,18 @@ func toSnakeCase(s string) string {
 		return s
 	}
 
+	// Fast path: if no uppercase letters are present, no transformation is needed.
+	hasUpper := false
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 'A' && s[i] <= 'Z' {
+			hasUpper = true
+			break
+		}
+	}
+	if !hasUpper {
+		return s
+	}
+
 	runes := []rune(s)
 	n := len(runes)
 	var result []rune
@@ -302,31 +326,35 @@ func toSnakeCase(s string) string {
 }
 
 // normalizeData normalizes all keys in a configuration map.
+// When a logger is provided, any keys that collide after normalization are warned about.
+// Later entries in the iteration overwrite earlier ones on collision (last-write wins).
 func normalizeData(data map[string]any, logger log.StructuredLogger) map[string]any {
 	if len(data) == 0 {
 		return map[string]any{}
 	}
 
-	keys := make([]string, 0, len(data))
-	for key := range data {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
 	normalized := make(map[string]any, len(data))
-	seen := make(map[string][]string, len(data))
 
-	for _, key := range keys {
+	// origins is allocated lazily only when a logger is present; it records
+	// all original keys that map to each normalized key for collision reporting.
+	var origins map[string][]string
+	if logger != nil {
+		origins = make(map[string][]string, len(data))
+	}
+
+	for key, value := range data {
 		norm := normalizeKey(key)
 		if norm == "" {
 			continue
 		}
-		seen[norm] = append(seen[norm], key)
-		normalized[norm] = data[key]
+		normalized[norm] = value
+		if origins != nil {
+			origins[norm] = append(origins[norm], key)
+		}
 	}
 
 	if logger != nil {
-		for norm, originals := range seen {
+		for norm, originals := range origins {
 			if len(originals) > 1 {
 				logger.Warn("Config key collision after normalization", log.Fields{
 					"key":       norm,
@@ -339,22 +367,17 @@ func normalizeData(data map[string]any, logger log.StructuredLogger) map[string]
 	return normalized
 }
 
-// lookupValue looks up a configuration value with key normalization.
+// lookupValue looks up a configuration value by normalizing the key to snake_case.
+// All keys in the data map are stored normalized (via normalizeData), so only
+// the normalized form needs to be checked.
 func lookupValue(data map[string]any, key string) (any, bool) {
 	if len(data) == 0 {
 		return nil, false
 	}
-
 	normalized := normalizeKey(key)
-	if normalized != "" {
-		if value, exists := data[normalized]; exists {
-			return value, true
-		}
+	if normalized == "" {
+		return nil, false
 	}
-
-	if value, exists := data[key]; exists {
-		return value, true
-	}
-
-	return nil, false
+	value, exists := data[normalized]
+	return value, exists
 }

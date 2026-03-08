@@ -76,65 +76,11 @@ func (m *Manager) AddSource(source Source) error {
 	return nil
 }
 
-// Load loads configuration from all sources.
-func (m *Manager) Load(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	sources, err := m.snapshotSources()
-	if err != nil {
-		return err
-	}
-
-	allSourceData := make(map[string]map[string]any, len(sources))
-	data := make(map[string]any)
-	for _, source := range sources {
-		sd, err := source.Load(ctx)
-		if err != nil {
-			m.logger.Error("Failed to load configuration", log.Fields{
-				"source": source.Name(),
-				"error":  err,
-			})
-			return fmt.Errorf("failed to load from source %s: %w", source.Name(), err)
-		}
-
-		normalized := normalizeData(sd, m.logger)
-		allSourceData[source.Name()] = normalized
-		for key, value := range normalized {
-			data[key] = value
-		}
-
-		m.logger.Info("Loaded configuration", log.Fields{
-			"source": source.Name(),
-			"keys":   len(normalized),
-		})
-	}
-
-	m.mu.Lock()
-	if m.ctx.Err() != nil {
-		m.mu.Unlock()
-		return errConfigClosed
-	}
-	m.data = data
-	m.sourceData = allSourceData
-	m.mu.Unlock()
-
-	return nil
-}
-
-// LoadBestEffort loads configuration from all sources, skipping failures.
-// It returns an error only if all sources fail.
-func (m *Manager) LoadBestEffort(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	sources, err := m.snapshotSources()
-	if err != nil {
-		return err
-	}
-
+// loadSources loads configuration from all given sources.
+// If bestEffort is true, individual source errors are logged and skipped;
+// an error is returned only when every source fails.
+// If bestEffort is false, the first source error aborts and is returned.
+func (m *Manager) loadSources(ctx context.Context, sources []Source, bestEffort bool) (map[string]any, map[string]map[string]any, error) {
 	allSourceData := make(map[string]map[string]any, len(sources))
 	data := make(map[string]any)
 	loaded := 0
@@ -143,11 +89,14 @@ func (m *Manager) LoadBestEffort(ctx context.Context) error {
 	for _, source := range sources {
 		sd, err := source.Load(ctx)
 		if err != nil {
-			lastErr = err
 			m.logger.Error("Failed to load configuration", log.Fields{
 				"source": source.Name(),
 				"error":  err,
 			})
+			if !bestEffort {
+				return nil, nil, fmt.Errorf("failed to load from source %s: %w", source.Name(), err)
+			}
+			lastErr = err
 			continue
 		}
 
@@ -164,8 +113,59 @@ func (m *Manager) LoadBestEffort(ctx context.Context) error {
 		})
 	}
 
-	if loaded == 0 && lastErr != nil {
-		return fmt.Errorf("failed to load any configuration sources: %w", lastErr)
+	if bestEffort && loaded == 0 && lastErr != nil {
+		return nil, nil, fmt.Errorf("failed to load any configuration sources: %w", lastErr)
+	}
+
+	return data, allSourceData, nil
+}
+
+// Load loads configuration from all sources.
+// This is a pure load operation — it does NOT notify watchers.
+// Use Reload to load and notify watchers of changes.
+func (m *Manager) Load(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	sources, err := m.snapshotSources()
+	if err != nil {
+		return err
+	}
+
+	data, allSourceData, err := m.loadSources(ctx, sources, false)
+	if err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	if m.ctx.Err() != nil {
+		m.mu.Unlock()
+		return errConfigClosed
+	}
+	m.data = data
+	m.sourceData = allSourceData
+	m.mu.Unlock()
+
+	return nil
+}
+
+// LoadBestEffort loads configuration from all sources, skipping failures.
+// It returns an error only if all sources fail.
+// This is a pure load operation — it does NOT notify watchers.
+func (m *Manager) LoadBestEffort(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	sources, err := m.snapshotSources()
+	if err != nil {
+		return err
+	}
+
+	data, allSourceData, err := m.loadSources(ctx, sources, true)
+	if err != nil {
+		return err
 	}
 
 	m.mu.Lock()
@@ -395,10 +395,6 @@ func (m *Manager) Watch(key string, callback WatcherCallback) error {
 		key = normalizeKey(key)
 	}
 
-	if _, exists := m.watchers[key]; !exists {
-		m.watchers[key] = make([]WatcherCallback, 0)
-	}
-
 	m.watchers[key] = append(m.watchers[key], callback)
 	return nil
 }
@@ -456,6 +452,73 @@ func (m *Manager) StartWatchers(ctx context.Context) error {
 	return nil
 }
 
+// mergeAllSources re-merges all tracked source snapshots in source-declaration order
+// (later sources win). Unregistered sources are merged last.
+// Must be called with m.mu held (at least read-locked; safe under write lock too).
+func (m *Manager) mergeAllSources() map[string]any {
+	merged := make(map[string]any)
+	seen := make(map[string]bool, len(m.sources))
+	for _, src := range m.sources {
+		seen[src.Name()] = true
+		for k, v := range m.sourceData[src.Name()] {
+			merged[k] = v
+		}
+	}
+	// Include snapshots from sources not formally registered (e.g. direct test calls)
+	for name, data := range m.sourceData {
+		if !seen[name] {
+			for k, v := range data {
+				merged[k] = v
+			}
+		}
+	}
+	return merged
+}
+
+// detectAndNotify computes changed keys between oldData and newData, copies
+// watcher callbacks under RLock, then fires them outside any lock.
+// Returns the number of changed keys.
+func (m *Manager) detectAndNotify(oldData, newData map[string]any) int {
+	changes := make(map[string]struct{})
+	oldValues := make(map[string]any)
+
+	for key, newVal := range newData {
+		if oldVal, exists := oldData[key]; !exists || !valuesEqual(oldVal, newVal) {
+			changes[key] = struct{}{}
+			oldValues[key] = oldVal
+		}
+	}
+	for key, oldVal := range oldData {
+		if _, stillPresent := newData[key]; !stillPresent {
+			changes[key] = struct{}{}
+			oldValues[key] = oldVal
+		}
+	}
+
+	if len(changes) == 0 {
+		return 0
+	}
+
+	m.mu.RLock()
+	if len(m.watchers) == 0 {
+		m.mu.RUnlock()
+		return len(changes)
+	}
+	keyWatchers := make(map[string][]WatcherCallback, len(changes))
+	for key := range changes {
+		if cbs, exists := m.watchers[key]; exists && len(cbs) > 0 {
+			copied := make([]WatcherCallback, len(cbs))
+			copy(copied, cbs)
+			keyWatchers[key] = copied
+		}
+	}
+	globalWatchers := append([]WatcherCallback(nil), m.watchers["*"]...)
+	m.mu.RUnlock()
+
+	m.notifyWatchers(changes, oldValues, newData, keyWatchers, globalWatchers)
+	return len(changes)
+}
+
 // handleSourceUpdate handles configuration updates from a source.
 // It re-merges all known source data so that keys removed from the updated
 // source are also removed from the effective configuration (no stale keys).
@@ -463,85 +526,25 @@ func (m *Manager) handleSourceUpdate(sourceName string, newData map[string]any) 
 	newData = normalizeData(newData, m.logger)
 
 	m.mu.Lock()
-
-	// Update this source's snapshot
 	m.sourceData[sourceName] = newData
-
-	// Re-merge: registered sources in declaration order (last wins), then any
-	// unregistered sources (e.g. from direct handleSourceUpdate calls in tests).
-	merged := make(map[string]any)
-	registered := make(map[string]bool, len(m.sources))
-	for _, src := range m.sources {
-		registered[src.Name()] = true
-		for key, value := range m.sourceData[src.Name()] {
-			merged[key] = value
-		}
-	}
-	// Include snapshots from sources not in m.sources
-	for name, data := range m.sourceData {
-		if !registered[name] {
-			for key, value := range data {
-				merged[key] = value
-			}
-		}
-	}
-
-	// Detect changes against current effective data
-	changes := make(map[string]struct{})
-	oldValues := make(map[string]any)
-
-	for key, newValue := range merged {
-		oldValue, exists := m.data[key]
-		if !exists || !valuesEqual(oldValue, newValue) {
-			changes[key] = struct{}{}
-			oldValues[key] = oldValue
-		}
-	}
-	// Detect keys that were removed entirely
-	for key, oldValue := range m.data {
-		if _, stillPresent := merged[key]; !stillPresent {
-			changes[key] = struct{}{}
-			oldValues[key] = oldValue
-		}
-	}
-
+	merged := m.mergeAllSources()
+	oldData := m.data
 	m.data = merged
+	m.mu.Unlock()
 
-	if len(changes) > 0 {
-		keyWatchers := make(map[string][]WatcherCallback, len(changes))
-		for key := range changes {
-			if watchers, exists := m.watchers[key]; exists && len(watchers) > 0 {
-				copied := make([]WatcherCallback, len(watchers))
-				copy(copied, watchers)
-				keyWatchers[key] = copied
-			}
-		}
-		globalWatchers := append([]WatcherCallback(nil), m.watchers["*"]...)
-		m.mu.Unlock()
-
-		m.notifyWatchers(changes, oldValues, merged, keyWatchers, globalWatchers)
+	if n := m.detectAndNotify(oldData, merged); n > 0 {
 		m.logger.Info("Configuration updated", log.Fields{
 			"source":  sourceName,
-			"changes": len(changes),
+			"changes": n,
 		})
-		return
 	}
-
-	m.mu.Unlock()
 }
 
-// notifyWatchers notifies all registered watchers of configuration changes.
-func (m *Manager) notifyWatchers(changes map[string]struct{}, oldValues map[string]any, newData map[string]any, keyWatchers map[string][]WatcherCallback, globalWatchers []WatcherCallback) {
+// notifyWatchers fires per-key and global watcher callbacks outside any lock.
+func (m *Manager) notifyWatchers(changes map[string]struct{}, oldValues, newData map[string]any, keyWatchers map[string][]WatcherCallback, globalWatchers []WatcherCallback) {
 	for key := range changes {
-		watchers := keyWatchers[key]
-		if len(watchers) == 0 {
-			continue
-		}
-		oldValue := oldValues[key]
-		newValue := newData[key]
-
-		for _, callback := range watchers {
-			m.callWatcher(callback, oldValue, newValue)
+		for _, cb := range keyWatchers[key] {
+			m.callWatcher(cb, oldValues[key], newData[key])
 		}
 	}
 
@@ -549,13 +552,13 @@ func (m *Manager) notifyWatchers(changes map[string]struct{}, oldValues map[stri
 		return
 	}
 
-	dataSnapshot := make(map[string]any, len(newData))
-	for key, value := range newData {
-		dataSnapshot[key] = value
+	// Shallow-copy newData for global watchers to prevent mutation by callbacks.
+	snapshot := make(map[string]any, len(newData))
+	for k, v := range newData {
+		snapshot[k] = v
 	}
-
-	for _, callback := range globalWatchers {
-		m.callWatcher(callback, nil, dataSnapshot)
+	for _, cb := range globalWatchers {
+		m.callWatcher(cb, nil, snapshot)
 	}
 }
 
@@ -570,21 +573,14 @@ func (m *Manager) callWatcher(callback WatcherCallback, old, new any) {
 	callback(old, new)
 }
 
-// Reload reloads configuration from all sources.
+// Reload reloads configuration from all sources and notifies registered watchers
+// of any changes. Use Load when watcher notification is not desired.
 func (m *Manager) Reload(ctx context.Context) error {
-	return m.Load(ctx)
-}
-
-// ReloadWithValidation reloads configuration and validates before committing.
-func (m *Manager) ReloadWithValidation(ctx context.Context, validate func(map[string]any) error) error {
-	if validate == nil {
-		return m.Reload(ctx)
-	}
-
+	// Snapshot old data before loading
 	m.mu.RLock()
-	snapshot := make(map[string]any, len(m.data))
-	for key, value := range m.data {
-		snapshot[key] = value
+	oldData := make(map[string]any, len(m.data))
+	for k, v := range m.data {
+		oldData[k] = v
 	}
 	m.mu.RUnlock()
 
@@ -593,19 +589,63 @@ func (m *Manager) ReloadWithValidation(ctx context.Context, validate func(map[st
 	}
 
 	m.mu.RLock()
-	data := make(map[string]any, len(m.data))
-	for key, value := range m.data {
-		data[key] = value
+	newData := m.data
+	m.mu.RUnlock()
+
+	m.detectAndNotify(oldData, newData)
+	return nil
+}
+
+// ReloadWithValidation reloads configuration, validates the new values, and
+// only commits + notifies watchers if validation passes.
+// On validation failure the previous configuration (data and sourceData) is restored.
+func (m *Manager) ReloadWithValidation(ctx context.Context, validate func(map[string]any) error) error {
+	if validate == nil {
+		return m.Reload(ctx)
+	}
+
+	// Snapshot current state (data + per-source snapshots) for rollback
+	m.mu.RLock()
+	oldData := make(map[string]any, len(m.data))
+	for k, v := range m.data {
+		oldData[k] = v
+	}
+	oldSourceData := make(map[string]map[string]any, len(m.sourceData))
+	for name, sd := range m.sourceData {
+		cp := make(map[string]any, len(sd))
+		for k, v := range sd {
+			cp[k] = v
+		}
+		oldSourceData[name] = cp
 	}
 	m.mu.RUnlock()
 
-	if err := validate(data); err != nil {
+	// Load new config (does NOT notify watchers)
+	if err := m.Load(ctx); err != nil {
+		return err
+	}
+
+	// Read new data for validation (copy to prevent mutation by validator)
+	m.mu.RLock()
+	newData := m.data
+	m.mu.RUnlock()
+
+	validationInput := make(map[string]any, len(newData))
+	for k, v := range newData {
+		validationInput[k] = v
+	}
+
+	if err := validate(validationInput); err != nil {
+		// Rollback both data and sourceData
 		m.mu.Lock()
-		m.data = snapshot
+		m.data = oldData
+		m.sourceData = oldSourceData
 		m.mu.Unlock()
 		return err
 	}
 
+	// Commit succeeded — notify watchers
+	m.detectAndNotify(oldData, newData)
 	return nil
 }
 
@@ -625,19 +665,27 @@ func (m *Manager) Close() error {
 }
 
 // Unmarshal populates a struct with configuration values.
+// It copies the configuration map under a short read-lock, then performs the
+// reflection-based population lock-free to minimise lock contention.
 func (m *Manager) Unmarshal(dst any) error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	val := reflect.ValueOf(dst)
 	if val.Kind() != reflect.Ptr || val.IsNil() {
 		return fmt.Errorf("dst must be a non-nil pointer")
 	}
 
-	return m.unmarshalValue(val.Elem())
+	// Copy data under RLock to avoid holding the lock during reflection.
+	m.mu.RLock()
+	data := make(map[string]any, len(m.data))
+	for k, v := range m.data {
+		data[k] = v
+	}
+	m.mu.RUnlock()
+
+	return unmarshalValue(data, val.Elem())
 }
 
-func (m *Manager) unmarshalValue(val reflect.Value) error {
+// unmarshalValue recursively populates a struct from the provided data map.
+func unmarshalValue(data map[string]any, val reflect.Value) error {
 	if val.Kind() != reflect.Struct {
 		return fmt.Errorf("dst must point to a struct")
 	}
@@ -653,18 +701,21 @@ func (m *Manager) unmarshalValue(val reflect.Value) error {
 			continue
 		}
 
+		// Recurse into embedded/nested structs (but not time.Time)
 		if fieldValue.Kind() == reflect.Struct && fieldValue.Type() != timeType {
-			if err := m.unmarshalValue(fieldValue); err != nil {
+			if err := unmarshalValue(data, fieldValue); err != nil {
 				return err
 			}
 			continue
 		}
 
-		if fieldValue.Kind() == reflect.Ptr && fieldValue.Type().Elem().Kind() == reflect.Struct && fieldValue.Type().Elem() != timeType {
+		if fieldValue.Kind() == reflect.Ptr &&
+			fieldValue.Type().Elem().Kind() == reflect.Struct &&
+			fieldValue.Type().Elem() != timeType {
 			if fieldValue.IsNil() {
 				fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
 			}
-			if err := m.unmarshalValue(fieldValue.Elem()); err != nil {
+			if err := unmarshalValue(data, fieldValue.Elem()); err != nil {
 				return err
 			}
 			continue
@@ -675,8 +726,8 @@ func (m *Manager) unmarshalValue(val reflect.Value) error {
 			key = field.Name
 		}
 
-		if value, exists := lookupValue(m.data, key); exists {
-			if err := m.setField(fieldValue, value); err != nil {
+		if value, exists := lookupValue(data, key); exists {
+			if err := setField(fieldValue, value); err != nil {
 				return fmt.Errorf("failed to set field %s: %w", field.Name, err)
 			}
 		}
@@ -685,40 +736,74 @@ func (m *Manager) unmarshalValue(val reflect.Value) error {
 	return nil
 }
 
-// setField sets a field value based on its type.
-func (m *Manager) setField(fieldValue reflect.Value, value any) error {
+var durationType = reflect.TypeOf(time.Duration(0))
+
+// setField sets a struct field value from a raw configuration value.
+// Supports: string, all int/uint sizes, float32/64, bool, time.Duration, []string.
+func setField(fieldValue reflect.Value, value any) error {
 	strValue := toString(value)
+
+	// Handle time.Duration before the generic int64 case.
+	if fieldValue.Type() == durationType {
+		d, err := time.ParseDuration(strValue)
+		if err != nil {
+			// Fallback: treat as milliseconds
+			ms, err2 := strconv.ParseInt(strValue, 10, 64)
+			if err2 != nil {
+				return fmt.Errorf("cannot parse %q as duration or milliseconds: %w", strValue, err)
+			}
+			fieldValue.SetInt(int64(time.Duration(ms) * time.Millisecond))
+		} else {
+			fieldValue.SetInt(int64(d))
+		}
+		return nil
+	}
 
 	switch fieldValue.Kind() {
 	case reflect.String:
 		fieldValue.SetString(strValue)
+
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		intValue, err := strconv.ParseInt(strValue, 10, 64)
 		if err != nil {
 			return err
 		}
 		fieldValue.SetInt(intValue)
+
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		uintValue, err := strconv.ParseUint(strValue, 10, 64)
 		if err != nil {
 			return err
 		}
 		fieldValue.SetUint(uintValue)
+
 	case reflect.Float32, reflect.Float64:
 		floatValue, err := strconv.ParseFloat(strValue, 64)
 		if err != nil {
 			return err
 		}
 		fieldValue.SetFloat(floatValue)
+
 	case reflect.Bool:
-		switch strings.ToLower(strValue) {
-		case "1", "true", "yes", "y", "on", "t":
-			fieldValue.SetBool(true)
-		case "0", "false", "no", "n", "off", "f":
-			fieldValue.SetBool(false)
-		default:
-			return fmt.Errorf("invalid boolean value: %s", strValue)
+		bv, err := parseBoolErr(strValue)
+		if err != nil {
+			return err
 		}
+		fieldValue.SetBool(bv)
+
+	case reflect.Slice:
+		if fieldValue.Type().Elem().Kind() != reflect.String {
+			return fmt.Errorf("unsupported slice element type: %v", fieldValue.Type().Elem())
+		}
+		parts := strings.Split(strValue, ",")
+		slice := reflect.MakeSlice(fieldValue.Type(), 0, len(parts))
+		for _, p := range parts {
+			if s := strings.TrimSpace(p); s != "" {
+				slice = reflect.Append(slice, reflect.ValueOf(s))
+			}
+		}
+		fieldValue.Set(slice)
+
 	default:
 		return fmt.Errorf("unsupported field type: %v", fieldValue.Kind())
 	}
