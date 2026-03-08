@@ -1,6 +1,6 @@
 # Cron Jobs
 
-> **Package**: `github.com/spcent/plumego/scheduler` | **Feature**: Recurring tasks
+> **Package**: `github.com/spcent/plumego/net/scheduler` | **Feature**: Recurring tasks
 
 ## Overview
 
@@ -19,7 +19,7 @@ Cron jobs enable recurring task execution using cron expressions. The scheduler 
 ### Basic Cron Job
 
 ```go
-import "github.com/spcent/plumego/scheduler"
+import "github.com/spcent/plumego/net/scheduler"
 
 sch := scheduler.New(scheduler.WithWorkers(4))
 sch.Start()

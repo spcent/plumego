@@ -1,6 +1,6 @@
 # Scheduler Examples
 
-> **Package**: `github.com/spcent/plumego/scheduler` | **Complete working examples**
+> **Package**: `github.com/spcent/plumego/net/scheduler` | **Complete working examples**
 
 ## Overview
 
@@ -19,7 +19,7 @@ import (
     "log"
     "time"
 
-    "github.com/spcent/plumego/scheduler"
+    "github.com/spcent/plumego/net/scheduler"
     "github.com/spcent/plumego/core"
 )
 
@@ -168,7 +168,7 @@ import (
     "sync"
     "time"
 
-    "github.com/spcent/plumego/scheduler"
+    "github.com/spcent/plumego/net/scheduler"
 )
 
 type EmailService struct {
@@ -293,7 +293,7 @@ import (
     "net/http"
     "time"
 
-    "github.com/spcent/plumego/scheduler"
+    "github.com/spcent/plumego/net/scheduler"
 )
 
 type WebhookDelivery struct {
@@ -458,7 +458,7 @@ import (
     "log"
     "time"
 
-    "github.com/spcent/plumego/scheduler"
+    "github.com/spcent/plumego/net/scheduler"
 )
 
 type Priority int
@@ -557,7 +557,7 @@ import (
     "sync"
     "time"
 
-    "github.com/spcent/plumego/scheduler"
+    "github.com/spcent/plumego/net/scheduler"
 )
 
 type BatchProcessor struct {

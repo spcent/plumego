@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/net/mq/store"
+	"github.com/spcent/plumego/net/scheduler"
 	"github.com/spcent/plumego/pubsub"
-	"github.com/spcent/plumego/scheduler"
 )
 
 // --- mock providers ---

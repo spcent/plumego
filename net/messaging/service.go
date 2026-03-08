@@ -12,9 +12,9 @@ import (
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/net/mq"
 	"github.com/spcent/plumego/net/mq/store"
+	"github.com/spcent/plumego/net/scheduler"
 	webhookout "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
-	"github.com/spcent/plumego/scheduler"
 	"github.com/spcent/plumego/security/input"
 )
 

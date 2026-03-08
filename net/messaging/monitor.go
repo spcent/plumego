@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/scheduler"
+	"github.com/spcent/plumego/net/scheduler"
 )
 
 // ChannelState describes the current health of a delivery channel.

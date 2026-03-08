@@ -1,6 +1,6 @@
 # Retry Policies
 
-> **Package**: `github.com/spcent/plumego/scheduler` | **Feature**: Automatic retry with backoff
+> **Package**: `github.com/spcent/plumego/net/scheduler` | **Feature**: Automatic retry with backoff
 
 ## Overview
 
@@ -18,7 +18,7 @@ Retry policies enable automatic retry of failed tasks with configurable backoff 
 ### Basic Retry
 
 ```go
-import "github.com/spcent/plumego/scheduler"
+import "github.com/spcent/plumego/net/scheduler"
 
 // Retry with exponential backoff: 1s, 2s, 4s, 8s, 16s (max 5 attempts)
 sch.Delay(

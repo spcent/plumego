@@ -1,6 +1,6 @@
 # Delayed Tasks
 
-> **Package**: `github.com/spcent/plumego/scheduler` | **Feature**: Future task execution
+> **Package**: `github.com/spcent/plumego/net/scheduler` | **Feature**: Future task execution
 
 ## Overview
 
@@ -19,7 +19,7 @@ Delayed tasks allow scheduling work for execution after a specified delay. This 
 ### Basic Delayed Task
 
 ```go
-import "github.com/spcent/plumego/scheduler"
+import "github.com/spcent/plumego/net/scheduler"
 
 sch := scheduler.New(scheduler.WithWorkers(4))
 sch.Start()
