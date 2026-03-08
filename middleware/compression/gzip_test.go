@@ -19,13 +19,13 @@ func TestGzip_SmallResponse(t *testing.T) {
 		w.Write([]byte("Hello World"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -62,13 +62,13 @@ func TestGzip_LargeResponse(t *testing.T) {
 		w.Write([]byte(largeData))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -86,7 +86,7 @@ func TestGzip_SkipWebSocket(t *testing.T) {
 		w.Write([]byte("upgrade"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -94,7 +94,7 @@ func TestGzip_SkipWebSocket(t *testing.T) {
 	req.Header.Set("Upgrade", "websocket")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusSwitchingProtocols {
 		t.Fatalf("expected status %d, got %d", http.StatusSwitchingProtocols, rr.Code)
@@ -117,14 +117,14 @@ func TestGzip_SkipSSE(t *testing.T) {
 		w.Write([]byte("data: hello\n\n"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	req.Header.Set("Accept", "text/event-stream")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -159,13 +159,13 @@ func TestGzip_SkipBinaryContent(t *testing.T) {
 				w.Write(tc.data)
 			}
 
-			wrapped := middleware.ApplyFunc(handler, Gzip())
+			wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set("Accept-Encoding", "gzip")
 			rr := httptest.NewRecorder()
 
-			wrapped(rr, req)
+			wrapped.ServeHTTP(rr, req)
 
 			if rr.Header().Get("Content-Encoding") == "gzip" {
 				t.Fatalf("%s should not be compressed", tc.contentType)
@@ -187,13 +187,13 @@ func TestGzip_SkipAlreadyCompressed(t *testing.T) {
 		w.Write([]byte("already compressed"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -216,13 +216,13 @@ func TestGzip_SkipNoAcceptEncoding(t *testing.T) {
 		w.Write([]byte("Hello World"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// No Accept-Encoding header
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -245,13 +245,13 @@ func TestGzip_SkipErrorResponses(t *testing.T) {
 		w.Write([]byte("Error"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
@@ -275,13 +275,13 @@ func TestGzip_CustomMaxBuffer(t *testing.T) {
 	}
 
 	cfg := GzipConfig{MaxBufferBytes: 5} // Only compress if <= 5 bytes
-	wrapped := middleware.ApplyFunc(handler, GzipWithConfig(cfg))
+	wrapped := middleware.Apply(http.HandlerFunc(handler), GzipWithConfig(cfg))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -305,13 +305,13 @@ func TestGzip_VaryHeader(t *testing.T) {
 		w.Write([]byte("Hello World"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Header().Get("Vary") != "Accept-Encoding" {
 		t.Fatalf("expected Vary: Accept-Encoding, got %q", rr.Header().Get("Vary"))
@@ -324,13 +324,13 @@ func TestGzip_EmptyResponse(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rr.Code)
@@ -350,13 +350,13 @@ func TestGzip_ChunkedWrite(t *testing.T) {
 
 	// Use a custom config with a small max buffer to trigger chunked writing
 	cfg := GzipConfig{MaxBufferBytes: 1 << 20} // 1MB max buffer
-	wrapped := middleware.ApplyFunc(handler, GzipWithConfig(cfg))
+	wrapped := middleware.Apply(http.HandlerFunc(handler), GzipWithConfig(cfg))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
@@ -389,7 +389,7 @@ func TestGzip_ErrorHandling(t *testing.T) {
 
 	// Use a custom config with a small max buffer
 	cfg := GzipConfig{MaxBufferBytes: 1 << 20} // 1MB max buffer
-	wrapped := middleware.ApplyFunc(handler, GzipWithConfig(cfg))
+	wrapped := middleware.Apply(http.HandlerFunc(handler), GzipWithConfig(cfg))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -403,7 +403,7 @@ func TestGzip_ErrorHandling(t *testing.T) {
 		failAfter:      1 << 20, // Fail after 1MB
 	}
 
-	wrapped(errorWriter, req)
+	wrapped.ServeHTTP(errorWriter, req)
 
 	// The handler should handle the error gracefully
 	// We're mainly testing that the error doesn't cause a panic

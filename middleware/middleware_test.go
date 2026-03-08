@@ -6,70 +6,7 @@ import (
 	"testing"
 )
 
-func TestChain(t *testing.T) {
-	// Create test middleware that adds a header
-	addHeader := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Test", "chain")
-			next.ServeHTTP(w, r)
-		})
-	}
-
-	// Create chain with multiple middlewares
-	chain := NewChain(addHeader)
-
-	// Test Apply with http.Handler
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	wrapped := chain.Apply(handler)
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", rr.Code)
-	}
-	if rr.Header().Get("X-Test") != "chain" {
-		t.Error("expected X-Test header to be set")
-	}
-}
-
-func TestChainApplyFunc(t *testing.T) {
-	addHeader := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Test", "func")
-			next.ServeHTTP(w, r)
-		})
-	}
-
-	chain := NewChain(addHeader)
-
-	// Test ApplyFunc
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	}
-
-	wrapped := chain.ApplyFunc(handler)
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", rr.Code)
-	}
-	if rr.Header().Get("X-Test") != "func" {
-		t.Error("expected X-Test header to be set")
-	}
-}
-
 func TestApply(t *testing.T) {
-	// Test with http.HandlerFunc
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -92,80 +29,13 @@ func TestApply(t *testing.T) {
 	}
 }
 
-func TestApplyMultiple(t *testing.T) {
-	// Test with multiple middlewares
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	mw1 := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-MW1", "true")
-			next.ServeHTTP(w, r)
-		})
-	}
-
-	mw2 := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-MW2", "true")
-			next.ServeHTTP(w, r)
-		})
-	}
-
-	wrapped := Apply(handler, mw1, mw2)
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
-
-	if rr.Header().Get("X-MW1") != "true" {
-		t.Error("expected X-MW1 header to be set")
-	}
-	if rr.Header().Get("X-MW2") != "true" {
-		t.Error("expected X-MW2 header to be set")
-	}
-}
-
-func TestNewChain(t *testing.T) {
-	// Test creating a chain with multiple middlewares
-	mw1 := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-MW1", "true")
-			next.ServeHTTP(w, r)
-		})
-	}
-
-	mw2 := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-MW2", "true")
-			next.ServeHTTP(w, r)
-		})
-	}
-
-	chain := NewChain(mw1, mw2)
-
-	// Test Apply
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	wrapped := chain.Apply(handler)
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
-
-	if rr.Header().Get("X-MW1") != "true" {
-		t.Error("expected X-MW1 header to be set")
-	}
-	if rr.Header().Get("X-MW2") != "true" {
-		t.Error("expected X-MW2 header to be set")
-	}
-}
-
-func TestChainOrder(t *testing.T) {
+func TestApplyMultipleOrder(t *testing.T) {
 	var order []string
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+		w.WriteHeader(http.StatusOK)
+	})
 
 	mw1 := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -181,15 +51,10 @@ func TestChainOrder(t *testing.T) {
 		})
 	}
 
-	chain := NewChain(mw1, mw2)
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-		w.WriteHeader(http.StatusOK)
-	})
-
+	wrapped := Apply(handler, mw1, mw2)
 	req := httptest.NewRequest("GET", "/test", nil)
 	rr := httptest.NewRecorder()
-	chain.Apply(handler).ServeHTTP(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	expected := []string{"mw1", "mw2", "handler"}
 	if !equalStringSlice(order, expected) {
@@ -197,39 +62,46 @@ func TestChainOrder(t *testing.T) {
 	}
 }
 
-func TestChainShortCircuit(t *testing.T) {
+func TestApplyWithoutMiddlewareKeepsHandlerSemantics(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	wrapped := Apply(handler)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rr.Code)
+	}
+}
+
+func TestChainUseAfterConstruction(t *testing.T) {
 	var order []string
 
-	shortCircuit := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "short")
-			w.WriteHeader(http.StatusTeapot)
-		})
+	mw := func(name string) Middleware {
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, name)
+				next.ServeHTTP(w, r)
+			})
+		}
 	}
 
-	downstream := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "downstream")
-			next.ServeHTTP(w, r)
-		})
-	}
+	chain := NewChain(mw("a"))
+	chain.Use(mw("b"))
+	chain.Use(mw("c"))
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "handler")
-		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
-	rr := httptest.NewRecorder()
-	NewChain(shortCircuit, downstream).Apply(handler).ServeHTTP(rr, req)
+	req := httptest.NewRequest("GET", "/", nil)
+	chain.Apply(handler).ServeHTTP(httptest.NewRecorder(), req)
 
-	if rr.Code != http.StatusTeapot {
-		t.Fatalf("expected status 418, got %d", rr.Code)
-	}
-
-	expected := []string{"short"}
+	expected := []string{"a", "b", "c", "handler"}
 	if !equalStringSlice(order, expected) {
-		t.Fatalf("expected order %v, got %v", expected, order)
+		t.Fatalf("expected %v, got %v", expected, order)
 	}
 }
 
@@ -266,7 +138,6 @@ func TestRegistryLen(t *testing.T) {
 
 func TestRegistryNilSafety(t *testing.T) {
 	var reg *Registry
-	// All nil-receiver methods must not panic.
 	reg.Use(func(next http.Handler) http.Handler { return next })
 	reg.Prepend(func(next http.Handler) http.Handler { return next })
 	if reg.Len() != 0 {
@@ -274,35 +145,6 @@ func TestRegistryNilSafety(t *testing.T) {
 	}
 	if reg.Middlewares() != nil {
 		t.Fatal("nil registry Middlewares should be nil")
-	}
-}
-
-func TestChainUseAfterConstruction(t *testing.T) {
-	var order []string
-
-	mw := func(name string) Middleware {
-		return func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				order = append(order, name)
-				next.ServeHTTP(w, r)
-			})
-		}
-	}
-
-	chain := NewChain(mw("a"))
-	chain.Use(mw("b"))
-	chain.Use(mw("c"))
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-	})
-
-	req := httptest.NewRequest("GET", "/", nil)
-	chain.Apply(handler).ServeHTTP(httptest.NewRecorder(), req)
-
-	expected := []string{"a", "b", "c", "handler"}
-	if !equalStringSlice(order, expected) {
-		t.Fatalf("expected %v, got %v", expected, order)
 	}
 }
 
@@ -336,30 +178,6 @@ func TestRegistryPrependOrder(t *testing.T) {
 		t.Fatalf("expected %v, got %v", expected, order)
 	}
 }
-
-func TestFromFuncMiddleware(t *testing.T) {
-	fm := func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Func", "yes")
-			next(w, r)
-		}
-	}
-
-	mw := FromFuncMiddleware(fm)
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	req := httptest.NewRequest("GET", "/", nil)
-	rr := httptest.NewRecorder()
-	mw(handler).ServeHTTP(rr, req)
-
-	if rr.Header().Get("X-Func") != "yes" {
-		t.Error("expected X-Func header from FromFuncMiddleware")
-	}
-}
-
-// --- Benchmarks ---
 
 func noopMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -90,8 +90,7 @@ func (a *App) applyGuardrails() {
 func (a *App) buildHandler() {
 	reg := a.ensureMiddlewareRegistry()
 	r := a.ensureRouter()
-	chain := middleware.NewChain(reg.Middlewares()...)
-	handler := chain.Apply(r)
+	handler := middleware.Apply(r, reg.Middlewares()...)
 
 	a.mu.Lock()
 	a.handler = handler
@@ -169,7 +168,7 @@ func (m *metricsAdapter) Observe(ctx context.Context, metrics observability.Requ
 // Extension capability: convenience shortcut. For more control, call
 // app.Use directly with the middleware of your choice.
 func (a *App) EnableAuth() {
-	if err := a.Use(middleware.FromFuncMiddleware(auth.Auth)); err != nil {
+	if err := a.Use(auth.FromAuthMiddleware(auth.NewSimpleAuthMiddleware(""))); err != nil {
 		a.logError("EnableAuth failed", err, nil)
 	}
 }

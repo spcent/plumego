@@ -283,10 +283,16 @@ The admin handler accepts a `state` query parameter on `/scheduler/jobs` (repeat
 Plumego keeps authentication, authorization, and session validation separate through interfaces in `contract`. Compose them with middleware rather than relying on framework magic:
 
 ```go
-chain := middleware.NewChain().
-	Use(auth.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))).
-	Use(auth.SessionCheck(sessionStore, sessionValidator)).
-	Use(auth.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
+app.Use(auth.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
+app.Use(auth.SessionCheck(sessionStore, sessionValidator))
+app.Use(auth.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
+
+protected := middleware.Apply(
+	http.HandlerFunc(adminHandler),
+	auth.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)),
+	auth.SessionCheck(sessionStore, sessionValidator),
+	auth.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""),
+)
 ```
 
 The `security/jwt` package provides adapters (`jwtManager.Authenticator`, `jwt.PolicyAuthorizer`, `jwt.PermissionAuthorizer`) that implement these contracts while keeping your own storage and policy engines decoupled.
