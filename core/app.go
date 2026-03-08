@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego/core/di"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
@@ -66,9 +65,6 @@ type App struct {
 
 	shutdownHooks []ShutdownHook
 	shutdownOnce  ResettableOnce
-
-	// Dependency injection container
-	diContainer *di.DIContainer
 }
 
 // Option defines a function type for configuring the App.
@@ -102,7 +98,6 @@ func New(options ...Option) *App {
 		router:        router.NewRouter(),
 		middlewareReg: middleware.NewRegistry(),
 		logger:        log.NewGLogger(),
-		diContainer:   di.NewDIContainer(),
 	}
 
 	for _, opt := range options {
@@ -113,25 +108,7 @@ func New(options ...Option) *App {
 		app.router.SetLogger(app.logger)
 	}
 
-	// Register core services in DI container
-	app.registerCoreServices()
-
 	return app
-}
-
-// registerCoreServices registers core application services in the DI container.
-func (a *App) registerCoreServices() {
-	// Register app instance
-	a.diContainer.Register(a)
-
-	// Register router
-	a.diContainer.Register(a.router)
-
-	// Register middleware registry
-	a.diContainer.Register(a.middlewareReg)
-
-	// Register logger
-	a.diContainer.Register(a.logger)
 }
 
 // Router returns the underlying router for advanced configuration.

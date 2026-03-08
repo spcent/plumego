@@ -3,13 +3,11 @@ package core
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"reflect"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -22,48 +20,58 @@ import (
 
 // Boot initializes and starts the server.
 func (a *App) Boot() error {
+	ctx := context.Background()
+
 	if lifecycle, ok := a.logger.(log.Lifecycle); ok {
-		if err := lifecycle.Start(context.Background()); err != nil {
+		if err := lifecycle.Start(ctx); err != nil {
 			return err
 		}
-		defer lifecycle.Stop(context.Background())
+		defer lifecycle.Stop(ctx)
 	}
 
+	if err := a.runBootSequence(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *App) runBootSequence(ctx context.Context) error {
 	if err := a.loadEnv(); err != nil {
 		return err
 	}
 
-	components := a.mountComponents()
-
-	a.mu.RLock()
-	debug := a.config.Debug
-	a.mu.RUnlock()
-
-	if debug {
+	if a.isDebugEnabled() {
 		os.Setenv("APP_DEBUG", "true")
 	}
+
+	components := a.mountComponents()
 
 	if err := a.setupServer(); err != nil {
 		return err
 	}
 
-	if err := a.startComponents(context.Background(), components); err != nil {
+	if err := a.startComponents(ctx, components); err != nil {
 		return err
 	}
 
-	if err := a.startRunners(context.Background()); err != nil {
-		a.stopComponents(context.Background())
+	if err := a.startRunners(ctx); err != nil {
+		a.stopComponents(ctx)
 		return err
 	}
 
 	if err := a.startServer(); err != nil && err != http.ErrServerClosed {
-		a.stopRunners(context.Background())
-		a.stopComponents(context.Background())
-		a.runShutdownHooks(context.Background())
+		a.stopRuntime(ctx)
 		return err
 	}
 
 	return nil
+}
+
+func (a *App) isDebugEnabled() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.config.Debug
 }
 
 func (a *App) loadEnv() error {
@@ -95,26 +103,11 @@ func (a *App) loadEnv() error {
 }
 
 func (a *App) setupServer() error {
-	a.mu.RLock()
-	debug := a.config.Debug
-	addr := a.config.Addr
-	readTimeout := a.config.ReadTimeout
-	readHeaderTimeout := a.config.ReadHeaderTimeout
-	writeTimeout := a.config.WriteTimeout
-	idleTimeout := a.config.IdleTimeout
-	maxHeaderBytes := a.config.MaxHeaderBytes
-	drainInterval := a.config.DrainInterval
-	enableHTTP2 := a.config.EnableHTTP2
-	a.mu.RUnlock()
-
-	if debug {
-		os.Setenv("APP_DEBUG", "true")
-	}
-
 	a.ensureHandler()
 
 	a.mu.RLock()
 	handler := a.handler
+	cfg := a.serverRuntimeConfigLocked()
 	a.mu.RUnlock()
 
 	if handler == nil {
@@ -123,19 +116,19 @@ func (a *App) setupServer() error {
 
 	a.mu.Lock()
 	a.httpServer = &http.Server{
-		Addr:              addr,
+		Addr:              cfg.addr,
 		Handler:           handler,
-		ReadTimeout:       readTimeout,
-		ReadHeaderTimeout: readHeaderTimeout,
-		WriteTimeout:      writeTimeout,
-		IdleTimeout:       idleTimeout,
-		MaxHeaderBytes:    maxHeaderBytes,
+		ReadTimeout:       cfg.readTimeout,
+		ReadHeaderTimeout: cfg.readHeaderTimeout,
+		WriteTimeout:      cfg.writeTimeout,
+		IdleTimeout:       cfg.idleTimeout,
+		MaxHeaderBytes:    cfg.maxHeaderBytes,
 	}
 
-	a.connTracker = newConnectionTracker(a.logger, drainInterval)
+	a.connTracker = newConnectionTracker(a.logger, cfg.drainInterval)
 	a.httpServer.ConnState = a.connTracker.track
 
-	if !enableHTTP2 {
+	if !cfg.enableHTTP2 {
 		a.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))
 	}
 	a.mu.Unlock()
@@ -144,60 +137,27 @@ func (a *App) setupServer() error {
 }
 
 func (a *App) startServer() error {
+	cfg := a.serverStartConfig()
+	if cfg.httpServer == nil {
+		return fmt.Errorf("server not configured")
+	}
+
+	if cfg.tlsEnabled && (cfg.tlsCertFile == "" || cfg.tlsKeyFile == "") {
+		a.logger.Error("TLS enabled but certificate or key file not provided")
+		return fmt.Errorf("TLS enabled but certificate or key file not provided")
+	}
+
 	a.mu.Lock()
 	a.started = true
 	a.mu.Unlock()
 
 	health.SetReady()
 
-	// Get configuration for server startup
-	a.mu.RLock()
-	tlsEnabled := a.config.TLS.Enabled
-	tlsCertFile := a.config.TLS.CertFile
-	tlsKeyFile := a.config.TLS.KeyFile
-	addr := a.config.Addr
-	httpServer := a.httpServer
-	a.mu.RUnlock()
+	stopSignalWatcher := make(chan struct{})
+	go a.handleShutdownSignal(stopSignalWatcher)
 
-	idleConnsClosed := make(chan struct{})
-	go func() {
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-		<-sig
-
-		health.SetNotReady("draining connections")
-		a.logger.Info("SIGTERM received, shutting down")
-
-		a.mu.RLock()
-		shutdownTimeout := a.config.ShutdownTimeout
-		httpServer := a.httpServer
-		connTracker := a.connTracker
-		a.mu.RUnlock()
-
-		if shutdownTimeout <= 0 {
-			shutdownTimeout = 5 * time.Second
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		defer cancel()
-
-		if connTracker != nil {
-			go connTracker.drain(ctx)
-		}
-
-		if httpServer != nil {
-			if err := httpServer.Shutdown(ctx); err != nil {
-				a.logger.Error("Server shutdown error", log.Fields{"error": err})
-			}
-		}
-
-		a.stopRunners(ctx)
-		a.stopComponents(ctx)
-		a.runShutdownHooks(ctx)
-		close(idleConnsClosed)
-	}()
-
-	a.logger.Info("Server running", log.Fields{"addr": addr})
-	if a.config.Debug {
+	a.logger.Info("Server running", log.Fields{"addr": cfg.addr})
+	if cfg.debug {
 		a.logger.Info("Debug mode enabled", log.Fields{
 			"routes":     devToolsRoutesPath,
 			"middleware": devToolsMiddlewarePath,
@@ -209,26 +169,112 @@ func (a *App) startServer() error {
 	}
 
 	var err error
-	if tlsEnabled {
-		if tlsCertFile == "" || tlsKeyFile == "" {
-			a.logger.Error("TLS enabled but certificate or key file not provided")
-			return fmt.Errorf("TLS enabled but certificate or key file not provided")
-		}
-		a.logger.Info("HTTPS enabled", log.Fields{"cert": tlsCertFile})
-		err = httpServer.ListenAndServeTLS(tlsCertFile, tlsKeyFile)
+	if cfg.tlsEnabled {
+		a.logger.Info("HTTPS enabled", log.Fields{"cert": cfg.tlsCertFile})
+		err = cfg.httpServer.ListenAndServeTLS(cfg.tlsCertFile, cfg.tlsKeyFile)
 	} else {
-		err = httpServer.ListenAndServe()
+		err = cfg.httpServer.ListenAndServe()
 	}
 
+	close(stopSignalWatcher)
+
 	health.SetNotReady("shutting down")
-	a.stopRunners(context.Background())
-	a.stopComponents(context.Background())
-	a.runShutdownHooks(context.Background())
-
-	<-idleConnsClosed
-
+	a.stopRuntime(context.Background())
 	a.logger.Info("Server stopped gracefully")
 	return err
+}
+
+type serverRuntimeConfig struct {
+	addr              string
+	readTimeout       time.Duration
+	readHeaderTimeout time.Duration
+	writeTimeout      time.Duration
+	idleTimeout       time.Duration
+	maxHeaderBytes    int
+	drainInterval     time.Duration
+	enableHTTP2       bool
+}
+
+type serverStartConfig struct {
+	addr            string
+	debug           bool
+	shutdownTimeout time.Duration
+	tlsEnabled      bool
+	tlsCertFile     string
+	tlsKeyFile      string
+	httpServer      *http.Server
+	connTracker     *connectionTracker
+}
+
+func (a *App) serverRuntimeConfigLocked() serverRuntimeConfig {
+	return serverRuntimeConfig{
+		addr:              a.config.Addr,
+		readTimeout:       a.config.ReadTimeout,
+		readHeaderTimeout: a.config.ReadHeaderTimeout,
+		writeTimeout:      a.config.WriteTimeout,
+		idleTimeout:       a.config.IdleTimeout,
+		maxHeaderBytes:    a.config.MaxHeaderBytes,
+		drainInterval:     a.config.DrainInterval,
+		enableHTTP2:       a.config.EnableHTTP2,
+	}
+}
+
+func (a *App) serverStartConfig() serverStartConfig {
+	a.mu.RLock()
+	cfg := serverStartConfig{
+		addr:            a.config.Addr,
+		debug:           a.config.Debug,
+		shutdownTimeout: a.config.ShutdownTimeout,
+		tlsEnabled:      a.config.TLS.Enabled,
+		tlsCertFile:     a.config.TLS.CertFile,
+		tlsKeyFile:      a.config.TLS.KeyFile,
+		httpServer:      a.httpServer,
+		connTracker:     a.connTracker,
+	}
+	a.mu.RUnlock()
+	return cfg
+}
+
+func (a *App) handleShutdownSignal(stop <-chan struct{}) {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sig)
+
+	select {
+	case <-stop:
+		return
+	case <-sig:
+	}
+
+	health.SetNotReady("draining connections")
+	a.logger.Info("SIGTERM received, shutting down")
+
+	cfg := a.serverStartConfig()
+	shutdownTimeout := cfg.shutdownTimeout
+	if shutdownTimeout <= 0 {
+		shutdownTimeout = 5 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if cfg.connTracker != nil {
+		go cfg.connTracker.drain(ctx)
+	}
+
+	if cfg.httpServer != nil {
+		if err := cfg.httpServer.Shutdown(ctx); err != nil {
+			a.logger.Error("Server shutdown error", log.Fields{"error": err})
+		}
+	}
+
+	a.stopRuntime(ctx)
+}
+
+func (a *App) stopRuntime(ctx context.Context) {
+	a.stopRunners(ctx)
+	a.stopComponents(ctx)
+	a.runShutdownHooks(ctx)
 }
 
 type connectionTracker struct {
@@ -245,46 +291,17 @@ func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *
 }
 
 func (a *App) mountComponents() []Component {
-	// Get all components (built-in + custom)
-	comps := append([]Component{}, a.builtInComponents()...)
-	comps = append(comps, a.components...)
+	// Get all components (built-in + custom) in declared order.
+	declared := append([]Component{}, a.builtInComponents()...)
+	declared = append(declared, a.components...)
 
 	if a.middlewareReg == nil {
 		a.middlewareReg = middleware.NewRegistry()
 	}
 
-	// 1. Register all components in DI container
-	for _, c := range comps {
-		if c == nil {
-			continue
-		}
-		a.diContainer.Register(c)
-	}
+	components := filterNilComponents(declared)
 
-	// 2. Inject dependencies into all components
-	for _, c := range comps {
-		if c == nil {
-			continue
-		}
-		if err := a.diContainer.Inject(c); err != nil {
-			a.logger.Error("Failed to inject dependencies", log.Fields{"component": reflect.TypeOf(c).String(), "error": err})
-			continue
-		}
-	}
-
-	// 3. Sort components based on dependencies
-	sortedComps, err := a.sortComponentsByDependencies(comps)
-	if err != nil {
-		a.logger.Error("Failed to sort components", log.Fields{"error": err})
-		// Fallback to original order if sorting fails
-		sortedComps = comps
-	}
-
-	// 4. Register middleware and routes for sorted components
-	for _, c := range sortedComps {
-		if c == nil {
-			continue
-		}
+	for _, c := range components {
 		c.RegisterMiddleware(a.middlewareReg)
 		c.RegisterRoutes(a.router)
 	}
@@ -294,22 +311,17 @@ func (a *App) mountComponents() []Component {
 	a.componentsMounted = true
 	a.mu.Unlock()
 
-	return sortedComps
+	return components
 }
 
 func (a *App) startComponents(ctx context.Context, comps []Component) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if len(comps) == 0 {
+	components := filterNilComponents(comps)
+	if len(components) == 0 {
 		return nil
 	}
 
-	started := make([]Component, 0, len(comps))
-	for _, c := range comps {
-		if c == nil {
-			continue
-		}
+	started := make([]Component, 0, len(components))
+	for _, c := range components {
 		if err := c.Start(ctx); err != nil {
 			for i := len(started) - 1; i >= 0; i-- {
 				_ = started[i].Stop(ctx)
@@ -319,23 +331,24 @@ func (a *App) startComponents(ctx context.Context, comps []Component) error {
 		started = append(started, c)
 	}
 
+	a.mu.Lock()
 	a.startedComponents = started
+	a.mu.Unlock()
 	return nil
 }
 
 func (a *App) startRunners(ctx context.Context) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	runners := append([]Runner{}, a.runners...)
+	a.mu.RUnlock()
 
-	if len(a.runners) == 0 {
+	runners = filterNilRunners(runners)
+	if len(runners) == 0 {
 		return nil
 	}
 
-	started := make([]Runner, 0, len(a.runners))
-	for _, runner := range a.runners {
-		if runner == nil {
-			continue
-		}
+	started := make([]Runner, 0, len(runners))
+	for _, runner := range runners {
 		if err := runner.Start(ctx); err != nil {
 			for i := len(started) - 1; i >= 0; i-- {
 				_ = started[i].Stop(ctx)
@@ -345,7 +358,9 @@ func (a *App) startRunners(ctx context.Context) error {
 		started = append(started, runner)
 	}
 
+	a.mu.Lock()
 	a.startedRunners = started
+	a.mu.Unlock()
 	return nil
 }
 
@@ -426,88 +441,22 @@ func (t *connectionTracker) drain(ctx context.Context) {
 	}
 }
 
-// sortComponentsByDependencies sorts components topologically based on their dependencies.
-// It ensures that dependent components are started before their dependencies and stopped after.
-func (a *App) sortComponentsByDependencies(components []Component) ([]Component, error) {
-	if len(components) == 0 {
-		return components, nil
-	}
-
-	// Create a map of component types to components
-	typeToComponent := make(map[reflect.Type]Component)
+func filterNilComponents(components []Component) []Component {
+	filtered := make([]Component, 0, len(components))
 	for _, comp := range components {
 		if comp != nil {
-			typeToComponent[reflect.TypeOf(comp)] = comp
+			filtered = append(filtered, comp)
 		}
 	}
+	return filtered
+}
 
-	// Helper function to get all dependencies including transitive dependencies
-	getAllDependencies := func(comp Component) ([]Component, error) {
-		if comp == nil {
-			return nil, nil
-		}
-		visited := make(map[reflect.Type]bool)
-		var result []Component
-
-		var dfs func(depType reflect.Type) error
-		dfs = func(depType reflect.Type) error {
-			if visited[depType] {
-				return errors.New("circular dependency detected")
-			}
-			visited[depType] = true
-
-			if depComp, exists := typeToComponent[depType]; exists && depComp != nil {
-				// Add this dependency
-				result = append(result, depComp)
-
-				// Recursively get its dependencies
-				for _, subDepType := range depComp.Dependencies() {
-					if err := dfs(subDepType); err != nil {
-						return err
-					}
-				}
-			}
-
-			visited[depType] = false
-			return nil
-		}
-
-		// Start with the component's direct dependencies
-		for _, depType := range comp.Dependencies() {
-			if err := dfs(depType); err != nil {
-				return nil, err
-			}
-		}
-
-		return result, nil
-	}
-
-	// Collect all components with their dependencies in the correct order
-	visited := make(map[Component]bool)
-	var sortedComponents []Component
-
-	// Process each component
-	for _, comp := range components {
-		if comp != nil && !visited[comp] {
-			// Get all dependencies for this component
-			dependencies, err := getAllDependencies(comp)
-			if err != nil {
-				return nil, err
-			}
-
-			// Add dependencies to sorted list (if not already present)
-			for _, dep := range dependencies {
-				if dep != nil && !visited[dep] {
-					sortedComponents = append(sortedComponents, dep)
-					visited[dep] = true
-				}
-			}
-
-			// Add the component itself
-			sortedComponents = append(sortedComponents, comp)
-			visited[comp] = true
+func filterNilRunners(runners []Runner) []Runner {
+	filtered := make([]Runner, 0, len(runners))
+	for _, runner := range runners {
+		if runner != nil {
+			filtered = append(filtered, runner)
 		}
 	}
-
-	return sortedComponents, nil
+	return filtered
 }

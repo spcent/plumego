@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spcent/plumego"
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/store/db"
 )
 
@@ -150,44 +152,50 @@ func runMigrations(db *sql.DB) error {
 // registerAdminRoutes registers admin endpoints for tenant management
 func registerAdminRoutes(app *plumego.App, mgr *db.DBTenantConfigManager) {
 	admin := &AdminHandler{manager: mgr}
+	adaptCtx := func(handler plumego.ContextHandlerFunc) http.HandlerFunc {
+		return contract.AdaptCtxHandler(handler, app.Logger()).ServeHTTP
+	}
 
 	// Admin routes (no tenant middleware - uses admin auth instead)
-	app.PostCtx("/admin/tenants", admin.CreateTenant)
-	app.GetCtx("/admin/tenants/:id", admin.GetTenant)
-	app.PutCtx("/admin/tenants/:id", admin.UpdateTenant)
-	app.DeleteCtx("/admin/tenants/:id", admin.DeleteTenant)
-	app.GetCtx("/admin/tenants", admin.ListTenants)
+	app.Post("/admin/tenants", adaptCtx(admin.CreateTenant))
+	app.Get("/admin/tenants/:id", adaptCtx(admin.GetTenant))
+	app.Put("/admin/tenants/:id", adaptCtx(admin.UpdateTenant))
+	app.Delete("/admin/tenants/:id", adaptCtx(admin.DeleteTenant))
+	app.Get("/admin/tenants", adaptCtx(admin.ListTenants))
 }
 
 // registerAPIRoutes registers tenant-scoped business API routes
 func registerAPIRoutes(app *plumego.App, tenantDB *db.TenantDB) {
 	api := &APIHandler{db: tenantDB}
+	adaptCtx := func(handler plumego.ContextHandlerFunc) http.HandlerFunc {
+		return contract.AdaptCtxHandler(handler, app.Logger()).ServeHTTP
+	}
 
 	// Business API routes (protected by tenant middleware)
-	app.GetCtx("/api/users", api.ListUsers)
-	app.PostCtx("/api/users", api.CreateUser)
-	app.GetCtx("/api/users/:id", api.GetUser)
-	app.DeleteCtx("/api/users/:id", api.DeleteUser)
+	app.Get("/api/users", adaptCtx(api.ListUsers))
+	app.Post("/api/users", adaptCtx(api.CreateUser))
+	app.Get("/api/users/:id", adaptCtx(api.GetUser))
+	app.Delete("/api/users/:id", adaptCtx(api.DeleteUser))
 
-	app.GetCtx("/api/analytics/requests", api.GetRequestAnalytics)
+	app.Get("/api/analytics/requests", adaptCtx(api.GetRequestAnalytics))
 }
 
 // registerHealthRoutes registers health check endpoints
 func registerHealthRoutes(app *plumego.App) {
-	app.GetCtx("/health", func(ctx *plumego.Context) {
+	app.Get("/health", contract.AdaptCtxHandler(func(ctx *plumego.Context) {
 		ctx.JSON(200, map[string]string{
 			"status": "healthy",
 			"time":   time.Now().Format(time.RFC3339),
 		})
-	})
+	}, app.Logger()).ServeHTTP)
 
-	app.GetCtx("/", func(ctx *plumego.Context) {
+	app.Get("/", contract.AdaptCtxHandler(func(ctx *plumego.Context) {
 		ctx.JSON(200, map[string]string{
 			"service": "Multi-Tenant SaaS Example",
 			"version": "1.0.0",
 			"docs":    "/api/docs",
 		})
-	})
+	}, app.Logger()).ServeHTTP)
 }
 
 // getEnv gets an environment variable with a default value

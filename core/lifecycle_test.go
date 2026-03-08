@@ -386,13 +386,13 @@ func TestStartServer(t *testing.T) {
 		t.Skip("Skipping TLS test due to certificate complexity")
 	})
 
-	// Test TLS with missing files - test the validation logic directly
+	// Test TLS with missing files
 	t.Run("TLS missing files", func(t *testing.T) {
 		app := New()
 		app.config.Addr = ":0"
 		app.config.TLS.Enabled = true
-		app.config.TLS.CertFile = "nonexistent_cert.pem"
-		app.config.TLS.KeyFile = "nonexistent_key.pem"
+		app.config.TLS.CertFile = ""
+		app.config.TLS.KeyFile = ""
 		app.config.ShutdownTimeout = 1 * time.Second
 
 		app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -403,21 +403,16 @@ func TestStartServer(t *testing.T) {
 			t.Fatalf("setupServer failed: %v", err)
 		}
 
-		// Test the validation logic that would happen in startServer
-		// This simulates what startServer does without actually starting the server
-		tlsCertFile := app.config.TLS.CertFile
-		tlsKeyFile := app.config.TLS.KeyFile
-
-		if tlsCertFile == "" || tlsKeyFile == "" {
-			t.Error("expected TLS files to be set")
+		err := app.startServer()
+		if err == nil {
+			t.Fatal("expected TLS validation error")
 		}
 
-		// Verify the files don't exist
-		if _, err := os.Stat(tlsCertFile); !os.IsNotExist(err) {
-			t.Errorf("expected cert file %s to not exist", tlsCertFile)
-		}
-		if _, err := os.Stat(tlsKeyFile); !os.IsNotExist(err) {
-			t.Errorf("expected key file %s to not exist", tlsKeyFile)
+		app.mu.RLock()
+		started := app.started
+		app.mu.RUnlock()
+		if started {
+			t.Fatal("app should not be marked started when TLS validation fails")
 		}
 	})
 
