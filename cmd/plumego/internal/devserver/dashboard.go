@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego"
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/net/websocket"
@@ -111,22 +112,26 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	})
 
 	// API endpoints (without Group - register directly)
-	d.app.GetCtx("/api/info", d.handleInfo)
-	d.app.GetCtx("/api/status", d.handleStatus)
-	d.app.GetCtx("/api/health", d.handleHealth)
-	d.app.GetCtx("/api/routes", d.handleRoutes)
-	d.app.GetCtx("/api/config", d.handleConfig)
-	d.app.GetCtx("/api/config/edit", d.handleConfigEditGet)
-	d.app.PostCtx("/api/config/edit", d.handleConfigEditSave)
-	d.app.GetCtx("/api/metrics", d.handleMetrics)
-	d.app.PostCtx("/api/metrics/clear", d.handleMetricsClear)
-	d.app.GetCtx("/api/deps", d.handleDeps)
-	d.app.GetCtx("/api/pprof/types", d.handlePprofTypes)
-	d.app.GetCtx("/api/pprof/raw", d.handlePprofRaw)
-	d.app.PostCtx("/api/test", d.handleAPITest)
-	d.app.PostCtx("/api/build", d.handleBuild)
-	d.app.PostCtx("/api/restart", d.handleRestart)
-	d.app.PostCtx("/api/stop", d.handleStop)
+	adaptCtx := func(handler plumego.ContextHandlerFunc) http.HandlerFunc {
+		return contract.AdaptCtxHandler(handler, d.app.Logger()).ServeHTTP
+	}
+
+	d.app.Get("/api/info", adaptCtx(d.handleInfo))
+	d.app.Get("/api/status", adaptCtx(d.handleStatus))
+	d.app.Get("/api/health", adaptCtx(d.handleHealth))
+	d.app.Get("/api/routes", adaptCtx(d.handleRoutes))
+	d.app.Get("/api/config", adaptCtx(d.handleConfig))
+	d.app.Get("/api/config/edit", adaptCtx(d.handleConfigEditGet))
+	d.app.Post("/api/config/edit", adaptCtx(d.handleConfigEditSave))
+	d.app.Get("/api/metrics", adaptCtx(d.handleMetrics))
+	d.app.Post("/api/metrics/clear", adaptCtx(d.handleMetricsClear))
+	d.app.Get("/api/deps", adaptCtx(d.handleDeps))
+	d.app.Get("/api/pprof/types", adaptCtx(d.handlePprofTypes))
+	d.app.Get("/api/pprof/raw", adaptCtx(d.handlePprofRaw))
+	d.app.Post("/api/test", adaptCtx(d.handleAPITest))
+	d.app.Post("/api/build", adaptCtx(d.handleBuild))
+	d.app.Post("/api/restart", adaptCtx(d.handleRestart))
+	d.app.Post("/api/stop", adaptCtx(d.handleStop))
 
 	// Static UI files
 	router := d.app.Router()

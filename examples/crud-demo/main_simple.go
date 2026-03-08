@@ -322,17 +322,21 @@ func main() {
 	ctrl := NewUserController(repo)
 
 	// Routes
-	app.GetHandler("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	app.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprintf(w, `<html><body><h1>🚀 CRUD Demo</h1>
 <p>Try: <code>curl http://localhost:8080/users</code></p></body></html>`)
-	}))
+	})
 
-	app.GetCtx("/users", ctrl.IndexCtx)
-	app.GetCtx("/users/:id", ctrl.ShowCtx)
-	app.PostCtx("/users", ctrl.CreateCtx)
-	app.PutCtx("/users/:id", ctrl.UpdateCtx)
-	app.DeleteCtx("/users/:id", ctrl.DeleteCtx)
+	adaptCtx := func(handler contract.CtxHandlerFunc) http.HandlerFunc {
+		return contract.AdaptCtxHandler(handler, app.Logger()).ServeHTTP
+	}
+
+	app.Get("/users", adaptCtx(ctrl.IndexCtx))
+	app.Get("/users/:id", adaptCtx(ctrl.ShowCtx))
+	app.Post("/users", adaptCtx(ctrl.CreateCtx))
+	app.Put("/users/:id", adaptCtx(ctrl.UpdateCtx))
+	app.Delete("/users/:id", adaptCtx(ctrl.DeleteCtx))
 
 	log.Println("🚀 Server: http://localhost:8080")
 	log.Println("📚 GET /users - List users")
