@@ -1,4 +1,4 @@
-// Package proxy provides reverse proxy handler for plumego
+// Package gateway provides reverse proxy handlers for plumego
 //
 // This package implements a production-grade HTTP reverse proxy with features including:
 //   - Load balancing (round-robin, weighted, least-connections, IP-hash)
@@ -13,14 +13,14 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/middleware/proxy"
+//		"github.com/spcent/plumego/gateway"
 //		"github.com/spcent/plumego/core"
 //	)
 //
 //	app := core.New()
 //
 //	// Register proxy as a route handler
-//	app.Any("/api/*", proxy.New(proxy.Config{
+//	app.Any("/api/*", gateway.New(gateway.Config{
 //		Targets: []string{
 //			"http://backend-1:8080",
 //			"http://backend-2:8080",
@@ -29,12 +29,12 @@
 //
 //	// Or use with router groups
 //	apiGroup := app.Router().Group("/api")
-//	apiGroup.Any("/*", proxy.New(proxy.Config{
+//	apiGroup.Any("/*", gateway.New(gateway.Config{
 //		Targets: []string{"http://backend:8080"},
 //	}))
 //
 //	app.Boot()
-package proxy
+package gateway
 
 import (
 	"context"
