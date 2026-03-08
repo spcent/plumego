@@ -8,7 +8,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware"
+	mw "github.com/spcent/plumego/middleware"
 )
 
 var errRequestTooLarge = errors.New("request body too large")
@@ -33,7 +33,7 @@ var errRequestTooLarge = errors.New("request body too large")
 //
 // When a request body exceeds the limit, it returns a 413 Request Entity Too Large
 // response with a structured error message containing the limit details.
-func BodyLimit(maxBytes int64, logger log.StructuredLogger) middleware.Middleware {
+func BodyLimit(maxBytes int64, logger log.StructuredLogger) mw.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if maxBytes <= 0 {
@@ -96,16 +96,10 @@ func (l *limitedBodyReader) Close() error {
 func (l *limitedBodyReader) fail() (int, error) {
 	if !l.exceeded {
 		l.exceeded = true
-		contract.WriteError(l.w, nil, contract.APIError{
-			Status:   http.StatusRequestEntityTooLarge,
-			Code:     "request_body_too_large",
-			Category: contract.CategoryClient,
-			Message:  "request body exceeds configured limit",
-			Details: map[string]any{
-				"max_bytes":  l.maxBytes,
-				"seen_bytes": l.used,
-				"at":         l.now().UTC(),
-			},
+		mw.WriteTransportError(l.w, nil, http.StatusRequestEntityTooLarge, mw.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
+			"max_bytes":  l.maxBytes,
+			"seen_bytes": l.used,
+			"at":         l.now().UTC(),
 		})
 		if l.logger != nil {
 			l.logger.WithFields(log.Fields{"max_bytes": l.maxBytes, "seen_bytes": l.used}).Warn("request body too large")
@@ -118,7 +112,7 @@ func (l *limitedBodyReader) fail() (int, error) {
 // ConcurrencyLimit restricts how many requests can be processed concurrently
 // and optionally bounds how many can wait in a queue. Requests that cannot
 // enter the queue within the configured timeout receive a 503 response.
-func ConcurrencyLimit(maxConcurrent, queueDepth int, queueTimeout time.Duration, logger log.StructuredLogger) middleware.Middleware {
+func ConcurrencyLimit(maxConcurrent, queueDepth int, queueTimeout time.Duration, logger log.StructuredLogger) mw.Middleware {
 	if maxConcurrent <= 0 {
 		return func(next http.Handler) http.Handler { return next }
 	}
@@ -141,12 +135,7 @@ func ConcurrencyLimit(maxConcurrent, queueDepth int, queueTimeout time.Duration,
 			case queue <- struct{}{}:
 				defer func() { <-queue }()
 			default:
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusServiceUnavailable,
-					Code:     "server_busy",
-					Category: contract.CategoryServer,
-					Message:  "server is throttling concurrent requests",
-				})
+				mw.WriteTransportError(w, r, http.StatusServiceUnavailable, mw.CodeServerBusy, "server is throttling concurrent requests", contract.CategoryServer, nil)
 				return
 			}
 
@@ -157,13 +146,7 @@ func ConcurrencyLimit(maxConcurrent, queueDepth int, queueTimeout time.Duration,
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
 			case <-timer.C:
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusServiceUnavailable,
-					Code:     "server_queue_timeout",
-					Category: contract.CategoryServer,
-					Message:  "request timed out waiting for an available worker",
-					Details:  map[string]any{"queue_depth": len(queue)},
-				})
+				mw.WriteTransportError(w, r, http.StatusServiceUnavailable, mw.CodeServerQueueTimeout, "request timed out waiting for an available worker", contract.CategoryServer, map[string]any{"queue_depth": len(queue)})
 				return
 			}
 

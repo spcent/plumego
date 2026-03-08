@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	mw "github.com/spcent/plumego/middleware"
 )
 
 const (
@@ -13,6 +14,12 @@ const (
 	defaultModelHeader  = "X-Model"
 	defaultToolHeader   = "X-Tool"
 	defaultTokensHeader = "X-Token-Count"
+
+	tenantCodeRequired      = mw.CodeTenantRequired
+	tenantCodeInvalidID     = mw.CodeTenantInvalidID
+	tenantCodePolicyDenied  = mw.CodeTenantPolicyDenied
+	tenantCodeQuotaExceeded = mw.CodeTenantQuotaExceeded
+	tenantCodeRateLimited   = mw.CodeTenantRateLimited
 )
 
 func headerOrDefault(value, fallback string) string {
@@ -23,12 +30,7 @@ func headerOrDefault(value, fallback string) string {
 }
 
 func writeTenantError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory) {
-	contract.WriteError(w, r, contract.APIError{
-		Status:   status,
-		Code:     code,
-		Message:  message,
-		Category: category,
-	})
+	mw.WriteTransportError(w, r, status, code, message, category, nil)
 }
 
 func setRetryAfterHeader(w http.ResponseWriter, retry time.Duration) {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware"
+	mw "github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/security/abuse"
 	"github.com/spcent/plumego/utils/httpx"
 )
@@ -111,7 +111,7 @@ func DefaultAbuseGuardConfig() AbuseGuardConfig {
 //
 // When a request is rate limited, it returns a 429 Too Many Requests response with
 // a structured error message containing the limit details.
-func AbuseGuard(config AbuseGuardConfig) middleware.Middleware {
+func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
 	defaults := DefaultAbuseGuardConfig()
 	includeHeaders := true
 	if defaults.IncludeHeaders != nil {
@@ -194,17 +194,11 @@ func applyRateLimitHeaders(w http.ResponseWriter, decision abuse.Decision) {
 }
 
 func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Decision, logger log.StructuredLogger) {
-	contract.WriteError(w, r, contract.APIError{
-		Status:   http.StatusTooManyRequests,
-		Code:     "rate_limited",
-		Category: contract.CategoryRateLimit,
-		Message:  "too many requests",
-		Details: map[string]any{
-			"limit":       decision.Limit,
-			"remaining":   decision.Remaining,
-			"retry_after": decision.RetryAfter.Seconds(),
-			"reset_at":    decision.Reset.UTC(),
-		},
+	mw.WriteTransportError(w, r, http.StatusTooManyRequests, mw.CodeRateLimited, "too many requests", contract.CategoryRateLimit, map[string]any{
+		"limit":       decision.Limit,
+		"remaining":   decision.Remaining,
+		"retry_after": decision.RetryAfter.Seconds(),
+		"reset_at":    decision.Reset.UTC(),
 	})
 
 	if logger != nil {

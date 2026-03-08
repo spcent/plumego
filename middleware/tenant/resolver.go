@@ -70,13 +70,13 @@ func TenantResolver(options TenantResolverOptions) middleware.Middleware {
 					options.OnMissing(w, r)
 					return
 				}
-				writeTenantError(w, r, http.StatusUnauthorized, "tenant_required", "tenant id is required", contract.CategoryAuthentication)
+				writeTenantError(w, r, http.StatusUnauthorized, tenantCodeRequired, "tenant id is required", contract.CategoryAuthentication)
 				return
 			}
 
 			// 4. Validate tenant ID format before storing in context.
 			if err := tenant.ValidateTenantID(tenantID); err != nil {
-				writeTenantError(w, r, http.StatusBadRequest, "invalid_tenant_id", "invalid tenant ID format", contract.CategoryAuthentication)
+				writeTenantError(w, r, http.StatusBadRequest, tenantCodeInvalidID, "invalid tenant ID format", contract.CategoryAuthentication)
 				return
 			}
 

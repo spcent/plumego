@@ -82,7 +82,15 @@ func (am *SimpleAuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		// Check if token matches expected token
 		if subtle.ConstantTimeCompare([]byte(token), []byte(am.authToken)) != 1 {
 			w.Header().Set("WWW-Authenticate", "Bearer realm=\""+am.realm+"\"")
-			contract.WriteError(w, r, contract.NewUnauthorizedError("Invalid or missing authentication token"))
+			middleware.WriteTransportError(
+				w,
+				r,
+				http.StatusUnauthorized,
+				middleware.CodeAuthUnauthenticated,
+				"invalid or missing authentication token",
+				contract.CategoryAuthentication,
+				nil,
+			)
 			return
 		}
 

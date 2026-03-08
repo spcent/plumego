@@ -33,6 +33,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/contract/protocol"
+	mw "github.com/spcent/plumego/middleware"
 )
 
 // Middleware creates a protocol gateway middleware
@@ -59,24 +60,14 @@ func Middleware(registry *protocol.Registry) func(http.Handler) http.Handler {
 			// Transform request
 			req, err := adapter.Transform(r.Context(), httpReq)
 			if err != nil {
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusBadRequest,
-					Code:     "PROTOCOL_TRANSFORM_FAILED",
-					Message:  "Protocol transformation failed: " + err.Error(),
-					Category: contract.CategoryClient,
-				})
+				mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
 				return
 			}
 
 			// Execute protocol request
 			resp, err := adapter.Execute(r.Context(), req)
 			if err != nil {
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusBadGateway,
-					Code:     "PROTOCOL_EXECUTION_FAILED",
-					Message:  "Protocol execution failed: " + err.Error(),
-					Category: contract.CategoryServer,
-				})
+				mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 
@@ -88,7 +79,7 @@ func Middleware(registry *protocol.Registry) func(http.Handler) http.Handler {
 
 			// Encode response
 			if err := adapter.Encode(r.Context(), resp, respWriter); err != nil {
-				contract.WriteError(w, r, contract.NewInternalError("Protocol encoding failed: "+err.Error()))
+				mw.WriteTransportError(w, r, http.StatusInternalServerError, mw.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 		})
@@ -195,12 +186,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnTransformError(w, r, err)
 					return
 				}
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusBadRequest,
-					Code:     "PROTOCOL_TRANSFORM_FAILED",
-					Message:  "Protocol transformation failed: " + err.Error(),
-					Category: contract.CategoryClient,
-				})
+				mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
 				return
 			}
 
@@ -211,12 +197,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnExecuteError(w, r, err)
 					return
 				}
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusBadGateway,
-					Code:     "PROTOCOL_EXECUTION_FAILED",
-					Message:  "Protocol execution failed: " + err.Error(),
-					Category: contract.CategoryServer,
-				})
+				mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 
@@ -232,7 +213,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnEncodeError(w, r, err)
 					return
 				}
-				contract.WriteError(w, r, contract.NewInternalError("Protocol encoding failed: "+err.Error()))
+				mw.WriteTransportError(w, r, http.StatusInternalServerError, mw.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 		})

@@ -76,7 +76,7 @@ func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
 				return
 			}
 
-			writeTenantError(w, r, status, "tenant_rate_limited", "tenant rate limit exceeded", contract.CategoryRateLimit)
+			writeTenantError(w, r, status, tenantCodeRateLimited, "tenant rate limit exceeded", contract.CategoryRateLimit)
 		})
 	}
 }

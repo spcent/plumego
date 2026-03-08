@@ -65,7 +65,7 @@ func TenantPolicy(options TenantPolicyOptions) middleware.Middleware {
 				return
 			}
 
-			writeTenantError(w, r, status, "policy_denied", "tenant policy denied request", contract.CategoryAuthentication)
+			writeTenantError(w, r, status, tenantCodePolicyDenied, "tenant policy denied request", contract.CategoryAuthentication)
 		})
 	}
 }

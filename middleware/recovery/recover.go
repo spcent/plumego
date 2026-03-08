@@ -49,12 +49,7 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 			if rec := recover(); rec != nil {
 				// Log panic details server-side; never expose them in the response.
 				logger.WithFields(log.Fields{"panic": rec, "trace_id": contract.TraceIDFromContext(r.Context())}).Error("panic recovered")
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusInternalServerError,
-					Code:     "internal_error",
-					Category: contract.CategoryServer,
-					Message:  "internal server error",
-				})
+				middleware.WriteTransportError(w, r, http.StatusInternalServerError, middleware.CodeInternalError, "internal server error", contract.CategoryServer, nil)
 			}
 		}()
 		next.ServeHTTP(w, r)
