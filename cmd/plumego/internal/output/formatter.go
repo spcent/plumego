@@ -24,7 +24,7 @@ type Formatter struct {
 // NewFormatter creates a new output formatter
 func NewFormatter() *Formatter {
 	return &Formatter{
-		format: "json",
+		format: "text",
 		color:  true,
 		out:    os.Stdout,
 		err:    os.Stderr,
@@ -84,7 +84,7 @@ func (f *Formatter) Print(data any) error {
 	case "text":
 		return f.printText(data)
 	default:
-		return f.printJSON(data)
+		return f.printText(data)
 	}
 }
 

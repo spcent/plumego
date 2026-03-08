@@ -111,7 +111,7 @@ type globalFlags struct {
 
 func defaultGlobalFlags() globalFlags {
 	return globalFlags{
-		Format:  "json",
+		Format:  "text",
 		EnvFile: ".env",
 	}
 }
