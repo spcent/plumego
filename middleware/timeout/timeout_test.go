@@ -23,12 +23,12 @@ func TestTimeoutMiddleware_TimesOut(t *testing.T) {
 		}
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Timeout(20*time.Millisecond))
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(20*time.Millisecond))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	var resp contract.ErrorResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
@@ -57,12 +57,12 @@ func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 		w.Write([]byte("done"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, Timeout(500*time.Millisecond))
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(500*time.Millisecond))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d", http.StatusCreated, rr.Code)
@@ -83,7 +83,7 @@ func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 		w.Write([]byte("toolarge"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, TimeoutWithConfig(TimeoutConfig{
+	wrapped := middleware.Apply(http.HandlerFunc(handler), TimeoutWithConfig(TimeoutConfig{
 		Timeout:        500 * time.Millisecond,
 		MaxBufferBytes: 4,
 	}))
@@ -91,7 +91,7 @@ func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
@@ -110,7 +110,7 @@ func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
 		w.Write(largeData)
 	}
 
-	wrapped := middleware.ApplyFunc(handler, TimeoutWithConfig(TimeoutConfig{
+	wrapped := middleware.Apply(http.HandlerFunc(handler), TimeoutWithConfig(TimeoutConfig{
 		Timeout:            500 * time.Millisecond,
 		MaxBufferBytes:     10 << 20,
 		StreamingThreshold: 512 << 10, // 512KB
@@ -119,7 +119,7 @@ func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	// Should return error since we cannot replay bypassed response
 	if rr.Code != http.StatusInternalServerError {
@@ -143,7 +143,7 @@ func TestTimeoutMiddleware_SmallResponseBuffered(t *testing.T) {
 		w.Write([]byte("small"))
 	}
 
-	wrapped := middleware.ApplyFunc(handler, TimeoutWithConfig(TimeoutConfig{
+	wrapped := middleware.Apply(http.HandlerFunc(handler), TimeoutWithConfig(TimeoutConfig{
 		Timeout:            500 * time.Millisecond,
 		MaxBufferBytes:     10 << 20,
 		StreamingThreshold: 512 << 10, // 512KB
@@ -152,7 +152,7 @@ func TestTimeoutMiddleware_SmallResponseBuffered(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d", http.StatusCreated, rr.Code)
@@ -176,7 +176,7 @@ func TestTimeoutMiddleware_StreamingThreshold(t *testing.T) {
 		w.Write(data)
 	}
 
-	wrapped := middleware.ApplyFunc(handler, TimeoutWithConfig(TimeoutConfig{
+	wrapped := middleware.Apply(http.HandlerFunc(handler), TimeoutWithConfig(TimeoutConfig{
 		Timeout:            500 * time.Millisecond,
 		MaxBufferBytes:     10 << 20,
 		StreamingThreshold: 512 << 10, // 512KB
@@ -185,7 +185,7 @@ func TestTimeoutMiddleware_StreamingThreshold(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	wrapped(rr, req)
+	wrapped.ServeHTTP(rr, req)
 
 	// Should be buffered (not exceed threshold)
 	if rr.Code != http.StatusOK {
