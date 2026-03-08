@@ -1,6 +1,6 @@
 // Package cache provides HTTP response caching middleware
 //
-// This package implements production-grade HTTP caching with features including:
+// This package contains production-grade HTTP caching logic with features including:
 //   - Multiple cache key strategies (URL, headers, custom)
 //   - Pluggable storage backends (in-memory LRU, user-provided)
 //   - Cache-Control header support (max-age, no-cache, no-store)
@@ -11,7 +11,7 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/middleware/cache"
+//		"github.com/spcent/plumego/gateway/cache"
 //		"github.com/spcent/plumego/core"
 //	)
 //

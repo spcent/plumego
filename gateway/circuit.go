@@ -1,7 +1,7 @@
-package proxy
+package gateway
 
 import (
-	"github.com/spcent/plumego/middleware/circuitbreaker"
+	"github.com/spcent/plumego/resilience/circuitbreaker"
 )
 
 // CircuitBreaker wraps the circuit breaker for a backend
