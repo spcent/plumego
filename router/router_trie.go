@@ -179,21 +179,19 @@ var pathBufPool = sync.Pool{
 	},
 }
 
-// buildParamMapPooled creates a parameter map using a pooled map
-// to reduce allocations on the hot path. The caller does NOT need
-// to return the map to the pool — it is handed to context and GC'd normally.
+// buildParamMapPooled creates a parameter map for the given keys and values.
+// The map is handed to the request context and GC'd with the request.
 func buildParamMapPooled(paramValues []string, paramKeys []string) map[string]string {
 	if len(paramValues) == 0 || len(paramKeys) == 0 {
 		return nil
 	}
-
-	params := GetParamsMap()
 
 	minLen := len(paramValues)
 	if len(paramKeys) < minLen {
 		minLen = len(paramKeys)
 	}
 
+	params := make(map[string]string, minLen)
 	for i := 0; i < minLen; i++ {
 		params[paramKeys[i]] = paramValues[i]
 	}

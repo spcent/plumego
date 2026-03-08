@@ -27,11 +27,11 @@ func (r *Router) Any(path string, handler Handler) error { return r.AddRoute(ANY
 
 // Options registers an OPTIONS route with the given path and handler.
 func (r *Router) Options(path string, handler Handler) error {
-	return r.AddRoute("OPTIONS", path, handler)
+	return r.AddRoute(OPTIONS, path, handler)
 }
 
 // Head registers a HEAD route with the given path and handler.
-func (r *Router) Head(path string, handler Handler) error { return r.AddRoute("HEAD", path, handler) }
+func (r *Router) Head(path string, handler Handler) error { return r.AddRoute(HEAD, path, handler) }
 
 // GetCtx registers a GET route with a context-aware handler.
 func (r *Router) GetCtx(path string, handler contract.CtxHandlerFunc) error {
