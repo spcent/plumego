@@ -147,10 +147,10 @@ func logBindError(r *http.Request, opts JSONOptions, err error, payload any, bod
 		if redactor == nil {
 			redactor = DefaultRedactor()
 		}
-		fieldsLog["payload"] = redactor.Redact(payload)
+		fieldsLog["payload"] = contract.DefaultObservabilityPolicy.RedactFields(map[string]any{"payload": redactor.Redact(payload)})["payload"]
 	} else if len(body) > 0 {
 		fieldsLog["body_bytes"] = len(body)
 	}
 
-	opts.Logger.WarnCtx(r.Context(), "request binding failed", fieldsLog)
+	opts.Logger.WarnCtx(r.Context(), "request binding failed", logpkg.Fields(contract.DefaultObservabilityPolicy.RedactFields(fieldsLog)))
 }

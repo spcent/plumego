@@ -211,15 +211,15 @@ func TestLoggingAddsStructuredFields(t *testing.T) {
 	}
 
 	expectedFields := map[string]any{
-		"trace_id":    "trace-123",
-		"method":      http.MethodPost,
-		"path":        "/structured",
-		"route":       "/structured/:id",
-		"route_name":  "structured",
-		"status":      http.StatusCreated,
-		"bytes":       len("ok"),
-		"user_agent":  "",
-		"duration_ms": entry.fields["duration_ms"],
+		"request_id": "trace-123",
+		"method":     http.MethodPost,
+		"path":       "/structured",
+		"route":      "/structured/:id",
+		"route_name": "structured",
+		"status":     http.StatusCreated,
+		"bytes":      len("ok"),
+		"user_agent": "",
+		"duration":   entry.fields["duration"],
 	}
 
 	for key, expected := range expectedFields {
@@ -264,7 +264,7 @@ func TestLoggingGeneratesTraceIDWhenMissing(t *testing.T) {
 		t.Fatalf("expected log entry to be recorded")
 	}
 
-	if (*logger.entries)[0].fields["trace_id"] == "" {
+	if (*logger.entries)[0].fields["request_id"] == "" {
 		t.Fatalf("trace id field should not be empty")
 	}
 }

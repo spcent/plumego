@@ -2,6 +2,8 @@ package bind
 
 import (
 	"fmt"
+
+	"github.com/spcent/plumego/contract"
 	"reflect"
 	"strings"
 )
@@ -20,20 +22,8 @@ func DefaultRedactor() *Redactor {
 	return NewRedactor(RedactConfig{
 		Mask:     "***",
 		MaxDepth: 4,
-		Fields: []string{
-			"password",
-			"pass",
-			"secret",
-			"token",
-			"access_token",
-			"refresh_token",
-			"authorization",
-			"apikey",
-			"api_key",
-			"signature",
-			"sign",
-		},
-		Tags: []string{"mask", "sensitive", "secret", "redact"},
+		Fields:   contract.DefaultObservabilityPolicy.SensitiveKeys(),
+		Tags:     []string{"mask", "sensitive", "secret", "redact"},
 	})
 }
 

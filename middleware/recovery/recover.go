@@ -48,7 +48,9 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 		defer func() {
 			if rec := recover(); rec != nil {
 				// Log panic details server-side; never expose them in the response.
-				logger.WithFields(log.Fields{"panic": rec, "trace_id": contract.TraceIDFromContext(r.Context())}).Error("panic recovered")
+				fields := contract.DefaultObservabilityPolicy.MiddlewareLogFields(r, http.StatusInternalServerError, 0)
+				fields["panic"] = rec
+				logger.WithFields(log.Fields(contract.DefaultObservabilityPolicy.RedactFields(fields))).Error("panic recovered")
 				middleware.WriteTransportError(w, r, http.StatusInternalServerError, middleware.CodeInternalError, "internal server error", contract.CategoryServer, nil)
 			}
 		}()

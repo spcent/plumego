@@ -228,6 +228,11 @@ func TestRecoveryWithLogger_UsesInjectedLogger(t *testing.T) {
 	if logger.last["panic"] != "logger panic" {
 		t.Fatalf("expected panic field to be logged, got %v", logger.last["panic"])
 	}
+	for _, key := range []string{"method", "path", "status", "duration", "request_id"} {
+		if _, ok := logger.last[key]; !ok {
+			t.Fatalf("expected %s field to be present", key)
+		}
+	}
 }
 
 // Benchmarks remain to ensure middleware overhead stays bounded.

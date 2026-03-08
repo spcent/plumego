@@ -102,7 +102,10 @@ func (l *limitedBodyReader) fail() (int, error) {
 			"at":         l.now().UTC(),
 		})
 		if l.logger != nil {
-			l.logger.WithFields(log.Fields{"max_bytes": l.maxBytes, "seen_bytes": l.used}).Warn("request body too large")
+			fields := contract.DefaultObservabilityPolicy.MiddlewareLogFields(nil, http.StatusRequestEntityTooLarge, 0)
+			fields["max_bytes"] = l.maxBytes
+			fields["seen_bytes"] = l.used
+			l.logger.WithFields(log.Fields(contract.DefaultObservabilityPolicy.RedactFields(fields))).Warn("request body too large")
 		}
 	}
 
