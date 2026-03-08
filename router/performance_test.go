@@ -8,7 +8,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 
-	"github.com/spcent/plumego/routeparam"
+	"github.com/spcent/plumego/validator"
 )
 
 // BenchmarkRouterComparison compares performance between old and new router implementations
@@ -181,8 +181,8 @@ func BenchmarkParameterValidation(b *testing.B) {
 
 	// Add route with validation
 	validation := NewRouteValidation().
-		AddParam("id", routeparam.PositiveInt).
-		AddParam("email", routeparam.UUID)
+		AddParam("id", validator.RouteParamPositiveInt).
+		AddParam("email", validator.RouteParamUUID)
 
 	r.AddValidation("GET", "/users/:id", validation)
 
@@ -218,7 +218,7 @@ func TestOptimizedRouterFeatures(t *testing.T) {
 
 	// Add validation
 	validation := NewRouteValidation().
-		AddParam("id", routeparam.PositiveInt)
+		AddParam("id", validator.RouteParamPositiveInt)
 	r.AddValidation("GET", "/users/:id", validation)
 
 	// Register routes
@@ -349,11 +349,11 @@ func TestCacheEviction(t *testing.T) {
 
 // TestValidationRules validates parameter validation
 func TestValidationRules(t *testing.T) {
-	emailValidator := routeparam.MustRegex(`^[^@]+@[^@]+\.[^@]+$`)
+	emailValidator := validator.RouteParamMustRegex(`^[^@]+@[^@]+\.[^@]+$`)
 	validation := NewRouteValidation().
-		AddParam("id", routeparam.PositiveInt).
+		AddParam("id", validator.RouteParamPositiveInt).
 		AddParam("email", emailValidator).
-		AddParam("name", routeparam.NewLength(1, 50))
+		AddParam("name", validator.RouteParamNewLength(1, 50))
 
 	tests := []struct {
 		name    string
