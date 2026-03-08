@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego"
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/net/websocket"
@@ -111,22 +112,22 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	})
 
 	// API endpoints (without Group - register directly)
-	d.app.GetCtx("/api/info", d.handleInfo)
-	d.app.GetCtx("/api/status", d.handleStatus)
-	d.app.GetCtx("/api/health", d.handleHealth)
-	d.app.GetCtx("/api/routes", d.handleRoutes)
-	d.app.GetCtx("/api/config", d.handleConfig)
-	d.app.GetCtx("/api/config/edit", d.handleConfigEditGet)
-	d.app.PostCtx("/api/config/edit", d.handleConfigEditSave)
-	d.app.GetCtx("/api/metrics", d.handleMetrics)
-	d.app.PostCtx("/api/metrics/clear", d.handleMetricsClear)
-	d.app.GetCtx("/api/deps", d.handleDeps)
-	d.app.GetCtx("/api/pprof/types", d.handlePprofTypes)
-	d.app.GetCtx("/api/pprof/raw", d.handlePprofRaw)
-	d.app.PostCtx("/api/test", d.handleAPITest)
-	d.app.PostCtx("/api/build", d.handleBuild)
-	d.app.PostCtx("/api/restart", d.handleRestart)
-	d.app.PostCtx("/api/stop", d.handleStop)
+	d.app.Get("/api/info", contract.AdaptCtxHandler(d.handleInfo, d.app.Logger()))
+	d.app.Get("/api/status", contract.AdaptCtxHandler(d.handleStatus, d.app.Logger()))
+	d.app.Get("/api/health", contract.AdaptCtxHandler(d.handleHealth, d.app.Logger()))
+	d.app.Get("/api/routes", contract.AdaptCtxHandler(d.handleRoutes, d.app.Logger()))
+	d.app.Get("/api/config", contract.AdaptCtxHandler(d.handleConfig, d.app.Logger()))
+	d.app.Get("/api/config/edit", contract.AdaptCtxHandler(d.handleConfigEditGet, d.app.Logger()))
+	d.app.Post("/api/config/edit", contract.AdaptCtxHandler(d.handleConfigEditSave, d.app.Logger()))
+	d.app.Get("/api/metrics", contract.AdaptCtxHandler(d.handleMetrics, d.app.Logger()))
+	d.app.Post("/api/metrics/clear", contract.AdaptCtxHandler(d.handleMetricsClear, d.app.Logger()))
+	d.app.Get("/api/deps", contract.AdaptCtxHandler(d.handleDeps, d.app.Logger()))
+	d.app.Get("/api/pprof/types", contract.AdaptCtxHandler(d.handlePprofTypes, d.app.Logger()))
+	d.app.Get("/api/pprof/raw", contract.AdaptCtxHandler(d.handlePprofRaw, d.app.Logger()))
+	d.app.Post("/api/test", contract.AdaptCtxHandler(d.handleAPITest, d.app.Logger()))
+	d.app.Post("/api/build", contract.AdaptCtxHandler(d.handleBuild, d.app.Logger()))
+	d.app.Post("/api/restart", contract.AdaptCtxHandler(d.handleRestart, d.app.Logger()))
+	d.app.Post("/api/stop", contract.AdaptCtxHandler(d.handleStop, d.app.Logger()))
 
 	// Static UI files
 	router := d.app.Router()

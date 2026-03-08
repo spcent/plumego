@@ -149,7 +149,6 @@ func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
 
 	// pprof endpoints (debug-only)
 	r.Get(DevToolsPprofBasePath, http.HandlerFunc(pprof.Index))
-	r.Get(DevToolsPprofIndexPath, http.HandlerFunc(pprof.Index))
 	r.Get(DevToolsPprofCmdline, http.HandlerFunc(pprof.Cmdline))
 	r.Get(DevToolsPprofProfile, http.HandlerFunc(pprof.Profile))
 	r.Get(DevToolsPprofSymbol, http.HandlerFunc(pprof.Symbol))

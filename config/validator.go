@@ -237,9 +237,9 @@ func (m *MaxLength) Name() string {
 
 // Pattern validator ensures string matches regex pattern
 type Pattern struct {
-	Pattern  string
-	once     sync.Once
-	regex    *regexp.Regexp
+	Pattern    string
+	once       sync.Once
+	regex      *regexp.Regexp
 	compileErr error
 }
 

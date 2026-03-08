@@ -37,7 +37,8 @@ func Configure(hooks Hooks) {
 		path = "/_debug/pubsub"
 	}
 
-	hooks.EnsureRouter().GetCtx(path, func(ctx *contract.Ctx) {
+	r := hooks.EnsureRouter()
+	r.Get(path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 		if pub == nil {
 			contractio.WriteContractError(ctx, http.StatusInternalServerError, "missing_pubsub", "pubsub is not configured")
 			return
@@ -51,7 +52,7 @@ func Configure(hooks Hooks) {
 		}
 
 		contractio.WriteContractError(ctx, http.StatusNotImplemented, "not_supported", "pubsub snapshot not supported by this implementation")
-	})
+	}, r.Logger()))
 }
 
 // Hooks provide the minimal integration points for Configure.

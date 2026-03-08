@@ -149,9 +149,9 @@ func TestBindJSONBodyCacheToggle(t *testing.T) {
 
 func TestBindJSONErrors(t *testing.T) {
 	tests := []struct {
-		name        string
-		body        string
-		wantMsg     string
+		name         string
+		body         string
+		wantMsg      string
 		wantSentinel error
 	}{
 		{name: "empty", body: "", wantMsg: "request body is empty", wantSentinel: ErrEmptyRequestBody},

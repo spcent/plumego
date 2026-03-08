@@ -2,14 +2,13 @@ package router
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/spcent/plumego/contract"
 )
 
 // Group creates a new router group with the given prefix.
-// Groups allow you to share a common path prefix and middleware across multiple routes.
+// Groups allow sharing a common path prefix and middleware across multiple routes.
 // Child groups inherit the parent's prefix and can add their own middleware.
 func (r *Router) Group(prefix string) *Router {
 	fullPrefix := normalizeGroupPrefix(r.prefix, prefix)
@@ -17,7 +16,7 @@ func (r *Router) Group(prefix string) *Router {
 	return &Router{
 		prefix:            fullPrefix,
 		parent:            r,
-		middlewareManager: NewMiddlewareManager(),
+		middlewareManager: newMiddlewareManager(),
 		state:             r.state,
 	}
 }
@@ -44,7 +43,20 @@ func normalizeGroupPrefix(parent, child string) string {
 	return combined
 }
 
-// AddRoute adds a route to the router with the given method, path and handler.
+// mustAddRoute calls AddRoute and panics on error.
+// Used by the canonical Get/Post/... convenience methods where errors are
+// programming mistakes (duplicate route, frozen router) that should fail fast.
+func (r *Router) mustAddRoute(method, path string, handler Handler) {
+	if err := r.AddRoute(method, path, handler); err != nil {
+		panic(fmt.Sprintf("router: %v", err))
+	}
+}
+
+// AddRoute adds a route to the router with the given method, path, and handler.
+// Returns an error for programming mistakes such as duplicate routes or
+// registering routes after Freeze(). Use the method shortcuts (Get, Post, …)
+// for typical route registration; AddRoute is useful when the method string
+// is determined at runtime or when callers need to inspect the error themselves.
 func (r *Router) AddRoute(method, path string, handler Handler) error {
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
@@ -178,6 +190,17 @@ func (r *Router) AddRoute(method, path string, handler Handler) error {
 	return nil
 }
 
+// AddRouteWithName adds a route and records a name for reverse URL generation.
+func (r *Router) AddRouteWithName(method, path, name string, handler Handler) error {
+	if err := r.AddRoute(method, path, handler); err != nil {
+		return err
+	}
+	if name != "" {
+		r.SetRouteMeta(method, path, RouteMeta{Name: name})
+	}
+	return nil
+}
+
 // AddRouteWithOptions adds a route and attaches metadata options.
 func (r *Router) AddRouteWithOptions(method, path string, handler Handler, opts ...RouteOption) error {
 	if err := r.AddRoute(method, path, handler); err != nil {
@@ -221,19 +244,4 @@ func compilePathSegments(path string) []segment {
 		}
 	}
 	return segments
-}
-
-// HandleFunc registers a standard http.HandlerFunc for the given path and method.
-func (r *Router) HandleFunc(method, path string, h http.HandlerFunc) error {
-	return r.AddRoute(method, path, h)
-}
-
-// Handle registers a standard http.Handler for the given path and method.
-func (r *Router) Handle(method, path string, h http.Handler) error {
-	return r.AddRoute(method, path, h)
-}
-
-// HandleWithOptions registers a standard http.Handler for the given path and method with metadata.
-func (r *Router) HandleWithOptions(method, path string, h http.Handler, opts ...RouteOption) error {
-	return r.AddRouteWithOptions(method, path, h, opts...)
 }

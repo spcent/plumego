@@ -162,24 +162,6 @@ func (r *Router) StaticFS(prefix string, fs http.FileSystem) {
 	r.registerStaticRoute(config, serveFromFileSystem)
 }
 
-// StaticSPA registers a route for Single Page Applications.
-// When a file is not found, it falls back to the index file.
-//
-// Example:
-//
-//	r.StaticSPA("/", "./dist", "index.html")
-//	// GET /about -> serves ./dist/index.html (SPA handles routing)
-func (r *Router) StaticSPA(prefix, dir, indexFile string) {
-	config := StaticConfig{
-		Prefix:      normalizeStaticPrefix(prefix),
-		Root:        dir,
-		IndexFile:   indexFile,
-		SPAFallback: true,
-	}
-
-	r.registerStaticRouteWithConfig(config, serveFromDirectoryWithConfig)
-}
-
 // serveFromDirectory serves files from a local directory
 func serveFromDirectory(w http.ResponseWriter, req *http.Request, root any) bool {
 	dir, ok := root.(string)
@@ -287,18 +269,18 @@ func isPathWithinRoot(rootDir, resolvedPath string) bool {
 func (r *Router) registerStaticRoute(config StaticConfig, handler func(http.ResponseWriter, *http.Request, any) bool) {
 	routePath := config.Prefix + "/*filepath"
 
-	r.GetFunc(routePath, func(w http.ResponseWriter, req *http.Request) {
+	r.Get(routePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		handler(w, req, config.Root)
-	})
+	}))
 }
 
 // registerStaticRouteWithConfig registers static file routes with full configuration
 func (r *Router) registerStaticRouteWithConfig(config StaticConfig, handler func(http.ResponseWriter, *http.Request, StaticConfig) bool) {
 	routePath := config.Prefix + "/*filepath"
 
-	r.GetFunc(routePath, func(w http.ResponseWriter, req *http.Request) {
+	r.Get(routePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		handler(w, req, config)
-	})
+	}))
 }
 
 // isExtensionAllowed checks if a file path's extension is in the allowed list.

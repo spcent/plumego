@@ -28,9 +28,9 @@ func (d errDriver) Open(string) (driver.Conn, error) { return nil, d.err }
 // sentinel databases that return meaningful errors from (*sql.Row).Scan
 // without requiring a real database connection.
 var (
-	errNoTenantIDDB  = sql.OpenDB(errConnector{errors.New("tenant ID not found in context")})
-	errNotInitDB     = sql.OpenDB(errConnector{errors.New("database not initialized")})
-	errBadColumnDB   = sql.OpenDB(errConnector{errors.New("invalid tenant column name")})
+	errNoTenantIDDB = sql.OpenDB(errConnector{errors.New("tenant ID not found in context")})
+	errNotInitDB    = sql.OpenDB(errConnector{errors.New("database not initialized")})
+	errBadColumnDB  = sql.OpenDB(errConnector{errors.New("invalid tenant column name")})
 )
 
 // TenantDB wraps sql.DB with automatic tenant filtering for queries.

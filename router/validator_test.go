@@ -4,18 +4,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/spcent/plumego/routeparam"
 )
 
 func TestRouteValidationGroupPrefix(t *testing.T) {
 	r := NewRouter()
 	api := r.Group("/api")
 
-	validation := NewRouteValidation().AddParam("id", PositiveIntValidator)
+	validation := NewRouteValidation().AddParam("id", routeparam.PositiveInt)
 	api.AddValidation(http.MethodGet, "/users/:id", validation)
 
-	api.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/users/123", nil)
 	rec := httptest.NewRecorder()
@@ -37,12 +39,12 @@ func TestRouteValidationGroupPrefix(t *testing.T) {
 func TestRouteValidationWildcard(t *testing.T) {
 	r := NewRouter()
 
-	validation := NewRouteValidation().AddParam("path", NewLengthValidator(5, 100))
+	validation := NewRouteValidation().AddParam("path", routeparam.NewLength(5, 100))
 	r.AddValidation(http.MethodGet, "/files/*path", validation)
 
-	r.GetFunc("/files/*path", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/files/a/b", nil)
 	rec := httptest.NewRecorder()
@@ -64,12 +66,12 @@ func TestRouteValidationWildcard(t *testing.T) {
 func TestRouteValidationCache(t *testing.T) {
 	r := NewRouter()
 
-	validation := NewRouteValidation().AddParam("id", PositiveIntValidator)
+	validation := NewRouteValidation().AddParam("id", routeparam.PositiveInt)
 	r.AddValidation(http.MethodGet, "/users/:id", validation)
 
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users/abc", nil)
 	rec := httptest.NewRecorder()
@@ -91,12 +93,12 @@ func TestRouteValidationCache(t *testing.T) {
 func TestRouteValidationAnyRoute(t *testing.T) {
 	r := NewRouter()
 
-	validation := NewRouteValidation().AddParam("id", PositiveIntValidator)
+	validation := NewRouteValidation().AddParam("id", routeparam.PositiveInt)
 	r.AddValidation(ANY, "/users/:id", validation)
 
-	r.AnyFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Any("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodPost, "/users/abc", nil)
 	rec := httptest.NewRecorder()
@@ -111,9 +113,9 @@ func TestGroupCanServeHTTPDirectly(t *testing.T) {
 	r := NewRouter()
 	api := r.Group("/api")
 
-	api.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	api.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/ping", nil)
 	rec := httptest.NewRecorder()

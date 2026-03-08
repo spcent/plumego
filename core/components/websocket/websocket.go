@@ -97,13 +97,13 @@ func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 	c.routesOnce.Do(func() {
 		wsAuth := ws.NewSimpleRoomAuth(c.config.Secret)
 
-		r.GetFunc(c.config.WSRoutePath, func(w http.ResponseWriter, r *http.Request) {
+		r.Get(c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ws.ServeWSWithAuth(w, r, c.hub, wsAuth, c.config.SendQueueSize,
 				c.config.SendTimeout, c.config.SendBehavior)
-		})
+		}))
 
 		if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
-			r.PostFunc(c.config.BroadcastPath, func(w http.ResponseWriter, r *http.Request) {
+			r.Post(c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
 					contractio.WriteHTTPError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "POST only")
 					return
@@ -137,7 +137,7 @@ func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 					c.hub.BroadcastAll(ws.OpcodeText, b)
 				}
 				w.WriteHeader(http.StatusNoContent)
-			})
+			}))
 		}
 	})
 }

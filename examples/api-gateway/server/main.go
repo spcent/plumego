@@ -172,7 +172,7 @@ func main() {
 	// Metrics endpoint (Prometheus)
 	if cfg.Metrics.Enabled {
 		if promCollector, ok := metricsCollector.(*metrics.PrometheusCollector); ok {
-			app.Handle(cfg.Metrics.Path, promCollector.Handler())
+			app.Any(cfg.Metrics.Path, func(w http.ResponseWriter, r *http.Request) { promCollector.Handler().ServeHTTP(w, r) })
 			log.Printf("✓ Metrics endpoint registered: %s", cfg.Metrics.Path)
 		}
 	}

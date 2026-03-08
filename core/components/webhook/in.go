@@ -51,13 +51,13 @@ func (c *WebhookInComponent) RegisterRoutes(r *router.Router) {
 		if gitHubPath == "" {
 			gitHubPath = "/webhooks/github"
 		}
-		r.PostCtx(gitHubPath, func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) })
+		r.Post(gitHubPath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }, r.Logger()))
 
 		stripePath := strings.TrimSpace(c.cfg.StripePath)
 		if stripePath == "" {
 			stripePath = "/webhooks/stripe"
 		}
-		r.PostCtx(stripePath, func(ctx *contract.Ctx) { c.webhookInStripe(ctx) })
+		r.Post(stripePath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }, r.Logger()))
 	})
 }
 

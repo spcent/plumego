@@ -13,10 +13,10 @@ import (
 
 // Global configuration instance for package-level convenience functions.
 var (
-	globalConfig        *Manager
-	globalConfigMu      sync.RWMutex
-	globalInitialized   bool // protected by globalConfigMu
-	globalInitErr       error
+	globalConfig      *Manager
+	globalConfigMu    sync.RWMutex
+	globalInitialized bool // protected by globalConfigMu
+	globalInitErr     error
 )
 
 // LoadEnvFile loads environment variables from a file.

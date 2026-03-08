@@ -12,9 +12,9 @@ import (
 
 func TestMethodMismatchReturnsNotFound(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/only", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodPost, "/only", nil)
 	rec := httptest.NewRecorder()
@@ -33,9 +33,9 @@ func TestMethodMismatchReturnsNotFound(t *testing.T) {
 
 func TestMethodNotAllowedWhenEnabled(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
-	r.GetFunc("/only", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodPost, "/only", nil)
 	rec := httptest.NewRecorder()
@@ -51,9 +51,9 @@ func TestMethodNotAllowedWhenEnabled(t *testing.T) {
 
 func TestMethodNotAllowedRoot(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
-	r.GetFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("root"))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	rec := httptest.NewRecorder()
@@ -69,9 +69,9 @@ func TestMethodNotAllowedRoot(t *testing.T) {
 
 func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true), WithCacheCapacity(10))
-	r.GetFunc("/only", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodPost, "/only", nil)
 	rec := httptest.NewRecorder()
@@ -98,9 +98,9 @@ func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
 
 func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
-	_ = r.GetFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	_ = r.PostFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	_ = r.PutFunc("/only", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	r.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
+	r.Post("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
+	r.Put("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 
 	req := httptest.NewRequest(http.MethodDelete, "/only", nil)
 	rec := httptest.NewRecorder()
@@ -116,9 +116,9 @@ func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
 
 func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
-	})
+	}))
 	r.Any("/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
@@ -165,10 +165,10 @@ func TestAnyFallbackWithCache(t *testing.T) {
 
 func TestTrailingSlashNormalization(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte(id))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users/123/", nil)
 	rec := httptest.NewRecorder()
@@ -184,9 +184,9 @@ func TestTrailingSlashNormalization(t *testing.T) {
 
 func TestInternalDoubleSlashNotNormalized(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users//123", nil)
 	rec := httptest.NewRecorder()
@@ -199,10 +199,10 @@ func TestInternalDoubleSlashNotNormalized(t *testing.T) {
 
 func TestWildcardParamCapturesRemainder(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/files/*path", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path, _ := contract.Param(r, "path")
 		w.Write([]byte(path))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/files/a/b/c.txt", nil)
 	rec := httptest.NewRecorder()
@@ -218,10 +218,10 @@ func TestWildcardParamCapturesRemainder(t *testing.T) {
 
 func TestEncodedSpaceParamIsDecoded(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte(id))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users/a%20b", nil)
 	rec := httptest.NewRecorder()
@@ -237,9 +237,9 @@ func TestEncodedSpaceParamIsDecoded(t *testing.T) {
 
 func TestEncodedSlashDoesNotMatchSingleSegmentParam(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users/a%2Fb", nil)
 	rec := httptest.NewRecorder()
@@ -252,10 +252,10 @@ func TestEncodedSlashDoesNotMatchSingleSegmentParam(t *testing.T) {
 
 func TestEncodedSlashMatchesWildcardParam(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/files/*path", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path, _ := contract.Param(r, "path")
 		w.Write([]byte(path))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/files/a%2Fb", nil)
 	rec := httptest.NewRecorder()
@@ -271,10 +271,10 @@ func TestEncodedSlashMatchesWildcardParam(t *testing.T) {
 
 func TestDuplicateParamKeysLastWins(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/teams/:id/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/teams/:id/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte(id))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/teams/1/users/2", nil)
 	rec := httptest.NewRecorder()
@@ -291,10 +291,10 @@ func TestDuplicateParamKeysLastWins(t *testing.T) {
 func TestGroupParamKeysLastWins(t *testing.T) {
 	r := NewRouter()
 	group := r.Group("/orgs/:id")
-	group.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	group.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte(id))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/orgs/1/users/2", nil)
 	rec := httptest.NewRecorder()
@@ -311,9 +311,9 @@ func TestGroupParamKeysLastWins(t *testing.T) {
 func TestGroupParamDoesNotMatchEncodedSlash(t *testing.T) {
 	r := NewRouter()
 	group := r.Group("/orgs/:id")
-	group.GetFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	group.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/orgs/a%2Fb/users", nil)
 	rec := httptest.NewRecorder()
@@ -326,10 +326,10 @@ func TestGroupParamDoesNotMatchEncodedSlash(t *testing.T) {
 
 func TestRouteCacheDoesNotLeakParams(t *testing.T) {
 	r := NewRouter(WithCacheCapacity(10))
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		w.Write([]byte(id))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users/one", nil)
 	rec := httptest.NewRecorder()
@@ -362,9 +362,9 @@ func TestMiddlewareShortCircuitStopsHandler(t *testing.T) {
 		})
 	})
 
-	r.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("handler should not be called")
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	rec := httptest.NewRecorder()
@@ -394,10 +394,10 @@ func TestCachedMatchPreservesMiddlewareOrder(t *testing.T) {
 			next.ServeHTTP(w, r)
 		})
 	})
-	r.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "handler")
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	rec := httptest.NewRecorder()
@@ -448,10 +448,10 @@ func TestCachedMatchPreservesNestedGroupOrder(t *testing.T) {
 		})
 	})
 
-	v1.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	v1.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "handler")
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/ping", nil)
 	rec := httptest.NewRecorder()
@@ -477,7 +477,7 @@ func TestCachedMatchPreservesNestedGroupOrder(t *testing.T) {
 
 func TestRouteParamsOverrideExistingContext(t *testing.T) {
 	r := NewRouter()
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := contract.Param(r, "id")
 		rc := contract.RequestContextFrom(r.Context())
 
@@ -488,7 +488,7 @@ func TestRouteParamsOverrideExistingContext(t *testing.T) {
 			t.Fatalf("expected RequestContext param %q, got %q", "123", rc.Params["id"])
 		}
 		w.Write([]byte("ok"))
-	})
+	}))
 
 	baseReq := httptest.NewRequest(http.MethodGet, "/users/123", nil)
 	ctx := context.WithValue(baseReq.Context(), contract.ParamsContextKey{}, map[string]string{"id": "ctx"})
@@ -541,9 +541,9 @@ func TestRouteContextVisibleToOuterMiddleware(t *testing.T) {
 		})
 	})
 
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users/123", nil)
 	rec := httptest.NewRecorder()
@@ -559,9 +559,9 @@ func TestRouteContextVisibleToOuterMiddleware(t *testing.T) {
 
 func TestRouteCacheNormalizesTrailingSlash(t *testing.T) {
 	r := NewRouter(WithCacheCapacity(10))
-	r.GetFunc("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users/123", nil)
 	rec := httptest.NewRecorder()
@@ -600,10 +600,10 @@ func TestRouteCacheInvalidatesOnMiddlewareChange(t *testing.T) {
 	}
 
 	r.Use(mw1)
-	r.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "handler")
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	rec := httptest.NewRecorder()
@@ -630,12 +630,12 @@ func TestRouteCacheInvalidatesOnMiddlewareChange(t *testing.T) {
 
 func TestRouteCacheSeparatesByHostAndMethod(t *testing.T) {
 	r := NewRouter(WithCacheCapacity(10))
-	r.GetFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
-	r.PostFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	r.Post("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	req.Host = "one.example"
