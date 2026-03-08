@@ -524,6 +524,8 @@ type statBucket struct {
 	max       float64
 	values    []float64
 	maxValues int
+	sorted    []float64
+	sortedOK  bool
 }
 
 func newStatBucket(maxValues int) *statBucket {
@@ -551,6 +553,7 @@ func (b *statBucket) record(value float64) {
 
 	if b.maxValues > 0 && len(b.values) < b.maxValues {
 		b.values = append(b.values, value)
+		b.sortedOK = false
 	}
 }
 
@@ -569,12 +572,26 @@ func (b *statBucket) snapshot() AggregatorStats {
 	stats.Mean = b.sum / float64(b.count)
 
 	if len(b.values) > 0 {
-		stats.P50 = percentile(b.values, 0.50)
-		stats.P95 = percentile(b.values, 0.95)
-		stats.P99 = percentile(b.values, 0.99)
+		sorted := b.sortedValues()
+		stats.P50 = percentileSorted(sorted, 0.50)
+		stats.P95 = percentileSorted(sorted, 0.95)
+		stats.P99 = percentileSorted(sorted, 0.99)
 	}
 
 	return stats
+}
+
+func (b *statBucket) sortedValues() []float64 {
+	if b.sortedOK {
+		return b.sorted
+	}
+
+	b.sorted = make([]float64, len(b.values))
+	copy(b.sorted, b.values)
+	sort.Float64s(b.sorted)
+	b.sortedOK = true
+
+	return b.sorted
 }
 
 func (d *DevCollector) appendDBSlowLocked(operation, driver, table, query string, durationMS float64, err error, now time.Time) {
