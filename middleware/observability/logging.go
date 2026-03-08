@@ -236,7 +236,7 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 			}
 
 			r = r.WithContext(ctx)
-			w.Header().Set("X-Request-ID", traceID)
+			w.Header().Set(contract.RequestIDHeader, traceID)
 			if spanID != "" {
 				w.Header().Set("X-Span-ID", spanID)
 			}
@@ -265,16 +265,10 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 				span.End(metricsData)
 			}
 
-			fields := log.Fields{
-				"trace_id":    traceID,
-				"method":      metricsData.Method,
-				"path":        metricsData.Path,
-				"status":      metricsData.Status,
-				"bytes":       metricsData.Bytes,
-				"duration_ms": metricsData.Duration.Milliseconds(),
-				"user_agent":  metricsData.UserAgent,
-				"client_ip":   httpx.ClientIP(r),
-			}
+			fields := contract.DefaultObservabilityPolicy.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
+			fields["bytes"] = metricsData.Bytes
+			fields["user_agent"] = metricsData.UserAgent
+			fields["client_ip"] = httpx.ClientIP(r)
 			if metricsData.Route != "" {
 				fields["route"] = metricsData.Route
 			}
@@ -294,10 +288,7 @@ func ensureTraceID(r *http.Request) string {
 	if id := contract.TraceIDFromContext(r.Context()); id != "" {
 		return id
 	}
-	if id := r.Header.Get("X-Request-ID"); id != "" {
-		return id
-	}
-	if id := r.Header.Get("X-Trace-ID"); id != "" {
+	if id := contract.DefaultObservabilityPolicy.RequestIDFromRequest(r); id != "" {
 		return id
 	}
 	return log.NewTraceID()

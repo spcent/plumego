@@ -281,12 +281,12 @@ func logBindError(c *Ctx, payload any, opts BindOptions, err error) {
 		if opts.Redact != nil {
 			fields["payload"] = opts.Redact(payload)
 		} else {
-			fields["payload"] = payload
+			fields["payload"] = DefaultObservabilityPolicy.RedactFields(map[string]any{"payload": payload})["payload"]
 		}
 		fields["validation_fields"] = v
 	}
 
-	logger.WarnCtx(c.R.Context(), "request binding failed", fields)
+	logger.WarnCtx(c.R.Context(), "request binding failed", logpkg.Fields(DefaultObservabilityPolicy.RedactFields(fields)))
 }
 
 func (c *Ctx) bodyBytes() ([]byte, error) {

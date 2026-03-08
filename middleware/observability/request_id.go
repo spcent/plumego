@@ -77,29 +77,32 @@ func RequestID(opts ...RequestIDOption) middleware.Middleware {
 
 			ctx := context.WithValue(r.Context(), contract.TraceIDKey{}, id)
 			ctx = log.WithTraceID(ctx, id)
-			if cfg.includeInRequest {
-				r.Header.Set(cfg.headerName, id)
+			r, _ = contract.DefaultObservabilityPolicy.AttachRequestID(ctx, w, r, id, cfg.includeInRequest)
+			if cfg.headerName != "" && cfg.headerName != contract.RequestIDHeader {
+				if cfg.includeInRequest {
+					r.Header.Set(cfg.headerName, id)
+				}
+				w.Header().Set(cfg.headerName, id)
 			}
-			w.Header().Set(cfg.headerName, id)
 
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r)
 		})
 	}
 }
 
 func traceIDFromRequest(r *http.Request, headerName, fallback string) string {
+	if id := contract.DefaultObservabilityPolicy.RequestIDFromRequest(r); id != "" {
+		return id
+	}
 	if r == nil {
 		return ""
 	}
-	if id := contract.TraceIDFromContext(r.Context()); id != "" {
-		return id
-	}
-	if headerName != "" {
+	if headerName != "" && headerName != contract.RequestIDHeader {
 		if id := strings.TrimSpace(r.Header.Get(headerName)); id != "" {
 			return id
 		}
 	}
-	if fallback != "" {
+	if fallback != "" && fallback != contract.FallbackRequestIDHeader {
 		if id := strings.TrimSpace(r.Header.Get(fallback)); id != "" {
 			return id
 		}

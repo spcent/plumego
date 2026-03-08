@@ -202,9 +202,9 @@ func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Deci
 	})
 
 	if logger != nil {
-		logger.WithFields(log.Fields{
-			"limit":     decision.Limit,
-			"remaining": decision.Remaining,
-		}).Warn("request rate limited")
+		fields := contract.DefaultObservabilityPolicy.MiddlewareLogFields(r, http.StatusTooManyRequests, 0)
+		fields["limit"] = decision.Limit
+		fields["remaining"] = decision.Remaining
+		logger.WithFields(log.Fields(contract.DefaultObservabilityPolicy.RedactFields(fields))).Warn("request rate limited")
 	}
 }
