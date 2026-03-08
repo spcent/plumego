@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -92,14 +93,22 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.AP
 	return errors
 }
 
-// GenerateDocumentation generates markdown documentation for all schemas
+// GenerateDocumentation generates markdown documentation for all schemas.
+// Rows are sorted by key for deterministic output.
 func (csm *ConfigSchemaManager) GenerateDocumentation() string {
+	keys := make([]string, 0, len(csm.schemas))
+	for k := range csm.schemas {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	var builder strings.Builder
 	builder.WriteString("# Configuration Documentation\n\n")
 	builder.WriteString("| Key | Type | Required | Default | Description | Validators |\n")
 	builder.WriteString("|-----|------|----------|---------|-------------|------------|\n")
 
-	for _, schema := range csm.schemas {
+	for _, k := range keys {
+		schema := csm.schemas[k]
 		defaultStr := "nil"
 		if schema.Default != nil {
 			defaultStr = fmt.Sprintf("%v", schema.Default)
@@ -108,7 +117,6 @@ func (csm *ConfigSchemaManager) GenerateDocumentation() string {
 		if schema.Required {
 			requiredStr = "Yes"
 		}
-
 		validatorNames := make([]string, 0, len(schema.Validators))
 		for _, v := range schema.Validators {
 			validatorNames = append(validatorNames, v.Name())
@@ -117,7 +125,6 @@ func (csm *ConfigSchemaManager) GenerateDocumentation() string {
 		if validatorStr == "" {
 			validatorStr = "-"
 		}
-
 		builder.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
 			schema.Key, schema.Type, requiredStr, defaultStr, schema.Description, validatorStr))
 	}

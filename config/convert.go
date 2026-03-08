@@ -176,6 +176,7 @@ func toBool(value any, defaultValue bool) bool {
 }
 
 // parseBool parses a string to bool with common true/false representations.
+// Returns defaultValue for unrecognised strings.
 func parseBool(value string, defaultValue bool) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "1", "true", "yes", "y", "on", "t":
@@ -184,6 +185,18 @@ func parseBool(value string, defaultValue bool) bool {
 		return false
 	default:
 		return defaultValue
+	}
+}
+
+// parseBoolErr is the error-returning variant of parseBool used by setField.
+func parseBoolErr(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on", "t":
+		return true, nil
+	case "0", "false", "no", "n", "off", "f":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value: %q", value)
 	}
 }
 
@@ -339,22 +352,17 @@ func normalizeData(data map[string]any, logger log.StructuredLogger) map[string]
 	return normalized
 }
 
-// lookupValue looks up a configuration value with key normalization.
+// lookupValue looks up a configuration value by normalizing the key to snake_case.
+// All keys in the data map are stored normalized (via normalizeData), so only
+// the normalized form needs to be checked.
 func lookupValue(data map[string]any, key string) (any, bool) {
 	if len(data) == 0 {
 		return nil, false
 	}
-
 	normalized := normalizeKey(key)
-	if normalized != "" {
-		if value, exists := data[normalized]; exists {
-			return value, true
-		}
+	if normalized == "" {
+		return nil, false
 	}
-
-	if value, exists := data[key]; exists {
-		return value, true
-	}
-
-	return nil, false
+	value, exists := data[normalized]
+	return value, exists
 }

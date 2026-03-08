@@ -559,6 +559,140 @@ func TestConfigUnmarshal(t *testing.T) {
 	}
 }
 
+func TestReloadNotifiesWatchers(t *testing.T) {
+	source := &stubSource{name: "test", data: map[string]any{"value": "v1"}}
+	cfg := New()
+	cfg.AddSource(source)
+	cfg.Load(context.Background())
+
+	got := make(chan string, 1)
+	cfg.Watch("value", func(_, newVal any) {
+		got <- toString(newVal)
+	})
+
+	source.data = map[string]any{"value": "v2"}
+	if err := cfg.Reload(context.Background()); err != nil {
+		t.Fatalf("reload failed: %v", err)
+	}
+
+	select {
+	case v := <-got:
+		if v != "v2" {
+			t.Fatalf("expected watcher to receive v2, got %q", v)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("watcher not fired after Reload")
+	}
+}
+
+func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
+	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
+	cfg := New()
+	cfg.AddSource(source)
+	cfg.Load(context.Background())
+
+	fired := make(chan struct{}, 1)
+	cfg.Watch("value", func(_, _ any) { fired <- struct{}{} })
+
+	// Failed validation — watcher must NOT fire
+	source.data = map[string]any{"value": "bad"}
+	_ = cfg.ReloadWithValidation(context.Background(), func(map[string]any) error {
+		return errors.New("rejected")
+	})
+	select {
+	case <-fired:
+		t.Fatal("watcher fired despite validation failure")
+	case <-time.After(50 * time.Millisecond):
+	}
+	if got := cfg.GetString("value", ""); got != "ok" {
+		t.Fatalf("expected rollback to 'ok', got %q", got)
+	}
+
+	// Successful validation — watcher MUST fire
+	source.data = map[string]any{"value": "good"}
+	_ = cfg.ReloadWithValidation(context.Background(), func(map[string]any) error { return nil })
+	select {
+	case <-fired:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("watcher not fired after successful ReloadWithValidation")
+	}
+}
+
+func TestUnmarshalDurationAndSlice(t *testing.T) {
+	cfg := New()
+	cfg.data = map[string]any{
+		"timeout":  "5s",
+		"tags":     "alpha,beta, gamma",
+		"fallback": "2000",
+	}
+
+	type T struct {
+		Timeout  time.Duration `config:"timeout"`
+		Tags     []string      `config:"tags"`
+		Fallback time.Duration `config:"fallback"`
+	}
+
+	var target T
+	if err := cfg.Unmarshal(&target); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if target.Timeout != 5*time.Second {
+		t.Errorf("timeout: want 5s, got %v", target.Timeout)
+	}
+	if len(target.Tags) != 3 || target.Tags[1] != "beta" {
+		t.Errorf("tags: want [alpha beta gamma], got %v", target.Tags)
+	}
+	if target.Fallback != 2000*time.Millisecond {
+		t.Errorf("fallback: want 2000ms, got %v", target.Fallback)
+	}
+}
+
+func TestGetStringSliceAndHas(t *testing.T) {
+	cfg := New()
+	cfg.data = map[string]any{
+		"hosts": "a.com,b.com, c.com",
+	}
+
+	if !cfg.Has("hosts") {
+		t.Error("Has should return true for existing key")
+	}
+	if cfg.Has("missing") {
+		t.Error("Has should return false for missing key")
+	}
+
+	got := cfg.GetStringSlice("hosts", ",", nil)
+	if len(got) != 3 || got[2] != "c.com" {
+		t.Errorf("GetStringSlice: want [a.com b.com c.com], got %v", got)
+	}
+	if def := cfg.GetStringSlice("missing", ",", []string{"x"}); len(def) != 1 || def[0] != "x" {
+		t.Errorf("GetStringSlice: missing key should return default, got %v", def)
+	}
+}
+
+func TestGetDuration(t *testing.T) {
+	cfg := New()
+	cfg.data = map[string]any{
+		"go_dur": "10s",
+		"ms_dur": "3000",
+	}
+	if d := cfg.GetDuration("go_dur", 0); d != 10*time.Second {
+		t.Errorf("want 10s, got %v", d)
+	}
+	if d := cfg.GetDuration("ms_dur", 0); d != 3*time.Second {
+		t.Errorf("want 3s, got %v", d)
+	}
+	if d := cfg.GetDuration("missing", 5*time.Second); d != 5*time.Second {
+		t.Errorf("want 5s default, got %v", d)
+	}
+}
+
+func TestFileSourceWithWatchInterval(t *testing.T) {
+	src := NewFileSource("config.json", FormatJSON, true).WithWatchInterval(500 * time.Millisecond)
+	if src.watchInterval != 500*time.Millisecond {
+		t.Errorf("expected 500ms, got %v", src.watchInterval)
+	}
+}
+
 // TestFileSource tests FileSource functionality
 func TestFileSource(t *testing.T) {
 	// Create a test JSON file

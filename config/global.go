@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -93,9 +94,9 @@ func InitDefault() error {
 			}
 
 			switch {
-			case len(configFile) > 5 && configFile[len(configFile)-5:] == ".json":
+			case strings.HasSuffix(configFile, ".json"):
 				globalConfig.AddSource(NewFileSource(configFile, FormatJSON, true))
-			case len(configFile) > 4 && configFile[len(configFile)-4:] == ".env":
+			case strings.HasSuffix(configFile, ".env"):
 				globalConfig.AddSource(NewFileSource(configFile, FormatEnv, true))
 			}
 		}

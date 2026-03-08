@@ -111,22 +111,34 @@ func (e *EnvSource) parseEnvVar(env string) (key, value string) {
 
 // FileSource implements Source for configuration files.
 type FileSource struct {
-	path     string
-	format   string
-	watch    bool
-	mu       sync.Mutex // protects lastData and lastMod
-	lastData map[string]any
-	lastMod  time.Time
+	path         string
+	format       string
+	watch        bool
+	watchInterval time.Duration // polling interval; defaults to time.Second
+	mu           sync.Mutex    // protects lastData and lastMod
+	lastData     map[string]any
+	lastMod      time.Time
 }
 
 // NewFileSource creates a new file configuration source.
 // Supported formats: FormatJSON, FormatEnv.
 func NewFileSource(path string, format string, watch bool) *FileSource {
 	return &FileSource{
-		path:   path,
-		format: format,
-		watch:  watch,
+		path:          path,
+		format:        format,
+		watch:         watch,
+		watchInterval: time.Second,
 	}
+}
+
+// WithWatchInterval sets the file-polling interval for hot-reload.
+// Panics if d <= 0. Returns the receiver for chaining.
+func (f *FileSource) WithWatchInterval(d time.Duration) *FileSource {
+	if d <= 0 {
+		panic("config: FileSource watch interval must be positive")
+	}
+	f.watchInterval = d
+	return f
 }
 
 // Load loads configuration from the file.
@@ -158,7 +170,7 @@ func (f *FileSource) Watch(ctx context.Context) <-chan WatchResult {
 	go func() {
 		defer close(results)
 
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(f.watchInterval)
 		defer ticker.Stop()
 
 		for {
