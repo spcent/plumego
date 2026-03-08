@@ -339,6 +339,8 @@ func (m *MultiCollector) GetStats() CollectorStats {
 	combined := CollectorStats{
 		TypeBreakdown: make(map[MetricType]int64),
 	}
+	var weightedDurationTotal time.Duration
+	var weightedSampleCount int64
 
 	for _, c := range m.collectors {
 		stats := c.GetStats()
@@ -358,10 +360,23 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		if combined.StartTime.IsZero() || (!stats.StartTime.IsZero() && stats.StartTime.Before(combined.StartTime)) {
 			combined.StartTime = stats.StartTime
 		}
+
+		sampleCount := sampleCountForAverageDuration(stats)
+		if sampleCount > 0 {
+			weightedSampleCount += sampleCount
+			if stats.TotalDuration > 0 {
+				weightedDurationTotal += stats.TotalDuration
+			} else {
+				weightedDurationTotal += stats.AverageDuration * time.Duration(sampleCount)
+			}
+		}
 	}
 
-	// Calculate average duration
-	if combined.TotalSpans > 0 {
+	// AverageDuration is a weighted aggregation across collectors.
+	if weightedSampleCount > 0 {
+		combined.AverageDuration = weightedDurationTotal / time.Duration(weightedSampleCount)
+	} else if combined.TotalSpans > 0 {
+		// Fallback for collectors that only populate TotalDuration/TotalSpans.
 		combined.AverageDuration = combined.TotalDuration / time.Duration(combined.TotalSpans)
 	}
 
@@ -370,6 +385,18 @@ func (m *MultiCollector) GetStats() CollectorStats {
 	}
 
 	return combined
+}
+
+func sampleCountForAverageDuration(stats CollectorStats) int64 {
+	if stats.TotalSpans > 0 {
+		return int64(stats.TotalSpans)
+	}
+
+	if stats.TotalRecords > 0 && stats.AverageDuration > 0 {
+		return stats.TotalRecords
+	}
+
+	return 0
 }
 
 // Clear clears all collectors.

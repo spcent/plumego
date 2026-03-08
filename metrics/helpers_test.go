@@ -303,6 +303,70 @@ func TestMultiCollectorGetStats(t *testing.T) {
 	}
 }
 
+func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
+	collector1 := &MockCollector{
+		OnGetStats: func() CollectorStats {
+			return CollectorStats{
+				TotalRecords:    10,
+				TotalSpans:      10,
+				TotalDuration:   10 * time.Millisecond,
+				AverageDuration: 1 * time.Millisecond,
+				TypeBreakdown:   make(map[MetricType]int64),
+			}
+		},
+	}
+
+	collector2 := &MockCollector{
+		OnGetStats: func() CollectorStats {
+			return CollectorStats{
+				TotalRecords:    1,
+				TotalSpans:      1,
+				TotalDuration:   100 * time.Millisecond,
+				AverageDuration: 100 * time.Millisecond,
+				TypeBreakdown:   make(map[MetricType]int64),
+			}
+		},
+	}
+
+	multi := NewMultiCollector(collector1, collector2)
+
+	stats := multi.GetStats()
+
+	expected := (10*time.Millisecond + 100*time.Millisecond) / time.Duration(11)
+	if stats.AverageDuration != expected {
+		t.Fatalf("expected weighted average duration %v, got %v", expected, stats.AverageDuration)
+	}
+}
+
+func TestMultiCollectorGetStatsCallsEachCollectorOnce(t *testing.T) {
+	callsA := 0
+	callsB := 0
+
+	collectorA := &MockCollector{
+		OnGetStats: func() CollectorStats {
+			callsA++
+			return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+		},
+	}
+	collectorB := &MockCollector{
+		OnGetStats: func() CollectorStats {
+			callsB++
+			return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+		},
+	}
+
+	multi := NewMultiCollector(collectorA, collectorB)
+
+	_ = multi.GetStats()
+
+	if callsA != 1 {
+		t.Fatalf("expected collectorA GetStats to be called once, got %d", callsA)
+	}
+	if callsB != 1 {
+		t.Fatalf("expected collectorB GetStats to be called once, got %d", callsB)
+	}
+}
+
 func TestMultiCollectorClear(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
