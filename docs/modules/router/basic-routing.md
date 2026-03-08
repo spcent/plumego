@@ -93,7 +93,7 @@ app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 
 **When to use**: Simple handlers, compatibility with standard library
 
-### 2. Context-Aware Handler
+### 2. Compatibility Adapter Handler
 
 ```go
 func(ctx *plumego.Context)
@@ -101,17 +101,13 @@ func(ctx *plumego.Context)
 
 **Example**:
 ```go
-import "github.com/spcent/plumego"
-
 app.GetCtx("/users/:id", func(ctx *plumego.Context) {
     id := ctx.Param("id")
-    ctx.JSON(http.StatusOK, map[string]string{
-        "id": id,
-    })
+    ctx.JSON(http.StatusOK, map[string]string{"id": id})
 })
 ```
 
-**When to use**: JSON APIs, need for context helpers
+**When to use**: Legacy code migration; prefer standard `net/http` handlers for new code.
 
 ### 3. http.Handler Interface
 
@@ -398,47 +394,57 @@ func main() {
 }
 ```
 
-### With Context Handlers
+### With Standard Handlers
 
 ```go
 package main
 
 import (
+    "encoding/json"
+    "fmt"
     "net/http"
-    "github.com/spcent/plumego/core"
+
     "github.com/spcent/plumego"
+    "github.com/spcent/plumego/core"
 )
 
 func main() {
     app := core.New()
 
-    // Using context-aware handlers
-    app.GetCtx("/users", func(ctx *plumego.Context) {
-        ctx.JSON(http.StatusOK, users)
+    app.Get("/users", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(users)
     })
 
-    app.GetCtx("/users/:id", func(ctx *plumego.Context) {
-        id := ctx.Param("id")
+    app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+        id := plumego.Param(r, "id")
 
         for _, user := range users {
             if user.ID == id {
-                ctx.JSON(http.StatusOK, user)
+                w.Header().Set("Content-Type", "application/json")
+                json.NewEncoder(w).Encode(user)
                 return
             }
         }
 
-        ctx.Error(http.StatusNotFound, "User not found")
+        http.Error(w, "User not found", http.StatusNotFound)
     })
 
-    app.PostCtx("/users", func(ctx *plumego.Context) {
+    app.Post("/users", func(w http.ResponseWriter, r *http.Request) {
         var user User
-        if err := ctx.Bind(&user); err != nil {
-            ctx.Error(http.StatusBadRequest, err.Error())
+        if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+            http.Error(w, err.Error(), http.StatusBadRequest)
             return
         }
 
+        if user.ID == "" {
+            user.ID = fmt.Sprintf("%d", len(users)+1)
+        }
+
         users = append(users, user)
-        ctx.Status(http.StatusCreated).JSON(user)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusCreated)
+        json.NewEncoder(w).Encode(user)
     })
 
     app.Boot()
@@ -510,10 +516,11 @@ func main() {
    app.Delete("/resources/:id", del)  // Delete
    ```
 
-3. **Use Context Handlers for APIs**
+3. **Use Standard `net/http` Handlers Consistently**
    ```go
-   app.GetCtx("/api/users", func(ctx *plumego.Context) {
-       ctx.JSON(200, users)
+   app.Get("/api/users", func(w http.ResponseWriter, r *http.Request) {
+       w.Header().Set("Content-Type", "application/json")
+       json.NewEncoder(w).Encode(users)
    })
    ```
 
@@ -538,11 +545,11 @@ func main() {
    ```go
    // ❌ Inconsistent
    app.Get("/users", standardHandler)
-   app.GetCtx("/products", contextHandler)
+   app.Post("/products", createProductHandler)
 
    // ✅ Consistent
-   app.GetCtx("/users", handler1)
-   app.GetCtx("/products", handler2)
+   app.Get("/users", handler1)
+   app.Get("/products", handler2)
    ```
 
 3. **Don't Ignore Errors**

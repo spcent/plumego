@@ -70,7 +70,7 @@ func main() {
 }
 ```
 
-`plumego.App` also implements `http.Handler`, so it can be mounted directly into a standard library server. Contextual handlers can use the unified `plumego.Context`:
+`plumego.App` also implements `http.Handler`, so it can be mounted directly into a standard library server:
 
 ```go
 package main
@@ -85,8 +85,10 @@ import (
 func main() {
     app := plumego.New()
 
-    app.GetCtx("/health", func(ctx *plumego.Context) {
-        ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
+    app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte(`{"status":"ok"}`))
     })
 
     log.Println("server started at :8080")
@@ -102,7 +104,7 @@ func main() {
 - Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload), friendly JSON error output, and `.env` hot reload. These endpoints are intended for local development or protected environments; disable or gate them in production.
 
 ## Key Components
-- **Router**: Register handlers with `Get`, `Post`, etc., or the context-aware variants (`GetCtx`) that expose a unified request context wrapper. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
+- **Router**: Register handlers with `Get`, `Post`, and other standard-library style methods that accept `func(w http.ResponseWriter, r *http.Request)`. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
 - **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (security headers, abuse guard, body size limits, concurrency limits) are auto-injected during setup. Recovery/logging/CORS helpers can be enabled via `core.WithRecovery`, `core.WithLogging`, and `core.WithCORS`. For a production-safe baseline, `core.WithRecommendedMiddleware()` enables RequestID + Logging + Recovery in the recommended order.
 - **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
 - **Ops/Admin Endpoints**: Optional protected operations API for queue stats/replay, receipt lookup, channel health, and tenant quota inspection. Mount via `core/components/ops` and secure with a token or custom middleware. If auth is missing and `AllowInsecure` is false (default), requests are denied.

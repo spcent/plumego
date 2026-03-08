@@ -180,19 +180,7 @@ app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 })
 ```
 
-### 2. Context-Aware Handler
-
-```go
-import "github.com/spcent/plumego"
-
-app.GetCtx("/health", func(ctx *plumego.Context) {
-    ctx.JSON(http.StatusOK, map[string]string{
-        "status": "ok",
-    })
-})
-```
-
-### 3. Handler with Path Parameters
+### 2. Handler with Path Parameters
 
 ```go
 app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
@@ -200,11 +188,6 @@ app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "User ID: %s", id)
 })
 
-// Or with Context
-app.GetCtx("/users/:id", func(ctx *plumego.Context) {
-    id := ctx.Param("id")
-    ctx.JSON(200, map[string]string{"id": id})
-})
 ```
 
 ### 4. Middleware as Handler
@@ -260,7 +243,7 @@ func (a *App) Head(path string, handler http.HandlerFunc)
 func (a *App) Options(path string, handler http.HandlerFunc)
 func (a *App) Any(path string, handler http.HandlerFunc)
 
-// Context-aware variants
+// Compatibility adapters (for existing codebases)
 func (a *App) GetCtx(path string, handler func(*plumego.Context))
 func (a *App) PostCtx(path string, handler func(*plumego.Context))
 // ... etc
@@ -361,11 +344,11 @@ func main() {
         core.WithRecommendedMiddleware(),
     )
 
-    app.GetCtx("/users", listUsers)
-    app.GetCtx("/users/:id", getUser)
-    app.PostCtx("/users", createUser)
-    app.PutCtx("/users/:id", updateUser)
-    app.DeleteCtx("/users/:id", deleteUser)
+    app.Get("/users", listUsers)
+    app.Get("/users/:id", getUser)
+    app.Post("/users", createUser)
+    app.Put("/users/:id", updateUser)
+    app.Delete("/users/:id", deleteUser)
 
     app.Boot()
 }
@@ -581,7 +564,7 @@ func TestApplication(t *testing.T) {
 ✅ **Do**:
 - Register all routes before calling `Boot()`
 - Use route groups for API versioning
-- Use context-aware handlers for cleaner code
+- Use standard `net/http` handlers for canonical examples
 - Follow RESTful conventions
 
 ❌ **Don't**:

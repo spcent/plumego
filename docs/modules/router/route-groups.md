@@ -64,9 +64,6 @@ api.Post("/users", createUser)
 api.Put("/users/:id", updateUser)
 api.Delete("/users/:id", deleteUser)
 
-// Context-aware variants
-api.GetCtx("/products", listProducts)
-api.PostCtx("/products", createProduct)
 ```
 
 ### Named Routes in Groups
