@@ -32,6 +32,21 @@ type JSONOptions struct {
 
 // BindJSON parses JSON into a struct, validates it, and stores it in context.
 // Retrieve the bound payload with FromRequest/FromContext.
+//
+// # Canonical style note
+//
+// This middleware-first binding pattern is NOT canonical for new Plumego code.
+// Per the style guide (§9.3), canonical handlers should decode JSON explicitly:
+//
+//	var req MyRequest
+//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//	    contract.WriteError(w, r, contract.NewError(...))
+//	    return
+//	}
+//
+// BindJSON is provided as an optional compatibility helper for advanced cases
+// where centralized validation middleware is strongly preferred. It must not be
+// used in canonical examples or generated scaffolding.
 func BindJSON[T any](opts JSONOptions) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +65,7 @@ func BindJSON[T any](opts JSONOptions) middleware.Middleware {
 }
 
 // FromRequest returns the bound payload from request context.
+// Only use in conjunction with BindJSON middleware. See BindJSON for canonical style guidance.
 func FromRequest[T any](r *http.Request) (*T, bool) {
 	if r == nil {
 		return nil, false
@@ -58,6 +74,7 @@ func FromRequest[T any](r *http.Request) (*T, bool) {
 }
 
 // FromContext returns the bound payload from context.
+// Only use in conjunction with BindJSON middleware. See BindJSON for canonical style guidance.
 func FromContext[T any](ctx context.Context) (*T, bool) {
 	if ctx == nil {
 		return nil, false
