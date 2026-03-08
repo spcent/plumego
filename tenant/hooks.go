@@ -29,6 +29,10 @@ type PolicyDecision struct {
 	Method   string
 	Path     string
 	Status   int
+	// Err is non-nil when the decision was caused by a backend error rather than
+	// a policy rule, allowing observers to distinguish system failures from
+	// intentional denials.
+	Err error
 }
 
 // QuotaDecision describes a quota evaluation outcome.
@@ -41,6 +45,10 @@ type QuotaDecision struct {
 	RemainingRequests int
 	RetryAfter        time.Duration
 	Status            int
+	// Err is non-nil when the decision was caused by a backend error rather than
+	// an explicit quota limit, allowing observers to distinguish system failures
+	// from intentional throttling.
+	Err error
 }
 
 // RateLimitDecision describes a rate limit evaluation outcome.
@@ -53,6 +61,10 @@ type RateLimitDecision struct {
 	Burst      int64
 	RetryAfter time.Duration
 	Status     int
+	// Err is non-nil when the decision was caused by a backend error rather than
+	// an explicit rate limit, allowing observers to distinguish system failures
+	// from intentional throttling.
+	Err error
 }
 
 // Resolve invokes the resolve hook when configured.

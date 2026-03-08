@@ -60,6 +60,7 @@ func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
 				Burst:      result.Burst,
 				RetryAfter: result.RetryAfter,
 				Status:     status,
+				Err:        err,
 			})
 
 			if allowed {

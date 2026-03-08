@@ -2,6 +2,7 @@ package tenant
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -75,8 +76,8 @@ func TestSlidingWindowQuotaManager_RequestLimit(t *testing.T) {
 		Tokens:   10,
 		Now:      now.Add(3 * time.Second),
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if !errors.Is(err, ErrQuotaExceeded) {
+		t.Fatalf("expected ErrQuotaExceeded, got %v", err)
 	}
 	if result.Allowed {
 		t.Error("expected 4th request to be denied")
@@ -119,8 +120,8 @@ func TestSlidingWindowQuotaManager_TokenLimit(t *testing.T) {
 		Tokens:   25,
 		Now:      now.Add(time.Second),
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if !errors.Is(err, ErrQuotaExceeded) {
+		t.Fatalf("expected ErrQuotaExceeded, got %v", err)
 	}
 	if result.Allowed {
 		t.Error("expected second request to be denied (token limit)")
@@ -289,8 +290,8 @@ func TestSlidingWindowQuotaManager_MultipleRequests(t *testing.T) {
 		Tokens:   10,
 		Now:      now.Add(time.Second),
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if !errors.Is(err, ErrQuotaExceeded) {
+		t.Fatalf("expected ErrQuotaExceeded, got %v", err)
 	}
 	if result.Allowed {
 		t.Error("second batch should be denied (exceeds quota)")

@@ -32,11 +32,12 @@ import (
 
 var ErrTenantNotFound = errors.New("tenant not found")
 
-// Config defines tenant-level policies and quotas.
+// Config defines tenant-level policies, quotas, and rate limits.
 type Config struct {
 	TenantID  string
 	Quota     QuotaConfig
 	Policy    PolicyConfig
+	RateLimit RateLimitConfig
 	Metadata  map[string]string
 	UpdatedAt time.Time
 }
@@ -54,6 +55,25 @@ type QuotaConfigProvider interface {
 // PolicyConfigProvider loads policy configuration for a tenant.
 type PolicyConfigProvider interface {
 	PolicyConfig(ctx context.Context, tenantID string) (PolicyConfig, error)
+}
+
+// RateLimitConfigProviderFromConfig wraps a ConfigManager as a RateLimitConfigProvider.
+// This allows InMemoryConfigManager (and DBTenantConfigManager) to serve as the
+// provider for TokenBucketRateLimiter without a separate InMemoryRateLimitProvider.
+type RateLimitConfigProviderFromConfig struct {
+	Manager ConfigManager
+}
+
+// RateLimitConfig implements RateLimitConfigProvider by reading from the unified Config.
+func (p *RateLimitConfigProviderFromConfig) RateLimitConfig(ctx context.Context, tenantID string) (RateLimitConfig, error) {
+	if p == nil || p.Manager == nil {
+		return RateLimitConfig{}, ErrTenantNotFound
+	}
+	cfg, err := p.Manager.GetTenantConfig(ctx, tenantID)
+	if err != nil {
+		return RateLimitConfig{}, err
+	}
+	return cfg.RateLimit, nil
 }
 
 // InMemoryConfigManager stores tenant configs in memory.
@@ -114,4 +134,16 @@ func (m *InMemoryConfigManager) PolicyConfig(ctx context.Context, tenantID strin
 		return PolicyConfig{}, err
 	}
 	return cfg.Policy, nil
+}
+
+// RateLimitConfig returns the rate limit config for a tenant.
+// This satisfies RateLimitConfigProvider so InMemoryConfigManager can be passed
+// directly to NewTokenBucketRateLimiter, removing the need for a separate
+// InMemoryRateLimitProvider when using the unified Config store.
+func (m *InMemoryConfigManager) RateLimitConfig(ctx context.Context, tenantID string) (RateLimitConfig, error) {
+	cfg, err := m.GetTenantConfig(ctx, tenantID)
+	if err != nil {
+		return RateLimitConfig{}, err
+	}
+	return cfg.RateLimit, nil
 }

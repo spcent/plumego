@@ -26,7 +26,7 @@ type QuotaStore interface {
 
 // InMemoryQuotaStore is a simple in-memory quota store.
 type InMemoryQuotaStore struct {
-	mu              sync.Mutex
+	mu              sync.RWMutex
 	entries         map[quotaKey]*QuotaUsage
 	cleanupInterval time.Duration
 	lastCleanup     time.Time
@@ -121,8 +121,8 @@ func (s *InMemoryQuotaStore) Usage(tenantID string, window QuotaWindow, windowSt
 	if s == nil {
 		return QuotaUsage{}, false
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	key := quotaKey{tenantID: tenantID, window: window, windowStart: windowStart}
 	usage := s.entries[key]

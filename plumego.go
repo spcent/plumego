@@ -148,6 +148,10 @@ type (
 	TenantQuotaDecision       = tenant.QuotaDecision
 	TenantPolicyDecision      = tenant.PolicyDecision
 	TenantRateLimitDecision   = tenant.RateLimitDecision
+	// TenantRateLimitConfigProviderFromConfig allows using any ConfigManager
+	// as a RateLimitConfigProvider for TokenBucketRateLimiter, reading the
+	// RateLimitConfig field from the unified tenant Config.
+	TenantRateLimitConfigProviderFromConfig = tenant.RateLimitConfigProviderFromConfig
 )
 
 // Tenant configuration and middleware options.
