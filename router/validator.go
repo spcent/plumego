@@ -5,8 +5,9 @@ import (
 )
 
 // ParamValidator defines the interface for route parameter validation.
-// Implementations live in the routeparam package; this interface is defined
-// here to keep the router package free of concrete validation logic.
+// Implementations are provided by external packages such as validator; this
+// interface is defined here to keep the router package free of concrete
+// validation logic.
 type ParamValidator interface {
 	Validate(name, value string) error
 }

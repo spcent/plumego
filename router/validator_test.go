@@ -5,14 +5,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spcent/plumego/routeparam"
+	"github.com/spcent/plumego/validator"
 )
 
 func TestRouteValidationGroupPrefix(t *testing.T) {
 	r := NewRouter()
 	api := r.Group("/api")
 
-	validation := NewRouteValidation().AddParam("id", routeparam.PositiveInt)
+	validation := NewRouteValidation().AddParam("id", validator.RouteParamPositiveInt)
 	api.AddValidation(http.MethodGet, "/users/:id", validation)
 
 	api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +39,7 @@ func TestRouteValidationGroupPrefix(t *testing.T) {
 func TestRouteValidationWildcard(t *testing.T) {
 	r := NewRouter()
 
-	validation := NewRouteValidation().AddParam("path", routeparam.NewLength(5, 100))
+	validation := NewRouteValidation().AddParam("path", validator.RouteParamNewLength(5, 100))
 	r.AddValidation(http.MethodGet, "/files/*path", validation)
 
 	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +66,7 @@ func TestRouteValidationWildcard(t *testing.T) {
 func TestRouteValidationCache(t *testing.T) {
 	r := NewRouter()
 
-	validation := NewRouteValidation().AddParam("id", routeparam.PositiveInt)
+	validation := NewRouteValidation().AddParam("id", validator.RouteParamPositiveInt)
 	r.AddValidation(http.MethodGet, "/users/:id", validation)
 
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +93,7 @@ func TestRouteValidationCache(t *testing.T) {
 func TestRouteValidationAnyRoute(t *testing.T) {
 	r := NewRouter()
 
-	validation := NewRouteValidation().AddParam("id", routeparam.PositiveInt)
+	validation := NewRouteValidation().AddParam("id", validator.RouteParamPositiveInt)
 	r.AddValidation(ANY, "/users/:id", validation)
 
 	r.Any("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
