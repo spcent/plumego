@@ -146,15 +146,14 @@ app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 })
 ```
 
-### Context-Aware Handler
+### JSON Response with Standard Handler
 
 ```go
-app.GetCtx("/users/:id", func(ctx *plumego.Context) {
-    // Extract from context
-    id := ctx.Param("id")
+app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+    id := plumego.Param(r, "id")
 
-    // Use parameter
-    ctx.JSON(200, map[string]string{"id": id})
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"id": id})
 })
 ```
 

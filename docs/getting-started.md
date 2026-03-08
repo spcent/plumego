@@ -65,20 +65,22 @@ app.Delete("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 
 ### Path Parameters
 
-Use `:name` in route paths to capture parameters. Context-aware handlers (`GetCtx`, `PostCtx`, etc.) provide a `*plumego.Context` with helpers for parameter access and JSON responses:
+Use `:name` in route paths to capture parameters:
 
 ```go
-app.GetCtx("/users/:id", func(ctx *plumego.Context) {
-	id, _ := ctx.Param("id")
-	ctx.JSON(http.StatusOK, map[string]string{
+app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	id := plumego.Param(r, "id")
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
 		"id":   id,
 		"name": "Alice",
 	})
 })
 
-app.PutCtx("/users/:id", func(ctx *plumego.Context) {
-	id, _ := ctx.Param("id")
-	ctx.JSON(http.StatusOK, map[string]string{
+app.Put("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+	id := plumego.Param(r, "id")
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
 		"id":      id,
 		"updated": "true",
 	})
@@ -117,3 +119,7 @@ app := plumego.New(
 - Browse `examples/reference/` for a full-featured application
 - See `examples/` for focused examples on routing, middleware, caching, and more
 - Read the source at `core/`, `router/`, and `contract/` for API details
+
+## Compatibility Note
+
+`GetCtx`, `PostCtx`, and related `*Ctx` helpers remain available as compatibility adapters for existing codebases. New onboarding examples in this guide use the standard `net/http` handler style as the canonical pattern.

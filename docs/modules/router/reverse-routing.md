@@ -114,15 +114,16 @@ url := router.URL("user.show", map[string]string{
 ### In Handlers
 
 ```go
-app.GetCtx("/users/:id", func(ctx *plumego.Context) {
-    id := ctx.Param("id")
+app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+    id := plumego.Param(r, "id")
 
     // Generate URL for related resource
     postsURL := app.Router().URL("user.posts", map[string]string{
         "id": id,
     })
 
-    ctx.JSON(200, map[string]string{
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{
         "id":       id,
         "postsURL": postsURL,
     })
@@ -262,8 +263,8 @@ type UserResponse struct {
     Links map[string]string `json:"_links"`
 }
 
-app.GetCtx("/users/:id", func(ctx *plumego.Context) {
-    id := ctx.Param("id")
+app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+    id := plumego.Param(r, "id")
     user := getUser(id)
 
     response := UserResponse{
@@ -277,7 +278,8 @@ app.GetCtx("/users/:id", func(ctx *plumego.Context) {
         },
     }
 
-    ctx.JSON(200, response)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(response)
 })
 
 // Response:
@@ -301,8 +303,11 @@ type PaginatedResponse struct {
     Links map[string]string `json:"links"`
 }
 
-app.GetCtx("/users", func(ctx *plumego.Context) {
-    page := ctx.QueryParam("page", "1")
+app.Get("/users", func(w http.ResponseWriter, r *http.Request) {
+    page := r.URL.Query().Get("page")
+    if page == "" {
+        page = "1"
+    }
     pageNum, _ := strconv.Atoi(page)
 
     users := getUsersPage(pageNum)
@@ -328,7 +333,8 @@ app.GetCtx("/users", func(ctx *plumego.Context) {
         },
     }
 
-    ctx.JSON(200, response)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(response)
 })
 ```
 
@@ -357,10 +363,10 @@ func sendWelcomeEmail(user User) {
 ### Location Headers
 
 ```go
-app.PostCtx("/users", func(ctx *plumego.Context) {
+app.Post("/users", func(w http.ResponseWriter, r *http.Request) {
     var user User
-    if err := ctx.Bind(&user); err != nil {
-        ctx.Error(400, err.Error())
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
 
@@ -372,8 +378,10 @@ app.PostCtx("/users", func(ctx *plumego.Context) {
         "id": createdUser.ID,
     })
 
-    ctx.Header("Location", location)
-    ctx.Status(201).JSON(createdUser)
+    w.Header().Set("Location", location)
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(createdUser)
 })
 ```
 
