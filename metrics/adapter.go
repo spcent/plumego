@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -189,8 +190,10 @@ type Aggregator struct {
 }
 
 type bucket struct {
-	samples []sample
-	maxLen  int
+	samples          []sample
+	maxLen           int
+	sortedCache      []float64
+	sortedCacheValid bool
 }
 
 type sample struct {
@@ -261,10 +264,12 @@ func (a *Aggregator) Record(name string, value float64) {
 
 	b.evictExpired(a.window, now)
 	b.samples = append(b.samples, sample{value: value, observedAt: now})
+	b.sortedCacheValid = false
 
 	if len(b.samples) > b.maxLen {
 		overflow := len(b.samples) - b.maxLen
 		b.samples = b.samples[overflow:]
+		b.sortedCacheValid = false
 	}
 }
 
@@ -295,20 +300,20 @@ func (a *Aggregator) GetStats(name string) AggregatorStats {
 	}
 	b.evictExpired(a.window, a.now())
 
-	return buildStats(b.samples)
+	return b.buildStats()
 
 }
 
-func buildStats(samples []sample) AggregatorStats {
+func (b *bucket) buildStats() AggregatorStats {
+	samples := b.samples
 	if len(samples) == 0 {
 		return AggregatorStats{}
 	}
 
 	stats := AggregatorStats{Min: samples[0].value, Max: samples[0].value}
-	values := make([]float64, len(samples))
+	sortedValues := b.getSortedValues()
 
-	for i, s := range samples {
-		values[i] = s.value
+	for _, s := range samples {
 		stats.Count++
 		stats.Sum += s.value
 		if s.value < stats.Min {
@@ -321,11 +326,26 @@ func buildStats(samples []sample) AggregatorStats {
 
 	stats.Mean = stats.Sum / float64(stats.Count)
 
-	stats.P50 = percentile(values, 0.50)
-	stats.P95 = percentile(values, 0.95)
-	stats.P99 = percentile(values, 0.99)
+	stats.P50 = percentileSorted(sortedValues, 0.50)
+	stats.P95 = percentileSorted(sortedValues, 0.95)
+	stats.P99 = percentileSorted(sortedValues, 0.99)
 
 	return stats
+}
+
+func (b *bucket) getSortedValues() []float64 {
+	if b.sortedCacheValid {
+		return b.sortedCache
+	}
+
+	b.sortedCache = make([]float64, len(b.samples))
+	for i, s := range b.samples {
+		b.sortedCache[i] = s.value
+	}
+	sort.Float64s(b.sortedCache)
+	b.sortedCacheValid = true
+
+	return b.sortedCache
 }
 
 func (b *bucket) evictExpired(window time.Duration, now time.Time) {
@@ -341,6 +361,7 @@ func (b *bucket) evictExpired(window time.Duration, now time.Time) {
 
 	if firstValid > 0 {
 		b.samples = b.samples[firstValid:]
+		b.sortedCacheValid = false
 	}
 }
 
@@ -382,7 +403,7 @@ func (a *Aggregator) GetAllStats() map[string]AggregatorStats {
 	result := make(map[string]AggregatorStats, len(a.buckets))
 	for name, b := range a.buckets {
 		b.evictExpired(a.window, now)
-		result[name] = buildStats(b.samples)
+		result[name] = b.buildStats()
 	}
 
 	return result
@@ -395,19 +416,16 @@ func percentile(values []float64, p float64) float64 {
 		return 0
 	}
 
-	// Create a sorted copy
 	sorted := make([]float64, len(values))
 	copy(sorted, values)
+	sort.Float64s(sorted)
 
-	// Simple insertion sort for small slices
-	for i := 1; i < len(sorted); i++ {
-		key := sorted[i]
-		j := i - 1
-		for j >= 0 && sorted[j] > key {
-			sorted[j+1] = sorted[j]
-			j--
-		}
-		sorted[j+1] = key
+	return percentileSorted(sorted, p)
+}
+
+func percentileSorted(sorted []float64, p float64) float64 {
+	if len(sorted) == 0 {
+		return 0
 	}
 
 	index := int(float64(len(sorted)-1) * p)
