@@ -140,7 +140,7 @@ type MetricsCollector interface {
 //   - Series, TotalRequests, AverageLatency.
 //
 // Tracing compatibility fields (optional and collector-specific):
-//   - TotalSpans, ErrorSpans, TotalDuration, AverageDuration.
+//   - TotalSpans, ErrorSpans, TotalDuration, AverageDuration, MaxSpanRetention, DroppedSpans.
 type CollectorStats struct {
 	TotalRecords  int64                `json:"total_records"`
 	ErrorRecords  int64                `json:"error_records"`
@@ -152,10 +152,12 @@ type CollectorStats struct {
 	TotalRequests  uint64  `json:"total_requests"`
 	AverageLatency float64 `json:"average_latency"`
 	// Tracing-specific fields
-	TotalSpans      int           `json:"total_spans"`
-	ErrorSpans      int           `json:"error_spans"`
-	TotalDuration   time.Duration `json:"total_duration"`
-	AverageDuration time.Duration `json:"average_duration"`
+	TotalSpans       int           `json:"total_spans"`
+	ErrorSpans       int           `json:"error_spans"`
+	TotalDuration    time.Duration `json:"total_duration"`
+	AverageDuration  time.Duration `json:"average_duration"`
+	MaxSpanRetention int           `json:"max_span_retention"`
+	DroppedSpans     int           `json:"dropped_spans"`
 }
 
 // BaseMetricsCollector provides a base implementation for metrics collectors

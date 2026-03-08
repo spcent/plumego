@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -237,5 +238,74 @@ func TestTraceIDGeneration(t *testing.T) {
 	}
 	if len(traceID1) == 0 || len(traceID2) == 0 {
 		t.Fatalf("trace IDs should not be empty")
+	}
+}
+
+func TestOpenTelemetryTracerDefaultMaxSpans(t *testing.T) {
+	tracer := NewOpenTelemetryTracer("plumego-test")
+	stats := tracer.GetSpanStats()
+	if stats.MaxRetention != defaultMaxSpans {
+		t.Fatalf("expected default max spans %d, got %d", defaultMaxSpans, stats.MaxRetention)
+	}
+}
+
+func TestOpenTelemetryTracerMaxSpansDropOldest(t *testing.T) {
+	tracer := NewOpenTelemetryTracer("plumego-test").WithMaxSpans(3)
+
+	for i := 0; i < 5; i++ {
+		tracer.record(Span{
+			Name:      "http.request",
+			SpanID:    "span-" + strconv.Itoa(i),
+			TraceID:   "trace-" + strconv.Itoa(i),
+			Status:    "OK",
+			Timestamp: time.Unix(int64(i), 0),
+		})
+	}
+
+	spans := tracer.Spans()
+	if len(spans) != 3 {
+		t.Fatalf("expected 3 spans after retention limit, got %d", len(spans))
+	}
+
+	if spans[0].SpanID != "span-2" || spans[1].SpanID != "span-3" || spans[2].SpanID != "span-4" {
+		t.Fatalf("expected deterministic drop-oldest behavior, got ids: %s, %s, %s", spans[0].SpanID, spans[1].SpanID, spans[2].SpanID)
+	}
+
+	spanStats := tracer.GetSpanStats()
+	if spanStats.MaxRetention != 3 {
+		t.Fatalf("expected max retention 3, got %d", spanStats.MaxRetention)
+	}
+	if spanStats.DroppedSpans != 2 {
+		t.Fatalf("expected 2 dropped spans, got %d", spanStats.DroppedSpans)
+	}
+
+	collectorStats := tracer.GetStats()
+	if collectorStats.MaxSpanRetention != 3 {
+		t.Fatalf("expected collector max retention 3, got %d", collectorStats.MaxSpanRetention)
+	}
+	if collectorStats.DroppedSpans != 2 {
+		t.Fatalf("expected collector dropped spans 2, got %d", collectorStats.DroppedSpans)
+	}
+}
+
+func TestOpenTelemetryTracerWithMaxSpansTrimsExisting(t *testing.T) {
+	tracer := NewOpenTelemetryTracer("plumego-test")
+	for i := 0; i < 4; i++ {
+		tracer.record(Span{SpanID: "span-" + strconv.Itoa(i), Status: "OK"})
+	}
+
+	tracer.WithMaxSpans(2)
+
+	spans := tracer.Spans()
+	if len(spans) != 2 {
+		t.Fatalf("expected 2 spans after trim, got %d", len(spans))
+	}
+	if spans[0].SpanID != "span-2" || spans[1].SpanID != "span-3" {
+		t.Fatalf("expected latest spans to be retained, got ids: %s, %s", spans[0].SpanID, spans[1].SpanID)
+	}
+
+	stats := tracer.GetSpanStats()
+	if stats.DroppedSpans != 2 {
+		t.Fatalf("expected dropped spans to include trim operation, got %d", stats.DroppedSpans)
 	}
 }

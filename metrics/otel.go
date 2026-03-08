@@ -100,9 +100,13 @@ type OpenTelemetryTracer struct {
 
 	name string
 
-	mu    sync.RWMutex
-	spans []Span
+	mu          sync.RWMutex
+	spans       []Span
+	maxSpans    int
+	droppedSpan int
 }
+
+const defaultMaxSpans = 10000
 
 // NewOpenTelemetryTracer creates a tracer with the given instrumentation name.
 // An empty name defaults to the plumego metrics namespace.
@@ -116,7 +120,30 @@ func NewOpenTelemetryTracer(name string) *OpenTelemetryTracer {
 	if name == "" {
 		name = "github.com/spcent/plumego/metrics"
 	}
-	return &OpenTelemetryTracer{name: name}
+	return &OpenTelemetryTracer{
+		name:     name,
+		maxSpans: defaultMaxSpans,
+	}
+}
+
+// WithMaxSpans limits how many spans are retained in memory.
+// A non-positive value disables the retention limit.
+func (t *OpenTelemetryTracer) WithMaxSpans(max int) *OpenTelemetryTracer {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if max <= 0 {
+		t.maxSpans = 0
+		return t
+	}
+
+	t.maxSpans = max
+	if len(t.spans) > max {
+		t.droppedSpan += len(t.spans) - max
+		t.spans = t.spans[len(t.spans)-max:]
+	}
+
+	return t
 }
 
 // Start begins a new span for the incoming request.
@@ -231,6 +258,8 @@ func (t *OpenTelemetryTracer) GetSpanStats() SpanStats {
 
 	var stats SpanStats
 	stats.TotalSpans = len(t.spans)
+	stats.MaxRetention = t.maxSpans
+	stats.DroppedSpans = t.droppedSpan
 
 	for _, span := range t.spans {
 		if span.Status == "ERROR" {
@@ -249,6 +278,12 @@ func (t *OpenTelemetryTracer) GetSpanStats() SpanStats {
 func (t *OpenTelemetryTracer) record(span Span) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	if t.maxSpans > 0 && len(t.spans) >= t.maxSpans {
+		t.spans = t.spans[1:]
+		t.droppedSpan++
+	}
+
 	t.spans = append(t.spans, span)
 }
 
@@ -358,6 +393,8 @@ type SpanStats struct {
 	ErrorSpans      int
 	TotalDuration   time.Duration
 	AverageDuration time.Duration
+	MaxRetention    int
+	DroppedSpans    int
 }
 
 // Record, ObserveHTTP, ObservePubSub, ObserveMQ, ObserveKV, ObserveIPC, ObserveDB
@@ -369,14 +406,16 @@ func (t *OpenTelemetryTracer) GetStats() CollectorStats {
 	spanStats := t.GetSpanStats()
 
 	stats := CollectorStats{
-		TotalRecords:    int64(spanStats.TotalSpans),
-		ErrorRecords:    int64(spanStats.ErrorSpans),
-		ActiveSeries:    map[bool]int{true: 1, false: 0}[spanStats.TotalSpans > 0],
-		TypeBreakdown:   make(map[MetricType]int64),
-		TotalSpans:      spanStats.TotalSpans,
-		ErrorSpans:      spanStats.ErrorSpans,
-		TotalDuration:   spanStats.TotalDuration,
-		AverageDuration: spanStats.AverageDuration,
+		TotalRecords:     int64(spanStats.TotalSpans),
+		ErrorRecords:     int64(spanStats.ErrorSpans),
+		ActiveSeries:     map[bool]int{true: 1, false: 0}[spanStats.TotalSpans > 0],
+		TypeBreakdown:    make(map[MetricType]int64),
+		TotalSpans:       spanStats.TotalSpans,
+		ErrorSpans:       spanStats.ErrorSpans,
+		TotalDuration:    spanStats.TotalDuration,
+		AverageDuration:  spanStats.AverageDuration,
+		MaxSpanRetention: spanStats.MaxRetention,
+		DroppedSpans:     spanStats.DroppedSpans,
 	}
 
 	if spanStats.TotalSpans > 0 {
@@ -409,6 +448,7 @@ func (t *OpenTelemetryTracer) Clear() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.spans = t.spans[:0]
+	t.droppedSpan = 0
 
 	t.clearBase()
 }
