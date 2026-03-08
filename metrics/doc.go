@@ -5,6 +5,12 @@
 // popular observability systems like Prometheus and OpenTelemetry while requiring
 // zero external dependencies.
 //
+
+// Unit conventions:
+//   - MetricRecord.Value uses seconds (float64) as the canonical unit for duration/latency metrics.
+//   - MetricRecord.Duration keeps the original time.Duration for convenience and backward compatibility.
+//   - Non-duration metrics (for example counters or queue depth) keep their domain-specific values.
+//
 // # Core Components
 //
 // The package provides collector implementations for different needs:

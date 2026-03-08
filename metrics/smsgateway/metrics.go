@@ -62,7 +62,7 @@ func (r *Reporter) RecordSendLatency(ctx context.Context, tenant, provider strin
 	if r == nil || r.Collector == nil {
 		return
 	}
-	r.record(ctx, MetricSendLatency, float64(duration.Milliseconds()), labels("", "", provider, tenant, "", "", 0), duration, err)
+	r.record(ctx, MetricSendLatency, duration.Seconds(), labels("", "", provider, tenant, "", "", 0), duration, err)
 }
 
 // RecordProviderResult records a provider success/failure sample.
@@ -82,7 +82,7 @@ func (r *Reporter) RecordReceiptDelay(ctx context.Context, tenant, provider stri
 	if r == nil || r.Collector == nil {
 		return
 	}
-	r.record(ctx, MetricReceiptDelay, float64(delay.Milliseconds()), labels("", "", provider, tenant, "", "", 0), delay, nil)
+	r.record(ctx, MetricReceiptDelay, delay.Seconds(), labels("", "", provider, tenant, "", "", 0), delay, nil)
 }
 
 // RecordRetry records retry attempts (attempt >= 2 recommended).

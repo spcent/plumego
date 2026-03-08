@@ -249,7 +249,7 @@ func TestPrometheusCollectorSMSGatewayMetrics(t *testing.T) {
 	collector.Record(ctx, MetricRecord{
 		Type:     MetricSMSGateway,
 		Name:     "send_latency",
-		Value:    150,
+		Value:    0.15,
 		Duration: 150 * time.Millisecond,
 		Labels: MetricLabels{
 			"tenant":   "tenant-1",
@@ -288,7 +288,7 @@ func TestPrometheusCollectorSMSGatewayMetrics(t *testing.T) {
 	collector.Record(ctx, MetricRecord{
 		Type:     MetricSMSGateway,
 		Name:     "receipt_delay",
-		Value:    2000,
+		Value:    2,
 		Duration: 2 * time.Second,
 		Labels: MetricLabels{
 			"tenant":   "tenant-1",
@@ -397,5 +397,51 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 	// Should be at most 5 (max memory)
 	if stats.Series > 5 {
 		t.Fatalf("expected at most 5 series after eviction, got %d", stats.Series)
+	}
+}
+
+func TestPrometheusCollectorSMSGatewayLatencyValueUsesSecondsFallback(t *testing.T) {
+	tests := []struct {
+		name        string
+		metricName  string
+		value       float64
+		sumFragment string
+	}{
+		{
+			name:        "send latency",
+			metricName:  "send_latency",
+			value:       0.125,
+			sumFragment: `plumego_test_sms_gateway_send_latency_seconds_sum{tenant="tenant-1",provider="provider-a"} 0.125000000`,
+		},
+		{
+			name:        "receipt delay",
+			metricName:  "receipt_delay",
+			value:       2.5,
+			sumFragment: `plumego_test_sms_gateway_receipt_delay_seconds_sum{tenant="tenant-1",provider="provider-a"} 2.500000000`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			collector := NewPrometheusCollector("plumego_test")
+			collector.Record(context.Background(), MetricRecord{
+				Type:  MetricSMSGateway,
+				Name:  tt.metricName,
+				Value: tt.value,
+				Labels: MetricLabels{
+					"tenant":   "tenant-1",
+					"provider": "provider-a",
+				},
+			})
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+			collector.Handler().ServeHTTP(rr, req)
+
+			body := rr.Body.String()
+			if !strings.Contains(body, tt.sumFragment) {
+				t.Fatalf("expected seconds-based sum metric %q, body:\n%s", tt.sumFragment, body)
+			}
+		})
 	}
 }
