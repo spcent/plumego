@@ -345,7 +345,6 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		combined.TotalRecords += stats.TotalRecords
 		combined.ErrorRecords += stats.ErrorRecords
 		combined.ActiveSeries += stats.ActiveSeries
-		combined.TotalRequests += stats.TotalRequests
 		combined.TotalSpans += stats.TotalSpans
 		combined.ErrorSpans += stats.ErrorSpans
 		combined.TotalDuration += stats.TotalDuration
@@ -359,16 +358,6 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		if combined.StartTime.IsZero() || (!stats.StartTime.IsZero() && stats.StartTime.Before(combined.StartTime)) {
 			combined.StartTime = stats.StartTime
 		}
-	}
-
-	// Calculate average latency
-	if combined.TotalRequests > 0 {
-		// This is a simple average across all collectors
-		totalLatency := 0.0
-		for _, c := range m.collectors {
-			totalLatency += c.GetStats().AverageLatency
-		}
-		combined.AverageLatency = totalLatency / float64(len(m.collectors))
 	}
 
 	// Calculate average duration

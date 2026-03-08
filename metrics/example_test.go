@@ -22,8 +22,8 @@ func Example() {
 
 	// Get statistics
 	stats := collector.GetStats()
-	fmt.Printf("Total requests: %d\n", stats.TotalRequests)
-	fmt.Printf("Unique series: %d\n", stats.Series)
+	fmt.Printf("Total requests: %d\n", stats.TotalRecords)
+	fmt.Printf("Unique series: %d\n", stats.ActiveSeries)
 
 	// Output:
 	// Total requests: 2
@@ -255,7 +255,7 @@ func ExampleNewMultiCollector() {
 	promStats := prom.GetStats()
 	baseRecords := base.GetRecords()
 
-	fmt.Printf("Prometheus: %d requests\n", promStats.TotalRequests)
+	fmt.Printf("Prometheus: %d requests\n", promStats.TotalRecords)
 	fmt.Printf("Base: %d records\n", len(baseRecords))
 
 	// Output:
@@ -310,7 +310,7 @@ func ExamplePrometheusCollector_WithMaxMemory() {
 	}
 
 	stats := collector.GetStats()
-	fmt.Printf("Series limited to: %v\n", stats.Series <= 3)
+	fmt.Printf("Series limited to: %v\n", stats.ActiveSeries <= 3)
 
 	// Output:
 	// Series limited to: true
@@ -362,8 +362,8 @@ func ExamplePrometheusCollector_integration() {
 
 	// Get statistics
 	stats := collector.GetStats()
-	fmt.Printf("Total HTTP requests: %d\n", stats.TotalRequests)
-	fmt.Printf("Unique series: %d\n", stats.Series)
+	fmt.Printf("Total HTTP requests: %d\n", stats.TotalRecords)
+	fmt.Printf("Unique series: %d\n", stats.ActiveSeries)
 
 	// Expose metrics endpoint
 	handler := collector.Handler()

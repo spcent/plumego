@@ -34,7 +34,7 @@ func TestConfigureObservabilityMetrics(t *testing.T) {
 	}
 
 	stats := prom.GetStats()
-	if stats.TotalRequests == 0 {
+	if stats.TotalRecords == 0 {
 		t.Fatalf("expected metrics to be recorded")
 	}
 

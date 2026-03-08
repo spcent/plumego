@@ -136,9 +136,6 @@ type MetricsCollector interface {
 // Optional fields:
 //   - TypeBreakdown: per-metric-type counters when the collector can provide them.
 //
-// Legacy compatibility fields (optional and collector-specific):
-//   - Series, TotalRequests, AverageLatency.
-//
 // Tracing compatibility fields (optional and collector-specific):
 //   - TotalSpans, ErrorSpans, TotalDuration, AverageDuration, MaxSpanRetention, DroppedSpans.
 type CollectorStats struct {
@@ -147,10 +144,6 @@ type CollectorStats struct {
 	ActiveSeries  int                  `json:"active_series"`
 	StartTime     time.Time            `json:"start_time"`
 	TypeBreakdown map[MetricType]int64 `json:"type_breakdown"`
-	// Legacy fields for backward compatibility
-	Series         int     `json:"series"`
-	TotalRequests  uint64  `json:"total_requests"`
-	AverageLatency float64 `json:"average_latency"`
 	// Tracing-specific fields
 	TotalSpans       int           `json:"total_spans"`
 	ErrorSpans       int           `json:"error_spans"`

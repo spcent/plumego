@@ -124,14 +124,14 @@ func TestPrometheusCollectorStats(t *testing.T) {
 
 	stats := collector.GetStats()
 
-	if stats.Series != 1 {
-		t.Fatalf("expected 1 series, got %d", stats.Series)
+	if stats.ActiveSeries != 1 {
+		t.Fatalf("expected 1 series, got %d", stats.ActiveSeries)
 	}
-	if stats.TotalRequests != 5 {
-		t.Fatalf("expected 5 total requests, got %d", stats.TotalRequests)
+	if stats.TotalRecords != 5 {
+		t.Fatalf("expected 5 total requests, got %d", stats.TotalRecords)
 	}
-	if stats.AverageLatency == 0 {
-		t.Fatalf("expected non-zero average latency")
+	if stats.TypeBreakdown[MetricHTTPRequest] == 0 {
+		t.Fatalf("expected HTTP type breakdown to be populated")
 	}
 	if stats.StartTime.IsZero() {
 		t.Fatalf("expected non-zero start time")
@@ -149,13 +149,13 @@ func TestPrometheusCollectorClear(t *testing.T) {
 	})
 
 	stats := collector.GetStats()
-	if stats.TotalRequests != 1 {
+	if stats.TotalRecords != 1 {
 		t.Fatalf("expected 1 request before clear")
 	}
 
 	collector.Clear()
 	stats = collector.GetStats()
-	if stats.TotalRequests != 0 {
+	if stats.TotalRecords != 0 {
 		t.Fatalf("expected 0 requests after clear")
 	}
 }
@@ -174,8 +174,8 @@ func TestPrometheusCollectorMaxMemory(t *testing.T) {
 	}
 
 	stats := collector.GetStats()
-	if stats.Series > 3 {
-		t.Fatalf("expected at most 3 series due to max memory limit, got %d", stats.Series)
+	if stats.ActiveSeries > 3 {
+		t.Fatalf("expected at most 3 series due to max memory limit, got %d", stats.ActiveSeries)
 	}
 }
 
@@ -200,8 +200,8 @@ func TestPrometheusCollectorConcurrency(t *testing.T) {
 	}
 
 	stats := collector.GetStats()
-	if stats.TotalRequests != 10 {
-		t.Fatalf("expected 10 requests, got %d", stats.TotalRequests)
+	if stats.TotalRecords != 10 {
+		t.Fatalf("expected 10 requests, got %d", stats.TotalRecords)
 	}
 }
 
@@ -381,8 +381,8 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 	}
 
 	stats := collector.GetStats()
-	if stats.Series != 5 {
-		t.Fatalf("expected 5 series, got %d", stats.Series)
+	if stats.ActiveSeries != 5 {
+		t.Fatalf("expected 5 series, got %d", stats.ActiveSeries)
 	}
 
 	// Add one more, should trigger eviction
@@ -395,8 +395,8 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 
 	stats = collector.GetStats()
 	// Should be at most 5 (max memory)
-	if stats.Series > 5 {
-		t.Fatalf("expected at most 5 series after eviction, got %d", stats.Series)
+	if stats.ActiveSeries > 5 {
+		t.Fatalf("expected at most 5 series after eviction, got %d", stats.ActiveSeries)
 	}
 }
 
