@@ -14,7 +14,12 @@ func DefaultWebSocketConfig() WebSocketConfig {
 	return websocket.DefaultWebSocketConfig()
 }
 
-// ConfigureWebSocket configures WebSocket support for the app.
+// ConfigureWebSocket enables WebSocket support on the application.
+//
+// Extension capability: not part of the minimal core HTTP runtime. This method
+// exists for convenience; prefer composing a WebSocket component explicitly via
+// core.WithComponent and NewWebSocketComponent when setting up new applications.
+//
 // It returns the Hub for advanced usage.
 func (a *App) ConfigureWebSocket() (*ws.Hub, error) {
 	if err := a.loadEnv(); err != nil {
@@ -24,7 +29,9 @@ func (a *App) ConfigureWebSocket() (*ws.Hub, error) {
 	return a.ConfigureWebSocketWithOptions(DefaultWebSocketConfig())
 }
 
-// ConfigureWebSocketWithOptions configures WebSocket support with custom options.
+// ConfigureWebSocketWithOptions enables WebSocket support with custom options.
+//
+// Extension capability: not part of the minimal core HTTP runtime.
 func (a *App) ConfigureWebSocketWithOptions(config WebSocketConfig) (*ws.Hub, error) {
 	if err := a.ensureMutable("configure_websocket", "configure websocket"); err != nil {
 		return nil, err
