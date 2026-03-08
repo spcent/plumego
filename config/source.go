@@ -53,21 +53,20 @@ func (e *EnvSource) Load(ctx context.Context) (map[string]any, error) {
 	data := make(map[string]any)
 
 	for _, env := range os.Environ() {
-		key, value := e.parseEnvVar(env)
-		if key == "" {
-			continue
-		}
-
-		if e.prefix != "" && !strings.HasPrefix(key, e.prefix) {
+		key, value, ok := parseEnvLine(env)
+		if !ok {
 			continue
 		}
 
 		if e.prefix != "" {
-			key = strings.TrimPrefix(key, e.prefix)
+			trimmed, found := strings.CutPrefix(key, e.prefix)
+			if !found {
+				continue
+			}
+			key = trimmed
 		}
 
-		key = toSnakeCase(key)
-		data[key] = value
+		data[toSnakeCase(key)] = value
 	}
 
 	return data, nil
@@ -87,28 +86,6 @@ func (e *EnvSource) Name() string {
 	return "env"
 }
 
-// parseEnvVar parses an environment variable string into key and value.
-func (e *EnvSource) parseEnvVar(env string) (key, value string) {
-	parts := strings.SplitN(env, "=", 2)
-	if len(parts) != 2 {
-		return "", ""
-	}
-
-	key = strings.TrimSpace(parts[0])
-	value = strings.TrimSpace(parts[1])
-
-	// Handle quoted values with proper escaping
-	if len(value) >= 2 {
-		quote := value[0]
-		if (quote == '"' || quote == '\'') && value[len(value)-1] == quote {
-			value = value[1 : len(value)-1]
-			value = strings.ReplaceAll(value, fmt.Sprintf("\\%c", quote), string(quote))
-		}
-	}
-
-	return key, value
-}
-
 // FileSource implements Source for configuration files.
 type FileSource struct {
 	path         string
@@ -125,7 +102,7 @@ type FileSource struct {
 func NewFileSource(path string, format string, watch bool) *FileSource {
 	return &FileSource{
 		path:          path,
-		format:        format,
+		format:        strings.ToLower(format), // normalize once at construction
 		watch:         watch,
 		watchInterval: time.Second,
 	}
@@ -235,7 +212,7 @@ func (f *FileSource) loadFile() (map[string]any, error) {
 		return nil, fmt.Errorf("failed to read file %s: %w", f.path, err)
 	}
 
-	switch strings.ToLower(f.format) {
+	switch f.format {
 	case FormatJSON:
 		return f.loadJSON(content)
 	case FormatEnv:

@@ -49,10 +49,18 @@ func (csm *ConfigSchemaManager) Register(key string, entry ConfigSchemaEntry) {
 
 // ValidateAll validates all configuration against registered schemas.
 // It does NOT modify the input map; use ValidateAndApplyDefaults for that.
+// Errors are returned in key-sorted order for deterministic output.
 func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.APIError {
 	var errors []contract.APIError
 
-	for key, schema := range csm.schemas {
+	keys := make([]string, 0, len(csm.schemas))
+	for k := range csm.schemas {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		schema := csm.schemas[key]
 		value, exists := config[key]
 
 		// Check required fields
@@ -138,11 +146,17 @@ func (csm *ConfigSchemaManager) GetSchema(key string) (ConfigSchemaEntry, bool) 
 	return schema, exists
 }
 
-// ListSchemas returns all registered schemas
+// ListSchemas returns all registered schemas sorted by key.
 func (csm *ConfigSchemaManager) ListSchemas() []ConfigSchemaEntry {
+	keys := make([]string, 0, len(csm.schemas))
+	for k := range csm.schemas {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	schemas := make([]ConfigSchemaEntry, 0, len(csm.schemas))
-	for _, schema := range csm.schemas {
-		schemas = append(schemas, schema)
+	for _, k := range keys {
+		schemas = append(schemas, csm.schemas[k])
 	}
 	return schemas
 }
@@ -193,8 +207,9 @@ type MinLength struct {
 
 func (m *MinLength) Validate(value any, key string) error {
 	str := toString(value)
-	if utf8.RuneCountInString(str) < m.Min {
-		return fmt.Errorf("config %s must be at least %d characters, got %d", key, m.Min, utf8.RuneCountInString(str))
+	n := utf8.RuneCountInString(str)
+	if n < m.Min {
+		return fmt.Errorf("config %s must be at least %d characters, got %d", key, m.Min, n)
 	}
 	return nil
 }
@@ -264,16 +279,15 @@ func (u *URL) Validate(value any, key string) error {
 	if str == "" {
 		return nil // Empty string is allowed (can use default)
 	}
-	if parsed, err := url.Parse(str); err != nil {
+	parsed, err := url.Parse(str)
+	if err != nil {
 		return fmt.Errorf("config %s must be a valid URL, got %s: %w", key, str, err)
-	} else {
-		// Check that URL has both scheme and host
-		if parsed.Scheme == "" {
-			return fmt.Errorf("config %s must be a valid URL with scheme (e.g., http://, https://), got %s", key, str)
-		}
-		if parsed.Host == "" {
-			return fmt.Errorf("config %s must be a valid URL with host, got %s", key, str)
-		}
+	}
+	if parsed.Scheme == "" {
+		return fmt.Errorf("config %s must be a valid URL with scheme (e.g., http://, https://), got %s", key, str)
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("config %s must be a valid URL with host, got %s", key, str)
 	}
 	return nil
 }
@@ -336,9 +350,6 @@ func NewConfigSchema() *ConfigSchema {
 
 // AddField adds validation rules for a configuration field
 func (s *ConfigSchema) AddField(key string, validators ...Validator) *ConfigSchema {
-	if s.fields[key] == nil {
-		s.fields[key] = make([]Validator, 0)
-	}
 	s.fields[key] = append(s.fields[key], validators...)
 	return s
 }
