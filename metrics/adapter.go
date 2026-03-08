@@ -185,15 +185,17 @@ type Aggregator struct {
 	mu      *sync.RWMutex
 	window  time.Duration
 	buckets map[string]*bucket
+	now     func() time.Time
 }
 
 type bucket struct {
-	count  int64
-	sum    float64
-	min    float64
-	max    float64
-	values []float64
-	maxLen int
+	samples []sample
+	maxLen  int
+}
+
+type sample struct {
+	value      float64
+	observedAt time.Time
 }
 
 // AggregatorStats contains statistical information about aggregated metrics.
@@ -210,20 +212,27 @@ type AggregatorStats struct {
 
 // NewAggregator creates a new metrics aggregator with the specified time window.
 //
-// The time window determines how long metrics are retained for aggregation.
-// Older metrics are automatically discarded.
+// Retention is bounded by both time and size:
+//   - During Record and GetStats, samples older than now-window are evicted.
+//   - Each metric bucket keeps at most 10,000 newest samples.
+//
+// This means statistics are always calculated from the intersection of:
+//   - samples observed within the configured window, and
+//   - the newest 10,000 samples for that metric.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/metrics"
 //
-//	// Aggregate metrics over 5-minute windows
+//	// Aggregate metrics over a rolling 5-minute window,
+//	// capped to the newest 10,000 samples per metric.
 //	agg := metrics.NewAggregator(5 * time.Minute)
 func NewAggregator(window time.Duration) *Aggregator {
 	return &Aggregator{
 		mu:      &sync.RWMutex{},
 		window:  window,
 		buckets: make(map[string]*bucket),
+		now:     time.Now,
 	}
 }
 
@@ -239,34 +248,30 @@ func NewAggregator(window time.Duration) *Aggregator {
 func (a *Aggregator) Record(name string, value float64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	now := a.now()
 
 	b, exists := a.buckets[name]
 	if !exists {
 		b = &bucket{
-			min:    value,
-			max:    value,
-			values: make([]float64, 0, 1000),
-			maxLen: 10000,
+			samples: make([]sample, 0, 1000),
+			maxLen:  10000,
 		}
 		a.buckets[name] = b
 	}
 
-	b.count++
-	b.sum += value
-	if value < b.min {
-		b.min = value
-	}
-	if value > b.max {
-		b.max = value
-	}
+	b.evictExpired(a.window, now)
+	b.samples = append(b.samples, sample{value: value, observedAt: now})
 
-	// Keep values for percentile calculation
-	if len(b.values) < b.maxLen {
-		b.values = append(b.values, value)
+	if len(b.samples) > b.maxLen {
+		overflow := len(b.samples) - b.maxLen
+		b.samples = b.samples[overflow:]
 	}
 }
 
 // GetStats returns aggregated statistics for the specified metric name.
+//
+// Before calculating statistics, GetStats evicts samples older than now-window.
+// Returned statistics include only retained samples (window + maxLen bounded).
 //
 // Example:
 //
@@ -277,35 +282,66 @@ func (a *Aggregator) Record(name string, value float64) {
 //	agg.Record("latency", 75.0)
 //
 //	stats := agg.GetStats("latency")
+//	// stats are based on samples observed within the configured window,
+//	// capped to the newest 10,000 samples.
 //	fmt.Printf("Mean: %.2f, P95: %.2f\n", stats.Mean, stats.P95)
 func (a *Aggregator) GetStats(name string) AggregatorStats {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
 	b, exists := a.buckets[name]
 	if !exists {
 		return AggregatorStats{}
 	}
+	b.evictExpired(a.window, a.now())
 
-	stats := AggregatorStats{
-		Count: b.count,
-		Sum:   b.sum,
-		Min:   b.min,
-		Max:   b.max,
+	return buildStats(b.samples)
+
+}
+
+func buildStats(samples []sample) AggregatorStats {
+	if len(samples) == 0 {
+		return AggregatorStats{}
 	}
 
-	if b.count > 0 {
-		stats.Mean = b.sum / float64(b.count)
+	stats := AggregatorStats{Min: samples[0].value, Max: samples[0].value}
+	values := make([]float64, len(samples))
+
+	for i, s := range samples {
+		values[i] = s.value
+		stats.Count++
+		stats.Sum += s.value
+		if s.value < stats.Min {
+			stats.Min = s.value
+		}
+		if s.value > stats.Max {
+			stats.Max = s.value
+		}
 	}
 
-	// Calculate percentiles if we have values
-	if len(b.values) > 0 {
-		stats.P50 = percentile(b.values, 0.50)
-		stats.P95 = percentile(b.values, 0.95)
-		stats.P99 = percentile(b.values, 0.99)
-	}
+	stats.Mean = stats.Sum / float64(stats.Count)
+
+	stats.P50 = percentile(values, 0.50)
+	stats.P95 = percentile(values, 0.95)
+	stats.P99 = percentile(values, 0.99)
 
 	return stats
+}
+
+func (b *bucket) evictExpired(window time.Duration, now time.Time) {
+	if window <= 0 || len(b.samples) == 0 {
+		return
+	}
+
+	cutoff := now.Add(-window)
+	firstValid := 0
+	for firstValid < len(b.samples) && b.samples[firstValid].observedAt.Before(cutoff) {
+		firstValid++
+	}
+
+	if firstValid > 0 {
+		b.samples = b.samples[firstValid:]
+	}
 }
 
 // Clear removes all aggregated metrics.
@@ -339,15 +375,14 @@ func (a *Aggregator) Clear() {
 //		fmt.Printf("%s: mean=%.2f\n", name, stats.Mean)
 //	}
 func (a *Aggregator) GetAllStats() map[string]AggregatorStats {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := a.now()
 
 	result := make(map[string]AggregatorStats, len(a.buckets))
-	for name := range a.buckets {
-		// Unlock temporarily to call GetStats which also locks
-		a.mu.RUnlock()
-		result[name] = a.GetStats(name)
-		a.mu.RLock()
+	for name, b := range a.buckets {
+		b.evictExpired(a.window, now)
+		result[name] = buildStats(b.samples)
 	}
 
 	return result
