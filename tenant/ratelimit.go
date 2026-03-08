@@ -94,6 +94,14 @@ func NewTokenBucketRateLimiter(provider RateLimitConfigProvider) *TokenBucketRat
 	return &TokenBucketRateLimiter{provider: provider}
 }
 
+// DeleteTenant removes the token bucket for a tenant, reclaiming memory.
+// Call this when a tenant is deleted or permanently deactivated.
+func (l *TokenBucketRateLimiter) DeleteTenant(tenantID string) {
+	if l != nil {
+		l.buckets.Delete(tenantID)
+	}
+}
+
 // Allow checks rate limits for a tenant using token bucket algorithm.
 func (l *TokenBucketRateLimiter) Allow(ctx context.Context, tenantID string, req RateLimitRequest) (RateLimitResult, error) {
 	if l == nil || l.provider == nil {

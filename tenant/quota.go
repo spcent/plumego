@@ -48,21 +48,26 @@ type quotaCounter struct {
 	tokens      int
 }
 
+// evictionInterval controls how often InMemoryQuotaManager scans for stale counters.
+const evictionInterval = time.Minute
+
 // InMemoryQuotaManager is a single-window in-memory quota manager.
 // It respects QuotaConfig.Limits by using the first valid limit entry.
 // For multi-window enforcement (hour + day + month simultaneously),
 // use WindowQuotaManager with an InMemoryQuotaStore instead.
 type InMemoryQuotaManager struct {
-	mu       sync.Mutex
-	provider QuotaConfigProvider
-	counters map[string]*quotaCounter
+	mu           sync.Mutex
+	provider     QuotaConfigProvider
+	counters     map[string]*quotaCounter
+	lastEviction time.Time
 }
 
 // NewInMemoryQuotaManager builds a quota manager from a config provider.
 func NewInMemoryQuotaManager(provider QuotaConfigProvider) *InMemoryQuotaManager {
 	return &InMemoryQuotaManager{
-		provider: provider,
-		counters: make(map[string]*quotaCounter),
+		provider:     provider,
+		counters:     make(map[string]*quotaCounter),
+		lastEviction: time.Now().UTC(),
 	}
 }
 
@@ -146,13 +151,18 @@ func (m *InMemoryQuotaManager) Allow(ctx context.Context, tenantID string, req Q
 }
 
 // evictStaleLocked removes counters whose window has expired.
+// It runs at most once per evictionInterval to avoid O(n) cost on every request.
 // Must be called with m.mu held.
 func (m *InMemoryQuotaManager) evictStaleLocked(now time.Time) {
+	if now.Sub(m.lastEviction) < evictionInterval {
+		return
+	}
 	for tenantID, counter := range m.counters {
 		if now.After(counter.windowEnd) {
 			delete(m.counters, tenantID)
 		}
 	}
+	m.lastEviction = now
 }
 
 func remaining(limit, used int) int {

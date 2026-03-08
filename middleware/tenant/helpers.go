@@ -44,3 +44,14 @@ func setRateLimitHeaders(w http.ResponseWriter, limit, remaining int64) {
 	}
 	w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(remaining, 10))
 }
+
+// setQuotaHeaders sets X-Quota-Remaining-Requests and X-Quota-Remaining-Tokens headers.
+// Values < 0 indicate unlimited and are omitted.
+func setQuotaHeaders(w http.ResponseWriter, remainingRequests, remainingTokens int) {
+	if remainingRequests >= 0 {
+		w.Header().Set("X-Quota-Remaining-Requests", strconv.Itoa(remainingRequests))
+	}
+	if remainingTokens >= 0 {
+		w.Header().Set("X-Quota-Remaining-Tokens", strconv.Itoa(remainingTokens))
+	}
+}

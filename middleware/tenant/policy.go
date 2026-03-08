@@ -39,6 +39,9 @@ func TenantPolicy(options TenantPolicyOptions) middleware.Middleware {
 			result, err := options.Evaluator.Evaluate(r.Context(), tenantID, req)
 			allowed := err == nil && result.Allowed
 			status := http.StatusForbidden
+			if allowed {
+				status = http.StatusOK
+			}
 
 			options.Hooks.Policy(r.Context(), tenant.PolicyDecision{
 				TenantID: tenantID,
@@ -49,6 +52,7 @@ func TenantPolicy(options TenantPolicyOptions) middleware.Middleware {
 				Method:   req.Method,
 				Path:     req.Path,
 				Status:   status,
+				Err:      err,
 			})
 
 			if allowed {

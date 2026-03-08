@@ -20,6 +20,8 @@ type TenantQuotaOptions struct {
 }
 
 // TenantQuota enforces tenant quota limits.
+// On every request (allowed or denied) it sets X-Quota-Remaining-Requests and
+// X-Quota-Remaining-Tokens headers so clients can monitor their quota consumption.
 func TenantQuota(options TenantQuotaOptions) middleware.Middleware {
 	tokensHeader := headerOrDefault(options.TokensHeader, defaultTokensHeader)
 
@@ -62,7 +64,11 @@ func TenantQuota(options TenantQuotaOptions) middleware.Middleware {
 				RemainingRequests: result.RemainingRequests,
 				RetryAfter:        result.RetryAfter,
 				Status:            status,
+				Err:               err,
 			})
+
+			// Always surface remaining quota to the client.
+			setQuotaHeaders(w, result.RemainingRequests, result.RemainingTokens)
 
 			if allowed {
 				next.ServeHTTP(w, r)
