@@ -119,7 +119,7 @@ func userUpdateValues(data any) ([]any, error) {
 // FindByEmail finds a user by email address
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*UserModel, error) {
 	query := "SELECT id, name, email, status, role, created_at, updated_at FROM users WHERE email = ?"
-	rows, err := db.QueryContext(ctx, r.db, query, email)
+	rows, err := db.QueryContext(ctx, r.DB(), query, email)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +336,7 @@ func NewProductRepository(database db.DB) *ProductRepository {
 func (r *ProductRepository) SoftDelete(ctx context.Context, id string) error {
 	now := time.Now()
 	query := "UPDATE products SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL"
-	result, err := db.ExecContext(ctx, r.db, query, now, id)
+	result, err := db.ExecContext(ctx, r.DB(), query, now, id)
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,10 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-// ConfigurePubSub registers a snapshot endpoint when enabled.
+// ConfigurePubSub registers a Pub/Sub debug snapshot endpoint when enabled.
+//
+// Extension capability: not part of the minimal core HTTP runtime. For
+// production pub/sub setup, use core.WithComponent with a PubSub component.
 func (a *App) ConfigurePubSub() {
 	pubsubdebug.Configure(pubsubdebug.Hooks{
 		EnsureMutable: a.ensureMutable,

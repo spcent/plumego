@@ -165,13 +165,20 @@ func (m *metricsAdapter) Observe(ctx context.Context, metrics observability.Requ
 }
 
 // EnableAuth enables the auth middleware.
+//
+// Extension capability: convenience shortcut. For more control, call
+// app.Use directly with the middleware of your choice.
 func (a *App) EnableAuth() {
 	if err := a.Use(middleware.FromFuncMiddleware(auth.Auth)); err != nil {
 		a.logError("EnableAuth failed", err, nil)
 	}
 }
 
-// EnableRateLimit enables the rate limiting middleware with the given configuration.
+// EnableRateLimit enables the rate limiting middleware.
+//
+// Extension capability: convenience shortcut. For more control, configure
+// ratelimit.RateLimitMiddleware directly and pass it to app.Use.
+//
 // maxConcurrent: maximum concurrent requests.
 // queueDepth: maximum queue depth for waiting requests.
 func (a *App) EnableRateLimit(maxConcurrent int64, queueDepth int64) {

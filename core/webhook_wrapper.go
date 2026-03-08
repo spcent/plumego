@@ -10,7 +10,10 @@ type Rule = webhook.Rule
 type WebhookBridge = webhook.WebhookBridge
 
 // ConfigureWebhookIn mounts inbound webhook receivers for GitHub and Stripe.
-// It remains for backward compatibility but now mounts a component into the lifecycle.
+//
+// Extension capability: not part of the minimal core HTTP runtime. Prefer
+// composing a webhook component explicitly via core.WithComponent for new
+// applications; this method is retained for backward compatibility.
 func (a *App) ConfigureWebhookIn() {
 	if err := a.ensureMutable("configure_webhook_in", "configure webhook in"); err != nil {
 		a.logError("ConfigureWebhookIn failed", err, nil)
@@ -34,7 +37,8 @@ func (a *App) ConfigureWebhookIn() {
 }
 
 // ConfigureWebhookOut mounts outbound webhook management APIs.
-// It remains for backward compatibility but now mounts a component into the lifecycle.
+//
+// Extension capability: not part of the minimal core HTTP runtime.
 func (a *App) ConfigureWebhookOut() {
 	if err := a.ensureMutable("configure_webhook_out", "configure webhook out"); err != nil {
 		a.logError("ConfigureWebhookOut failed", err, nil)
