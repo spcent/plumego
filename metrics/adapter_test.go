@@ -247,6 +247,50 @@ func TestAggregatorConcurrency(t *testing.T) {
 	}
 }
 
+func TestAggregatorEvictsSamplesOutsideWindowOnRecord(t *testing.T) {
+	base := time.Unix(1000, 0)
+	current := base
+
+	agg := NewAggregator(100 * time.Millisecond)
+	agg.now = func() time.Time { return current }
+
+	agg.Record("latency", 10)
+
+	current = base.Add(50 * time.Millisecond)
+	agg.Record("latency", 20)
+
+	current = base.Add(200 * time.Millisecond)
+	agg.Record("latency", 30)
+
+	stats := agg.GetStats("latency")
+	if stats.Count != 1 {
+		t.Fatalf("expected 1 retained sample, got %d", stats.Count)
+	}
+	if stats.Sum != 30 {
+		t.Fatalf("expected retained sum 30, got %.2f", stats.Sum)
+	}
+}
+
+func TestAggregatorEvictsSamplesOutsideWindowOnGetStats(t *testing.T) {
+	base := time.Unix(2000, 0)
+	current := base
+
+	agg := NewAggregator(100 * time.Millisecond)
+	agg.now = func() time.Time { return current }
+
+	agg.Record("latency", 10)
+
+	current = base.Add(50 * time.Millisecond)
+	agg.Record("latency", 20)
+
+	current = base.Add(250 * time.Millisecond)
+	stats := agg.GetStats("latency")
+
+	if stats.Count != 0 {
+		t.Fatalf("expected all samples to expire, got count %d", stats.Count)
+	}
+}
+
 func TestPercentile(t *testing.T) {
 	values := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 
