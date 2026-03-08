@@ -239,24 +239,37 @@ func (p *PrometheusCollector) GetStats() CollectorStats {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	var stats CollectorStats
-	stats.Series = len(p.requests)
-	stats.StartTime = p.startTime
-
-	// Calculate request rate
 	totalRequests := uint64(0)
-	for _, count := range p.requests {
+	errorRecords := int64(0)
+	for key, count := range p.requests {
 		totalRequests += count
+		status, err := strconv.Atoi(key.status)
+		if err == nil && status >= http.StatusBadRequest {
+			errorRecords += int64(count)
+		}
 	}
-	stats.TotalRequests = totalRequests
 
-	// Calculate average latency
 	var totalDuration float64
 	var totalSamples uint64
 	for _, d := range p.durations {
 		totalDuration += d.sum
 		totalSamples += d.count
 	}
+
+	stats := CollectorStats{
+		TotalRecords:  int64(totalRequests),
+		ErrorRecords:  errorRecords,
+		ActiveSeries:  len(p.requests),
+		StartTime:     p.startTime,
+		TypeBreakdown: make(map[MetricType]int64),
+		// Legacy compatibility fields.
+		Series:        len(p.requests),
+		TotalRequests: totalRequests,
+	}
+	if totalRequests > 0 {
+		stats.TypeBreakdown[MetricHTTPRequest] = int64(totalRequests)
+	}
+
 	if totalSamples > 0 {
 		stats.AverageLatency = totalDuration / float64(totalSamples)
 	}

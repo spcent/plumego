@@ -368,25 +368,40 @@ type SpanStats struct {
 func (t *OpenTelemetryTracer) GetStats() CollectorStats {
 	spanStats := t.GetSpanStats()
 
-	return CollectorStats{
+	stats := CollectorStats{
+		TotalRecords:    int64(spanStats.TotalSpans),
+		ErrorRecords:    int64(spanStats.ErrorSpans),
+		ActiveSeries:    map[bool]int{true: 1, false: 0}[spanStats.TotalSpans > 0],
+		TypeBreakdown:   make(map[MetricType]int64),
 		TotalSpans:      spanStats.TotalSpans,
 		ErrorSpans:      spanStats.ErrorSpans,
 		TotalDuration:   spanStats.TotalDuration,
 		AverageDuration: spanStats.AverageDuration,
-		// Include base collector stats if available
-		TotalRecords: func() int64 {
-			if t.baseForwarder.base != nil {
-				return t.baseForwarder.base.GetStats().TotalRecords
-			}
-			return 0
-		}(),
-		ErrorRecords: func() int64 {
-			if t.baseForwarder.base != nil {
-				return t.baseForwarder.base.GetStats().ErrorRecords
-			}
-			return 0
-		}(),
 	}
+
+	if spanStats.TotalSpans > 0 {
+		stats.TypeBreakdown[MetricHTTPRequest] = int64(spanStats.TotalSpans)
+	}
+
+	if t.baseForwarder.base != nil {
+		baseStats := t.baseForwarder.base.GetStats()
+		stats.TotalRecords += baseStats.TotalRecords
+		stats.ErrorRecords += baseStats.ErrorRecords
+		if len(baseStats.TypeBreakdown) > 0 {
+			if stats.TypeBreakdown == nil {
+				stats.TypeBreakdown = make(map[MetricType]int64, len(baseStats.TypeBreakdown))
+			}
+			for key, value := range baseStats.TypeBreakdown {
+				stats.TypeBreakdown[key] += value
+			}
+			stats.ActiveSeries = len(stats.TypeBreakdown)
+		}
+		if !baseStats.StartTime.IsZero() {
+			stats.StartTime = baseStats.StartTime
+		}
+	}
+
+	return stats
 }
 
 // Clear implements the unified MetricsCollector interface

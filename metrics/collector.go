@@ -125,7 +125,22 @@ type MetricsCollector interface {
 	Clear()
 }
 
-// CollectorStats provides statistics about the collector
+// CollectorStats provides a contract for collector statistics payloads.
+//
+// Mandatory fields for all collectors:
+//   - TotalRecords: total number of records processed by the collector.
+//   - ErrorRecords: number of records classified as errors.
+//   - ActiveSeries: number of currently active metric series maintained.
+//   - StartTime: collector start/reset time (zero only when intentionally unknown).
+//
+// Optional fields:
+//   - TypeBreakdown: per-metric-type counters when the collector can provide them.
+//
+// Legacy compatibility fields (optional and collector-specific):
+//   - Series, TotalRequests, AverageLatency.
+//
+// Tracing compatibility fields (optional and collector-specific):
+//   - TotalSpans, ErrorSpans, TotalDuration, AverageDuration.
 type CollectorStats struct {
 	TotalRecords  int64                `json:"total_records"`
 	ErrorRecords  int64                `json:"error_records"`
@@ -443,6 +458,9 @@ func (b *BaseMetricsCollector) GetStats() CollectorStats {
 	defer b.mu.RUnlock()
 
 	stats := b.stats
+	if stats.ActiveSeries == 0 && len(stats.TypeBreakdown) > 0 {
+		stats.ActiveSeries = len(stats.TypeBreakdown)
+	}
 	if stats.TypeBreakdown != nil {
 		stats.TypeBreakdown = cloneBreakdown(stats.TypeBreakdown)
 	}
@@ -508,7 +526,7 @@ func cloneLabels(labels MetricLabels) MetricLabels {
 }
 
 func cloneBreakdown(breakdown map[MetricType]int64) map[MetricType]int64 {
-	if len(breakdown) == 0 {
+	if breakdown == nil {
 		return nil
 	}
 	result := make(map[MetricType]int64, len(breakdown))

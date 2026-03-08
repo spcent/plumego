@@ -333,7 +333,7 @@ func (m *MultiCollector) ObserveDB(ctx context.Context, operation, driver, query
 // The statistics are aggregated across all collectors.
 func (m *MultiCollector) GetStats() CollectorStats {
 	if len(m.collectors) == 0 {
-		return CollectorStats{}
+		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
 	}
 
 	combined := CollectorStats{
@@ -374,6 +374,10 @@ func (m *MultiCollector) GetStats() CollectorStats {
 	// Calculate average duration
 	if combined.TotalSpans > 0 {
 		combined.AverageDuration = combined.TotalDuration / time.Duration(combined.TotalSpans)
+	}
+
+	if combined.ActiveSeries == 0 && len(combined.TypeBreakdown) > 0 {
+		combined.ActiveSeries = len(combined.TypeBreakdown)
 	}
 
 	return combined
