@@ -82,7 +82,7 @@ func TenantQuota(options TenantQuotaOptions) middleware.Middleware {
 				return
 			}
 
-			writeTenantError(w, r, status, "quota_exceeded", "tenant quota exceeded", contract.CategoryRateLimit)
+			writeTenantError(w, r, status, tenantCodeQuotaExceeded, "tenant quota exceeded", contract.CategoryRateLimit)
 		})
 	}
 }

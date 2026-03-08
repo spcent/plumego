@@ -40,6 +40,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	mw "github.com/spcent/plumego/middleware"
 	nethttp "github.com/spcent/plumego/net/http"
 )
 
@@ -180,12 +181,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 			if c.config.OnError != nil {
 				c.config.OnError(key, inflight.err)
 			}
-			contract.WriteError(w, r, contract.APIError{
-				Status:   http.StatusBadGateway,
-				Code:     "UPSTREAM_FAILED",
-				Message:  "Upstream request failed",
-				Category: contract.CategoryServer,
-			})
+			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
 			return
 		}
 
@@ -203,7 +199,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		inflight.waiters--
 		c.mu.Unlock()
 
-		contract.WriteError(w, r, contract.NewTimeoutError("Upstream request timeout"))
+		mw.WriteTransportError(w, r, http.StatusGatewayTimeout, mw.CodeRequestTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
 	}
 }
 

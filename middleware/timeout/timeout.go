@@ -7,6 +7,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
+	mw "github.com/spcent/plumego/middleware"
 )
 
 const (
@@ -116,12 +117,7 @@ func TimeoutWithConfig(cfg TimeoutConfig) middleware.Middleware {
 				}
 				tw.WriteTo(w)
 			case <-ctx.Done():
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusGatewayTimeout,
-					Code:     "request_timeout",
-					Category: contract.CategoryServer,
-					Message:  "request timed out",
-				})
+				mw.WriteTransportError(w, r, http.StatusGatewayTimeout, mw.CodeRequestTimeout, "request timed out", contract.CategoryTimeout, nil)
 			}
 		})
 	}

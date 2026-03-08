@@ -47,6 +47,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
+	mw "github.com/spcent/plumego/middleware"
 )
 
 // Strategy defines the version extraction strategy
@@ -190,12 +191,7 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 				if cfg.OnVersionMismatch != nil {
 					cfg.OnVersionMismatch(w, r, version)
 				} else {
-					contract.WriteError(w, r, contract.APIError{
-						Status:   http.StatusNotAcceptable,
-						Code:     "UNSUPPORTED_VERSION",
-						Message:  fmt.Sprintf("Unsupported API version: %d", version),
-						Category: contract.CategoryClient,
-					})
+					mw.WriteTransportError(w, r, http.StatusNotAcceptable, mw.CodeUnsupportedVersion, fmt.Sprintf("unsupported API version: %d", version), contract.CategoryClient, nil)
 				}
 				return
 			}
@@ -379,12 +375,7 @@ func CustomExtractor(extractor Extractor, defaultVersion int, supportedVersions 
 			}
 
 			if len(supportedVersions) > 0 && !isVersionSupported(version, supportedVersions) {
-				contract.WriteError(w, r, contract.APIError{
-					Status:   http.StatusNotAcceptable,
-					Code:     "UNSUPPORTED_VERSION",
-					Message:  fmt.Sprintf("Unsupported API version: %d", version),
-					Category: contract.CategoryClient,
-				})
+				mw.WriteTransportError(w, r, http.StatusNotAcceptable, mw.CodeUnsupportedVersion, fmt.Sprintf("unsupported API version: %d", version), contract.CategoryClient, nil)
 				return
 			}
 

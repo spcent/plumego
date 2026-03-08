@@ -37,6 +37,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
+	mw "github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/utils"
 )
 
@@ -68,12 +69,7 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 					if config.OnError != nil {
 						config.OnError(err)
 					}
-					contract.WriteError(w, r, contract.APIError{
-						Status:   http.StatusBadRequest,
-						Code:     "TRANSFORM_FAILED",
-						Message:  "Request transformation failed",
-						Category: contract.CategoryClient,
-					})
+					mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeTransformFailed, "request transformation failed", contract.CategoryClient, nil)
 					return
 				}
 			}

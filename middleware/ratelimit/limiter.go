@@ -8,7 +8,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware"
+	mw "github.com/spcent/plumego/middleware"
 )
 
 // RateLimiter provides intelligent concurrency control with backpressure, monitoring, and dynamic adjustment.
@@ -192,7 +192,7 @@ func NewRateLimiter(config RateLimiterConfig) *RateLimiter {
 }
 
 // Middleware creates the middleware
-func (rl *RateLimiter) Middleware() middleware.Middleware {
+func (rl *RateLimiter) Middleware() mw.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rl.handleRequest(w, r, next)
@@ -207,7 +207,7 @@ func (rl *RateLimiter) handleRequest(w http.ResponseWriter, r *http.Request, nex
 
 	// Step 1: Try to enter queue (non-blocking)
 	if !rl.tryEnterQueue() {
-		rl.rejectRequest(w, r, "server_busy", "Server is busy, queue full")
+		rl.rejectRequest(w, r, mw.CodeServerBusy, "server is busy, queue full")
 		atomic.AddInt64(&rl.rejectedRequests, 1)
 		return
 	}
@@ -215,7 +215,7 @@ func (rl *RateLimiter) handleRequest(w http.ResponseWriter, r *http.Request, nex
 
 	// Step 2: Wait for concurrency slot (with timeout)
 	if !rl.waitForConcurrencySlot() {
-		rl.rejectRequest(w, r, "server_queue_timeout", "Request timed out waiting for worker")
+		rl.rejectRequest(w, r, mw.CodeServerQueueTimeout, "request timed out waiting for worker")
 		atomic.AddInt64(&rl.timeoutRequests, 1)
 		return
 	}
@@ -273,17 +273,11 @@ func (rl *RateLimiter) leaveConcurrency() {
 
 // rejectRequest rejects a request
 func (rl *RateLimiter) rejectRequest(w http.ResponseWriter, r *http.Request, code, message string) {
-	contract.WriteError(w, r, contract.APIError{
-		Status:   http.StatusServiceUnavailable,
-		Code:     code,
-		Category: contract.CategoryServer,
-		Message:  message,
-		Details: map[string]any{
-			"current_concurrent": int64(len(rl.sem)),
-			"current_queue":      int64(len(rl.queue)),
-			"max_concurrent":     atomic.LoadInt64(&rl.maxConcurrent),
-			"queue_depth":        atomic.LoadInt64(&rl.queueDepth),
-		},
+	mw.WriteTransportError(w, r, http.StatusServiceUnavailable, code, message, contract.CategoryServer, map[string]any{
+		"current_concurrent": int64(len(rl.sem)),
+		"current_queue":      int64(len(rl.queue)),
+		"max_concurrent":     atomic.LoadInt64(&rl.maxConcurrent),
+		"queue_depth":        atomic.LoadInt64(&rl.queueDepth),
 	})
 
 	if rl.logger != nil {
@@ -493,7 +487,7 @@ func max(a, b int64) int64 {
 }
 
 // RateLimitMiddleware creates a middleware for advanced concurrency limiting
-func RateLimitMiddleware(config RateLimiterConfig) middleware.Middleware {
+func RateLimitMiddleware(config RateLimiterConfig) mw.Middleware {
 	rl := NewRateLimiter(config)
 	return rl.Middleware()
 }
