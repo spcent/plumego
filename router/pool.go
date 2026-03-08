@@ -1,8 +1,54 @@
 package router
 
 import (
+	"net/http"
 	"sync"
 )
+
+// metricsResponseWriter wraps http.ResponseWriter to capture the status code
+// and total bytes written for metrics reporting.
+type metricsResponseWriter struct {
+	http.ResponseWriter
+	status int
+	bytes  int
+}
+
+func (m *metricsResponseWriter) WriteHeader(code int) {
+	if m.status == 0 {
+		m.status = code
+	}
+	m.ResponseWriter.WriteHeader(code)
+}
+
+func (m *metricsResponseWriter) Write(b []byte) (int, error) {
+	if m.status == 0 {
+		m.status = http.StatusOK
+	}
+	n, err := m.ResponseWriter.Write(b)
+	m.bytes += n
+	return n, err
+}
+
+func (m *metricsResponseWriter) reset(w http.ResponseWriter) {
+	m.ResponseWriter = w
+	m.status = 0
+	m.bytes = 0
+}
+
+var metricsWriterPool = sync.Pool{
+	New: func() any { return &metricsResponseWriter{} },
+}
+
+func getMetricsWriter(w http.ResponseWriter) *metricsResponseWriter {
+	mw := metricsWriterPool.Get().(*metricsResponseWriter)
+	mw.reset(w)
+	return mw
+}
+
+func putMetricsWriter(mw *metricsResponseWriter) {
+	mw.ResponseWriter = nil
+	metricsWriterPool.Put(mw)
+}
 
 // Object pools for reducing allocations during request processing
 
@@ -28,30 +74,6 @@ func PutParamValues(s *[]string) {
 	// Reset slice length but keep capacity
 	*s = (*s)[:0]
 	paramValuesPool.Put(s)
-}
-
-// paramsMapPool is a pool for map[string]string used to store route parameters
-var paramsMapPool = sync.Pool{
-	New: func() any {
-		return make(map[string]string, 4)
-	},
-}
-
-// GetParamsMap retrieves a params map from the pool
-func GetParamsMap() map[string]string {
-	return paramsMapPool.Get().(map[string]string)
-}
-
-// PutParamsMap returns a params map to the pool after clearing it
-func PutParamsMap(m map[string]string) {
-	if m == nil {
-		return
-	}
-	// Clear the map
-	for k := range m {
-		delete(m, k)
-	}
-	paramsMapPool.Put(m)
 }
 
 // routeMatcherPool is a pool for RouteMatcher instances

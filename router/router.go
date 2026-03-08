@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
@@ -23,12 +24,14 @@ import (
 //	router.Delete("/users/:id", handler) // DELETE /users/:id
 //	router.Any("/health", handler)       // All HTTP methods
 const (
-	GET    = "GET"    // HTTP GET method - retrieve resources
-	POST   = "POST"   // HTTP POST method - create resources
-	PUT    = "PUT"    // HTTP PUT method - update/replace resources
-	DELETE = "DELETE" // HTTP DELETE method - remove resources
-	PATCH  = "PATCH"  // HTTP PATCH method - partial updates
-	ANY    = "ANY"    // Any HTTP method - catch-all route
+	GET     = "GET"     // HTTP GET method - retrieve resources
+	POST    = "POST"    // HTTP POST method - create resources
+	PUT     = "PUT"     // HTTP PUT method - update/replace resources
+	DELETE  = "DELETE"  // HTTP DELETE method - remove resources
+	PATCH   = "PATCH"   // HTTP PATCH method - partial updates
+	OPTIONS = "OPTIONS" // HTTP OPTIONS method - describe communication options
+	HEAD    = "HEAD"    // HTTP HEAD method - same as GET but without response body
+	ANY     = "ANY"     // Any HTTP method - catch-all route
 )
 
 // Configuration defaults
@@ -103,7 +106,7 @@ type MiddlewareManager struct {
 	middlewares []middleware.Middleware
 	mu          sync.RWMutex
 	metrics     metrics.MetricsCollector // Unified metrics collector for monitoring
-	version     uint64
+	version     atomic.Uint64
 }
 
 // NewMiddlewareManager creates a new middleware manager with an empty middleware chain.
@@ -135,7 +138,7 @@ func (mm *MiddlewareManager) AddMiddleware(m middleware.Middleware) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 	mm.middlewares = append(mm.middlewares, m)
-	mm.version++
+	mm.version.Add(1)
 }
 
 // GetMiddlewares returns a copy of all middlewares in the manager.
@@ -158,10 +161,9 @@ func (mm *MiddlewareManager) GetMiddlewares() []middleware.Middleware {
 }
 
 // Version returns the current middleware version for cache invalidation.
+// This is a lock-free atomic read.
 func (mm *MiddlewareManager) Version() uint64 {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
-	return mm.version
+	return mm.version.Load()
 }
 
 // MergeMiddlewares merges another middleware manager's middlewares with this manager's middlewares.
@@ -230,8 +232,10 @@ type routerState struct {
 	routeValidations map[string]map[string]*RouteValidation
 	routeMeta        map[string]map[string]RouteMeta
 	namedRoutes      map[string]*NamedRoute
-	methodNotAllowed bool
-	metricsCollector metrics.MetricsCollector
+	// methodNotAllowed and metricsCollector use atomic access so the hot-path
+	// ServeHTTP can read them without acquiring the global mutex.
+	methodNotAllowed atomic.Bool
+	metricsCollector atomic.Pointer[metrics.MetricsCollector]
 }
 
 // Router represents an HTTP router with path-based routing and middleware support.
@@ -380,7 +384,7 @@ func WithLogger(logger log.StructuredLogger) RouterOption {
 // WithMethodNotAllowed enables returning 405 with Allow header when path matches another method.
 func WithMethodNotAllowed(enabled bool) RouterOption {
 	return func(r *Router) {
-		r.state.methodNotAllowed = enabled
+		r.state.methodNotAllowed.Store(enabled)
 	}
 }
 
@@ -448,16 +452,12 @@ func (r *Router) SetLogger(logger log.StructuredLogger) {
 
 // SetMethodNotAllowed toggles 405 responses when another method matches the path.
 func (r *Router) SetMethodNotAllowed(enabled bool) {
-	r.state.mu.Lock()
-	defer r.state.mu.Unlock()
-	r.state.methodNotAllowed = enabled
+	r.state.methodNotAllowed.Store(enabled)
 }
 
 // MethodNotAllowedEnabled reports whether 405 handling is enabled.
 func (r *Router) MethodNotAllowedEnabled() bool {
-	r.state.mu.RLock()
-	defer r.state.mu.RUnlock()
-	return r.state.methodNotAllowed
+	return r.state.methodNotAllowed.Load()
 }
 
 // Freeze prevents the router from accepting new route registrations.
@@ -494,35 +494,37 @@ func (r *Router) Freeze() {
 //	r := router.NewRouter()
 //	r.Register(&UserRoutes{})
 func (r *Router) Register(registrars ...RouteRegistrar) {
-	// Get unique registrars without holding the lock
-	// This prevents deadlock when reg.Register(r) calls back into AddRoute
-	var newRegistrars []RouteRegistrar
-
-	r.state.mu.RLock()
-	seen := make(map[RouteRegistrar]bool)
-	for _, registrar := range r.state.registrars {
-		seen[registrar] = true
-	}
-	r.state.mu.RUnlock()
-
-	// Find new registrars
-	for _, registrar := range registrars {
-		if !seen[registrar] {
-			newRegistrars = append(newRegistrars, registrar)
-			seen[registrar] = true
+	// Deduplicate within the caller's input list first (no lock needed).
+	var unique []RouteRegistrar
+	localSeen := make(map[RouteRegistrar]bool, len(registrars))
+	for _, reg := range registrars {
+		if !localSeen[reg] {
+			localSeen[reg] = true
+			unique = append(unique, reg)
 		}
 	}
 
-	// Register new registrars
-	for _, registrar := range newRegistrars {
-		// Add to registrars list
+	for _, registrar := range unique {
+		// Atomically check-and-append to prevent duplicate registration even
+		// when Register is called concurrently. We must NOT hold the lock while
+		// calling registrar.Register(r) because it invokes AddRoute, which also
+		// acquires the lock.
 		r.state.mu.Lock()
-		r.state.registrars = append(r.state.registrars, registrar)
+		alreadyRegistered := false
+		for _, existing := range r.state.registrars {
+			if existing == registrar {
+				alreadyRegistered = true
+				break
+			}
+		}
+		if !alreadyRegistered {
+			r.state.registrars = append(r.state.registrars, registrar)
+		}
 		r.state.mu.Unlock()
 
-		// Call Register without holding the lock
-		// This allows registrar.Register(r) to call AddRoute safely
-		registrar.Register(r)
+		if !alreadyRegistered {
+			registrar.Register(r)
+		}
 	}
 }
 
@@ -592,9 +594,11 @@ func (r *Router) Use(middlewares ...middleware.Middleware) {
 //	prometheusCollector := metrics.NewPrometheusCollector()
 //	r.SetMetricsCollector(prometheusCollector)
 func (r *Router) SetMetricsCollector(collector metrics.MetricsCollector) {
-	r.state.mu.Lock()
-	defer r.state.mu.Unlock()
-	r.state.metricsCollector = collector
+	if collector == nil {
+		r.state.metricsCollector.Store(nil)
+	} else {
+		r.state.metricsCollector.Store(&collector)
+	}
 }
 
 // GetMetricsCollector returns the current metrics collector.
@@ -610,9 +614,11 @@ func (r *Router) SetMetricsCollector(collector metrics.MetricsCollector) {
 //	    collector.IncrementCounter("route_requests", map[string]string{"route": "/users"})
 //	}
 func (r *Router) GetMetricsCollector() metrics.MetricsCollector {
-	r.state.mu.RLock()
-	defer r.state.mu.RUnlock()
-	return r.state.metricsCollector
+	p := r.state.metricsCollector.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // CacheStats returns statistics about the route cache.
@@ -658,36 +664,13 @@ func (r *Router) CacheSize() int {
 	return r.state.routeCache.Size()
 }
 
-// findChild finds a child node with the given path segment
+// findChild finds a child node with the exact given path segment (static nodes only).
 func (r *Router) findChild(parent *node, path string) *node {
-	// Check if it's a wildcard segment
-	if len(path) == 1 {
-		switch path {
-		case ":":
-			// Check for param child - return nil to indicate no existing param child found
-			// This forces creation of a new param child node
-			return nil
-		case "*":
-			// Check for wild child - return nil to indicate no existing wild child found
-			// This forces creation of a new wild child node
-			return nil
-		default:
-			// Check for exact match
-			for _, child := range parent.children {
-				if child.path == path {
-					return child
-				}
-			}
-		}
-	} else {
-		// Check for exact match for longer paths
-		for _, child := range parent.children {
-			if child.path == path {
-				return child
-			}
+	for _, child := range parent.children {
+		if child.path == path {
+			return child
 		}
 	}
-
 	return nil
 }
 
@@ -715,21 +698,23 @@ func (r *Router) findWildChild(parent *node) *node {
 	return nil
 }
 
-// insertChild inserts a child node into the parent's children list
+// insertChild inserts a child node into the parent's children list,
+// keeping the indices string and children slice sorted by first byte.
 func (r *Router) insertChild(parent *node, child *node) {
-	// Find insertion point to keep indices sorted
-	var i int
-	for i = 0; i < len(parent.indices); i++ {
-		if parent.indices[i] > child.path[0] {
-			break
-		}
+	// Find insertion point to keep indices sorted.
+	i := 0
+	for i < len(parent.indices) && parent.indices[i] <= child.path[0] {
+		i++
 	}
 
-	// Insert index
+	// Insert the index character without allocating a temp string.
 	parent.indices = parent.indices[:i] + string(child.path[0]) + parent.indices[i:]
 
-	// Insert child
-	parent.children = append(parent.children[:i], append([]*node{child}, parent.children[i:]...)...)
+	// Insert the child node using copy to avoid the temporary slice created by
+	// the double-append pattern: append(a[:i], append([]T{x}, a[i:]...)...).
+	parent.children = append(parent.children, nil)        // grow by one
+	copy(parent.children[i+1:], parent.children[i:])      // shift right
+	parent.children[i] = child
 }
 
 func (r *Router) addCtxRoute(method, path string, h contract.CtxHandlerFunc) error {

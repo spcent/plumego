@@ -115,52 +115,28 @@ func (rc *RouteCache) Lookup(method, path, key string) (*MatchResult, []string, 
 	}
 	rc.mu.RUnlock()
 
-	rc.patternMu.RLock()
-	patterns, exists := rc.patternCache[method]
-	if !exists || len(patterns) == 0 {
-		rc.patternMu.RUnlock()
+	result, paramValues, found := rc.matchPatternCache(method, path)
+	if found {
+		atomic.AddUint64(&rc.hits, 1)
+	} else {
 		atomic.AddUint64(&rc.misses, 1)
-		return nil, nil, false
 	}
-
-	bufPtr := pathBufPool.Get().(*[]string)
-	buf := *bufPtr
-	numParts := fastSplitPath(path, buf)
-	pathParts := buf[:numParts]
-
-	paramBufPtr := matchParamBufPool.Get().(*[]string)
-	paramBuf := *paramBufPtr
-
-	for i := range patterns {
-		entry := patterns[i]
-		if paramCount, ok := matchPrecompiled(&entry.precompiled, pathParts, paramBuf); ok {
-			paramValues := make([]string, paramCount)
-			copy(paramValues, paramBuf[:paramCount])
-			rc.patternMu.RUnlock()
-
-			*bufPtr = buf
-			pathBufPool.Put(bufPtr)
-			*paramBufPtr = paramBuf
-			matchParamBufPool.Put(paramBufPtr)
-
-			atomic.AddUint64(&rc.hits, 1)
-			return entry.result, paramValues, true
-		}
-	}
-	rc.patternMu.RUnlock()
-
-	*bufPtr = buf
-	pathBufPool.Put(bufPtr)
-	*paramBufPtr = paramBuf
-	matchParamBufPool.Put(paramBufPtr)
-
-	atomic.AddUint64(&rc.misses, 1)
-	return nil, nil, false
+	return result, paramValues, found
 }
 
-// GetByPattern tries to match a path against cached patterns for parameterized routes
-// Returns the match result and extracted parameter values if found
+// GetByPattern tries to match a path against cached patterns for parameterized routes.
+// Returns the match result and extracted parameter values if found.
 func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string, bool) {
+	result, paramValues, found := rc.matchPatternCache(method, path)
+	if found {
+		atomic.AddUint64(&rc.hits, 1)
+	}
+	return result, paramValues, found
+}
+
+// matchPatternCache is the shared implementation for pattern-based cache lookup.
+// It does NOT update hit/miss counters; callers are responsible for that.
+func (rc *RouteCache) matchPatternCache(method, path string) (*MatchResult, []string, bool) {
 	rc.patternMu.RLock()
 	patterns, exists := rc.patternCache[method]
 	if !exists || len(patterns) == 0 {
@@ -168,20 +144,17 @@ func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string,
 		return nil, nil, false
 	}
 
-	// Use pooled buffer for path splitting to avoid allocation
 	bufPtr := pathBufPool.Get().(*[]string)
 	buf := *bufPtr
 	numParts := fastSplitPath(path, buf)
 	pathParts := buf[:numParts]
 
-	// Use pooled buffer for extracted parameter values
 	paramBufPtr := matchParamBufPool.Get().(*[]string)
 	paramBuf := *paramBufPtr
 
 	for i := range patterns {
 		entry := patterns[i]
 		if paramCount, ok := matchPrecompiled(&entry.precompiled, pathParts, paramBuf); ok {
-			// Copy params out of the pooled buffer before returning it
 			paramValues := make([]string, paramCount)
 			copy(paramValues, paramBuf[:paramCount])
 			rc.patternMu.RUnlock()
@@ -191,7 +164,6 @@ func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string,
 			*paramBufPtr = paramBuf
 			matchParamBufPool.Put(paramBufPtr)
 
-			atomic.AddUint64(&rc.hits, 1)
 			return entry.result, paramValues, true
 		}
 	}
@@ -258,21 +230,19 @@ func (rc *RouteCache) SetPattern(method, pattern string, result *MatchResult) {
 		result:      result,
 		precompiled: newPrecompiledPattern(pattern),
 	}
-	inserted := false
-
 	newPatternScore := patternSpecificityScore(pattern)
+	insertAt := len(patterns) // default: append at end
 	for i, existing := range patterns {
 		if patternSpecificityScore(existing.pattern) < newPatternScore {
-			// Insert before this entry
-			patterns = append(patterns[:i], append([]PatternCacheEntry{entry}, patterns[i:]...)...)
-			inserted = true
+			insertAt = i
 			break
 		}
 	}
 
-	if !inserted {
-		patterns = append(patterns, entry)
-	}
+	// Insert without creating a temporary slice.
+	patterns = append(patterns, PatternCacheEntry{}) // grow by one
+	copy(patterns[insertAt+1:], patterns[insertAt:]) // shift right
+	patterns[insertAt] = entry
 
 	rc.patternCache[method] = patterns
 }
@@ -294,14 +264,6 @@ func patternSpecificityScore(pattern string) int {
 		}
 	}
 	return score
-}
-
-// countSegments counts the number of segments in a path pattern
-func countSegments(pattern string) int {
-	if pattern == "/" || pattern == "" {
-		return 0
-	}
-	return len(strings.Split(strings.Trim(pattern, "/"), "/"))
 }
 
 // IsParameterized checks if a route pattern contains parameters or wildcards
