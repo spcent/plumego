@@ -167,8 +167,8 @@ func (m *metricsAdapter) Observe(ctx context.Context, metrics observability.Requ
 //
 // Extension capability: convenience shortcut. For more control, call
 // app.Use directly with the middleware of your choice.
-func (a *App) EnableAuth() {
-	if err := a.Use(auth.FromAuthMiddleware(auth.NewSimpleAuthMiddleware(""))); err != nil {
+func (a *App) EnableAuth(authToken string) {
+	if err := a.Use(auth.FromAuthMiddleware(auth.NewSimpleAuthMiddleware(authToken))); err != nil {
 		a.logError("EnableAuth failed", err, nil)
 	}
 }

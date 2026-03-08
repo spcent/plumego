@@ -3,183 +3,166 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"sync"
 	"testing"
 )
 
-func TestAuth(t *testing.T) {
-	// Mock handler that will be called if auth passes
-	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
-	})
-
+func TestSimpleAuthMiddlewareAuthenticate(t *testing.T) {
 	tests := []struct {
-		name           string
-		authToken      string // AUTH_TOKEN environment variable value
-		requestToken   string // X-Token header value in request
-		expectedStatus int
-		expectedBody   string
-		shouldCallNext bool
+		name            string
+		configuredToken string
+		authorization   string
+		xToken          string
+		url             string
+		cookie          *http.Cookie
+		expectedStatus  int
+		expectedBody    string
 	}{
 		{
-			name:           "No AUTH_TOKEN env var set - should allow all requests",
-			authToken:      "",
-			requestToken:   "",
-			expectedStatus: http.StatusOK,
-			expectedBody:   "success",
-			shouldCallNext: true,
+			name:            "valid x-token header",
+			configuredToken: "secret123",
+			xToken:          "secret123",
+			expectedStatus:  http.StatusOK,
+			expectedBody:    "success",
 		},
 		{
-			name:           "No AUTH_TOKEN env var set with token in request - should allow",
-			authToken:      "",
-			requestToken:   "any-token",
-			expectedStatus: http.StatusOK,
-			expectedBody:   "success",
-			shouldCallNext: true,
+			name:            "valid bearer token",
+			configuredToken: "secret123",
+			authorization:   "Bearer secret123",
+			expectedStatus:  http.StatusOK,
+			expectedBody:    "success",
 		},
 		{
-			name:           "Valid token provided - should allow",
-			authToken:      "secret123",
-			requestToken:   "secret123",
-			expectedStatus: http.StatusOK,
-			expectedBody:   "success",
-			shouldCallNext: true,
+			name:            "missing configured token fails closed",
+			configuredToken: "",
+			expectedStatus:  http.StatusUnauthorized,
+			expectedBody:    `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
 		},
 		{
-			name:           "Invalid token provided - should reject",
-			authToken:      "secret123",
-			requestToken:   "wrong-token",
-			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
-			shouldCallNext: false,
+			name:            "missing credentials",
+			configuredToken: "secret123",
+			expectedStatus:  http.StatusUnauthorized,
+			expectedBody:    `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
 		},
 		{
-			name:           "No token provided when required - should reject",
-			authToken:      "secret123",
-			requestToken:   "",
-			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
-			shouldCallNext: false,
+			name:            "malformed authorization header",
+			configuredToken: "secret123",
+			authorization:   "Bearer",
+			expectedStatus:  http.StatusUnauthorized,
+			expectedBody:    `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
 		},
 		{
-			name:           "Empty token when required - should reject",
-			authToken:      "secret123",
-			requestToken:   "",
-			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
-			shouldCallNext: false,
+			name:            "query token ignored",
+			configuredToken: "secret123",
+			url:             "/test?token=secret123",
+			expectedStatus:  http.StatusUnauthorized,
+			expectedBody:    `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
+		},
+		{
+			name:            "cookie token ignored",
+			configuredToken: "secret123",
+			cookie:          &http.Cookie{Name: "auth_token", Value: "secret123"},
+			expectedStatus:  http.StatusUnauthorized,
+			expectedBody:    `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
+		},
+		{
+			name:            "invalid token",
+			configuredToken: "secret123",
+			xToken:          "wrong-token",
+			expectedStatus:  http.StatusUnauthorized,
+			expectedBody:    `{"error":{"code":"auth_unauthenticated","message":"invalid or missing authentication token","category":"auth_error"}}` + "\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set up environment variable
-			if tt.authToken != "" {
-				os.Setenv("AUTH_TOKEN", tt.authToken)
-			} else {
-				os.Unsetenv("AUTH_TOKEN")
+			hit := false
+			mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				hit = true
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("success"))
+			})
+
+			url := tt.url
+			if url == "" {
+				url = "/test"
+			}
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			if tt.authorization != "" {
+				req.Header.Set("Authorization", tt.authorization)
+			}
+			if tt.xToken != "" {
+				req.Header.Set("X-Token", tt.xToken)
+			}
+			if tt.cookie != nil {
+				req.AddCookie(tt.cookie)
 			}
 
-			// Clean up after test
-			defer func() {
-				if tt.authToken != "" {
-					os.Unsetenv("AUTH_TOKEN")
-				}
-			}()
-
-			// Create test request
-			req := httptest.NewRequest("GET", "/test", nil)
-			if tt.requestToken != "" {
-				req.Header.Set("X-Token", tt.requestToken)
-			}
-
-			// Create response recorder
 			w := httptest.NewRecorder()
+			authMiddleware := NewSimpleAuthMiddleware(tt.configuredToken).Authenticate(mockHandler)
+			authMiddleware.ServeHTTP(w, req)
 
-			// Create middleware with mock handler
-			authMiddleware := Auth(mockHandler)
-
-			// Execute the middleware
-			authMiddleware(w, req)
-
-			// Check status code
 			if w.Code != tt.expectedStatus {
-				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
+				t.Fatalf("expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
-
-			// Check response body
-			body := w.Body.String()
-			if body != tt.expectedBody {
-				t.Errorf("Expected body %q, got %q", tt.expectedBody, body)
+			if body := w.Body.String(); body != tt.expectedBody {
+				t.Fatalf("expected body %q, got %q", tt.expectedBody, body)
 			}
-
-			// Verify Content-Type for error responses
-			if tt.expectedStatus == http.StatusUnauthorized {
-				contentType := w.Header().Get("Content-Type")
-				// Note: httptest.ResponseRecorder doesn't set Content-Type automatically
-				// In a real scenario, you might want to set it in your Auth function
-				_ = contentType // We're not checking this in the current implementation
+			if tt.expectedStatus == http.StatusUnauthorized && w.Header().Get("WWW-Authenticate") == "" {
+				t.Fatalf("expected WWW-Authenticate header")
+			}
+			if tt.expectedStatus == http.StatusOK && !hit {
+				t.Fatalf("expected downstream handler call")
+			}
+			if tt.expectedStatus == http.StatusUnauthorized && hit {
+				t.Fatalf("did not expect downstream handler call")
 			}
 		})
 	}
 }
 
-// Benchmark test to measure performance
-func BenchmarkAuth(b *testing.B) {
-	os.Setenv("AUTH_TOKEN", "secret123")
-	defer os.Unsetenv("AUTH_TOKEN")
-
+func BenchmarkSimpleAuthMiddleware(b *testing.B) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	authMiddleware := Auth(mockHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	authMiddleware := NewSimpleAuthMiddleware("secret123").Authenticate(mockHandler)
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Token", "secret123")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
-		authMiddleware(w, req)
+		authMiddleware.ServeHTTP(w, req)
 	}
 }
 
-// Test concurrent access to ensure thread safety
-func TestAuthConcurrent(t *testing.T) {
-	os.Setenv("AUTH_TOKEN", "secret123")
-	defer os.Unsetenv("AUTH_TOKEN")
-
+func TestSimpleAuthMiddlewareConcurrent(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
-	authMiddleware := Auth(mockHandler)
+	authMiddleware := NewSimpleAuthMiddleware("secret123").Authenticate(mockHandler)
 
-	// Test concurrent valid requests
-	t.Run("concurrent valid requests", func(t *testing.T) {
-		const numGoroutines = 100
-		done := make(chan bool, numGoroutines)
+	const numGoroutines = 100
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
 
-		for i := 0; i < numGoroutines; i++ {
-			go func() {
-				req := httptest.NewRequest("GET", "/test", nil)
-				req.Header.Set("X-Token", "secret123")
-				w := httptest.NewRecorder()
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set("Authorization", "Bearer secret123")
+			w := httptest.NewRecorder()
 
-				authMiddleware(w, req)
+			authMiddleware.ServeHTTP(w, req)
 
-				if w.Code != http.StatusOK {
-					t.Errorf("Expected status 200, got %d", w.Code)
-				}
-				done <- true
-			}()
-		}
+			if w.Code != http.StatusOK {
+				t.Errorf("expected status 200, got %d", w.Code)
+			}
+		}()
+	}
 
-		// Wait for all goroutines to complete
-		for i := 0; i < numGoroutines; i++ {
-			<-done
-		}
-	})
+	wg.Wait()
 }
