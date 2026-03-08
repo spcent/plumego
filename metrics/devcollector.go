@@ -10,7 +10,7 @@ import (
 
 // DevCollectorConfig configures the dev metrics collector.
 type DevCollectorConfig struct {
-	Window      time.Duration // Display window (not enforced yet)
+	Window      time.Duration // Display window for snapshot retention
 	MaxSamples  int           // Maximum recent request samples to retain
 	MaxSeries   int           // Maximum distinct route series to retain
 	MaxValues   int           // Maximum values retained per series for percentiles
@@ -125,6 +125,7 @@ type DevCollector struct {
 	maxSamples int
 	maxSeries  int
 	maxValues  int
+	now        func() time.Time
 
 	total   *httpSeries
 	series  map[string]*httpSeries
@@ -171,6 +172,7 @@ func NewDevCollector(cfg DevCollectorConfig) *DevCollector {
 		maxSamples:    cfg.MaxSamples,
 		maxSeries:     cfg.MaxSeries,
 		maxValues:     cfg.MaxValues,
+		now:           time.Now,
 		total:         newHTTPSeries("ALL", "ALL", cfg.MaxValues),
 		series:        make(map[string]*httpSeries),
 		samples:       make([]DevRequestSample, 0, cfg.MaxSamples),
@@ -186,8 +188,10 @@ func NewDevCollector(cfg DevCollectorConfig) *DevCollector {
 
 // Snapshot returns the current HTTP metrics snapshot.
 func (d *DevCollector) Snapshot() DevHTTPSnapshot {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.pruneHTTPLocked(d.now())
 
 	routes := make([]DevHTTPSeries, 0, len(d.series))
 	for _, s := range d.series {
@@ -215,8 +219,10 @@ func (d *DevCollector) Snapshot() DevHTTPSnapshot {
 
 // DBSnapshot returns the current DB metrics snapshot.
 func (d *DevCollector) DBSnapshot() DevDBSnapshot {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.pruneDBLocked(d.now())
 
 	series := make([]DevDBSeries, 0, len(d.dbSeries))
 	for _, s := range d.dbSeries {
@@ -278,7 +284,7 @@ func (d *DevCollector) ObserveHTTP(ctx context.Context, method, path string, sta
 	d.base.ObserveHTTP(ctx, method, path, status, bytes, duration)
 
 	key := seriesKey(method, path)
-	now := time.Now()
+	now := d.now()
 	errorHit := status >= 400
 	durationMS := duration.Seconds() * 1000
 
@@ -341,7 +347,7 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 	d.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
 
 	durationMS := duration.Seconds() * 1000
-	now := time.Now()
+	now := d.now()
 	errorHit := err != nil
 	table := extractTable(query)
 
@@ -409,7 +415,61 @@ func (d *DevCollector) Clear() {
 	d.dbSeries = make(map[string]*dbSeries)
 	d.dbTableSeries = make(map[string]*dbSeries)
 	d.dbSlow = d.dbSlow[:0]
-	d.startedAt = time.Now()
+	d.startedAt = d.now()
+}
+
+func (d *DevCollector) retentionCutoff(now time.Time) time.Time {
+	cutoff := now.Add(-d.window)
+	if cutoff.Before(d.startedAt) {
+		return d.startedAt
+	}
+	return cutoff
+}
+
+func (d *DevCollector) pruneHTTPLocked(now time.Time) {
+	cutoff := d.retentionCutoff(now)
+
+	writeIdx := 0
+	for _, sample := range d.samples {
+		if sample.Timestamp.Before(cutoff) {
+			continue
+		}
+		d.samples[writeIdx] = sample
+		writeIdx++
+	}
+	d.samples = d.samples[:writeIdx]
+
+	for key, series := range d.series {
+		if series.lastSeen.Before(cutoff) {
+			delete(d.series, key)
+		}
+	}
+}
+
+func (d *DevCollector) pruneDBLocked(now time.Time) {
+	cutoff := d.retentionCutoff(now)
+
+	writeIdx := 0
+	for _, sample := range d.dbSlow {
+		if sample.Timestamp.Before(cutoff) {
+			continue
+		}
+		d.dbSlow[writeIdx] = sample
+		writeIdx++
+	}
+	d.dbSlow = d.dbSlow[:writeIdx]
+
+	for key, series := range d.dbSeries {
+		if series.lastSeen.Before(cutoff) {
+			delete(d.dbSeries, key)
+		}
+	}
+
+	for key, series := range d.dbTableSeries {
+		if series.lastSeen.Before(cutoff) {
+			delete(d.dbTableSeries, key)
+		}
+	}
 }
 
 func (d *DevCollector) appendSampleLocked(method, path string, status, bytes int, durationMS float64, errorHit bool, ts time.Time) {
