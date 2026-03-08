@@ -13,7 +13,7 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/gateway"
+//		"github.com/spcent/plumego/net/gateway"
 //		"github.com/spcent/plumego/core"
 //	)
 //

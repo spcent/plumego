@@ -4,7 +4,7 @@ package circuitbreaker
 import (
 	"net/http"
 
-	resilience "github.com/spcent/plumego/resilience/circuitbreaker"
+	resilience "github.com/spcent/plumego/security/resilience/circuitbreaker"
 )
 
 type (

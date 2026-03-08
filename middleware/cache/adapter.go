@@ -1,7 +1,7 @@
 // Package cache provides a thin HTTP adapter for gateway cache capabilities.
 package cache
 
-import gatewaycache "github.com/spcent/plumego/gateway/cache"
+import gatewaycache "github.com/spcent/plumego/net/gateway/cache"
 
 type (
 	Store                  = gatewaycache.Store

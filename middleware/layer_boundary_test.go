@@ -20,12 +20,12 @@ func TestMiddlewareAdaptersRespectLayerBoundaries(t *testing.T) {
 		{
 			name:      "proxy adapter imports only gateway",
 			dir:       "proxy",
-			allowList: []string{"github.com/spcent/plumego/gateway"},
+			allowList: []string{"github.com/spcent/plumego/net/gateway"},
 		},
 		{
 			name:      "cache adapter imports only gateway cache",
 			dir:       "cache",
-			allowList: []string{"github.com/spcent/plumego/gateway/cache"},
+			allowList: []string{"github.com/spcent/plumego/net/gateway/cache"},
 		},
 		{
 			name:      "circuit adapter imports only resilience circuit",

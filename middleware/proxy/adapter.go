@@ -1,7 +1,7 @@
 // Package proxy provides a thin HTTP adapter for the gateway reverse proxy module.
 package proxy
 
-import gateway "github.com/spcent/plumego/gateway"
+import gateway "github.com/spcent/plumego/net/gateway"
 
 type (
 	PathRewriteFunc            = gateway.PathRewriteFunc
