@@ -276,3 +276,90 @@ func TestDevCollectorDurationUnitConsistency(t *testing.T) {
 		})
 	}
 }
+
+func TestDevCollectorSnapshotRetentionWindow(t *testing.T) {
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	current := base
+
+	collector := NewDevCollector(DevCollectorConfig{
+		Window:     30 * time.Second,
+		MaxSamples: 10,
+		MaxSeries:  10,
+		MaxValues:  100,
+		DBMaxSlow:  5,
+		DBSlowMS:   1,
+	})
+	collector.startedAt = base
+	collector.now = func() time.Time { return current }
+
+	ctx := context.Background()
+
+	collector.ObserveHTTP(ctx, "GET", "/expired", 200, 10, 5*time.Millisecond)
+	current = base.Add(20 * time.Second)
+	collector.ObserveHTTP(ctx, "GET", "/active", 200, 20, 10*time.Millisecond)
+	current = base.Add(40 * time.Second)
+	collector.ObserveHTTP(ctx, "GET", "/active", 500, 30, 15*time.Millisecond)
+
+	snapshot := collector.Snapshot()
+
+	if len(snapshot.Recent) != 2 {
+		t.Fatalf("expected 2 recent samples after retention pruning, got %d", len(snapshot.Recent))
+	}
+	for _, sample := range snapshot.Recent {
+		if sample.Path == "/expired" {
+			t.Fatalf("expected expired sample to be pruned")
+		}
+	}
+
+	if len(snapshot.Routes) != 1 {
+		t.Fatalf("expected only active route series, got %d", len(snapshot.Routes))
+	}
+	if snapshot.Routes[0].Path != "/active" {
+		t.Fatalf("expected active route series, got %q", snapshot.Routes[0].Path)
+	}
+}
+
+func TestDevCollectorDBSnapshotRetentionWindow(t *testing.T) {
+	base := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	current := base
+
+	collector := NewDevCollector(DevCollectorConfig{
+		Window:      30 * time.Second,
+		MaxSamples:  10,
+		MaxSeries:   10,
+		MaxValues:   100,
+		DBSlowMS:    1,
+		DBMaxSlow:   10,
+		DBMaxSeries: 10,
+	})
+	collector.startedAt = base
+	collector.now = func() time.Time { return current }
+
+	ctx := context.Background()
+
+	collector.ObserveDB(ctx, "query", "mysql", "SELECT * FROM expired_users", 1, 5*time.Millisecond, nil)
+	current = base.Add(20 * time.Second)
+	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users", 1, 6*time.Millisecond, nil)
+	current = base.Add(40 * time.Second)
+	collector.ObserveDB(ctx, "exec", "postgres", "UPDATE orders SET total = 1", 1, 7*time.Millisecond, nil)
+
+	snapshot := collector.DBSnapshot()
+
+	for _, sample := range snapshot.Slow {
+		if sample.Table == "expired_users" {
+			t.Fatalf("expected expired slow query sample to be pruned")
+		}
+	}
+
+	for _, series := range snapshot.Series {
+		if series.Operation == "query" && series.Driver == "mysql" {
+			t.Fatalf("expected expired db series to be pruned")
+		}
+	}
+
+	for _, series := range snapshot.Tables {
+		if series.Table == "expired_users" {
+			t.Fatalf("expected expired db table series to be pruned")
+		}
+	}
+}
