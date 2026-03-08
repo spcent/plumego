@@ -2,7 +2,6 @@ package bind
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,8 +12,6 @@ import (
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/validator"
 )
-
-type ctxKey struct{}
 
 // ErrorHandler allows customizing bind/validation error responses.
 type ErrorHandler func(w http.ResponseWriter, r *http.Request, err error, fields []contract.FieldError)
@@ -30,8 +27,7 @@ type JSONOptions struct {
 	OnError               ErrorHandler
 }
 
-// BindJSON parses JSON into a struct, validates it, and stores it in context.
-// Retrieve the bound payload with FromRequest/FromContext.
+// BindJSON parses JSON into a struct and validates it.
 //
 // # Canonical style note
 //
@@ -58,31 +54,9 @@ func BindJSON[T any](opts JSONOptions) middleware.Middleware {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), ctxKey{}, &payload)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// FromRequest returns the bound payload from request context.
-// Only use in conjunction with BindJSON middleware. See BindJSON for canonical style guidance.
-func FromRequest[T any](r *http.Request) (*T, bool) {
-	if r == nil {
-		return nil, false
-	}
-	return FromContext[T](r.Context())
-}
-
-// FromContext returns the bound payload from context.
-// Only use in conjunction with BindJSON middleware. See BindJSON for canonical style guidance.
-func FromContext[T any](ctx context.Context) (*T, bool) {
-	if ctx == nil {
-		return nil, false
-	}
-	if v, ok := ctx.Value(ctxKey{}).(*T); ok {
-		return v, true
-	}
-	return nil, false
 }
 
 func decodeJSON[T any](w http.ResponseWriter, r *http.Request, opts JSONOptions) (T, []byte, error) {

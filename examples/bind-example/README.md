@@ -1,6 +1,6 @@
-# Bind Example
+# Request Decode Example
 
-This example demonstrates the standardized JSON binding + validation middleware.
+This example demonstrates canonical explicit JSON decode + validation in handlers.
 
 ## Run
 
@@ -50,7 +50,7 @@ Expected response (example):
 }
 ```
 
-## JSON parse error
+## JSON parse error / unknown fields
 
 ```bash
 curl -X POST http://127.0.0.1:8082/v1/users \
@@ -58,14 +58,15 @@ curl -X POST http://127.0.0.1:8082/v1/users \
   -d '{'
 ```
 
-Expected response (example):
-
-```json
-{
-  "error": {
-    "code": "INVALID_JSON",
-    "message": "invalid JSON payload",
-    "category": "validation_error"
-  }
-}
+```bash
+curl -X POST http://127.0.0.1:8082/v1/users \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"user@example.com","password":"secret","extra":"x"}'
 ```
+
+Expected response code: `INVALID_JSON`.
+
+## Style rule
+
+Do not inject business DTOs via middleware and do not retrieve DTOs from request context in new code.
+Use explicit `json.NewDecoder(r.Body).Decode(&req)` plus local validation directly in handlers.

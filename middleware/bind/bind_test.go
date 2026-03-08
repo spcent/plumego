@@ -21,9 +21,9 @@ func TestBindJSONSuccess(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	handler := BindJSON[testPayload](JSONOptions{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, ok := FromRequest[testPayload](r)
-		if !ok || p == nil {
-			t.Fatalf("expected payload in context")
+		var p testPayload
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			t.Fatalf("expected request body to remain readable: %v", err)
 		}
 		if p.Name != "alice" {
 			t.Fatalf("unexpected name: %s", p.Name)

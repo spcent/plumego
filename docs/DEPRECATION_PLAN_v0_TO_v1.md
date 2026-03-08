@@ -212,7 +212,7 @@ These types may remain in v1 as legacy helpers if low-cost, but:
 
 ### Current state
 
-`middleware/bind.BindJSON[T]` parses JSON, validates it, and stores the payload in request context for retrieval through `FromRequest` or `FromContext`.
+`middleware/bind.BindJSON[T]` parses JSON and validates payloads as a compatibility middleware; canonical style is explicit decode and validation inside handlers.
 
 ### Problem
 
