@@ -3,7 +3,7 @@ package auth
 import (
 	"crypto/subtle"
 	"net/http"
-	"os"
+	"strings"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
@@ -18,8 +18,8 @@ type AuthMiddleware interface {
 	Authenticate(next http.Handler) http.Handler
 }
 
-// SimpleAuthMiddleware is a simple authentication middleware that uses X-Token header,
-// query parameter, or AUTH_TOKEN environment variable for authentication.
+// SimpleAuthMiddleware is a simple authentication middleware that validates
+// explicit header-based credentials.
 //
 // This middleware is suitable for simple API authentication scenarios.
 // For production use, consider using JWT or OAuth2-based authentication.
@@ -28,16 +28,12 @@ type AuthMiddleware interface {
 //
 //	import "github.com/spcent/plumego/middleware/auth"
 //
-//	// Use environment variable
-//	handler := auth.NewSimpleAuthMiddleware("").Authenticate(myHandler)
-//
 //	// Or provide token directly
 //	handler := auth.NewSimpleAuthMiddleware("my-secret-token").Authenticate(myHandler)
 //
-// The middleware checks for the token in the following order:
-//  1. X-Token header
-//  2. URL query parameter "token"
-//  3. Cookie named "auth_token"
+// The middleware checks for credentials in the following order:
+//  1. Authorization header with Bearer token
+//  2. X-Token header
 //
 // If authentication fails, it returns a 401 Unauthorized response with
 // a WWW-Authenticate header and a JSON error message.
@@ -47,13 +43,9 @@ type SimpleAuthMiddleware struct {
 }
 
 // NewSimpleAuthMiddleware creates a new SimpleAuthMiddleware with the given authToken.
-// If authToken is empty, it will be read from the AUTH_TOKEN environment variable.
 func NewSimpleAuthMiddleware(authToken string) *SimpleAuthMiddleware {
-	if authToken == "" {
-		authToken = os.Getenv("AUTH_TOKEN")
-	}
 	return &SimpleAuthMiddleware{
-		authToken: authToken,
+		authToken: strings.TrimSpace(authToken),
 		realm:     "Protected Area",
 	}
 }
@@ -61,36 +53,17 @@ func NewSimpleAuthMiddleware(authToken string) *SimpleAuthMiddleware {
 // Authenticate implements the AuthMiddleware interface.
 func (am *SimpleAuthMiddleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip authentication if no auth token is configured
+		// Fail closed if auth token is not configured.
 		if am.authToken == "" {
-			next.ServeHTTP(w, r)
+			writeUnauthorized(w, r, am.realm)
 			return
 		}
 
-		// Get token from request headers, query parameters, or cookies
-		token := r.Header.Get("X-Token")
-		if token == "" {
-			token = r.URL.Query().Get("token")
-		}
-		if token == "" {
-			cookie, err := r.Cookie("auth_token")
-			if err == nil {
-				token = cookie.Value
-			}
-		}
+		token := extractTokenFromHeaders(r)
 
 		// Check if token matches expected token
-		if subtle.ConstantTimeCompare([]byte(token), []byte(am.authToken)) != 1 {
-			w.Header().Set("WWW-Authenticate", "Bearer realm=\""+am.realm+"\"")
-			middleware.WriteTransportError(
-				w,
-				r,
-				http.StatusUnauthorized,
-				middleware.CodeAuthUnauthenticated,
-				"invalid or missing authentication token",
-				contract.CategoryAuthentication,
-				nil,
-			)
+		if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(am.authToken)) != 1 {
+			writeUnauthorized(w, r, am.realm)
 			return
 		}
 
@@ -99,15 +72,45 @@ func (am *SimpleAuthMiddleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-// Auth is a middleware function that validates the X-Token header against the AUTH_TOKEN environment variable when it is set.
+func extractTokenFromHeaders(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+
+	authz := strings.TrimSpace(r.Header.Get("Authorization"))
+	if len(authz) >= len("Bearer ") && strings.EqualFold(authz[:len("Bearer")], "Bearer") {
+		bearerToken := strings.TrimSpace(authz[len("Bearer"):])
+		if bearerToken != "" {
+			return bearerToken
+		}
+	}
+
+	return strings.TrimSpace(r.Header.Get("X-Token"))
+}
+
+func writeUnauthorized(w http.ResponseWriter, r *http.Request, realm string) {
+	w.Header().Set("WWW-Authenticate", "Bearer realm=\""+realm+"\"")
+	middleware.WriteTransportError(
+		w,
+		r,
+		http.StatusUnauthorized,
+		middleware.CodeAuthUnauthenticated,
+		"invalid or missing authentication token",
+		contract.CategoryAuthentication,
+		nil,
+	)
+}
+
+// Auth is a compatibility helper that applies a middleware with empty configuration.
+//
+// Deprecated: inject auth configuration from bootstrap using NewSimpleAuthMiddleware.
 // This is a convenience function for backwards compatibility.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/middleware/auth"
 //
-//	// Set AUTH_TOKEN environment variable before using
-//	os.Setenv("AUTH_TOKEN", "my-secret-token")
+//	// Prefer NewSimpleAuthMiddleware("my-secret-token") for explicit configuration.
 //	handler := auth.Auth(myHandlerFunc)
 func Auth(next http.HandlerFunc) http.HandlerFunc {
 	middleware := NewSimpleAuthMiddleware("")
