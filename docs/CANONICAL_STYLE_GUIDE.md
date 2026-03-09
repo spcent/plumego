@@ -1,187 +1,39 @@
 # Plumego Canonical Style Guide
 
-Status: Final  
-Audience: Plumego maintainers, contributors, AI agents, code reviewers  
-Scope: Canonical coding style for Plumego core-facing web applications and official examples  
-Applies to: `core`, `router`, `middleware`, official examples, docs, code generation prompts, AI/code-agent workflows
+Scope: `core`, `router`, `middleware`, official examples, docs, code generation, AI-agent workflows.
 
 ---
 
-# 1. Purpose
+## 1. Core Principles
 
-This document defines the **single recommended way** to build HTTP applications with Plumego.
+- **stdlib first** — stay close to `http.Handler`, `*http.Request`, `http.ResponseWriter`, `httptest`
+- **one obvious way** — one bootstrap, one route style, one handler shape, one decode path, one error shape, one test style
+- **explicit over implicit** — no hidden binding, no context service-locator, no magical response wrappers, no import-order behavior
+- **small-step refactorability** — narrow boundaries, stable interfaces, shallow call paths, minimal indirection
 
-Its goal is not API maximalism. Its goal is to make Plumego:
-
-- easy for humans to read and review,
-- easy for AI agents to modify safely,
-- easy to refactor in small steps,
-- hard to misuse through hidden framework behavior,
-- stable enough that examples, generated code, and production code all look structurally similar.
-
-This guide is intentionally strict.
-
-Plumego may retain compatibility APIs, adapters, and optional helper packages, but **official examples, docs, scaffolds, starter templates, and AI-generated code must follow the canonical style in this document**.
-
-When there is tension between convenience and predictability, canonical Plumego chooses predictability.
+When convenience conflicts with predictability, choose predictability.
 
 ---
 
-# 2. Core philosophy
+## 2. Package Roles
 
-## 2.1 Standard library first
+### `core`
+App construction, lifecycle, route registration entry points, middleware attachment, server startup. Must not become a feature catalog.
 
-Plumego is a thin layer over Go's standard HTTP model.
+### `router`
+Route matching, params, grouping, route tree/lookup, static mounting.
+Not allowed: repositories, validators, JSON writers, business response wrappers, service construction.
 
-Canonical Plumego code should stay close to:
+### `middleware`
+Transport-layer cross-cutting only: logging, recovery, timeout, request-id, CORS, auth adapters, rate-limiting, tracing, metrics.
+Not allowed: service injection, ORM lookup, business DTO assembly, hidden request binding, domain-policy branching.
 
-- `http.Handler`
-- `http.HandlerFunc`
-- `*http.Request`
-- `http.ResponseWriter`
-- standard `context.Context`
-- `httptest`
-
-Plumego may add ergonomics and conventions, but it must not hide the standard library execution model.
-
-## 2.2 One obvious way
-
-For each common task, there must be exactly one recommended pattern.
-
-Examples:
-
-- one recommended app bootstrap style,
-- one recommended route registration style,
-- one recommended handler style,
-- one recommended middleware style,
-- one recommended JSON request decode style,
-- one recommended JSON response style,
-- one recommended error response shape,
-- one recommended testing style.
-
-If Plumego supports multiple ways to do the same thing, only one may be canonical.
-
-## 2.3 Explicit over implicit
-
-Canonical Plumego code must prefer explicit data flow and explicit control flow.
-
-Avoid hidden behavior such as:
-
-- automatic mixed-source binding,
-- service lookup through request context,
-- magical default response wrappers,
-- route registration with side effects not visible in the local file,
-- middleware that silently injects business dependencies,
-- business behavior that depends on import order.
-
-## 2.4 Small-step refactorability
-
-A human or AI agent should be able to change one route, one handler, one middleware, or one response format without needing to understand the entire repository.
-
-That requires:
-
-- narrow package boundaries,
-- stable interfaces,
-- shallow call paths,
-- minimal indirection,
-- canonical structure across examples,
-- a small, stable public API surface.
+### Extension packages
+`ai`, `ops`, `tenant`, websocket, webhook, scheduler — capability layers, not the core learning path. Must not define primary coding style.
 
 ---
 
-# 3. Non-goals
-
-This guide does **not** attempt to make Plumego:
-
-- the shortest possible framework for demos,
-- the most feature-rich framework,
-- a macro-heavy or annotation-driven framework,
-- an auto-binding or auto-DI framework,
-- a framework where transport, domain, and infrastructure concerns are intentionally blurred,
-- a platform where all capabilities are surfaced from `App` directly.
-
-The canonical style optimizes for **predictability, grepability, and low ambiguity**, not maximal convenience.
-
----
-
-# 4. Canonical package roles
-
-To remain AI-agent friendly, package names must closely match package responsibilities.
-
-## 4.1 `core`
-
-`core` is the main runtime entry point.
-
-It should contain only foundational application primitives such as:
-
-- app construction,
-- app lifecycle,
-- route registration entry points,
-- middleware attachment,
-- server startup integration,
-- minimal core-facing abstractions.
-
-`core` must not become a feature catalog.
-
-## 4.2 `router`
-
-`router` is for routing concerns only.
-
-Allowed responsibilities:
-
-- route matching,
-- route params,
-- grouping,
-- route tree / lookup,
-- route registration internals,
-- static route mounting if retained.
-
-Not allowed in canonical routing packages:
-
-- repositories,
-- resource controllers,
-- validators,
-- JSON writers,
-- business response wrappers,
-- persistence abstractions,
-- service construction.
-
-## 4.3 `middleware`
-
-`middleware` is for transport-layer cross-cutting concerns only.
-
-Allowed responsibilities:
-
-- logging,
-- recovery,
-- timeout,
-- request id,
-- CORS,
-- auth adapters,
-- rate limiting adapters,
-- tracing adapters,
-- metrics adapters.
-
-Not allowed in canonical middleware:
-
-- service injection,
-- ORM lookup,
-- business DTO assembly,
-- hidden request binding required by handlers,
-- response rewriting that changes domain semantics,
-- domain-policy branching that belongs in services.
-
-## 4.4 Extension packages
-
-Packages such as AI, ops, tenant, websocket, webhook, frontend hosting, and scheduler belong to extension or capability layers, not the canonical core learning path.
-
-They may exist and be documented, but they must not define the primary coding style for standard HTTP applications.
-
----
-
-# 5. Canonical application structure
-
-The canonical file layout for a Plumego HTTP service should be simple and shallow.
+## 3. Application Structure
 
 ```text
 cmd/myservice/main.go
@@ -196,45 +48,17 @@ internal/platform/httpjson/response.go
 internal/platform/httperr/error.go
 ```
 
-## 5.1 Directory principles
-
-- `cmd/` contains startup only.
-- `internal/httpapp/` contains HTTP wiring only.
-- `internal/domain/` contains business logic.
-- `internal/platform/` contains reusable transport or infra helpers.
-- Do not mix routing, domain logic, persistence, and response helpers in one package.
-- Do not place framework experiments in the canonical path used by official examples.
-
-## 5.2 Canonical bootstrap boundary
-
-`main.go` should do very little:
-
-- build config,
-- build dependencies,
-- construct app,
-- register routes,
-- start server.
-
-Business logic must not be assembled inline in `main.go` beyond simple dependency wiring.
+- `cmd/` — startup only
+- `internal/httpapp/` — HTTP wiring only
+- `internal/domain/` — business logic
+- `internal/platform/` — reusable transport/infra helpers
+- Do not mix routing, domain logic, persistence, and response helpers in one package
 
 ---
 
-# 6. Canonical app bootstrap
-
-The canonical style uses a small, explicit app construction flow.
-
-## 6.1 Recommended shape
+## 4. Canonical Bootstrap
 
 ```go
-package main
-
-import (
-    "log"
-    "net/http"
-
-    "github.com/spcent/plumego/core"
-)
-
 func main() {
     app := core.New()
 
@@ -250,32 +74,15 @@ func main() {
 }
 ```
 
-## 6.2 Canonical bootstrap rules
-
-- Prefer constructing the app in one visible place.
-- Prefer `http.ListenAndServe` compatibility.
-- Attach global middleware explicitly and near startup.
-- Call one route registration function per bounded HTTP area.
-- Avoid hidden auto-registration from unrelated packages.
-- Avoid startup behavior that depends on `init()` side effects.
-
-## 6.3 Avoid
-
-- giant startup files with embedded business logic,
-- route registration spread across many `init()` functions,
-- startup driven by implicit side effects,
-- app behavior that depends on package import order,
-- startup code that must be mentally executed to discover effective routes.
+Rules:
+- One visible construction site
+- Global middleware attached explicitly near startup
+- One `registerRoutes` call per bounded area
+- No `init()` side-effect registration, no hidden auto-registration
 
 ---
 
-# 7. Canonical route registration
-
-## 7.1 One public route registration style
-
-Canonical code uses **one primary route registration API**.
-
-Recommended style:
+## 5. Route Registration
 
 ```go
 func registerRoutes(app *core.App) {
@@ -284,89 +91,32 @@ func registerRoutes(app *core.App) {
 }
 ```
 
-If compatibility APIs exist, they are not canonical.
-
-## 7.2 Route registration rules
-
-- One route, one explicit method, one explicit path, one explicit handler.
-- Prefer static registration over reflection or discovery.
-- Prefer local visibility over global magical grouping.
-- Route registration must remain grep-friendly.
-- The reader must be able to discover an endpoint definition by searching for its path or handler.
-
-## 7.3 Groups
-
-Route groups may be used for:
-
-- path prefix,
-- shared middleware.
-
-Groups must not become a container for hidden business policy, service injection, or version policy that is difficult to trace.
+- One method + one path + one handler per line
+- Static registration; no reflection or discovery
+- Must remain grep-friendly — path and handler discoverable by search
+- Groups: path prefix and shared middleware only; not for hidden policy or service injection
 
 ---
 
-# 8. Canonical handler style
+## 6. Handler Style
 
-## 8.1 Canonical handler signature
-
-The canonical handler signature for Plumego official code is:
+Canonical signature:
 
 ```go
 func(w http.ResponseWriter, r *http.Request)
 ```
 
-This is the single canonical style for:
+Handler responsibilities (transport only):
+1. Read request inputs
+2. Validate transport-level shape
+3. Call a service
+4. Translate outcome to transport response
 
-- official examples,
-- docs,
-- starter templates,
-- generated code,
-- AI-agent edits unless explicitly instructed otherwise.
-
-If Plumego internally supports additional handler signatures or adapters, those are compatibility or advanced surfaces, not the canonical public style.
-
-## 8.2 Why this signature is canonical
-
-This signature is preferred because it is:
-
-- closest to `net/http`,
-- easiest to test with `httptest`,
-- easiest for AI agents to understand,
-- easiest to adapt across packages,
-- least dependent on framework-specific abstractions.
-
-## 8.3 Handler responsibilities
-
-A canonical handler should do only transport work:
-
-1. read request inputs,
-2. validate transport-level presence and basic shape,
-3. call a service,
-4. translate service outcomes into transport responses.
-
-## 8.4 Handler anti-patterns
-
-Do not put these directly in handlers unless unavoidable:
-
-- raw SQL,
-- repository construction,
-- dependency lookup from context maps,
-- config loading,
-- complex transaction orchestration,
-- hidden retries,
-- logging setup,
-- response envelope invention per file,
-- domain-policy branching that belongs in services.
+Not in handlers: raw SQL, repo construction, context service-lookup, config loading, transaction orchestration, response envelope invention.
 
 ---
 
-# 9. Canonical request decoding
-
-## 9.1 Explicit decode is the default
-
-Canonical Plumego code should decode JSON explicitly.
-
-Recommended pattern:
+## 7. Request Decoding
 
 ```go
 type CreateUserRequest struct {
@@ -380,228 +130,102 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
         WriteError(w, BadRequest("invalid_json", "invalid request body"))
         return
     }
-
     // transport-level validation here
 }
 ```
 
-## 9.2 Allowed helper level
+Thin helper `DecodeJSON(r, &req)` acceptable if: reads exactly one source, returns plain Go errors, no hidden side effects.
 
-A thin helper such as `DecodeJSON(r, &req)` is acceptable only if it is transparent and predictable.
-
-A canonical decode helper must:
-
-- read from exactly one source,
-- not perform mixed-source binding,
-- not silently apply business defaults,
-- not inject values into request context,
-- return normal Go errors without hidden side effects.
-
-## 9.3 Not canonical
-
-The following are **not** canonical for general examples:
-
-- middleware-first binding that stores DTOs into request context,
-- mixed binding across path, query, headers, and body automatically,
-- auto-validation with hidden translation rules,
-- request DTO retrieval through magic keys,
-- binder behavior that changes based on struct tags not visible in the local file.
-
-Such helpers may exist, but must be treated as optional compatibility or advanced features.
+Not canonical: middleware-first binding into context, mixed-source auto-binding, magic key DTO retrieval.
 
 ---
 
-# 10. Canonical parameter access
-
-## 10.1 Route params
-
-Route params should be read explicitly where they are used.
+## 8. Parameter Access
 
 ```go
+// Route param
 id := Param(r, "id")
 if id == "" {
     WriteError(w, BadRequest("missing_id", "missing route parameter id"))
     return
 }
+
+// Query param
+r.URL.Query().Get("page")
+
+// Header
+r.Header.Get("Authorization")
 ```
 
-## 10.2 Query params
-
-Use `r.URL.Query()` or one thin helper. Do not layer multiple query APIs unless there is a compelling reason.
-
-## 10.3 Headers
-
-Read headers directly from `r.Header` or a single thin helper.
-
-The canonical rule is simple: **data source visibility matters**. A reader should see whether the value came from path, query, header, or body.
+Data source must be visible at the read site — reader must see whether value came from path, query, header, or body.
 
 ---
 
-# 11. Canonical middleware style
-
-## 11.1 Middleware must be plain wrapping
-
-Canonical middleware should be a standard wrapping function.
+## 9. Middleware Style
 
 ```go
 type Middleware func(http.Handler) http.Handler
 ```
 
-or the exact Plumego public type if it is semantically equivalent.
+`next` must be called exactly once. No pre/post/error lifecycle splits for ordinary middleware.
 
-## 11.2 Middleware responsibilities
-
-Allowed:
-
-- request id,
-- logging,
-- recovery,
-- timeout,
-- auth gate,
-- rate limiting,
-- tracing,
-- metrics.
-
-## 11.3 Middleware must not hide business inputs
-
-Not canonical:
-
-- middleware that builds business DTOs required by handlers,
-- middleware that injects service objects into context for routine use,
-- middleware that silently mutates domain meaning,
-- middleware that writes normal business success responses,
-- middleware that decides domain success/failure states on behalf of services.
-
-## 11.4 `next` semantics must stay simple
-
-Avoid complex middleware semantics such as:
-
-- calling `next` multiple times,
-- pre/post/error split lifecycles for ordinary middleware,
-- control flow that requires reading framework internals to understand,
-- middleware contracts that differ across packages.
+Not canonical: business DTO construction, service injection into context, domain success/failure decisions, mutating domain semantics.
 
 ---
 
-# 12. Canonical error model
-
-## 12.1 One error response shape
-
-Plumego must expose one canonical transport error structure for JSON APIs.
-
-Recommended baseline:
+## 10. Error Model
 
 ```go
 type ErrorResponse struct {
     Code    string `json:"code"`
     Message string `json:"message"`
 }
-```
 
-Optional fields such as `details`, `request_id`, or `category` are acceptable only if they are framework-wide and stable.
-
-## 12.2 One write path
-
-Canonical code should use one helper to emit errors, for example:
-
-```go
+// One write path:
 WriteError(w, BadRequest("invalid_json", "invalid request body"))
 ```
 
-or an equivalent single canonical helper.
-
-## 12.3 Error rules
-
-- transport errors should be structured,
-- status code should be explicit or derived predictably,
-- error codes should be stable machine-readable strings,
-- end-user messages should be concise and safe,
-- logs may include richer internal details, but responses should not,
-- identical classes of error should produce identical shapes across modules.
-
-## 12.4 Avoid
-
-- ad hoc `http.Error` text in normal JSON APIs,
-- file-by-file custom envelopes,
-- one middleware returning a different shape from the rest of the framework,
-- helpers that silently wrap success and error responses differently per module.
+Rules:
+- Structured errors only (no ad hoc `http.Error` in JSON APIs)
+- Explicit or predictably derived status codes
+- Stable machine-readable error codes
+- Logs may be richer; responses must not leak internals
+- Identical error class → identical shape across modules
 
 ---
 
-# 13. Canonical success responses
-
-## 13.1 Response writing should be minimal and direct
-
-For JSON APIs, use one response helper or direct JSON encoding consistently.
-
-Recommended shape:
+## 11. Success Responses
 
 ```go
 WriteJSON(w, http.StatusCreated, CreateUserResponse{ID: id})
 ```
 
-## 13.2 Avoid response envelope proliferation
-
-Do not invent multiple success wrappers such as:
-
-- `{ "success": true, "data": ... }`,
-- `{ "code": 0, "result": ... }`,
-- `{ "status": "ok", "payload": ... }`
-
-unless the project has committed to one global envelope. If there is a global envelope, it must be documented once and used everywhere.
-
-## 13.3 Status codes matter
-
-Canonical code must set meaningful HTTP status codes explicitly for non-trivial cases.
+- One response helper, used consistently
+- No envelope proliferation (`{ "success": true, "data": ... }` etc.) unless there is one global envelope documented once and used everywhere
+- Meaningful HTTP status codes set explicitly
 
 ---
 
-# 14. Canonical dependency flow
-
-## 14.1 Constructor injection, not request-context service lookup
-
-Business dependencies should be injected through constructors or structs.
-
-Recommended pattern:
+## 12. Dependency Injection
 
 ```go
 type UserHandler struct {
     Service user.Service
 }
 
-func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-    // ...
-}
+func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) { ... }
 ```
-
-## 14.2 Avoid service locator patterns
 
 Not canonical:
-
 ```go
-svc := MustServiceFromContext(r.Context(), "userService")
+svc := MustServiceFromContext(r.Context(), "userService")  // obscures shape, fragile
 ```
 
-This obscures dependency shape and makes AI-generated changes more fragile.
-
-## 14.3 Route wiring should show dependencies
-
-The file that registers handlers should make dependency ownership obvious.
-
-A reviewer should be able to answer:
-
-- who constructs the handler,
-- what dependencies it has,
-- which routes use it,
-- whether a route shares or owns a dependency.
+Route wiring file must make clear: who constructs the handler, what its dependencies are, which routes use it.
 
 ---
 
-# 15. Canonical testing style
-
-## 15.1 `httptest` first
-
-Canonical Plumego HTTP tests should use `httptest` and standard request/response assertions.
+## 13. Testing Style
 
 ```go
 func TestHealth(t *testing.T) {
@@ -610,7 +234,6 @@ func TestHealth(t *testing.T) {
 
     req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
     rec := httptest.NewRecorder()
-
     app.ServeHTTP(rec, req)
 
     if rec.Code != http.StatusOK {
@@ -619,143 +242,69 @@ func TestHealth(t *testing.T) {
 }
 ```
 
-## 15.2 Testing rules
-
-- test routes as handlers, not only through mocks,
-- prefer table-driven tests for pure transport cases,
-- isolate domain mocks or stubs behind interfaces,
-- keep setup local and small,
-- keep middleware order visible in the test file.
-
-## 15.3 Avoid
-
-- test harnesses that require full framework bootstrapping for simple route tests,
-- hidden global app state between tests,
-- tests that rely on implicit middleware ordering not visible in the test file,
-- tests that assert undocumented framework side effects.
+Rules:
+- `httptest` first
+- Table-driven for pure transport cases
+- Domain mocks behind interfaces
+- Middleware order visible in the test file
+- No full-framework bootstrap for simple route tests
+- No hidden global state between tests
 
 ---
 
-# 16. Canonical documentation rules
+## 14. Rules for AI Agents
 
-## 16.1 Official examples must teach one style
+Default behavior:
+- Prefer stdlib-shaped solutions
+- Follow this guide over package convenience APIs when both are possible
+- Preserve existing canonical patterns when editing nearby files
+- Avoid hidden context-based dependency flow
+- Avoid new wrapper abstractions unless justified
 
-Official docs and examples must not mix canonical and compatibility patterns in the same tutorial.
+Do not introduce:
+- New response helper families
+- New handler signatures
+- New route registration idioms
+- New service locator patterns
+- New implicit DTO flow through middleware
+- New business logic inside middleware
+- New package roles that blur core boundaries
 
-Each example must be labeled as one of:
+Change strategy:
+1. Keep public behavior unchanged
+2. Align local code to canonical style
+3. Extract helpers only when repetition justifies it
+4. Do not refactor unrelated files opportunistically
 
-- `canonical`,
-- `compatibility`,
-- `experimental`.
-
-## 16.2 Canonical examples must prefer boring clarity
-
-Examples are not a place to demonstrate every Plumego feature. They are a place to demonstrate the best long-term shape.
-
-## 16.3 README discipline
-
-The repository README and package-level docs must present:
-
-1. the canonical bootstrap,
-2. the canonical route registration style,
-3. the canonical request decode style,
-4. the canonical error write style,
-5. the canonical test style.
-
-Capability packs belong below the core path, not above it.
+Conflict rule: if existing code conflicts with this guide — preserve behavior first, avoid mixing styles in the touched area, move toward canonical when diff is clear and bounded.
 
 ---
 
-# 17. Rules for AI agents and code generation
+## 15. Compatibility APIs
 
-This section is normative.
-
-## 17.1 Default behavior for agents
-
-AI agents working in Plumego repositories must:
-
-- prefer standard-library-shaped solutions,
-- follow this guide over package convenience APIs when both are possible,
-- avoid introducing new public helper styles unless explicitly requested,
-- preserve existing canonical patterns when editing nearby files,
-- avoid hidden context-based dependency flow,
-- avoid new wrapper abstractions around simple handlers unless justified.
-
-## 17.2 When multiple APIs exist
-
-If Plumego exposes multiple ways to achieve the same behavior, agents must choose the canonical one from this guide, not the shortest one.
-
-## 17.3 Do not widen the style surface
-
-Agents must not introduce:
-
-- new response helper families,
-- new handler signatures,
-- new route registration idioms,
-- new service locator patterns,
-- new implicit DTO flow through middleware,
-- new business logic inside middleware,
-- new package roles that blur core boundaries,
-- new convenience APIs that weaken the standard-library-first posture.
-
-## 17.4 Change strategy
-
-Agents should prefer small, reversible edits:
-
-1. keep public behavior unchanged,
-2. align local code to canonical style,
-3. extract helpers only when repeated enough to justify them,
-4. do not refactor unrelated files opportunistically.
-
-## 17.5 Canonical conflict rule
-
-If existing repository code conflicts with this guide, agents should:
-
-- preserve behavior first,
-- avoid mixing styles in the same touched area,
-- move the changed area toward the canonical style when the diff remains clear and bounded,
-- avoid introducing a third style during migration.
+- Must not appear in canonical docs or examples
+- Must be labeled clearly
+- New features must not build on compatibility-only surfaces
+- Migration always moves toward canonical, never away
 
 ---
 
-# 18. Compatibility APIs and migration posture
+## 16. Review Checklist
 
-This guide does not require immediate removal of compatibility APIs.
-
-However:
-
-- compatibility APIs must not appear in canonical docs,
-- compatibility APIs should be labeled clearly,
-- new features should not be built on compatibility-only surfaces,
-- migration should always move toward canonical style, not away from it,
-- compatibility layers must not define the visual identity of Plumego examples.
-
-If a code path uses a deprecated or compatibility API, maintainers and AI agents should prefer migration when touching that area, unless the change scope must remain minimal.
+- Request flow obvious from route to response?
+- Code stays close to `net/http` semantics?
+- Single visible source for each input?
+- JSON decoding explicit or via one transparent helper?
+- Middleware transport-only?
+- Dependencies explicit in structs or constructors?
+- Response and error shapes consistent with framework conventions?
+- A new contributor can trace control flow in a few minutes?
 
 ---
 
-# 19. Review checklist
+## 17. Canonical Examples
 
-A PR follows the canonical style if reviewers can answer yes to most of the following:
-
-- Is the request flow obvious from route to response?
-- Does the code stay close to `net/http` semantics?
-- Is there a single visible way inputs are read?
-- Is JSON decoding explicit or done through one transparent helper?
-- Are middleware responsibilities transport-only?
-- Are dependencies explicit in structs or constructors?
-- Is the response format consistent with framework conventions?
-- Is the error shape consistent with framework conventions?
-- Would an AI agent likely generate similar code next time?
-- Would a new contributor understand the control flow quickly?
-
-If the answer is no to several items, the PR is probably widening Plumego's style surface and should be revised.
-
----
-
-# 20. Canonical examples
-
-## 20.1 Canonical create endpoint
+### Create endpoint
 
 ```go
 package handlers
@@ -804,7 +353,7 @@ func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-## 20.2 Canonical route wiring
+### Route wiring
 
 ```go
 func registerRoutes(app *core.App, userHandler handlers.UserHandler) {
@@ -812,7 +361,7 @@ func registerRoutes(app *core.App, userHandler handlers.UserHandler) {
 }
 ```
 
-## 20.3 Canonical test
+### Test
 
 ```go
 func TestCreateUser(t *testing.T) {
@@ -835,40 +384,24 @@ func TestCreateUser(t *testing.T) {
 
 ---
 
-# 21. Forbidden patterns in canonical code
+## 18. Forbidden Patterns (Canonical Code)
 
-The following patterns must not appear in canonical docs, templates, or generated starter code:
-
-- mixing `Get`, `GetCtx`, and `GetHandler` styles in one example,
-- binding request DTOs in middleware and reading them from context in ordinary CRUD handlers,
-- using `router` as a home for repositories or resource controllers,
-- retrieving services from request context maps,
-- exposing platform capabilities through `core.App` convenience methods when ordinary composition is enough,
-- introducing new response helper families for a single feature,
-- teaching multiple equally valid bootstraps in first-party docs,
-- hiding route registration behind import side effects,
-- placing business logic in middleware,
-- introducing package names that blur transport and domain boundaries,
-- using official examples to showcase compatibility-only APIs.
+- Mixing `Get`, `GetCtx`, `GetHandler` styles in one example
+- Binding request DTOs in middleware, reading from context in CRUD handlers
+- Using `router` for repositories or resource controllers
+- Retrieving services from request context maps
+- Exposing platform capabilities through `core.App` when ordinary composition suffices
+- Introducing new response helper families for a single feature
+- Teaching multiple equally valid bootstraps in first-party docs
+- Hiding route registration behind import side effects
+- Placing business logic in middleware
+- Blurring transport and domain package boundaries
+- Using official examples to showcase compatibility-only APIs
 
 ---
 
-# 22. Versioning note
+## 19. Final Rule
 
-Until Plumego v1 stabilizes its public surface, this guide acts as the forward-compatible style target.
+If a reviewer cannot understand how a request is handled within a few minutes by reading only the route registration, middleware, and handler file — the code is not canonical enough.
 
-Where the repository currently contains broader or older API surfaces, maintainers should:
-
-- keep this guide as the canonical north star,
-- document compatibility paths explicitly,
-- move examples and new packages toward canonical style,
-- prefer contraction over expansion in core-facing APIs,
-- treat API simplification as a feature, not a regression.
-
----
-
-# 23. Final rule
-
-If a human reviewer or AI agent cannot understand how a request is handled within a few minutes by reading only the route registration, middleware, and handler file, the code is not canonical enough.
-
-Plumego's long-term strength is not that it can support many styles. It is that it can support one stable, explicit, standard-library-aligned style extremely well.
+Plumego's strength is one stable, explicit, stdlib-aligned style, not many styles.

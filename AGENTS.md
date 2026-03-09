@@ -1,19 +1,13 @@
 # AGENTS.md — plumego
 
-This document is the operational guide for AI coding agents working in `spcent/plumego`.
+Operational guide for AI coding agents in `spcent/plumego`.
 
 ## 1) Mission and Constraints
 
 Plumego is a lightweight Go toolkit built on the standard library HTTP model.
-Agents must optimize for:
-
-- Clarity and maintainability
-- Explicit control/data flow
-- Backward compatibility in stable APIs
-- Small, reversible changes
+Optimize for: clarity, explicit control flow, backward compatibility, small reversible changes.
 
 Hard constraints:
-
 - Preserve `net/http` compatibility
 - Keep main module dependency-free (stdlib only)
 - Do not blur module boundaries
@@ -22,28 +16,22 @@ Hard constraints:
 
 ---
 
-## 2) Canonical Style Authority (Mandatory)
+## 2) Canonical Style Authority
 
-`docs/CANONICAL_STYLE_GUIDE.md` is the canonical style source for docs, examples,
-scaffolds, and AI-generated code.
+`docs/CANONICAL_STYLE_GUIDE.md` is the canonical style source for docs, examples, scaffolds, and AI-generated code.
 
-When guidance overlaps, use this precedence:
-
+Precedence when guidance overlaps:
 1. Security and module-boundary constraints in this file
 2. Coding style from `docs/CANONICAL_STYLE_GUIDE.md`
 3. Existing local patterns in touched files
 
 Canonical defaults:
-
-- Standard-library handler shape: `func(http.ResponseWriter, *http.Request)`
+- Handler shape: `func(http.ResponseWriter, *http.Request)`
 - Explicit route registration: one method + path + handler per line
-- Explicit JSON decode in handlers (`json.NewDecoder(r.Body).Decode(...)`)
-- One stable error write path (`contract.WriteError` with structured error codes)
-- Constructor-based dependency injection (no context service-locator pattern)
-- Middleware as `func(http.Handler) http.Handler`, transport-only responsibility
-
-Compatibility APIs may exist, but are not the default style for new docs/examples
-unless a task explicitly asks for compatibility behavior.
+- Explicit JSON decode: `json.NewDecoder(r.Body).Decode(...)`
+- Single error write path: `contract.WriteError` with structured error codes
+- Constructor-based DI — no context service-locator pattern
+- Middleware: `func(http.Handler) http.Handler`, transport-only responsibility
 
 ---
 
@@ -62,29 +50,28 @@ unless a task explicitly asks for compatibility behavior.
 | `utils/` | Small shared helpers only | Low |
 
 Rules:
-
-- Do not move routing behavior into `core`.
-- Do not put business logic in `middleware`.
-- Do not put persistence/business logic in `utils`.
-- Changes in `core/`, `router/`, `middleware/`, `security/` require extra testing.
+- Do not move routing behavior into `core`
+- Do not put business logic in `middleware`
+- Do not put persistence/business logic in `utils`
+- Changes in `core/`, `router/`, `middleware/`, `security/` require extra testing
 
 ---
 
 ## 4) API and Change Rules
 
-Agents must:
-
+Do:
 - Preserve stable public APIs unless explicitly asked otherwise
-- Provide migration notes for any unavoidable breaking behavior
+- Provide migration notes for unavoidable breaking changes
 - Prefer standard library solutions over new dependencies
 - Keep edits minimal and scoped to the task
+- Add/update tests near changed behavior
+- Update docs when changing API/config/security/default behavior
 
-Avoid introducing:
-
-- New handler styles
-- New response/error helper families for one feature
-- Hidden DI through request context
-- Business DTO injection via middleware
+Do not:
+- Introduce new handler styles or response/error helper families for one feature
+- Hide DI through request context
+- Inject business DTOs via middleware
+- Add non-stdlib dependencies to the main module without strong reason
 
 ---
 
@@ -99,8 +86,6 @@ Avoid introducing:
 
 ## 6) Quality Gates (Required)
 
-Before finalizing changes, run:
-
 ```bash
 go test -timeout 20s ./...
 go vet ./...
@@ -108,7 +93,6 @@ gofmt -w .
 ```
 
 Extra checks by change type:
-
 - Routing: static/param/group/reverse-routing tests
 - Middleware: ordering and error-path tests
 - Security: invalid token/signature negative tests
@@ -117,36 +101,18 @@ Extra checks by change type:
 
 ---
 
-## 7) Documentation Sync Rules
+## 7) Documentation Sync
 
-Update docs when changing:
+Update when changing public APIs, env variables/defaults, security behavior, startup/shutdown semantics, or module boundaries.
 
-- Public APIs
-- Environment variables or defaults
-- Security behavior
-- Startup/shutdown semantics
-- Module boundaries
-
-Primary docs to keep in sync:
-
-- `README.md`
-- `README_CN.md`
-- `AGENTS.md`
-- `CLAUDE.md`
-- `env.example`
+Sync targets: `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `env.example`
 
 ---
 
-## 8) Recommended Agent Workflow
+## 8) Agent Workflow
 
-1. Read `AGENTS.md`, `CLAUDE.md`, and relevant local files
-2. Identify module boundary and risk level
-3. Make minimal focused changes
-4. Add/update tests near changed behavior
-5. Run required quality gates
-6. Update docs if behavior or configuration changed
-7. Keep commit(s) small and reversible
-
----
-
-Plumego values explicitness, restraint, and correctness over feature volume.
+1. Identify module boundary and risk level
+2. Make minimal focused changes
+3. Add/update tests near changed behavior
+4. Run quality gates (§6)
+5. Sync docs if behavior or configuration changed
