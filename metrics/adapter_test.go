@@ -1,48 +1,11 @@
 package metrics
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/spcent/plumego/middleware/observability"
 )
-
-func TestMiddlewareAdapter(t *testing.T) {
-	collector := NewBaseMetricsCollector()
-	adapter := NewMiddlewareAdapter(collector)
-
-	ctx := context.Background()
-	metrics := observability.RequestMetrics{
-		Method:   "GET",
-		Path:     "/test",
-		Status:   200,
-		Bytes:    100,
-		Duration: 50 * time.Millisecond,
-	}
-
-	adapter.Observe(ctx, metrics)
-
-	records := collector.GetRecords()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
-	}
-
-	if records[0].Labels[labelMethod] != "GET" {
-		t.Fatalf("expected method GET, got %s", records[0].Labels[labelMethod])
-	}
-}
-
-func TestMiddlewareAdapterCollector(t *testing.T) {
-	collector := NewBaseMetricsCollector()
-	adapter := NewMiddlewareAdapter(collector)
-
-	if adapter.Collector() != collector {
-		t.Fatalf("expected adapter to return the same collector")
-	}
-}
 
 func TestResponseWriter(t *testing.T) {
 	rec := httptest.NewRecorder()
@@ -318,24 +281,6 @@ func TestPercentile(t *testing.T) {
 }
 
 // Benchmarks
-func BenchmarkMiddlewareAdapter(b *testing.B) {
-	collector := NewBaseMetricsCollector()
-	adapter := NewMiddlewareAdapter(collector)
-	ctx := context.Background()
-	metrics := observability.RequestMetrics{
-		Method:   "GET",
-		Path:     "/test",
-		Status:   200,
-		Bytes:    100,
-		Duration: 50 * time.Millisecond,
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		adapter.Observe(ctx, metrics)
-	}
-}
-
 func BenchmarkMetricsMiddleware(b *testing.B) {
 	collector := NewNoopCollector()
 	middleware := MetricsMiddleware(collector)

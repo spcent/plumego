@@ -14,6 +14,7 @@ import (
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/security/headers"
 	tenants "github.com/spcent/plumego/tenant"
+	tenantmw "github.com/spcent/plumego/tenant/middleware"
 )
 
 // WithRouter sets the router for the App.
@@ -411,7 +412,7 @@ func WithTenantMiddleware(options TenantMiddlewareOptions) Option {
 
 		// 3. Quota enforcement (optional).
 		if options.QuotaManager != nil {
-			a.Use(tenant.TenantQuota(tenant.TenantQuotaOptions{
+			a.Use(tenantmw.TenantQuota(tenantmw.TenantQuotaOptions{
 				Manager:      options.QuotaManager,
 				TokensHeader: options.QuotaTokensHeader,
 				Estimator:    options.QuotaEstimator,
@@ -422,7 +423,7 @@ func WithTenantMiddleware(options TenantMiddlewareOptions) Option {
 
 		// 4. Policy enforcement (optional).
 		if options.PolicyEvaluator != nil {
-			a.Use(tenant.TenantPolicy(tenant.TenantPolicyOptions{
+			a.Use(tenantmw.TenantPolicy(tenantmw.TenantPolicyOptions{
 				Evaluator:   options.PolicyEvaluator,
 				ModelHeader: options.PolicyModelHeader,
 				ToolHeader:  options.PolicyToolHeader,

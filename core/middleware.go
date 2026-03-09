@@ -1,11 +1,9 @@
 package core
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/middleware/cors"
@@ -140,26 +138,7 @@ func (a *App) loggingMiddleware() middleware.Middleware {
 		tracer := a.tracer
 		a.mu.RUnlock()
 
-		var metricsCollector observability.MetricsCollector
-		if collector != nil {
-			metricsCollector = &metricsAdapter{collector: collector}
-		}
-		return observability.Logging(logger, metricsCollector, tracer)(next)
-	}
-}
-
-// metricsAdapter adapts the unified MetricsCollector to the legacy interface
-type metricsAdapter struct {
-	collector metrics.MetricsCollector
-}
-
-func (m *metricsAdapter) Observe(ctx context.Context, metrics observability.RequestMetrics) {
-	if m.collector != nil {
-		path := metrics.Path
-		if metrics.Route != "" {
-			path = metrics.Route
-		}
-		m.collector.ObserveHTTP(ctx, metrics.Method, path, metrics.Status, metrics.Bytes, metrics.Duration)
+		return observability.Logging(logger, collector, tracer)(next)
 	}
 }
 
@@ -168,7 +147,7 @@ func (m *metricsAdapter) Observe(ctx context.Context, metrics observability.Requ
 // Extension capability: convenience shortcut. For more control, call
 // app.Use directly with the middleware of your choice.
 func (a *App) EnableAuth(authToken string) {
-	if err := a.Use(auth.FromAuthMiddleware(auth.NewSimpleAuthMiddleware(authToken))); err != nil {
+	if err := a.Use(auth.SimpleAuth(authToken)); err != nil {
 		a.logError("EnableAuth failed", err, nil)
 	}
 }

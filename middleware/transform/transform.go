@@ -428,41 +428,6 @@ func ModifyJSONResponse(modifier func(map[string]any) error) ResponseTransformer
 	}
 }
 
-// WrapJSONResponse wraps response JSON in a standard envelope
-func WrapJSONResponse(wrapperKey string) ResponseTransformer {
-	return func(r *http.Response) error {
-		if !isJSONContentType(r.Header.Get("Content-Type")) {
-			return nil
-		}
-
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			return err
-		}
-		_ = r.Body.Close()
-
-		var data any
-		if err := json.Unmarshal(body, &data); err != nil {
-			r.Body = io.NopCloser(bytes.NewReader(body))
-			return nil
-		}
-
-		// Wrap data
-		wrapped := map[string]any{
-			wrapperKey: data,
-		}
-
-		newBody, err := json.Marshal(wrapped)
-		if err != nil {
-			return err
-		}
-
-		setResponseBody(r, newBody)
-
-		return nil
-	}
-}
-
 // SetResponseStatus changes the response status code
 func SetResponseStatus(statusCode int) ResponseTransformer {
 	return func(r *http.Response) error {
