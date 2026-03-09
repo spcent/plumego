@@ -8,7 +8,9 @@ import (
 	"github.com/spcent/plumego/core"
 	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/proxy"
+	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/net/discovery"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/security/jwt"
@@ -90,8 +92,6 @@ func main() {
 	// Create application options
 	appOptions := []core.Option{
 		core.WithAddr(cfg.Server.Addr),
-		core.WithRecovery(),
-		core.WithLogging(),
 	}
 
 	// Add debug option if enabled
@@ -109,6 +109,9 @@ func main() {
 
 	// Get logger for access logging
 	logger := plog.NewGLogger()
+
+	app.Use(recovery.RecoveryMiddleware)
+	app.Use(observability.Logging(logger, nil, nil))
 
 	// Configure middleware stack for /api routes
 	apiGroup := app.Router().Group("/api")

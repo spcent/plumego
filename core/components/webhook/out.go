@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -86,8 +85,6 @@ func (c *WebhookOutComponent) Health() (string, health.HealthStatus) {
 
 	return "webhook_out", status
 }
-
-func (c *WebhookOutComponent) Dependencies() []reflect.Type { return nil }
 
 type targetDTO struct {
 	ID      string   `json:"id"`

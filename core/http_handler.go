@@ -12,7 +12,6 @@ func (a *App) ensureHandler() {
 		a.freezeConfig()
 		r := a.ensureRouter()
 		a.ensureComponents()
-		a.applyGuardrails()
 		if r != nil {
 			r.Freeze()
 		}

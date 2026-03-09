@@ -115,7 +115,6 @@ func TestConfigureMetricsNoHandler(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
 		EnsureRouter:  func() *router.Router { return r },
-		EnableLogging: func() error { return nil },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -137,7 +136,6 @@ func TestConfigureMetricsWithPrometheus(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:       func(op, desc string) error { return nil },
 		EnsureRouter:        func() *router.Router { return r },
-		EnableLogging:       func() error { return nil },
 		SetMetricsCollector: func(c metrics.MetricsCollector) { setCollector = c },
 	}
 	cfg := DefaultObservabilityConfig()
@@ -160,7 +158,6 @@ func TestConfigureMetricsWithExplicitCollector(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:       func(op, desc string) error { return nil },
 		EnsureRouter:        func() *router.Router { return r },
-		EnableLogging:       func() error { return nil },
 		SetMetricsCollector: func(c metrics.MetricsCollector) { setCollector = c },
 	}
 	cfg := DefaultObservabilityConfig()
@@ -185,7 +182,6 @@ func TestConfigureMetricsWithExplicitHandler(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
 		EnsureRouter:  func() *router.Router { return r },
-		EnableLogging: func() error { return nil },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -205,7 +201,6 @@ func TestConfigureMetricsCollectorFromHooks(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:       func(op, desc string) error { return nil },
 		EnsureRouter:        func() *router.Router { return r },
-		EnableLogging:       func() error { return nil },
 		GetMetricsCollector: func() metrics.MetricsCollector { return prom },
 		SetMetricsCollector: func(c metrics.MetricsCollector) {},
 	}
@@ -223,7 +218,6 @@ func TestConfigureTracingOnly(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		EnableLogging: func() error { return nil },
 		SetTracer:     func(t mwobs.Tracer) { setTracer = t },
 	}
 	cfg := DefaultObservabilityConfig()
@@ -244,7 +238,6 @@ func TestConfigureTracingWithExplicitTracer(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		EnableLogging: func() error { return nil },
 		SetTracer:     func(t mwobs.Tracer) { setTracer = t },
 	}
 	cfg := DefaultObservabilityConfig()
@@ -266,7 +259,6 @@ func TestConfigureTracingFromHooks(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		EnableLogging: func() error { return nil },
 		GetTracer:     func() mwobs.Tracer { return hookTracer },
 		SetTracer:     func(t mwobs.Tracer) { setTracer = t },
 	}
@@ -279,99 +271,6 @@ func TestConfigureTracingFromHooks(t *testing.T) {
 	}
 	if setTracer != hookTracer {
 		t.Fatal("expected hook tracer to be used")
-	}
-}
-
-func TestConfigureEnableLoggingCalledWhenMetricsEnabled(t *testing.T) {
-	r := router.NewRouter()
-	loggingEnabled := false
-
-	hooks := Hooks{
-		EnsureMutable:       func(op, desc string) error { return nil },
-		EnsureRouter:        func() *router.Router { return r },
-		EnableLogging:       func() error { loggingEnabled = true; return nil },
-		SetMetricsCollector: func(c metrics.MetricsCollector) {},
-	}
-	cfg := DefaultObservabilityConfig()
-	cfg.Metrics.Enabled = true
-
-	_ = Configure(hooks, cfg)
-	if !loggingEnabled {
-		t.Fatal("expected EnableLogging to be called")
-	}
-}
-
-func TestConfigureEnableLoggingCalledWhenTracingEnabled(t *testing.T) {
-	loggingEnabled := false
-
-	hooks := Hooks{
-		EnsureMutable: func(op, desc string) error { return nil },
-		EnableLogging: func() error { loggingEnabled = true; return nil },
-		SetTracer:     func(t mwobs.Tracer) {},
-	}
-	cfg := DefaultObservabilityConfig()
-	cfg.Tracing.Enabled = true
-
-	_ = Configure(hooks, cfg)
-	if !loggingEnabled {
-		t.Fatal("expected EnableLogging to be called")
-	}
-}
-
-func TestConfigureEnableLoggingNotCalledWhenBothDisabled(t *testing.T) {
-	loggingCalled := false
-
-	hooks := Hooks{
-		EnsureMutable: func(op, desc string) error { return nil },
-		EnableLogging: func() error { loggingCalled = true; return nil },
-	}
-	cfg := DefaultObservabilityConfig()
-
-	_ = Configure(hooks, cfg)
-	if loggingCalled {
-		t.Fatal("EnableLogging should not be called when both disabled")
-	}
-}
-
-func TestConfigureEnableLoggingNilHook(t *testing.T) {
-	r := router.NewRouter()
-
-	hooks := Hooks{
-		EnsureMutable:       func(op, desc string) error { return nil },
-		EnsureRouter:        func() *router.Router { return r },
-		SetMetricsCollector: func(c metrics.MetricsCollector) {},
-		// EnableLogging is nil
-	}
-	cfg := DefaultObservabilityConfig()
-	cfg.Metrics.Enabled = true
-
-	err := Configure(hooks, cfg)
-	if err == nil {
-		t.Fatal("expected error for nil EnableLogging")
-	}
-	if err.Error() != "observability hooks missing EnableLogging" {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestConfigureEnableLoggingError(t *testing.T) {
-	r := router.NewRouter()
-
-	hooks := Hooks{
-		EnsureMutable:       func(op, desc string) error { return nil },
-		EnsureRouter:        func() *router.Router { return r },
-		EnableLogging:       func() error { return fmt.Errorf("logging failed") },
-		SetMetricsCollector: func(c metrics.MetricsCollector) {},
-	}
-	cfg := DefaultObservabilityConfig()
-	cfg.Metrics.Enabled = true
-
-	err := Configure(hooks, cfg)
-	if err == nil {
-		t.Fatal("expected error from EnableLogging")
-	}
-	if err.Error() != "logging failed" {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -401,7 +300,6 @@ func TestConfigureMetricsEmptyPath(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:       func(op, desc string) error { return nil },
 		EnsureRouter:        func() *router.Router { return r },
-		EnableLogging:       func() error { return nil },
 		SetMetricsCollector: func(c metrics.MetricsCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
@@ -420,7 +318,6 @@ func TestConfigureMetricsZeroMaxSeries(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:       func(op, desc string) error { return nil },
 		EnsureRouter:        func() *router.Router { return r },
-		EnableLogging:       func() error { return nil },
 		SetMetricsCollector: func(c metrics.MetricsCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
@@ -436,7 +333,6 @@ func TestConfigureMetricsZeroMaxSeries(t *testing.T) {
 func TestConfigureTracingWithNilSetTracer(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		EnableLogging: func() error { return nil },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Tracing.Enabled = true
@@ -453,7 +349,6 @@ func TestConfigureMetricsWithNilSetCollector(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
 		EnsureRouter:  func() *router.Router { return r },
-		EnableLogging: func() error { return nil },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true

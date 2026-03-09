@@ -11,14 +11,8 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
-	"github.com/spcent/plumego/middleware/ratelimit"
-	webhookin "github.com/spcent/plumego/net/webhookin"
-	webhookout "github.com/spcent/plumego/net/webhookout"
-	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
-	"github.com/spcent/plumego/security/headers"
 )
 
 func TestWithRouter(t *testing.T) {
@@ -88,170 +82,6 @@ func TestWithMaxHeaderBytes(t *testing.T) {
 	opt(app)
 	if app.config.MaxHeaderBytes != bytes {
 		t.Errorf("expected max header bytes to be %d, got %d", bytes, app.config.MaxHeaderBytes)
-	}
-}
-
-func TestWithMaxBodyBytes(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	bytes := int64(1024 * 1024)
-	opt := WithMaxBodyBytes(bytes)
-	opt(app)
-	if app.config.MaxBodyBytes != bytes {
-		t.Errorf("expected max body bytes to be %d, got %d", bytes, app.config.MaxBodyBytes)
-	}
-}
-
-func TestWithRecovery(t *testing.T) {
-	app := &App{}
-	opt := WithRecovery()
-	opt(app)
-	if !app.recoveryEnabled {
-		t.Errorf("expected recovery middleware to be enabled")
-	}
-}
-
-func TestWithLogging(t *testing.T) {
-	app := &App{}
-	opt := WithLogging()
-	opt(app)
-	if !app.loggingEnabled {
-		t.Errorf("expected logging middleware to be enabled")
-	}
-}
-
-func TestWithCORS(t *testing.T) {
-	app := &App{}
-	opt := WithCORS()
-	opt(app)
-	if !app.corsEnabled {
-		t.Errorf("expected CORS middleware to be enabled")
-	}
-	if app.corsOptions != nil {
-		t.Errorf("expected default CORS options to be nil")
-	}
-}
-
-func TestWithCORSOptions(t *testing.T) {
-	app := &App{}
-	opts := cors.CORSOptions{AllowedOrigins: []string{"https://example.com"}}
-	opt := WithCORSOptions(opts)
-	opt(app)
-	if !app.corsEnabled {
-		t.Errorf("expected CORS middleware to be enabled")
-	}
-	if app.corsOptions == nil || len(app.corsOptions.AllowedOrigins) != 1 {
-		t.Fatalf("expected CORS options to be set")
-	}
-	if app.corsOptions.AllowedOrigins[0] != "https://example.com" {
-		t.Errorf("unexpected allowed origin: %s", app.corsOptions.AllowedOrigins[0])
-	}
-}
-
-func TestWithSecurityHeadersEnabled(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	opt := WithSecurityHeadersEnabled(false)
-	opt(app)
-	if app.config.EnableSecurityHeaders {
-		t.Errorf("expected security headers to be disabled")
-	}
-}
-
-func TestWithSecurityHeadersPolicy(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	policy := headers.StrictPolicy()
-	opt := WithSecurityHeadersPolicy(&policy)
-	opt(app)
-	if app.config.SecurityHeadersPolicy == nil {
-		t.Errorf("expected security headers policy to be set")
-	}
-	if !app.config.EnableSecurityHeaders {
-		t.Errorf("expected security headers to be enabled")
-	}
-}
-
-func TestWithAbuseGuardEnabled(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	opt := WithAbuseGuardEnabled(false)
-	opt(app)
-	if app.config.EnableAbuseGuard {
-		t.Errorf("expected abuse guard to be disabled")
-	}
-}
-
-func TestWithAbuseGuardConfig(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	cfg := ratelimit.DefaultAbuseGuardConfig()
-	cfg.Rate = 10
-	opt := WithAbuseGuardConfig(cfg)
-	opt(app)
-	if app.config.AbuseGuardConfig == nil {
-		t.Fatalf("expected abuse guard config to be set")
-	}
-	if app.config.AbuseGuardConfig.Rate != 10 {
-		t.Errorf("expected abuse guard rate to be 10, got %v", app.config.AbuseGuardConfig.Rate)
-	}
-	if !app.config.EnableAbuseGuard {
-		t.Errorf("expected abuse guard to be enabled")
-	}
-}
-
-func TestWithPubSub(t *testing.T) {
-	app := &App{}
-	ps := pubsub.New()
-	opt := WithPubSub(ps)
-	opt(app)
-	if app.pub != ps {
-		t.Errorf("expected pubsub to be set")
-	}
-}
-
-func TestWithPubSubDebug(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	cfg := PubSubConfig{Enabled: true, Path: "/debug/pubsub"}
-	opt := WithPubSubDebug(cfg)
-	opt(app)
-	if app.config.PubSub != cfg {
-		t.Errorf("expected pubsub config to be set")
-	}
-}
-
-func TestWithWebhookOut(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	svc := &webhookout.Service{}
-	cfg := WebhookOutConfig{Enabled: true, BasePath: "/webhooks", Service: svc}
-	opt := WithWebhookOut(cfg)
-	opt(app)
-	if app.config.WebhookOut != cfg {
-		t.Errorf("expected webhook out config to be set")
-	}
-}
-
-func TestWithWebhookIn(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	deduper := webhookin.NewDeduper(10 * time.Minute)
-	cfg := WebhookInConfig{Enabled: true, GitHubPath: "/github", Deduper: deduper}
-	opt := WithWebhookIn(cfg)
-	opt(app)
-	if app.config.WebhookIn != cfg {
-		t.Errorf("expected webhook in config to be set")
-	}
-}
-
-func TestWithConcurrencyLimits(t *testing.T) {
-	app := &App{config: &AppConfig{}}
-	maxConcurrent := 100
-	queueDepth := 1000
-	queueTimeout := 5 * time.Second
-	opt := WithConcurrencyLimits(maxConcurrent, queueDepth, queueTimeout)
-	opt(app)
-	if app.config.MaxConcurrency != maxConcurrent {
-		t.Errorf("expected max concurrency to be %d, got %d", maxConcurrent, app.config.MaxConcurrency)
-	}
-	if app.config.QueueDepth != queueDepth {
-		t.Errorf("expected queue depth to be %d, got %d", queueDepth, app.config.QueueDepth)
-	}
-	if app.config.QueueTimeout != queueTimeout {
-		t.Errorf("expected queue timeout to be %v, got %v", queueTimeout, app.config.QueueTimeout)
 	}
 }
 
@@ -342,33 +172,9 @@ func TestWithComponents(t *testing.T) {
 	}
 }
 
-func TestWithRequestID(t *testing.T) {
-	app := New(WithRequestID())
-	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-	app.ServeHTTP(rec, req)
-
-	if rec.Header().Get("X-Request-ID") == "" {
-		t.Fatalf("expected X-Request-ID to be set")
-	}
-}
-
-func TestWithRecommendedMiddleware(t *testing.T) {
-	app := New(WithRecommendedMiddleware())
-	if !app.requestIDEnabled {
-		t.Fatalf("expected request id to be enabled")
-	}
-	if !app.loggingEnabled {
-		t.Fatalf("expected logging to be enabled")
-	}
-	if !app.recoveryEnabled {
-		t.Fatalf("expected recovery to be enabled")
-	}
-
+func TestRequestIDMiddleware(t *testing.T) {
+	app := New()
+	app.Use(observability.RequestID())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

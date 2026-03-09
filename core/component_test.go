@@ -135,70 +135,6 @@ func TestFrontendComponentRegisterMiddleware(t *testing.T) {
 	component.RegisterMiddleware(reg)
 }
 
-// TestPubSubDebugComponent tests the pubsub debug component
-func TestPubSubDebugComponent(t *testing.T) {
-	// Create a mock pubsub for testing
-	type mockPubSub struct{}
-
-	cfg := PubSubConfig{
-		Enabled: true,
-		Path:    "/debug/pubsub",
-	}
-
-	// Test with nil pubsub
-	component := newPubSubDebugComponent(cfg, nil)
-
-	if component == nil {
-		t.Fatal("Expected component to be created")
-	}
-
-	// Test lifecycle
-	ctx := context.Background()
-	if err := component.Start(ctx); err != nil {
-		t.Errorf("Start should return nil, got %v", err)
-	}
-	if err := component.Stop(ctx); err != nil {
-		t.Errorf("Stop should return nil, got %v", err)
-	}
-
-	// Test health
-	name, healthStatus := component.Health()
-	if name != "pubsub_debug" {
-		t.Errorf("Expected name 'pubsub_debug', got '%s'", name)
-	}
-	if healthStatus.Status != health.StatusHealthy {
-		t.Errorf("Expected healthy status, got %v", healthStatus.Status)
-	}
-}
-
-// TestPubSubDebugComponentRegisterRoutes tests route registration
-func TestPubSubDebugComponentRegisterRoutes(t *testing.T) {
-	r := router.NewRouter()
-	cfg := PubSubConfig{
-		Enabled: true,
-		Path:    "/debug/pubsub",
-	}
-
-	component := newPubSubDebugComponent(cfg, nil)
-
-	// This should not panic even with nil pubsub
-	component.RegisterRoutes(r)
-}
-
-// TestPubSubDebugComponentRegisterMiddleware tests middleware registration
-func TestPubSubDebugComponentRegisterMiddleware(t *testing.T) {
-	cfg := PubSubConfig{
-		Enabled: true,
-		Path:    "/debug/pubsub",
-	}
-
-	component := newPubSubDebugComponent(cfg, nil)
-	reg := middleware.NewRegistry()
-
-	// Should not panic
-	component.RegisterMiddleware(reg)
-}
-
 // TestHasComponentType tests the hasComponentType method
 func TestHasComponentType(t *testing.T) {
 	app := &App{
@@ -260,45 +196,6 @@ func TestBuiltInComponents(t *testing.T) {
 		t.Errorf("Expected 1 built-in component with debug, got %d", len(components))
 	}
 	app.config.Debug = false
-
-	// Test with pubsub debug enabled
-	app.config.PubSub.Enabled = true
-	app.config.PubSub.Path = "/debug"
-
-	components = app.builtInComponents()
-	if len(components) != 1 {
-		t.Errorf("Expected 1 built-in component with pubsub debug, got %d", len(components))
-	}
-
-	// Test with webhook out enabled
-	app.config.PubSub.Enabled = false
-	app.config.WebhookOut.Enabled = true
-	app.config.WebhookOut.Service = nil
-
-	components = app.builtInComponents()
-	if len(components) != 1 {
-		t.Errorf("Expected 1 built-in component with webhook out, got %d", len(components))
-	}
-
-	// Test with webhook in enabled
-	app.config.WebhookOut.Enabled = false
-	app.config.WebhookIn.Enabled = true
-	app.config.WebhookIn.Pub = nil
-
-	components = app.builtInComponents()
-	if len(components) != 1 {
-		t.Errorf("Expected 1 built-in component with webhook in, got %d", len(components))
-	}
-
-	// Test with all enabled
-	app.config.PubSub.Enabled = true
-	app.config.WebhookOut.Enabled = true
-	app.config.WebhookIn.Enabled = true
-
-	components = app.builtInComponents()
-	if len(components) != 3 {
-		t.Errorf("Expected 3 built-in components, got %d", len(components))
-	}
 }
 
 // TestServeHTTP tests the ServeHTTP method

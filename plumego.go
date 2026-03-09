@@ -5,7 +5,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/middleware/cors"
+	compobs "github.com/spcent/plumego/core/components/observability"
 	"github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/tenant"
 )
@@ -37,32 +37,20 @@ type Runner = core.Runner
 // ShutdownHook is invoked during application shutdown.
 type ShutdownHook = core.ShutdownHook
 
-// CORSOptions configures the CORS middleware.
-type CORSOptions = cors.CORSOptions
-
 // TLSConfig re-exports the TLS settings for App configuration.
 type TLSConfig = core.TLSConfig
-
-// PubSubConfig re-exports the debug Pub/Sub snapshot configuration.
-type PubSubConfig = core.PubSubConfig
-
-// WebhookOutConfig configures outbound webhook management endpoints.
-type WebhookOutConfig = core.WebhookOutConfig
-
-// WebhookInConfig configures inbound webhook receivers.
-type WebhookInConfig = core.WebhookInConfig
 
 // WebSocketConfig defines the WebSocket hub configuration.
 type WebSocketConfig = core.WebSocketConfig
 
 // MetricsConfig configures built-in metrics wiring.
-type MetricsConfig = core.MetricsConfig
+type MetricsConfig = compobs.MetricsConfig
 
 // TracingConfig configures built-in tracing wiring.
-type TracingConfig = core.TracingConfig
+type TracingConfig = compobs.TracingConfig
 
 // ObservabilityConfig bundles metrics + tracing settings.
-type ObservabilityConfig = core.ObservabilityConfig
+type ObservabilityConfig = compobs.ObservabilityConfig
 
 // New creates a new App instance.
 func New(options ...Option) *App {
@@ -71,55 +59,39 @@ func New(options ...Option) *App {
 
 // Re-export common configuration helpers for convenience.
 var (
-	WithRouter                 = core.WithRouter
-	WithAddr                   = core.WithAddr
-	WithEnvPath                = core.WithEnvPath
-	WithShutdownTimeout        = core.WithShutdownTimeout
-	WithServerTimeouts         = core.WithServerTimeouts
-	WithMaxHeaderBytes         = core.WithMaxHeaderBytes
-	WithMaxBodyBytes           = core.WithMaxBodyBytes
-	WithRecovery               = core.WithRecovery
-	WithLogging                = core.WithLogging
-	WithRequestID              = core.WithRequestID
-	WithRecommendedMiddleware  = core.WithRecommendedMiddleware
-	WithCORS                   = core.WithCORS
-	WithCORSOptions            = core.WithCORSOptions
-	WithSecurityHeadersEnabled = core.WithSecurityHeadersEnabled
-	WithSecurityHeadersPolicy  = core.WithSecurityHeadersPolicy
-	WithAbuseGuardEnabled      = core.WithAbuseGuardEnabled
-	WithAbuseGuardConfig       = core.WithAbuseGuardConfig
-	WithPubSub                 = core.WithPubSub
-	WithPubSubDebug            = core.WithPubSubDebug
-	WithWebhookOut             = core.WithWebhookOut
-	WithWebhookIn              = core.WithWebhookIn
-	WithConcurrencyLimits      = core.WithConcurrencyLimits
-	WithHTTP2                  = core.WithHTTP2
-	WithTLS                    = core.WithTLS
-	WithTLSConfig              = core.WithTLSConfig
-	WithDebug                  = core.WithDebug
-	WithLogger                 = core.WithLogger
-	WithComponent              = core.WithComponent
-	WithComponents             = core.WithComponents
-	WithMethodNotAllowed       = core.WithMethodNotAllowed
-	WithShutdownHook           = core.WithShutdownHook
-	WithShutdownHooks          = core.WithShutdownHooks
-	WithRunner                 = core.WithRunner
-	WithRunners                = core.WithRunners
-	WithMetricsCollector       = core.WithMetricsCollector
-	WithTracer                 = core.WithTracer
+	WithRouter           = core.WithRouter
+	WithAddr             = core.WithAddr
+	WithEnvPath          = core.WithEnvPath
+	WithShutdownTimeout  = core.WithShutdownTimeout
+	WithServerTimeouts   = core.WithServerTimeouts
+	WithMaxHeaderBytes   = core.WithMaxHeaderBytes
+	WithHTTP2            = core.WithHTTP2
+	WithTLS              = core.WithTLS
+	WithTLSConfig        = core.WithTLSConfig
+	WithDebug            = core.WithDebug
+	WithLogger           = core.WithLogger
+	WithComponent        = core.WithComponent
+	WithComponents       = core.WithComponents
+	WithMethodNotAllowed = core.WithMethodNotAllowed
+	WithShutdownHook     = core.WithShutdownHook
+	WithShutdownHooks    = core.WithShutdownHooks
+	WithRunner           = core.WithRunner
+	WithRunners          = core.WithRunners
+	WithMetricsCollector = core.WithMetricsCollector
+	WithTracer           = core.WithTracer
 )
 
 // DefaultWebSocketConfig exposes the default WebSocket settings.
 var DefaultWebSocketConfig = core.DefaultWebSocketConfig
 
 // DefaultMetricsConfig exposes default metrics settings.
-var DefaultMetricsConfig = core.DefaultMetricsConfig
+var DefaultMetricsConfig = compobs.DefaultMetricsConfig
 
 // DefaultTracingConfig exposes default tracing settings.
-var DefaultTracingConfig = core.DefaultTracingConfig
+var DefaultTracingConfig = compobs.DefaultTracingConfig
 
 // DefaultObservabilityConfig exposes default observability settings.
-var DefaultObservabilityConfig = core.DefaultObservabilityConfig
+var DefaultObservabilityConfig = compobs.DefaultObservabilityConfig
 
 // Tenant types for multi-tenancy support.
 type (
@@ -153,9 +125,6 @@ type (
 	// RateLimitConfig field from the unified tenant Config.
 	TenantRateLimitConfigProviderFromConfig = tenant.RateLimitConfigProviderFromConfig
 )
-
-// Tenant configuration and middleware options.
-type TenantMiddlewareOptions = core.TenantMiddlewareOptions
 
 // Tenant functions for creating managers and extracting context.
 var (
@@ -193,12 +162,6 @@ var (
 var (
 	NewTenantDB   = db.NewTenantDB
 	ValidateQuery = db.ValidateQuery
-)
-
-// Tenant configuration options.
-var (
-	WithTenantConfigManager = core.WithTenantConfigManager
-	WithTenantMiddleware    = core.WithTenantMiddleware
 )
 
 // Tenant errors.

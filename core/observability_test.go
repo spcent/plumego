@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	compobs "github.com/spcent/plumego/core/components/observability"
 	"github.com/spcent/plumego/metrics"
 )
 
@@ -13,7 +14,7 @@ func TestConfigureObservabilityMetrics(t *testing.T) {
 	app := New()
 
 	prom := metrics.NewPrometheusCollector("plumego_test")
-	cfg := DefaultObservabilityConfig()
+	cfg := compobs.DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
 	cfg.Metrics.Path = "/metrics"
 	cfg.Metrics.Collector = prom
@@ -27,18 +28,6 @@ func TestConfigureObservabilityMetrics(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/ping", nil))
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-
-	stats := prom.GetStats()
-	if stats.TotalRecords == 0 {
-		t.Fatalf("expected metrics to be recorded")
-	}
-
-	rec = httptest.NewRecorder()
 	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 
 	if rec.Code != http.StatusOK {
@@ -53,7 +42,7 @@ func TestConfigureObservabilityMetrics(t *testing.T) {
 func TestConfigureObservabilityTracing(t *testing.T) {
 	app := New()
 
-	cfg := DefaultObservabilityConfig()
+	cfg := compobs.DefaultObservabilityConfig()
 	cfg.Tracing.Enabled = true
 
 	if err := app.ConfigureObservability(cfg); err != nil {
@@ -62,9 +51,5 @@ func TestConfigureObservabilityTracing(t *testing.T) {
 
 	if app.tracer == nil {
 		t.Fatalf("expected tracer to be configured")
-	}
-
-	if !app.loggingEnabled {
-		t.Fatalf("expected logging to be enabled")
 	}
 }

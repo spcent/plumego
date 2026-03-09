@@ -68,13 +68,6 @@ func TestHealthDebugDisabled(t *testing.T) {
 	}
 }
 
-func TestDependencies(t *testing.T) {
-	c := NewComponent(Options{})
-	if deps := c.Dependencies(); deps != nil {
-		t.Fatalf("expected nil dependencies, got %v", deps)
-	}
-}
-
 func TestRegisterRoutesDebugFalse(t *testing.T) {
 	c := NewComponent(Options{Debug: false})
 	r := router.NewRouter()

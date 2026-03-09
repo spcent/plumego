@@ -3,7 +3,6 @@ package pubsubdebug
 import (
 	"context"
 	"net/http"
-	"reflect"
 	"strings"
 	"sync"
 
@@ -77,5 +76,3 @@ func (c *PubSubDebugComponent) Health() (string, health.HealthStatus) {
 
 	return "pubsub_debug", status
 }
-
-func (c *PubSubDebugComponent) Dependencies() []reflect.Type { return nil }

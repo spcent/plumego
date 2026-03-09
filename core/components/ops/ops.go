@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -184,8 +183,6 @@ func (c *Component) Health() (string, health.HealthStatus) {
 
 	return "ops", status
 }
-
-func (c *Component) Dependencies() []reflect.Type { return nil }
 
 func (c *Component) handleSummary(ctx *contract.Ctx) {
 	if ctx == nil {

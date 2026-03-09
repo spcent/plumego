@@ -3,50 +3,23 @@ package core
 import (
 	"reflect"
 
-	"github.com/spcent/plumego/core/components/builtin"
-	"github.com/spcent/plumego/core/components/pubsubdebug"
-	"github.com/spcent/plumego/core/components/webhook"
-	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/core/components/devtools"
 )
 
 func (a *App) builtInComponents() []Component {
 	a.mu.RLock()
-	pubSubConfig := a.config.PubSub
-	webhookOutConfig := a.config.WebhookOut
-	webhookInConfig := a.config.WebhookIn
 	debug := a.config.Debug
-	pub := a.pub
 	logger := a.logger
 	a.mu.RUnlock()
 
-	comps := builtin.BuiltInComponents(builtin.Hooks{
-		Debug:            debug,
-		PubSubConfig:     pubSubConfig,
-		WebhookOutConfig: webhookOutConfig,
-		WebhookInConfig:  webhookInConfig,
-		PubSub:           pub,
-		Logger:           logger,
-		HasComponentType: a.hasComponentType,
-		NewDevTools: func() builtin.Component {
-			return newDevToolsComponent(a)
-		},
-		NewPubSubDebug: func(cfg pubsubdebug.PubSubConfig, fallback pubsub.PubSub) builtin.Component {
-			return newPubSubDebugComponent(cfg, fallback)
-		},
-		NewWebhookOut: func(cfg webhook.WebhookOutConfig) builtin.Component {
-			return newWebhookOutComponent(cfg)
-		},
-		NewWebhookIn: func(cfg webhook.WebhookInConfig, fallback pubsub.PubSub, logger log.StructuredLogger) builtin.Component {
-			return newWebhookInComponent(cfg, fallback, logger)
-		},
-	})
+	var comps []Component
 
-	out := make([]Component, 0, len(comps))
-	for _, c := range comps {
-		out = append(out, c)
+	if debug && !a.hasComponentType((*devtools.DevToolsComponent)(nil)) {
+		comps = append(comps, newDevToolsComponent(a))
 	}
-	return out
+
+	_ = logger // available for future built-in components
+	return comps
 }
 
 func (a *App) hasComponentType(target any) bool {
