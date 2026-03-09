@@ -70,7 +70,7 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 
 	current := rm.root
 	// Use pooled slice for parameter values to avoid per-request allocation
-	pvPtr := GetParamValues()
+	pvPtr := getParamValues()
 	paramValues := *pvPtr
 
 	for i, pathSegment := range parts {
@@ -86,7 +86,7 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 			}
 			// Empty segment with no wildcard = no match
 			*pvPtr = paramValues
-			PutParamValues(pvPtr)
+			putParamValues(pvPtr)
 			return nil
 		}
 
@@ -113,14 +113,14 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 
 		// No match found
 		*pvPtr = paramValues
-		PutParamValues(pvPtr)
+		putParamValues(pvPtr)
 		return nil
 	}
 
 	// Check if we found a valid handler
 	if current == nil || current.handler == nil {
 		*pvPtr = paramValues
-		PutParamValues(pvPtr)
+		putParamValues(pvPtr)
 		return nil
 	}
 
@@ -132,7 +132,7 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 		copy(resultParams, paramValues)
 	}
 	*pvPtr = paramValues
-	PutParamValues(pvPtr)
+	putParamValues(pvPtr)
 
 	// Return match result with direct middleware slice
 	return &MatchResult{
