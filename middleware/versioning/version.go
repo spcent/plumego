@@ -139,54 +139,47 @@ type Config struct {
 	OnVersionExtracted func(r *http.Request, version int)
 }
 
-// WithDefaults returns a Config with default values applied
-func (c *Config) WithDefaults() *Config {
-	config := *c
+// versionKey is a collision-safe unexported struct context key
+type versionKey struct{}
 
-	if config.DefaultVersion == 0 {
-		config.DefaultVersion = 1
+// applyDefaults returns a Config with default values applied
+func applyDefaults(c Config) Config {
+	if c.DefaultVersion == 0 {
+		c.DefaultVersion = 1
 	}
-
-	if config.VendorPrefix == "" {
-		config.VendorPrefix = "application/vnd.api"
+	if c.VendorPrefix == "" {
+		c.VendorPrefix = "application/vnd.api"
 	}
-
-	if config.PathPrefix == "" {
-		config.PathPrefix = "/v"
+	if c.PathPrefix == "" {
+		c.PathPrefix = "/v"
 	}
-
-	if config.ParamName == "" {
-		config.ParamName = "version"
+	if c.ParamName == "" {
+		c.ParamName = "version"
 	}
-
-	if config.HeaderName == "" {
-		config.HeaderName = "X-API-Version"
+	if c.HeaderName == "" {
+		c.HeaderName = "X-API-Version"
 	}
-
-	if !config.StripVersionFromPath {
-		config.StripVersionFromPath = true
+	if !c.StripVersionFromPath {
+		c.StripVersionFromPath = true
 	}
-
-	return &config
+	return c
 }
 
-// contextKey is the type for context keys
-type contextKey string
-
-const (
-	versionContextKey contextKey = "api_version"
-)
-
 // Middleware creates a version negotiation middleware
-func Middleware(config Config) func(http.Handler) http.Handler {
-	cfg := config.WithDefaults()
+func Middleware(config Config) mw.Middleware {
+	cfg := applyDefaults(config)
+
+	// Pre-compile Accept header regex at construction time
+	var acceptRe *regexp.Regexp
+	if cfg.Strategy == StrategyAcceptHeader {
+		pattern := regexp.QuoteMeta(cfg.VendorPrefix) + `\.v(\d+)(?:\+|;|$)`
+		acceptRe = regexp.MustCompile(pattern)
+	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Extract version based on strategy
-			version := extractVersion(r, cfg)
+			version := extractVersion(r, cfg, acceptRe)
 
-			// Validate version
 			if len(cfg.SupportedVersions) > 0 && !isVersionSupported(version, cfg.SupportedVersions) {
 				if cfg.OnVersionMismatch != nil {
 					cfg.OnVersionMismatch(w, r, version)
@@ -196,23 +189,16 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Strip version from path if needed
 			if cfg.Strategy == StrategyURLPath && cfg.StripVersionFromPath {
 				r.URL.Path = stripVersionFromPath(r.URL.Path, cfg.PathPrefix, version)
 			}
 
-			// Call hook
 			if cfg.OnVersionExtracted != nil {
 				cfg.OnVersionExtracted(r, version)
 			}
 
-			// Add version to context
-			ctx := context.WithValue(r.Context(), versionContextKey, version)
-
-			// Add version header to response
+			ctx := context.WithValue(r.Context(), versionKey{}, version)
 			w.Header().Set("X-API-Version", strconv.Itoa(version))
-
-			// Continue with version in context
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -221,19 +207,19 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 // GetVersion returns the API version from context
 // Returns 0 if version not found in context
 func GetVersion(ctx context.Context) int {
-	if v, ok := ctx.Value(versionContextKey).(int); ok {
+	if v, ok := ctx.Value(versionKey{}).(int); ok {
 		return v
 	}
 	return 0
 }
 
 // extractVersion extracts version from request based on strategy
-func extractVersion(r *http.Request, config *Config) int {
+func extractVersion(r *http.Request, config Config, acceptRe *regexp.Regexp) int {
 	var version int
 
 	switch config.Strategy {
 	case StrategyAcceptHeader:
-		version = extractFromAccept(r, config.VendorPrefix)
+		version = extractFromAccept(r, acceptRe)
 	case StrategyURLPath:
 		version = extractFromPath(r, config.PathPrefix)
 	case StrategyQueryParam:
@@ -242,7 +228,6 @@ func extractVersion(r *http.Request, config *Config) int {
 		version = extractFromHeader(r, config.HeaderName)
 	}
 
-	// Use default if no version found
 	if version <= 0 {
 		version = config.DefaultVersion
 	}
@@ -250,18 +235,12 @@ func extractVersion(r *http.Request, config *Config) int {
 	return version
 }
 
-// extractFromAccept extracts version from Accept header
-// Example: application/vnd.myapi.v2+json -> 2
-func extractFromAccept(r *http.Request, vendorPrefix string) int {
+// extractFromAccept extracts version from Accept header using a pre-compiled regex
+func extractFromAccept(r *http.Request, re *regexp.Regexp) int {
 	accept := r.Header.Get("Accept")
-	if accept == "" {
+	if accept == "" || re == nil {
 		return 0
 	}
-
-	// Match pattern: vendorPrefix.vN or vendorPrefix.vN+format
-	// Example: application/vnd.myapi.v2+json
-	pattern := regexp.QuoteMeta(vendorPrefix) + `\.v(\d+)(?:\+|;|$)`
-	re := regexp.MustCompile(pattern)
 
 	matches := re.FindStringSubmatch(accept)
 	if len(matches) >= 2 {
@@ -278,15 +257,12 @@ func extractFromAccept(r *http.Request, vendorPrefix string) int {
 func extractFromPath(r *http.Request, pathPrefix string) int {
 	path := r.URL.Path
 
-	// Match pattern: /vN/ or /vN (at start of path)
 	if !strings.HasPrefix(path, pathPrefix) {
 		return 0
 	}
 
-	// Remove prefix
 	remaining := strings.TrimPrefix(path, pathPrefix)
 
-	// Extract version number
 	var versionStr string
 	for i, ch := range remaining {
 		if ch >= '0' && ch <= '9' {
@@ -365,7 +341,7 @@ func stripVersionFromPath(path, pathPrefix string, version int) string {
 type Extractor func(r *http.Request) int
 
 // CustomExtractor creates a middleware with custom version extraction
-func CustomExtractor(extractor Extractor, defaultVersion int, supportedVersions []int) func(http.Handler) http.Handler {
+func CustomExtractor(extractor Extractor, defaultVersion int, supportedVersions []int) mw.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			version := extractor(r)
@@ -379,7 +355,7 @@ func CustomExtractor(extractor Extractor, defaultVersion int, supportedVersions 
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), versionContextKey, version)
+			ctx := context.WithValue(r.Context(), versionKey{}, version)
 			w.Header().Set("X-API-Version", strconv.Itoa(version))
 
 			next.ServeHTTP(w, r.WithContext(ctx))

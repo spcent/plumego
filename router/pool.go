@@ -1,97 +1,44 @@
 package router
 
 import (
-	"net/http"
 	"sync"
 )
 
-// metricsResponseWriter wraps http.ResponseWriter to capture the status code
-// and total bytes written for metrics reporting.
-type metricsResponseWriter struct {
-	http.ResponseWriter
-	status int
-	bytes  int
-}
+// Object pools for reducing allocations during request processing.
+// All pool helpers are unexported; they are implementation details.
 
-func (m *metricsResponseWriter) WriteHeader(code int) {
-	if m.status == 0 {
-		m.status = code
-	}
-	m.ResponseWriter.WriteHeader(code)
-}
-
-func (m *metricsResponseWriter) Write(b []byte) (int, error) {
-	if m.status == 0 {
-		m.status = http.StatusOK
-	}
-	n, err := m.ResponseWriter.Write(b)
-	m.bytes += n
-	return n, err
-}
-
-func (m *metricsResponseWriter) reset(w http.ResponseWriter) {
-	m.ResponseWriter = w
-	m.status = 0
-	m.bytes = 0
-}
-
-var metricsWriterPool = sync.Pool{
-	New: func() any { return &metricsResponseWriter{} },
-}
-
-func getMetricsWriter(w http.ResponseWriter) *metricsResponseWriter {
-	mw := metricsWriterPool.Get().(*metricsResponseWriter)
-	mw.reset(w)
-	return mw
-}
-
-func putMetricsWriter(mw *metricsResponseWriter) {
-	mw.ResponseWriter = nil
-	metricsWriterPool.Put(mw)
-}
-
-// Object pools for reducing allocations during request processing
-
-// paramValuesPool is a pool for []string slices used to store parameter values
 var paramValuesPool = sync.Pool{
 	New: func() any {
-		// Pre-allocate with common capacity (most routes have < 4 params)
-		s := make([]string, 0, 4)
+		s := make([]string, 0, DefaultPoolSliceCap)
 		return &s
 	},
 }
 
-// GetParamValues retrieves a string slice from the pool
-func GetParamValues() *[]string {
+func getParamValues() *[]string {
 	return paramValuesPool.Get().(*[]string)
 }
 
-// PutParamValues returns a string slice to the pool after resetting it
-func PutParamValues(s *[]string) {
+func putParamValues(s *[]string) {
 	if s == nil {
 		return
 	}
-	// Reset slice length but keep capacity
 	*s = (*s)[:0]
 	paramValuesPool.Put(s)
 }
 
-// routeMatcherPool is a pool for RouteMatcher instances
 var routeMatcherPool = sync.Pool{
 	New: func() any {
 		return &RouteMatcher{}
 	},
 }
 
-// GetRouteMatcher retrieves a RouteMatcher from the pool
-func GetRouteMatcher(root *node) *RouteMatcher {
+func getRouteMatcher(root *node) *RouteMatcher {
 	rm := routeMatcherPool.Get().(*RouteMatcher)
 	rm.root = root
 	return rm
 }
 
-// PutRouteMatcher returns a RouteMatcher to the pool
-func PutRouteMatcher(rm *RouteMatcher) {
+func putRouteMatcher(rm *RouteMatcher) {
 	if rm == nil {
 		return
 	}
@@ -99,22 +46,18 @@ func PutRouteMatcher(rm *RouteMatcher) {
 	routeMatcherPool.Put(rm)
 }
 
-// pathPartsPool is a pool for []string slices used to store split path parts
 var pathPartsPool = sync.Pool{
 	New: func() any {
-		// Pre-allocate with common capacity (most paths have < 8 segments)
-		s := make([]string, 0, 8)
+		s := make([]string, 0, DefaultPathPartsCap)
 		return &s
 	},
 }
 
-// GetPathParts retrieves a path parts slice from the pool
-func GetPathParts() *[]string {
+func getPathParts() *[]string {
 	return pathPartsPool.Get().(*[]string)
 }
 
-// PutPathParts returns a path parts slice to the pool after resetting it
-func PutPathParts(s *[]string) {
+func putPathParts(s *[]string) {
 	if s == nil {
 		return
 	}
@@ -122,16 +65,15 @@ func PutPathParts(s *[]string) {
 	pathPartsPool.Put(s)
 }
 
-// SplitPathToParts splits a path into parts using a pooled slice
-// This preserves empty segments to properly reject paths like /users//123
-// Caller must call PutPathParts when done
-func SplitPathToParts(path string) *[]string {
-	parts := GetPathParts()
+// splitPathToParts splits a path into parts using a pooled slice.
+// This preserves empty segments to properly reject paths like /users//123.
+// Caller must call putPathParts when done.
+func splitPathToParts(path string) *[]string {
+	parts := getPathParts()
 	if path == "" || path == "/" {
 		return parts
 	}
 
-	// Trim leading/trailing slashes
 	start := 0
 	end := len(path)
 	if path[0] == '/' {
@@ -141,7 +83,6 @@ func SplitPathToParts(path string) *[]string {
 		end--
 	}
 
-	// Split by '/', preserving empty segments
 	for i := start; i < end; i++ {
 		if path[i] == '/' {
 			*parts = append(*parts, path[start:i])

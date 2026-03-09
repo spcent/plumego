@@ -471,21 +471,6 @@ func (rl *RateLimiter) Stop() {
 	close(rl.stopChan)
 }
 
-// Helper functions
-func min(a, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // RateLimitMiddleware creates a middleware for advanced concurrency limiting
 func RateLimitMiddleware(config RateLimiterConfig) mw.Middleware {
 	rl := NewRateLimiter(config)

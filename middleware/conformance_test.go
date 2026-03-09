@@ -27,7 +27,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		{
 			name:         "auth unauthenticated",
 			expectedCode: middleware.CodeAuthUnauthenticated,
-			handler: auth.NewSimpleAuthMiddleware("secret").Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: auth.SimpleAuth("secret")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),

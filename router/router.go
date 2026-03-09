@@ -8,7 +8,6 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -43,7 +42,6 @@ type HandlerFunc = http.HandlerFunc
 type middlewareManager struct {
 	middlewares []middleware.Middleware
 	mu          sync.RWMutex
-	metrics     metrics.MetricsCollector
 	version     atomic.Uint64
 }
 
@@ -99,18 +97,18 @@ type route struct {
 }
 
 // routerState is the shared mutable state for the root router and all groups.
+// It does not carry application-layer concerns (logger, metrics); those live
+// on the Router struct itself and are not shared across groups.
 type routerState struct {
 	trees            map[string]*node
 	routes           map[string][]route
 	frozen           bool
 	mu               sync.RWMutex
-	logger           log.StructuredLogger
 	routeCache       *RouteCache
 	routeValidations map[string]map[string]*RouteValidation
 	routeMeta        map[string]map[string]RouteMeta
 	namedRoutes      map[string]*NamedRoute
 	methodNotAllowed atomic.Bool
-	metricsCollector atomic.Pointer[metrics.MetricsCollector]
 }
 
 // Router represents an HTTP router with path-based routing and middleware support.
@@ -131,6 +129,11 @@ type Router struct {
 	parent            *Router
 	middlewareManager *middlewareManager
 	state             *routerState
+
+	// logger is stored directly on the Router (not in shared routerState) so
+	// that groups can carry the same logger reference without coupling the
+	// routing state to application-layer concerns.
+	logger log.StructuredLogger
 }
 
 // RouterOption defines a function type for router configuration options.
@@ -151,12 +154,12 @@ func WithRouteName(name string) RouteOption {
 	}
 }
 
-// WithLogger sets a custom logger for the router.
+// WithLogger sets a logger on the router. The logger is not used by routing
+// logic itself; it is available via Logger() so that components registering
+// routes can obtain the application logger without an extra dependency.
 func WithLogger(logger log.StructuredLogger) RouterOption {
 	return func(r *Router) {
-		if logger != nil {
-			r.state.logger = logger
-		}
+		r.logger = logger
 	}
 }
 
@@ -183,7 +186,6 @@ func NewRouter(opts ...RouterOption) *Router {
 		state: &routerState{
 			trees:            make(map[string]*node),
 			routes:           make(map[string][]route),
-			logger:           log.NewGLogger(),
 			routeValidations: make(map[string]map[string]*RouteValidation),
 			routeMeta:        make(map[string]map[string]RouteMeta),
 			namedRoutes:      make(map[string]*NamedRoute),
@@ -198,20 +200,18 @@ func NewRouter(opts ...RouterOption) *Router {
 	return r
 }
 
-// SetLogger configures the logger used by context-aware handler adapters.
+// SetLogger sets the logger returned by Logger(). The router does not use the
+// logger internally; this is a convenience for component code that receives a
+// *Router and needs to obtain the application logger.
 func (r *Router) SetLogger(logger log.StructuredLogger) {
-	r.state.mu.Lock()
-	defer r.state.mu.Unlock()
-	r.state.logger = logger
+	r.logger = logger
 }
 
-// Logger returns the router's structured logger.
-// Components that adapt contract.CtxHandlerFunc handlers can use this to obtain
-// the logger needed by contract.AdaptCtxHandler.
+// Logger returns the logger associated with this router (or nil if unset).
+// Components that need to pass a logger to contract.AdaptCtxHandler can use
+// this to obtain the one configured via WithLogger or SetLogger.
 func (r *Router) Logger() log.StructuredLogger {
-	r.state.mu.RLock()
-	defer r.state.mu.RUnlock()
-	return r.state.logger
+	return r.logger
 }
 
 // SetMethodNotAllowed toggles 405 responses when another method matches the path.
@@ -243,24 +243,6 @@ func (r *Router) Use(middlewares ...middleware.Middleware) {
 	for _, m := range middlewares {
 		r.middlewareManager.addMiddleware(m)
 	}
-}
-
-// SetMetricsCollector sets the unified metrics collector for the router.
-func (r *Router) SetMetricsCollector(collector metrics.MetricsCollector) {
-	if collector == nil {
-		r.state.metricsCollector.Store(nil)
-	} else {
-		r.state.metricsCollector.Store(&collector)
-	}
-}
-
-// GetMetricsCollector returns the current metrics collector, or nil if not set.
-func (r *Router) GetMetricsCollector() metrics.MetricsCollector {
-	p := r.state.metricsCollector.Load()
-	if p == nil {
-		return nil
-	}
-	return *p
 }
 
 // CacheStats returns statistics about the route cache.

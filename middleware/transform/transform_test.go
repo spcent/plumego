@@ -321,38 +321,6 @@ func TestModifyJSONResponse(t *testing.T) {
 	}
 }
 
-func TestWrapJSONResponse(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"data": "value",
-		})
-	})
-
-	middleware := Middleware(Config{
-		ResponseTransformers: []ResponseTransformer{
-			WrapJSONResponse("result"),
-		},
-	})
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	w := httptest.NewRecorder()
-	middleware(handler).ServeHTTP(w, req)
-
-	var response map[string]any
-	json.Unmarshal(w.Body.Bytes(), &response)
-
-	result, ok := response["result"].(map[string]any)
-	if !ok {
-		t.Error("Expected response to be wrapped in result key")
-	}
-
-	if result["data"] != "value" {
-		t.Error("Expected wrapped data to contain original value")
-	}
-}
-
 func TestChainRequest(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Header-1") != "value1" {

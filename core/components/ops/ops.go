@@ -392,7 +392,7 @@ func (c *Component) authMiddlewares() []middleware.Middleware {
 		token = strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
 	}
 	if token != "" {
-		middlewares = append(middlewares, auth.FromAuthMiddleware(auth.NewSimpleAuthMiddleware(token)))
+		middlewares = append(middlewares, auth.SimpleAuth(token))
 	}
 
 	if !c.cfg.Auth.AllowInsecure && len(middlewares) == 0 {

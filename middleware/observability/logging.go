@@ -60,8 +60,7 @@ type RequestMetrics struct {
 }
 
 // MetricsCollector can be plugged into the logging middleware to export metrics.
-// This interface is maintained for backward compatibility but new code should use
-// the unified metrics.MetricsCollector interface.
+// Implement ObserveHTTP to receive per-request HTTP metrics.
 //
 // Example:
 //
@@ -69,27 +68,13 @@ type RequestMetrics struct {
 //
 //	type MyMetricsCollector struct{}
 //
-//	func (c *MyMetricsCollector) Observe(ctx context.Context, metrics observability.RequestMetrics) {
+//	func (c *MyMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 //		// Collect metrics
 //	}
 //
 //	collector := &MyMetricsCollector{}
 //	handler := observability.Logging(log.NewGLogger(), collector, nil)(myHandler)
 type MetricsCollector interface {
-	Observe(ctx context.Context, metrics RequestMetrics)
-}
-
-// UnifiedMetricsCollector is an adapter that allows the unified metrics.MetricsCollector
-// to be used with the logging middleware.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/middleware/observability"
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector()
-//	handler := observability.Logging(log.NewGLogger(), collector, nil)(myHandler)
-type UnifiedMetricsCollector interface {
 	ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
 }
 
@@ -258,7 +243,11 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 			}
 
 			if metrics != nil {
-				metrics.Observe(r.Context(), metricsData)
+				path := metricsData.Path
+				if metricsData.Route != "" {
+					path = metricsData.Route
+				}
+				metrics.ObserveHTTP(r.Context(), metricsData.Method, path, metricsData.Status, metricsData.Bytes, metricsData.Duration)
 			}
 
 			if span != nil {
@@ -356,11 +345,4 @@ func (r *responseRecorder) Flush() {
 	if fl, ok := r.ResponseWriter.(http.Flusher); ok {
 		fl.Flush()
 	}
-}
-
-func (r *responseRecorder) Push(target string, opts *http.PushOptions) error {
-	if pusher, ok := r.ResponseWriter.(http.Pusher); ok {
-		return pusher.Push(target, opts)
-	}
-	return http.ErrNotSupported
 }
