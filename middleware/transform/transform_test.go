@@ -321,7 +321,6 @@ func TestModifyJSONResponse(t *testing.T) {
 	}
 }
 
-
 func TestChainRequest(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Header-1") != "value1" {

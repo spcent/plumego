@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/core"
-	cb "github.com/spcent/plumego/security/resilience/circuitbreaker"
-	gateway "github.com/spcent/plumego/net/gateway"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
-	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
+	gateway "github.com/spcent/plumego/net/gateway"
+	cb "github.com/spcent/plumego/security/resilience/circuitbreaker"
 	"github.com/spcent/plumego/tenant"
+	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
 )
 
 func main() {

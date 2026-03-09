@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	contract "github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
@@ -96,14 +97,14 @@ func (l *stubLogger) record(msg string, fields log.Fields) {
 }
 
 type stubMetrics struct {
-	mu       sync.Mutex
-	observed []RequestMetrics
+	mu    sync.Mutex
+	count int
 }
 
-func (m *stubMetrics) Observe(ctx context.Context, metrics RequestMetrics) {
+func (m *stubMetrics) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.observed = append(m.observed, metrics)
+	m.count++
 }
 
 type stubSpan struct {
@@ -228,7 +229,7 @@ func TestLoggingAddsStructuredFields(t *testing.T) {
 		}
 	}
 
-	if len(metrics.observed) != 1 {
+	if metrics.count != 1 {
 		t.Fatalf("expected metrics to be recorded")
 	}
 

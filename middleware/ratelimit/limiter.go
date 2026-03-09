@@ -471,7 +471,6 @@ func (rl *RateLimiter) Stop() {
 	close(rl.stopChan)
 }
 
-
 // RateLimitMiddleware creates a middleware for advanced concurrency limiting
 func RateLimitMiddleware(config RateLimiterConfig) mw.Middleware {
 	rl := NewRateLimiter(config)

@@ -40,7 +40,7 @@ package middleware
 // Middleware execution order:
 //   - Prepend() adds middleware to the beginning (executes first)
 //   - Use() adds middleware to the end (executes last)
-//   - When applied, middlewares execute in reverse order (last added runs first)
+//   - When applied, middlewares execute in registration order (first added runs first)
 type Registry struct {
 	middlewares []Middleware
 }

@@ -428,7 +428,6 @@ func ModifyJSONResponse(modifier func(map[string]any) error) ResponseTransformer
 	}
 }
 
-
 // SetResponseStatus changes the response status code
 func SetResponseStatus(statusCode int) ResponseTransformer {
 	return func(r *http.Response) error {

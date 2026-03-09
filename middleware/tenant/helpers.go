@@ -15,9 +15,9 @@ const (
 	defaultToolHeader   = "X-Tool"
 	defaultTokensHeader = "X-Token-Count"
 
-	tenantCodeRequired      = mw.CodeTenantRequired
-	tenantCodeInvalidID     = mw.CodeTenantInvalidID
-	tenantCodeRateLimited   = mw.CodeTenantRateLimited
+	tenantCodeRequired    = mw.CodeTenantRequired
+	tenantCodeInvalidID   = mw.CodeTenantInvalidID
+	tenantCodeRateLimited = mw.CodeTenantRateLimited
 )
 
 func headerOrDefault(value, fallback string) string {
@@ -44,4 +44,3 @@ func setRateLimitHeaders(w http.ResponseWriter, limit, remaining int64) {
 	}
 	w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(remaining, 10))
 }
-

@@ -10,11 +10,11 @@ import (
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/tenant"
-	tenantmw "github.com/spcent/plumego/tenant/middleware"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/security/headers"
 	tenants "github.com/spcent/plumego/tenant"
+	tenantmw "github.com/spcent/plumego/tenant/middleware"
 )
 
 // WithRouter sets the router for the App.

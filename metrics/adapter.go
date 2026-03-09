@@ -1,75 +1,13 @@
 package metrics
 
 import (
-	"context"
 	"net/http"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/utils"
 )
-
-// MiddlewareAdapter adapts a unified MetricsCollector to the observability.MetricsCollector interface.
-//
-// This allows using the unified metrics collectors (Prometheus, OpenTelemetry, etc.)
-// with the existing observability.Logging middleware.
-//
-// Example:
-//
-//	import (
-//		"github.com/spcent/plumego/metrics"
-//		"github.com/spcent/plumego/middleware/observability"
-//	)
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	adapter := metrics.NewMiddlewareAdapter(collector)
-//	handler := observability.Logging(logger, adapter, tracer)(myHandler)
-type MiddlewareAdapter struct {
-	collector MetricsCollector
-}
-
-// NewMiddlewareAdapter creates a new middleware adapter for a unified metrics collector.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	adapter := metrics.NewMiddlewareAdapter(collector)
-func NewMiddlewareAdapter(collector MetricsCollector) *MiddlewareAdapter {
-	return &MiddlewareAdapter{collector: collector}
-}
-
-// Observe implements the observability.MetricsCollector interface.
-// It forwards the request metrics to the underlying unified collector.
-func (a *MiddlewareAdapter) Observe(ctx context.Context, metrics observability.RequestMetrics) {
-	a.collector.ObserveHTTP(
-		ctx,
-		metrics.Method,
-		metrics.Path,
-		metrics.Status,
-		metrics.Bytes,
-		metrics.Duration,
-	)
-}
-
-// Collector returns the underlying unified metrics collector.
-// This allows accessing collector-specific features like statistics and clearing.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	adapter := metrics.NewMiddlewareAdapter(collector)
-//	stats := adapter.Collector().GetStats()
-func (a *MiddlewareAdapter) Collector() MetricsCollector {
-	return a.collector
-}
-
-// Verify that MiddlewareAdapter implements observability.MetricsCollector at compile time
-var _ observability.MetricsCollector = (*MiddlewareAdapter)(nil)
 
 // responseWriter wraps http.ResponseWriter to capture status code and bytes written.
 // This is useful for custom middleware that needs to record metrics.

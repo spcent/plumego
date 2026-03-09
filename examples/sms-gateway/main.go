@@ -27,7 +27,6 @@ import (
 	"github.com/spcent/plumego/metrics/smsgateway"
 	"github.com/spcent/plumego/middleware/observability"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
-	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
 	"github.com/spcent/plumego/net/mq"
 	mqstore "github.com/spcent/plumego/net/mq/store"
 	plumrouter "github.com/spcent/plumego/router"
@@ -35,6 +34,7 @@ import (
 	"github.com/spcent/plumego/store/idempotency"
 	kvstore "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/tenant"
+	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
 )
 
 func main() {
@@ -146,7 +146,7 @@ func main() {
 	handler = tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
 		HeaderName: "X-Tenant-ID",
 	})(handler)
-	handler = observability.Logging(logger, httpMetricsAdapter{collector: collector}, tracer)(handler)
+	handler = observability.Logging(logger, collector, tracer)(handler)
 
 	addr := getenv("SMS_GATEWAY_ADDR", "127.0.0.1:8089")
 	ln, err := net.Listen("tcp", addr)
@@ -341,17 +341,6 @@ func sqlDialectFromDriver(driver string) message.SQLDialect {
 	default:
 		return message.DialectPostgres
 	}
-}
-
-type httpMetricsAdapter struct {
-	collector metrics.MetricsCollector
-}
-
-func (h httpMetricsAdapter) Observe(ctx context.Context, m observability.RequestMetrics) {
-	if h.collector == nil {
-		return
-	}
-	h.collector.ObserveHTTP(ctx, m.Method, m.Path, m.Status, m.Bytes, m.Duration)
 }
 
 func extractMessageID(data []byte) string {

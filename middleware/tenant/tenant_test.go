@@ -44,5 +44,3 @@ func TestTenantResolverMissing(t *testing.T) {
 		t.Fatalf("expected status 401, got %d", rec.Code)
 	}
 }
-
-
