@@ -8,7 +8,7 @@ import (
 	"github.com/spcent/plumego/core"
 	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware/proxy"
+	"github.com/spcent/plumego/net/gateway"
 	"github.com/spcent/plumego/net/discovery"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/security/jwt"
@@ -288,17 +288,17 @@ func registerServices(v1Group *router.Router, cfg *Config, sd *discovery.Static,
 			cfg.Services.UserService.Timeout,
 			cfg.Services.UserService.RetryCount)
 
-		v1Group.Any("/users/*", proxy.New(proxy.Config{
+		v1Group.Any("/users/*", gateway.New(gateway.Config{
 			Targets:      cfg.Services.UserService.Targets,
 			LoadBalancer: cfg.Services.UserService.GetLoadBalancer(),
-			PathRewrite:  proxy.StripPrefix("/api/v1"),
+			PathRewrite:  gateway.StripPrefix("/api/v1"),
 			Timeout:      cfg.Services.UserService.GetTimeout(cfg.Timeouts.Service),
 			RetryCount:   cfg.Services.UserService.GetRetryCount(),
-			ModifyRequest: proxy.ChainRequestModifiers(
-				proxy.AddHeader("X-Gateway", "plumego"),
-				proxy.AddHeader("X-Gateway-Version", "1.0"),
+			ModifyRequest: gateway.ChainRequestModifiers(
+				gateway.AddHeader("X-Gateway", "plumego"),
+				gateway.AddHeader("X-Gateway-Version", "1.0"),
 			),
-			ModifyResponse: proxy.AddResponseHeader("X-Served-By", "API-Gateway"),
+			ModifyResponse: gateway.AddResponseHeader("X-Served-By", "API-Gateway"),
 			HealthCheck:    cfg.Services.UserService.GetHealthCheckConfig(),
 		}))
 	}
@@ -311,11 +311,11 @@ func registerServices(v1Group *router.Router, cfg *Config, sd *discovery.Static,
 			cfg.Services.OrderService.Timeout,
 			cfg.Services.OrderService.RetryCount)
 
-		v1Group.Any("/orders/*", proxy.New(proxy.Config{
+		v1Group.Any("/orders/*", gateway.New(gateway.Config{
 			ServiceName:  "order-service",
 			Discovery:    sd,
 			LoadBalancer: cfg.Services.OrderService.GetLoadBalancer(),
-			PathRewrite:  proxy.StripPrefix("/api/v1"),
+			PathRewrite:  gateway.StripPrefix("/api/v1"),
 			Timeout:      cfg.Services.OrderService.GetTimeout(cfg.Timeouts.Service),
 			RetryCount:   cfg.Services.OrderService.GetRetryCount(),
 			HealthCheck:  cfg.Services.OrderService.GetHealthCheckConfig(),
@@ -330,10 +330,10 @@ func registerServices(v1Group *router.Router, cfg *Config, sd *discovery.Static,
 			cfg.Services.ProductService.Timeout,
 			cfg.Services.ProductService.RetryCount)
 
-		v1Group.Any("/products/*", proxy.New(proxy.Config{
+		v1Group.Any("/products/*", gateway.New(gateway.Config{
 			Targets:      cfg.Services.ProductService.Targets,
 			LoadBalancer: cfg.Services.ProductService.GetLoadBalancer(),
-			PathRewrite:  proxy.StripPrefix("/api/v1"),
+			PathRewrite:  gateway.StripPrefix("/api/v1"),
 			Timeout:      cfg.Services.ProductService.GetTimeout(cfg.Timeouts.Service),
 			RetryCount:   cfg.Services.ProductService.GetRetryCount(),
 			HealthCheck:  cfg.Services.ProductService.GetHealthCheckConfig(),

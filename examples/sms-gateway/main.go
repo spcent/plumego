@@ -27,6 +27,7 @@ import (
 	"github.com/spcent/plumego/metrics/smsgateway"
 	"github.com/spcent/plumego/middleware/observability"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
+	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
 	"github.com/spcent/plumego/net/mq"
 	mqstore "github.com/spcent/plumego/net/mq/store"
 	plumrouter "github.com/spcent/plumego/router"
@@ -138,7 +139,7 @@ func main() {
 		message.ExampleSendHandler(idemStore, repo, router, queue),
 		logger,
 	)
-	handler = tenantmw.TenantQuota(tenantmw.TenantQuotaOptions{
+	handler = tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
 		Manager: quotaManager,
 		Hooks:   tenant.Hooks{},
 	})(handler)

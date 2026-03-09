@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/middleware/circuitbreaker"
-	"github.com/spcent/plumego/middleware/proxy"
+	cb "github.com/spcent/plumego/security/resilience/circuitbreaker"
+	gateway "github.com/spcent/plumego/net/gateway"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
+	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
 	"github.com/spcent/plumego/tenant"
 )
 
@@ -42,16 +43,16 @@ func main() {
 		HeaderName:   "X-Tenant-ID",
 		AllowMissing: true,
 	}))
-	apiGroup.Use(tenantmw.TenantQuota(tenantmw.TenantQuotaOptions{
+	apiGroup.Use(tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
 		Manager: quotaMgr,
 	}))
 
 	// Add circuit breaker for all API routes
-	apiGroup.Use(circuitbreaker.Middleware(circuitbreaker.Config{
+	apiGroup.Use(cb.Middleware(cb.Config{
 		Name:             "api",
 		FailureThreshold: 0.5,
 		Timeout:          10 * time.Second,
-		OnStateChange: func(from, to circuitbreaker.State) {
+		OnStateChange: func(from, to cb.State) {
 			log.Printf("Circuit breaker state changed: %s -> %s", from, to)
 		},
 	}))
@@ -60,15 +61,15 @@ func main() {
 	v1Group := apiGroup.Group("/v1")
 
 	// Proxy with circuit breaker per backend - now using Any() since proxy is a handler
-	v1Group.Any("/users/*", proxy.New(proxy.Config{
+	v1Group.Any("/users/*", gateway.New(gateway.Config{
 		Targets: []string{
 			"http://localhost:8081",
 			"http://localhost:8082",
 		},
-		LoadBalancer:          proxy.NewRoundRobinBalancer(),
-		PathRewrite:           proxy.StripPrefix("/api/v1"),
+		LoadBalancer:          gateway.NewRoundRobinBalancer(),
+		PathRewrite:           gateway.StripPrefix("/api/v1"),
 		CircuitBreakerEnabled: true,
-		CircuitBreakerConfig: &proxy.CircuitBreakerConfig{
+		CircuitBreakerConfig: &gateway.CircuitBreakerConfig{
 			FailureThreshold: 0.5,
 			SuccessThreshold: 3,
 			Timeout:          30 * time.Second,

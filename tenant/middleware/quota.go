@@ -1,4 +1,4 @@
-package tenant
+package tenantmw
 
 import (
 	"net/http"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
+	mw "github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/tenant"
 )
 
@@ -22,7 +22,7 @@ type TenantQuotaOptions struct {
 // TenantQuota enforces tenant quota limits.
 // On every request (allowed or denied) it sets X-Quota-Remaining-Requests and
 // X-Quota-Remaining-Tokens headers so clients can monitor their quota consumption.
-func TenantQuota(options TenantQuotaOptions) middleware.Middleware {
+func TenantQuota(options TenantQuotaOptions) mw.Middleware {
 	tokensHeader := headerOrDefault(options.TokensHeader, defaultTokensHeader)
 
 	return func(next http.Handler) http.Handler {

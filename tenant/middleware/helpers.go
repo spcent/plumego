@@ -1,4 +1,4 @@
-package tenant
+package tenantmw
 
 import (
 	"net/http"
@@ -10,14 +10,12 @@ import (
 )
 
 const (
-	defaultTenantHeader = "X-Tenant-ID"
 	defaultModelHeader  = "X-Model"
 	defaultToolHeader   = "X-Tool"
 	defaultTokensHeader = "X-Token-Count"
 
-	tenantCodeRequired      = mw.CodeTenantRequired
-	tenantCodeInvalidID     = mw.CodeTenantInvalidID
-	tenantCodeRateLimited   = mw.CodeTenantRateLimited
+	tenantCodePolicyDenied  = mw.CodeTenantPolicyDenied
+	tenantCodeQuotaExceeded = mw.CodeTenantQuotaExceeded
 )
 
 func headerOrDefault(value, fallback string) string {
@@ -38,10 +36,13 @@ func setRetryAfterHeader(w http.ResponseWriter, retry time.Duration) {
 	w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())))
 }
 
-func setRateLimitHeaders(w http.ResponseWriter, limit, remaining int64) {
-	if limit > 0 {
-		w.Header().Set("X-RateLimit-Limit", strconv.FormatInt(limit, 10))
+// setQuotaHeaders sets X-Quota-Remaining-Requests and X-Quota-Remaining-Tokens headers.
+// Values < 0 indicate unlimited and are omitted.
+func setQuotaHeaders(w http.ResponseWriter, remainingRequests, remainingTokens int) {
+	if remainingRequests >= 0 {
+		w.Header().Set("X-Quota-Remaining-Requests", strconv.Itoa(remainingRequests))
 	}
-	w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(remaining, 10))
+	if remainingTokens >= 0 {
+		w.Header().Set("X-Quota-Remaining-Tokens", strconv.Itoa(remainingTokens))
+	}
 }
-

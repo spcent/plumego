@@ -358,9 +358,3 @@ func (r *responseRecorder) Flush() {
 	}
 }
 
-func (r *responseRecorder) Push(target string, opts *http.PushOptions) error {
-	if pusher, ok := r.ResponseWriter.(http.Pusher); ok {
-		return pusher.Push(target, opts)
-	}
-	return http.ErrNotSupported
-}

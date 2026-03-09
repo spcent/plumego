@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestSimpleAuthMiddlewareAuthenticate(t *testing.T) {
+func TestSimpleAuth(t *testing.T) {
 	tests := []struct {
 		name            string
 		configuredToken string
@@ -99,8 +99,7 @@ func TestSimpleAuthMiddlewareAuthenticate(t *testing.T) {
 			}
 
 			w := httptest.NewRecorder()
-			authMiddleware := NewSimpleAuthMiddleware(tt.configuredToken).Authenticate(mockHandler)
-			authMiddleware.ServeHTTP(w, req)
+			SimpleAuth(tt.configuredToken)(mockHandler).ServeHTTP(w, req)
 
 			if w.Code != tt.expectedStatus {
 				t.Fatalf("expected status %d, got %d", tt.expectedStatus, w.Code)
@@ -121,29 +120,29 @@ func TestSimpleAuthMiddlewareAuthenticate(t *testing.T) {
 	}
 }
 
-func BenchmarkSimpleAuthMiddleware(b *testing.B) {
+func BenchmarkSimpleAuth(b *testing.B) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	authMiddleware := NewSimpleAuthMiddleware("secret123").Authenticate(mockHandler)
+	mw := SimpleAuth("secret123")(mockHandler)
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Token", "secret123")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
-		authMiddleware.ServeHTTP(w, req)
+		mw.ServeHTTP(w, req)
 	}
 }
 
-func TestSimpleAuthMiddlewareConcurrent(t *testing.T) {
+func TestSimpleAuthConcurrent(t *testing.T) {
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("success"))
 	})
 
-	authMiddleware := NewSimpleAuthMiddleware("secret123").Authenticate(mockHandler)
+	mw := SimpleAuth("secret123")(mockHandler)
 
 	const numGoroutines = 100
 	var wg sync.WaitGroup
@@ -156,7 +155,7 @@ func TestSimpleAuthMiddlewareConcurrent(t *testing.T) {
 			req.Header.Set("Authorization", "Bearer secret123")
 			w := httptest.NewRecorder()
 
-			authMiddleware.ServeHTTP(w, req)
+			mw.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
 				t.Errorf("expected status 200, got %d", w.Code)

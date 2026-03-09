@@ -1,10 +1,13 @@
-package tenant
+// Package tenantmw provides HTTP middleware for tenant policy and quota enforcement.
+// These middleware delegate authorization and quota decisions to domain-level evaluators
+// configured at startup, keeping HTTP concerns separate from business logic.
+package tenantmw
 
 import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
+	mw "github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/tenant"
 )
 
@@ -18,7 +21,7 @@ type TenantPolicyOptions struct {
 }
 
 // TenantPolicy enforces tenant policy checks.
-func TenantPolicy(options TenantPolicyOptions) middleware.Middleware {
+func TenantPolicy(options TenantPolicyOptions) mw.Middleware {
 	modelHeader := headerOrDefault(options.ModelHeader, defaultModelHeader)
 	toolHeader := headerOrDefault(options.ToolHeader, defaultToolHeader)
 

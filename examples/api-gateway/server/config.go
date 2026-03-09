@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/middleware/proxy"
+	"github.com/spcent/plumego/net/gateway"
 )
 
 // Config holds the API gateway configuration
@@ -285,26 +285,26 @@ func LoadConfig() (*Config, error) {
 }
 
 // GetLoadBalancer returns a load balancer instance based on config
-func (sc *ServiceConfig) GetLoadBalancer() proxy.LoadBalancer {
+func (sc *ServiceConfig) GetLoadBalancer() gateway.LoadBalancer {
 	switch sc.LoadBalancer {
 	case "weighted-round-robin":
-		return proxy.NewWeightedRoundRobinBalancer()
+		return gateway.NewWeightedRoundRobinBalancer()
 	case "least-connections":
-		return proxy.NewLeastConnectionsBalancer()
+		return gateway.NewLeastConnectionsBalancer()
 	case "ip-hash":
-		return proxy.NewIPHashBalancer()
+		return gateway.NewIPHashBalancer()
 	default:
-		return proxy.NewRoundRobinBalancer()
+		return gateway.NewRoundRobinBalancer()
 	}
 }
 
 // GetHealthCheckConfig returns health check configuration
-func (sc *ServiceConfig) GetHealthCheckConfig() *proxy.HealthCheckConfig {
+func (sc *ServiceConfig) GetHealthCheckConfig() *gateway.HealthCheckConfig {
 	if !sc.HealthCheck {
 		return nil
 	}
 
-	return &proxy.HealthCheckConfig{
+	return &gateway.HealthCheckConfig{
 		Interval:       10 * time.Second,
 		Timeout:        5 * time.Second,
 		Path:           "/health",
