@@ -6,10 +6,8 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -137,15 +135,15 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 		return nil, false
 	}
 
-	partsPtr := SplitPathToParts(path)
+	partsPtr := splitPathToParts(path)
 	parts := *partsPtr
-	defer PutPathParts(partsPtr)
+	defer putPathParts(partsPtr)
 
 	tree := r.state.trees[method]
 	if tree != nil {
-		matcher := GetRouteMatcher(tree)
+		matcher := getRouteMatcher(tree)
 		result := matcher.Match(parts)
-		PutRouteMatcher(matcher)
+		putRouteMatcher(matcher)
 		if result != nil {
 			return result, false
 		}
@@ -154,9 +152,9 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 	// RFC 7231 §4.3.2: fall back to GET handler for HEAD requests.
 	if method == HEAD {
 		if getTree := r.state.trees[GET]; getTree != nil {
-			getMatcher := GetRouteMatcher(getTree)
+			getMatcher := getRouteMatcher(getTree)
 			result := getMatcher.Match(parts)
-			PutRouteMatcher(getMatcher)
+			putRouteMatcher(getMatcher)
 			if result != nil {
 				return result, false
 			}
@@ -166,9 +164,9 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 	// Fall back to ANY handler.
 	if method != ANY {
 		if anyTree := r.state.trees[ANY]; anyTree != nil {
-			anyMatcher := GetRouteMatcher(anyTree)
+			anyMatcher := getRouteMatcher(anyTree)
 			result := anyMatcher.Match(parts)
-			PutRouteMatcher(anyMatcher)
+			putRouteMatcher(anyMatcher)
 			if result != nil {
 				return result, true
 			}
@@ -220,9 +218,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	reqWithParams := req
 	ctx := req.Context()
-
 	existingRC, ok := ctx.Value(contract.RequestContextKey{}).(contract.RequestContext)
 	if !ok {
 		existingRC = contract.RequestContext{}
@@ -240,12 +236,10 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	}
 
 	// Merge params into context using a single WithValue call.
-	// contract.ParamsFromContext checks RequestContextKey.Params as fallback,
-	// so a separate ParamsContextKey write is not required.
 	ctx = context.WithValue(ctx, contract.RequestContextKey{}, existingRC)
-	reqWithParams = req.WithContext(ctx)
+	reqWithParams := req.WithContext(ctx)
 
-	// Obtain the handler (possibly from cache).
+	// Obtain the handler (possibly from middleware-chain cache).
 	version := r.middlewareManager.getVersion()
 	var handler http.Handler
 	if cached, ok := result.loadCached(version); ok {
@@ -263,26 +257,6 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 			handler = chain.Apply(result.Handler)
 			result.storeCached(version, handler)
 		}
-	}
-
-	// Instrument with metrics if a collector is configured (lock-free atomic read).
-	var collector metrics.MetricsCollector
-	if p := r.state.metricsCollector.Load(); p != nil {
-		collector = *p
-	}
-
-	if collector != nil {
-		mw := getMetricsWriter(w)
-		start := time.Now()
-		handler.ServeHTTP(mw, reqWithParams)
-		elapsed := time.Since(start)
-		status := mw.status
-		if status == 0 {
-			status = http.StatusOK
-		}
-		collector.ObserveHTTP(req.Context(), req.Method, result.RoutePattern, status, mw.bytes, elapsed)
-		putMetricsWriter(mw)
-		return
 	}
 
 	handler.ServeHTTP(w, reqWithParams)
@@ -308,21 +282,21 @@ func (r *Router) allowedMethods(path string) []string {
 			}
 		}
 	} else {
-		partsPtr := SplitPathToParts(normalized)
+		partsPtr := splitPathToParts(normalized)
 		parts := *partsPtr
 
 		for method, tree := range r.state.trees {
 			if method == ANY || tree == nil {
 				continue
 			}
-			matcher := GetRouteMatcher(tree)
+			matcher := getRouteMatcher(tree)
 			if matcher.Match(parts) != nil {
 				allowed = append(allowed, method)
 			}
-			PutRouteMatcher(matcher)
+			putRouteMatcher(matcher)
 		}
 
-		PutPathParts(partsPtr)
+		putPathParts(partsPtr)
 	}
 
 	if len(allowed) > 1 {

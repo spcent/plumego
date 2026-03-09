@@ -18,6 +18,7 @@ func (r *Router) Group(prefix string) *Router {
 		parent:            r,
 		middlewareManager: newMiddlewareManager(),
 		state:             r.state,
+		logger:            r.logger,
 	}
 }
 
