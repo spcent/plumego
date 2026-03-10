@@ -16,38 +16,8 @@ import (
 
 type MigrateCmd struct{}
 
-func (c *MigrateCmd) Name() string {
-	return "migrate"
-}
-
-func (c *MigrateCmd) Short() string {
-	return "Manage database migrations"
-}
-
-func (c *MigrateCmd) Long() string {
-	return `Manage database migrations using SQL files.
-
-Commands:
-  up       Apply pending migrations
-  down     Roll back applied migrations
-  status   Show migration status
-  create   Create new migration files
-
-Examples:
-  plumego migrate status --driver sqlite3 --db-url ./app.db
-  plumego migrate up --driver mysql --db-url "user:pass@tcp(localhost:3306)/app"
-  plumego migrate down --driver postgres --db-url "postgres://localhost/app" --steps 1
-  plumego migrate create add_users_table`
-}
-
-func (c *MigrateCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "dir", Default: "./migrations", Usage: "Migrations directory"},
-		{Name: "db-url", Default: "", Usage: "Database connection string"},
-		{Name: "driver", Default: "", Usage: "Database driver name"},
-		{Name: "steps", Default: "0", Usage: "Number of migrations to apply/rollback (0 = all)"},
-	}
-}
+func (c *MigrateCmd) Name() string  { return "migrate" }
+func (c *MigrateCmd) Short() string { return "Manage database migrations" }
 
 func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
@@ -94,15 +64,13 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 			return out.Error(fmt.Sprintf("failed to create migration: %v", err), 1)
 		}
 
-		result := map[string]any{
+		return out.Success("Migration files created", map[string]any{
 			"version":   migration.Version,
 			"name":      migration.Name,
 			"up_path":   migration.UpPath,
 			"down_path": migration.DownPath,
 			"directory": absDir,
-		}
-
-		return out.Success("Migration files created", result)
+		})
 	case "status", "up", "down":
 		if len(positionals) > 0 {
 			return out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
@@ -156,7 +124,6 @@ func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, dri
 	}
 }
 
-// appliedVersionSet builds a set of version strings from applied migrations.
 func appliedVersionSet(applied []migrate.AppliedMigration) map[string]struct{} {
 	set := make(map[string]struct{}, len(applied))
 	for _, entry := range applied {
@@ -165,7 +132,6 @@ func appliedVersionSet(applied []migrate.AppliedMigration) map[string]struct{} {
 	return set
 }
 
-// pendingMigrations returns migrations not yet applied.
 func pendingMigrations(migrations []migrate.Migration, applied []migrate.AppliedMigration) []migrate.Migration {
 	set := appliedVersionSet(applied)
 	var pending []migrate.Migration
@@ -189,14 +155,12 @@ func (c *MigrateCmd) reportStatus(out *output.Formatter, migrations []migrate.Mi
 		})
 	}
 
-	result := map[string]any{
+	return out.Success("Migration status", map[string]any{
 		"applied":         applied,
 		"pending":         pendingInfo,
 		"current_version": latestVersion(applied),
 		"total":           len(migrations),
-	}
-
-	return out.Success("Migration status", result)
+	})
 }
 
 func (c *MigrateCmd) applyUp(out *output.Formatter, ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
@@ -229,14 +193,12 @@ func (c *MigrateCmd) applyUp(out *output.Formatter, ctx context.Context, db *sql
 		return out.Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
 	}
 
-	result := map[string]any{
+	return out.Success("Migrations applied", map[string]any{
 		"command":         "up",
 		"applied":         appliedResults,
 		"current_version": latestVersion(newApplied),
 		"pending":         pendingVersions(migrations, newApplied),
-	}
-
-	return out.Success("Migrations applied", result)
+	})
 }
 
 func (c *MigrateCmd) applyDown(out *output.Formatter, ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
@@ -284,14 +246,12 @@ func (c *MigrateCmd) applyDown(out *output.Formatter, ctx context.Context, db *s
 		return out.Error(fmt.Sprintf("failed to fetch applied migrations: %v", err), 1)
 	}
 
-	result := map[string]any{
+	return out.Success("Migrations rolled back", map[string]any{
 		"command":         "down",
 		"rolled_back":     rolledBack,
 		"current_version": latestVersion(newApplied),
 		"pending":         pendingVersions(migrations, newApplied),
-	}
-
-	return out.Success("Migrations rolled back", result)
+	})
 }
 
 func latestVersion(applied []migrate.AppliedMigration) string {

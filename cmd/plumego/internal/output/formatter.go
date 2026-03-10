@@ -71,6 +71,11 @@ func (f *Formatter) IsQuiet() bool {
 	return f.quiet
 }
 
+// IsVerbose returns whether verbose mode is enabled.
+func (f *Formatter) IsVerbose() bool {
+	return f.verbose
+}
+
 // Print outputs data in the configured format
 func (f *Formatter) Print(data any) error {
 	f.mu.Lock()

@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -9,96 +11,52 @@ import (
 )
 
 // NewCmd creates a new project
-type NewCmd struct {
-}
+type NewCmd struct{}
 
 func (c *NewCmd) Name() string  { return "new" }
 func (c *NewCmd) Short() string { return "Create new project from template" }
-func (c *NewCmd) Long() string {
-	return `Create a new plumego project from predefined templates.
-
-Templates:
-  - minimal:      Minimal HTTP server (default)
-  - api:          REST API server with routing
-  - fullstack:    API + frontend serving
-  - microservice: Microservice with all features
-
-Examples:
-  plumego new myapp
-  plumego new myapi --template api --module github.com/acme/myapi
-  plumego new webapp --template fullstack --dry-run
-`
-}
-
-func (c *NewCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "template", Default: "minimal", Usage: "Project template"},
-		{Name: "module", Default: "", Usage: "Go module path"},
-		{Name: "dir", Default: "", Usage: "Output directory"},
-		{Name: "force", Default: false, Usage: "Overwrite existing directory"},
-		{Name: "no-git", Default: false, Usage: "Skip git initialization"},
-		{Name: "dry-run", Default: false, Usage: "Preview without creating"},
-	}
-}
 
 func (c *NewCmd) Run(ctx *Context, args []string) error {
-	out := ctx.Out
+	fs := flag.NewFlagSet("new", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
-	if len(args) == 0 {
-		return out.Error("project name required", 1)
+	templateFlag := fs.String("template", "minimal", "Project template (minimal, api, fullstack, microservice)")
+	moduleFlag := fs.String("module", "", "Go module path")
+	dirFlag := fs.String("dir", "", "Output directory")
+	force := fs.Bool("force", false, "Overwrite existing directory")
+	noGit := fs.Bool("no-git", false, "Skip git initialization")
+	dryRun := fs.Bool("dry-run", false, "Preview without creating")
+
+	if err := fs.Parse(args); err != nil {
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	projectName := args[0]
-	template := "minimal"
-	module := ""
-	dir := filepath.Join(".", projectName)
-	force := false
-	noGit := false
-	dryRun := false
-
-	// Parse flags (simplified for demonstration)
-	for i := 1; i < len(args); i++ {
-		switch args[i] {
-		case "--template":
-			if i+1 < len(args) {
-				template = args[i+1]
-				i++
-			}
-		case "--module":
-			if i+1 < len(args) {
-				module = args[i+1]
-				i++
-			}
-		case "--dir":
-			if i+1 < len(args) {
-				dir = args[i+1]
-				i++
-			}
-		case "--force":
-			force = true
-		case "--no-git":
-			noGit = true
-		case "--dry-run":
-			dryRun = true
-		}
+	positionals := fs.Args()
+	if len(positionals) == 0 {
+		return ctx.Out.Error("project name required", 1)
 	}
 
-	// Infer module if not provided
+	projectName := positionals[0]
+	template := *templateFlag
+	module := *moduleFlag
+	dir := *dirFlag
+
+	if dir == "" {
+		dir = filepath.Join(".", projectName)
+	}
 	if module == "" {
 		module = projectName
 	}
 
-	out.Verbose(fmt.Sprintf("Creating project: %s", projectName))
-	out.Verbose(fmt.Sprintf("Template: %s", template))
-	out.Verbose(fmt.Sprintf("Module: %s", module))
-	out.Verbose(fmt.Sprintf("Directory: %s", dir))
+	ctx.Out.Verbose(fmt.Sprintf("Creating project: %s", projectName))
+	ctx.Out.Verbose(fmt.Sprintf("Template: %s", template))
+	ctx.Out.Verbose(fmt.Sprintf("Module: %s", module))
+	ctx.Out.Verbose(fmt.Sprintf("Directory: %s", dir))
 
-	// Check if directory exists
-	if _, err := os.Stat(dir); err == nil && !force {
-		return out.Error(fmt.Sprintf("directory %s already exists (use --force to overwrite)", dir), 2)
+	if _, err := os.Stat(dir); err == nil && !*force {
+		return ctx.Out.Error(fmt.Sprintf("directory %s already exists (use --force to overwrite)", dir), 2)
 	}
 
-	// Validate template
 	validTemplates := []string{"minimal", "api", "fullstack", "microservice"}
 	valid := false
 	for _, t := range validTemplates {
@@ -108,31 +66,27 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 		}
 	}
 	if !valid {
-		return out.Error(fmt.Sprintf("invalid template: %s (valid: minimal, api, fullstack, microservice)", template), 3)
+		return ctx.Out.Error(fmt.Sprintf("invalid template: %s (valid: minimal, api, fullstack, microservice)", template), 3)
 	}
 
-	// Dry run - just show what would be created
-	if dryRun {
+	if *dryRun {
 		files := scaffold.GetTemplateFiles(template)
-		result := map[string]any{
+		return ctx.Out.Print(map[string]any{
 			"dry_run":       true,
 			"project":       projectName,
 			"path":          dir,
 			"module":        module,
 			"template":      template,
 			"files_created": files,
-		}
-		return out.Print(result)
+		})
 	}
 
-	// Create project
-	files, err := scaffold.CreateProject(dir, projectName, module, template, !noGit)
+	files, err := scaffold.CreateProject(dir, projectName, module, template, !*noGit)
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to create project: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("failed to create project: %v", err), 1)
 	}
 
-	// Success response
-	result := map[string]any{
+	return ctx.Out.Success("Project created successfully", map[string]any{
 		"project":       projectName,
 		"path":          dir,
 		"module":        module,
@@ -143,7 +97,5 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 			"go mod tidy",
 			"plumego dev",
 		},
-	}
-
-	return out.Success("Project created successfully", result)
+	})
 }

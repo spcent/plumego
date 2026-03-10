@@ -1,113 +1,63 @@
 package commands
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/codegen"
 )
 
 // GenerateCmd generates code
-type GenerateCmd struct {
-}
+type GenerateCmd struct{}
 
 func (c *GenerateCmd) Name() string  { return "generate" }
 func (c *GenerateCmd) Short() string { return "Generate components, middleware, handlers" }
-func (c *GenerateCmd) Long() string {
-	return `Generate boilerplate code for plumego components.
-
-Types:
-  component   Component with full lifecycle
-  middleware  HTTP middleware
-  handler     HTTP handler
-  model       Data model with validation
-
-Examples:
-  plumego generate component Auth
-  plumego generate middleware RateLimit
-  plumego generate handler User --methods GET,POST,PUT,DELETE
-  plumego generate model User --with-validation
-`
-}
-
-func (c *GenerateCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "output", Default: "", Usage: "Output file path"},
-		{Name: "package", Default: "", Usage: "Package name"},
-		{Name: "methods", Default: "GET", Usage: "HTTP methods (comma-separated)"},
-		{Name: "with-tests", Default: false, Usage: "Generate test file"},
-		{Name: "with-validation", Default: false, Usage: "Generate validation"},
-		{Name: "force", Default: false, Usage: "Overwrite existing files"},
-	}
-}
 
 func (c *GenerateCmd) Run(ctx *Context, args []string) error {
-	out := ctx.Out
+	fs := flag.NewFlagSet("generate", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
-	if len(args) < 2 {
-		return out.Error("generate type and name required (e.g., plumego generate component Auth)", 1)
+	outputPath := fs.String("output", "", "Output file path")
+	packageName := fs.String("package", "", "Package name")
+	methods := fs.String("methods", "GET", "HTTP methods (comma-separated)")
+	withTests := fs.Bool("with-tests", false, "Generate test file")
+	withValidation := fs.Bool("with-validation", false, "Generate validation")
+	force := fs.Bool("force", false, "Overwrite existing files")
+
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	genType := args[0]
-	name := args[1]
-	restArgs := args[2:]
-
-	// Parse flags
-	outputPath := ""
-	packageName := ""
-	methods := "GET"
-	withTests := false
-	withValidation := false
-	force := false
-
-	for i := 0; i < len(restArgs); i++ {
-		switch restArgs[i] {
-		case "--output":
-			if i+1 < len(restArgs) {
-				outputPath = restArgs[i+1]
-				i++
-			}
-		case "--package":
-			if i+1 < len(restArgs) {
-				packageName = restArgs[i+1]
-				i++
-			}
-		case "--methods":
-			if i+1 < len(restArgs) {
-				methods = restArgs[i+1]
-				i++
-			}
-		case "--with-tests":
-			withTests = true
-		case "--with-validation":
-			withValidation = true
-		case "--force":
-			force = true
-		}
+	if len(positionals) < 2 {
+		return ctx.Out.Error("generate type and name required (e.g., plumego generate component Auth)", 1)
 	}
+
+	genType := positionals[0]
+	name := positionals[1]
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	out.Verbose(fmt.Sprintf("Generating %s: %s", genType, name))
+	ctx.Out.Verbose(fmt.Sprintf("Generating %s: %s", genType, name))
 
-	opts := codegen.GenerateOptions{
+	result, err := codegen.Generate(cwd, codegen.GenerateOptions{
 		Type:           genType,
 		Name:           name,
-		OutputPath:     outputPath,
-		PackageName:    packageName,
-		Methods:        methods,
-		WithTests:      withTests,
-		WithValidation: withValidation,
-		Force:          force,
-	}
-
-	result, err := codegen.Generate(cwd, opts)
+		OutputPath:     *outputPath,
+		PackageName:    *packageName,
+		Methods:        *methods,
+		WithTests:      *withTests,
+		WithValidation: *withValidation,
+		Force:          *force,
+	})
 	if err != nil {
-		return out.Error(fmt.Sprintf("generation failed: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("generation failed: %v", err), 1)
 	}
 
-	return out.Success(fmt.Sprintf("%s generated successfully", genType), result)
+	return ctx.Out.Success(fmt.Sprintf("%s generated successfully", genType), result)
 }

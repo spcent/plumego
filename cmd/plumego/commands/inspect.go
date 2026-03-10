@@ -18,40 +18,8 @@ const maxInspectResponseBytes = 10 << 20
 
 type InspectCmd struct{}
 
-func (c *InspectCmd) Name() string {
-	return "inspect"
-}
-
-func (c *InspectCmd) Short() string {
-	return "Inspect running application"
-}
-
-func (c *InspectCmd) Long() string {
-	return `Inspect a running plumego application via HTTP endpoints.
-
-This command connects to a running application and fetches various
-runtime information like health status, metrics, routes, and configuration.
-
-Subcommands:
-  health    - Check health endpoints
-  metrics   - Fetch metrics
-  routes    - List active routes (requires support in app)
-  config    - View runtime config (requires support in app)
-  info      - General application info
-
-Examples:
-  plumego inspect health --url http://localhost:8080
-  plumego inspect metrics --url http://localhost:8080
-  plumego inspect health --format json`
-}
-
-func (c *InspectCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "url", Default: "http://localhost:8080", Usage: "Application URL"},
-		{Name: "auth", Default: "", Usage: "Authentication token"},
-		{Name: "timeout", Default: "10s", Usage: "Request timeout"},
-	}
-}
+func (c *InspectCmd) Name() string  { return "inspect" }
+func (c *InspectCmd) Short() string { return "Inspect running application" }
 
 func (c *InspectCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("inspect", flag.ContinueOnError)
@@ -100,8 +68,6 @@ func (c *InspectCmd) Run(ctx *Context, args []string) error {
 	}
 }
 
-// doInspectRequest performs an HTTP GET with optional auth and a bounded body read.
-// The response body is always closed before returning.
 func doInspectRequest(client *http.Client, url, auth string) ([]byte, int, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -126,7 +92,6 @@ func doInspectRequest(client *http.Client, url, auth string) ([]byte, int, error
 	return body, resp.StatusCode, nil
 }
 
-// fetchSingleEndpoint fetches one endpoint and returns the parsed JSON result.
 func fetchSingleEndpoint(out *output.Formatter, client *http.Client, baseURL, auth, path, successMsg string) error {
 	url := strings.TrimSuffix(baseURL, "/") + path
 
@@ -147,7 +112,6 @@ func fetchSingleEndpoint(out *output.Formatter, client *http.Client, baseURL, au
 	return out.Success(successMsg, data)
 }
 
-// probeEndpoints tries a list of endpoints and returns the first that responds.
 func probeEndpoints(client *http.Client, baseURL, auth string, endpoints []string) (body []byte, statusCode int, endpoint string, err error) {
 	var lastErr error
 	for _, ep := range endpoints {
@@ -227,11 +191,9 @@ func inspectMetrics(out *output.Formatter, client *http.Client, baseURL, auth st
 		return out.Success("Metrics retrieved", metricsData)
 	}
 
-	result := map[string]any{
+	return out.Success("Metrics retrieved", map[string]any{
 		"endpoint": endpoint,
 		"format":   "text",
 		"data":     string(body),
-	}
-
-	return out.Success("Metrics retrieved", result)
+	})
 }
