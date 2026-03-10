@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -165,8 +164,6 @@ func (c *WebSocketComponent) Health() (string, health.HealthStatus) {
 
 	return "websocket", status
 }
-
-func (c *WebSocketComponent) Dependencies() []reflect.Type { return nil }
 
 // Hub exposes the underlying WebSocket hub for advanced usage.
 func (c *WebSocketComponent) Hub() *ws.Hub { return c.hub }

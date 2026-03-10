@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/config"
+	"github.com/spcent/plumego/core/components/devtools"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
@@ -159,12 +160,12 @@ func (a *App) startServer() error {
 	a.logger.Info("Server running", log.Fields{"addr": cfg.addr})
 	if cfg.debug {
 		a.logger.Info("Debug mode enabled", log.Fields{
-			"routes":     devToolsRoutesPath,
-			"middleware": devToolsMiddlewarePath,
-			"config":     devToolsConfigPath,
-			"metrics":    devToolsMetricsPath,
-			"pprof":      devToolsPprofBasePath,
-			"reload":     devToolsReloadPath,
+			"routes":     devtools.DevToolsRoutesPath,
+			"middleware": devtools.DevToolsMiddlewarePath,
+			"config":     devtools.DevToolsConfigPath,
+			"metrics":    devtools.DevToolsMetricsPath,
+			"pprof":      devtools.DevToolsPprofBasePath,
+			"reload":     devtools.DevToolsReloadPath,
 		})
 	}
 
@@ -402,15 +403,6 @@ func (a *App) stopRunners(ctx context.Context) {
 			}
 		}
 	})
-}
-
-// ResetForTesting resets all ResettableOnce instances for testing purposes.
-// This method is intended for testing only and should not be used in production.
-func (a *App) ResetForTesting() {
-	a.handlerOnce.Reset()
-	a.componentStopOnce.Reset()
-	a.runnerStopOnce.Reset()
-	a.shutdownOnce.Reset()
 }
 
 func (t *connectionTracker) track(_ net.Conn, state http.ConnState) {

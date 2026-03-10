@@ -6,6 +6,10 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/core"
+	"github.com/spcent/plumego/middleware/circuitbreaker"
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/proxy"
+	"github.com/spcent/plumego/middleware/recovery"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	gateway "github.com/spcent/plumego/net/gateway"
 	cb "github.com/spcent/plumego/security/resilience/circuitbreaker"
@@ -30,9 +34,9 @@ func main() {
 	app := core.New(
 		core.WithAddr(":8080"),
 		core.WithDebug(),
-		core.WithRecovery(),
-		core.WithLogging(),
 	)
+	app.Use(recovery.RecoveryMiddleware)
+	app.Use(observability.Logging(nil, nil, nil))
 
 	// Create /api route group for middleware
 	apiGroup := app.Router().Group("/api")

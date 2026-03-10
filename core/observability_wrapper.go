@@ -7,30 +7,13 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-type MetricsConfig = observability.MetricsConfig
-type TracingConfig = observability.TracingConfig
-type ObservabilityConfig = observability.ObservabilityConfig
-
-func DefaultMetricsConfig() MetricsConfig {
-	return observability.DefaultMetricsConfig()
-}
-
-func DefaultTracingConfig() TracingConfig {
-	return observability.DefaultTracingConfig()
-}
-
-func DefaultObservabilityConfig() ObservabilityConfig {
-	return observability.DefaultObservabilityConfig()
-}
-
 // ConfigureObservability wires built-in metrics and tracing with structured logging.
-func (a *App) ConfigureObservability(cfg ObservabilityConfig) error {
+func (a *App) ConfigureObservability(cfg observability.ObservabilityConfig) error {
 	return observability.Configure(observability.Hooks{
 		EnsureMutable: a.ensureMutable,
 		EnsureRouter: func() *router.Router {
 			return a.ensureRouter()
 		},
-		EnableLogging: a.enableLogging,
 		GetMetricsCollector: func() metrics.MetricsCollector {
 			a.mu.RLock()
 			defer a.mu.RUnlock()

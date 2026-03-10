@@ -22,6 +22,8 @@ import (
 	"github.com/spcent/plumego/ai/tool"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/recovery"
 )
 
 func main() {
@@ -95,9 +97,9 @@ func main() {
 	app := core.New(
 		core.WithAddr(":8080"),
 		core.WithDebug(),
-		core.WithLogging(),
-		core.WithRecovery(),
 	)
+	app.Use(recovery.RecoveryMiddleware)
+	app.Use(observability.Logging(log.NewGLogger(), nil, nil))
 
 	// Phase 1 Routes
 	app.Get("/", indexHandler)

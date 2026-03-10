@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -77,8 +76,6 @@ func (c *WebhookInComponent) Health() (string, health.HealthStatus) {
 
 	return "webhook_in", status
 }
-
-func (c *WebhookInComponent) Dependencies() []reflect.Type { return nil }
 
 func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 	secret := strings.TrimSpace(c.cfg.GitHubSecret)

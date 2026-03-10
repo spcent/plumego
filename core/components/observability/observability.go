@@ -80,15 +80,6 @@ func Configure(hooks Hooks, cfg ObservabilityConfig) error {
 		}
 	}
 
-	if cfg.Metrics.Enabled || cfg.Tracing.Enabled {
-		if hooks.EnableLogging == nil {
-			return fmt.Errorf("observability hooks missing EnableLogging")
-		}
-		if err := hooks.EnableLogging(); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -167,7 +158,6 @@ func normalizeObservabilityPath(path string) string {
 type Hooks struct {
 	EnsureMutable       func(op, desc string) error
 	EnsureRouter        func() *router.Router
-	EnableLogging       func() error
 	GetMetricsCollector func() metrics.MetricsCollector
 	SetMetricsCollector func(metrics.MetricsCollector)
 	GetTracer           func() mwobs.Tracer

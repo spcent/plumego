@@ -155,16 +155,6 @@ func TestStopNilHub(t *testing.T) {
 	}
 }
 
-func TestDependencies(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-
-	comp, _ := NewComponent(cfg, false, nil)
-	if deps := comp.Dependencies(); deps != nil {
-		t.Fatalf("expected nil dependencies, got %v", deps)
-	}
-}
-
 func TestRegisterMiddlewareNoop(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()

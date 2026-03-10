@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
-	"reflect"
 	"sync"
 
 	"github.com/spcent/plumego/config"
@@ -216,8 +215,6 @@ func (c *DevToolsComponent) Health() (string, health.HealthStatus) {
 	}
 	return "devtools", status
 }
-
-func (c *DevToolsComponent) Dependencies() []reflect.Type { return nil }
 
 func (c *DevToolsComponent) reloadEnv(ctx context.Context) error {
 	_ = ctx

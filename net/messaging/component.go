@@ -2,7 +2,6 @@ package messaging
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
@@ -66,8 +65,4 @@ func (c *Component) Health() (string, health.HealthStatus) {
 		}
 	}
 	return "messaging", health.HealthStatus{Status: health.StatusHealthy}
-}
-
-func (c *Component) Dependencies() []reflect.Type {
-	return nil
 }

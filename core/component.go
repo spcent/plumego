@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
@@ -17,12 +16,9 @@ type Component interface {
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 	Health() (name string, status health.HealthStatus)
-	// Dependencies returns a list of component types that this component depends on.
-	Dependencies() []reflect.Type
 }
 
-// BaseComponent provides a default implementation for Component interface
-// with empty dependencies list and health check.
+// BaseComponent provides a default implementation for Component interface.
 type BaseComponent struct{}
 
 // RegisterRoutes implements Component.RegisterRoutes
@@ -30,11 +26,6 @@ func (b *BaseComponent) RegisterRoutes(r *router.Router) {}
 
 // RegisterMiddleware implements Component.RegisterMiddleware
 func (b *BaseComponent) RegisterMiddleware(m *middleware.Registry) {}
-
-// Dependencies implements Component.Dependencies
-func (b *BaseComponent) Dependencies() []reflect.Type {
-	return nil
-}
 
 // Health implements Component.Health
 func (b *BaseComponent) Health() (name string, status health.HealthStatus) {

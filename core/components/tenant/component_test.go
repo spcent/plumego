@@ -92,25 +92,16 @@ func TestRegisterMiddlewareNoop(t *testing.T) {
 	c.RegisterMiddleware(nil)
 }
 
-func TestDependenciesReturnsNil(t *testing.T) {
-	c := &TenantConfigComponent{}
-	deps := c.Dependencies()
-	if deps != nil {
-		t.Fatalf("expected nil dependencies, got %v", deps)
-	}
-}
-
 func TestComponentInterface(t *testing.T) {
 	// Verify TenantConfigComponent satisfies the expected interface shape
 	c := &TenantConfigComponent{}
-	_ = c.Dependencies()
 	_, _ = c.Health()
 	_ = c.Start(context.Background())
 	_ = c.Stop(context.Background())
 
 	// Verify type implements expected methods via reflection
 	typ := reflect.TypeOf(c)
-	methods := []string{"RegisterRoutes", "RegisterMiddleware", "Start", "Stop", "Health", "Dependencies"}
+	methods := []string{"RegisterRoutes", "RegisterMiddleware", "Start", "Stop", "Health"}
 	for _, m := range methods {
 		if _, ok := typ.MethodByName(m); !ok {
 			t.Fatalf("TenantConfigComponent missing method %s", m)

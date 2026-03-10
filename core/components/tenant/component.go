@@ -2,7 +2,6 @@ package tenantcomponent
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
@@ -43,6 +42,3 @@ func (c *TenantConfigComponent) Health() (name string, status health.HealthStatu
 	}
 	return componentName, health.HealthStatus{Status: health.StatusHealthy}
 }
-
-// Dependencies implements Component.
-func (c *TenantConfigComponent) Dependencies() []reflect.Type { return nil }

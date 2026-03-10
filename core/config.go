@@ -1,11 +1,6 @@
 package core
 
-import (
-	"time"
-
-	"github.com/spcent/plumego/middleware/ratelimit"
-	"github.com/spcent/plumego/security/headers"
-)
+import "time"
 
 // TLSConfig defines TLS configuration.
 type TLSConfig struct {
@@ -29,17 +24,4 @@ type AppConfig struct {
 	MaxHeaderBytes    int           // Maximum size of request headers
 	EnableHTTP2       bool          // Whether to keep HTTP/2 support enabled
 	DrainInterval     time.Duration // How often to log in-flight connection counts while draining
-	MaxBodyBytes      int64         // Per-request body limit
-	MaxConcurrency    int           // Maximum number of concurrent requests being served
-	QueueDepth        int           // Maximum number of requests allowed to queue while waiting for a worker
-	QueueTimeout      time.Duration // Maximum time a request can wait in the queue
-	// Security guardrails
-	EnableSecurityHeaders bool
-	SecurityHeadersPolicy *headers.Policy
-	EnableAbuseGuard      bool
-	AbuseGuardConfig      *ratelimit.AbuseGuardConfig
-
-	PubSub     PubSubConfig     // PubSub configuration
-	WebhookOut WebhookOutConfig // Webhook outbound configuration
-	WebhookIn  WebhookInConfig  // Webhook inbound configuration
 }

@@ -8,18 +8,8 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
-	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
-)
-
-const (
-	// DefaultMaxConcurrency is the default maximum number of concurrent requests.
-	DefaultMaxConcurrency = 256
-
-	// DefaultQueueDepth is the default depth of the request queue.
-	DefaultQueueDepth = 512
 )
 
 // App represents the main application instance.
@@ -31,40 +21,33 @@ type App struct {
 	logger        log.StructuredLogger // Logger instance
 
 	// Runtime state (protected by mutex)
-	mu            sync.RWMutex
-	started       bool // Whether the app has started
-	envLoaded     bool // Whether environment variables have been loaded
-	guardsApplied bool // Whether guards have been applied
-	configFrozen  bool // Whether configuration has been frozen
+	mu           sync.RWMutex
+	started      bool // Whether the app has started
+	envLoaded    bool // Whether environment variables have been loaded
+	configFrozen bool // Whether configuration has been frozen
 
 	// Server components
 	httpServer  *http.Server       // HTTP server instance
 	connTracker *connectionTracker // Connection tracker for WebSocket
 	handler     http.Handler       // Combined handler with middleware applied
-	handlerOnce ResettableOnce     // Ensures handler initialization happens once, can be reset for testing
+	handlerOnce sync.Once          // Ensures handler initialization happens once, can be reset for testing
 
 	// Optional components
 	metricsCollector metrics.MetricsCollector
 	tracer           observability.Tracer
-	pub              pubsub.PubSub
-	loggingEnabled   bool
-	requestIDEnabled bool
-	recoveryEnabled  bool
-	corsEnabled      bool
-	corsOptions      *cors.CORSOptions
 
 	// Component management
 	components        []Component
 	startedComponents []Component
-	componentStopOnce ResettableOnce
+	componentStopOnce sync.Once
 	componentsMounted bool
 
 	runners        []Runner
 	startedRunners []Runner
-	runnerStopOnce ResettableOnce
+	runnerStopOnce sync.Once
 
 	shutdownHooks []ShutdownHook
-	shutdownOnce  ResettableOnce
+	shutdownOnce  sync.Once
 }
 
 // Option defines a function type for configuring the App.
@@ -73,24 +56,18 @@ type Option func(*App)
 // New creates a new App instance with the provided options.
 func New(options ...Option) *App {
 	defaultConfig := &AppConfig{
-		Addr:                  ":8080",
-		EnvFile:               ".env",
-		TLS:                   TLSConfig{Enabled: false},
-		Debug:                 false,
-		ShutdownTimeout:       5 * time.Second,
-		ReadTimeout:           30 * time.Second,
-		ReadHeaderTimeout:     5 * time.Second,
-		WriteTimeout:          30 * time.Second,
-		IdleTimeout:           60 * time.Second,
-		MaxHeaderBytes:        1 << 20, // 1 MiB
-		EnableHTTP2:           true,
-		DrainInterval:         500 * time.Millisecond,
-		MaxBodyBytes:          10 << 20, // 10 MiB
-		MaxConcurrency:        DefaultMaxConcurrency,
-		QueueDepth:            DefaultQueueDepth,
-		QueueTimeout:          250 * time.Millisecond,
-		EnableSecurityHeaders: true,
-		EnableAbuseGuard:      true,
+		Addr:              ":8080",
+		EnvFile:           ".env",
+		TLS:               TLSConfig{Enabled: false},
+		Debug:             false,
+		ShutdownTimeout:   5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1 MiB
+		EnableHTTP2:       true,
+		DrainInterval:     500 * time.Millisecond,
 	}
 
 	app := &App{
