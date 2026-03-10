@@ -42,10 +42,10 @@ type HealthCheckRecord struct {
 
 // HealthTrend represents the health trend analysis.
 type HealthTrend struct {
-	Direction     TrendDirection `json:"direction"`      // improving/declining/stable
-	Stability     float64        `json:"stability"`      // 0.0-1.0, higher is more stable
-	RecentSuccess float64        `json:"recent_success"` // Recent success rate
-	TrendScore    float64        `json:"trend_score"`    // -1.0 to 1.0, negative means deteriorating
+	Direction     TrendDirection `json:"direction"`
+	Stability     float64        `json:"stability"`
+	RecentSuccess float64        `json:"recent_success"`
+	TrendScore    float64        `json:"trend_score"`
 }
 
 // TrendDirection represents the direction of health trend.
@@ -77,7 +77,7 @@ func (cm *ComponentMetrics) GetRecentSuccessRate() float64 {
 type MetricsCollector struct {
 	mu        sync.RWMutex
 	metrics   *HealthMetrics
-	collector HealthManager
+	collector HealthChecker
 }
 
 // NewMetricsCollector creates a new metrics collector.
@@ -87,7 +87,6 @@ func NewMetricsCollector(manager HealthManager) *MetricsCollector {
 			StartTime:        time.Now(),
 			ComponentMetrics: make(map[string]*ComponentMetrics),
 		},
-		collector: manager,
 	}
 	if manager != nil {
 		_ = AttachMetrics(manager, collector)
@@ -95,7 +94,7 @@ func NewMetricsCollector(manager HealthManager) *MetricsCollector {
 	return collector
 }
 
-// AttachMetrics attaches a metrics collector to a health manager when supported.
+// AttachMetrics attaches a MetricsCollector to a HealthManager.
 func AttachMetrics(manager HealthManager, collector *MetricsCollector) error {
 	if manager == nil {
 		return errors.New("manager cannot be nil")
@@ -104,23 +103,12 @@ func AttachMetrics(manager HealthManager, collector *MetricsCollector) error {
 		return errors.New("collector cannot be nil")
 	}
 
-	hm, ok := manager.(*healthManager)
-	if !ok {
-		return errors.New("manager does not support metrics attachment")
-	}
-
-	hm.mu.Lock()
-	defer hm.mu.Unlock()
-	if hm.closed {
-		return errManagerClosed
-	}
-
-	hm.metrics = collector
+	manager.SetMetricsRecorder(collector)
 	collector.collector = manager
 	return nil
 }
 
-// RecordCheck records a health check execution with enhanced metrics collection.
+// RecordCheck records a health check execution.
 func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Duration, success bool, status HealthState) {
 	mc.RecordCheckWithError(componentName, duration, success, status, nil)
 }
@@ -147,7 +135,7 @@ func (mc *MetricsCollector) RecordCheckWithError(componentName string, duration 
 			MaxLatency:    duration,
 			LastStatus:    status,
 			LastCheckTime: time.Now(),
-			RecentHistory: make([]HealthCheckRecord, 0, 10), // Keep last 10 checks
+			RecentHistory: make([]HealthCheckRecord, 0, 10),
 		}
 	}
 
@@ -162,7 +150,6 @@ func (mc *MetricsCollector) RecordCheckWithError(componentName string, duration 
 		comp.FailureCount++
 	}
 
-	// Update latency metrics
 	if comp.MinLatency == 0 || duration < comp.MinLatency {
 		comp.MinLatency = duration
 	}
@@ -170,7 +157,6 @@ func (mc *MetricsCollector) RecordCheckWithError(componentName string, duration 
 		comp.MaxLatency = duration
 	}
 
-	// Calculate running average with improved precision
 	if comp.CheckCount == 1 {
 		comp.AverageLatency = duration
 	} else {
@@ -178,7 +164,6 @@ func (mc *MetricsCollector) RecordCheckWithError(componentName string, duration 
 		comp.AverageLatency = (totalLatency + duration) / time.Duration(comp.CheckCount)
 	}
 
-	// Add to recent history (keep only last 10 records)
 	record := HealthCheckRecord{
 		Timestamp: time.Now(),
 		Duration:  duration,
@@ -189,13 +174,11 @@ func (mc *MetricsCollector) RecordCheckWithError(componentName string, duration 
 		record.ErrorMessage = err.Error()
 	}
 
-	// Append new record
 	comp.RecentHistory = append(comp.RecentHistory, record)
 	if len(comp.RecentHistory) > 10 {
-		comp.RecentHistory = comp.RecentHistory[1:] // Remove oldest
+		comp.RecentHistory = comp.RecentHistory[1:]
 	}
 
-	// Update health trend
 	mc.updateHealthTrend(comp)
 }
 
@@ -211,10 +194,8 @@ func (mc *MetricsCollector) updateHealthTrend(comp *ComponentMetrics) {
 		return
 	}
 
-	// Calculate recent success rate
 	recentSuccess := comp.GetRecentSuccessRate()
 
-	// Calculate trend by comparing recent vs older results
 	var recentGood, olderGood int
 	recentCount := len(comp.RecentHistory)
 	halfPoint := recentCount / 2
@@ -245,7 +226,6 @@ func (mc *MetricsCollector) updateHealthTrend(comp *ComponentMetrics) {
 		direction = TrendStable
 	}
 
-	// Calculate stability (inverse of variance in success/failure)
 	stability := mc.calculateStability(comp.RecentHistory)
 
 	comp.HealthTrend = HealthTrend{
@@ -269,14 +249,13 @@ func (mc *MetricsCollector) calculateStability(history []HealthCheckRecord) floa
 		}
 	}
 
-	// Higher stability when success rate is consistent (either high or low but stable)
 	successRate := float64(successCount) / float64(len(history))
 	if successRate >= 0.8 || successRate <= 0.2 {
-		return 0.9 // Very stable (consistently good or bad)
+		return 0.9
 	} else if successRate >= 0.6 || successRate <= 0.4 {
-		return 0.7 // Moderately stable
+		return 0.7
 	} else {
-		return 0.3 // Unstable (mixed results)
+		return 0.3
 	}
 }
 
@@ -285,7 +264,6 @@ func (mc *MetricsCollector) GetMetrics() HealthMetrics {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
-	// Return a copy to prevent external modification without copying the mutex.
 	metricsCopy := HealthMetrics{
 		StartTime:     mc.metrics.StartTime,
 		LastCheckTime: mc.metrics.LastCheckTime,
@@ -313,7 +291,6 @@ func (mc *MetricsCollector) GetComponentMetrics(componentName string) (*Componen
 		return nil, false
 	}
 
-	// Return a copy to prevent external modification
 	metricsCopy := *metrics
 	metricsCopy.RecentHistory = append([]HealthCheckRecord(nil), metrics.RecentHistory...)
 	return &metricsCopy, true
@@ -368,8 +345,8 @@ type HealthReport struct {
 func (mc *MetricsCollector) GenerateReport() HealthReport {
 	overallHealth := mc.collector.GetOverallHealth()
 	allHealth := mc.collector.GetAllHealth()
+	readiness := mc.collector.Readiness()
 	buildInfo := GetBuildInfo()
-	readiness := GetReadiness()
 
 	components := make([]string, 0, len(allHealth))
 	for name := range allHealth {

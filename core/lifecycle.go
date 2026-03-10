@@ -14,7 +14,6 @@ import (
 
 	"github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/core/components/devtools"
-	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 )
@@ -152,7 +151,9 @@ func (a *App) startServer() error {
 	a.started = true
 	a.mu.Unlock()
 
-	health.SetReady()
+	if a.healthManager != nil {
+		a.healthManager.MarkReady()
+	}
 
 	stopSignalWatcher := make(chan struct{})
 	go a.handleShutdownSignal(stopSignalWatcher)
@@ -179,7 +180,9 @@ func (a *App) startServer() error {
 
 	close(stopSignalWatcher)
 
-	health.SetNotReady("shutting down")
+	if a.healthManager != nil {
+		a.healthManager.MarkNotReady("shutting down")
+	}
 	a.stopRuntime(context.Background())
 	a.logger.Info("Server stopped gracefully")
 	return err
@@ -247,7 +250,9 @@ func (a *App) handleShutdownSignal(stop <-chan struct{}) {
 	case <-sig:
 	}
 
-	health.SetNotReady("draining connections")
+	if a.healthManager != nil {
+		a.healthManager.MarkNotReady("draining connections")
+	}
 	a.logger.Info("SIGTERM received, shutting down")
 
 	cfg := a.serverStartConfig()

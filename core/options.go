@@ -3,6 +3,7 @@ package core
 import (
 	"time"
 
+	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/observability"
@@ -176,5 +177,13 @@ func WithMetricsCollector(collector metrics.MetricsCollector) Option {
 func WithTracer(tracer observability.Tracer) Option {
 	return func(a *App) {
 		a.tracer = tracer
+	}
+}
+
+// WithHealthManager attaches a HealthManager to the App.
+// When set, the App will call MarkReady/MarkNotReady on it during lifecycle events.
+func WithHealthManager(hm health.HealthManager) Option {
+	return func(a *App) {
+		a.healthManager = hm
 	}
 }

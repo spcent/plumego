@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
@@ -35,6 +36,7 @@ type App struct {
 	// Optional components
 	metricsCollector metrics.MetricsCollector
 	tracer           observability.Tracer
+	healthManager    health.HealthManager
 
 	// Component management
 	components        []Component

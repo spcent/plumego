@@ -32,6 +32,15 @@ type HealthHistoryQueryResult struct {
 	HasMore bool                 `json:"has_more"`
 }
 
+// HistoryStats summarises collected health history.
+type HistoryStats struct {
+	TotalEntries   int                 `json:"total_entries"`
+	OldestEntry    *HealthHistoryEntry `json:"oldest_entry,omitempty"`
+	NewestEntry    *HealthHistoryEntry `json:"newest_entry,omitempty"`
+	EntriesByState map[string]int      `json:"entries_by_state"`
+	TimeSpan       time.Duration       `json:"time_span,omitempty"`
+}
+
 // GetHealthHistory returns the health history.
 func (hm *healthManager) GetHealthHistory() []HealthHistoryEntry {
 	hm.mu.RLock()
@@ -52,20 +61,15 @@ func (hm *healthManager) QueryHealthHistory(query HealthHistoryQuery) HealthHist
 	// Filter entries based on query criteria
 	var filtered []HealthHistoryEntry
 	for _, entry := range hm.history {
-		// Time range filter
 		if query.StartTime != nil && entry.Timestamp.Before(*query.StartTime) {
 			continue
 		}
 		if query.EndTime != nil && entry.Timestamp.After(*query.EndTime) {
 			continue
 		}
-
-		// State filter
 		if query.State != nil && entry.State != *query.State {
 			continue
 		}
-
-		// Component filter
 		if query.Component != "" {
 			found := false
 			for _, comp := range entry.Components {
@@ -78,24 +82,20 @@ func (hm *healthManager) QueryHealthHistory(query HealthHistoryQuery) HealthHist
 				continue
 			}
 		}
-
 		filtered = append(filtered, entry)
 	}
 
-	// Calculate total before pagination
 	total := len(filtered)
 
-	// Apply pagination
 	limit := query.Limit
 	if limit <= 0 || limit > 100 {
-		limit = 50 // Default limit
+		limit = 50
 	}
 	offset := query.Offset
 	if offset < 0 {
 		offset = 0
 	}
 
-	// Ensure we don't exceed bounds
 	end := offset + limit
 	if end > len(filtered) {
 		end = len(filtered)
@@ -106,48 +106,42 @@ func (hm *healthManager) QueryHealthHistory(query HealthHistoryQuery) HealthHist
 		entries = filtered[offset:end]
 	}
 
-	hasMore := end < len(filtered)
-
 	return HealthHistoryQueryResult{
 		Entries: entries,
 		Total:   total,
 		Limit:   limit,
 		Offset:  offset,
-		HasMore: hasMore,
+		HasMore: end < len(filtered),
 	}
 }
 
 // GetHealthHistoryStats returns statistics about the health history.
-func (hm *healthManager) GetHealthHistoryStats() map[string]any {
+func (hm *healthManager) GetHealthHistoryStats() HistoryStats {
 	hm.mu.RLock()
 	defer hm.mu.RUnlock()
 
+	stateCounts := make(map[string]int)
+
 	if len(hm.history) == 0 {
-		return map[string]any{
-			"total_entries":    0,
-			"oldest_entry":     nil,
-			"newest_entry":     nil,
-			"entries_by_state": map[string]int{},
-			"retention_config": hm.config,
+		return HistoryStats{
+			TotalEntries:   0,
+			EntriesByState: stateCounts,
 		}
 	}
 
-	// Count entries by state
-	stateCounts := make(map[string]int)
 	for _, entry := range hm.history {
 		stateCounts[string(entry.State)]++
 	}
 
-	oldestEntry := hm.history[0]
-	newestEntry := hm.history[len(hm.history)-1]
+	oldest := hm.history[0]
+	newest := hm.history[len(hm.history)-1]
 
-	return map[string]any{
-		"total_entries":    len(hm.history),
-		"oldest_entry":     oldestEntry,
-		"newest_entry":     newestEntry,
-		"entries_by_state": stateCounts,
-		"retention_config": hm.config,
-		"time_span":        newestEntry.Timestamp.Sub(oldestEntry.Timestamp),
+	return HistoryStats{
+		TotalEntries:   len(hm.history),
+		OldestEntry:    &oldest,
+		NewestEntry:    &newest,
+		EntriesByState: stateCounts,
+		TimeSpan:       newest.Timestamp.Sub(oldest.Timestamp),
 	}
 }
 
@@ -157,7 +151,6 @@ func (hm *healthManager) applyRetentionPolicy() {
 		return
 	}
 
-	// Apply time-based retention
 	if hm.config.HistoryRetention > 0 {
 		cutoffTime := time.Now().Add(-hm.config.HistoryRetention)
 		keepIndex := 0
@@ -173,7 +166,6 @@ func (hm *healthManager) applyRetentionPolicy() {
 		}
 	}
 
-	// Apply count-based retention
 	if hm.config.MaxHistoryEntries > 0 && len(hm.history) > hm.config.MaxHistoryEntries {
 		hm.history = hm.history[len(hm.history)-hm.config.MaxHistoryEntries:]
 	}

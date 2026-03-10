@@ -57,20 +57,14 @@ type BuildInfo struct {
 	BuildTime string `json:"buildTime"`
 }
 
-var (
-	version   = "dev"
-	commit    = "none"
-	buildTime = "unknown"
-)
-
 // These variables can be overridden at build time using -ldflags.
 var (
 	// Version reports the application version.
-	Version = version
+	Version = "dev"
 	// Commit reports the git commit hash used for the build.
-	Commit = commit
+	Commit = "none"
 	// BuildTime reports when the binary was built.
-	BuildTime = buildTime
+	BuildTime = "unknown"
 )
 
 // GetBuildInfo returns the current build metadata.
@@ -78,18 +72,42 @@ func GetBuildInfo() BuildInfo {
 	return BuildInfo{Version: Version, Commit: Commit, BuildTime: BuildTime}
 }
 
-// HealthManager defines the interface for health check management.
-type HealthManager interface {
+// MetricsRecorder records individual health check executions for metrics collection.
+type MetricsRecorder interface {
+	RecordCheckWithError(name string, duration time.Duration, success bool, status HealthState, err error)
+}
+
+// ComponentRegistry handles component registration and removal.
+type ComponentRegistry interface {
 	RegisterComponent(checker ComponentChecker) error
 	UnregisterComponent(name string) error
-	GetComponentHealth(name string) (*ComponentHealth, bool)
-	GetAllHealth() map[string]*ComponentHealth
+}
+
+// HealthChecker executes health checks and reads component status.
+type HealthChecker interface {
 	CheckComponent(ctx context.Context, name string) error
 	CheckAllComponents(ctx context.Context) HealthStatus
+	GetComponentHealth(name string) (*ComponentHealth, bool)
+	GetAllHealth() map[string]*ComponentHealth
 	GetOverallHealth() HealthStatus
+	Readiness() ReadinessStatus
+}
+
+// HistoryQuerier provides read access to health check history.
+type HistoryQuerier interface {
 	GetHealthHistory() []HealthHistoryEntry
 	QueryHealthHistory(query HealthHistoryQuery) HealthHistoryQueryResult
-	GetHealthHistoryStats() map[string]any
+	GetHealthHistoryStats() HistoryStats
+}
+
+// HealthManager is the full management interface combining all sub-interfaces.
+type HealthManager interface {
+	ComponentRegistry
+	HealthChecker
+	HistoryQuerier
+	MarkReady()
+	MarkNotReady(reason string)
+	SetMetricsRecorder(r MetricsRecorder)
 	SetConfig(config HealthCheckConfig) error
 	GetConfig() HealthCheckConfig
 	ForceCleanup()

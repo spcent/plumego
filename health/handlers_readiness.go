@@ -11,11 +11,23 @@ const (
 	readinessHandlerTimeout = 5 * time.Second
 )
 
+// ReadinessResponse is the JSON body for readiness endpoints.
+type ReadinessResponse struct {
+	Ready     bool        `json:"ready"`
+	Status    HealthState `json:"status"`
+	Message   string      `json:"message,omitempty"`
+	Timestamp time.Time   `json:"timestamp"`
+}
+
 // ReadinessHandler exposes the current readiness state as JSON.
 // It returns HTTP 200 when ready and 503 otherwise.
-func ReadinessHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		status := GetReadiness()
+func ReadinessHandler(manager HealthManager) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !requireManager(manager, w, r) {
+			return
+		}
+
+		status := manager.Readiness()
 		code := http.StatusOK
 		if !status.Ready {
 			code = http.StatusServiceUnavailable
@@ -25,7 +37,7 @@ func ReadinessHandler() http.Handler {
 	})
 }
 
-// ReadinessHandlerWithManager exposes the current readiness state based on component health.
+// ReadinessHandlerWithManager checks component health and exposes the derived readiness state.
 // It returns HTTP 200 when ready and 503 otherwise.
 func ReadinessHandlerWithManager(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,22 +48,20 @@ func ReadinessHandlerWithManager(manager HealthManager) http.Handler {
 		ctx, cancel := withCheckTimeout(r.Context(), readinessHandlerTimeout)
 		defer cancel()
 
-		// Perform health check
-		overallHealth := manager.CheckAllComponents(ctx)
+		overall := manager.CheckAllComponents(ctx)
 
+		ready := overall.Status.isReady()
 		code := http.StatusOK
-		if !overallHealth.Status.isReady() {
+		if !ready {
 			code = http.StatusServiceUnavailable
 		}
 
-		response := map[string]any{
-			"ready":     overallHealth.Status.isReady(),
-			"status":    overallHealth.Status,
-			"message":   overallHealth.Message,
-			"timestamp": overallHealth.Timestamp,
-		}
-
-		_ = contract.WriteJSON(w, code, response)
+		_ = contract.WriteJSON(w, code, ReadinessResponse{
+			Ready:     ready,
+			Status:    overall.Status,
+			Message:   overall.Message,
+			Timestamp: overall.Timestamp,
+		})
 	})
 }
 

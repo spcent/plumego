@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 )
@@ -54,18 +53,16 @@ func TestHealthHandler(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	// Register a healthy component
 	mockHealthy := &MockChecker{name: "healthy", healthy: true}
 	manager.RegisterComponent(mockHealthy)
 
-	// Register an unhealthy component
 	mockUnhealthy := &MockChecker{name: "unhealthy", healthy: false}
 	manager.RegisterComponent(mockUnhealthy)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rr := httptest.NewRecorder()
 
-	HealthHandler(manager).ServeHTTP(rr, req)
+	HealthHandler(manager, false).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 when components are unhealthy, got %d", rr.Code)
@@ -174,7 +171,7 @@ func TestHealthHistoryHandler(t *testing.T) {
 		MaxHistoryEntries:  100,
 		HistoryRetention:   24 * time.Hour,
 		AutoCleanupEnabled: false,
-		EnableHistory:      true, // Enable history for this test
+		EnableHistory:      true,
 	}
 	manager, err := NewHealthManager(config)
 	if err != nil {
@@ -184,7 +181,6 @@ func TestHealthHistoryHandler(t *testing.T) {
 	mock := &MockChecker{name: "test", healthy: true}
 	manager.RegisterComponent(mock)
 
-	// Trigger some health checks
 	ctx := context.Background()
 	manager.CheckAllComponents(ctx)
 
@@ -248,23 +244,17 @@ func TestComponentsListHandler(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 
-	var response map[string]any
+	var response ComponentsListResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
 
-	components, ok := response["components"].([]any)
-	if !ok {
-		t.Fatalf("components field not found or not an array")
+	if len(response.Components) != 2 {
+		t.Fatalf("expected 2 components, got %d", len(response.Components))
 	}
 
-	if len(components) != 2 {
-		t.Fatalf("expected 2 components, got %d", len(components))
-	}
-
-	count, ok := response["count"].(float64)
-	if !ok || int(count) != 2 {
-		t.Fatalf("expected count to be 2, got %v", count)
+	if response.Count != 2 {
+		t.Fatalf("expected count to be 2, got %d", response.Count)
 	}
 }
 
@@ -279,7 +269,6 @@ func TestReadinessHandlerWithManager(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	// Register a healthy component
 	mockHealthy := &MockChecker{name: "healthy", healthy: true}
 	manager.RegisterComponent(mockHealthy)
 
@@ -292,23 +281,28 @@ func TestReadinessHandlerWithManager(t *testing.T) {
 		t.Fatalf("expected 200 when ready, got %d", rr.Code)
 	}
 
-	var response map[string]any
+	var response ReadinessResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
 
-	if ready, ok := response["ready"].(bool); !ok || !ready {
-		t.Fatalf("expected ready=true, got %v", response["ready"])
+	if !response.Ready {
+		t.Fatalf("expected ready=true, got false")
 	}
 }
 
 func TestReadinessHandler(t *testing.T) {
-	t.Cleanup(func() { SetNotReady("starting") })
-	SetNotReady("booting")
+	mgr, err := NewHealthManager(HealthCheckConfig{})
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	mgr.MarkNotReady("booting")
+
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rr := httptest.NewRecorder()
 
-	ReadinessHandler().ServeHTTP(rr, req)
+	ReadinessHandler(mgr).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 when not ready, got %d", rr.Code)
@@ -322,9 +316,9 @@ func TestReadinessHandler(t *testing.T) {
 		t.Fatalf("expected ready=false, got true")
 	}
 
-	SetReady()
+	mgr.MarkReady()
 	rr = httptest.NewRecorder()
-	ReadinessHandler().ServeHTTP(rr, req)
+	ReadinessHandler(mgr).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 when ready, got %d", rr.Code)
 	}
@@ -363,80 +357,7 @@ func TestHealthStateIsReady(t *testing.T) {
 	}
 }
 
-func TestIsDevelopment(t *testing.T) {
-	tests := []struct {
-		name     string
-		envVars  map[string]string
-		expected bool
-	}{
-		{
-			name:     "no env vars set",
-			envVars:  map[string]string{},
-			expected: false,
-		},
-		{
-			name:     "APP_ENV=development",
-			envVars:  map[string]string{"APP_ENV": "development"},
-			expected: true,
-		},
-		{
-			name:     "APP_ENV=Development (case insensitive)",
-			envVars:  map[string]string{"APP_ENV": "Development"},
-			expected: true,
-		},
-		{
-			name:     "APP_ENV=production",
-			envVars:  map[string]string{"APP_ENV": "production"},
-			expected: false,
-		},
-		{
-			name:     "APP_DEBUG=true",
-			envVars:  map[string]string{"APP_DEBUG": "true"},
-			expected: true,
-		},
-		{
-			name:     "APP_DEBUG=True (case insensitive)",
-			envVars:  map[string]string{"APP_DEBUG": "True"},
-			expected: true,
-		},
-		{
-			name:     "APP_DEBUG=false",
-			envVars:  map[string]string{"APP_DEBUG": "false"},
-			expected: false,
-		},
-		{
-			name:     "APP_ENV=production and APP_DEBUG=true",
-			envVars:  map[string]string{"APP_ENV": "production", "APP_DEBUG": "true"},
-			expected: true,
-		},
-		{
-			name:     "APP_ENV=development and APP_DEBUG=false",
-			envVars:  map[string]string{"APP_ENV": "development", "APP_DEBUG": "false"},
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Clear relevant env vars before each subtest
-			t.Setenv("APP_ENV", "")
-			t.Setenv("APP_DEBUG", "")
-
-			for k, v := range tt.envVars {
-				t.Setenv(k, v)
-			}
-
-			got := isDevelopment()
-			if got != tt.expected {
-				t.Fatalf("isDevelopment() = %v, want %v", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestHealthHandlerIncludesRuntimeInDevMode(t *testing.T) {
-	t.Cleanup(func() { SetNotReady("starting") })
-
+func TestHealthHandlerIncludesRuntime(t *testing.T) {
 	config := HealthCheckConfig{
 		MaxHistoryEntries:  100,
 		HistoryRetention:   24 * time.Hour,
@@ -449,13 +370,11 @@ func TestHealthHandlerIncludesRuntimeInDevMode(t *testing.T) {
 	mock := &MockChecker{name: "test", healthy: true}
 	manager.RegisterComponent(mock)
 
-	t.Run("runtime included in dev mode", func(t *testing.T) {
-		t.Setenv("APP_DEBUG", "true")
-
+	t.Run("runtime included when debug=true", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/health", nil)
 		rr := httptest.NewRecorder()
 
-		HealthHandler(manager).ServeHTTP(rr, req)
+		HealthHandler(manager, true).ServeHTTP(rr, req)
 
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", rr.Code)
@@ -467,7 +386,7 @@ func TestHealthHandlerIncludesRuntimeInDevMode(t *testing.T) {
 		}
 
 		if response.Runtime == nil {
-			t.Fatal("expected runtime info in dev mode, got nil")
+			t.Fatal("expected runtime info when debug=true, got nil")
 		}
 		if response.Runtime.GoVersion != runtime.Version() {
 			t.Fatalf("expected go version %s, got %s", runtime.Version(), response.Runtime.GoVersion)
@@ -480,14 +399,11 @@ func TestHealthHandlerIncludesRuntimeInDevMode(t *testing.T) {
 		}
 	})
 
-	t.Run("runtime omitted in production", func(t *testing.T) {
-		t.Setenv("APP_ENV", "production")
-		t.Setenv("APP_DEBUG", "")
-
+	t.Run("runtime omitted when debug=false", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/health", nil)
 		rr := httptest.NewRecorder()
 
-		HealthHandler(manager).ServeHTTP(rr, req)
+		HealthHandler(manager, false).ServeHTTP(rr, req)
 
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", rr.Code)
@@ -499,59 +415,12 @@ func TestHealthHandlerIncludesRuntimeInDevMode(t *testing.T) {
 		}
 
 		if response.Runtime != nil {
-			t.Fatal("expected runtime info to be nil in production mode")
-		}
-	})
-}
-
-func TestHandlePanicDevMode(t *testing.T) {
-	t.Run("includes stack trace in dev mode", func(t *testing.T) {
-		t.Setenv("APP_DEBUG", "true")
-
-		req := httptest.NewRequest(http.MethodGet, "/health", nil)
-		rr := httptest.NewRecorder()
-
-		handlePanic(rr, req, "test panic value", "req-123")
-
-		if rr.Code != http.StatusInternalServerError {
-			t.Fatalf("expected 500, got %d", rr.Code)
-		}
-
-		body := rr.Body.String()
-		if !strings.Contains(body, "test panic value") {
-			t.Fatalf("dev mode panic response should contain panic value, got: %s", body)
-		}
-		if !strings.Contains(body, "goroutine") {
-			t.Fatalf("dev mode panic response should contain stack trace, got: %s", body)
-		}
-	})
-
-	t.Run("hides details in production", func(t *testing.T) {
-		t.Setenv("APP_ENV", "")
-		t.Setenv("APP_DEBUG", "")
-
-		req := httptest.NewRequest(http.MethodGet, "/health", nil)
-		rr := httptest.NewRecorder()
-
-		handlePanic(rr, req, "secret panic value", "req-456")
-
-		if rr.Code != http.StatusInternalServerError {
-			t.Fatalf("expected 500, got %d", rr.Code)
-		}
-
-		body := rr.Body.String()
-		if strings.Contains(body, "secret panic value") {
-			t.Fatalf("production panic response must NOT contain panic value, got: %s", body)
-		}
-		if strings.Contains(body, "goroutine") {
-			t.Fatalf("production panic response must NOT contain stack trace, got: %s", body)
+			t.Fatal("expected runtime info to be nil when debug=false")
 		}
 	})
 }
 
 func TestDebugHealthHandler(t *testing.T) {
-	t.Cleanup(func() { SetNotReady("starting") })
-
 	config := HealthCheckConfig{
 		MaxHistoryEntries:  100,
 		HistoryRetention:   24 * time.Hour,
@@ -564,30 +433,25 @@ func TestDebugHealthHandler(t *testing.T) {
 	mock := &MockChecker{name: "db", healthy: true}
 	manager.RegisterComponent(mock)
 
-	t.Run("returns 404 in production", func(t *testing.T) {
-		t.Setenv("APP_ENV", "")
-		t.Setenv("APP_DEBUG", "")
-
+	t.Run("returns 404 when debug=false", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/health/debug", nil)
 		rr := httptest.NewRecorder()
 
-		DebugHealthHandler(manager).ServeHTTP(rr, req)
+		DebugHealthHandler(manager, false).ServeHTTP(rr, req)
 
 		if rr.Code != http.StatusNotFound {
-			t.Fatalf("expected 404 in production, got %d", rr.Code)
+			t.Fatalf("expected 404 when debug=false, got %d", rr.Code)
 		}
 	})
 
-	t.Run("returns diagnostics in dev mode via APP_ENV", func(t *testing.T) {
-		t.Setenv("APP_ENV", "development")
-
+	t.Run("returns diagnostics when debug=true", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/health/debug", nil)
 		rr := httptest.NewRecorder()
 
-		DebugHealthHandler(manager).ServeHTTP(rr, req)
+		DebugHealthHandler(manager, true).ServeHTTP(rr, req)
 
 		if rr.Code != http.StatusOK {
-			t.Fatalf("expected 200 in dev mode, got %d", rr.Code)
+			t.Fatalf("expected 200 when debug=true, got %d", rr.Code)
 		}
 
 		var response map[string]any
@@ -595,53 +459,18 @@ func TestDebugHealthHandler(t *testing.T) {
 			t.Fatalf("failed to decode body: %v", err)
 		}
 
-		// Verify runtime info is present
-		if _, ok := response["runtime"]; !ok {
-			t.Fatal("expected runtime field in debug response")
-		}
-		// Verify build info is present
-		if _, ok := response["build_info"]; !ok {
-			t.Fatal("expected build_info field in debug response")
-		}
-		// Verify readiness is present
-		if _, ok := response["readiness"]; !ok {
-			t.Fatal("expected readiness field in debug response")
-		}
-		// Verify health info is present (manager was provided)
-		if _, ok := response["health"]; !ok {
-			t.Fatal("expected health field in debug response")
-		}
-		// Verify components info is present
-		if _, ok := response["components"]; !ok {
-			t.Fatal("expected components field in debug response")
-		}
-		// Verify config is present
-		if _, ok := response["config"]; !ok {
-			t.Fatal("expected config field in debug response")
-		}
-	})
-
-	t.Run("returns diagnostics in dev mode via APP_DEBUG", func(t *testing.T) {
-		t.Setenv("APP_ENV", "")
-		t.Setenv("APP_DEBUG", "true")
-
-		req := httptest.NewRequest(http.MethodGet, "/health/debug", nil)
-		rr := httptest.NewRecorder()
-
-		DebugHealthHandler(manager).ServeHTTP(rr, req)
-
-		if rr.Code != http.StatusOK {
-			t.Fatalf("expected 200 with APP_DEBUG=true, got %d", rr.Code)
+		for _, field := range []string{"runtime", "build_info", "readiness", "health", "components", "config"} {
+			if _, ok := response[field]; !ok {
+				t.Fatalf("expected %q field in debug response", field)
+			}
 		}
 	})
 
 	t.Run("works with nil manager", func(t *testing.T) {
-		t.Setenv("APP_DEBUG", "true")
-
 		req := httptest.NewRequest(http.MethodGet, "/health/debug", nil)
 		rr := httptest.NewRecorder()
 
-		DebugHealthHandler(nil).ServeHTTP(rr, req)
+		DebugHealthHandler(nil, true).ServeHTTP(rr, req)
 
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200 even with nil manager, got %d", rr.Code)
@@ -652,11 +481,9 @@ func TestDebugHealthHandler(t *testing.T) {
 			t.Fatalf("failed to decode body: %v", err)
 		}
 
-		// Should still have runtime and build info
 		if _, ok := response["runtime"]; !ok {
 			t.Fatal("expected runtime field even with nil manager")
 		}
-		// Should not have health/components/config when manager is nil
 		if _, ok := response["health"]; ok {
 			t.Fatal("expected no health field with nil manager")
 		}
