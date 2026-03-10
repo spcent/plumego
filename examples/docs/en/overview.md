@@ -207,8 +207,8 @@ No global magic. No hidden registries.
 ```go
 app := plumego.New()
 
-app.GetCtx("/health", func(ctx *plumego.Context) {
-    ctx.JSON(200, map[string]string{"status": "ok"})
+app.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+    _, _ = w.Write([]byte(`{"status":"ok"}`))
 })
 
 log.Fatal(http.ListenAndServe(":8080", app))
@@ -219,10 +219,14 @@ log.Fatal(http.ListenAndServe(":8080", app))
 ```go
 app := core.New(
     core.WithAddr(":8080"),
-    core.WithRecovery(),
-    core.WithLogging(),
-    core.WithCORS(),
-    core.WithGracefulShutdown(),
+    core.WithDebug(),
+)
+
+_ = app.Use(
+    observability.RequestID(),
+    observability.Logging(app.Logger(), nil, nil),
+    recovery.RecoveryMiddleware,
+    cors.CORS,
 )
 
 app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {

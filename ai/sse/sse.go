@@ -37,6 +37,7 @@ type Stream struct {
 	// Configuration
 	keepAliveInterval time.Duration
 	keepAliveTicker   *time.Ticker
+	keepAliveStop     chan struct{}
 	done              chan struct{}
 }
 
@@ -134,6 +135,11 @@ func (s *Stream) Close() error {
 
 	if s.keepAliveTicker != nil {
 		s.keepAliveTicker.Stop()
+		s.keepAliveTicker = nil
+	}
+	if s.keepAliveStop != nil {
+		close(s.keepAliveStop)
+		s.keepAliveStop = nil
 	}
 
 	return nil
@@ -147,10 +153,18 @@ func (s *Stream) SetKeepAliveInterval(interval time.Duration) {
 	s.keepAliveInterval = interval
 	if s.keepAliveTicker != nil {
 		s.keepAliveTicker.Stop()
-		if interval > 0 {
-			s.keepAliveTicker = time.NewTicker(interval)
-			go s.runKeepAlive()
-		}
+		s.keepAliveTicker = nil
+	}
+	if s.keepAliveStop != nil {
+		close(s.keepAliveStop)
+		s.keepAliveStop = nil
+	}
+	if interval > 0 && !s.closed {
+		ticker := time.NewTicker(interval)
+		stop := make(chan struct{})
+		s.keepAliveTicker = ticker
+		s.keepAliveStop = stop
+		go s.runKeepAlive(ticker, stop)
 	}
 }
 
@@ -205,18 +219,23 @@ func (s *Stream) startKeepAlive() {
 		return
 	}
 
-	s.keepAliveTicker = time.NewTicker(s.keepAliveInterval)
-	go s.runKeepAlive()
+	ticker := time.NewTicker(s.keepAliveInterval)
+	stop := make(chan struct{})
+	s.keepAliveTicker = ticker
+	s.keepAliveStop = stop
+	go s.runKeepAlive(ticker, stop)
 }
 
 // runKeepAlive sends keep-alive comments.
-func (s *Stream) runKeepAlive() {
+func (s *Stream) runKeepAlive(ticker *time.Ticker, stop <-chan struct{}) {
 	for {
 		select {
-		case <-s.keepAliveTicker.C:
+		case <-ticker.C:
 			if err := s.SendComment("keep-alive"); err != nil {
 				return
 			}
+		case <-stop:
+			return
 		case <-s.done:
 			return
 		case <-s.ctx.Done():

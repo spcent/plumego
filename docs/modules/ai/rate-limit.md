@@ -29,7 +29,8 @@ limiter := ratelimit.NewTokenLimiter(
 )
 
 // Apply to AI routes
-app.Use("/api/ai", limiter.Middleware(extractUserID))
+ai := app.Router().Group("/api/ai")
+ai.Use(limiter.Middleware(extractUserID))
 ```
 
 ## Token-Based Limiting

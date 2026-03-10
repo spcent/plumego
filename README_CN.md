@@ -49,16 +49,22 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/middleware/recovery"
 )
 
 func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
-        core.WithRecovery(),
-        core.WithLogging(),
-        core.WithCORS(),
     )
+
+    if err := app.Use(
+        observability.RequestID(),
+        recovery.RecoveryMiddleware,
+    ); err != nil {
+        log.Fatalf("register middleware: %v", err)
+    }
 
     app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
@@ -79,16 +85,17 @@ import (
     "log"
     "net/http"
 
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego"
 )
 
 func main() {
-    app := plumego.New()
+    app := plumego.New(plumego.WithAddr(":8080"))
 
     app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusOK)
-        w.Write([]byte(`{"status":"ok"}`))
+        contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+            "status": "ok",
+        })
     })
 
     log.Println("server started at :8080")
@@ -100,12 +107,12 @@ func main() {
 - 环境变量可以从 `.env` 文件加载（默认路径 `.env`；可通过 `core.WithEnvPath` 覆盖）。
 - 常用变量：`AUTH_TOKEN`（ops 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - 应用默认包括 10485760 字节（10 MiB）请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5000ms（5 秒）优雅关闭窗口。可通过 `core.With...` 选项覆盖。
-- 安全基线默认启用（安全头 + 防滥用中间件）。防滥用默认每客户端 100 req/s，突发 200，并最多跟踪 10 万个活跃 key。可通过 `core.WithSecurityHeadersEnabled`、`core.WithSecurityHeadersPolicy`、`core.WithAbuseGuardEnabled`、`core.WithAbuseGuardConfig` 关闭或调整。
+- 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.SecurityHeaders(...)` 与 `middleware/ratelimit.AbuseGuard(...)`。
 - Debug 模式（`core.WithDebug`）默认开启 `/_debug` 调试端点（路由表、Middleware、配置快照、指标、pprof、手动重载）、友好 JSON 错误输出，以及 `.env` 热加载。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
 
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等标准库风格方法注册处理器（`func(w http.ResponseWriter, r *http.Request)`）。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
-- **中间件**：在启动前使用 `app.Use(...)` 链式添加中间件；防护栏（安全头、防滥用、请求体限制、并发限制）会在设置期间自动注入。恢复/日志/CORS 辅助工具可通过 `core.WithRecovery`、`core.WithLogging`、`core.WithCORS` 启用。生产基线可使用 `core.WithRecommendedMiddleware()` 一键启用 RequestID + Logging + Recovery 的推荐顺序组合。
+- **中间件**：在启动前使用 `app.Use(...)` 显式链式添加，并保持传输层职责。常见组合包括 `middleware/observability.RequestID`、`middleware/observability.Logging`、`middleware/recovery.RecoveryMiddleware`、`middleware/cors.CORS`、`middleware/security.SecurityHeaders`、`middleware/ratelimit.AbuseGuard`。
 - **多租户（实验）**：提供租户隔离、配额管理、策略控制和数据库过滤能力，API 仍处于实验阶段，可能变更。详见[多租户](#多租户)章节。
 - **运维/管理端点**：可选的受保护运维 API，包含队列状态/重放、回执查询、通道健康、租户配额等能力。通过 `core/components/ops` 挂载，并使用令牌或自定义中间件保护；当 `AllowInsecure` 为 false（默认）且未配置鉴权时会拒绝访问。
 - **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
@@ -132,75 +139,122 @@ Plumego 为 SaaS 应用提供实验性的多租户支持，包括租户隔离、
 
 ```go
 import (
-    "github.com/spcent/plumego"
-    "github.com/spcent/plumego/store/db"
+    "context"
+    "database/sql"
+    "log"
+    "net/http"
+    "time"
+
+    "github.com/spcent/plumego/contract"
+    "github.com/spcent/plumego/core"
+    tenantmw "github.com/spcent/plumego/middleware/tenant"
+    storedb "github.com/spcent/plumego/store/db"
+    "github.com/spcent/plumego/tenant"
+    tenantpolicy "github.com/spcent/plumego/tenant/middleware"
 )
 
-// 创建带缓存的租户配置管理器
-tenantMgr := plumego.NewDBTenantConfigManager(
-    database,
-    plumego.WithTenantCache(1000, 5*time.Minute),
-)
+func setupTenantApp(database *sql.DB) *core.App {
+    // 创建带缓存的租户配置管理器
+    tenantMgr := storedb.NewDBTenantConfigManager(
+        database,
+        storedb.WithTenantCache(1000, 5*time.Minute),
+    )
 
-// 创建限流配置与限流器
-rateLimitProvider := plumego.NewInMemoryRateLimitProvider()
-rateLimitProvider.SetRateLimit("tenant-id", plumego.TenantRateLimitConfig{
-    RequestsPerSecond: 50,
-    Burst:             100,
-})
-rateLimiter := plumego.NewTokenBucketRateLimiter(rateLimitProvider)
+    // 创建租户中间件需要的管理器
+    quotaMgr := tenant.NewWindowQuotaManager(tenantMgr, tenant.NewInMemoryQuotaStore())
+    policyEval := tenant.NewConfigPolicyEvaluator(tenantMgr)
+    rateLimiter := tenant.NewTokenBucketRateLimiter(
+        &tenant.RateLimitConfigProviderFromConfig{Manager: tenantMgr},
+    )
 
-// 创建配额和策略管理器
-quotaStore := plumego.NewInMemoryQuotaStore()
-quotaMgr := plumego.NewWindowQuotaManager(tenantMgr, quotaStore)
-policyEval := plumego.NewConfigPolicyEvaluator(tenantMgr)
+    // 租户感知数据库包装器（自动追加 tenant 过滤）
+    tenantDB := storedb.NewTenantDB(database)
 
-// 创建租户感知数据库包装器
-tenantDB := plumego.NewTenantDB(database)
+    app := core.New(core.WithAddr(":8080"))
+    api := app.Router().Group("/api")
 
-// 配置应用
-app := plumego.New(
-    plumego.WithTenantConfigManager(tenantMgr),
-    plumego.WithTenantMiddleware(plumego.TenantMiddlewareOptions{
-        HeaderName:      "X-Tenant-ID",
-        AllowMissing:    false,
-        RateLimiter:     rateLimiter,
-        QuotaManager:    quotaMgr,
-        PolicyEvaluator: policyEval,
-        Hooks: plumego.TenantHooks{
-            OnQuota: func(ctx context.Context, decision plumego.TenantQuotaDecision) {
+    // canonical：显式中间件链
+    api.Use(tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+        HeaderName: "X-Tenant-ID",
+    }))
+    api.Use(tenantmw.TenantRateLimit(tenantmw.TenantRateLimitOptions{
+        Limiter: rateLimiter,
+    }))
+    api.Use(tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
+        Manager: quotaMgr,
+        Hooks: tenant.Hooks{
+            OnQuota: func(ctx context.Context, decision tenant.QuotaDecision) {
                 if !decision.Allowed {
                     log.Printf("租户 %s 超过配额", decision.TenantID)
                 }
             },
         },
-    }),
-)
+    }))
+    api.Use(tenantpolicy.TenantPolicy(tenantpolicy.TenantPolicyOptions{
+        Evaluator: policyEval,
+    }))
+
+    api.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        rows, err := tenantDB.QueryFromContext(
+            r.Context(),
+            "SELECT id, email FROM users WHERE active = ?",
+            true,
+        )
+        if err != nil {
+            contract.WriteError(w, r, contract.APIError{
+                Status:   http.StatusInternalServerError,
+                Code:     "db_query_failed",
+                Message:  "query failed",
+                Category: contract.CategoryServer,
+            })
+            return
+        }
+        defer rows.Close()
+        contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"})
+    }))
+
+    return app
+}
 ```
 
 如果你在代码中管理租户配置（或实现自定义配置提供者），可以这样设置多窗口配额：
 
 ```go
-tenantMgr := plumego.NewInMemoryTenantConfigManager()
-tenantMgr.SetTenantConfig(plumego.TenantConfig{
+tenantMgr := tenant.NewInMemoryConfigManager()
+tenantMgr.SetTenantConfig(tenant.Config{
     TenantID: "tenant-id",
-    Quota: plumego.TenantQuotaConfig{
-        Limits: []plumego.TenantQuotaLimit{
-            {Window: plumego.TenantQuotaWindowDay, Requests: 200000},
-            {Window: plumego.TenantQuotaWindowMonth, Tokens: 10_000_000},
+    Quota: tenant.QuotaConfig{
+        Limits: []tenant.QuotaLimit{
+            {Window: tenant.QuotaWindowDay, Requests: 200000},
+            {Window: tenant.QuotaWindowMonth, Tokens: 10_000_000},
         },
+    },
+    Policy: tenant.PolicyConfig{
+        AllowedModels: []string{"gpt-4o-mini"},
+        AllowedTools:  []string{"search"},
+    },
+    RateLimit: tenant.RateLimitConfig{
+        RequestsPerSecond: 50,
+        Burst:             100,
     },
 })
 
 // 路由策略缓存（可选）
-routePolicyStore := plumego.NewInMemoryRoutePolicyStore()
-_ = routePolicyStore.SetRoutePolicy(context.Background(), plumego.TenantRoutePolicy{
+routePolicyStore := tenant.NewInMemoryRoutePolicyStore()
+_ = routePolicyStore.SetRoutePolicy(context.Background(), tenant.RoutePolicy{
     TenantID: "tenant-id",
     Strategy: "weighted",
     Payload:  []byte(`{"rules":[{"provider":"a","weight":70},{"provider":"b","weight":30}]}`),
 })
-routePolicyCache := plumego.NewInMemoryRoutePolicyCache(1000, 5*time.Minute)
-routePolicyProvider := plumego.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
+routePolicyCache := tenant.NewInMemoryRoutePolicyCache(1000, 5*time.Minute)
+routePolicyProvider := tenant.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
+
+// 可选：复用同一份配置创建租户限流器
+rateLimiter := tenant.NewTokenBucketRateLimiter(
+    &tenant.RateLimitConfigProviderFromConfig{Manager: tenantMgr},
+)
+_ = routePolicyProvider
+_ = rateLimiter
 ```
 
 ### 自动查询过滤
@@ -441,6 +495,8 @@ plumego dev --debounce 1s
 完整文档请参见 `cmd/plumego/DEV_SERVER.md`。
 
 ## 文档
+规范文档入口与优先级顺序：`docs/README.md`。
+
 详细文档请参见 `examples/docs` 目录：
 - `examples/docs/en/` - 英文文档
 - `examples/docs/zh/` - 中文文档

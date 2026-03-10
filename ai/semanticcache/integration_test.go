@@ -63,8 +63,8 @@ func TestIntegration_FullStack(t *testing.T) {
 			t.Errorf("unexpected response text: %s", resp.GetText())
 		}
 
-		if mockProvider.callCount != 1 {
-			t.Errorf("expected 1 provider call, got %d", mockProvider.callCount)
+		if mockProvider.CallCount() != 1 {
+			t.Errorf("expected 1 provider call, got %d", mockProvider.CallCount())
 		}
 	})
 
@@ -89,8 +89,8 @@ func TestIntegration_FullStack(t *testing.T) {
 		}
 
 		// Should not call provider again (exact cache hit)
-		if mockProvider.callCount != 1 {
-			t.Errorf("expected still 1 provider call (exact cached), got %d", mockProvider.callCount)
+		if mockProvider.CallCount() != 1 {
+			t.Errorf("expected still 1 provider call (exact cached), got %d", mockProvider.CallCount())
 		}
 	})
 
@@ -117,7 +117,7 @@ func TestIntegration_FullStack(t *testing.T) {
 		// Note: With SimpleEmbeddingGenerator, semantic similarity is low
 		// In production with real embeddings, this would likely hit semantic cache
 		// For now, it will call the provider
-		t.Logf("Provider call count: %d", mockProvider.callCount)
+		t.Logf("Provider call count: %d", mockProvider.CallCount())
 	})
 
 	// Test 4: Verify statistics
@@ -149,13 +149,13 @@ func TestIntegration_FullStack(t *testing.T) {
 		}
 
 		// Should call provider again after clear
-		prevCount := mockProvider.callCount
+		prevCount := mockProvider.CallCount()
 		_, err := cachingProvider.Complete(ctx, req)
 		if err != nil {
 			t.Fatalf("Complete failed: %v", err)
 		}
 
-		if mockProvider.callCount <= prevCount {
+		if mockProvider.CallCount() <= prevCount {
 			t.Error("expected provider call after cache clear")
 		}
 	})
@@ -202,7 +202,7 @@ func TestIntegration_MultipleQueries(t *testing.T) {
 	// Verify stats
 	stats := cachingProvider.Stats()
 	t.Logf("Total requests: %d", len(queries))
-	t.Logf("Provider calls: %d", mockProvider.callCount)
+	t.Logf("Provider calls: %d", mockProvider.CallCount())
 	t.Logf("Semantic hits: %d", stats.SemanticHits)
 	t.Logf("Semantic misses: %d", stats.SemanticMisses)
 	t.Logf("Stores: %d", stats.Stores)
@@ -213,7 +213,7 @@ func TestIntegration_MultipleQueries(t *testing.T) {
 	}
 
 	// Make same requests again - should have higher hit rate
-	prevCalls := mockProvider.callCount
+	prevCalls := mockProvider.CallCount()
 	for _, query := range queries {
 		req := &provider.CompletionRequest{
 			Model: "test-model",
@@ -229,7 +229,7 @@ func TestIntegration_MultipleQueries(t *testing.T) {
 	}
 
 	// Should have fewer new provider calls
-	newCalls := mockProvider.callCount - prevCalls
+	newCalls := mockProvider.CallCount() - prevCalls
 	t.Logf("New provider calls on repeat: %d", newCalls)
 
 	if newCalls > 0 {
@@ -280,7 +280,7 @@ func TestIntegration_ConcurrentAccess(t *testing.T) {
 	}
 
 	stats := cachingProvider.Stats()
-	t.Logf("Concurrent test - Provider calls: %d", mockProvider.callCount)
+	t.Logf("Concurrent test - Provider calls: %d", mockProvider.CallCount())
 	t.Logf("Concurrent test - Semantic hits: %d", stats.SemanticHits)
 	t.Logf("Concurrent test - Semantic misses: %d", stats.SemanticMisses)
 
@@ -319,7 +319,7 @@ func TestIntegration_TTLExpiration(t *testing.T) {
 		t.Fatalf("Complete failed: %v", err)
 	}
 
-	initialCalls := mockProvider.callCount
+	initialCalls := mockProvider.CallCount()
 
 	// Wait for expiration
 	time.Sleep(100 * time.Millisecond)
@@ -333,7 +333,7 @@ func TestIntegration_TTLExpiration(t *testing.T) {
 		t.Fatalf("Complete failed: %v", err)
 	}
 
-	if mockProvider.callCount <= initialCalls {
+	if mockProvider.CallCount() <= initialCalls {
 		t.Error("expected provider call after expiration")
 	}
 

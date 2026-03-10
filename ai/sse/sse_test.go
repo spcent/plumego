@@ -233,13 +233,16 @@ func TestStream_KeepAlive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStream() error = %v", err)
 	}
-	defer stream.Close()
 
 	// Set short keep-alive interval
 	stream.SetKeepAliveInterval(50 * time.Millisecond)
 
 	// Wait for keep-alive
 	time.Sleep(100 * time.Millisecond)
+
+	if err := stream.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
 
 	output := w.Body.String()
 	if !strings.Contains(output, ": keep-alive") {

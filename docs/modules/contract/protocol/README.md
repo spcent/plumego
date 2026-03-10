@@ -1,130 +1,47 @@
-# Protocol Adapters
+# Protocol Contract
 
-> **Package**: `github.com/spcent/plumego/contract/protocol`
+> Package: `github.com/spcent/plumego/contract/protocol`
 
-Protocol adapters allow Plumego to handle multiple protocols (HTTP, gRPC, GraphQL) using the same handler logic.
+`contract/protocol` defines adapter contracts so Plumego can gateway gRPC/GraphQL/custom protocols without adding hard dependencies to core.
 
----
+## Core Interfaces
 
-## Overview
+- `ProtocolAdapter`
+- `Request`
+- `Response`
+- `ResponseWriter`
+- `Registry`
 
-Protocol adapters provide:
-- **Unified Interface**: Same handler for different protocols
-- **Request Translation**: Convert protocol-specific requests to Plumego context
-- **Response Translation**: Convert Plumego responses back to protocol format
-- **Middleware Compatibility**: Use same middleware across protocols
-
----
-
-## Supported Protocols
-
-| Protocol | Status | Adapter |
-|----------|--------|---------|
-| **HTTP/REST** | ✅ Native | Built-in |
-| **gRPC** | ✅ Available | `protocol.GRPCAdapter` |
-| **GraphQL** | ✅ Available | `protocol.GraphQLAdapter` |
-| **WebSocket** | ✅ Native | Built-in |
-
----
-
-## Quick Start
-
-### HTTP (Default)
+## Gateway Wiring
 
 ```go
-// No adapter needed - native support
-app.GetCtx("/users", func(ctx *plumego.Context) {
-    ctx.JSON(200, users)
-})
-```
+registry := protocol.NewRegistry()
+registry.Register(grpcAdapter)
+registry.Register(graphqlAdapter)
 
-### gRPC
-
-```go
-import "github.com/spcent/plumego/contract/protocol"
-
-// Create adapter
-grpcAdapter := protocol.NewGRPCAdapter()
-
-// In gRPC service
-func (s *UserService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
-    // Convert to Plumego context
-    pctx := grpcAdapter.ToContext(req)
-
-    // Use standard handler
-    handler(pctx)
-
-    // Convert response
-    return grpcAdapter.FromContext(pctx)
+if err := app.Use(protomw.Middleware(registry)); err != nil {
+    log.Fatal(err)
 }
 ```
 
-### GraphQL
+Requests unmatched by adapters pass through to normal HTTP routes.
 
-```go
-import "github.com/spcent/plumego/contract/protocol"
+## Adapter Lifecycle
 
-gqlAdapter := protocol.NewGraphQLAdapter()
+1. `Handles(req)` chooses whether adapter takes this request.
+2. `Transform(ctx, req)` maps HTTP to protocol request.
+3. `Execute(ctx, req)` runs protocol call.
+4. `Encode(ctx, resp, writer)` maps protocol response to HTTP response.
 
-// In GraphQL resolver
-func (r *Resolver) User(ctx context.Context, args struct{ ID string }) (*User, error) {
-    pctx := gqlAdapter.ToContext(ctx, args)
-    handler(pctx)
-    return gqlAdapter.FromContext(pctx)
-}
-```
+## Built-in Helper Types
 
----
+- `protocol.GRPCRequest` / `protocol.GRPCResponse`
+- `protocol.GraphQLRequest` / `protocol.GraphQLResponse`
+- `protocol.GRPCErrorCode(...)`
 
-## Documentation
+These helpers are optional, but useful for consistency.
 
-- **[HTTP Adapter](http-adapter.md)** - HTTP/REST protocol (default)
-- **[gRPC/GraphQL](grpc-graphql.md)** - gRPC and GraphQL adapters
+## Error Mapping
 
----
-
-## Use Cases
-
-### 1. Multi-Protocol API
-
-Expose same business logic via multiple protocols:
-
-```go
-// Business logic
-func getUser(ctx *plumego.Context) {
-    id := ctx.Param("id")
-    user := loadUser(id)
-    ctx.JSON(200, user)
-}
-
-// HTTP endpoint
-app.GetCtx("/users/:id", getUser)
-
-// gRPC service
-func (s *UserService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
-    pctx := grpcAdapter.ToContext(req)
-    getUser(pctx)
-    return grpcAdapter.FromContext(pctx)
-}
-```
-
-### 2. Protocol Migration
-
-Gradually migrate from REST to gRPC:
-
-```go
-// Same handler for both
-handler := func(ctx *plumego.Context) {
-    // Business logic
-}
-
-// REST (legacy)
-app.GetCtx("/api/users", handler)
-
-// gRPC (new)
-grpcService.GetUsers = grpcAdapter.Wrap(handler)
-```
-
----
-
-**Next**: [HTTP Adapter](http-adapter.md) | [gRPC/GraphQL](grpc-graphql.md)
+`middleware/protocol` emits structured transport errors when transform/execute/encode fails.
+Keep adapter errors explicit and avoid leaking backend internals.

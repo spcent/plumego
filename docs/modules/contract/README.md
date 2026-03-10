@@ -28,7 +28,7 @@
 
 ## 与根包关系
 
-`plumego.Context` 是 `contract.Ctx` 的别名，`app.GetCtx(...)` 最终会走 `contract.AdaptCtxHandler`。
+`plumego.Context` 是 `contract.Ctx` 的别名。当前 v1 推荐保持标准 `net/http` handler 形态，并通过 `contract.AdaptCtxHandler(...)` 显式适配 `Ctx` 处理器。
 
 ## 相关文档
 

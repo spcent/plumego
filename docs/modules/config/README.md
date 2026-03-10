@@ -50,10 +50,13 @@ import (
 func main() {
     cfg := config.Load()
 
-    app := core.New(
+    opts := []core.Option{
         core.WithAddr(cfg.Get("APP_ADDR", ":8080")),
-        core.WithDebug(cfg.GetBool("APP_DEBUG", false)),
-    )
+    }
+    if cfg.GetBool("APP_DEBUG", false) {
+        opts = append(opts, core.WithDebug())
+    }
+    app := core.New(opts...)
 
     app.Boot()
 }
@@ -145,17 +148,21 @@ APP_ENABLE_HTTP2=true
 ```go
 cfg := config.Load()
 
-app := core.New(
+opts := []core.Option{
     core.WithAddr(cfg.Get("APP_ADDR", ":8080")),
     core.WithServerTimeouts(
-        cfg.GetDuration("APP_READ_TIMEOUT", 30*time.Second),
-        cfg.GetDuration("APP_WRITE_TIMEOUT", 30*time.Second),
-        cfg.GetDuration("APP_IDLE_TIMEOUT", 60*time.Second),
-        cfg.GetDuration("APP_SHUTDOWN_TIMEOUT", 5*time.Second),
+        cfg.GetDuration("APP_READ_TIMEOUT_MS", 30*time.Second),
+        cfg.GetDuration("APP_READ_HEADER_TIMEOUT_MS", 5*time.Second),
+        cfg.GetDuration("APP_WRITE_TIMEOUT_MS", 30*time.Second),
+        cfg.GetDuration("APP_IDLE_TIMEOUT_MS", 60*time.Second),
     ),
-    core.WithMaxBodyBytes(cfg.GetInt64("APP_MAX_BODY_BYTES", 10<<20)),
-    core.WithDebug(cfg.GetBool("APP_DEBUG", false)),
-)
+    core.WithShutdownTimeout(cfg.GetDuration("APP_SHUTDOWN_TIMEOUT_MS", 5*time.Second)),
+}
+if cfg.GetBool("APP_DEBUG", false) {
+    opts = append(opts, core.WithDebug())
+}
+
+app := core.New(opts...)
 ```
 
 ---
@@ -293,10 +300,13 @@ func main() {
     cfg := config.Load()
 
     // Create app with config
-    app := core.New(
+    opts := []core.Option{
         core.WithAddr(cfg.Get("APP_ADDR", ":8080")),
-        core.WithDebug(cfg.GetBool("APP_DEBUG", false)),
-    )
+    }
+    if cfg.GetBool("APP_DEBUG", false) {
+        opts = append(opts, core.WithDebug())
+    }
+    app := core.New(opts...)
 
     // Routes
     app.Get("/", homeHandler)
@@ -376,10 +386,13 @@ func main() {
         cfg = config.Load() // .env
     }
 
-    app := core.New(
+    opts := []core.Option{
         core.WithAddr(cfg.Get("APP_ADDR", ":8080")),
-        core.WithDebug(cfg.GetBool("APP_DEBUG", false)),
-    )
+    }
+    if cfg.GetBool("APP_DEBUG", false) {
+        opts = append(opts, core.WithDebug())
+    }
+    app := core.New(opts...)
 
     app.Boot()
 }

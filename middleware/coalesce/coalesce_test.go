@@ -276,7 +276,7 @@ func TestCoalesce_Stats(t *testing.T) {
 
 func TestCoalesce_OnCoalescedCallback(t *testing.T) {
 	coalescedCount := int32(0)
-	var coalescedKey string
+	var coalescedKey atomic.Value
 
 	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(50 * time.Millisecond)
@@ -286,7 +286,7 @@ func TestCoalesce_OnCoalescedCallback(t *testing.T) {
 	middleware := Middleware(Config{
 		OnCoalesced: func(key string, count int) {
 			atomic.AddInt32(&coalescedCount, 1)
-			coalescedKey = key
+			coalescedKey.Store(key)
 		},
 	})
 	handler := middleware(backend)
@@ -312,7 +312,8 @@ func TestCoalesce_OnCoalescedCallback(t *testing.T) {
 		t.Errorf("Expected OnCoalesced to be called twice, got %d", count)
 	}
 
-	if coalescedKey == "" {
+	key, _ := coalescedKey.Load().(string)
+	if key == "" {
 		t.Error("Expected coalescedKey to be set")
 	}
 }
@@ -356,7 +357,7 @@ func TestCoalesce_ResponseStatusCodes(t *testing.T) {
 			handler := middleware(backend)
 
 			var wg sync.WaitGroup
-			var responses []*httptest.ResponseRecorder
+			responses := make(chan *httptest.ResponseRecorder, 2)
 
 			wg.Add(2)
 
@@ -367,14 +368,15 @@ func TestCoalesce_ResponseStatusCodes(t *testing.T) {
 					req := httptest.NewRequest("GET", "/test", nil)
 					w := httptest.NewRecorder()
 					handler.ServeHTTP(w, req)
-					responses = append(responses, w)
+					responses <- w
 				}()
 			}
 
 			wg.Wait()
+			close(responses)
 
 			// Both should receive the same status code
-			for _, resp := range responses {
+			for resp := range responses {
 				if resp.Code != tt.statusCode {
 					t.Errorf("Expected status %d, got %d", tt.statusCode, resp.Code)
 				}

@@ -200,7 +200,8 @@ func callAI(ctx context.Context, req *provider.CompletionRequest) (*provider.Com
 
 ```go
 // Global timeout for all AI requests
-app.Use("/api/ai", middleware.Timeout(60*time.Second))
+ai := app.Router().Group("/api/ai")
+ai.Use(timeout.Timeout(60 * time.Second))
 
 // Per-model timeouts
 timeouts := map[string]time.Duration{

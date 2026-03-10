@@ -1,145 +1,52 @@
-# HTTP Adapter
+# HTTP Adapter Pattern
 
-> **Package**: `github.com/spcent/plumego`
+This page shows how protocol adapters work at the HTTP boundary.
 
-The HTTP adapter is the default protocol for Plumego and requires no explicit configuration.
-
----
-
-## Overview
-
-HTTP is the native protocol for Plumego. All features work out-of-the-box:
-
-- ✅ Standard `http.Handler` interface
-- ✅ Context-aware handlers
-- ✅ All HTTP methods (GET, POST, PUT, DELETE, etc.)
-- ✅ Path parameters and query strings
-- ✅ Request/response helpers
-- ✅ Middleware support
-
----
-
-## Handler Types
-
-### 1. Standard Library Handler
+## Minimal Adapter Skeleton
 
 ```go
-app.Get("/users", func(w http.ResponseWriter, r *http.Request) {
-    json.NewEncoder(w).Encode(users)
-})
-```
+type MyAdapter struct{}
 
-### 2. Context-Aware Handler
+func (a *MyAdapter) Name() string { return "my-protocol" }
 
-```go
-app.GetCtx("/users", func(ctx *plumego.Context) {
-    ctx.JSON(200, users)
-})
-```
-
-### 3. http.Handler Interface
-
-```go
-type UserHandler struct {}
-
-func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    // Handle request
+func (a *MyAdapter) Handles(req *protocol.HTTPRequest) bool {
+    return strings.HasPrefix(req.URL, "/rpc")
 }
 
-app.Get("/users", &UserHandler{})
+func (a *MyAdapter) Transform(ctx context.Context, req *protocol.HTTPRequest) (protocol.Request, error) {
+    // parse HTTP request -> protocol request
+    return myRequest{...}, nil
+}
+
+func (a *MyAdapter) Execute(ctx context.Context, req protocol.Request) (protocol.Response, error) {
+    // call backend
+    return myResponse{...}, nil
+}
+
+func (a *MyAdapter) Encode(ctx context.Context, resp protocol.Response, w protocol.ResponseWriter) error {
+    w.WriteHeader(resp.StatusCode())
+    _, err := io.Copy(responseBodyWriter{w}, resp.Body())
+    return err
+}
 ```
 
----
-
-## Request Handling
-
-### Path Parameters
+## Register Adapter
 
 ```go
-app.GetCtx("/users/:id", func(ctx *plumego.Context) {
-    id := ctx.Param("id")
-    ctx.JSON(200, getUser(id))
-})
+registry := protocol.NewRegistry()
+registry.Register(&MyAdapter{})
+
+if err := app.Use(protomw.Middleware(registry)); err != nil {
+    log.Fatal(err)
+}
 ```
 
-### Query Parameters
+## Pass-through Behavior
 
-```go
-app.GetCtx("/search", func(ctx *plumego.Context) {
-    q := ctx.Query("q")
-    page := ctx.QueryInt("page", 1)
-    ctx.JSON(200, search(q, page))
-})
-```
+If no adapter handles a request, middleware forwards request to the next HTTP handler in chain.
 
-### Headers
+## Recommended Boundaries
 
-```go
-app.GetCtx("/api/users", func(ctx *plumego.Context) {
-    token := ctx.GetHeader("Authorization")
-    ctx.JSON(200, users)
-})
-```
-
-### Body
-
-```go
-app.PostCtx("/users", func(ctx *plumego.Context) {
-    var user User
-    if err := ctx.Bind(&user); err != nil {
-        ctx.Error(400, err.Error())
-        return
-    }
-    ctx.JSON(201, createUser(user))
-})
-```
-
----
-
-## Response Handling
-
-### JSON
-
-```go
-ctx.JSON(200, data)
-```
-
-### XML
-
-```go
-ctx.XML(200, data)
-```
-
-### Plain Text
-
-```go
-ctx.String(200, "Hello World")
-```
-
-### HTML
-
-```go
-ctx.HTML(200, "<h1>Hello</h1>")
-```
-
-### File
-
-```go
-ctx.File("path/to/file.pdf")
-```
-
-### Stream
-
-```go
-ctx.Stream(200, "text/event-stream", eventStream)
-```
-
----
-
-## Examples
-
-See [Context](../context.md), [Request](../request.md), and [Response](../response.md) documentation for complete HTTP adapter usage.
-
----
-
-**Next**: [gRPC/GraphQL Adapters](grpc-graphql.md)
+- Keep transport concerns (headers/body/status mapping) in adapter.
+- Keep business logic in service layer, not adapter.
+- Return deterministic errors; avoid panic paths.

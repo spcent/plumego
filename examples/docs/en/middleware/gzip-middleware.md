@@ -94,7 +94,7 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 ## Configuration
 
 ```go
-cfg := GzipConfig{
+cfg := compression.GzipConfig{
     MaxBufferBytes: 10 << 20, // 10MB default
 }
 ```
@@ -109,20 +109,20 @@ cfg := GzipConfig{
 
 ### Standard Web Application
 ```go
-core.Use(middleware.Gzip())
+app.Use(compression.Gzip())
 // Compresses text responses, skips images/videos
 ```
 
 ### API Server
 ```go
-core.Use(middleware.GzipWithConfig(GzipConfig{
+app.Use(compression.GzipWithConfig(compression.GzipConfig{
     MaxBufferBytes: 50 << 20, // 50MB for large API responses
 }))
 ```
 
 ### File Server
 ```go
-core.Use(middleware.GzipWithConfig(GzipConfig{
+app.Use(compression.GzipWithConfig(compression.GzipConfig{
     MaxBufferBytes: 5 << 20, // 5MB, skip very large files
 }))
 ```
@@ -186,13 +186,13 @@ Key test cases:
 ### Before
 ```go
 // Always compressed everything
-core.Use(middleware.Gzip())
+app.Use(compression.Gzip())
 ```
 
 ### After
 ```go
 // Intelligent compression
-core.Use(middleware.Gzip())
+app.Use(compression.Gzip())
 // Same API, smarter behavior
 ```
 

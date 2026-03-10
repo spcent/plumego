@@ -294,15 +294,15 @@ curl "http://localhost:8080/users?search=example.com"
 
 ```go
 // 批量创建
-r.PostCtx("/users/batch", ctrl.BatchCreateCtx)
+r.Post("/users/batch", contract.AdaptCtxHandler(ctrl.BatchCreateCtx, r.Logger()))
 
 // 批量删除
-r.DeleteCtx("/users/batch", ctrl.BatchDeleteCtx)
+r.Delete("/users/batch", contract.AdaptCtxHandler(ctrl.BatchDeleteCtx, r.Logger()))
 
 // 自定义端点
-r.GetCtx("/users/active", func(ctx *contract.Ctx) {
+r.Get("/users/active", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
     // 使用 repository 的自定义方法
-})
+}, r.Logger()))
 ```
 
 ### 添加验证

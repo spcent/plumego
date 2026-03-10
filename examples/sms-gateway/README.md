@@ -42,7 +42,10 @@ routePolicyCache := plumego.NewInMemoryRoutePolicyCache(1000, 5*time.Minute)
 routePolicyProvider := plumego.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
 router := &routing.PolicyRouter{Provider: routePolicyProvider}
 
-app.PostCtx("/v1/messages", message.ExampleSendHandler(idem, repo, router, queue))
+app.Post("/v1/messages", contract.AdaptCtxHandler(
+    message.ExampleSendHandler(idem, repo, router, queue),
+    app.Logger(),
+).ServeHTTP)
 ```
 
 ## End-to-End Demo

@@ -170,9 +170,13 @@ README 给了两套最小示例：
 app := core.New(
     core.WithAddr(":8080"),
     core.WithDebug(),
-    core.WithRecovery(),
-    core.WithLogging(),
-    core.WithCORS(),
+)
+
+_ = app.Use(
+    observability.RequestID(),
+    observability.Logging(app.Logger(), nil, nil),
+    recovery.RecoveryMiddleware,
+    cors.CORS,
 )
 app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
     w.Write([]byte("pong"))
@@ -188,8 +192,8 @@ if err := app.Boot(); err != nil {
 ```go
 app := plumego.New()
 
-app.GetCtx("/health", func(ctx *plumego.Context) {
-    _ = ctx.Response(http.StatusOK, map[string]string{"status": "ok"}, nil)
+app.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+    _, _ = w.Write([]byte(`{"status":"ok"}`))
 })
 
 log.Println("server started at :8080")

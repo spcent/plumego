@@ -1,75 +1,65 @@
 # Router module
 
-The **router** package provides trie-based matching with groups, parameters, and middleware inheritance while staying compatible with standard `http.Handler` interfaces.
+The `router` package provides trie-based matching with groups, path parameters, wildcard routes, and reverse routing while staying compatible with standard `http.Handler`.
 
-## Handler shapes
-- Standard handlers: `Get`, `Post`, `Put`, `Patch`, `Delete`, `Options`, `Head`, `Any` accept `http.Handler` values.
-- Function helpers: `GetFunc`/`PostFunc`/etc accept `http.HandlerFunc`.
-- Context-aware handlers: `GetCtx`/`PostCtx`/etc accept `contract.CtxHandlerFunc` where path params and request metadata are already parsed.
+## Handler shape
+Use standard handlers:
+
+- `Get`, `Post`, `Put`, `Patch`, `Delete`, `Options`, `Head`, `Any`
+- Signature: `http.Handler` (or `http.HandlerFunc`)
+
+Read path params via `contract.Param(r, "id")`.
 
 ## Path patterns
 - Static: `/docs/index.html`
 - Parameters: `/users/:id`, `/teams/:teamID/members/:id`
-- Wildcards: `/*filepath` (capture the remainder for static assets or docs)
+- Wildcards: `/*filepath`
 
 ## Grouping and middleware order
-Middleware runs **global → group → route-specific**.
+Middleware order is explicit: `global router.Use(...) -> group.Use(...) -> route`.
 
 ```go
-api := app.Router().Group("/api", middleware.SimpleAuth("token"))
-api.Use(middleware.Timeout(2 * time.Second))
+r := app.Router()
+r.Use(observability.RequestID())
 
-api.GetCtx("/users/:id", func(ctx *contract.Ctx) {
-    id := ctx.Param("id")
-    ctx.Text(http.StatusOK, "user="+id)
-})
+api := r.Group("/api")
+api.Use(auth.SimpleAuth(os.Getenv("AUTH_TOKEN")))
+api.Use(timeout.Timeout(2 * time.Second))
 
-// Nested groups inherit middleware and prefixes.
-v1 := api.Group("/v1")
-v1.Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("pong")) })
+api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+    id, _ := contract.Param(req, "id")
+    _, _ = w.Write([]byte("user=" + id))
+}))
 ```
 
-Register everything before `app.Boot()`; the router is frozen during boot to prevent missing registrations.
+Register routes before `app.Boot()`; boot freezes route registration.
 
-## Method not allowed handling
-By default, method mismatches return `404`. Enable `405` with:
+## Reverse routing
+Assign route names and generate URLs safely:
 
 ```go
-r := router.NewRouter(router.WithMethodNotAllowed(true))
+if err := r.AddRouteWithOptions(router.GET, "/users/:id", http.HandlerFunc(showUser),
+    router.WithRouteName("users.show"),
+); err != nil {
+    log.Fatal(err)
+}
+
+u, err := r.URL("users.show", map[string]string{"id": "42"})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(u.String()) // /users/42
 ```
 
-When enabled, the router returns `405` and sets the `Allow` header when another method matches the path.
-
-## Static frontends and catch-alls
-Mount static assets under their own group so cache headers or auth can be isolated.
+## Method-not-allowed behavior
+Enable 405 responses for method mismatch:
 
 ```go
-assets := app.Router().Group("/docs")
-assets.Get("/*filepath", func(w http.ResponseWriter, r *http.Request) {
-    http.ServeFileFS(w, r, os.DirFS("./examples/docs"), path.Clean(r.URL.Path))
-})
+app := core.New(core.WithMethodNotAllowed(true))
 ```
 
-For embedded bundles, use the helpers in `frontend`:
-
-```go
-// Mount an embedded SPA or docs site at "/".
-_ = frontend.RegisterFS(
-    app.Router(),
-    http.FS(staticFS),
-    frontend.WithPrefix("/"),
-    frontend.WithCacheControl("public, max-age=31536000"),
-    frontend.WithIndexCacheControl("no-cache"),
-    frontend.WithFallback(true),
-)
-```
-
-## Debugging tools
-- Enable `core.WithDebug()` to log every method/path pair during boot.
-- Dump the routing table from `router.Routes()` in a development-only endpoint when diagnosing conflicts.
-- Late registrations that panic during boot are expected; fix initialization order instead of deferring registration.
-
-## Where to look in the repo
-- `router/router.go`: trie matching, groups, and handler helpers.
-- `frontend/frontend.go`: helpers for mounting static directories or embedded frontend bundles.
-- `examples/reference/main.go`: real wiring of API, metrics, health, docs, and frontend routes.
+## Where to look in repo
+- `router/registration.go`: route/group registration and validation.
+- `router/dispatch.go`: match and dispatch path.
+- `router/metadata.go`: route meta and reverse routing.
+- `router/reverse_routing_group_test.go`: group + reverse-routing boundary tests.

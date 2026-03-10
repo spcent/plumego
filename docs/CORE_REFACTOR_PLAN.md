@@ -1,5 +1,9 @@
 # Core Package Refactoring Plan
 
+> Historical document (superseded).  
+> This refactor plan is archived and is **not** the canonical v1 guidance as of March 10, 2026.  
+> Use `docs/other/V1_CORE_API_FREEZE.md` and `docs/CANONICAL_STYLE_GUIDE.md` as the source of truth.
+
 > Authority: `docs/CANONICAL_STYLE_GUIDE.md`
 > Scope: `core/` package and its sub-packages
 > Compatibility: Not required — clean break, follow best practices

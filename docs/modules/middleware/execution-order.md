@@ -110,7 +110,8 @@ app.Use(requestIDMiddleware)
 app.Use(loggingMiddleware)
 
 // Group middleware
-api := app.Group("/api",
+api := app.Router().Group("/api")
+api.Use(
     authMiddleware,      // Group-specific
     rateLimitMiddleware,
 )

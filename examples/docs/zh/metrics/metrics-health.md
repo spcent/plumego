@@ -1,63 +1,51 @@
 # Metrics 与 Health 模块
 
-Plumego 自带 Prometheus / OpenTelemetry 适配器和轻量健康探针，免去额外样板代码。
+Plumego 提供 Prometheus / OpenTelemetry 适配器以及可直接挂载的健康检查端点。
 
 ## 指标与追踪
-- **Prometheus**：`metrics.NewPrometheusCollector(namespace)` 实现 `middleware.MetricsCollector`，通过 `app.GetHandler("/metrics", prom.Handler())` 暴露。
-- **OpenTelemetry**：`metrics.NewOpenTelemetryTracer(serviceName)` 实现 `middleware.Tracer`，由日志中间件自动产生日志与 span。
-- 通过 `core.WithMetricsCollector`、`core.WithTracer` 注入后，日志中间件会自动记录耗时、状态码与 TraceID。
+- `metrics.NewPrometheusCollector(namespace)` 提供 Prometheus 采集器与 `prom.Handler()`。
+- `metrics.NewOpenTelemetryTracer(serviceName)` 提供与可观测性中间件兼容的 tracer。
+- 通过 `core.WithMetricsCollector(...)` 与 `core.WithTracer(...)` 注入。
 
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
 tracer := metrics.NewOpenTelemetryTracer("my-service")
-app := core.New(core.WithMetricsCollector(prom), core.WithTracer(tracer), core.WithLogging())
-app.GetHandler("/metrics", prom.Handler())
+
+app := core.New(
+    core.WithMetricsCollector(prom),
+    core.WithTracer(tracer),
+)
+
+if err := app.Use(
+    observability.RequestID(),
+    observability.Logging(app.Logger(), prom, tracer),
+); err != nil {
+    log.Fatal(err)
+}
+
+app.Get("/metrics", prom.Handler().ServeHTTP)
 ```
 
 ## 健康端点
-提供开箱即用的处理器：
-
 ```go
-app.GetHandler("/health/ready", health.ReadinessHandler())
-app.GetHandler("/health/build", health.BuildInfoHandler())
+app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 
-- `ReadinessHandler` 在启动完成后返回 200，启动/关闭阶段返回 503。
-- `BuildInfoHandler` 以 JSON 形式暴露 `health.BuildInfo`（版本、提交、构建时间）；可通过 ldflags 注入。
-- 错误响应使用 contract 统一错误结构（`contract.APIError`），并在可用时包含 `trace_id`。
-
-## 健康指标
-为 `HealthManager` 绑定指标采集器后，可输出结构化健康指标：
-
-```go
-manager, _ := health.NewHealthManager(health.HealthCheckConfig{})
-collector := health.NewMetricsCollector(manager) // 自动绑定
-app.GetHandler("/health/metrics", health.MetricsHandler(collector))
-```
-
-- 若采集器与管理器分开创建，可调用 `health.AttachMetrics(manager, collector)` 手动绑定。
-- `HealthMetrics` 会输出 `check_count`、`success_count`、`failure_count` 以及按组件拆分的指标。
+- `ReadinessHandler`：ready 后返回 `200`，启动/关闭过程中返回 `503`。
+- `BuildInfoHandler`：返回构建信息 JSON（`version`、`commit`、`build_time`）。
 
 ## 组件健康上报
-组件可报告结构化健康状态，便于就绪决策与看板展示：
-
 ```go
 func (w *worker) Health() (string, health.HealthStatus) {
     if w.backlog.Load() > 1000 {
-        return "worker", health.Degraded
+        return "worker", health.HealthStatus{Status: health.StatusDegraded, Message: "backlog high"}
     }
-    return "worker", health.Healthy
+    return "worker", health.HealthStatus{Status: health.StatusHealthy}
 }
 ```
 
-`HealthStatus` 具备类型安全（`Healthy`、`Degraded`、`Unhealthy`），方便聚合各组件状态。
-
-## 运维提示
-- 若 `/metrics` 需要认证或只在内网暴露，可配合中间件或独立监听路径；处理器本身是标准 `http.Handler`。
-- 保持就绪检查轻量，避免下游调用或大规模分配。
-- 日志中间件与 Prometheus/OTel 采集器组合使用，可为每个请求自动关联指标与 TraceID。
-
-## 代码位置
-- `metrics/prometheus.go` 与 `metrics/otel.go`：指标采集器与追踪适配器。
-- `health/health.go`：就绪标记与状态类型；`health/http.go` 提供 HTTP 处理器。
-- `examples/reference/main.go`：在真实应用中挂载 `/metrics`、`/health/ready`、`/health/build` 的示例。
+## 运维建议
+- 就绪检查保持轻量、确定性强。
+- `/metrics` 按部署要求放在内网或鉴权后路径。
+- 建议日志 + 指标 + 追踪联合启用，便于请求级关联排障。

@@ -122,12 +122,12 @@ cfg := config.Load()
 app := core.New(
     core.WithAddr(cfg.Get("APP_ADDR", ":8080")),
     core.WithServerTimeouts(
-        cfg.GetDuration("APP_READ_TIMEOUT", 30*time.Second),
-        cfg.GetDuration("APP_WRITE_TIMEOUT", 30*time.Second),
-        cfg.GetDuration("APP_IDLE_TIMEOUT", 60*time.Second),
-        cfg.GetDuration("APP_SHUTDOWN_TIMEOUT", 5*time.Second),
+        cfg.GetDuration("APP_READ_TIMEOUT_MS", 30*time.Second),
+        cfg.GetDuration("APP_READ_HEADER_TIMEOUT_MS", 5*time.Second),
+        cfg.GetDuration("APP_WRITE_TIMEOUT_MS", 30*time.Second),
+        cfg.GetDuration("APP_IDLE_TIMEOUT_MS", 60*time.Second),
     ),
-    core.WithMaxBodyBytes(cfg.GetInt64("APP_MAX_BODY_BYTES", 10<<20)),
+    core.WithShutdownTimeout(cfg.GetDuration("APP_SHUTDOWN_TIMEOUT_MS", 5*time.Second)),
 )
 ```
 

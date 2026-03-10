@@ -122,8 +122,8 @@ func (s *MemoryVectorStore) Add(ctx context.Context, entry *VectorEntry) error {
 
 // Search implements VectorStore using linear scan with cosine similarity.
 func (s *MemoryVectorStore) Search(ctx context.Context, query *Embedding, topK int, threshold float64) ([]*SimilarityResult, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	s.stats.TotalSearches++
 
@@ -169,6 +169,19 @@ func (s *MemoryVectorStore) Search(ctx context.Context, query *Embedding, topK i
 	}
 
 	return results, nil
+}
+
+// MarkUsed updates access metadata for an existing entry.
+func (s *MemoryVectorStore) MarkUsed(hash string, now time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entry, ok := s.entries[hash]
+	if !ok || entry == nil {
+		return
+	}
+	entry.LastUsed = now
+	entry.HitCount++
 }
 
 // Delete implements VectorStore.
@@ -334,9 +347,10 @@ func (c *SemanticCache) Get(ctx context.Context, req *provider.CompletionRequest
 	bestMatch := results[0]
 	c.incrementHits(bestMatch.Similarity)
 
-	// Update usage stats
-	bestMatch.Entry.LastUsed = time.Now()
-	bestMatch.Entry.HitCount++
+	// Update usage stats when using the in-memory store.
+	if store, ok := c.vectorStore.(*MemoryVectorStore); ok && bestMatch.Entry != nil && bestMatch.Entry.Embedding != nil {
+		store.MarkUsed(bestMatch.Entry.Embedding.Hash, time.Now())
+	}
 
 	return bestMatch.Entry.CacheEntry.Response, bestMatch.Similarity, nil
 }

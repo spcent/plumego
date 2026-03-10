@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/middleware/circuitbreaker"
 	"github.com/spcent/plumego/middleware/observability"
-	"github.com/spcent/plumego/middleware/proxy"
 	"github.com/spcent/plumego/middleware/recovery"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	gateway "github.com/spcent/plumego/net/gateway"

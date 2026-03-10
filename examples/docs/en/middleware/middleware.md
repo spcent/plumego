@@ -1,88 +1,66 @@
 # Middleware module
 
-Plumego’s middleware wraps standard `http.Handler` values. Chain them globally with `app.Use(...)`, per group via `Group("/x", m1, m2)`, or per route using handler wrappers.
+Plumego middleware is standard-library compatible (`func(http.Handler) http.Handler`).
+Register globally with `app.Use(...)`, or scope to a router group via `group.Use(...)`.
 
-## Built-in middleware
-- **Recovery**: `core.WithRecovery()` catches panics, logs stack traces, returns JSON errors.
-- **Logging**: `core.WithLogging()` records request/response metadata and plugs into metrics/tracing collectors provided through `core.WithMetricsCollector` and `core.WithTracer`.
-- **Request ID**: `middleware.RequestID()` injects `X-Request-ID` and stores it in context for correlation.
-- **CORS**: `core.WithCORS()` sets permissive defaults; customize with `core.WithCORSOptions(...)` or `middleware.CORSWithOptions(...)` (use `CORSWithOptionsFunc` for `http.HandlerFunc` return).
-- **Gzip**: `middleware.Gzip()` compresses responses when clients send `Accept-Encoding: gzip`.
-- **Timeout**: `middleware.Timeout(duration)` enforces per-request deadlines.
-- **Body limit**: `middleware.BodyLimit(maxBytes, logger)` caps request size with a structured 413 response.
-- **Concurrency limit**: `middleware.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)` bounds parallel work and queueing.
-- **Rate limit**: `middleware.RateLimit(ratePerSecond, burst, cleanupInterval, maxIdle)` applies an IP-based token bucket.
-- **Auth helpers**: `middleware.SimpleAuth("token")` checks a bearer token header; `middleware.APIKey("X-API-Key", "secret")` validates custom headers.
-- **Bind/Validate**: `bind.BindJSON[T](...)` standardizes request binding, validation, and field-level error responses.
+## Common built-in middleware
+- Request ID: `observability.RequestID()`
+- Structured logging: `observability.Logging(app.Logger(), metricsCollector, tracer)`
+- Panic recovery: `recovery.RecoveryMiddleware`
+- CORS: `cors.CORS` / `cors.CORSWithOptions(...)`
+- Gzip compression: `compression.Gzip()`
+- Timeout: `timeout.Timeout(duration)`
+- Body limit: `limits.BodyLimit(maxBytes, logger)`
+- Concurrency limit: `limits.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)`
+- Auth helpers: `auth.SimpleAuth(token)`
+- Security headers: `security.SecurityHeaders(nil)`
+- Abuse guard / token bucket: `ratelimit.AbuseGuard(...)`, `ratelimit.TokenBucket(...)`
 
-Core wires protective defaults (body/concurrency limits) during setup. Call `app.Use(...)` for additional per-app chains; group-level middleware stacks are appended automatically.
-
-## Composition examples
-### Global guardrail chain
+## Global chain example
 ```go
-app := core.New(core.WithRecovery(), core.WithLogging())
-app.Use(
-    middleware.Gzip(),
-    middleware.Timeout(3*time.Second),
-    middleware.ConcurrencyLimit(200, 400, 250*time.Millisecond, logger),
-)
+app := core.New(core.WithAddr(":8080"))
+
+if err := app.Use(
+    observability.RequestID(),
+    observability.Logging(app.Logger(), nil, nil),
+    recovery.RecoveryMiddleware,
+    cors.CORS,
+    compression.Gzip(),
+    timeout.Timeout(3*time.Second),
+    limits.ConcurrencyLimit(200, 400, 250*time.Millisecond, app.Logger()),
+); err != nil {
+    log.Fatal(err)
+}
 ```
 
-### Route-specific controls
+## Group-scoped controls
 ```go
-secured := app.Router().Group("/admin", middleware.SimpleAuth(os.Getenv("AUTH_TOKEN")))
-secured.Get("/stats", middleware.TimeoutFunc(1*time.Second)(func(w http.ResponseWriter, r *http.Request) {
+api := app.Router().Group("/api")
+api.Use(auth.SimpleAuth(os.Getenv("AUTH_TOKEN")))
+api.Use(timeout.Timeout(2 * time.Second))
+
+api.Get("/stats", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
     w.Write([]byte("ok"))
 }))
 ```
 
-### Using `contract.Ctx` helpers
+## Context binding/validation with canonical adapter
 ```go
-app.GetCtx("/echo/:msg", middleware.WrapCtx(middleware.Timeout(2*time.Second), func(ctx *contract.Ctx) {
-    _ = ctx.Response(http.StatusOK, map[string]any{"echo": ctx.Param("msg")}, nil)
-}))
-```
-
-### Binding + validation
-```go
-type CreateUserRequest struct {
-    Email    string `json:"email" validate:"required,email"`
-    Password string `json:"password" validate:"required" mask:"true"`
-}
-
-app.Post("/v1/users",
-    bind.BindJSON[CreateUserRequest](bind.JSONOptions{}),
-    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        payload, _ := bind.FromRequest[CreateUserRequest](r)
-        // use payload...
-        w.WriteHeader(http.StatusOK)
-    }),
-)
-```
-
-### Binding with `GetCtx`
-```go
-app.PostCtx("/v1/users", func(ctx *contract.Ctx) {
+app.Post("/v1/users", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
     var payload CreateUserRequest
     if err := ctx.BindAndValidateJSONWithOptions(&payload, contract.BindOptions{
         DisallowUnknownFields: true,
         Logger:                ctx.Logger,
-        Redact:                bind.DefaultRedactor().Redact,
     }); err != nil {
         contract.WriteBindError(ctx.W, ctx.R, err)
         return
     }
-    _ = ctx.Response(http.StatusOK, map[string]any{"ok": true}, nil)
-})
+
+    _ = ctx.Response(http.StatusCreated, map[string]any{"ok": true}, nil)
+}, app.Logger()).ServeHTTP)
 ```
 
-See `examples/bind-example/main.go` for a runnable end-to-end demo.
-
 ## Operational notes
-- Chain order matters: loggers should typically wrap recoveries so panics include request metadata.
-- Avoid global state in custom middleware; share dependencies through closures or application-scoped singletons.
-- When enabling CORS or auth per group, keep public assets in a dedicated group to avoid unintended headers or auth checks.
-
-## Where to look in the repo
-- `middleware/` directory for implementations (recovery, logging, gzip, CORS, timeout, body limit, rate limit, auth, concurrency control).
-- `examples/reference/main.go` for a realistic chain combining recovery, logging, CORS, and default safety limits.
+- Keep middleware order explicit and regression-tested.
+- Prefer constructor/closure injection for dependencies; avoid hidden global state.
+- Scope auth/security middleware per group when public and private routes differ.

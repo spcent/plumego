@@ -2,114 +2,38 @@
 
 > **Package**: `github.com/spcent/plumego/router`
 
-This document covers the fundamentals of route registration and HTTP method handling in Plumego.
-
----
-
-## Table of Contents
-
-- [HTTP Methods](#http-methods)
-- [Handler Types](#handler-types)
-- [Route Registration](#route-registration)
-- [Static Routes](#static-routes)
-- [Any Method](#any-method)
-- [Route Naming](#route-naming)
-- [Best Practices](#best-practices)
-
----
+This page covers canonical route registration for Plumego v1.
 
 ## HTTP Methods
 
-Plumego supports all standard HTTP methods:
+`core.App` convenience methods:
 
 ```go
-app.Get(path, handler)      // GET
-app.Post(path, handler)     // POST
-app.Put(path, handler)      // PUT
-app.Patch(path, handler)    // PATCH
-app.Delete(path, handler)   // DELETE
-app.Head(path, handler)     // HEAD
-app.Options(path, handler)  // OPTIONS
+app.Get(path, handlerFunc)    // GET
+app.Post(path, handlerFunc)   // POST
+app.Put(path, handlerFunc)    // PUT
+app.Patch(path, handlerFunc)  // PATCH
+app.Delete(path, handlerFunc) // DELETE
+app.Any(path, handlerFunc)    // ANY
 ```
 
-### Method Examples
+For `HEAD` and `OPTIONS`, register through `app.Router()`:
 
 ```go
-package main
-
-import (
-    "net/http"
-    "github.com/spcent/plumego/core"
-)
-
-func main() {
-    app := core.New()
-
-    // GET - Retrieve resources
-    app.Get("/users", listUsers)
-    app.Get("/users/:id", getUser)
-
-    // POST - Create resources
-    app.Post("/users", createUser)
-
-    // PUT - Update entire resource
-    app.Put("/users/:id", updateUser)
-
-    // PATCH - Partial update
-    app.Patch("/users/:id", patchUser)
-
-    // DELETE - Remove resources
-    app.Delete("/users/:id", deleteUser)
-
-    // HEAD - Headers only (like GET but no body)
-    app.Head("/users/:id", headUser)
-
-    // OPTIONS - Supported methods
-    app.Options("/users", optionsUsers)
-
-    app.Boot()
-}
+r := app.Router()
+r.Head("/users/:id", http.HandlerFunc(headUser))
+r.Options("/users", http.HandlerFunc(optionsUsers))
 ```
-
----
 
 ## Handler Types
 
-Plumego supports multiple handler signatures for flexibility.
-
-### 1. Standard Library Handler
+### Standard handler (preferred)
 
 ```go
 func(w http.ResponseWriter, r *http.Request)
 ```
 
-**Example**:
-```go
-app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusOK)
-    w.Write([]byte("pong"))
-})
-```
-
-**When to use**: Simple handlers, compatibility with standard library
-
-### 2. Compatibility Adapter Handler
-
-```go
-func(ctx *plumego.Context)
-```
-
-**Example**:
-```go
-app.GetCtx("/users/:id", func(ctx *plumego.Context) {
-    id := ctx.Param("id")
-    ctx.JSON(http.StatusOK, map[string]string{"id": id})
-})
-```
-
-**When to use**: Legacy code migration; prefer standard `net/http` handlers for new code.
-
-### 3. http.Handler Interface
+### `http.Handler`
 
 ```go
 type Handler interface {
@@ -117,551 +41,72 @@ type Handler interface {
 }
 ```
 
-**Example**:
+### `contract.Ctx` adapter (explicit)
+
 ```go
-type UserHandler struct {
-    db *sql.DB
-}
-
-func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    // Handle request
-}
-
-app.Get("/users", &UserHandler{db: db})
+app.Post("/users", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
+    _ = ctx.Response(http.StatusCreated, map[string]any{"ok": true}, nil)
+}, app.Logger()).ServeHTTP)
 ```
-
-**When to use**: Stateful handlers, dependency injection
-
----
 
 ## Route Registration
 
-### Direct Registration
-
 ```go
-app := core.New()
+app := core.New(core.WithAddr(":8080"))
 
-// GET route
-app.Get("/", homeHandler)
-
-// POST route
-app.Post("/users", createUserHandler)
-
-// Multiple routes for same path
 app.Get("/users", listUsers)
 app.Post("/users", createUser)
+app.Get("/users/:id", getUser)
 ```
 
-### Method Chaining
+Use one method+path registration per line to keep behavior explicit.
+
+## Groups and Middleware
 
 ```go
-// Not supported, use separate calls
-app.Get("/users", listUsers)
-app.Post("/users", createUser)
+r := app.Router()
+api := r.Group("/api")
+api.Use(observability.RequestID())
+api.Use(auth.SimpleAuth(os.Getenv("AUTH_TOKEN")))
+
+api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+    id, _ := contract.Param(req, "id")
+    _, _ = w.Write([]byte(id))
+}))
 ```
 
-### Via Router
+Execution order: parent `Use` -> child group `Use` -> route handler.
+
+## Static Files
+
+Register static serving through router helpers:
 
 ```go
-router := app.Router()
-
-router.Get("/users", listUsers)
-router.Post("/users", createUser)
+r := app.Router()
+r.Static("/assets", "./public")
+r.StaticFS("/docs", http.FS(embeddedDocsFS))
 ```
 
----
-
-## Static Routes
-
-Static routes have fixed paths without parameters.
-
-### Simple Static Routes
+## Reverse Routing
 
 ```go
-app.Get("/", homeHandler)
-app.Get("/about", aboutHandler)
-app.Get("/contact", contactHandler)
-```
+r := app.Router()
 
-### Nested Static Routes
-
-```go
-app.Get("/api/users", listUsers)
-app.Get("/api/products", listProducts)
-app.Get("/api/orders", listOrders)
-```
-
-### Static Files
-
-```go
-// Serve directory
-app.Static("/assets", "./public")
-
-// Serve embedded files
-//go:embed static/*
-var staticFS embed.FS
-
-app.StaticFS("/static", http.FS(staticFS))
-```
-
----
-
-## Any Method
-
-Handle any HTTP method with a single route.
-
-### Basic Usage
-
-```go
-app.Any("/webhook", func(w http.ResponseWriter, r *http.Request) {
-    method := r.Method
-    fmt.Fprintf(w, "Received %s request", method)
-})
-```
-
-### Method Switching
-
-```go
-app.Any("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-    switch r.Method {
-    case http.MethodGet:
-        getUser(w, r)
-    case http.MethodPut:
-        updateUser(w, r)
-    case http.MethodDelete:
-        deleteUser(w, r)
-    default:
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-    }
-})
-```
-
-### When to Use
-
-Use `Any` for:
-- Webhook endpoints that accept multiple methods
-- Dynamic method handling
-- Simplified route definitions
-
-**Warning**: Prefer specific methods (GET, POST, etc.) for clarity and RESTful design.
-
----
-
-## Route Naming
-
-Named routes enable reverse routing (URL generation).
-
-### Basic Naming
-
-```go
-// Register with name
-app.GetNamed("home", "/", homeHandler)
-app.GetNamed("user.show", "/users/:id", getUserHandler)
-app.PostNamed("user.create", "/users", createUserHandler)
-```
-
-### Generating URLs
-
-```go
-// Simple route
-url := app.Router().URL("home")
-// Result: /
-
-// Route with parameters
-url := app.Router().URL("user.show", map[string]string{
-    "id": "123",
-})
-// Result: /users/123
-```
-
-### Naming Conventions
-
-```go
-// Resource-based naming
-app.GetNamed("users.index", "/users", listUsers)
-app.GetNamed("users.show", "/users/:id", getUser)
-app.PostNamed("users.store", "/users", createUser)
-app.PutNamed("users.update", "/users/:id", updateUser)
-app.DeleteNamed("users.destroy", "/users/:id", deleteUser)
-
-// Dot notation for hierarchy
-app.GetNamed("api.v1.users.index", "/api/v1/users", listUsers)
-```
-
----
-
-## Complete Examples
-
-### REST API
-
-```go
-package main
-
-import (
-    "encoding/json"
-    "net/http"
-    "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego"
-)
-
-type User struct {
-    ID   string `json:"id"`
-    Name string `json:"name"`
+if err := r.AddRouteWithOptions(router.GET, "/users/:id", http.HandlerFunc(getUser),
+    router.WithRouteName("users.show"),
+); err != nil {
+    log.Fatal(err)
 }
 
-var users = []User{
-    {ID: "1", Name: "Alice"},
-    {ID: "2", Name: "Bob"},
+u, err := r.URL("users.show", map[string]string{"id": "42"})
+if err != nil {
+    log.Fatal(err)
 }
-
-func main() {
-    app := core.New()
-
-    // List all users
-    app.Get("/users", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(users)
-    })
-
-    // Get single user
-    app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-        id := plumego.Param(r, "id")
-
-        for _, user := range users {
-            if user.ID == id {
-                w.Header().Set("Content-Type", "application/json")
-                json.NewEncoder(w).Encode(user)
-                return
-            }
-        }
-
-        http.Error(w, "User not found", http.StatusNotFound)
-    })
-
-    // Create user
-    app.Post("/users", func(w http.ResponseWriter, r *http.Request) {
-        var user User
-        if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-            http.Error(w, err.Error(), http.StatusBadRequest)
-            return
-        }
-
-        users = append(users, user)
-
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusCreated)
-        json.NewEncoder(w).Encode(user)
-    })
-
-    // Update user
-    app.Put("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-        id := plumego.Param(r, "id")
-
-        var updatedUser User
-        if err := json.NewDecoder(r.Body).Decode(&updatedUser); err != nil {
-            http.Error(w, err.Error(), http.StatusBadRequest)
-            return
-        }
-
-        for i, user := range users {
-            if user.ID == id {
-                users[i] = updatedUser
-                w.Header().Set("Content-Type", "application/json")
-                json.NewEncoder(w).Encode(updatedUser)
-                return
-            }
-        }
-
-        http.Error(w, "User not found", http.StatusNotFound)
-    })
-
-    // Delete user
-    app.Delete("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-        id := plumego.Param(r, "id")
-
-        for i, user := range users {
-            if user.ID == id {
-                users = append(users[:i], users[i+1:]...)
-                w.WriteHeader(http.StatusNoContent)
-                return
-            }
-        }
-
-        http.Error(w, "User not found", http.StatusNotFound)
-    })
-
-    app.Boot()
-}
+_ = u // /users/42
 ```
-
-### With Standard Handlers
-
-```go
-package main
-
-import (
-    "encoding/json"
-    "fmt"
-    "net/http"
-
-    "github.com/spcent/plumego"
-    "github.com/spcent/plumego/core"
-)
-
-func main() {
-    app := core.New()
-
-    app.Get("/users", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(users)
-    })
-
-    app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-        id := plumego.Param(r, "id")
-
-        for _, user := range users {
-            if user.ID == id {
-                w.Header().Set("Content-Type", "application/json")
-                json.NewEncoder(w).Encode(user)
-                return
-            }
-        }
-
-        http.Error(w, "User not found", http.StatusNotFound)
-    })
-
-    app.Post("/users", func(w http.ResponseWriter, r *http.Request) {
-        var user User
-        if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-            http.Error(w, err.Error(), http.StatusBadRequest)
-            return
-        }
-
-        if user.ID == "" {
-            user.ID = fmt.Sprintf("%d", len(users)+1)
-        }
-
-        users = append(users, user)
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusCreated)
-        json.NewEncoder(w).Encode(user)
-    })
-
-    app.Boot()
-}
-```
-
-### Stateful Handlers
-
-```go
-package main
-
-import (
-    "database/sql"
-    "net/http"
-    "github.com/spcent/plumego/core"
-)
-
-type UserHandler struct {
-    db *sql.DB
-}
-
-func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
-    rows, err := h.db.Query("SELECT id, name FROM users")
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
-    defer rows.Close()
-
-    // Process rows...
-}
-
-func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-    // Insert into database...
-}
-
-func main() {
-    db, _ := sql.Open("postgres", "...")
-    handler := &UserHandler{db: db}
-
-    app := core.New()
-
-    app.Get("/users", handler.List)
-    app.Post("/users", handler.Create)
-
-    app.Boot()
-}
-```
-
----
 
 ## Best Practices
 
-### ✅ Do
-
-1. **Use Specific Methods**
-   ```go
-   // ✅ Clear and RESTful
-   app.Get("/users", listUsers)
-   app.Post("/users", createUser)
-   ```
-
-2. **Follow REST Conventions**
-   ```go
-   app.Get("/resources", list)        // List all
-   app.Get("/resources/:id", get)     // Get one
-   app.Post("/resources", create)     // Create
-   app.Put("/resources/:id", update)  // Update
-   app.Delete("/resources/:id", del)  // Delete
-   ```
-
-3. **Use Standard `net/http` Handlers Consistently**
-   ```go
-   app.Get("/api/users", func(w http.ResponseWriter, r *http.Request) {
-       w.Header().Set("Content-Type", "application/json")
-       json.NewEncoder(w).Encode(users)
-   })
-   ```
-
-4. **Name Important Routes**
-   ```go
-   app.GetNamed("user.profile", "/profile", profileHandler)
-   ```
-
-### ❌ Don't
-
-1. **Don't Overuse `Any`**
-   ```go
-   // ❌ Unclear intent
-   app.Any("/users", handler)
-
-   // ✅ Explicit methods
-   app.Get("/users", listUsers)
-   app.Post("/users", createUsers)
-   ```
-
-2. **Don't Mix Handler Types**
-   ```go
-   // ❌ Inconsistent
-   app.Get("/users", standardHandler)
-   app.Post("/products", createProductHandler)
-
-   // ✅ Consistent
-   app.Get("/users", handler1)
-   app.Get("/products", handler2)
-   ```
-
-3. **Don't Ignore Errors**
-   ```go
-   // ❌ No error handling
-   json.NewDecoder(r.Body).Decode(&user)
-
-   // ✅ Handle errors
-   if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-       http.Error(w, err.Error(), http.StatusBadRequest)
-       return
-   }
-   ```
-
----
-
-## Common Patterns
-
-### Health Check Endpoints
-
-```go
-app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusOK)
-    w.Write([]byte(`{"status":"ok"}`))
-})
-
-app.Get("/health/ready", readinessCheck)
-app.Get("/health/live", livenessCheck)
-```
-
-### Version Info
-
-```go
-app.Get("/version", func(w http.ResponseWriter, r *http.Request) {
-    json.NewEncoder(w).Encode(map[string]string{
-        "version": "1.0.0",
-        "build":   "abc123",
-    })
-})
-```
-
-### Redirects
-
-```go
-app.Get("/old-path", func(w http.ResponseWriter, r *http.Request) {
-    http.Redirect(w, r, "/new-path", http.StatusMovedPermanently)
-})
-```
-
-### Favicon
-
-```go
-app.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-    http.ServeFile(w, r, "./static/favicon.ico")
-})
-```
-
----
-
-## Testing Routes
-
-```go
-package main
-
-import (
-    "net/http"
-    "net/http/httptest"
-    "testing"
-    "github.com/spcent/plumego/core"
-)
-
-func TestRoutes(t *testing.T) {
-    app := core.New()
-    app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-        w.Write([]byte("pong"))
-    })
-
-    tests := []struct {
-        method string
-        path   string
-        want   int
-    }{
-        {"GET", "/ping", http.StatusOK},
-        {"GET", "/notfound", http.StatusNotFound},
-        {"POST", "/ping", http.StatusMethodNotAllowed},
-    }
-
-    for _, tt := range tests {
-        req := httptest.NewRequest(tt.method, tt.path, nil)
-        w := httptest.NewRecorder()
-
-        app.Router().ServeHTTP(w, req)
-
-        if w.Code != tt.want {
-            t.Errorf("%s %s: got %d, want %d", tt.method, tt.path, w.Code, tt.want)
-        }
-    }
-}
-```
-
----
-
-## Next Steps
-
-- **[Route Groups](route-groups.md)** - Organize routes with prefixes
-- **[Path Parameters](path-parameters.md)** - Extract URL parameters
-- **[Middleware Binding](middleware-binding.md)** - Add per-route middleware
-- **[Reverse Routing](reverse-routing.md)** - Generate URLs from routes
-
----
-
-**Related**:
-- [Router Overview](README.md)
-- [Core Module](../core/)
-- [Contract Module](../contract/)
+- Register routes/middleware before `app.Boot()`.
+- Prefer explicit route names for endpoints reused by links/redirects.
+- Keep handlers in `net/http` shape and adapt `contract.Ctx` only when needed.

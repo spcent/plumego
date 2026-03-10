@@ -651,8 +651,9 @@ func spaFallback(w http.ResponseWriter, r *http.Request) {
        ),
    )
 
-   // ✅ Use groups
-   group := app.Group("/api", middleware1, middleware2, middleware3, middleware4)
+   // ✅ Use groups + explicit middleware registration
+   group := app.Router().Group("/api")
+   group.Use(middleware1, middleware2, middleware3, middleware4)
    group.Get("/route", handler)
    ```
 

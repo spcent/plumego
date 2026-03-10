@@ -114,14 +114,14 @@ cfg := TimeoutConfig{
 ```go
 // Responses < 512KB are fully buffered
 // Timeout rollback works normally
-core.Use(middleware.Timeout(30 * time.Second))
+app.Use(timeout.Timeout(30 * time.Second))
 ```
 
 ### File Download (Large Responses)
 ```go
 // Responses ≥ 512KB bypass buffering
 // Minimal memory usage, no timeout rollback
-core.Use(middleware.TimeoutWithConfig(TimeoutConfig{
+app.Use(timeout.TimeoutWithConfig(timeout.TimeoutConfig{
     Timeout:            5 * time.Minute,
     StreamingThreshold: 2 << 20, // 2MB threshold for downloads
 }))
@@ -130,7 +130,7 @@ core.Use(middleware.TimeoutWithConfig(TimeoutConfig{
 ### Mixed Workload
 ```go
 // Small API responses + occasional large files
-core.Use(middleware.TimeoutWithConfig(TimeoutConfig{
+app.Use(timeout.TimeoutWithConfig(timeout.TimeoutConfig{
     Timeout:            30 * time.Second,
     MaxBufferBytes:     20 << 20,  // 20MB max
     StreamingThreshold: 1 << 20,   // 1MB threshold
@@ -142,13 +142,13 @@ core.Use(middleware.TimeoutWithConfig(TimeoutConfig{
 ### Before
 ```go
 // Old code - always buffers
-core.Use(middleware.Timeout(30 * time.Second))
+app.Use(timeout.Timeout(30 * time.Second))
 ```
 
 ### After
 ```go
 // New code - smart buffering
-core.Use(middleware.Timeout(30 * time.Second))
+app.Use(timeout.Timeout(30 * time.Second))
 // Same API, automatic optimization
 ```
 

@@ -1,286 +1,75 @@
-# Built-in Middleware Reference
+# Built-in Middleware
 
-> **Package**: `github.com/spcent/plumego/middleware/*`
+> **Package root**: `github.com/spcent/plumego/middleware`
 
-Complete reference for all 19 built-in middleware packages.
+This page lists canonical middleware in Plumego v1 and how to register them.
 
----
-
-## Authentication & Authorization
-
-### 1. Auth (`middleware/auth`)
-
-JWT and session authentication.
+## Registration Pattern
 
 ```go
-import "github.com/spcent/plumego/middleware/auth"
-
-app := core.New(
-    core.WithComponent(&auth.Component{
-        JWTSecret: os.Getenv("JWT_SECRET"),
-    }),
-)
-```
-
----
-
-## Request Processing
-
-> Policy: do not implement middleware that injects business DTOs into request context for regular HTTP handlers. Use explicit decode + validation in handlers.
-
-### Bind (`middleware/bind`) — compatibility only
-
-`middleware/bind` exists for compatibility scenarios. New HTTP handlers should decode JSON explicitly with `json.NewDecoder(r.Body).Decode(&req)`, validate near decode, and return errors through `contract.WriteError`.
-
-### 2. Limits (`middleware/limits`)
-
-Request size and duration limits.
-
-```go
-import "github.com/spcent/plumego/middleware/limits"
-
-app.Use(limits.New(limits.Config{
-    MaxBodySize:    10 << 20, // 10 MB
-    MaxHeaderSize:  1 << 20,  // 1 MB
-    RequestTimeout: 30 * time.Second,
-}))
-```
-
-### 3. Timeout (`middleware/timeout`)
-
-Request timeout handling.
-
-```go
-import "github.com/spcent/plumego/middleware/timeout"
-
-app.Use(timeout.New(30 * time.Second))
-```
-
----
-
-## Caching & Performance
-
-### 4. Cache (`middleware/cache`)
-
-HTTP caching with ETag and Cache-Control.
-
-```go
-import "github.com/spcent/plumego/middleware/cache"
-
-app.Use(cache.New(cache.Config{
-    TTL:          5 * time.Minute,
-    CacheControl: "public, max-age=300",
-}))
-```
-
-### 5. Coalesce (`middleware/coalesce`)
-
-Request coalescing/deduplication.
-
-```go
-import "github.com/spcent/plumego/middleware/coalesce"
-
-app.Use(coalesce.New())
-```
-
-### 6. Compression (`middleware/compression`)
-
-Response compression (gzip, brotli).
-
-```go
-import "github.com/spcent/plumego/middleware/compression"
-
-app := core.New(
-    core.WithComponent(&compression.Component{
-        Level: compression.DefaultCompression,
-    }),
-)
-```
-
----
-
-## Resilience
-
-### 7. CircuitBreaker (`middleware/circuitbreaker`)
-
-Circuit breaker pattern for fault tolerance.
-
-```go
-import "github.com/spcent/plumego/middleware/circuitbreaker"
-
-app.Use(circuitbreaker.New(circuitbreaker.Config{
-    MaxRequests:  5,
-    Interval:     10 * time.Second,
-    Timeout:      30 * time.Second,
-}))
-```
-
-### 8. RateLimit (`middleware/ratelimit`)
-
-Rate limiting.
-
-```go
-import "github.com/spcent/plumego/middleware/ratelimit"
-
-app := core.New(
-    core.WithComponent(&ratelimit.Component{
-        RequestsPerSecond: 100,
-        Burst:             200,
-    }),
-)
-```
-
-### 9. Recovery (`middleware/recovery`)
-
-Panic recovery.
-
-```go
-import "github.com/spcent/plumego/middleware/recovery"
-
-app := core.New(
-    core.WithRecovery(),
-)
-```
-
----
-
-## Cross-Origin & Protocol
-
-### 10. CORS (`middleware/cors`)
-
-Cross-Origin Resource Sharing.
-
-```go
-import "github.com/spcent/plumego/middleware/cors"
-
-app := core.New(
-    core.WithCORS(cors.Config{
-        AllowOrigins:     []string{"https://example.com"},
-        AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-        AllowHeaders:     []string{"Authorization", "Content-Type"},
-        AllowCredentials: true,
-        MaxAge:           3600,
-    }),
-)
-```
-
-### 11. Protocol (`middleware/protocol`)
-
-Protocol adaptation (HTTP, gRPC, GraphQL).
-
-```go
-import "github.com/spcent/plumego/middleware/protocol"
-
-app.Use(protocol.New())
-```
-
-### 12. Versioning (`middleware/versioning`)
-
-API versioning.
-
-```go
-import "github.com/spcent/plumego/middleware/versioning"
-
-app.Use(versioning.New(versioning.Config{
-    Header: "API-Version",
-    Default: "v1",
-}))
-```
-
----
-
-## Observability
-
-### 13. Observability (`middleware/observability`)
-
-Metrics, tracing, and logging.
-
-```go
-import "github.com/spcent/plumego/middleware/observability"
-
-app := core.New(
-    core.WithComponent(&observability.Component{
-        MetricsEnabled: true,
-        TracingEnabled: true,
-    }),
-)
-```
-
----
-
-## Proxy & Routing
-
-### 14. Proxy (`middleware/proxy`)
-
-Reverse proxy.
-
-```go
-import "github.com/spcent/plumego/middleware/proxy"
-
-target, _ := url.Parse("http://backend:8080")
-app.Use(proxy.New(target))
-```
-
-### 15. Tenant (`middleware/tenant`)
-
-Multi-tenancy routing.
-
-```go
-import "github.com/spcent/plumego/middleware/tenant"
-
-app := core.New(
-    core.WithTenantMiddleware(core.TenantMiddlewareOptions{
-        HeaderName: "X-Tenant-ID",
-    }),
-)
-```
-
----
-
-## Security
-
-### 16. Security (`middleware/security`)
-
-Security headers (CSP, HSTS, etc.).
-
-```go
-app := core.New(
-    core.WithSecurityHeadersEnabled(true),
-)
-```
-
----
-
-## Transformation
-
-### 17. Transform (`middleware/transform`)
-
-Response transformation.
-
-```go
-import "github.com/spcent/plumego/middleware/transform"
-
-app.Use(transform.New(transform.Config{
-    ContentType: "application/json",
-}))
-```
-
----
-
-## Development
-
-### 18. Debug (`middleware/debug`)
-
-Debug utilities.
-
-```go
-import "github.com/spcent/plumego/middleware/debug"
-
-if config.Debug {
-    app.Use(debug.New())
+app := core.New(core.WithAddr(":8080"))
+
+if err := app.Use(
+    observability.RequestID(),
+    observability.Logging(app.Logger(), nil, nil),
+    recovery.RecoveryMiddleware,
+); err != nil {
+    log.Fatal(err)
 }
 ```
 
----
+`app.Use(...)` order is execution order.
 
-**Next**: [Error Handling](error-handling.md)
+## Observability
+
+- `observability.RequestID(...)`
+- `observability.Logging(logger, metricsCollector, tracer)`
+
+## Safety / Reliability
+
+- `recovery.RecoveryMiddleware`
+- `timeout.Timeout(duration)`
+- `timeout.TimeoutWithConfig(timeout.TimeoutConfig{...})`
+- `limits.BodyLimit(maxBytes, logger)`
+- `limits.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)`
+
+## Transport / Performance
+
+- `cors.CORS`
+- `cors.CORSWithOptions(opts, next)` (handler wrapper form)
+- `compression.Gzip()`
+- `compression.GzipWithConfig(compression.GzipConfig{...})`
+
+## Security
+
+- `security.SecurityHeaders(policy)`
+- `auth.SimpleAuth(token)`
+- `auth.Authenticate(authenticator, ...)`
+- `auth.Authorize(authorizer, action, resource, ...)`
+- `auth.SessionCheck(store, validator, ...)`
+- `ratelimit.AbuseGuard(config)`
+- `ratelimit.TokenBucket(config)`
+- `ratelimit.RateLimitMiddleware(config)`
+
+## Protocol / Version / Tenant
+
+- `protocol.Middleware(registry)` / `protocol.MiddlewareWithConfig(config)`
+- `versioning.Middleware(versioning.Config{...})`
+- `tenant.TenantResolver(options)`
+- `tenant.TenantRateLimit(options)`
+
+## Group-Level Middleware
+
+```go
+api := app.Router().Group("/api")
+api.Use(auth.SimpleAuth(os.Getenv("AUTH_TOKEN")))
+api.Use(timeout.Timeout(2 * time.Second))
+```
+
+## Testing Guidance
+
+For middleware changes, add tests for:
+- ordering
+- panic/error path
+- status/header/body behavior
+- race safety (`go test -race`)

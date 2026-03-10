@@ -1,75 +1,65 @@
 # Router 模块
 
-**router** 提供基于前缀树的匹配，支持分组、路径参数和中间件继承，并保持与标准 `http.Handler` 兼容。
+`router` 包提供基于前缀树的匹配能力，支持路由分组、路径参数、通配路由与逆向路由，同时保持标准 `http.Handler` 兼容。
 
 ## Handler 形态
-- 标准 Handler：`Get`、`Post`、`Put`、`Patch`、`Delete`、`Options`、`Head`、`Any` 接受 `http.Handler`。
-- 函数辅助：`GetFunc`/`PostFunc` 等接受 `http.HandlerFunc`。
-- 上下文 Handler：`GetCtx`/`PostCtx` 等接受 `contract.CtxHandlerFunc`，自动解析路径参数和请求信息。
+使用标准处理器：
+
+- `Get`、`Post`、`Put`、`Patch`、`Delete`、`Options`、`Head`、`Any`
+- 签名：`http.Handler`（或 `http.HandlerFunc`）
+
+路径参数通过 `contract.Param(r, "id")` 读取。
 
 ## 路径模式
 - 静态：`/docs/index.html`
 - 参数：`/users/:id`、`/teams/:teamID/members/:id`
-- 通配：`/*filepath`（捕获剩余路径，用于静态资源或文档）
+- 通配：`/*filepath`
 
 ## 分组与中间件顺序
-中间件执行顺序为 **全局 → 分组 → 路由专属**。
+中间件顺序显式：`全局 router.Use(...) -> group.Use(...) -> 路由处理器`。
 
 ```go
-api := app.Router().Group("/api", middleware.SimpleAuth("token"))
-api.Use(middleware.Timeout(2 * time.Second))
+r := app.Router()
+r.Use(observability.RequestID())
 
-api.GetCtx("/users/:id", func(ctx *contract.Ctx) {
-    id := ctx.Param("id")
-    ctx.Text(http.StatusOK, "user="+id)
-})
+api := r.Group("/api")
+api.Use(auth.SimpleAuth(os.Getenv("AUTH_TOKEN")))
+api.Use(timeout.Timeout(2 * time.Second))
 
-// 嵌套分组继承前缀与中间件。
-v1 := api.Group("/v1")
-v1.Get("/ping", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("pong")) })
+api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+    id, _ := contract.Param(req, "id")
+    _, _ = w.Write([]byte("user=" + id))
+}))
 ```
 
-所有注册应在 `app.Boot()` 前完成；启动时路由会被冻结以避免遗漏。
+所有路由需在 `app.Boot()` 前注册；启动时会冻结路由表。
 
-## Method Not Allowed 处理
-默认情况下方法不匹配返回 `404`。如需 `405`：
+## 逆向路由
+通过路由名安全生成 URL：
 
 ```go
-r := router.NewRouter(router.WithMethodNotAllowed(true))
+if err := r.AddRouteWithOptions(router.GET, "/users/:id", http.HandlerFunc(showUser),
+    router.WithRouteName("users.show"),
+); err != nil {
+    log.Fatal(err)
+}
+
+u, err := r.URL("users.show", map[string]string{"id": "42"})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(u.String()) // /users/42
 ```
 
-启用后，当路径匹配但方法不支持时会返回 `405` 并设置 `Allow`。
-
-## 静态前端与通配
-为静态资源单独划分分组，方便隔离缓存策略或鉴权。
+## Method Not Allowed 行为
+开启方法不匹配返回 405：
 
 ```go
-assets := app.Router().Group("/docs")
-assets.Get("/*filepath", func(w http.ResponseWriter, r *http.Request) {
-    http.ServeFileFS(w, r, os.DirFS("./examples/docs"), path.Clean(r.URL.Path))
-})
+app := core.New(core.WithMethodNotAllowed(true))
 ```
-
-若使用嵌入资源，可利用 `frontend` 辅助：
-
-```go
-// 将嵌入的 SPA 或文档站点挂载到 "/"。
-_ = frontend.RegisterFS(
-    app.Router(),
-    http.FS(staticFS),
-    frontend.WithPrefix("/"),
-    frontend.WithCacheControl("public, max-age=31536000"),
-    frontend.WithIndexCacheControl("no-cache"),
-    frontend.WithFallback(true),
-)
-```
-
-## 调试技巧
-- 打开 `core.WithDebug()` 可在启动时打印所有 method/path。
-- 本地诊断冲突时，可在开发路由中遍历 `router.Routes()` 输出结果。
-- 启动期的延迟注册 panic 属于预期行为，请调整初始化顺序而不是忽略。
 
 ## 代码位置
-- `router/router.go`：前缀树匹配、分组与辅助函数。
-- `frontend/frontend.go`：挂载磁盘目录或嵌入前端包的辅助方法。
-- `examples/reference/main.go`：API、指标、健康检查、文档和前端路由的实际接线。
+- `router/registration.go`：路由/分组注册与校验。
+- `router/dispatch.go`：匹配与分发。
+- `router/metadata.go`：路由元信息与逆向路由。
+- `router/reverse_routing_group_test.go`：分组与逆向路由边界测试。

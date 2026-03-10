@@ -1,5 +1,9 @@
 # CORE API Contraction Proposal
 
+> Historical document (superseded).  
+> This proposal is archived and is **not** the canonical v1 guidance as of March 10, 2026.  
+> Use `docs/other/V1_CORE_API_FREEZE.md` and `docs/CANONICAL_STYLE_GUIDE.md` as the source of truth.
+
 Status: Draft v0.1  
 Scope: `core`, `router`, `contract`, `middleware`, canonical examples  
 Audience: maintainers, contributors, code agents, reviewers  
@@ -694,4 +698,3 @@ The smallest stable public surface will produce the best long-term outcomes for:
 - documentation quality
 - ecosystem predictability
 - future maintenance cost
-

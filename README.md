@@ -49,16 +49,22 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/middleware/recovery"
 )
 
 func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
-        core.WithRecovery(),
-        core.WithLogging(),
-        core.WithCORS(),
     )
+
+    if err := app.Use(
+        observability.RequestID(),
+        recovery.RecoveryMiddleware,
+    ); err != nil {
+        log.Fatalf("register middleware: %v", err)
+    }
 
     app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
@@ -79,16 +85,17 @@ import (
     "log"
     "net/http"
 
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego"
 )
 
 func main() {
-    app := plumego.New()
+    app := plumego.New(plumego.WithAddr(":8080"))
 
     app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusOK)
-        w.Write([]byte(`{"status":"ok"}`))
+        contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+            "status": "ok",
+        })
     })
 
     log.Println("server started at :8080")
@@ -100,12 +107,12 @@ func main() {
 - Environment variables can be loaded from a `.env` file (default path `.env`; override via `core.WithEnvPath`).
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - The app defaults to a 10485760 byte (10 MiB) request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5000ms (5s) graceful shutdown window. Override via `core.With...` options.
-- Security guardrails (security headers + abuse guard) are enabled by default. Abuse guard defaults to 100 req/s with a burst of 200 per client and tracks up to 100k active keys. Disable or tune via `core.WithSecurityHeadersEnabled`, `core.WithSecurityHeadersPolicy`, `core.WithAbuseGuardEnabled`, and `core.WithAbuseGuardConfig`.
+- Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
 - Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload), friendly JSON error output, and `.env` hot reload. These endpoints are intended for local development or protected environments; disable or gate them in production.
 
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, and other standard-library style methods that accept `func(w http.ResponseWriter, r *http.Request)`. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
-- **Middleware**: Chain middleware before boot with `app.Use(...)`; guards (security headers, abuse guard, body size limits, concurrency limits) are auto-injected during setup. Recovery/logging/CORS helpers can be enabled via `core.WithRecovery`, `core.WithLogging`, and `core.WithCORS`. For a production-safe baseline, `core.WithRecommendedMiddleware()` enables RequestID + Logging + Recovery in the recommended order.
+- **Middleware**: Chain middleware before boot with `app.Use(...)`. Keep middleware transport-only and explicit. Common options include `middleware/observability.RequestID`, `middleware/observability.Logging`, `middleware/recovery.RecoveryMiddleware`, `middleware/cors.CORS`, `middleware/security.SecurityHeaders`, and `middleware/ratelimit.AbuseGuard`.
 - **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
 - **Ops/Admin Endpoints**: Optional protected operations API for queue stats/replay, receipt lookup, channel health, and tenant quota inspection. Mount via `core/components/ops` and secure with a token or custom middleware. If auth is missing and `AllowInsecure` is false (default), requests are denied.
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
@@ -133,75 +140,122 @@ Plumego provides experimental multi-tenancy primitives for SaaS applications wit
 
 ```go
 import (
-    "github.com/spcent/plumego"
-    "github.com/spcent/plumego/store/db"
+    "context"
+    "database/sql"
+    "log"
+    "net/http"
+    "time"
+
+    "github.com/spcent/plumego/contract"
+    "github.com/spcent/plumego/core"
+    tenantmw "github.com/spcent/plumego/middleware/tenant"
+    storedb "github.com/spcent/plumego/store/db"
+    "github.com/spcent/plumego/tenant"
+    tenantpolicy "github.com/spcent/plumego/tenant/middleware"
 )
 
-// Create tenant config manager with caching
-tenantMgr := plumego.NewDBTenantConfigManager(
-    database,
-    plumego.WithTenantCache(1000, 5*time.Minute),
-)
+func setupTenantApp(database *sql.DB) *core.App {
+    // Create tenant config manager with caching.
+    tenantMgr := storedb.NewDBTenantConfigManager(
+        database,
+        storedb.WithTenantCache(1000, 5*time.Minute),
+    )
 
-// Create rate limit provider and limiter
-rateLimitProvider := plumego.NewInMemoryRateLimitProvider()
-rateLimitProvider.SetRateLimit("tenant-id", plumego.TenantRateLimitConfig{
-    RequestsPerSecond: 50,
-    Burst:             100,
-})
-rateLimiter := plumego.NewTokenBucketRateLimiter(rateLimitProvider)
+    // Create managers used by tenant middleware.
+    quotaMgr := tenant.NewWindowQuotaManager(tenantMgr, tenant.NewInMemoryQuotaStore())
+    policyEval := tenant.NewConfigPolicyEvaluator(tenantMgr)
+    rateLimiter := tenant.NewTokenBucketRateLimiter(
+        &tenant.RateLimitConfigProviderFromConfig{Manager: tenantMgr},
+    )
 
-// Create quota and policy managers
-quotaStore := plumego.NewInMemoryQuotaStore()
-quotaMgr := plumego.NewWindowQuotaManager(tenantMgr, quotaStore)
-policyEval := plumego.NewConfigPolicyEvaluator(tenantMgr)
+    // Tenant-aware DB wrapper for query isolation.
+    tenantDB := storedb.NewTenantDB(database)
 
-// Create tenant-aware database wrapper
-tenantDB := plumego.NewTenantDB(database)
+    app := core.New(core.WithAddr(":8080"))
+    api := app.Router().Group("/api")
 
-// Configure application
-app := plumego.New(
-    plumego.WithTenantConfigManager(tenantMgr),
-    plumego.WithTenantMiddleware(plumego.TenantMiddlewareOptions{
-        HeaderName:      "X-Tenant-ID",
-        AllowMissing:    false,
-        RateLimiter:     rateLimiter,
-        QuotaManager:    quotaMgr,
-        PolicyEvaluator: policyEval,
-        Hooks: plumego.TenantHooks{
-            OnQuota: func(ctx context.Context, decision plumego.TenantQuotaDecision) {
+    // Canonical explicit middleware chain.
+    api.Use(tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+        HeaderName: "X-Tenant-ID",
+    }))
+    api.Use(tenantmw.TenantRateLimit(tenantmw.TenantRateLimitOptions{
+        Limiter: rateLimiter,
+    }))
+    api.Use(tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
+        Manager: quotaMgr,
+        Hooks: tenant.Hooks{
+            OnQuota: func(ctx context.Context, decision tenant.QuotaDecision) {
                 if !decision.Allowed {
-                    log.Printf("Quota exceeded for %s", decision.TenantID)
+                    log.Printf("quota exceeded for %s", decision.TenantID)
                 }
             },
         },
-    }),
-)
+    }))
+    api.Use(tenantpolicy.TenantPolicy(tenantpolicy.TenantPolicyOptions{
+        Evaluator: policyEval,
+    }))
+
+    api.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        rows, err := tenantDB.QueryFromContext(
+            r.Context(),
+            "SELECT id, email FROM users WHERE active = ?",
+            true,
+        )
+        if err != nil {
+            contract.WriteError(w, r, contract.APIError{
+                Status:   http.StatusInternalServerError,
+                Code:     "db_query_failed",
+                Message:  "query failed",
+                Category: contract.CategoryServer,
+            })
+            return
+        }
+        defer rows.Close()
+        contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"})
+    }))
+
+    return app
+}
 ```
 
 If you manage tenant config in code (or provide your own config provider), you can set multi-window quotas like:
 
 ```go
-tenantMgr := plumego.NewInMemoryTenantConfigManager()
-tenantMgr.SetTenantConfig(plumego.TenantConfig{
+tenantMgr := tenant.NewInMemoryConfigManager()
+tenantMgr.SetTenantConfig(tenant.Config{
     TenantID: "tenant-id",
-    Quota: plumego.TenantQuotaConfig{
-        Limits: []plumego.TenantQuotaLimit{
-            {Window: plumego.TenantQuotaWindowDay, Requests: 200000},
-            {Window: plumego.TenantQuotaWindowMonth, Tokens: 10_000_000},
+    Quota: tenant.QuotaConfig{
+        Limits: []tenant.QuotaLimit{
+            {Window: tenant.QuotaWindowDay, Requests: 200000},
+            {Window: tenant.QuotaWindowMonth, Tokens: 10_000_000},
         },
+    },
+    Policy: tenant.PolicyConfig{
+        AllowedModels: []string{"gpt-4o-mini"},
+        AllowedTools:  []string{"search"},
+    },
+    RateLimit: tenant.RateLimitConfig{
+        RequestsPerSecond: 50,
+        Burst:             100,
     },
 })
 
 // Route policy cache (optional)
-routePolicyStore := plumego.NewInMemoryRoutePolicyStore()
-_ = routePolicyStore.SetRoutePolicy(context.Background(), plumego.TenantRoutePolicy{
+routePolicyStore := tenant.NewInMemoryRoutePolicyStore()
+_ = routePolicyStore.SetRoutePolicy(context.Background(), tenant.RoutePolicy{
     TenantID: "tenant-id",
     Strategy: "weighted",
     Payload:  []byte(`{"rules":[{"provider":"a","weight":70},{"provider":"b","weight":30}]}`),
 })
-routePolicyCache := plumego.NewInMemoryRoutePolicyCache(1000, 5*time.Minute)
-routePolicyProvider := plumego.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
+routePolicyCache := tenant.NewInMemoryRoutePolicyCache(1000, 5*time.Minute)
+routePolicyProvider := tenant.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
+
+// Optional: tenant-aware token bucket from the same config manager.
+rateLimiter := tenant.NewTokenBucketRateLimiter(
+    &tenant.RateLimitConfigProviderFromConfig{Manager: tenantMgr},
+)
+_ = routePolicyProvider
+_ = rateLimiter
 ```
 
 ### Automatic Query Filtering
@@ -442,6 +496,8 @@ plumego dev --debounce 1s
 For complete documentation, see `cmd/plumego/DEV_SERVER.md`.
 
 ## Documentation
+Canonical docs entrypoint and priority order: `docs/README.md`.
+
 For detailed documentation, see the `examples/docs` directory:
 - `examples/docs/en/` - English documentation
 - `examples/docs/zh/` - Chinese documentation

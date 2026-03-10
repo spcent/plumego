@@ -3,6 +3,7 @@ package semanticcache
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 
 // MockProvider implements provider.Provider for testing
 type MockProvider struct {
-	callCount    int
+	callCount    atomic.Int64
 	shouldFail   bool
 	responseText string
 }
@@ -23,7 +24,7 @@ func (m *MockProvider) Name() string {
 }
 
 func (m *MockProvider) Complete(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {
-	m.callCount++
+	m.callCount.Add(1)
 
 	if m.shouldFail {
 		return nil, errors.New("mock provider error")
@@ -37,6 +38,10 @@ func (m *MockProvider) Complete(ctx context.Context, req *provider.CompletionReq
 		},
 		Usage: tokenizer.TokenUsage{InputTokens: 10, OutputTokens: 20},
 	}, nil
+}
+
+func (m *MockProvider) CallCount() int64 {
+	return m.callCount.Load()
 }
 
 func (m *MockProvider) CompleteStream(ctx context.Context, req *provider.CompletionRequest) (*provider.StreamReader, error) {
@@ -88,8 +93,8 @@ func TestSemanticCachingProvider(t *testing.T) {
 			t.Fatal("expected response")
 		}
 
-		if mock.callCount != 1 {
-			t.Errorf("expected 1 provider call, got %d", mock.callCount)
+		if mock.CallCount() != 1 {
+			t.Errorf("expected 1 provider call, got %d", mock.CallCount())
 		}
 	})
 
@@ -109,8 +114,8 @@ func TestSemanticCachingProvider(t *testing.T) {
 			t.Fatalf("Complete failed: %v", err)
 		}
 
-		if mock.callCount != 1 {
-			t.Errorf("expected 1 provider call, got %d", mock.callCount)
+		if mock.CallCount() != 1 {
+			t.Errorf("expected 1 provider call, got %d", mock.CallCount())
 		}
 
 		// Second call - should hit cache
@@ -119,8 +124,8 @@ func TestSemanticCachingProvider(t *testing.T) {
 			t.Fatalf("Complete failed: %v", err)
 		}
 
-		if mock.callCount != 1 {
-			t.Errorf("expected still 1 provider call (cached), got %d", mock.callCount)
+		if mock.CallCount() != 1 {
+			t.Errorf("expected still 1 provider call (cached), got %d", mock.CallCount())
 		}
 
 		if resp2.ID != resp1.ID {
@@ -154,8 +159,8 @@ func TestSemanticCachingProvider(t *testing.T) {
 			t.Fatalf("Complete failed: %v", err)
 		}
 
-		if mockProvider.callCount != 1 {
-			t.Errorf("expected 1 provider call, got %d", mockProvider.callCount)
+		if mockProvider.CallCount() != 1 {
+			t.Errorf("expected 1 provider call, got %d", mockProvider.CallCount())
 		}
 
 		// Second call - should hit exact cache
@@ -165,8 +170,8 @@ func TestSemanticCachingProvider(t *testing.T) {
 		}
 
 		// Should still be 1 call (exact cache hit)
-		if mockProvider.callCount != 1 {
-			t.Errorf("expected still 1 provider call, got %d", mockProvider.callCount)
+		if mockProvider.CallCount() != 1 {
+			t.Errorf("expected still 1 provider call, got %d", mockProvider.CallCount())
 		}
 	})
 
@@ -252,8 +257,8 @@ func TestSemanticCachingProvider(t *testing.T) {
 		// Second call should hit provider again
 		scp.Complete(ctx, req)
 
-		if mock.callCount != 2 {
-			t.Errorf("expected 2 provider calls after clear, got %d", mock.callCount)
+		if mock.CallCount() != 2 {
+			t.Errorf("expected 2 provider calls after clear, got %d", mock.CallCount())
 		}
 	})
 

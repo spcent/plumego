@@ -1,88 +1,66 @@
 # Middleware 模块
 
-Plumego 的中间件与标准 `http.Handler` 兼容，可通过 `app.Use(...)` 全局注册，也可在分组 `Group("/x", m1, m2)` 或具体路由上包裹使用。
+Plumego 中间件完全兼容标准库签名（`func(http.Handler) http.Handler`）。
+可用 `app.Use(...)` 全局注册，也可通过 `group.Use(...)` 作用于路由分组。
 
-## 内置中间件
-- **恢复**：`core.WithRecovery()` 捕获 panic，记录栈并返回结构化错误。
-- **日志**：`core.WithLogging()` 采集请求/响应信息，与 `core.WithMetricsCollector`、`core.WithTracer` 注入的指标/追踪对接。
-- **Request ID**：`middleware.RequestID()` 注入 `X-Request-ID` 并写入 context 以便关联日志。
-- **CORS**：`core.WithCORS()` 提供宽松默认值，可用 `core.WithCORSOptions(...)` 或 `middleware.CORSWithOptions(...)` 自定义（如需返回 `http.HandlerFunc`，使用 `CORSWithOptionsFunc`）。
-- **Gzip**：`middleware.Gzip()` 在客户端声明 `Accept-Encoding: gzip` 时压缩响应。
-- **超时**：`middleware.Timeout(duration)` 为单个请求设定截止时间。
-- **请求体限制**：`middleware.BodyLimit(maxBytes, logger)` 返回结构化的 413 响应。
-- **并发限制**：`middleware.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)` 控制并发与排队深度。
-- **限流**：`middleware.RateLimit(ratePerSecond, burst, cleanupInterval, maxIdle)` 基于 IP 的令牌桶实现。
-- **鉴权辅助**：`middleware.SimpleAuth("token")` 校验 Bearer Token；`middleware.APIKey("X-API-Key", "secret")` 校验自定义头。
-- **绑定/校验**：`bind.BindJSON[T](...)` 统一请求绑定、校验与字段级错误返回。
+## 常用内置中间件
+- Request ID：`observability.RequestID()`
+- 结构化日志：`observability.Logging(app.Logger(), metricsCollector, tracer)`
+- panic 恢复：`recovery.RecoveryMiddleware`
+- CORS：`cors.CORS` / `cors.CORSWithOptions(...)`
+- Gzip 压缩：`compression.Gzip()`
+- 超时控制：`timeout.Timeout(duration)`
+- 请求体限制：`limits.BodyLimit(maxBytes, logger)`
+- 并发限制：`limits.ConcurrencyLimit(maxConcurrent, queueDepth, queueTimeout, logger)`
+- 鉴权辅助：`auth.SimpleAuth(token)`
+- 安全头：`security.SecurityHeaders(nil)`
+- 防滥用/令牌桶：`ratelimit.AbuseGuard(...)`、`ratelimit.TokenBucket(...)`
 
-核心在初始化时会自动接入保护性的请求体/并发限制，可按需通过 `app.Use(...)` 或分组中间件追加链路。
-
-## 组合示例
-### 全局防护链
+## 全局链路示例
 ```go
-app := core.New(core.WithRecovery(), core.WithLogging())
-app.Use(
-    middleware.Gzip(),
-    middleware.Timeout(3*time.Second),
-    middleware.ConcurrencyLimit(200, 400, 250*time.Millisecond, logger),
-)
+app := core.New(core.WithAddr(":8080"))
+
+if err := app.Use(
+    observability.RequestID(),
+    observability.Logging(app.Logger(), nil, nil),
+    recovery.RecoveryMiddleware,
+    cors.CORS,
+    compression.Gzip(),
+    timeout.Timeout(3*time.Second),
+    limits.ConcurrencyLimit(200, 400, 250*time.Millisecond, app.Logger()),
+); err != nil {
+    log.Fatal(err)
+}
 ```
 
-### 路由级控制
+## 分组级控制
 ```go
-secured := app.Router().Group("/admin", middleware.SimpleAuth(os.Getenv("AUTH_TOKEN")))
-secured.Get("/stats", middleware.TimeoutFunc(1*time.Second)(func(w http.ResponseWriter, r *http.Request) {
+api := app.Router().Group("/api")
+api.Use(auth.SimpleAuth(os.Getenv("AUTH_TOKEN")))
+api.Use(timeout.Timeout(2 * time.Second))
+
+api.Get("/stats", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
     w.Write([]byte("ok"))
 }))
 ```
 
-### 使用 `contract.Ctx` 辅助
+## Ctx 绑定/校验（显式适配）
 ```go
-app.GetCtx("/echo/:msg", middleware.WrapCtx(middleware.Timeout(2*time.Second), func(ctx *contract.Ctx) {
-    _ = ctx.Response(http.StatusOK, map[string]any{"echo": ctx.Param("msg")}, nil)
-}))
-```
-
-### 请求绑定 + 校验
-```go
-type CreateUserRequest struct {
-    Email    string `json:"email" validate:"required,email"`
-    Password string `json:"password" validate:"required" mask:"true"`
-}
-
-app.Post("/v1/users",
-    bind.BindJSON[CreateUserRequest](bind.JSONOptions{}),
-    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        payload, _ := bind.FromRequest[CreateUserRequest](r)
-        // 处理 payload ...
-        w.WriteHeader(http.StatusOK)
-    }),
-)
-```
-
-### `GetCtx` 绑定示例
-```go
-app.PostCtx("/v1/users", func(ctx *contract.Ctx) {
+app.Post("/v1/users", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
     var payload CreateUserRequest
     if err := ctx.BindAndValidateJSONWithOptions(&payload, contract.BindOptions{
         DisallowUnknownFields: true,
         Logger:                ctx.Logger,
-        Redact:                bind.DefaultRedactor().Redact,
     }); err != nil {
         contract.WriteBindError(ctx.W, ctx.R, err)
         return
     }
-    _ = ctx.Response(http.StatusOK, map[string]any{"ok": true}, nil)
-})
+
+    _ = ctx.Response(http.StatusCreated, map[string]any{"ok": true}, nil)
+}, app.Logger()).ServeHTTP)
 ```
 
-可运行示例见 `examples/bind-example/main.go`。
-
-## 运维提示
-- 链路顺序很重要：通常建议日志包裹恢复，以便 panic 日志包含请求上下文。
-- 自定义中间件避免使用全局可变状态；依赖通过闭包或应用级单例传递。
-- 当在分组上启用 CORS/鉴权时，将公共静态资源置于独立分组以避免意外头部或鉴权校验。
-
-## 代码位置
-- `middleware/` 目录：恢复、日志、gzip、CORS、超时、体积限制、限流、鉴权、并发控制等实现。
-- `examples/reference/main.go`：结合恢复、日志、CORS 与默认安全限制的实际链路。
+## 运维建议
+- 保持中间件顺序显式，并用回归测试锁定顺序语义。
+- 依赖通过构造函数或闭包注入，避免隐藏全局状态。
+- 公私路由混合时，优先按分组挂鉴权/安全中间件，降低误配风险。

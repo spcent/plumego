@@ -253,9 +253,11 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 
 ```go
 // ✅ Disable debug in production
-app := core.New(
-    core.WithDebug(os.Getenv("APP_ENV") != "production"),
-)
+opts := []core.Option{}
+if os.Getenv("APP_ENV") != "production" {
+    opts = append(opts, core.WithDebug())
+}
+app := core.New(opts...)
 
 // ✅ Custom error messages (don't leak info)
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
@@ -266,9 +268,8 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 // ✅ Security headers enabled
-app := core.New(
-    core.WithSecurityHeadersEnabled(true),
-)
+app := core.New()
+_ = app.Use(security.SecurityHeaders(nil))
 ```
 
 **Checklist**:

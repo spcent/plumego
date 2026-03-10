@@ -94,24 +94,34 @@ Group related routes under a shared prefix using the router directly:
 ```go
 api := app.Router().Group("/api/v1")
 
-api.GetFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+api.Get("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ok"}`))
-})
+}))
 
-api.GetFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+api.Get("/version", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"version":"1.0.0"}`))
-})
+}))
 ```
 
 ## Running with Middleware
 
-Enable common middleware using functional options:
+Register middleware explicitly before `Boot()`:
 
 ```go
-app := plumego.New(
-	plumego.WithAddr(":8080"),
-	plumego.WithRecommendedMiddleware(), // RequestID + Logging + Recovery
+import (
+	"log"
+
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/recovery"
 )
+
+app := plumego.New(plumego.WithAddr(":8080"))
+if err := app.Use(
+	observability.RequestID(),
+	recovery.RecoveryMiddleware,
+); err != nil {
+	log.Fatalf("register middleware: %v", err)
+}
 ```
 
 ## Next Steps

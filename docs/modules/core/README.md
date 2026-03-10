@@ -1,82 +1,80 @@
 # Core Module
 
-> **Package**: `github.com/spcent/plumego/core`
-> **Stability**: High - Core API is stable
-> **Go Version**: 1.24+
+> **Package**: `github.com/spcent/plumego/core`  
+> **Stability**: High (v1 GA)
 
-The `core` package is the heart of Plumego, providing application lifecycle management, dependency injection, component orchestration, and configuration options.
-
----
-
-## Overview
-
-The core module provides:
-
-- **Application Lifecycle**: Explicit `New()` → configuration → `Boot()` → `Shutdown()` flow
-- **Dependency Injection**: Built-in DI container for managing component dependencies
-- **Component System**: Pluggable architecture for modules (WebSocket, Webhook, Observability, etc.)
-- **Runner System**: Background service management with lifecycle coordination
-- **Configuration**: Functional options pattern for clean, type-safe configuration
-- **Graceful Shutdown**: Connection draining with configurable timeout
+The `core` package is Plumego's application entrypoint. It manages app construction, route registration, middleware composition, component/runner lifecycle, and server boot.
 
 ---
 
-## Quick Start
+## What `core` Owns
+
+- App construction via `core.New(...)`
+- HTTP route registration (`Get`, `Post`, `Put`, `Delete`, `Patch`, `Any`)
+- Middleware registration via `app.Use(...)`
+- Component lifecycle (`WithComponent`, `WithComponents`)
+- Runner lifecycle (`WithRunner`, `WithRunners`)
+- Graceful shutdown hooks (`WithShutdownHook`, `WithShutdownHooks`)
+- Server boot (`app.Boot()`)
+
+`core` stays transport-first and remains compatible with `net/http`.
+
+---
+
+## Quick Start (Canonical)
 
 ```go
 package main
 
 import (
-    "github.com/spcent/plumego/core"
     "log"
+    "net/http"
+
+    "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/middleware/recovery"
 )
 
 func main() {
-    // Create application with functional options
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
-        core.WithRecommendedMiddleware(), // RequestID + Logging + Recovery
     )
 
-    // Define routes
-    app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+    if err := app.Use(
+        observability.RequestID(),
+        observability.Logging(app.Logger(), nil, nil),
+        recovery.RecoveryMiddleware,
+    ); err != nil {
+        log.Fatalf("register middleware: %v", err)
+    }
+
+    app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
     })
 
-    // Boot and block until shutdown signal
     if err := app.Boot(); err != nil {
-        log.Fatal(err)
+        log.Fatalf("server stopped: %v", err)
     }
 }
 ```
 
 ---
 
-## Core Concepts
+## Lifecycle Model
 
-### 1. Application (`*App`)
+1. Construct app with `core.New(options...)`.
+2. Register middleware and routes while app is mutable.
+3. Boot app with `app.Boot()`.
+4. During shutdown, hooks/components/runners are stopped in managed order.
 
-The `App` struct is your application instance. It orchestrates:
-- HTTP server configuration
-- Route registration
-- Middleware chain
-- Component lifecycle
-- Graceful shutdown
+After boot starts, mutating operations (adding routes/middleware/runners/hooks) are rejected.
 
-**Creation**:
-```go
-app := core.New(options...)
-```
+---
 
-### 2. Component Interface
+## Core Interfaces
 
-Components are self-contained modules that can:
-- Register routes
-- Register middleware
-- Start/stop background services
-- Report health status
-- Declare dependencies
+### `Component`
 
 ```go
 type Component interface {
@@ -85,13 +83,11 @@ type Component interface {
     Start(ctx context.Context) error
     Stop(ctx context.Context) error
     Health() (name string, status health.HealthStatus)
-    Dependencies() []reflect.Type
 }
 ```
 
-### 3. Runner Interface
+### `Runner`
 
-Runners are lightweight background services:
 ```go
 type Runner interface {
     Start(ctx context.Context) error
@@ -99,380 +95,84 @@ type Runner interface {
 }
 ```
 
-### 4. Dependency Injection
+### `ShutdownHook`
 
-The DI container manages:
-- Automatic dependency resolution
-- Topological sorting (start order)
-- Singleton lifecycle
-- Type-safe registration
-
-### 5. Functional Options
-
-Configuration uses the functional options pattern:
 ```go
-type Option func(*App)
-
-func WithAddr(addr string) Option { ... }
+type ShutdownHook func(context.Context) error
 ```
 
 ---
 
-## Documentation Structure
+## Route Registration
 
-| Document | Description |
-|----------|-------------|
-| **[Application](application.md)** | App creation, configuration, routing |
-| **[Lifecycle](lifecycle.md)** | Boot, shutdown, signal handling |
-| **[Components](components.md)** | Component system, built-in components |
-| **[Dependency Injection](dependency-injection.md)** | DI container usage |
-| **[Configuration Options](configuration-options.md)** | All available `core.With*` options |
-| **[Runners](runners.md)** | Background service management |
-| **[Testing](testing.md)** | Testing utilities and patterns |
+Use standard-library handler shape:
+
+```go
+app.Get("/users", listUsers)
+app.Post("/users", createUser)
+app.Delete("/users/:id", deleteUser)
+```
+
+For advanced routing (groups, route metadata, reverse routing), use `app.Router()` and the `router` module directly.
 
 ---
 
-## Key Types
+## Middleware Registration
+
+Use explicit order with `app.Use(...)` before boot:
 
 ```go
-// App is the main application instance
-type App struct {
-    server     *http.Server
-    router     *router.Router
-    middleware *middleware.Chain
-    di         *di.Container
-    components []Component
-    runners    []Runner
-    // ... internal fields
-}
-
-// Option configures the application
-type Option func(*App)
-
-// Component is a pluggable module
-type Component interface {
-    RegisterRoutes(r *router.Router)
-    RegisterMiddleware(m *middleware.Registry)
-    Start(ctx context.Context) error
-    Stop(ctx context.Context) error
-    Health() (name string, status health.HealthStatus)
-    Dependencies() []reflect.Type
-}
-
-// Runner is a background service
-type Runner interface {
-    Start(ctx context.Context) error
-    Stop(ctx context.Context) error
+if err := app.Use(mw1, mw2, mw3); err != nil {
+    // handle registration error
 }
 ```
 
----
-
-## Usage Examples
-
-### Minimal Application
-
-```go
-app := core.New()
-app.Get("/", func(w http.ResponseWriter, r *http.Request) {
-    w.Write([]byte("Hello World"))
-})
-app.Boot()
-```
-
-### Production Configuration
-
-```go
-app := core.New(
-    // Server
-    core.WithAddr(":8080"),
-    core.WithServerTimeouts(30*time.Second, 5*time.Second, 30*time.Second, 60*time.Second),
-    core.WithMaxBodyBytes(10 << 20), // 10 MiB
-
-    // Security
-    core.WithSecurityHeadersEnabled(true),
-    core.WithAbuseGuardEnabled(true),
-
-    // Middleware
-    core.WithRecommendedMiddleware(),
-    core.WithCORS(cors.DefaultConfig()),
-
-    // Components
-    core.WithComponent(&websocket.Component{}),
-    core.WithComponent(&webhook.Component{}),
-
-    // TLS
-    core.WithTLS("cert.pem", "key.pem"),
-    core.WithHTTP2(true),
-)
-```
-
-### With Custom Component
-
-```go
-type MyComponent struct {}
-
-func (c *MyComponent) RegisterRoutes(r *router.Router) {
-    r.Get("/custom", c.handleCustom)
-}
-
-func (c *MyComponent) Start(ctx context.Context) error {
-    // Initialize resources
-    return nil
-}
-
-func (c *MyComponent) Stop(ctx context.Context) error {
-    // Cleanup
-    return nil
-}
-
-// ... other Component methods
-
-app := core.New(
-    core.WithComponent(&MyComponent{}),
-)
-```
+Recommended baseline order:
+1. request ID
+2. logging/tracing
+3. recovery
+4. security/limits/cors (as needed)
 
 ---
 
-## Common Patterns
+## Configuration Options
 
-### 1. Graceful Shutdown
+See full option signatures and examples in:
 
-```go
-app := core.New(
-    core.WithShutdownTimeout(10 * time.Second),
-)
+- [configuration-options.md](configuration-options.md)
 
-// Boot() blocks until SIGINT/SIGTERM
-if err := app.Boot(); err != nil {
-    log.Fatal(err)
-}
-// Connections are drained before exit
-```
-
-### 2. Environment-Based Configuration
-
-```go
-import "github.com/spcent/plumego/config"
-
-cfg := config.Load()
-
-app := core.New(
-    core.WithAddr(cfg.Get("APP_ADDR", ":8080")),
-    core.WithDebug(cfg.GetBool("APP_DEBUG", false)),
-)
-```
-
-### 3. Component Composition
-
-```go
-app := core.New(
-    core.WithComponent(&websocket.Component{
-        Secret: os.Getenv("WS_SECRET"),
-    }),
-    core.WithComponent(&webhook.InComponent{
-        GitHubSecret: os.Getenv("GITHUB_WEBHOOK_SECRET"),
-    }),
-    core.WithComponent(&devtools.Component{
-        Enabled: config.IsDebug(),
-    }),
-)
-```
-
-### 4. Testing Applications
-
-```go
-func TestApp(t *testing.T) {
-    app := core.New(
-        core.WithAddr(":0"), // Random port
-    )
-    app.Get("/test", handler)
-
-    go app.Boot()
-    defer app.Shutdown(context.Background())
-
-    // Make HTTP requests to app.Addr()
-}
-```
+Common options:
+- `WithAddr`
+- `WithEnvPath`
+- `WithServerTimeouts`
+- `WithMaxHeaderBytes`
+- `WithShutdownTimeout`
+- `WithHTTP2`
+- `WithTLS` / `WithTLSConfig`
+- `WithDebug`
+- `WithLogger`
+- `WithMethodNotAllowed`
+- `WithComponent` / `WithComponents`
+- `WithRunner` / `WithRunners`
+- `WithShutdownHook` / `WithShutdownHooks`
+- `WithMetricsCollector`
+- `WithTracer`
+- `WithRouter`
 
 ---
 
-## Built-in Components
+## Compatibility Notes (v1)
 
-Plumego includes several production-ready components:
+The following historical option names are not part of the current core v1 API:
 
-| Component | Package | Description |
-|-----------|---------|-------------|
-| **DevTools** | `core/components/devtools` | Development utilities (routes, profiling) |
-| **Observability** | `core/components/observability` | Metrics, tracing, health checks |
-| **Ops** | `core/components/ops` | Operational endpoints (health, metrics) |
-| **Tenant** | `core/components/tenant` | Multi-tenancy management |
-| **Webhook (In)** | `core/components/webhook` | Inbound webhook receivers |
-| **WebSocket** | `core/components/websocket` | WebSocket hub with JWT auth |
+- `WithRecommendedMiddleware`
+- `WithRequestID`
+- `WithLogging`
+- `WithRecovery`
+- `WithCORS`
+- `WithTenantConfigManager`
+- `WithTenantMiddleware`
+- `WithMiddlewareChain`
+- `WithServer`
 
-See [Components](components.md) for detailed documentation.
-
----
-
-## Configuration Reference
-
-### Server Options
-
-```go
-core.WithAddr(":8080")
-core.WithServerTimeouts(read, write, idle, shutdown time.Duration)
-core.WithMaxBodyBytes(10 << 20)
-core.WithTLS("cert.pem", "key.pem")
-core.WithHTTP2(true)
-```
-
-### Middleware Options
-
-```go
-core.WithRecommendedMiddleware()  // RequestID + Logging + Recovery
-core.WithRequestID()
-core.WithLogging()
-core.WithRecovery()
-core.WithCORS(config)
-core.WithSecurityHeadersEnabled(true)
-core.WithAbuseGuardEnabled(true)
-```
-
-### Component & Runner Options
-
-```go
-core.WithComponent(component Component)
-core.WithRunner(runner Runner)
-```
-
-### Feature Options
-
-```go
-core.WithDebug()
-core.WithShutdownTimeout(duration)
-core.WithTenantConfigManager(manager)
-core.WithAIProvider(provider)
-```
-
-See [Configuration Options](configuration-options.md) for complete reference.
-
----
-
-## Error Handling
-
-```go
-// Boot returns error if server fails to start
-if err := app.Boot(); err != nil {
-    log.Fatalf("Failed to boot: %v", err)
-}
-
-// Shutdown returns error if graceful shutdown fails
-ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-defer cancel()
-if err := app.Shutdown(ctx); err != nil {
-    log.Printf("Shutdown error: %v", err)
-}
-```
-
----
-
-## Best Practices
-
-### ✅ Do
-
-- Use functional options for configuration
-- Enable recommended middleware in production
-- Configure appropriate timeouts
-- Register components before calling `Boot()`
-- Handle `Boot()` errors
-- Use graceful shutdown
-
-### ❌ Don't
-
-- Modify `App` after `Boot()` is called
-- Use global mutable state
-- Ignore shutdown errors
-- Skip timeout configuration in production
-- Register routes after `Boot()`
-
----
-
-## Performance Considerations
-
-1. **Connection Pooling**: HTTP/2 is enabled by default
-2. **Keep-Alive**: Idle timeout controls connection reuse
-3. **Body Limits**: Prevent memory exhaustion with `WithMaxBodyBytes()`
-4. **Shutdown Timeout**: Balance between graceful and fast shutdown
-5. **Middleware Order**: Place cheap middleware early in chain
-
----
-
-## Security Considerations
-
-1. **TLS**: Always use TLS in production (`WithTLS()`)
-2. **Timeouts**: Prevent slowloris attacks with read/write timeouts
-3. **Body Limits**: Prevent DoS with `WithMaxBodyBytes()`
-4. **Security Headers**: Enable with `WithSecurityHeadersEnabled()`
-5. **Abuse Guard**: Rate limiting with `WithAbuseGuardEnabled()`
-
----
-
-## Troubleshooting
-
-### Server won't start
-
-```go
-// Check port availability
-app := core.New(core.WithAddr(":8080"))
-if err := app.Boot(); err != nil {
-    // Port in use or permission denied
-}
-```
-
-### Components not starting
-
-```go
-// Check component dependencies
-type MyComponent struct {}
-
-func (c *MyComponent) Dependencies() []reflect.Type {
-    return []reflect.Type{
-        reflect.TypeOf(&OtherComponent{}),
-    }
-}
-```
-
-### Shutdown hangs
-
-```go
-// Increase shutdown timeout
-app := core.New(
-    core.WithShutdownTimeout(30 * time.Second),
-)
-```
-
----
-
-## Next Steps
-
-- **[Application](application.md)** - Deep dive into app creation and routing
-- **[Lifecycle](lifecycle.md)** - Understand startup and shutdown sequence
-- **[Components](components.md)** - Build pluggable components
-- **[Dependency Injection](dependency-injection.md)** - Manage component dependencies
-- **[Configuration Options](configuration-options.md)** - Complete options reference
-
----
-
-## Related Modules
-
-- **[Router](../router/)** - HTTP routing and path parameters
-- **[Middleware](../middleware/)** - Request processing chain
-- **[Contract](../contract/)** - Request context and error handling
-- **[Config](../config/)** - Environment variable management
-
----
-
-**Stability**: High - Breaking changes require major version bump
-**Maintainers**: Plumego Core Team
-**Last Updated**: 2026-02-11
+Use explicit `app.Use(...)` and router-group middleware composition instead.
