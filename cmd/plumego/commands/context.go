@@ -14,9 +14,6 @@ import (
 type Context struct {
 	Out     *output.Formatter
 	EnvFile string
-	Verbose bool
-	Quiet   bool
-	Format  string
 }
 
 // resolveDir converts a directory flag to an absolute path and verifies it exists.
@@ -71,7 +68,6 @@ func parseInterspersedFlags(fs *flag.FlagSet, args []string) ([]string, error) {
 
 		fl := fs.Lookup(name)
 		if fl == nil {
-			// Keep unknown flags in the flag stream so FlagSet can report a proper parse error.
 			flagArgs = append(flagArgs, arg)
 			continue
 		}
@@ -98,7 +94,6 @@ func parseInterspersedFlags(fs *flag.FlagSet, args []string) ([]string, error) {
 		return nil, err
 	}
 
-	// Keep any remaining non-flag args from FlagSet for completeness.
 	if tail := fs.Args(); len(tail) > 0 {
 		positionals = append(positionals, tail...)
 	}

@@ -20,7 +20,20 @@ import (
 	"github.com/spcent/plumego/pubsub"
 )
 
-type DevCmd struct{}
+// DevCmd starts the development server. The newDashboard field allows
+// test code to inject a mock without using package-level variables.
+type DevCmd struct {
+	newDashboard func(devserver.Config) (devserver.DashboardAPI, error)
+}
+
+// NewDevCmd constructs a DevCmd wired to the real dashboard constructor.
+func NewDevCmd() *DevCmd {
+	return &DevCmd{
+		newDashboard: func(cfg devserver.Config) (devserver.DashboardAPI, error) {
+			return devserver.NewDashboard(cfg)
+		},
+	}
+}
 
 type devOptions struct {
 	dir             string
@@ -34,52 +47,8 @@ type devOptions struct {
 	runCmd          string
 }
 
-var newDevDashboard = func(cfg devserver.Config) (devserver.DashboardAPI, error) {
-	return devserver.NewDashboard(cfg)
-}
-
-func (c *DevCmd) Name() string {
-	return "dev"
-}
-
-func (c *DevCmd) Short() string {
-	return "Start development server with dashboard and hot reload"
-}
-
-func (c *DevCmd) Long() string {
-	return `Start a development server with web dashboard and automatic hot reload.
-
-This command runs your application with a powerful web-based dashboard that provides:
-- Real-time log streaming with filtering
-- Auto-discovered route browser
-- Performance metrics and health monitoring
-- Manual build triggers and app control
-- Hot reload on file changes (< 5 seconds)
-
-The dashboard is built with plumego itself (dogfooding), demonstrating the
-framework's capabilities while providing an enhanced development experience.
-
-Examples:
-  plumego dev                                    # Dashboard at :9999, app at :8080
-  plumego dev --addr :3000                       # Custom app port
-  plumego dev --dashboard-addr :8888             # Custom dashboard port
-  plumego dev --watch "**/*.go,**/*.yaml"        # Custom watch patterns
-  plumego dev --debounce 1s                      # Slower rebuild trigger`
-}
-
-func (c *DevCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "dir", Default: ".", Usage: "Project directory"},
-		{Name: "addr", Default: ":8080", Usage: "Application listen address (sets APP_ADDR)"},
-		{Name: "dashboard-addr", Default: "127.0.0.1:9999", Usage: "Dashboard listen address"},
-		{Name: "watch", Default: "**/*.go", Usage: "Watch patterns (comma-separated)"},
-		{Name: "exclude", Default: "", Usage: "Exclude patterns (comma-separated)"},
-		{Name: "debounce", Default: "500ms", Usage: "Debounce duration for file changes"},
-		{Name: "no-reload", Default: false, Usage: "Disable hot reload"},
-		{Name: "build-cmd", Default: "", Usage: "Custom build command"},
-		{Name: "run-cmd", Default: "", Usage: "Custom run command"},
-	}
-}
+func (c *DevCmd) Name() string  { return "dev" }
+func (c *DevCmd) Short() string { return "Start development server with dashboard and hot reload" }
 
 func (c *DevCmd) Run(ctx *Context, args []string) error {
 	opts, err := parseDevArgs(args)
@@ -116,7 +85,6 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Parse debounce duration
 	debounce, err := time.ParseDuration(opts.debounceStr)
 	if err != nil {
 		return out.Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
@@ -131,18 +99,14 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		return err
 	}
 
-	// Get UI path (embedded or disk)
 	uiPath := filepath.Join(getExecutableDir(), "internal", "devserver", "ui")
 
-	// Create dashboard
-	dash, err := newDevDashboard(devserver.Config{
-		DashboardAddr: opts.dashboardAddr,
-		AppAddr:       opts.addr,
-		ProjectDir:    absDir,
-		UIPath:        uiPath,
-	})
-	if err != nil {
-		return out.Error(fmt.Sprintf("failed to create dashboard: %v", err), 1)
+	cfg := devserver.Config{
+		DashboardAddr:     opts.dashboardAddr,
+		AppAddr:           opts.addr,
+		ProjectDir:        absDir,
+		UIPath:            uiPath,
+		OutputPassthrough: out.Format() == "text" && !out.IsQuiet(),
 	}
 
 	if opts.buildCmd != "" {
@@ -153,7 +117,8 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		if cmd == "" {
 			return out.Error("build command is empty", 1)
 		}
-		dash.GetBuilder().SetCustomBuild(cmd, args)
+		cfg.CustomBuildCmd = cmd
+		cfg.CustomBuildArgs = args
 	}
 
 	if opts.runCmd != "" {
@@ -164,10 +129,14 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		if cmd == "" {
 			return out.Error("run command is empty", 1)
 		}
-		dash.GetRunner().SetCustomCommand(cmd, args)
+		cfg.CustomRunCmd = cmd
+		cfg.CustomRunArgs = args
 	}
 
-	dash.GetRunner().SetOutputPassthrough(out.Format() == "text" && !out.IsQuiet())
+	dash, err := c.newDashboard(cfg)
+	if err != nil {
+		return out.Error(fmt.Sprintf("failed to create dashboard: %v", err), 1)
+	}
 
 	if out.Format() != "text" {
 		stopForwarder, err := startDevEventForwarder(runCtx, out, dash.GetPubSub())
@@ -177,7 +146,6 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		defer stopForwarder()
 	}
 
-	// Start dashboard server
 	if err := dash.Start(runCtx); err != nil {
 		return out.Error(fmt.Sprintf("failed to start dashboard: %v", err), 1)
 	}
@@ -186,7 +154,6 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		return err
 	}
 
-	// Build and run the application
 	if err := dash.BuildAndRun(runCtx); err != nil {
 		return out.Error(fmt.Sprintf("failed to build and run: %v", err), 1)
 	}
@@ -214,11 +181,9 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		return nil
 	}
 
-	// Parse watch patterns
 	watches := parsePatterns(opts.watchPatterns)
 	excludes := parsePatterns(opts.excludePatterns)
 
-	// Add sensible default excludes
 	excludes = append(excludes,
 		"**/vendor/**",
 		"**/node_modules/**",
@@ -227,7 +192,6 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		"**/.dev-server",
 	)
 
-	// Start file watcher
 	w, err := watcher.NewWatcher(absDir, watches, excludes, debounce)
 	if err != nil {
 		dash.Stop(runCtx)
@@ -235,7 +199,6 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	}
 	defer w.Close()
 
-	// Handle OS signals for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
@@ -243,7 +206,6 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		return err
 	}
 
-	// Main event loop
 	for {
 		select {
 		case path := <-w.Events():
@@ -251,7 +213,6 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 				return err
 			}
 
-			// Publish file change event to dashboard
 			dash.PublishEvent(devserver.EventFileChange, devserver.FileChangeEvent{
 				Path:   path,
 				Action: "modify",
@@ -270,7 +231,6 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 				}
 			}
 
-			// Trigger rebuild and restart
 			if err := dash.Rebuild(runCtx); err != nil {
 				if err := emitReloadFailed(out, err); err != nil {
 					return err
@@ -513,7 +473,7 @@ func toEventMap(data any) map[string]any {
 func emitDevStart(out *output.Formatter, absDir, addr, dashboardAddr string) error {
 	if out.Format() == "text" {
 		message := fmt.Sprintf(
-			"🚀 Starting Plumego Dev Server\n   Project: %s\n   App URL: http://localhost%s\n   Dashboard URL: http://localhost%s\n",
+			"Starting Plumego Dev Server\n   Project: %s\n   App URL: http://localhost%s\n   Dashboard URL: http://localhost%s\n",
 			absDir,
 			addr,
 			dashboardAddr,
@@ -539,7 +499,7 @@ func emitDashboardStarted(out *output.Formatter, dashboardAddr string) error {
 	if out.Format() == "text" {
 		return out.Event(output.Event{
 			Event:   "dashboard_started",
-			Message: fmt.Sprintf("✓ Dashboard started at http://localhost%s\n", dashboardAddr),
+			Message: fmt.Sprintf("Dashboard started at http://localhost%s\n", dashboardAddr),
 		})
 	}
 
@@ -570,7 +530,7 @@ func emitWatching(out *output.Formatter) error {
 	if out.Format() == "text" {
 		return out.Event(output.Event{
 			Event:   "watching",
-			Message: "👀 Watching for changes...\n   Press Ctrl+C to stop",
+			Message: "Watching for changes...\n   Press Ctrl+C to stop",
 		})
 	}
 
@@ -581,19 +541,9 @@ func emitWatching(out *output.Formatter) error {
 }
 
 func emitReloadDisabled(out *output.Formatter) error {
-	if out.Format() == "text" {
-		return out.Event(output.Event{
-			Event:   "reload_disabled",
-			Message: "Auto reload disabled.\nPress Ctrl+C to stop",
-			Data: map[string]any{
-				"auto_reload": false,
-			},
-		})
-	}
-
 	return out.Event(output.Event{
 		Event:   "reload_disabled",
-		Message: "Auto reload disabled",
+		Message: "Auto reload disabled.\nPress Ctrl+C to stop",
 		Data: map[string]any{
 			"auto_reload": false,
 		},
@@ -604,7 +554,7 @@ func emitFileChanged(out *output.Formatter, path string) error {
 	if out.Format() == "text" {
 		return out.Event(output.Event{
 			Event:   "file_changed",
-			Message: fmt.Sprintf("\n📝 File changed: %s", path),
+			Message: fmt.Sprintf("\nFile changed: %s", path),
 			Data: map[string]any{
 				"path": path,
 			},
@@ -623,7 +573,7 @@ func emitFileChanged(out *output.Formatter, path string) error {
 func emitReloadFailed(out *output.Formatter, reloadErr error) error {
 	message := "Reload failed"
 	if out.Format() == "text" {
-		message = fmt.Sprintf("❌ Reload failed: %v", reloadErr)
+		message = fmt.Sprintf("Reload failed: %v", reloadErr)
 	}
 
 	return out.Event(output.Event{
@@ -640,7 +590,7 @@ func emitReloadComplete(out *output.Formatter) error {
 	if out.Format() == "text" {
 		return out.Event(output.Event{
 			Event:   "reload_complete",
-			Message: "✓ Reload complete\n",
+			Message: "Reload complete\n",
 		})
 	}
 
@@ -653,7 +603,7 @@ func emitReloadComplete(out *output.Formatter) error {
 func emitWatcherError(out *output.Formatter, watchErr error) error {
 	message := "Watcher error"
 	if out.Format() == "text" {
-		message = fmt.Sprintf("⚠️  Watcher error: %v", watchErr)
+		message = fmt.Sprintf("Watcher error: %v", watchErr)
 	}
 
 	return out.Event(output.Event{
@@ -670,7 +620,7 @@ func emitShutdown(out *output.Formatter) error {
 	if out.Format() == "text" {
 		return out.Event(output.Event{
 			Event:   "stopped",
-			Message: "\n\n🛑 Shutting down...",
+			Message: "\nShutting down...",
 			Data: map[string]any{
 				"code": 0,
 			},
@@ -686,11 +636,10 @@ func emitShutdown(out *output.Formatter) error {
 	})
 }
 
-// getExecutableDir returns the directory containing the plumego executable
+// getExecutableDir returns the directory containing the plumego executable.
 func getExecutableDir() string {
 	ex, err := os.Executable()
 	if err != nil {
-		// Fallback to working directory
 		wd, _ := os.Getwd()
 		return wd
 	}

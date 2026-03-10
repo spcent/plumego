@@ -16,41 +16,8 @@ import (
 
 type TestCmd struct{}
 
-func (c *TestCmd) Name() string {
-	return "test"
-}
-
-func (c *TestCmd) Short() string {
-	return "Run tests with enhanced reporting"
-}
-
-func (c *TestCmd) Long() string {
-	return `Run Go tests with enhanced output and reporting.
-
-This command wraps 'go test' with structured output formats and
-additional analysis for better CI/CD integration.
-
-Examples:
-  plumego test
-  plumego test --race
-  plumego test --cover
-  plumego test --bench
-  plumego test --format json
-  plumego test ./pkg/...`
-}
-
-func (c *TestCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "dir", Default: ".", Usage: "Project directory"},
-		{Name: "race", Default: "false", Usage: "Enable race detector"},
-		{Name: "cover", Default: "false", Usage: "Enable coverage analysis"},
-		{Name: "bench", Default: "false", Usage: "Run benchmarks"},
-		{Name: "timeout", Default: "20s", Usage: "Test timeout"},
-		{Name: "tags", Default: "", Usage: "Build tags"},
-		{Name: "run", Default: "", Usage: "Run only tests matching pattern"},
-		{Name: "short", Default: "false", Usage: "Run short tests only"},
-	}
-}
+func (c *TestCmd) Name() string  { return "test" }
+func (c *TestCmd) Short() string { return "Run tests with enhanced reporting" }
 
 func (c *TestCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
@@ -74,10 +41,8 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Error(err.Error(), 1)
 	}
 
-	// Build test arguments
 	testArgs := []string{"test"}
 
-	// Determine packages to test
 	packages := []string{"./..."}
 	if len(fs.Args()) > 0 {
 		packages = fs.Args()
@@ -111,13 +76,11 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 		testArgs = append(testArgs, "-short")
 	}
 
-	// Add JSON output for parsing
 	testArgs = append(testArgs, "-json")
 	testArgs = append(testArgs, packages...)
 
 	startTime := time.Now()
 
-	// Run tests
 	cmd := exec.Command("go", testArgs...)
 	cmd.Dir = absDir
 
@@ -125,21 +88,19 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if ctx.Verbose {
+	if ctx.Out.IsVerbose() {
 		ctx.Out.Verbose(fmt.Sprintf("Running: go %s", strings.Join(testArgs, " ")))
 	}
 
 	testErr := cmd.Run()
 	duration := time.Since(startTime)
 
-	// Parse JSON output
 	testResult := parseTestOutput(stdout.String())
 	testResult["duration_ms"] = duration.Milliseconds()
 	testResult["race_detector"] = *race
 	testResult["coverage_enabled"] = *cover
 	testResult["benchmark"] = *bench
 
-	// Read coverage if available
 	if *cover {
 		coveragePath := filepath.Join(absDir, "coverage.out")
 		if coverage, err := parseCoverage(coveragePath); err == nil {
@@ -221,8 +182,6 @@ func parseCoverage(coverageFile string) (float64, error) {
 		return 0, err
 	}
 
-	// Simple coverage parsing - look for "total:" line
-	// Format: "total:	(statements)	XX.X%"
 	re := regexp.MustCompile(`total:.*?\s+([\d.]+)%`)
 	matches := re.FindStringSubmatch(string(data))
 	if len(matches) > 1 {
@@ -231,14 +190,13 @@ func parseCoverage(coverageFile string) (float64, error) {
 		return coverage, nil
 	}
 
-	// If no total line, calculate from coverage data
 	lines := strings.Split(string(data), "\n")
 	if len(lines) <= 1 {
 		return 0, fmt.Errorf("no coverage data")
 	}
 
 	var totalStatements, coveredStatements int
-	for _, line := range lines[1:] { // Skip "mode:" line
+	for _, line := range lines[1:] {
 		if line == "" {
 			continue
 		}

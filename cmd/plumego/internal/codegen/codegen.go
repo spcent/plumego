@@ -49,48 +49,38 @@ func generateComponent(dir string, opts GenerateOptions) (*GenerateResult, error
 		Name:  opts.Name,
 		Files: make(map[string][]string),
 		Imports: []string{
-			"context",
+			"net/http",
 			"github.com/spcent/plumego/core",
-			"github.com/spcent/plumego/router",
-			"github.com/spcent/plumego/middleware",
-			"github.com/spcent/plumego/health",
 		},
 	}
 
-	// Determine output path
 	outputPath := opts.OutputPath
 	if outputPath == "" {
 		componentDir := strings.ToLower(opts.Name)
-		outputPath = filepath.Join(dir, "components", componentDir, componentDir+".go")
+		outputPath = filepath.Join(dir, "internal", "httpapp", "handlers", componentDir+".go")
 	}
 
-	// Determine package name
 	packageName := opts.PackageName
 	if packageName == "" {
-		packageName = strings.ToLower(opts.Name)
+		packageName = "handlers"
 	}
 
-	// Check if file exists
 	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
 		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
 	}
 
-	// Generate component code
 	content := generateComponentCode(opts.Name, packageName)
 
-	// Create directory
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Write file
 	if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
 	result.Files["created"] = []string{outputPath}
 
-	// Generate tests if requested
 	if opts.WithTests {
 		testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
 		testContent := generateComponentTestCode(opts.Name, packageName)
@@ -113,40 +103,33 @@ func generateMiddleware(dir string, opts GenerateOptions) (*GenerateResult, erro
 		},
 	}
 
-	// Determine output path
 	outputPath := opts.OutputPath
 	if outputPath == "" {
 		middlewareName := strings.ToLower(opts.Name)
-		outputPath = filepath.Join(dir, "middleware", middlewareName+".go")
+		outputPath = filepath.Join(dir, "internal", "httpapp", "middleware", middlewareName+".go")
 	}
 
-	// Determine package name
 	packageName := opts.PackageName
 	if packageName == "" {
 		packageName = "middleware"
 	}
 
-	// Check if file exists
 	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
 		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
 	}
 
-	// Generate middleware code
 	content := generateMiddlewareCode(opts.Name, packageName)
 
-	// Create directory
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Write file
 	if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
 	result.Files["created"] = []string{outputPath}
 
-	// Generate tests if requested
 	if opts.WithTests {
 		testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
 		testContent := generateMiddlewareTestCode(opts.Name, packageName)
@@ -165,48 +148,39 @@ func generateHandler(dir string, opts GenerateOptions) (*GenerateResult, error) 
 		Name:  opts.Name,
 		Files: make(map[string][]string),
 		Imports: []string{
+			"encoding/json",
 			"net/http",
-			"github.com/spcent/plumego/contract",
 		},
 	}
 
-	// Determine output path
 	outputPath := opts.OutputPath
 	if outputPath == "" {
 		handlerName := strings.ToLower(opts.Name)
-		outputPath = filepath.Join(dir, "handlers", handlerName+".go")
+		outputPath = filepath.Join(dir, "internal", "httpapp", "handlers", handlerName+".go")
 	}
 
-	// Determine package name
 	packageName := opts.PackageName
 	if packageName == "" {
 		packageName = "handlers"
 	}
 
-	// Check if file exists
 	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
 		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
 	}
 
-	// Parse methods
 	methods := strings.Split(opts.Methods, ",")
-
-	// Generate handler code
 	content := generateHandlerCode(opts.Name, packageName, methods)
 
-	// Create directory
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Write file
 	if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
 	result.Files["created"] = []string{outputPath}
 
-	// Generate tests if requested
 	if opts.WithTests {
 		testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
 		testContent := generateHandlerTestCode(opts.Name, packageName, methods)
@@ -227,37 +201,27 @@ func generateModel(dir string, opts GenerateOptions) (*GenerateResult, error) {
 		Imports: []string{},
 	}
 
-	if opts.WithValidation {
-		result.Imports = append(result.Imports, "github.com/spcent/plumego/validator")
-	}
-
-	// Determine output path
 	outputPath := opts.OutputPath
 	if outputPath == "" {
 		modelName := strings.ToLower(opts.Name)
-		outputPath = filepath.Join(dir, "models", modelName+".go")
+		outputPath = filepath.Join(dir, "internal", "domain", modelName, modelName+".go")
 	}
 
-	// Determine package name
 	packageName := opts.PackageName
 	if packageName == "" {
-		packageName = "models"
+		packageName = strings.ToLower(opts.Name)
 	}
 
-	// Check if file exists
 	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
 		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
 	}
 
-	// Generate model code
 	content := generateModelCode(opts.Name, packageName, opts.WithValidation)
 
-	// Create directory
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Write file
 	if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
@@ -267,96 +231,65 @@ func generateModel(dir string, opts GenerateOptions) (*GenerateResult, error) {
 	return result, nil
 }
 
+// --- Code templates ---
+
+// generateComponentCode generates a canonical handler struct with health endpoint.
 func generateComponentCode(name, pkg string) string {
+	lower := strings.ToLower(name)
 	return fmt.Sprintf(`package %s
 
 import (
-	"context"
 	"net/http"
-
-	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/router"
 )
 
-// %sComponent implements the Component interface
-type %sComponent struct {
-	// Name identifies this component instance.
-	Name string
+// %sHandler handles HTTP requests for the %s domain.
+type %sHandler struct {
+	Service %sService
 }
 
-// New%sComponent creates a new %s component
-func New%sComponent() *%sComponent {
-	return &%sComponent{Name: "%s"}
+// %sService defines the operations required by %sHandler.
+type %sService interface {
+	// TODO: define service methods
 }
 
-// RegisterRoutes registers routes for this component
-func (c *%sComponent) RegisterRoutes(r *router.Router) {
-	r.Get("/%s/health", http.HandlerFunc(c.handleHealth))
-}
-
-// RegisterMiddleware registers middleware for this component
-func (c *%sComponent) RegisterMiddleware(m *middleware.Registry) {
-	// No middleware registered by default.
-}
-
-// Start starts the component
-func (c *%sComponent) Start(ctx context.Context) error {
-	return nil
-}
-
-// Stop stops the component
-func (c *%sComponent) Stop(ctx context.Context) error {
-	return nil
-}
-
-// Health returns the component health status
-func (c *%sComponent) Health() (string, health.HealthStatus) {
-	if c.Name == "" {
-		return "%s", health.Healthy()
-	}
-	return c.Name, health.Healthy()
-}
-
-func (c *%sComponent) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (h %sHandler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("{\"status\":\"ok\"}"))
+	_, _ = w.Write([]byte(`+"`"+`{"status":"ok"}`+"`"+`))
 }
-`, pkg, name, name, name, name, name, name, name, name, strings.ToLower(name), name, name, name, name, strings.ToLower(name), strings.ToLower(name), name)
+
+func (h %sHandler) RegisterRoutes(mux interface {
+	Get(string, http.HandlerFunc)
+}) {
+	mux.Get("/%s/health", h.Health)
+}
+`, pkg, name, lower, name, name, name, lower, name, name, name, lower)
 }
 
 func generateComponentTestCode(name, pkg string) string {
 	return fmt.Sprintf(`package %s
 
 import (
-	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
-func Test%sComponent_Start(t *testing.T) {
-	comp := New%sComponent()
-	ctx := context.Background()
+func Test%sHandler_Health(t *testing.T) {
+	h := %sHandler{}
 
-	if err := comp.Start(ctx); err != nil {
-		t.Errorf("Start failed: %%v", err)
+	req := httptest.NewRequest(http.MethodGet, "/%s/health", nil)
+	rec := httptest.NewRecorder()
+	h.Health(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %%d", rec.Code)
 	}
 }
-
-func Test%sComponent_Health(t *testing.T) {
-	comp := New%sComponent()
-
-	name, status := comp.Health()
-	if name == "" {
-		t.Error("Health name is empty")
-	}
-	if status.Status != "healthy" {
-		t.Errorf("Expected healthy, got %%s", status.Status)
-	}
-}
-`, pkg, name, name, name, name)
+`, pkg, name, name, strings.ToLower(name))
 }
 
+// generateMiddlewareCode generates canonical middleware: func(http.Handler) http.Handler.
 func generateMiddlewareCode(name, pkg string) string {
 	return fmt.Sprintf(`package %s
 
@@ -364,14 +297,16 @@ import (
 	"net/http"
 )
 
-// %s adds a header and passes the request through.
-func %s(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-%s", "true")
-		next.ServeHTTP(w, r)
-	})
+// %s is an HTTP middleware that adds transport-layer behaviour for %s.
+func %s() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// TODO: add transport-only logic here
+			next.ServeHTTP(w, r)
+		})
+	}
 }
-`, pkg, name, name, name)
+`, pkg, name, strings.ToLower(name), name)
 }
 
 func generateMiddlewareTestCode(name, pkg string) string {
@@ -384,26 +319,37 @@ import (
 )
 
 func Test%s(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
 	})
 
-	middleware := %s(handler)
+	handler := %s()(next)
 
-	req := httptest.NewRequest("GET", "/", nil)
-	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 
-	middleware.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %%d", w.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %%d", rec.Code)
 	}
 }
 `, pkg, name, name)
 }
 
+// generateHandlerCode generates a canonical handler struct with methods.
 func generateHandlerCode(name, pkg string, methods []string) string {
+	serviceIface := fmt.Sprintf(`
+// %sService defines the operations required by %sHandler.
+type %sService interface {
+	// TODO: define service methods
+}
+
+// %sHandler handles HTTP requests for the %s domain.
+type %sHandler struct {
+	Service %sService
+}
+`, name, name, name, name, strings.ToLower(name), name, name)
+
 	handlers := ""
 	for _, method := range methods {
 		method = strings.TrimSpace(strings.ToUpper(method))
@@ -413,51 +359,66 @@ func generateHandlerCode(name, pkg string, methods []string) string {
 	return fmt.Sprintf(`package %s
 
 import (
+	"encoding/json"
 	"net/http"
-
-	"github.com/spcent/plumego/contract"
 )
-
-%s
-`, pkg, handlers)
+%s%s`, pkg, serviceIface, handlers)
 }
 
 func generateHandlerMethodCode(name, method string) string {
+	lower := strings.ToLower(name)
 	switch method {
 	case "GET":
 		return fmt.Sprintf(`
-// Get%s handles GET requests for %s
-func Get%s(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
-		"message": "%s retrieved",
-	}, nil)
+// Get handles GET /%s
+func (h %sHandler) Get(w http.ResponseWriter, r *http.Request) {
+	// TODO: read params, call h.Service, write response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{"message": "%s retrieved"})
 }
-`, name, name, name, strings.ToLower(name))
+`, lower, name, lower)
 	case "POST":
 		return fmt.Sprintf(`
-// Create%s handles POST requests for %s
-func Create%s(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusCreated, map[string]string{
-		"message": "%s created",
-	}, nil)
+type Create%sRequest struct {
+	Name string `+"`json:\"name\"`"+`
 }
-`, name, name, name, strings.ToLower(name))
+
+type Create%sResponse struct {
+	ID string `+"`json:\"id\"`"+`
+}
+
+// Create handles POST /%s
+func (h %sHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var req Create%sRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	// TODO: call h.Service.Create(req.Name)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(Create%sResponse{ID: "TODO"})
+}
+`, name, name, lower, name, name, name)
 	case "PUT":
 		return fmt.Sprintf(`
-// Update%s handles PUT requests for %s
-func Update%s(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
-		"message": "%s updated",
-	}, nil)
+// Update handles PUT /%s/:id
+func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
+	// TODO: read id param, decode body, call h.Service.Update
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{"message": "%s updated"})
 }
-`, name, name, name, strings.ToLower(name))
+`, lower, name, lower)
 	case "DELETE":
 		return fmt.Sprintf(`
-// Delete%s handles DELETE requests for %s
-func Delete%s(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusNoContent, nil, nil)
+// Delete handles DELETE /%s/:id
+func (h %sHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	// TODO: read id param, call h.Service.Delete
+	w.WriteHeader(http.StatusNoContent)
 }
-`, name, name, name)
+`, lower, name)
 	default:
 		return ""
 	}
@@ -473,68 +434,64 @@ func generateHandlerTestCode(name, pkg string, methods []string) string {
 	return fmt.Sprintf(`package %s
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 )
-
-%s
-`, pkg, tests)
+%s`, pkg, tests)
 }
 
 func generateHandlerTestMethodCode(name, method string) string {
+	lower := strings.ToLower(name)
 	switch method {
 	case "GET":
 		return fmt.Sprintf(`
 func TestGet%s(t *testing.T) {
-	req := httptest.NewRequest("GET", "/%s", nil)
-	w := httptest.NewRecorder()
-
-	Get%s(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("Expected status 200, got %%d", w.Code)
+	h := %sHandler{}
+	req := httptest.NewRequest(http.MethodGet, "/%s", nil)
+	rec := httptest.NewRecorder()
+	h.Get(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %%d", rec.Code)
 	}
 }
-`, name, strings.ToLower(name), name)
+`, name, name, lower)
 	case "POST":
 		return fmt.Sprintf(`
 func TestCreate%s(t *testing.T) {
-	req := httptest.NewRequest("POST", "/%s", nil)
-	w := httptest.NewRecorder()
-
-	Create%s(w, req)
-
-	if w.Code != 201 {
-		t.Errorf("Expected status 201, got %%d", w.Code)
+	h := %sHandler{}
+	req := httptest.NewRequest(http.MethodPost, "/%s", nil)
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusCreated {
+		t.Fatalf("unexpected status %%d", rec.Code)
 	}
 }
-`, name, strings.ToLower(name), name)
+`, name, name, lower)
 	case "PUT":
 		return fmt.Sprintf(`
 func TestUpdate%s(t *testing.T) {
-	req := httptest.NewRequest("PUT", "/%s/1", nil)
-	w := httptest.NewRecorder()
-
-	Update%s(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("Expected status 200, got %%d", w.Code)
+	h := %sHandler{}
+	req := httptest.NewRequest(http.MethodPut, "/%s/1", nil)
+	rec := httptest.NewRecorder()
+	h.Update(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %%d", rec.Code)
 	}
 }
-`, name, strings.ToLower(name), name)
+`, name, name, lower)
 	case "DELETE":
 		return fmt.Sprintf(`
 func TestDelete%s(t *testing.T) {
-	req := httptest.NewRequest("DELETE", "/%s/1", nil)
-	w := httptest.NewRecorder()
-
-	Delete%s(w, req)
-
-	if w.Code != 204 {
-		t.Errorf("Expected status 204, got %%d", w.Code)
+	h := %sHandler{}
+	req := httptest.NewRequest(http.MethodDelete, "/%s/1", nil)
+	rec := httptest.NewRecorder()
+	h.Delete(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %%d", rec.Code)
 	}
 }
-`, name, strings.ToLower(name), name)
+`, name, name, lower)
 	default:
 		return ""
 	}
@@ -543,20 +500,19 @@ func TestDelete%s(t *testing.T) {
 func generateModelCode(name, pkg string, withValidation bool) string {
 	validation := ""
 	if withValidation {
-		validation = `
-// Validate validates the model
-func (m *` + name + `) Validate() error {
+		validation = fmt.Sprintf(`
+// Validate checks required fields.
+func (m *%s) Validate() error {
 	if strings.TrimSpace(m.Name) == "" {
 		return fmt.Errorf("name is required")
 	}
 	return nil
-}`
+}`, name)
 	}
 
 	imports := ""
 	if withValidation {
 		imports = `
-
 import (
 	"fmt"
 	"strings"
@@ -566,14 +522,12 @@ import (
 
 	return fmt.Sprintf(`package %s
 %s
-
-// %s represents a %s model
+// %s represents a %s entity.
 type %s struct {
 	ID        int64  `+"`json:\"id\"`"+`
 	CreatedAt string `+"`json:\"created_at\"`"+`
 	UpdatedAt string `+"`json:\"updated_at\"`"+`
-
-	Name string `+"`json:\"name\"`"+`
+	Name      string `+"`json:\"name\"`"+`
 }
 %s
 `, pkg, imports, name, strings.ToLower(name), name, validation)
