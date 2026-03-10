@@ -128,12 +128,12 @@ Status: Completed for high-traffic examples and now included in drift scan.
 ### Phase E: Canonical Snippet Compile Gate (New)
 
 Target:
-- Add a lightweight compile check for selected canonical docs snippets (`README*`, `docs/getting-started.md`, `docs/modules/core/README.md`, `docs/modules/health/*`, `docs/modules/router/path-parameters.md`, `docs/modules/router/advanced-patterns.md`) plus high-traffic examples docs (`examples/docs/en|zh/guide.md`, `examples/docs/en/websocket/websocket.md`).
+- Add a lightweight compile check for selected canonical docs snippets (`README*`, `docs/getting-started.md`, `docs/modules/core/README.md`, `docs/modules/health/*`, `docs/modules/router/README.md`, `docs/modules/router/basic-routing.md`, `docs/modules/router/middleware-binding.md`, `docs/modules/router/reverse-routing.md`, `docs/modules/router/route-groups.md`, `docs/modules/router/path-parameters.md`, `docs/modules/router/advanced-patterns.md`) plus high-traffic examples docs (`examples/docs/en|zh/guide.md`, `examples/docs/en/websocket/websocket.md`).
 
 Acceptance:
 - CI/local gate can catch signature drift beyond regex pattern checks.
 
-Status: Completed in current round (`scripts/check-doc-snippets-compile.sh` integrated into release readiness gate, currently validating 19 `package main` snippets).
+Status: Completed in current round (`scripts/check-doc-snippets-compile.sh` integrated into release readiness gate, currently validating 24 `package main` snippets).
 
 ## 5. Release-Ready Exit Criteria
 

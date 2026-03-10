@@ -31,6 +31,36 @@ api := r.Group("/api")
 api.Get("/ping", http.HandlerFunc(pingHandler))
 ```
 
+Compile-oriented complete example:
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/router"
+)
+
+func main() {
+    app := core.New(core.WithAddr(":8080"))
+    r := app.Router()
+
+    api := r.Group("/api")
+    v1 := api.Group("/v1")
+    v1.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+        id := router.Param(req, "id")
+        _, _ = w.Write([]byte("user=" + id))
+    }))
+
+    if err := app.Boot(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
 ---
 
 ## Prefix Composition
