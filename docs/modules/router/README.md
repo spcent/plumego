@@ -43,6 +43,37 @@ if err := app.Boot(); err != nil {
 }
 ```
 
+Compile-oriented complete example:
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/router"
+)
+
+func main() {
+    app := core.New(core.WithAddr(":8080"))
+    r := app.Router()
+    r.Use(observability.RequestID())
+
+    api := r.Group("/api/v1")
+    api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+        id := router.Param(req, "id")
+        _, _ = w.Write([]byte("user=" + id))
+    }))
+
+    if err := app.Boot(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
 ---
 
 ## Standalone Usage

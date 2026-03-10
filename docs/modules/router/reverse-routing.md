@@ -30,6 +30,37 @@ url := app.Router().URL("users.show", "id", "42")
 _ = url
 ```
 
+Compile-oriented complete example:
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego/core"
+)
+
+func main() {
+    app := core.New(core.WithAddr(":8080"))
+
+    app.GetNamed("users.show", "/users/:id", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+    })
+    app.GetNamed("users.posts", "/users/:id/posts/:postId", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+    })
+
+    _ = app.Router().URL("users.show", "id", "42")
+    _ = app.Router().URL("users.posts", "id", "42", "postId", "7")
+
+    if err := app.Boot(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
 ## Quick Start (standalone router)
 
 ```go

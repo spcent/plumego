@@ -108,6 +108,53 @@ Effective chain for `/api/v1/users`:
 
 `RequestID -> Logging -> authn -> rateLimit -> handler`
 
+Compile-oriented complete example:
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/middleware/observability"
+)
+
+func main() {
+    app := core.New(core.WithAddr(":8080"))
+
+    if err := app.Use(observability.RequestID()); err != nil {
+        log.Fatal(err)
+    }
+
+    r := app.Router()
+    r.Use(passThroughMiddleware)
+
+    api := r.Group("/api")
+    api.Use(passThroughMiddleware)
+
+    v1 := api.Group("/v1")
+    v1.Use(passThroughMiddleware)
+
+    v1.Get("/users", http.HandlerFunc(listUsers))
+
+    if err := app.Boot(); err != nil {
+        log.Fatal(err)
+    }
+}
+
+func passThroughMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        next.ServeHTTP(w, r)
+    })
+}
+
+func listUsers(w http.ResponseWriter, r *http.Request) {
+    _, _ = w.Write([]byte("[]"))
+}
+```
+
 ---
 
 ## Error and Panic Path

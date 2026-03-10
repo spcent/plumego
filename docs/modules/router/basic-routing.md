@@ -59,6 +59,37 @@ app.Post("/users", createUser)
 app.Get("/users/:id", getUser)
 ```
 
+Compile-oriented complete example:
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego/core"
+)
+
+func main() {
+    app := core.New(core.WithAddr(":8080"))
+
+    app.Get("/users", func(w http.ResponseWriter, r *http.Request) {
+        _, _ = w.Write([]byte("list users"))
+    })
+    app.Post("/users", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusCreated)
+    })
+    app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+        _, _ = w.Write([]byte("get user"))
+    })
+
+    if err := app.Boot(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
 Use one method+path registration per line to keep behavior explicit.
 
 ## Groups and Middleware
