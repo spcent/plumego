@@ -93,9 +93,9 @@ func main() {
     app := plumego.New(plumego.WithAddr(":8080"))
 
     app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-        contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+        _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
             "status": "ok",
-        })
+        }, nil)
     })
 
     log.Println("server started at :8080")
@@ -211,7 +211,7 @@ func setupTenantApp(database *sql.DB) *core.App {
             return
         }
         defer rows.Close()
-        contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"})
+        _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"}, nil)
     }))
 
     return app
@@ -370,11 +370,17 @@ go run ./examples/reference
 The `health` package now exposes HTTP handlers, eliminating the need to implement ready/build info checks yourself:
 
 ```go
-app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+if err != nil {
+    log.Fatal(err)
+}
+
+app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 
-`ReadinessHandler` returns 200 after `health.SetReady()` is called (the startup lifecycle calls this automatically), otherwise 503. `BuildInfoHandler` returns the current `health.BuildInfo` struct as JSON.
+`ReadinessHandler` returns readiness from the provided `HealthManager` (200 when ready, otherwise 503). When the manager is attached via `core.WithHealthManager`, the core lifecycle updates readiness automatically.
 
 ## Observability Adapters
 No need to write your own adapters to hook logging middleware into metrics/tracing backends:

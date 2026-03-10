@@ -74,7 +74,7 @@ func main() {
 - Middleware: register explicitly with `app.Use(...)`, group scope with `group.Use(...)`.
 - Contract helpers: `contract.WriteError`, `contract.WriteResponse`, `contract.AdaptCtxHandler`.
 - WebSocket: `app.ConfigureWebSocket()` / `app.ConfigureWebSocketWithOptions(...)`.
-- Health: `health.ReadinessHandler()` and `health.BuildInfoHandler()`.
+- Health: `health.ReadinessHandler(manager)` and `health.BuildInfoHandler()`.
 
 ## Reference App
 `examples/reference` wires a production-like setup:

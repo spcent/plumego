@@ -48,7 +48,9 @@ func (w *worker) RegisterRoutes(r *router.Router)           {}
 func (w *worker) RegisterMiddleware(m *middleware.Registry) {}
 func (w *worker) Start(ctx context.Context) error           { return nil }
 func (w *worker) Stop(ctx context.Context) error            { return nil }
-func (w *worker) Health() (string, health.HealthStatus)     { return "worker", health.Healthy }
+func (w *worker) Health() (string, health.HealthStatus) {
+    return "worker", health.HealthStatus{Status: health.StatusHealthy}
+}
 
 app := core.New(core.WithComponent(&worker{bus: pubsub.New()}))
 ```
@@ -59,11 +61,16 @@ app := core.New(core.WithComponent(&worker{bus: pubsub.New()}))
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
 tracer := metrics.NewOpenTelemetryTracer("plumego")
+healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+if err != nil {
+    log.Fatal(err)
+}
 
 app := core.New(
     core.WithAddr(":8080"),
     core.WithMetricsCollector(prom),
     core.WithTracer(tracer),
+    core.WithHealthManager(healthManager),
 )
 
 if err := app.Use(
@@ -75,7 +82,7 @@ if err := app.Use(
 }
 
 app.Get("/metrics", prom.Handler().ServeHTTP)
-app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 
 if err := app.Boot(); err != nil {

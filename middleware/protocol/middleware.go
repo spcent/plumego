@@ -50,7 +50,7 @@ func Middleware(registry *protocol.Registry) func(http.Handler) http.Handler {
 			}
 
 			// Try to find adapter
-			adapter := registry.Find(httpReq)
+			adapter := findAdapter(registry, httpReq)
 			if adapter == nil {
 				// No adapter found, pass through to next handler
 				next.ServeHTTP(w, r)
@@ -123,6 +123,13 @@ func (w *responseWriter) WriteHeader(statusCode int) {
 	}
 }
 
+func findAdapter(registry *protocol.Registry, req *protocol.HTTPRequest) protocol.ProtocolAdapter {
+	if registry == nil {
+		return nil
+	}
+	return registry.Find(req)
+}
+
 // convertHeaders converts http.Header to map[string][]string
 func convertHeaders(h http.Header) map[string][]string {
 	headers := make(map[string][]string)
@@ -156,7 +163,19 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Convert http.Request to HTTPRequest
-			body, _ := io.ReadAll(r.Body)
+			bodyReader := r.Body
+			if bodyReader == nil {
+				bodyReader = http.NoBody
+			}
+			body, err := io.ReadAll(bodyReader)
+			if err != nil {
+				if config.OnTransformError != nil {
+					config.OnTransformError(w, r, err)
+					return
+				}
+				mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeProtocolTransformFail, "protocol request read failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
+				return
+			}
 			r.Body = io.NopCloser(bytes.NewReader(body)) // Restore for potential passthrough
 
 			httpReq := &protocol.HTTPRequest{
@@ -168,7 +187,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 			}
 
 			// Try to find adapter
-			adapter := config.Registry.Find(httpReq)
+			adapter := findAdapter(config.Registry, httpReq)
 			if adapter == nil {
 				if config.OnAdapterNotFound != nil {
 					config.OnAdapterNotFound(w, r)

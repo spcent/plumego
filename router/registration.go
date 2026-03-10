@@ -53,6 +53,15 @@ func (r *Router) mustAddRoute(method, path string, handler Handler) {
 	}
 }
 
+// mustAddNamedRoute calls AddRouteWithName and panics on error.
+// Used by the named convenience methods where registration failures are
+// programming errors (duplicate route, frozen router) and should fail fast.
+func (r *Router) mustAddNamedRoute(method, path, name string, handler Handler) {
+	if err := r.AddRouteWithName(method, path, name, handler); err != nil {
+		panic(fmt.Sprintf("router: %v", err))
+	}
+}
+
 // AddRoute adds a route to the router with the given method, path, and handler.
 // Returns an error for programming mistakes such as duplicate routes or
 // registering routes after Freeze(). Use the method shortcuts (Get, Post, …)

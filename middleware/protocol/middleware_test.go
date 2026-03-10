@@ -1,0 +1,209 @@
+package protocol
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	contractproto "github.com/spcent/plumego/contract/protocol"
+)
+
+type stubProtocolRequest struct {
+	method string
+	body   []byte
+}
+
+func (r *stubProtocolRequest) Method() string               { return r.method }
+func (r *stubProtocolRequest) Headers() map[string][]string { return map[string][]string{} }
+func (r *stubProtocolRequest) Body() io.Reader              { return bytes.NewReader(r.body) }
+func (r *stubProtocolRequest) Metadata() map[string]any     { return map[string]any{} }
+
+type stubProtocolResponse struct {
+	status int
+	body   []byte
+}
+
+func (r *stubProtocolResponse) StatusCode() int              { return r.status }
+func (r *stubProtocolResponse) Headers() map[string][]string { return map[string][]string{} }
+func (r *stubProtocolResponse) Body() io.Reader              { return bytes.NewReader(r.body) }
+func (r *stubProtocolResponse) Metadata() map[string]any     { return map[string]any{} }
+
+type stubAdapter struct {
+	lastBody string
+}
+
+func (a *stubAdapter) Name() string { return "stub" }
+
+func (a *stubAdapter) Handles(_ *contractproto.HTTPRequest) bool {
+	return true
+}
+
+func (a *stubAdapter) Transform(_ context.Context, req *contractproto.HTTPRequest) (contractproto.Request, error) {
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	a.lastBody = string(body)
+	return &stubProtocolRequest{method: req.Method, body: body}, nil
+}
+
+func (a *stubAdapter) Execute(_ context.Context, req contractproto.Request) (contractproto.Response, error) {
+	return &stubProtocolResponse{
+		status: http.StatusCreated,
+		body:   []byte("created:" + req.Method()),
+	}, nil
+}
+
+func (a *stubAdapter) Encode(_ context.Context, resp contractproto.Response, writer contractproto.ResponseWriter) error {
+	writer.WriteHeader(resp.StatusCode())
+	body, err := io.ReadAll(resp.Body())
+	if err != nil {
+		return err
+	}
+	_, err = writer.Write(body)
+	return err
+}
+
+type errReadCloser struct{}
+
+func (errReadCloser) Read(_ []byte) (int, error) { return 0, errors.New("read body failed") }
+func (errReadCloser) Close() error               { return nil }
+
+func TestMiddlewareNilRegistryPassThrough(t *testing.T) {
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusAccepted)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/passthrough", nil)
+	rec := httptest.NewRecorder()
+	Middleware(nil)(next).ServeHTTP(rec, req)
+
+	if !nextCalled {
+		t.Fatalf("expected next handler to be called")
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d", http.StatusAccepted, rec.Code)
+	}
+}
+
+func TestMiddlewareWithConfigNilRegistryPassThrough(t *testing.T) {
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		body, _ := io.ReadAll(r.Body)
+		if string(body) != "payload" {
+			t.Fatalf("expected passthrough body payload, got %q", string(body))
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/passthrough", bytes.NewBufferString("payload"))
+	rec := httptest.NewRecorder()
+	MiddlewareWithConfig(Config{})(next).ServeHTTP(rec, req)
+
+	if !nextCalled {
+		t.Fatalf("expected next handler to be called")
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestMiddlewareWithConfigNilRegistryOnAdapterNotFound(t *testing.T) {
+	nextCalled := false
+	notFoundCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	cfg := Config{
+		OnAdapterNotFound: func(w http.ResponseWriter, _ *http.Request) {
+			notFoundCalled = true
+			w.WriteHeader(http.StatusTeapot)
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/custom-not-found", nil)
+	rec := httptest.NewRecorder()
+	MiddlewareWithConfig(cfg)(next).ServeHTTP(rec, req)
+
+	if !notFoundCalled {
+		t.Fatalf("expected OnAdapterNotFound to be called")
+	}
+	if nextCalled {
+		t.Fatalf("expected next handler to be skipped when OnAdapterNotFound handles request")
+	}
+	if rec.Code != http.StatusTeapot {
+		t.Fatalf("expected status %d, got %d", http.StatusTeapot, rec.Code)
+	}
+}
+
+func TestMiddlewareWithConfigReadBodyErrorUsesOnTransformError(t *testing.T) {
+	nextCalled := false
+	onTransformCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	cfg := Config{
+		OnTransformError: func(w http.ResponseWriter, _ *http.Request, err error) {
+			onTransformCalled = true
+			if err == nil || err.Error() != "read body failed" {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			w.WriteHeader(http.StatusBadRequest)
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/read-error", nil)
+	req.Body = errReadCloser{}
+	rec := httptest.NewRecorder()
+	MiddlewareWithConfig(cfg)(next).ServeHTTP(rec, req)
+
+	if !onTransformCalled {
+		t.Fatalf("expected OnTransformError to be called")
+	}
+	if nextCalled {
+		t.Fatalf("expected next handler to be skipped on read error")
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestMiddlewareUsesRegisteredAdapter(t *testing.T) {
+	adapter := &stubAdapter{}
+	registry := contractproto.NewRegistry()
+	registry.Register(adapter)
+
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/proto", bytes.NewBufferString("hello"))
+	rec := httptest.NewRecorder()
+	Middleware(registry)(next).ServeHTTP(rec, req)
+
+	if nextCalled {
+		t.Fatalf("expected next handler to be skipped when adapter handles request")
+	}
+	if adapter.lastBody != "hello" {
+		t.Fatalf("expected adapter body hello, got %q", adapter.lastBody)
+	}
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d", http.StatusCreated, rec.Code)
+	}
+	if rec.Body.String() != "created:POST" {
+		t.Fatalf("expected response body created:POST, got %q", rec.Body.String())
+	}
+}

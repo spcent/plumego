@@ -323,8 +323,8 @@ import (
     "encoding/json"
     "net/http"
     "strconv"
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego"
 )
 
 type User struct {
@@ -337,7 +337,7 @@ func main() {
 
     // Get user by ID
     app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-        idStr := plumego.Param(r, "id")
+        idStr, _ := contract.Param(r, "id")
 
         id, err := strconv.Atoi(idStr)
         if err != nil {
@@ -351,7 +351,7 @@ func main() {
 
     // Get user's posts
     app.Get("/users/:id/posts", func(w http.ResponseWriter, r *http.Request) {
-        idStr := plumego.Param(r, "id")
+        idStr, _ := contract.Param(r, "id")
         id, _ := strconv.Atoi(idStr)
 
         posts := []map[string]interface{}{
@@ -363,8 +363,8 @@ func main() {
 
     // Get specific post
     app.Get("/users/:userId/posts/:postId", func(w http.ResponseWriter, r *http.Request) {
-        userId := plumego.Param(r, "userId")
-        postId := plumego.Param(r, "postId")
+        userId, _ := contract.Param(r, "userId")
+        postId, _ := contract.Param(r, "postId")
 
         post := map[string]string{
             "userId": userId,
@@ -388,8 +388,8 @@ import (
     "net/http"
     "os"
     "path/filepath"
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego"
 )
 
 func main() {
@@ -397,7 +397,7 @@ func main() {
 
     // Serve files from /files/*path
     app.Get("/files/*path", func(w http.ResponseWriter, r *http.Request) {
-        path := plumego.Param(r, "path")
+        path, _ := contract.Param(r, "path")
 
         // Security: prevent directory traversal
         path = filepath.Clean(path)
@@ -428,7 +428,7 @@ func main() {
 
     // File metadata endpoint
     app.Get("/files/*/info", func(w http.ResponseWriter, r *http.Request) {
-        path := plumego.Param(r, "path")
+        path, _ := contract.Param(r, "path")
         fullPath := filepath.Join("./public", filepath.Clean(path))
 
         info, err := os.Stat(fullPath)
@@ -452,8 +452,8 @@ package main
 import (
     "fmt"
     "net/http"
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego"
 )
 
 func main() {
@@ -461,23 +461,23 @@ func main() {
 
     // User profile
     app.Get("/:username", func(w http.ResponseWriter, r *http.Request) {
-        username := plumego.Param(r, "username")
+        username, _ := contract.Param(r, "username")
         fmt.Fprintf(w, "Profile: %s", username)
     })
 
     // User's repositories
     app.Get("/:username/:repo", func(w http.ResponseWriter, r *http.Request) {
-        username := plumego.Param(r, "username")
-        repo := plumego.Param(r, "repo")
+        username, _ := contract.Param(r, "username")
+        repo, _ := contract.Param(r, "repo")
         fmt.Fprintf(w, "Repository: %s/%s", username, repo)
     })
 
     // Repository file browser
     app.Get("/:username/:repo/tree/:branch/*path", func(w http.ResponseWriter, r *http.Request) {
-        username := plumego.Param(r, "username")
-        repo := plumego.Param(r, "repo")
-        branch := plumego.Param(r, "branch")
-        path := plumego.Param(r, "path")
+        username, _ := contract.Param(r, "username")
+        repo, _ := contract.Param(r, "repo")
+        branch, _ := contract.Param(r, "branch")
+        path, _ := contract.Param(r, "path")
 
         fmt.Fprintf(w, "Repo: %s/%s\nBranch: %s\nPath: %s",
             username, repo, branch, path)
@@ -485,9 +485,9 @@ func main() {
 
     // Repository issues
     app.Get("/:username/:repo/issues/:number", func(w http.ResponseWriter, r *http.Request) {
-        username := plumego.Param(r, "username")
-        repo := plumego.Param(r, "repo")
-        number := plumego.Param(r, "number")
+        username, _ := contract.Param(r, "username")
+        repo, _ := contract.Param(r, "repo")
+        number, _ := contract.Param(r, "number")
 
         fmt.Fprintf(w, "Issue: %s/%s#%s", username, repo, number)
     })
@@ -606,17 +606,18 @@ app.Get("/users/*path", handler3)    // Priority 3 (wildcard)
 package main
 
 import (
+    "net/http"
     "net/http/httptest"
     "testing"
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego"
 )
 
 func TestPathParameters(t *testing.T) {
     app := core.New()
 
     app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-        id := plumego.Param(r, "id")
+        id, _ := contract.Param(r, "id")
         w.Write([]byte(id))
     })
 

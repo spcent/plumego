@@ -28,11 +28,17 @@ app.Get("/metrics", prom.Handler().ServeHTTP)
 
 ## Health endpoints
 ```go
-app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+if err != nil {
+    log.Fatal(err)
+}
+
+app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 
-- `ReadinessHandler`: returns `200` after ready, `503` during startup/shutdown.
+- `ReadinessHandler`: returns readiness from `healthManager` (`200` when ready, `503` when not ready).
 - `BuildInfoHandler`: returns build metadata JSON (`version`, `commit`, `build_time`).
 
 ## Component health reporting

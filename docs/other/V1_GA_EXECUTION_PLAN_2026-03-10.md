@@ -25,18 +25,36 @@ Scope decision: Option A (`core/router/middleware/contract/security/store` GA; `
   - `go test -timeout 20s ./...`
   - `go test -race -timeout 60s ./...`
   - `go vet ./...`
+- Core/router named-route convenience APIs aligned and covered:
+  - `core.App`: `GetNamed/PostNamed/PutNamed/DeleteNamed/PatchNamed/AnyNamed`
+  - `router.Router`: `GetNamed/PostNamed/PutNamed/DeleteNamed/PatchNamed/AnyNamed`
+  - Added regression tests in `core/routing_test.go` and `router/reverse_routing_group_test.go`
+- Added strict core registration APIs with explicit errors:
+  - `(*App).AddRoute(...) error`
+  - `(*App).AddRouteWithName(...) error`
+- Protocol middleware safety hardened:
+  - nil registry passthrough behavior for `middleware/protocol`
+  - request-body read error path handling
+  - regression tests in `middleware/protocol/middleware_test.go`
+- Canonical health/router/example docs corrected to compile-faithful API usage:
+  - `health.ReadinessHandler(manager)` style
+  - router reverse-routing `URL(name, "k", "v", ...)` style
+- `scripts/check-doc-api-drift.sh` expanded:
+  - detects old health API signatures
+  - detects old router URL map signature pattern
+  - scans `examples/docs/en` + `examples/docs/zh`
+- `scripts/v1-release-readiness-check.sh` now passes end-to-end in current environment (root + submodules).
 
 ## 2. Current Risk Snapshot
 
 ### P0 (must finish before v1.0.0 final)
 
-1. Documentation drift still exists in module docs/examples with removed APIs (`WithRecommendedMiddleware`, `WithTenantMiddleware`, `app.Shutdown`, etc.).
-2. Canonical API story is still fragmented across router/middleware/tenant docs.
+1. No new open P0 found in canonical v1 API/doc path after latest pass.
 
 ### P1 (should finish for production readiness)
 
-1. Cross-doc compatibility annotation is inconsistent (stable vs experimental module boundaries).
-2. Example catalog contains historical snippets that are not compile-faithful.
+1. Compile-faithful validation for canonical docs is still mostly pattern-based (`check-doc-api-drift.sh`), not full snippet compilation.
+2. Historical/plan documents still contain removed APIs (intentional in some files), which can still confuse contributors if navigation discipline is not followed.
 
 ## 3. Drift Inventory (Top Files by stale API hit count)
 
@@ -69,6 +87,8 @@ Acceptance:
 - All snippets use explicit `app.Use(...)` or `group.Use(...)`.
 - Group examples use `app.Router().Group(...)` with current router API.
 
+Status: Completed in current round.
+
 ### Phase B: Core Lifecycle and Component Docs
 
 Target files:
@@ -78,6 +98,8 @@ Target files:
 Acceptance:
 - Remove references to non-existent `app.Shutdown`, `app.Addr`, `app.Group`, `WithServer`, `WithDIContainer` in canonical sections.
 - Keep lifecycle behavior aligned with current `Boot()` and signal handling model.
+
+Status: Mostly completed for canonical paths; continue spot-fix as new drift appears.
 
 ### Phase C: Tenant Experimental Docs Cleanup
 
@@ -89,6 +111,8 @@ Acceptance:
 - Replace removed core options with explicit tenant middleware chain on router groups.
 - Add explicit “Experimental” compatibility banner in each entry doc.
 
+Status: Partially completed; still ongoing for non-canonical planning docs.
+
 ### Phase D: Example Docs Cleanup (EN/ZH)
 
 Target files:
@@ -98,6 +122,18 @@ Target files:
 Acceptance:
 - No removed API names in docs snippets.
 - Keep examples aligned with README canonical style.
+
+Status: Completed for high-traffic examples and now included in drift scan.
+
+### Phase E: Canonical Snippet Compile Gate (New)
+
+Target:
+- Add a lightweight compile check for selected canonical docs snippets (`README*`, `docs/getting-started.md`, `docs/modules/core/README.md`, `docs/modules/health/*`, `docs/modules/router/path-parameters.md`, `docs/modules/router/advanced-patterns.md`) plus high-traffic examples docs (`examples/docs/en|zh/guide.md`, `examples/docs/en/websocket/websocket.md`).
+
+Acceptance:
+- CI/local gate can catch signature drift beyond regex pattern checks.
+
+Status: Completed in current round (`scripts/check-doc-snippets-compile.sh` integrated into release readiness gate, currently validating 19 `package main` snippets).
 
 ## 5. Release-Ready Exit Criteria
 
@@ -129,6 +165,7 @@ Use `scripts/v1-release-readiness-check.sh` as the single pre-release entrypoint
   - root `go test -timeout 20s ./...`
   - root `go vet ./...`
   - canonical doc drift check (`scripts/check-doc-api-drift.sh`)
+  - canonical doc snippet compile check (`scripts/check-doc-snippets-compile.sh`)
   - submodule `gofmt` + `go test` + `go vet`
 - Optional race run:
   - `RUN_RACE=1 bash scripts/v1-release-readiness-check.sh`

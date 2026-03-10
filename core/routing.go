@@ -9,30 +9,56 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-func (a *App) registerRoute(method, path string, handler http.Handler) {
+func (a *App) addRoute(method, path string, handler http.Handler) error {
 	if handler == nil {
-		err := contract.WrapError(contract.ErrHandlerNil, "add_route", "core", map[string]any{
+		return contract.WrapError(contract.ErrHandlerNil, "add_route", "core", map[string]any{
 			"method": method,
 			"path":   path,
 		})
-		a.logError("route registration failed", err, log.Fields{"method": method, "path": path})
-		return
 	}
 
 	if err := a.ensureMutable("add_route", "register route"); err != nil {
-		a.logError("route registration failed", err, log.Fields{"method": method, "path": path})
-		return
+		return err
 	}
 
 	r := a.ensureRouter()
 	if r == nil {
-		err := contract.WrapError(fmt.Errorf("router not configured"), "add_route", "core", nil)
-		a.logError("route registration failed", err, log.Fields{"method": method, "path": path})
-		return
+		return contract.WrapError(fmt.Errorf("router not configured"), "add_route", "core", nil)
 	}
 
-	if err := r.AddRoute(method, path, handler); err != nil {
+	return r.AddRoute(method, path, handler)
+}
+
+func (a *App) addNamedRoute(method, name, path string, handler http.Handler) error {
+	if handler == nil {
+		return contract.WrapError(contract.ErrHandlerNil, "add_route", "core", map[string]any{
+			"method": method,
+			"path":   path,
+			"name":   name,
+		})
+	}
+
+	if err := a.ensureMutable("add_route", "register route"); err != nil {
+		return err
+	}
+
+	r := a.ensureRouter()
+	if r == nil {
+		return contract.WrapError(fmt.Errorf("router not configured"), "add_route", "core", nil)
+	}
+
+	return r.AddRouteWithName(method, path, name, handler)
+}
+
+func (a *App) registerRoute(method, path string, handler http.Handler) {
+	if err := a.addRoute(method, path, handler); err != nil {
 		a.logError("route registration failed", err, log.Fields{"method": method, "path": path})
+	}
+}
+
+func (a *App) registerNamedRoute(method, name, path string, handler http.Handler) {
+	if err := a.addNamedRoute(method, name, path, handler); err != nil {
+		a.logError("named route registration failed", err, log.Fields{"method": method, "path": path, "name": name})
 	}
 }
 
@@ -44,6 +70,17 @@ func (a *App) registerRoute(method, path string, handler http.Handler) {
 // This is the only style shown in quick-start guides and
 // canonical examples.
 // =========================================================
+
+// AddRoute registers a route and returns explicit errors for invalid registration.
+// This is useful in strict boot wiring where route registration failures must be surfaced.
+func (a *App) AddRoute(method, path string, handler http.Handler) error {
+	return a.addRoute(method, path, handler)
+}
+
+// AddRouteWithName registers a named route and returns explicit registration errors.
+func (a *App) AddRouteWithName(method, path, name string, handler http.Handler) error {
+	return a.addNamedRoute(method, name, path, handler)
+}
 
 // HandleFunc registers a handler function for the given path (any HTTP method).
 func (a *App) HandleFunc(pattern string, handler http.HandlerFunc) {
@@ -83,4 +120,34 @@ func (a *App) Patch(path string, handler http.HandlerFunc) {
 // Any registers a route for any HTTP method with the given handler.
 func (a *App) Any(path string, handler http.HandlerFunc) {
 	a.registerRoute(router.ANY, path, handler)
+}
+
+// GetNamed registers a named GET route.
+func (a *App) GetNamed(name, path string, handler http.HandlerFunc) {
+	a.registerNamedRoute(router.GET, name, path, handler)
+}
+
+// PostNamed registers a named POST route.
+func (a *App) PostNamed(name, path string, handler http.HandlerFunc) {
+	a.registerNamedRoute(router.POST, name, path, handler)
+}
+
+// PutNamed registers a named PUT route.
+func (a *App) PutNamed(name, path string, handler http.HandlerFunc) {
+	a.registerNamedRoute(router.PUT, name, path, handler)
+}
+
+// DeleteNamed registers a named DELETE route.
+func (a *App) DeleteNamed(name, path string, handler http.HandlerFunc) {
+	a.registerNamedRoute(router.DELETE, name, path, handler)
+}
+
+// PatchNamed registers a named PATCH route.
+func (a *App) PatchNamed(name, path string, handler http.HandlerFunc) {
+	a.registerNamedRoute(router.PATCH, name, path, handler)
+}
+
+// AnyNamed registers a named route for any HTTP method.
+func (a *App) AnyNamed(name, path string, handler http.HandlerFunc) {
+	a.registerNamedRoute(router.ANY, name, path, handler)
 }

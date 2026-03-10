@@ -136,3 +136,43 @@ func TestGroupRootNamedRouteUsesNormalizedPrefix(t *testing.T) {
 		t.Fatalf("expected 204, got %d", rec.Code)
 	}
 }
+
+func TestNamedMethodHelpersOnGroups(t *testing.T) {
+	r := NewRouter()
+
+	api := r.Group("/api")
+	v1 := api.Group("/v1")
+
+	v1.GetNamed("users.show", "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		id, _ := contract.Param(req, "id")
+		_, _ = w.Write([]byte(id))
+	}))
+	v1.PostNamed("users.create", "/users", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	}))
+
+	showURL := r.URL("users.show", "id", "42")
+	if showURL != "/api/v1/users/42" {
+		t.Fatalf("show URL = %q, want %q", showURL, "/api/v1/users/42")
+	}
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, showURL, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if rec.Body.String() != "42" {
+		t.Fatalf("expected body 42, got %q", rec.Body.String())
+	}
+
+	createURL := r.URL("users.create")
+	if createURL != "/api/v1/users" {
+		t.Fatalf("create URL = %q, want %q", createURL, "/api/v1/users")
+	}
+
+	rec = httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, createURL, nil))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", rec.Code)
+	}
+}

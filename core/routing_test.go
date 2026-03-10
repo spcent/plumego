@@ -69,3 +69,130 @@ func TestAny(t *testing.T) {
 		}
 	}
 }
+
+func TestNamedRouteRegistration(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		path     string
+		route    string
+		register func(*App, string, string, http.HandlerFunc)
+	}{
+		{
+			name:   "get",
+			method: http.MethodGet,
+			path:   "/named/get/:id",
+			route:  "named.get",
+			register: func(app *App, route, path string, h http.HandlerFunc) {
+				app.GetNamed(route, path, h)
+			},
+		},
+		{
+			name:   "post",
+			method: http.MethodPost,
+			path:   "/named/post/:id",
+			route:  "named.post",
+			register: func(app *App, route, path string, h http.HandlerFunc) {
+				app.PostNamed(route, path, h)
+			},
+		},
+		{
+			name:   "put",
+			method: http.MethodPut,
+			path:   "/named/put/:id",
+			route:  "named.put",
+			register: func(app *App, route, path string, h http.HandlerFunc) {
+				app.PutNamed(route, path, h)
+			},
+		},
+		{
+			name:   "delete",
+			method: http.MethodDelete,
+			path:   "/named/delete/:id",
+			route:  "named.delete",
+			register: func(app *App, route, path string, h http.HandlerFunc) {
+				app.DeleteNamed(route, path, h)
+			},
+		},
+		{
+			name:   "patch",
+			method: http.MethodPatch,
+			path:   "/named/patch/:id",
+			route:  "named.patch",
+			register: func(app *App, route, path string, h http.HandlerFunc) {
+				app.PatchNamed(route, path, h)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := New()
+			called := false
+			tt.register(app, tt.route, tt.path, func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusNoContent)
+			})
+
+			url := app.Router().URL(tt.route, "id", "42")
+			req := httptest.NewRequest(tt.method, url, nil)
+			rr := httptest.NewRecorder()
+			app.ServeHTTP(rr, req)
+
+			if !called {
+				t.Fatalf("handler was not called for route %q", tt.route)
+			}
+			if rr.Code != http.StatusNoContent {
+				t.Fatalf("expected status 204, got %d", rr.Code)
+			}
+			if url == "" {
+				t.Fatalf("expected URL for route %q", tt.route)
+			}
+		})
+	}
+}
+
+func TestAddRouteReturnsRegistrationErrors(t *testing.T) {
+	app := New()
+
+	if err := app.AddRoute(http.MethodGet, "/strict", nil); err == nil {
+		t.Fatalf("expected nil-handler registration error")
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	if err := app.AddRoute(http.MethodGet, "/strict", handler); err != nil {
+		t.Fatalf("unexpected add route error: %v", err)
+	}
+
+	if err := app.AddRoute(http.MethodGet, "/strict", handler); err == nil {
+		t.Fatalf("expected duplicate route error")
+	}
+
+	app.started = true
+	if err := app.AddRoute(http.MethodGet, "/after-start", handler); err == nil {
+		t.Fatalf("expected add route to fail after app started")
+	}
+}
+
+func TestAddRouteWithNameRegistersURLAndReturnsErrors(t *testing.T) {
+	app := New()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := app.AddRouteWithName(http.MethodGet, "/users/:id", "users.show", handler); err != nil {
+		t.Fatalf("unexpected add named route error: %v", err)
+	}
+
+	if got := app.Router().URL("users.show", "id", "42"); got != "/users/42" {
+		t.Fatalf("named route URL = %q, want %q", got, "/users/42")
+	}
+
+	if err := app.AddRouteWithName(http.MethodGet, "/users/:id", "users.show", handler); err == nil {
+		t.Fatalf("expected duplicate named route error")
+	}
+}

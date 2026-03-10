@@ -25,6 +25,7 @@ Common options:
 - `core.WithShutdownHook(hook)` / `core.WithShutdownHooks(...)`
 - `core.WithMetricsCollector(collector)`
 - `core.WithTracer(tracer)`
+- `core.WithHealthManager(manager)`
 
 ### Route registration
 ```go
@@ -71,7 +72,7 @@ err := r.AddRouteWithOptions(router.GET, "/users/:id", http.HandlerFunc(show),
     router.WithRouteName("users.show"),
 )
 
-u, err := r.URL("users.show", map[string]string{"id": "42"})
+u := r.URL("users.show", "id", "42")
 ```
 
 ### Path params
@@ -148,9 +149,13 @@ Read events from `sub.C()` and `defer sub.Cancel()`.
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
 tracer := metrics.NewOpenTelemetryTracer("svc")
+healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+if err != nil {
+    log.Fatal(err)
+}
 
 app.Get("/metrics", prom.Handler().ServeHTTP)
-app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 

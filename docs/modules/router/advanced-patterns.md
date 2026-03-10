@@ -54,6 +54,7 @@ func subdomainRouter(routes map[string]http.Handler) http.Handler {
 package main
 
 import (
+    "fmt"
     "net/http"
     "github.com/spcent/plumego/core"
 )
@@ -71,13 +72,40 @@ func main() {
 
     // Main app with subdomain routing
     app := core.New()
-    app.Use(subdomainRouter(map[string]http.Handler{
+    _ = app.Use(subdomainMiddleware(map[string]http.Handler{
         "api":   api.Router(),
         "admin": admin.Router(),
         "www":   www.Router(),
     }))
 
     app.Boot()
+}
+
+func subdomainMiddleware(routes map[string]http.Handler) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            host := r.Host
+            for subdomain, handler := range routes {
+                if host == subdomain+".example.com" || host == subdomain+".localhost" {
+                    handler.ServeHTTP(w, r)
+                    return
+                }
+            }
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+
+func apiListUsers(w http.ResponseWriter, r *http.Request) {
+    _, _ = fmt.Fprint(w, "api users")
+}
+
+func adminDashboard(w http.ResponseWriter, r *http.Request) {
+    _, _ = fmt.Fprint(w, "admin dashboard")
+}
+
+func homepage(w http.ResponseWriter, r *http.Request) {
+    _, _ = fmt.Fprint(w, "home")
 }
 ```
 
@@ -539,18 +567,17 @@ app.Get("/api/users",
 package main
 
 import (
+    "encoding/json"
     "net/http"
     "regexp"
+    "strconv"
+    "strings"
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego/router"
 )
 
 func main() {
-    app := core.New(
-        core.WithRouter(router.New(
-            router.WithNotFoundHandler(customNotFound),
-        )),
-    )
+    app := core.New()
 
     // Health checks (no constraints)
     app.Get("/health", healthCheck)
@@ -587,6 +614,96 @@ func main() {
     app.Get("/*path", spaFallback)
 
     app.Boot()
+}
+
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+    _ = json.NewEncoder(w).Encode(map[string]any{"status": "ok"})
+}
+
+func getUserV1(w http.ResponseWriter, r *http.Request) {
+    id, _ := contract.Param(r, "id")
+    _ = json.NewEncoder(w).Encode(map[string]any{"id": id, "version": "v1"})
+}
+
+func getResource(w http.ResponseWriter, r *http.Request) {
+    uuid, _ := contract.Param(r, "uuid")
+    _ = json.NewEncoder(w).Encode(map[string]any{"uuid": uuid})
+}
+
+func getStatus(w http.ResponseWriter, r *http.Request) {
+    statusType, _ := contract.Param(r, "type")
+    _ = json.NewEncoder(w).Encode(map[string]any{"type": statusType})
+}
+
+func listUsersJSON(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    _ = json.NewEncoder(w).Encode([]map[string]any{{"id": 1, "name": "alice"}})
+}
+
+func listUsersXML(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/xml")
+    _, _ = w.Write([]byte(`<users><user id="1" name="alice"/></users>`))
+}
+
+func intConstraint(min, max int) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            raw, _ := contract.Param(r, "id")
+            v, err := strconv.Atoi(raw)
+            if err != nil || v < min || v > max {
+                http.Error(w, "invalid integer parameter", http.StatusBadRequest)
+                return
+            }
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+
+func regexConstraint(param string, pattern *regexp.Regexp) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            raw, _ := contract.Param(r, param)
+            if !pattern.MatchString(raw) {
+                http.Error(w, "invalid parameter format", http.StatusBadRequest)
+                return
+            }
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+
+func enumConstraint(param string, values []string) func(http.Handler) http.Handler {
+    allowed := make(map[string]struct{}, len(values))
+    for _, value := range values {
+        allowed[value] = struct{}{}
+    }
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            raw, _ := contract.Param(r, param)
+            if _, ok := allowed[raw]; !ok {
+                http.Error(w, "invalid enum parameter", http.StatusBadRequest)
+                return
+            }
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+
+func contentNegotiationRouter(handlers map[string]http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        accept := r.Header.Get("Accept")
+        for contentType, handler := range handlers {
+            if strings.Contains(accept, contentType) {
+                handler(w, r)
+                return
+            }
+        }
+        if handler, ok := handlers["application/json"]; ok {
+            handler(w, r)
+            return
+        }
+        http.Error(w, "unsupported media type", http.StatusNotAcceptable)
+    }
 }
 
 func customNotFound(w http.ResponseWriter, r *http.Request) {

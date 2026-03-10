@@ -338,6 +338,27 @@ app := core.New(
 
 ---
 
+### `WithHealthManager`
+
+Attach a health manager so core lifecycle updates readiness automatically.
+
+```go
+func WithHealthManager(hm health.HealthManager) Option
+```
+
+```go
+hm, err := health.NewHealthManager(health.HealthCheckConfig{})
+if err != nil {
+    log.Fatal(err)
+}
+
+app := core.New(
+    core.WithHealthManager(hm),
+)
+```
+
+---
+
 ## Middleware Registration (Canonical)
 
 Middleware is not configured by `With*` options in v1. Register middleware explicitly before `Boot()`:

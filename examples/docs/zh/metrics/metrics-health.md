@@ -28,11 +28,17 @@ app.Get("/metrics", prom.Handler().ServeHTTP)
 
 ## 健康端点
 ```go
-app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+if err != nil {
+    log.Fatal(err)
+}
+
+app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 
-- `ReadinessHandler`：ready 后返回 `200`，启动/关闭过程中返回 `503`。
+- `ReadinessHandler`：返回 `healthManager` 当前状态（ready=true 返回 `200`，否则 `503`）。
 - `BuildInfoHandler`：返回构建信息 JSON（`version`、`commit`、`build_time`）。
 
 ## 组件健康上报

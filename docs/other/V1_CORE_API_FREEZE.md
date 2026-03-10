@@ -31,6 +31,8 @@ Decision: adopt **Option A** for v1.0 GA production guarantees.
 
 - `core.New(options ...Option) *App`
 - `(*App).Use(middlewares ...middleware.Middleware) error`
+- `(*App).AddRoute(method, path string, handler http.Handler) error`
+- `(*App).AddRouteWithName(method, path, name string, handler http.Handler) error`
 - `(*App).Get(path string, handler http.HandlerFunc)`
 - `(*App).Post(path string, handler http.HandlerFunc)`
 - `(*App).Put(path string, handler http.HandlerFunc)`
@@ -65,6 +67,7 @@ Decision: adopt **Option A** for v1.0 GA production guarantees.
 - `WithRunners`
 - `WithMetricsCollector`
 - `WithTracer`
+- `WithHealthManager`
 
 ### `router` package (core route composition)
 
@@ -73,6 +76,7 @@ Decision: adopt **Option A** for v1.0 GA production guarantees.
 - `(*Router).Group`
 - `(*Router).GroupFunc`
 - `(*Router).Get/Post/Put/Delete/Patch/Any`
+- `(*Router).GetNamed/PostNamed/PutNamed/DeleteNamed/PatchNamed/AnyNamed`
 - `(*Router).AddRoute`
 - `(*Router).AddRouteWithOptions`
 - `(*Router).AddRouteWithName`
@@ -102,6 +106,12 @@ These remain supported in v1.x but are not the primary style in canonical exampl
 - `(*App).Handle(pattern string, handler http.Handler)`
 - `(*App).HandleFunc(pattern string, handler http.HandlerFunc)`
 - `(*App).Any(path string, handler http.HandlerFunc)`
+- `(*App).GetNamed(name, path string, handler http.HandlerFunc)`
+- `(*App).PostNamed(name, path string, handler http.HandlerFunc)`
+- `(*App).PutNamed(name, path string, handler http.HandlerFunc)`
+- `(*App).DeleteNamed(name, path string, handler http.HandlerFunc)`
+- `(*App).PatchNamed(name, path string, handler http.HandlerFunc)`
+- `(*App).AnyNamed(name, path string, handler http.HandlerFunc)`
 
 ### Top-level `plumego` package exports
 

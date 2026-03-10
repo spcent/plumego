@@ -113,6 +113,17 @@ app.Post("/users", createUser)
 app.Delete("/users/:id", deleteUser)
 ```
 
+For strict boot-time wiring (fail on duplicate/frozen registration), use explicit error-return APIs:
+
+```go
+if err := app.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(getUser)); err != nil {
+    log.Fatalf("register route: %v", err)
+}
+if err := app.AddRouteWithName(http.MethodGet, "/users/:id", "users.show", http.HandlerFunc(getUser)); err != nil {
+    log.Fatalf("register named route: %v", err)
+}
+```
+
 For advanced routing (groups, route metadata, reverse routing), use `app.Router()` and the `router` module directly.
 
 ---
@@ -157,6 +168,7 @@ Common options:
 - `WithShutdownHook` / `WithShutdownHooks`
 - `WithMetricsCollector`
 - `WithTracer`
+- `WithHealthManager`
 - `WithRouter`
 
 ---

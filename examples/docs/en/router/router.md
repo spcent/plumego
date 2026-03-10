@@ -44,11 +44,8 @@ if err := r.AddRouteWithOptions(router.GET, "/users/:id", http.HandlerFunc(showU
     log.Fatal(err)
 }
 
-u, err := r.URL("users.show", map[string]string{"id": "42"})
-if err != nil {
-    log.Fatal(err)
-}
-fmt.Println(u.String()) // /users/42
+u := r.URL("users.show", "id", "42")
+fmt.Println(u) // /users/42
 ```
 
 ## Method-not-allowed behavior

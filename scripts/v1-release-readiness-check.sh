@@ -37,6 +37,9 @@ go vet ./...
 echo "[v1-check] Canonical doc drift check"
 bash scripts/check-doc-api-drift.sh
 
+echo "[v1-check] Canonical doc snippet compile check"
+bash scripts/check-doc-snippets-compile.sh
+
 for module in "${SUBMODULES[@]}"; do
   echo "[v1-check] Submodule: $module"
   (

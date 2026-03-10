@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,22 @@ import (
 
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
+
+func mustNewLocalServer(t *testing.T, handler http.Handler) *httptest.Server {
+	t.Helper()
+
+	defer func() {
+		if rec := recover(); rec != nil {
+			msg := fmt.Sprint(rec)
+			if strings.Contains(msg, "failed to listen on a port") || strings.Contains(msg, "operation not permitted") {
+				t.Skipf("skipping local listener test in restricted runtime: %s", msg)
+			}
+			panic(rec)
+		}
+	}()
+
+	return httptest.NewServer(handler)
+}
 
 func runCLI(t *testing.T, args []string, cwd string) (string, string, error) {
 	t.Helper()
@@ -192,7 +209,7 @@ func TestCLI_MigrateCreateParsesFlagsAfterSubcommand(t *testing.T) {
 }
 
 func TestCLI_InspectParsesFlagsAfterSubcommand(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := mustNewLocalServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/health" {
 			http.NotFound(w, r)
 			return

@@ -12,6 +12,7 @@ import (
 	"github.com/spcent/plumego/core/components/pubsubdebug"
 	"github.com/spcent/plumego/core/components/webhook"
 	"github.com/spcent/plumego/examples/reference/internal/config"
+	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
@@ -29,12 +30,18 @@ type App struct {
 	WebhookSvc *webhookout.Service
 	Prom       *metrics.PrometheusCollector
 	Tracer     *metrics.OpenTelemetryTracer
+	Health     health.HealthManager
 }
 
 // New constructs the App and initialises all infrastructure dependencies.
 // staticFS must expose a "templates/" subtree for HTML template parsing.
 func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 	bus := pubsub.New()
+
+	healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("create health manager: %w", err)
+	}
 
 	webhookStore := webhookout.NewMemStore()
 	webhookCfg := webhookout.ConfigFromEnv()
@@ -51,6 +58,7 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 	opts := []core.Option{
 		core.WithAddr(cfg.Core.Addr),
 		core.WithEnvPath(cfg.Core.EnvFile),
+		core.WithHealthManager(healthManager),
 	}
 	if cfg.Core.Debug {
 		opts = append(opts, core.WithDebug())
@@ -104,6 +112,7 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 		WebhookSvc: webhookSvc,
 		Prom:       prom,
 		Tracer:     tracer,
+		Health:     healthManager,
 	}, nil
 }
 

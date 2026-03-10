@@ -25,3 +25,33 @@ func (r *Router) Head(path string, handler http.Handler) { r.mustAddRoute(HEAD, 
 
 // Any registers a route that accepts any HTTP method. Panics on duplicate or frozen-router errors.
 func (r *Router) Any(path string, handler http.Handler) { r.mustAddRoute(ANY, path, handler) }
+
+// GetNamed registers a named GET route. Panics on duplicate or frozen-router errors.
+func (r *Router) GetNamed(name, path string, handler http.Handler) {
+	r.mustAddNamedRoute(GET, path, name, handler)
+}
+
+// PostNamed registers a named POST route. Panics on duplicate or frozen-router errors.
+func (r *Router) PostNamed(name, path string, handler http.Handler) {
+	r.mustAddNamedRoute(POST, path, name, handler)
+}
+
+// PutNamed registers a named PUT route. Panics on duplicate or frozen-router errors.
+func (r *Router) PutNamed(name, path string, handler http.Handler) {
+	r.mustAddNamedRoute(PUT, path, name, handler)
+}
+
+// DeleteNamed registers a named DELETE route. Panics on duplicate or frozen-router errors.
+func (r *Router) DeleteNamed(name, path string, handler http.Handler) {
+	r.mustAddNamedRoute(DELETE, path, name, handler)
+}
+
+// PatchNamed registers a named PATCH route. Panics on duplicate or frozen-router errors.
+func (r *Router) PatchNamed(name, path string, handler http.Handler) {
+	r.mustAddNamedRoute(PATCH, path, name, handler)
+}
+
+// AnyNamed registers a named ANY-method route. Panics on duplicate or frozen-router errors.
+func (r *Router) AnyNamed(name, path string, handler http.Handler) {
+	r.mustAddNamedRoute(ANY, path, name, handler)
+}

@@ -73,7 +73,7 @@ func main() {
 - 中间件：`app.Use(...)` 显式注册；`group.Use(...)` 做分组级控制。
 - Contract：`contract.WriteError`、`contract.WriteResponse`、`contract.AdaptCtxHandler`。
 - WebSocket：`app.ConfigureWebSocket()` / `app.ConfigureWebSocketWithOptions(...)`。
-- 健康检查：`health.ReadinessHandler()` 与 `health.BuildInfoHandler()`。
+- 健康检查：`health.ReadinessHandler(manager)` 与 `health.BuildInfoHandler()`。
 
 ## 参考应用
 `examples/reference` 提供接近生产的组合示例：

@@ -249,11 +249,17 @@ go run ./examples/reference
 
 Plumego 的 `health` 包提供现成 HTTP handlers： ([GitHub][1])
 
-* `/health/ready`：ready 前返回 503，ready 后返回 200（启动生命周期会自动调用 `health.SetReady()`）
+* `/health/ready`：根据 `healthManager` 的 ready 状态返回（ready=true 返回 200，否则 503）
 * `/health/build`：返回 build info struct 的 JSON
 
 ```go
-app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+if err != nil {
+    log.Fatal(err)
+}
+
+app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 

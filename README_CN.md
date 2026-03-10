@@ -93,9 +93,9 @@ func main() {
     app := plumego.New(plumego.WithAddr(":8080"))
 
     app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-        contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+        _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
             "status": "ok",
-        })
+        }, nil)
     })
 
     log.Println("server started at :8080")
@@ -210,7 +210,7 @@ func setupTenantApp(database *sql.DB) *core.App {
             return
         }
         defer rows.Close()
-        contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"})
+        _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"}, nil)
     }))
 
     return app
@@ -369,11 +369,17 @@ go run ./examples/reference
 `health` 包现在暴露 HTTP 处理程序，无需自行实现就绪/构建信息检查：
 
 ```go
-app.Get("/health/ready", health.ReadinessHandler().ServeHTTP)
+healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+if err != nil {
+    log.Fatal(err)
+}
+
+app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 
-`ReadinessHandler` 在 `health.SetReady()` 被调用后返回 200（启动生命周期会自动调用），否则返回 503。`BuildInfoHandler` 以 JSON 形式返回当前的 `health.BuildInfo` 结构体。
+`ReadinessHandler` 会返回传入 `HealthManager` 的就绪状态（ready 为 true 时返回 200，否则 503）。当通过 `core.WithHealthManager` 挂载后，core 生命周期会自动更新 ready/not-ready 状态。
 
 ## 可观测性适配器
 无需自行编写适配器，即可将日志中间件接入指标/链路追踪后端：

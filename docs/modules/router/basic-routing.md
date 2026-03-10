@@ -98,10 +98,7 @@ if err := r.AddRouteWithOptions(router.GET, "/users/:id", http.HandlerFunc(getUs
     log.Fatal(err)
 }
 
-u, err := r.URL("users.show", map[string]string{"id": "42"})
-if err != nil {
-    log.Fatal(err)
-}
+u := r.URL("users.show", "id", "42")
 _ = u // /users/42
 ```
 

@@ -37,6 +37,17 @@ app.Patch("/users/:id", patchUser)
 app.Any("/webhook", handleWebhook)
 ```
 
+If you need explicit error handling for duplicate/frozen route registration:
+
+```go
+if err := app.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(getUser)); err != nil {
+    log.Fatalf("add route: %v", err)
+}
+if err := app.AddRouteWithName(http.MethodGet, "/users/:id", "users.show", http.HandlerFunc(getUser)); err != nil {
+    log.Fatalf("add named route: %v", err)
+}
+```
+
 For `HEAD`, `OPTIONS`, route groups, reverse routing, and metadata, use the router directly:
 
 ```go
@@ -134,7 +145,7 @@ if err := app.Use(
 }
 
 app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-    contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"})
+    _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"}, nil)
 })
 
 if err := app.Boot(); err != nil {
