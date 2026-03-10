@@ -1,13 +1,7 @@
 package health
 
 import (
-	"fmt"
-	"log"
 	"net/http"
-	"os"
-	"runtime"
-	"runtime/debug"
-	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -19,111 +13,52 @@ const (
 	allComponentsHealthTimeout = 15 * time.Second
 )
 
-// ErrorResponse represents a standardized error response.
-type ErrorResponse struct {
-	Error     string    `json:"error"`
-	Code      string    `json:"code,omitempty"`
-	Message   string    `json:"message,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
-	RequestID string    `json:"request_id,omitempty"`
-}
-
-// RuntimeInfo contains runtime diagnostics included in development mode.
-type RuntimeInfo struct {
-	GoVersion    string `json:"go_version"`
-	NumGoroutine int    `json:"num_goroutine"`
-	NumCPU       int    `json:"num_cpu"`
-	GOARCH       string `json:"goarch"`
-	GOOS         string `json:"goos"`
-	MemAlloc     uint64 `json:"mem_alloc_bytes"`
-	MemSys       uint64 `json:"mem_sys_bytes"`
-	NumGC        uint32 `json:"num_gc"`
-}
-
-// HealthResponse represents a standardized health response.
+// HealthResponse is the JSON body for the main health endpoint.
 type HealthResponse struct {
-	HealthStatus `json:",inline"`
-	ResponseTime time.Duration   `json:"response_time"`
-	RequestID    string          `json:"request_id,omitempty"`
-	BuildInfo    BuildInfo       `json:"build_info,omitempty"`
-	Readiness    ReadinessStatus `json:"readiness,omitempty"`
-	Runtime      *RuntimeInfo    `json:"runtime,omitempty"`
+	HealthStatus
+	BuildInfo BuildInfo    `json:"build_info,omitempty"`
+	Runtime   *RuntimeInfo `json:"runtime,omitempty"`
 }
 
-// HealthHandler creates a comprehensive health check handler with enhanced error handling.
-func HealthHandler(manager HealthManager) http.Handler {
+// ComponentsListResponse is the JSON body for the component list endpoint.
+type ComponentsListResponse struct {
+	Components []string `json:"components"`
+	Count      int      `json:"count"`
+}
+
+// HealthHandler creates a comprehensive health check handler.
+// Pass debug=true to include runtime diagnostics in the response.
+func HealthHandler(manager HealthManager, debug bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		startTime := time.Now()
-		requestID := extractRequestID(r)
-
-		// Enhanced error handling with recovery
-		defer func() {
-			if rvr := recover(); rvr != nil {
-				handlePanic(w, r, rvr, requestID)
-			}
-		}()
-
-		// Validate request method
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			sendErrorResponse(w, r, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED",
-				"Only GET and HEAD methods are allowed", requestID)
-			return
-		}
-
 		if manager == nil {
-			sendErrorResponse(w, r, http.StatusServiceUnavailable, "HEALTH_MANAGER_UNAVAILABLE",
-				"Health manager is not configured", requestID)
+			contract.WriteError(w, r, contract.APIError{
+				Status:   http.StatusServiceUnavailable,
+				Code:     "HEALTH_MANAGER_UNAVAILABLE",
+				Message:  "health manager is not configured",
+				Category: contract.CategoryForStatus(http.StatusServiceUnavailable),
+			})
 			return
 		}
 
-		// Perform health check with timeout
 		ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
 		defer cancel()
 
-		var health HealthStatus
+		health := manager.CheckAllComponents(ctx)
 
-		// Use goroutine with channel for better timeout handling
-		done := make(chan bool, 1)
-		go func() {
-			defer func() { done <- true }()
-			health = manager.CheckAllComponents(ctx)
-		}()
-
-		// Wait for completion or timeout
-		select {
-		case <-done:
-			// Health check completed successfully
-		case <-ctx.Done():
-			// Health check timed out
-			sendErrorResponse(w, r, http.StatusGatewayTimeout, "HEALTH_CHECK_TIMEOUT",
-				"Health check timed out", requestID)
-			return
-		}
-
-		code := httpStatusForHealth(health.Status)
-
-		// Create enhanced response
-		response := HealthResponse{
+		resp := HealthResponse{
 			HealthStatus: health,
-			ResponseTime: time.Since(startTime),
-			RequestID:    requestID,
 			BuildInfo:    GetBuildInfo(),
-			Readiness:    GetReadiness(),
 		}
-
-		// Include runtime diagnostics in development mode
-		if isDevelopment() {
-			response.Runtime = getRuntimeInfo()
+		if debug {
+			resp.Runtime = getRuntimeInfo()
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		if err := contract.WriteJSON(w, code, response); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		}
+		_ = contract.WriteJSON(w, httpStatusForHealth(health.Status), resp)
 	})
 }
 
-// ComponentHealthHandler creates a handler for checking specific component health.
+// ComponentHealthHandler creates a handler for checking a specific component's health.
 func ComponentHealthHandler(manager HealthManager, componentName string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
@@ -133,13 +68,15 @@ func ComponentHealthHandler(manager HealthManager, componentName string) http.Ha
 		ctx, cancel := withCheckTimeout(r.Context(), componentHealthTimeout)
 		defer cancel()
 
-		// Check the specific component
 		_ = manager.CheckComponent(ctx, componentName)
 
 		health, exists := manager.GetComponentHealth(componentName)
 		if !exists {
-			_ = contract.WriteJSON(w, http.StatusNotFound, map[string]string{
-				"error": "component not found",
+			contract.WriteError(w, r, contract.APIError{
+				Status:   http.StatusNotFound,
+				Code:     "COMPONENT_NOT_FOUND",
+				Message:  "component not found",
+				Category: contract.CategoryForStatus(http.StatusNotFound),
 			})
 			return
 		}
@@ -148,7 +85,7 @@ func ComponentHealthHandler(manager HealthManager, componentName string) http.Ha
 	})
 }
 
-// AllComponentsHealthHandler creates a handler for checking all components health.
+// AllComponentsHealthHandler creates a handler for checking all components' health.
 func AllComponentsHealthHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
@@ -158,16 +95,12 @@ func AllComponentsHealthHandler(manager HealthManager) http.Handler {
 		ctx, cancel := withCheckTimeout(r.Context(), allComponentsHealthTimeout)
 		defer cancel()
 
-		// Check all components
 		manager.CheckAllComponents(ctx)
-		allHealth := manager.GetAllHealth()
-
-		_ = contract.WriteJSON(w, http.StatusOK, allHealth)
+		_ = contract.WriteJSON(w, http.StatusOK, manager.GetAllHealth())
 	})
 }
 
 // LiveHandler creates a liveness probe handler that always returns 200.
-// This is useful for Kubernetes liveness probes.
 func LiveHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -183,164 +116,14 @@ func ComponentsListHandler(manager HealthManager) http.Handler {
 		}
 
 		allHealth := manager.GetAllHealth()
-		components := make([]string, 0, len(allHealth))
+		names := make([]string, 0, len(allHealth))
 		for name := range allHealth {
-			components = append(components, name)
+			names = append(names, name)
 		}
 
-		response := map[string]any{
-			"components": components,
-			"count":      len(components),
-		}
-
-		_ = contract.WriteJSON(w, http.StatusOK, response)
-	})
-}
-
-// extractRequestID extracts request ID from headers for tracing.
-func extractRequestID(r *http.Request) string {
-	// Try common headers for request ID
-	if id := r.Header.Get("X-Request-ID"); id != "" {
-		return id
-	}
-	if id := r.Header.Get("X-Correlation-ID"); id != "" {
-		return id
-	}
-	if id := r.Header.Get("Request-ID"); id != "" {
-		return id
-	}
-	return ""
-}
-
-// sendErrorResponse sends a standardized error response.
-func sendErrorResponse(w http.ResponseWriter, r *http.Request, statusCode int, code, message, requestID string) {
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-
-	details := map[string]any{
-		"error":     http.StatusText(statusCode),
-		"timestamp": time.Now(),
-	}
-	if requestID != "" {
-		details["request_id"] = requestID
-	}
-
-	apiErr := contract.APIError{
-		Status:   statusCode,
-		Code:     code,
-		Message:  message,
-		Category: contract.CategoryForStatus(statusCode),
-		Details:  details,
-	}
-	if requestID != "" {
-		apiErr.TraceID = requestID
-	}
-	contract.WriteError(w, r, apiErr)
-}
-
-// handlePanic handles panics in HTTP handlers gracefully.
-// In development mode, the panic value and stack trace are included in the
-// response body so that developers can diagnose the issue without checking
-// server logs. In production, only a generic error message is returned.
-func handlePanic(w http.ResponseWriter, r *http.Request, panicValue any, requestID string) {
-	stack := string(debug.Stack())
-	log.Printf("[PANIC] health handler panic: %v\n%s", panicValue, stack)
-
-	if isDevelopment() {
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-
-		details := map[string]any{
-			"error":     http.StatusText(http.StatusInternalServerError),
-			"timestamp": time.Now(),
-			"panic":     fmt.Sprintf("%v", panicValue),
-			"stack":     stack,
-		}
-		if requestID != "" {
-			details["request_id"] = requestID
-		}
-
-		apiErr := contract.APIError{
-			Status:   http.StatusInternalServerError,
-			Code:     "INTERNAL_SERVER_ERROR",
-			Message:  fmt.Sprintf("panic: %v", panicValue),
-			Category: contract.CategoryForStatus(http.StatusInternalServerError),
-			Details:  details,
-		}
-		if requestID != "" {
-			apiErr.TraceID = requestID
-		}
-		contract.WriteError(w, r, apiErr)
-		return
-	}
-
-	sendErrorResponse(w, r, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR",
-		"Internal server error occurred", requestID)
-}
-
-// isDevelopment checks if the application is running in development mode.
-// It returns true when either APP_ENV is set to "development" or APP_DEBUG
-// is set to "true". The core lifecycle sets APP_DEBUG when debug mode is
-// enabled via core.WithDebug().
-func isDevelopment() bool {
-	if strings.EqualFold(os.Getenv("APP_ENV"), "development") {
-		return true
-	}
-	return strings.EqualFold(os.Getenv("APP_DEBUG"), "true")
-}
-
-// getRuntimeInfo collects current Go runtime diagnostics.
-func getRuntimeInfo() *RuntimeInfo {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	return &RuntimeInfo{
-		GoVersion:    runtime.Version(),
-		NumGoroutine: runtime.NumGoroutine(),
-		NumCPU:       runtime.NumCPU(),
-		GOARCH:       runtime.GOARCH,
-		GOOS:         runtime.GOOS,
-		MemAlloc:     m.Alloc,
-		MemSys:       m.Sys,
-		NumGC:        m.NumGC,
-	}
-}
-
-// DebugHealthHandler creates a handler that returns comprehensive system
-// diagnostics. This handler only responds in development mode; in production
-// it returns 404 Not Found to avoid leaking internal details.
-func DebugHealthHandler(manager HealthManager) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !isDevelopment() {
-			http.NotFound(w, r)
-			return
-		}
-
-		startTime := time.Now()
-		requestID := extractRequestID(r)
-
-		ri := getRuntimeInfo()
-
-		response := map[string]any{
-			"request_id":    requestID,
-			"timestamp":     time.Now(),
-			"build_info":    GetBuildInfo(),
-			"readiness":     GetReadiness(),
-			"runtime":       ri,
-			"response_time": time.Since(startTime).String(),
-		}
-
-		if manager != nil {
-			ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
-			defer cancel()
-
-			overall := manager.CheckAllComponents(ctx)
-			allHealth := manager.GetAllHealth()
-			config := manager.GetConfig()
-
-			response["health"] = overall
-			response["components"] = allHealth
-			response["config"] = config
-		}
-
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, http.StatusOK, response)
+		_ = contract.WriteJSON(w, http.StatusOK, ComponentsListResponse{
+			Components: names,
+			Count:      len(names),
+		})
 	})
 }

@@ -17,9 +17,12 @@ type healthManager struct {
 	config            HealthCheckConfig
 	cleanupTimer      *time.Timer
 	closed            bool
-	metrics           *MetricsCollector
+	metrics           MetricsRecorder
 	lastCheckTime     time.Time
 	lastCheckDuration time.Duration
+
+	readinessMu sync.RWMutex
+	readiness   ReadinessStatus
 }
 
 // NewHealthManager creates a new HealthManager instance.
@@ -32,6 +35,10 @@ func NewHealthManager(config HealthCheckConfig) (HealthManager, error) {
 		components: make(map[string]ComponentChecker),
 		health:     make(map[string]*ComponentHealth),
 		config:     config,
+		readiness: ReadinessStatus{
+			Ready:  false,
+			Reason: "starting",
+		},
 	}
 
 	if config.AutoCleanupEnabled {
@@ -39,6 +46,41 @@ func NewHealthManager(config HealthCheckConfig) (HealthManager, error) {
 	}
 
 	return hm, nil
+}
+
+// MarkReady marks the application as ready to serve traffic.
+func (hm *healthManager) MarkReady() {
+	hm.readinessMu.Lock()
+	defer hm.readinessMu.Unlock()
+	hm.readiness = ReadinessStatus{
+		Ready:     true,
+		Timestamp: time.Now(),
+	}
+}
+
+// MarkNotReady marks the application as not ready and records the reason.
+func (hm *healthManager) MarkNotReady(reason string) {
+	hm.readinessMu.Lock()
+	defer hm.readinessMu.Unlock()
+	hm.readiness = ReadinessStatus{
+		Ready:     false,
+		Reason:    reason,
+		Timestamp: time.Now(),
+	}
+}
+
+// Readiness returns the current readiness status.
+func (hm *healthManager) Readiness() ReadinessStatus {
+	hm.readinessMu.RLock()
+	defer hm.readinessMu.RUnlock()
+	return hm.readiness
+}
+
+// SetMetricsRecorder attaches a MetricsRecorder to this manager.
+func (hm *healthManager) SetMetricsRecorder(r MetricsRecorder) {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+	hm.metrics = r
 }
 
 // RegisterComponent registers a health check component.
@@ -260,7 +302,7 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
 
-	// Update overall readiness based on component health
+	// Update internal readiness based on component health
 	timestamp := time.Now()
 	readiness := ReadinessStatus{
 		Timestamp:  timestamp,
@@ -269,7 +311,6 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 
 	if allHealthy {
 		readiness.Ready = true
-		readiness.Reason = ""
 	} else {
 		readiness.Ready = false
 		readiness.Reason = fmt.Sprintf("components failed: %v", failedComponents)
@@ -279,8 +320,9 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 		readiness.Components[name] = compHealth.Status.isReady()
 	}
 
-	// Update readiness
-	updateReadiness(readiness)
+	hm.readinessMu.Lock()
+	hm.readiness = readiness
+	hm.readinessMu.Unlock()
 
 	// Add to history if enabled
 	if hm.config.EnableHistory {

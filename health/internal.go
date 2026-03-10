@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 var errManagerClosed = errors.New("manager is closed")
@@ -110,12 +112,16 @@ type componentCheckResult struct {
 	Error error
 }
 
-// requireManager checks that the manager is not nil and sends an error response
-// if it is. Returns true if the manager is available, false if it is nil.
+// requireManager checks that the manager is not nil and writes an error response if it is.
+// Returns true if the manager is available.
 func requireManager(manager HealthManager, w http.ResponseWriter, r *http.Request) bool {
 	if manager == nil {
-		sendErrorResponse(w, r, http.StatusServiceUnavailable,
-			"HEALTH_MANAGER_UNAVAILABLE", "Health manager is not configured", "")
+		contract.WriteError(w, r, contract.APIError{
+			Status:   http.StatusServiceUnavailable,
+			Code:     "HEALTH_MANAGER_UNAVAILABLE",
+			Message:  "health manager is not configured",
+			Category: contract.CategoryForStatus(http.StatusServiceUnavailable),
+		})
 		return false
 	}
 	return true

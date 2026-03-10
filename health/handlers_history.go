@@ -17,9 +17,7 @@ func HealthHistoryHandler(manager HealthManager) http.Handler {
 			return
 		}
 
-		history := manager.GetHealthHistory()
-
-		_ = contract.WriteJSON(w, http.StatusOK, history)
+		_ = contract.WriteJSON(w, http.StatusOK, manager.GetHealthHistory())
 	})
 }
 
@@ -30,101 +28,38 @@ func HealthHistoryExportHandler(manager HealthManager) http.Handler {
 			return
 		}
 
-		// Parse query parameters for filtering and format
-		query := HealthHistoryQuery{}
-
-		// Parse time range
-		if startTimeStr := r.URL.Query().Get("start_time"); startTimeStr != "" {
-			if startTime, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
-				query.StartTime = &startTime
-			}
+		query, err := parseHistoryQuery(r)
+		if err != nil {
+			contract.WriteError(w, r, contract.APIError{
+				Status:   http.StatusBadRequest,
+				Code:     "INVALID_QUERY",
+				Message:  err.Error(),
+				Category: contract.CategoryForStatus(http.StatusBadRequest),
+			})
+			return
 		}
 
-		if endTimeStr := r.URL.Query().Get("end_time"); endTimeStr != "" {
-			if endTime, err := time.Parse(time.RFC3339, endTimeStr); err == nil {
-				query.EndTime = &endTime
-			}
-		}
-
-		// Parse state filter
-		if stateStr := r.URL.Query().Get("state"); stateStr != "" {
-			state := HealthState(stateStr)
-			if !isValidHealthState(state) {
-				sendErrorResponse(w, r, http.StatusBadRequest, "INVALID_STATE",
-					"Valid states: healthy, degraded, unhealthy", "")
-				return
-			}
-			query.State = &state
-		}
-
-		// Parse component filter
-		if component := r.URL.Query().Get("component"); component != "" {
-			query.Component = component
-		}
-
-		// Parse limit
-		if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-			if limit, err := strconv.Atoi(limitStr); err == nil {
-				query.Limit = limit
-			}
-		}
-
-		// Parse offset
-		if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-			if offset, err := strconv.Atoi(offsetStr); err == nil {
-				query.Offset = offset
-			}
-		}
-
-		// Get format parameter
-		format := r.URL.Query().Get("format")
+		format := strings.ToLower(r.URL.Query().Get("format"))
 		if format == "" {
 			format = "json"
 		}
 
-		// Query history
 		result := manager.QueryHealthHistory(query)
 
-		switch strings.ToLower(format) {
+		switch format {
 		case "csv":
-			exportHistoryToCSV(w, result.Entries)
+			writeHistoryCSV(w, result.Entries)
 		case "json":
 			_ = contract.WriteJSON(w, http.StatusOK, result)
 		default:
-			sendErrorResponse(w, r, http.StatusBadRequest, "INVALID_FORMAT",
-				"Supported formats: json, csv", "")
-			return
+			contract.WriteError(w, r, contract.APIError{
+				Status:   http.StatusBadRequest,
+				Code:     "INVALID_FORMAT",
+				Message:  "supported formats: json, csv",
+				Category: contract.CategoryForStatus(http.StatusBadRequest),
+			})
 		}
 	})
-}
-
-// exportHistoryToCSV exports health history entries to CSV format.
-func exportHistoryToCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
-
-	writer := csv.NewWriter(w)
-
-	// Write header
-	header := []string{"Timestamp", "State", "Message", "Components", "Duration"}
-	_ = writer.Write(header)
-
-	// Write data
-	for _, entry := range entries {
-		record := []string{
-			entry.Timestamp.Format(time.RFC3339),
-			string(entry.State),
-			entry.Message,
-			strings.Join(entry.Components, ";"),
-			entry.Duration.String(),
-		}
-		_ = writer.Write(record)
-	}
-
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		http.Error(w, "Failed to write CSV", http.StatusInternalServerError)
-	}
 }
 
 // HealthHistoryStatsHandler returns statistics about health history.
@@ -134,8 +69,87 @@ func HealthHistoryStatsHandler(manager HealthManager) http.Handler {
 			return
 		}
 
-		stats := manager.GetHealthHistoryStats()
-
-		_ = contract.WriteJSON(w, http.StatusOK, stats)
+		_ = contract.WriteJSON(w, http.StatusOK, manager.GetHealthHistoryStats())
 	})
+}
+
+// parseHistoryQuery parses query parameters from the request into a HealthHistoryQuery.
+func parseHistoryQuery(r *http.Request) (HealthHistoryQuery, error) {
+	q := HealthHistoryQuery{}
+	params := r.URL.Query()
+
+	if s := params.Get("start_time"); s != "" {
+		t, err := time.Parse(time.RFC3339, s)
+		if err == nil {
+			q.StartTime = &t
+		}
+	}
+
+	if s := params.Get("end_time"); s != "" {
+		t, err := time.Parse(time.RFC3339, s)
+		if err == nil {
+			q.EndTime = &t
+		}
+	}
+
+	if s := params.Get("state"); s != "" {
+		state := HealthState(s)
+		if !isValidHealthState(state) {
+			return q, &invalidParamError{param: "state", msg: "valid states: healthy, degraded, unhealthy"}
+		}
+		q.State = &state
+	}
+
+	if s := params.Get("component"); s != "" {
+		q.Component = s
+	}
+
+	if s := params.Get("limit"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			q.Limit = n
+		}
+	}
+
+	if s := params.Get("offset"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			q.Offset = n
+		}
+	}
+
+	return q, nil
+}
+
+// invalidParamError is a simple error type for query parameter validation.
+type invalidParamError struct {
+	param string
+	msg   string
+}
+
+func (e *invalidParamError) Error() string {
+	return e.param + ": " + e.msg
+}
+
+// writeHistoryCSV exports health history entries to CSV format.
+func writeHistoryCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
+
+	writer := csv.NewWriter(w)
+
+	_ = writer.Write([]string{"Timestamp", "State", "Message", "Components", "Duration"})
+
+	for _, entry := range entries {
+		_ = writer.Write([]string{
+			entry.Timestamp.Format(time.RFC3339),
+			string(entry.State),
+			entry.Message,
+			strings.Join(entry.Components, ";"),
+			entry.Duration.String(),
+		})
+	}
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		http.Error(w, "failed to write CSV", http.StatusInternalServerError)
+	}
 }
