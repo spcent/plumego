@@ -57,7 +57,7 @@ func main() {
 
     app := core.New(core.WithAddr(":8080"))
 
-    api := app.Group("/api")
+    api := app.Router().Group("/api")
     api.Use(limiter.Middleware(extractUserID))
 
     api.Post("/chat", handleChat(claude, sessionMgr, cb, retrier))

@@ -28,6 +28,8 @@ If guidance conflicts, this priority order wins.
   - `docs/CORE_API_CONTRACTION_PROPOSAL.md`
   - `docs/CORE_REFACTOR_PLAN.md`
   - `docs/other/V1.0_READINESS_REPORT.md` (superseded by newer execution/scope docs)
+  - `docs/tenant/*` planning/checklist docs (see `docs/tenant/README.md`)
+  - `docs/lowcode/*` phase-design drafts (not part of v1 canonical docs)
 
 ## Experimental Modules
 

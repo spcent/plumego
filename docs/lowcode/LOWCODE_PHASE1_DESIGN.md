@@ -1,5 +1,8 @@
 # 低代码平台 - 阶段一详细设计文档
 
+> 历史规划说明（2026-03-10）：本文档不属于 Plumego v1 canonical 文档集。
+> 以 `docs/README.md` 与 `docs/modules/*` 为准。
+
 > **版本**: v0.1.0-draft | **日期**: 2026-02-05 | **阶段**: Phase 1 - Infrastructure
 
 ---

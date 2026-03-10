@@ -118,6 +118,8 @@ This section defines the target shape after contraction.
 
 The canonical bootstrap remains:
 
+> Legacy snippet (historical): uses pre-freeze option-style middleware wiring; not canonical v1.
+
 ```go
 app := core.New(
     core.WithAddr(":8080"),

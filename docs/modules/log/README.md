@@ -123,7 +123,7 @@ if err := log.InitWithConfig(log.InitConfig{
 ```
 
 For request paths, prefer middleware stack:
-- `core.WithRecommendedMiddleware()` enables `RequestID + Logging + Recovery`
+- Register middleware explicitly via `app.Use(...)` (for example `RequestID + Logging + Recovery`)
 - Request/trace IDs are propagated into request context and response headers
 
 ## Integration with Core

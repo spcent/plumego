@@ -1,5 +1,8 @@
 # Tenant Package Status - v1.0
 
+> Historical planning note (March 10, 2026): this file is not canonical v1 guidance.
+> Prefer `docs/README.md`, `docs/other/V1_GA_PRODUCTION_SCOPE.md`, and `docs/modules/tenant/*`.
+
 ## Current State
 
 The `tenant/` package provides multi-tenancy infrastructure and is integrated via core options, but remains **experimental**.

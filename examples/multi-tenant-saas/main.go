@@ -12,7 +12,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spcent/plumego"
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
+	tenantmw "github.com/spcent/plumego/middleware/tenant"
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/store/db"
+	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
 )
 
 func main() {
@@ -40,39 +44,44 @@ func main() {
 	app := plumego.New(
 		plumego.WithAddr(getEnv("APP_ADDR", ":8080")),
 		plumego.WithDebug(),
-
-		// Add tenant configuration manager
-		plumego.WithTenantConfigManager(tenantMgr),
-
-		// Add tenant middleware with quota and policy enforcement
-		plumego.WithTenantMiddleware(plumego.TenantMiddlewareOptions{
-			HeaderName:      "X-Tenant-ID",
-			AllowMissing:    false, // Require tenant ID on all requests
-			QuotaManager:    quotaMgr,
-			PolicyEvaluator: policyEval,
-			Hooks: plumego.TenantHooks{
-				OnResolve: func(ctx context.Context, info plumego.TenantResolveInfo) {
-					log.Printf("[TENANT] Resolved: %s from %s", info.TenantID, info.Source)
-				},
-				OnQuota: func(ctx context.Context, decision plumego.TenantQuotaDecision) {
-					if !decision.Allowed {
-						log.Printf("[QUOTA] Denied for %s (remaining: %d requests, %d tokens, retry after %v)",
-							decision.TenantID, decision.RemainingRequests, decision.RemainingTokens, decision.RetryAfter)
-					}
-				},
-				OnPolicy: func(ctx context.Context, decision plumego.TenantPolicyDecision) {
-					if !decision.Allowed {
-						log.Printf("[POLICY] Denied for %s: %s (model=%s, tool=%s)",
-							decision.TenantID, decision.Reason, decision.Model, decision.Tool)
-					}
-				},
-			},
-		}),
 	)
+
+	api := app.Router().Group("/api")
+	api.Use(tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+		HeaderName:   "X-Tenant-ID",
+		AllowMissing: false,
+		Hooks: plumego.TenantHooks{
+			OnResolve: func(ctx context.Context, info plumego.TenantResolveInfo) {
+				log.Printf("[TENANT] Resolved: %s from %s", info.TenantID, info.Source)
+			},
+		},
+	}))
+	api.Use(tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
+		Manager: quotaMgr,
+		Hooks: plumego.TenantHooks{
+			OnQuota: func(ctx context.Context, decision plumego.TenantQuotaDecision) {
+				if !decision.Allowed {
+					log.Printf("[QUOTA] Denied for %s (remaining: %d requests, %d tokens, retry after %v)",
+						decision.TenantID, decision.RemainingRequests, decision.RemainingTokens, decision.RetryAfter)
+				}
+			},
+		},
+	}))
+	api.Use(tenantpolicy.TenantPolicy(tenantpolicy.TenantPolicyOptions{
+		Evaluator: policyEval,
+		Hooks: plumego.TenantHooks{
+			OnPolicy: func(ctx context.Context, decision plumego.TenantPolicyDecision) {
+				if !decision.Allowed {
+					log.Printf("[POLICY] Denied for %s: %s (model=%s, tool=%s)",
+						decision.TenantID, decision.Reason, decision.Model, decision.Tool)
+				}
+			},
+		},
+	}))
 
 	// Register routes
 	registerAdminRoutes(app, tenantMgr)
-	registerAPIRoutes(app, tenantDB)
+	registerAPIRoutes(api, app.Logger(), tenantDB)
 	registerHealthRoutes(app)
 
 	// Start application
@@ -165,19 +174,19 @@ func registerAdminRoutes(app *plumego.App, mgr *db.DBTenantConfigManager) {
 }
 
 // registerAPIRoutes registers tenant-scoped business API routes
-func registerAPIRoutes(app *plumego.App, tenantDB *db.TenantDB) {
-	api := &APIHandler{db: tenantDB}
+func registerAPIRoutes(apiRoutes *router.Router, logger plumelog.StructuredLogger, tenantDB *db.TenantDB) {
+	handler := &APIHandler{db: tenantDB}
 	adaptCtx := func(handler plumego.ContextHandlerFunc) http.HandlerFunc {
-		return contract.AdaptCtxHandler(handler, app.Logger()).ServeHTTP
+		return contract.AdaptCtxHandler(handler, logger).ServeHTTP
 	}
 
 	// Business API routes (protected by tenant middleware)
-	app.Get("/api/users", adaptCtx(api.ListUsers))
-	app.Post("/api/users", adaptCtx(api.CreateUser))
-	app.Get("/api/users/:id", adaptCtx(api.GetUser))
-	app.Delete("/api/users/:id", adaptCtx(api.DeleteUser))
+	apiRoutes.Get("/users", adaptCtx(handler.ListUsers))
+	apiRoutes.Post("/users", adaptCtx(handler.CreateUser))
+	apiRoutes.Get("/users/:id", adaptCtx(handler.GetUser))
+	apiRoutes.Delete("/users/:id", adaptCtx(handler.DeleteUser))
 
-	app.Get("/api/analytics/requests", adaptCtx(api.GetRequestAnalytics))
+	apiRoutes.Get("/analytics/requests", adaptCtx(handler.GetRequestAnalytics))
 }
 
 // registerHealthRoutes registers health check endpoints

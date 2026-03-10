@@ -431,7 +431,7 @@ app := core.New(
 app := core.New()
 
 // API routes
-api := app.Group("/api")
+api := app.Router().Group("/api")
 api.Get("/users", listUsers)
 api.Get("/products", listProducts)
 
@@ -556,7 +556,7 @@ func main() {
     app.Get("/health", healthCheck)
 
     // API v1
-    v1 := app.Group("/api/v1")
+    v1 := app.Router().Group("/api/v1")
 
     // Users (with integer ID constraint)
     v1.Get("/users/:id",
@@ -577,7 +577,7 @@ func main() {
     )
 
     // API v2 (content negotiation)
-    v2 := app.Group("/api/v2")
+    v2 := app.Router().Group("/api/v2")
     v2.Get("/users", contentNegotiationRouter(map[string]http.HandlerFunc{
         "application/json": listUsersJSON,
         "application/xml":  listUsersXML,

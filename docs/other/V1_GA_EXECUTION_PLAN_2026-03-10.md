@@ -119,3 +119,18 @@ v1.0.0 final is eligible only when:
   2. run stale-API scan,
   3. run quality gates,
   4. sync README/README_CN if behavior or defaults changed.
+
+## 7. Automation Entry
+
+Use `scripts/v1-release-readiness-check.sh` as the single pre-release entrypoint.
+
+- Default run includes:
+  - root `gofmt` check
+  - root `go test -timeout 20s ./...`
+  - root `go vet ./...`
+  - canonical doc drift check (`scripts/check-doc-api-drift.sh`)
+  - submodule `gofmt` + `go test` + `go vet`
+- Optional race run:
+  - `RUN_RACE=1 bash scripts/v1-release-readiness-check.sh`
+- Release operation reference:
+  - `docs/other/V1_RELEASE_RUNBOOK.md`

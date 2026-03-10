@@ -1,4 +1,5 @@
 .claude/prompts/
+.github/
 
 # Binaries
 *.exe
@@ -27,4 +28,3 @@ examples/*/ai-gateway
 examples/*/ai-agent-gateway
 examples/*/*-demo
 examples/*/*-gateway
-

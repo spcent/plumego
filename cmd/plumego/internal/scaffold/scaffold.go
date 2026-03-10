@@ -133,15 +133,24 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/core"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/recovery"
 )
 
 func main() {
 	app := core.New(
 		core.WithAddr(":8080"),
 		core.WithDebug(),
-		core.WithRecovery(),
-		core.WithLogging(),
 	)
+	if err := app.Use(
+		observability.RequestID(),
+		observability.Logging(app.Logger(), nil, nil),
+		recovery.RecoveryMiddleware,
+		cors.CORS,
+	); err != nil {
+		log.Fatal(err)
+	}
 
 	app.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello from Plumego!"))

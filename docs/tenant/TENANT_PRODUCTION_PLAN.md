@@ -1,5 +1,8 @@
 # Tenant Package - Production Readiness Plan
 
+> Historical planning note (March 10, 2026): this plan is not canonical v1 guidance.
+> Prefer `docs/README.md`, `docs/other/V1_GA_PRODUCTION_SCOPE.md`, and `docs/modules/tenant/*`.
+
 > **Target**: Upgrade tenant package from **Experimental** to **Stable** for v1.1
 
 ## Executive Summary
@@ -401,6 +404,9 @@ examples/multi-tenant-saas/
 ```
 
 **Code Example**:
+
+> Legacy snippet (historical): this example uses pre-freeze option-style wiring.
+
 ```go
 func main() {
     // Setup tenant config manager
@@ -687,6 +693,9 @@ app.Use(middleware.TenantQuota(...))
 ```
 
 **After (v1.1 - Stable)**:
+
+> Legacy snippet (historical): option-style setup retained for plan context only.
+
 ```go
 // Simple options-based setup
 manager := plumego.NewInMemoryTenantConfigManager()

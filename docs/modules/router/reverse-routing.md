@@ -84,7 +84,7 @@ app.GetNamed("api.v1.users.show", "/api/v1/users/:id", getUser)
 ### Group Named Routes
 
 ```go
-api := app.Group("/api/v1")
+api := app.Router().Group("/api/v1")
 
 // Names are independent of group prefix
 api.GetNamed("users.index", "/users", listUsers)  // /api/v1/users

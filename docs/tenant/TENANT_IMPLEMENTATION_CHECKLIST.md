@@ -1,5 +1,8 @@
 # Tenant Package v1.1 - Implementation Checklist
 
+> Historical planning note (March 10, 2026): this checklist is not canonical v1 guidance.
+> Prefer `docs/README.md`, `docs/other/V1_GA_PRODUCTION_SCOPE.md`, and `docs/modules/tenant/*`.
+
 > **Sprint Goal**: Upgrade tenant package from Experimental → Stable
 > **Target**: v1.1.0 Release
 > **Estimated**: 30 hours / 3-4 days
@@ -101,6 +104,9 @@
   - [ ] `TestTenantOptions_Integration` - End-to-end test
 
 **Checkpoint**: ✅ Example usage compiles:
+
+> Legacy snippet (historical): option-style tenant wiring shown below is pre-freeze and non-canonical in v1.
+
 ```go
 app := core.New(
     core.WithTenantConfigManager(manager),

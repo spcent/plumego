@@ -1,20 +1,24 @@
 package main
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/recovery"
 )
 
-// User model
+// User represents a demo user resource.
 type User struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -25,286 +29,263 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// InMemoryUserRepository
+type userPatch struct {
+	Name   *string `json:"name,omitempty"`
+	Email  *string `json:"email,omitempty"`
+	Status *string `json:"status,omitempty"`
+	Role   *string `json:"role,omitempty"`
+}
+
+// InMemoryUserRepository is a minimal thread-safe store for the demo.
 type InMemoryUserRepository struct {
-	users map[string]*User
 	mu    sync.RWMutex
+	users map[string]User
 }
 
 func NewInMemoryUserRepository() *InMemoryUserRepository {
-	repo := &InMemoryUserRepository{
-		users: make(map[string]*User),
-	}
-
 	now := time.Now()
-	repo.users = map[string]*User{
+	return &InMemoryUserRepository{users: map[string]User{
 		"user-1": {ID: "user-1", Name: "Alice Johnson", Email: "alice@example.com", Status: "active", Role: "admin", CreatedAt: now, UpdatedAt: now},
 		"user-2": {ID: "user-2", Name: "Bob Smith", Email: "bob@example.com", Status: "active", Role: "user", CreatedAt: now, UpdatedAt: now},
 		"user-3": {ID: "user-3", Name: "Charlie Brown", Email: "charlie@example.com", Status: "active", Role: "user", CreatedAt: now, UpdatedAt: now},
 		"user-4": {ID: "user-4", Name: "Diana Prince", Email: "diana@example.com", Status: "active", Role: "user", CreatedAt: now, UpdatedAt: now},
 		"user-5": {ID: "user-5", Name: "Eve Davis", Email: "eve@example.com", Status: "inactive", Role: "user", CreatedAt: now, UpdatedAt: now},
-	}
-
-	return repo
+	}}
 }
 
-func (r *InMemoryUserRepository) FindAll(ctx context.Context, params *router.QueryParams) ([]User, int64, error) {
+func (r *InMemoryUserRepository) List(status, role, search string, page, pageSize int) ([]User, int) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var users []User
-	for _, user := range r.users {
-		if len(params.Filters) > 0 {
-			match := true
-			if status, ok := params.Filters["status"]; ok && user.Status != status {
-				match = false
-			}
-			if role, ok := params.Filters["role"]; ok && user.Role != role {
-				match = false
-			}
-			if !match {
+	filtered := make([]User, 0, len(r.users))
+	needle := strings.ToLower(strings.TrimSpace(search))
+
+	for _, u := range r.users {
+		if status != "" && u.Status != status {
+			continue
+		}
+		if role != "" && u.Role != role {
+			continue
+		}
+		if needle != "" {
+			if !strings.Contains(strings.ToLower(u.Name), needle) && !strings.Contains(strings.ToLower(u.Email), needle) {
 				continue
 			}
 		}
-
-		if params.Search != "" {
-			if !strings.Contains(strings.ToLower(user.Name), strings.ToLower(params.Search)) &&
-				!strings.Contains(strings.ToLower(user.Email), strings.ToLower(params.Search)) {
-				continue
-			}
-		}
-
-		users = append(users, *user)
+		filtered = append(filtered, u)
 	}
 
-	total := int64(len(users))
-	start := params.Offset
-	end := params.Offset + params.Limit
-	if start > len(users) {
-		return []User{}, total, nil
-	}
-	if end > len(users) {
-		end = len(users)
-	}
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].ID < filtered[j].ID
+	})
 
-	return users[start:end], total, nil
+	total := len(filtered)
+	start := (page - 1) * pageSize
+	if start >= total {
+		return []User{}, total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	out := make([]User, end-start)
+	copy(out, filtered[start:end])
+	return out, total
 }
 
-func (r *InMemoryUserRepository) FindByID(ctx context.Context, id string) (*User, error) {
+func (r *InMemoryUserRepository) Get(id string) (User, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	u, ok := r.users[id]
+	return u, ok
+}
 
-	user, ok := r.users[id]
+func (r *InMemoryUserRepository) Create(u User) (User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.users[u.ID]; exists {
+		return User{}, fmt.Errorf("user already exists")
+	}
+	r.users[u.ID] = u
+	return u, nil
+}
+
+func (r *InMemoryUserRepository) Update(id string, patch userPatch) (User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	u, ok := r.users[id]
 	if !ok {
-		return nil, fmt.Errorf("user not found")
+		return User{}, fmt.Errorf("user not found")
 	}
-	return user, nil
+
+	if patch.Name != nil {
+		u.Name = strings.TrimSpace(*patch.Name)
+	}
+	if patch.Email != nil {
+		u.Email = strings.TrimSpace(*patch.Email)
+	}
+	if patch.Status != nil {
+		u.Status = strings.TrimSpace(*patch.Status)
+	}
+	if patch.Role != nil {
+		u.Role = strings.TrimSpace(*patch.Role)
+	}
+	u.UpdatedAt = time.Now()
+
+	r.users[id] = u
+	return u, nil
 }
 
-func (r *InMemoryUserRepository) Create(ctx context.Context, user *User) error {
+func (r *InMemoryUserRepository) Delete(id string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	if _, exists := r.users[user.ID]; exists {
-		return fmt.Errorf("user already exists")
-	}
-	r.users[user.ID] = user
-	return nil
-}
-
-func (r *InMemoryUserRepository) Update(ctx context.Context, id string, user *User) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if _, exists := r.users[id]; !exists {
-		return fmt.Errorf("user not found")
-	}
-	r.users[id] = user
-	return nil
-}
-
-func (r *InMemoryUserRepository) Delete(ctx context.Context, id string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if _, exists := r.users[id]; !exists {
-		return fmt.Errorf("user not found")
+	if _, ok := r.users[id]; !ok {
+		return false
 	}
 	delete(r.users, id)
-	return nil
+	return true
 }
 
-// UserHooks
-type UserHooks struct {
-	router.NoOpResourceHooks
-}
-
-func (h *UserHooks) BeforeCreate(ctx context.Context, data any) error {
-	user := data.(*User)
-	now := time.Now()
-	user.CreatedAt = now
-	user.UpdatedAt = now
-
-	if user.ID == "" {
-		user.ID = fmt.Sprintf("user-%d", now.UnixNano())
-	}
-	if user.Status == "" {
-		user.Status = "active"
-	}
-	if user.Role == "" {
-		user.Role = "user"
-	}
-
-	log.Printf("[✓] Creating user: %s (%s)", user.Name, user.Email)
-	return nil
-}
-
-func (h *UserHooks) AfterCreate(ctx context.Context, data any) error {
-	user := data.(*User)
-	log.Printf("[✓] User created: %s (ID: %s)", user.Name, user.ID)
-	return nil
-}
-
-func (h *UserHooks) BeforeUpdate(ctx context.Context, id string, data any) error {
-	user := data.(*User)
-	user.UpdatedAt = time.Now()
-	log.Printf("[✓] Updating user: %s", id)
-	return nil
-}
-
-func (h *UserHooks) AfterDelete(ctx context.Context, id string) error {
-	log.Printf("[✓] User deleted: %s", id)
-	return nil
-}
-
-// UserTransformer
-type UserTransformer struct{}
-
-func (t *UserTransformer) Transform(ctx context.Context, resource any) (any, error) {
-	user := resource.(*User)
-	return map[string]any{
-		"id":         user.ID,
-		"name":       user.Name,
-		"email":      user.Email,
-		"status":     user.Status,
-		"role":       user.Role,
-		"created_at": user.CreatedAt.Format(time.RFC3339),
-		"updated_at": user.UpdatedAt.Format(time.RFC3339),
-	}, nil
-}
-
-func (t *UserTransformer) TransformCollection(ctx context.Context, resources any) (any, error) {
-	users := resources.([]User)
-	result := make([]map[string]any, len(users))
-	for i, user := range users {
-		transformed, _ := t.Transform(ctx, &user)
-		result[i] = transformed.(map[string]any)
-	}
-	return result, nil
-}
-
-// UserController
-type UserController struct {
-	*router.BaseContextResourceController
+type userController struct {
 	repo *InMemoryUserRepository
 }
 
-func NewUserController(repo *InMemoryUserRepository) *UserController {
-	ctrl := &UserController{
-		BaseContextResourceController: router.NewBaseContextResourceController("user"),
-		repo:                          repo,
-	}
-
-	ctrl.QueryBuilder.WithPageSize(10, 50).
-		WithAllowedSorts("name", "email", "created_at", "updated_at").
-		WithAllowedFilters("status", "role")
-
-	ctrl.Hooks = &UserHooks{}
-	ctrl.Transformer = &UserTransformer{}
-
-	return ctrl
+func newUserController(repo *InMemoryUserRepository) *userController {
+	return &userController{repo: repo}
 }
 
-func (c *UserController) IndexCtx(ctx *contract.Ctx) {
-	params := c.QueryBuilder.Parse(ctx.R)
-	results, total, err := c.repo.FindAll(ctx.R.Context(), params)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
+func parsePage(v string, def int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n <= 0 {
+		return def
+	}
+	return n
+}
+
+func (c *userController) list(ctx *contract.Ctx) {
+	page := parsePage(ctx.Query.Get("page"), 1)
+	pageSize := parsePage(ctx.Query.Get("page_size"), 10)
+	if pageSize > 100 {
+		pageSize = 100
 	}
 
-	transformed, _ := c.Transformer.TransformCollection(ctx.R.Context(), results)
-	pagination := router.NewPaginationMeta(params.Page, params.PageSize, total)
+	users, total := c.repo.List(
+		strings.TrimSpace(ctx.Query.Get("status")),
+		strings.TrimSpace(ctx.Query.Get("role")),
+		ctx.Query.Get("search"),
+		page,
+		pageSize,
+	)
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
 
-	ctx.JSON(http.StatusOK, router.PaginatedResponse{
-		Data:       transformed,
-		Pagination: pagination,
+	_ = ctx.JSON(http.StatusOK, map[string]any{
+		"data": users,
+		"pagination": map[string]any{
+			"page":        page,
+			"page_size":   pageSize,
+			"total":       total,
+			"total_pages": totalPages,
+		},
 	})
 }
 
-func (c *UserController) ShowCtx(ctx *contract.Ctx) {
-	id := c.ParamExtractor.GetID(ctx.R)
-	if id == "" {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "ID required"})
+func (c *userController) show(ctx *contract.Ctx) {
+	id, ok := ctx.Param("id")
+	if !ok || strings.TrimSpace(id) == "" {
+		_ = ctx.JSON(http.StatusBadRequest, map[string]string{"error": "id is required"})
 		return
 	}
 
-	result, err := c.repo.FindByID(ctx.R.Context(), id)
+	u, found := c.repo.Get(id)
+	if !found {
+		_ = ctx.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
+		return
+	}
+	_ = ctx.JSON(http.StatusOK, u)
+}
+
+func (c *userController) create(ctx *contract.Ctx) {
+	var req struct {
+		Name   string `json:"name"`
+		Email  string `json:"email"`
+		Status string `json:"status"`
+		Role   string `json:"role"`
+	}
+	if err := json.NewDecoder(ctx.R.Body).Decode(&req); err != nil {
+		_ = ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		return
+	}
+
+	req.Name = strings.TrimSpace(req.Name)
+	req.Email = strings.TrimSpace(req.Email)
+	if req.Name == "" || req.Email == "" {
+		_ = ctx.JSON(http.StatusBadRequest, map[string]string{"error": "name and email are required"})
+		return
+	}
+	if req.Status == "" {
+		req.Status = "active"
+	}
+	if req.Role == "" {
+		req.Role = "user"
+	}
+
+	now := time.Now()
+	u := User{
+		ID:        fmt.Sprintf("user-%d", now.UnixNano()),
+		Name:      req.Name,
+		Email:     req.Email,
+		Status:    req.Status,
+		Role:      req.Role,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	created, err := c.repo.Create(u)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, map[string]string{"error": "Not found"})
+		_ = ctx.JSON(http.StatusConflict, map[string]string{"error": err.Error()})
 		return
 	}
 
-	transformed, _ := c.Transformer.Transform(ctx.R.Context(), result)
-	ctx.JSON(http.StatusOK, transformed)
+	_ = ctx.JSON(http.StatusCreated, created)
 }
 
-func (c *UserController) CreateCtx(ctx *contract.Ctx) {
-	var data User
-	if err := ctx.BindJSON(&data); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+func (c *userController) update(ctx *contract.Ctx) {
+	id, ok := ctx.Param("id")
+	if !ok || strings.TrimSpace(id) == "" {
+		_ = ctx.JSON(http.StatusBadRequest, map[string]string{"error": "id is required"})
 		return
 	}
 
-	c.Hooks.BeforeCreate(ctx.R.Context(), &data)
-	if err := c.repo.Create(ctx.R.Context(), &data); err != nil {
-		ctx.JSON(http.StatusConflict, map[string]string{"error": err.Error()})
+	var patch userPatch
+	if err := json.NewDecoder(ctx.R.Body).Decode(&patch); err != nil {
+		_ = ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
 	}
-	c.Hooks.AfterCreate(ctx.R.Context(), &data)
 
-	transformed, _ := c.Transformer.Transform(ctx.R.Context(), &data)
-	ctx.JSON(http.StatusCreated, transformed)
+	updated, err := c.repo.Update(id, patch)
+	if err != nil {
+		_ = ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+		return
+	}
+
+	_ = ctx.JSON(http.StatusOK, updated)
 }
 
-func (c *UserController) UpdateCtx(ctx *contract.Ctx) {
-	id := c.ParamExtractor.GetID(ctx.R)
-	var data User
-	if err := ctx.BindJSON(&data); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+func (c *userController) delete(ctx *contract.Ctx) {
+	id, ok := ctx.Param("id")
+	if !ok || strings.TrimSpace(id) == "" {
+		_ = ctx.JSON(http.StatusBadRequest, map[string]string{"error": "id is required"})
 		return
 	}
 
-	data.ID = id
-	c.Hooks.BeforeUpdate(ctx.R.Context(), id, &data)
-	if err := c.repo.Update(ctx.R.Context(), id, &data); err != nil {
-		ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	if !c.repo.Delete(id) {
+		_ = ctx.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
 		return
 	}
-	c.Hooks.AfterUpdate(ctx.R.Context(), id, &data)
-
-	transformed, _ := c.Transformer.Transform(ctx.R.Context(), &data)
-	ctx.JSON(http.StatusOK, transformed)
-}
-
-func (c *UserController) DeleteCtx(ctx *contract.Ctx) {
-	id := c.ParamExtractor.GetID(ctx.R)
-	c.Hooks.BeforeDelete(ctx.R.Context(), id)
-	if err := c.repo.Delete(ctx.R.Context(), id); err != nil {
-		ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
-		return
-	}
-	c.Hooks.AfterDelete(ctx.R.Context(), id)
 	ctx.W.WriteHeader(http.StatusNoContent)
 }
 
@@ -312,36 +293,35 @@ func main() {
 	app := core.New(
 		core.WithAddr(":8080"),
 		core.WithDebug(),
-		core.WithRequestID(),
-		core.WithLogging(),
-		core.WithRecovery(),
-		core.WithCORS(),
 	)
+	if err := app.Use(
+		observability.RequestID(),
+		observability.Logging(app.Logger(), nil, nil),
+		recovery.RecoveryMiddleware,
+		cors.CORS,
+	); err != nil {
+		log.Fatal(err)
+	}
 
 	repo := NewInMemoryUserRepository()
-	ctrl := NewUserController(repo)
+	ctrl := newUserController(repo)
 
-	// Routes
-	app.Get("/", func(w http.ResponseWriter, r *http.Request) {
+	app.Get("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<html><body><h1>🚀 CRUD Demo</h1>
-<p>Try: <code>curl http://localhost:8080/users</code></p></body></html>`)
+		_, _ = fmt.Fprint(w, `<html><body><h1>CRUD Demo</h1><p>Try: <code>curl http://localhost:8080/users</code></p></body></html>`)
 	})
 
 	adaptCtx := func(handler contract.CtxHandlerFunc) http.HandlerFunc {
 		return contract.AdaptCtxHandler(handler, app.Logger()).ServeHTTP
 	}
 
-	app.Get("/users", adaptCtx(ctrl.IndexCtx))
-	app.Get("/users/:id", adaptCtx(ctrl.ShowCtx))
-	app.Post("/users", adaptCtx(ctrl.CreateCtx))
-	app.Put("/users/:id", adaptCtx(ctrl.UpdateCtx))
-	app.Delete("/users/:id", adaptCtx(ctrl.DeleteCtx))
+	app.Get("/users", adaptCtx(ctrl.list))
+	app.Get("/users/:id", adaptCtx(ctrl.show))
+	app.Post("/users", adaptCtx(ctrl.create))
+	app.Put("/users/:id", adaptCtx(ctrl.update))
+	app.Delete("/users/:id", adaptCtx(ctrl.delete))
 
-	log.Println("🚀 Server: http://localhost:8080")
-	log.Println("📚 GET /users - List users")
-	log.Println("📚 POST /users - Create user")
-
+	log.Println("server: http://localhost:8080")
 	if err := app.Boot(); err != nil {
 		log.Fatal(err)
 	}

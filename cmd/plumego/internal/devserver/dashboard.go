@@ -15,6 +15,9 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/frontend"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/net/websocket"
 	"github.com/spcent/plumego/pubsub"
 )
@@ -58,8 +61,15 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	app := core.New(
 		core.WithAddr(cfg.DashboardAddr),
 		core.WithDebug(),
-		core.WithRecommendedMiddleware(),
 	)
+	if err := app.Use(
+		observability.RequestID(),
+		observability.Logging(app.Logger(), nil, nil),
+		recovery.RecoveryMiddleware,
+		cors.CORS,
+	); err != nil {
+		return nil, fmt.Errorf("register dashboard middleware: %w", err)
+	}
 
 	// Create WebSocket hub (4 workers, queue size 100)
 	hub := websocket.NewHub(4, 100)
@@ -112,7 +122,7 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 	})
 
 	// API endpoints (without Group - register directly)
-	adaptCtx := func(handler plumego.ContextHandlerFunc) http.HandlerFunc {
+	adaptCtx := func(handler contract.CtxHandlerFunc) http.HandlerFunc {
 		return contract.AdaptCtxHandler(handler, d.app.Logger()).ServeHTTP
 	}
 

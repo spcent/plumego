@@ -74,7 +74,7 @@ cb := circuitbreaker.New(
 
 ```go
 // Apply to AI route group
-ai := app.Group("/api/ai")
+ai := app.Router().Group("/api/ai")
 ai.Use(cb.Middleware())
 
 // Handler doesn't need to know about circuit breaker

@@ -117,6 +117,8 @@ type App struct {
 The style guide (§4, §18) requires "one bootstrap" and forbids "Teaching multiple equally
 valid bootstraps." Currently there are three families for the same operation:
 
+> Legacy snippet (historical): shows pre-freeze API variants for analysis context only.
+
 ```go
 // Style A — direct Use (canonical)
 app.Use(recovery.RecoveryWithLogger(logger))
@@ -257,6 +259,8 @@ app.Add(webhook.NewInbound(webhook.InConfig{GitHubPath: "/webhooks/github"}, ps,
 `core/options.go`. The tenant domain is an extension capability (§2: "tenant — capability
 layers, not the core learning path"). The style guide (§9) says middleware must be
 "Transport-layer cross-cutting only."
+
+> Legacy snippet (historical): this "Current" sample is intentionally non-canonical.
 
 ```go
 // ❌ Current — business domain orchestration inside core
