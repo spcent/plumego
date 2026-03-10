@@ -227,14 +227,14 @@ func (lbc *MemoryLeaderboardCache) cleanupExpiredLeaderboards() {
 
 // getOrCreateSortedSet retrieves or creates a sorted set
 func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Duration) (*sortedSet, error) {
-	// Try to load existing
+	// Fast path: key exists and is not expired
 	if value, ok := lbc.leaderboards.Load(key); ok {
 		ss := value.(*sortedSet)
 		if !ss.isExpired() {
 			return ss, nil
 		}
-		// Expired, delete it
-		lbc.leaderboards.Delete(key)
+		// Expired, remove it so a fresh one can be created
+		lbc.leaderboards.CompareAndDelete(key, ss)
 	}
 
 	// Use default TTL if not specified
@@ -242,7 +242,7 @@ func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Dur
 		ttl = lbc.config.DefaultTTL
 	}
 
-	// Check max leaderboards limit
+	// Check max leaderboards limit before allocating
 	count := int64(0)
 	lbc.leaderboards.Range(func(_, _ any) bool {
 		count++
@@ -253,10 +253,14 @@ func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Dur
 		return nil, ErrLeaderboardFull
 	}
 
-	// Create new sorted set
+	// Use LoadOrStore to avoid the TOCTOU race: two goroutines may both miss
+	// the key and try to create a new sorted set simultaneously.
 	ss := newSortedSet(ttl)
-	lbc.leaderboards.Store(key, ss)
-
+	actual, loaded := lbc.leaderboards.LoadOrStore(key, ss)
+	if loaded {
+		// Another goroutine won the race; use the one it stored.
+		return actual.(*sortedSet), nil
+	}
 	return ss, nil
 }
 
