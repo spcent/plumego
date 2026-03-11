@@ -22,10 +22,6 @@ func DefaultWebSocketConfig() WebSocketConfig {
 //
 // It returns the Hub for advanced usage.
 func (a *App) ConfigureWebSocket() (*ws.Hub, error) {
-	if err := a.loadEnv(); err != nil {
-		return nil, err
-	}
-
 	return a.ConfigureWebSocketWithOptions(DefaultWebSocketConfig())
 }
 

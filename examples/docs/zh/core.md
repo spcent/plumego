@@ -4,9 +4,12 @@
 
 ## 创建并启动应用
 ```go
+ctx := context.Background()
+
 app := core.New(
     core.WithAddr(":8080"),
     core.WithDebug(),
+    core.WithDevTools(),
 )
 
 if err := app.Use(
@@ -18,13 +21,25 @@ if err := app.Use(
     log.Fatalf("register middleware: %v", err)
 }
 
-app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
     w.Write([]byte("pong"))
-})
-
-if err := app.Boot(); err != nil {
-    log.Fatalf("server stopped: %v", err)
+})); err != nil {
+    log.Fatalf("register route: %v", err)
 }
+
+if err := app.Prepare(); err != nil {
+    log.Fatalf("prepare app: %v", err)
+}
+if err := app.Start(ctx); err != nil {
+    log.Fatalf("start runtime: %v", err)
+}
+srv, err := app.Server()
+if err != nil {
+    log.Fatalf("build server: %v", err)
+}
+defer app.Shutdown(ctx)
+
+log.Fatal(srv.ListenAndServe())
 ```
 
 ## 配置与默认值
@@ -35,7 +50,7 @@ if err := app.Boot(); err != nil {
 - `WithServerTimeouts`（读/读头/写/空闲超时）
 - `WithMaxHeaderBytes`
 - `WithHTTP2`、`WithTLS`、`WithTLSConfig`
-- `WithDebug`、`WithLogger`
+- `WithDebug`、`WithDevTools`、`WithLogger`
 - `WithMethodNotAllowed`
 
 ## 组件与生命周期
@@ -85,9 +100,19 @@ app.Get("/metrics", prom.Handler().ServeHTTP)
 app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 
-if err := app.Boot(); err != nil {
+ctx := context.Background()
+if err := app.Prepare(); err != nil {
     log.Fatal(err)
 }
+if err := app.Start(ctx); err != nil {
+    log.Fatal(err)
+}
+srv, err := app.Server()
+if err != nil {
+    log.Fatal(err)
+}
+defer app.Shutdown(ctx)
+log.Fatal(srv.ListenAndServe())
 ```
 
 ## Ctx 风格处理器（显式适配）
@@ -105,6 +130,6 @@ app.Post("/users", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 ```
 
 ## 安全与排障提示
-- `Boot()` 前完成路由和中间件注册；启动后变更会被拒绝。
+- `Prepare()` 前完成路由和中间件注册；进入准备阶段后变更会被拒绝。
 - 处理器应支持 `context` 取消，保证优雅退出可控。
 - WebSocket/Webhook 建议通过显式组件和配置接入，避免隐藏副作用。

@@ -32,7 +32,7 @@ api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Req
 }))
 ```
 
-所有路由需在 `app.Boot()` 前注册；启动时会冻结路由表。
+所有路由需在 `app.Prepare()` 前注册；准备阶段会冻结路由表。
 
 ## 逆向路由
 通过路由名安全生成 URL：

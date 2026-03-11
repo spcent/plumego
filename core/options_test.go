@@ -128,6 +128,15 @@ func TestWithDebug(t *testing.T) {
 	}
 }
 
+func TestWithDevTools(t *testing.T) {
+	app := &App{config: &AppConfig{}}
+	opt := WithDevTools()
+	opt(app)
+	if !app.devTools {
+		t.Errorf("expected devtools to be enabled")
+	}
+}
+
 func TestWithLogger(t *testing.T) {
 	app := &App{}
 	logger := log.NewGLogger()

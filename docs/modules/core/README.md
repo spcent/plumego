@@ -3,7 +3,7 @@
 > **Package**: `github.com/spcent/plumego/core`  
 > **Stability**: High (v1 GA)
 
-The `core` package is Plumego's application entrypoint. It manages app construction, route registration, middleware composition, component/runner lifecycle, and server boot.
+The `core` package is Plumego's application entrypoint. It manages app construction, route registration, middleware composition, component/runner lifecycle, and explicit server preparation/startup.
 
 ---
 
@@ -15,7 +15,7 @@ The `core` package is Plumego's application entrypoint. It manages app construct
 - Component lifecycle (`WithComponent`, `WithComponents`)
 - Runner lifecycle (`WithRunner`, `WithRunners`)
 - Graceful shutdown hooks (`WithShutdownHook`, `WithShutdownHooks`)
-- Server boot (`app.Boot()`)
+- Explicit lifecycle (`app.Prepare()`, `app.Start(ctx)`, `app.Server()`, `app.Shutdown(ctx)`)
 
 `core` stays transport-first and remains compatible with `net/http`.
 
@@ -27,6 +27,7 @@ The `core` package is Plumego's application entrypoint. It manages app construct
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -39,6 +40,7 @@ func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
+        core.WithDevTools(),
     )
 
     if err := app.Use(
@@ -49,13 +51,25 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+    if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
-    })
-
-    if err := app.Boot(); err != nil {
-        log.Fatalf("server stopped: %v", err)
+    })); err != nil {
+        log.Fatalf("register route: %v", err)
     }
+
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare app: %v", err)
+    }
+    if err := app.Start(context.Background()); err != nil {
+        log.Fatalf("start runtime: %v", err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("build server: %v", err)
+    }
+    defer app.Shutdown(context.Background())
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
@@ -65,8 +79,10 @@ func main() {
 
 1. Construct app with `core.New(options...)`.
 2. Register middleware and routes while app is mutable.
-3. Boot app with `app.Boot()`.
-4. During shutdown, hooks/components/runners are stopped in managed order.
+3. Prepare app with `app.Prepare()`.
+4. Start runtime hooks with `app.Start(ctx)`.
+5. Serve using the prepared `*http.Server` or `app.Run(ctx)`.
+6. During shutdown, call `app.Shutdown(ctx)` to stop server, runners, components, and hooks.
 
 After boot starts, mutating operations (adding routes/middleware/runners/hooks) are rejected.
 
@@ -130,7 +146,7 @@ For advanced routing (groups, route metadata, reverse routing), use `app.Router(
 
 ## Middleware Registration
 
-Use explicit order with `app.Use(...)` before boot:
+Use explicit order with `app.Use(...)` before prepare:
 
 ```go
 if err := app.Use(mw1, mw2, mw3); err != nil {
@@ -161,6 +177,7 @@ Common options:
 - `WithHTTP2`
 - `WithTLS` / `WithTLSConfig`
 - `WithDebug`
+- `WithDevTools`
 - `WithLogger`
 - `WithMethodNotAllowed`
 - `WithComponent` / `WithComponents`

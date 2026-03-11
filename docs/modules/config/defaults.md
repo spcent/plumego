@@ -2,36 +2,27 @@
 
 > **Package**: `github.com/spcent/plumego/config`
 
-Managing default values and fallbacks.
+Defaults are supplied explicitly by the caller.
 
----
-
-## Basic Defaults
+## Basic defaults
 
 ```go
-addr := cfg.Get("APP_ADDR", ":8080")          // Default: :8080
-debug := cfg.GetBool("APP_DEBUG", false)      // Default: false
-timeout := cfg.GetDuration("TIMEOUT", 30*time.Second)  // Default: 30s
+addr := cfg.GetString("app_addr", ":8080")
+debug := cfg.GetBool("app_debug", false)
+timeout := cfg.GetDuration("app_timeout", 30*time.Second)
 ```
 
----
-
-## Computed Defaults
+## Derived defaults
 
 ```go
-env := cfg.Get("ENV", "development")
-
-var debug bool
+env := cfg.GetString("app_env", "development")
+writeTimeout := 30 * time.Second
 if env == "production" {
-    debug = false  // Production default
-} else {
-    debug = true   // Development default
+    writeTimeout = 15 * time.Second
 }
 ```
 
----
-
-## Centralized Defaults
+## Centralize defaults near startup
 
 ```go
 type AppConfig struct {
@@ -40,44 +31,17 @@ type AppConfig struct {
     Timeout time.Duration
 }
 
-func LoadConfig() AppConfig {
-    cfg := config.Load()
-
+func loadAppConfig(cfg *config.Manager) AppConfig {
     return AppConfig{
-        Addr:    cfg.Get("APP_ADDR", ":8080"),
-        Debug:   cfg.GetBool("APP_DEBUG", false),
-        Timeout: cfg.GetDuration("TIMEOUT", 30*time.Second),
+        Addr:    cfg.GetString("app_addr", ":8080"),
+        Debug:   cfg.GetBool("app_debug", false),
+        Timeout: cfg.GetDuration("app_timeout", 30*time.Second),
     }
 }
 ```
 
----
+## Guidance
 
-## Best Practices
-
-### ✅ Do
-
-1. **Always Provide Defaults**
-   ```go
-   addr := cfg.Get("APP_ADDR", ":8080")
-   ```
-
-2. **Use Sensible Defaults**
-   ```go
-   timeout := cfg.GetDuration("TIMEOUT", 30*time.Second)  // ✅ Reasonable
-   ```
-
-### ❌ Don't
-
-1. **Don't Use Empty Defaults for Critical Values**
-   ```go
-   // ❌ Empty default for critical value
-   apiKey := cfg.Get("API_KEY", "")
-
-   // ✅ Require critical values
-   apiKey := cfg.MustGet("API_KEY")
-   ```
-
----
-
-**Next**: [Advanced Config](advanced-config.md)
+- Use defaults for optional behavior.
+- Use validators for required values.
+- Keep defaults in one place so startup behavior is easy to inspect.

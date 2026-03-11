@@ -29,6 +29,7 @@ type Component interface {
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -39,9 +40,11 @@ import (
 )
 
 func main() {
+    ctx := context.Background()
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
+        core.WithDevTools(),
     )
 
     if err := app.Use(
@@ -53,18 +56,30 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+    if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
-    })
-
-    if err := app.Boot(); err != nil {
-        log.Fatalf("server stopped: %v", err)
+    })); err != nil {
+        log.Fatalf("register route: %v", err)
     }
+
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare app: %v", err)
+    }
+    if err := app.Start(ctx); err != nil {
+        log.Fatalf("start runtime: %v", err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("build server: %v", err)
+    }
+    defer app.Shutdown(ctx)
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
 ## 配置基础
-- `.env` 加载：`core.WithEnvPath(...)`。
+- `.env` 应在 `main` 中显式加载；`core.WithEnvPath(...)` 只记录路径，供需要该信息的组件使用。
 - 地址、HTTP 超时、优雅关闭、header 限制、TLS、HTTP2 等通过 `core.With...` 选项配置。
 - 指标/链路追踪通过 `core.WithMetricsCollector(...)` 与 `core.WithTracer(...)` 注入。
 

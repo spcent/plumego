@@ -36,6 +36,7 @@ Compile-oriented complete example:
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -43,6 +44,7 @@ import (
 )
 
 func main() {
+    ctx := context.Background()
     app := core.New(core.WithAddr(":8080"))
 
     app.GetNamed("users.show", "/users/:id", func(w http.ResponseWriter, r *http.Request) {
@@ -55,9 +57,19 @@ func main() {
     _ = app.Router().URL("users.show", "id", "42")
     _ = app.Router().URL("users.posts", "id", "42", "postId", "7")
 
-    if err := app.Boot(); err != nil {
+    if err := app.Prepare(); err != nil {
         log.Fatal(err)
     }
+    if err := app.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer app.Shutdown(ctx)
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 

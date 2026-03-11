@@ -23,7 +23,7 @@ type Config struct {
 ## Env 覆盖策略
 推荐优先级：
 1. `Defaults()` 默认值
-2. `.env`（可选，`core.WithEnvPath` + `core.Boot()`）
+2. `.env`（可选，在 `main` 中显式加载）
 3. 环境变量（显式覆盖）
 4. 命令行参数（最高优先级）
 
@@ -39,7 +39,7 @@ type Config struct {
 4. 校验配置。
 5. 根据配置组装 `core.New(...)` options。
 6. 注册 middleware / component / runner。
-7. 调用 `app.Boot()`。
+7. 调用 `app.Prepare()`、`app.Start(ctx)`，然后启动准备好的 server。
 
 保证启动确定性，避免隐式副作用。
 
@@ -67,6 +67,7 @@ func LoadConfig() (Config, error) {
 }
 
 func main() {
+	ctx := context.Background()
 	cfg, err := LoadConfig()
 	if err != nil {
 		log.Fatalf("config error: %v", err)
@@ -75,10 +76,20 @@ func main() {
 	app := core.New(
 		core.WithAddr(cfg.Core.Addr),
 		core.WithDebug(),
+		core.WithDevTools(),
 	)
 
-	if err := app.Boot(); err != nil {
-		log.Fatalf("boot error: %v", err)
+	if err := app.Prepare(); err != nil {
+		log.Fatalf("prepare error: %v", err)
 	}
+	if err := app.Start(ctx); err != nil {
+		log.Fatalf("start error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		log.Fatalf("server error: %v", err)
+	}
+	defer app.Shutdown(ctx)
+	log.Fatal(srv.ListenAndServe())
 }
 ```

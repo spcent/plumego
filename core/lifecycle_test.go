@@ -51,22 +51,7 @@ func requireNetwork(t *testing.T) string {
 func TestBoot(t *testing.T) {
 	addr := requireNetwork(t)
 
-	// Create a temporary .env file for testing
-	tmpFile, err := os.CreateTemp("", "boot_test_env")
-	if err != nil {
-		t.Fatalf("failed to create temp env file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString("BOOT_TEST_KEY=boot_value\n"); err != nil {
-		t.Fatalf("failed to write env file: %v", err)
-	}
-	tmpFile.Close()
-
-	app := New(
-		WithEnvPath(tmpFile.Name()),
-		WithAddr(addr), // Use random port
-	)
+	app := New(WithAddr(addr))
 
 	// Add a test route
 	app.Get("/boot-test", func(w http.ResponseWriter, r *http.Request) {
@@ -83,11 +68,6 @@ func TestBoot(t *testing.T) {
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
 
-	// Test that env was loaded
-	if os.Getenv("BOOT_TEST_KEY") != "boot_value" {
-		t.Errorf("expected BOOT_TEST_KEY to be boot_value")
-	}
-
 	// Test server is responding
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/boot-test", nil)
@@ -101,7 +81,9 @@ func TestBoot(t *testing.T) {
 	}
 
 	// Signal shutdown
-	sendShutdownSignal(t)
+	if err := app.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown returned unexpected error: %v", err)
+	}
 
 	// Wait for shutdown
 	select {
@@ -185,7 +167,9 @@ func TestBootStartsRunnersBeforeServer(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	sendShutdownSignal(t)
+	if err := app.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown returned unexpected error: %v", err)
+	}
 
 	select {
 	case err := <-serverDone:
@@ -200,94 +184,6 @@ func TestBootStartsRunnersBeforeServer(t *testing.T) {
 	}
 	if !hookCalled {
 		t.Fatalf("shutdown hook should run on shutdown")
-	}
-}
-
-// TestLoadEnv tests environment loading functionality
-func TestLoadEnv(t *testing.T) {
-	tests := []struct {
-		name          string
-		envFile       string
-		envContent    string
-		expectError   bool
-		alreadyLoaded bool
-	}{
-		{
-			name:        "load valid env file",
-			envFile:     "test.env",
-			envContent:  "TEST_VAR=test_value\n",
-			expectError: false,
-		},
-		{
-			name:        "env file does not exist",
-			envFile:     "nonexistent.env",
-			expectError: false,
-		},
-		{
-			name:        "empty env file path",
-			envFile:     "",
-			expectError: false,
-		},
-		{
-			name:          "already loaded",
-			envFile:       "test.env",
-			envContent:    "TEST_VAR2=value2\n",
-			expectError:   false,
-			alreadyLoaded: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Clean up env
-			os.Unsetenv("TEST_VAR")
-			os.Unsetenv("TEST_VAR2")
-
-			app := New()
-
-			if tt.alreadyLoaded {
-				app.envLoaded = true
-			}
-
-			if tt.envFile != "" && tt.envFile != "nonexistent.env" {
-				tmpFile, err := os.CreateTemp("", tt.envFile)
-				if err != nil {
-					t.Fatalf("failed to create temp file: %v", err)
-				}
-				defer os.Remove(tmpFile.Name())
-
-				if _, err := tmpFile.WriteString(tt.envContent); err != nil {
-					t.Fatalf("failed to write env file: %v", err)
-				}
-				tmpFile.Close()
-				app.config.EnvFile = tmpFile.Name()
-			} else if tt.envFile == "nonexistent.env" {
-				app.config.EnvFile = "nonexistent.env"
-			} else {
-				app.config.EnvFile = ""
-			}
-
-			err := app.loadEnv()
-
-			if tt.expectError && err == nil {
-				t.Error("expected error but got none")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-
-			if !tt.alreadyLoaded && tt.envFile != "" && tt.envFile != "nonexistent.env" && tt.envContent != "" {
-				// Check if env was loaded
-				parts := strings.Split(tt.envContent, "=")
-				if len(parts) >= 2 {
-					key := parts[0]
-					expectedValue := strings.TrimSpace(parts[1])
-					if os.Getenv(key) != expectedValue {
-						t.Errorf("expected %s=%s, got %s", key, expectedValue, os.Getenv(key))
-					}
-				}
-			}
-		})
 	}
 }
 
@@ -446,7 +342,9 @@ func TestStartServer(t *testing.T) {
 		}
 
 		// Trigger shutdown
-		sendShutdownSignal(t)
+		if err := app.Shutdown(context.Background()); err != nil {
+			t.Fatalf("shutdown returned unexpected error: %v", err)
+		}
 
 		select {
 		case err := <-serverDone:
@@ -771,7 +669,9 @@ func TestAppBootWithComponents(t *testing.T) {
 	}
 
 	// Shutdown
-	sendShutdownSignal(t)
+	if err := app.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown returned unexpected error: %v", err)
+	}
 
 	select {
 	case err := <-serverDone:
@@ -831,7 +731,9 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 	}
 
 	// Trigger shutdown
-	sendShutdownSignal(t)
+		if err := app.Shutdown(context.Background()); err != nil {
+			t.Fatalf("shutdown returned unexpected error: %v", err)
+		}
 
 	select {
 	case <-done:

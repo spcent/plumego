@@ -12,26 +12,30 @@ This page documents the actual v1 lifecycle behavior of `core.App`.
 
 1. `core.New(options...)`
 2. Register middleware/routes/components/runners/hooks (mutable phase)
-3. `app.Boot()`
-4. OS signal (`SIGINT`/`SIGTERM`) triggers graceful shutdown path
+3. `app.Prepare()`
+4. `app.Start(ctx)`
+5. Serve via `app.Server()` or `app.Run(ctx)`
+6. `app.Shutdown(ctx)`
 
-During boot, configuration is frozen and further mutation is rejected.
+During `Prepare()`, configuration is frozen and further mutation is rejected.
 
 ---
 
-## What `Boot()` Does
+## What `Prepare()` and `Start()` Do
 
-`Boot()` runs the boot sequence in order:
+`Prepare()` runs the setup sequence in order:
 
-1. Load `.env` file if configured (`WithEnvPath`)
-2. Enable debug env flag when debug mode is on
-3. Mount components (`RegisterMiddleware`, `RegisterRoutes`)
-4. Freeze router
-5. Build HTTP handler from router + middleware registry
-6. Start components
-7. Start runners
-8. Start HTTP server (`ListenAndServe` / `ListenAndServeTLS`)
-9. Wait for shutdown signal and perform graceful stop
+1. Mount explicit components (`RegisterMiddleware`, `RegisterRoutes`)
+2. Freeze router
+3. Build HTTP handler from router + middleware registry
+4. Construct `*http.Server`
+
+`Start(ctx)` then:
+
+1. Starts logger lifecycle hooks (if implemented)
+2. Starts components
+3. Starts runners
+4. Marks readiness ready
 
 If a start step fails, already-started runners/components are stopped.
 
@@ -39,7 +43,7 @@ If a start step fails, already-started runners/components are stopped.
 
 ## Graceful Shutdown Behavior
 
-When a shutdown signal is received while `Boot()` is running:
+When `Shutdown(ctx)` is called:
 
 1. readiness is marked not-ready
 2. server shutdown runs with configured timeout (`WithShutdownTimeout`)
@@ -54,27 +58,41 @@ Timeout fallback is `5s` when shutdown timeout is not positive.
 
 ## Signals
 
-`Boot()` handles:
+`Run(ctx)` handles:
 
 - `SIGINT`
 - `SIGTERM`
 
-No extra application code is required for the default signal path.
+If you use `Prepare()` / `Start()` / `Server()` directly, signal handling is your responsibility.
 
 ---
 
 ## Important API Notes
 
-- There is no public `app.Shutdown(ctx)` method in current v1 API.
-- There is no public `app.Server()` or `app.Addr()` getter in current v1 API.
+- `WithEnvPath` no longer loads `.env` automatically.
+- `WithDebug` no longer auto-mounts devtools.
+- `WithDevTools` explicitly mounts the debug routes/component.
 
-If you need full manual server lifecycle control, run with the standard library server and `app` as `http.Handler`:
+Manual server lifecycle control is now a first-class path:
 
 ```go
 app := core.New(core.WithAddr(":8080"))
 app.Get("/health", healthHandler)
 
-log.Fatal(http.ListenAndServe(":8080", app))
+if err := app.Prepare(); err != nil {
+    log.Fatal(err)
+}
+if err := app.Start(context.Background()); err != nil {
+    log.Fatal(err)
+}
+defer app.Shutdown(context.Background())
+
+srv, err := app.Server()
+if err != nil {
+    log.Fatal(err)
+}
+
+log.Fatal(srv.ListenAndServe())
 ```
 
 ---
@@ -93,7 +111,7 @@ app := core.New(
 )
 ```
 
-Before boot freeze (runtime registration):
+Before prepare freeze (runtime registration):
 
 ```go
 _ = app.Register(runnerB)
@@ -104,8 +122,8 @@ _ = app.OnShutdown(func(ctx context.Context) error { return nil })
 
 ## Testing Lifecycle Logic
 
-For most cases, prefer `httptest` + `app.ServeHTTP` instead of `Boot()`.  
-Use `Boot()` tests only for lifecycle-specific behavior (signals/components/runners).
+For most cases, prefer `httptest` + `app.ServeHTTP` instead of full lifecycle startup.  
+Use `Prepare()` / `Start()` / `Shutdown()` tests for lifecycle-specific behavior.
 
 Quality gates:
 

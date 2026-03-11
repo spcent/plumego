@@ -4,235 +4,88 @@
 
 ## Overview
 
-The `ai/` package provides an AI agent gateway for Plumego applications. It offers a unified interface for multiple LLM providers, real-time streaming via Server-Sent Events, conversation session management, token counting, function calling, semantic caching, and fault-tolerance patterns.
+The `ai/` tree provides provider adapters, streaming helpers, session management, token counting, tools, resilience wrappers, and related building blocks.
 
-**Key Features**:
-- **Unified Provider Interface**: Single API for Claude, OpenAI, and custom providers
-- **SSE Streaming**: Real-time token-by-token responses via Server-Sent Events
-- **Session Management**: Conversation history with context window control
-- **Token Counting**: Usage tracking and quota enforcement
-- **Function Calling**: Tool framework for agent actions
-- **Semantic Cache**: Embedding-based response deduplication
-- **Circuit Breaker**: Fault tolerance for LLM calls
-- **Orchestration**: Multi-step AI workflow coordination
-- **Rate Limiting**: Per-tenant/per-user AI quota management
+Current stable entry points documented here:
 
-## Subpackages
+- `ai/provider`: unified provider interface with Claude/OpenAI adapters
+- `ai/session`: conversation/session storage and token-window trimming
+- `ai/sse`: SSE response streaming helpers
+- `ai/ratelimit`: token bucket rate limiter primitives
+- `ai/resilience`: provider wrapper with rate limiting and circuit breaking
 
-| Package | Description |
-|---------|-------------|
-| `ai/provider` | Unified LLM provider interface (Claude, OpenAI) |
-| `ai/session` | Conversation session management |
-| `ai/sse` | Server-Sent Events streaming |
-| `ai/streaming` | Streaming response processing |
-| `ai/tokenizer` | Token counting and quota management |
-| `ai/tool` | Function calling framework |
-| `ai/semanticcache` | Embedding-based response caching |
-| `ai/llmcache` | Exact-match LLM response caching |
-| `ai/circuitbreaker` | Circuit breaker for LLM calls |
-| `ai/orchestration` | AI workflow orchestration |
-| `ai/prompt` | Prompt management and templating |
-| `ai/ratelimit` | AI endpoint rate limiting |
-| `ai/resilience` | Error handling and retries |
-| `ai/filter` | Request/response filtering |
-| `ai/instrumentation` | AI metrics and observability |
+There is no current `core.WithAIProvider(...)` or `core.WithSessionManager(...)` integration option. Wire AI dependencies explicitly in your handlers/services.
 
-## Quick Start
-
-### Basic AI Endpoint
+## Minimal chat wiring
 
 ```go
+package main
+
 import (
+    "context"
+    "encoding/json"
+    "log"
+    "net/http"
+    "os"
+
     "github.com/spcent/plumego/ai/provider"
     "github.com/spcent/plumego/ai/session"
-    "github.com/spcent/plumego/ai/sse"
+    "github.com/spcent/plumego/core"
 )
 
-// Create provider
-claude := provider.NewClaude(
-    provider.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
-    provider.WithModel("claude-opus-4-6"),
-)
+func main() {
+    model := provider.NewClaudeProvider(os.Getenv("ANTHROPIC_API_KEY"))
+    sessions := session.NewManager(session.NewMemoryStorage())
 
-// Session manager
-sessionMgr := session.NewManager(
-    session.NewInMemoryStorage(),
-    session.WithMaxTokens(100000),
-    session.WithDefaultTTL(24*time.Hour),
-)
-
-// Streaming chat endpoint
-app.Post("/api/chat", func(w http.ResponseWriter, r *http.Request) {
-    var req struct {
-        SessionID string `json:"session_id"`
-        Message   string `json:"message"`
+    app := core.New(core.WithAddr(":8080"))
+    if err := app.Router().AddRoute(http.MethodPost, "/chat", handleChat(model, sessions)); err != nil {
+        log.Fatal(err)
     }
-    json.NewDecoder(r.Body).Decode(&req)
 
-    // Create SSE stream
-    stream, err := sse.NewStream(r.Context(), w)
-    if err != nil {
-        http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-        return
+    if err := app.Run(context.Background()); err != nil {
+        log.Fatal(err)
     }
-    defer stream.Close()
-
-    // Get session
-    sess, _ := sessionMgr.GetOrCreate(r.Context(), req.SessionID)
-    sessionMgr.AddMessage(r.Context(), sess.ID, provider.Message{
-        Role:    "user",
-        Content: req.Message,
-    })
-
-    // Stream completion
-    reader, err := claude.CompleteStream(r.Context(), &provider.CompletionRequest{
-        Model:    "claude-opus-4-6",
-        Messages: sess.Messages,
-    })
-    if err != nil {
-        stream.SendError("completion failed")
-        return
-    }
-    defer reader.Close()
-
-    // Pipe tokens to client
-    for {
-        delta, err := reader.Next()
-        if err == io.EOF {
-            break
-        }
-        stream.Send(sse.Event{Data: delta.Text})
-    }
-})
-```
-
-### Non-Streaming Chat
-
-```go
-resp, err := claude.Complete(r.Context(), &provider.CompletionRequest{
-    Model: "claude-opus-4-6",
-    Messages: []provider.Message{
-        {Role: "user", Content: "What is Go?"},
-    },
-    MaxTokens: 1024,
-})
-if err != nil {
-    http.Error(w, "AI error", http.StatusInternalServerError)
-    return
 }
 
-json.NewEncoder(w).Encode(map[string]string{
-    "response": resp.Content[0].Text,
-})
+func handleChat(model provider.Provider, sessions *session.Manager) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        var req struct {
+            Message string `json:"message"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            http.Error(w, "invalid json", http.StatusBadRequest)
+            return
+        }
+
+        sess, err := sessions.Create(r.Context(), session.CreateOptions{Model: "claude-3-sonnet-20240229"})
+        if err != nil {
+            http.Error(w, "session error", http.StatusInternalServerError)
+            return
+        }
+
+        _ = sessions.AppendMessage(r.Context(), sess.ID, provider.NewTextMessage(provider.RoleUser, req.Message))
+        messages, _ := sessions.GetActiveContext(r.Context(), sess.ID, 100000)
+
+        resp, err := model.Complete(r.Context(), &provider.CompletionRequest{
+            Model:     "claude-3-sonnet-20240229",
+            Messages:  messages,
+            MaxTokens: 512,
+        })
+        if err != nil {
+            http.Error(w, "provider error", http.StatusBadGateway)
+            return
+        }
+
+        _ = sessions.AppendMessage(r.Context(), sess.ID, provider.NewTextMessage(provider.RoleAssistant, resp.GetText()))
+        _ = json.NewEncoder(w).Encode(map[string]string{"response": resp.GetText()})
+    })
+}
 ```
 
-## Integration with Core
+## Related pages
 
-### Application Setup
-
-```go
-app := core.New(
-    core.WithAddr(":8080"),
-    core.WithAIProvider(claude),
-    core.WithSessionManager(sessionMgr),
-)
-```
-
-### AI Middleware Stack
-
-```go
-// Typical AI endpoint middleware
-aiMiddleware := middleware.NewChain().
-    Use(middleware.RequestID).
-    Use(rateLimiter.Middleware()).          // Per-user rate limiting
-    Use(tokenBudget.Middleware(10000)).     // Token budget enforcement
-    Use(circuitBreaker.Middleware()).       // Fault tolerance
-    Apply(aiHandler)
-```
-
-## Architecture
-
-```
-Client Request
-     │
-     ▼
-Rate Limiter (per-user/tenant)
-     │
-     ▼
-Circuit Breaker (fault tolerance)
-     │
-     ▼
-Session Manager (conversation history)
-     │
-     ▼
-Prompt Builder (system prompt + history)
-     │
-     ▼
-LLM Provider (Claude/OpenAI)
-     │
-     ▼
-Token Counter (usage tracking)
-     │
-     ▼
-SSE Stream → Client (real-time tokens)
-```
-
-## Configuration
-
-### Provider Options
-
-```go
-// Claude (Anthropic)
-claude := provider.NewClaude(
-    provider.WithAPIKey("sk-ant-..."),
-    provider.WithModel("claude-opus-4-6"),
-    provider.WithMaxRetries(3),
-    provider.WithTimeout(60*time.Second),
-)
-
-// OpenAI
-openai := provider.NewOpenAI(
-    provider.WithAPIKey("sk-..."),
-    provider.WithModel("gpt-4"),
-    provider.WithOrganization("org-..."),
-)
-```
-
-### Multi-Provider Routing
-
-```go
-// Route based on request requirements
-router := provider.NewRouter()
-router.Add("claude", claude, provider.WithPriority(1))
-router.Add("openai", openai, provider.WithPriority(2))
-router.SetFallback("openai") // Fallback if primary fails
-```
-
-## Module Documentation
-
-- **[Provider Interface](provider.md)** — LLM provider abstraction
-- **[Session Management](session.md)** — Conversation history
-- **[SSE Streaming](sse.md)** — Server-Sent Events
-- **[Streaming Processing](streaming.md)** — Stream handling patterns
-- **[Token Counting](tokenizer.md)** — Usage tracking
-- **[Function Calling](tool.md)** — Agent tools
-- **[Semantic Cache](semantic-cache.md)** — Embedding-based caching
-- **[Circuit Breaker](circuit-breaker.md)** — Fault tolerance
-- **[Orchestration](orchestration.md)** — AI workflows
-- **[Rate Limiting](rate-limit.md)** — AI quota management
-- **[Resilience](resilience.md)** — Error handling and retries
-
-## Related Documentation
-
-- [Middleware: Observability](../middleware/observability.md) — Request tracing
-- [Metrics Module](../metrics/) — Prometheus/OTel metrics
-- [Tenant Module](../tenant/) — Multi-tenant AI quotas
-
-## Reference Implementation
-
-See `examples/ai-agent-gateway/` for a complete working AI gateway with:
-- Multi-provider routing
-- Real-time SSE streaming
-- Session-based conversation history
-- Token quota management
-- Semantic response caching
+- [Provider Interface](provider.md)
+- [Session Management](session.md)
+- [SSE Streaming](sse.md)
+- [Rate Limiting](rate-limit.md)
+- [Examples](examples.md)

@@ -11,7 +11,7 @@ import (
 )
 
 func TestDevToolsRoutesEndpoint(t *testing.T) {
-	app := New(WithDebug())
+	app := New(WithDebug(), WithDevTools())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -29,7 +29,7 @@ func TestDevToolsRoutesEndpoint(t *testing.T) {
 }
 
 func TestDevToolsRoutesJSONEndpoint(t *testing.T) {
-	app := New(WithDebug())
+	app := New(WithDebug(), WithDevTools())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -58,7 +58,7 @@ func TestDevToolsRoutesJSONEndpoint(t *testing.T) {
 }
 
 func TestDevToolsConfigEndpoint(t *testing.T) {
-	app := New(WithDebug())
+	app := New(WithDebug(), WithDevTools())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -85,7 +85,7 @@ func TestDevToolsConfigEndpoint(t *testing.T) {
 }
 
 func TestDevToolsMetricsEndpoints(t *testing.T) {
-	app := New(WithDebug())
+	app := New(WithDebug(), WithDevTools())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -120,7 +120,7 @@ func TestDevToolsMetricsEndpoints(t *testing.T) {
 }
 
 func TestDevToolsMetricsClearEndpoint(t *testing.T) {
-	app := New(WithDebug())
+	app := New(WithDebug(), WithDevTools())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -155,7 +155,7 @@ func TestDevToolsMetricsClearEndpoint(t *testing.T) {
 }
 
 func TestDevToolsPprofEndpoint(t *testing.T) {
-	app := New(WithDebug())
+	app := New(WithDebug(), WithDevTools())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -170,7 +170,7 @@ func TestDevToolsPprofEndpoint(t *testing.T) {
 }
 
 func TestDevToolsPprofPaths(t *testing.T) {
-	app := New(WithDebug())
+	app := New(WithDebug(), WithDevTools())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

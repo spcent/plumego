@@ -114,6 +114,7 @@ Compile-oriented complete example:
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -122,6 +123,7 @@ import (
 )
 
 func main() {
+    ctx := context.Background()
     app := core.New(core.WithAddr(":8080"))
 
     if err := app.Use(observability.RequestID()); err != nil {
@@ -139,9 +141,19 @@ func main() {
 
     v1.Get("/users", http.HandlerFunc(listUsers))
 
-    if err := app.Boot(); err != nil {
+    if err := app.Prepare(); err != nil {
         log.Fatal(err)
     }
+    if err := app.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer app.Shutdown(ctx)
+
+    log.Fatal(srv.ListenAndServe())
 }
 
 func passThroughMiddleware(next http.Handler) http.Handler {
@@ -175,7 +187,7 @@ Recovery should be early enough to catch downstream panics.
 
 ## Common Mistakes
 
-- Registering middleware after app boot starts.
+- Registering middleware after `app.Prepare()` starts.
 - Mixing business logic into middleware.
 - Relying on implicit order instead of explicit registration sequence.
 - Applying heavy middleware globally when only subset routes need it.

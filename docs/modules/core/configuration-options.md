@@ -213,7 +213,24 @@ app := core.New(
 
 Notes:
 - `WithDebug` has no boolean parameter in v1.
-- Debug mode also sets `APP_DEBUG=true` at runtime.
+- Debug mode does not auto-mount devtools.
+
+---
+
+### `WithDevTools`
+
+Explicitly mount the devtools component.
+
+```go
+func WithDevTools() Option
+```
+
+```go
+app := core.New(
+    core.WithDebug(),
+    core.WithDevTools(),
+)
+```
 
 ---
 

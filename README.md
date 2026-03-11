@@ -45,6 +45,7 @@ Create a small `main.go`, wire routes and middleware, then start the server:
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -57,6 +58,7 @@ func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
+        core.WithDevTools(),
     )
 
     if err := app.Use(
@@ -66,13 +68,26 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+    if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
-    })
-
-    if err := app.Boot(); err != nil {
-        log.Fatalf("server stopped: %v", err)
+    })); err != nil {
+        log.Fatalf("register route: %v", err)
     }
+
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare app: %v", err)
+    }
+    if err := app.Start(context.Background()); err != nil {
+        log.Fatalf("start runtime: %v", err)
+    }
+
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("build server: %v", err)
+    }
+    defer app.Shutdown(context.Background())
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
@@ -104,10 +119,11 @@ func main() {
 ```
 
 ## Configuration Basics
-- Environment variables can be loaded from a `.env` file (default path `.env`; override via `core.WithEnvPath`).
+- Environment variables should be loaded explicitly in your `main` package. `core.WithEnvPath` only records the path for components that need it, such as devtools reload support.
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - The app defaults to a 10485760 byte (10 MiB) request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5000ms (5s) graceful shutdown window. Override via `core.With...` options.
 - Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
+- Debug mode and devtools are separate. Use `core.WithDebug()` for debug behavior and `core.WithDevTools()` for the debug routes/component.
 - Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload), friendly JSON error output, and `.env` hot reload. These endpoints are intended for local development or protected environments; disable or gate them in production.
 
 ## Key Components

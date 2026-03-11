@@ -217,9 +217,12 @@ log.Fatal(http.ListenAndServe(":8080", app))
 ### Production-oriented server
 
 ```go
+ctx := context.Background()
+
 app := core.New(
     core.WithAddr(":8080"),
     core.WithDebug(),
+    core.WithDevTools(),
 )
 
 _ = app.Use(
@@ -233,9 +236,12 @@ app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
     w.Write([]byte("pong"))
 })
 
-if err := app.Boot(); err != nil {
-    log.Fatal(err)
-}
+if err := app.Prepare(); err != nil { log.Fatal(err) }
+if err := app.Start(ctx); err != nil { log.Fatal(err) }
+srv, err := app.Server()
+if err != nil { log.Fatal(err) }
+defer app.Shutdown(ctx)
+log.Fatal(srv.ListenAndServe())
 ```
 
 ---

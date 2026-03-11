@@ -118,11 +118,25 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 
 // Start launches the webhook service and blocks while the HTTP server runs.
 func (a *App) Start() error {
+	ctx := context.Background()
+
 	if a.WebhookSvc != nil {
-		a.WebhookSvc.Start(context.Background())
+		a.WebhookSvc.Start(ctx)
 		defer a.WebhookSvc.Stop()
 	}
-	if err := a.Core.Boot(); err != nil {
+	if err := a.Core.Prepare(); err != nil {
+		return fmt.Errorf("prepare server: %w", err)
+	}
+	if err := a.Core.Start(ctx); err != nil {
+		return fmt.Errorf("start runtime: %w", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		return fmt.Errorf("get server: %w", err)
+	}
+	defer a.Core.Shutdown(ctx)
+
+	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("server stopped: %w", err)
 	}
 	return nil

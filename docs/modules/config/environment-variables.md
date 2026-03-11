@@ -2,135 +2,53 @@
 
 > **Package**: `github.com/spcent/plumego/config`
 
-Complete reference for all standard Plumego environment variables.
+These are common application keys used in Plumego examples and app wiring. The config package does not auto-apply them to `core`; you read them explicitly and pass them into constructors/options.
 
----
-
-## Server Configuration
+## Common keys
 
 ```bash
-# Listen address
 APP_ADDR=:8080
-
-# Debug mode
 APP_DEBUG=false
-
-# Shutdown timeout (milliseconds)
 APP_SHUTDOWN_TIMEOUT_MS=5000
-```
-
----
-
-## HTTP Timeouts
-
-```bash
-# Read timeout (milliseconds)
 APP_READ_TIMEOUT_MS=30000
-
-# Write timeout (milliseconds)
 APP_WRITE_TIMEOUT_MS=30000
-
-# Idle timeout (milliseconds)
 APP_IDLE_TIMEOUT_MS=60000
-```
-
----
-
-## Request Limits
-
-```bash
-# Max request body size (bytes)
-APP_MAX_BODY_BYTES=10485760
-
-# Max concurrent requests
-APP_MAX_CONCURRENCY=256
-```
-
----
-
-## TLS Configuration
-
-```bash
-# Enable TLS
 TLS_ENABLED=false
-
-# Certificate file path
 TLS_CERT_FILE=cert.pem
-
-# Key file path
 TLS_KEY_FILE=key.pem
-
-# Enable HTTP/2
 APP_ENABLE_HTTP2=true
 ```
 
----
-
-## Database
-
-```bash
-# Database URL
-DB_URL=postgres://user:pass@localhost:5432/dbname
-
-# Connection pool size
-DB_MAX_CONNECTIONS=25
-
-# Connection timeout
-DB_CONNECT_TIMEOUT_MS=5000
-```
-
----
-
-## Security
-
-```bash
-# JWT secret (min 32 bytes)
-JWT_SECRET=your-secret-key-here
-
-# JWT expiration
-JWT_EXPIRATION=24h
-
-# WebSocket secret
-WS_SECRET=your-ws-secret-here
-```
-
----
-
-## Webhooks
-
-```bash
-# GitHub webhook secret
-GITHUB_WEBHOOK_SECRET=your-github-secret
-
-# Stripe webhook secret
-STRIPE_WEBHOOK_SECRET=your-stripe-secret
-
-# Webhook queue size
-WEBHOOK_QUEUE_SIZE=2048
-
-# Webhook workers
-WEBHOOK_WORKERS=8
-```
-
----
-
-## Usage
+## Reading them explicitly
 
 ```go
-cfg := config.Load()
+cfg := config.NewManager(plumelog.NewGLogger())
+_ = cfg.AddSource(config.NewEnvSource(""))
+if err := cfg.Load(context.Background()); err != nil {
+    log.Fatal(err)
+}
 
 app := core.New(
-    core.WithAddr(cfg.Get("APP_ADDR", ":8080")),
+    core.WithAddr(cfg.GetString("app_addr", ":8080")),
     core.WithServerTimeouts(
-        cfg.GetDuration("APP_READ_TIMEOUT_MS", 30*time.Second),
-        cfg.GetDuration("APP_READ_HEADER_TIMEOUT_MS", 5*time.Second),
-        cfg.GetDuration("APP_WRITE_TIMEOUT_MS", 30*time.Second),
-        cfg.GetDuration("APP_IDLE_TIMEOUT_MS", 60*time.Second),
+        cfg.GetDurationMs("app_read_timeout_ms", 30000),
+        5*time.Second,
+        cfg.GetDurationMs("app_write_timeout_ms", 30000),
+        cfg.GetDurationMs("app_idle_timeout_ms", 60000),
     ),
-    core.WithShutdownTimeout(cfg.GetDuration("APP_SHUTDOWN_TIMEOUT_MS", 5*time.Second)),
+    core.WithShutdownTimeout(cfg.GetDurationMs("app_shutdown_timeout_ms", 5000)),
 )
+
+if cfg.GetBool("app_debug", false) {
+    app = core.New(
+        core.WithAddr(cfg.GetString("app_addr", ":8080")),
+        core.WithDebug(),
+    )
+}
 ```
 
----
+## Notes
 
-**Next**: [.env Parsing](dotenv-parsing.md)
+- `config.NewEnvSource("")` normalizes keys to snake_case, so `APP_ADDR` becomes `app_addr`.
+- Duration values ending in `_MS` are typically easier to read with `GetDurationMs(...)`.
+- Secrets should come from real environment injection or external secret management, not committed files.

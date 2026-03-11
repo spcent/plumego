@@ -2,96 +2,49 @@
 
 > **Package**: `github.com/spcent/plumego/config`
 
-Patterns for validating configuration values.
+Validation in the current package is explicit. Use manager accessors with validators or define a reusable schema.
 
----
-
-## Required Variables
-
-### MustGet
+## Per-value validation
 
 ```go
-// Panics if missing
-apiKey := cfg.MustGet("API_KEY")
-```
-
-### Manual Check
-
-```go
-apiKey := cfg.Get("API_KEY", "")
-if apiKey == "" {
-    log.Fatal("API_KEY is required")
-}
-```
-
-### Multiple Required
-
-```go
-required := []string{"API_KEY", "DB_URL", "JWT_SECRET"}
-for _, key := range required {
-    if cfg.Get(key, "") == "" {
-        log.Fatalf("%s is required", key)
-    }
-}
-```
-
----
-
-## Range Validation
-
-```go
-port := cfg.GetInt("PORT", 8080)
-if port < 1 || port > 65535 {
-    log.Fatal("PORT must be 1-65535")
+apiKey, err := cfg.String("api_key", "", &config.Required{}, &config.MinLength{Min: 20})
+if err != nil {
+    log.Fatal(err)
 }
 
-maxConns := cfg.GetInt("MAX_CONNECTIONS", 100)
-if maxConns < 1 || maxConns > 1000 {
-    log.Fatal("MAX_CONNECTIONS must be 1-1000")
-}
-```
-
----
-
-## Format Validation
-
-```go
-import "regexp"
-
-email := cfg.Get("ADMIN_EMAIL", "")
-emailRegex := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$`)
-if !emailRegex.MatchString(email) {
-    log.Fatal("Invalid ADMIN_EMAIL format")
-}
-```
-
----
-
-## Validation Helper
-
-```go
-func validateConfig(cfg *config.Config) error {
-    // Required
-    if cfg.Get("API_KEY", "") == "" {
-        return errors.New("API_KEY is required")
-    }
-
-    // Range
-    port := cfg.GetInt("PORT", 8080)
-    if port < 1 || port > 65535 {
-        return fmt.Errorf("invalid PORT: %d", port)
-    }
-
-    return nil
+port, err := cfg.Int("port", 8080, &config.Range{Min: 1, Max: 65535})
+if err != nil {
+    log.Fatal(err)
 }
 
-// Usage
-cfg := config.Load()
-if err := validateConfig(cfg); err != nil {
+baseURL, err := cfg.String("api_base_url", "", &config.URL{})
+if err != nil {
     log.Fatal(err)
 }
 ```
 
----
+## Schema validation
 
-**Next**: [Defaults](defaults.md)
+```go
+schema := config.NewConfigSchema().
+    AddField("app_env", &config.OneOf{Values: []string{"development", "staging", "production"}}).
+    AddField("jwt_secret", &config.Required{}, &config.MinLength{Min: 32}).
+    AddField("port", &config.Range{Min: 1, Max: 65535})
+
+if err := schema.Validate(cfg.GetAll()); err != nil {
+    log.Fatal(err)
+}
+```
+
+## Manual validation for cross-field rules
+
+```go
+func validate(cfg *config.Manager) error {
+    if cfg.GetBool("tls_enabled", false) {
+        if cfg.GetString("tls_cert_file", "") == "" || cfg.GetString("tls_key_file", "") == "" {
+            return fmt.Errorf("tls_cert_file and tls_key_file are required when tls_enabled=true")
+        }
+    }
+    return nil
+}
+```

@@ -1,383 +1,145 @@
 # AI Agent Gateway Examples
 
-> **Package**: `github.com/spcent/plumego/ai` | **Complete working examples**
+> **Package**: `github.com/spcent/plumego/ai` | **Examples aligned with current API surface**
 
-## Example 1: Production AI Chat Service
+The previous examples in this document referenced outdated constructors and app options. The examples below use the current provider, session, resilience, and SSE APIs.
 
-Complete streaming chat service with sessions, rate limiting, and circuit breaking.
+## Example 1: Streaming chat endpoint
 
 ```go
 package main
 
 import (
+    "context"
+    "encoding/json"
+    "fmt"
     "io"
     "log"
-    "os"
-    "time"
     "net/http"
-    "encoding/json"
+    "os"
 
-    "github.com/spcent/plumego/core"
     "github.com/spcent/plumego/ai/provider"
     "github.com/spcent/plumego/ai/session"
     "github.com/spcent/plumego/ai/sse"
-    "github.com/spcent/plumego/ai/ratelimit"
-    "github.com/spcent/plumego/ai/circuitbreaker"
-    "github.com/spcent/plumego/ai/resilience"
+    "github.com/spcent/plumego/core"
 )
 
 func main() {
-    // Initialize provider with resilience
-    claude := provider.NewClaude(
-        provider.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
-    )
-
-    cb := circuitbreaker.New(
-        circuitbreaker.WithFailureThreshold(5),
-        circuitbreaker.WithTimeout(30*time.Second),
-    )
-
-    retrier := resilience.NewRetrier(
-        resilience.WithMaxAttempts(3),
-        resilience.WithExponentialBackoff(time.Second, 30*time.Second),
-        resilience.WithRetryOn(provider.IsTransientError),
-    )
-
-    sessionMgr := session.NewManager(
-        session.NewInMemoryStorage(),
-        session.WithMaxTokens(100000),
-        session.WithDefaultTTL(24*time.Hour),
-        session.WithAutoTrim(true),
-    )
-
-    limiter := ratelimit.NewTokenLimiter(
-        ratelimit.WithTokensPerMinute(50000),
-        ratelimit.WithRequestsPerMinute(30),
-    )
+    model := provider.NewClaudeProvider(os.Getenv("ANTHROPIC_API_KEY"))
+    sessions := session.NewManager(session.NewMemoryStorage())
 
     app := core.New(core.WithAddr(":8080"))
 
-    api := app.Router().Group("/api")
-    api.Use(limiter.Middleware(extractUserID))
+    if err := app.Router().AddRoute(http.MethodPost, "/chat", handleChat(model, sessions)); err != nil {
+        log.Fatal(err)
+    }
 
-    api.Post("/chat", handleChat(claude, sessionMgr, cb, retrier))
-    api.Get("/sessions", handleListSessions(sessionMgr))
-    api.Delete("/sessions/:id", handleDeleteSession(sessionMgr))
-
-    if err := app.Boot(); err != nil {
+    if err := app.Run(context.Background()); err != nil {
         log.Fatal(err)
     }
 }
 
-func handleChat(claude provider.Provider, sessionMgr *session.Manager,
-    cb *circuitbreaker.CircuitBreaker, retrier *resilience.Retrier) http.HandlerFunc {
-
-    return func(w http.ResponseWriter, r *http.Request) {
+func handleChat(model provider.Provider, sessions *session.Manager) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         var req struct {
             SessionID string `json:"session_id"`
             Message   string `json:"message"`
         }
         if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-            http.Error(w, "Invalid JSON", http.StatusBadRequest)
+            http.Error(w, "invalid json", http.StatusBadRequest)
             return
         }
 
-        // Check circuit breaker
-        if !cb.Allow() {
-            w.Header().Set("Retry-After", "30")
-            http.Error(w, "AI service temporarily unavailable", http.StatusServiceUnavailable)
+        sessID := req.SessionID
+        if sessID == "" {
+            created, err := sessions.Create(r.Context(), session.CreateOptions{Model: "claude-3-sonnet-20240229"})
+            if err != nil {
+                http.Error(w, "session error", http.StatusInternalServerError)
+                return
+            }
+            sessID = created.ID
+        }
+
+        if err := sessions.AppendMessage(r.Context(), sessID, provider.Message{Role: "user", Content: req.Message}); err != nil {
+            http.Error(w, "session error", http.StatusInternalServerError)
             return
         }
 
-        // Get session
-        sess, err := sessionMgr.GetOrCreate(r.Context(), req.SessionID)
+        active, err := sessions.GetActiveContext(r.Context(), sessID, 100000)
         if err != nil {
-            http.Error(w, "Session error", http.StatusInternalServerError)
+            http.Error(w, "session error", http.StatusInternalServerError)
             return
         }
 
-        // Add user message
-        sessionMgr.AddMessage(r.Context(), sess.ID, provider.Message{
-            Role:    "user",
-            Content: req.Message,
+        reader, err := model.CompleteStream(r.Context(), &provider.CompletionRequest{
+            Model:     "claude-3-sonnet-20240229",
+            Messages:  active,
+            MaxTokens: 2048,
+            Stream:    true,
         })
-
-        // Create SSE stream
-        stream, err := sse.NewStream(r.Context(), w,
-            sse.WithKeepAlive(20*time.Second),
-        )
         if err != nil {
-            http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-            return
-        }
-        defer stream.Close()
-
-        // Call LLM with retry
-        var reader *provider.StreamReader
-        _, err = retrier.Do(r.Context(), func() (struct{}, error) {
-            var e error
-            reader, e = claude.CompleteStream(r.Context(), &provider.CompletionRequest{
-                Model:     "claude-opus-4-6",
-                System:    "You are a helpful assistant.",
-                Messages:  sess.Messages,
-                MaxTokens: 2048,
-                Stream:    true,
-            })
-            return struct{}{}, e
-        })
-
-        if err != nil {
-            cb.RecordFailure()
-            stream.SendError("AI service error")
+            http.Error(w, "provider error", http.StatusBadGateway)
             return
         }
         defer reader.Close()
 
-        cb.RecordSuccess()
+        stream, err := sse.NewStream(r.Context(), w)
+        if err != nil {
+            http.Error(w, "streaming not supported", http.StatusInternalServerError)
+            return
+        }
+        defer stream.Close()
 
-        // Stream tokens
-        var fullResponse strings.Builder
+        var full string
         for {
             delta, err := reader.Next()
             if err == io.EOF {
                 break
             }
             if err != nil {
-                stream.SendError("Stream interrupted")
+                http.Error(w, "stream error", http.StatusBadGateway)
                 return
             }
-            if delta.Text != "" {
-                fullResponse.WriteString(delta.Text)
-                stream.Send(sse.Event{
-                    Event: "token",
-                    Data:  fmt.Sprintf(`{"text":%q}`, delta.Text),
-                })
-            }
-        }
-
-        // Save response to session
-        sessionMgr.AddMessage(r.Context(), sess.ID, provider.Message{
-            Role:    "assistant",
-            Content: fullResponse.String(),
-        })
-
-        stream.Send(sse.Event{
-            Event: "done",
-            Data:  fmt.Sprintf(`{"session_id":%q}`, sess.ID),
-        })
-    }
-}
-```
-
-## Example 2: Research Agent with Tools
-
-```go
-func handleResearch(w http.ResponseWriter, r *http.Request) {
-    var req struct {
-        Query string `json:"query"`
-    }
-    json.NewDecoder(r.Body).Decode(&req)
-
-    // Define tools
-    registry := tool.NewRegistry()
-    registry.Register(tool.New("search_web", "Search the web",
-        tool.Schema{
-            Type: "object",
-            Properties: map[string]tool.Property{
-                "query": {Type: "string", Description: "Search query"},
-            },
-            Required: []string{"query"},
-        },
-        func(ctx context.Context, input map[string]any) (string, error) {
-            results, _ := webSearch.Search(ctx, input["query"].(string))
-            out, _ := json.Marshal(results)
-            return string(out), nil
-        },
-    ))
-
-    registry.Register(tool.New("get_page", "Fetch webpage content",
-        tool.Schema{
-            Type: "object",
-            Properties: map[string]tool.Property{
-                "url": {Type: "string", Description: "URL to fetch"},
-            },
-            Required: []string{"url"},
-        },
-        func(ctx context.Context, input map[string]any) (string, error) {
-            content, _ := httpFetcher.Get(ctx, input["url"].(string))
-            return content, nil
-        },
-    ))
-
-    // Initial message
-    messages := []provider.Message{
-        {Role: "user", Content: req.Query},
-    }
-
-    // Run agentic loop
-    result, err := runAgentLoop(r.Context(), messages, registry, 10)
-    if err != nil {
-        http.Error(w, "Research failed", http.StatusInternalServerError)
-        return
-    }
-
-    json.NewEncoder(w).Encode(map[string]string{"result": result})
-}
-
-func runAgentLoop(ctx context.Context, messages []provider.Message,
-    tools *tool.Registry, maxIter int) (string, error) {
-
-    for i := 0; i < maxIter; i++ {
-        resp, err := claude.Complete(ctx, &provider.CompletionRequest{
-            Model:      "claude-opus-4-6",
-            Messages:   messages,
-            Tools:      tools.ProviderTools(),
-            ToolChoice: provider.ToolChoiceAuto,
-            MaxTokens:  4096,
-        })
-        if err != nil {
-            return "", err
-        }
-
-        // Add assistant message
-        messages = append(messages, provider.Message{
-            Role: "assistant", Content: resp.RawContent,
-        })
-
-        if resp.StopReason == "end_turn" {
-            for _, block := range resp.Content {
-                if block.Type == "text" {
-                    return block.Text, nil
-                }
-            }
-            return "", nil
-        }
-
-        // Execute tools
-        var toolResults []provider.ContentPart
-        for _, block := range resp.Content {
-            if block.Type != "tool_use" {
+            if delta.Text == "" {
                 continue
             }
-            result, err := tools.Execute(ctx, block.Name, block.Input)
-            if err != nil {
-                result = "Error: " + err.Error()
+
+            full += delta.Text
+            if err := stream.Send(&sse.Event{Event: "token", Data: fmt.Sprintf(`{"text":%q}`, delta.Text)}); err != nil {
+                return
             }
-            toolResults = append(toolResults, provider.ContentPart{
-                Type:      "tool_result",
-                ToolUseID: block.ID,
-                Content:   result,
-            })
         }
 
-        messages = append(messages, provider.Message{
-            Role: "user", Parts: toolResults,
-        })
-    }
-
-    return "", errors.New("max iterations reached")
+        _ = sessions.AppendMessage(r.Context(), sessID, provider.Message{Role: "assistant", Content: full})
+        _ = stream.Send(&sse.Event{Event: "done", Data: fmt.Sprintf(`{"session_id":%q}`, sessID)})
+    })
 }
 ```
 
-## Example 3: Document Q&A with Semantic Cache
+## Example 2: Resilient provider wrapper
 
 ```go
-func setupDocumentQA() http.HandlerFunc {
-    // Embedding + caching setup
-    embedder := embedding.NewOpenAI(
-        embedding.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
-        embedding.WithModel("text-embedding-3-small"),
-    )
+base := provider.NewClaudeProvider(os.Getenv("ANTHROPIC_API_KEY"))
+limiter := ratelimit.NewTokenBucketLimiter(30, 0.5)
+breaker := circuitbreaker.NewCircuitBreaker("claude", 5, 30*time.Second)
 
-    cache := semanticcache.New(
-        semanticcache.WithEmbeddingProvider(embedder),
-        semanticcache.WithVectorStore(semanticcache.NewInMemoryVectorStore()),
-        semanticcache.WithSimilarityThreshold(0.93),
-        semanticcache.WithTTL(24*time.Hour),
-    )
-
-    cachedClaude := semanticcache.Wrap(claude, cache)
-
-    return func(w http.ResponseWriter, r *http.Request) {
-        var req struct {
-            Question string `json:"question"`
-            DocID    string `json:"doc_id"`
-        }
-        json.NewDecoder(r.Body).Decode(&req)
-
-        // Fetch document context
-        doc, _ := docStore.Get(req.DocID)
-
-        resp, err := cachedClaude.Complete(r.Context(), &provider.CompletionRequest{
-            Model: "claude-opus-4-6",
-            System: fmt.Sprintf("Answer questions based on this document:\n\n%s", doc.Content),
-            Messages: []provider.Message{
-                {Role: "user", Content: req.Question},
-            },
-            MaxTokens: 1024,
-        })
-        if err != nil {
-            http.Error(w, "AI error", http.StatusInternalServerError)
-            return
-        }
-
-        json.NewEncoder(w).Encode(map[string]any{
-            "answer":    resp.Content[0].Text,
-            "from_cache": resp.Metadata["cache_hit"] == "true",
-        })
-    }
-}
+model := resilience.NewResilientProvider(resilience.Config{
+    Provider:       base,
+    RateLimiter:    limiter,
+    CircuitBreaker: breaker,
+})
 ```
 
-## Example 4: Multi-Provider with Fallback
+## Example 3: Session manager with explicit config
 
 ```go
-type MultiProvider struct {
-    primary   provider.Provider
-    secondary provider.Provider
-    breakers  map[string]*circuitbreaker.CircuitBreaker
-}
-
-func (m *MultiProvider) Complete(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {
-    // Try primary
-    if m.breakers["primary"].Allow() {
-        resp, err := m.primary.Complete(ctx, req)
-        if err == nil {
-            m.breakers["primary"].RecordSuccess()
-            return resp, nil
-        }
-        m.breakers["primary"].RecordFailure()
-        log.Warnf("Primary provider failed: %v", err)
-    }
-
-    // Try secondary
-    if m.breakers["secondary"].Allow() {
-        resp, err := m.secondary.Complete(ctx, req)
-        if err == nil {
-            m.breakers["secondary"].RecordSuccess()
-            return resp, nil
-        }
-        m.breakers["secondary"].RecordFailure()
-    }
-
-    return nil, errors.New("all providers unavailable")
-}
-
-// Usage
-multi := &MultiProvider{
-    primary:   provider.NewClaude(provider.WithAPIKey(claudeKey)),
-    secondary: provider.NewOpenAI(provider.WithAPIKey(openaiKey)),
-    breakers: map[string]*circuitbreaker.CircuitBreaker{
-        "primary":   circuitbreaker.New(circuitbreaker.WithFailureThreshold(3)),
-        "secondary": circuitbreaker.New(circuitbreaker.WithFailureThreshold(3)),
-    },
-}
+sessions := session.NewManager(
+    session.NewMemoryStorage(),
+    session.WithConfig(session.Config{
+        DefaultTTL:  24 * time.Hour,
+        MaxMessages: 200,
+        MaxTokens:   100000,
+        AutoTrim:    true,
+    }),
+)
 ```
-
-## Related Documentation
-
-- [README](README.md) — Module overview
-- [Provider Interface](provider.md) — LLM providers
-- [Session Management](session.md) — Conversation history
-- [SSE Streaming](sse.md) — Real-time streaming
-- [Tool Framework](tool.md) — Agent tools

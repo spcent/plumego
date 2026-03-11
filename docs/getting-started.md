@@ -18,6 +18,7 @@ Create a file called `main.go`:
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -27,11 +28,25 @@ import (
 func main() {
 	app := plumego.New(plumego.WithAddr(":8080"))
 
-	app.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
+	if err := app.AddRoute(http.MethodGet, "/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, World!"))
-	})
+	})); err != nil {
+		log.Fatal(err)
+	}
 
-	if err := app.Boot(); err != nil {
+	if err := app.Prepare(); err != nil {
+		log.Fatal(err)
+	}
+	if err := app.Start(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer app.Shutdown(context.Background())
+
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -105,7 +120,7 @@ api.Get("/version", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request
 
 ## Running with Middleware
 
-Register middleware explicitly before `Boot()`:
+Register middleware explicitly before `Prepare()`:
 
 ```go
 import (

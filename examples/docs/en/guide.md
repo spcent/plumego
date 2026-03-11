@@ -30,6 +30,7 @@ Mount components via `core.WithComponent(...)` / `core.WithComponents(...)`.
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -40,9 +41,11 @@ import (
 )
 
 func main() {
+    ctx := context.Background()
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
+        core.WithDevTools(),
     )
 
     if err := app.Use(
@@ -54,18 +57,30 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+    if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
-    })
-
-    if err := app.Boot(); err != nil {
-        log.Fatalf("server stopped: %v", err)
+    })); err != nil {
+        log.Fatalf("register route: %v", err)
     }
+
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare app: %v", err)
+    }
+    if err := app.Start(ctx); err != nil {
+        log.Fatalf("start runtime: %v", err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("build server: %v", err)
+    }
+    defer app.Shutdown(ctx)
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
 ## Configuration Basics
-- `.env` loading: `core.WithEnvPath(...)`.
+- `.env` loading should happen explicitly in `main`; `core.WithEnvPath(...)` only records the path for components that need it.
 - Address / server timeouts / graceful shutdown / header size / TLS / HTTP2 via `core.With...` options.
 - Metrics/tracing hooks via `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
 

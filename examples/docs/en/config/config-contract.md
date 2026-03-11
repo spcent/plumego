@@ -24,7 +24,7 @@ Recommended functions:
 ## Env Override Strategy
 Use a clear precedence order:
 1. Defaults in `Defaults()`
-2. `.env` file (optional) via `core.WithEnvPath` + `core.Boot()`
+2. `.env` file (optional) loaded explicitly in `main`
 3. Environment variables (explicit overrides)
 4. Command-line flags (highest priority)
 
@@ -40,7 +40,7 @@ Naming conventions:
 4. Validate config.
 5. Build `core.New(...)` options from config.
 6. Register middleware/components/runners.
-7. Call `app.Boot()`.
+7. Call `app.Prepare()`, `app.Start(ctx)`, then serve the prepared server.
 
 This keeps startup deterministic and avoids hidden side effects.
 
@@ -68,6 +68,7 @@ func LoadConfig() (Config, error) {
 }
 
 func main() {
+	ctx := context.Background()
 	cfg, err := LoadConfig()
 	if err != nil {
 		log.Fatalf("config error: %v", err)
@@ -76,10 +77,20 @@ func main() {
 	app := core.New(
 		core.WithAddr(cfg.Core.Addr),
 		core.WithDebug(),
+		core.WithDevTools(),
 	)
 
-	if err := app.Boot(); err != nil {
-		log.Fatalf("boot error: %v", err)
+	if err := app.Prepare(); err != nil {
+		log.Fatalf("prepare error: %v", err)
 	}
+	if err := app.Start(ctx); err != nil {
+		log.Fatalf("start error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		log.Fatalf("server error: %v", err)
+	}
+	defer app.Shutdown(ctx)
+	log.Fatal(srv.ListenAndServe())
 }
 ```

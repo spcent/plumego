@@ -54,7 +54,9 @@ func subdomainRouter(routes map[string]http.Handler) http.Handler {
 package main
 
 import (
+    "context"
     "fmt"
+    "log"
     "net/http"
     "github.com/spcent/plumego/core"
 )
@@ -78,7 +80,9 @@ func main() {
         "www":   www.Router(),
     }))
 
-    app.Boot()
+    if err := app.Run(context.Background()); err != nil {
+        log.Fatal(err)
+    }
 }
 
 func subdomainMiddleware(routes map[string]http.Handler) func(http.Handler) http.Handler {
@@ -567,7 +571,9 @@ app.Get("/api/users",
 package main
 
 import (
+    "context"
     "encoding/json"
+    "log"
     "net/http"
     "regexp"
     "strconv"
@@ -613,7 +619,9 @@ func main() {
     // SPA fallback
     app.Get("/*path", spaFallback)
 
-    app.Boot()
+    if err := app.Run(context.Background()); err != nil {
+        log.Fatal(err)
+    }
 }
 
 func healthCheck(w http.ResponseWriter, r *http.Request) {

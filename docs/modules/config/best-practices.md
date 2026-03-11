@@ -2,196 +2,68 @@
 
 > **Package**: `github.com/spcent/plumego/config`
 
-Best practices for managing application configuration.
+## Recommended rules
 
----
+1. Build configuration with `config.Manager`, not implicit globals.
+2. Keep `.env` loading explicit in `main`.
+3. Validate configuration before starting the app.
+4. Inject config into constructors; do not fetch config ad hoc from random call sites.
+5. Never commit secrets.
 
-## General Principles
+## Good patterns
 
-### ✅ Do
+### Instance-based config wiring
 
-1. **Use Environment Variables for Secrets**
-   ```go
-   // ✅ From environment
-   secret := cfg.MustGet("JWT_SECRET")
+```go
+cfg := config.NewManager(plumelog.NewGLogger())
+_ = cfg.AddSource(config.NewEnvSource(""))
+if err := cfg.Load(context.Background()); err != nil {
+    log.Fatal(err)
+}
 
-   // ❌ Hardcoded
-   secret := "my-secret-key"
-   ```
+svc := service.New(service.Config{
+    BaseURL: cfg.GetString("api_base_url", "http://localhost:8080"),
+    Timeout: cfg.GetDuration("api_timeout", 5*time.Second),
+})
+```
 
-2. **Provide Sensible Defaults**
-   ```go
-   addr := cfg.Get("APP_ADDR", ":8080")
-   timeout := cfg.GetDuration("TIMEOUT", 30*time.Second)
-   ```
+### Early validation
 
-3. **Validate Early**
-   ```go
-   cfg := config.Load()
-   if err := validateConfig(cfg); err != nil {
-       log.Fatal(err)
-   }
-   ```
+```go
+port, err := cfg.Int("port", 8080, &config.Range{Min: 1, Max: 65535})
+if err != nil {
+    log.Fatal(err)
+}
+_ = port
+```
 
-4. **Document Variables**
-   ```bash
-   # env.example
-   APP_ADDR=:8080  # Server listen address
-   DB_URL=postgres://localhost/db  # Database connection URL
-   ```
+### Explicit secret handling
 
----
+```go
+secret, err := cfg.String("jwt_secret", "", &config.Required{}, &config.MinLength{Min: 32})
+if err != nil {
+    log.Fatal(err)
+}
+_ = secret
+```
 
-## Security
+## Avoid
 
-### ✅ Do
+### Hidden global reads everywhere
 
-1. **Never Commit Secrets**
-   ```bash
-   # .gitignore
-   .env.local
-   .env.production
-   .env.*.local
-   ```
+```go
+// Avoid spreading package-level config lookups through business code.
+// Prefer reading once at the edge and injecting the result.
+```
 
-2. **Use Strong Secrets**
-   ```bash
-   # ✅ Strong (32+ bytes)
-   JWT_SECRET=long-random-string-with-32-plus-characters
+### Mixing environment mutation with library startup
 
-   # ❌ Weak
-   JWT_SECRET=secret
-   ```
+```go
+// Do not hide config.LoadEnvFile(...) inside app bootstrap helpers.
+```
 
-3. **Rotate Secrets Regularly**
-   ```bash
-   # Production: Use secret management service
-   # AWS Secrets Manager, HashiCorp Vault, etc.
-   ```
+### Empty defaults for required values
 
----
-
-## Organization
-
-### ✅ Do
-
-1. **Group Related Variables**
-   ```bash
-   # Server
-   APP_ADDR=:8080
-   APP_DEBUG=false
-
-   # Database
-   DB_URL=postgres://localhost/db
-   DB_MAX_CONNS=25
-
-   # Cache
-   REDIS_URL=redis://localhost:6379
-   REDIS_POOL_SIZE=10
-   ```
-
-2. **Use Consistent Naming**
-   ```bash
-   # ✅ Consistent prefix
-   APP_ADDR=:8080
-   APP_DEBUG=false
-   APP_TIMEOUT=30s
-
-   # ❌ Inconsistent
-   ADDR=:8080
-   DEBUG_MODE=false
-   TIMEOUT_SECONDS=30
-   ```
-
----
-
-## Development vs Production
-
-### ✅ Do
-
-1. **Different Configs per Environment**
-   ```bash
-   # .env (development)
-   APP_DEBUG=true
-   DB_URL=postgres://localhost/dev
-
-   # .env.production
-   APP_DEBUG=false
-   DB_URL=postgres://prod-server/prod
-   ```
-
-2. **Use ENV Variable to Switch**
-   ```go
-   env := os.Getenv("ENV")
-   if env == "" {
-       env = "development"
-   }
-
-   var cfg *config.Config
-   if env == "production" {
-       cfg = config.LoadFrom(".env.production")
-   } else {
-       cfg = config.Load()
-   }
-   ```
-
----
-
-## Anti-Patterns
-
-### ❌ Don't
-
-1. **Don't Use Magic Numbers**
-   ```go
-   // ❌ Magic number
-   timeout := 30 * time.Second
-
-   // ✅ From config
-   timeout := cfg.GetDuration("TIMEOUT", 30*time.Second)
-   ```
-
-2. **Don't Scatter Config Access**
-   ```go
-   // ❌ Scattered throughout code
-   func handler1() {
-       addr := os.Getenv("APP_ADDR")
-   }
-   func handler2() {
-       addr := os.Getenv("APP_ADDR")
-   }
-
-   // ✅ Centralized
-   type AppConfig struct {
-       Addr string
-   }
-   config := LoadAppConfig()
-   ```
-
-3. **Don't Ignore Validation Errors**
-   ```go
-   // ❌ Silent failure
-   port, _ := strconv.Atoi(cfg.Get("PORT", "8080"))
-
-   // ✅ Handle errors
-   port := cfg.GetInt("PORT", 8080)
-   if port < 1 || port > 65535 {
-       log.Fatal("Invalid PORT")
-   }
-   ```
-
----
-
-## Summary
-
-**Key Rules**:
-1. Environment variables for secrets
-2. Sensible defaults for everything
-3. Validate early, fail fast
-4. Never commit secrets
-5. Document all variables
-6. Group related config
-7. Use consistent naming
-
----
-
-**Next**: [Migration Guide](migration-guide.md)
+```go
+// Prefer validated accessors over silently accepting empty strings.
+```

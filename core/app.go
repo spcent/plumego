@@ -20,12 +20,14 @@ type App struct {
 	router        *router.Router       // HTTP router
 	middlewareReg *middleware.Registry // Middleware registry for all routes
 	logger        log.StructuredLogger // Logger instance
+	devTools      bool
 
 	// Runtime state (protected by mutex)
-	mu           sync.RWMutex
-	started      bool // Whether the app has started
-	envLoaded    bool // Whether environment variables have been loaded
-	configFrozen bool // Whether configuration has been frozen
+	mu             sync.RWMutex
+	started        bool // Whether runtime hooks have started
+	configFrozen   bool // Whether configuration has been frozen
+	loggerStarted  bool
+	signalHandling bool
 
 	// Server components
 	httpServer  *http.Server       // HTTP server instance
@@ -40,6 +42,7 @@ type App struct {
 
 	// Component management
 	components        []Component
+	mountedComponents []Component
 	startedComponents []Component
 	componentStopOnce sync.Once
 	componentsMounted bool

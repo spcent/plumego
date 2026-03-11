@@ -45,6 +45,7 @@ type Component interface {
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -57,6 +58,7 @@ func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
+        core.WithDevTools(),
     )
 
     if err := app.Use(
@@ -66,13 +68,26 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+    if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
         w.Write([]byte("pong"))
-    })
-
-    if err := app.Boot(); err != nil {
-        log.Fatalf("server stopped: %v", err)
+    })); err != nil {
+        log.Fatalf("register route: %v", err)
     }
+
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare app: %v", err)
+    }
+    if err := app.Start(context.Background()); err != nil {
+        log.Fatalf("start runtime: %v", err)
+    }
+
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("build server: %v", err)
+    }
+    defer app.Shutdown(context.Background())
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
@@ -104,10 +119,11 @@ func main() {
 ```
 
 ## 配置基础
-- 环境变量可以从 `.env` 文件加载（默认路径 `.env`；可通过 `core.WithEnvPath` 覆盖）。
+- 环境变量应在 `main` 包中显式加载。`core.WithEnvPath` 仅记录路径，供需要该信息的组件使用，例如 devtools 热重载。
 - 常用变量：`AUTH_TOKEN`（ops 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - 应用默认包括 10485760 字节（10 MiB）请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5000ms（5 秒）优雅关闭窗口。可通过 `core.With...` 选项覆盖。
 - 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.SecurityHeaders(...)` 与 `middleware/ratelimit.AbuseGuard(...)`。
+- 调试模式与 devtools 已拆分：`core.WithDebug()` 只开启调试行为，`core.WithDevTools()` 才会挂载调试路由组件。
 - Debug 模式（`core.WithDebug`）默认开启 `/_debug` 调试端点（路由表、Middleware、配置快照、指标、pprof、手动重载）、友好 JSON 错误输出，以及 `.env` 热加载。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
 
 ## 关键组件

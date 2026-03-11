@@ -2,11 +2,14 @@
 
 The `core` package owns the HTTP server lifecycle. It wires routing, middleware registration, component startup/shutdown, and graceful termination around standard `net/http` handlers.
 
-## Create and boot an app
+## Create and start an app
 ```go
+ctx := context.Background()
+
 app := core.New(
     core.WithAddr(":8080"),
     core.WithDebug(),
+    core.WithDevTools(),
 )
 
 if err := app.Use(
@@ -18,13 +21,25 @@ if err := app.Use(
     log.Fatalf("register middleware: %v", err)
 }
 
-app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
     w.Write([]byte("pong"))
-})
-
-if err := app.Boot(); err != nil {
-    log.Fatalf("server stopped: %v", err)
+})); err != nil {
+    log.Fatalf("register route: %v", err)
 }
+
+if err := app.Prepare(); err != nil {
+    log.Fatalf("prepare app: %v", err)
+}
+if err := app.Start(ctx); err != nil {
+    log.Fatalf("start runtime: %v", err)
+}
+srv, err := app.Server()
+if err != nil {
+    log.Fatalf("build server: %v", err)
+}
+defer app.Shutdown(ctx)
+
+log.Fatal(srv.ListenAndServe())
 ```
 
 ## Configuration and defaults
@@ -35,7 +50,7 @@ Most server knobs map to `AppConfig` / `core.With...` options:
 - `WithServerTimeouts` (read/read-header/write/idle)
 - `WithMaxHeaderBytes`
 - `WithHTTP2`, `WithTLS`, `WithTLSConfig`
-- `WithDebug`, `WithLogger`
+- `WithDebug`, `WithDevTools`, `WithLogger`
 - `WithMethodNotAllowed`
 
 ## Components and lifecycle hooks
@@ -85,9 +100,19 @@ app.Get("/metrics", prom.Handler().ServeHTTP)
 app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 
-if err := app.Boot(); err != nil {
+ctx := context.Background()
+if err := app.Prepare(); err != nil {
     log.Fatal(err)
 }
+if err := app.Start(ctx); err != nil {
+    log.Fatal(err)
+}
+srv, err := app.Server()
+if err != nil {
+    log.Fatal(err)
+}
+defer app.Shutdown(ctx)
+log.Fatal(srv.ListenAndServe())
 ```
 
 ## Context-style handlers (canonical adapter)
@@ -105,6 +130,6 @@ app.Post("/users", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 ```
 
 ## Safety and troubleshooting
-- Register routes/middleware before `Boot()`; mutating after boot is rejected.
+- Register routes/middleware before `Prepare()`; mutating after prepare is rejected.
 - Keep handlers cancellation-aware so shutdown drains quickly.
 - WebSocket and webhook features should be mounted via explicit components/config, not hidden globals.

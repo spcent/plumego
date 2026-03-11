@@ -2,106 +2,69 @@
 
 > **Package**: `github.com/spcent/plumego/config`
 
-Guide to `.env` file format and parsing.
+The current package supports `.env` parsing in two explicit forms:
 
----
+- `config.LoadEnvFile(path, overwrite)` to write values into process environment
+- `config.NewFileSource(path, config.FormatEnv, watch)` to load `.env` content into a `config.Manager`
 
-## File Format
+## File format
 
 ```bash
-# Comments start with #
 APP_ADDR=:8080
 APP_DEBUG=true
-
-# Quotes are optional
 DB_URL="postgres://localhost/db"
-API_KEY='secret-key'
-
-# Empty values
 OPTIONAL_KEY=
-
-# Spaces around = are trimmed
 PORT = 8080
 ```
 
----
+Comments beginning with `#` are ignored. Keys are normalized to snake_case in `Manager` source loading.
 
-## Loading
-
-### Default Location
+## Load into process environment
 
 ```go
-// Loads .env from current directory
-cfg := config.Load()
+if err := config.LoadEnvFile(".env", false); err != nil {
+    log.Fatal(err)
+}
 ```
 
-### Custom Location
+Use this in `main` when you explicitly want process-global mutation.
+
+## Load into a manager without mutating process environment
 
 ```go
-cfg := config.LoadFrom(".env.production")
-cfg := config.LoadFrom("/etc/app/.env")
+cfg := config.NewManager(plumelog.NewGLogger())
+_ = cfg.AddSource(config.NewFileSource(".env.production", config.FormatEnv, false))
+if err := cfg.Load(context.Background()); err != nil {
+    log.Fatal(err)
+}
 ```
 
----
+## Watching a `.env` file
 
-## Multiple Environments
-
-```bash
-.env                 # Default (committed)
-.env.local          # Local overrides (gitignored)
-.env.production     # Production
-.env.staging        # Staging
-.env.test           # Testing
+```go
+source := config.NewFileSource(".env", config.FormatEnv, true).WithWatchInterval(time.Second)
 ```
 
-### .gitignore
+## Recommended file layout
 
 ```bash
+.env.example
 .env.local
-.env.*.local
+.env.production
+.env.staging
+.env.test
 ```
 
----
+## Priority guidance
 
-## Loading Priority
+Use explicit source ordering rather than relying on hidden default lookup:
 
-1. OS environment variables (highest)
-2. .env file
-3. Defaults in code (lowest)
+1. base file
+2. environment-specific file
+3. real environment variables
 
 ```go
-// If APP_ADDR is set in environment, it overrides .env
-cfg := config.Load()
-addr := cfg.Get("APP_ADDR", ":8080")
+_ = cfg.AddSource(config.NewFileSource(".env", config.FormatEnv, false))
+_ = cfg.AddSource(config.NewFileSource(".env.production", config.FormatEnv, false))
+_ = cfg.AddSource(config.NewEnvSource(""))
 ```
-
----
-
-## Best Practices
-
-### ✅ Do
-
-1. **Commit .env.example**
-   ```bash
-   # .env.example (template)
-   APP_ADDR=:8080
-   DB_URL=postgres://localhost/db
-   ```
-
-2. **Ignore .env.local**
-   ```bash
-   # .gitignore
-   .env.local
-   ```
-
-### ❌ Don't
-
-1. **Don't Commit Secrets**
-   ```bash
-   # ❌ Don't commit
-   .env.production  # Contains secrets
-   ```
-
----
-
-**Next**: [Validation](validation.md)

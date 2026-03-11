@@ -1,6 +1,12 @@
 
 # Plumego v1.0 发布路线图
 
+> Status: Historical proposal, not the current GA execution plan.
+>
+> For the current v1 assessment and execution path, see:
+> `docs/other/ROADMAP_V1_REVIEW_AND_EXECUTION_PLAN_2026-03-11.md`
+> and `docs/other/V1_GA_EXECUTION_PLAN_2026-03-10.md`.
+
 本文档是驱动 Plumego 框架达到 v1.0 版本的核心开发计划。
 我们的目标是创建一个现代、极致简化、由 AI Agent 驱动开发和迭代的 Go Web 工具包。
 在此过程中，我们将打破向后兼容性，以建立一个逻辑清晰、高度可组合的全新架构。

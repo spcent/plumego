@@ -167,9 +167,12 @@ README 给了两套最小示例：
 ### 1）更“工程化”的 `core.New(...)`（配置项更集中）
 
 ```go
+ctx := context.Background()
+
 app := core.New(
     core.WithAddr(":8080"),
     core.WithDebug(),
+    core.WithDevTools(),
 )
 
 _ = app.Use(
@@ -182,9 +185,12 @@ app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
     w.Write([]byte("pong"))
 })
 
-if err := app.Boot(); err != nil {
-    log.Fatalf("server stopped: %v", err)
-}
+if err := app.Prepare(); err != nil { log.Fatalf("prepare app: %v", err) }
+if err := app.Start(ctx); err != nil { log.Fatalf("start runtime: %v", err) }
+srv, err := app.Server()
+if err != nil { log.Fatalf("build server: %v", err) }
+defer app.Shutdown(ctx)
+log.Fatal(srv.ListenAndServe())
 ```
 
 ### 2）更“标准库直觉”的 `plumego.New()`（直接作为 `http.Handler` 挂载）

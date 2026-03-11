@@ -212,24 +212,25 @@ func TestUseAfterServeHTTPReturnsError(t *testing.T) {
 	}
 }
 
-func TestLoadEnvFromFile(t *testing.T) {
-	tmpFile, err := os.CreateTemp("", "app_env")
+func TestPrepareBuildsHTTPServer(t *testing.T) {
+	app := New(WithAddr(":5555"))
+	app.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+
+	server, err := app.Server()
 	if err != nil {
-		t.Fatalf("failed to create temp env file: %v", err)
+		t.Fatalf("Server returned error: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString("APP_TEST_KEY=123\n"); err != nil {
-		t.Fatalf("failed to write env file: %v", err)
+	if server.Addr != ":5555" {
+		t.Fatalf("httpServer addr should be :5555, got %s", server.Addr)
 	}
-	tmpFile.Close()
-
-	app := New(WithEnvPath(tmpFile.Name()))
-	if err := app.loadEnv(); err != nil {
-		t.Fatalf("loadEnv returned error: %v", err)
-	}
-	if val := os.Getenv("APP_TEST_KEY"); val != "123" {
-		t.Fatalf("expected APP_TEST_KEY to be set to 123, got %s", val)
+	if server.Handler == nil {
+		t.Fatalf("httpServer handler should not be nil")
 	}
 }
 
@@ -273,7 +274,7 @@ func TestConfigureWebSocketRequiresSecret(t *testing.T) {
 	}
 }
 
-func TestConfigureWebSocketLoadsEnvFile(t *testing.T) {
+func TestConfigureWebSocketRequiresExplicitSecretSource(t *testing.T) {
 	os.Unsetenv("WS_SECRET")
 	defer os.Unsetenv("WS_SECRET")
 
@@ -289,8 +290,13 @@ func TestConfigureWebSocketLoadsEnvFile(t *testing.T) {
 	tmpFile.Close()
 
 	app := New(WithEnvPath(tmpFile.Name()))
+	if _, err := app.ConfigureWebSocket(); err == nil {
+		t.Fatalf("expected websocket configuration to fail without explicit secret injection")
+	}
+
+	os.Setenv("WS_SECRET", "from_env_with_32_bytes_secret_value!!")
 	if _, err := app.ConfigureWebSocket(); err != nil {
-		t.Fatalf("expected websocket configuration to load env, got error: %v", err)
+		t.Fatalf("expected websocket configuration with explicit env to succeed, got error: %v", err)
 	}
 }
 

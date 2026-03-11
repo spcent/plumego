@@ -32,7 +32,7 @@ api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Req
 }))
 ```
 
-Register routes before `app.Boot()`; boot freezes route registration.
+Register routes before `app.Prepare()`; prepare freezes route registration.
 
 ## Reverse routing
 Assign route names and generate URLs safely:

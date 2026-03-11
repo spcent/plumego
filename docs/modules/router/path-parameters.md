@@ -320,7 +320,9 @@ app.Get("/users/status/:status", func(w http.ResponseWriter, r *http.Request) {
 package main
 
 import (
+    "context"
     "encoding/json"
+    "log"
     "net/http"
     "strconv"
     "github.com/spcent/plumego/contract"
@@ -374,7 +376,9 @@ func main() {
         json.NewEncoder(w).Encode(post)
     })
 
-    app.Boot()
+    if err := app.Run(context.Background()); err != nil {
+        log.Fatal(err)
+    }
 }
 ```
 
@@ -384,7 +388,9 @@ func main() {
 package main
 
 import (
+    "context"
     "fmt"
+    "log"
     "net/http"
     "os"
     "path/filepath"
@@ -440,7 +446,9 @@ func main() {
         fmt.Fprintf(w, "Name: %s\nSize: %d bytes\n", info.Name(), info.Size())
     })
 
-    app.Boot()
+    if err := app.Run(context.Background()); err != nil {
+        log.Fatal(err)
+    }
 }
 ```
 
@@ -450,7 +458,9 @@ func main() {
 package main
 
 import (
+    "context"
     "fmt"
+    "log"
     "net/http"
     "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
@@ -492,7 +502,9 @@ func main() {
         fmt.Fprintf(w, "Issue: %s/%s#%s", username, repo, number)
     })
 
-    app.Boot()
+    if err := app.Run(context.Background()); err != nil {
+        log.Fatal(err)
+    }
 }
 ```
 

@@ -69,6 +69,7 @@ var (
 	WithTLS              = core.WithTLS
 	WithTLSConfig        = core.WithTLSConfig
 	WithDebug            = core.WithDebug
+	WithDevTools         = core.WithDevTools
 	WithLogger           = core.WithLogger
 	WithComponent        = core.WithComponent
 	WithComponents       = core.WithComponents

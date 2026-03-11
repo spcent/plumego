@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,97 +13,157 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/core/components/devtools"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/router"
 )
 
-// Boot initializes and starts the server.
+// Boot is the legacy convenience entrypoint.
+// Prefer Prepare + Start + Server/Shutdown for explicit lifecycle control.
 func (a *App) Boot() error {
-	ctx := context.Background()
+	return a.Run(context.Background())
+}
 
-	if lifecycle, ok := a.logger.(log.Lifecycle); ok {
-		if err := lifecycle.Start(ctx); err != nil {
-			return err
-		}
-		defer lifecycle.Stop(ctx)
+// Run prepares the app, starts runtime hooks, then serves until shutdown.
+func (a *App) Run(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	if err := a.runBootSequence(ctx); err != nil {
+	if err := a.Prepare(); err != nil {
+		return err
+	}
+	if err := a.Start(ctx); err != nil {
+		return err
+	}
+
+	stopSignalWatcher := make(chan struct{})
+	go a.handleShutdownSignal(stopSignalWatcher)
+
+	err := a.startServer()
+	close(stopSignalWatcher)
+
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		_ = a.Shutdown(context.Background())
 		return err
 	}
 
 	return nil
 }
 
-func (a *App) runBootSequence(ctx context.Context) error {
-	if err := a.loadEnv(); err != nil {
-		return err
-	}
-
-	if a.isDebugEnabled() {
-		os.Setenv("APP_DEBUG", "true")
-	}
-
-	components := a.mountComponents()
-
+// Prepare freezes routing/middleware state and constructs the HTTP server.
+func (a *App) Prepare() error {
 	if err := a.setupServer(); err != nil {
 		return err
 	}
 
-	if err := a.startComponents(ctx, components); err != nil {
-		return err
-	}
-
-	if err := a.startRunners(ctx); err != nil {
-		a.stopComponents(ctx)
-		return err
-	}
-
-	if err := a.startServer(); err != nil && err != http.ErrServerClosed {
-		a.stopRuntime(ctx)
-		return err
-	}
-
 	return nil
 }
 
-func (a *App) isDebugEnabled() bool {
+// Server returns the prepared HTTP server instance.
+func (a *App) Server() (*http.Server, error) {
 	a.mu.RLock()
-	defer a.mu.RUnlock()
-	return a.config.Debug
-}
-
-func (a *App) loadEnv() error {
-	a.mu.RLock()
-	envFile := ""
-	if a.config != nil {
-		envFile = a.config.EnvFile
-	}
-	loaded := a.envLoaded
+	server := a.httpServer
 	a.mu.RUnlock()
 
-	if loaded || envFile == "" {
-		return nil
+	if server == nil {
+		return nil, fmt.Errorf("server not prepared")
+	}
+	return server, nil
+}
+
+// Start starts component, runner, health, and logger runtime hooks.
+func (a *App) Start(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	if _, err := os.Stat(envFile); err == nil {
-		a.logger.Info("Load .env file", log.Fields{"path": envFile})
-		err := config.LoadEnv(envFile, true)
-		if err != nil {
-			a.logger.Error("Load .env failed", log.Fields{"error": err})
+	a.mu.RLock()
+	if a.started {
+		a.mu.RUnlock()
+		return fmt.Errorf("app already started")
+	}
+	prepared := a.httpServer != nil
+	logger := a.logger
+	components := append([]Component{}, a.mountedComponents...)
+	a.mu.RUnlock()
+
+	if !prepared {
+		return fmt.Errorf("app not prepared")
+	}
+
+	if lifecycle, ok := logger.(log.Lifecycle); ok {
+		if err := lifecycle.Start(ctx); err != nil {
 			return err
 		}
+		a.mu.Lock()
+		a.loggerStarted = true
+		a.mu.Unlock()
+	}
+
+	if err := a.startComponents(ctx, components); err != nil {
+		a.stopLoggerLifecycle(ctx)
+		return err
+	}
+	if err := a.startRunners(ctx); err != nil {
+		a.stopComponents(ctx)
+		a.stopLoggerLifecycle(ctx)
+		return err
 	}
 
 	a.mu.Lock()
-	a.envLoaded = true
+	a.started = true
 	a.mu.Unlock()
+
+	if a.healthManager != nil {
+		a.healthManager.MarkReady()
+	}
+
 	return nil
 }
 
+// Shutdown gracefully stops the HTTP server and all runtime hooks.
+func (a *App) Shutdown(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	cfg := a.serverStartConfig()
+	if a.healthManager != nil {
+		a.healthManager.MarkNotReady("shutting down")
+	}
+
+	if cfg.connTracker != nil {
+		go cfg.connTracker.drain(ctx)
+	}
+
+	var shutdownErr error
+	if cfg.httpServer != nil {
+		if err := cfg.httpServer.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			a.logger.Error("Server shutdown error", log.Fields{"error": err})
+			shutdownErr = err
+		}
+	}
+
+	a.stopRuntime(ctx)
+	a.stopLoggerLifecycle(ctx)
+
+	a.mu.Lock()
+	a.started = false
+	a.mu.Unlock()
+
+	return shutdownErr
+}
+
 func (a *App) setupServer() error {
+	a.mu.RLock()
+	if a.httpServer != nil {
+		a.mu.RUnlock()
+		return nil
+	}
+	a.mu.RUnlock()
+
 	a.ensureHandler()
 
 	a.mu.RLock()
@@ -147,17 +208,6 @@ func (a *App) startServer() error {
 		return fmt.Errorf("TLS enabled but certificate or key file not provided")
 	}
 
-	a.mu.Lock()
-	a.started = true
-	a.mu.Unlock()
-
-	if a.healthManager != nil {
-		a.healthManager.MarkReady()
-	}
-
-	stopSignalWatcher := make(chan struct{})
-	go a.handleShutdownSignal(stopSignalWatcher)
-
 	a.logger.Info("Server running", log.Fields{"addr": cfg.addr})
 	if cfg.debug {
 		a.logger.Info("Debug mode enabled", log.Fields{
@@ -177,14 +227,6 @@ func (a *App) startServer() error {
 	} else {
 		err = cfg.httpServer.ListenAndServe()
 	}
-
-	close(stopSignalWatcher)
-
-	if a.healthManager != nil {
-		a.healthManager.MarkNotReady("shutting down")
-	}
-	a.stopRuntime(context.Background())
-	a.logger.Info("Server stopped gracefully")
 	return err
 }
 
@@ -250,9 +292,6 @@ func (a *App) handleShutdownSignal(stop <-chan struct{}) {
 	case <-sig:
 	}
 
-	if a.healthManager != nil {
-		a.healthManager.MarkNotReady("draining connections")
-	}
 	a.logger.Info("SIGTERM received, shutting down")
 
 	cfg := a.serverStartConfig()
@@ -264,23 +303,29 @@ func (a *App) handleShutdownSignal(stop <-chan struct{}) {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
-	if cfg.connTracker != nil {
-		go cfg.connTracker.drain(ctx)
-	}
-
-	if cfg.httpServer != nil {
-		if err := cfg.httpServer.Shutdown(ctx); err != nil {
-			a.logger.Error("Server shutdown error", log.Fields{"error": err})
-		}
-	}
-
-	a.stopRuntime(ctx)
+	_ = a.Shutdown(ctx)
 }
 
 func (a *App) stopRuntime(ctx context.Context) {
 	a.stopRunners(ctx)
 	a.stopComponents(ctx)
 	a.runShutdownHooks(ctx)
+}
+
+func (a *App) stopLoggerLifecycle(ctx context.Context) {
+	a.mu.RLock()
+	started := a.loggerStarted
+	logger := a.logger
+	a.mu.RUnlock()
+	if !started {
+		return
+	}
+	if lifecycle, ok := logger.(log.Lifecycle); ok {
+		_ = lifecycle.Stop(ctx)
+	}
+	a.mu.Lock()
+	a.loggerStarted = false
+	a.mu.Unlock()
 }
 
 type connectionTracker struct {
@@ -297,16 +342,14 @@ func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *
 }
 
 func (a *App) mountComponents() []Component {
-	// Get all components (built-in + custom) in declared order.
-	declared := append([]Component{}, a.builtInComponents()...)
-	declared = append(declared, a.components...)
+	components := a.declaredComponents()
 
 	if a.middlewareReg == nil {
 		a.middlewareReg = middleware.NewRegistry()
 	}
-
-	components := filterNilComponents(declared)
-
+	if a.router == nil {
+		a.router = router.NewRouter()
+	}
 	for _, c := range components {
 		c.RegisterMiddleware(a.middlewareReg)
 		c.RegisterRoutes(a.router)
@@ -315,6 +358,7 @@ func (a *App) mountComponents() []Component {
 	a.router.Freeze()
 	a.mu.Lock()
 	a.componentsMounted = true
+	a.mountedComponents = append([]Component{}, components...)
 	a.mu.Unlock()
 
 	return components

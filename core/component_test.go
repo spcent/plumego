@@ -176,26 +176,24 @@ func TestAppLogger(t *testing.T) {
 	}
 }
 
-// TestBuiltInComponents tests the builtInComponents method
-func TestBuiltInComponents(t *testing.T) {
+// TestDeclaredComponents tests explicit component assembly.
+func TestDeclaredComponents(t *testing.T) {
 	app := &App{
 		config: &AppConfig{},
 	}
 
-	components := app.builtInComponents()
+	components := app.declaredComponents()
 
-	// Should return empty slice for default config
 	if len(components) != 0 {
-		t.Errorf("Expected 0 built-in components, got %d", len(components))
+		t.Errorf("Expected 0 declared components, got %d", len(components))
 	}
 
-	// Test with debug enabled
 	app.config.Debug = true
-	components = app.builtInComponents()
+	app.devTools = true
+	components = app.declaredComponents()
 	if len(components) != 1 {
-		t.Errorf("Expected 1 built-in component with debug, got %d", len(components))
+		t.Errorf("Expected 1 declared component with explicit devtools, got %d", len(components))
 	}
-	app.config.Debug = false
 }
 
 // TestServeHTTP tests the ServeHTTP method

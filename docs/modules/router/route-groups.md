@@ -37,6 +37,7 @@ Compile-oriented complete example:
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -45,6 +46,7 @@ import (
 )
 
 func main() {
+    ctx := context.Background()
     app := core.New(core.WithAddr(":8080"))
     r := app.Router()
 
@@ -55,9 +57,19 @@ func main() {
         _, _ = w.Write([]byte("user=" + id))
     }))
 
-    if err := app.Boot(); err != nil {
+    if err := app.Prepare(); err != nil {
         log.Fatal(err)
     }
+    if err := app.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer app.Shutdown(ctx)
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 

@@ -2,134 +2,94 @@
 
 > **Package**: `github.com/spcent/plumego/config`
 
-Advanced configuration patterns and techniques.
+Advanced patterns in the current config package are built around explicit `Manager`, explicit `Source`, and explicit injection.
 
----
-
-## Struct-Based Config
+## Struct-based loading
 
 ```go
-type Config struct {
-    Server   ServerConfig
-    Database DatabaseConfig
-    Redis    RedisConfig
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+
+    "github.com/spcent/plumego/config"
+    plumelog "github.com/spcent/plumego/log"
+)
+
+type AppConfig struct {
+    AppAddr       string        `config:"app_addr"`
+    AppDebug      bool          `config:"app_debug"`
+    ReadTimeout   time.Duration `config:"read_timeout"`
+    WriteTimeout  time.Duration `config:"write_timeout"`
+    DatabaseURL   string        `config:"db_url"`
+    DatabaseConns int           `config:"db_max_conns"`
 }
 
-type ServerConfig struct {
-    Addr         string
-    ReadTimeout  time.Duration
-    WriteTimeout time.Duration
-}
+func main() {
+    cfg := config.NewManager(plumelog.NewGLogger())
+    _ = cfg.AddSource(config.NewEnvSource(""))
+    _ = cfg.AddSource(config.NewFileSource(".env", config.FormatEnv, false))
 
-type DatabaseConfig struct {
-    URL          string
-    MaxConns     int
-    ConnTimeout  time.Duration
-}
+    if err := cfg.Load(context.Background()); err != nil {
+        log.Fatal(err)
+    }
 
-func LoadAppConfig() Config {
-    cfg := config.Load()
-
-    return Config{
-        Server: ServerConfig{
-            Addr:         cfg.Get("APP_ADDR", ":8080"),
-            ReadTimeout:  cfg.GetDuration("READ_TIMEOUT", 30*time.Second),
-            WriteTimeout: cfg.GetDuration("WRITE_TIMEOUT", 30*time.Second),
-        },
-        Database: DatabaseConfig{
-            URL:         cfg.MustGet("DB_URL"),
-            MaxConns:    cfg.GetInt("DB_MAX_CONNS", 25),
-            ConnTimeout: cfg.GetDuration("DB_TIMEOUT", 5*time.Second),
-        },
+    var appConfig AppConfig
+    if err := cfg.Unmarshal(&appConfig); err != nil {
+        log.Fatal(err)
     }
 }
 ```
 
----
-
-## Feature Flags
+## Feature flags
 
 ```go
-type Features struct {
-    EnableMetrics bool
-    EnableTracing bool
-    EnableCache   bool
-}
-
-func LoadFeatures(cfg *config.Config) Features {
-    return Features{
-        EnableMetrics: cfg.GetBool("FEATURE_METRICS", true),
-        EnableTracing: cfg.GetBool("FEATURE_TRACING", false),
-        EnableCache:   cfg.GetBool("FEATURE_CACHE", true),
+func featureFlags(cfg *config.Manager) struct {
+    Metrics bool
+    Tracing bool
+    Cache   bool
+} {
+    return struct {
+        Metrics bool
+        Tracing bool
+        Cache   bool
+    }{
+        Metrics: cfg.GetBool("feature_metrics", true),
+        Tracing: cfg.GetBool("feature_tracing", false),
+        Cache:   cfg.GetBool("feature_cache", true),
     }
-}
-
-// Usage
-features := LoadFeatures(cfg)
-if features.EnableMetrics {
-    // Enable metrics
 }
 ```
 
----
-
-## Environment-Specific Defaults
+## Watching file-backed config
 
 ```go
-func getDefaults(env string) map[string]string {
-    defaults := map[string]string{
-        "APP_ADDR": ":8080",
-    }
+source := config.NewFileSource(".env", config.FormatEnv, true).WithWatchInterval(2 * time.Second)
+cfg := config.NewManager(plumelog.NewGLogger())
 
-    switch env {
-    case "production":
-        defaults["APP_DEBUG"] = "false"
-        defaults["LOG_LEVEL"] = "info"
-    case "development":
-        defaults["APP_DEBUG"] = "true"
-        defaults["LOG_LEVEL"] = "debug"
-    }
+_ = cfg.AddSource(source)
+_ = cfg.Load(context.Background())
 
-    return defaults
+_ = cfg.Watch("app_debug", func(oldValue, newValue any) {
+    log.Printf("app_debug changed: %v -> %v", oldValue, newValue)
+})
+
+if err := cfg.StartWatchers(context.Background()); err != nil {
+    log.Fatal(err)
 }
 ```
 
----
+## Source ordering
 
-## Configuration Reloading
+Sources are merged in registration order, later sources win.
 
 ```go
-type ReloadableConfig struct {
-    mu     sync.RWMutex
-    config Config
-}
-
-func (rc *ReloadableConfig) Get() Config {
-    rc.mu.RLock()
-    defer rc.mu.RUnlock()
-    return rc.config
-}
-
-func (rc *ReloadableConfig) Reload() {
-    rc.mu.Lock()
-    defer rc.mu.Unlock()
-    rc.config = LoadAppConfig()
-}
-
-// Usage
-rc := &ReloadableConfig{config: LoadAppConfig()}
-
-// Reload on signal
-go func() {
-    sigCh := make(chan os.Signal, 1)
-    signal.Notify(sigCh, syscall.SIGHUP)
-    for range sigCh {
-        rc.Reload()
-        log.Println("Configuration reloaded")
-    }
-}()
+cfg := config.NewManager(plumelog.NewGLogger())
+_ = cfg.AddSource(config.NewFileSource("base.env", config.FormatEnv, false))
+_ = cfg.AddSource(config.NewFileSource("override.env", config.FormatEnv, false))
+_ = cfg.AddSource(config.NewEnvSource(""))
 ```
 
----
-
-**Next**: [Best Practices](best-practices.md)
+This is the recommended way to model environment-specific overrides instead of hiding selection logic inside `config.Load()`.

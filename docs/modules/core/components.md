@@ -98,7 +98,7 @@ Common component packages:
 
 Notes:
 
-- Devtools component is auto-mounted when `WithDebug()` is enabled (unless already present).
+- Devtools component is mounted explicitly via `WithDevTools()` or `WithComponent(...)`.
 - WebSocket can be composed either by `WithComponent(...)` or helper methods (`ConfigureWebSocket*`).
 
 ---

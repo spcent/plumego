@@ -18,6 +18,7 @@ Common options:
 - `core.WithHTTP2(bool)`
 - `core.WithTLS(certFile, keyFile)` / `core.WithTLSConfig(core.TLSConfig)`
 - `core.WithDebug()`
+- `core.WithDevTools()`
 - `core.WithLogger(log.StructuredLogger)`
 - `core.WithMethodNotAllowed(bool)`
 - `core.WithComponent(component)` / `core.WithComponents(...)`
@@ -44,7 +45,10 @@ err := app.Use(mw1, mw2, mw3)
 
 ### Lifecycle
 ```go
-err := app.Boot()
+err := app.Prepare()
+err := app.Start(ctx)
+srv, err := app.Server()
+err := app.Shutdown(ctx)
 err := app.Register(runner)
 err := app.OnShutdown(hook)
 ```

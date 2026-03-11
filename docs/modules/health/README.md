@@ -2,7 +2,7 @@
 
 > **Package Path**: `github.com/spcent/plumego/health` | **Stability**: High | **Priority**: P1
 
-The `health` package provides standard HTTP handlers and a `HealthManager` for liveness, readiness, component health checks, and build/runtime diagnostics.
+The `health` package provides explicit health handlers and a `HealthManager` for liveness, readiness, component checks, health history, and build/runtime diagnostics.
 
 ## Canonical Quick Start
 
@@ -10,7 +10,12 @@ The `health` package provides standard HTTP handlers and a `HealthManager` for l
 package main
 
 import (
+    "context"
     "log"
+    "net/http"
+    "os/signal"
+    "syscall"
+    "time"
 
     "github.com/spcent/plumego/core"
     "github.com/spcent/plumego/health"
@@ -21,18 +26,50 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+    defer manager.Close()
 
     app := core.New(
         core.WithAddr(":8080"),
         core.WithHealthManager(manager),
     )
 
-    app.Get("/health/live", health.LiveHandler().ServeHTTP)
-    app.Get("/health/ready", health.ReadinessHandler(manager).ServeHTTP)
-    app.Get("/health", health.HealthHandler(manager, false).ServeHTTP)
-    app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+    if err := app.Router().AddRoute(http.MethodGet, "/health/live", health.LiveHandler()); err != nil {
+        log.Fatal(err)
+    }
+    if err := app.Router().AddRoute(http.MethodGet, "/health/ready", health.ReadinessHandler(manager)); err != nil {
+        log.Fatal(err)
+    }
+    if err := app.Router().AddRoute(http.MethodGet, "/health", health.HealthHandler(manager, false)); err != nil {
+        log.Fatal(err)
+    }
+    if err := app.Router().AddRoute(http.MethodGet, "/health/build", health.BuildInfoHandler()); err != nil {
+        log.Fatal(err)
+    }
 
-    if err := app.Boot(); err != nil {
+    if err := app.Prepare(); err != nil {
+        log.Fatal(err)
+    }
+
+    ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+
+    if err := app.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    go func() {
+        <-ctx.Done()
+        shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+        _ = app.Shutdown(shutdownCtx)
+    }()
+
+    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
         log.Fatal(err)
     }
 }
@@ -41,18 +78,19 @@ func main() {
 ## Handler Matrix
 
 - `health.LiveHandler()`
-  - Always returns `200` with `alive` body.
-  - Use for liveness probes.
+  Returns `200` with `alive` body.
 - `health.ReadinessHandler(manager)`
-  - Returns manager readiness (`200` when ready, `503` when not ready).
-  - Works with explicit `MarkReady/MarkNotReady` state.
+  Returns `200` when `manager.Readiness().Ready` is true, otherwise `503`.
 - `health.ReadinessHandlerWithManager(manager)`
-  - Runs component checks and derives readiness from aggregate health.
+  Recomputes component health and derives readiness from aggregate status.
 - `health.HealthHandler(manager, debug)`
-  - Full component health summary (`healthy/degraded/unhealthy`) plus build info.
-  - With `debug=true`, includes runtime diagnostics.
+  Returns overall health plus build metadata. With `debug=true`, includes runtime diagnostics.
 - `health.BuildInfoHandler()`
-  - Returns version/commit/build metadata.
+  Returns version, commit, and build time metadata.
+- `health.ComponentHealthHandler(manager, name)`
+  Returns the latest status for a single component.
+- `health.AllComponentsHealthHandler(manager)`
+  Returns the current health map for all registered components.
 
 ## Registering Component Checks
 
@@ -85,17 +123,9 @@ func wire(manager health.HealthManager, db *sql.DB) error {
 
 ## Core Lifecycle Integration
 
-When `HealthManager` is mounted via `core.WithHealthManager(...)`, core lifecycle updates readiness automatically:
+When a `HealthManager` is attached with `core.WithHealthManager(...)`, core keeps readiness aligned with lifecycle:
 
-- startup complete -> `MarkReady()`
-- shutdown/drain path -> `MarkNotReady(...)`
+- after successful startup: `MarkReady()`
+- during shutdown/drain: `MarkNotReady(...)`
 
-This keeps readiness endpoints aligned with actual serving state.
-
-## Related APIs
-
-- Per-component: `health.ComponentHealthHandler(manager, "component")`
-- All components: `health.AllComponentsHealthHandler(manager)`
-- Component list: `health.ComponentsListHandler(manager)`
-- History/debug: `health.HealthHistoryHandler(...)`, `health.DebugHealthHandler(...)`
-- Metrics bridge: `health.AttachMetrics(...)`, `health.MetricsHandler(...)`
+That makes readiness probes reflect actual serving state instead of a separate flag path.

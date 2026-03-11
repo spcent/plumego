@@ -65,6 +65,7 @@ Compile-oriented complete example:
 package main
 
 import (
+    "context"
     "log"
     "net/http"
 
@@ -72,6 +73,7 @@ import (
 )
 
 func main() {
+    ctx := context.Background()
     app := core.New(core.WithAddr(":8080"))
 
     app.Get("/users", func(w http.ResponseWriter, r *http.Request) {
@@ -84,9 +86,19 @@ func main() {
         _, _ = w.Write([]byte("get user"))
     })
 
-    if err := app.Boot(); err != nil {
+    if err := app.Prepare(); err != nil {
         log.Fatal(err)
     }
+    if err := app.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer app.Shutdown(ctx)
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
@@ -135,6 +147,6 @@ _ = u // /users/42
 
 ## Best Practices
 
-- Register routes/middleware before `app.Boot()`.
+- Register routes/middleware before `app.Prepare()`.
 - Prefer explicit route names for endpoints reused by links/redirects.
 - Keep handlers in `net/http` shape and adapt `contract.Ctx` only when needed.
