@@ -140,9 +140,9 @@ func ExampleWithHeaders() {
 	http.ListenAndServe(":8080", r)
 }
 
-// FullConfigurationExample demonstrates all options together
-// This is not a runnable example (no Example prefix) since it starts a server
-func FullConfigurationExample() {
+// ExampleRegisterFromDir_full demonstrates all options together in a
+// production-ready configuration.
+func ExampleRegisterFromDir_full() {
 	r := router.NewRouter()
 
 	// Production-ready configuration with all features

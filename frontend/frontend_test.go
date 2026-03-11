@@ -12,21 +12,23 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
+// writeTestFile creates a file at dir/relPath with the given content,
+// creating intermediate directories as needed.
+func writeTestFile(t *testing.T, dir, relPath, content string) {
+	t.Helper()
+	full := filepath.Join(dir, filepath.FromSlash(relPath))
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", relPath, err)
+	}
+	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", relPath, err)
+	}
+}
+
 func TestRegisterFromDir(t *testing.T) {
 	dir := t.TempDir()
-
-	write := func(path, content string) {
-		full := filepath.Join(dir, path)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", path, err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", path, err)
-		}
-	}
-
-	write("index.html", "<html>home</html>")
-	write("_next/static/app.js", "console.log('hello')")
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
+	writeTestFile(t, dir, "_next/static/app.js", "console.log('hello')")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir, WithCacheControl("public, max-age=31536000")); err != nil {
@@ -73,15 +75,8 @@ func TestRegisterFromDir(t *testing.T) {
 
 func TestRegisterWithPrefix(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("app shell"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(dir, "assets"), 0o755); err != nil {
-		t.Fatalf("mkdir assets: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "assets/logo.png"), []byte("png"), 0o644); err != nil {
-		t.Fatalf("write asset: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "app shell")
+	writeTestFile(t, dir, "assets/logo.png", "png")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir, WithPrefix("/app")); err != nil {
@@ -115,24 +110,15 @@ func TestRegisterFromDirMissing(t *testing.T) {
 	}
 }
 
-func TestRegisterEmbedded(t *testing.T) {
+// TestRegisterFS_HTTPFileSystem verifies that RegisterFS works with http.Dir.
+func TestRegisterFS_HTTPFileSystem(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("embedded home"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "bundle.js"), []byte("console.log('ok')"), 0o644); err != nil {
-		t.Fatalf("write bundle: %v", err)
-	}
-
-	originalFS, originalRoot := embeddedFS, embeddedRoot
-	embeddedFS, embeddedRoot = os.DirFS(dir), "."
-	defer func() {
-		embeddedFS, embeddedRoot = originalFS, originalRoot
-	}()
+	writeTestFile(t, dir, "index.html", "embedded home")
+	writeTestFile(t, dir, "bundle.js", "console.log('ok')")
 
 	r := router.NewRouter()
-	if err := RegisterEmbedded(r); err != nil {
-		t.Fatalf("register embedded: %v", err)
+	if err := RegisterFS(r, http.Dir(dir)); err != nil {
+		t.Fatalf("register: %v", err)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/bundle.js", nil)
@@ -147,6 +133,8 @@ func TestRegisterEmbedded(t *testing.T) {
 	}
 }
 
+// TestRegisterEmbeddedMissing verifies that RegisterEmbedded returns an error
+// when the embedded/ directory contains no real assets (only .keep).
 func TestRegisterEmbeddedMissing(t *testing.T) {
 	r := router.NewRouter()
 	if err := RegisterEmbedded(r); err == nil {
@@ -156,36 +144,47 @@ func TestRegisterEmbeddedMissing(t *testing.T) {
 	}
 }
 
+// TestRegisterFS_NestedDirectories verifies that files in nested subdirectories
+// are served correctly when using RegisterFS.
+func TestRegisterFS_NestedDirectories(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "assets/style.css", "css")
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, http.Dir(dir)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/assets/style.css", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("nested asset failed: %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "css") {
+		t.Fatalf("nested asset content wrong: %q", rec.Body.String())
+	}
+}
+
 // Test security and edge cases
 func TestSecurityPathTraversal(t *testing.T) {
 	dir := t.TempDir()
-
-	// Create index.html
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
-
-	// Create a secret file outside the intended directory structure
-	secretDir := filepath.Join(dir, "secret")
-	if err := os.MkdirAll(secretDir, 0o755); err != nil {
-		t.Fatalf("mkdir secret: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(secretDir, "secret.txt"), []byte("secret data"), 0o644); err != nil {
-		t.Fatalf("write secret: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "secret/secret.txt", "secret data")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 
-	// Try various path traversal attempts
 	traversalPaths := []string{
 		"/../secret/secret.txt",
 		"/../../secret.txt",
 		"/../../../etc/passwd",
-		"/%2e%2e%2fsecret%2fsecret.txt", // URL encoded
-		"/%2e%2e/",                      // URL encoded dot-dot
+		"/%2e%2e%2fsecret%2fsecret.txt",
+		"/%2e%2e/",
 	}
 
 	for _, path := range traversalPaths {
@@ -194,7 +193,6 @@ func TestSecurityPathTraversal(t *testing.T) {
 			rec := httptest.NewRecorder()
 			r.ServeHTTP(rec, req)
 
-			// Should either return 404 or index.html, not the secret file
 			if rec.Code == http.StatusOK && strings.Contains(rec.Body.String(), "secret data") {
 				t.Fatalf("path traversal succeeded: %s", path)
 			}
@@ -205,7 +203,6 @@ func TestSecurityPathTraversal(t *testing.T) {
 func TestSpecialCharactersInFilenames(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create files with special characters
 	files := map[string]string{
 		"index.html":            "index",
 		"file with spaces.html": "spaces",
@@ -215,9 +212,7 @@ func TestSpecialCharactersInFilenames(t *testing.T) {
 	}
 
 	for filename, content := range files {
-		if err := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", filename, err)
-		}
+		writeTestFile(t, dir, filename, content)
 	}
 
 	r := router.NewRouter()
@@ -227,7 +222,6 @@ func TestSpecialCharactersInFilenames(t *testing.T) {
 
 	for filename, content := range files {
 		t.Run(filename, func(t *testing.T) {
-			// URL encode the filename for spaces
 			path := "/" + filename
 			if strings.Contains(filename, " ") {
 				path = "/file%20with%20spaces.html"
@@ -249,27 +243,14 @@ func TestSpecialCharactersInFilenames(t *testing.T) {
 
 func TestDirectoryTraversalWithSubdirs(t *testing.T) {
 	dir := t.TempDir()
-
-	// Create nested directory structure
-	subDir := filepath.Join(dir, "assets", "js")
-	if err := os.MkdirAll(subDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-
-	if err := os.WriteFile(filepath.Join(subDir, "app.js"), []byte("app code"), 0o644); err != nil {
-		t.Fatalf("write app.js: %v", err)
-	}
-
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
+	writeTestFile(t, dir, "assets/js/app.js", "app code")
+	writeTestFile(t, dir, "index.html", "index")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 
-	// Test valid nested path
 	req := httptest.NewRequest(http.MethodGet, "/assets/js/app.js", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -281,7 +262,6 @@ func TestDirectoryTraversalWithSubdirs(t *testing.T) {
 		t.Fatalf("nested path content wrong: %q", rec.Body.String())
 	}
 
-	// Test directory access (should serve index)
 	req = httptest.NewRequest(http.MethodGet, "/assets/js/", nil)
 	rec = httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -293,14 +273,11 @@ func TestDirectoryTraversalWithSubdirs(t *testing.T) {
 
 func TestInvalidPrefixes(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
 
-	// Test invalid prefix formats
 	invalidPrefixes := []string{
-		"/app/../", // Contains path traversal
-		"/app/./",  // Contains current directory
+		"/app/../",
+		"/app/./",
 	}
 
 	for _, prefix := range invalidPrefixes {
@@ -313,11 +290,10 @@ func TestInvalidPrefixes(t *testing.T) {
 		})
 	}
 
-	// Test valid prefixes that should work
 	validPrefixes := []string{
-		"",     // Empty (should default to /)
-		"app",  // Missing leading slash (should be fixed)
-		"app/", // Missing leading slash with trailing (should be fixed)
+		"",
+		"app",
+		"app/",
 	}
 
 	for _, prefix := range validPrefixes {
@@ -333,14 +309,8 @@ func TestInvalidPrefixes(t *testing.T) {
 
 func TestCacheControlBehavior(t *testing.T) {
 	dir := t.TempDir()
-
-	// Create files
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "asset.js"), []byte("asset"), 0o644); err != nil {
-		t.Fatalf("write asset: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "asset.js", "asset")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir, WithCacheControl("max-age=3600")); err != nil {
@@ -355,7 +325,7 @@ func TestCacheControlBehavior(t *testing.T) {
 	}{
 		{"index", "/", false, ""},
 		{"asset", "/asset.js", true, "max-age=3600"},
-		{"missing", "/missing.html", false, ""}, // Falls back to index
+		{"missing", "/missing.html", false, ""},
 	}
 
 	for _, tt := range tests {
@@ -380,12 +350,8 @@ func TestCacheControlBehavior(t *testing.T) {
 
 func TestIndexCacheControl(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "asset.js"), []byte("asset"), 0o644); err != nil {
-		t.Fatalf("write asset: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "asset.js", "asset")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(
@@ -414,9 +380,7 @@ func TestIndexCacheControl(t *testing.T) {
 
 func TestFallbackDisabled(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir, WithFallback(false)); err != nil {
@@ -440,16 +404,10 @@ func TestFallbackDisabled(t *testing.T) {
 
 func TestCustomHeaders(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
-
-	headers := map[string]string{
-		"X-Frontend": "ok",
-	}
+	writeTestFile(t, dir, "index.html", "index")
 
 	r := router.NewRouter()
-	if err := RegisterFromDir(r, dir, WithHeaders(headers)); err != nil {
+	if err := RegisterFromDir(r, dir, WithHeaders(map[string]string{"X-Frontend": "ok"})); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 
@@ -463,30 +421,25 @@ func TestCustomHeaders(t *testing.T) {
 
 func TestIndexFileValidation(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
 
 	r := router.NewRouter()
 
-	// Test invalid index files
 	invalidIndexes := []string{
-		"../index.html",  // Contains path separator
-		"index/../index", // Contains path separator
-		"",               // Empty (should default)
+		"../index.html",
+		"index/../index",
+		"",
 	}
 
 	for _, index := range invalidIndexes {
 		t.Run("index_"+index, func(t *testing.T) {
 			err := RegisterFromDir(r, dir, WithIndex(index))
 			if index == "" {
-				// Empty should work (defaults to index.html)
 				if err != nil {
 					t.Fatalf("empty index should work: %v", err)
 				}
 				return
 			}
-			// Invalid indexes should fail
 			if err == nil {
 				t.Fatalf("expected error for index %q, got nil", index)
 			}
@@ -506,11 +459,9 @@ func TestNilFilesystem(t *testing.T) {
 }
 
 func TestUnreadableDirectory(t *testing.T) {
-	// Skip on Windows as it doesn't support Unix-style permissions
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping test on Windows due to permission model differences")
 	}
-	// Skip if running as root, as root can read any directory
 	if os.Getuid() == 0 {
 		t.Skip("skipping test when running as root")
 	}
@@ -520,7 +471,7 @@ func TestUnreadableDirectory(t *testing.T) {
 	if err := os.MkdirAll(subDir, 0o000); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	defer os.Chmod(subDir, 0o755) // Cleanup
+	defer os.Chmod(subDir, 0o755)
 
 	r := router.NewRouter()
 	err := RegisterFromDir(r, subDir)
@@ -549,74 +500,9 @@ func TestNonDirectoryPath(t *testing.T) {
 	}
 }
 
-func TestEmptyEmbeddedDirectory(t *testing.T) {
-	dir := t.TempDir()
-	// Create only .keep file
-	if err := os.MkdirAll(filepath.Join(dir, "embedded"), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "embedded", ".keep"), []byte(""), 0o644); err != nil {
-		t.Fatalf("write .keep: %v", err)
-	}
-
-	originalFS, originalRoot := embeddedFS, embeddedRoot
-	embeddedFS, embeddedRoot = os.DirFS(dir), "embedded"
-	defer func() {
-		embeddedFS, embeddedRoot = originalFS, originalRoot
-	}()
-
-	r := router.NewRouter()
-	err := RegisterEmbedded(r)
-	if err == nil {
-		t.Fatal("expected error for empty embedded directory")
-	}
-	if !strings.Contains(err.Error(), "no embedded frontend assets") {
-		t.Fatalf("wrong error message: %v", err)
-	}
-}
-
-func TestNestedDirectoriesInEmbedded(t *testing.T) {
-	dir := t.TempDir()
-	// Create nested structure
-	if err := os.MkdirAll(filepath.Join(dir, "embedded", "assets"), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "embedded", "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "embedded", "assets", "style.css"), []byte("css"), 0o644); err != nil {
-		t.Fatalf("write css: %v", err)
-	}
-
-	originalFS, originalRoot := embeddedFS, embeddedRoot
-	embeddedFS, embeddedRoot = os.DirFS(dir), "embedded"
-	defer func() {
-		embeddedFS, embeddedRoot = originalFS, originalRoot
-	}()
-
-	r := router.NewRouter()
-	if err := RegisterEmbedded(r); err != nil {
-		t.Fatalf("register embedded: %v", err)
-	}
-
-	// Test nested asset
-	req := httptest.NewRequest(http.MethodGet, "/assets/style.css", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("nested asset failed: %d", rec.Code)
-	}
-	if !strings.Contains(rec.Body.String(), "css") {
-		t.Fatalf("nested asset content wrong: %q", rec.Body.String())
-	}
-}
-
 func TestMethodNotAllowed(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir); err != nil {
@@ -639,12 +525,8 @@ func TestMethodNotAllowed(t *testing.T) {
 
 func TestHeadMethod(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "asset.js"), []byte("asset"), 0o644); err != nil {
-		t.Fatalf("write asset: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "asset.js", "asset")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir); err != nil {
@@ -661,7 +543,6 @@ func TestHeadMethod(t *testing.T) {
 			if rec.Code != http.StatusOK {
 				t.Fatalf("HEAD %s: got status %d", path, rec.Code)
 			}
-			// HEAD should not have body
 			if rec.Body.Len() > 0 {
 				t.Fatalf("HEAD %s: unexpected body length %d", path, rec.Body.Len())
 			}
@@ -671,23 +552,20 @@ func TestHeadMethod(t *testing.T) {
 
 func TestPrefixNormalization(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "index")
 
 	tests := []struct {
 		input     string
-		expected  string
 		shouldErr bool
 	}{
-		{"/", "/", false},
-		{"/app", "/app", false},
-		{"/app/", "/app", false},
-		{"app", "/app", false},
-		{"app/", "/app", false},
-		{"/app/../", "", true}, // Path traversal
-		{"/app/./", "", true},  // Current directory
-		{"", "/", false},
+		{"/", false},
+		{"/app", false},
+		{"/app/", false},
+		{"app", false},
+		{"app/", false},
+		{"/app/../", true},
+		{"/app/./", true},
+		{"", false},
 	}
 
 	for _, tt := range tests {
@@ -710,24 +588,12 @@ func TestPrefixNormalization(t *testing.T) {
 
 func TestPrecompressedFiles(t *testing.T) {
 	dir := t.TempDir()
-
-	write := func(path, content string) {
-		full := filepath.Join(dir, path)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", path, err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", path, err)
-		}
-	}
-
-	// Create original file and compressed variants
-	write("index.html", "<html>index</html>")
-	write("app.js", "console.log('original')")
-	write("app.js.gz", "gzipped content")
-	write("app.js.br", "brotli content")
-	write("style.css", "body { color: red; }")
-	write("style.css.gz", "gzipped css")
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.js", "console.log('original')")
+	writeTestFile(t, dir, "app.js.gz", "gzipped content")
+	writeTestFile(t, dir, "app.js.br", "brotli content")
+	writeTestFile(t, dir, "style.css", "body { color: red; }")
+	writeTestFile(t, dir, "style.css.gz", "gzipped css")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir, WithPrecompressed(true)); err != nil {
@@ -817,20 +683,11 @@ func TestPrecompressedFiles(t *testing.T) {
 
 func TestPrecompressedDisabled(t *testing.T) {
 	dir := t.TempDir()
-
-	write := func(path, content string) {
-		full := filepath.Join(dir, path)
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", path, err)
-		}
-	}
-
-	write("index.html", "<html>index</html>")
-	write("app.js", "original")
-	write("app.js.gz", "gzipped")
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.js", "original")
+	writeTestFile(t, dir, "app.js.gz", "gzipped")
 
 	r := router.NewRouter()
-	// Precompressed disabled by default or explicitly set to false
 	if err := RegisterFromDir(r, dir, WithPrecompressed(false)); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -844,11 +701,9 @@ func TestPrecompressedDisabled(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: %d", rec.Code)
 	}
-
 	if rec.Body.String() != "original" {
 		t.Fatalf("should serve original file when precompressed disabled, got: %q", rec.Body.String())
 	}
-
 	if rec.Header().Get("Content-Encoding") != "" {
 		t.Fatalf("should not set Content-Encoding when precompressed disabled")
 	}
@@ -856,24 +711,13 @@ func TestPrecompressedDisabled(t *testing.T) {
 
 func TestCustomNotFoundPage(t *testing.T) {
 	dir := t.TempDir()
-
-	write := func(path, content string) {
-		full := filepath.Join(dir, path)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", path, err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", path, err)
-		}
-	}
-
-	write("index.html", "<html>home</html>")
-	write("404.html", "<html>Custom 404 Page</html>")
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
+	writeTestFile(t, dir, "404.html", "<html>Custom 404 Page</html>")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir,
 		WithNotFoundPage("404.html"),
-		WithFallback(false), // Disable fallback to test 404 page
+		WithFallback(false),
 	); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -906,18 +750,9 @@ func (f *errOnPathFS) Open(name string) (http.File, error) {
 // page is configured, the error page is served with the correct 500 status code.
 func TestCustomErrorPage(t *testing.T) {
 	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
+	writeTestFile(t, dir, "500.html", "<html>Server Error</html>")
 
-	write := func(p, content string) {
-		full := filepath.Join(dir, p)
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", p, err)
-		}
-	}
-
-	write("index.html", "<html>home</html>")
-	write("500.html", "<html>Server Error</html>")
-
-	// Wrap the real FS with one that returns a permission error for "bad-file".
 	fs := &errOnPathFS{base: http.Dir(dir), errPath: "bad-file"}
 
 	r := router.NewRouter()
@@ -938,13 +773,10 @@ func TestCustomErrorPage(t *testing.T) {
 }
 
 // TestCustomErrorPageFallback verifies that when the custom error page itself
-// is missing, serveError falls back to the plain http.Error response.
+// is missing, serveError falls back to a JSON error response.
 func TestCustomErrorPageFallback(t *testing.T) {
 	dir := t.TempDir()
-
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>home</html>"), 0o644); err != nil {
-		t.Fatalf("write index: %v", err)
-	}
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
 	// 500.html intentionally not created.
 
 	fs := &errOnPathFS{base: http.Dir(dir), errPath: "bad-file"}
@@ -961,9 +793,13 @@ func TestCustomErrorPageFallback(t *testing.T) {
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500 status, got: %d", rec.Code)
 	}
-	// Body should be the default http.Error message, not a custom page.
-	if strings.Contains(rec.Body.String(), "Server Error") {
-		t.Fatalf("should not serve missing error page, got: %q", rec.Body.String())
+	// Fallback is JSON; it must not contain HTML from the (missing) error page.
+	body := rec.Body.String()
+	if strings.Contains(body, "<html>") {
+		t.Fatalf("should not serve missing error page HTML, got: %q", body)
+	}
+	if !strings.Contains(body, `"error"`) {
+		t.Fatalf("expected JSON error response, got: %q", body)
 	}
 }
 
@@ -971,16 +807,8 @@ func TestCustomErrorPageFallback(t *testing.T) {
 // the correct 404 status code rather than 200 OK.
 func TestCustomNotFoundPageStatus(t *testing.T) {
 	dir := t.TempDir()
-
-	write := func(p, content string) {
-		full := filepath.Join(dir, p)
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", p, err)
-		}
-	}
-
-	write("index.html", "<html>home</html>")
-	write("404.html", "<html>Custom 404 Page</html>")
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
+	writeTestFile(t, dir, "404.html", "<html>Custom 404 Page</html>")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir,
@@ -1004,20 +832,9 @@ func TestCustomNotFoundPageStatus(t *testing.T) {
 
 func TestCustomMIMETypes(t *testing.T) {
 	dir := t.TempDir()
-
-	write := func(path, content string) {
-		full := filepath.Join(dir, path)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", path, err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", path, err)
-		}
-	}
-
-	write("index.html", "<html>index</html>")
-	write("app.wasm", "wasm binary content")
-	write("manifest.json", `{"name":"app"}`)
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.wasm", "wasm binary content")
+	writeTestFile(t, dir, "manifest.json", `{"name":"app"}`)
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir, WithMIMETypes(map[string]string{
@@ -1028,12 +845,11 @@ func TestCustomMIMETypes(t *testing.T) {
 	}
 
 	tests := []struct {
-		path          string
-		expectType    string
-		shouldContain bool
+		path       string
+		expectType string
 	}{
-		{"/app.wasm", "application/wasm", true},
-		{"/manifest.json", "application/json; charset=utf-8", true},
+		{"/app.wasm", "application/wasm"},
+		{"/manifest.json", "application/json; charset=utf-8"},
 	}
 
 	for _, tc := range tests {
@@ -1048,7 +864,7 @@ func TestCustomMIMETypes(t *testing.T) {
 			}
 
 			contentType := rec.Header().Get("Content-Type")
-			if tc.shouldContain && !strings.Contains(contentType, tc.expectType) {
+			if !strings.Contains(contentType, tc.expectType) {
 				t.Fatalf("Content-Type: got %q, expected to contain %q", contentType, tc.expectType)
 			}
 		})
@@ -1057,17 +873,9 @@ func TestCustomMIMETypes(t *testing.T) {
 
 func TestMIMETypesWithPrecompressed(t *testing.T) {
 	dir := t.TempDir()
-
-	write := func(path, content string) {
-		full := filepath.Join(dir, path)
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", path, err)
-		}
-	}
-
-	write("index.html", "<html>index</html>")
-	write("app.wasm", "wasm original")
-	write("app.wasm.br", "wasm compressed")
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.wasm", "wasm original")
+	writeTestFile(t, dir, "app.wasm.br", "wasm compressed")
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, dir,
@@ -1088,20 +896,44 @@ func TestMIMETypesWithPrecompressed(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: %d", rec.Code)
 	}
-
-	// Should serve compressed version
 	if !strings.Contains(rec.Body.String(), "wasm compressed") {
 		t.Fatalf("should serve compressed version")
 	}
-
-	// Should still set correct MIME type for original file
 	contentType := rec.Header().Get("Content-Type")
 	if !strings.Contains(contentType, "application/wasm") {
 		t.Fatalf("Content-Type should be set for original file type, got: %q", contentType)
 	}
-
-	// Should have Content-Encoding header
 	if rec.Header().Get("Content-Encoding") != "br" {
 		t.Fatalf("should set Content-Encoding")
+	}
+}
+
+// TestAcceptsToken verifies the token-level Accept-Encoding parser.
+func TestAcceptsToken(t *testing.T) {
+	tests := []struct {
+		header string
+		token  string
+		want   bool
+	}{
+		{"br, gzip, deflate", "br", true},
+		{"gzip, deflate", "br", false},
+		{"gzip, deflate", "gzip", true},
+		{"GZIP", "gzip", true},               // case-insensitive
+		{"gzip;q=0.9, br;q=1.0", "br", true}, // quality factors ignored
+		{"", "gzip", false},                  // empty header
+		{"brotli", "br", false},              // no substring matching
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.header+"/"+tt.token, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tt.header != "" {
+				req.Header.Set("Accept-Encoding", tt.header)
+			}
+			got := acceptsToken(req, tt.token)
+			if got != tt.want {
+				t.Fatalf("acceptsToken(%q, %q) = %v, want %v", tt.header, tt.token, got, tt.want)
+			}
+		})
 	}
 }

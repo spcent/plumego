@@ -15,47 +15,36 @@ import (
 //go:embed embedded/*
 var embedded embed.FS
 
-// embeddedFS allows tests to swap the source filesystem.
-var embeddedFS fs.FS = embedded
-
-// embeddedRoot is the directory that holds the embedded assets.
-var embeddedRoot = "embedded"
-
-// HasEmbedded reports whether any embedded frontend assets are available.
-func HasEmbedded() bool {
-	_, err := embeddedSub()
-	return err == nil
-}
-
-// RegisterEmbedded mounts an embedded frontend bundle if present.
+// RegisterEmbedded mounts the embedded frontend bundle.
+// Returns an error if no embedded frontend assets are found.
 func RegisterEmbedded(r *router.Router, opts ...Option) error {
 	f, err := embeddedSub()
 	if err != nil {
 		return err
 	}
-
 	return RegisterFS(r, http.FS(f), opts...)
 }
 
 // embeddedSub returns the embedded filesystem subdirectory containing frontend assets.
-// It returns an error if no assets are found or if the embedded directory is inaccessible.
+// Returns an error if no assets are found or if the embedded directory is inaccessible.
 func embeddedSub() (fs.FS, error) {
-	// Check if embedded directory exists and has content
-	entries, err := fs.ReadDir(embeddedFS, embeddedRoot)
+	const root = "embedded"
+
+	entries, err := fs.ReadDir(embedded, root)
 	if err != nil {
-		return nil, fmt.Errorf("embedded frontend directory %q not found: %w", embeddedRoot, err)
+		return nil, fmt.Errorf("embedded frontend directory %q not found: %w", root, err)
 	}
 
-	// Check for non-hidden files (excluding .keep and other dotfiles)
+	// Consider the directory non-empty only when it contains real files (not .keep)
+	// or non-empty subdirectories.
 	hasContent := false
 	for _, entry := range entries {
 		if !entry.IsDir() && entry.Name() != ".keep" {
 			hasContent = true
 			break
 		}
-		// Also check for subdirectories that might contain assets
 		if entry.IsDir() {
-			subEntries, err := fs.ReadDir(embeddedFS, embeddedRoot+"/"+entry.Name())
+			subEntries, err := fs.ReadDir(embedded, root+"/"+entry.Name())
 			if err == nil && len(subEntries) > 0 {
 				hasContent = true
 				break
@@ -67,11 +56,9 @@ func embeddedSub() (fs.FS, error) {
 		return nil, errors.New("no embedded frontend assets found (embedded/ directory is empty)")
 	}
 
-	// Return the embedded subdirectory
-	subFS, err := fs.Sub(embeddedFS, embeddedRoot)
+	subFS, err := fs.Sub(embedded, root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get embedded subdirectory: %w", err)
 	}
-
 	return subFS, nil
 }
