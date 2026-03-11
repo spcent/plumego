@@ -378,7 +378,7 @@ func parseCommandLine(input string) (string, []string, error) {
 	return args[0], args[1:], nil
 }
 
-func startDevEventForwarder(ctx context.Context, out *output.Formatter, ps *pubsub.InProcPubSub) (func(), error) {
+func startDevEventForwarder(ctx context.Context, out *output.Formatter, ps *pubsub.InProcBroker) (func(), error) {
 	patterns := []string{"app.*", "build.*"}
 	opts := pubsub.DefaultSubOptions()
 	subs := make([]pubsub.Subscription, 0, len(patterns))

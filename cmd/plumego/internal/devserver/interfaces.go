@@ -24,7 +24,7 @@ type DashboardAPI interface {
 	BuildAndRun(ctx context.Context) error
 	Rebuild(ctx context.Context) error
 	PublishEvent(eventType string, data any)
-	GetPubSub() *pubsub.InProcPubSub
+	GetPubSub() *pubsub.InProcBroker
 	GetBuilder() BuilderAPI
 	GetRunner() RunnerAPI
 }

@@ -7,11 +7,28 @@ import (
 	"time"
 )
 
+// publishWithTTL is a local test helper that sets TTL metadata and publishes.
+func publishWithTTL(b *InProcBroker, tm *ttlManager, topic string, msg Message, ttl time.Duration) error {
+	if msg.ID == "" {
+		msg.ID = generateCorrelationID()
+	}
+	if msg.Meta == nil {
+		msg.Meta = make(map[string]string)
+	}
+	msg.Meta["X-Message-TTL"] = ttl.String()
+	msg.Meta["X-Message-ExpiresAt"] = time.Now().Add(ttl).UTC().Format(time.RFC3339Nano)
+	tm.Track(topic, msg.ID, ttl)
+	return b.Publish(topic, msg)
+}
+
 // --- messageScheduler integration tests ---
 
 func TestPublishDelayed_Basic(t *testing.T) {
-	ps := New(WithScheduler())
+	ps := New()
 	defer ps.Close()
+
+	sched := newMessageScheduler(ps)
+	defer sched.Close()
 
 	sub, err := ps.Subscribe("delayed.topic", DefaultSubOptions())
 	if err != nil {
@@ -20,22 +37,17 @@ func TestPublishDelayed_Basic(t *testing.T) {
 	defer sub.Cancel()
 
 	msg := Message{ID: "d-1", Data: "delayed-hello"}
-	id, err := ps.PublishDelayed("delayed.topic", msg, 50*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
-	}
+	id := sched.Schedule("delayed.topic", msg, 50*time.Millisecond)
 	if id == 0 {
 		t.Fatal("expected non-zero schedule ID")
 	}
 
-	// Message should not be delivered immediately
 	select {
 	case <-sub.C():
 		t.Fatal("message delivered too early")
 	case <-time.After(10 * time.Millisecond):
 	}
 
-	// Wait for delivery
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	select {
@@ -52,8 +64,11 @@ func TestPublishDelayed_Basic(t *testing.T) {
 }
 
 func TestPublishAt_Basic(t *testing.T) {
-	ps := New(WithScheduler())
+	ps := New()
 	defer ps.Close()
+
+	sched := newMessageScheduler(ps)
+	defer sched.Close()
 
 	sub, err := ps.Subscribe("at.topic", DefaultSubOptions())
 	if err != nil {
@@ -63,10 +78,7 @@ func TestPublishAt_Basic(t *testing.T) {
 
 	at := time.Now().Add(50 * time.Millisecond)
 	msg := Message{ID: "a-1", Data: "at-hello"}
-	id, err := ps.PublishAt("at.topic", msg, at)
-	if err != nil {
-		t.Fatal(err)
-	}
+	id := sched.ScheduleAt("at.topic", msg, at)
 	if id == 0 {
 		t.Fatal("expected non-zero schedule ID")
 	}
@@ -83,49 +95,12 @@ func TestPublishAt_Basic(t *testing.T) {
 	}
 }
 
-func TestPublishDelayed_DisabledScheduler(t *testing.T) {
-	ps := New() // No WithScheduler()
-	defer ps.Close()
-
-	_, err := ps.PublishDelayed("topic", Message{}, time.Second)
-	if err != ErrSchedulerDisabled {
-		t.Fatalf("expected ErrSchedulerDisabled, got %v", err)
-	}
-
-	_, err = ps.PublishAt("topic", Message{}, time.Now().Add(time.Second))
-	if err != ErrSchedulerDisabled {
-		t.Fatalf("expected ErrSchedulerDisabled, got %v", err)
-	}
-}
-
-func TestPublishDelayed_ClosedPubSub(t *testing.T) {
-	ps := New(WithScheduler())
-	ps.Close()
-
-	_, err := ps.PublishDelayed("topic", Message{}, time.Second)
-	if err != ErrPublishToClosed {
-		t.Fatalf("expected ErrPublishToClosed, got %v", err)
-	}
-}
-
-func TestPublishDelayed_InvalidTopic(t *testing.T) {
-	ps := New(WithScheduler())
-	defer ps.Close()
-
-	_, err := ps.PublishDelayed("", Message{}, time.Second)
-	if err != ErrInvalidTopic {
-		t.Fatalf("expected ErrInvalidTopic, got %v", err)
-	}
-
-	_, err = ps.PublishAt("  ", Message{}, time.Now())
-	if err != ErrInvalidTopic {
-		t.Fatalf("expected ErrInvalidTopic, got %v", err)
-	}
-}
-
 func TestCancelScheduled(t *testing.T) {
-	ps := New(WithScheduler())
+	ps := New()
 	defer ps.Close()
+
+	sched := newMessageScheduler(ps)
+	defer sched.Close()
 
 	sub, err := ps.Subscribe("cancel.topic", DefaultSubOptions())
 	if err != nil {
@@ -134,64 +109,50 @@ func TestCancelScheduled(t *testing.T) {
 	defer sub.Cancel()
 
 	msg := Message{ID: "c-1", Data: "cancel-me"}
-	id, err := ps.PublishDelayed("cancel.topic", msg, 100*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
+	id := sched.Schedule("cancel.topic", msg, 100*time.Millisecond)
+
+	if sched.PendingCount() != 1 {
+		t.Fatalf("expected 1 scheduled, got %d", sched.PendingCount())
 	}
 
-	if ps.ScheduledCount() != 1 {
-		t.Fatalf("expected 1 scheduled, got %d", ps.ScheduledCount())
-	}
-
-	ok := ps.CancelScheduled(id)
+	ok := sched.Cancel(id)
 	if !ok {
 		t.Fatal("expected cancel to succeed")
 	}
 
-	if ps.ScheduledCount() != 0 {
-		t.Fatalf("expected 0 scheduled after cancel, got %d", ps.ScheduledCount())
+	if sched.PendingCount() != 0 {
+		t.Fatalf("expected 0 scheduled after cancel, got %d", sched.PendingCount())
 	}
 
-	// Message should not be delivered
 	select {
 	case <-sub.C():
 		t.Fatal("cancelled message was delivered")
 	case <-time.After(200 * time.Millisecond):
-		// Expected
-	}
-}
-
-func TestCancelScheduled_DisabledScheduler(t *testing.T) {
-	ps := New()
-	defer ps.Close()
-
-	if ps.CancelScheduled(1) {
-		t.Fatal("expected false when scheduler disabled")
-	}
-	if ps.ScheduledCount() != 0 {
-		t.Fatalf("expected 0, got %d", ps.ScheduledCount())
 	}
 }
 
 func TestScheduledCount(t *testing.T) {
-	ps := New(WithScheduler())
+	ps := New()
 	defer ps.Close()
 
+	sched := newMessageScheduler(ps)
+	defer sched.Close()
+
 	for i := 0; i < 5; i++ {
-		_, err := ps.PublishDelayed("count.topic", Message{Data: i}, time.Hour)
-		if err != nil {
-			t.Fatal(err)
-		}
+		sched.Schedule("count.topic", Message{Data: i}, time.Hour)
 	}
 
-	if ps.ScheduledCount() != 5 {
-		t.Fatalf("expected 5 scheduled, got %d", ps.ScheduledCount())
+	if sched.PendingCount() != 5 {
+		t.Fatalf("expected 5 scheduled, got %d", sched.PendingCount())
 	}
 }
 
 func TestPublishDelayed_MultipleMessages(t *testing.T) {
-	ps := New(WithScheduler())
+	ps := New()
 	defer ps.Close()
+
+	sched := newMessageScheduler(ps)
+	defer sched.Close()
 
 	sub, err := ps.Subscribe("multi.topic", DefaultSubOptions())
 	if err != nil {
@@ -199,20 +160,12 @@ func TestPublishDelayed_MultipleMessages(t *testing.T) {
 	}
 	defer sub.Cancel()
 
-	// Schedule messages in reverse order: second message should arrive first
-	_, err = ps.PublishDelayed("multi.topic", Message{ID: "m-2", Data: "second"}, 100*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = ps.PublishDelayed("multi.topic", Message{ID: "m-1", Data: "first"}, 30*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sched.Schedule("multi.topic", Message{ID: "m-2", Data: "second"}, 100*time.Millisecond)
+	sched.Schedule("multi.topic", Message{ID: "m-1", Data: "first"}, 30*time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	// First delivered should be "first" (shorter delay)
 	select {
 	case received := <-sub.C():
 		if received.Data != "first" {
@@ -222,7 +175,6 @@ func TestPublishDelayed_MultipleMessages(t *testing.T) {
 		t.Fatal("timeout waiting for first message")
 	}
 
-	// Second delivered should be "second" (longer delay)
 	select {
 	case received := <-sub.C():
 		if received.Data != "second" {
@@ -234,8 +186,11 @@ func TestPublishDelayed_MultipleMessages(t *testing.T) {
 }
 
 func TestPublishAt_PastTime(t *testing.T) {
-	ps := New(WithScheduler())
+	ps := New()
 	defer ps.Close()
+
+	sched := newMessageScheduler(ps)
+	defer sched.Close()
 
 	sub, err := ps.Subscribe("past.topic", DefaultSubOptions())
 	if err != nil {
@@ -243,12 +198,8 @@ func TestPublishAt_PastTime(t *testing.T) {
 	}
 	defer sub.Cancel()
 
-	// Schedule for the past — should be delivered immediately
 	past := time.Now().Add(-time.Hour)
-	_, err = ps.PublishAt("past.topic", Message{ID: "p-1", Data: "past"}, past)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sched.ScheduleAt("past.topic", Message{ID: "p-1", Data: "past"}, past)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -265,8 +216,11 @@ func TestPublishAt_PastTime(t *testing.T) {
 // --- ttlManager integration tests ---
 
 func TestPublishWithTTL_Basic(t *testing.T) {
-	ps := New(WithTTL())
+	ps := New()
 	defer ps.Close()
+
+	tm := newTTLManager(ps, time.Minute)
+	defer tm.Close()
 
 	sub, err := ps.Subscribe("ttl.topic", DefaultSubOptions())
 	if err != nil {
@@ -274,9 +228,7 @@ func TestPublishWithTTL_Basic(t *testing.T) {
 	}
 	defer sub.Cancel()
 
-	msg := Message{Data: "ttl-hello"}
-	err = ps.PublishWithTTL("ttl.topic", msg, 5*time.Second)
-	if err != nil {
+	if err := publishWithTTL(ps, tm, "ttl.topic", Message{Data: "ttl-hello"}, 5*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
@@ -287,7 +239,6 @@ func TestPublishWithTTL_Basic(t *testing.T) {
 		if received.Data != "ttl-hello" {
 			t.Fatalf("expected 'ttl-hello', got %v", received.Data)
 		}
-		// Verify TTL metadata
 		if received.Meta["X-Message-TTL"] != "5s" {
 			t.Fatalf("expected TTL metadata '5s', got %q", received.Meta["X-Message-TTL"])
 		}
@@ -302,123 +253,20 @@ func TestPublishWithTTL_Basic(t *testing.T) {
 	}
 }
 
-func TestPublishWithTTL_DisabledTTL(t *testing.T) {
-	ps := New() // No WithTTL()
-	defer ps.Close()
-
-	err := ps.PublishWithTTL("topic", Message{}, time.Second)
-	if err != ErrTTLDisabled {
-		t.Fatalf("expected ErrTTLDisabled, got %v", err)
-	}
-}
-
-func TestPublishWithTTL_ClosedPubSub(t *testing.T) {
-	ps := New(WithTTL())
-	ps.Close()
-
-	err := ps.PublishWithTTL("topic", Message{}, time.Second)
-	if err != ErrPublishToClosed {
-		t.Fatalf("expected ErrPublishToClosed, got %v", err)
-	}
-}
-
-func TestPublishWithTTL_InvalidTopic(t *testing.T) {
-	ps := New(WithTTL())
-	defer ps.Close()
-
-	err := ps.PublishWithTTL("", Message{}, time.Second)
-	if err != ErrInvalidTopic {
-		t.Fatalf("expected ErrInvalidTopic, got %v", err)
-	}
-}
-
-func TestPublishWithTTL_ExpiredSkipped(t *testing.T) {
-	ps := New(WithScheduler(), WithTTL())
-	defer ps.Close()
-
-	sub, err := ps.Subscribe("expire.topic", DefaultSubOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Cancel()
-
-	// Publish a message with TTL metadata set to already be expired,
-	// then schedule it for delayed delivery. The expired message should
-	// be skipped during delivery.
-	msg := Message{ID: "exp-1", Data: "should-expire"}
-	msg.Meta = map[string]string{
-		"X-Message-TTL":       (50 * time.Millisecond).String(),
-		"X-Message-ExpiresAt": time.Now().Add(50 * time.Millisecond).UTC().Format(time.RFC3339Nano),
-	}
-
-	// Schedule for delivery well after TTL expires
-	_, err = ps.PublishDelayed("expire.topic", msg, 200*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Wait long enough for the scheduled delivery attempt
-	select {
-	case <-sub.C():
-		t.Fatal("expired message should not have been delivered")
-	case <-time.After(400 * time.Millisecond):
-		// Expected: message expired before delivery
-	}
-}
-
-func TestGetTTLStats(t *testing.T) {
-	ps := New(WithTTL())
-	defer ps.Close()
-
-	stats := ps.GetTTLStats()
-	if stats.TrackedTopics != 0 || stats.TrackedMessages != 0 {
-		t.Fatalf("expected empty stats, got %+v", stats)
-	}
-
-	if err := ps.PublishWithTTL("topic-a", Message{Data: "a"}, time.Hour); err != nil {
-		t.Fatal(err)
-	}
-	if err := ps.PublishWithTTL("topic-a", Message{Data: "b"}, time.Hour); err != nil {
-		t.Fatal(err)
-	}
-	if err := ps.PublishWithTTL("topic-b", Message{Data: "c"}, time.Hour); err != nil {
-		t.Fatal(err)
-	}
-
-	stats = ps.GetTTLStats()
-	if stats.TrackedTopics != 2 {
-		t.Fatalf("expected 2 tracked topics, got %d", stats.TrackedTopics)
-	}
-	if stats.TrackedMessages != 3 {
-		t.Fatalf("expected 3 tracked messages, got %d", stats.TrackedMessages)
-	}
-}
-
-func TestGetTTLStats_DisabledTTL(t *testing.T) {
+func TestPublishWithTTL_AutoGeneratesID(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	stats := ps.GetTTLStats()
-	if stats.TrackedTopics != 0 || stats.TrackedMessages != 0 {
-		t.Fatalf("expected zero stats when TTL disabled, got %+v", stats)
-	}
-}
+	tm := newTTLManager(ps, time.Minute)
+	defer tm.Close()
 
-// --- Combined scheduler + TTL tests ---
-
-func TestSchedulerAndTTL_Combined(t *testing.T) {
-	ps := New(WithScheduler(), WithTTL())
-	defer ps.Close()
-
-	sub, err := ps.Subscribe("combo.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe("autoid.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer sub.Cancel()
 
-	// Publish with TTL and verify delivery
-	err = ps.PublishWithTTL("combo.topic", Message{Data: "combo-msg"}, 5*time.Second)
-	if err != nil {
+	if err := publishWithTTL(ps, tm, "autoid.topic", Message{Data: "no-id"}, time.Hour); err != nil {
 		t.Fatal(err)
 	}
 
@@ -426,59 +274,11 @@ func TestSchedulerAndTTL_Combined(t *testing.T) {
 	defer cancel()
 	select {
 	case received := <-sub.C():
-		if received.Data != "combo-msg" {
-			t.Fatalf("expected 'combo-msg', got %v", received.Data)
+		if received.ID == "" {
+			t.Fatal("expected auto-generated ID")
 		}
 	case <-ctx.Done():
-		t.Fatal("timeout waiting for combo message")
-	}
-
-	// Delayed publish and verify delivery
-	_, err = ps.PublishDelayed("combo.topic", Message{Data: "delayed-combo"}, 50*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Second)
-	defer cancel2()
-	select {
-	case received := <-sub.C():
-		if received.Data != "delayed-combo" {
-			t.Fatalf("expected 'delayed-combo', got %v", received.Data)
-		}
-	case <-ctx2.Done():
-		t.Fatal("timeout waiting for delayed combo message")
-	}
-}
-
-func TestPublishDelayed_SetsMessageFields(t *testing.T) {
-	ps := New(WithScheduler())
-	defer ps.Close()
-
-	sub, err := ps.Subscribe("fields.topic", DefaultSubOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Cancel()
-
-	msg := Message{Data: "check-fields"}
-	_, err = ps.PublishDelayed("fields.topic", msg, 10*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	select {
-	case received := <-sub.C():
-		if received.Topic != "fields.topic" {
-			t.Fatalf("expected topic 'fields.topic', got %q", received.Topic)
-		}
-		if received.Time.IsZero() {
-			t.Fatal("expected Time to be set")
-		}
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for message")
+		t.Fatal("timeout")
 	}
 }
 
@@ -532,8 +332,6 @@ func TestMessageScheduler_Cancel(t *testing.T) {
 	if sched.PendingCount() != 0 {
 		t.Fatalf("expected 0 pending, got %d", sched.PendingCount())
 	}
-
-	// Cancel again should return false
 	if sched.Cancel(id) {
 		t.Fatal("expected second cancel to return false")
 	}
@@ -558,7 +356,6 @@ func TestTTLManager_TrackAndExpire(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	// Use a long cleanup interval so entries aren't removed before IsExpired check
 	tm := newTTLManager(ps, time.Minute)
 	defer tm.Close()
 
@@ -582,7 +379,6 @@ func TestTTLManager_NotTracked(t *testing.T) {
 	tm := newTTLManager(ps, time.Minute)
 	defer tm.Close()
 
-	// Non-tracked messages should not be considered expired
 	if tm.IsExpired("topic", "unknown") {
 		t.Fatal("non-tracked message should not be expired")
 	}
@@ -618,7 +414,6 @@ func TestTTLManager_Cleanup(t *testing.T) {
 	tm.Track("topic", "m1", 30*time.Millisecond)
 	tm.Track("topic", "m2", time.Hour)
 
-	// Wait for cleanup to run
 	time.Sleep(120 * time.Millisecond)
 
 	stats := tm.Stats()
@@ -634,7 +429,6 @@ func TestTTLManager_ClosedManager(t *testing.T) {
 	tm := newTTLManager(ps, time.Minute)
 	tm.Close()
 
-	// Track should be no-op when closed
 	tm.Track("topic", "msg", time.Hour)
 
 	stats := tm.Stats()
@@ -643,53 +437,24 @@ func TestTTLManager_ClosedManager(t *testing.T) {
 	}
 }
 
-func TestPublishWithTTL_AutoGeneratesID(t *testing.T) {
-	ps := New(WithTTL())
-	defer ps.Close()
-
-	sub, err := ps.Subscribe("autoid.topic", DefaultSubOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Cancel()
-
-	// Publish without ID — should auto-generate
-	err = ps.PublishWithTTL("autoid.topic", Message{Data: "no-id"}, time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	select {
-	case received := <-sub.C():
-		if received.ID == "" {
-			t.Fatal("expected auto-generated ID")
-		}
-	case <-ctx.Done():
-		t.Fatal("timeout")
-	}
-}
-
 func TestScheduler_ConcurrentScheduleCancel(t *testing.T) {
-	ps := New(WithScheduler())
+	ps := New()
 	defer ps.Close()
+
+	sched := newMessageScheduler(ps)
+	defer sched.Close()
 
 	var ids atomic.Int64
 	done := make(chan struct{})
 
-	// Concurrently schedule and cancel
 	go func() {
 		defer close(done)
 		for i := 0; i < 100; i++ {
-			id, err := ps.PublishDelayed("conc.topic", Message{Data: i}, time.Hour)
-			if err != nil {
-				return
-			}
+			id := sched.Schedule("conc.topic", Message{Data: i}, time.Hour)
 			if id > 0 {
 				ids.Add(1)
 			}
-			ps.CancelScheduled(id)
+			sched.Cancel(id)
 		}
 	}()
 

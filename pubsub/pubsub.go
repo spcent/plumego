@@ -43,7 +43,7 @@ type subscriber struct {
 	dropped  atomic.Uint64
 
 	// back-reference to parent
-	ps *InProcPubSub
+	ps *InProcBroker
 
 	// context cancellation
 	cancel context.CancelFunc
@@ -92,8 +92,6 @@ func (s *subscriber) Cancel() {
 		s.mu.Lock()
 		s.closed.Store(true)
 		if s.ringBuf != nil {
-			// For ring buffer subscribers, close the ring buffer.
-			// The pump goroutine will close s.ch when it exits.
 			s.ringBuf.Close()
 		} else {
 			close(s.ch)
@@ -109,25 +107,18 @@ func (s *subscriber) Cancel() {
 			<-s.pumpDone
 		}
 
-		// Call hook before removing
-		if s.ps.config.Hooks.OnUnsubscribe != nil {
-			s.ps.config.Hooks.OnUnsubscribe(s.topic, s.id)
-		}
-
+		s.ps.notifyUnsubscribe(s.topic, s.id)
 		s.ps.removeSubscriber(s.topic, s.id, s.kind)
 	})
 }
 
 // pumpRingBuffer moves messages from the ring buffer to the output channel.
-// It runs as a background goroutine for ring buffer–based subscribers.
-// Termination is driven exclusively by s.done and ringBuf.Notify() closure,
-// avoiding the redundant s.closed.Load() poll in the inner drain loop.
+// Termination is driven exclusively by s.done and ringBuf.Notify() closure.
 func (s *subscriber) pumpRingBuffer() {
 	defer close(s.ch)
 	defer close(s.pumpDone)
 
 	for {
-		// Drain all available messages from ring buffer.
 		for {
 			msg, ok := s.ringBuf.Pop()
 			if !ok {
@@ -140,11 +131,10 @@ func (s *subscriber) pumpRingBuffer() {
 			}
 		}
 
-		// Wait for new messages or closure.
 		select {
 		case _, ok := <-s.ringBuf.Notify():
 			if !ok {
-				return // ring buffer closed by Cancel()
+				return
 			}
 		case <-s.done:
 			return
@@ -152,42 +142,28 @@ func (s *subscriber) pumpRingBuffer() {
 	}
 }
 
-// InProcPubSub is an in-memory pubsub implementation.
+// InProcBroker is the in-memory Broker implementation.
 //
-// This is a lightweight, in-process publish/subscribe system designed for:
-//   - Event-driven architectures
-//   - WebSocket fan-out scenarios
-//   - Internal service communication
-//   - Webhook event distribution
+// It implements Broker, PatternSubscriber, MQTTSubscriber, BatchPublisher,
+// and Drainable. Callers should declare variables using the narrowest
+// interface they depend on.
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/pubsub"
-//
-//	// Create a pubsub instance with options
-//	ps := pubsub.New(
+//	b := pubsub.New(
 //		pubsub.WithShardCount(32),
-//		pubsub.WithDefaultBufferSize(64),
 //		pubsub.WithWorkerPoolSize(512),
 //	)
-//	defer ps.Close()
+//	defer b.Close()
 //
-//	// Subscribe to a topic
-//	sub, err := ps.Subscribe("user.created", pubsub.SubOptions{
-//		BufferSize: 16,
-//		Policy:     pubsub.DropOldest,
-//	})
+//	sub, err := b.Subscribe("user.created", pubsub.DefaultSubOptions())
 //	if err != nil {
-//		// Handle error
+//		// handle
 //	}
 //	defer sub.Cancel()
 //
-//	// Publish a message
-//	msg := pubsub.Message{
-//		Data: map[string]any{"user_id": "123", "email": "user@example.com"},
-//	}
-//	err = ps.Publish("user.created", msg)
-type InProcPubSub struct {
+//	err = b.Publish("user.created", pubsub.Message{Data: "hello"})
+type InProcBroker struct {
 	shards *shardedMap
 	config Config
 
@@ -200,128 +176,76 @@ type InProcPubSub struct {
 	// draining state
 	draining atomic.Bool
 	drainWg  sync.WaitGroup
-
-	// message scheduler for delayed delivery
-	scheduler *messageScheduler
-
-	// TTL manager for message expiration
-	ttlMgr *ttlManager
-
-	// topic history for message retention
-	history *topicHistory
-
-	// request-reply manager for efficient RPC-style communication
-	requestMgr *requestManager
 }
 
-// New creates a new InProcPubSub instance.
+// Compile-time interface assertions.
+var (
+	_ Broker            = (*InProcBroker)(nil)
+	_ PatternSubscriber = (*InProcBroker)(nil)
+	_ MQTTSubscriber    = (*InProcBroker)(nil)
+	_ BatchPublisher    = (*InProcBroker)(nil)
+	_ Drainable         = (*InProcBroker)(nil)
+)
+
+// New creates a new InProcBroker with the given options.
+//
+// Capability features (history, scheduling, request-reply, etc.) are provided
+// by wrapping the returned broker with sub-package constructors — not by
+// passing Enable* flags here.
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/pubsub"
-//
-//	// Simple creation
-//	ps := pubsub.New()
-//	defer ps.Close()
-//
-//	// With options
-//	ps := pubsub.New(
+//	b := pubsub.New(
 //		pubsub.WithShardCount(32),
 //		pubsub.WithDefaultBufferSize(64),
 //		pubsub.WithWorkerPoolSize(512),
-//		pubsub.WithMetricsCollector(collector),
 //	)
-func New(opts ...Option) *InProcPubSub {
+//	defer b.Close()
+func New(opts ...Option) *InProcBroker {
 	config := DefaultConfig()
 	for _, opt := range opts {
 		opt(&config)
 	}
 
-	ps := &InProcPubSub{
+	b := &InProcBroker{
 		shards:     newShardedMap(config.ShardCount),
 		config:     config,
 		workerPool: newWorkerPool(config.WorkerPoolSize),
 	}
-	ps.nextID.Store(0)
+	b.nextID.Store(0)
 
-	if config.EnableScheduler {
-		ps.scheduler = newMessageScheduler(ps)
-	}
-
-	if config.EnableTTL {
-		ps.ttlMgr = newTTLManager(ps, config.TTLCleanupInterval)
-	}
-
-	if config.EnableHistory {
-		ps.history = newTopicHistory(config.HistoryConfig)
-	}
-
-	if config.EnableRequestReply {
-		rm, err := newRequestManager(ps)
-		if err == nil {
-			ps.requestMgr = rm
-		}
-	}
-
-	return ps
+	return b
 }
 
-// Close shuts down the pubsub system.
-//
-// This method:
-//   - Marks the pubsub as closed
-//   - Cancels all active subscriptions
-//   - Waits for all async operations to complete
-//   - Cleans up all resources
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/pubsub"
-//
-//	ps := pubsub.New()
-//	// ... use pubsub ...
-//	ps.Close()
-func (ps *InProcPubSub) Close() error {
-	if ps.closed.Swap(true) {
+// Close shuts down the broker and cancels all active subscriptions.
+func (b *InProcBroker) Close() error {
+	if b.closed.Swap(true) {
 		return nil
 	}
 
-	// Stop request manager, scheduler and TTL manager before closing subscriptions
-	if ps.requestMgr != nil {
-		ps.requestMgr.Close()
-	}
-	if ps.scheduler != nil {
-		ps.scheduler.Close()
-	}
-	if ps.ttlMgr != nil {
-		ps.ttlMgr.Close()
-	}
+	// Wait for pending async operations
+	b.workerPool.Close()
 
-	// Wait for pending operations
-	ps.workerPool.Close()
-
-	// Collect and cancel all subscribers
-	all := ps.shards.collectAllSubscribers()
-	for _, s := range all {
+	// Cancel all subscribers
+	for _, s := range b.shards.collectAllSubscribers() {
 		s.Cancel()
 	}
 
 	return nil
 }
 
-// Drain waits for all pending messages to be delivered or until the context is cancelled.
-func (ps *InProcPubSub) Drain(ctx context.Context) error {
-	if ps.closed.Load() {
-		return ErrClosed
+// Drain blocks until all in-flight messages are delivered or ctx is cancelled.
+func (b *InProcBroker) Drain(ctx context.Context) error {
+	if b.closed.Load() {
+		return newErr(ErrCodeClosed, "drain", "", "broker is closed", nil)
 	}
 
-	ps.draining.Store(true)
-	defer ps.draining.Store(false)
+	b.draining.Store(true)
+	defer b.draining.Store(false)
 
-	// Wait for all in-flight operations via WaitGroup instead of polling.
 	done := make(chan struct{})
 	go func() {
-		ps.drainWg.Wait()
+		b.drainWg.Wait()
 		close(done)
 	}()
 
@@ -333,111 +257,41 @@ func (ps *InProcPubSub) Drain(ctx context.Context) error {
 	}
 }
 
-// Subscribe creates a new subscription to a topic.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/pubsub"
-//
-//	ps := pubsub.New()
-//	defer ps.Close()
-//
-//	sub, err := ps.Subscribe("user.created", pubsub.SubOptions{
-//		BufferSize: 16,
-//		Policy:     pubsub.DropOldest,
-//	})
-//	if err != nil {
-//		// Handle error
-//	}
-//	defer sub.Cancel()
-//
-//	// Receive messages
-//	for msg := range sub.C() {
-//		// Process message
-//		fmt.Printf("Received: %v\n", msg.Data)
-//	}
-func (ps *InProcPubSub) Subscribe(topic string, opts SubOptions) (Subscription, error) {
-	return ps.subscribeInternal(context.Background(), topic, opts, false)
+// Subscribe creates a new subscription to an exact topic.
+func (b *InProcBroker) Subscribe(topic string, opts SubOptions) (Subscription, error) {
+	return b.subscribeInternal(context.Background(), topic, opts, false)
 }
 
-// SubscribeWithContext creates a subscription that is cancelled when the context is done.
-func (ps *InProcPubSub) SubscribeWithContext(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
-	return ps.subscribeInternal(ctx, topic, opts, false)
+// SubscribeWithContext creates a subscription cancelled when ctx is done.
+func (b *InProcBroker) SubscribeWithContext(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
+	return b.subscribeInternal(ctx, topic, opts, false)
 }
 
-// SubscribePattern creates a new subscription to a topic pattern.
-//
-// Pattern matching uses filepath.Match syntax with topic names as literal strings.
-// The pattern is matched against the entire topic name character-by-character.
-//
-// Supported wildcards:
-//   - "*" matches zero or more characters (including '.')
-//   - "?" matches exactly one character (including '.')
-//   - "[...]" matches any single character in the bracket expression
-//   - "[^...]" matches any single character NOT in the bracket expression
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/pubsub"
-//
-//	ps := pubsub.New()
-//	defer ps.Close()
-//
-//	// Subscribe to all user events
-//	sub, err := ps.SubscribePattern("user.*", pubsub.SubOptions{
-//		BufferSize: 16,
-//		Policy:     pubsub.DropOldest,
-//	})
-func (ps *InProcPubSub) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
-	return ps.subscribeInternal(context.Background(), pattern, opts, true)
+// SubscribePattern creates a subscription matching a glob pattern.
+func (b *InProcBroker) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
+	return b.subscribeInternal(context.Background(), pattern, opts, true)
 }
 
-// SubscribePatternWithContext creates a pattern subscription that is cancelled when the context is done.
-func (ps *InProcPubSub) SubscribePatternWithContext(ctx context.Context, pattern string, opts SubOptions) (Subscription, error) {
-	return ps.subscribeInternal(ctx, pattern, opts, true)
+// SubscribePatternWithContext creates a pattern subscription cancelled when ctx is done.
+func (b *InProcBroker) SubscribePatternWithContext(ctx context.Context, pattern string, opts SubOptions) (Subscription, error) {
+	return b.subscribeInternal(ctx, pattern, opts, true)
 }
 
-// SubscribeMQTT creates a new subscription using MQTT-style topic patterns.
-//
-// MQTT pattern rules:
-//   - "/" is the level separator
-//   - "+" matches exactly one level (e.g., "a/+/c" matches "a/b/c" but not "a/b/d/c")
-//   - "#" matches zero or more levels and must be the last character (e.g., "a/#" matches "a", "a/b", "a/b/c")
-//
-// Example:
-//
-//	ps := pubsub.New()
-//	defer ps.Close()
-//
-//	// Subscribe to all sensor temperature readings
-//	sub, err := ps.SubscribeMQTT("devices/+/temperature", pubsub.SubOptions{
-//		BufferSize: 16,
-//		Policy:     pubsub.DropOldest,
-//	})
-//	if err != nil {
-//		// Handle error
-//	}
-//	defer sub.Cancel()
-//
-//	// Subscribe to all device events
-//	sub2, err := ps.SubscribeMQTT("devices/#", pubsub.DefaultSubOptions())
-func (ps *InProcPubSub) SubscribeMQTT(pattern string, opts SubOptions) (Subscription, error) {
-	return ps.subscribeMQTTInternal(context.Background(), pattern, opts)
+// SubscribeMQTT creates a subscription using MQTT-style topic patterns.
+func (b *InProcBroker) SubscribeMQTT(pattern string, opts SubOptions) (Subscription, error) {
+	return b.subscribeMQTTInternal(context.Background(), pattern, opts)
 }
 
-// SubscribeMQTTWithContext creates an MQTT pattern subscription that is cancelled when the context is done.
-func (ps *InProcPubSub) SubscribeMQTTWithContext(ctx context.Context, pattern string, opts SubOptions) (Subscription, error) {
-	return ps.subscribeMQTTInternal(ctx, pattern, opts)
+// SubscribeMQTTWithContext creates an MQTT subscription cancelled when ctx is done.
+func (b *InProcBroker) SubscribeMQTTWithContext(ctx context.Context, pattern string, opts SubOptions) (Subscription, error) {
+	return b.subscribeMQTTInternal(ctx, pattern, opts)
 }
 
 // initSubscriberChannel sets up the subscriber's message channel.
-// When UseRingBuffer is enabled with DropOldest policy, a ring buffer is used
-// together with an unbuffered channel driven by a pump goroutine.
-// Otherwise a plain buffered channel is created.
 func initSubscriberChannel(sub *subscriber, opts SubOptions) {
 	if opts.UseRingBuffer && opts.Policy == DropOldest {
 		sub.ringBuf = newRingBuffer(opts.BufferSize)
-		sub.ch = make(chan Message) // unbuffered: pump goroutine handles buffering
+		sub.ch = make(chan Message)
 		sub.pumpDone = make(chan struct{})
 		go sub.pumpRingBuffer()
 	} else {
@@ -445,48 +299,44 @@ func initSubscriberChannel(sub *subscriber, opts SubOptions) {
 	}
 }
 
-// subscribeInternal is the internal implementation for all subscribe methods.
-func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opts SubOptions, isPattern bool) (Subscription, error) {
+// subscribeInternal handles both exact-topic and glob-pattern subscriptions.
+func (b *InProcBroker) subscribeInternal(ctx context.Context, topic string, opts SubOptions, isPattern bool) (Subscription, error) {
 	start := time.Now()
 	var err error
 	defer func() {
-		ps.recordMetrics(ctx, "subscribe", topic, time.Since(start), err)
+		b.recordMetrics(ctx, "subscribe", topic, time.Since(start), err)
 	}()
 
-	if ps.closed.Load() {
-		err = ErrSubscribeToClosed
+	if b.closed.Load() {
+		err = newErr(ErrCodeClosed, "subscribe", topic, "broker is closed", nil)
 		return nil, err
 	}
 
 	topic = strings.TrimSpace(topic)
 	if topic == "" {
 		if isPattern {
-			err = ErrInvalidPattern
+			err = newErr(ErrCodeInvalidPattern, "subscribe", "", "pattern must not be empty", nil)
 		} else {
-			err = ErrInvalidTopic
+			err = newErr(ErrCodeInvalidTopic, "subscribe", "", "topic must not be empty", nil)
 		}
 		return nil, err
 	}
 
-	// Validate pattern syntax
 	if isPattern {
 		if _, matchErr := path.Match(topic, "probe"); matchErr != nil {
-			err = ErrInvalidPattern
+			err = newErr(ErrCodeInvalidPattern, "subscribe", topic, "invalid glob pattern", matchErr)
 			return nil, err
 		}
 	}
 
-	opts = ps.normalizeSubOptions(opts)
+	opts = b.normalizeSubOptions(opts)
 	if opts.BufferSize < 1 {
-		err = ErrBufferTooSmall
+		err = newErr(ErrCodeInvalidOptions, "subscribe", topic, "buffer size must be at least 1", nil)
 		return nil, err
 	}
 
-	id := ps.nextID.Add(1)
+	id := b.nextID.Add(1)
 
-	// Only set up context cancellation machinery when ctx can actually be cancelled.
-	// context.Background() and context.TODO() never cancel, so skip the goroutine
-	// and WithCancel allocation to avoid unnecessary resource consumption.
 	needsCtxWatch := ctx != nil && ctx != context.Background() && ctx != context.TODO()
 
 	var cancel context.CancelFunc
@@ -503,7 +353,7 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 		id:     id,
 		topic:  topic,
 		opts:   opts,
-		ps:     ps,
+		ps:     b,
 		kind:   kind,
 		done:   make(chan struct{}),
 		cancel: cancel,
@@ -511,20 +361,15 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 
 	initSubscriberChannel(sub, opts)
 
-	// Add to sharded map
 	if isPattern {
-		ps.shards.addPattern(topic, id, sub)
+		b.shards.addPattern(topic, id, sub)
 	} else {
-		ps.shards.addTopic(topic, id, sub)
+		b.shards.addTopic(topic, id, sub)
 	}
-	ps.metrics.addSubs(topic, 1)
+	b.metrics.addSubs(topic, 1)
 
-	// Call hook
-	if ps.config.Hooks.OnSubscribe != nil {
-		ps.config.Hooks.OnSubscribe(topic, id)
-	}
+	b.notifySubscribe(topic, id)
 
-	// Watch for context cancellation only when the context can actually be cancelled.
 	if needsCtxWatch {
 		go func() {
 			select {
@@ -538,40 +383,38 @@ func (ps *InProcPubSub) subscribeInternal(ctx context.Context, topic string, opt
 	return sub, nil
 }
 
-// subscribeMQTTInternal is the internal implementation for MQTT subscribe methods.
-func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern string, opts SubOptions) (Subscription, error) {
+// subscribeMQTTInternal handles MQTT-pattern subscriptions.
+func (b *InProcBroker) subscribeMQTTInternal(ctx context.Context, pattern string, opts SubOptions) (Subscription, error) {
 	start := time.Now()
 	var err error
 	defer func() {
-		ps.recordMetrics(ctx, "subscribe_mqtt", pattern, time.Since(start), err)
+		b.recordMetrics(ctx, "subscribe_mqtt", pattern, time.Since(start), err)
 	}()
 
-	if ps.closed.Load() {
-		err = ErrSubscribeToClosed
+	if b.closed.Load() {
+		err = newErr(ErrCodeClosed, "subscribe_mqtt", pattern, "broker is closed", nil)
 		return nil, err
 	}
 
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
-		err = ErrInvalidPattern
+		err = newErr(ErrCodeInvalidPattern, "subscribe_mqtt", "", "pattern must not be empty", nil)
 		return nil, err
 	}
 
-	// Validate MQTT pattern syntax
 	if validErr := ValidateMQTTPattern(pattern); validErr != nil {
-		err = validErr
+		err = newErr(ErrCodeInvalidPattern, "subscribe_mqtt", pattern, validErr.Error(), validErr)
 		return nil, err
 	}
 
-	opts = ps.normalizeSubOptions(opts)
+	opts = b.normalizeSubOptions(opts)
 	if opts.BufferSize < 1 {
-		err = ErrBufferTooSmall
+		err = newErr(ErrCodeInvalidOptions, "subscribe_mqtt", pattern, "buffer size must be at least 1", nil)
 		return nil, err
 	}
 
-	id := ps.nextID.Add(1)
+	id := b.nextID.Add(1)
 
-	// Only set up context cancellation machinery when ctx can actually be cancelled.
 	needsCtxWatch := ctx != nil && ctx != context.Background() && ctx != context.TODO()
 
 	var cancel context.CancelFunc
@@ -583,7 +426,7 @@ func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern strin
 		id:     id,
 		topic:  pattern,
 		opts:   opts,
-		ps:     ps,
+		ps:     b,
 		kind:   subKindMQTT,
 		done:   make(chan struct{}),
 		cancel: cancel,
@@ -591,16 +434,11 @@ func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern strin
 
 	initSubscriberChannel(sub, opts)
 
-	// Add to sharded map
-	ps.shards.addMQTTPattern(pattern, id, sub)
-	ps.metrics.addSubs(pattern, 1)
+	b.shards.addMQTTPattern(pattern, id, sub)
+	b.metrics.addSubs(pattern, 1)
 
-	// Call hook
-	if ps.config.Hooks.OnSubscribe != nil {
-		ps.config.Hooks.OnSubscribe(pattern, id)
-	}
+	b.notifySubscribe(pattern, id)
 
-	// Watch for context cancellation only when the context can actually be cancelled.
 	if needsCtxWatch {
 		go func() {
 			select {
@@ -615,65 +453,29 @@ func (ps *InProcPubSub) subscribeMQTTInternal(ctx context.Context, pattern strin
 }
 
 // Publish sends a message to a topic.
-//
-// This method:
-//   - Validates the topic
-//   - Fills message metadata (topic, timestamp)
-//   - Delivers to all subscribers (including pattern matches)
-//   - Handles backpressure according to subscriber policy
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/pubsub"
-//
-//	ps := pubsub.New()
-//	defer ps.Close()
-//
-//	msg := pubsub.Message{
-//		Data: map[string]any{
-//			"user_id": "123",
-//			"email":   "user@example.com",
-//		},
-//	}
-//
-//	err := ps.Publish("user.created", msg)
-func (ps *InProcPubSub) Publish(topic string, msg Message) error {
-	return ps.publishInternal(context.Background(), topic, msg, false)
+func (b *InProcBroker) Publish(topic string, msg Message) error {
+	return b.publishInternal(context.Background(), topic, msg, false)
 }
 
 // PublishWithContext publishes a message with context support.
-func (ps *InProcPubSub) PublishWithContext(ctx context.Context, topic string, msg Message) error {
-	return ps.publishInternal(ctx, topic, msg, false)
+func (b *InProcBroker) PublishWithContext(ctx context.Context, topic string, msg Message) error {
+	return b.publishInternal(ctx, topic, msg, false)
 }
 
-// PublishAsync publishes without waiting for delivery results (fire-and-forget).
-//
-// This method returns immediately after queuing the message for delivery,
-// without waiting for the actual delivery to subscribers. The message will
-// be delivered asynchronously to all matching subscribers.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/pubsub"
-//
-//	ps := pubsub.New()
-//	defer ps.Close()
-//
-//	// Fire-and-forget publish
-//	err := ps.PublishAsync("user.created", msg)
-func (ps *InProcPubSub) PublishAsync(topic string, msg Message) error {
-	return ps.publishInternal(context.Background(), topic, msg, true)
+// PublishAsync publishes without waiting for delivery (fire-and-forget).
+func (b *InProcBroker) PublishAsync(topic string, msg Message) error {
+	return b.publishInternal(context.Background(), topic, msg, true)
 }
 
 // PublishBatch publishes multiple messages to a topic atomically.
-func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
-	if ps.closed.Load() {
-		return ErrPublishToClosed
+func (b *InProcBroker) PublishBatch(topic string, msgs []Message) error {
+	if b.closed.Load() {
+		return newErr(ErrCodeClosed, "publish_batch", topic, "broker is closed", nil)
 	}
 
 	topic = strings.TrimSpace(topic)
 	if topic == "" {
-		return ErrInvalidTopic
+		return newErr(ErrCodeInvalidTopic, "publish_batch", "", "topic must not be empty", nil)
 	}
 
 	for i := range msgs {
@@ -683,58 +485,33 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 		}
 	}
 
-	// Single lock acquisition per topic: combines existence check and snapshot.
-	subs := ps.shards.getTopicSubscribersIfAny(topic)
+	subs := b.shards.getTopicSubscribersIfAny(topic)
 	var patterns []patternSnapshot
-	if ps.shards.hasAnyPatterns() {
-		patterns = ps.shards.getAllPatterns()
+	if b.shards.hasAnyPatterns() {
+		patterns = b.shards.getAllPatterns()
 	}
 	var mqttSubs []*subscriber
-	if ps.shards.hasAnyMQTTPatterns() {
-		mqttSubs = ps.shards.getMQTTPatternMatches(topic)
+	if b.shards.hasAnyMQTTPatterns() {
+		mqttSubs = b.shards.getMQTTPatternMatches(topic)
 	}
 
-	ps.drainWg.Add(1)
-	defer ps.drainWg.Done()
+	b.drainWg.Add(1)
+	defer b.drainWg.Done()
 
 	bgCtx := context.Background()
 	for _, msg := range msgs {
-		// TTL check: consistent with doPublish to prevent silent bypass of expiration.
-		if ps.ttlMgr != nil && msg.Meta != nil {
-			if expiresAt, ok := msg.Meta["X-Message-ExpiresAt"]; ok {
-				if t, err := time.Parse(time.RFC3339Nano, expiresAt); err == nil && time.Now().After(t) {
-					continue // skip expired message
-				}
-			}
-		}
-
 		clonedMsg := cloneMessage(msg)
-		ps.metrics.incPublish(topic)
+		b.metrics.incPublish(topic)
+		b.notifyPublish(topic, &clonedMsg)
 
-		// Call hook
-		if ps.config.Hooks.OnPublish != nil {
-			ps.config.Hooks.OnPublish(topic, &clonedMsg)
-		}
-
-		// Record message in history
-		if ps.history != nil {
-			h := ps.history.GetOrCreate(topic, 0)
-			h.Add(clonedMsg)
-		}
-
-		// Deliver to exact topic subscribers
 		for _, s := range subs {
-			ps.deliver(bgCtx, s, clonedMsg)
+			b.deliver(bgCtx, s, clonedMsg)
 		}
-
-		// Deliver to glob pattern subscribers
 		if len(patterns) > 0 {
-			ps.deliverToPatterns(bgCtx, patterns, topic, clonedMsg)
+			b.deliverToPatterns(bgCtx, patterns, topic, clonedMsg)
 		}
-
-		// Deliver to MQTT pattern subscribers
 		for _, s := range mqttSubs {
-			ps.deliver(bgCtx, s, clonedMsg)
+			b.deliver(bgCtx, s, clonedMsg)
 		}
 	}
 
@@ -742,13 +519,13 @@ func (ps *InProcPubSub) PublishBatch(topic string, msgs []Message) error {
 }
 
 // PublishMulti publishes messages to multiple topics.
-func (ps *InProcPubSub) PublishMulti(msgs map[string][]Message) error {
-	if ps.closed.Load() {
-		return ErrPublishToClosed
+func (b *InProcBroker) PublishMulti(msgs map[string][]Message) error {
+	if b.closed.Load() {
+		return newErr(ErrCodeClosed, "publish_multi", "", "broker is closed", nil)
 	}
 
 	for topic, topicMsgs := range msgs {
-		if err := ps.PublishBatch(topic, topicMsgs); err != nil {
+		if err := b.PublishBatch(topic, topicMsgs); err != nil {
 			return err
 		}
 	}
@@ -756,145 +533,113 @@ func (ps *InProcPubSub) PublishMulti(msgs map[string][]Message) error {
 	return nil
 }
 
-// publishInternal is the internal implementation for publish methods.
-func (ps *InProcPubSub) publishInternal(ctx context.Context, topic string, msg Message, async bool) error {
+// publishInternal is the shared implementation for Publish and PublishAsync.
+func (b *InProcBroker) publishInternal(ctx context.Context, topic string, msg Message, async bool) error {
 	start := time.Now()
 	var err error
 	defer func() {
-		opName := "publish"
+		op := "publish"
 		if async {
-			opName = "publish_async"
+			op = "publish_async"
 		}
-		ps.recordMetrics(ctx, opName, topic, time.Since(start), err)
+		b.recordMetrics(ctx, op, topic, time.Since(start), err)
 	}()
 
-	// Check context cancellation early
 	if ctx.Err() != nil {
 		err = ctx.Err()
 		return err
 	}
 
-	if ps.closed.Load() {
-		err = ErrPublishToClosed
+	if b.closed.Load() {
+		err = newErr(ErrCodeClosed, "publish", topic, "broker is closed", nil)
 		return err
 	}
 
 	topic = strings.TrimSpace(topic)
 	if topic == "" {
-		err = ErrInvalidTopic
+		err = newErr(ErrCodeInvalidTopic, "publish", "", "topic must not be empty", nil)
 		return err
 	}
 
-	// Fill message metadata
 	msg.Topic = topic
 	if msg.Time.IsZero() {
 		msg.Time = time.Now().UTC()
 	}
 	msg = cloneMessage(msg)
 
-	ps.metrics.incPublish(topic)
-
-	// Call hook
-	if ps.config.Hooks.OnPublish != nil {
-		ps.config.Hooks.OnPublish(topic, &msg)
-	}
+	b.metrics.incPublish(topic)
+	b.notifyPublish(topic, &msg)
 
 	if async {
-		// Use worker pool for async publish with context cancellation support
-		ps.drainWg.Add(1)
-		submitted := ps.workerPool.SubmitWithContext(ctx, func() {
-			defer ps.drainWg.Done()
-			ps.doPublish(ctx, topic, msg)
+		b.drainWg.Add(1)
+		submitted := b.workerPool.SubmitWithContext(ctx, func() {
+			defer b.drainWg.Done()
+			b.doPublish(ctx, topic, msg)
 		})
 		if !submitted {
-			ps.drainWg.Done()
-			// Context cancelled or worker pool closed
+			b.drainWg.Done()
 			if ctx.Err() != nil {
 				err = ctx.Err()
 				return err
 			}
-			// Worker pool is closed, do sync publish
-			ps.doPublish(ctx, topic, msg)
+			b.doPublish(ctx, topic, msg)
 		}
 	} else {
-		ps.drainWg.Add(1)
-		defer ps.drainWg.Done()
-		ps.doPublish(ctx, topic, msg)
+		b.drainWg.Add(1)
+		defer b.drainWg.Done()
+		b.doPublish(ctx, topic, msg)
 	}
 
 	return nil
 }
 
-// doPublish performs the actual message delivery.
-func (ps *InProcPubSub) doPublish(ctx context.Context, topic string, msg Message) {
-	// Check TTL expiration from message metadata
-	if ps.ttlMgr != nil && msg.Meta != nil {
-		if expiresAt, ok := msg.Meta["X-Message-ExpiresAt"]; ok {
-			if t, err := time.Parse(time.RFC3339Nano, expiresAt); err == nil && time.Now().After(t) {
-				return
-			}
-		}
-	}
-
-	// Check context cancellation before delivery
+// doPublish performs the actual fan-out delivery.
+func (b *InProcBroker) doPublish(ctx context.Context, topic string, msg Message) {
 	if ctx.Err() != nil {
 		return
 	}
 
-	// Record message in history
-	if ps.history != nil {
-		h := ps.history.GetOrCreate(topic, 0)
-		h.Add(msg)
-	}
+	hasPatternSubs := b.shards.hasAnyPatterns()
+	hasMQTTSubs := b.shards.hasAnyMQTTPatterns()
 
-	hasPatternSubs := ps.shards.hasAnyPatterns()
-	hasMQTTSubs := ps.shards.hasAnyMQTTPatterns()
-
-	// Single lock acquisition: combines existence check and subscriber snapshot.
-	subs := ps.shards.getTopicSubscribersIfAny(topic)
+	subs := b.shards.getTopicSubscribersIfAny(topic)
 	if subs == nil && !hasPatternSubs && !hasMQTTSubs {
 		return
 	}
 
-	// Deliver to exact topic subscribers
 	for _, s := range subs {
 		if ctx.Err() != nil {
 			return
 		}
-		ps.deliver(ctx, s, msg)
+		b.deliver(ctx, s, msg)
 	}
 
-	// Get and deliver to glob pattern subscribers
 	if hasPatternSubs {
-		patterns := ps.shards.getAllPatterns()
-		ps.deliverToPatterns(ctx, patterns, topic, msg)
+		b.deliverToPatterns(ctx, b.shards.getAllPatterns(), topic, msg)
 	}
 
-	// Get and deliver to MQTT pattern subscribers
 	if hasMQTTSubs {
-		mqttSubs := ps.shards.getMQTTPatternMatches(topic)
-		for _, s := range mqttSubs {
+		for _, s := range b.shards.getMQTTPatternMatches(topic) {
 			if ctx.Err() != nil {
 				return
 			}
-			ps.deliver(ctx, s, msg)
+			b.deliver(ctx, s, msg)
 		}
 	}
 }
 
-// deliverToPatterns delivers a message to all matching pattern subscribers.
-func (ps *InProcPubSub) deliverToPatterns(ctx context.Context, patterns []patternSnapshot, topic string, msg Message) {
+// deliverToPatterns delivers a message to all matching glob-pattern subscribers.
+func (b *InProcBroker) deliverToPatterns(ctx context.Context, patterns []patternSnapshot, topic string, msg Message) {
 	for _, entry := range patterns {
 		if ctx.Err() != nil {
 			return
 		}
 
-		// isGlob is pre-computed at snapshot time to avoid ContainsAny on every publish.
 		var matched bool
 		if entry.isGlob {
-			var err error
-			matched, err = path.Match(entry.pattern, topic)
-			if err != nil {
+			var matchErr error
+			matched, matchErr = path.Match(entry.pattern, topic)
+			if matchErr != nil {
 				matched = false
 			}
 		} else {
@@ -906,55 +651,50 @@ func (ps *InProcPubSub) deliverToPatterns(ctx context.Context, patterns []patter
 				if ctx.Err() != nil {
 					return
 				}
-				ps.deliver(ctx, s, msg)
+				b.deliver(ctx, s, msg)
 			}
 		}
 	}
 }
 
-// GetSubscriberCount returns the number of subscribers for a topic.
-func (ps *InProcPubSub) GetSubscriberCount(topic string) int {
-	return ps.shards.getTopicSubscriberCount(topic)
+// GetSubscriberCount returns the number of exact-topic subscribers.
+func (b *InProcBroker) GetSubscriberCount(topic string) int {
+	return b.shards.getTopicSubscriberCount(topic)
 }
 
-// GetPatternSubscriberCount returns the number of subscribers for a pattern.
-func (ps *InProcPubSub) GetPatternSubscriberCount(pattern string) int {
-	return ps.shards.getPatternSubscriberCount(pattern)
+// GetPatternSubscriberCount returns the number of glob-pattern subscribers.
+func (b *InProcBroker) GetPatternSubscriberCount(pattern string) int {
+	return b.shards.getPatternSubscriberCount(pattern)
 }
 
-// GetMQTTSubscriberCount returns the number of subscribers for an MQTT pattern.
-func (ps *InProcPubSub) GetMQTTSubscriberCount(pattern string) int {
-	return ps.shards.getMQTTPatternSubscriberCount(pattern)
+// GetMQTTSubscriberCount returns the number of MQTT-pattern subscribers.
+func (b *InProcBroker) GetMQTTSubscriberCount(pattern string) int {
+	return b.shards.getMQTTPatternSubscriberCount(pattern)
 }
 
-// TopicExists checks if a topic has any active subscribers.
-// This is a lightweight check that only acquires a read lock on one shard.
-func (ps *InProcPubSub) TopicExists(topic string) bool {
-	return ps.shards.topicExists(topic)
+// TopicExists reports whether the topic has any active exact subscribers.
+func (b *InProcBroker) TopicExists(topic string) bool {
+	return b.shards.topicExists(topic)
 }
 
-// PatternExists checks if a pattern has any active subscribers.
-// This is a lightweight check that only acquires a read lock on one shard.
-func (ps *InProcPubSub) PatternExists(pattern string) bool {
-	return ps.shards.patternExists(pattern)
+// PatternExists reports whether the glob pattern has any active subscribers.
+func (b *InProcBroker) PatternExists(pattern string) bool {
+	return b.shards.patternExists(pattern)
 }
 
-// MQTTPatternExists checks if an MQTT pattern has any active subscribers.
-func (ps *InProcPubSub) MQTTPatternExists(pattern string) bool {
-	return ps.shards.mqttPatternExists(pattern)
+// MQTTPatternExists reports whether the MQTT pattern has any active subscribers.
+func (b *InProcBroker) MQTTPatternExists(pattern string) bool {
+	return b.shards.mqttPatternExists(pattern)
 }
 
-// HasSubscribers checks if publishing to the given topic would reach any subscriber,
-// either through an exact topic match, a matching glob pattern, or a matching MQTT pattern subscription.
-func (ps *InProcPubSub) HasSubscribers(topic string) bool {
-	// Fast path: check exact topic subscribers
-	if ps.shards.topicExists(topic) {
+// HasSubscribers reports whether publishing to topic would reach any subscriber
+// (exact, glob-pattern, or MQTT-pattern).
+func (b *InProcBroker) HasSubscribers(topic string) bool {
+	if b.shards.topicExists(topic) {
 		return true
 	}
-
-	// Check glob pattern subscribers
-	if ps.shards.hasAnyPatterns() {
-		for _, entry := range ps.shards.getAllPatterns() {
+	if b.shards.hasAnyPatterns() {
+		for _, entry := range b.shards.getAllPatterns() {
 			if entry.isGlob {
 				if matched, err := path.Match(entry.pattern, topic); err == nil && matched {
 					return true
@@ -964,60 +704,55 @@ func (ps *InProcPubSub) HasSubscribers(topic string) bool {
 			}
 		}
 	}
-
-	// Check MQTT pattern subscribers
-	if ps.shards.hasAnyMQTTPatterns() {
-		mqttSubs := ps.shards.getMQTTPatternMatches(topic)
-		if len(mqttSubs) > 0 {
+	if b.shards.hasAnyMQTTPatterns() {
+		if len(b.shards.getMQTTPatternMatches(topic)) > 0 {
 			return true
 		}
 	}
-
 	return false
 }
 
-// ListTopics returns all active topics.
-func (ps *InProcPubSub) ListTopics() []string {
-	topics := ps.shards.listTopics()
+// ListTopics returns all active exact-topic names, sorted.
+func (b *InProcBroker) ListTopics() []string {
+	topics := b.shards.listTopics()
 	sort.Strings(topics)
 	return topics
 }
 
-// ListPatterns returns all active subscription patterns.
-func (ps *InProcPubSub) ListPatterns() []string {
-	patterns := ps.shards.listPatterns()
+// ListPatterns returns all active glob-pattern subscriptions, sorted.
+func (b *InProcBroker) ListPatterns() []string {
+	patterns := b.shards.listPatterns()
 	sort.Strings(patterns)
 	return patterns
 }
 
-// ListMQTTPatterns returns all active MQTT subscription patterns.
-func (ps *InProcPubSub) ListMQTTPatterns() []string {
-	patterns := ps.shards.listMQTTPatterns()
+// ListMQTTPatterns returns all active MQTT-pattern subscriptions, sorted.
+func (b *InProcBroker) ListMQTTPatterns() []string {
+	patterns := b.shards.listMQTTPatterns()
 	sort.Strings(patterns)
 	return patterns
 }
 
-// removeSubscriber removes subscription from the sharded map.
-func (ps *InProcPubSub) removeSubscriber(topic string, id uint64, kind subKind) {
+// removeSubscriber removes a subscription from the sharded map.
+func (b *InProcBroker) removeSubscriber(topic string, id uint64, kind subKind) {
 	switch kind {
 	case subKindPattern:
-		ps.shards.removePattern(topic, id)
+		b.shards.removePattern(topic, id)
 	case subKindMQTT:
-		ps.shards.removeMQTTPattern(topic, id)
+		b.shards.removeMQTTPattern(topic, id)
 	default:
-		ps.shards.removeTopic(topic, id)
+		b.shards.removeTopic(topic, id)
 	}
-	ps.metrics.addSubs(topic, -1)
+	b.metrics.addSubs(topic, -1)
 }
 
-// deliver handles message delivery to a subscriber with backpressure policy.
-func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message) {
-	// Panic recovery
-	if ps.config.EnablePanicRecovery {
+// deliver handles message delivery to a single subscriber with the configured backpressure policy.
+func (b *InProcBroker) deliver(ctx context.Context, s *subscriber, msg Message) {
+	if b.config.EnablePanicRecovery {
 		defer func() {
 			if r := recover(); r != nil {
-				if ps.config.OnPanic != nil {
-					ps.config.OnPanic(s.topic, s.id, r)
+				if b.config.OnPanic != nil {
+					b.config.OnPanic(s.topic, s.id, r)
 				}
 				s.Cancel()
 			}
@@ -1029,27 +764,20 @@ func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message)
 		metricTopic = msg.Topic
 	}
 
-	// Apply filter if present
 	if s.opts.Filter != nil && !s.opts.Filter(msg) {
 		return
 	}
 
-	// Clone message unless zero-copy is enabled
 	if !s.opts.ZeroCopy {
 		msg = cloneMessage(msg)
 	}
 
-	// Fast path: check if closed without lock
 	if s.closed.Load() {
 		return
 	}
 
-	// BlockWithTimeout must not hold s.mu while blocking on the channel send,
-	// otherwise every concurrent deliver call to this subscriber serialises on
-	// the lock for up to the full block timeout.  Handle it outside the lock.
-	// (closed check above already covers this path)
 	if s.opts.Policy == BlockWithTimeout {
-		if ps.deliverBlockWithTimeout(ctx, s, msg, metricTopic) {
+		if b.deliverBlockWithTimeout(ctx, s, msg, metricTopic) {
 			s.Cancel()
 		}
 		return
@@ -1065,111 +793,84 @@ func (ps *InProcPubSub) deliver(ctx context.Context, s *subscriber, msg Message)
 
 	switch s.opts.Policy {
 	case DropOldest:
-		cancelSub = ps.deliverDropOldest(s, msg, metricTopic)
+		cancelSub = b.deliverDropOldest(s, msg, metricTopic)
 	case DropNewest:
-		cancelSub = ps.deliverDropNewest(s, msg, metricTopic)
+		cancelSub = b.deliverDropNewest(s, msg, metricTopic)
 	case CloseSubscriber:
-		cancelSub = ps.deliverCloseSubscriber(s, msg, metricTopic)
+		cancelSub = b.deliverCloseSubscriber(s, msg, metricTopic)
 	default:
-		// Safe default: DropOldest
-		cancelSub = ps.deliverDropOldest(s, msg, metricTopic)
+		cancelSub = b.deliverDropOldest(s, msg, metricTopic)
 	}
 
 	s.mu.Unlock()
 
-	// Cancel outside the lock to avoid deadlock
 	if cancelSub {
 		s.Cancel()
 	}
 }
 
-// deliverDropOldest drops the oldest message if buffer is full.
-// When the subscriber has a ring buffer, it uses O(1) push with automatic eviction.
-// Otherwise, it falls back to the channel drain-and-retry loop.
-func (ps *InProcPubSub) deliverDropOldest(s *subscriber, msg Message, metricTopic string) bool {
-	// Fast path: ring buffer provides O(1) DropOldest
+// deliverDropOldest drops the oldest message when the buffer is full.
+func (b *InProcBroker) deliverDropOldest(s *subscriber, msg Message, metricTopic string) bool {
 	if s.ringBuf != nil {
 		dropped, wasDropped := s.ringBuf.Push(msg)
 		if wasDropped {
-			ps.metrics.incDropped(metricTopic, DropOldest)
+			b.metrics.incDropped(metricTopic, DropOldest)
 			s.dropped.Add(1)
-			if ps.config.Hooks.OnDrop != nil {
-				ps.config.Hooks.OnDrop(metricTopic, s.id, &dropped, DropOldest)
-			}
+			b.notifyDrop(metricTopic, s.id, &dropped, DropOldest)
 		}
-		ps.metrics.incDelivered(metricTopic)
+		b.metrics.incDelivered(metricTopic)
 		s.received.Add(1)
-		if ps.config.Hooks.OnDeliver != nil {
-			ps.config.Hooks.OnDeliver(metricTopic, s.id, &msg)
-		}
+		b.notifyDeliver(metricTopic, s.id, &msg)
 		return false
 	}
 
-	// Fallback: channel-based drain-and-retry
 	for spinCount := 0; ; spinCount++ {
-		// Guard against racing with Cancel(): if the subscriber closed while we
-		// were spinning, stop instead of looping forever.
 		if s.closed.Load() {
 			return false
 		}
 		select {
 		case s.ch <- msg:
-			ps.metrics.incDelivered(metricTopic)
+			b.metrics.incDelivered(metricTopic)
 			s.received.Add(1)
-			// Call deliver hook
-			if ps.config.Hooks.OnDeliver != nil {
-				ps.config.Hooks.OnDeliver(metricTopic, s.id, &msg)
-			}
+			b.notifyDeliver(metricTopic, s.id, &msg)
 			return false
 		default:
-			// Buffer is full, try to drop the oldest
 			select {
 			case dropped := <-s.ch:
-				ps.metrics.incDropped(metricTopic, DropOldest)
+				b.metrics.incDropped(metricTopic, DropOldest)
 				s.dropped.Add(1)
-				// Call drop hook
-				if ps.config.Hooks.OnDrop != nil {
-					ps.config.Hooks.OnDrop(metricTopic, s.id, &dropped, DropOldest)
-				}
-				// Continue loop to try sending again
+				b.notifyDrop(metricTopic, s.id, &dropped, DropOldest)
 			default:
-				// Channel was emptied by the consumer between the two selects.
-				// Yield the CPU to avoid a tight spin under heavy contention.
 				runtime.Gosched()
 			}
 		}
-		// Yield more aggressively every 64 iterations under sustained contention.
 		if spinCount > 0 && spinCount%64 == 0 {
 			runtime.Gosched()
 		}
 	}
 }
 
-// deliverDropNewest drops the newest message if buffer is full.
-func (ps *InProcPubSub) deliverDropNewest(s *subscriber, msg Message, metricTopic string) bool {
+// deliverDropNewest discards the incoming message when the buffer is full.
+func (b *InProcBroker) deliverDropNewest(s *subscriber, msg Message, metricTopic string) bool {
 	select {
 	case s.ch <- msg:
-		ps.metrics.incDelivered(metricTopic)
+		b.metrics.incDelivered(metricTopic)
 		s.received.Add(1)
-		if ps.config.Hooks.OnDeliver != nil {
-			ps.config.Hooks.OnDeliver(metricTopic, s.id, &msg)
-		}
+		b.notifyDeliver(metricTopic, s.id, &msg)
 		return false
 	default:
-		ps.metrics.incDropped(metricTopic, DropNewest)
+		b.metrics.incDropped(metricTopic, DropNewest)
 		s.dropped.Add(1)
-		if ps.config.Hooks.OnDrop != nil {
-			ps.config.Hooks.OnDrop(metricTopic, s.id, &msg, DropNewest)
-		}
+		b.notifyDrop(metricTopic, s.id, &msg, DropNewest)
 		return false
 	}
 }
 
-// deliverBlockWithTimeout blocks until timeout, context cancellation, or success.
-func (ps *InProcPubSub) deliverBlockWithTimeout(ctx context.Context, s *subscriber, msg Message, metricTopic string) bool {
+// deliverBlockWithTimeout blocks until buffer space is available or the deadline elapses.
+func (b *InProcBroker) deliverBlockWithTimeout(ctx context.Context, s *subscriber, msg Message, metricTopic string) bool {
 	timeout := s.opts.BlockTimeout
 	if timeout <= 0 {
-		timeout = ps.config.DefaultBlockTimeout
+		timeout = b.config.DefaultBlockTimeout
 	}
 
 	timer := time.NewTimer(timeout)
@@ -1177,329 +878,129 @@ func (ps *InProcPubSub) deliverBlockWithTimeout(ctx context.Context, s *subscrib
 
 	select {
 	case s.ch <- msg:
-		ps.metrics.incDelivered(metricTopic)
+		b.metrics.incDelivered(metricTopic)
 		s.received.Add(1)
-		if ps.config.Hooks.OnDeliver != nil {
-			ps.config.Hooks.OnDeliver(metricTopic, s.id, &msg)
-		}
+		b.notifyDeliver(metricTopic, s.id, &msg)
 		return false
 	case <-timer.C:
-		ps.metrics.incDropped(metricTopic, BlockWithTimeout)
+		b.metrics.incDropped(metricTopic, BlockWithTimeout)
 		s.dropped.Add(1)
-		if ps.config.Hooks.OnDrop != nil {
-			ps.config.Hooks.OnDrop(metricTopic, s.id, &msg, BlockWithTimeout)
-		}
+		b.notifyDrop(metricTopic, s.id, &msg, BlockWithTimeout)
 		return false
 	case <-ctx.Done():
-		ps.metrics.incDropped(metricTopic, BlockWithTimeout)
+		b.metrics.incDropped(metricTopic, BlockWithTimeout)
 		s.dropped.Add(1)
-		if ps.config.Hooks.OnDrop != nil {
-			ps.config.Hooks.OnDrop(metricTopic, s.id, &msg, BlockWithTimeout)
-		}
+		b.notifyDrop(metricTopic, s.id, &msg, BlockWithTimeout)
 		return false
 	}
 }
 
-// deliverCloseSubscriber closes the subscription if buffer is full.
-func (ps *InProcPubSub) deliverCloseSubscriber(s *subscriber, msg Message, metricTopic string) bool {
+// deliverCloseSubscriber closes the subscription when the buffer is full.
+func (b *InProcBroker) deliverCloseSubscriber(s *subscriber, msg Message, metricTopic string) bool {
 	select {
 	case s.ch <- msg:
-		ps.metrics.incDelivered(metricTopic)
+		b.metrics.incDelivered(metricTopic)
 		s.received.Add(1)
-		if ps.config.Hooks.OnDeliver != nil {
-			ps.config.Hooks.OnDeliver(metricTopic, s.id, &msg)
-		}
+		b.notifyDeliver(metricTopic, s.id, &msg)
 		return false
 	default:
-		ps.metrics.incDropped(metricTopic, CloseSubscriber)
+		b.metrics.incDropped(metricTopic, CloseSubscriber)
 		s.dropped.Add(1)
-		if ps.config.Hooks.OnDrop != nil {
-			ps.config.Hooks.OnDrop(metricTopic, s.id, &msg, CloseSubscriber)
-		}
-		return true // signal to cancel subscription
+		b.notifyDrop(metricTopic, s.id, &msg, CloseSubscriber)
+		return true
 	}
 }
 
-// normalizeSubOptions ensures valid subscription options with config defaults.
-func (ps *InProcPubSub) normalizeSubOptions(opts SubOptions) SubOptions {
+// normalizeSubOptions fills in defaults from the broker config.
+func (b *InProcBroker) normalizeSubOptions(opts SubOptions) SubOptions {
 	if opts.BufferSize <= 0 {
-		opts.BufferSize = ps.config.DefaultBufferSize
+		opts.BufferSize = b.config.DefaultBufferSize
 	}
 
-	// Validate policy
 	switch opts.Policy {
 	case DropOldest, DropNewest, BlockWithTimeout, CloseSubscriber:
 	default:
-		opts.Policy = ps.config.DefaultPolicy
+		opts.Policy = b.config.DefaultPolicy
 	}
 
-	// Validate timeout
 	if opts.Policy == BlockWithTimeout && opts.BlockTimeout <= 0 {
-		opts.BlockTimeout = ps.config.DefaultBlockTimeout
+		opts.BlockTimeout = b.config.DefaultBlockTimeout
 	}
 
-	// Propagate config-level ring buffer setting
-	if ps.config.EnableRingBuffer && opts.Policy == DropOldest {
+	// Ring buffer is the default for DropOldest subscribers.
+	if opts.Policy == DropOldest {
 		opts.UseRingBuffer = true
 	}
 
 	return opts
 }
 
-// Snapshot exposes observability metrics.
-func (ps *InProcPubSub) Snapshot() MetricsSnapshot {
-	return ps.metrics.Snapshot()
+// Snapshot returns a point-in-time view of pubsub metrics.
+func (b *InProcBroker) Snapshot() MetricsSnapshot {
+	return b.metrics.Snapshot()
 }
 
-// SetMetricsCollector sets the unified metrics collector.
-func (ps *InProcPubSub) SetMetricsCollector(collector metrics.MetricsCollector) {
-	ps.config.MetricsCollector = collector
+// SetMetricsCollector replaces the external metrics sink at runtime.
+func (b *InProcBroker) SetMetricsCollector(collector metrics.MetricsCollector) {
+	b.config.MetricsCollector = collector
 }
 
-// GetMetricsCollector returns the current metrics collector.
-func (ps *InProcPubSub) GetMetricsCollector() metrics.MetricsCollector {
-	return ps.config.MetricsCollector
+// Config returns a copy of the broker's configuration.
+func (b *InProcBroker) Config() Config {
+	return b.config
 }
 
-// Config returns a copy of the current configuration.
-func (ps *InProcPubSub) Config() Config {
-	return ps.config
+// TopicShard returns the shard index for the given topic/pattern.
+func (b *InProcBroker) TopicShard(topic string) int {
+	return b.shards.getShardIndex(topic)
 }
 
-// TopicShard returns the shard index that a topic or pattern is assigned to.
-// This is useful for diagnostics and understanding topic distribution across shards.
-func (ps *InProcPubSub) TopicShard(topic string) int {
-	return ps.shards.getShardIndex(topic)
+// ShardStats returns per-shard statistics.
+func (b *InProcBroker) ShardStats() []ShardStat {
+	return b.shards.shardStats()
 }
 
-// ShardStats returns per-shard statistics for monitoring shard balance and distribution.
-func (ps *InProcPubSub) ShardStats() []ShardStat {
-	return ps.shards.shardStats()
+// TopicShardMapping returns topic→shard-index mapping for all active topics.
+func (b *InProcBroker) TopicShardMapping() map[string]int {
+	return b.shards.topicShardMapping()
 }
 
-// TopicShardMapping returns a map of all active topics and patterns to their shard indices.
-// This is useful for understanding how topics are distributed across shards.
-func (ps *InProcPubSub) TopicShardMapping() map[string]int {
-	return ps.shards.topicShardMapping()
-}
-
-// recordMetrics records metrics using the unified collector.
-func (ps *InProcPubSub) recordMetrics(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	collector := ps.config.MetricsCollector
-	if collector == nil {
+// recordMetrics forwards an operation observation to the external collector, if any.
+func (b *InProcBroker) recordMetrics(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+	if b.config.MetricsCollector == nil {
 		return
 	}
-	collector.ObservePubSub(ctx, operation, topic, duration, err)
+	b.config.MetricsCollector.ObservePubSub(ctx, operation, topic, duration, err)
 }
 
-// PublishDelayed schedules a message for delivery after the specified delay.
-// Requires the scheduler to be enabled via WithScheduler() option.
-// Returns a schedule ID that can be used to cancel the scheduled message.
-func (ps *InProcPubSub) PublishDelayed(topic string, msg Message, delay time.Duration) (uint64, error) {
-	if ps.closed.Load() {
-		return 0, ErrPublishToClosed
-	}
-	if ps.scheduler == nil {
-		return 0, ErrSchedulerDisabled
-	}
+// --- Observer notification helpers ---
 
-	topic = strings.TrimSpace(topic)
-	if topic == "" {
-		return 0, ErrInvalidTopic
+func (b *InProcBroker) notifyPublish(topic string, msg *Message) {
+	for _, o := range b.config.observers {
+		o.OnPublish(topic, msg)
 	}
-
-	msg.Topic = topic
-	if msg.Time.IsZero() {
-		msg.Time = time.Now().UTC()
-	}
-
-	id := ps.scheduler.Schedule(topic, msg, delay)
-	return id, nil
 }
 
-// PublishAt schedules a message for delivery at a specific time.
-// Requires the scheduler to be enabled via WithScheduler() option.
-// Returns a schedule ID that can be used to cancel the scheduled message.
-func (ps *InProcPubSub) PublishAt(topic string, msg Message, at time.Time) (uint64, error) {
-	if ps.closed.Load() {
-		return 0, ErrPublishToClosed
+func (b *InProcBroker) notifySubscribe(topic string, subID uint64) {
+	for _, o := range b.config.observers {
+		o.OnSubscribe(topic, subID)
 	}
-	if ps.scheduler == nil {
-		return 0, ErrSchedulerDisabled
-	}
-
-	topic = strings.TrimSpace(topic)
-	if topic == "" {
-		return 0, ErrInvalidTopic
-	}
-
-	msg.Topic = topic
-	if msg.Time.IsZero() {
-		msg.Time = time.Now().UTC()
-	}
-
-	id := ps.scheduler.ScheduleAt(topic, msg, at)
-	return id, nil
 }
 
-// CancelScheduled cancels a previously scheduled message by its schedule ID.
-// Returns true if the message was found and cancelled.
-func (ps *InProcPubSub) CancelScheduled(id uint64) bool {
-	if ps.scheduler == nil {
-		return false
+func (b *InProcBroker) notifyUnsubscribe(topic string, subID uint64) {
+	for _, o := range b.config.observers {
+		o.OnUnsubscribe(topic, subID)
 	}
-	return ps.scheduler.Cancel(id)
 }
 
-// ScheduledCount returns the number of messages pending scheduled delivery.
-func (ps *InProcPubSub) ScheduledCount() int {
-	if ps.scheduler == nil {
-		return 0
+func (b *InProcBroker) notifyDeliver(topic string, subID uint64, msg *Message) {
+	for _, o := range b.config.observers {
+		o.OnDeliver(topic, subID, msg)
 	}
-	return ps.scheduler.PendingCount()
 }
 
-// PublishWithTTL publishes a message with a time-to-live. The message will be
-// skipped during delivery if it has expired (useful with delayed delivery).
-// Requires the TTL manager to be enabled via WithTTL() option.
-func (ps *InProcPubSub) PublishWithTTL(topic string, msg Message, ttl time.Duration) error {
-	if ps.closed.Load() {
-		return ErrPublishToClosed
+func (b *InProcBroker) notifyDrop(topic string, subID uint64, msg *Message, policy BackpressurePolicy) {
+	for _, o := range b.config.observers {
+		o.OnDrop(topic, subID, msg, policy)
 	}
-	if ps.ttlMgr == nil {
-		return ErrTTLDisabled
-	}
-
-	topic = strings.TrimSpace(topic)
-	if topic == "" {
-		return ErrInvalidTopic
-	}
-
-	if msg.ID == "" {
-		msg.ID = generateCorrelationID()
-	}
-
-	// Add TTL metadata
-	if msg.Meta == nil {
-		msg.Meta = make(map[string]string)
-	}
-	msg.Meta["X-Message-TTL"] = ttl.String()
-	msg.Meta["X-Message-ExpiresAt"] = time.Now().Add(ttl).UTC().Format(time.RFC3339Nano)
-
-	// Track in TTL manager
-	ps.ttlMgr.Track(topic, msg.ID, ttl)
-
-	return ps.Publish(topic, msg)
 }
-
-// GetTTLStats returns statistics from the TTL manager.
-func (ps *InProcPubSub) GetTTLStats() TTLStats {
-	if ps.ttlMgr == nil {
-		return TTLStats{}
-	}
-	return ps.ttlMgr.Stats()
-}
-
-// GetTopicHistory returns all retained messages for a topic (oldest first).
-// Requires history to be enabled via WithHistory() option.
-func (ps *InProcPubSub) GetTopicHistory(topic string) ([]Message, error) {
-	if ps.history == nil {
-		return nil, ErrHistoryDisabled
-	}
-
-	h := ps.history.Get(topic)
-	if h == nil {
-		return nil, nil
-	}
-	return h.GetAll(), nil
-}
-
-// GetTopicHistorySince returns messages added after the given sequence number.
-// Requires history to be enabled via WithHistory() option.
-func (ps *InProcPubSub) GetTopicHistorySince(topic string, sequence uint64) ([]Message, error) {
-	if ps.history == nil {
-		return nil, ErrHistoryDisabled
-	}
-
-	h := ps.history.Get(topic)
-	if h == nil {
-		return nil, nil
-	}
-	return h.GetSince(sequence), nil
-}
-
-// GetRecentMessages returns the last N messages for a topic (oldest first).
-// Requires history to be enabled via WithHistory() option.
-func (ps *InProcPubSub) GetRecentMessages(topic string, count int) ([]Message, error) {
-	if ps.history == nil {
-		return nil, ErrHistoryDisabled
-	}
-
-	h := ps.history.Get(topic)
-	if h == nil {
-		return nil, nil
-	}
-	return h.GetLast(count), nil
-}
-
-// GetTopicHistoryByTTL returns messages not older than the given TTL duration.
-// Requires history to be enabled via WithHistory() option.
-func (ps *InProcPubSub) GetTopicHistoryByTTL(topic string, ttl time.Duration) ([]Message, error) {
-	if ps.history == nil {
-		return nil, ErrHistoryDisabled
-	}
-
-	h := ps.history.Get(topic)
-	if h == nil {
-		return nil, nil
-	}
-	return h.GetWithTTL(ttl), nil
-}
-
-// ClearTopicHistory removes all retained messages for a topic.
-// Requires history to be enabled via WithHistory() option.
-func (ps *InProcPubSub) ClearTopicHistory(topic string) error {
-	if ps.history == nil {
-		return ErrHistoryDisabled
-	}
-
-	ps.history.Delete(topic)
-	return nil
-}
-
-// TopicHistoryStats returns history statistics for all topics with retained messages.
-// Requires history to be enabled via WithHistory() option.
-func (ps *InProcPubSub) TopicHistoryStats() (map[string]HistoryStats, error) {
-	if ps.history == nil {
-		return nil, ErrHistoryDisabled
-	}
-
-	return ps.history.Stats(), nil
-}
-
-// TopicHistorySequence returns the current sequence number for a topic's history.
-// Returns 0 if no history exists for the topic.
-// Requires history to be enabled via WithHistory() option.
-func (ps *InProcPubSub) TopicHistorySequence(topic string) (uint64, error) {
-	if ps.history == nil {
-		return 0, ErrHistoryDisabled
-	}
-
-	h := ps.history.Get(topic)
-	if h == nil {
-		return 0, nil
-	}
-	return h.CurrentSequence(), nil
-}
-
-// Ensure InProcPubSub implements all interfaces
-var (
-	_ PubSub             = (*InProcPubSub)(nil)
-	_ PatternPubSub      = (*InProcPubSub)(nil)
-	_ MQTTPubSub         = (*InProcPubSub)(nil)
-	_ ContextPubSub      = (*InProcPubSub)(nil)
-	_ BatchPubSub        = (*InProcPubSub)(nil)
-	_ DrainablePubSub    = (*InProcPubSub)(nil)
-	_ HistoryPubSub      = (*InProcPubSub)(nil)
-	_ RequestReplyPubSub = (*InProcPubSub)(nil)
-)

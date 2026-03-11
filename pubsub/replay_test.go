@@ -306,12 +306,15 @@ func TestReplayStore_Replay(t *testing.T) {
 		_ = ps.Publish("replay.topic", Message{Data: i})
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	// Drain original messages
-	ch := sub.C()
-	for len(ch) > 0 {
-		<-ch
+	// Drain original messages (ring buffer uses unbuffered channel, must use select)
+	drainDeadline := time.After(150 * time.Millisecond)
+drainOrig:
+	for {
+		select {
+		case <-sub.C():
+		case <-drainDeadline:
+			break drainOrig
+		}
 	}
 
 	// Replay all messages
@@ -326,14 +329,17 @@ func TestReplayStore_Replay(t *testing.T) {
 		t.Errorf("Expected to replay 3 messages, got %d", count)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify replayed messages were received
+	// Verify replayed messages were received (ring buffer: unbuffered channel)
 	received := 0
-	ch = sub.C()
-	for len(ch) > 0 {
-		<-ch
-		received++
+	replayDeadline := time.After(200 * time.Millisecond)
+replayDrain:
+	for received < 3 {
+		select {
+		case <-sub.C():
+			received++
+		case <-replayDeadline:
+			break replayDrain
+		}
 	}
 
 	if received != 3 {

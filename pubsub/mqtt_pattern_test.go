@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"sync"
 	"testing"
@@ -343,8 +344,9 @@ func TestSubscribeMQTT_InvalidPattern(t *testing.T) {
 
 	// Empty pattern
 	_, err := ps.SubscribeMQTT("", DefaultSubOptions())
-	if err != ErrInvalidPattern {
-		t.Errorf("expected ErrInvalidPattern for empty, got %v", err)
+	var pubsubErr *Error
+	if !errors.As(err, &pubsubErr) || pubsubErr.Code != ErrCodeInvalidPattern {
+		t.Errorf("expected ErrCodeInvalidPattern for empty, got %v", err)
 	}
 
 	// # not at end
@@ -365,8 +367,9 @@ func TestSubscribeMQTT_ClosedPubSub(t *testing.T) {
 	ps.Close()
 
 	_, err := ps.SubscribeMQTT("a/+/b", DefaultSubOptions())
-	if err != ErrSubscribeToClosed {
-		t.Errorf("expected ErrSubscribeToClosed, got %v", err)
+	var closedErr *Error
+	if !errors.As(err, &closedErr) || closedErr.Code != ErrCodeClosed {
+		t.Errorf("expected ErrCodeClosed, got %v", err)
 	}
 }
 
@@ -748,24 +751,25 @@ func TestSubscribeMQTT_CloseCleanup(t *testing.T) {
 	}
 }
 
-func TestSubscribeMQTT_Hooks(t *testing.T) {
-	var subscribedTopic string
-	var subscribedID uint64
-	var unsubscribedTopic string
-	var deliveredTopic string
+type mqttTestObserver struct {
+	subscribedTopic   string
+	subscribedID      uint64
+	unsubscribedTopic string
+	deliveredTopic    string
+}
 
-	ps := New(WithHooks(Hooks{
-		OnSubscribe: func(topic string, subID uint64) {
-			subscribedTopic = topic
-			subscribedID = subID
-		},
-		OnUnsubscribe: func(topic string, subID uint64) {
-			unsubscribedTopic = topic
-		},
-		OnDeliver: func(topic string, subID uint64, msg *Message) {
-			deliveredTopic = topic
-		},
-	}))
+func (o *mqttTestObserver) OnPublish(_ string, _ *Message) {}
+func (o *mqttTestObserver) OnSubscribe(topic string, subID uint64) {
+	o.subscribedTopic = topic
+	o.subscribedID = subID
+}
+func (o *mqttTestObserver) OnUnsubscribe(topic string, _ uint64)                        { o.unsubscribedTopic = topic }
+func (o *mqttTestObserver) OnDeliver(topic string, _ uint64, _ *Message)                { o.deliveredTopic = topic }
+func (o *mqttTestObserver) OnDrop(_ string, _ uint64, _ *Message, _ BackpressurePolicy) {}
+
+func TestSubscribeMQTT_Hooks(t *testing.T) {
+	obs := &mqttTestObserver{}
+	ps := New(WithObserver(obs))
 	defer ps.Close()
 
 	sub, err := ps.SubscribeMQTT("devices/+/temp", DefaultSubOptions())
@@ -773,11 +777,11 @@ func TestSubscribeMQTT_Hooks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if subscribedTopic != "devices/+/temp" {
-		t.Errorf("OnSubscribe topic = %q, want devices/+/temp", subscribedTopic)
+	if obs.subscribedTopic != "devices/+/temp" {
+		t.Errorf("OnSubscribe topic = %q, want devices/+/temp", obs.subscribedTopic)
 	}
-	if subscribedID != sub.ID() {
-		t.Errorf("OnSubscribe ID = %d, want %d", subscribedID, sub.ID())
+	if obs.subscribedID != sub.ID() {
+		t.Errorf("OnSubscribe ID = %d, want %d", obs.subscribedID, sub.ID())
 	}
 
 	// Publish and verify OnDeliver gets the actual topic, not the pattern
@@ -789,14 +793,14 @@ func TestSubscribeMQTT_Hooks(t *testing.T) {
 		t.Fatal("timeout")
 	}
 
-	if deliveredTopic != "devices/sensor1/temp" {
-		t.Errorf("OnDeliver topic = %q, want devices/sensor1/temp", deliveredTopic)
+	if obs.deliveredTopic != "devices/sensor1/temp" {
+		t.Errorf("OnDeliver topic = %q, want devices/sensor1/temp", obs.deliveredTopic)
 	}
 
 	sub.Cancel()
 
-	if unsubscribedTopic != "devices/+/temp" {
-		t.Errorf("OnUnsubscribe topic = %q, want devices/+/temp", unsubscribedTopic)
+	if obs.unsubscribedTopic != "devices/+/temp" {
+		t.Errorf("OnUnsubscribe topic = %q, want devices/+/temp", obs.unsubscribedTopic)
 	}
 }
 

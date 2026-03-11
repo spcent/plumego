@@ -365,7 +365,7 @@ func TestRingBuffer_ConcurrentPushDrop(t *testing.T) {
 // --- PubSub integration tests with ring buffer ---
 
 func TestPubSub_RingBuffer_BasicDelivery(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("test", SubOptions{
@@ -435,7 +435,7 @@ func TestPubSub_RingBuffer_PerSubscriberOptIn(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_NotUsedForOtherPolicies(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	// DropNewest should NOT use ring buffer even with global setting
@@ -456,7 +456,7 @@ func TestPubSub_RingBuffer_NotUsedForOtherPolicies(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_DropOldest(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 2, Policy: DropOldest})
@@ -521,7 +521,7 @@ done:
 }
 
 func TestPubSub_RingBuffer_Stats(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 4, Policy: DropOldest})
@@ -554,7 +554,7 @@ func TestPubSub_RingBuffer_Stats(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_Cancel(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 8, Policy: DropOldest})
@@ -575,7 +575,7 @@ func TestPubSub_RingBuffer_Cancel(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_CancelIdempotent(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 8, Policy: DropOldest})
@@ -590,7 +590,7 @@ func TestPubSub_RingBuffer_CancelIdempotent(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_MultiSubscriber(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub1, err := ps.Subscribe("events", SubOptions{BufferSize: 8, Policy: DropOldest})
@@ -623,7 +623,7 @@ func TestPubSub_RingBuffer_MultiSubscriber(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_PatternSubscription(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.SubscribePattern("user.*", SubOptions{BufferSize: 8, Policy: DropOldest})
@@ -647,7 +647,7 @@ func TestPubSub_RingBuffer_PatternSubscription(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_Filter(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("events", SubOptions{
@@ -684,24 +684,26 @@ func TestPubSub_RingBuffer_Filter(t *testing.T) {
 	}
 }
 
-func TestPubSub_RingBuffer_Hooks(t *testing.T) {
-	var (
-		deliveredCount atomic.Int64
-		droppedCount   atomic.Int64
-	)
+type ringbufHookObserver struct {
+	delivered atomic.Int64
+	dropped   atomic.Int64
+}
 
-	ps := New(
-		WithRingBuffer(),
-		WithHooks(Hooks{
-			OnDeliver: func(topic string, subID uint64, msg *Message) {
-				deliveredCount.Add(1)
-			},
-			OnDrop: func(topic string, subID uint64, msg *Message, policy BackpressurePolicy) {
-				droppedCount.Add(1)
-			},
-		}),
-	)
+func (o *ringbufHookObserver) OnPublish(_ string, _ *Message)           {}
+func (o *ringbufHookObserver) OnSubscribe(_ string, _ uint64)           {}
+func (o *ringbufHookObserver) OnUnsubscribe(_ string, _ uint64)         {}
+func (o *ringbufHookObserver) OnDeliver(_ string, _ uint64, _ *Message) { o.delivered.Add(1) }
+func (o *ringbufHookObserver) OnDrop(_ string, _ uint64, _ *Message, _ BackpressurePolicy) {
+	o.dropped.Add(1)
+}
+
+func TestPubSub_RingBuffer_Hooks(t *testing.T) {
+	obs := &ringbufHookObserver{}
+	ps := New(WithObserver(obs))
 	defer ps.Close()
+
+	deliveredCount := &obs.delivered
+	droppedCount := &obs.dropped
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 2, Policy: DropOldest})
 	if err != nil {
@@ -737,7 +739,7 @@ func TestPubSub_RingBuffer_Hooks(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_Close(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
@@ -764,7 +766,7 @@ func TestPubSub_RingBuffer_Close(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_HighThroughput(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 256, Policy: DropOldest})
@@ -802,7 +804,7 @@ func TestPubSub_RingBuffer_HighThroughput(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_DoneChannel(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 4, Policy: DropOldest})
@@ -829,7 +831,7 @@ func TestPubSub_RingBuffer_DoneChannel(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_MixedSubscribers(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	// One subscriber with ring buffer (DropOldest), one without (DropNewest)
@@ -864,7 +866,7 @@ func TestPubSub_RingBuffer_MixedSubscribers(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_BatchPublish(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 8, Policy: DropOldest})
@@ -896,7 +898,7 @@ func TestPubSub_RingBuffer_BatchPublish(t *testing.T) {
 }
 
 func TestPubSub_RingBuffer_ConcurrentPublish(t *testing.T) {
-	ps := New(WithRingBuffer())
+	ps := New()
 	defer ps.Close()
 
 	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 256, Policy: DropOldest})

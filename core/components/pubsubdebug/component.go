@@ -16,11 +16,11 @@ import (
 
 type PubSubDebugComponent struct {
 	cfg        PubSubConfig
-	defaultPub pubsub.PubSub
+	defaultPub pubsub.Broker
 	routesOnce sync.Once
 }
 
-func NewPubSubDebugComponent(cfg PubSubConfig, fallbackPub pubsub.PubSub) *PubSubDebugComponent {
+func NewPubSubDebugComponent(cfg PubSubConfig, fallbackPub pubsub.Broker) *PubSubDebugComponent {
 	return &PubSubDebugComponent{cfg: cfg, defaultPub: fallbackPub}
 }
 

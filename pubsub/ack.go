@@ -47,9 +47,9 @@ type ackableSubscriber struct {
 	pending    map[string]*pendingMessage // msgID -> pending message
 	ackTimeout time.Duration
 	maxRetries int
-	deadLetter *InProcPubSub
+	deadLetter *InProcBroker
 	dlTopic    string
-	ps         *InProcPubSub
+	ps         *InProcBroker
 	dlq        *deadLetterQueue
 }
 
@@ -73,7 +73,7 @@ type AckOptions struct {
 	DeadLetterTopic string
 
 	// DeadLetterPubSub is the pubsub for dead letter messages (nil = same pubsub)
-	DeadLetterPubSub *InProcPubSub
+	DeadLetterPubSub *InProcBroker
 
 	// DLQConfig provides additional configuration for the local dead letter queue.
 	// When set (non-zero), a local dead letter queue is created to store failed
@@ -92,7 +92,7 @@ func DefaultAckOptions() AckOptions {
 }
 
 // SubscribeAckable creates an ackable subscription.
-func (ps *InProcPubSub) SubscribeAckable(topic string, subOpts SubOptions, ackOpts AckOptions) (AckableSubscription, error) {
+func (ps *InProcBroker) SubscribeAckable(topic string, subOpts SubOptions, ackOpts AckOptions) (AckableSubscription, error) {
 	sub, err := ps.Subscribe(topic, subOpts)
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (as *ackableSubscriber) Receive(ctx context.Context) (Message, error) {
 	select {
 	case msg, ok := <-as.subscriber.C():
 		if !ok {
-			return Message{}, ErrClosed
+			return Message{}, newErr(ErrCodeClosed, "receive", "", "subscription is closed", nil)
 		}
 
 		// Track message for ack
@@ -146,7 +146,7 @@ func (as *ackableSubscriber) Receive(ctx context.Context) (Message, error) {
 		return Message{}, ctx.Err()
 
 	case <-as.subscriber.Done():
-		return Message{}, ErrClosed
+		return Message{}, newErr(ErrCodeClosed, "receive", "", "subscription is closed", nil)
 	}
 }
 
@@ -224,7 +224,7 @@ func (as *ackableSubscriber) Ack(msgID string) error {
 
 	pm, ok := as.pending[msgID]
 	if !ok {
-		return ErrNotFound
+		return newErr(ErrCodeNotFound, "ack", "", "message not found in pending", nil)
 	}
 
 	if pm.timer != nil {
@@ -241,7 +241,7 @@ func (as *ackableSubscriber) Nack(msgID string, requeue bool) error {
 	pm, ok := as.pending[msgID]
 	if !ok {
 		as.mu.Unlock()
-		return ErrNotFound
+		return newErr(ErrCodeNotFound, "ack", "", "message not found in pending", nil)
 	}
 
 	if pm.timer != nil {
@@ -425,7 +425,7 @@ func (dlq *deadLetterQueue) Clear() {
 }
 
 // Reprocess moves messages back to their original topics.
-func (dlq *deadLetterQueue) Reprocess(ps *InProcPubSub, filter func(dm DeadLetterMessage) bool) int {
+func (dlq *deadLetterQueue) Reprocess(ps *InProcBroker, filter func(dm DeadLetterMessage) bool) int {
 	dlq.mu.Lock()
 	defer dlq.mu.Unlock()
 
