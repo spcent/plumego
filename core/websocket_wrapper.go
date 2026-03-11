@@ -56,7 +56,7 @@ func (a *App) ConfigureWebSocketWithOptions(config WebSocketConfig) (*ws.Hub, er
 // compose it via core.WithComponent.
 func NewWebSocketComponent(config WebSocketConfig, logger log.StructuredLogger, debug bool) (Component, *ws.Hub, error) {
 	if logger == nil {
-		logger = log.NewGLogger()
+		logger = log.NewNoOpLogger()
 	}
 
 	comp, err := websocket.NewComponent(config, debug, logger)

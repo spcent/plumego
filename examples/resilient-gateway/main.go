@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/core"
+	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
@@ -32,6 +33,7 @@ func main() {
 	app := core.New(
 		core.WithAddr(":8080"),
 		core.WithDebug(),
+		core.WithLogger(plog.NewGLogger()),
 	)
 	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(observability.Logging(app.Logger(), nil, nil))

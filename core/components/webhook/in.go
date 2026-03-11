@@ -30,7 +30,7 @@ type WebhookInComponent struct {
 
 func NewWebhookInComponent(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *WebhookInComponent {
 	if logger == nil {
-		logger = log.NewGLogger()
+		logger = log.NewNoOpLogger()
 	}
 	pub := cfg.Pub
 	if pub == nil {

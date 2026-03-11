@@ -32,6 +32,7 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/core"
+    plumelog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/observability"
     "github.com/spcent/plumego/middleware/recovery"
 )
@@ -41,6 +42,7 @@ func main() {
         core.WithAddr(":8080"),
         core.WithDebug(),
         core.WithDevTools(),
+        core.WithLogger(plumelog.NewGLogger()),
     )
 
     if err := app.Use(
@@ -85,6 +87,8 @@ func main() {
 6. During shutdown, call `app.Shutdown(ctx)` to stop server, runners, components, and hooks.
 
 After boot starts, mutating operations (adding routes/middleware/runners/hooks) are rejected.
+
+`core.New(...)` defaults to `log.NewNoOpLogger()`. Inject a real logger with `core.WithLogger(...)` before wiring logging middleware around `app.Logger()`.
 
 ---
 

@@ -11,7 +11,9 @@ app := core.New(core.WithAddr(":8080"))
 
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), nil, nil),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatal(err)
@@ -23,7 +25,10 @@ if err := app.Use(
 ## Observability
 
 - `observability.RequestID(...)`
-- `observability.Logging(logger, metricsCollector, tracer)`
+- `observability.Tracing(tracer)`
+- `observability.HTTPMetrics(metricsCollector)`
+- `observability.AccessLog(logger)`
+- `observability.Logging(logger, metricsCollector, tracer)` as a convenience wrapper
 
 ## Safety / Reliability
 

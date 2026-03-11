@@ -5,7 +5,10 @@ Register globally with `app.Use(...)`, or scope to a router group via `group.Use
 
 ## Common built-in middleware
 - Request ID: `observability.RequestID()`
-- Structured logging: `observability.Logging(app.Logger(), metricsCollector, tracer)`
+- Tracing: `observability.Tracing(tracer)`
+- HTTP metrics: `observability.HTTPMetrics(metricsCollector)`
+- Access log: `observability.AccessLog(app.Logger())`
+- Combined convenience wrapper: `observability.Logging(app.Logger(), metricsCollector, tracer)`
 - Panic recovery: `recovery.Recovery(logger)`
 - CORS: `cors.CORS` / `cors.CORSWithOptions(...)`
 - Gzip compression: `compression.Gzip()`
@@ -22,7 +25,9 @@ app := core.New(core.WithAddr(":8080"))
 
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), nil, nil),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
     cors.CORS,
     compression.Gzip(),

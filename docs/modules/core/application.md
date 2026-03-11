@@ -9,7 +9,7 @@ Canonical usage guide for creating and configuring `core.App` in v1.
 ## Create an App
 
 ```go
-app := core.New()
+app := core.New(core.WithLogger(plumelog.NewGLogger()))
 ```
 
 With options:
@@ -17,6 +17,7 @@ With options:
 ```go
 app := core.New(
     core.WithAddr(":8080"),
+    core.WithLogger(plumelog.NewGLogger()),
     core.WithDebug(),
     core.WithDevTools(),
     core.WithServerTimeouts(30*time.Second, 5*time.Second, 30*time.Second, 60*time.Second),

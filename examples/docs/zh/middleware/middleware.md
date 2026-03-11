@@ -5,7 +5,10 @@ Plumego 中间件完全兼容标准库签名（`func(http.Handler) http.Handler`
 
 ## 常用内置中间件
 - Request ID：`observability.RequestID()`
-- 结构化日志：`observability.Logging(app.Logger(), metricsCollector, tracer)`
+- Tracing：`observability.Tracing(tracer)`
+- HTTP 指标：`observability.HTTPMetrics(metricsCollector)`
+- 访问日志：`observability.AccessLog(app.Logger())`
+- 组合便捷入口：`observability.Logging(app.Logger(), metricsCollector, tracer)`
 - panic 恢复：`recovery.Recovery(logger)`
 - CORS：`cors.CORS` / `cors.CORSWithOptions(...)`
 - Gzip 压缩：`compression.Gzip()`
@@ -22,7 +25,9 @@ app := core.New(core.WithAddr(":8080"))
 
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), nil, nil),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
     cors.CORS,
     compression.Gzip(),

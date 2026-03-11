@@ -126,11 +126,15 @@ Register middleware explicitly before `Prepare()`:
 import (
 	"log"
 
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
 )
 
-app := plumego.New(plumego.WithAddr(":8080"))
+app := plumego.New(
+	plumego.WithAddr(":8080"),
+	plumego.WithLogger(plumelog.NewGLogger()),
+)
 if err := app.Use(
 	observability.RequestID(),
 	recovery.Recovery(app.Logger()),

@@ -13,6 +13,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
+	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
@@ -293,6 +294,7 @@ func main() {
 	app := core.New(
 		core.WithAddr(":8080"),
 		core.WithDebug(),
+		core.WithLogger(plog.NewGLogger()),
 	)
 	if err := app.Use(
 		observability.RequestID(),

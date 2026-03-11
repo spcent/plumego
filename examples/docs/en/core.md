@@ -10,6 +10,7 @@ app := core.New(
     core.WithAddr(":8080"),
     core.WithDebug(),
     core.WithDevTools(),
+    core.WithLogger(plumelog.NewGLogger()),
 )
 
 if err := app.Use(
@@ -82,6 +83,7 @@ if err != nil {
 }
 
 app := core.New(
+    core.WithLogger(plumelog.NewGLogger()),
     core.WithAddr(":8080"),
     core.WithMetricsCollector(prom),
     core.WithTracer(tracer),

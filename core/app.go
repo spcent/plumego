@@ -79,7 +79,7 @@ func New(options ...Option) *App {
 		config:        defaultConfig,
 		router:        router.NewRouter(),
 		middlewareReg: middleware.NewRegistry(),
-		logger:        log.NewGLogger(),
+		logger:        log.NewNoOpLogger(),
 	}
 
 	for _, opt := range options {

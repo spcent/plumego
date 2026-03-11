@@ -13,6 +13,7 @@ import (
 	"github.com/spcent/plumego/core/components/webhook"
 	"github.com/spcent/plumego/examples/reference/internal/config"
 	"github.com/spcent/plumego/health"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
@@ -59,6 +60,7 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 		core.WithAddr(cfg.Core.Addr),
 		core.WithEnvPath(cfg.Core.EnvFile),
 		core.WithHealthManager(healthManager),
+		core.WithLogger(plumelog.NewGLogger()),
 	}
 	if cfg.Core.Debug {
 		opts = append(opts, core.WithDebug())

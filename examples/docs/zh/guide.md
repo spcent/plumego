@@ -34,6 +34,7 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/core"
+    plumelog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/cors"
     "github.com/spcent/plumego/middleware/observability"
     "github.com/spcent/plumego/middleware/recovery"
@@ -45,6 +46,7 @@ func main() {
         core.WithAddr(":8080"),
         core.WithDebug(),
         core.WithDevTools(),
+        core.WithLogger(plumelog.NewGLogger()),
     )
 
     if err := app.Use(

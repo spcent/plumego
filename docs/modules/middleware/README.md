@@ -21,7 +21,9 @@ app := core.New(core.WithAddr(":8080"))
 
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), nil, nil),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatalf("register middleware: %v", err)
@@ -55,7 +57,10 @@ Wrap one handler manually.
 ## Built-in Middleware (Common)
 
 - request ID: `middleware/observability.RequestID(...)`
-- structured logging: `middleware/observability.Logging(...)`
+- tracing: `middleware/observability.Tracing(...)`
+- HTTP metrics: `middleware/observability.HTTPMetrics(...)`
+- access log: `middleware/observability.AccessLog(...)`
+- combined convenience wrapper: `middleware/observability.Logging(...)`
 - panic recovery: `middleware/recovery.Recovery(logger)`
 - CORS: `middleware/cors.CORS` / `middleware/cors.CORSWithOptions(...)`
 - security headers: `middleware/security.SecurityHeaders(...)`
@@ -74,6 +79,9 @@ Use only the middleware needed by your transport boundary.
 h := middleware.Apply(
     http.HandlerFunc(finalHandler),
     observability.RequestID(),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(logger),
     recovery.Recovery(logger),
 )
 
@@ -87,9 +95,11 @@ http.ListenAndServe(":8080", h)
 Recommended baseline order:
 
 1. request ID
-2. logging/tracing
-3. recovery
-4. auth/rate/security headers/cors (by endpoint needs)
+2. tracing
+3. HTTP metrics
+4. access log
+5. recovery
+6. auth/rate/security headers/cors (by endpoint needs)
 
 Keep ordering explicit in code and tests.
 
@@ -102,6 +112,9 @@ When components contribute middleware, use `middleware.Registry`:
 ```go
 reg := middleware.NewRegistry()
 reg.Use(observability.RequestID())
+reg.Use(observability.Tracing(nil))
+reg.Use(observability.HTTPMetrics(nil))
+reg.Use(observability.AccessLog(logger))
 reg.Use(recovery.Recovery(logger))
 
 h := middleware.Apply(http.HandlerFunc(finalHandler), reg.Middlewares()...)

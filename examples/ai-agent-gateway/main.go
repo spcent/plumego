@@ -97,6 +97,7 @@ func main() {
 	app := core.New(
 		core.WithAddr(":8080"),
 		core.WithDebug(),
+		core.WithLogger(logger),
 	)
 	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(observability.Logging(app.Logger(), nil, nil))

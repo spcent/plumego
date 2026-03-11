@@ -13,7 +13,7 @@ Key capabilities:
 - Two built-in implementations:
   - `NewGLogger()` for glog-style text output and file rotation
   - `NewJSONLogger(...)` for JSON output
-- Lifecycle hooks (`Start/Stop`) for integration with `core.Boot()`
+- Lifecycle hooks (`Start/Stop`) for integration with `core` lifecycle
 
 ## Core Interface
 
@@ -35,7 +35,7 @@ type StructuredLogger interface {
 
 ## Quick Start
 
-### GLogger (default)
+### GLogger
 
 ```go
 import (
@@ -125,5 +125,7 @@ For request paths, prefer middleware stack:
 ## Integration with Core
 
 Use `core.WithLogger(customLogger)` to inject the app logger explicitly.
+
+`core.New(...)` defaults to `log.NewNoOpLogger()`. If you wire `observability.Logging(app.Logger(), ...)` or `recovery.Recovery(app.Logger())`, inject a real logger first.
 
 If the logger implements `log.Lifecycle`, core lifecycle will call `Start()` and `Stop()` automatically.

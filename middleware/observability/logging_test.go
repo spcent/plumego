@@ -97,14 +97,24 @@ func (l *stubLogger) record(msg string, fields log.Fields) {
 }
 
 type stubMetrics struct {
-	mu    sync.Mutex
-	count int
+	mu       sync.Mutex
+	count    int
+	method   string
+	path     string
+	status   int
+	bytes    int
+	duration time.Duration
 }
 
 func (m *stubMetrics) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.count++
+	m.method = method
+	m.path = path
+	m.status = status
+	m.bytes = bytes
+	m.duration = duration
 }
 
 type stubSpan struct {
@@ -333,6 +343,89 @@ func TestLoggingAddsSpanID(t *testing.T) {
 	if (*logger.entries)[0].fields["span_id"] != "span-123" {
 		t.Fatalf("expected span id field to be logged, got %v", (*logger.entries)[0].fields["span_id"])
 	}
+}
+
+func TestTracingMiddlewareSetsTraceHeadersAndSpanContext(t *testing.T) {
+	tracer := &spanContextTracer{}
+	handler := Tracing(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tc := contract.TraceContextFromContext(r.Context())
+		if tc == nil || tc.SpanID != "span-123" {
+			t.Fatalf("expected trace context with span id, got %+v", tc)
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("ok"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/trace", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Header().Get(contract.RequestIDHeader) != "trace-ctx" {
+		t.Fatalf("expected request id header to be set from tracer")
+	}
+	if rec.Header().Get("X-Span-ID") != "span-123" {
+		t.Fatalf("expected span id header to be set")
+	}
+	if tracer.span == nil || !tracer.span.ended {
+		t.Fatalf("expected tracer span to be ended")
+	}
+}
+
+func TestHTTPMetricsMiddlewareObservesRoutePattern(t *testing.T) {
+	collector := &stubMetrics{}
+	handler := HTTPMetrics(collector)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("ok"))
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/users/42", nil)
+	req = req.WithContext(context.WithValue(req.Context(), contract.RequestContextKey{}, contract.RequestContext{
+		RoutePattern: "/users/:id",
+	}))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if collector.count != 1 {
+		t.Fatalf("expected one metrics observation, got %d", collector.count)
+	}
+	if collector.path != "/users/:id" {
+		t.Fatalf("expected route pattern to be observed, got %q", collector.path)
+	}
+	if collector.status != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", collector.status)
+	}
+	if collector.bytes != len("ok") {
+		t.Fatalf("expected bytes %d, got %d", len("ok"), collector.bytes)
+	}
+}
+
+func TestAccessLogMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
+	logger := newStubLogger()
+	tracer := &spanContextTracer{}
+	handler := AccessLog(logger)(Tracing(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	req := httptest.NewRequest(http.MethodGet, "/span-log", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if len(*logger.entries) != 1 {
+		t.Fatalf("expected one log entry, got %d", len(*logger.entries))
+	}
+	if (*logger.entries)[0].fields["span_id"] != "span-123" {
+		t.Fatalf("expected span id in access log, got %v", (*logger.entries)[0].fields["span_id"])
+	}
+}
+
+func TestAccessLogMiddlewareRejectsNilLogger(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic when logger is nil")
+		}
+	}()
+
+	_ = AccessLog(nil)
 }
 
 func BenchmarkLogging(b *testing.B) {

@@ -98,9 +98,10 @@ func WithDevTools() Option {
 // WithLogger sets a custom logger for the App.
 func WithLogger(logger log.StructuredLogger) Option {
 	return func(a *App) {
-		if logger != nil {
-			a.logger = logger
+		if logger == nil {
+			panic("core logger cannot be nil")
 		}
+		a.logger = logger
 	}
 }
 

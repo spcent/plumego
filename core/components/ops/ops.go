@@ -129,7 +129,7 @@ type QuotaUsage struct {
 func NewComponent(opts Options) *Component {
 	logger := opts.Logger
 	if logger == nil {
-		logger = log.NewGLogger()
+		logger = log.NewNoOpLogger()
 	}
 	return &Component{
 		cfg:    opts,

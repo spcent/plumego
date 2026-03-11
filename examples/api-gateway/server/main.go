@@ -90,8 +90,10 @@ func main() {
 	})
 
 	// Create application options
+	logger := plog.NewGLogger()
 	appOptions := []core.Option{
 		core.WithAddr(cfg.Server.Addr),
+		core.WithLogger(logger),
 	}
 
 	// Add debug option if enabled
@@ -106,9 +108,6 @@ func main() {
 	}
 
 	app := core.New(appOptions...)
-
-	// Get logger for access logging
-	logger := plog.NewGLogger()
 
 	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(observability.Logging(logger, nil, nil))

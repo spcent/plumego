@@ -63,7 +63,7 @@ type Options struct {
 
 func NewComponent(opts Options) *DevToolsComponent {
 	if opts.Logger == nil {
-		opts.Logger = log.NewGLogger()
+		opts.Logger = log.NewNoOpLogger()
 	}
 	return &DevToolsComponent{
 		debug:      opts.Debug,

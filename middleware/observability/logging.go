@@ -103,6 +103,114 @@ type Tracer interface {
 	Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan)
 }
 
+// Tracing starts and finishes a request span while preserving trace metadata in context and headers.
+func Tracing(tracer Tracer) middleware.Middleware {
+	return func(next http.Handler) http.Handler {
+		if tracer == nil {
+			return next
+		}
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			traceID := ensureTraceID(r)
+			ctx := context.WithValue(r.Context(), contract.TraceIDKey{}, traceID)
+			ctx = log.WithTraceID(ctx, traceID)
+
+			ctx, span := tracer.Start(ctx, r)
+			spanTraceID, spanID := extractSpanContext(ctx, span)
+			if spanTraceID != "" {
+				traceID = spanTraceID
+				ctx = context.WithValue(ctx, contract.TraceIDKey{}, traceID)
+				ctx = log.WithTraceID(ctx, traceID)
+			}
+			if spanID != "" && contract.TraceContextFromContext(ctx) == nil {
+				ctx = contract.ContextWithTraceContext(ctx, contract.TraceContext{
+					TraceID: contract.TraceID(traceID),
+					SpanID:  contract.SpanID(spanID),
+				})
+			}
+
+			r = r.WithContext(ctx)
+			w.Header().Set(contract.RequestIDHeader, traceID)
+			if spanID != "" {
+				w.Header().Set("X-Span-ID", spanID)
+			}
+
+			recorder := newResponseRecorder(w)
+			next.ServeHTTP(recorder, r)
+
+			if span != nil {
+				span.End(recorder.StatusCode(), recorder.BytesWritten(), traceID)
+			}
+		})
+	}
+}
+
+// HTTPMetrics records per-request HTTP metrics using the configured collector.
+func HTTPMetrics(collector MetricsCollector) middleware.Middleware {
+	return func(next http.Handler) http.Handler {
+		if collector == nil {
+			return next
+		}
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			traceID := ensureTraceID(r)
+			w.Header().Set(contract.RequestIDHeader, traceID)
+			recorder := newResponseRecorder(w)
+			start := time.Now()
+
+			next.ServeHTTP(recorder, r)
+
+			metricsData := buildRequestMetrics(r, recorder, start, traceID)
+			path := metricsData.Path
+			if metricsData.Route != "" {
+				path = metricsData.Route
+			}
+			collector.ObserveHTTP(r.Context(), metricsData.Method, path, metricsData.Status, metricsData.Bytes, metricsData.Duration)
+		})
+	}
+}
+
+// AccessLog emits a structured access log when the request completes.
+func AccessLog(logger log.StructuredLogger) middleware.Middleware {
+	if logger == nil {
+		panic("access logger cannot be nil")
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			traceID := ensureTraceID(r)
+			w.Header().Set(contract.RequestIDHeader, traceID)
+			recorder := newResponseRecorder(w)
+			start := time.Now()
+
+			next.ServeHTTP(recorder, r)
+
+			if headerTraceID := recorder.Header().Get(contract.RequestIDHeader); headerTraceID != "" {
+				traceID = headerTraceID
+			}
+			metricsData := buildRequestMetrics(r, recorder, start, traceID)
+			rc := contract.RequestContextFrom(r.Context())
+			fields := contract.DefaultObservabilityPolicy.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
+			fields["bytes"] = metricsData.Bytes
+			fields["user_agent"] = metricsData.UserAgent
+			fields["client_ip"] = httpx.ClientIP(r)
+			if metricsData.Route != "" {
+				fields["route"] = metricsData.Route
+			}
+			if rc.RouteName != "" {
+				fields["route_name"] = rc.RouteName
+			}
+			if spanID := recorder.Header().Get("X-Span-ID"); spanID != "" {
+				fields["span_id"] = spanID
+			} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.SpanID != "" {
+				fields["span_id"] = tc.SpanID
+			}
+
+			logger.WithFields(fields).Info("request completed")
+		})
+	}
+}
+
 // Logging provides request logging with structured fields and optional metrics/tracing hooks.
 //
 // This middleware logs each request with structured fields including method, path, status,
@@ -168,18 +276,7 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 			next.ServeHTTP(recorder, r)
 
 			rc := contract.RequestContextFrom(r.Context())
-			metricsData := RequestMetrics{
-				Method:    r.Method,
-				Path:      r.URL.Path,
-				Status:    recorder.StatusCode(),
-				Bytes:     recorder.BytesWritten(),
-				Duration:  time.Since(start),
-				TraceID:   traceID,
-				UserAgent: r.UserAgent(),
-			}
-			if rc.RoutePattern != "" {
-				metricsData.Route = rc.RoutePattern
-			}
+			metricsData := buildRequestMetrics(r, recorder, start, traceID)
 
 			if metrics != nil {
 				path := metricsData.Path
@@ -230,6 +327,23 @@ func extractSpanContext(ctx context.Context, span TraceSpan) (string, string) {
 		return string(tc.TraceID), string(tc.SpanID)
 	}
 	return "", ""
+}
+
+func buildRequestMetrics(r *http.Request, recorder *responseRecorder, started time.Time, traceID string) RequestMetrics {
+	rc := contract.RequestContextFrom(r.Context())
+	metricsData := RequestMetrics{
+		Method:    r.Method,
+		Path:      r.URL.Path,
+		Status:    recorder.StatusCode(),
+		Bytes:     recorder.BytesWritten(),
+		Duration:  time.Since(started),
+		TraceID:   traceID,
+		UserAgent: r.UserAgent(),
+	}
+	if rc.RoutePattern != "" {
+		metricsData.Route = rc.RoutePattern
+	}
+	return metricsData
 }
 
 type responseRecorder struct {

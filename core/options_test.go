@@ -148,12 +148,22 @@ func TestWithLogger(t *testing.T) {
 }
 
 func TestWithLoggerNil(t *testing.T) {
-	app := &App{logger: log.NewGLogger()}
-	originalLogger := app.logger
-	opt := WithLogger(nil)
-	opt(app)
-	if app.logger != originalLogger {
-		t.Errorf("expected logger to remain unchanged when nil is passed")
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic when nil logger is passed")
+		}
+	}()
+
+	WithLogger(nil)(&App{})
+}
+
+func TestNewDefaultsToNoOpLogger(t *testing.T) {
+	app := New()
+	if app.logger == nil {
+		t.Fatal("expected logger to be initialized")
+	}
+	if _, ok := app.logger.(*log.NoOpLogger); !ok {
+		t.Fatalf("expected NoOpLogger by default, got %T", app.logger)
 	}
 }
 

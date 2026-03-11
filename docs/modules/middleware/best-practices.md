@@ -26,7 +26,9 @@ Register in intentional order and test it.
 ```go
 _ = app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), nil, nil),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
 )
 ```

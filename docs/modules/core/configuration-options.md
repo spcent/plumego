@@ -238,6 +238,8 @@ app := core.New(
 
 Set a custom structured logger.
 
+`core.New(...)` uses `log.NewNoOpLogger()` by default. Use `WithLogger(...)` whenever you expect `app.Logger()` to emit logs.
+
 ```go
 func WithLogger(logger log.StructuredLogger) Option
 ```
