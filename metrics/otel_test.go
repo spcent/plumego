@@ -7,9 +7,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware/observability"
 )
 
 func TestOpenTelemetryTracer(t *testing.T) {
@@ -24,12 +21,7 @@ func TestOpenTelemetryTracer(t *testing.T) {
 	// Add a small delay to ensure non-zero duration
 	time.Sleep(1 * time.Millisecond)
 
-	span.End(observability.RequestMetrics{
-		Status:   http.StatusOK,
-		Bytes:    10,
-		TraceID:  "abc123",
-		Duration: 100 * time.Millisecond,
-	})
+	span.End(http.StatusOK, 10, "abc123")
 
 	spans := tracer.Spans()
 	if len(spans) != 1 {
@@ -58,12 +50,7 @@ func TestOpenTelemetryTracerError(t *testing.T) {
 		t.Fatalf("tracer should return span")
 	}
 
-	span.End(observability.RequestMetrics{
-		Status:   http.StatusInternalServerError,
-		Bytes:    50,
-		TraceID:  "error123",
-		Duration: 200 * time.Millisecond,
-	})
+	span.End(http.StatusInternalServerError, 50, "error123")
 
 	spans := tracer.Spans()
 	if len(spans) != 1 {
@@ -84,12 +71,7 @@ func TestOpenTelemetryTracerWithParent(t *testing.T) {
 	req.Header.Set("X-Trace-ID", "parent-trace-id")
 	_, span := tracer.Start(context.Background(), req)
 
-	span.End(observability.RequestMetrics{
-		Status:   http.StatusOK,
-		Bytes:    10,
-		TraceID:  "abc123",
-		Duration: 100 * time.Millisecond,
-	})
+	span.End(http.StatusOK, 10, "abc123")
 
 	spans := tracer.Spans()
 	if len(spans) != 1 {
@@ -119,23 +101,18 @@ func TestOpenTelemetryTracerStats(t *testing.T) {
 			status = http.StatusInternalServerError
 		}
 
-		span.End(observability.RequestMetrics{
-			Status:   status,
-			Bytes:    100,
-			TraceID:  "trace",
-			Duration: time.Duration(100+i*10) * time.Millisecond,
-		})
+		span.End(status, 100, "trace")
 	}
 
-	stats := tracer.GetStats()
-	if stats.TotalSpans != 5 {
-		t.Fatalf("expected 5 spans, got %d", stats.TotalSpans)
+	spanStats := tracer.GetSpanStats()
+	if spanStats.TotalSpans != 5 {
+		t.Fatalf("expected 5 spans, got %d", spanStats.TotalSpans)
 	}
 	// Check that we have at least one error span (status 500)
-	if stats.ErrorSpans < 1 {
-		t.Fatalf("expected at least 1 error span, got %d", stats.ErrorSpans)
+	if spanStats.ErrorSpans < 1 {
+		t.Fatalf("expected at least 1 error span, got %d", spanStats.ErrorSpans)
 	}
-	if stats.AverageDuration == 0 {
+	if spanStats.AverageDuration == 0 {
 		t.Fatalf("expected non-zero average duration")
 	}
 }
@@ -145,11 +122,7 @@ func TestOpenTelemetryTracerClear(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	_, span := tracer.Start(context.Background(), req)
-	span.End(observability.RequestMetrics{
-		Status:  http.StatusOK,
-		Bytes:   10,
-		TraceID: "test",
-	})
+	span.End(http.StatusOK, 10, "test")
 
 	if len(tracer.Spans()) != 1 {
 		t.Fatalf("expected 1 span before clear")
@@ -170,11 +143,7 @@ func TestOpenTelemetryTracerConcurrency(t *testing.T) {
 		go func() {
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			_, span := tracer.Start(context.Background(), req)
-			span.End(observability.RequestMetrics{
-				Status:  http.StatusOK,
-				Bytes:   10,
-				TraceID: "concurrent",
-			})
+			span.End(http.StatusOK, 10, "concurrent")
 			done <- true
 		}()
 	}
@@ -194,8 +163,8 @@ func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
 	tracer := NewOpenTelemetryTracer("plumego-test")
 
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
-	ctx := context.WithValue(context.Background(), contract.TraceIDKey{}, "trace-ctx")
-	ctx, span := tracer.Start(ctx, req)
+	req.Header.Set("X-Trace-ID", "trace-ctx")
+	ctx, span := tracer.Start(context.Background(), req)
 
 	spanCtx, ok := span.(interface {
 		TraceID() string
@@ -205,21 +174,22 @@ func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
 		t.Fatalf("expected span to expose context identifiers")
 	}
 	if spanCtx.TraceID() != "trace-ctx" {
-		t.Fatalf("expected trace id from context, got %s", spanCtx.TraceID())
+		t.Fatalf("expected trace id from header, got %s", spanCtx.TraceID())
 	}
 
-	traceCtx := contract.TraceContextFromContext(ctx)
-	if traceCtx == nil || string(traceCtx.TraceID) != "trace-ctx" {
-		t.Fatalf("expected trace context to be set from context")
+	internalCtx := traceContextFromContext(ctx)
+	if internalCtx == nil || internalCtx.traceID != "trace-ctx" {
+		t.Fatalf("expected internal trace context to be set with traceID trace-ctx")
 	}
-	if traceCtx.SpanID == "" {
-		t.Fatalf("expected span id in trace context")
+	if internalCtx.spanID == "" {
+		t.Fatalf("expected non-empty span id in internal trace context")
 	}
 }
 
 func TestSpanIDGeneration(t *testing.T) {
-	spanID1 := generateSpanID()
-	spanID2 := generateSpanID()
+	tracer := NewOpenTelemetryTracer("test")
+	spanID1 := tracer.generateSpanID()
+	spanID2 := tracer.generateSpanID()
 
 	if spanID1 == spanID2 {
 		t.Fatalf("span IDs should be unique")
@@ -230,8 +200,9 @@ func TestSpanIDGeneration(t *testing.T) {
 }
 
 func TestTraceIDGeneration(t *testing.T) {
-	traceID1 := generateTraceID()
-	traceID2 := generateTraceID()
+	tracer := NewOpenTelemetryTracer("test")
+	traceID1 := tracer.generateTraceID()
+	traceID2 := tracer.generateTraceID()
 
 	if traceID1 == traceID2 {
 		t.Fatalf("trace IDs should be unique")
@@ -279,13 +250,6 @@ func TestOpenTelemetryTracerMaxSpansDropOldest(t *testing.T) {
 		t.Fatalf("expected 2 dropped spans, got %d", spanStats.DroppedSpans)
 	}
 
-	collectorStats := tracer.GetStats()
-	if collectorStats.MaxSpanRetention != 3 {
-		t.Fatalf("expected collector max retention 3, got %d", collectorStats.MaxSpanRetention)
-	}
-	if collectorStats.DroppedSpans != 2 {
-		t.Fatalf("expected collector dropped spans 2, got %d", collectorStats.DroppedSpans)
-	}
 }
 
 func TestOpenTelemetryTracerWithMaxSpansTrimsExisting(t *testing.T) {

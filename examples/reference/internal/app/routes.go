@@ -85,8 +85,7 @@ func (a *App) registerStatic() error {
 }
 
 func (a *App) registerHealth() {
-	hm, _ := health.NewHealthManager(health.HealthCheckConfig{Enabled: true})
-	a.Core.Get("/health/ready", health.ReadinessHandler(hm).ServeHTTP)
+	a.Core.Get("/health/ready", health.ReadinessHandler(nil).ServeHTTP)
 	a.Core.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 }
 

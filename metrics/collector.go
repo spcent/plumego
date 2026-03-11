@@ -34,8 +34,6 @@ const (
 	MetricKVDelete MetricType = "kv_delete"
 	MetricKVExists MetricType = "kv_exists"
 	MetricKVKeys   MetricType = "kv_keys"
-	MetricKVHit    MetricType = "kv_hit"
-	MetricKVMiss   MetricType = "kv_miss"
 	MetricKVEvict  MetricType = "kv_evict"
 
 	// IPC metrics
@@ -135,22 +133,12 @@ type MetricsCollector interface {
 //
 // Optional fields:
 //   - TypeBreakdown: per-metric-type counters when the collector can provide them.
-//
-// Tracing compatibility fields (optional and collector-specific):
-//   - TotalSpans, ErrorSpans, TotalDuration, AverageDuration, MaxSpanRetention, DroppedSpans.
 type CollectorStats struct {
 	TotalRecords  int64                `json:"total_records"`
 	ErrorRecords  int64                `json:"error_records"`
 	ActiveSeries  int                  `json:"active_series"`
 	StartTime     time.Time            `json:"start_time"`
 	TypeBreakdown map[MetricType]int64 `json:"type_breakdown"`
-	// Tracing-specific fields
-	TotalSpans       int           `json:"total_spans"`
-	ErrorSpans       int           `json:"error_spans"`
-	TotalDuration    time.Duration `json:"total_duration"`
-	AverageDuration  time.Duration `json:"average_duration"`
-	MaxSpanRetention int           `json:"max_span_retention"`
-	DroppedSpans     int           `json:"dropped_spans"`
 }
 
 // BaseMetricsCollector provides a base implementation for metrics collectors
@@ -256,7 +244,7 @@ func (b *BaseMetricsCollector) ObservePubSub(ctx context.Context, operation, top
 	record := MetricRecord{
 		Type:  metricType,
 		Name:  "pubsub_" + operation,
-		Value: float64(duration.Milliseconds()),
+		Value: durationValueSeconds(duration),
 		Labels: MetricLabels{
 			labelOperation: operation,
 			labelTopic:     topic,
@@ -286,7 +274,7 @@ func (b *BaseMetricsCollector) ObserveMQ(ctx context.Context, operation, topic s
 	record := MetricRecord{
 		Type:  metricType,
 		Name:  "mq_" + operation,
-		Value: float64(duration.Milliseconds()),
+		Value: durationValueSeconds(duration),
 		Labels: MetricLabels{
 			labelOperation: operation,
 			labelTopic:     topic,
@@ -333,25 +321,6 @@ func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key str
 		Error:    err,
 	}
 	b.Record(ctx, record)
-
-	// Also record hit/miss specific metrics
-	if operation == "get" {
-		var hitType MetricType
-		if hit {
-			hitType = MetricKVHit
-		} else {
-			hitType = MetricKVMiss
-		}
-		hitRecord := MetricRecord{
-			Type:     hitType,
-			Name:     "kv_" + operation + "_" + map[bool]string{true: "hit", false: "miss"}[hit],
-			Value:    durationValueSeconds(duration),
-			Labels:   labels,
-			Duration: duration,
-			Error:    err,
-		}
-		b.Record(ctx, hitRecord)
-	}
 }
 
 // ObserveIPC implements IPC metrics recording

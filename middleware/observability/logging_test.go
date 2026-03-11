@@ -108,14 +108,21 @@ func (m *stubMetrics) ObserveHTTP(ctx context.Context, method, path string, stat
 }
 
 type stubSpan struct {
-	endedWith RequestMetrics
-	ended     bool
+	endedStatus int
+	endedBytes  int
+	endedTrace  string
+	ended       bool
 }
 
-func (s *stubSpan) End(metrics RequestMetrics) {
-	s.endedWith = metrics
+func (s *stubSpan) End(status, bytes int, traceID string) {
+	s.endedStatus = status
+	s.endedBytes = bytes
+	s.endedTrace = traceID
 	s.ended = true
 }
+
+func (s *stubSpan) TraceID() string { return "" }
+func (s *stubSpan) SpanID() string  { return "" }
 
 type stubTracer struct {
 	started   bool
@@ -134,14 +141,18 @@ func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Contex
 }
 
 type spanContextSpan struct {
-	traceID   string
-	spanID    string
-	endedWith RequestMetrics
-	ended     bool
+	traceID     string
+	spanID      string
+	endedStatus int
+	endedBytes  int
+	endedTrace  string
+	ended       bool
 }
 
-func (s *spanContextSpan) End(metrics RequestMetrics) {
-	s.endedWith = metrics
+func (s *spanContextSpan) End(status, bytes int, traceID string) {
+	s.endedStatus = status
+	s.endedBytes = bytes
+	s.endedTrace = traceID
 	s.ended = true
 }
 

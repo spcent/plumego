@@ -7,19 +7,12 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/spcent/plumego/middleware/observability"
 )
 
 func TestPrometheusCollectorObserveAndHandler(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test")
 
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/test",
-		Status:   http.StatusOK,
-		Duration: 125 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/test", http.StatusOK, 0, 125*time.Millisecond)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -80,12 +73,7 @@ func TestPrometheusCollectorMultipleRequests(t *testing.T) {
 	}
 
 	for _, req := range requests {
-		collector.Observe(context.Background(), observability.RequestMetrics{
-			Method:   req.method,
-			Path:     req.path,
-			Status:   req.status,
-			Duration: 100 * time.Millisecond,
-		})
+		collector.ObserveHTTP(context.Background(), req.method, req.path, req.status, 0, 100*time.Millisecond)
 	}
 
 	rr := httptest.NewRecorder()
@@ -114,12 +102,7 @@ func TestPrometheusCollectorStats(t *testing.T) {
 
 	// Add some requests
 	for i := 0; i < 5; i++ {
-		collector.Observe(context.Background(), observability.RequestMetrics{
-			Method:   http.MethodGet,
-			Path:     "/test",
-			Status:   http.StatusOK,
-			Duration: time.Duration(100+i*10) * time.Millisecond,
-		})
+		collector.ObserveHTTP(context.Background(), http.MethodGet, "/test", http.StatusOK, 0, time.Duration(100+i*10)*time.Millisecond)
 	}
 
 	stats := collector.GetStats()
@@ -141,12 +124,7 @@ func TestPrometheusCollectorStats(t *testing.T) {
 func TestPrometheusCollectorClear(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test")
 
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/test",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/test", http.StatusOK, 0, 100*time.Millisecond)
 
 	stats := collector.GetStats()
 	if stats.TotalRecords != 1 {
@@ -165,12 +143,7 @@ func TestPrometheusCollectorMaxMemory(t *testing.T) {
 
 	// Add more requests than max memory
 	for i := 0; i < 5; i++ {
-		collector.Observe(context.Background(), observability.RequestMetrics{
-			Method:   http.MethodGet,
-			Path:     "/test" + string(rune('A'+i)),
-			Status:   http.StatusOK,
-			Duration: 100 * time.Millisecond,
-		})
+		collector.ObserveHTTP(context.Background(), http.MethodGet, "/test"+string(rune('A'+i)), http.StatusOK, 0, 100*time.Millisecond)
 	}
 
 	stats := collector.GetStats()
@@ -185,12 +158,7 @@ func TestPrometheusCollectorConcurrency(t *testing.T) {
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func() {
-			collector.Observe(context.Background(), observability.RequestMetrics{
-				Method:   http.MethodGet,
-				Path:     "/concurrent",
-				Status:   http.StatusOK,
-				Duration: 50 * time.Millisecond,
-			})
+			collector.ObserveHTTP(context.Background(), http.MethodGet, "/concurrent", http.StatusOK, 0, 50*time.Millisecond)
 			done <- true
 		}()
 	}
@@ -208,12 +176,7 @@ func TestPrometheusCollectorConcurrency(t *testing.T) {
 func TestPrometheusCollectorMetricsFormat(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test")
 
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodPost,
-		Path:     "/api/data",
-		Status:   http.StatusCreated,
-		Duration: 250 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodPost, "/api/data", http.StatusCreated, 0, 250*time.Millisecond)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -319,19 +282,9 @@ func TestPrometheusCollectorLabelEscaping(t *testing.T) {
 	collector := NewPrometheusCollector("test")
 
 	// Attempt metric injection via path containing newline and fake metric
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   "GET",
-		Path:     "/api\ninjected_metric{x=\"y\"} 999",
-		Status:   http.StatusOK,
-		Duration: 10 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), "GET", "/api\ninjected_metric{x=\"y\"} 999", http.StatusOK, 0, 10*time.Millisecond)
 	// Attempt label breakout via quote in path
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   "GET",
-		Path:     `/api"},{evil="true"}`,
-		Status:   http.StatusOK,
-		Duration: 10 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), "GET", `/api"},{evil="true"}`, http.StatusOK, 0, 10*time.Millisecond)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -372,12 +325,7 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 
 	// Fill up to limit
 	for i := 0; i < 5; i++ {
-		collector.Observe(context.Background(), observability.RequestMetrics{
-			Method:   http.MethodGet,
-			Path:     "/fill" + string(rune('0'+i)),
-			Status:   http.StatusOK,
-			Duration: 100 * time.Millisecond,
-		})
+		collector.ObserveHTTP(context.Background(), http.MethodGet, "/fill"+string(rune('0'+i)), http.StatusOK, 0, 100*time.Millisecond)
 	}
 
 	stats := collector.GetStats()
@@ -386,12 +334,7 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 	}
 
 	// Add one more, should trigger eviction
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/new",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/new", http.StatusOK, 0, 100*time.Millisecond)
 
 	stats = collector.GetStats()
 	// Should be at most 5 (max memory)

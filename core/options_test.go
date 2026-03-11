@@ -291,4 +291,6 @@ func (m *mockTracer) Log(span any, fields map[string]any)    {}
 
 type mockSpan struct{}
 
-func (m *mockSpan) End(metrics observability.RequestMetrics) {}
+func (m *mockSpan) End(status, bytes int, traceID string) {}
+func (m *mockSpan) TraceID() string                       { return "" }
+func (m *mockSpan) SpanID() string                        { return "" }

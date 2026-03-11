@@ -9,6 +9,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/utils"
 	"github.com/spcent/plumego/utils/httpx"
@@ -79,86 +80,24 @@ type MetricsCollector interface {
 }
 
 // TraceSpan represents a started tracing span.
+// Implementations must expose End to finalize the span and TraceID/SpanID for correlation.
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/middleware"
+//	import "github.com/spcent/plumego/metrics"
 //
-//	type MyTraceSpan struct{}
-//
-//	func (s *MyTraceSpan) End(metrics observability.RequestMetrics) {
-//		// End the span and record metrics
-//	}
-//
-//	type MyTracer struct{}
-//
-//	func (t *MyTracer) Start(ctx context.Context, r *http.Request) (context.Context, observability.TraceSpan) {
-//		span := &MyTraceSpan{}
-//		return ctx, span
-//	}
-//
-//	tracer := &MyTracer{}
-//	handler := observability.Logging(log.NewGLogger(), nil, tracer)(myHandler)
-type TraceSpan interface {
-	End(metrics RequestMetrics)
-}
-
-// SpanContext exposes identifiers for log correlation.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/middleware"
-//
-//	type MySpanContext struct{}
-//
-//	func (s *MySpanContext) TraceID() string {
-//		return "trace-123"
-//	}
-//
-//	func (s *MySpanContext) SpanID() string {
-//		return "span-456"
-//	}
-//
-//	type MyTraceSpan struct{}
-//
-//	func (s *MyTraceSpan) End(metrics observability.RequestMetrics) {
-//		// End the span
-//	}
-//
-//	type MyTracer struct{}
-//
-//	func (t *MyTracer) Start(ctx context.Context, r *http.Request) (context.Context, observability.TraceSpan) {
-//		span := &MyTraceSpan{}
-//		return ctx, span
-//	}
-//
-//	tracer := &MyTracer{}
-//	handler := observability.Logging(log.NewGLogger(), nil, tracer)(myHandler)
-type SpanContext interface {
-	TraceID() string
-	SpanID() string
-}
+//	tracer := metrics.NewOpenTelemetryTracer("my-service")
+//	ctx, span := tracer.Start(r.Context(), r)
+//	defer span.End(http.StatusOK, bytesWritten, span.TraceID())
+type TraceSpan = metrics.TraceSpan
 
 // Tracer starts a span for the incoming request.
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/middleware"
+//	import "github.com/spcent/plumego/metrics"
 //
-//	type MyTraceSpan struct{}
-//
-//	func (s *MyTraceSpan) End(metrics observability.RequestMetrics) {
-//		// End the span
-//	}
-//
-//	type MyTracer struct{}
-//
-//	func (t *MyTracer) Start(ctx context.Context, r *http.Request) (context.Context, observability.TraceSpan) {
-//		span := &MyTraceSpan{}
-//		return ctx, span
-//	}
-//
-//	tracer := &MyTracer{}
+//	tracer := metrics.NewOpenTelemetryTracer("my-service")
 //	handler := observability.Logging(log.NewGLogger(), nil, tracer)(myHandler)
 type Tracer interface {
 	Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan)
@@ -251,7 +190,7 @@ func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Trace
 			}
 
 			if span != nil {
-				span.End(metricsData)
+				span.End(metricsData.Status, metricsData.Bytes, traceID)
 			}
 
 			fields := contract.DefaultObservabilityPolicy.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
@@ -284,11 +223,11 @@ func ensureTraceID(r *http.Request) string {
 }
 
 func extractSpanContext(ctx context.Context, span TraceSpan) (string, string) {
+	if span != nil {
+		return span.TraceID(), span.SpanID()
+	}
 	if tc := contract.TraceContextFromContext(ctx); tc != nil {
 		return string(tc.TraceID), string(tc.SpanID)
-	}
-	if sc, ok := span.(SpanContext); ok {
-		return sc.TraceID(), sc.SpanID()
 	}
 	return "", ""
 }
