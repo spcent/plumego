@@ -40,6 +40,10 @@ func TestNewCtxPopulatesFields(t *testing.T) {
 	if ctx.Deadline.IsZero() || !ctx.Deadline.Equal(deadline) {
 		t.Fatalf("expected deadline to be copied")
 	}
+
+	if _, ok := ctx.Logger.(*log.NoOpLogger); !ok {
+		t.Fatalf("expected NoOpLogger by default, got %T", ctx.Logger)
+	}
 }
 
 func TestCtxResponseHelpers(t *testing.T) {

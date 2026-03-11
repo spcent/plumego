@@ -6,7 +6,7 @@ Plumego 中间件完全兼容标准库签名（`func(http.Handler) http.Handler`
 ## 常用内置中间件
 - Request ID：`observability.RequestID()`
 - 结构化日志：`observability.Logging(app.Logger(), metricsCollector, tracer)`
-- panic 恢复：`recovery.RecoveryMiddleware`
+- panic 恢复：`recovery.Recovery(logger)`
 - CORS：`cors.CORS` / `cors.CORSWithOptions(...)`
 - Gzip 压缩：`compression.Gzip()`
 - 超时控制：`timeout.Timeout(duration)`
@@ -23,7 +23,7 @@ app := core.New(core.WithAddr(":8080"))
 if err := app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
     cors.CORS,
     compression.Gzip(),
     timeout.Timeout(3*time.Second),

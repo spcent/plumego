@@ -98,8 +98,8 @@ func main() {
 		core.WithAddr(":8080"),
 		core.WithDebug(),
 	)
-	app.Use(recovery.RecoveryMiddleware)
-	app.Use(observability.Logging(log.NewGLogger(), nil, nil))
+	app.Use(recovery.Recovery(app.Logger()))
+	app.Use(observability.Logging(app.Logger(), nil, nil))
 
 	// Phase 1 Routes
 	app.Get("/", indexHandler)

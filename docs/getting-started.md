@@ -133,7 +133,7 @@ import (
 app := plumego.New(plumego.WithAddr(":8080"))
 if err := app.Use(
 	observability.RequestID(),
-	recovery.RecoveryMiddleware,
+	recovery.Recovery(app.Logger()),
 ); err != nil {
 	log.Fatalf("register middleware: %v", err)
 }

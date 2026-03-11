@@ -3,6 +3,7 @@
 package config
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	plumecfg "github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/core"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 // Config holds all application configuration.
@@ -52,7 +54,9 @@ func Load() (Config, error) {
 		return cfg, err
 	}
 
-	applyEnv(&cfg)
+	if err := applyEnv(&cfg); err != nil {
+		return cfg, err
+	}
 	applyFlags(&cfg)
 
 	return cfg, Validate(cfg)
@@ -66,18 +70,27 @@ func Validate(cfg Config) error {
 	return nil
 }
 
-func applyEnv(cfg *Config) {
-	cfg.Core.Addr = plumecfg.GetString("APP_ADDR", cfg.Core.Addr)
-	cfg.Core.EnvFile = plumecfg.GetString("APP_ENV_FILE", cfg.Core.EnvFile)
-	cfg.Core.Debug = plumecfg.GetBool("APP_DEBUG", cfg.Core.Debug)
+func applyEnv(cfg *Config) error {
+	manager := plumecfg.NewManager(plumelog.NewGLogger())
+	if err := manager.AddSource(plumecfg.NewEnvSource("")); err != nil {
+		return err
+	}
+	if err := manager.Load(context.Background()); err != nil {
+		return err
+	}
 
-	cfg.WebSocketSecret = plumecfg.GetString("WS_SECRET", cfg.WebSocketSecret)
-	cfg.GitHubSecret = plumecfg.GetString("GITHUB_WEBHOOK_SECRET", cfg.GitHubSecret)
-	cfg.StripeSecret = plumecfg.GetString("STRIPE_WEBHOOK_SECRET", cfg.StripeSecret)
-	cfg.WebhookToken = plumecfg.GetString("WEBHOOK_TRIGGER_TOKEN", cfg.WebhookToken)
-	cfg.EnableDocs = plumecfg.GetBool("ENABLE_DOCS", cfg.EnableDocs)
-	cfg.EnableMetrics = plumecfg.GetBool("ENABLE_METRICS", cfg.EnableMetrics)
-	cfg.EnableWebhooks = plumecfg.GetBool("ENABLE_WEBHOOKS", cfg.EnableWebhooks)
+	cfg.Core.Addr = manager.GetString("app_addr", cfg.Core.Addr)
+	cfg.Core.EnvFile = manager.GetString("app_env_file", cfg.Core.EnvFile)
+	cfg.Core.Debug = manager.GetBool("app_debug", cfg.Core.Debug)
+
+	cfg.WebSocketSecret = manager.GetString("ws_secret", cfg.WebSocketSecret)
+	cfg.GitHubSecret = manager.GetString("github_webhook_secret", cfg.GitHubSecret)
+	cfg.StripeSecret = manager.GetString("stripe_webhook_secret", cfg.StripeSecret)
+	cfg.WebhookToken = manager.GetString("webhook_trigger_token", cfg.WebhookToken)
+	cfg.EnableDocs = manager.GetBool("enable_docs", cfg.EnableDocs)
+	cfg.EnableMetrics = manager.GetBool("enable_metrics", cfg.EnableMetrics)
+	cfg.EnableWebhooks = manager.GetBool("enable_webhooks", cfg.EnableWebhooks)
+	return nil
 }
 
 func applyFlags(cfg *Config) {

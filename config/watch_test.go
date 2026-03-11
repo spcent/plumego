@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/log"
 )
 
 type watchResult struct {
@@ -13,7 +15,7 @@ type watchResult struct {
 }
 
 func TestConfigWatchersReceiveUpdates(t *testing.T) {
-	cm := NewConfigManager(nil)
+	cm := NewConfigManager(log.NewGLogger())
 	cm.data["foo"] = "old"
 
 	resultCh := make(chan watchResult, 1)
@@ -64,7 +66,7 @@ func TestConfigWatchersReceiveUpdates(t *testing.T) {
 }
 
 func TestConfigWatchersNormalizeKeys(t *testing.T) {
-	cm := NewConfigManager(nil)
+	cm := NewConfigManager(log.NewGLogger())
 	cm.data["foo_bar"] = "old"
 
 	resultCh := make(chan watchResult, 1)

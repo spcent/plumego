@@ -8,7 +8,7 @@ import (
 	"github.com/spcent/plumego/middleware"
 )
 
-// RecoveryMiddleware recovers from panics in request handlers and returns a 500 Internal Server Error.
+// Recovery recovers from panics in request handlers and returns a 500 Internal Server Error.
 //
 // This middleware prevents the entire application from crashing when a panic occurs in a request handler.
 // It logs the panic details server-side and returns a generic 500 response to the client.
@@ -18,7 +18,7 @@ import (
 //
 //	import "github.com/spcent/plumego/middleware/recovery"
 //
-//	handler := recovery.RecoveryMiddleware(myHandler)
+//	handler := recovery.Recovery(logger)(myHandler)
 //
 // When a panic occurs, the middleware:
 //  1. Recovers the panic and prevents the application from crashing
@@ -27,15 +27,9 @@ import (
 //
 // Note: This middleware should be placed early in the middleware chain to ensure
 // it can catch panics from all downstream handlers.
-func RecoveryMiddleware(next http.Handler) http.Handler {
-	return RecoveryWithLogger(nil)(next)
-}
-
-// RecoveryWithLogger returns recovery middleware using the provided logger.
-// If logger is nil, it falls back to the default logger.
-func RecoveryWithLogger(logger log.StructuredLogger) middleware.Middleware {
+func Recovery(logger log.StructuredLogger) middleware.Middleware {
 	if logger == nil {
-		logger = log.NewGLogger()
+		panic("recovery logger cannot be nil")
 	}
 
 	return func(next http.Handler) http.Handler {

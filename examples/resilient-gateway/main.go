@@ -33,8 +33,8 @@ func main() {
 		core.WithAddr(":8080"),
 		core.WithDebug(),
 	)
-	app.Use(recovery.RecoveryMiddleware)
-	app.Use(observability.Logging(nil, nil, nil))
+	app.Use(recovery.Recovery(app.Logger()))
+	app.Use(observability.Logging(app.Logger(), nil, nil))
 
 	// Create /api route group for middleware
 	apiGroup := app.Router().Group("/api")

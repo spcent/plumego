@@ -12,7 +12,7 @@ app := core.New(core.WithAddr(":8080"))
 if err := app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatal(err)
 }
@@ -27,7 +27,7 @@ if err := app.Use(
 
 ## Safety / Reliability
 
-- `recovery.RecoveryMiddleware`
+- `recovery.Recovery(logger)`
 - `timeout.Timeout(duration)`
 - `timeout.TimeoutWithConfig(timeout.TimeoutConfig{...})`
 - `limits.BodyLimit(maxBytes, logger)`

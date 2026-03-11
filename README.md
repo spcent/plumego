@@ -63,7 +63,7 @@ func main() {
 
     if err := app.Use(
         observability.RequestID(),
-        recovery.RecoveryMiddleware,
+        recovery.Recovery(app.Logger()),
     ); err != nil {
         log.Fatalf("register middleware: %v", err)
     }
@@ -128,7 +128,7 @@ func main() {
 
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, and other standard-library style methods that accept `func(w http.ResponseWriter, r *http.Request)`. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
-- **Middleware**: Chain middleware before boot with `app.Use(...)`. Keep middleware transport-only and explicit. Common options include `middleware/observability.RequestID`, `middleware/observability.Logging`, `middleware/recovery.RecoveryMiddleware`, `middleware/cors.CORS`, `middleware/security.SecurityHeaders`, and `middleware/ratelimit.AbuseGuard`.
+- **Middleware**: Chain middleware before boot with `app.Use(...)`. Keep middleware transport-only and explicit. Common options include `middleware/observability.RequestID`, `middleware/observability.Logging`, `middleware/recovery.Recovery(logger)`, `middleware/cors.CORS`, `middleware/security.SecurityHeaders`, and `middleware/ratelimit.AbuseGuard`.
 - **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
 - **Ops/Admin Endpoints**: Optional protected operations API for queue stats/replay, receipt lookup, channel health, and tenant quota inspection. Mount via `core/components/ops` and secure with a token or custom middleware. If auth is missing and `AllowInsecure` is false (default), requests are denied.
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.

@@ -2,21 +2,12 @@ package log
 
 import (
 	"context"
-	"sync"
 )
 
 type contextKey int
 
 const (
 	traceIDKey contextKey = iota
-	loggerKey
-)
-
-var (
-	defaultLoggerMu      sync.RWMutex
-	defaultLoggerOnce    sync.Once
-	defaultLogger        StructuredLogger
-	defaultLoggerFactory func() StructuredLogger
 )
 
 // WithTraceID adds a trace ID to the context.
@@ -38,113 +29,4 @@ func TraceIDFromContext(ctx context.Context) string {
 		return traceID
 	}
 	return ""
-}
-
-// WithLogger attaches a logger instance to the context.
-// This allows child functions to retrieve and use the same logger.
-func WithLogger(ctx context.Context, logger StructuredLogger) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return context.WithValue(ctx, loggerKey, logger)
-}
-
-// LoggerFromContext extracts the logger from context.
-// Returns a default gLogger if no logger is present.
-func LoggerFromContext(ctx context.Context) StructuredLogger {
-	if ctx == nil {
-		return getDefaultLogger()
-	}
-	if logger, ok := ctx.Value(loggerKey).(StructuredLogger); ok {
-		return logger
-	}
-	return getDefaultLogger()
-}
-
-// LoggerFromContextOrNew extracts the logger from context, or creates a new one.
-// If no trace ID is present in the context, it automatically generates one.
-// Returns both the logger and an updated context with trace ID and logger attached.
-//
-// Note: this function has the side effect of attaching a new trace ID and logger to
-// the returned context when they are absent. Always use the returned context for
-// subsequent operations so those values are not lost.
-func LoggerFromContextOrNew(ctx context.Context) (StructuredLogger, context.Context) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if logger, ok := ctx.Value(loggerKey).(StructuredLogger); ok {
-		return logger, ctx
-	}
-
-	// Generate trace ID if not present
-	if TraceIDFromContext(ctx) == "" {
-		ctx = WithTraceID(ctx, NewTraceID())
-	}
-
-	logger := newLogger()
-	ctx = WithLogger(ctx, logger)
-	return logger, ctx
-}
-
-// NewRequestLogger creates a fresh request-scoped logger with a new trace ID, attaches
-// both to the context, and returns them. Unlike LoggerFromContextOrNew, this always
-// creates a new logger and trace ID regardless of what is already in the context.
-// Use this at the start of each incoming request to establish a clean logging scope.
-func NewRequestLogger(ctx context.Context) (StructuredLogger, context.Context) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	traceID := NewTraceID()
-	ctx = WithTraceID(ctx, traceID)
-	logger := newLogger()
-	ctx = WithLogger(ctx, logger)
-	return logger, ctx
-}
-
-// SetDefaultLogger replaces the logger returned by LoggerFromContext when no
-// logger is stored in the context, and used by LoggerFromContextOrNew and
-// NewRequestLogger when creating a new request-scoped logger.
-// Must be called before the first request is processed; not safe for
-// concurrent use with logging.
-func SetDefaultLogger(l StructuredLogger) {
-	defaultLoggerMu.Lock()
-	defer defaultLoggerMu.Unlock()
-	defaultLogger = l
-	// Reset once so that subsequent calls to getDefaultLogger pick up the new value.
-	defaultLoggerOnce = sync.Once{}
-}
-
-// SetDefaultLoggerFactory sets a factory function used to create new loggers in
-// LoggerFromContextOrNew and NewRequestLogger. When set, each call to those
-// functions produces a fresh logger via the factory rather than reusing the
-// singleton defaultLogger.
-// Must be called before the first request; not safe for concurrent use with logging.
-func SetDefaultLoggerFactory(f func() StructuredLogger) {
-	defaultLoggerMu.Lock()
-	defer defaultLoggerMu.Unlock()
-	defaultLoggerFactory = f
-}
-
-func newLogger() StructuredLogger {
-	defaultLoggerMu.RLock()
-	factory := defaultLoggerFactory
-	defaultLoggerMu.RUnlock()
-	if factory != nil {
-		return factory()
-	}
-	return getDefaultLogger()
-}
-
-func getDefaultLogger() StructuredLogger {
-	defaultLoggerOnce.Do(func() {
-		defaultLoggerMu.Lock()
-		if defaultLogger == nil {
-			defaultLogger = NewGLogger()
-		}
-		defaultLoggerMu.Unlock()
-	})
-	defaultLoggerMu.RLock()
-	l := defaultLogger
-	defaultLoggerMu.RUnlock()
-	return l
 }

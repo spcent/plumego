@@ -86,16 +86,12 @@ logger.Warn("downstream latency high", log.Fields{
 
 ## Context Utilities
 
-Use context helpers to keep trace correlation consistent:
+Use context helpers only for trace correlation metadata:
 
 ```go
 ctx := log.WithTraceID(context.Background(), "trace-123")
-ctx = log.WithLogger(ctx, logger)
-
 traceID := log.TraceIDFromContext(ctx)
-reqLogger := log.LoggerFromContext(ctx)
-
-reqLogger.InfoCtx(ctx, "business event", log.Fields{"trace_id": traceID})
+logger.InfoCtx(ctx, "business event", log.Fields{"trace_id": traceID})
 ```
 
 ## Levels and Verbosity
@@ -128,7 +124,6 @@ For request paths, prefer middleware stack:
 
 ## Integration with Core
 
-`core.New(...)` defaults to `NewGLogger()`.
-Use `core.WithLogger(customLogger)` to override.
+Use `core.WithLogger(customLogger)` to inject the app logger explicitly.
 
-If the logger implements `log.Lifecycle`, `core.Boot()` will call `Start()` and `Stop()` automatically.
+If the logger implements `log.Lifecycle`, core lifecycle will call `Start()` and `Stop()` automatically.

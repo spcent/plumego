@@ -297,7 +297,7 @@ func main() {
 	if err := app.Use(
 		observability.RequestID(),
 		observability.Logging(app.Logger(), nil, nil),
-		recovery.RecoveryMiddleware,
+		recovery.Recovery(app.Logger()),
 		cors.CORS,
 	); err != nil {
 		log.Fatal(err)

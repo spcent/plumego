@@ -25,7 +25,7 @@ package middleware
 //
 //	// Add middleware in registration order
 //	registry.Use(observability.Logging(log.NewGLogger(), nil, nil))
-//	registry.Use(recovery.RecoveryMiddleware)
+//	registry.Use(recovery.Recovery(logger))
 //	registry.Use(cors.CORS)
 //
 //	// Prepend middleware (executes first)
@@ -66,7 +66,7 @@ func NewRegistry() *Registry {
 //
 //	registry := middleware.NewRegistry()
 //	registry.Use(observability.Logging(log.NewGLogger(), nil, nil))
-//	registry.Use(recovery.RecoveryMiddleware)
+//	registry.Use(recovery.Recovery(logger))
 func (r *Registry) Use(middlewares ...Middleware) {
 	if r == nil {
 		return
@@ -126,7 +126,7 @@ func (r *Registry) Len() int {
 //
 //	registry := middleware.NewRegistry()
 //	registry.Use(observability.Logging(log.NewGLogger(), nil, nil))
-//	registry.Use(recovery.RecoveryMiddleware)
+//	registry.Use(recovery.Recovery(logger))
 //
 //	middlewares := registry.Middlewares()
 //	handler := middleware.Apply(myHandler, middlewares...)

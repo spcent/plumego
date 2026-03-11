@@ -110,7 +110,7 @@ func main() {
 	// Get logger for access logging
 	logger := plog.NewGLogger()
 
-	app.Use(recovery.RecoveryMiddleware)
+	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(observability.Logging(logger, nil, nil))
 
 	// Configure middleware stack for /api routes

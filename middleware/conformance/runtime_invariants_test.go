@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/middleware/limits"
@@ -22,6 +23,7 @@ func TestMiddlewareTypeShape(t *testing.T) {
 }
 
 func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
+	recoveryMw := recovery.Recovery(log.NewNoOpLogger())
 	tests := []struct {
 		name string
 		mw   middleware.Middleware
@@ -39,7 +41,7 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "recovery",
-			mw:   recovery.RecoveryMiddleware,
+			mw:   recoveryMw,
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
@@ -135,6 +137,7 @@ func TestMiddlewareOrderingDeterministic(t *testing.T) {
 }
 
 func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
+	recoveryLogger := log.NewNoOpLogger()
 	tests := []struct {
 		name         string
 		expectedCode string
@@ -180,7 +183,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		{
 			name:         "recovery internal",
 			expectedCode: middleware.CodeInternalError,
-			handler: recovery.RecoveryMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: recovery.Recovery(recoveryLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("boom")
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/middleware/limits"
@@ -18,6 +19,7 @@ import (
 )
 
 func TestMiddlewareErrorConformance(t *testing.T) {
+	recoveryLogger := log.NewNoOpLogger()
 	tests := []struct {
 		name         string
 		expectedCode string
@@ -59,7 +61,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		{
 			name:         "recovery internal",
 			expectedCode: middleware.CodeInternalError,
-			handler: recovery.RecoveryMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: recovery.Recovery(recoveryLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("boom")
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),

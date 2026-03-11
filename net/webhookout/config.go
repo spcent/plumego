@@ -2,9 +2,10 @@ package webhookout
 
 import (
 	"errors"
+	"os"
+	"strconv"
+	"strings"
 	"time"
-
-	"github.com/spcent/plumego/config"
 )
 
 // DropPolicy defines the queue overflow behavior.
@@ -115,29 +116,41 @@ func DefaultConfig() Config {
 	}
 }
 
-// ConfigFromEnv creates config from environment variables.
+// ValueReader provides the configuration values required to construct Config.
+type ValueReader interface {
+	GetBool(key string, defaultValue bool) bool
+	GetInt(key string, defaultValue int) int
+	GetDurationMs(key string, defaultValueMs int) time.Duration
+	GetString(key, defaultValue string) string
+}
+
+// ConfigFromReader creates config from an explicit configuration reader.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/net/webhookout"
 //
-//	config := webhookout.ConfigFromEnv()
-func ConfigFromEnv() Config {
+//	config := webhookout.ConfigFromReader(reader)
+func ConfigFromReader(reader ValueReader) Config {
+	if reader == nil {
+		panic("webhookout: config reader is required")
+	}
+
 	cfg := Config{
-		Enabled:    config.GetBool("WEBHOOK_ENABLED", true),
-		QueueSize:  config.GetInt("WEBHOOK_QUEUE_SIZE", 2048),
-		Workers:    config.GetInt("WEBHOOK_WORKERS", 8),
-		DrainMax:   config.GetDurationMs("WEBHOOK_DRAIN_MAX_MS", 5000),
-		DropPolicy: DropPolicy(config.GetString("WEBHOOK_DROP_POLICY", string(BlockWithLimit))),
-		BlockWait:  config.GetDurationMs("WEBHOOK_BLOCK_WAIT_MS", 50),
+		Enabled:    reader.GetBool("WEBHOOK_ENABLED", true),
+		QueueSize:  reader.GetInt("WEBHOOK_QUEUE_SIZE", 2048),
+		Workers:    reader.GetInt("WEBHOOK_WORKERS", 8),
+		DrainMax:   reader.GetDurationMs("WEBHOOK_DRAIN_MAX_MS", 5000),
+		DropPolicy: DropPolicy(reader.GetString("WEBHOOK_DROP_POLICY", string(BlockWithLimit))),
+		BlockWait:  reader.GetDurationMs("WEBHOOK_BLOCK_WAIT_MS", 50),
 
-		DefaultTimeout:    config.GetDurationMs("WEBHOOK_DEFAULT_TIMEOUT_MS", 5000),
-		DefaultMaxRetries: config.GetInt("WEBHOOK_DEFAULT_MAX_RETRIES", 6),
-		BackoffBase:       config.GetDurationMs("WEBHOOK_BACKOFF_BASE_MS", 500),
-		BackoffMax:        config.GetDurationMs("WEBHOOK_BACKOFF_MAX_MS", 30000),
-		RetryOn429:        config.GetBool("WEBHOOK_RETRY_ON_429", true),
+		DefaultTimeout:    reader.GetDurationMs("WEBHOOK_DEFAULT_TIMEOUT_MS", 5000),
+		DefaultMaxRetries: reader.GetInt("WEBHOOK_DEFAULT_MAX_RETRIES", 6),
+		BackoffBase:       reader.GetDurationMs("WEBHOOK_BACKOFF_BASE_MS", 500),
+		BackoffMax:        reader.GetDurationMs("WEBHOOK_BACKOFF_MAX_MS", 30000),
+		RetryOn429:        reader.GetBool("WEBHOOK_RETRY_ON_429", true),
 
-		AllowPrivateNetwork: config.GetBool("WEBHOOK_ALLOW_PRIVATE_NET", false),
+		AllowPrivateNetwork: reader.GetBool("WEBHOOK_ALLOW_PRIVATE_NET", false),
 	}
 
 	// Validate and apply defaults
@@ -168,6 +181,50 @@ func ConfigFromEnv() Config {
 	}
 
 	return cfg
+}
+
+// ConfigFromEnv creates config from process environment variables.
+func ConfigFromEnv() Config {
+	return ConfigFromReader(envReader{})
+}
+
+type envReader struct{}
+
+func (envReader) GetBool(key string, defaultValue bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	switch value {
+	case "1", "true", "yes", "y", "on", "t":
+		return true
+	case "0", "false", "no", "n", "off", "f":
+		return false
+	case "":
+		return defaultValue
+	default:
+		return defaultValue
+	}
+}
+
+func (envReader) GetInt(key string, defaultValue int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	if parsed, err := strconv.Atoi(value); err == nil {
+		return parsed
+	}
+	return defaultValue
+}
+
+func (envReader) GetDurationMs(key string, defaultValueMs int) time.Duration {
+	return time.Duration(envReader{}.GetInt(key, defaultValueMs)) * time.Millisecond
+}
+
+func (envReader) GetString(key, defaultValue string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	return value
 }
 
 // Validate checks if configuration is valid.

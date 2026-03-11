@@ -22,7 +22,7 @@ app := core.New(core.WithAddr(":8080"))
 if err := app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatalf("register middleware: %v", err)
 }
@@ -56,7 +56,7 @@ Wrap one handler manually.
 
 - request ID: `middleware/observability.RequestID(...)`
 - structured logging: `middleware/observability.Logging(...)`
-- panic recovery: `middleware/recovery.RecoveryMiddleware`
+- panic recovery: `middleware/recovery.Recovery(logger)`
 - CORS: `middleware/cors.CORS` / `middleware/cors.CORSWithOptions(...)`
 - security headers: `middleware/security.SecurityHeaders(...)`
 - abuse guard: `middleware/ratelimit.AbuseGuard(...)`
@@ -74,7 +74,7 @@ Use only the middleware needed by your transport boundary.
 h := middleware.Apply(
     http.HandlerFunc(finalHandler),
     observability.RequestID(),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(logger),
 )
 
 http.ListenAndServe(":8080", h)
@@ -102,7 +102,7 @@ When components contribute middleware, use `middleware.Registry`:
 ```go
 reg := middleware.NewRegistry()
 reg.Use(observability.RequestID())
-reg.Use(recovery.RecoveryMiddleware)
+reg.Use(recovery.Recovery(logger))
 
 h := middleware.Apply(http.HandlerFunc(finalHandler), reg.Middlewares()...)
 ```

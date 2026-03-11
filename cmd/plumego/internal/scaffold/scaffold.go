@@ -139,7 +139,7 @@ func New() *core.App {
 	if err := app.Use(
 		observability.RequestID(),
 		observability.Logging(app.Logger(), nil, nil),
-		recovery.RecoveryMiddleware,
+		recovery.Recovery(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func main() {
 	if err := app.Use(
 		observability.RequestID(),
 		observability.Logging(app.Logger(), nil, nil),
-		recovery.RecoveryMiddleware,
+		recovery.Recovery(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
 	}

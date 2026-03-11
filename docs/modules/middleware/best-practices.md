@@ -27,7 +27,7 @@ Register in intentional order and test it.
 _ = app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
 )
 ```
 

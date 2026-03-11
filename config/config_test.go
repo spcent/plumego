@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/log"
 )
 
 type stubSource struct {
@@ -135,7 +137,7 @@ func TestConfigWithData(t *testing.T) {
 }
 
 func TestConfigKeyNormalization(t *testing.T) {
-	cfg := NewConfigManager(nil)
+	cfg := NewConfigManager(log.NewGLogger())
 	ctx := context.Background()
 
 	src := &stubSource{

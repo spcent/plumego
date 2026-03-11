@@ -6,7 +6,7 @@ Register globally with `app.Use(...)`, or scope to a router group via `group.Use
 ## Common built-in middleware
 - Request ID: `observability.RequestID()`
 - Structured logging: `observability.Logging(app.Logger(), metricsCollector, tracer)`
-- Panic recovery: `recovery.RecoveryMiddleware`
+- Panic recovery: `recovery.Recovery(logger)`
 - CORS: `cors.CORS` / `cors.CORSWithOptions(...)`
 - Gzip compression: `compression.Gzip()`
 - Timeout: `timeout.Timeout(duration)`
@@ -23,7 +23,7 @@ app := core.New(core.WithAddr(":8080"))
 if err := app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
     cors.CORS,
     compression.Gzip(),
     timeout.Timeout(3*time.Second),

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/recovery"
 )
@@ -89,7 +90,7 @@ func TestRecoveryCatchesPanicFromDownstreamMiddlewareOrder(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	middleware.Apply(final, outer, recovery.RecoveryMiddleware, panicMw).ServeHTTP(rec, req)
+	middleware.Apply(final, outer, recovery.Recovery(log.NewNoOpLogger()), panicMw).ServeHTTP(rec, req)
 
 	assertCanonicalErrorEnvelope(t, rec, middleware.CodeInternalError)
 	if handlerCalled {

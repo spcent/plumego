@@ -63,7 +63,7 @@ func main() {
 
     if err := app.Use(
         observability.RequestID(),
-        recovery.RecoveryMiddleware,
+        recovery.Recovery(app.Logger()),
     ); err != nil {
         log.Fatalf("register middleware: %v", err)
     }
@@ -128,7 +128,7 @@ func main() {
 
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等标准库风格方法注册处理器（`func(w http.ResponseWriter, r *http.Request)`）。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
-- **中间件**：在启动前使用 `app.Use(...)` 显式链式添加，并保持传输层职责。常见组合包括 `middleware/observability.RequestID`、`middleware/observability.Logging`、`middleware/recovery.RecoveryMiddleware`、`middleware/cors.CORS`、`middleware/security.SecurityHeaders`、`middleware/ratelimit.AbuseGuard`。
+- **中间件**：在启动前使用 `app.Use(...)` 显式链式添加，并保持传输层职责。常见组合包括 `middleware/observability.RequestID`、`middleware/observability.Logging`、`middleware/recovery.Recovery(logger)`、`middleware/cors.CORS`、`middleware/security.SecurityHeaders`、`middleware/ratelimit.AbuseGuard`。
 - **多租户（实验）**：提供租户隔离、配额管理、策略控制和数据库过滤能力，API 仍处于实验阶段，可能变更。详见[多租户](#多租户)章节。
 - **运维/管理端点**：可选的受保护运维 API，包含队列状态/重放、回执查询、通道健康、租户配额等能力。通过 `core/components/ops` 挂载，并使用令牌或自定义中间件保护；当 `AllowInsecure` 为 false（默认）且未配置鉴权时会拒绝访问。
 - **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。

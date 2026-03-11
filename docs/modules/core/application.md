@@ -67,7 +67,7 @@ Register middleware explicitly before `Prepare()`:
 if err := app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatalf("register middleware: %v", err)
 }
@@ -162,7 +162,7 @@ app := core.New(
 if err := app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatalf("register middleware: %v", err)
 }

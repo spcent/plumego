@@ -94,7 +94,7 @@ type Middleware func(http.Handler) http.Handler
 Common middleware:
 - `observability.RequestID()`
 - `observability.Logging(logger, metricsCollector, tracer)`
-- `recovery.RecoveryMiddleware`
+- `recovery.Recovery(logger)`
 - `cors.CORS` / `cors.CORSWithOptions(...)`
 - `compression.Gzip()`
 - `timeout.Timeout(duration)` / `timeout.TimeoutWithConfig(...)`

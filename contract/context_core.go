@@ -237,7 +237,7 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 	traceID := TraceIDFromContext(r.Context())
 
 	if logger == nil {
-		logger = log.NewGLogger()
+		logger = log.NewNoOpLogger()
 	}
 
 	// Detect compression

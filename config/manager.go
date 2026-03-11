@@ -44,10 +44,10 @@ type Manager struct {
 
 // NewManager creates a new Manager instance.
 func NewManager(logger log.StructuredLogger) *Manager {
-	ctx, cancel := context.WithCancel(context.Background())
 	if logger == nil {
-		logger = log.NewGLogger()
+		panic("config: logger is required")
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Manager{
 		sources:    make([]Source, 0),
 		data:       make(map[string]any),

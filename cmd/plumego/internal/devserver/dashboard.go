@@ -76,7 +76,7 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	if err := app.Use(
 		observability.RequestID(),
 		observability.Logging(app.Logger(), nil, nil),
-		recovery.RecoveryMiddleware,
+		recovery.Recovery(app.Logger()),
 		cors.CORS,
 	); err != nil {
 		return nil, fmt.Errorf("register dashboard middleware: %w", err)

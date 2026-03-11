@@ -24,7 +24,7 @@ Both `core.App.Use(...)` and `router.Router.Use(...)` consume this type.
 if err := app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatal(err)
 }
@@ -177,7 +177,7 @@ Recommended baseline includes panic recovery:
 _ = app.Use(
     observability.RequestID(),
     observability.Logging(app.Logger(), nil, nil),
-    recovery.RecoveryMiddleware,
+    recovery.Recovery(app.Logger()),
 )
 ```
 
