@@ -13,7 +13,7 @@ import (
 
 // PrometheusExporter exports pubsub metrics in Prometheus format
 type PrometheusExporter struct {
-	ps       *InProcPubSub
+	ps       *InProcBroker
 	registry *metricsRegistry
 	mu       sync.RWMutex
 
@@ -64,7 +64,7 @@ type histogram struct {
 }
 
 // NewPrometheusExporter creates a new Prometheus exporter
-func NewPrometheusExporter(ps *InProcPubSub) *PrometheusExporter {
+func NewPrometheusExporter(ps *InProcBroker) *PrometheusExporter {
 	return &PrometheusExporter{
 		ps:        ps,
 		registry:  newMetricsRegistry(),

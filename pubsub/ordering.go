@@ -74,9 +74,9 @@ func DefaultOrderingConfig() OrderingConfig {
 	}
 }
 
-// OrderedPubSub wraps InProcPubSub with ordering guarantees
+// OrderedPubSub wraps InProcBroker with ordering guarantees
 type OrderedPubSub struct {
-	*InProcPubSub
+	*InProcBroker
 
 	config OrderingConfig
 
@@ -164,7 +164,7 @@ func NewOrdered(config OrderingConfig, opts ...Option) *OrderedPubSub {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ops := &OrderedPubSub{
-		InProcPubSub: ps,
+		InProcBroker: ps,
 		config:       config,
 		topicQueues:  make(map[string]*orderedQueue),
 		keyQueues:    make(map[string]*orderedQueue),
@@ -212,7 +212,7 @@ func (ops *OrderedPubSub) PublishWithKey(topic, key string, msg Message, level O
 	switch level {
 	case OrderNone:
 		// Fast path: no ordering
-		return ops.InProcPubSub.Publish(topic, msg)
+		return ops.InProcBroker.Publish(topic, msg)
 
 	case OrderPerTopic:
 		queue = ops.getOrCreateTopicQueue(topic)
@@ -254,7 +254,7 @@ func (ops *OrderedPubSub) PublishWithKey(topic, key string, msg Message, level O
 
 	default:
 		// Queue full - caller should retry with backoff or use a different OrderLevel.
-		return ErrOrderedQueueFull
+		return newErr(ErrCodeBufferFull, "enqueue", "", "ordered queue is full", nil)
 	}
 }
 
@@ -403,7 +403,7 @@ func (ops *OrderedPubSub) flushBatch(queue *orderedQueue, identifier string) {
 		om.message.Meta[MetaKeySequence] = strconv.FormatUint(om.sequence, 10)
 
 		// Publish
-		_ = ops.InProcPubSub.Publish(om.topic, om.message)
+		_ = ops.InProcBroker.Publish(om.topic, om.message)
 		ops.orderedPublishes.Add(1)
 		queue.processed.Add(1)
 	}
@@ -501,7 +501,7 @@ func (ops *OrderedPubSub) Close() error {
 	ops.wg.Wait()
 
 	// Close base pubsub
-	return ops.InProcPubSub.Close()
+	return ops.InProcBroker.Close()
 }
 
 // OrderingStats returns ordering statistics including per-queue metrics.
@@ -611,7 +611,7 @@ func (os *OrderedSubscription) Receive(ctx context.Context) (Message, error) {
 	select {
 	case msg, ok := <-os.C():
 		if !ok {
-			return Message{}, ErrClosed
+			return Message{}, newErr(ErrCodeClosed, "consume", "", "subscription is closed", nil)
 		}
 
 		// Verify sequence from message metadata

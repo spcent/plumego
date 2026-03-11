@@ -89,9 +89,9 @@ func DefaultPersistenceConfig() PersistenceConfig {
 	}
 }
 
-// PersistentPubSub wraps InProcPubSub with persistence capabilities
+// PersistentPubSub wraps InProcBroker with persistence capabilities
 type PersistentPubSub struct {
-	*InProcPubSub
+	*InProcBroker
 
 	config PersistenceConfig
 
@@ -190,7 +190,7 @@ func NewPersistent(config PersistenceConfig, opts ...Option) (*PersistentPubSub,
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pps := &PersistentPubSub{
-		InProcPubSub: ps,
+		InProcBroker: ps,
 		config:       config,
 		ctx:          ctx,
 		cancel:       cancel,
@@ -321,7 +321,7 @@ func (pps *PersistentPubSub) restoreFromSnapshot(snap *snapshotData) error {
 		}
 
 		// Republish to in-memory system
-		_ = pps.InProcPubSub.Publish(pm.Topic, pm.Message)
+		_ = pps.InProcBroker.Publish(pm.Topic, pm.Message)
 		pps.restoreCount.Add(1)
 	}
 
@@ -387,7 +387,7 @@ func (pps *PersistentPubSub) replayWALFile(path string, startSeq uint64) error {
 			pps.config.OnRestore(entry.Message, entry.Timestamp)
 		}
 
-		_ = pps.InProcPubSub.Publish(entry.Topic, entry.Message)
+		_ = pps.InProcBroker.Publish(entry.Topic, entry.Message)
 		pps.restoreCount.Add(1)
 
 		// Update sequence
@@ -458,7 +458,7 @@ func (pps *PersistentPubSub) PublishPersistent(topic string, msg Message, durabi
 	}
 
 	// Then publish in-memory
-	return pps.InProcPubSub.Publish(topic, msg)
+	return pps.InProcBroker.Publish(topic, msg)
 }
 
 // Publish overrides to use default durability
@@ -717,7 +717,7 @@ func (pps *PersistentPubSub) Close() error {
 	_ = pps.Snapshot()
 
 	// Close base pubsub
-	return pps.InProcPubSub.Close()
+	return pps.InProcBroker.Close()
 }
 
 // Stats returns persistence statistics

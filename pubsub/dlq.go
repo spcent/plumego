@@ -93,7 +93,7 @@ func DefaultDLQConfig(topic string) DLQConfig {
 // DLQ provides advanced dead letter queue functionality
 type DLQ struct {
 	config DLQConfig
-	ps     *InProcPubSub
+	ps     *InProcBroker
 
 	// Message storage
 	messages   map[string]*DLQMessage
@@ -186,7 +186,7 @@ type DLQQueryOptions struct {
 }
 
 // NewDLQ creates a new enhanced dead letter queue
-func NewDLQ(ps *InProcPubSub, config DLQConfig) *DLQ {
+func NewDLQ(ps *InProcBroker, config DLQConfig) *DLQ {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	dlq := &DLQ{

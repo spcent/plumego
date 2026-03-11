@@ -83,7 +83,7 @@ func TestPrometheusExporter_WithPersistence(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	exporter := NewPrometheusExporter(pps.InProcPubSub).
+	exporter := NewPrometheusExporter(pps.InProcBroker).
 		WithPersistent(pps)
 
 	metrics := exporter.Collect()
@@ -106,7 +106,7 @@ func TestPrometheusExporter_WithDistributed(t *testing.T) {
 	_ = dps.JoinCluster(testContext(t))
 	time.Sleep(100 * time.Millisecond)
 
-	exporter := NewPrometheusExporter(dps.InProcPubSub).
+	exporter := NewPrometheusExporter(dps.InProcBroker).
 		WithDistributed(dps)
 
 	metrics := exporter.Collect()
@@ -130,7 +130,7 @@ func TestPrometheusExporter_WithOrdering(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	exporter := NewPrometheusExporter(ops.InProcPubSub).
+	exporter := NewPrometheusExporter(ops.InProcBroker).
 		WithOrdered(ops)
 
 	metrics := exporter.Collect()
@@ -157,7 +157,7 @@ func TestPrometheusExporter_WithRateLimit(t *testing.T) {
 		_ = rlps.Publish("test", msg)
 	}
 
-	exporter := NewPrometheusExporter(rlps.InProcPubSub).
+	exporter := NewPrometheusExporter(rlps.InProcBroker).
 		WithRateLimited(rlps)
 
 	metrics := exporter.Collect()

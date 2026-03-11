@@ -15,13 +15,13 @@ import (
 // and triggers outbound webhooks via webhookout.Service.
 type WebhookNotifier struct {
 	webhook *webhookout.Service
-	bus     *pubsub.InProcPubSub
+	bus     *pubsub.InProcBroker
 	logger  log.StructuredLogger
 	sub     pubsub.Subscription
 }
 
 // NewWebhookNotifier creates a notifier wired to the given services.
-func NewWebhookNotifier(bus *pubsub.InProcPubSub, webhook *webhookout.Service, logger log.StructuredLogger) *WebhookNotifier {
+func NewWebhookNotifier(bus *pubsub.InProcBroker, webhook *webhookout.Service, logger log.StructuredLogger) *WebhookNotifier {
 	return &WebhookNotifier{
 		webhook: webhook,
 		bus:     bus,

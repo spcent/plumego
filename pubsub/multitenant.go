@@ -80,7 +80,7 @@ type TenantConfig struct {
 
 // MultiTenantPubSub provides tenant isolation and quotas
 type MultiTenantPubSub struct {
-	ps *InProcPubSub
+	ps *InProcBroker
 
 	// Tenant management
 	tenants   map[string]*tenantData
@@ -114,7 +114,7 @@ type tenantData struct {
 }
 
 // NewMultiTenantPubSub creates a multi-tenant pubsub wrapper
-func NewMultiTenantPubSub(ps *InProcPubSub, defaultQuota TenantQuota) *MultiTenantPubSub {
+func NewMultiTenantPubSub(ps *InProcBroker, defaultQuota TenantQuota) *MultiTenantPubSub {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	mtps := &MultiTenantPubSub{
@@ -210,7 +210,7 @@ func (mtps *MultiTenantPubSub) GetUsage(tenantID string) (*TenantUsage, error) {
 // Publish publishes a message with tenant quota enforcement
 func (mtps *MultiTenantPubSub) Publish(tenantID, topic string, msg Message) error {
 	if mtps.closed.Load() {
-		return ErrPublishToClosed
+		return newErr(ErrCodeClosed, "publish", topic, "broker is closed", nil)
 	}
 
 	// Get tenant

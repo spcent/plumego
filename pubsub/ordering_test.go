@@ -93,12 +93,17 @@ func TestOrderedPubSub_OrderLevels(t *testing.T) {
 				}
 			}
 
-			// Receive
-			waitUntil(120*time.Millisecond, func() bool { return len(sub.C()) >= 3 })
+			// Receive up to 3 messages with timeout (ring buffer uses unbuffered channel)
 			count := 0
-			for len(sub.C()) > 0 {
-				<-sub.C()
-				count++
+			deadline := time.After(120 * time.Millisecond)
+		drain:
+			for count < 3 {
+				select {
+				case <-sub.C():
+					count++
+				case <-deadline:
+					break drain
+				}
 			}
 
 			if count != 3 {
@@ -197,13 +202,17 @@ func TestOrderedPubSub_Batching(t *testing.T) {
 		_ = ops.PublishOrdered("test.batch", msg, OrderPerTopic)
 	}
 
-	waitUntil(180*time.Millisecond, func() bool { return len(sub.C()) >= 12 })
-
-	// Should receive all messages
+	// Should receive all messages (ring buffer uses unbuffered channel, len() always 0)
 	count := 0
-	for len(sub.C()) > 0 {
-		<-sub.C()
-		count++
+	deadline := time.After(180 * time.Millisecond)
+batchDrain:
+	for count < 12 {
+		select {
+		case <-sub.C():
+			count++
+		case <-deadline:
+			break batchDrain
+		}
 	}
 
 	if count != 12 {

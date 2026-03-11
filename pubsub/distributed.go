@@ -112,9 +112,9 @@ type ClusterNode struct {
 	Version  string    `json:"version"`
 }
 
-// DistributedPubSub wraps InProcPubSub with distributed capabilities
+// DistributedPubSub wraps InProcBroker with distributed capabilities
 type DistributedPubSub struct {
-	*InProcPubSub
+	*InProcBroker
 
 	config ClusterConfig
 
@@ -192,7 +192,7 @@ func NewDistributed(config ClusterConfig, opts ...Option) (*DistributedPubSub, e
 	ctx, cancel := context.WithCancel(context.Background())
 
 	dps := &DistributedPubSub{
-		InProcPubSub: ps,
+		InProcBroker: ps,
 		config:       config,
 		nodes:        make(map[string]*ClusterNode),
 		ctx:          ctx,
@@ -311,7 +311,7 @@ func (dps *DistributedPubSub) PublishGlobal(topic string, msg Message) error {
 	}
 
 	// Publish locally first
-	if err := dps.InProcPubSub.Publish(topic, msg); err != nil {
+	if err := dps.InProcBroker.Publish(topic, msg); err != nil {
 		return err
 	}
 
@@ -681,7 +681,7 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 	}
 
 	// Publish locally
-	if err := dps.InProcPubSub.Publish(cm.Topic, cm.Message); err != nil {
+	if err := dps.InProcBroker.Publish(cm.Topic, cm.Message); err != nil {
 		contract.WriteError(w, r, contract.NewInternalError(err.Error()))
 		dps.clusterErrors.Add(1)
 		return
@@ -738,7 +738,7 @@ func (dps *DistributedPubSub) Close() error {
 	_ = dps.LeaveCluster(ctx)
 
 	// Close base pubsub
-	return dps.InProcPubSub.Close()
+	return dps.InProcBroker.Close()
 }
 
 // Nodes returns current cluster nodes

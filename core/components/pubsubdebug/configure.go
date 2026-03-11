@@ -60,6 +60,6 @@ type Hooks struct {
 	EnsureMutable  func(op, desc string) error
 	LogError       func(msg string, err error)
 	ConfigSnapshot func() PubSubConfig
-	DefaultPubSub  func() pubsub.PubSub
+	DefaultPubSub  func() pubsub.Broker
 	EnsureRouter   func() *router.Router
 }

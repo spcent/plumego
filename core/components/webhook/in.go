@@ -22,13 +22,13 @@ import (
 
 type WebhookInComponent struct {
 	cfg        WebhookInConfig
-	pub        pubsub.PubSub
+	pub        pubsub.Broker
 	logger     log.StructuredLogger
 	deduper    *webhookin.Deduper
 	routesOnce sync.Once
 }
 
-func NewWebhookInComponent(cfg WebhookInConfig, fallbackPub pubsub.PubSub, logger log.StructuredLogger) *WebhookInComponent {
+func NewWebhookInComponent(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *WebhookInComponent {
 	if logger == nil {
 		logger = log.NewGLogger()
 	}

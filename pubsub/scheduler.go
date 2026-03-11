@@ -52,7 +52,7 @@ type messageScheduler struct {
 	notify   chan struct{}
 	closed   atomic.Bool
 	nextID   atomic.Uint64
-	ps       *InProcPubSub
+	ps       *InProcBroker
 	cancelFn context.CancelFunc
 
 	// Pending delayed messages by ID (for cancellation)
@@ -60,7 +60,7 @@ type messageScheduler struct {
 }
 
 // newMessageScheduler creates a new message scheduler.
-func newMessageScheduler(ps *InProcPubSub) *messageScheduler {
+func newMessageScheduler(ps *InProcBroker) *messageScheduler {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	s := &messageScheduler{
@@ -219,14 +219,14 @@ func (s *messageScheduler) fireNext() {
 type ttlManager struct {
 	mu         sync.Mutex
 	messages   map[string]map[string]time.Time // topic -> msgID -> expiresAt
-	ps         *InProcPubSub
+	ps         *InProcBroker
 	closed     atomic.Bool
 	cancelFn   context.CancelFunc
 	cleanupInt time.Duration
 }
 
 // newTTLManager creates a new TTL manager.
-func newTTLManager(ps *InProcPubSub, cleanupInterval time.Duration) *ttlManager {
+func newTTLManager(ps *InProcBroker, cleanupInterval time.Duration) *ttlManager {
 	if cleanupInterval <= 0 {
 		cleanupInterval = time.Minute
 	}

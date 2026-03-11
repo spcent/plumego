@@ -28,7 +28,7 @@ const dashboardRoom = "dashboard"
 type Dashboard struct {
 	app       *core.App
 	hub       *websocket.Hub
-	pubsub    *pubsub.InProcPubSub
+	pubsub    *pubsub.InProcBroker
 	builder   *Builder
 	runner    *AppRunner
 	analyzer  *Analyzer
@@ -622,7 +622,7 @@ func (d *Dashboard) PublishEvent(eventType string, data any) {
 }
 
 // GetPubSub returns the PubSub instance for external use
-func (d *Dashboard) GetPubSub() *pubsub.InProcPubSub {
+func (d *Dashboard) GetPubSub() *pubsub.InProcBroker {
 	return d.pubsub
 }
 

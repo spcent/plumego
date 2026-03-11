@@ -67,9 +67,9 @@ func DefaultRateLimitConfig() RateLimitConfig {
 	}
 }
 
-// RateLimitedPubSub wraps InProcPubSub with rate limiting
+// RateLimitedPubSub wraps InProcBroker with rate limiting
 type RateLimitedPubSub struct {
-	*InProcPubSub
+	*InProcBroker
 
 	config RateLimitConfig
 
@@ -145,7 +145,7 @@ func NewRateLimited(config RateLimitConfig, opts ...Option) (*RateLimitedPubSub,
 	ctx, cancel := context.WithCancel(context.Background())
 
 	rlps := &RateLimitedPubSub{
-		InProcPubSub:  ps,
+		InProcBroker:  ps,
 		config:        config,
 		topicLimiters: make(map[string]*tokenBucket),
 		subLimiters:   make(map[uint64]*tokenBucket),
@@ -244,7 +244,7 @@ func (tb *tokenBucket) updateRate(newRate float64) {
 // Publish publishes a message with rate limiting
 func (rlps *RateLimitedPubSub) Publish(topic string, msg Message) error {
 	if rlps.closed.Load() {
-		return ErrClosed
+		return newErr(ErrCodeClosed, "publish", topic, "broker is closed", nil)
 	}
 
 	// Check global rate limit
@@ -265,7 +265,7 @@ func (rlps *RateLimitedPubSub) Publish(topic string, msg Message) error {
 	}
 
 	// Publish to base pubsub
-	return rlps.InProcPubSub.Publish(topic, msg)
+	return rlps.InProcBroker.Publish(topic, msg)
 }
 
 // checkOrWaitLimit checks rate limit or waits if configured
@@ -370,7 +370,7 @@ func (rlps *RateLimitedPubSub) startAdaptiveWorker() {
 // adjustAdaptiveRates adjusts rate limits based on system load
 func (rlps *RateLimitedPubSub) adjustAdaptiveRates() {
 	// Calculate current load (simplified metric)
-	snapshot := rlps.InProcPubSub.Snapshot()
+	snapshot := rlps.InProcBroker.Snapshot()
 
 	// Use total subscribers across all topics as a proxy for load
 	totalSubs := 0
@@ -432,7 +432,7 @@ func (rlps *RateLimitedPubSub) adjustAdaptiveRates() {
 
 // Subscribe creates a rate-limited subscription
 func (rlps *RateLimitedPubSub) Subscribe(topic string, opts SubOptions) (Subscription, error) {
-	sub, err := rlps.InProcPubSub.Subscribe(topic, opts)
+	sub, err := rlps.InProcBroker.Subscribe(topic, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +498,7 @@ func (rlps *RateLimitedPubSub) Close() error {
 	rlps.wg.Wait()
 
 	// Close base pubsub
-	return rlps.InProcPubSub.Close()
+	return rlps.InProcBroker.Close()
 }
 
 // RateLimitStats returns rate limiting statistics

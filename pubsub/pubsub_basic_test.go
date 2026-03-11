@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -88,8 +89,10 @@ func TestPubSub_InvalidPattern(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	if _, err := ps.SubscribePattern("[", DefaultSubOptions()); err != ErrInvalidPattern {
-		t.Fatalf("expected ErrInvalidPattern, got %v", err)
+	_, err := ps.SubscribePattern("[", DefaultSubOptions())
+	var e *Error
+	if !errors.As(err, &e) || e.Code != ErrCodeInvalidPattern {
+		t.Fatalf("expected ErrCodeInvalidPattern, got %v", err)
 	}
 }
 
