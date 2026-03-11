@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/spcent/plumego/middleware/observability"
 )
 
 // TestNewOpenTelemetryTracerEmptyName tests the default name behavior
@@ -33,12 +31,7 @@ func TestSpanHandleEnd4xxError(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	_, span := tracer.Start(context.Background(), req)
 
-	span.End(observability.RequestMetrics{
-		Status:   http.StatusBadRequest,
-		Bytes:    100,
-		TraceID:  "test",
-		Duration: 50 * time.Millisecond,
-	})
+	span.End(http.StatusBadRequest, 100, "test")
 
 	spans := tracer.Spans()
 	if len(spans) != 1 {
@@ -58,12 +51,7 @@ func TestSpanHandleEnd5xxError(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	_, span := tracer.Start(context.Background(), req)
 
-	span.End(observability.RequestMetrics{
-		Status:   http.StatusInternalServerError,
-		Bytes:    100,
-		TraceID:  "test",
-		Duration: 50 * time.Millisecond,
-	})
+	span.End(http.StatusInternalServerError, 100, "test")
 
 	spans := tracer.Spans()
 	if len(spans) != 1 {
@@ -83,12 +71,7 @@ func TestSpanHandleEndSuccess(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	_, span := tracer.Start(context.Background(), req)
 
-	span.End(observability.RequestMetrics{
-		Status:   http.StatusOK,
-		Bytes:    100,
-		TraceID:  "test",
-		Duration: 50 * time.Millisecond,
-	})
+	span.End(http.StatusOK, 100, "test")
 
 	spans := tracer.Spans()
 	if len(spans) != 1 {
@@ -108,20 +91,10 @@ func TestPrometheusCollectorEvictionEdgeCases(t *testing.T) {
 	collector := NewPrometheusCollector("test").WithMaxMemory(1)
 
 	// Add first request
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/test1",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/test1", http.StatusOK, 0, 100*time.Millisecond)
 
 	// Add second request - should trigger eviction
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/test2",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/test2", http.StatusOK, 0, 100*time.Millisecond)
 
 	stats := collector.GetStats()
 	if stats.ActiveSeries > 1 {
@@ -135,12 +108,7 @@ func TestPrometheusCollectorMultipleMetricsPerLabel(t *testing.T) {
 
 	// Add multiple requests to same label
 	for i := 0; i < 5; i++ {
-		collector.Observe(context.Background(), observability.RequestMetrics{
-			Method:   http.MethodGet,
-			Path:     "/test",
-			Status:   http.StatusOK,
-			Duration: time.Duration(100+i*10) * time.Millisecond,
-		})
+		collector.ObserveHTTP(context.Background(), http.MethodGet, "/test", http.StatusOK, 0, time.Duration(100+i*10)*time.Millisecond)
 	}
 
 	stats := collector.GetStats()
@@ -155,12 +123,7 @@ func TestPrometheusCollectorMultipleMetricsPerLabel(t *testing.T) {
 // TestPrometheusHandlerContentType tests the content type header
 func TestPrometheusHandlerContentType(t *testing.T) {
 	collector := NewPrometheusCollector("test")
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/test",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/test", http.StatusOK, 0, 100*time.Millisecond)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -195,12 +158,7 @@ func TestPrometheusCollectorObserveContext(t *testing.T) {
 	collector := NewPrometheusCollector("test")
 
 	// Test with background context
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodPost,
-		Path:     "/api/data",
-		Status:   http.StatusCreated,
-		Duration: 250 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodPost, "/api/data", http.StatusCreated, 0, 250*time.Millisecond)
 
 	stats := collector.GetStats()
 	if stats.TotalRecords != 1 {
@@ -217,12 +175,7 @@ func TestPrometheusSnapshotConcurrency(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func(id int) {
 			for j := 0; j < 10; j++ {
-				collector.Observe(context.Background(), observability.RequestMetrics{
-					Method:   http.MethodGet,
-					Path:     "/concurrent",
-					Status:   http.StatusOK,
-					Duration: 50 * time.Millisecond,
-				})
+				collector.ObserveHTTP(context.Background(), http.MethodGet, "/concurrent", http.StatusOK, 0, 50*time.Millisecond)
 			}
 			done <- true
 		}(i)
@@ -285,12 +238,7 @@ func TestSpanAttributesCompleteness(t *testing.T) {
 	// Sleep to ensure measurable duration
 	time.Sleep(75 * time.Millisecond)
 
-	span.End(observability.RequestMetrics{
-		Status:   http.StatusOK,
-		Bytes:    512,
-		TraceID:  "trace-456",
-		Duration: 75 * time.Millisecond,
-	})
+	span.End(http.StatusOK, 512, "trace-456")
 
 	spans := tracer.Spans()
 	if len(spans) != 1 {
@@ -306,7 +254,6 @@ func TestSpanAttributesCompleteness(t *testing.T) {
 		"net.peer.name":                "example.com",
 		"net.transport":                "tcp",
 		"service.name":                 "test-service",
-		"service.version":              "1.0.0",
 		"parent.trace_id":              "parent-123",
 		"http.status_code":             "200",
 		"http.response_content_length": "512",
@@ -344,12 +291,7 @@ func TestSpanWithoutParentTraceID(t *testing.T) {
 	// No X-Trace-ID header
 
 	_, span := tracer.Start(context.Background(), req)
-	span.End(observability.RequestMetrics{
-		Status:   http.StatusOK,
-		Bytes:    10,
-		TraceID:  "test",
-		Duration: 50 * time.Millisecond,
-	})
+	span.End(http.StatusOK, 10, "test")
 
 	spans := tracer.Spans()
 	if len(spans) != 1 {
@@ -380,16 +322,11 @@ func TestPrometheusEvictionWithZeroRequests(t *testing.T) {
 
 	// Force eviction on empty map (should not panic)
 	collector.mu.Lock()
-	collector.evictOldest()
+	collector.evictLeastUsed()
 	collector.mu.Unlock()
 
 	// Should still work normally after
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/test",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/test", http.StatusOK, 0, 100*time.Millisecond)
 
 	stats := collector.GetStats()
 	if stats.TotalRecords != 1 {
@@ -402,50 +339,20 @@ func TestPrometheusEvictionLeastUsed(t *testing.T) {
 	collector := NewPrometheusCollector("test").WithMaxMemory(3)
 
 	// Add 3 entries with different usage counts
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/least",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/most",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/middle",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/least", http.StatusOK, 0, 100*time.Millisecond)
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/most", http.StatusOK, 0, 100*time.Millisecond)
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/middle", http.StatusOK, 0, 100*time.Millisecond)
 
 	// Add more usage to "most" and "middle"
 	for i := 0; i < 3; i++ {
-		collector.Observe(context.Background(), observability.RequestMetrics{
-			Method:   http.MethodGet,
-			Path:     "/most",
-			Status:   http.StatusOK,
-			Duration: 100 * time.Millisecond,
-		})
+		collector.ObserveHTTP(context.Background(), http.MethodGet, "/most", http.StatusOK, 0, 100*time.Millisecond)
 	}
 	for i := 0; i < 2; i++ {
-		collector.Observe(context.Background(), observability.RequestMetrics{
-			Method:   http.MethodGet,
-			Path:     "/middle",
-			Status:   http.StatusOK,
-			Duration: 100 * time.Millisecond,
-		})
+		collector.ObserveHTTP(context.Background(), http.MethodGet, "/middle", http.StatusOK, 0, 100*time.Millisecond)
 	}
 
 	// Add one more to trigger eviction
-	collector.Observe(context.Background(), observability.RequestMetrics{
-		Method:   http.MethodGet,
-		Path:     "/new",
-		Status:   http.StatusOK,
-		Duration: 100 * time.Millisecond,
-	})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/new", http.StatusOK, 0, 100*time.Millisecond)
 
 	stats := collector.GetStats()
 	// Should have at most 3 series

@@ -9,8 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/spcent/plumego/middleware/observability"
 )
 
 type labelKey struct {
@@ -111,47 +109,28 @@ func (p *PrometheusCollector) WithMaxMemory(max int) *PrometheusCollector {
 	return p
 }
 
-// Observe records a single HTTP request metric set.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//	import "github.com/spcent/plumego/middleware/observability"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	collector.Observe(context.Background(), observability.RequestMetrics{
-//		Method:   "GET",
-//		Path:     "/api/users",
-//		Status:   200,
-//		Bytes:    100,
-//		Duration: 50 * time.Millisecond,
-//	})
-func (p *PrometheusCollector) Observe(_ context.Context, m observability.RequestMetrics) {
-	key := labelKey{m.Method, m.Path, strconv.Itoa(m.Status)}
+func (p *PrometheusCollector) recordHTTP(method, path string, status int, duration time.Duration) {
+	key := labelKey{method, path, strconv.Itoa(status)}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Check memory limit and evict if needed
 	if p.maxMemory > 0 && len(p.requests) >= p.maxMemory {
-		p.evictOldest()
+		p.evictLeastUsed()
 	}
 
 	p.requests[key]++
 
-	duration := m.Duration.Seconds()
+	d := duration.Seconds()
 	stats := p.durations[key]
 	stats.count++
-	stats.sum += duration
-
-	// Update min/max
-	if stats.count == 1 || duration < stats.min {
-		stats.min = duration
+	stats.sum += d
+	if stats.count == 1 || d < stats.min {
+		stats.min = d
 	}
-	if stats.count == 1 || duration > stats.max {
-		stats.max = duration
+	if stats.count == 1 || d > stats.max {
+		stats.max = d
 	}
-
 	p.durations[key] = stats
 }
 
@@ -289,12 +268,15 @@ func (p *PrometheusCollector) Clear() {
 	p.clearBase()
 }
 
-// Record implements the unified MetricsCollector interface
+// Record implements the unified MetricsCollector interface.
 func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
-	// For HTTP requests, use the existing Prometheus format
 	if record.Type == MetricHTTPRequest {
-		if metrics, ok := httpMetricsFromRecord(record); ok {
-			p.Observe(ctx, metrics)
+		method, _ := record.Labels[labelMethod]
+		path, _ := record.Labels[labelPath]
+		statusStr, _ := record.Labels[labelStatus]
+		status, _ := strconv.Atoi(statusStr)
+		if method != "" && path != "" && status != 0 {
+			p.recordHTTP(method, path, status, record.Duration)
 			return
 		}
 	}
@@ -302,23 +284,12 @@ func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
 		p.observeSMSGateway(record)
 		return
 	}
-
-	// For other metric types, use the base collector
 	p.getBase().Record(ctx, record)
 }
 
-// ObserveHTTP implements the unified MetricsCollector interface
-func (p *PrometheusCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	metrics := observability.RequestMetrics{
-		Method:    method,
-		Path:      path,
-		Status:    status,
-		Bytes:     bytes,
-		Duration:  duration,
-		TraceID:   "",
-		UserAgent: "",
-	}
-	p.Observe(ctx, metrics)
+// ObserveHTTP implements the unified MetricsCollector interface.
+func (p *PrometheusCollector) ObserveHTTP(_ context.Context, method, path string, status, _ int, duration time.Duration) {
+	p.recordHTTP(method, path, status, duration)
 }
 
 // ObservePubSub, ObserveMQ, ObserveKV, ObserveIPC, ObserveDB are provided
@@ -342,59 +313,27 @@ func (p *PrometheusCollector) snapshot() (map[labelKey]uint64, map[labelKey]late
 	return reqCopy, durCopy, uptime
 }
 
-func (p *PrometheusCollector) evictOldest() {
-	// Simple eviction: remove 10% of least-used entries
+// evictLeastUsed removes the least-requested 10% of label combinations to stay within
+// the maxMemory limit. Eviction is by ascending request count (least used first).
+func (p *PrometheusCollector) evictLeastUsed() {
 	evictCount := len(p.requests) / 10
 	if evictCount == 0 {
 		evictCount = 1
 	}
 
-	// Collect all keys
 	keys := make([]labelKey, 0, len(p.requests))
 	for k := range p.requests {
 		keys = append(keys, k)
 	}
 
-	// Sort by request count (evict least used first)
 	sort.Slice(keys, func(i, j int) bool {
 		return p.requests[keys[i]] < p.requests[keys[j]]
 	})
 
-	// Remove oldest
 	for i := 0; i < evictCount && i < len(keys); i++ {
 		delete(p.requests, keys[i])
 		delete(p.durations, keys[i])
 	}
-}
-
-func httpMetricsFromRecord(record MetricRecord) (observability.RequestMetrics, bool) {
-	if record.Labels == nil {
-		return observability.RequestMetrics{}, false
-	}
-
-	statusStr, ok := record.Labels[labelStatus]
-	if !ok {
-		return observability.RequestMetrics{}, false
-	}
-	status, err := strconv.Atoi(statusStr)
-	if err != nil {
-		return observability.RequestMetrics{}, false
-	}
-	method, ok := record.Labels[labelMethod]
-	if !ok {
-		return observability.RequestMetrics{}, false
-	}
-	path, ok := record.Labels[labelPath]
-	if !ok {
-		return observability.RequestMetrics{}, false
-	}
-
-	return observability.RequestMetrics{
-		Method:   method,
-		Path:     path,
-		Status:   status,
-		Duration: record.Duration,
-	}, true
 }
 
 type smsKey struct {

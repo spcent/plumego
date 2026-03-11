@@ -307,11 +307,10 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 	collector1 := &MockCollector{
 		OnGetStats: func() CollectorStats {
 			return CollectorStats{
-				TotalRecords:    10,
-				TotalSpans:      10,
-				TotalDuration:   10 * time.Millisecond,
-				AverageDuration: 1 * time.Millisecond,
-				TypeBreakdown:   make(map[MetricType]int64),
+				TotalRecords:  10,
+				ErrorRecords:  1,
+				TypeBreakdown: map[MetricType]int64{MetricHTTPRequest: 10},
+				StartTime:     time.Unix(100, 0),
 			}
 		},
 	}
@@ -319,11 +318,10 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 	collector2 := &MockCollector{
 		OnGetStats: func() CollectorStats {
 			return CollectorStats{
-				TotalRecords:    1,
-				TotalSpans:      1,
-				TotalDuration:   100 * time.Millisecond,
-				AverageDuration: 100 * time.Millisecond,
-				TypeBreakdown:   make(map[MetricType]int64),
+				TotalRecords:  5,
+				ErrorRecords:  2,
+				TypeBreakdown: map[MetricType]int64{MetricHTTPRequest: 3, MetricPubSubPublish: 2},
+				StartTime:     time.Unix(200, 0),
 			}
 		},
 	}
@@ -332,9 +330,24 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 
 	stats := multi.GetStats()
 
-	expected := (10*time.Millisecond + 100*time.Millisecond) / time.Duration(11)
-	if stats.AverageDuration != expected {
-		t.Fatalf("expected weighted average duration %v, got %v", expected, stats.AverageDuration)
+	// TotalRecords should be summed
+	if stats.TotalRecords != 15 {
+		t.Fatalf("expected TotalRecords 15, got %d", stats.TotalRecords)
+	}
+	// ErrorRecords should be summed
+	if stats.ErrorRecords != 3 {
+		t.Fatalf("expected ErrorRecords 3, got %d", stats.ErrorRecords)
+	}
+	// TypeBreakdown should be merged
+	if stats.TypeBreakdown[MetricHTTPRequest] != 13 {
+		t.Fatalf("expected MetricHTTPRequest 13, got %d", stats.TypeBreakdown[MetricHTTPRequest])
+	}
+	if stats.TypeBreakdown[MetricPubSubPublish] != 2 {
+		t.Fatalf("expected MetricPubSubPublish 2, got %d", stats.TypeBreakdown[MetricPubSubPublish])
+	}
+	// StartTime should be the earliest
+	if !stats.StartTime.Equal(time.Unix(100, 0)) {
+		t.Fatalf("expected StartTime to be earliest, got %v", stats.StartTime)
 	}
 }
 

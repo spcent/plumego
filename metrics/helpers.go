@@ -80,43 +80,20 @@ func (t *Timer) Reset() {
 //		// Perform KV operation
 //		return kvStore.Get("user:123")
 //	}, metrics.MeasureWithKV(true))
-func MeasureFunc(ctx context.Context, collector MetricsCollector, operation, subject string, fn func() error, opts ...MeasureOption) error {
-	cfg := &measureConfig{}
-	for _, opt := range opts {
-		opt(cfg)
-	}
+//
+// measureTarget distinguishes which domain-specific Observe method to call.
+type measureTarget uint8
 
-	timer := NewTimer()
-	err := fn()
-	duration := timer.Elapsed()
-
-	switch cfg.metricType {
-	case "kv":
-		hit := err == nil && cfg.kvHit
-		collector.ObserveKV(ctx, operation, subject, duration, err, hit)
-	case "pubsub":
-		collector.ObservePubSub(ctx, operation, subject, duration, err)
-	case "mq":
-		collector.ObserveMQ(ctx, operation, subject, duration, err, cfg.mqPanicked)
-	case "ipc":
-		collector.ObserveIPC(ctx, operation, subject, cfg.ipcTransport, cfg.ipcBytes, duration, err)
-	default:
-		// Generic record
-		record := MetricRecord{
-			Type:     MetricType(operation),
-			Name:     operation,
-			Value:    float64(duration.Milliseconds()),
-			Duration: duration,
-			Error:    err,
-		}
-		collector.Record(ctx, record)
-	}
-
-	return err
-}
+const (
+	measureGeneric measureTarget = iota
+	measureKV
+	measurePubSub
+	measureMQ
+	measureIPC
+)
 
 type measureConfig struct {
-	metricType   string
+	target       measureTarget
 	kvHit        bool
 	mqPanicked   bool
 	ipcTransport string
@@ -135,7 +112,7 @@ type MeasureOption func(*measureConfig)
 //	err := metrics.MeasureFunc(ctx, collector, "get", "key", fn, metrics.MeasureWithKV(true))
 func MeasureWithKV(hit bool) MeasureOption {
 	return func(cfg *measureConfig) {
-		cfg.metricType = "kv"
+		cfg.target = measureKV
 		cfg.kvHit = hit
 	}
 }
@@ -149,7 +126,7 @@ func MeasureWithKV(hit bool) MeasureOption {
 //	err := metrics.MeasureFunc(ctx, collector, "publish", "topic", fn, metrics.MeasureWithPubSub())
 func MeasureWithPubSub() MeasureOption {
 	return func(cfg *measureConfig) {
-		cfg.metricType = "pubsub"
+		cfg.target = measurePubSub
 	}
 }
 
@@ -162,7 +139,7 @@ func MeasureWithPubSub() MeasureOption {
 //	err := metrics.MeasureFunc(ctx, collector, "subscribe", "queue", fn, metrics.MeasureWithMQ(false))
 func MeasureWithMQ(panicked bool) MeasureOption {
 	return func(cfg *measureConfig) {
-		cfg.metricType = "mq"
+		cfg.target = measureMQ
 		cfg.mqPanicked = panicked
 	}
 }
@@ -177,10 +154,56 @@ func MeasureWithMQ(panicked bool) MeasureOption {
 //		metrics.MeasureWithIPC("unix", 256))
 func MeasureWithIPC(transport string, bytes int) MeasureOption {
 	return func(cfg *measureConfig) {
-		cfg.metricType = "ipc"
+		cfg.target = measureIPC
 		cfg.ipcTransport = transport
 		cfg.ipcBytes = bytes
 	}
+}
+
+// MeasureFunc measures the duration of a function and records it.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/metrics"
+//
+//	collector := metrics.NewPrometheusCollector("myapp")
+//
+//	err := metrics.MeasureFunc(ctx, collector, "get", "user:123", func() error {
+//		// Perform KV operation
+//		return kvStore.Get("user:123")
+//	}, metrics.MeasureWithKV(true))
+func MeasureFunc(ctx context.Context, collector MetricsCollector, operation, subject string, fn func() error, opts ...MeasureOption) error {
+	cfg := &measureConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	timer := NewTimer()
+	err := fn()
+	duration := timer.Elapsed()
+
+	switch cfg.target {
+	case measureKV:
+		hit := err == nil && cfg.kvHit
+		collector.ObserveKV(ctx, operation, subject, duration, err, hit)
+	case measurePubSub:
+		collector.ObservePubSub(ctx, operation, subject, duration, err)
+	case measureMQ:
+		collector.ObserveMQ(ctx, operation, subject, duration, err, cfg.mqPanicked)
+	case measureIPC:
+		collector.ObserveIPC(ctx, operation, subject, cfg.ipcTransport, cfg.ipcBytes, duration, err)
+	default:
+		record := MetricRecord{
+			Type:     MetricType(operation),
+			Name:     operation,
+			Value:    durationValueSeconds(duration),
+			Duration: duration,
+			Error:    err,
+		}
+		collector.Record(ctx, record)
+	}
+
+	return err
 }
 
 // RecordSuccess is a convenience function to record a successful operation.
@@ -195,7 +218,7 @@ func RecordSuccess(ctx context.Context, collector MetricsCollector, operation st
 	record := MetricRecord{
 		Type:     MetricType(operation),
 		Name:     operation,
-		Value:    float64(duration.Milliseconds()),
+		Value:    durationValueSeconds(duration),
 		Duration: duration,
 		Error:    nil,
 	}
@@ -216,7 +239,7 @@ func RecordError(ctx context.Context, collector MetricsCollector, operation stri
 	record := MetricRecord{
 		Type:     MetricType(operation),
 		Name:     operation,
-		Value:    float64(duration.Milliseconds()),
+		Value:    durationValueSeconds(duration),
 		Duration: duration,
 		Error:    err,
 	}
@@ -240,7 +263,7 @@ func RecordWithLabels(ctx context.Context, collector MetricsCollector, operation
 	record := MetricRecord{
 		Type:     MetricType(operation),
 		Name:     operation,
-		Value:    float64(duration.Milliseconds()),
+		Value:    durationValueSeconds(duration),
 		Duration: duration,
 		Labels:   labels,
 	}
@@ -339,17 +362,12 @@ func (m *MultiCollector) GetStats() CollectorStats {
 	combined := CollectorStats{
 		TypeBreakdown: make(map[MetricType]int64),
 	}
-	var weightedDurationTotal time.Duration
-	var weightedSampleCount int64
 
 	for _, c := range m.collectors {
 		stats := c.GetStats()
 		combined.TotalRecords += stats.TotalRecords
 		combined.ErrorRecords += stats.ErrorRecords
 		combined.ActiveSeries += stats.ActiveSeries
-		combined.TotalSpans += stats.TotalSpans
-		combined.ErrorSpans += stats.ErrorSpans
-		combined.TotalDuration += stats.TotalDuration
 
 		// Merge type breakdown
 		for k, v := range stats.TypeBreakdown {
@@ -360,24 +378,6 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		if combined.StartTime.IsZero() || (!stats.StartTime.IsZero() && stats.StartTime.Before(combined.StartTime)) {
 			combined.StartTime = stats.StartTime
 		}
-
-		sampleCount := sampleCountForAverageDuration(stats)
-		if sampleCount > 0 {
-			weightedSampleCount += sampleCount
-			if stats.TotalDuration > 0 {
-				weightedDurationTotal += stats.TotalDuration
-			} else {
-				weightedDurationTotal += stats.AverageDuration * time.Duration(sampleCount)
-			}
-		}
-	}
-
-	// AverageDuration is a weighted aggregation across collectors.
-	if weightedSampleCount > 0 {
-		combined.AverageDuration = weightedDurationTotal / time.Duration(weightedSampleCount)
-	} else if combined.TotalSpans > 0 {
-		// Fallback for collectors that only populate TotalDuration/TotalSpans.
-		combined.AverageDuration = combined.TotalDuration / time.Duration(combined.TotalSpans)
 	}
 
 	if combined.ActiveSeries == 0 && len(combined.TypeBreakdown) > 0 {
@@ -385,18 +385,6 @@ func (m *MultiCollector) GetStats() CollectorStats {
 	}
 
 	return combined
-}
-
-func sampleCountForAverageDuration(stats CollectorStats) int64 {
-	if stats.TotalSpans > 0 {
-		return int64(stats.TotalSpans)
-	}
-
-	if stats.TotalRecords > 0 && stats.AverageDuration > 0 {
-		return stats.TotalRecords
-	}
-
-	return 0
 }
 
 // Clear clears all collectors.

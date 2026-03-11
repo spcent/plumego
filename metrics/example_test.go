@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware/observability"
 )
 
 // Example demonstrates basic usage of the Prometheus collector
@@ -99,11 +98,7 @@ func ExampleOpenTelemetryTracer_Start() {
 	time.Sleep(10 * time.Millisecond)
 
 	// End the span
-	span.End(observability.RequestMetrics{
-		Status:  200,
-		Bytes:   100,
-		TraceID: "trace-123",
-	})
+	span.End(200, 100, "trace-123")
 
 	_ = ctx
 	fmt.Println("Span created and ended")
@@ -185,7 +180,7 @@ func ExampleMeasureFunc_withKV() {
 	fmt.Printf("Recorded at least %d metric(s)\n", len(records))
 
 	// Output:
-	// Recorded at least 2 metric(s)
+	// Recorded at least 1 metric(s)
 }
 
 // ExampleRecordSuccess demonstrates recording a successful operation

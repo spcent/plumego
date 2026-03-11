@@ -5,8 +5,6 @@ import (
 	"sort"
 	"sync"
 	"time"
-
-	"github.com/spcent/plumego/utils"
 )
 
 // responseWriter wraps http.ResponseWriter to capture status code and bytes written.
@@ -25,7 +23,7 @@ func (rw *responseWriter) WriteHeader(status int) {
 
 // Write captures the number of bytes written.
 func (rw *responseWriter) Write(b []byte) (int, error) {
-	n, err := utils.SafeWrite(rw.ResponseWriter, b)
+	n, err := rw.ResponseWriter.Write(b)
 	rw.bytes += n
 	return n, err
 }

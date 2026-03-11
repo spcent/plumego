@@ -6,11 +6,31 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware/observability"
 )
+
+// TraceSpan represents an in-flight tracing span returned by OpenTelemetryTracer.Start.
+// Callers end the span by calling End with the final HTTP outcome.
+type TraceSpan interface {
+	// End finalizes the span with the HTTP response outcome.
+	End(status, bytes int, traceID string)
+
+	// TraceID returns the trace identifier propagated through this span.
+	TraceID() string
+
+	// SpanID returns the unique identifier of this span.
+	SpanID() string
+}
+
+// traceContextKey is the package-internal context key for span propagation.
+type traceContextKey struct{}
+
+// internalTraceContext carries trace identity within the metrics package.
+type internalTraceContext struct {
+	traceID string
+	spanID  string
+}
 
 // Span captures finalized tracing data for inspection or export.
 //
@@ -68,7 +88,7 @@ type spanHandle struct {
 	parentID  string
 }
 
-// OpenTelemetryTracer implements observability.Tracer without external dependencies.
+// OpenTelemetryTracer implements distributed tracing without external dependencies.
 //
 // This tracer provides OpenTelemetry-compatible tracing without requiring
 // external dependencies. It's designed for:
@@ -88,11 +108,7 @@ type spanHandle struct {
 //	mux := http.NewServeMux()
 //	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 //		ctx, span := tracer.Start(context.Background(), r)
-//		defer span.End(metrics.RequestMetrics{
-//			Status:  http.StatusOK,
-//			Bytes:   100,
-//			TraceID: span.TraceID(),
-//		})
+//		defer span.End(http.StatusOK, 100, span.TraceID())
 //		// ... handle request ...
 //	})
 type OpenTelemetryTracer struct {
@@ -100,10 +116,12 @@ type OpenTelemetryTracer struct {
 
 	name string
 
-	mu          sync.RWMutex
-	spans       []Span
-	maxSpans    int
-	droppedSpan int
+	mu           sync.RWMutex
+	spans        []Span
+	maxSpans     int
+	droppedSpan  int
+	spanCounter  uint64
+	traceCounter uint64
 }
 
 const defaultMaxSpans = 10000
@@ -148,11 +166,9 @@ func (t *OpenTelemetryTracer) WithMaxSpans(max int) *OpenTelemetryTracer {
 
 // Start begins a new span for the incoming request.
 //
-// This method:
-//   - Generates a unique span ID and trace ID
-//   - Extracts trace context from headers or context
-//   - Creates a span with HTTP-specific attributes
-//   - Returns a context with the trace information
+// It reads X-Trace-ID from the request header to propagate an existing trace,
+// and extracts any parent span context from the context value set by a prior
+// Start call in the same request chain.
 //
 // Example:
 //
@@ -160,21 +176,24 @@ func (t *OpenTelemetryTracer) WithMaxSpans(max int) *OpenTelemetryTracer {
 //
 //	tracer := metrics.NewOpenTelemetryTracer("my-service")
 //	ctx, span := tracer.Start(context.Background(), r)
-//	defer span.End(metrics.RequestMetrics{
-//		Status:  http.StatusOK,
-//		Bytes:   100,
-//		TraceID: span.TraceID(),
-//	})
-func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (context.Context, observability.TraceSpan) {
-	// Generate simple span and trace IDs
-	spanID := generateSpanID()
-	traceID := contract.TraceIDFromContext(ctx)
+//	defer span.End(http.StatusOK, 100, span.TraceID())
+func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan) {
+	spanID := t.generateSpanID()
+
+	// Resolve trace ID: prefer inbound header, then parent context, then generate new.
+	traceID := r.Header.Get("X-Trace-ID")
 	if traceID == "" {
-		if headerTraceID := r.Header.Get("X-Trace-ID"); headerTraceID != "" {
-			traceID = headerTraceID
-		} else {
-			traceID = generateTraceID()
+		if parent := traceContextFromContext(ctx); parent != nil {
+			traceID = parent.traceID
 		}
+	}
+	if traceID == "" {
+		traceID = t.generateTraceID()
+	}
+
+	parentID := ""
+	if parent := traceContextFromContext(ctx); parent != nil && parent.spanID != "" {
+		parentID = parent.spanID
 	}
 
 	handle := &spanHandle{
@@ -183,6 +202,7 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 		startTime: time.Now(),
 		spanID:    spanID,
 		traceID:   traceID,
+		parentID:  parentID,
 		attrs: map[string]string{
 			"http.method":     r.Method,
 			"http.route":      r.URL.Path,
@@ -191,34 +211,26 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 			"net.peer.name":   r.Host,
 			"net.transport":   "tcp",
 			"service.name":    t.name,
-			"service.version": "1.0.0", // Could be configurable
 		},
 	}
-
-	// Track parent span when trace context is available.
-	parentSpanID := ""
-	if parent := contract.TraceContextFromContext(ctx); parent != nil && parent.SpanID != "" {
-		parentSpanID = string(parent.SpanID)
-		handle.parentID = parentSpanID
-		handle.attrs["parent.span_id"] = parentSpanID
+	if parentID != "" {
+		handle.attrs["parent.span_id"] = parentID
+	}
+	if inboundTraceID := r.Header.Get("X-Trace-ID"); inboundTraceID != "" {
+		handle.attrs["parent.trace_id"] = inboundTraceID
 	}
 
-	// Preserve parent trace ID from inbound headers for compatibility.
-	if parentID := r.Header.Get("X-Trace-ID"); parentID != "" {
-		handle.attrs["parent.trace_id"] = parentID
-	}
-
-	traceCtx := contract.TraceContext{
-		TraceID: contract.TraceID(traceID),
-		SpanID:  contract.SpanID(spanID),
-	}
-	if parentSpanID != "" {
-		parentID := contract.SpanID(parentSpanID)
-		traceCtx.ParentSpanID = &parentID
-	}
-	ctx = contract.ContextWithTraceContext(ctx, traceCtx)
+	ctx = context.WithValue(ctx, traceContextKey{}, &internalTraceContext{
+		traceID: traceID,
+		spanID:  spanID,
+	})
 
 	return ctx, handle
+}
+
+func traceContextFromContext(ctx context.Context) *internalTraceContext {
+	v, _ := ctx.Value(traceContextKey{}).(*internalTraceContext)
+	return v
 }
 
 // Spans returns a copy of completed spans.
@@ -289,51 +301,40 @@ func (t *OpenTelemetryTracer) record(span Span) {
 
 // End finalizes the span and records its metrics attributes.
 //
-// This method:
-//   - Calculates the span duration
-//   - Adds HTTP-specific attributes
-//   - Determines the span status based on HTTP status code
-//   - Records the span for later inspection
-//
 // Example:
 //
-//	import "github.com/spcent/plumego/metrics"
-//
-//	span.End(metrics.RequestMetrics{
-//		Status:  http.StatusOK,
-//		Bytes:   100,
-//		TraceID: span.TraceID(),
-//	})
-func (s *spanHandle) End(metrics observability.RequestMetrics) {
+//	ctx, span := tracer.Start(r.Context(), r)
+//	defer span.End(http.StatusOK, bytesWritten, span.TraceID())
+func (s *spanHandle) End(status, bytes int, traceID string) {
 	duration := time.Since(s.startTime)
 
-	// Build attributes
-	attrs := make(map[string]string, len(s.attrs)+5)
+	attrs := make(map[string]string, len(s.attrs)+4)
 	for k, v := range s.attrs {
 		attrs[k] = v
 	}
 
-	attrs["http.status_code"] = strconv.Itoa(metrics.Status)
-	attrs["http.response_content_length"] = strconv.Itoa(metrics.Bytes)
-	attrs["plumego.trace_id"] = metrics.TraceID
-	attrs["http.status_text"] = http.StatusText(metrics.Status)
+	attrs["http.status_code"] = strconv.Itoa(status)
+	attrs["http.response_content_length"] = strconv.Itoa(bytes)
 	attrs["duration_ms"] = strconv.FormatInt(duration.Milliseconds(), 10)
+	attrs["http.status_text"] = http.StatusText(status)
+	if traceID != "" {
+		attrs["plumego.trace_id"] = traceID
+	}
 
-	// Determine status and message
-	status := "OK"
+	spanStatus := "OK"
 	statusMsg := ""
-	if metrics.Status >= 500 {
-		status = "ERROR"
-		statusMsg = fmt.Sprintf("Server error: %d", metrics.Status)
-	} else if metrics.Status >= 400 {
-		status = "ERROR"
-		statusMsg = fmt.Sprintf("Client error: %d", metrics.Status)
+	if status >= 500 {
+		spanStatus = "ERROR"
+		statusMsg = fmt.Sprintf("Server error: %d", status)
+	} else if status >= 400 {
+		spanStatus = "ERROR"
+		statusMsg = fmt.Sprintf("Client error: %d", status)
 	}
 
 	s.tracer.record(Span{
 		Name:          s.name,
 		Attributes:    attrs,
-		Status:        status,
+		Status:        spanStatus,
 		StatusMessage: statusMsg,
 		Duration:      duration,
 		Timestamp:     s.startTime,
@@ -353,29 +354,14 @@ func (s *spanHandle) SpanID() string {
 	return s.spanID
 }
 
-// SpanID and TraceID generation (simple implementation)
-var (
-	spanCounter  uint64
-	traceCounter uint64
-	spanMu       sync.Mutex
-)
-
-func generateSpanID() string {
-	spanMu.Lock()
-	defer spanMu.Unlock()
-
-	spanCounter++
-	// Use nanosecond timestamp + counter to ensure uniqueness
-	return fmt.Sprintf("%x-%x", time.Now().UnixNano(), spanCounter)
+func (t *OpenTelemetryTracer) generateSpanID() string {
+	n := atomic.AddUint64(&t.spanCounter, 1)
+	return fmt.Sprintf("%x-%x", time.Now().UnixNano(), n)
 }
 
-func generateTraceID() string {
-	spanMu.Lock()
-	defer spanMu.Unlock()
-
-	traceCounter++
-	// Use nanosecond timestamp + counter to ensure uniqueness
-	return fmt.Sprintf("%x-%x-%x", time.Now().Unix(), time.Now().UnixNano(), traceCounter)
+func (t *OpenTelemetryTracer) generateTraceID() string {
+	n := atomic.AddUint64(&t.traceCounter, 1)
+	return fmt.Sprintf("%x-%x-%x", time.Now().Unix(), time.Now().UnixNano(), n)
 }
 
 // SpanStats provides statistics about collected spans.
@@ -400,22 +386,15 @@ type SpanStats struct {
 // Record, ObserveHTTP, ObservePubSub, ObserveMQ, ObserveKV, ObserveIPC, ObserveDB
 // are provided by the embedded baseForwarder.
 
-// GetStats implements the unified MetricsCollector interface
-// This method returns span statistics
+// GetStats implements the unified MetricsCollector interface.
 func (t *OpenTelemetryTracer) GetStats() CollectorStats {
 	spanStats := t.GetSpanStats()
 
 	stats := CollectorStats{
-		TotalRecords:     int64(spanStats.TotalSpans),
-		ErrorRecords:     int64(spanStats.ErrorSpans),
-		ActiveSeries:     map[bool]int{true: 1, false: 0}[spanStats.TotalSpans > 0],
-		TypeBreakdown:    make(map[MetricType]int64),
-		TotalSpans:       spanStats.TotalSpans,
-		ErrorSpans:       spanStats.ErrorSpans,
-		TotalDuration:    spanStats.TotalDuration,
-		AverageDuration:  spanStats.AverageDuration,
-		MaxSpanRetention: spanStats.MaxRetention,
-		DroppedSpans:     spanStats.DroppedSpans,
+		TotalRecords:  int64(spanStats.TotalSpans),
+		ErrorRecords:  int64(spanStats.ErrorSpans),
+		ActiveSeries:  map[bool]int{true: 1, false: 0}[spanStats.TotalSpans > 0],
+		TypeBreakdown: make(map[MetricType]int64),
 	}
 
 	if spanStats.TotalSpans > 0 {
@@ -443,7 +422,7 @@ func (t *OpenTelemetryTracer) GetStats() CollectorStats {
 	return stats
 }
 
-// Clear implements the unified MetricsCollector interface
+// Clear implements the unified MetricsCollector interface.
 func (t *OpenTelemetryTracer) Clear() {
 	t.mu.Lock()
 	defer t.mu.Unlock()

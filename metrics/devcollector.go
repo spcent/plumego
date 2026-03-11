@@ -269,18 +269,11 @@ func (d *DevCollector) DBSnapshot() DevDBSnapshot {
 
 // Record implements MetricsCollector.
 func (d *DevCollector) Record(ctx context.Context, record MetricRecord) {
-	if d == nil {
-		return
-	}
 	d.base.Record(ctx, record)
 }
 
 // ObserveHTTP implements MetricsCollector.
 func (d *DevCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	if d == nil {
-		return
-	}
-
 	d.base.ObserveHTTP(ctx, method, path, status, bytes, duration)
 
 	key := seriesKey(method, path)
@@ -309,41 +302,26 @@ func (d *DevCollector) ObserveHTTP(ctx context.Context, method, path string, sta
 
 // ObservePubSub implements MetricsCollector.
 func (d *DevCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	if d == nil {
-		return
-	}
 	d.base.ObservePubSub(ctx, operation, topic, duration, err)
 }
 
 // ObserveMQ implements MetricsCollector.
 func (d *DevCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	if d == nil {
-		return
-	}
 	d.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
 }
 
 // ObserveKV implements MetricsCollector.
 func (d *DevCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	if d == nil {
-		return
-	}
 	d.base.ObserveKV(ctx, operation, key, duration, err, hit)
 }
 
 // ObserveIPC implements MetricsCollector.
 func (d *DevCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	if d == nil {
-		return
-	}
 	d.base.ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
 }
 
 // ObserveDB implements MetricsCollector.
 func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	if d == nil {
-		return
-	}
 	d.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
 
 	durationMS := duration.Seconds() * 1000
@@ -389,10 +367,6 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 
 // GetStats implements MetricsCollector.
 func (d *DevCollector) GetStats() CollectorStats {
-	if d == nil {
-		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
-	}
-
 	stats := d.base.GetStats()
 	if stats.ActiveSeries == 0 && len(stats.TypeBreakdown) > 0 {
 		stats.ActiveSeries = len(stats.TypeBreakdown)
@@ -402,9 +376,6 @@ func (d *DevCollector) GetStats() CollectorStats {
 
 // Clear implements MetricsCollector.
 func (d *DevCollector) Clear() {
-	if d == nil {
-		return
-	}
 	d.base.Clear()
 	d.mu.Lock()
 	defer d.mu.Unlock()

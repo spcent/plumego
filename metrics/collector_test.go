@@ -438,7 +438,7 @@ func TestBaseMetricsCollector_DurationValueUnitSeconds(t *testing.T) {
 			observe: func(c *BaseMetricsCollector, ctx context.Context, d time.Duration) {
 				c.ObserveKV(ctx, "get", "key", d, nil, true)
 			},
-			expectedCount: 2,
+			expectedCount: 1,
 		},
 		{
 			name: "ipc",

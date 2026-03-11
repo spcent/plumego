@@ -387,4 +387,6 @@ func (s *stubTracer) Start(ctx context.Context, _ *http.Request) (context.Contex
 
 type stubSpan struct{}
 
-func (s *stubSpan) End(_ mwobs.RequestMetrics) {}
+func (s *stubSpan) End(status, bytes int, traceID string) {}
+func (s *stubSpan) TraceID() string                       { return "" }
+func (s *stubSpan) SpanID() string                        { return "" }
