@@ -26,7 +26,7 @@ type Service struct {
 	worker    *mq.Worker
 	store     mq.TaskStore
 	scheduler *scheduler.Scheduler
-	bus       *pubsub.InProcPubSub
+	bus       *pubsub.InProcBroker
 	templates *TemplateEngine
 	logger    log.StructuredLogger
 
@@ -53,7 +53,7 @@ type Config struct {
 	Scheduler *scheduler.Scheduler
 
 	// Bus is the in-process pub/sub for result events.
-	Bus *pubsub.InProcPubSub
+	Bus *pubsub.InProcBroker
 
 	// SMS provider; nil disables SMS channel.
 	SMS SMSProvider

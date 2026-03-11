@@ -25,7 +25,7 @@ type App struct {
 	Core       *core.App
 	Cfg        config.Config
 	StaticFS   fs.FS
-	Bus        *pubsub.InProcPubSub
+	Bus        *pubsub.InProcBroker
 	WebhookSvc *webhookout.Service
 	Prom       *metrics.PrometheusCollector
 	Tracer     *metrics.OpenTelemetryTracer

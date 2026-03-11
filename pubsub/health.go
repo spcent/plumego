@@ -65,7 +65,7 @@ type HealthMetrics struct {
 }
 
 // Health returns the current health status of the pubsub system.
-func (ps *InProcPubSub) Health() HealthStatus {
+func (ps *InProcBroker) Health() HealthStatus {
 	status := HealthStatus{
 		Timestamp: time.Now(),
 		Details:   make(map[string]any),
@@ -97,7 +97,7 @@ func (ps *InProcPubSub) Health() HealthStatus {
 }
 
 // collectHealthMetrics gathers all health metrics.
-func (ps *InProcPubSub) collectHealthMetrics() HealthMetrics {
+func (ps *InProcBroker) collectHealthMetrics() HealthMetrics {
 	metrics := HealthMetrics{}
 
 	// Topic and pattern counts
@@ -142,31 +142,31 @@ func (ps *InProcPubSub) collectHealthMetrics() HealthMetrics {
 }
 
 // IsHealthy returns true if the pubsub system is healthy.
-func (ps *InProcPubSub) IsHealthy() bool {
+func (ps *InProcBroker) IsHealthy() bool {
 	return !ps.closed.Load()
 }
 
 // ReadinessCheck performs a readiness check.
 // Returns nil if ready, error otherwise.
-func (ps *InProcPubSub) ReadinessCheck() error {
+func (ps *InProcBroker) ReadinessCheck() error {
 	if ps.closed.Load() {
-		return ErrClosed
+		return newErr(ErrCodeClosed, "readiness", "", "broker is closed", nil)
 	}
 	return nil
 }
 
 // LivenessCheck performs a liveness check.
 // Returns nil if alive, error otherwise.
-func (ps *InProcPubSub) LivenessCheck() error {
+func (ps *InProcBroker) LivenessCheck() error {
 	if ps.closed.Load() {
-		return ErrClosed
+		return newErr(ErrCodeClosed, "readiness", "", "broker is closed", nil)
 	}
 
 	// Check if worker pool is responsive
 	if ps.workerPool != nil {
 		// If pool is at capacity, the system may be under backpressure.
 		if ps.workerPool.Available() == 0 {
-			return ErrBackpressure
+			return newErr(ErrCodeBackpressure, "liveness", "", "worker pool at capacity", nil)
 		}
 	}
 
@@ -174,7 +174,7 @@ func (ps *InProcPubSub) LivenessCheck() error {
 }
 
 // DiagnosticInfo returns detailed diagnostic information.
-func (ps *InProcPubSub) DiagnosticInfo() map[string]any {
+func (ps *InProcBroker) DiagnosticInfo() map[string]any {
 	info := make(map[string]any)
 
 	info["closed"] = ps.closed.Load()

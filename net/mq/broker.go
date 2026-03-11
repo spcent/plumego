@@ -54,9 +54,9 @@ import (
 	"github.com/spcent/plumego/pubsub"
 )
 
-// InProcBroker adapts pubsub.PubSub to the Broker interface.
+// InProcBroker adapts pubsub.Broker to the Broker interface.
 type InProcBroker struct {
-	ps            pubsub.PubSub
+	ps            pubsub.Broker
 	metrics       MetricsCollector
 	panicHandler  PanicHandler
 	config        Config
@@ -203,7 +203,7 @@ func (b *InProcBroker) validateTTL(expiresAt time.Time) error {
 //
 // Panics if configuration is invalid or persistence initialization fails.
 // Use NewInProcBrokerE to receive an error instead of a panic.
-func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
+func NewInProcBroker(ps pubsub.Broker, opts ...Option) *InProcBroker {
 	broker, err := newInProcBroker(ps, opts...)
 	if err != nil {
 		panic(err.Error())
@@ -213,12 +213,12 @@ func NewInProcBroker(ps pubsub.PubSub, opts ...Option) *InProcBroker {
 
 // NewInProcBrokerE creates a broker and returns an error instead of panicking
 // on invalid configuration or persistence initialization failures.
-func NewInProcBrokerE(ps pubsub.PubSub, opts ...Option) (*InProcBroker, error) {
+func NewInProcBrokerE(ps pubsub.Broker, opts ...Option) (*InProcBroker, error) {
 	return newInProcBroker(ps, opts...)
 }
 
 // newInProcBroker is the shared constructor for NewInProcBroker and NewInProcBrokerE.
-func newInProcBroker(ps pubsub.PubSub, opts ...Option) (_ *InProcBroker, retErr error) {
+func newInProcBroker(ps pubsub.Broker, opts ...Option) (_ *InProcBroker, retErr error) {
 	if ps == nil {
 		ps = pubsub.New()
 	}
@@ -280,7 +280,7 @@ func newInProcBroker(ps pubsub.PubSub, opts ...Option) (_ *InProcBroker, retErr 
 	}
 
 	// Initialize consumer group manager for InProcPubSub backends.
-	if inproc, ok := ps.(*pubsub.InProcPubSub); ok {
+	if inproc, ok := ps.(*pubsub.InProcBroker); ok {
 		broker.consumerGroupMgr = pubsub.NewConsumerGroupManager(inproc)
 	}
 
@@ -724,7 +724,7 @@ func (b *InProcBroker) observe(ctx context.Context, op Operation, topic string, 
 
 // ConsumerGroupManager returns the consumer group manager for the underlying
 // InProcPubSub backend. Returns nil when the backend does not support consumer
-// groups (e.g. a custom pubsub.PubSub implementation).
+// groups (e.g. a custom pubsub.Broker implementation).
 func (b *InProcBroker) ConsumerGroupManager() *pubsub.ConsumerGroupManager {
 	if b == nil {
 		return nil

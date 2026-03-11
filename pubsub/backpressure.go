@@ -102,7 +102,7 @@ type BackpressureStats struct {
 
 // BackpressureController manages backpressure feedback
 type BackpressureController struct {
-	ps     *InProcPubSub
+	ps     *InProcBroker
 	config BackpressureConfig
 
 	// Pressure tracking per topic
@@ -136,7 +136,7 @@ type topicPressure struct {
 }
 
 // NewBackpressureController creates a new backpressure controller
-func NewBackpressureController(ps *InProcPubSub, config BackpressureConfig) *BackpressureController {
+func NewBackpressureController(ps *InProcBroker, config BackpressureConfig) *BackpressureController {
 	if !config.Enabled {
 		return nil
 	}

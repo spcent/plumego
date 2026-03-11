@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/checker"
@@ -9,71 +11,37 @@ import (
 )
 
 // CheckCmd validates project health
-type CheckCmd struct {
-}
+type CheckCmd struct{}
 
 func (c *CheckCmd) Name() string  { return "check" }
 func (c *CheckCmd) Short() string { return "Validate project health" }
-func (c *CheckCmd) Long() string {
-	return `Validate project structure, configuration, and dependencies.
-
-Checks:
-  - Configuration validation (env vars, config files)
-  - Dependency status (go.mod, outdated packages)
-  - Security audit (secrets, known vulnerabilities)
-  - Project structure (required files, conventions)
-
-Examples:
-  plumego check
-  plumego check --config-only
-  plumego check --security --format json
-`
-}
-
-func (c *CheckCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "config-only", Default: false, Usage: "Only check configuration"},
-		{Name: "deps-only", Default: false, Usage: "Only check dependencies"},
-		{Name: "security", Default: false, Usage: "Run security checks"},
-	}
-}
 
 func (c *CheckCmd) Run(ctx *Context, args []string) error {
-	out := ctx.Out
+	fs := flag.NewFlagSet("check", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
-	// Parse flags
-	configOnly := false
-	depsOnly := false
-	security := false
+	configOnly := fs.Bool("config-only", false, "Only check configuration")
+	depsOnly := fs.Bool("deps-only", false, "Only check dependencies")
+	security := fs.Bool("security", false, "Run security checks")
 
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--config-only":
-			configOnly = true
-		case "--deps-only":
-			depsOnly = true
-		case "--security":
-			security = true
-		}
+	if err := fs.Parse(args); err != nil {
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	// Determine current directory
 	cwd, err := os.Getwd()
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return ctx.Out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	out.Verbose(fmt.Sprintf("Checking project at: %s", cwd))
+	ctx.Out.Verbose(fmt.Sprintf("Checking project at: %s", cwd))
 
-	// Run checks
 	checks := &checker.CheckResult{
 		Status: "healthy",
 		Checks: make(map[string]checker.CheckDetail),
 	}
 
-	// Configuration check
-	if !depsOnly {
-		out.Verbose("Running configuration checks...")
+	if !*depsOnly {
+		ctx.Out.Verbose("Running configuration checks...")
 		configCheck := checker.CheckConfig(cwd, ctx.EnvFile)
 		checks.Checks["config"] = configCheck
 		if configCheck.Status == "failed" {
@@ -81,9 +49,8 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 		}
 	}
 
-	// Dependencies check
-	if !configOnly {
-		out.Verbose("Running dependency checks...")
+	if !*configOnly {
+		ctx.Out.Verbose("Running dependency checks...")
 		depsCheck := checker.CheckDependencies(cwd)
 		checks.Checks["dependencies"] = depsCheck
 		if depsCheck.Status == "failed" {
@@ -93,9 +60,8 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 		}
 	}
 
-	// Security check
-	if security && !configOnly && !depsOnly {
-		out.Verbose("Running security checks...")
+	if *security && !*configOnly && !*depsOnly {
+		ctx.Out.Verbose("Running security checks...")
 		securityCheck := checker.CheckSecurity(cwd, ctx.EnvFile)
 		checks.Checks["security"] = securityCheck
 		if securityCheck.Status == "failed" {
@@ -105,9 +71,8 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 		}
 	}
 
-	// Project structure check
-	if !configOnly && !depsOnly {
-		out.Verbose("Running project structure checks...")
+	if !*configOnly && !*depsOnly {
+		ctx.Out.Verbose("Running project structure checks...")
 		structureCheck := checker.CheckStructure(cwd)
 		checks.Checks["structure"] = structureCheck
 		if structureCheck.Status == "warning" && checks.Status == "healthy" {
@@ -115,7 +80,6 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 		}
 	}
 
-	// Determine exit code
 	exitCode := 0
 	switch checks.Status {
 	case "unhealthy":
@@ -125,11 +89,10 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 	}
 
 	if exitCode == 0 {
-		return out.Success("All checks passed", checks)
+		return ctx.Out.Success("All checks passed", checks)
 	}
 
-	// Print result and exit with appropriate code
-	if err := out.Print(checks); err != nil {
+	if err := ctx.Out.Print(checks); err != nil {
 		return err
 	}
 	return output.Exit(exitCode)

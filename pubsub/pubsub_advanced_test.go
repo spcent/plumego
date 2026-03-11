@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -221,30 +222,35 @@ func TestPubSub_ErrorHandling(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	// Test invalid topic
-	_, err := ps.Subscribe("", DefaultSubOptions())
-	if err != ErrInvalidTopic {
-		t.Errorf("Expected ErrInvalidTopic, got %v", err)
+	checkCode := func(t *testing.T, err error, wantCode ErrorCode, label string) {
+		t.Helper()
+		var e *Error
+		if !errors.As(err, &e) || e.Code != wantCode {
+			t.Errorf("%s: want code %s, got %v", label, wantCode, err)
+		}
 	}
 
-	// Test invalid buffer size (negative)
+	// Test invalid topic
+	_, err := ps.Subscribe("", DefaultSubOptions())
+	checkCode(t, err, ErrCodeInvalidTopic, "empty topic")
+
+	// Test invalid buffer size (negative — normalised to default, no error)
 	_, err = ps.Subscribe("test", SubOptions{BufferSize: -1})
-	if err != nil && err != ErrBufferTooSmall {
-		t.Errorf("Expected ErrBufferTooSmall or nil, got %v", err)
+	if err != nil {
+		var e *Error
+		if !errors.As(err, &e) || e.Code != ErrCodeInvalidOptions {
+			t.Errorf("Expected ErrCodeInvalidOptions or nil for negative buffer, got %v", err)
+		}
 	}
 
 	// Test publish to closed
 	ps.Close()
 	err = ps.Publish("test", Message{ID: "test"})
-	if err != ErrPublishToClosed {
-		t.Errorf("Expected ErrPublishToClosed, got %v", err)
-	}
+	checkCode(t, err, ErrCodeClosed, "publish to closed")
 
 	// Test subscribe to closed
 	_, err = ps.Subscribe("test", DefaultSubOptions())
-	if err != ErrSubscribeToClosed {
-		t.Errorf("Expected ErrSubscribeToClosed, got %v", err)
-	}
+	checkCode(t, err, ErrCodeClosed, "subscribe to closed")
 }
 
 // TestPubSub_MetricsAccuracy tests metric accuracy

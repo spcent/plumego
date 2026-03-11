@@ -24,7 +24,7 @@ type WebhookOutConfig struct {
 // WebhookInConfig configures inbound webhook receivers.
 type WebhookInConfig struct {
 	Enabled bool          // Whether to enable the inbound webhook endpoints
-	Pub     pubsub.PubSub // PubSub instance for event publishing
+	Pub     pubsub.Broker // PubSub instance for event publishing
 
 	GitHubSecret      string             // Secret for GitHub webhook events
 	StripeSecret      string             // Secret for Stripe webhook events

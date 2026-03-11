@@ -29,12 +29,12 @@ type AppRunner struct {
 	cancel  context.CancelFunc
 	mu      sync.Mutex
 
-	pubsub  *pubsub.InProcPubSub
+	pubsub  *pubsub.InProcBroker
 	running bool
 }
 
 // NewAppRunner creates a new application runner
-func NewAppRunner(dir string, ps *pubsub.InProcPubSub) *AppRunner {
+func NewAppRunner(dir string, ps *pubsub.InProcBroker) *AppRunner {
 	return &AppRunner{
 		dir:         dir,
 		binaryPath:  filepath.Join(dir, ".dev-server"),

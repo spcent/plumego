@@ -24,7 +24,7 @@ type Rule struct {
 }
 
 type WebhookBridge struct {
-	Pub pubsub.PubSub
+	Pub pubsub.Broker
 	Out *webhookout.Service
 
 	// Rules define what inbound topics are bridged to which outbound event types.

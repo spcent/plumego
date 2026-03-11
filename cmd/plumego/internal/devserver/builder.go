@@ -19,11 +19,11 @@ type Builder struct {
 	buildCmd   string
 	buildArgs  []string
 
-	pubsub *pubsub.InProcPubSub
+	pubsub *pubsub.InProcBroker
 }
 
 // NewBuilder creates a new builder
-func NewBuilder(dir string, ps *pubsub.InProcPubSub) *Builder {
+func NewBuilder(dir string, ps *pubsub.InProcBroker) *Builder {
 	return &Builder{
 		dir:        dir,
 		outputPath: filepath.Join(dir, ".dev-server"),

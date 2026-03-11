@@ -13,11 +13,11 @@ import (
 
 // TestHandler serves demo and integration-test endpoints.
 type TestHandler struct {
-	bus *pubsub.InProcPubSub
+	bus *pubsub.InProcBroker
 }
 
 // NewTestHandler creates a TestHandler backed by the given pub/sub bus.
-func NewTestHandler(bus *pubsub.InProcPubSub) *TestHandler {
+func NewTestHandler(bus *pubsub.InProcBroker) *TestHandler {
 	return &TestHandler{bus: bus}
 }
 

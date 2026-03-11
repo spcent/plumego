@@ -98,22 +98,19 @@ func matchParts(patternParts, topicParts []string) bool {
 // Returns an error if the pattern is invalid.
 func ValidateMQTTPattern(pattern string) error {
 	if pattern == "" {
-		return ErrInvalidPattern
+		return newErr(ErrCodeInvalidPattern, "validate", "", "pattern must not be empty", nil)
 	}
 
 	parts := strings.Split(pattern, MQTTSeparator)
 
 	for i, part := range parts {
-		// "#" must be the last part
 		if part == MQTTMultiLevelWildcard && i != len(parts)-1 {
-			return NewError(ErrCodeInvalidPattern, "validate", "multi-level wildcard '#' must be the last character")
+			return newErr(ErrCodeInvalidPattern, "validate", pattern, "multi-level wildcard '#' must be the last character", nil)
 		}
 
-		// Check for invalid wildcard combinations
 		if part != MQTTSingleLevelWildcard && part != MQTTMultiLevelWildcard {
-			// Wildcards cannot be mixed with other characters in a level
 			if strings.Contains(part, MQTTSingleLevelWildcard) || strings.Contains(part, MQTTMultiLevelWildcard) {
-				return NewError(ErrCodeInvalidPattern, "validate", "wildcards cannot be mixed with other characters")
+				return newErr(ErrCodeInvalidPattern, "validate", pattern, "wildcards cannot be mixed with other characters", nil)
 			}
 		}
 	}

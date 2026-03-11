@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -408,9 +409,11 @@ func TestRateLimitedPubSub_Close(t *testing.T) {
 	}
 
 	// Publishing after close should fail
-	msg := Message{Data: "test"}
-	if err := rlps.Publish("test", msg); err != ErrClosed {
-		t.Errorf("Expected ErrClosed, got %v", err)
+	msg2 := Message{Data: "test"}
+	publishErr := rlps.Publish("test", msg2)
+	var closedErr *Error
+	if !errors.As(publishErr, &closedErr) || closedErr.Code != ErrCodeClosed {
+		t.Errorf("Expected ErrCodeClosed, got %v", publishErr)
 	}
 }
 

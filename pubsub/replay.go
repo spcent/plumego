@@ -120,7 +120,7 @@ type ReplayStats struct {
 
 // ReplayStore manages message storage and replay
 type ReplayStore struct {
-	ps     *InProcPubSub
+	ps     *InProcBroker
 	config ReplayConfig
 
 	// In-memory storage
@@ -150,7 +150,7 @@ type ReplayStore struct {
 }
 
 // NewReplayStore creates a new message replay store
-func NewReplayStore(ps *InProcPubSub, config ReplayConfig) (*ReplayStore, error) {
+func NewReplayStore(ps *InProcBroker, config ReplayConfig) (*ReplayStore, error) {
 	if !config.Enabled {
 		return nil, errors.New("replay is not enabled")
 	}

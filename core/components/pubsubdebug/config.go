@@ -6,5 +6,5 @@ import "github.com/spcent/plumego/pubsub"
 type PubSubConfig struct {
 	Enabled bool          // Whether to enable the debug endpoint
 	Path    string        // Path for the debug endpoint
-	Pub     pubsub.PubSub // PubSub instance for snapshotting
+	Pub     pubsub.Broker // PubSub instance for snapshotting
 }

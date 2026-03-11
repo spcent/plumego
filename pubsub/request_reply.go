@@ -9,26 +9,26 @@ import (
 )
 
 const (
-	// ReplyToHeader is the metadata key for reply topic
+	// ReplyToHeader is the metadata key for the reply topic.
 	ReplyToHeader = "X-Reply-To"
-	// CorrelationIDHeader is the metadata key for correlation ID
+	// CorrelationIDHeader is the metadata key for the correlation ID.
 	CorrelationIDHeader = "X-Correlation-ID"
-	// DefaultRequestTimeout is the default timeout for Request operations
+	// DefaultRequestTimeout is the default timeout for Request operations.
 	DefaultRequestTimeout = 30 * time.Second
 )
 
-// requestManager manages request-reply pattern.
+// requestManager manages the request-reply pattern using a shared reply subscription.
 type requestManager struct {
 	mu         sync.RWMutex
-	pending    map[string]chan Message // correlationID -> response channel
-	ps         *InProcPubSub
+	pending    map[string]chan Message
+	ps         *InProcBroker
 	replyTopic string
 	replySub   Subscription
-	done       chan struct{} // closed by Close() to unblock waiting Request calls
+	done       chan struct{}
 }
 
-// newRequestManager creates a new request manager.
-func newRequestManager(ps *InProcPubSub) (*requestManager, error) {
+// newRequestManager creates a request manager for the given broker.
+func newRequestManager(ps *InProcBroker) (*requestManager, error) {
 	rm := &requestManager{
 		pending:    make(map[string]chan Message),
 		ps:         ps,
@@ -36,7 +36,6 @@ func newRequestManager(ps *InProcPubSub) (*requestManager, error) {
 		done:       make(chan struct{}),
 	}
 
-	// Subscribe to reply topic
 	sub, err := ps.Subscribe(rm.replyTopic, SubOptions{
 		BufferSize: 256,
 		Policy:     DropNewest,
@@ -46,9 +45,7 @@ func newRequestManager(ps *InProcPubSub) (*requestManager, error) {
 	}
 	rm.replySub = sub
 
-	// Start reply handler
 	go rm.handleReplies()
-
 	return rm, nil
 }
 
@@ -66,185 +63,101 @@ func generateCorrelationID() string {
 	return hex.EncodeToString(b)
 }
 
-// Request sends a message and waits for a response.
+// Request sends a request and waits for a response using the shared reply subscription.
 func (rm *requestManager) Request(ctx context.Context, topic string, msg Message) (Message, error) {
 	if rm.ps.closed.Load() {
-		return Message{}, ErrClosed
+		return Message{}, newErr(ErrCodeClosed, "request", topic, "broker is closed", nil)
 	}
 
-	// Generate correlation ID
 	correlationID := generateCorrelationID()
-
-	// Ensure metadata exists
 	if msg.Meta == nil {
 		msg.Meta = make(map[string]string)
 	}
 	msg.Meta[ReplyToHeader] = rm.replyTopic
 	msg.Meta[CorrelationIDHeader] = correlationID
 
-	// Create response channel
 	respCh := make(chan Message, 1)
 
 	rm.mu.Lock()
 	rm.pending[correlationID] = respCh
 	rm.mu.Unlock()
 
-	// Cleanup on exit
 	defer func() {
 		rm.mu.Lock()
 		delete(rm.pending, correlationID)
 		rm.mu.Unlock()
 	}()
 
-	// Publish request
 	if err := rm.ps.Publish(topic, msg); err != nil {
 		return Message{}, err
 	}
 
-	// Wait for response
 	select {
 	case resp := <-respCh:
 		return resp, nil
 	case <-rm.done:
-		return Message{}, ErrClosed
+		return Message{}, newErr(ErrCodeClosed, "request", topic, "broker is closed", nil)
 	case <-ctx.Done():
 		return Message{}, ctx.Err()
 	}
 }
 
-// RequestWithTimeout sends a message and waits for a response with timeout.
+// RequestWithTimeout sends a request with an explicit timeout.
 func (rm *requestManager) RequestWithTimeout(topic string, msg Message, timeout time.Duration) (Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return rm.Request(ctx, topic, msg)
 }
 
-// handleReplies processes incoming replies.
+// handleReplies dispatches incoming reply messages to waiting Request calls.
 func (rm *requestManager) handleReplies() {
 	for msg := range rm.replySub.C() {
 		correlationID := msg.Meta[CorrelationIDHeader]
 		if correlationID == "" {
 			continue
 		}
-
 		rm.mu.RLock()
 		respCh, ok := rm.pending[correlationID]
 		rm.mu.RUnlock()
-
 		if ok {
 			select {
 			case respCh <- msg:
 			default:
-				// Response channel full or closed
 			}
 		}
 	}
 }
 
-// Close closes the request manager.
+// Close shuts down the request manager.
 func (rm *requestManager) Close() {
 	if rm.replySub != nil {
 		rm.replySub.Cancel()
 	}
-
-	// Close done first so all pending Request calls unblock via ErrClosed.
-	// We must NOT close the individual respCh channels here: handleReplies may
-	// hold an RLock reference to a respCh and attempt a send concurrently with
-	// this Close, causing a send-on-closed-channel panic.
 	close(rm.done)
-
 	rm.mu.Lock()
 	rm.pending = make(map[string]chan Message)
 	rm.mu.Unlock()
 }
 
 // Reply sends a reply to a request message.
-func (ps *InProcPubSub) Reply(reqMsg Message, respMsg Message) error {
+// The request message must contain ReplyToHeader and CorrelationIDHeader metadata.
+func Reply(broker Broker, reqMsg Message, respMsg Message) error {
 	replyTo := reqMsg.Meta[ReplyToHeader]
 	if replyTo == "" {
-		return NewErrorWithTopic(ErrCodeNotFound, "reply", reqMsg.Topic, "no reply-to header in request")
+		return newErr(ErrCodeNotFound, "reply", reqMsg.Topic, "no reply-to header in request", nil)
 	}
-
 	correlationID := reqMsg.Meta[CorrelationIDHeader]
 	if correlationID == "" {
-		return NewErrorWithTopic(ErrCodeNotFound, "reply", reqMsg.Topic, "no correlation ID in request")
+		return newErr(ErrCodeNotFound, "reply", reqMsg.Topic, "no correlation ID in request", nil)
 	}
-
-	// Copy correlation ID to response
 	if respMsg.Meta == nil {
 		respMsg.Meta = make(map[string]string)
 	}
 	respMsg.Meta[CorrelationIDHeader] = correlationID
-
-	return ps.Publish(replyTo, respMsg)
+	return broker.Publish(replyTo, respMsg)
 }
 
-// Request sends a message and waits for a response.
-// If the request-reply manager is enabled (via WithRequestReply()), uses the shared
-// reply subscription for efficient multiplexed request handling. Otherwise, creates
-// a temporary subscription per request.
-func (ps *InProcPubSub) Request(ctx context.Context, topic string, msg Message) (Message, error) {
-	if ps.closed.Load() {
-		return Message{}, ErrClosed
-	}
-
-	// Use request manager if enabled
-	if ps.requestMgr != nil {
-		return ps.requestMgr.Request(ctx, topic, msg)
-	}
-
-	// Fallback: create a temporary subscription for the reply
-	replyTopic := generateReplyTopic()
-	correlationID := generateCorrelationID()
-
-	if msg.Meta == nil {
-		msg.Meta = make(map[string]string)
-	}
-	msg.Meta[ReplyToHeader] = replyTopic
-	msg.Meta[CorrelationIDHeader] = correlationID
-
-	replySub, err := ps.Subscribe(replyTopic, SubOptions{
-		BufferSize: 1,
-		Policy:     DropNewest,
-	})
-	if err != nil {
-		return Message{}, err
-	}
-	defer replySub.Cancel()
-
-	if err := ps.Publish(topic, msg); err != nil {
-		return Message{}, err
-	}
-
-	select {
-	case resp := <-replySub.C():
-		return resp, nil
-	case <-ctx.Done():
-		return Message{}, ctx.Err()
-	}
-}
-
-// RequestWithTimeout sends a message and waits for a response with timeout.
-func (ps *InProcPubSub) RequestWithTimeout(topic string, msg Message, timeout time.Duration) (Message, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	return ps.Request(ctx, topic, msg)
-}
-
-// PendingRequests returns the number of in-flight requests waiting for replies.
-// Requires the request-reply manager to be enabled via WithRequestReply().
-func (ps *InProcPubSub) PendingRequests() (int, error) {
-	if ps.requestMgr == nil {
-		return 0, ErrRequestReplyDisabled
-	}
-
-	ps.requestMgr.mu.RLock()
-	n := len(ps.requestMgr.pending)
-	ps.requestMgr.mu.RUnlock()
-	return n, nil
-}
-
-// IsRequest checks if a message is a request that expects a reply.
+// IsRequest reports whether the message is a request expecting a reply.
 func IsRequest(msg Message) bool {
 	return msg.Meta != nil && msg.Meta[ReplyToHeader] != ""
 }

@@ -17,22 +17,18 @@ type RootCmd struct {
 type Command interface {
 	Name() string
 	Short() string
-	Long() string
-	Flags() []Flag
 	Run(ctx *Context, args []string) error
 }
 
-// Flag represents a command flag
-type Flag struct {
-	Name     string
-	Short    string
-	Default  any
-	Usage    string
-	Required bool
+// BuildInfo holds build-time version metadata injected from main.
+type BuildInfo struct {
+	Version   string
+	GitCommit string
+	BuildDate string
 }
 
 // Execute runs the root command
-func Execute() error {
+func Execute(info BuildInfo) error {
 	root := &RootCmd{
 		subcommands: make(map[string]Command),
 		formatter:   output.NewFormatter(),
@@ -41,7 +37,7 @@ func Execute() error {
 	// Register commands
 	root.Register(&NewCmd{})
 	root.Register(&GenerateCmd{})
-	root.Register(&DevCmd{})
+	root.Register(NewDevCmd())
 	root.Register(&RoutesCmd{})
 	root.Register(&CheckCmd{})
 	root.Register(&ConfigCmd{})
@@ -49,7 +45,11 @@ func Execute() error {
 	root.Register(&TestCmd{})
 	root.Register(&BuildCmd{})
 	root.Register(&InspectCmd{})
-	root.Register(&VersionCmd{})
+	root.Register(&VersionCmd{
+		Version:   info.Version,
+		GitCommit: info.GitCommit,
+		BuildDate: info.BuildDate,
+	})
 
 	return root.Run(os.Args[1:])
 }
@@ -93,9 +93,6 @@ func (r *RootCmd) Run(args []string) error {
 	ctx := &Context{
 		Out:     r.formatter,
 		EnvFile: global.EnvFile,
-		Verbose: global.Verbose,
-		Quiet:   global.Quiet,
-		Format:  global.Format,
 	}
 
 	return cmd.Run(ctx, args[1:])

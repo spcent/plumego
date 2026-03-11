@@ -80,7 +80,7 @@ func DefaultConsumerGroupConfig(groupID string) ConsumerGroupConfig {
 
 // ConsumerGroupManager manages consumer groups
 type ConsumerGroupManager struct {
-	ps *InProcPubSub
+	ps *InProcBroker
 
 	groups   map[string]*consumerGroup
 	groupsMu sync.RWMutex
@@ -130,7 +130,7 @@ type groupConsumer struct {
 }
 
 // NewConsumerGroupManager creates a new consumer group manager
-func NewConsumerGroupManager(ps *InProcPubSub) *ConsumerGroupManager {
+func NewConsumerGroupManager(ps *InProcBroker) *ConsumerGroupManager {
 	return &ConsumerGroupManager{
 		ps:     ps,
 		groups: make(map[string]*consumerGroup),
