@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/configmgr"
@@ -9,41 +11,14 @@ import (
 )
 
 // ConfigCmd manages configuration
-type ConfigCmd struct {
-}
+type ConfigCmd struct{}
 
 func (c *ConfigCmd) Name() string  { return "config" }
 func (c *ConfigCmd) Short() string { return "Configuration management" }
-func (c *ConfigCmd) Long() string {
-	return `View, validate, and generate configuration files.
-
-Commands:
-  show      Display current configuration
-  validate  Validate configuration files
-  init      Generate default config files
-  env       Show environment variables
-
-Examples:
-  plumego config show
-  plumego config show --resolve --redact
-  plumego config validate
-  plumego config init
-  plumego config env --format json
-`
-}
-
-func (c *ConfigCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "resolve", Default: false, Usage: "Resolve environment variables"},
-		{Name: "redact", Default: false, Usage: "Redact sensitive values"},
-	}
-}
 
 func (c *ConfigCmd) Run(ctx *Context, args []string) error {
-	out := ctx.Out
-
 	if len(args) == 0 {
-		return out.Error("config command required (show, validate, init, env)", 1)
+		return ctx.Out.Error("config command required (show, validate, init, env)", 1)
 	}
 
 	subCmd := args[0]
@@ -51,29 +26,27 @@ func (c *ConfigCmd) Run(ctx *Context, args []string) error {
 
 	switch subCmd {
 	case "show":
-		return c.runShow(out, ctx.EnvFile, subArgs)
+		return c.runShow(ctx.Out, ctx.EnvFile, subArgs)
 	case "validate":
-		return c.runValidate(out, ctx.EnvFile, subArgs)
+		return c.runValidate(ctx.Out, ctx.EnvFile, subArgs)
 	case "init":
-		return c.runInit(out, subArgs)
+		return c.runInit(ctx.Out, subArgs)
 	case "env":
-		return c.runEnv(out, ctx.EnvFile, subArgs)
+		return c.runEnv(ctx.Out, ctx.EnvFile, subArgs)
 	default:
-		return out.Error(fmt.Sprintf("unknown config command: %s", subCmd), 1)
+		return ctx.Out.Error(fmt.Sprintf("unknown config command: %s", subCmd), 1)
 	}
 }
 
 func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string) error {
-	resolve := false
-	redact := false
+	fs := flag.NewFlagSet("config show", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--resolve":
-			resolve = true
-		case "--redact":
-			redact = true
-		}
+	resolve := fs.Bool("resolve", false, "Resolve environment variables")
+	redact := fs.Bool("redact", false, "Redact sensitive values")
+
+	if err := fs.Parse(args); err != nil {
+		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
 	cwd, err := os.Getwd()
@@ -82,12 +55,12 @@ func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string
 	}
 
 	out.Verbose("Loading configuration...")
-	config, err := configmgr.LoadConfig(cwd, envFile, resolve)
+	config, err := configmgr.LoadConfig(cwd, envFile, *resolve)
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to load config: %v", err), 1)
 	}
 
-	if redact {
+	if *redact {
 		config = configmgr.RedactSensitive(config)
 	}
 
@@ -95,12 +68,18 @@ func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string
 }
 
 func (c *ConfigCmd) runValidate(out *output.Formatter, envFile string, args []string) error {
+	fs := flag.NewFlagSet("config validate", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+	}
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	out.Verbose(fmt.Sprintf("Validating configuration with args: %v", args))
+	out.Verbose("Validating configuration...")
 	result := configmgr.ValidateConfig(cwd, envFile)
 
 	if len(result.Errors) > 0 {
@@ -121,31 +100,41 @@ func (c *ConfigCmd) runValidate(out *output.Formatter, envFile string, args []st
 }
 
 func (c *ConfigCmd) runInit(out *output.Formatter, args []string) error {
+	fs := flag.NewFlagSet("config init", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+	}
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	out.Verbose(fmt.Sprintf("Generating default configuration files with args: %v", args))
+	out.Verbose("Generating default configuration files...")
 	files, err := configmgr.InitConfig(cwd)
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to init config: %v", err), 1)
 	}
 
-	result := map[string]any{
+	return out.Success("Configuration files created", map[string]any{
 		"files_created": files,
-	}
-
-	return out.Success("Configuration files created", result)
+	})
 }
 
 func (c *ConfigCmd) runEnv(out *output.Formatter, envFile string, args []string) error {
+	fs := flag.NewFlagSet("config env", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	if err := fs.Parse(args); err != nil {
+		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+	}
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
 	}
 
-	out.Verbose(fmt.Sprintf("Loading environment variables with args: %v", args))
+	out.Verbose("Loading environment variables...")
 	envVars := configmgr.GetEnvVars(cwd, envFile)
 
 	return out.Print(envVars)

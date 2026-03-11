@@ -47,6 +47,17 @@ type Config struct {
 	AppAddr       string
 	ProjectDir    string
 	UIPath        string
+
+	// Optional custom build command. Empty means use the default go build.
+	CustomBuildCmd  string
+	CustomBuildArgs []string
+
+	// Optional custom run command. Empty means run the built binary.
+	CustomRunCmd  string
+	CustomRunArgs []string
+
+	// OutputPassthrough forwards app stdout/stderr to the CLI output.
+	OutputPassthrough bool
 }
 
 // NewDashboard creates a new development dashboard
@@ -96,6 +107,15 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	// Set app address for runner
 	d.runner.SetEnv("APP_ADDR", cfg.AppAddr)
 	d.runner.SetEnv("APP_DEBUG", "true")
+
+	// Apply optional custom commands from config
+	if cfg.CustomBuildCmd != "" {
+		d.builder.SetCustomBuild(cfg.CustomBuildCmd, cfg.CustomBuildArgs)
+	}
+	if cfg.CustomRunCmd != "" {
+		d.runner.SetCustomCommand(cfg.CustomRunCmd, cfg.CustomRunArgs)
+	}
+	d.runner.SetOutputPassthrough(cfg.OutputPassthrough)
 
 	// Register routes
 	d.registerRoutes(cfg.UIPath)
@@ -606,12 +626,7 @@ func (d *Dashboard) GetPubSub() *pubsub.InProcBroker {
 	return d.pubsub
 }
 
-// GetBuilder returns the Builder instance
-func (d *Dashboard) GetBuilder() BuilderAPI {
-	return d.builder
-}
-
-// GetRunner returns the AppRunner instance
-func (d *Dashboard) GetRunner() RunnerAPI {
-	return d.runner
+// SetOutputPassthrough controls whether app stdout/stderr is forwarded to the CLI.
+func (d *Dashboard) SetOutputPassthrough(enabled bool) {
+	d.runner.SetOutputPassthrough(enabled)
 }

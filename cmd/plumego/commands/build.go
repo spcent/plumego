@@ -14,38 +14,8 @@ import (
 
 type BuildCmd struct{}
 
-func (c *BuildCmd) Name() string {
-	return "build"
-}
-
-func (c *BuildCmd) Short() string {
-	return "Build application with optimizations"
-}
-
-func (c *BuildCmd) Long() string {
-	return `Build the Go application with plumego-specific optimizations.
-
-This command wraps 'go build' with useful defaults and options for
-building production-ready binaries.
-
-Examples:
-  plumego build
-  plumego build --output ./bin/app
-  plumego build --ldflags "-X main.version=1.0.0"
-  plumego build --tags prod
-  plumego build --format json`
-}
-
-func (c *BuildCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "dir", Default: ".", Usage: "Project directory"},
-		{Name: "output", Default: "./bin/app", Usage: "Output binary path"},
-		{Name: "ldflags", Default: "", Usage: "Go linker flags"},
-		{Name: "tags", Default: "", Usage: "Build tags (comma-separated)"},
-		{Name: "race", Default: "false", Usage: "Enable race detector"},
-		{Name: "trimpath", Default: "true", Usage: "Remove file system paths from binary"},
-	}
-}
+func (c *BuildCmd) Name() string  { return "build" }
+func (c *BuildCmd) Short() string { return "Build application with optimizations" }
 
 func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
@@ -67,19 +37,16 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Error(err.Error(), 1)
 	}
 
-	// Get output path
 	absOutput, err := filepath.Abs(*outputPath)
 	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid output path: %v", err), 1)
 	}
 
-	// Create output directory
 	outputDir := filepath.Dir(absOutput)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return ctx.Out.Error(fmt.Sprintf("failed to create output directory: %v", err), 1)
 	}
 
-	// Build command
 	buildArgs := []string{"build"}
 
 	if *race {
@@ -100,18 +67,14 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 
 	buildArgs = append(buildArgs, "-o", absOutput)
 
-	// Get Go version
 	goVersion, err := getGoVersion()
 	if err != nil {
 		goVersion = "unknown"
 	}
 
-	// Get git commit
 	gitCommit := getGitCommit(absDir)
-
 	startTime := time.Now()
 
-	// Run build
 	cmd := exec.Command("go", buildArgs...)
 	cmd.Dir = absDir
 	var stdoutBuf bytes.Buffer
@@ -119,7 +82,7 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 
-	if ctx.Verbose {
+	if ctx.Out.IsVerbose() {
 		ctx.Out.Verbose(fmt.Sprintf("Building: go %s", strings.Join(buildArgs, " ")))
 	}
 
@@ -146,7 +109,6 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 
 	buildTime := time.Since(startTime)
 
-	// Get binary size
 	fileInfo, err := os.Stat(absOutput)
 	var sizeBytes int64
 	if err == nil {
@@ -181,7 +143,6 @@ func getGoVersion() (string, error) {
 		return "", err
 	}
 
-	// Parse "go version go1.24.0 linux/amd64"
 	parts := strings.Fields(string(output))
 	if len(parts) >= 3 {
 		return strings.TrimPrefix(parts[2], "go"), nil

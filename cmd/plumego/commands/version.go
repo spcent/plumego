@@ -7,34 +7,14 @@ import (
 	"runtime"
 )
 
-// Version information (set at build time)
-var (
-	Version   = "dev"
-	GitCommit = "unknown"
-	BuildDate = "unknown"
-)
-
-type VersionCmd struct{}
-
-func (c *VersionCmd) Name() string {
-	return "version"
+type VersionCmd struct {
+	Version   string
+	GitCommit string
+	BuildDate string
 }
 
-func (c *VersionCmd) Short() string {
-	return "Show version information"
-}
-
-func (c *VersionCmd) Long() string {
-	return `Display version information for the plumego CLI.
-
-Examples:
-  plumego version
-  plumego version --format json`
-}
-
-func (c *VersionCmd) Flags() []Flag {
-	return nil
-}
+func (c *VersionCmd) Name() string  { return "version" }
+func (c *VersionCmd) Short() string { return "Show version information" }
 
 func (c *VersionCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("version", flag.ContinueOnError)
@@ -43,13 +23,11 @@ func (c *VersionCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	versionInfo := map[string]any{
-		"version":    Version,
-		"git_commit": GitCommit,
-		"build_date": BuildDate,
+	return ctx.Out.Success("Plumego CLI", map[string]any{
+		"version":    c.Version,
+		"git_commit": c.GitCommit,
+		"build_date": c.BuildDate,
 		"go_version": runtime.Version(),
 		"platform":   runtime.GOOS + "/" + runtime.GOARCH,
-	}
-
-	return ctx.Out.Success("Plumego CLI", versionInfo)
+	})
 }

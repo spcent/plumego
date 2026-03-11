@@ -10,38 +10,8 @@ import (
 
 type RoutesCmd struct{}
 
-func (c *RoutesCmd) Name() string {
-	return "routes"
-}
-
-func (c *RoutesCmd) Short() string {
-	return "Inspect registered routes"
-}
-
-func (c *RoutesCmd) Long() string {
-	return `Analyze and display HTTP routes registered in the application.
-
-This command scans the codebase to find route registrations and displays
-them in a structured format. Useful for documentation and debugging.
-
-Examples:
-  plumego routes
-  plumego routes --format json
-  plumego routes --method GET
-  plumego routes --pattern "/api/*"
-  plumego routes --middleware`
-}
-
-func (c *RoutesCmd) Flags() []Flag {
-	return []Flag{
-		{Name: "dir", Default: ".", Usage: "Project directory"},
-		{Name: "method", Default: "", Usage: "Filter by HTTP method (GET, POST, etc.)"},
-		{Name: "pattern", Default: "", Usage: "Filter routes by pattern"},
-		{Name: "middleware", Default: "false", Usage: "Show middleware chains"},
-		{Name: "group", Default: "", Usage: "Filter by route group"},
-		{Name: "sort", Default: "path", Usage: "Sort by: path, method, group"},
-	}
-}
+func (c *RoutesCmd) Name() string  { return "routes" }
+func (c *RoutesCmd) Short() string { return "Inspect registered routes" }
 
 func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("routes", flag.ContinueOnError)
@@ -63,7 +33,6 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Error(err.Error(), 1)
 	}
 
-	// Analyze routes
 	routes, err := routeanalyzer.AnalyzeRoutes(absDir, routeanalyzer.AnalyzeOptions{
 		Method:         *method,
 		Pattern:        *pattern,
