@@ -8,7 +8,7 @@
 
 Current package surface is centered on explicit collectors:
 
-- `metrics.MetricsCollector` is the shared interface.
+- `metrics.AggregateCollector` is the full collector interface.
 - `metrics.NewPrometheusCollector(namespace)` provides the in-memory collector.
 - `metrics.NewPrometheusExporter(collector)` provides the Prometheus HTTP exporter.
 - `metrics.NewOpenTelemetryTracer(name)` provides tracing hooks compatible with the middleware observability layer.
@@ -92,16 +92,24 @@ collector.ObserveHTTP(context.Background(), "GET", "/users", 200, 512, 42*time.M
 ### Time arbitrary work
 
 ```go
-err := metrics.MeasureFunc(ctx, collector, "db_query", "users", func() error {
+err := metrics.MeasureFunc(ctx, collector, "db_query", func() error {
     return repo.ListUsers(ctx)
+})
+```
+
+For domain-specific measurement helpers, prefer the explicit variant that matches the dependency:
+
+```go
+err := metrics.MeasureKVFunc(ctx, collector, "get", "users:42", true, func() error {
+    return repo.Get(ctx, "users:42")
 })
 ```
 
 ## Collector Model
 
-### `MetricsCollector`
+### `AggregateCollector`
 
-All collectors implement:
+Full collectors implement:
 
 - `Record(ctx, record)`
 - `ObserveHTTP(...)`

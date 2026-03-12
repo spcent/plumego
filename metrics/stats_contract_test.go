@@ -13,7 +13,7 @@ func TestCollectorStatsContract(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		collector MetricsCollector
+		collector AggregateCollector
 	}{
 		{name: "base", collector: NewBaseMetricsCollector()},
 		{name: "prometheus", collector: NewPrometheusCollector("test")},

@@ -23,7 +23,7 @@
 //
 // # Unified Interface
 //
-// All collectors implement the MetricsCollector interface, providing a consistent
+// Full collectors implement the AggregateCollector interface, providing a consistent
 // API for recording metrics across different subsystems:
 //
 //   - HTTP requests and responses

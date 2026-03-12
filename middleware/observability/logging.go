@@ -60,22 +60,23 @@ type RequestMetrics struct {
 	UserAgent string
 }
 
-// MetricsCollector can be plugged into the logging middleware to export metrics.
+// HTTPMetricsObserver can be plugged into the logging middleware to export
+// per-request HTTP metrics.
 // Implement ObserveHTTP to receive per-request HTTP metrics.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/middleware/observability"
 //
-//	type MyMetricsCollector struct{}
+//	type MyHTTPMetricsObserver struct{}
 //
-//	func (c *MyMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+//	func (c *MyHTTPMetricsObserver) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 //		// Collect metrics
 //	}
 //
-//	collector := &MyMetricsCollector{}
+//	collector := &MyHTTPMetricsObserver{}
 //	handler := observability.Logging(log.NewGLogger(), collector, nil)(myHandler)
-type MetricsCollector = metrics.HTTPObserver
+type HTTPMetricsObserver = metrics.HTTPObserver
 
 // TraceSpan represents a started tracing span.
 // Implementations must expose End to finalize the span and TraceID/SpanID for correlation.
@@ -144,7 +145,7 @@ func Tracing(tracer Tracer) middleware.Middleware {
 }
 
 // HTTPMetrics records per-request HTTP metrics using the configured collector.
-func HTTPMetrics(collector MetricsCollector) middleware.Middleware {
+func HTTPMetrics(collector HTTPMetricsObserver) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		if collector == nil {
 			return next
@@ -237,7 +238,7 @@ func AccessLog(logger log.StructuredLogger) middleware.Middleware {
 // The middleware also sets the following headers:
 //   - X-Request-ID: The trace ID (or generated if not provided)
 //   - X-Span-ID: The span ID (if available)
-func Logging(logger log.StructuredLogger, metrics MetricsCollector, tracer Tracer) middleware.Middleware {
+func Logging(logger log.StructuredLogger, metrics HTTPMetricsObserver, tracer Tracer) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := ensureTraceID(r)

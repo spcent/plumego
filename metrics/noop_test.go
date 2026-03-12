@@ -7,7 +7,7 @@ import (
 )
 
 func TestNoopCollectorImplementsInterface(t *testing.T) {
-	var _ MetricsCollector = (*NoopCollector)(nil)
+	var _ AggregateCollector = (*NoopCollector)(nil)
 }
 
 func TestNoopCollectorRecord(t *testing.T) {

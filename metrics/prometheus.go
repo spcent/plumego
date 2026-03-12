@@ -24,7 +24,7 @@ type latencyStats struct {
 	max   float64
 }
 
-// PrometheusCollector implements MetricsCollector without third-party dependencies.
+// PrometheusCollector implements AggregateCollector without third-party dependencies.
 // It exposes a text-based metrics handler compatible with Prometheus exposition format.
 //
 // This collector is designed for production use with:
@@ -205,7 +205,7 @@ func (p *PrometheusCollector) Clear() {
 	p.clearBase()
 }
 
-// Record implements the unified MetricsCollector interface.
+// Record implements the aggregate collector contract.
 func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
 	if record.Type == MetricHTTPRequest {
 		method, _ := record.Labels[labelMethod]
@@ -224,7 +224,7 @@ func (p *PrometheusCollector) Record(ctx context.Context, record MetricRecord) {
 	p.getBase().Record(ctx, record)
 }
 
-// ObserveHTTP implements the unified MetricsCollector interface.
+// ObserveHTTP implements the aggregate collector contract.
 func (p *PrometheusCollector) ObserveHTTP(_ context.Context, method, path string, status, _ int, duration time.Duration) {
 	p.recordHTTP(method, path, status, duration)
 }

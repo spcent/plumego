@@ -386,7 +386,7 @@ type SpanStats struct {
 // Record, ObserveHTTP, ObservePubSub, ObserveMQ, ObserveKV, ObserveIPC, ObserveDB
 // are provided by the embedded baseForwarder.
 
-// GetStats implements the unified MetricsCollector interface.
+// GetStats implements the aggregate collector contract.
 func (t *OpenTelemetryTracer) GetStats() CollectorStats {
 	spanStats := t.GetSpanStats()
 
@@ -422,7 +422,7 @@ func (t *OpenTelemetryTracer) GetStats() CollectorStats {
 	return stats
 }
 
-// Clear implements the unified MetricsCollector interface.
+// Clear implements the aggregate collector contract.
 func (t *OpenTelemetryTracer) Clear() {
 	t.mu.Lock()
 	defer t.mu.Unlock()

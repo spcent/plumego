@@ -6,300 +6,121 @@ import (
 )
 
 // Timer provides a convenient way to measure operation duration.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	timer := metrics.NewTimer()
-//
-//	// Perform operation
-//	doWork()
-//
-//	// Record duration
-//	duration := timer.Elapsed()
-//	collector.ObserveHTTP(ctx, "GET", "/api/users", 200, 100, duration)
 type Timer struct {
 	start time.Time
 }
 
 // NewTimer creates and starts a new timer.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	timer := metrics.NewTimer()
-//	// ... do work ...
-//	duration := timer.Elapsed()
 func NewTimer() *Timer {
 	return &Timer{start: time.Now()}
 }
 
 // Elapsed returns the duration since the timer was created.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	timer := metrics.NewTimer()
-//	doSomething()
-//	duration := timer.Elapsed()
-//	fmt.Printf("Operation took: %v\n", duration)
 func (t *Timer) Elapsed() time.Duration {
 	return time.Since(t.start)
 }
 
 // Reset resets the timer to the current time.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	timer := metrics.NewTimer()
-//	doFirstOperation()
-//	duration1 := timer.Elapsed()
-//
-//	timer.Reset()
-//	doSecondOperation()
-//	duration2 := timer.Elapsed()
 func (t *Timer) Reset() {
 	t.start = time.Now()
 }
 
-// MeasureFunc measures the duration of a function and records it.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//
-//	err := metrics.MeasureFunc(ctx, collector, "get", "user:123", func() error {
-//		// Perform KV operation
-//		return kvStore.Get("user:123")
-//	}, metrics.MeasureWithKV(true))
-//
-// measureTarget distinguishes which domain-specific Observe method to call.
-type measureTarget uint8
-
-const (
-	measureGeneric measureTarget = iota
-	measureKV
-	measurePubSub
-	measureMQ
-	measureIPC
-)
-
-type measureConfig struct {
-	target       measureTarget
-	kvHit        bool
-	mqPanicked   bool
-	ipcTransport string
-	ipcBytes     int
-}
-
-// MeasureOption configures the MeasureFunc behavior.
-type MeasureOption func(*measureConfig)
-
-// MeasureWithKV configures measurement for KV operations.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	err := metrics.MeasureFunc(ctx, collector, "get", "key", fn, metrics.MeasureWithKV(true))
-func MeasureWithKV(hit bool) MeasureOption {
-	return func(cfg *measureConfig) {
-		cfg.target = measureKV
-		cfg.kvHit = hit
-	}
-}
-
-// MeasureWithPubSub configures measurement for PubSub operations.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	err := metrics.MeasureFunc(ctx, collector, "publish", "topic", fn, metrics.MeasureWithPubSub())
-func MeasureWithPubSub() MeasureOption {
-	return func(cfg *measureConfig) {
-		cfg.target = measurePubSub
-	}
-}
-
-// MeasureWithMQ configures measurement for Message Queue operations.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	err := metrics.MeasureFunc(ctx, collector, "subscribe", "queue", fn, metrics.MeasureWithMQ(false))
-func MeasureWithMQ(panicked bool) MeasureOption {
-	return func(cfg *measureConfig) {
-		cfg.target = measureMQ
-		cfg.mqPanicked = panicked
-	}
-}
-
-// MeasureWithIPC configures measurement for IPC operations.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	err := metrics.MeasureFunc(ctx, collector, "read", "/tmp/socket", fn,
-//		metrics.MeasureWithIPC("unix", 256))
-func MeasureWithIPC(transport string, bytes int) MeasureOption {
-	return func(cfg *measureConfig) {
-		cfg.target = measureIPC
-		cfg.ipcTransport = transport
-		cfg.ipcBytes = bytes
-	}
-}
-
-// MeasureFunc measures the duration of a function and records it.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//
-//	err := metrics.MeasureFunc(ctx, collector, "get", "user:123", func() error {
-//		// Perform KV operation
-//		return kvStore.Get("user:123")
-//	}, metrics.MeasureWithKV(true))
-func MeasureFunc(ctx context.Context, collector MetricsCollector, operation, subject string, fn func() error, opts ...MeasureOption) error {
-	cfg := &measureConfig{}
-	for _, opt := range opts {
-		opt(cfg)
-	}
-
+// MeasureFunc measures a generic operation and records it through Recorder.
+func MeasureFunc(ctx context.Context, recorder Recorder, operation string, fn func() error) error {
 	timer := NewTimer()
 	err := fn()
 	duration := timer.Elapsed()
 
-	switch cfg.target {
-	case measureKV:
-		hit := err == nil && cfg.kvHit
-		collector.ObserveKV(ctx, operation, subject, duration, err, hit)
-	case measurePubSub:
-		collector.ObservePubSub(ctx, operation, subject, duration, err)
-	case measureMQ:
-		collector.ObserveMQ(ctx, operation, subject, duration, err, cfg.mqPanicked)
-	case measureIPC:
-		collector.ObserveIPC(ctx, operation, subject, cfg.ipcTransport, cfg.ipcBytes, duration, err)
-	default:
-		record := MetricRecord{
-			Type:     MetricType(operation),
-			Name:     operation,
-			Value:    durationValueSeconds(duration),
-			Duration: duration,
-			Error:    err,
-		}
-		collector.Record(ctx, record)
-	}
-
-	return err
-}
-
-// RecordSuccess is a convenience function to record a successful operation.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	metrics.RecordSuccess(ctx, collector, "database_query", 50*time.Millisecond)
-func RecordSuccess(ctx context.Context, collector MetricsCollector, operation string, duration time.Duration) {
-	record := MetricRecord{
-		Type:     MetricType(operation),
-		Name:     operation,
-		Value:    durationValueSeconds(duration),
-		Duration: duration,
-		Error:    nil,
-	}
-	collector.Record(ctx, record)
-}
-
-// RecordError is a convenience function to record a failed operation.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	if err := doOperation(); err != nil {
-//		metrics.RecordError(ctx, collector, "database_query", 50*time.Millisecond, err)
-//	}
-func RecordError(ctx context.Context, collector MetricsCollector, operation string, duration time.Duration, err error) {
-	record := MetricRecord{
+	recorder.Record(ctx, MetricRecord{
 		Type:     MetricType(operation),
 		Name:     operation,
 		Value:    durationValueSeconds(duration),
 		Duration: duration,
 		Error:    err,
-	}
-	collector.Record(ctx, record)
+	})
+
+	return err
+}
+
+// MeasureKVFunc measures a key-value operation and records it through KVObserver.
+func MeasureKVFunc(ctx context.Context, observer KVObserver, operation, key string, hit bool, fn func() error) error {
+	timer := NewTimer()
+	err := fn()
+	duration := timer.Elapsed()
+
+	observer.ObserveKV(ctx, operation, key, duration, err, err == nil && hit)
+	return err
+}
+
+// MeasurePubSubFunc measures a pub/sub operation and records it through PubSubObserver.
+func MeasurePubSubFunc(ctx context.Context, observer PubSubObserver, operation, topic string, fn func() error) error {
+	timer := NewTimer()
+	err := fn()
+	duration := timer.Elapsed()
+
+	observer.ObservePubSub(ctx, operation, topic, duration, err)
+	return err
+}
+
+// MeasureMQFunc measures a message queue operation and records it through MQObserver.
+func MeasureMQFunc(ctx context.Context, observer MQObserver, operation, topic string, panicked bool, fn func() error) error {
+	timer := NewTimer()
+	err := fn()
+	duration := timer.Elapsed()
+
+	observer.ObserveMQ(ctx, operation, topic, duration, err, panicked)
+	return err
+}
+
+// MeasureIPCFunc measures an IPC operation and records it through IPCObserver.
+func MeasureIPCFunc(ctx context.Context, observer IPCObserver, operation, addr, transport string, bytes int, fn func() error) error {
+	timer := NewTimer()
+	err := fn()
+	duration := timer.Elapsed()
+
+	observer.ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
+	return err
+}
+
+// RecordSuccess is a convenience function to record a successful operation.
+func RecordSuccess(ctx context.Context, recorder Recorder, operation string, duration time.Duration) {
+	recorder.Record(ctx, MetricRecord{
+		Type:     MetricType(operation),
+		Name:     operation,
+		Value:    durationValueSeconds(duration),
+		Duration: duration,
+	})
+}
+
+// RecordError is a convenience function to record a failed operation.
+func RecordError(ctx context.Context, recorder Recorder, operation string, duration time.Duration, err error) {
+	recorder.Record(ctx, MetricRecord{
+		Type:     MetricType(operation),
+		Name:     operation,
+		Value:    durationValueSeconds(duration),
+		Duration: duration,
+		Error:    err,
+	})
 }
 
 // RecordWithLabels is a convenience function to record a metric with custom labels.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	metrics.RecordWithLabels(ctx, collector, "api_call", 100*time.Millisecond,
-//		metrics.MetricLabels{
-//			"endpoint": "/api/users",
-//			"method":   "GET",
-//			"status":   "success",
-//		})
-func RecordWithLabels(ctx context.Context, collector MetricsCollector, operation string, duration time.Duration, labels MetricLabels) {
-	record := MetricRecord{
+func RecordWithLabels(ctx context.Context, recorder Recorder, operation string, duration time.Duration, labels MetricLabels) {
+	recorder.Record(ctx, MetricRecord{
 		Type:     MetricType(operation),
 		Name:     operation,
 		Value:    durationValueSeconds(duration),
 		Duration: duration,
 		Labels:   labels,
-	}
-	collector.Record(ctx, record)
+	})
 }
 
-// MultiCollector wraps multiple collectors and forwards all operations to each.
-//
-// This is useful when you want to collect metrics to multiple destinations
-// simultaneously (e.g., Prometheus and OpenTelemetry).
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	prom := metrics.NewPrometheusCollector("myapp")
-//	otel := metrics.NewOpenTelemetryTracer("myapp")
-//	multi := metrics.NewMultiCollector(prom, otel)
-//
-//	// Metrics are recorded to both collectors
-//	multi.ObserveHTTP(ctx, "GET", "/api/users", 200, 100, 50*time.Millisecond)
+// MultiCollector wraps multiple aggregate collectors and forwards all operations to each.
 type MultiCollector struct {
-	collectors []MetricsCollector
+	collectors []AggregateCollector
 }
 
 // NewMultiCollector creates a new multi-collector that forwards to all provided collectors.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	prom := metrics.NewPrometheusCollector("myapp")
-//	otel := metrics.NewOpenTelemetryTracer("myapp")
-//	base := metrics.NewBaseMetricsCollector()
-//	multi := metrics.NewMultiCollector(prom, otel, base)
-func NewMultiCollector(collectors ...MetricsCollector) *MultiCollector {
+func NewMultiCollector(collectors ...AggregateCollector) *MultiCollector {
 	return &MultiCollector{collectors: collectors}
 }
 
@@ -353,7 +174,6 @@ func (m *MultiCollector) ObserveDB(ctx context.Context, operation, driver, query
 }
 
 // GetStats returns combined statistics from all collectors.
-// The statistics are aggregated across all collectors.
 func (m *MultiCollector) GetStats() CollectorStats {
 	if len(m.collectors) == 0 {
 		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
@@ -369,12 +189,10 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		combined.ErrorRecords += stats.ErrorRecords
 		combined.ActiveSeries += stats.ActiveSeries
 
-		// Merge type breakdown
 		for k, v := range stats.TypeBreakdown {
 			combined.TypeBreakdown[k] += v
 		}
 
-		// Use earliest start time
 		if combined.StartTime.IsZero() || (!stats.StartTime.IsZero() && stats.StartTime.Before(combined.StartTime)) {
 			combined.StartTime = stats.StartTime
 		}
@@ -394,5 +212,4 @@ func (m *MultiCollector) Clear() {
 	}
 }
 
-// Verify that MultiCollector implements MetricsCollector interface at compile time
-var _ MetricsCollector = (*MultiCollector)(nil)
+var _ AggregateCollector = (*MultiCollector)(nil)

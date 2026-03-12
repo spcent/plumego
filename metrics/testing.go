@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// MockCollector is a configurable mock implementation of MetricsCollector for testing.
+// MockCollector is a configurable mock implementation of AggregateCollector for testing.
 // It embeds NoopCollector and allows selective override of methods through function fields.
 //
 // This collector is useful for:
@@ -432,5 +432,5 @@ func (m *MockCollector) GetLastDBCall() *DBCall {
 	return &call
 }
 
-// Verify that MockCollector implements MetricsCollector interface at compile time
-var _ MetricsCollector = (*MockCollector)(nil)
+// Verify that MockCollector implements AggregateCollector at compile time.
+var _ AggregateCollector = (*MockCollector)(nil)

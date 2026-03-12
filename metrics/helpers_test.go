@@ -37,7 +37,7 @@ func TestMeasureFuncSuccess(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	ctx := context.Background()
 
-	err := MeasureFunc(ctx, collector, "test_op", "subject", func() error {
+	err := MeasureFunc(ctx, collector, "test_op", func() error {
 		time.Sleep(10 * time.Millisecond)
 		return nil
 	})
@@ -64,7 +64,7 @@ func TestMeasureFuncError(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	err := MeasureFunc(ctx, collector, "test_op", "subject", func() error {
+	err := MeasureFunc(ctx, collector, "test_op", func() error {
 		return testErr
 	})
 
@@ -86,9 +86,9 @@ func TestMeasureFuncWithKV(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	ctx := context.Background()
 
-	err := MeasureFunc(ctx, collector, "get", "key123", func() error {
+	err := MeasureKVFunc(ctx, collector, "get", "key123", true, func() error {
 		return nil
-	}, MeasureWithKV(true))
+	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -105,9 +105,9 @@ func TestMeasureFuncWithPubSub(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	ctx := context.Background()
 
-	err := MeasureFunc(ctx, collector, "publish", "topic", func() error {
+	err := MeasurePubSubFunc(ctx, collector, "publish", "topic", func() error {
 		return nil
-	}, MeasureWithPubSub())
+	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -127,9 +127,9 @@ func TestMeasureFuncWithMQ(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	ctx := context.Background()
 
-	err := MeasureFunc(ctx, collector, "subscribe", "queue", func() error {
+	err := MeasureMQFunc(ctx, collector, "subscribe", "queue", false, func() error {
 		return nil
-	}, MeasureWithMQ(false))
+	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -149,9 +149,9 @@ func TestMeasureFuncWithIPC(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	ctx := context.Background()
 
-	err := MeasureFunc(ctx, collector, "read", "/tmp/socket", func() error {
+	err := MeasureIPCFunc(ctx, collector, "read", "/tmp/socket", "unix", 256, func() error {
 		return nil
-	}, MeasureWithIPC("unix", 256))
+	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -417,5 +417,5 @@ func TestMultiCollectorEmpty(t *testing.T) {
 }
 
 func TestMultiCollectorImplementsInterface(t *testing.T) {
-	var _ MetricsCollector = (*MultiCollector)(nil)
+	var _ AggregateCollector = (*MultiCollector)(nil)
 }

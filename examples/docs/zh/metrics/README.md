@@ -168,21 +168,19 @@ duration := timer.Elapsed()
 collector.ObserveHTTP(ctx, "GET", "/api", 200, 100, duration)
 ```
 
-### MeasureFunc
+### Explicit measurement helpers
 
-Automatic metric recording with function wrapping:
+Use the helper that matches the dependency boundary:
 
 ```go
-err := metrics.MeasureFunc(ctx, collector, "database_query", "users", func() error {
+err := metrics.MeasureFunc(ctx, collector, "database_query", func() error {
     return db.Query("SELECT * FROM users")
-}, metrics.MeasureWithKV(true))
-```
+})
 
-**Measurement Options:**
-- `MeasureWithKV(hit bool)` - For KV operations
-- `MeasureWithPubSub()` - For PubSub operations
-- `MeasureWithMQ(panicked bool)` - For MQ operations
-- `MeasureWithIPC(transport, bytes)` - For IPC operations
+err = metrics.MeasureKVFunc(ctx, collector, "get", "users:42", true, func() error {
+    return cache.Get("users:42")
+})
+```
 
 ### Convenience Functions
 
@@ -303,7 +301,7 @@ app.Use(middleware.Metrics(collector))
 ### Custom Middleware
 
 ```go
-func MetricsMiddleware(collector metrics.MetricsCollector) func(http.Handler) http.Handler {
+func MetricsMiddleware(collector metrics.HTTPObserver) func(http.Handler) http.Handler {
     return func(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
             timer := metrics.NewTimer()
@@ -365,7 +363,7 @@ func MetricsMiddleware(collector metrics.MetricsCollector) func(http.Handler) ht
 
 6. **Measure Critical Paths**
    ```go
-   err := metrics.MeasureFunc(ctx, collector, "db_query", "users", func() error {
+   err := metrics.MeasureFunc(ctx, collector, "db_query", func() error {
        return db.Query(...)
    })
    ```

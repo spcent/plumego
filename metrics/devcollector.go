@@ -115,7 +115,7 @@ type DevDBRedactionConfig struct {
 }
 
 // DevCollector is a lightweight in-memory metrics collector for dev dashboards.
-// It focuses on HTTP request aggregation while still implementing MetricsCollector.
+// It focuses on HTTP request aggregation while still implementing AggregateCollector.
 type DevCollector struct {
 	base *BaseMetricsCollector
 
@@ -267,12 +267,12 @@ func (d *DevCollector) DBSnapshot() DevDBSnapshot {
 	return snap
 }
 
-// Record implements MetricsCollector.
+// Record implements AggregateCollector.
 func (d *DevCollector) Record(ctx context.Context, record MetricRecord) {
 	d.base.Record(ctx, record)
 }
 
-// ObserveHTTP implements MetricsCollector.
+// ObserveHTTP implements AggregateCollector.
 func (d *DevCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 	d.base.ObserveHTTP(ctx, method, path, status, bytes, duration)
 
@@ -300,27 +300,27 @@ func (d *DevCollector) ObserveHTTP(ctx context.Context, method, path string, sta
 	d.appendSampleLocked(method, path, status, bytes, durationMS, errorHit, now)
 }
 
-// ObservePubSub implements MetricsCollector.
+// ObservePubSub implements AggregateCollector.
 func (d *DevCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
 	d.base.ObservePubSub(ctx, operation, topic, duration, err)
 }
 
-// ObserveMQ implements MetricsCollector.
+// ObserveMQ implements AggregateCollector.
 func (d *DevCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
 	d.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
 }
 
-// ObserveKV implements MetricsCollector.
+// ObserveKV implements AggregateCollector.
 func (d *DevCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
 	d.base.ObserveKV(ctx, operation, key, duration, err, hit)
 }
 
-// ObserveIPC implements MetricsCollector.
+// ObserveIPC implements AggregateCollector.
 func (d *DevCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
 	d.base.ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
 }
 
-// ObserveDB implements MetricsCollector.
+// ObserveDB implements AggregateCollector.
 func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
 	d.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
 
@@ -365,7 +365,7 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 	d.appendDBSlowLocked(operation, driver, table, query, durationMS, err, now)
 }
 
-// GetStats implements MetricsCollector.
+// GetStats implements AggregateCollector.
 func (d *DevCollector) GetStats() CollectorStats {
 	stats := d.base.GetStats()
 	if stats.ActiveSeries == 0 && len(stats.TypeBreakdown) > 0 {
@@ -374,7 +374,7 @@ func (d *DevCollector) GetStats() CollectorStats {
 	return stats
 }
 
-// Clear implements MetricsCollector.
+// Clear implements AggregateCollector.
 func (d *DevCollector) Clear() {
 	d.base.Clear()
 	d.mu.Lock()

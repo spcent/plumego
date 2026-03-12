@@ -93,8 +93,10 @@ func durationValueSeconds(duration time.Duration) float64 {
 	return duration.Seconds()
 }
 
-// MetricsCollector is the unified interface for collecting metrics across all modules
-type MetricsCollector interface {
+// AggregateCollector is the full collector surface.
+// Prefer narrower interfaces at module boundaries and reserve this contract for
+// collector implementations or fan-out adapters that truly need the whole set.
+type AggregateCollector interface {
 	// Record records a single metric
 	Record(ctx context.Context, record MetricRecord)
 
@@ -160,6 +162,16 @@ type DBObserver interface {
 	ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error)
 }
 
+// StatsReader exposes aggregated collector statistics.
+type StatsReader interface {
+	GetStats() CollectorStats
+}
+
+// Resetter clears accumulated metrics state.
+type Resetter interface {
+	Clear()
+}
+
 // CollectorStats provides a contract for collector statistics payloads.
 //
 // Mandatory fields for all collectors:
@@ -219,7 +231,7 @@ func (b *BaseMetricsCollector) WithMaxRecords(max int) *BaseMetricsCollector {
 	return b
 }
 
-// Record implements the MetricsCollector interface
+// Record implements the aggregate collector contract.
 func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -620,7 +632,7 @@ func unquoteIdent(s string) string {
 	return s
 }
 
-// baseForwarder provides lazy-initialized forwarding of MetricsCollector methods
+// baseForwarder provides lazy-initialized forwarding of aggregate collector methods
 // to an underlying BaseMetricsCollector. Embed this in collectors that delegate
 // common observation methods (PubSub, MQ, KV, IPC, DB) to the base implementation.
 type baseForwarder struct {

@@ -143,7 +143,7 @@ func ExampleMeasureFunc() {
 	collector := metrics.NewBaseMetricsCollector()
 	ctx := context.Background()
 
-	err := metrics.MeasureFunc(ctx, collector, "database_query", "users", func() error {
+	err := metrics.MeasureFunc(ctx, collector, "database_query", func() error {
 		// Simulate database operation
 		time.Sleep(10 * time.Millisecond)
 		return nil
@@ -166,11 +166,11 @@ func ExampleMeasureFunc_withKV() {
 	collector := metrics.NewBaseMetricsCollector()
 	ctx := context.Background()
 
-	err := metrics.MeasureFunc(ctx, collector, "get", "user:123", func() error {
+	err := metrics.MeasureKVFunc(ctx, collector, "get", "user:123", true, func() error {
 		// Simulate KV get operation
 		time.Sleep(5 * time.Millisecond)
 		return nil
-	}, metrics.MeasureWithKV(true))
+	})
 
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -312,9 +312,9 @@ func ExamplePrometheusCollector_WithMaxMemory() {
 	// Series limited to: true
 }
 
-// ExampleMetricsCollector demonstrates the unified interface
-func ExampleMetricsCollector() {
-	var collector metrics.MetricsCollector
+// ExampleAggregateCollector demonstrates the aggregate collector contract.
+func ExampleAggregateCollector() {
+	var collector metrics.AggregateCollector
 
 	// Can use any implementation
 	collector = metrics.NewBaseMetricsCollector()

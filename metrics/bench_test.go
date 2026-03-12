@@ -278,7 +278,7 @@ func BenchmarkMeasureFuncSimple(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = MeasureFunc(ctx, collector, "test", "subject", func() error {
+		_ = MeasureFunc(ctx, collector, "test", func() error {
 			return nil
 		})
 	}

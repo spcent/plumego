@@ -6,7 +6,7 @@ import (
 )
 
 // NoopCollector is a metrics collector that does nothing.
-// It implements the MetricsCollector interface but discards all metrics.
+// It implements AggregateCollector but discards all metrics.
 //
 // This collector is useful for:
 //   - Testing when you don't want to track metrics
@@ -97,5 +97,5 @@ func (n *NoopCollector) Clear() {
 	// No-op
 }
 
-// Verify that NoopCollector implements MetricsCollector interface at compile time
-var _ MetricsCollector = (*NoopCollector)(nil)
+// Verify that NoopCollector implements AggregateCollector at compile time.
+var _ AggregateCollector = (*NoopCollector)(nil)
