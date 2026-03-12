@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego"
+	"github.com/spcent/plumego/contract"
 )
 
 type pprofProfile struct {
@@ -38,7 +38,7 @@ func pprofProfiles() []pprofProfile {
 	}
 }
 
-func parsePprofRequest(ctx *plumego.Context) (string, int, error) {
+func parsePprofRequest(ctx *contract.Ctx) (string, int, error) {
 	profileType := strings.ToLower(strings.TrimSpace(ctx.Query.Get("type")))
 	if profileType == "" {
 		profileType = "cpu"

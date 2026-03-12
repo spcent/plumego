@@ -585,4 +585,4 @@ sch.Delay("task", 100*time.Millisecond, quickTask)
 
 See examples:
 - `examples/scheduler/` — Delayed task examples
-- `examples/reference/` — Production delayed tasks
+- `reference/standard-service/` — Production delayed tasks

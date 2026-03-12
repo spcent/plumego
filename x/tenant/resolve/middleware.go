@@ -1,36 +1,36 @@
-package tenant
+package resolve
 
 import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/tenant"
+	tenantcore "github.com/spcent/plumego/tenant"
+	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
-// TenantResolverOptions configures tenant resolution.
-type TenantResolverOptions struct {
+// Options configures tenant resolution.
+type Options struct {
 	// HeaderName is the HTTP header to extract tenant ID from (default: "X-Tenant-ID").
 	HeaderName string
 	// Extractor is a custom function to extract tenant ID from the request.
 	// When set, takes precedence over HeaderName. Principal extraction still runs first.
-	Extractor tenant.TenantExtractor
+	Extractor tenantcore.TenantExtractor
 	// DisablePrincipal disables extracting tenant ID from the authenticated Principal.
 	DisablePrincipal bool
 	// AllowMissing allows requests to proceed when no tenant ID is found.
 	AllowMissing bool
 	// Hooks provides callbacks for tenant resolution events.
-	Hooks tenant.Hooks
+	Hooks tenantcore.Hooks
 	// OnMissing is called when tenant ID is missing and AllowMissing is false.
 	// If nil, a standard 401 JSON error is returned.
 	OnMissing func(http.ResponseWriter, *http.Request)
 }
 
-// TenantResolver resolves tenant id from request and stores it in context.
-// Resolution order: Principal → custom Extractor or Header.
-// The resolved tenant ID is validated before being stored in context.
-func TenantResolver(options TenantResolverOptions) middleware.Middleware {
-	header := headerOrDefault(options.HeaderName, defaultTenantHeader)
+// Middleware resolves tenant id from request and stores it in context.
+// Resolution order: Principal -> custom Extractor or Header.
+func Middleware(options Options) middleware.Middleware {
+	header := tenanttransport.HeaderOrDefault(options.HeaderName, tenanttransport.DefaultTenantHeader)
 	requireTenant := !options.AllowMissing
 	allowFromPrincipal := !options.DisablePrincipal
 
@@ -39,7 +39,6 @@ func TenantResolver(options TenantResolverOptions) middleware.Middleware {
 			var tenantID string
 			source := ""
 
-			// 1. Try to extract from authenticated Principal (JWT/session).
 			if allowFromPrincipal {
 				if p := contract.PrincipalFromRequest(r); p != nil && p.TenantID != "" {
 					tenantID = p.TenantID
@@ -47,7 +46,6 @@ func TenantResolver(options TenantResolverOptions) middleware.Middleware {
 				}
 			}
 
-			// 2. Fall back to custom extractor or header.
 			if tenantID == "" {
 				if options.Extractor != nil {
 					if id, err := options.Extractor(r); err == nil && id != "" {
@@ -60,7 +58,6 @@ func TenantResolver(options TenantResolverOptions) middleware.Middleware {
 				}
 			}
 
-			// 3. Handle missing tenant.
 			if tenantID == "" {
 				if !requireTenant {
 					next.ServeHTTP(w, r)
@@ -70,19 +67,17 @@ func TenantResolver(options TenantResolverOptions) middleware.Middleware {
 					options.OnMissing(w, r)
 					return
 				}
-				writeTenantError(w, r, http.StatusUnauthorized, tenantCodeRequired, "tenant id is required", contract.CategoryAuthentication)
+				tenanttransport.WriteError(w, r, http.StatusUnauthorized, tenanttransport.CodeRequired, "tenant id is required", contract.CategoryAuthentication)
 				return
 			}
 
-			// 4. Validate tenant ID format before storing in context.
-			if err := tenant.ValidateTenantID(tenantID); err != nil {
-				writeTenantError(w, r, http.StatusBadRequest, tenantCodeInvalidID, "invalid tenant ID format", contract.CategoryAuthentication)
+			if err := tenantcore.ValidateTenantID(tenantID); err != nil {
+				tenanttransport.WriteError(w, r, http.StatusBadRequest, tenanttransport.CodeInvalidID, "invalid tenant ID format", contract.CategoryAuthentication)
 				return
 			}
 
-			// 5. Store in context and invoke hook.
-			r = tenant.RequestWithTenantID(r, tenantID)
-			options.Hooks.Resolve(r.Context(), tenant.ResolveInfo{
+			r = tenantcore.RequestWithTenantID(r, tenantID)
+			options.Hooks.Resolve(r.Context(), tenantcore.ResolveInfo{
 				TenantID: tenantID,
 				Source:   source,
 			})

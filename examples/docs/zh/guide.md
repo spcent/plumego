@@ -95,7 +95,7 @@ func main() {
 - 健康检查：`health.ReadinessHandler(manager)` 与 `health.BuildInfoHandler()`。
 
 ## 参考应用
-`examples/reference` 提供接近生产的组合示例：
+`reference/standard-service` 提供接近生产的组合示例：
 - Request ID + logging + recovery + CORS 中间件链。
 - 可选 metrics/tracing 注入。
 - 显式 WebSocket 配置。
@@ -104,7 +104,7 @@ func main() {
 运行：
 
 ```bash
-go run ./examples/reference
+go run ./reference/standard-service
 ```
 
 ## 开发检查

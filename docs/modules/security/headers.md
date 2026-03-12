@@ -517,5 +517,5 @@ policy := headers.CustomPolicy(
 ## Reference Implementation
 
 See examples:
-- `examples/reference/` — Security headers in production app
+- `reference/standard-service/` — Security headers in production app
 - `examples/api-gateway/` — API-specific security headers

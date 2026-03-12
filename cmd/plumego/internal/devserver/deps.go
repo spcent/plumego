@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego"
+	"github.com/spcent/plumego/contract"
 )
 
 const depsCacheTTL = 30 * time.Second
@@ -100,7 +100,7 @@ type pkgInfo struct {
 	imports []string
 }
 
-func (d *Dashboard) handleDeps(ctx *plumego.Context) {
+func (d *Dashboard) handleDeps(ctx *contract.Ctx) {
 	includeStd := strings.TrimSpace(ctx.Query.Get("include_std"))
 	includeStdlib := includeStd == "" || includeStd == "1" || strings.EqualFold(includeStd, "true")
 

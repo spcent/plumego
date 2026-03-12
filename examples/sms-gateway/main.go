@@ -27,7 +27,6 @@ import (
 	"github.com/spcent/plumego/metrics/smsgateway"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
-	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/net/mq"
 	mqstore "github.com/spcent/plumego/net/mq/store"
 	plumrouter "github.com/spcent/plumego/router"
@@ -35,7 +34,8 @@ import (
 	"github.com/spcent/plumego/store/idempotency"
 	kvstore "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/tenant"
-	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
+	tenantquota "github.com/spcent/plumego/x/tenant/quota"
+	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
 func main() {
@@ -140,11 +140,11 @@ func main() {
 		message.ExampleSendHandler(idemStore, repo, router, queue),
 		logger,
 	)
-	handler = tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
+	handler = tenantquota.Middleware(tenantquota.Options{
 		Manager: quotaManager,
 		Hooks:   tenant.Hooks{},
 	})(handler)
-	handler = tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+	handler = tenantresolve.Middleware(tenantresolve.Options{
 		HeaderName: "X-Tenant-ID",
 	})(handler)
 	handler = observability.RequestID()(handler)

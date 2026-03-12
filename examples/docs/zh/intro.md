@@ -237,7 +237,7 @@ chain := middleware.NewChain().
 
 ## Reference App：一个可运行的“综合样板间”
 
-`examples/reference` 被定义为“开箱即用 main package”，把常见能力组合在一起： ([GitHub][1])
+`reference/standard-service` 被定义为“开箱即用 main package”，把常见能力组合在一起： ([GitHub][1])
 
 * 配好的 WebSocket hub（JWT keys + broadcast）
 * Inbound GitHub/Stripe Webhooks → 发布到 in-process Pub/Sub
@@ -248,7 +248,7 @@ chain := middleware.NewChain().
 运行方式也直接： ([GitHub][1])
 
 ```bash
-go run ./examples/reference
+go run ./reference/standard-service
 ```
 
 ---

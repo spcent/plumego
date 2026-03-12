@@ -1,6 +1,6 @@
 # Tenant Policy
 
-> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/tenant/middleware`  
+> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/x/tenant/policy`  
 > **Stability**: Experimental (v1)
 
 Tenant policy controls allowed models/tools/methods/paths per tenant.
@@ -46,7 +46,7 @@ type PolicyRequest struct {
 ```go
 api := app.Router().Group("/api")
 
-api.Use(tenantmw.TenantPolicy(tenantmw.TenantPolicyOptions{
+api.Use(tenantpolicy.Middleware(tenantpolicy.Options{
     Evaluator: policyEval,
     Hooks: tenant.Hooks{
         OnPolicy: func(ctx context.Context, d tenant.PolicyDecision) {

@@ -10,13 +10,16 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/spcent/plumego"
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
-	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/router"
-	"github.com/spcent/plumego/store/db"
-	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
+	"github.com/spcent/plumego/tenant"
+	tenantconfig "github.com/spcent/plumego/x/tenant/config"
+	tenantpolicy "github.com/spcent/plumego/x/tenant/policy"
+	tenantquota "github.com/spcent/plumego/x/tenant/quota"
+	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
+	tenantdb "github.com/spcent/plumego/x/tenant/store/db"
 )
 
 func main() {
@@ -28,38 +31,38 @@ func main() {
 	defer database.Close()
 
 	// Create tenant config manager with caching
-	tenantMgr := db.NewDBTenantConfigManager(
+	tenantMgr := tenantconfig.NewDBTenantConfigManager(
 		database,
-		db.WithTenantCache(1000, 5*time.Minute), // Cache up to 1000 tenants for 5 minutes
+		tenantconfig.WithTenantCache(1000, 5*time.Minute), // Cache up to 1000 tenants for 5 minutes
 	)
 
 	// Create quota and policy managers
-	quotaMgr := plumego.NewInMemoryQuotaManager(tenantMgr)
-	policyEval := plumego.NewConfigPolicyEvaluator(tenantMgr)
+	quotaMgr := tenant.NewInMemoryQuotaManager(tenantMgr)
+	policyEval := tenant.NewConfigPolicyEvaluator(tenantMgr)
 
 	// Create tenant-aware database wrapper
-	tenantDB := db.NewTenantDB(database)
+	tenantDB := tenantdb.NewTenantDB(database)
 
 	// Create application with tenant support
-	app := plumego.New(
-		plumego.WithAddr(getEnv("APP_ADDR", ":8080")),
-		plumego.WithDebug(),
+	app := core.New(
+		core.WithAddr(getEnv("APP_ADDR", ":8080")),
+		core.WithDebug(),
 	)
 
 	api := app.Router().Group("/api")
-	api.Use(tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+	api.Use(tenantresolve.Middleware(tenantresolve.Options{
 		HeaderName:   "X-Tenant-ID",
 		AllowMissing: false,
-		Hooks: plumego.TenantHooks{
-			OnResolve: func(ctx context.Context, info plumego.TenantResolveInfo) {
+		Hooks: tenant.Hooks{
+			OnResolve: func(ctx context.Context, info tenant.ResolveInfo) {
 				log.Printf("[TENANT] Resolved: %s from %s", info.TenantID, info.Source)
 			},
 		},
 	}))
-	api.Use(tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
+	api.Use(tenantquota.Middleware(tenantquota.Options{
 		Manager: quotaMgr,
-		Hooks: plumego.TenantHooks{
-			OnQuota: func(ctx context.Context, decision plumego.TenantQuotaDecision) {
+		Hooks: tenant.Hooks{
+			OnQuota: func(ctx context.Context, decision tenant.QuotaDecision) {
 				if !decision.Allowed {
 					log.Printf("[QUOTA] Denied for %s (remaining: %d requests, %d tokens, retry after %v)",
 						decision.TenantID, decision.RemainingRequests, decision.RemainingTokens, decision.RetryAfter)
@@ -67,10 +70,10 @@ func main() {
 			},
 		},
 	}))
-	api.Use(tenantpolicy.TenantPolicy(tenantpolicy.TenantPolicyOptions{
+	api.Use(tenantpolicy.Middleware(tenantpolicy.Options{
 		Evaluator: policyEval,
-		Hooks: plumego.TenantHooks{
-			OnPolicy: func(ctx context.Context, decision plumego.TenantPolicyDecision) {
+		Hooks: tenant.Hooks{
+			OnPolicy: func(ctx context.Context, decision tenant.PolicyDecision) {
 				if !decision.Allowed {
 					log.Printf("[POLICY] Denied for %s: %s (model=%s, tool=%s)",
 						decision.TenantID, decision.Reason, decision.Model, decision.Tool)
@@ -159,9 +162,9 @@ func runMigrations(db *sql.DB) error {
 }
 
 // registerAdminRoutes registers admin endpoints for tenant management
-func registerAdminRoutes(app *plumego.App, mgr *db.DBTenantConfigManager) {
+func registerAdminRoutes(app *core.App, mgr *tenantconfig.DBTenantConfigManager) {
 	admin := &AdminHandler{manager: mgr}
-	adaptCtx := func(handler plumego.ContextHandlerFunc) http.HandlerFunc {
+	adaptCtx := func(handler contract.CtxHandlerFunc) http.HandlerFunc {
 		return contract.AdaptCtxHandler(handler, app.Logger()).ServeHTTP
 	}
 
@@ -174,9 +177,9 @@ func registerAdminRoutes(app *plumego.App, mgr *db.DBTenantConfigManager) {
 }
 
 // registerAPIRoutes registers tenant-scoped business API routes
-func registerAPIRoutes(apiRoutes *router.Router, logger plumelog.StructuredLogger, tenantDB *db.TenantDB) {
+func registerAPIRoutes(apiRoutes *router.Router, logger plumelog.StructuredLogger, tenantDB *tenantdb.TenantDB) {
 	handler := &APIHandler{db: tenantDB}
-	adaptCtx := func(handler plumego.ContextHandlerFunc) http.HandlerFunc {
+	adaptCtx := func(handler contract.CtxHandlerFunc) http.HandlerFunc {
 		return contract.AdaptCtxHandler(handler, logger).ServeHTTP
 	}
 
@@ -190,15 +193,15 @@ func registerAPIRoutes(apiRoutes *router.Router, logger plumelog.StructuredLogge
 }
 
 // registerHealthRoutes registers health check endpoints
-func registerHealthRoutes(app *plumego.App) {
-	app.Get("/health", contract.AdaptCtxHandler(func(ctx *plumego.Context) {
+func registerHealthRoutes(app *core.App) {
+	app.Get("/health", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 		ctx.JSON(200, map[string]string{
 			"status": "healthy",
 			"time":   time.Now().Format(time.RFC3339),
 		})
 	}, app.Logger()).ServeHTTP)
 
-	app.Get("/", contract.AdaptCtxHandler(func(ctx *plumego.Context) {
+	app.Get("/", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 		ctx.JSON(200, map[string]string{
 			"service": "Multi-Tenant SaaS Example",
 			"version": "1.0.0",

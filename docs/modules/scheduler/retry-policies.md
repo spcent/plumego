@@ -594,4 +594,4 @@ policy := scheduler.RetryExponential(time.Second, 10).
 
 See examples:
 - `examples/scheduler/` — Retry policy examples
-- `examples/reference/` — Production retry patterns
+- `reference/standard-service/` — Production retry patterns

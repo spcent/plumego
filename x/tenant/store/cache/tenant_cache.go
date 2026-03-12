@@ -6,20 +6,21 @@ import (
 	"strings"
 	"time"
 
+	storecache "github.com/spcent/plumego/store/cache"
 	"github.com/spcent/plumego/tenant"
 )
 
 // TenantCache wraps a Cache implementation and automatically scopes keys by tenant ID.
 // This prevents cross-tenant cache pollution and ensures data isolation.
 type TenantCache struct {
-	cache     Cache
+	cache     storecache.Cache
 	keyPrefix string
 	separator string
 }
 
 // NewTenantCache creates a new tenant-scoped cache wrapper.
 // Keys will be automatically prefixed with the tenant ID from context.
-func NewTenantCache(cache Cache, options ...TenantCacheOption) *TenantCache {
+func NewTenantCache(cache storecache.Cache, options ...TenantCacheOption) *TenantCache {
 	tc := &TenantCache{
 		cache:     cache,
 		keyPrefix: "tenant",
@@ -37,7 +38,6 @@ func NewTenantCache(cache Cache, options ...TenantCacheOption) *TenantCache {
 type TenantCacheOption func(*TenantCache)
 
 // WithKeyPrefix sets a custom prefix for all tenant cache keys.
-// Default is "tenant".
 func WithKeyPrefix(prefix string) TenantCacheOption {
 	return func(tc *TenantCache) {
 		tc.keyPrefix = prefix
@@ -45,14 +45,12 @@ func WithKeyPrefix(prefix string) TenantCacheOption {
 }
 
 // WithSeparator sets a custom separator between prefix, tenant ID, and key.
-// Default is ":".
 func WithSeparator(sep string) TenantCacheOption {
 	return func(tc *TenantCache) {
 		tc.separator = sep
 	}
 }
 
-// Get retrieves a value from the cache, automatically scoping by tenant ID from context.
 func (tc *TenantCache) Get(ctx context.Context, key string) ([]byte, error) {
 	scopedKey, err := tc.scopeKey(ctx, key)
 	if err != nil {
@@ -61,7 +59,6 @@ func (tc *TenantCache) Get(ctx context.Context, key string) ([]byte, error) {
 	return tc.cache.Get(ctx, scopedKey)
 }
 
-// Set stores a value in the cache, automatically scoping by tenant ID from context.
 func (tc *TenantCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	scopedKey, err := tc.scopeKey(ctx, key)
 	if err != nil {
@@ -70,7 +67,6 @@ func (tc *TenantCache) Set(ctx context.Context, key string, value []byte, ttl ti
 	return tc.cache.Set(ctx, scopedKey, value, ttl)
 }
 
-// Delete removes a value from the cache, automatically scoping by tenant ID from context.
 func (tc *TenantCache) Delete(ctx context.Context, key string) error {
 	scopedKey, err := tc.scopeKey(ctx, key)
 	if err != nil {
@@ -79,7 +75,6 @@ func (tc *TenantCache) Delete(ctx context.Context, key string) error {
 	return tc.cache.Delete(ctx, scopedKey)
 }
 
-// Exists checks if a key exists in the cache, automatically scoping by tenant ID from context.
 func (tc *TenantCache) Exists(ctx context.Context, key string) (bool, error) {
 	scopedKey, err := tc.scopeKey(ctx, key)
 	if err != nil {
@@ -88,14 +83,10 @@ func (tc *TenantCache) Exists(ctx context.Context, key string) (bool, error) {
 	return tc.cache.Exists(ctx, scopedKey)
 }
 
-// Clear removes all cache entries (delegates to underlying cache).
-// Note: This clears the ENTIRE cache, not just the current tenant.
-// For tenant-specific clearing, use DeletePattern with tenant prefix.
 func (tc *TenantCache) Clear(ctx context.Context) error {
 	return tc.cache.Clear(ctx)
 }
 
-// Incr atomically increments a counter, scoped by tenant ID.
 func (tc *TenantCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
 	scopedKey, err := tc.scopeKey(ctx, key)
 	if err != nil {
@@ -104,7 +95,6 @@ func (tc *TenantCache) Incr(ctx context.Context, key string, delta int64) (int64
 	return tc.cache.Incr(ctx, scopedKey, delta)
 }
 
-// Decr atomically decrements a counter, scoped by tenant ID.
 func (tc *TenantCache) Decr(ctx context.Context, key string, delta int64) (int64, error) {
 	scopedKey, err := tc.scopeKey(ctx, key)
 	if err != nil {
@@ -113,7 +103,6 @@ func (tc *TenantCache) Decr(ctx context.Context, key string, delta int64) (int64
 	return tc.cache.Decr(ctx, scopedKey, delta)
 }
 
-// Append appends data to an existing value, scoped by tenant ID.
 func (tc *TenantCache) Append(ctx context.Context, key string, data []byte) error {
 	scopedKey, err := tc.scopeKey(ctx, key)
 	if err != nil {
@@ -124,18 +113,16 @@ func (tc *TenantCache) Append(ctx context.Context, key string, data []byte) erro
 
 // RawCache returns the underlying cache for operations that need direct access.
 // Use with caution as this bypasses tenant isolation.
-func (tc *TenantCache) RawCache() Cache {
+func (tc *TenantCache) RawCache() storecache.Cache {
 	return tc.cache
 }
 
-// scopeKey builds a tenant-scoped cache key from context.
 func (tc *TenantCache) scopeKey(ctx context.Context, key string) (string, error) {
 	tenantID := tenant.TenantIDFromContext(ctx)
 	if tenantID == "" {
 		return "", tenant.ErrTenantNotFound
 	}
 
-	// Prevent tenant isolation bypass by rejecting IDs with separator or control chars
 	if err := tc.validateTenantID(tenantID); err != nil {
 		return "", err
 	}
@@ -143,19 +130,15 @@ func (tc *TenantCache) scopeKey(ctx context.Context, key string) (string, error)
 	return tc.buildKey(tenantID, key), nil
 }
 
-// validateTenantID ensures tenant ID cannot be used to bypass isolation.
 func (tc *TenantCache) validateTenantID(tenantID string) error {
 	if tenantID == "" {
 		return tenant.ErrTenantNotFound
 	}
 
-	// Prevent separator injection - this could allow one tenant to access another's data
-	// e.g., if separator is ":", tenant "abc:xyz" could collide with "abc" + "xyz"
 	if strings.Contains(tenantID, tc.separator) {
 		return fmt.Errorf("tenant ID cannot contain separator character '%s'", tc.separator)
 	}
 
-	// Prevent control character injection similar to cache key validation
 	for i := 0; i < len(tenantID); i++ {
 		c := tenantID[i]
 		if c < 0x20 || c == 0x7F {
@@ -166,8 +149,6 @@ func (tc *TenantCache) validateTenantID(tenantID string) error {
 	return nil
 }
 
-// buildKey constructs a cache key with tenant prefix.
-// Assumes tenantID has already been validated by validateTenantID.
 func (tc *TenantCache) buildKey(tenantID, key string) string {
 	if tc.keyPrefix == "" {
 		return fmt.Sprintf("%s%s%s", tenantID, tc.separator, key)

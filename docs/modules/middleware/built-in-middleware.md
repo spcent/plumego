@@ -60,8 +60,8 @@ if err := app.Use(
 
 - `protocol.Middleware(registry)` / `protocol.MiddlewareWithConfig(config)`
 - `versioning.Middleware(versioning.Config{...})`
-- `tenant.TenantResolver(options)`
-- `tenant.TenantRateLimit(options)`
+- `x/tenant/resolve.Middleware(options)`
+- `x/tenant/ratelimit.Middleware(options)`
 
 ## Group-Level Middleware
 

@@ -604,5 +604,5 @@ func TestEmailValidation(t *testing.T) {
 ## Reference Implementation
 
 See examples:
-- `examples/reference/` — Input validation in registration/login
+- `reference/standard-service/` — Input validation in registration/login
 - `examples/multi-tenant-saas/` — Email validation for multi-tenant users

@@ -415,7 +415,7 @@ func TestSecurityNegativeCases(t *testing.T) {
 
 See complete working examples:
 
-- `examples/reference/` — Full-featured app with JWT auth
+- `reference/standard-service/` — Full-featured app with JWT auth
 - `examples/multi-tenant-saas/` — Multi-tenant security patterns
 - `examples/api-gateway/` — API gateway security
 

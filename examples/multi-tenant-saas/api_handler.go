@@ -8,13 +8,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/spcent/plumego"
-	"github.com/spcent/plumego/store/db"
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/tenant"
+	tenantdb "github.com/spcent/plumego/x/tenant/store/db"
 )
 
 // APIHandler handles tenant-scoped business API requests
 type APIHandler struct {
-	db *db.TenantDB
+	db *tenantdb.TenantDB
 }
 
 // User represents a user in the system
@@ -50,7 +51,7 @@ type RequestLog struct {
 }
 
 // ListUsers retrieves all users for the current tenant
-func (h *APIHandler) ListUsers(ctx *plumego.Context) {
+func (h *APIHandler) ListUsers(ctx *contract.Ctx) {
 	start := time.Now()
 	defer h.logRequest(ctx, start)
 
@@ -85,7 +86,7 @@ func (h *APIHandler) ListUsers(ctx *plumego.Context) {
 }
 
 // CreateUser creates a new user for the current tenant
-func (h *APIHandler) CreateUser(ctx *plumego.Context) {
+func (h *APIHandler) CreateUser(ctx *contract.Ctx) {
 	start := time.Now()
 	defer h.logRequest(ctx, start)
 
@@ -122,7 +123,7 @@ func (h *APIHandler) CreateUser(ctx *plumego.Context) {
 
 	user := User{
 		ID:        int(userID),
-		TenantID:  plumego.TenantIDFromContext(ctx.R.Context()),
+		TenantID:  tenant.TenantIDFromContext(ctx.R.Context()),
 		Email:     req.Email,
 		Name:      req.Name,
 		CreatedAt: time.Now(),
@@ -134,7 +135,7 @@ func (h *APIHandler) CreateUser(ctx *plumego.Context) {
 }
 
 // GetUser retrieves a specific user by ID (tenant-scoped)
-func (h *APIHandler) GetUser(ctx *plumego.Context) {
+func (h *APIHandler) GetUser(ctx *contract.Ctx) {
 	start := time.Now()
 	defer h.logRequest(ctx, start)
 
@@ -172,7 +173,7 @@ func (h *APIHandler) GetUser(ctx *plumego.Context) {
 }
 
 // DeleteUser deletes a user (tenant-scoped)
-func (h *APIHandler) DeleteUser(ctx *plumego.Context) {
+func (h *APIHandler) DeleteUser(ctx *contract.Ctx) {
 	start := time.Now()
 	defer h.logRequest(ctx, start)
 
@@ -206,7 +207,7 @@ func (h *APIHandler) DeleteUser(ctx *plumego.Context) {
 		return
 	}
 
-	tenantID := plumego.TenantIDFromContext(ctx.R.Context())
+	tenantID := tenant.TenantIDFromContext(ctx.R.Context())
 	log.Printf("Deleted user %s for tenant %s", userID, tenantID)
 
 	ctx.JSON(http.StatusOK, map[string]string{
@@ -215,11 +216,11 @@ func (h *APIHandler) DeleteUser(ctx *plumego.Context) {
 }
 
 // GetRequestAnalytics retrieves analytics data for the current tenant
-func (h *APIHandler) GetRequestAnalytics(ctx *plumego.Context) {
+func (h *APIHandler) GetRequestAnalytics(ctx *contract.Ctx) {
 	start := time.Now()
 	defer h.logRequest(ctx, start)
 
-	tenantID := plumego.TenantIDFromContext(ctx.R.Context())
+	tenantID := tenant.TenantIDFromContext(ctx.R.Context())
 
 	// Get total requests
 	var totalRequests int
@@ -291,9 +292,9 @@ func (h *APIHandler) GetRequestAnalytics(ctx *plumego.Context) {
 }
 
 // logRequest logs the API request to the database
-func (h *APIHandler) logRequest(ctx *plumego.Context, start time.Time) {
+func (h *APIHandler) logRequest(ctx *contract.Ctx, start time.Time) {
 	duration := time.Since(start)
-	tenantID := plumego.TenantIDFromContext(ctx.R.Context())
+	tenantID := tenant.TenantIDFromContext(ctx.R.Context())
 
 	// Log to database (use RawDB to bypass tenant filtering for logging)
 	// Note: We use a simple status code of 200 for successful responses

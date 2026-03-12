@@ -4,7 +4,7 @@
 
 ## Overview
 
-`TenantDB` wraps a standard `*sql.DB` to automatically inject `tenant_id` filters into all queries. This prevents cross-tenant data access without requiring every query to manually include tenant filtering.
+`x/tenant/store/db.TenantDB` wraps a standard `*sql.DB` to automatically inject `tenant_id` filters into all queries. This prevents cross-tenant data access without requiring every query to manually include tenant filtering.
 
 ## Quick Start
 
@@ -12,7 +12,7 @@
 import "github.com/spcent/plumego/store/db"
 
 // Create tenant-aware database wrapper
-tenantDB := db.NewTenantDB(database)
+tenantDB := tenantdb.NewTenantDB(database)
 
 // Query with context that has tenant ID
 ctx := tenant.ContextWithTenantID(r.Context(), "tenant-123")
@@ -210,11 +210,11 @@ func TestTenantIsolation(t *testing.T) {
 
 ## Tenant Configuration in DB
 
-The `db` package also includes `DBTenantConfigManager` for storing tenant configurations in the database:
+The `x/tenant/config` package also includes `DBTenantConfigManager` for storing tenant configurations in the database:
 
 ```go
-configMgr := db.NewDBTenantConfigManager(database,
-    db.WithTenantCache(1000, 5*time.Minute), // LRU cache with 5min TTL
+configMgr := tenantconfig.NewDBTenantConfigManager(database,
+    tenantconfig.WithTenantCache(1000, 5*time.Minute), // LRU cache with 5min TTL
 )
 
 // Get config (cached)

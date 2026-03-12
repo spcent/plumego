@@ -55,4 +55,4 @@ go func() {
 - `pubsub/pubsub.go`：进程内总线实现。
 - `core/websocket_wrapper.go`：应用层 websocket 配置。
 - `net/websocket/hub.go`：广播与连接管理实现。
-- `examples/reference/internal/app`：接近生产的接线示例。
+- `reference/standard-service/internal/app`：接近生产的接线示例。

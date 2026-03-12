@@ -11,7 +11,7 @@ import (
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/core/components/pubsubdebug"
 	"github.com/spcent/plumego/core/components/webhook"
-	"github.com/spcent/plumego/examples/reference/internal/config"
+	"github.com/spcent/plumego/reference/standard-service/internal/config"
 	"github.com/spcent/plumego/health"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"

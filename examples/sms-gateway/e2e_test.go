@@ -12,12 +12,12 @@ import (
 	"github.com/spcent/plumego/examples/sms-gateway/internal/routing"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/tasks"
 	logpkg "github.com/spcent/plumego/log"
-	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/net/mq"
 	mqstore "github.com/spcent/plumego/net/mq/store"
 	"github.com/spcent/plumego/store/idempotency"
 	kvstore "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/tenant"
+	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
 func TestSMSGatewayPipeline(t *testing.T) {
@@ -75,7 +75,7 @@ func TestSMSGatewayPipeline(t *testing.T) {
 		message.ExampleSendHandler(idemStore, repo, router, queue),
 		logpkg.NewGLogger(),
 	)
-	handler = tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+	handler = tenantresolve.Middleware(tenantresolve.Options{
 		HeaderName: "X-Tenant-ID",
 	})(handler)
 

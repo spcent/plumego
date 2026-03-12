@@ -22,11 +22,11 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/spcent/plumego"
+	"github.com/spcent/plumego/core"
 )
 
 func main() {
-	app := plumego.New(plumego.WithAddr(":8080"))
+	app := core.New(core.WithAddr(":8080"))
 
 	if err := app.AddRoute(http.MethodGet, "/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, World!"))
@@ -83,8 +83,10 @@ app.Delete("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 Use `:name` in route paths to capture parameters:
 
 ```go
+import "github.com/spcent/plumego/router"
+
 app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-	id := plumego.Param(r, "id")
+	id := router.Param(r, "id")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":   id,
@@ -93,7 +95,7 @@ app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 })
 
 app.Put("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-	id := plumego.Param(r, "id")
+	id := router.Param(r, "id")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":      id,
@@ -126,14 +128,15 @@ Register middleware explicitly before `Prepare()`:
 import (
 	"log"
 
+	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
 )
 
-app := plumego.New(
-	plumego.WithAddr(":8080"),
-	plumego.WithLogger(plumelog.NewGLogger()),
+app := core.New(
+	core.WithAddr(":8080"),
+	core.WithLogger(plumelog.NewGLogger()),
 )
 if err := app.Use(
 	observability.RequestID(),
@@ -145,7 +148,7 @@ if err := app.Use(
 
 ## Next Steps
 
-- Browse `examples/reference/` for a full-featured application
+- Browse `reference/standard-service/` for a full-featured application
 - See `examples/` for focused examples on routing, middleware, caching, and more
 - Read the source at `core/`, `router/`, and `contract/` for API details
 

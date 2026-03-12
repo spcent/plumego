@@ -1,4 +1,4 @@
-package tenant
+package resolve
 
 import (
 	"net/http"
@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/tenant"
+	tenantcore "github.com/spcent/plumego/tenant"
 )
 
-func TestTenantResolverFromPrincipal(t *testing.T) {
+func TestMiddlewareFromPrincipal(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if tenant.TenantIDFromContext(r.Context()) != "t-1" {
+		if tenantcore.TenantIDFromContext(r.Context()) != "t-1" {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -22,7 +22,7 @@ func TestTenantResolverFromPrincipal(t *testing.T) {
 	req = contract.RequestWithPrincipal(req, &contract.Principal{TenantID: "t-1"})
 	rec := httptest.NewRecorder()
 
-	mw := TenantResolver(TenantResolverOptions{})
+	mw := Middleware(Options{})
 	mw(handler).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -30,14 +30,14 @@ func TestTenantResolverFromPrincipal(t *testing.T) {
 	}
 }
 
-func TestTenantResolverMissing(t *testing.T) {
+func TestMiddlewareMissing(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 
-	mw := TenantResolver(TenantResolverOptions{})
+	mw := Middleware(Options{})
 	mw(handler).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {

@@ -9,11 +9,11 @@ import (
 	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
-	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	gateway "github.com/spcent/plumego/net/gateway"
 	cb "github.com/spcent/plumego/security/resilience/circuitbreaker"
 	"github.com/spcent/plumego/tenant"
-	tenantpolicy "github.com/spcent/plumego/tenant/middleware"
+	tenantquota "github.com/spcent/plumego/x/tenant/quota"
+	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
 func main() {
@@ -44,13 +44,13 @@ func main() {
 	// Create /api route group for middleware
 	apiGroup := app.Router().Group("/api")
 
-	// Add tenant middleware to the API group using the canonical middleware/tenant path.
+	// Add tenant middleware to the API group using the canonical x/tenant path.
 	// AllowMissing=true so requests without a tenant ID proceed unauthenticated.
-	apiGroup.Use(tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+	apiGroup.Use(tenantresolve.Middleware(tenantresolve.Options{
 		HeaderName:   "X-Tenant-ID",
 		AllowMissing: true,
 	}))
-	apiGroup.Use(tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
+	apiGroup.Use(tenantquota.Middleware(tenantquota.Options{
 		Manager: quotaMgr,
 	}))
 

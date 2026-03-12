@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/examples/reference/internal/docsite"
-	"github.com/spcent/plumego/examples/reference/internal/handler"
+	"github.com/spcent/plumego/reference/standard-service/internal/docsite"
+	"github.com/spcent/plumego/reference/standard-service/internal/handler"
 	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/metrics"

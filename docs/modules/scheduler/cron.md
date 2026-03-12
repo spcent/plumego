@@ -537,4 +537,4 @@ sch.AddCron("job", "* * * * *", func(ctx context.Context) error {
 
 See examples:
 - `examples/scheduler/` — Cron job examples
-- `examples/reference/` — Production cron jobs
+- `reference/standard-service/` — Production cron jobs

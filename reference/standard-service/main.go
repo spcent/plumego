@@ -12,8 +12,8 @@ import (
 	"io/fs"
 	"log"
 
-	"github.com/spcent/plumego/examples/reference/internal/app"
-	"github.com/spcent/plumego/examples/reference/internal/config"
+	"github.com/spcent/plumego/reference/standard-service/internal/app"
+	"github.com/spcent/plumego/reference/standard-service/internal/config"
 )
 
 //go:embed ui/*

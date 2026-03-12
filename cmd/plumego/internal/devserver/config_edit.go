@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego"
+	"github.com/spcent/plumego/contract"
 )
 
 const defaultConfigEditFile = ".env"
@@ -30,7 +30,7 @@ type ConfigEditRequest struct {
 	Restart bool              `json:"restart"`
 }
 
-func (d *Dashboard) handleConfigEditGet(ctx *plumego.Context) {
+func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
 		ctx.JSON(400, map[string]any{"error": err.Error()})
@@ -55,7 +55,7 @@ func (d *Dashboard) handleConfigEditGet(ctx *plumego.Context) {
 	ctx.JSON(200, payload)
 }
 
-func (d *Dashboard) handleConfigEditSave(ctx *plumego.Context) {
+func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
 		ctx.JSON(400, map[string]any{"error": err.Error()})

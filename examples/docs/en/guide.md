@@ -96,7 +96,7 @@ func main() {
 - Health: `health.ReadinessHandler(manager)` and `health.BuildInfoHandler()`.
 
 ## Reference App
-`examples/reference` wires a production-like setup:
+`reference/standard-service` wires a production-like setup:
 - Request ID + logging + recovery + CORS middleware chain.
 - Optional metrics/tracing collector/tracer injection.
 - WebSocket setup with explicit config.
@@ -105,7 +105,7 @@ func main() {
 Run:
 
 ```bash
-go run ./examples/reference
+go run ./reference/standard-service
 ```
 
 ## Development

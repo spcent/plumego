@@ -8,7 +8,7 @@ The `store/` package provides data persistence abstractions for Plumego applicat
 
 **Key Features**:
 - **Cache**: Interface-based caching with in-memory and Redis backends
-- **Database**: `database/sql` wrapper with metrics, tenant isolation, and query monitoring
+- **Database**: `database/sql` wrapper with metrics and query monitoring
 - **KV Store**: Embedded key-value store with WAL persistence and LRU eviction
 - **File Storage**: Local and S3-compatible file storage with metadata
 - **Idempotency**: Duplicate request detection and replay
@@ -18,7 +18,7 @@ The `store/` package provides data persistence abstractions for Plumego applicat
 | Package | Description |
 |---------|-------------|
 | `store/cache` | Caching interface (in-memory, Redis, distributed) |
-| `store/db` | SQL database wrapper with tenant isolation |
+| `store/db` | SQL database wrapper with metrics and monitoring |
 | `store/kv` | Embedded key-value store with WAL |
 | `store/file` | File storage (local filesystem, S3) |
 | `store/idempotency` | Idempotent request handling |
@@ -43,7 +43,10 @@ c.Set("key", "value", cache.WithTTL(10*time.Minute))
 ### Database
 
 ```go
-import "github.com/spcent/plumego/store/db"
+import (
+    "github.com/spcent/plumego/store/db"
+    tenantdb "github.com/spcent/plumego/x/tenant/store/db"
+)
 
 // Open database with monitoring
 database, err := db.Open("postgres", os.Getenv("DATABASE_URL"),
@@ -51,8 +54,8 @@ database, err := db.Open("postgres", os.Getenv("DATABASE_URL"),
     db.WithMetrics(metricsRegistry),
 )
 
-// Tenant-isolated queries
-tenantDB := db.NewTenantDB(database)
+// Tenant-aware query filtering lives in the x/tenant extension.
+tenantDB := tenantdb.NewTenantDB(database)
 rows, err := tenantDB.QueryFromContext(ctx, "SELECT * FROM users")
 ```
 

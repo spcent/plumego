@@ -109,7 +109,7 @@ func main() {
 }
 ```
 
-`plumego.App` 也实现了 `http.Handler`，可以直接挂载到标准库的服务器中：
+`core.App` 也实现了 `http.Handler`，可以直接挂载到标准库的服务器中：
 
 ```go
 package main
@@ -119,11 +119,11 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/contract"
-    "github.com/spcent/plumego"
+    "github.com/spcent/plumego/core"
 )
 
 func main() {
-    app := plumego.New(plumego.WithAddr(":8080"))
+    app := core.New(core.WithAddr(":8080"))
 
     app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
         _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
@@ -166,7 +166,7 @@ Plumego 为 SaaS 应用提供实验性的多租户支持，包括租户隔离、
 - **配额管理**：租户级用量限制（分钟/小时/日/月窗口），固定窗口执行
 - **策略控制**：租户级模型和工具白名单
 - **路由策略缓存**：租户级路由策略支持缓存封装
-- **数据库隔离**：通过 `TenantDB` 包装器自动为所有 SQL 查询添加租户过滤
+- **数据库隔离**：通过 `x/tenant/store/db` 中的 `TenantDB` 包装器自动为所有 SQL 查询添加租户过滤
 - **中间件栈**：租户解析 → 限流 → 配额检查 → 策略执行
 - **审计钩子**：可选的回调接口，用于监控配额/策略违规
 
@@ -182,17 +182,20 @@ import (
 
     "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
-    tenantmw "github.com/spcent/plumego/middleware/tenant"
-    storedb "github.com/spcent/plumego/store/db"
+    tenantconfig "github.com/spcent/plumego/x/tenant/config"
     "github.com/spcent/plumego/tenant"
-    tenantpolicy "github.com/spcent/plumego/tenant/middleware"
+    tenantpolicy "github.com/spcent/plumego/x/tenant/policy"
+    tenantquota "github.com/spcent/plumego/x/tenant/quota"
+    tenantratelimit "github.com/spcent/plumego/x/tenant/ratelimit"
+    tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
+    tenantdb "github.com/spcent/plumego/x/tenant/store/db"
 )
 
 func setupTenantApp(database *sql.DB) *core.App {
     // 创建带缓存的租户配置管理器
-    tenantMgr := storedb.NewDBTenantConfigManager(
+    tenantMgr := tenantconfig.NewDBTenantConfigManager(
         database,
-        storedb.WithTenantCache(1000, 5*time.Minute),
+        tenantconfig.WithTenantCache(1000, 5*time.Minute),
     )
 
     // 创建租户中间件需要的管理器
@@ -203,19 +206,19 @@ func setupTenantApp(database *sql.DB) *core.App {
     )
 
     // 租户感知数据库包装器（自动追加 tenant 过滤）
-    tenantDB := storedb.NewTenantDB(database)
+    tenantDB := tenantdb.NewTenantDB(database)
 
     app := core.New(core.WithAddr(":8080"))
     api := app.Router().Group("/api")
 
     // canonical：显式中间件链
-    api.Use(tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+    api.Use(tenantresolve.Middleware(tenantresolve.Options{
         HeaderName: "X-Tenant-ID",
     }))
-    api.Use(tenantmw.TenantRateLimit(tenantmw.TenantRateLimitOptions{
+    api.Use(tenantratelimit.Middleware(tenantratelimit.Options{
         Limiter: rateLimiter,
     }))
-    api.Use(tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
+    api.Use(tenantquota.Middleware(tenantquota.Options{
         Manager: quotaMgr,
         Hooks: tenant.Hooks{
             OnQuota: func(ctx context.Context, decision tenant.QuotaDecision) {
@@ -225,7 +228,7 @@ func setupTenantApp(database *sql.DB) *core.App {
             },
         },
     }))
-    api.Use(tenantpolicy.TenantPolicy(tenantpolicy.TenantPolicyOptions{
+    api.Use(tenantpolicy.Middleware(tenantpolicy.Options{
         Evaluator: policyEval,
     }))
 
@@ -294,7 +297,7 @@ _ = rateLimiter
 
 ### 自动查询过滤
 
-`TenantDB` 包装器会自动为所有查询添加租户 ID 过滤：
+`x/tenant/store/db` 中的 `TenantDB` 包装器会自动为所有查询添加租户 ID 过滤：
 
 ```go
 // 你的查询
@@ -386,7 +389,7 @@ protected := middleware.Apply(
 `security/jwt` 提供契约适配器（`jwtManager.Authenticator`、`jwt.PolicyAuthorizer`、`jwt.PermissionAuthorizer`），以保持存储与策略实现的解耦。
 
 ## 参考应用
-`examples/reference` 是一个开箱即用的 `main` 包，整合了常用组件：
+`reference/standard-service` 是一个开箱即用的 `main` 包，整合了常用组件：
 
 - 配置了带 JWT 密钥的 WebSocket 中心和广播端点
 - 入站 GitHub/Stripe Webhook，发布到进程内 Pub/Sub
@@ -397,7 +400,7 @@ protected := middleware.Apply(
 运行方式：
 
 ```bash
-go run ./examples/reference
+go run ./reference/standard-service
 ```
 
 ## 健康端点
@@ -423,7 +426,7 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 - `metrics.NewPrometheusCollector(namespace)` 实现 `observability.HTTPMetricsObserver`；如需 `/metrics` 端点，请显式搭配 `metrics.NewPrometheusExporter(collector)`。
 - `metrics.NewOpenTelemetryTracer(name)` 实现 `observability.Tracer`，发出带有 HTTP 元数据的 span。
 
-如 `examples/reference` 所示，使用 `core.WithPrometheusCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`，然后再通过 `observability.HTTPMetrics(app.HTTPMetrics())` 显式挂载请求指标中间件。
+如 `reference/standard-service` 所示，使用 `core.WithPrometheusCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`，然后再通过 `observability.HTTPMetrics(app.HTTPMetrics())` 显式挂载请求指标中间件。
 如果某个模块只需要单一能力，优先依赖更窄的接口，例如 `metrics.HTTPObserver`、`metrics.MQObserver`、`metrics.DBObserver` 或 `metrics.Recorder`，而不是整个 `metrics.AggregateCollector`。
 
 如果希望一键启用 Prometheus 指标与 OpenTelemetry 风格追踪：

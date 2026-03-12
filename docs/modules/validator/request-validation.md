@@ -507,5 +507,5 @@ if exists, _ := db.EmailExists(req.Email); exists {
 ## Reference Implementation
 
 See examples:
-- `examples/reference/` — Complete validation examples
+- `reference/standard-service/` — Complete validation examples
 - `examples/crud/` — CRUD API with validation

@@ -1,6 +1,6 @@
 # Tenant Rate Limit
 
-> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/middleware/tenant`  
+> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/x/tenant/ratelimit`  
 > **Stability**: Experimental (v1)
 
 Tenant rate limiting uses a per-tenant token bucket.
@@ -37,7 +37,7 @@ This reads per-tenant `RateLimitConfig` from tenant config manager.
 ```go
 api := app.Router().Group("/api")
 
-api.Use(tenanthttp.TenantRateLimit(tenanthttp.TenantRateLimitOptions{
+api.Use(tenantratelimit.Middleware(tenantratelimit.Options{
     Limiter: limiter,
     Hooks: tenant.Hooks{
         OnRateLimit: func(ctx context.Context, d tenant.RateLimitDecision) {

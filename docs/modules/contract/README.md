@@ -26,9 +26,9 @@
 - `contract.WriteResponse(w, r, status, data, meta)`
 - `contract.WriteBindError(w, r, err)`
 
-## 与根包关系
+## 与应用层关系
 
-`plumego.Context` 是 `contract.Ctx` 的别名。当前 v1 推荐保持标准 `net/http` handler 形态，并通过 `contract.AdaptCtxHandler(...)` 显式适配 `Ctx` 处理器。
+当前推荐保持标准 `net/http` handler 形态，并通过 `contract.AdaptCtxHandler(...)` 显式适配 `Ctx` 处理器；不要再依赖根包别名入口。
 
 ## 相关文档
 

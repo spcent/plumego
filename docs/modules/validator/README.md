@@ -502,7 +502,7 @@ type User struct {
 ## Reference Implementation
 
 See examples:
-- `examples/reference/` — Request validation in production
+- `reference/standard-service/` — Request validation in production
 - `examples/crud/` — CRUD API with validation
 
 ---

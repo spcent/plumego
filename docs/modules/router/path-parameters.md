@@ -48,7 +48,7 @@ Named parameters match exactly one path segment.
 ```go
 // Define route with parameter
 app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-    id := plumego.Param(r, "id")
+    id := router.Param(r, "id")
     fmt.Fprintf(w, "User ID: %s", id)
 })
 
@@ -99,7 +99,7 @@ Wildcard parameters match all remaining path segments.
 ```go
 // Define route with wildcard
 app.Get("/files/*path", func(w http.ResponseWriter, r *http.Request) {
-    path := plumego.Param(r, "path")
+    path := router.Param(r, "path")
     fmt.Fprintf(w, "File path: %s", path)
 })
 
@@ -135,11 +135,11 @@ app.Get("/*path1/*path2", handler)
 ### Standard Library Handler
 
 ```go
-import "github.com/spcent/plumego"
+import "github.com/spcent/plumego/router"
 
 app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
     // Extract parameter
-    id := plumego.Param(r, "id")
+    id := router.Param(r, "id")
 
     // Use parameter
     fmt.Fprintf(w, "User ID: %s", id)
@@ -150,7 +150,7 @@ app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 
 ```go
 app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-    id := plumego.Param(r, "id")
+    id := router.Param(r, "id")
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string]string{"id": id})
@@ -162,7 +162,7 @@ app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 ```go
 app.Get("/users/:id/posts/:postId", func(w http.ResponseWriter, r *http.Request) {
     // Get all parameters as map
-    params := plumego.Params(r)
+    params := contract.RequestContextFrom(r.Context()).Params
 
     id := params["id"]
     postId := params["postId"]
@@ -179,8 +179,8 @@ Routes can have multiple named parameters.
 
 ```go
 app.Get("/users/:userId/posts/:postId", func(w http.ResponseWriter, r *http.Request) {
-    userId := plumego.Param(r, "userId")
-    postId := plumego.Param(r, "postId")
+    userId := router.Param(r, "userId")
+    postId := router.Param(r, "postId")
 
     fmt.Fprintf(w, "User: %s, Post: %s", userId, postId)
 })
@@ -194,9 +194,9 @@ app.Get("/users/:userId/posts/:postId", func(w http.ResponseWriter, r *http.Requ
 
 ```go
 app.Get("/:org/:repo/issues/:number", func(w http.ResponseWriter, r *http.Request) {
-    org := plumego.Param(r, "org")
-    repo := plumego.Param(r, "repo")
-    number := plumego.Param(r, "number")
+    org := router.Param(r, "org")
+    repo := router.Param(r, "repo")
+    number := router.Param(r, "number")
 
     fmt.Fprintf(w, "Org: %s, Repo: %s, Issue: %s", org, repo, number)
 })
@@ -210,8 +210,8 @@ app.Get("/:org/:repo/issues/:number", func(w http.ResponseWriter, r *http.Reques
 
 ```go
 app.Get("/users/:id/files/*path", func(w http.ResponseWriter, r *http.Request) {
-    id := plumego.Param(r, "id")
-    path := plumego.Param(r, "path")
+    id := router.Param(r, "id")
+    path := router.Param(r, "path")
 
     fmt.Fprintf(w, "User: %s, Path: %s", id, path)
 })
@@ -231,7 +231,7 @@ Always validate parameters before use.
 
 ```go
 app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-    idStr := plumego.Param(r, "id")
+    idStr := router.Param(r, "id")
 
     // Convert to integer
     id, err := strconv.Atoi(idStr)
@@ -254,7 +254,7 @@ import "regexp"
 var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 app.Get("/resources/:uuid", func(w http.ResponseWriter, r *http.Request) {
-    uuid := plumego.Param(r, "uuid")
+    uuid := router.Param(r, "uuid")
 
     // Validate UUID format
     if !uuidRegex.MatchString(uuid) {
@@ -272,7 +272,7 @@ app.Get("/resources/:uuid", func(w http.ResponseWriter, r *http.Request) {
 
 ```go
 app.Get("/pages/:page", func(w http.ResponseWriter, r *http.Request) {
-    pageStr := plumego.Param(r, "page")
+    pageStr := router.Param(r, "page")
 
     page, err := strconv.Atoi(pageStr)
     if err != nil || page < 1 || page > 1000 {
@@ -296,7 +296,7 @@ var validStatuses = map[string]bool{
 }
 
 app.Get("/users/status/:status", func(w http.ResponseWriter, r *http.Request) {
-    status := plumego.Param(r, "status")
+    status := router.Param(r, "status")
 
     // Validate enum
     if !validStatuses[status] {
@@ -526,7 +526,7 @@ func main() {
 2. **Validate Parameters**
    ```go
    // ✅ Always validate
-   id, err := strconv.Atoi(plumego.Param(r, "id"))
+   id, err := strconv.Atoi(router.Param(r, "id"))
    if err != nil {
        http.Error(w, "Invalid ID", 400)
        return
@@ -545,7 +545,7 @@ func main() {
 4. **Sanitize Wildcards for File Paths**
    ```go
    // ✅ Clean and validate
-   path := filepath.Clean(plumego.Param(r, "path"))
+   path := filepath.Clean(router.Param(r, "path"))
    if filepath.IsAbs(path) {
        return // Reject absolute paths
    }
@@ -556,11 +556,11 @@ func main() {
 1. **Don't Trust Parameters Blindly**
    ```go
    // ❌ No validation
-   id := plumego.Param(r, "id")
+   id := router.Param(r, "id")
    db.Query("SELECT * FROM users WHERE id = " + id) // SQL injection!
 
    // ✅ Validate and use prepared statements
-   id, err := strconv.Atoi(plumego.Param(r, "id"))
+   id, err := strconv.Atoi(router.Param(r, "id"))
    if err != nil { return }
    db.Query("SELECT * FROM users WHERE id = ?", id)
    ```

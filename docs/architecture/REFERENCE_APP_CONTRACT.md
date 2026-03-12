@@ -1,6 +1,6 @@
 # Reference App Contract
 
-`reference/standard-service` is the future canonical application layout for Plumego.
+`reference/standard-service` is the canonical application layout for Plumego.
 
 ## Purpose
 
@@ -15,17 +15,16 @@
 - Templates must mirror the reference app layout.
 - Examples must not introduce alternative architectural conventions.
 
-## Expected Layout
+## Current Layout
 
 ```text
 reference/standard-service/
-  cmd/service/main.go
-  internal/httpapp/app.go
-  internal/httpapp/routes.go
-  internal/httpapp/handlers/
-  internal/httpapp/middleware/
-  internal/domain/
-  internal/platform/
+  main.go
+  internal/app/
+  internal/config/
+  internal/docsite/
+  internal/handler/
+  ui/
 ```
 
 ## Canonical Expectations
@@ -35,3 +34,4 @@ reference/standard-service/
 - Constructor-based dependency injection.
 - `contract.WriteError` as the single error write path.
 - No root package facade imports.
+- Future templates must mirror this baseline until the reference app itself changes.

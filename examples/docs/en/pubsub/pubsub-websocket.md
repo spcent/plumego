@@ -55,4 +55,4 @@ go func() {
 - `pubsub/pubsub.go`: in-process bus implementation.
 - `core/websocket_wrapper.go`: app-level websocket setup.
 - `net/websocket/hub.go`: hub broadcast internals.
-- `examples/reference/internal/app`: production-style wiring.
+- `reference/standard-service/internal/app`: production-style wiring.

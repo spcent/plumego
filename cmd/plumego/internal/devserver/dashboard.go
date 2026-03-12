@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego"
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/frontend"
@@ -319,11 +318,11 @@ func (d *Dashboard) Rebuild(ctx context.Context) error {
 
 // HTTP Handlers
 
-func (d *Dashboard) handleInfo(ctx *plumego.Context) {
+func (d *Dashboard) handleInfo(ctx *contract.Ctx) {
 	ctx.JSON(http.StatusOK, d.getDashboardInfo())
 }
 
-func (d *Dashboard) handleStatus(ctx *plumego.Context) {
+func (d *Dashboard) handleStatus(ctx *contract.Ctx) {
 	info := d.getDashboardInfo()
 	status := map[string]any{
 		"dashboard": map[string]any{
@@ -345,7 +344,7 @@ func (d *Dashboard) handleStatus(ctx *plumego.Context) {
 	ctx.JSON(http.StatusOK, status)
 }
 
-func (d *Dashboard) handleHealth(ctx *plumego.Context) {
+func (d *Dashboard) handleHealth(ctx *contract.Ctx) {
 	healthy := d.runner.IsRunning()
 
 	ctx.JSON(http.StatusOK, map[string]any{
@@ -361,7 +360,7 @@ func (d *Dashboard) handleHealth(ctx *plumego.Context) {
 	})
 }
 
-func (d *Dashboard) handleBuild(ctx *plumego.Context) {
+func (d *Dashboard) handleBuild(ctx *contract.Ctx) {
 	if err := d.builder.Build(); err != nil {
 		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"success": false,
@@ -376,7 +375,7 @@ func (d *Dashboard) handleBuild(ctx *plumego.Context) {
 	})
 }
 
-func (d *Dashboard) handleRestart(ctx *plumego.Context) {
+func (d *Dashboard) handleRestart(ctx *contract.Ctx) {
 	bgCtx := context.Background()
 
 	if err := d.Rebuild(bgCtx); err != nil {
@@ -393,7 +392,7 @@ func (d *Dashboard) handleRestart(ctx *plumego.Context) {
 	})
 }
 
-func (d *Dashboard) handleStop(ctx *plumego.Context) {
+func (d *Dashboard) handleStop(ctx *contract.Ctx) {
 	if err := d.runner.Stop(); err != nil {
 		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"success": false,
@@ -408,7 +407,7 @@ func (d *Dashboard) handleStop(ctx *plumego.Context) {
 	})
 }
 
-func (d *Dashboard) handleRoutes(ctx *plumego.Context) {
+func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"error": "Application is not running",
@@ -436,7 +435,7 @@ func (d *Dashboard) handleRoutes(ctx *plumego.Context) {
 	})
 }
 
-func (d *Dashboard) handleConfig(ctx *plumego.Context) {
+func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"error": "Application is not running",
@@ -455,7 +454,7 @@ func (d *Dashboard) handleConfig(ctx *plumego.Context) {
 	ctx.JSON(http.StatusOK, config)
 }
 
-func (d *Dashboard) handleMetrics(ctx *plumego.Context) {
+func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {
 	metrics := map[string]any{
 		"dashboard": map[string]any{
 			"uptime":    time.Since(d.startTime).Seconds(),
@@ -492,7 +491,7 @@ func (d *Dashboard) handleMetrics(ctx *plumego.Context) {
 	ctx.JSON(http.StatusOK, metrics)
 }
 
-func (d *Dashboard) handleMetricsClear(ctx *plumego.Context) {
+func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"success": false,
@@ -514,13 +513,13 @@ func (d *Dashboard) handleMetricsClear(ctx *plumego.Context) {
 	})
 }
 
-func (d *Dashboard) handlePprofTypes(ctx *plumego.Context) {
+func (d *Dashboard) handlePprofTypes(ctx *contract.Ctx) {
 	ctx.JSON(http.StatusOK, map[string]any{
 		"types": pprofProfiles(),
 	})
 }
 
-func (d *Dashboard) handlePprofRaw(ctx *plumego.Context) {
+func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"error": "Application is not running",
@@ -563,7 +562,7 @@ func (d *Dashboard) handlePprofRaw(ctx *plumego.Context) {
 	_, _ = ctx.W.Write(payload)
 }
 
-func (d *Dashboard) handleAPITest(ctx *plumego.Context) {
+func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
 			"success": false,

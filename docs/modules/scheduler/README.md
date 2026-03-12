@@ -452,7 +452,7 @@ func TestDelayedTask(t *testing.T) {
 ## Reference Implementation
 
 See examples:
-- `examples/reference/` — Scheduler with cron jobs
+- `reference/standard-service/` — Scheduler with cron jobs
 - `examples/scheduler/` — Complete scheduler examples
 - `examples/api-gateway/` — Background task processing
 

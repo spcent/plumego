@@ -660,5 +660,5 @@ ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(255);
 ## Reference Implementation
 
 See examples:
-- `examples/reference/` — User registration and login
+- `reference/standard-service/` — User registration and login
 - `examples/multi-tenant-saas/` — Multi-tenant authentication

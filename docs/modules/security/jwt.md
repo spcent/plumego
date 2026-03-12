@@ -603,6 +603,6 @@ func (tc *TokenCache) Verify(token string, tokenType jwt.TokenType) (*jwt.Claims
 ## Reference Implementation
 
 See examples:
-- `examples/reference/` — JWT authentication with login/refresh
+- `reference/standard-service/` — JWT authentication with login/refresh
 - `examples/api-gateway/` — API gateway with JWT verification
 - `examples/multi-tenant-saas/` — Multi-tenant JWT with tenant claims

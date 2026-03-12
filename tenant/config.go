@@ -12,7 +12,7 @@
 //   - No dedicated tenant guide beyond the main README
 //
 // For production multi-tenancy, we recommend:
-//   - Wiring tenant middleware explicitly (see middleware/tenant.TenantResolver/Policy/Quota)
+//   - Wiring tenant middleware explicitly (see x/tenant/resolve, x/tenant/ratelimit, x/tenant/quota, x/tenant/policy)
 //   - Validating isolation and quota behavior in your environment
 //   - Treating the API as experimental until stabilized
 //

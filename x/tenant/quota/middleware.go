@@ -1,4 +1,4 @@
-package tenantmw
+package quota
 
 import (
 	"net/http"
@@ -7,23 +7,22 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	mw "github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/tenant"
+	tenantcore "github.com/spcent/plumego/tenant"
+	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
-// TenantQuotaOptions configures quota enforcement.
-type TenantQuotaOptions struct {
-	Manager      tenant.QuotaManager
+// Options configures quota enforcement.
+type Options struct {
+	Manager      tenantcore.QuotaManager
 	TokensHeader string
 	Estimator    func(*http.Request) int
-	Hooks        tenant.Hooks
-	OnRejected   func(http.ResponseWriter, *http.Request, tenant.QuotaResult)
+	Hooks        tenantcore.Hooks
+	OnRejected   func(http.ResponseWriter, *http.Request, tenantcore.QuotaResult)
 }
 
-// TenantQuota enforces tenant quota limits.
-// On every request (allowed or denied) it sets X-Quota-Remaining-Requests and
-// X-Quota-Remaining-Tokens headers so clients can monitor their quota consumption.
-func TenantQuota(options TenantQuotaOptions) mw.Middleware {
-	tokensHeader := headerOrDefault(options.TokensHeader, defaultTokensHeader)
+// Middleware enforces tenant quota limits.
+func Middleware(options Options) mw.Middleware {
+	tokensHeader := tenanttransport.HeaderOrDefault(options.TokensHeader, tenanttransport.DefaultTokensHeader)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +31,7 @@ func TenantQuota(options TenantQuotaOptions) mw.Middleware {
 				return
 			}
 
-			tenantID := tenant.TenantIDFromContext(r.Context())
+			tenantID := tenantcore.TenantIDFromContext(r.Context())
 			tokens := 0
 			if options.Estimator != nil {
 				tokens = options.Estimator(r)
@@ -42,20 +41,19 @@ func TenantQuota(options TenantQuotaOptions) mw.Middleware {
 				}
 			}
 
-			result, err := options.Manager.Allow(r.Context(), tenantID, tenant.QuotaRequest{
+			result, err := options.Manager.Allow(r.Context(), tenantID, tenantcore.QuotaRequest{
 				Requests: 1,
 				Tokens:   tokens,
 				Now:      time.Now().UTC(),
 			})
 			allowed := err == nil && result.Allowed
 
-			// Status reflects the actual outcome: 200 when allowed, 429 when denied.
 			status := http.StatusOK
 			if !allowed {
 				status = http.StatusTooManyRequests
 			}
 
-			options.Hooks.Quota(r.Context(), tenant.QuotaDecision{
+			options.Hooks.Quota(r.Context(), tenantcore.QuotaDecision{
 				TenantID:          tenantID,
 				Allowed:           allowed,
 				Tokens:            tokens,
@@ -67,22 +65,21 @@ func TenantQuota(options TenantQuotaOptions) mw.Middleware {
 				Err:               err,
 			})
 
-			// Always surface remaining quota to the client.
-			setQuotaHeaders(w, result.RemainingRequests, result.RemainingTokens)
+			tenanttransport.SetQuotaHeaders(w, result.RemainingRequests, result.RemainingTokens)
 
 			if allowed {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			setRetryAfterHeader(w, result.RetryAfter)
+			tenanttransport.SetRetryAfterHeader(w, result.RetryAfter)
 
 			if options.OnRejected != nil {
 				options.OnRejected(w, r, result)
 				return
 			}
 
-			writeTenantError(w, r, status, tenantCodeQuotaExceeded, "tenant quota exceeded", contract.CategoryRateLimit)
+			tenanttransport.WriteError(w, r, status, tenanttransport.CodeQuotaExceeded, "tenant quota exceeded", contract.CategoryRateLimit)
 		})
 	}
 }

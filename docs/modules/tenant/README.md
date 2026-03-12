@@ -23,9 +23,11 @@ import (
     "time"
 
     "github.com/spcent/plumego/core"
-    tenanthttp "github.com/spcent/plumego/middleware/tenant"
+    tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
     "github.com/spcent/plumego/tenant"
-    tenantmw "github.com/spcent/plumego/tenant/middleware"
+    tenantpolicy "github.com/spcent/plumego/x/tenant/policy"
+    tenantquota "github.com/spcent/plumego/x/tenant/quota"
+    tenantratelimit "github.com/spcent/plumego/x/tenant/ratelimit"
 )
 
 func setup() *core.App {
@@ -53,14 +55,14 @@ func setup() *core.App {
     app := core.New(core.WithAddr(":8080"))
 
     api := app.Router().Group("/api")
-    api.Use(tenanthttp.TenantResolver(tenanthttp.TenantResolverOptions{
+    api.Use(tenantresolve.Middleware(tenantresolve.Options{
         HeaderName:   "X-Tenant-ID",
         AllowMissing: false,
     }))
-    api.Use(tenanthttp.TenantRateLimit(tenanthttp.TenantRateLimitOptions{
+    api.Use(tenantratelimit.Middleware(tenantratelimit.Options{
         Limiter: rateLimiter,
     }))
-    api.Use(tenantmw.TenantQuota(tenantmw.TenantQuotaOptions{
+    api.Use(tenantquota.Middleware(tenantquota.Options{
         Manager: quotaMgr,
         Hooks: tenant.Hooks{
             OnQuota: func(ctx context.Context, d tenant.QuotaDecision) {
@@ -70,7 +72,7 @@ func setup() *core.App {
             },
         },
     }))
-    api.Use(tenantmw.TenantPolicy(tenantmw.TenantPolicyOptions{
+    api.Use(tenantpolicy.Middleware(tenantpolicy.Options{
         Evaluator: policyEval,
     }))
 
@@ -89,17 +91,17 @@ func setup() *core.App {
 
 - config manager
   - `tenant.NewInMemoryConfigManager()`
-  - `store/db.NewDBTenantConfigManager(...)`
+  - `x/tenant/config.NewDBTenantConfigManager(...)`
 - resolver middleware
-  - `middleware/tenant.TenantResolver(...)`
+  - `x/tenant/resolve.Middleware(...)`
 - rate limiter middleware
-  - `middleware/tenant.TenantRateLimit(...)`
+  - `x/tenant/ratelimit.Middleware(...)`
 - quota middleware
-  - `tenant/middleware.TenantQuota(...)`
+  - `x/tenant/quota.Middleware(...)`
 - policy middleware
-  - `tenant/middleware.TenantPolicy(...)`
+  - `x/tenant/policy.Middleware(...)`
 - tenant-aware SQL helper
-  - `store/db.NewTenantDB(...)`
+  - `x/tenant/store/db.NewTenantDB(...)`
 
 ---
 
@@ -118,7 +120,7 @@ Recommended order for tenant-aware APIs:
 ## Tenant-Aware Database Access
 
 ```go
-tenantDB := db.NewTenantDB(sqlDB)
+tenantDB := tenantdb.NewTenantDB(sqlDB)
 
 api.Get("/orders", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
     rows, err := tenantDB.QueryFromContext(r.Context(),

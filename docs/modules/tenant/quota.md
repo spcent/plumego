@@ -1,6 +1,6 @@
 # Tenant Quota
 
-> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/tenant/middleware`  
+> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/x/tenant/quota`  
 > **Stability**: Experimental (v1)
 
 Quota management limits per-tenant request/token usage.
@@ -50,7 +50,7 @@ Use `WindowQuotaManager` when you need simultaneous window checks (for example d
 ```go
 api := app.Router().Group("/api")
 
-api.Use(tenantmw.TenantQuota(tenantmw.TenantQuotaOptions{
+api.Use(tenantquota.Middleware(tenantquota.Options{
     Manager: quotaMgr,
     Hooks: tenant.Hooks{
         OnQuota: func(ctx context.Context, d tenant.QuotaDecision) {

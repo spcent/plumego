@@ -12,7 +12,7 @@ This page provides compile-oriented example patterns for tenant wiring.
 app := core.New(core.WithAddr(":8080"))
 
 api := app.Router().Group("/api")
-api.Use(tenanthttp.TenantResolver(tenanthttp.TenantResolverOptions{
+api.Use(tenantresolve.Middleware(tenantresolve.Options{
     HeaderName:   "X-Tenant-ID",
     AllowMissing: false,
 }))
@@ -34,10 +34,10 @@ policyEval := tenant.NewConfigPolicyEvaluator(tenantMgr)
 rateLimiter := tenant.NewTokenBucketRateLimiter(&tenant.RateLimitConfigProviderFromConfig{Manager: tenantMgr})
 
 api := app.Router().Group("/api")
-api.Use(tenanthttp.TenantResolver(tenanthttp.TenantResolverOptions{HeaderName: "X-Tenant-ID"}))
-api.Use(tenanthttp.TenantRateLimit(tenanthttp.TenantRateLimitOptions{Limiter: rateLimiter}))
-api.Use(tenantmw.TenantQuota(tenantmw.TenantQuotaOptions{Manager: quotaMgr}))
-api.Use(tenantmw.TenantPolicy(tenantmw.TenantPolicyOptions{Evaluator: policyEval}))
+api.Use(tenantresolve.Middleware(tenantresolve.Options{HeaderName: "X-Tenant-ID"}))
+api.Use(tenantratelimit.Middleware(tenantratelimit.Options{Limiter: rateLimiter}))
+api.Use(tenantquota.Middleware(tenantquota.Options{Manager: quotaMgr}))
+api.Use(tenantpolicy.Middleware(tenantpolicy.Options{Evaluator: policyEval}))
 ```
 
 ---
@@ -45,7 +45,7 @@ api.Use(tenantmw.TenantPolicy(tenantmw.TenantPolicyOptions{Evaluator: policyEval
 ## 3) Tenant-Aware SQL Query
 
 ```go
-tenantDB := db.NewTenantDB(sqlDB)
+tenantDB := tenantdb.NewTenantDB(sqlDB)
 
 api.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
     rows, err := tenantDB.QueryFromContext(r.Context(),
@@ -66,9 +66,9 @@ api.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) 
 ## 4) DB-backed Tenant Config Manager
 
 ```go
-tenantMgr := db.NewDBTenantConfigManager(
+tenantMgr := tenantconfig.NewDBTenantConfigManager(
     sqlDB,
-    db.WithTenantCache(1000, 5*time.Minute),
+    tenantconfig.WithTenantCache(1000, 5*time.Minute),
 )
 
 rateLimiter := tenant.NewTokenBucketRateLimiter(

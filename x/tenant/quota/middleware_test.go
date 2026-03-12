@@ -1,31 +1,33 @@
-package tenant
+package quota
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spcent/plumego/tenant"
+	tenantcore "github.com/spcent/plumego/tenant"
 )
 
-func TestTenantRateLimit(t *testing.T) {
-	provider := tenant.NewInMemoryRateLimitProvider()
-	provider.SetRateLimit("t-1", tenant.RateLimitConfig{
-		RequestsPerSecond: 1,
-		Burst:             1,
+func TestMiddlewareExceeded(t *testing.T) {
+	cfg := tenantcore.NewInMemoryConfigManager()
+	cfg.SetTenantConfig(tenantcore.Config{
+		TenantID: "t-1",
+		Quota: tenantcore.QuotaConfig{
+			RequestsPerMinute: 1,
+		},
 	})
+	manager := tenantcore.NewInMemoryQuotaManager(cfg)
 
-	limiter := tenant.NewTokenBucketRateLimiter(provider)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	mw := TenantRateLimit(TenantRateLimitOptions{Limiter: limiter})
+	mw := Middleware(Options{Manager: manager})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = tenant.RequestWithTenantID(req, "t-1")
-	rec := httptest.NewRecorder()
+	req = tenantcore.RequestWithTenantID(req, "t-1")
 
+	rec := httptest.NewRecorder()
 	mw(handler).ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)

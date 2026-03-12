@@ -66,14 +66,14 @@ For production use with automatic caching:
 
 ```go
 import (
-    "github.com/spcent/plumego/store/db"
     "github.com/spcent/plumego/tenant"
+    tenantconfig "github.com/spcent/plumego/x/tenant/config"
 )
 
 // Create with LRU cache (1000 entries, 5 min TTL)
-configMgr := db.NewDBTenantConfigManager(
+configMgr := tenantconfig.NewDBTenantConfigManager(
     database,
-    db.WithTenantCache(1000, 5*time.Minute),
+    tenantconfig.WithTenantCache(1000, 5*time.Minute),
 )
 ```
 
@@ -202,8 +202,8 @@ Config rarely changes — cache for minutes:
 
 ```go
 // 5-minute cache prevents DB hammering
-configMgr := db.NewDBTenantConfigManager(db,
-    db.WithTenantCache(1000, 5*time.Minute),
+configMgr := tenantconfig.NewDBTenantConfigManager(db,
+    tenantconfig.WithTenantCache(1000, 5*time.Minute),
 )
 ```
 

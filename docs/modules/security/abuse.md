@@ -613,5 +613,5 @@ func (rg *RedisGuard) Allow(clientIP string) bool {
 ## Reference Implementation
 
 See examples:
-- `examples/reference/` — Abuse guard with login rate limiting
+- `reference/standard-service/` — Abuse guard with login rate limiting
 - `examples/api-gateway/` — API gateway with per-client limits

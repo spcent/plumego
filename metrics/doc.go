@@ -273,6 +273,6 @@
 // # Examples
 //
 // See the examples directory for complete working examples:
-//   - examples/reference/ - Full-featured application with metrics
+//   - reference/standard-service/ - Full-featured application with metrics
 //   - examples/docs/ - API documentation with metrics integration
 package metrics

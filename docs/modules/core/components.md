@@ -94,12 +94,12 @@ Common component packages:
 - `core/components/ops`
 - `core/components/webhook`
 - `core/components/websocket`
-- `core/components/tenant` (experimental surface)
 
 Notes:
 
 - Devtools component is mounted explicitly via `WithDevTools()` or `WithComponent(...)`.
 - WebSocket can be composed either by `WithComponent(...)` or helper methods (`ConfigureWebSocket*`).
+- Tenant capabilities should be wired through `x/tenant/*`, not `core/components/*`.
 
 ---
 

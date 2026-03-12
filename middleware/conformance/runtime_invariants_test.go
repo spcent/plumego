@@ -14,8 +14,8 @@ import (
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/recovery"
-	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/middleware/versioning"
+	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
 func TestMiddlewareTypeShape(t *testing.T) {
@@ -54,7 +54,7 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "tenant resolver valid",
-			mw: tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+			mw: tenantresolve.Middleware(tenantresolve.Options{
 				AllowMissing: true,
 			}),
 			req: httptest.NewRequest(http.MethodGet, "/", nil),
@@ -164,7 +164,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		{
 			name:         "tenant required",
 			expectedCode: middleware.CodeTenantRequired,
-			handler: tenantmw.TenantResolver(tenantmw.TenantResolverOptions{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: tenantresolve.Middleware(tenantresolve.Options{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),

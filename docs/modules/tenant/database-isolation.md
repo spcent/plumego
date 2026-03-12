@@ -1,18 +1,18 @@
 # Database Isolation
 
-> **Package**: `github.com/spcent/plumego/store/db` | **Feature**: Automatic tenant query scoping
+> **Package**: `github.com/spcent/plumego/x/tenant/store/db` | **Feature**: Automatic tenant query scoping
 
 ## Overview
 
-Database isolation ensures tenant data is kept separate through automatic query scoping. Plumego provides a `TenantDB` wrapper that automatically injects `tenant_id` conditions into SQL queries, preventing data leakage between tenants.
+Database isolation ensures tenant data is kept separate through automatic query scoping. Plumego provides an `x/tenant/store/db` `TenantDB` wrapper that automatically injects `tenant_id` conditions into SQL queries, preventing data leakage between tenants.
 
 ## Setup
 
 ```go
-import "github.com/spcent/plumego/store/db"
+import tenantdb "github.com/spcent/plumego/x/tenant/store/db"
 
 // Wrap standard database/sql connection
-tenantDB := db.NewTenantDB(database)
+tenantDB := tenantdb.NewTenantDB(database)
 ```
 
 ## Automatic Query Scoping
@@ -102,7 +102,7 @@ CREATE TABLE orders (
 
 ```go
 type UserRepository struct {
-    db *db.TenantDB
+    db *tenantdb.TenantDB
 }
 
 func (r *UserRepository) FindByID(ctx context.Context, id string) (*User, error) {
@@ -277,7 +277,7 @@ rawDB.Exec(`
 ```go
 func TestUserRepository(t *testing.T) {
     db := setupTestDB(t)
-    tenantDB := db.NewTenantDB(db)
+    tenantDB := tenantdb.NewTenantDB(db)
     repo := &UserRepository{db: tenantDB}
 
     // Create context with tenant ID

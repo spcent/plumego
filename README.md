@@ -8,7 +8,7 @@
 
 Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, WebSocket utilities, webhook pipelines, and static frontend hosting. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
 
-The `core` package is the stable, primary entrypoint. The top-level `plumego` package provides convenience re-exports for common types and options.
+The `core` package is the stable, primary entrypoint. Import stable packages explicitly from their module paths rather than through a root package facade.
 
 ## Repository Direction
 
@@ -109,7 +109,7 @@ func main() {
 }
 ```
 
-`plumego.App` also implements `http.Handler`, so it can be mounted directly into a standard library server:
+`core.App` also implements `http.Handler`, so it can be mounted directly into a standard library server:
 
 ```go
 package main
@@ -119,11 +119,11 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/contract"
-    "github.com/spcent/plumego"
+    "github.com/spcent/plumego/core"
 )
 
 func main() {
-    app := plumego.New(plumego.WithAddr(":8080"))
+    app := core.New(core.WithAddr(":8080"))
 
     app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
         _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
@@ -167,7 +167,7 @@ Plumego provides experimental multi-tenancy primitives for SaaS applications wit
 - **Quota Management**: Per-tenant usage limits across minute/hour/day/month windows with fixed-window enforcement
 - **Policy Controls**: Per-tenant allow-lists for models and tools
 - **Routing Policy Cache**: Tenant-specific routing policy with cache wrapper
-- **Database Isolation**: Automatic tenant filtering for all SQL queries via `TenantDB` wrapper
+- **Database Isolation**: Automatic tenant filtering for all SQL queries via the `x/tenant/store/db` `TenantDB` wrapper
 - **Middleware Stack**: Tenant resolution → Rate limiting → Quota checking → Policy enforcement
 - **Audit Hooks**: Optional callbacks for monitoring quota/policy violations
 
@@ -183,17 +183,20 @@ import (
 
     "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
-    tenantmw "github.com/spcent/plumego/middleware/tenant"
-    storedb "github.com/spcent/plumego/store/db"
+    tenantconfig "github.com/spcent/plumego/x/tenant/config"
     "github.com/spcent/plumego/tenant"
-    tenantpolicy "github.com/spcent/plumego/tenant/middleware"
+    tenantpolicy "github.com/spcent/plumego/x/tenant/policy"
+    tenantquota "github.com/spcent/plumego/x/tenant/quota"
+    tenantratelimit "github.com/spcent/plumego/x/tenant/ratelimit"
+    tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
+    tenantdb "github.com/spcent/plumego/x/tenant/store/db"
 )
 
 func setupTenantApp(database *sql.DB) *core.App {
     // Create tenant config manager with caching.
-    tenantMgr := storedb.NewDBTenantConfigManager(
+    tenantMgr := tenantconfig.NewDBTenantConfigManager(
         database,
-        storedb.WithTenantCache(1000, 5*time.Minute),
+        tenantconfig.WithTenantCache(1000, 5*time.Minute),
     )
 
     // Create managers used by tenant middleware.
@@ -204,19 +207,19 @@ func setupTenantApp(database *sql.DB) *core.App {
     )
 
     // Tenant-aware DB wrapper for query isolation.
-    tenantDB := storedb.NewTenantDB(database)
+    tenantDB := tenantdb.NewTenantDB(database)
 
     app := core.New(core.WithAddr(":8080"))
     api := app.Router().Group("/api")
 
     // Canonical explicit middleware chain.
-    api.Use(tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
+    api.Use(tenantresolve.Middleware(tenantresolve.Options{
         HeaderName: "X-Tenant-ID",
     }))
-    api.Use(tenantmw.TenantRateLimit(tenantmw.TenantRateLimitOptions{
+    api.Use(tenantratelimit.Middleware(tenantratelimit.Options{
         Limiter: rateLimiter,
     }))
-    api.Use(tenantpolicy.TenantQuota(tenantpolicy.TenantQuotaOptions{
+    api.Use(tenantquota.Middleware(tenantquota.Options{
         Manager: quotaMgr,
         Hooks: tenant.Hooks{
             OnQuota: func(ctx context.Context, decision tenant.QuotaDecision) {
@@ -226,7 +229,7 @@ func setupTenantApp(database *sql.DB) *core.App {
             },
         },
     }))
-    api.Use(tenantpolicy.TenantPolicy(tenantpolicy.TenantPolicyOptions{
+    api.Use(tenantpolicy.Middleware(tenantpolicy.Options{
         Evaluator: policyEval,
     }))
 
@@ -295,7 +298,7 @@ _ = rateLimiter
 
 ### Automatic Query Filtering
 
-The `TenantDB` wrapper automatically filters all queries by tenant ID:
+The `x/tenant/store/db` `TenantDB` wrapper automatically filters all queries by tenant ID:
 
 ```go
 // Your query
@@ -387,7 +390,7 @@ protected := middleware.Apply(
 The `security/jwt` package provides adapters (`jwtManager.Authenticator`, `jwt.PolicyAuthorizer`, `jwt.PermissionAuthorizer`) that implement these contracts while keeping your own storage and policy engines decoupled.
 
 ## Reference App
-`examples/reference` is an out-of-the-box `main` package that integrates common components:
+`reference/standard-service` is an out-of-the-box `main` package that integrates common components:
 
 - Configured WebSocket hub with JWT keys and broadcast endpoint
 - Inbound GitHub/Stripe Webhooks, publishing to in-process Pub/Sub
@@ -398,7 +401,7 @@ The `security/jwt` package provides adapters (`jwtManager.Authenticator`, `jwt.P
 Run it with:
 
 ```bash
-go run ./examples/reference
+go run ./reference/standard-service
 ```
 
 ## Health Endpoints
@@ -424,7 +427,7 @@ No need to write your own adapters to hook logging middleware into metrics/traci
 - `metrics.NewPrometheusCollector(namespace)` implements `observability.HTTPMetricsObserver`; pair it with `metrics.NewPrometheusExporter(collector)` for `/metrics`.
 - `metrics.NewOpenTelemetryTracer(name)` implements `observability.Tracer`, emitting spans with HTTP metadata.
 
-As shown in `examples/reference`, wire them into `core.New` using `core.WithPrometheusCollector(...)` and `core.WithTracer(...)`, then mount request metrics explicitly with `observability.HTTPMetrics(app.HTTPMetrics())`.
+As shown in `reference/standard-service`, wire them into `core.New` using `core.WithPrometheusCollector(...)` and `core.WithTracer(...)`, then mount request metrics explicitly with `observability.HTTPMetrics(app.HTTPMetrics())`.
 For narrower DI at module boundaries, prefer `metrics.HTTPObserver`, `metrics.MQObserver`, `metrics.DBObserver`, or `metrics.Recorder` instead of the full `metrics.AggregateCollector` when a call site only needs one capability.
 
 To enable a built-in Prometheus endpoint and OpenTelemetry-style tracer in one call:

@@ -1,4 +1,4 @@
-package tenant
+package ratelimit
 
 import (
 	"net/http"
@@ -6,19 +6,20 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/tenant"
+	tenantcore "github.com/spcent/plumego/tenant"
+	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
-// TenantRateLimitOptions configures rate limit enforcement.
-type TenantRateLimitOptions struct {
-	Limiter    tenant.RateLimiter
+// Options configures rate limit enforcement.
+type Options struct {
+	Limiter    tenantcore.RateLimiter
 	Estimator  func(*http.Request) int64
-	Hooks      tenant.Hooks
-	OnRejected func(http.ResponseWriter, *http.Request, tenant.RateLimitResult)
+	Hooks      tenantcore.Hooks
+	OnRejected func(http.ResponseWriter, *http.Request, tenantcore.RateLimitResult)
 }
 
-// TenantRateLimit enforces per-tenant rate limits.
-func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
+// Middleware enforces per-tenant rate limits.
+func Middleware(options Options) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if options.Limiter == nil {
@@ -26,7 +27,7 @@ func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
 				return
 			}
 
-			tenantID := tenant.TenantIDFromContext(r.Context())
+			tenantID := tenantcore.TenantIDFromContext(r.Context())
 			if tenantID == "" {
 				next.ServeHTTP(w, r)
 				return
@@ -39,19 +40,18 @@ func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
 				}
 			}
 
-			result, err := options.Limiter.Allow(r.Context(), tenantID, tenant.RateLimitRequest{
+			result, err := options.Limiter.Allow(r.Context(), tenantID, tenantcore.RateLimitRequest{
 				Tokens: tokens,
 				Now:    time.Now().UTC(),
 			})
 			allowed := err == nil && result.Allowed
 
-			// Status reflects the actual outcome: 200 when allowed, 429 when denied.
 			status := http.StatusOK
 			if !allowed {
 				status = http.StatusTooManyRequests
 			}
 
-			options.Hooks.RateLimit(r.Context(), tenant.RateLimitDecision{
+			options.Hooks.RateLimit(r.Context(), tenantcore.RateLimitDecision{
 				TenantID:   tenantID,
 				Allowed:    allowed,
 				Tokens:     tokens,
@@ -68,15 +68,15 @@ func TenantRateLimit(options TenantRateLimitOptions) middleware.Middleware {
 				return
 			}
 
-			setRetryAfterHeader(w, result.RetryAfter)
-			setRateLimitHeaders(w, result.Limit, result.Remaining)
+			tenanttransport.SetRetryAfterHeader(w, result.RetryAfter)
+			tenanttransport.SetRateLimitHeaders(w, result.Limit, result.Remaining)
 
 			if options.OnRejected != nil {
 				options.OnRejected(w, r, result)
 				return
 			}
 
-			writeTenantError(w, r, status, tenantCodeRateLimited, "tenant rate limit exceeded", contract.CategoryRateLimit)
+			tenanttransport.WriteError(w, r, status, tenanttransport.CodeRateLimited, "tenant rate limit exceeded", contract.CategoryRateLimit)
 		})
 	}
 }

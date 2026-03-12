@@ -7,13 +7,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/spcent/plumego"
-	"github.com/spcent/plumego/store/db"
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/tenant"
+	tenantconfig "github.com/spcent/plumego/x/tenant/config"
 )
 
 // AdminHandler handles tenant administration
 type AdminHandler struct {
-	manager *db.DBTenantConfigManager
+	manager *tenantconfig.DBTenantConfigManager
 }
 
 // CreateTenantRequest represents the request body for creating a tenant
@@ -28,15 +29,15 @@ type CreateTenantRequest struct {
 
 // TenantResponse represents the response for tenant operations
 type TenantResponse struct {
-	TenantID  string                     `json:"tenant_id"`
-	Quota     plumego.TenantQuotaConfig  `json:"quota"`
-	Policy    plumego.TenantPolicyConfig `json:"policy"`
-	Metadata  map[string]string          `json:"metadata,omitempty"`
-	UpdatedAt time.Time                  `json:"updated_at"`
+	TenantID  string              `json:"tenant_id"`
+	Quota     tenant.QuotaConfig  `json:"quota"`
+	Policy    tenant.PolicyConfig `json:"policy"`
+	Metadata  map[string]string   `json:"metadata,omitempty"`
+	UpdatedAt time.Time           `json:"updated_at"`
 }
 
 // CreateTenant creates a new tenant
-func (h *AdminHandler) CreateTenant(ctx *plumego.Context) {
+func (h *AdminHandler) CreateTenant(ctx *contract.Ctx) {
 	var req CreateTenantRequest
 	if err := json.NewDecoder(ctx.R.Body).Decode(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, map[string]string{
@@ -63,13 +64,13 @@ func (h *AdminHandler) CreateTenant(ctx *plumego.Context) {
 	}
 
 	// Create tenant configuration
-	config := plumego.TenantConfig{
+	config := tenant.Config{
 		TenantID: req.TenantID,
-		Quota: plumego.TenantQuotaConfig{
+		Quota: tenant.QuotaConfig{
 			RequestsPerMinute: req.QuotaRequestsPerMin,
 			TokensPerMinute:   req.QuotaTokensPerMin,
 		},
-		Policy: plumego.TenantPolicyConfig{
+		Policy: tenant.PolicyConfig{
 			AllowedModels: req.AllowedModels,
 			AllowedTools:  req.AllowedTools,
 		},
@@ -93,7 +94,7 @@ func (h *AdminHandler) CreateTenant(ctx *plumego.Context) {
 }
 
 // GetTenant retrieves a tenant by ID
-func (h *AdminHandler) GetTenant(ctx *plumego.Context) {
+func (h *AdminHandler) GetTenant(ctx *contract.Ctx) {
 	tenantID, _ := ctx.Param("id")
 	if tenantID == "" {
 		ctx.JSON(http.StatusBadRequest, map[string]string{
@@ -104,7 +105,7 @@ func (h *AdminHandler) GetTenant(ctx *plumego.Context) {
 
 	config, err := h.manager.GetTenantConfig(context.Background(), tenantID)
 	if err != nil {
-		if err == plumego.ErrTenantNotFound {
+		if err == tenant.ErrTenantNotFound {
 			ctx.JSON(http.StatusNotFound, map[string]string{
 				"error": "Tenant not found",
 			})
@@ -121,7 +122,7 @@ func (h *AdminHandler) GetTenant(ctx *plumego.Context) {
 }
 
 // UpdateTenant updates an existing tenant
-func (h *AdminHandler) UpdateTenant(ctx *plumego.Context) {
+func (h *AdminHandler) UpdateTenant(ctx *contract.Ctx) {
 	tenantID, _ := ctx.Param("id")
 	if tenantID == "" {
 		ctx.JSON(http.StatusBadRequest, map[string]string{
@@ -141,7 +142,7 @@ func (h *AdminHandler) UpdateTenant(ctx *plumego.Context) {
 	// Verify tenant exists
 	_, err := h.manager.GetTenantConfig(context.Background(), tenantID)
 	if err != nil {
-		if err == plumego.ErrTenantNotFound {
+		if err == tenant.ErrTenantNotFound {
 			ctx.JSON(http.StatusNotFound, map[string]string{
 				"error": "Tenant not found",
 			})
@@ -155,13 +156,13 @@ func (h *AdminHandler) UpdateTenant(ctx *plumego.Context) {
 	}
 
 	// Update configuration
-	config := plumego.TenantConfig{
+	config := tenant.Config{
 		TenantID: tenantID,
-		Quota: plumego.TenantQuotaConfig{
+		Quota: tenant.QuotaConfig{
 			RequestsPerMinute: req.QuotaRequestsPerMin,
 			TokensPerMinute:   req.QuotaTokensPerMin,
 		},
-		Policy: plumego.TenantPolicyConfig{
+		Policy: tenant.PolicyConfig{
 			AllowedModels: req.AllowedModels,
 			AllowedTools:  req.AllowedTools,
 		},
@@ -183,7 +184,7 @@ func (h *AdminHandler) UpdateTenant(ctx *plumego.Context) {
 }
 
 // DeleteTenant deletes a tenant
-func (h *AdminHandler) DeleteTenant(ctx *plumego.Context) {
+func (h *AdminHandler) DeleteTenant(ctx *contract.Ctx) {
 	tenantID, _ := ctx.Param("id")
 	if tenantID == "" {
 		ctx.JSON(http.StatusBadRequest, map[string]string{
@@ -193,7 +194,7 @@ func (h *AdminHandler) DeleteTenant(ctx *plumego.Context) {
 	}
 
 	if err := h.manager.DeleteTenantConfig(context.Background(), tenantID); err != nil {
-		if err == plumego.ErrTenantNotFound {
+		if err == tenant.ErrTenantNotFound {
 			ctx.JSON(http.StatusNotFound, map[string]string{
 				"error": "Tenant not found",
 			})
@@ -214,7 +215,7 @@ func (h *AdminHandler) DeleteTenant(ctx *plumego.Context) {
 }
 
 // ListTenants lists all tenants
-func (h *AdminHandler) ListTenants(ctx *plumego.Context) {
+func (h *AdminHandler) ListTenants(ctx *contract.Ctx) {
 	tenants, err := h.manager.ListTenants(context.Background(), 100, 0)
 	if err != nil {
 		log.Printf("Failed to list tenants: %v", err)
@@ -236,7 +237,7 @@ func (h *AdminHandler) ListTenants(ctx *plumego.Context) {
 }
 
 // toTenantResponse converts a TenantConfig to a TenantResponse
-func toTenantResponse(config plumego.TenantConfig) TenantResponse {
+func toTenantResponse(config tenant.Config) TenantResponse {
 	return TenantResponse{
 		TenantID:  config.TenantID,
 		Quota:     config.Quota,
