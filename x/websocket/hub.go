@@ -26,7 +26,7 @@ type hubJob struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create hub with 4 workers and 1024 job queue size
 //	hub := websocket.NewHub(4, 1024)
@@ -162,7 +162,7 @@ func (rl *simpleRateLimiter) allow() bool {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	event := websocket.SecurityEvent{
 //		Timestamp: time.Now(),
@@ -181,7 +181,7 @@ type SecurityEvent struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	config := websocket.HubConfig{
 //		WorkerCount:            4,
@@ -232,7 +232,7 @@ type HubConfig struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	metrics := hub.Metrics()
@@ -257,7 +257,7 @@ type HubMetrics struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	defer hub.Stop()
@@ -272,7 +272,7 @@ func NewHub(workerCount int, jobQueueSize int) *Hub {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	config := websocket.HubConfig{
 //		WorkerCount:            8,
@@ -436,7 +436,7 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	defer hub.Stop()
@@ -463,7 +463,7 @@ func (h *Hub) Stop() {
 //	import (
 //	    "context"
 //	    "time"
-//	    "github.com/spcent/plumego/net/websocket"
+//	    "github.com/spcent/plumego/x/websocket"
 //	)
 //
 //	hub := websocket.NewHub(4, 1024)
@@ -506,7 +506,7 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub.RangeConns("chat-room", func(c *websocket.Conn) bool {
 //	    if userID, ok := c.GetMetadata("user_id"); ok {
@@ -541,7 +541,7 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	conn := websocket.NewConn(...)
@@ -630,7 +630,7 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	if err := hub.CanJoin("chat-room"); err != nil {
@@ -672,7 +672,7 @@ func (h *Hub) CanJoin(room string) error {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	conn := websocket.NewConn(...)
@@ -701,7 +701,7 @@ func (h *Hub) Join(room string, c *Conn) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	metrics := hub.Metrics()
@@ -729,7 +729,7 @@ func (h *Hub) Metrics() HubMetrics {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	conn := websocket.NewConn(...)
@@ -756,7 +756,7 @@ func (h *Hub) Leave(room string, c *Conn) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	conn := websocket.NewConn(...)
@@ -819,7 +819,7 @@ func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	// Broadcast text message to all users in chat-room
@@ -863,7 +863,7 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	// Send system-wide notification
@@ -927,7 +927,7 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	count := hub.GetRoomCount("chat-room")
@@ -945,7 +945,7 @@ func (h *Hub) GetRoomCount(room string) int {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	total := hub.GetTotalCount()
@@ -959,7 +959,7 @@ func (h *Hub) GetTotalCount() int {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
 //	rooms := hub.GetRooms()

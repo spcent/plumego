@@ -1,4 +1,4 @@
-package webhookout
+package webhook
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ import (
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	service := webhookout.NewService(store, config)
 //	metrics := service.Metrics()
@@ -52,7 +52,7 @@ type Metrics struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	store := webhookout.NewMemoryStore()
 //	config := webhookout.DefaultConfig()
@@ -88,7 +88,7 @@ type Service struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	store := webhookout.NewMemoryStore()
 //	config := webhookout.DefaultConfig()
@@ -114,7 +114,7 @@ func NewService(store Store, cfg Config) *Service {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	store := webhookout.NewMemoryStore()
 //	config := webhookout.DefaultConfig()
@@ -160,7 +160,7 @@ func (s *Service) Start(ctx context.Context) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	store := webhookout.NewMemoryStore()
 //	config := webhookout.DefaultConfig()
@@ -197,7 +197,7 @@ func (s *Service) Stop() {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	store := webhookout.NewMemoryStore()
 //	config := webhookout.DefaultConfig()
@@ -211,7 +211,7 @@ func (s *Service) Metrics() Metrics { return s.metrics }
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	target := webhookout.Target{
 //		Name:    "Payment Service",
@@ -252,7 +252,7 @@ func (s *Service) CreateTarget(ctx context.Context, t Target) (Target, error) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	enabled := false
 //	patch := webhookout.TargetPatch{
@@ -279,7 +279,7 @@ func (s *Service) UpdateTarget(ctx context.Context, id string, patch TargetPatch
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	target, ok := service.GetTarget(context.Background(), "target-123")
 //	if !ok {
@@ -293,7 +293,7 @@ func (s *Service) GetTarget(ctx context.Context, id string) (Target, bool) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	enabled := true
 //	filter := webhookout.TargetFilter{
@@ -309,7 +309,7 @@ func (s *Service) ListTargets(ctx context.Context, f TargetFilter) ([]Target, er
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	delivery, ok := service.GetDelivery(context.Background(), "del-123")
 //	if !ok {
@@ -323,7 +323,7 @@ func (s *Service) GetDelivery(ctx context.Context, id string) (Delivery, bool) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	filter := webhookout.DeliveryFilter{
 //		Limit: 100,
@@ -337,7 +337,7 @@ func (s *Service) ListDeliveries(ctx context.Context, f DeliveryFilter) ([]Deliv
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	newDelivery, err := service.ReplayDelivery(context.Background(), "del-123")
 //	if err != nil {
@@ -410,7 +410,7 @@ func rewriteDeliveryIDInPayload(raw []byte, newDeliveryID string) ([]byte, error
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	event := webhookout.Event{
 //		Type: "payment.success",

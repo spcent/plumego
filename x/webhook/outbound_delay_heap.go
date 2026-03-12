@@ -1,4 +1,4 @@
-package webhookout
+package webhook
 
 import (
 	"container/heap"

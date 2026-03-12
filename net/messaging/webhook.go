@@ -7,21 +7,20 @@ import (
 
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/pubsub"
-
-	webhookout "github.com/spcent/plumego/net/webhookout"
+	"github.com/spcent/plumego/x/webhook"
 )
 
 // WebhookNotifier subscribes to "messaging.result" events on the pubsub bus
-// and triggers outbound webhooks via webhookout.Service.
+// and triggers outbound webhooks via webhook.Service.
 type WebhookNotifier struct {
-	webhook *webhookout.Service
+	webhook *webhook.Service
 	bus     *pubsub.InProcBroker
 	logger  log.StructuredLogger
 	sub     pubsub.Subscription
 }
 
 // NewWebhookNotifier creates a notifier wired to the given services.
-func NewWebhookNotifier(bus *pubsub.InProcBroker, webhook *webhookout.Service, logger log.StructuredLogger) *WebhookNotifier {
+func NewWebhookNotifier(bus *pubsub.InProcBroker, webhook *webhook.Service, logger log.StructuredLogger) *WebhookNotifier {
 	return &WebhookNotifier{
 		webhook: webhook,
 		bus:     bus,
@@ -92,7 +91,7 @@ func (n *WebhookNotifier) forward(ctx context.Context, msg pubsub.Message) {
 		eventData["error"] = result.Error
 	}
 
-	_, err := n.webhook.TriggerEvent(ctx, webhookout.Event{
+	_, err := n.webhook.TriggerEvent(ctx, webhook.Event{
 		Type:       eventType,
 		OccurredAt: time.Now(),
 		Data:       eventData,

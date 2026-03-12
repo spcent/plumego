@@ -41,8 +41,8 @@ This page is the canonical entry for module docs.
 
 - [x/tenant](x-tenant/README.md): target multi-tenant extension boundary
 - [x/ai](x-ai/README.md): AI gateway capabilities
-- `x/webhook`: webhook ingress/egress extension surface
-- `x/websocket`: websocket extension surface
+- [x/webhook](x-webhook/README.md): webhook ingress/egress extension surface
+- [x/websocket](x-websocket/README.md): websocket extension surface
 
 ## Legacy Roots Being Retired
 

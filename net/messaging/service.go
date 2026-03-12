@@ -13,9 +13,9 @@ import (
 	"github.com/spcent/plumego/net/mq"
 	"github.com/spcent/plumego/net/mq/store"
 	"github.com/spcent/plumego/net/scheduler"
-	webhookout "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/security/input"
+	"github.com/spcent/plumego/x/webhook"
 )
 
 // Service is the central message-sending coordinator.
@@ -79,7 +79,7 @@ type Config struct {
 
 	// Webhook is the outbound webhook service for delivery notifications.
 	// When set together with Bus, a WebhookNotifier is created automatically.
-	Webhook *webhookout.Service
+	Webhook *webhook.Service
 
 	// Worker tuning.
 	WorkerConcurrency int

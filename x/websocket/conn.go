@@ -24,7 +24,7 @@ var msgBufPool = sync.Pool{
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Block until space available (default)
 //	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
@@ -52,7 +52,7 @@ const (
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	msg := websocket.Outbound{
 //		Op:   websocket.OpcodeText,
@@ -67,7 +67,7 @@ type Outbound struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	userInfo := websocket.UserInfo{
 //		ID:    "user-123",
@@ -94,7 +94,7 @@ type UserInfo struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create connection with blocking send
 //	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
@@ -152,7 +152,7 @@ type Conn struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create connection with blocking send
 //	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
@@ -386,7 +386,7 @@ func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	conn := websocket.NewConn(...)
 //	conn.SetMetadata("session_id", "abc123")
@@ -401,7 +401,7 @@ func (c *Conn) SetMetadata(key string, value any) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	conn := websocket.NewConn(...)
 //	conn.SetMetadata("session_id", "abc123")
@@ -416,7 +416,7 @@ func (c *Conn) GetMetadata(key string) (any, bool) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	conn := websocket.NewConn(...)
 //	conn.SetMetadata("temp_data", "value")
@@ -431,7 +431,7 @@ func (c *Conn) DeleteMetadata(key string) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	conn := websocket.NewConn(...)
 //	conn.SetMetadata("key1", "value1")

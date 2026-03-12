@@ -39,7 +39,7 @@ type RoomAuthenticator interface {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	auth := websocket.NewSimpleRoomAuth(secret)
 //	auth.SetRoomPassword("chat-room", "my-secret-password")
@@ -58,7 +58,7 @@ type SimpleRoomAuth struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	secret := []byte("my-jwt-secret")
 //	auth := websocket.NewSimpleRoomAuth(secret)
@@ -74,7 +74,7 @@ func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	auth := websocket.NewSimpleRoomAuth(secret)
 //	auth.SetRoomPassword("chat-room", "my-secret-password")

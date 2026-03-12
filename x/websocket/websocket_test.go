@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/health"
-	ws "github.com/spcent/plumego/net/websocket"
 	"github.com/spcent/plumego/router"
 )
 
@@ -33,7 +32,7 @@ func TestDefaultWebSocketConfig(t *testing.T) {
 	if cfg.SendTimeout != 200*time.Millisecond {
 		t.Fatalf("expected SendTimeout 200ms, got %v", cfg.SendTimeout)
 	}
-	if cfg.SendBehavior != ws.SendBlock {
+	if cfg.SendBehavior != SendBlock {
 		t.Fatalf("expected SendBehavior SendBlock, got %v", cfg.SendBehavior)
 	}
 	if cfg.WSRoutePath != "/ws" {
@@ -341,7 +340,7 @@ func TestNewComponentCustomConfig(t *testing.T) {
 		JobQueueSize:       128,
 		SendQueueSize:      64,
 		SendTimeout:        100 * time.Millisecond,
-		SendBehavior:       ws.SendDrop,
+		SendBehavior:       SendDrop,
 		Secret:             validSecret(),
 		WSRoutePath:        "/custom-ws",
 		BroadcastPath:      "/custom-broadcast",

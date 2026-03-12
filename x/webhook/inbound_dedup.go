@@ -12,7 +12,7 @@
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/net/webhookin"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	// Verify GitHub webhook
 //	secret := []byte("your-webhook-secret")
@@ -32,7 +32,7 @@
 //	if !dedup.Allow(requestID) {
 //		// Duplicate request
 //	}
-package webhookin
+package webhook
 
 import (
 	"sync"

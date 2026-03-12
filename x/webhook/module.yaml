@@ -45,8 +45,7 @@ test_commands:
   - go vet ./x/webhook/...
 
 doc_paths:
-  - docs/modules/net/webhookin/README.md
-  - docs/modules/net/webhookout/README.md
+  - docs/modules/x-webhook/README.md
 
 change_risks:
   - signature verification regression

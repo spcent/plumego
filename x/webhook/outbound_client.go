@@ -13,7 +13,7 @@
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/net/webhookout"
+//	import "github.com/spcent/plumego/x/webhook"
 //
 //	// Create a webhook sender
 //	sender := webhookout.NewSender(webhookout.Config{
@@ -28,7 +28,7 @@
 //		URL:     "https://customer.example.com/webhook",
 //		Payload: eventData,
 //	})
-package webhookout
+package webhook
 
 import (
 	"net"

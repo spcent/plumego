@@ -15,7 +15,7 @@
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/net/websocket"
+//	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create a WebSocket hub
 //	hub := websocket.NewHubWithConfig(websocket.HubConfig{

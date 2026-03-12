@@ -42,7 +42,7 @@ test_commands:
   - go vet ./x/websocket/...
 
 doc_paths:
-  - docs/modules/net/websocket/README.md
+  - docs/modules/x-websocket/README.md
 
 change_risks:
   - websocket auth regression

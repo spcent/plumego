@@ -1,4 +1,4 @@
-package webhookin
+package webhook
 
 import (
 	"errors"
