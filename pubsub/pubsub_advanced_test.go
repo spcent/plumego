@@ -524,13 +524,13 @@ func TestPublishWithContext_ContextValuesPropagated(t *testing.T) {
 	const key ctxKey = "trace-id"
 
 	var capturedCtx context.Context
-	collector := &testMetricsCollector{
+	collector := &testMetricsObserver{
 		onObservePubSub: func(ctx context.Context, operation, topic string, duration time.Duration, err error) {
 			capturedCtx = ctx
 		},
 	}
 
-	ps := New(WithMetricsCollector(collector))
+	ps := New(WithMetricsObserver(collector))
 	defer ps.Close()
 
 	_, err := ps.Subscribe("ctx.values", SubOptions{BufferSize: 8, Policy: DropOldest})
@@ -552,14 +552,14 @@ func TestPublishWithContext_ContextValuesPropagated(t *testing.T) {
 	}
 }
 
-// testMetricsCollector is a test helper that implements metrics.MetricsCollector
+// testMetricsObserver is a test helper that implements metrics.PubSubObserver
 // with callback hooks for verifying context propagation.
-type testMetricsCollector struct {
+type testMetricsObserver struct {
 	metrics.BaseMetricsCollector
 	onObservePubSub func(ctx context.Context, operation, topic string, duration time.Duration, err error)
 }
 
-func (c *testMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
+func (c *testMetricsObserver) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
 	if c.onObservePubSub != nil {
 		c.onObservePubSub(ctx, operation, topic, duration, err)
 	}

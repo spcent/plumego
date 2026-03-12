@@ -73,48 +73,48 @@ func (cm *ComponentMetrics) GetRecentSuccessRate() float64 {
 	return float64(successCount) / float64(len(cm.RecentHistory))
 }
 
-// MetricsCollector collects health check metrics.
-type MetricsCollector struct {
+// MetricsTracker records and aggregates health check metrics over time.
+type MetricsTracker struct {
 	mu        sync.RWMutex
 	metrics   *HealthMetrics
 	collector HealthChecker
 }
 
-// NewMetricsCollector creates a new metrics collector.
-func NewMetricsCollector(manager HealthManager) *MetricsCollector {
-	collector := &MetricsCollector{
+// NewMetricsTracker creates a new health metrics tracker.
+func NewMetricsTracker(manager HealthManager) *MetricsTracker {
+	tracker := &MetricsTracker{
 		metrics: &HealthMetrics{
 			StartTime:        time.Now(),
 			ComponentMetrics: make(map[string]*ComponentMetrics),
 		},
 	}
 	if manager != nil {
-		_ = AttachMetrics(manager, collector)
+		_ = AttachMetricsTracker(manager, tracker)
 	}
-	return collector
+	return tracker
 }
 
-// AttachMetrics attaches a MetricsCollector to a HealthManager.
-func AttachMetrics(manager HealthManager, collector *MetricsCollector) error {
+// AttachMetricsTracker attaches a MetricsTracker to a HealthManager.
+func AttachMetricsTracker(manager HealthManager, tracker *MetricsTracker) error {
 	if manager == nil {
 		return errors.New("manager cannot be nil")
 	}
-	if collector == nil {
-		return errors.New("collector cannot be nil")
+	if tracker == nil {
+		return errors.New("tracker cannot be nil")
 	}
 
-	manager.SetMetricsRecorder(collector)
-	collector.collector = manager
+	manager.SetMetricsRecorder(tracker)
+	tracker.collector = manager
 	return nil
 }
 
 // RecordCheck records a health check execution.
-func (mc *MetricsCollector) RecordCheck(componentName string, duration time.Duration, success bool, status HealthState) {
+func (mc *MetricsTracker) RecordCheck(componentName string, duration time.Duration, success bool, status HealthState) {
 	mc.RecordCheckWithError(componentName, duration, success, status, nil)
 }
 
 // RecordCheckWithError records a health check execution including error details.
-func (mc *MetricsCollector) RecordCheckWithError(componentName string, duration time.Duration, success bool, status HealthState, err error) {
+func (mc *MetricsTracker) RecordCheckWithError(componentName string, duration time.Duration, success bool, status HealthState, err error) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
@@ -183,7 +183,7 @@ func (mc *MetricsCollector) RecordCheckWithError(componentName string, duration 
 }
 
 // updateHealthTrend calculates and updates the health trend for a component.
-func (mc *MetricsCollector) updateHealthTrend(comp *ComponentMetrics) {
+func (mc *MetricsTracker) updateHealthTrend(comp *ComponentMetrics) {
 	if len(comp.RecentHistory) < 3 {
 		comp.HealthTrend = HealthTrend{
 			Direction:     TrendStable,
@@ -237,7 +237,7 @@ func (mc *MetricsCollector) updateHealthTrend(comp *ComponentMetrics) {
 }
 
 // calculateStability calculates the stability score based on recent history.
-func (mc *MetricsCollector) calculateStability(history []HealthCheckRecord) float64 {
+func (mc *MetricsTracker) calculateStability(history []HealthCheckRecord) float64 {
 	if len(history) < 2 {
 		return 1.0
 	}
@@ -260,7 +260,7 @@ func (mc *MetricsCollector) calculateStability(history []HealthCheckRecord) floa
 }
 
 // GetMetrics returns the current health metrics.
-func (mc *MetricsCollector) GetMetrics() HealthMetrics {
+func (mc *MetricsTracker) GetMetrics() HealthMetrics {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
@@ -282,7 +282,7 @@ func (mc *MetricsCollector) GetMetrics() HealthMetrics {
 }
 
 // GetComponentMetrics returns metrics for a specific component.
-func (mc *MetricsCollector) GetComponentMetrics(componentName string) (*ComponentMetrics, bool) {
+func (mc *MetricsTracker) GetComponentMetrics(componentName string) (*ComponentMetrics, bool) {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
@@ -297,7 +297,7 @@ func (mc *MetricsCollector) GetComponentMetrics(componentName string) (*Componen
 }
 
 // GetSuccessRate returns the success rate of health checks as a percentage.
-func (mc *MetricsCollector) GetSuccessRate() float64 {
+func (mc *MetricsTracker) GetSuccessRate() float64 {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
@@ -309,7 +309,7 @@ func (mc *MetricsCollector) GetSuccessRate() float64 {
 }
 
 // GetUptime returns the application uptime.
-func (mc *MetricsCollector) GetUptime() time.Duration {
+func (mc *MetricsTracker) GetUptime() time.Duration {
 	mc.mu.RLock()
 	start := mc.metrics.StartTime
 	mc.mu.RUnlock()
@@ -322,7 +322,7 @@ func (mc *MetricsCollector) GetUptime() time.Duration {
 }
 
 // Reset resets all metrics.
-func (mc *MetricsCollector) Reset() {
+func (mc *MetricsTracker) Reset() {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
@@ -342,7 +342,7 @@ type HealthReport struct {
 }
 
 // GenerateReport generates a comprehensive health report.
-func (mc *MetricsCollector) GenerateReport() HealthReport {
+func (mc *MetricsTracker) GenerateReport() HealthReport {
 	overallHealth := mc.collector.GetOverallHealth()
 	allHealth := mc.collector.GetAllHealth()
 	readiness := mc.collector.Readiness()

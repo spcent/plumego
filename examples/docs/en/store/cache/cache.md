@@ -62,7 +62,7 @@ func (mc *MemoryCache) checkMemoryLimit(valueSize uint64) error
 
 #### Added Memory Usage Tracking
 ```go
-type MetricsCollector struct {
+type MetricsTracker struct {
     CurrentMemory uint64 // Current memory usage in bytes
     // ...
 }
@@ -86,7 +86,7 @@ func (mc *MemoryCache) cleanupExpired()
 
 #### Added Comprehensive Metrics
 ```go
-type MetricsCollector struct {
+type MetricsTracker struct {
     Hits          uint64 // Cache hits
     Misses        uint64 // Cache misses
     Sets          uint64 // Set operations

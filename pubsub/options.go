@@ -30,8 +30,8 @@ type Config struct {
 	// Set to 0 for unlimited (not recommended in production).
 	WorkerPoolSize int
 
-	// MetricsCollector is the external metrics sink.
-	MetricsCollector metrics.PubSubObserver
+	// MetricsObserver is the external metrics sink.
+	MetricsObserver metrics.PubSubObserver
 
 	// EnablePanicRecovery wraps the delivery goroutine in a recover() guard
 	// (default: true).
@@ -101,10 +101,10 @@ func WithWorkerPoolSize(size int) Option {
 	}
 }
 
-// WithMetricsCollector sets the external metrics sink.
-func WithMetricsCollector(collector metrics.PubSubObserver) Option {
+// WithMetricsObserver sets the external metrics sink.
+func WithMetricsObserver(observer metrics.PubSubObserver) Option {
 	return func(c *Config) {
-		c.MetricsCollector = collector
+		c.MetricsObserver = observer
 	}
 }
 

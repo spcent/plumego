@@ -66,8 +66,8 @@ type Metrics struct {
 	Panic     bool
 }
 
-// MetricsCollector can be plugged into the broker to observe activity.
-type MetricsCollector = metrics.MQObserver
+// MetricsObserver can be plugged into the broker to observe activity.
+type MetricsObserver = metrics.MQObserver
 
 // PanicHandler is invoked when a broker operation panics.
 type PanicHandler func(ctx context.Context, op Operation, recovered any)

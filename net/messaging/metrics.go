@@ -12,7 +12,7 @@ type messagingMetrics interface {
 	metrics.Recorder
 }
 
-// metricsWrapper wraps the MetricsCollector to provide messaging-specific
+// metricsWrapper wraps the configured metrics observer/recorder to provide messaging-specific
 // helper methods for recording send latency, errors, and queue depth.
 type metricsWrapper struct {
 	collector messagingMetrics

@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-func TestMetricsCollector_RecordQuery(t *testing.T) {
-	collector := NewMetricsCollector(4)
+func TestMetricsTracker_RecordQuery(t *testing.T) {
+	collector := NewMetricsTracker(4)
 	ctx := context.Background()
 
 	t.Run("record successful query", func(t *testing.T) {
@@ -75,8 +75,8 @@ func TestMetricsCollector_RecordQuery(t *testing.T) {
 	})
 }
 
-func TestMetricsCollector_Latency(t *testing.T) {
-	collector := NewMetricsCollector(2)
+func TestMetricsTracker_Latency(t *testing.T) {
+	collector := NewMetricsTracker(2)
 	ctx := context.Background()
 
 	collector.RecordQuery(ctx, "SELECT", 0, 100*time.Microsecond, nil)
@@ -99,8 +99,8 @@ func TestMetricsCollector_Latency(t *testing.T) {
 	}
 }
 
-func TestMetricsCollector_ShardDistribution(t *testing.T) {
-	collector := NewMetricsCollector(4)
+func TestMetricsTracker_ShardDistribution(t *testing.T) {
+	collector := NewMetricsTracker(4)
 	ctx := context.Background()
 
 	// Send queries to different shards
@@ -127,8 +127,8 @@ func TestMetricsCollector_ShardDistribution(t *testing.T) {
 	}
 }
 
-func TestMetricsCollector_CrossShardQueries(t *testing.T) {
-	collector := NewMetricsCollector(4)
+func TestMetricsTracker_CrossShardQueries(t *testing.T) {
+	collector := NewMetricsTracker(4)
 
 	collector.RecordSingleShardQuery()
 	collector.RecordSingleShardQuery()
@@ -145,8 +145,8 @@ func TestMetricsCollector_CrossShardQueries(t *testing.T) {
 	}
 }
 
-func TestMetricsCollector_Rewrite(t *testing.T) {
-	collector := NewMetricsCollector(2)
+func TestMetricsTracker_Rewrite(t *testing.T) {
+	collector := NewMetricsTracker(2)
 
 	// Record cache hit
 	collector.RecordRewrite(true, nil)
@@ -182,8 +182,8 @@ func TestMetricsCollector_Rewrite(t *testing.T) {
 	}
 }
 
-func TestMetricsCollector_Reset(t *testing.T) {
-	collector := NewMetricsCollector(2)
+func TestMetricsTracker_Reset(t *testing.T) {
+	collector := NewMetricsTracker(2)
 	ctx := context.Background()
 
 	// Add some metrics
@@ -217,8 +217,8 @@ func TestMetricsCollector_Reset(t *testing.T) {
 	}
 }
 
-func TestMetricsCollector_EnableDisable(t *testing.T) {
-	collector := NewMetricsCollector(2)
+func TestMetricsTracker_EnableDisable(t *testing.T) {
+	collector := NewMetricsTracker(2)
 	ctx := context.Background()
 
 	// Disable metrics
@@ -252,8 +252,8 @@ func TestMetricsCollector_EnableDisable(t *testing.T) {
 	}
 }
 
-func TestMetricsCollector_PrometheusFormat(t *testing.T) {
-	collector := NewMetricsCollector(2)
+func TestMetricsTracker_PrometheusFormat(t *testing.T) {
+	collector := NewMetricsTracker(2)
 	ctx := context.Background()
 
 	collector.RecordQuery(ctx, "SELECT", 0, 1*time.Millisecond, nil)
@@ -276,8 +276,8 @@ func TestMetricsCollector_PrometheusFormat(t *testing.T) {
 	}
 }
 
-func BenchmarkMetricsCollector_RecordQuery(b *testing.B) {
-	collector := NewMetricsCollector(4)
+func BenchmarkMetricsTracker_RecordQuery(b *testing.B) {
+	collector := NewMetricsTracker(4)
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -286,8 +286,8 @@ func BenchmarkMetricsCollector_RecordQuery(b *testing.B) {
 	}
 }
 
-func BenchmarkMetricsCollector_Snapshot(b *testing.B) {
-	collector := NewMetricsCollector(4)
+func BenchmarkMetricsTracker_Snapshot(b *testing.B) {
+	collector := NewMetricsTracker(4)
 	ctx := context.Background()
 
 	// Add some data

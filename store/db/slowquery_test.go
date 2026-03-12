@@ -220,11 +220,11 @@ func TestSlowQueryDetector_Concurrency(t *testing.T) {
 	}
 }
 
-func TestMetricsCollectorWithSlowQueryDetection(t *testing.T) {
+func TestSlowQueryMetricsObserver(t *testing.T) {
 	callbackCalled := false
 	base := metrics.NewMockCollector()
 
-	collector := NewMetricsCollectorWithSlowQueryDetection(
+	collector := NewSlowQueryMetricsObserver(
 		base,
 		WithSlowQueryThreshold(100*time.Millisecond),
 		WithSlowQueryCallback(func(sq SlowQuery) {

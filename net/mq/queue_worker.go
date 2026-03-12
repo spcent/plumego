@@ -23,7 +23,7 @@ type WorkerConfig struct {
 	RetryPolicy         RetryPolicy
 	LeaseExtendInterval time.Duration
 	ShutdownTimeout     time.Duration
-	MetricsCollector    metrics.MQObserver
+	MetricsObserver     metrics.MQObserver
 	Deduper             TaskDeduper
 	DedupeKeyFunc       func(Task) string
 	DedupeTTL           time.Duration
@@ -375,7 +375,7 @@ func (w *Worker) observeLatency(task Task) {
 	if task.CreatedAt.IsZero() {
 		return
 	}
-	collector := w.config.MetricsCollector
+	collector := w.config.MetricsObserver
 	if collector == nil && w.queue != nil {
 		collector = w.queue.collector()
 	}

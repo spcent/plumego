@@ -248,25 +248,25 @@ func (idb *InstrumentedDBWithSlowQueryDetection) QueryRowContext(ctx context.Con
 	return row
 }
 
-// MetricsCollectorWithSlowQueryDetection wraps a MetricsCollector with slow query detection.
-type MetricsCollectorWithSlowQueryDetection struct {
-	base     MetricsCollector
+// SlowQueryMetricsObserver wraps a MetricsObserver with slow query detection.
+type SlowQueryMetricsObserver struct {
+	base     MetricsObserver
 	detector *SlowQueryDetector
 }
 
-// NewMetricsCollectorWithSlowQueryDetection creates a metrics collector with slow query detection.
-func NewMetricsCollectorWithSlowQueryDetection(
-	base MetricsCollector,
+// NewSlowQueryMetricsObserver creates a metrics observer with slow query detection.
+func NewSlowQueryMetricsObserver(
+	base MetricsObserver,
 	opts ...SlowQueryDetectorOption,
-) *MetricsCollectorWithSlowQueryDetection {
-	return &MetricsCollectorWithSlowQueryDetection{
+) *SlowQueryMetricsObserver {
+	return &SlowQueryMetricsObserver{
 		base:     base,
 		detector: NewSlowQueryDetector(opts...),
 	}
 }
 
-// ObserveDB implements MetricsCollector and also detects slow queries.
-func (c *MetricsCollectorWithSlowQueryDetection) ObserveDB(
+// ObserveDB implements MetricsObserver and also detects slow queries.
+func (c *SlowQueryMetricsObserver) ObserveDB(
 	ctx context.Context,
 	operation, driver, query string,
 	rows int,
@@ -283,6 +283,6 @@ func (c *MetricsCollectorWithSlowQueryDetection) ObserveDB(
 }
 
 // GetSlowQueryDetector returns the slow query detector.
-func (c *MetricsCollectorWithSlowQueryDetection) GetSlowQueryDetector() *SlowQueryDetector {
+func (c *SlowQueryMetricsObserver) GetSlowQueryDetector() *SlowQueryDetector {
 	return c.detector
 }

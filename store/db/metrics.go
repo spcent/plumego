@@ -6,27 +6,27 @@ import (
 	"time"
 )
 
-// MetricsCollector defines the minimal interface for database metrics collection.
+// MetricsObserver defines the minimal interface for database metrics collection.
 // It is intentionally decoupled from the main metrics package to avoid circular dependencies.
-type MetricsCollector interface {
+type MetricsObserver interface {
 	ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error)
 }
 
 // InstrumentedDB wraps a sql.DB with metrics collection.
 // It implements the DB interface and records metrics for all database operations.
 type InstrumentedDB struct {
-	db        *sql.DB
-	collector MetricsCollector
-	driver    string
+	db       *sql.DB
+	observer MetricsObserver
+	driver   string
 }
 
 // NewInstrumentedDB creates a new instrumented database connection.
-// The collector parameter can be nil to disable metrics.
-func NewInstrumentedDB(db *sql.DB, collector MetricsCollector, driver string) *InstrumentedDB {
+// The observer parameter can be nil to disable metrics.
+func NewInstrumentedDB(db *sql.DB, observer MetricsObserver, driver string) *InstrumentedDB {
 	return &InstrumentedDB{
-		db:        db,
-		collector: collector,
-		driver:    driver,
+		db:       db,
+		observer: observer,
+		driver:   driver,
 	}
 }
 
@@ -37,14 +37,14 @@ func (idb *InstrumentedDB) ExecContext(ctx context.Context, query string, args .
 	duration := time.Since(start)
 
 	// Record metrics
-	if idb.collector != nil {
+	if idb.observer != nil {
 		rows := int64(0)
 		if result != nil && err == nil {
 			if affected, aErr := result.RowsAffected(); aErr == nil {
 				rows = affected
 			}
 		}
-		idb.collector.ObserveDB(ctx, "exec", idb.driver, query, int(rows), duration, err)
+		idb.observer.ObserveDB(ctx, "exec", idb.driver, query, int(rows), duration, err)
 	}
 
 	return result, err
@@ -57,8 +57,8 @@ func (idb *InstrumentedDB) QueryContext(ctx context.Context, query string, args 
 	duration := time.Since(start)
 
 	// Record metrics (rows count is not known yet)
-	if idb.collector != nil {
-		idb.collector.ObserveDB(ctx, "query", idb.driver, query, 0, duration, err)
+	if idb.observer != nil {
+		idb.observer.ObserveDB(ctx, "query", idb.driver, query, 0, duration, err)
 	}
 
 	return rows, err
@@ -71,8 +71,8 @@ func (idb *InstrumentedDB) QueryRowContext(ctx context.Context, query string, ar
 	duration := time.Since(start)
 
 	// Record metrics
-	if idb.collector != nil {
-		idb.collector.ObserveDB(ctx, "query", idb.driver, query, 1, duration, nil)
+	if idb.observer != nil {
+		idb.observer.ObserveDB(ctx, "query", idb.driver, query, 1, duration, nil)
 	}
 
 	return row
@@ -85,8 +85,8 @@ func (idb *InstrumentedDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*s
 	duration := time.Since(start)
 
 	// Record metrics
-	if idb.collector != nil {
-		idb.collector.ObserveDB(ctx, "transaction", idb.driver, "BEGIN", 0, duration, err)
+	if idb.observer != nil {
+		idb.observer.ObserveDB(ctx, "transaction", idb.driver, "BEGIN", 0, duration, err)
 	}
 
 	return tx, err
@@ -99,8 +99,8 @@ func (idb *InstrumentedDB) PingContext(ctx context.Context) error {
 	duration := time.Since(start)
 
 	// Record metrics
-	if idb.collector != nil {
-		idb.collector.ObserveDB(ctx, "ping", idb.driver, "", 0, duration, err)
+	if idb.observer != nil {
+		idb.observer.ObserveDB(ctx, "ping", idb.driver, "", 0, duration, err)
 	}
 
 	return err
@@ -113,8 +113,8 @@ func (idb *InstrumentedDB) Close() error {
 	duration := time.Since(start)
 
 	// Record metrics
-	if idb.collector != nil {
-		idb.collector.ObserveDB(context.Background(), "close", idb.driver, "", 0, duration, err)
+	if idb.observer != nil {
+		idb.observer.ObserveDB(context.Background(), "close", idb.driver, "", 0, duration, err)
 	}
 
 	return err
@@ -163,7 +163,7 @@ func (idb *InstrumentedDB) SetConnMaxIdleTime(d time.Duration) {
 //		}
 //	}()
 func (idb *InstrumentedDB) RecordPoolStats(ctx context.Context) {
-	if idb.collector == nil {
+	if idb.observer == nil {
 		return
 	}
 
@@ -173,31 +173,31 @@ func (idb *InstrumentedDB) RecordPoolStats(ctx context.Context) {
 	// These can be aggregated by monitoring systems like Prometheus
 
 	// Track open connections
-	idb.collector.ObserveDB(ctx, "pool_open_connections", idb.driver,
+	idb.observer.ObserveDB(ctx, "pool_open_connections", idb.driver,
 		"", int(stats.OpenConnections), 0, nil)
 
 	// Track connections in use
-	idb.collector.ObserveDB(ctx, "pool_in_use", idb.driver,
+	idb.observer.ObserveDB(ctx, "pool_in_use", idb.driver,
 		"", int(stats.InUse), 0, nil)
 
 	// Track idle connections
-	idb.collector.ObserveDB(ctx, "pool_idle", idb.driver,
+	idb.observer.ObserveDB(ctx, "pool_idle", idb.driver,
 		"", int(stats.Idle), 0, nil)
 
 	// Track wait count (total number of connections waited for)
-	idb.collector.ObserveDB(ctx, "pool_wait_count", idb.driver,
+	idb.observer.ObserveDB(ctx, "pool_wait_count", idb.driver,
 		"", int(stats.WaitCount), 0, nil)
 
 	// Track wait duration
-	idb.collector.ObserveDB(ctx, "pool_wait_duration", idb.driver,
+	idb.observer.ObserveDB(ctx, "pool_wait_duration", idb.driver,
 		"", 0, stats.WaitDuration, nil)
 
 	// Track max idle closed (connections closed due to idle limit)
-	idb.collector.ObserveDB(ctx, "pool_max_idle_closed", idb.driver,
+	idb.observer.ObserveDB(ctx, "pool_max_idle_closed", idb.driver,
 		"", int(stats.MaxIdleClosed), 0, nil)
 
 	// Track max lifetime closed (connections closed due to max lifetime)
-	idb.collector.ObserveDB(ctx, "pool_max_lifetime_closed", idb.driver,
+	idb.observer.ObserveDB(ctx, "pool_max_lifetime_closed", idb.driver,
 		"", int(stats.MaxLifetimeClosed), 0, nil)
 }
 

@@ -940,9 +940,9 @@ func (b *InProcBroker) Snapshot() MetricsSnapshot {
 	return b.metrics.Snapshot()
 }
 
-// SetMetricsCollector replaces the external metrics sink at runtime.
-func (b *InProcBroker) SetMetricsCollector(collector metrics.PubSubObserver) {
-	b.config.MetricsCollector = collector
+// SetMetricsObserver replaces the external metrics sink at runtime.
+func (b *InProcBroker) SetMetricsObserver(observer metrics.PubSubObserver) {
+	b.config.MetricsObserver = observer
 }
 
 // Config returns a copy of the broker's configuration.
@@ -967,10 +967,10 @@ func (b *InProcBroker) TopicShardMapping() map[string]int {
 
 // recordMetrics forwards an operation observation to the external collector, if any.
 func (b *InProcBroker) recordMetrics(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	if b.config.MetricsCollector == nil {
+	if b.config.MetricsObserver == nil {
 		return
 	}
-	b.config.MetricsCollector.ObservePubSub(ctx, operation, topic, duration, err)
+	b.config.MetricsObserver.ObservePubSub(ctx, operation, topic, duration, err)
 }
 
 // --- Observer notification helpers ---

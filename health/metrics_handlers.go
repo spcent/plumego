@@ -7,17 +7,17 @@ import (
 )
 
 // MetricsHandler creates a handler that exposes health metrics.
-func MetricsHandler(collector *MetricsCollector) http.Handler {
+func MetricsHandler(tracker *MetricsTracker) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		metrics := collector.GetMetrics()
+		metrics := tracker.GetMetrics()
 		_ = contract.WriteJSON(w, http.StatusOK, metrics)
 	})
 }
 
 // HealthReportHandler creates a handler that exposes comprehensive health report.
-func HealthReportHandler(collector *MetricsCollector) http.Handler {
+func HealthReportHandler(tracker *MetricsTracker) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		report := collector.GenerateReport()
+		report := tracker.GenerateReport()
 		_ = contract.WriteJSON(w, httpStatusForHealth(report.HealthStatus.Status), report)
 	})
 }

@@ -401,22 +401,22 @@ func cleanTableName(name string) string {
 	return name
 }
 
-// AggregatingCollector wraps a MetricsCollector and also aggregates statistics.
-type AggregatingCollector struct {
-	base       MetricsCollector
+// AggregatingObserver wraps a MetricsObserver and also aggregates statistics.
+type AggregatingObserver struct {
+	base       MetricsObserver
 	aggregator *DBStatsAggregator
 }
 
-// NewAggregatingCollector creates a collector that both records metrics and aggregates statistics.
-func NewAggregatingCollector(base MetricsCollector, slowQueryThreshold time.Duration) *AggregatingCollector {
-	return &AggregatingCollector{
+// NewAggregatingObserver creates an observer that both records metrics and aggregates statistics.
+func NewAggregatingObserver(base MetricsObserver, slowQueryThreshold time.Duration) *AggregatingObserver {
+	return &AggregatingObserver{
 		base:       base,
 		aggregator: NewDBStatsAggregator(slowQueryThreshold),
 	}
 }
 
-// ObserveDB implements MetricsCollector and also aggregates statistics.
-func (c *AggregatingCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
+// ObserveDB implements MetricsObserver and also aggregates statistics.
+func (c *AggregatingObserver) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
 	// Forward to base collector
 	if c.base != nil {
 		c.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
@@ -427,6 +427,6 @@ func (c *AggregatingCollector) ObserveDB(ctx context.Context, operation, driver,
 }
 
 // GetAggregator returns the underlying statistics aggregator.
-func (c *AggregatingCollector) GetAggregator() *DBStatsAggregator {
+func (c *AggregatingObserver) GetAggregator() *DBStatsAggregator {
 	return c.aggregator
 }

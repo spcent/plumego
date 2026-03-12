@@ -7,7 +7,7 @@ This package provides comprehensive database metrics tracking through the `Instr
 - **Automatic Operation Tracking**: All database operations (query, exec, transaction, ping, connect, close) are automatically recorded
 - **Connection Pool Monitoring**: Track connection pool health metrics like open connections, idle connections, wait times
 - **Low Overhead**: Minimal performance impact with optional metrics collection
-- **Flexible Integration**: Works with any `sql.DB` and metrics collector
+- **Flexible Integration**: Works with any `sql.DB` and metrics observer
 - **Production Ready**: Supports nil collectors for zero-overhead when metrics are disabled
 
 ## Quick Start
@@ -22,7 +22,7 @@ import (
     _ "github.com/lib/pq" // your database driver
 )
 
-// Create a metrics collector
+// Create a metrics observer
 collector := metrics.NewPrometheusCollector("myapp")
 
 // Open database connection
@@ -262,7 +262,7 @@ See `examples/db-metrics/` for a complete example application demonstrating:
 
 ```go
 // NewInstrumentedDB creates a new instrumented database connection
-func NewInstrumentedDB(db *sql.DB, collector MetricsCollector, driver string) *InstrumentedDB
+func NewInstrumentedDB(db *sql.DB, observer MetricsObserver, driver string) *InstrumentedDB
 
 // RecordPoolStats records current connection pool statistics
 func (idb *InstrumentedDB) RecordPoolStats(ctx context.Context)
@@ -273,10 +273,10 @@ func (idb *InstrumentedDB) Unwrap() *sql.DB
 // All standard sql.DB methods (ExecContext, QueryContext, etc.)
 ```
 
-### MetricsCollector Interface
+### MetricsObserver Interface
 
 ```go
-type MetricsCollector interface {
+type MetricsObserver interface {
     ObserveDB(ctx context.Context, operation, driver, query string,
               rows int, duration time.Duration, err error)
 }

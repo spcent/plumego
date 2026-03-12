@@ -23,9 +23,9 @@ func WithQueueNowFunc(now func() time.Time) TaskQueueOption {
 	}
 }
 
-func WithQueueMetricsCollector(collector metrics.MQObserver) TaskQueueOption {
+func WithQueueMetricsObserver(observer metrics.MQObserver) TaskQueueOption {
 	return func(q *TaskQueue) {
-		q.metrics = collector
+		q.metrics = observer
 	}
 }
 

@@ -150,7 +150,7 @@ func (c Config) Validate() error {
 type MemoryCache struct {
 	store    sync.Map
 	config   Config
-	metrics  *MetricsCollector
+	metrics  *MetricsTracker
 	stopChan chan struct{}
 	wg       sync.WaitGroup
 }
@@ -161,8 +161,8 @@ type cacheItem struct {
 	key        string // Store key for cleanup
 }
 
-// MetricsCollector collects cache metrics.
-type MetricsCollector struct {
+// MetricsTracker collects cache metrics.
+type MetricsTracker struct {
 	Hits          uint64
 	Misses        uint64
 	Sets          uint64
@@ -174,13 +174,13 @@ type MetricsCollector struct {
 	mu            sync.RWMutex
 }
 
-// NewMetricsCollector creates a new metrics collector.
-func NewMetricsCollector() *MetricsCollector {
-	return &MetricsCollector{}
+// NewMetricsTracker creates a new cache metrics tracker.
+func NewMetricsTracker() *MetricsTracker {
+	return &MetricsTracker{}
 }
 
 // GetStats returns the current metrics snapshot.
-func (mc *MetricsCollector) GetStats() MetricsSnapshot {
+func (mc *MetricsTracker) GetStats() MetricsSnapshot {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
@@ -224,7 +224,7 @@ func NewMemoryCacheWithConfig(config Config) *MemoryCache {
 
 	cache := &MemoryCache{
 		config:   config,
-		metrics:  NewMetricsCollector(),
+		metrics:  NewMetricsTracker(),
 		stopChan: make(chan struct{}),
 	}
 
@@ -263,7 +263,7 @@ func (mc *MemoryCache) removeExpiredItem(key any, item cacheItem) bool {
 	}
 
 	mc.store.Delete(key)
-	mc.updateMetrics(func(m *MetricsCollector) {
+	mc.updateMetrics(func(m *MetricsTracker) {
 		m.Expired++
 		m.CurrentSize--
 		if m.CurrentMemory >= uint64(len(item.value)) {
@@ -334,7 +334,7 @@ func (mc *MemoryCache) checkMemoryLimit(valueSize uint64) error {
 }
 
 // updateMetrics updates metrics with a write lock.
-func (mc *MemoryCache) updateMetrics(fn func(*MetricsCollector)) {
+func (mc *MemoryCache) updateMetrics(fn func(*MetricsTracker)) {
 	if !mc.config.EnableMetrics {
 		return
 	}
@@ -352,7 +352,7 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 
 	val, ok := mc.store.Load(key)
 	if !ok {
-		mc.updateMetrics(func(m *MetricsCollector) {
+		mc.updateMetrics(func(m *MetricsTracker) {
 			m.Misses++
 		})
 		return nil, ErrNotFound
@@ -363,7 +363,7 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 		return nil, ErrNotFound
 	}
 
-	mc.updateMetrics(func(m *MetricsCollector) {
+	mc.updateMetrics(func(m *MetricsTracker) {
 		m.Hits++
 	})
 
@@ -401,7 +401,7 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl ti
 		key:        key,
 	})
 
-	mc.updateMetrics(func(m *MetricsCollector) {
+	mc.updateMetrics(func(m *MetricsTracker) {
 		m.Sets++
 		// Only increment size if this is a new key
 		if existingSize == 0 {
@@ -426,7 +426,7 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 	if existing, ok := mc.store.Load(key); ok {
 		item := existing.(cacheItem)
 		mc.store.Delete(key)
-		mc.updateMetrics(func(m *MetricsCollector) {
+		mc.updateMetrics(func(m *MetricsTracker) {
 			m.Deletes++
 			m.CurrentSize--
 			if m.CurrentMemory >= uint64(len(item.value)) {
@@ -462,7 +462,7 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 	mc.store.Range(func(key, value any) bool {
 		item := value.(cacheItem)
 		mc.store.Delete(key)
-		mc.updateMetrics(func(m *MetricsCollector) {
+		mc.updateMetrics(func(m *MetricsTracker) {
 			m.CurrentSize--
 			if m.CurrentMemory >= uint64(len(item.value)) {
 				m.CurrentMemory -= uint64(len(item.value))
@@ -471,7 +471,7 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 		return true
 	})
 
-	mc.updateMetrics(func(m *MetricsCollector) {
+	mc.updateMetrics(func(m *MetricsTracker) {
 		m.Clears++
 	})
 

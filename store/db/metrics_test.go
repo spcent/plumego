@@ -111,8 +111,8 @@ func TestNewInstrumentedDB(t *testing.T) {
 	if idb.db != db {
 		t.Error("expected db to be set")
 	}
-	if idb.collector != collector {
-		t.Error("expected collector to be set")
+	if idb.observer != collector {
+		t.Error("expected observer to be set")
 	}
 	if idb.driver != "postgres" {
 		t.Errorf("expected driver 'postgres', got %q", idb.driver)

@@ -57,7 +57,7 @@ import (
 // InProcBroker adapts pubsub.Broker to the Broker interface.
 type InProcBroker struct {
 	ps            pubsub.Broker
-	metrics       MetricsCollector
+	metrics       MetricsObserver
 	panicHandler  PanicHandler
 	config        Config
 	startTime     time.Time
@@ -89,10 +89,10 @@ type InProcBroker struct {
 // Option configures the broker.
 type Option func(*InProcBroker)
 
-// WithMetricsCollector registers a metrics collector.
-func WithMetricsCollector(collector MetricsCollector) Option {
+// WithMetricsObserver registers a metrics observer.
+func WithMetricsObserver(observer MetricsObserver) Option {
 	return func(b *InProcBroker) {
-		b.metrics = collector
+		b.metrics = observer
 	}
 }
 

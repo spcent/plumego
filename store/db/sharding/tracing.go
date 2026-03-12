@@ -238,18 +238,18 @@ func getQueryOperation(query string) string {
 	return query
 }
 
-// InstrumentedRouter wraps a Router with tracing and metrics
+// InstrumentedRouter wraps a Router with tracing and metrics.
 type InstrumentedRouter struct {
 	router  *Router
-	metrics *MetricsCollector
+	metrics *MetricsTracker
 	tracing *TracingHelper
 }
 
-// NewInstrumentedRouter creates a new instrumented router
+// NewInstrumentedRouter creates a new instrumented router.
 func NewInstrumentedRouter(router *Router, metricsEnabled bool, tracingConfig TracingConfig) *InstrumentedRouter {
-	var metrics *MetricsCollector
+	var metrics *MetricsTracker
 	if metricsEnabled {
-		metrics = NewMetricsCollector(router.ShardCount())
+		metrics = NewMetricsTracker(router.ShardCount())
 	}
 
 	return &InstrumentedRouter{
@@ -259,8 +259,8 @@ func NewInstrumentedRouter(router *Router, metricsEnabled bool, tracingConfig Tr
 	}
 }
 
-// MetricsCollector returns the metrics collector
-func (ir *InstrumentedRouter) MetricsCollector() *MetricsCollector {
+// MetricsTracker returns the metrics tracker.
+func (ir *InstrumentedRouter) MetricsTracker() *MetricsTracker {
 	return ir.metrics
 }
 

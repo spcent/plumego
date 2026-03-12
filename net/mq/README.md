@@ -118,12 +118,12 @@ worker := mq.NewWorker(queue, mq.WorkerConfig{
 
 ```go
 collector := metrics.NewDevCollector(metrics.DefaultDevCollectorConfig())
-queue := mq.NewTaskQueue(store, mq.WithQueueMetricsCollector(collector))
+queue := mq.NewTaskQueue(store, mq.WithQueueMetricsObserver(collector))
 
 worker := mq.NewWorker(queue, mq.WorkerConfig{
     ConsumerID:       "worker-1",
     Concurrency:      8,
-    MetricsCollector: collector,
+    MetricsObserver: collector,
 })
 ```
 

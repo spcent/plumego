@@ -83,7 +83,7 @@ func main() {
 	quotaManager := tenant.NewWindowQuotaManager(tenantConfig, quotaStore)
 
 	queueStore := mqstore.NewMemory(mqstore.MemConfig{})
-	queue := mq.NewTaskQueue(queueStore, mq.WithQueueMetricsCollector(collector))
+	queue := mq.NewTaskQueue(queueStore, mq.WithQueueMetricsObserver(collector))
 	var queueReplayer mqstore.DLQReplayer
 	if replayer, ok := any(queueStore).(mqstore.DLQReplayer); ok {
 		queueReplayer = replayer
@@ -93,14 +93,14 @@ func main() {
 	defer dedupeCleanup()
 
 	worker := mq.NewWorker(queue, mq.WorkerConfig{
-		ConsumerID:       "sms-worker",
-		Concurrency:      2,
-		PollInterval:     100 * time.Millisecond,
-		RetryPolicy:      mq.ExponentialBackoff{Base: 200 * time.Millisecond, Max: 2 * time.Second, Factor: 2},
-		ShutdownTimeout:  3 * time.Second,
-		MetricsCollector: collector,
-		Deduper:          deduper,
-		DedupeTTL:        dedupeTTL,
+		ConsumerID:      "sms-worker",
+		Concurrency:     2,
+		PollInterval:    100 * time.Millisecond,
+		RetryPolicy:     mq.ExponentialBackoff{Base: 200 * time.Millisecond, Max: 2 * time.Second, Factor: 2},
+		ShutdownTimeout: 3 * time.Second,
+		MetricsObserver: collector,
+		Deduper:         deduper,
+		DedupeTTL:       dedupeTTL,
 	})
 
 	smsMetrics := smsgateway.NewReporter(collector)

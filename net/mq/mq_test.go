@@ -75,7 +75,7 @@ func TestInProcBrokerMetrics(t *testing.T) {
 	collector := &metricsCollector{
 		NoopCollector: metrics.NewNoopCollector(),
 	}
-	broker := NewInProcBroker(pubsub.New(), WithMetricsCollector(collector))
+	broker := NewInProcBroker(pubsub.New(), WithMetricsObserver(collector))
 	defer broker.Close()
 
 	if err := broker.Publish(context.Background(), "topic", Message{ID: "test-1"}); err != nil {

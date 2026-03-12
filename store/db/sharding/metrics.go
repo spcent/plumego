@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// MetricsCollector collects metrics for database sharding operations
-type MetricsCollector struct {
+// MetricsTracker collects metrics for database sharding operations.
+type MetricsTracker struct {
 	mu sync.RWMutex
 
 	// Query metrics
@@ -45,7 +45,7 @@ type MetricsCollector struct {
 	enabled bool
 }
 
-// MetricsSnapshot is a point-in-time snapshot of metrics
+// MetricsSnapshot is a point-in-time snapshot of metrics.
 type MetricsSnapshot struct {
 	// Query metrics
 	TotalQueries       uint64 `json:"total_queries"`
@@ -84,9 +84,9 @@ type MetricsSnapshot struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// NewMetricsCollector creates a new metrics collector
-func NewMetricsCollector(shardCount int) *MetricsCollector {
-	return &MetricsCollector{
+// NewMetricsTracker creates a new sharding metrics tracker.
+func NewMetricsTracker(shardCount int) *MetricsTracker {
+	return &MetricsTracker{
 		shardQueryCounts: make([]uint64, shardCount),
 		shardErrorCounts: make([]uint64, shardCount),
 		latencyBuckets:   make(map[string]uint64),
@@ -94,8 +94,8 @@ func NewMetricsCollector(shardCount int) *MetricsCollector {
 	}
 }
 
-// RecordQuery records a query execution
-func (m *MetricsCollector) RecordQuery(ctx context.Context, queryType string, shardIndex int, latency time.Duration, err error) {
+// RecordQuery records a query execution.
+func (m *MetricsTracker) RecordQuery(ctx context.Context, queryType string, shardIndex int, latency time.Duration, err error) {
 	if !m.enabled {
 		return
 	}
@@ -145,8 +145,8 @@ func (m *MetricsCollector) RecordQuery(ctx context.Context, queryType string, sh
 	m.recordLatencyBucket(latencyUs)
 }
 
-// RecordSingleShardQuery records a single-shard query
-func (m *MetricsCollector) RecordSingleShardQuery() {
+// RecordSingleShardQuery records a single-shard query.
+func (m *MetricsTracker) RecordSingleShardQuery() {
 	if !m.enabled {
 		return
 	}
@@ -155,8 +155,8 @@ func (m *MetricsCollector) RecordSingleShardQuery() {
 	m.singleShardQueries++
 }
 
-// RecordCrossShardQuery records a cross-shard query
-func (m *MetricsCollector) RecordCrossShardQuery() {
+// RecordCrossShardQuery records a cross-shard query.
+func (m *MetricsTracker) RecordCrossShardQuery() {
 	if !m.enabled {
 		return
 	}
@@ -165,8 +165,8 @@ func (m *MetricsCollector) RecordCrossShardQuery() {
 	m.crossShardQueries++
 }
 
-// RecordRewrite records a SQL rewrite operation
-func (m *MetricsCollector) RecordRewrite(cached bool, err error) {
+// RecordRewrite records a SQL rewrite operation.
+func (m *MetricsTracker) RecordRewrite(cached bool, err error) {
 	if !m.enabled {
 		return
 	}
@@ -186,8 +186,8 @@ func (m *MetricsCollector) RecordRewrite(cached bool, err error) {
 	}
 }
 
-// recordLatencyBucket records latency in histogram buckets
-func (m *MetricsCollector) recordLatencyBucket(latencyUs uint64) {
+// recordLatencyBucket records latency in histogram buckets.
+func (m *MetricsTracker) recordLatencyBucket(latencyUs uint64) {
 	// Define buckets (in microseconds)
 	buckets := []uint64{
 		100,     // 0.1ms
@@ -213,7 +213,7 @@ func (m *MetricsCollector) recordLatencyBucket(latencyUs uint64) {
 	m.latencyBuckets[">1s"]++
 }
 
-// formatLatencyBucket formats a bucket value for display
+// formatLatencyBucket formats a bucket value for display.
 func formatLatencyBucket(bucketUs uint64) string {
 	if bucketUs < 1000 {
 		return "<0.1ms"
@@ -235,7 +235,7 @@ func formatLatencyBucket(bucketUs uint64) string {
 }
 
 // Snapshot returns a point-in-time snapshot of metrics
-func (m *MetricsCollector) Snapshot() MetricsSnapshot {
+func (m *MetricsTracker) Snapshot() MetricsSnapshot {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -294,7 +294,7 @@ func (m *MetricsCollector) Snapshot() MetricsSnapshot {
 }
 
 // Reset resets all metrics to zero
-func (m *MetricsCollector) Reset() {
+func (m *MetricsTracker) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -326,28 +326,28 @@ func (m *MetricsCollector) Reset() {
 }
 
 // Enable enables metrics collection
-func (m *MetricsCollector) Enable() {
+func (m *MetricsTracker) Enable() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.enabled = true
 }
 
 // Disable disables metrics collection
-func (m *MetricsCollector) Disable() {
+func (m *MetricsTracker) Disable() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.enabled = false
 }
 
 // IsEnabled returns whether metrics collection is enabled
-func (m *MetricsCollector) IsEnabled() bool {
+func (m *MetricsTracker) IsEnabled() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.enabled
 }
 
 // PrometheusMetrics returns metrics in Prometheus text format
-func (m *MetricsCollector) PrometheusMetrics() string {
+func (m *MetricsTracker) PrometheusMetrics() string {
 	snapshot := m.Snapshot()
 
 	metrics := ""

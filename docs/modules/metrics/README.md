@@ -189,7 +189,7 @@ metrics.RecordError(ctx, collector, "cache_warm", 150*time.Millisecond, err)
 - `core.WithHTTPMetrics(...)` stores a non-Prometheus HTTP observer on the app.
 - `app.HTTPMetrics()` returns the current app-managed HTTP observer so middleware wiring stays explicit.
 - `core/components/observability` can wire `/metrics` and tracing when you opt into that component-level configuration.
-- `health.AttachMetrics(...)` bridges health checks into the health metrics collector.
+- `health.AttachMetricsTracker(...)` bridges health checks into the health metrics tracker.
 
 ## Related Documentation
 

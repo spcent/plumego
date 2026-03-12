@@ -281,8 +281,8 @@ func TestInstrumentedRouter(t *testing.T) {
 
 	instrumented := NewInstrumentedRouter(router, true, tracingConfig)
 
-	if instrumented.MetricsCollector() == nil {
-		t.Error("expected metrics collector to be created")
+	if instrumented.MetricsTracker() == nil {
+		t.Error("expected metrics tracker to be created")
 	}
 
 	if instrumented.Router() != router {

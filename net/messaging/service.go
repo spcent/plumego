@@ -70,9 +70,9 @@ type Config struct {
 	// QuotaChecker for per-tenant send limits; nil disables quota enforcement.
 	Quota *QuotaChecker
 
-	// MetricsCollector for observability; nil disables metrics.
+	// Metrics for observability; nil disables metrics.
 	// It records queue-level metrics and messaging-specific metric records.
-	MetricsCollector interface {
+	Metrics interface {
 		metrics.MQObserver
 		metrics.Recorder
 	}
@@ -141,7 +141,7 @@ func New(cfg Config) *Service {
 		receipts:  cfg.Receipts,
 		quota:     cfg.Quota,
 		monitor:   monitor,
-		metrics:   newMetrics(cfg.MetricsCollector),
+		metrics:   newMetrics(cfg.Metrics),
 		webhook:   wh,
 	}
 

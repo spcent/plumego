@@ -492,7 +492,7 @@ distCache.Set(ctx, key, value, ttl)
 
 **Problem**: Memory usage too high
 - **Solution**: Reduce `MaxLeaderboards` or `MaxMembersPerSet`
-- **Check**: Monitor `MetricsCollector.CurrentMemoryUsage`
+- **Check**: Monitor `MetricsTracker.CurrentMemory`
 
 **Problem**: Scores not updating
 - **Solution**: Verify `ZIncrBy` delta is not zero

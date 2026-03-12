@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestMetricsCollector(t *testing.T) {
+func TestMetricsTracker(t *testing.T) {
 	config := HealthCheckConfig{
 		MaxHistoryEntries:  100,
 		HistoryRetention:   24 * time.Hour,
@@ -17,7 +17,7 @@ func TestMetricsCollector(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	// Register a component
 	mock := &MockChecker{name: "test", healthy: true}
@@ -65,7 +65,7 @@ func TestMetricsCollector(t *testing.T) {
 	}
 }
 
-func TestMetricsCollectorAttachment(t *testing.T) {
+func TestMetricsTrackerAttachment(t *testing.T) {
 	config := HealthCheckConfig{
 		MaxHistoryEntries:  100,
 		HistoryRetention:   24 * time.Hour,
@@ -75,7 +75,7 @@ func TestMetricsCollectorAttachment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	mock := &MockChecker{name: "attached", healthy: true}
 	if err := manager.RegisterComponent(mock); err != nil {
@@ -105,7 +105,7 @@ func TestMetricsCopyIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	collector.RecordCheck("test", 10*time.Millisecond, true, StatusHealthy)
 
@@ -148,7 +148,7 @@ func TestGetSuccessRate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	// No checks yet
 	rate := collector.GetSuccessRate()
@@ -178,7 +178,7 @@ func TestGetUptime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	// Should have some uptime
 	uptime1 := collector.GetUptime()
@@ -204,7 +204,7 @@ func TestReset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	// Add some data
 	collector.RecordCheck("comp1", time.Millisecond, true, StatusHealthy)
@@ -238,7 +238,7 @@ func TestGenerateReport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	// Register components
 	mock1 := &MockChecker{name: "comp1", healthy: true}
@@ -284,7 +284,7 @@ func TestMetricsHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	// Add some test data
 	collector.RecordCheck("test", time.Millisecond, true, StatusHealthy)
@@ -313,7 +313,7 @@ func TestHealthReportHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	collector := NewMetricsCollector(manager)
+	collector := NewMetricsTracker(manager)
 
 	// Register a healthy component
 	mock := &MockChecker{name: "healthy", healthy: true}

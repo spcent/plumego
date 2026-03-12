@@ -37,14 +37,14 @@ func (s *stubCollector) ObservePubSub(_ context.Context, operation, topic string
 
 func (s *stubCollector) GetStats() metrics.CollectorStats { return s.stats }
 
-func TestPubSubMetricsCollector(t *testing.T) {
+func TestPubSubMetricsObserver(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
 	collector := &stubCollector{
 		NoopCollector: metrics.NewNoopCollector(),
 	}
-	ps.SetMetricsCollector(collector)
+	ps.SetMetricsObserver(collector)
 
 	if _, err := ps.Subscribe("metrics", DefaultSubOptions()); err != nil {
 		t.Fatalf("subscribe: %v", err)
