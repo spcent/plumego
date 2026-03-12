@@ -14,7 +14,6 @@ import (
 	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	webhookin "github.com/spcent/plumego/net/webhookin"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/utils/jsonx"
@@ -24,7 +23,7 @@ type WebhookInComponent struct {
 	cfg        WebhookInConfig
 	pub        pubsub.Broker
 	logger     log.StructuredLogger
-	deduper    *webhookin.Deduper
+	deduper    *Deduper
 	routesOnce sync.Once
 }
 
@@ -91,7 +90,7 @@ func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 	if maxBody <= 0 {
 		maxBody = 1 << 20
 	}
-	raw, err := webhookin.VerifyGitHub(ctx.R, secret, maxBody)
+	raw, err := VerifyGitHub(ctx.R, secret, maxBody)
 	if err != nil {
 		contractio.WriteContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid GitHub signature")
 		return
@@ -176,7 +175,7 @@ func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 		tol = 5 * time.Minute
 	}
 
-	raw, err := webhookin.VerifyStripe(ctx.R, secret, webhookin.StripeVerifyOptions{MaxBody: maxBody, Tolerance: tol})
+	raw, err := VerifyStripe(ctx.R, secret, StripeVerifyOptions{MaxBody: maxBody, Tolerance: tol})
 	if err != nil {
 		contractio.WriteContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid Stripe signature")
 		return
@@ -242,7 +241,7 @@ func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 	})
 }
 
-func (c *WebhookInComponent) ensureWebhookInDeduper() *webhookin.Deduper {
+func (c *WebhookInComponent) ensureWebhookInDeduper() *Deduper {
 	if c.cfg.Deduper != nil {
 		return c.cfg.Deduper
 	}
@@ -253,7 +252,7 @@ func (c *WebhookInComponent) ensureWebhookInDeduper() *webhookin.Deduper {
 	if ttl <= 0 {
 		ttl = 10 * time.Minute
 	}
-	c.deduper = webhookin.NewDeduper(ttl)
+	c.deduper = NewDeduper(ttl)
 	return c.deduper
 }
 

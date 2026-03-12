@@ -1,0 +1,60 @@
+name: x/websocket
+path: x/websocket
+layer: extension
+status: experimental
+owner: realtime
+summary: WebSocket extension surface for hub primitives and explicit component mounting.
+
+responsibilities:
+  - WebSocket component mounting
+  - App-facing hub aliases
+  - Auth and broadcast entrypoints
+  - Default websocket configuration
+
+non_goals:
+  - Core bootstrap ownership
+  - Generic event bus abstractions
+  - Stable root-package entrypoints
+  - Business-specific websocket channels
+
+public_entrypoints:
+  - NewComponent
+  - DefaultWebSocketConfig
+  - NewHub
+  - NewHubWithConfig
+  - ServeWSWithAuth
+  - ServeWSWithConfig
+
+allowed_imports:
+  - health
+  - log
+  - middleware
+  - router
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/websocket/...
+  - go test -timeout 20s ./x/websocket/...
+  - go vet ./x/websocket/...
+
+doc_paths:
+  - docs/modules/net/websocket/README.md
+
+change_risks:
+  - websocket auth regression
+  - broadcast behavior regression
+  - connection lifecycle regression
+
+review_checklist:
+  - Keep auth explicit
+  - Do not weaken secret checks
+  - Keep app-level mounting explicit
+
+agent_hints:
+  - Use x/websocket for app-facing imports
+  - Treat net/websocket as the legacy implementation root
+  - Keep websocket setup out of core

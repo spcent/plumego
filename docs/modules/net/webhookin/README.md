@@ -2,6 +2,8 @@
 
 > **Package**: `github.com/spcent/plumego/net/webhookin` | **Providers**: GitHub, Stripe, Custom
 
+For application-facing imports, prefer `github.com/spcent/plumego/x/webhook`. This page documents the current legacy implementation package.
+
 ## Overview
 
 The `webhookin` package receives and verifies webhook events from external services. All webhooks are verified using HMAC signatures before processing, preventing unauthorized event injection.

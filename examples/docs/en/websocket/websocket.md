@@ -47,7 +47,7 @@ package main
 import (
     "net/http"
     "time"
-    "github.com/spcent/plumego/net/websocket"
+    "github.com/spcent/plumego/x/websocket"
 )
 
 func main() {

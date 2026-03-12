@@ -1,0 +1,64 @@
+name: x/webhook
+path: x/webhook
+layer: extension
+status: experimental
+owner: integration
+summary: Webhook ingress, egress, and bridge components for explicit extension mounting.
+
+responsibilities:
+  - Inbound webhook verification helpers
+  - Outbound webhook delivery service aliases
+  - Webhook component mounting
+  - PubSub-to-webhook bridge wiring
+
+non_goals:
+  - Core bootstrap ownership
+  - Generic messaging abstractions
+  - Stable root-package entrypoints
+  - Business-specific webhook workflows
+
+public_entrypoints:
+  - NewWebhookInComponent
+  - NewWebhookOutComponent
+  - NewService
+  - NewMemStore
+  - VerifyHMAC
+  - VerifyGitHub
+  - VerifyStripe
+
+allowed_imports:
+  - contract
+  - middleware
+  - router
+  - health
+  - log
+  - pubsub
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/webhook/...
+  - go test -timeout 20s ./x/webhook/...
+  - go vet ./x/webhook/...
+
+doc_paths:
+  - docs/modules/net/webhookin/README.md
+  - docs/modules/net/webhookout/README.md
+
+change_risks:
+  - signature verification regression
+  - delivery retry regression
+  - component route regression
+
+review_checklist:
+  - Fail closed on verification errors
+  - Keep secrets out of logs
+  - Keep app-level mounting explicit
+
+agent_hints:
+  - Use x/webhook for app-facing imports
+  - Treat net/webhook* as legacy implementation roots
+  - Keep transport concerns inside the component layer

@@ -6,6 +6,28 @@ import (
 	"github.com/spcent/plumego/pubsub"
 )
 
+// BuilderAPI defines the builder methods exposed to commands and tests.
+type BuilderAPI interface {
+	HasCustomBuild() bool
+	SetCustomBuild(cmd string, args []string)
+	Build() error
+	Clean() error
+	OutputPath() string
+	Verify() error
+}
+
+// RunnerAPI defines the runner methods exposed to commands and tests.
+type RunnerAPI interface {
+	HasCustomCommand() bool
+	SetCustomCommand(cmd string, args []string)
+	SetOutputPassthrough(enabled bool)
+	SetEnv(key, value string)
+	IsRunning() bool
+	Start(ctx context.Context) error
+	Stop() error
+	Restart(ctx context.Context) error
+}
+
 // DashboardAPI defines the methods used by the dev command.
 type DashboardAPI interface {
 	Start(ctx context.Context) error

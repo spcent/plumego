@@ -2,6 +2,8 @@
 
 > **Package**: `github.com/spcent/plumego/net/websocket`
 
+For application-facing imports, prefer `github.com/spcent/plumego/x/websocket`. This page documents the current legacy implementation package.
+
 ## Overview
 
 `net/websocket` provides a standard-library-only WebSocket server implementation with:

@@ -15,23 +15,22 @@ import (
 	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	ws "github.com/spcent/plumego/net/websocket"
 	"github.com/spcent/plumego/router"
 )
 
 // WebSocketConfig defines the configuration for WebSocket.
 type WebSocketConfig struct {
-	WorkerCount        int             // Number of worker goroutines
-	JobQueueSize       int             // Size of the job queue
-	SendQueueSize      int             // Size of the send queue per connection
-	SendTimeout        time.Duration   // Timeout for sending messages
-	SendBehavior       ws.SendBehavior // Behavior when queue is full or timeout occurs
-	Secret             []byte          // Secret key for JWT authentication
-	WSRoutePath        string          // Path for WebSocket connection
-	BroadcastPath      string          // Path for broadcasting messages
-	BroadcastEnabled   bool            // Enable broadcast endpoint when true
-	MaxConnections     int             // Maximum total connections (0 = unlimited)
-	MaxRoomConnections int             // Maximum connections per room (0 = unlimited)
+	WorkerCount        int           // Number of worker goroutines
+	JobQueueSize       int           // Size of the job queue
+	SendQueueSize      int           // Size of the send queue per connection
+	SendTimeout        time.Duration // Timeout for sending messages
+	SendBehavior       SendBehavior  // Behavior when queue is full or timeout occurs
+	Secret             []byte        // Secret key for JWT authentication
+	WSRoutePath        string        // Path for WebSocket connection
+	BroadcastPath      string        // Path for broadcasting messages
+	BroadcastEnabled   bool          // Enable broadcast endpoint when true
+	MaxConnections     int           // Maximum total connections (0 = unlimited)
+	MaxRoomConnections int           // Maximum connections per room (0 = unlimited)
 }
 
 const (
@@ -48,7 +47,7 @@ func DefaultWebSocketConfig() WebSocketConfig {
 		JobQueueSize:       4096,
 		SendQueueSize:      DefaultSendQueueSize,
 		SendTimeout:        200 * time.Millisecond,
-		SendBehavior:       ws.SendBlock,
+		SendBehavior:       SendBlock,
 		Secret:             secret,
 		WSRoutePath:        "/ws",
 		BroadcastPath:      "/_admin/broadcast",
@@ -62,7 +61,7 @@ type WebSocketComponent struct {
 	config WebSocketConfig
 	debug  bool
 	logger log.StructuredLogger
-	hub    *ws.Hub
+	hub    *Hub
 
 	routesOnce sync.Once
 }
@@ -77,7 +76,7 @@ func NewComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) 
 		)
 	}
 
-	hub := ws.NewHubWithConfig(ws.HubConfig{
+	hub := NewHubWithConfig(HubConfig{
 		WorkerCount:        cfg.WorkerCount,
 		JobQueueSize:       cfg.JobQueueSize,
 		MaxConnections:     cfg.MaxConnections,
@@ -94,10 +93,10 @@ func NewComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) 
 
 func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 	c.routesOnce.Do(func() {
-		wsAuth := ws.NewSimpleRoomAuth(c.config.Secret)
+		wsAuth := NewSimpleRoomAuth(c.config.Secret)
 
 		r.Get(c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ws.ServeWSWithAuth(w, r, c.hub, wsAuth, c.config.SendQueueSize,
+			ServeWSWithAuth(w, r, c.hub, wsAuth, c.config.SendQueueSize,
 				c.config.SendTimeout, c.config.SendBehavior)
 		}))
 
@@ -131,9 +130,9 @@ func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 
 				// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
 				if room := r.URL.Query().Get("room"); room != "" {
-					c.hub.BroadcastRoom(room, ws.OpcodeText, b)
+					c.hub.BroadcastRoom(room, OpcodeText, b)
 				} else {
-					c.hub.BroadcastAll(ws.OpcodeText, b)
+					c.hub.BroadcastAll(OpcodeText, b)
 				}
 				w.WriteHeader(http.StatusNoContent)
 			}))
@@ -166,4 +165,4 @@ func (c *WebSocketComponent) Health() (string, health.HealthStatus) {
 }
 
 // Hub exposes the underlying WebSocket hub for advanced usage.
-func (c *WebSocketComponent) Hub() *ws.Hub { return c.hub }
+func (c *WebSocketComponent) Hub() *Hub { return c.hub }

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/spcent/plumego/net/webhookin"
+	"github.com/spcent/plumego/x/webhook"
 )
 
 type webhookEvent struct {
@@ -21,11 +21,11 @@ func main() {
 		secret = "dev-secret"
 	}
 
-	allowlist, err := webhookin.NewIPAllowlist([]string{"203.0.113.0/24", "198.51.100.10"})
+	allowlist, err := webhook.NewIPAllowlist([]string{"203.0.113.0/24", "198.51.100.10"})
 	if err != nil {
 		log.Fatalf("allowlist: %v", err)
 	}
-	nonceStore := webhookin.NewMemoryNonceStore(10 * time.Minute)
+	nonceStore := webhook.NewMemoryNonceStore(10 * time.Minute)
 
 	mux := http.NewServeMux()
 	mux.Handle("/webhooks/inbound", genericHMACHandler([]byte(secret), allowlist, nonceStore))
@@ -35,15 +35,15 @@ func main() {
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
-func genericHMACHandler(secret []byte, allowlist *webhookin.IPAllowlist, nonceStore webhookin.NonceStore) http.HandlerFunc {
+func genericHMACHandler(secret []byte, allowlist *webhook.IPAllowlist, nonceStore webhook.NonceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+		result, err := webhook.VerifyHMAC(r, webhook.HMACConfig{
 			Secret:   secret,
 			Header:   "X-Signature",
 			Prefix:   "sha256=",
-			Encoding: webhookin.EncodingHex,
+			Encoding: webhook.EncodingHex,
 			MaxBody:  1 << 20,
-			Replay: webhookin.HMACReplayConfig{
+			Replay: webhook.HMACReplayConfig{
 				TimestampHeader: "X-Timestamp",
 				NonceHeader:     "X-Nonce",
 				Tolerance:       5 * time.Minute,
@@ -52,7 +52,7 @@ func genericHMACHandler(secret []byte, allowlist *webhookin.IPAllowlist, nonceSt
 			IPAllowlist: allowlist,
 		})
 		if err != nil {
-			http.Error(w, "invalid webhook signature", webhookin.HTTPStatus(err))
+			http.Error(w, "invalid webhook signature", webhook.HTTPStatus(err))
 			return
 		}
 

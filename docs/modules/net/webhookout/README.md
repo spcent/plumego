@@ -2,6 +2,8 @@
 
 > **Package**: `github.com/spcent/plumego/net/webhookout` | **Feature**: Reliable webhook delivery
 
+For application-facing imports, prefer `github.com/spcent/plumego/x/webhook`. This page documents the current legacy implementation package.
+
 ## Overview
 
 The `webhookout` package provides reliable outbound webhook delivery with automatic retries, dead-letter queuing, signature signing, and delivery tracking.

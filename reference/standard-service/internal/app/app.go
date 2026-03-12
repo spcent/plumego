@@ -15,7 +15,6 @@ import (
 	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
-	webhookout "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/reference/standard-service/internal/config"
 	"github.com/spcent/plumego/x/devtools/pubsubdebug"
@@ -29,7 +28,7 @@ type App struct {
 	Cfg        config.Config
 	StaticFS   fs.FS
 	Bus        *pubsub.InProcBroker
-	WebhookSvc *webhookout.Service
+	WebhookSvc *webhook.Service
 	Prom       *metrics.PrometheusCollector
 	Tracer     *metrics.OpenTelemetryTracer
 	Health     health.HealthManager
@@ -45,10 +44,10 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 		return nil, fmt.Errorf("create health manager: %w", err)
 	}
 
-	webhookStore := webhookout.NewMemStore()
-	webhookCfg := webhookout.ConfigFromEnv()
+	webhookStore := webhook.NewMemStore()
+	webhookCfg := webhook.ConfigFromEnv()
 	webhookCfg.Enabled = cfg.EnableWebhooks
-	webhookSvc := webhookout.NewService(webhookStore, webhookCfg)
+	webhookSvc := webhook.NewService(webhookStore, webhookCfg)
 
 	var prom *metrics.PrometheusCollector
 	var tracer *metrics.OpenTelemetryTracer

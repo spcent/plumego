@@ -18,8 +18,8 @@ import (
 	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
-	"github.com/spcent/plumego/net/websocket"
 	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/x/websocket"
 )
 
 const dashboardRoom = "dashboard"
@@ -627,6 +627,16 @@ func (d *Dashboard) PublishEvent(eventType string, data any) {
 // GetPubSub returns the PubSub instance for external use
 func (d *Dashboard) GetPubSub() *pubsub.InProcBroker {
 	return d.pubsub
+}
+
+// GetBuilder exposes the builder behind the dashboard.
+func (d *Dashboard) GetBuilder() BuilderAPI {
+	return d.builder
+}
+
+// GetRunner exposes the runner behind the dashboard.
+func (d *Dashboard) GetRunner() RunnerAPI {
+	return d.runner
 }
 
 // SetOutputPassthrough controls whether app stdout/stderr is forwarded to the CLI.

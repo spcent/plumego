@@ -2,6 +2,8 @@
 
 > **Package Path**: `github.com/spcent/plumego/net` | **Stability**: Medium | **Priority**: P2
 
+Legacy note: `net/*` remains the implementation root for several networking capabilities, but application-facing code should prefer the extension entrypoints under `x/*` where available, especially `x/webhook` and `x/websocket`.
+
 ## Overview
 
 The `net/` package provides network utilities for Plumego applications: service discovery, inbound/outbound webhooks, WebSocket hubs, inter-process communication, and in-memory message queuing.

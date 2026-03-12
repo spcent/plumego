@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
 )
 
@@ -25,7 +24,7 @@ type Rule struct {
 
 type WebhookBridge struct {
 	Pub pubsub.Broker
-	Out *webhookout.Service
+	Out *Service
 
 	// Rules define what inbound topics are bridged to which outbound event types.
 	Rules []Rule
@@ -147,7 +146,7 @@ func (b *WebhookBridge) handleMsg(ctx context.Context, msg pubsub.Message, rule 
 	}
 
 	// Map to webhook.Event
-	ev := webhookout.Event{
+	ev := Event{
 		Type: rule.OutEventType,
 		// OccurredAt will be set inside TriggerEvent; keep inbound time in meta for traceability.
 		Data: map[string]any{

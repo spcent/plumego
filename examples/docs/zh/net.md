@@ -130,7 +130,7 @@ _ = broker.Publish(context.Background(), "events", mq.Message{ID: "1", Data: "pa
 ### Deduplication
 
 ```go
-import "github.com/spcent/plumego/net/webhookin"
+import "github.com/spcent/plumego/x/webhook"
 
 // Create deduper with 10 minute TTL
 deduper := webhookin.NewDeduper(10 * time.Minute)
@@ -189,15 +189,15 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 ### 通用 HMAC 验证（重放保护 + IP 白名单）
 
 ```go
-allowlist, _ := webhookin.NewIPAllowlist([]string{"203.0.113.0/24"})
-nonceStore := webhookin.NewMemoryNonceStore(10 * time.Minute)
+allowlist, _ := webhook.NewIPAllowlist([]string{"203.0.113.0/24"})
+nonceStore := webhook.NewMemoryNonceStore(10 * time.Minute)
 
-result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+result, err := webhook.VerifyHMAC(r, webhook.HMACConfig{
     Secret:   []byte("shared-secret"),
     Header:   "X-Signature",
     Prefix:   "sha256=",
-    Encoding: webhookin.EncodingHex,
-    Replay: webhookin.HMACReplayConfig{
+    Encoding: webhook.EncodingHex,
+    Replay: webhook.HMACReplayConfig{
         TimestampHeader: "X-Timestamp",
         NonceHeader:     "X-Nonce",
         Tolerance:       5 * time.Minute,
@@ -206,7 +206,7 @@ result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
     IPAllowlist: allowlist,
 })
 if err != nil {
-    http.Error(w, "Invalid signature", webhookin.HTTPStatus(err))
+    http.Error(w, "Invalid signature", webhook.HTTPStatus(err))
     return
 }
 payload := result.Body
@@ -215,17 +215,17 @@ payload := result.Body
 ### 端到端入站处理示例
 
 ```go
-allowlist, _ := webhookin.NewIPAllowlist([]string{"203.0.113.0/24"})
-nonceStore := webhookin.NewMemoryNonceStore(10 * time.Minute)
+allowlist, _ := webhook.NewIPAllowlist([]string{"203.0.113.0/24"})
+nonceStore := webhook.NewMemoryNonceStore(10 * time.Minute)
 
 mux := http.NewServeMux()
 mux.Handle("/webhooks/inbound", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+    result, err := webhook.VerifyHMAC(r, webhook.HMACConfig{
         Secret:   []byte(os.Getenv("WEBHOOK_SECRET")),
         Header:   "X-Signature",
         Prefix:   "sha256=",
-        Encoding: webhookin.EncodingHex,
-        Replay: webhookin.HMACReplayConfig{
+        Encoding: webhook.EncodingHex,
+        Replay: webhook.HMACReplayConfig{
             TimestampHeader: "X-Timestamp",
             NonceHeader:     "X-Nonce",
             Tolerance:       5 * time.Minute,
@@ -234,7 +234,7 @@ mux.Handle("/webhooks/inbound", http.HandlerFunc(func(w http.ResponseWriter, r *
         IPAllowlist: allowlist,
     })
     if err != nil {
-        http.Error(w, "Invalid signature", webhookin.HTTPStatus(err))
+        http.Error(w, "Invalid signature", webhook.HTTPStatus(err))
         return
     }
 
@@ -267,12 +267,11 @@ Event → Target Matching → Delivery Creation → Queue → Worker → HTTP Re
 
 ```go
 import (
-    "github.com/spcent/plumego/net/webhookout"
-    "github.com/spcent/plumego/net/webhookout/store" // or your own store
+    "github.com/spcent/plumego/x/webhook"
 )
 
 // Create service
-cfg := webhookout.Config{
+cfg := webhook.Config{
     Enabled:          true,
     Workers:          4,
     QueueSize:        1000,
@@ -285,8 +284,8 @@ cfg := webhookout.Config{
     DrainMax:         30 * time.Second,
 }
 
-store := store.NewMemoryStore() // or PostgreSQL, Redis, etc.
-service := webhookout.NewService(store, cfg)
+store := webhook.NewMemStore()
+service := webhook.NewService(store, cfg)
 
 // Start workers
 ctx := context.Background()

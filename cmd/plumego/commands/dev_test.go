@@ -14,7 +14,7 @@ import (
 )
 
 type fakeDashboard struct {
-	pubsub      *pubsub.InProcPubSub
+	pubsub      *pubsub.InProcBroker
 	passthrough bool
 	started     bool
 	stopped     bool
@@ -40,7 +40,11 @@ func (d *fakeDashboard) Rebuild(context.Context) error { return nil }
 
 func (d *fakeDashboard) PublishEvent(string, any) {}
 
-func (d *fakeDashboard) GetPubSub() *pubsub.InProcPubSub { return d.pubsub }
+func (d *fakeDashboard) GetPubSub() *pubsub.InProcBroker { return d.pubsub }
+
+func (d *fakeDashboard) GetBuilder() devserver.BuilderAPI { return nil }
+
+func (d *fakeDashboard) GetRunner() devserver.RunnerAPI { return nil }
 
 func (d *fakeDashboard) SetOutputPassthrough(enabled bool) { d.passthrough = enabled }
 
