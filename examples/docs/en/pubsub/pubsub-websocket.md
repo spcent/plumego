@@ -25,16 +25,18 @@ _ = bus.Publish("orders.created", pubsub.Message{
 To share events with other modules (for example webhook-in), pass the same `bus` instance into those component constructors.
 
 ## WebSocket hub
-Configure via `app.ConfigureWebSocket()` or `app.ConfigureWebSocketWithOptions(...)`.
+Mount explicitly via `x/websocket`.
 
 ```go
 app := core.New(core.WithAddr(":8080"))
-wsCfg := core.DefaultWebSocketConfig()
+wsCfg := xwebsocket.DefaultWebSocketConfig()
 wsCfg.Secret = []byte(os.Getenv("WS_SECRET"))
-hub, err := app.ConfigureWebSocketWithOptions(wsCfg)
+comp, err := xwebsocket.NewComponent(wsCfg, false, app.Logger())
 if err != nil {
     log.Fatal(err)
 }
+_ = app.MountComponent(comp)
+hub := comp.Hub()
 
 // Forward pubsub events to websocket clients.
 go func() {
@@ -53,6 +55,6 @@ go func() {
 
 ## Where to look in repo
 - `pubsub/pubsub.go`: in-process bus implementation.
-- `core/websocket_wrapper.go`: app-level websocket setup.
-- `net/websocket/hub.go`: hub broadcast internals.
+- `x/websocket/websocket.go`: app-level websocket component.
+- `x/websocket/hub.go`: hub broadcast internals.
 - `reference/standard-service/internal/app`: production-style wiring.

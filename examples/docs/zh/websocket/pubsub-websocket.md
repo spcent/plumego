@@ -25,16 +25,18 @@ _ = bus.Publish("orders.created", pubsub.Message{
 若其他模块（如 webhook 入站组件）也要发布事件，请共享同一个 `bus` 实例并显式注入。
 
 ## WebSocket Hub
-通过 `app.ConfigureWebSocket()` 或 `app.ConfigureWebSocketWithOptions(...)` 配置。
+通过 `x/websocket` 显式挂载。
 
 ```go
 app := core.New(core.WithAddr(":8080"))
-wsCfg := core.DefaultWebSocketConfig()
+wsCfg := xwebsocket.DefaultWebSocketConfig()
 wsCfg.Secret = []byte(os.Getenv("WS_SECRET"))
-hub, err := app.ConfigureWebSocketWithOptions(wsCfg)
+comp, err := xwebsocket.NewComponent(wsCfg, false, app.Logger())
 if err != nil {
     log.Fatal(err)
 }
+_ = app.MountComponent(comp)
+hub := comp.Hub()
 
 // 将 pubsub 事件广播给 websocket 客户端。
 go func() {
@@ -53,6 +55,6 @@ go func() {
 
 ## 代码位置
 - `pubsub/pubsub.go`：进程内总线实现。
-- `core/websocket_wrapper.go`：应用层 websocket 配置。
-- `net/websocket/hub.go`：广播与连接管理实现。
+- `x/websocket/websocket.go`：应用层 websocket 组件。
+- `x/websocket/hub.go`：广播与连接管理实现。
 - `reference/standard-service/internal/app`：接近生产的接线示例。

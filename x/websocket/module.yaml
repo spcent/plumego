@@ -56,5 +56,5 @@ review_checklist:
 
 agent_hints:
   - Use x/websocket for app-facing imports
-  - Treat net/websocket as the legacy implementation root
+  - The implementation now lives directly in x/websocket
   - Keep websocket setup out of core

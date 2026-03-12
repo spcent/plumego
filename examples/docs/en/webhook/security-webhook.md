@@ -30,8 +30,8 @@ Default inbound endpoints:
 Mount outbound management as a component:
 
 ```go
-store := webhookout.NewMemStore()
-svc := webhookout.NewService(store, webhookout.ConfigFromEnv())
+store := webhook.NewMemStore()
+svc := webhook.NewService(store, webhook.ConfigFromEnv())
 
 app := core.New(
     core.WithComponent(webhook.NewWebhookOutComponent(webhook.WebhookOutConfig{
@@ -48,17 +48,17 @@ app := core.New(
 The outbound component exposes target CRUD, delivery listing/detail, replay, and trigger endpoints under `BasePath`.
 
 ## Generic signature verification
-For custom providers, use `net/webhookin` verification helpers directly:
+For custom providers, use `x/webhook` verification helpers directly:
 
 ```go
-result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+result, err := webhook.VerifyHMAC(r, webhook.HMACConfig{
     Secret:   []byte(os.Getenv("WEBHOOK_SECRET")),
     Header:   "X-Signature",
     Prefix:   "sha256=",
-    Encoding: webhookin.EncodingHex,
+    Encoding: webhook.EncodingHex,
 })
 if err != nil {
-    http.Error(w, "invalid signature", webhookin.HTTPStatus(err))
+    http.Error(w, "invalid signature", webhook.HTTPStatus(err))
     return
 }
 _ = result.Body

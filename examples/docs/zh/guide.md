@@ -91,7 +91,7 @@ func main() {
 - 路由：`app.Get/Post/Put/Delete/Patch/Any`；高级能力通过 `app.Router()`。
 - 中间件：`app.Use(...)` 显式注册；`group.Use(...)` 做分组级控制。
 - Contract：`contract.WriteError`、`contract.WriteResponse`、`contract.AdaptCtxHandler`。
-- WebSocket：`app.ConfigureWebSocket()` / `app.ConfigureWebSocketWithOptions(...)`。
+- WebSocket：显式创建 `x/websocket` 组件，再通过 `app.MountComponent(...)` 挂载。
 - 健康检查：`health.ReadinessHandler(manager)` 与 `health.BuildInfoHandler()`。
 
 ## 参考应用

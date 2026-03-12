@@ -119,7 +119,7 @@ defer sub.Cancel()
 _ = broker.Publish(context.Background(), "events", mq.Message{ID: "1", Data: "payload"})
 ```
 
-## Webhook In (`net/webhookin`)
+## Webhook In (`x/webhook`)
 
 ### Features
 - **Deduplication**: TTL-based idempotency gate
@@ -133,7 +133,7 @@ _ = broker.Publish(context.Background(), "events", mq.Message{ID: "1", Data: "pa
 import "github.com/spcent/plumego/x/webhook"
 
 // Create deduper with 10 minute TTL
-deduper := webhookin.NewDeduper(10 * time.Minute)
+deduper := webhook.NewDeduper(10 * time.Minute)
 
 // Check if request was already processed
 if deduper.SeenBefore(requestID) {
@@ -149,7 +149,7 @@ if deduper.SeenBefore(requestID) {
 ```go
 func handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
     secret := os.Getenv("GITHUB_WEBHOOK_SECRET")
-    body, err := webhookin.VerifyGitHub(r, secret, 10<<20) // 10MB max
+    body, err := webhook.VerifyGitHub(r, secret, 10<<20) // 10MB max
     if err != nil {
         http.Error(w, "Invalid signature", http.StatusUnauthorized)
         return
@@ -168,12 +168,12 @@ func handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
     secret := os.Getenv("STRIPE_WEBHOOK_SECRET")
     
-    opts := webhookin.StripeVerifyOptions{
+    opts := webhook.StripeVerifyOptions{
         MaxBody:   10 << 20, // 10MB
         Tolerance: 5 * time.Minute,
     }
     
-    body, err := webhookin.VerifyStripe(r, secret, opts)
+    body, err := webhook.VerifyStripe(r, secret, opts)
     if err != nil {
         http.Error(w, "Invalid signature", http.StatusUnauthorized)
         return
@@ -245,7 +245,7 @@ mux.Handle("/webhooks/inbound", http.HandlerFunc(func(w http.ResponseWriter, r *
 log.Fatal(http.ListenAndServe(":8080", mux))
 ```
 
-## Webhook Out (`net/webhookout`)
+## Webhook Out (`x/webhook`)
 
 ### Features
 - **Reliable Delivery**: Retry with exponential backoff
@@ -293,7 +293,7 @@ service.Start(ctx)
 defer service.Stop()
 
 // Create target
-target := webhookout.Target{
+target := webhook.Target{
     Name:    "My App",
     URL:     "https://myapp.com/webhook",
     Secret:  "super-secret-key",
@@ -307,7 +307,7 @@ target := webhookout.Target{
 target, err := service.CreateTarget(ctx, target)
 
 // Trigger event
-event := webhookout.Event{
+event := webhook.Event{
     Type: "user.created",
     Data: map[string]any{
         "user_id":   12345,
@@ -327,8 +327,8 @@ count, err := service.TriggerEvent(ctx, event)
 
 ```go
 // List deliveries
-filter := webhookout.DeliveryFilter{
-    Status: webhookout.DeliveryFailed,
+filter := webhook.DeliveryFilter{
+    Status: webhook.DeliveryFailed,
     Limit:  50,
 }
 deliveries, err := service.ListDeliveries(ctx, filter)
@@ -344,14 +344,14 @@ newDelivery, err := service.ReplayDelivery(ctx, deliveryID)
 
 ```go
 // Update target
-patch := webhookout.TargetPatch{
+patch := webhook.TargetPatch{
     Enabled: boolPtr(false),
     URL:     stringPtr("https://new-url.com/webhook"),
 }
 target, err := service.UpdateTarget(ctx, targetID, patch)
 
 // List targets
-targets, err := service.ListTargets(ctx, webhookout.TargetFilter{
+targets, err := service.ListTargets(ctx, webhook.TargetFilter{
     Enabled: boolPtr(true),
     Event:   "user.created",
 })
@@ -406,9 +406,9 @@ cfg.AllowPrivateNetwork = true
 // Each delivery stores exact payload for replay
 ```
 
-## WebSocket (`net/websocket`)
+## WebSocket (`x/websocket`)
 
-详见 [docs/modules/net/websocket/README.md](../../../docs/modules/net/websocket/README.md)。
+详见 [docs/modules/x-websocket/README.md](../../../docs/modules/x-websocket/README.md)。
 
 ## Performance Considerations
 
@@ -439,11 +439,10 @@ go test ./net/... -v
 go test ./net/http -v -cover
 
 # Webhook tests
-go test ./net/webhookin -v
-go test ./net/webhookout -v
+go test ./x/webhook -v
 
 # WebSocket tests
-go test ./net/websocket -v
+go test ./x/websocket -v
 ```
 
 ## Production Checklist

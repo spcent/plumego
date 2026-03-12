@@ -26,7 +26,7 @@ A production-ready WebSocket server implementation using only Go standard librar
 The package is organized into modular files:
 
 ```
-net/websocket/
+x/websocket/
 ├── constants.go    # Protocol constants and configurations
 ├── conn.go         # Connection management and frame I/O
 ├── stream.go       # Streaming API for large messages
@@ -326,13 +326,13 @@ errors := map[string]bool{
 
 ```bash
 # Run all tests
-go test ./net/websocket -v
+go test ./x/websocket -v
 
 # Run specific test
-go test ./net/websocket -run TestAuthentication -v
+go test ./x/websocket -run TestAuthentication -v
 
 # Benchmark
-go test ./net/websocket -bench=. -benchmem
+go test ./x/websocket -bench=. -benchmem
 ```
 
 ## Production Deployment

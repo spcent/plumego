@@ -12,5 +12,5 @@ Use this package for:
 
 Do not import legacy `net/websocket` from new application code.
 
-Related docs:
-- [Net WebSocket](../net/websocket/README.md)
+Migration note:
+- older links under `docs/modules/net/websocket` now redirect here conceptually

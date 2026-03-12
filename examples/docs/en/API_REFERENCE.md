@@ -56,8 +56,9 @@ err := app.OnShutdown(hook)
 ### Advanced wrappers
 ```go
 r := app.Router()
-_, err := app.ConfigureWebSocket()
-_, err := app.ConfigureWebSocketWithOptions(core.DefaultWebSocketConfig())
+wsCfg := xwebsocket.DefaultWebSocketConfig()
+comp, err := xwebsocket.NewComponent(wsCfg, false, app.Logger())
+err = app.MountComponent(comp)
 err := app.ConfigureObservability(core.DefaultObservabilityConfig())
 ```
 
@@ -125,7 +126,7 @@ contract.WriteError(w, r, apiErr)
 err = ctx.Response(status, data, meta)
 ```
 
-## Webhook (`core/components/webhook`, `net/webhookin`, `net/webhookout`)
+## Webhook (`x/webhook`)
 
 ### Mount components
 ```go
@@ -135,7 +136,7 @@ core.WithComponent(webhook.NewWebhookOutComponent(webhook.WebhookOutConfig{...})
 
 ### Generic signature verify
 ```go
-result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{...})
+result, err := webhook.VerifyHMAC(r, webhook.HMACConfig{...})
 ```
 
 ## Pub/Sub (`pubsub`)

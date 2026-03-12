@@ -30,8 +30,8 @@ app := core.New(
 通过组件挂载出站管理：
 
 ```go
-store := webhookout.NewMemStore()
-svc := webhookout.NewService(store, webhookout.ConfigFromEnv())
+store := webhook.NewMemStore()
+svc := webhook.NewService(store, webhook.ConfigFromEnv())
 
 app := core.New(
     core.WithComponent(webhook.NewWebhookOutComponent(webhook.WebhookOutConfig{
@@ -48,17 +48,17 @@ app := core.New(
 出站组件会在 `BasePath` 下暴露目标管理、投递列表/详情、重放和触发接口。
 
 ## 通用签名校验
-自定义 provider 可直接使用 `net/webhookin`：
+自定义 provider 可直接使用 `x/webhook`：
 
 ```go
-result, err := webhookin.VerifyHMAC(r, webhookin.HMACConfig{
+result, err := webhook.VerifyHMAC(r, webhook.HMACConfig{
     Secret:   []byte(os.Getenv("WEBHOOK_SECRET")),
     Header:   "X-Signature",
     Prefix:   "sha256=",
-    Encoding: webhookin.EncodingHex,
+    Encoding: webhook.EncodingHex,
 })
 if err != nil {
-    http.Error(w, "invalid signature", webhookin.HTTPStatus(err))
+    http.Error(w, "invalid signature", webhook.HTTPStatus(err))
     return
 }
 _ = result.Body

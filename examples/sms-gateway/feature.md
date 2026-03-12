@@ -16,7 +16,7 @@
 **plumego 已具备、可直接复用的基础能力**
 - **HTTP 栈与生命周期**：`core`/`router`/`middleware` 提供标准 `net/http` 兼容的路由、中间件、优雅启停与超时控制。
 - **安全与中间件**：日志、恢复、CORS、gzip、超时、限流、并发限制、请求体大小限制、安全头、基础认证等（可作为 API 接入层能力）。
-- **Webhook 与 Pub/Sub**：`net/webhookin`/`net/webhookout` + `pubsub` 可用于接收供应商回执或将消息事件扇出。
+- **Webhook 与 Pub/Sub**：`x/webhook` + `pubsub` 可用于接收供应商回执或将消息事件扇出。
 - **调度与任务**：`scheduler` 适合做延迟发送或重试的基础调度；`net/mq` 提供持久化队列用于可靠执行。
 - **存储**：`store/kv` 是带 WAL 的内嵌 KV（适合做幂等、去重、短期状态、缓存）。
 - **多租户（实验）**：`tenant` 模块可用于租户隔离、配额与策略控制。

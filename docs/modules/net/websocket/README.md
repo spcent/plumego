@@ -1,59 +1,14 @@
-# WebSocket Hub
+# WebSocket Migration
 
-> **Package**: `github.com/spcent/plumego/net/websocket`
+`net/websocket` has been moved into [`x/websocket`](../x-websocket/README.md).
 
-For application-facing imports, prefer `github.com/spcent/plumego/x/websocket`. This page documents the current legacy implementation package.
+Use `github.com/spcent/plumego/x/websocket` for:
+- `Hub`, `HubConfig`, `NewHub`, and `NewHubWithConfig`
+- `NewSimpleRoomAuth` and `NewSecureRoomAuth`
+- `ServeWSWithAuth` and `ServeWSWithConfig`
+- `NewComponent` and `DefaultWebSocketConfig`
 
-## Overview
-
-`net/websocket` provides a standard-library-only WebSocket server implementation with:
-
-- RFC6455 frame handling (text/binary/control frames)
-- Room-based broadcast hub with worker pool
-- Bounded per-connection send queues (`SendBlock` / `SendDrop` / `SendClose`)
-- JWT + room-password authentication
-- Optional origin allow-list validation
-- Message validation and connection metadata helpers
-
-## Quick Start
-
-```go
-package main
-
-import (
-    "net/http"
-    "time"
-
-    "github.com/spcent/plumego/net/websocket"
-)
-
-func main() {
-    hub := websocket.NewHubWithConfig(websocket.HubConfig{
-        WorkerCount:        4,
-        JobQueueSize:       1024,
-        MaxConnections:     10000,
-        MaxRoomConnections: 1000,
-    })
-    defer hub.Stop()
-
-    auth := websocket.NewSimpleRoomAuth([]byte("your-32-byte-secret"))
-    auth.SetRoomPassword("chat", "chat-room-password")
-
-    http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-        websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
-            Hub:            hub,
-            Auth:           auth,
-            QueueSize:      256,
-            SendTimeout:    200 * time.Millisecond,
-            SendBehavior:   websocket.SendBlock,
-            AllowedOrigins: []string{"https://app.example.com"},
-            ReadLimit:      1 << 20, // 1MB
-        })
-    })
-
-    _ = http.ListenAndServe(":8080", nil)
-}
-```
+This page is kept only as a migration marker for historical links.
 
 ## Authentication
 

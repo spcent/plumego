@@ -12,6 +12,5 @@ Use this package for:
 
 Do not import legacy `net/webhookin` or `net/webhookout` from new application code.
 
-Related docs:
-- [Net Webhook In](../net/webhookin/README.md)
-- [Net Webhook Out](../net/webhookout/README.md)
+Migration note:
+- older links under `docs/modules/net/webhookin` and `docs/modules/net/webhookout` now redirect here conceptually

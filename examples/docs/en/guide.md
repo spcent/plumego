@@ -92,7 +92,7 @@ func main() {
 - Router: `app.Get/Post/Put/Delete/Patch/Any`; advanced operations from `app.Router()`.
 - Middleware: register explicitly with `app.Use(...)`, group scope with `group.Use(...)`.
 - Contract helpers: `contract.WriteError`, `contract.WriteResponse`, `contract.AdaptCtxHandler`.
-- WebSocket: `app.ConfigureWebSocket()` / `app.ConfigureWebSocketWithOptions(...)`.
+- WebSocket: create an `x/websocket` component explicitly, then mount it with `app.MountComponent(...)`.
 - Health: `health.ReadinessHandler(manager)` and `health.BuildInfoHandler()`.
 
 ## Reference App
