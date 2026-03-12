@@ -96,6 +96,9 @@ Do not:
 ## 6) Quality Gates (Required)
 
 ```bash
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/module-manifests
+go run ./internal/checks/reference-layout
 go test -race -timeout 60s ./...
 go test -timeout 20s ./...
 go vet ./...
@@ -108,6 +111,8 @@ Extra checks by change type:
 - Security: invalid token/signature negative tests
 - Tenant: quota/policy/isolation tests
 - Store: concurrent access and persistence correctness tests
+
+Check baselines live under `specs/check-baseline/`. Treat them as temporary migration debt lists; shrink them, do not expand them casually.
 
 ---
 

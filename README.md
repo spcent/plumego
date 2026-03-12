@@ -26,6 +26,8 @@ For architecture planning and future refactors, prefer the rules in:
 - `specs/dependency-rules.yaml`
 - `<module>/module.yaml`
 
+Machine-enforced repo guardrails live under `internal/checks/*`. Historical exceptions are tracked explicitly in `specs/check-baseline/*` so CI can block new drift while existing migration debt is burned down.
+
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
 - **Middleware Chain**: Logging, recovery, gzip, CORS, timeout (buffers up to 10 MiB by default), rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.

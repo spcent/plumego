@@ -18,6 +18,6 @@ staged:
     - go vet ./x/tenant/...
 
 checks:
-  - internal/checks/dependency-rules
-  - internal/checks/module-manifests
-  - internal/checks/reference-layout
+  - go run ./internal/checks/dependency-rules
+  - go run ./internal/checks/module-manifests
+  - go run ./internal/checks/reference-layout
