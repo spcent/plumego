@@ -71,7 +71,7 @@ If you use `Prepare()` / `Start()` / `Server()` directly, signal handling is you
 
 - `WithEnvPath` no longer loads `.env` automatically.
 - `WithDebug` no longer auto-mounts devtools.
-- `WithDevTools` explicitly mounts the debug routes/component.
+- `x/devtools` must be mounted explicitly via `app.MountComponent(...)`.
 
 Manual server lifecycle control is now a first-class path:
 

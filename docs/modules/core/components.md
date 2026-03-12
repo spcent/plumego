@@ -33,7 +33,13 @@ app := core.New(
 )
 ```
 
-Components can also be added by convenience wrappers before boot freeze (for example websocket helpers), but canonical setup is constructor-time registration.
+Before boot freeze, components can also be mounted explicitly:
+
+```go
+if err := app.MountComponent(componentA); err != nil {
+    log.Fatal(err)
+}
+```
 
 ---
 
@@ -89,16 +95,17 @@ func (c *AuditComponent) Health() (string, health.HealthStatus) {
 
 Common component packages:
 
-- `core/components/devtools`
+- `x/devtools`
+- `x/devtools/pubsubdebug`
 - `core/components/observability`
-- `core/components/ops`
-- `core/components/webhook`
-- `core/components/websocket`
+- `x/ops`
+- `x/webhook`
+- `x/websocket`
 
 Notes:
 
-- Devtools component is mounted explicitly via `WithDevTools()` or `WithComponent(...)`.
-- WebSocket can be composed either by `WithComponent(...)` or helper methods (`ConfigureWebSocket*`).
+- Devtools should be mounted explicitly from `x/devtools`, for example `app.MountComponent(xdevtools.NewAppComponent(app))`.
+- WebSocket should be mounted explicitly from `x/websocket`.
 - Tenant capabilities should be wired through `x/tenant/*`, not `core/components/*`.
 
 ---

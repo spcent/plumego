@@ -69,15 +69,19 @@ import (
     plumelog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/observability"
     "github.com/spcent/plumego/middleware/recovery"
+    xdevtools "github.com/spcent/plumego/x/devtools"
 )
 
 func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
-        core.WithDevTools(),
         core.WithLogger(plumelog.NewGLogger()),
     )
+
+    if err := app.MountComponent(xdevtools.NewAppComponent(app)); err != nil {
+        log.Fatalf("mount devtools: %v", err)
+    }
 
     if err := app.Use(
         observability.RequestID(),
@@ -142,16 +146,16 @@ func main() {
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - The app defaults to a 10485760 byte (10 MiB) request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5000ms (5s) graceful shutdown window. Override via `core.With...` options.
 - Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
-- Debug mode and devtools are separate. Use `core.WithDebug()` for debug behavior and `core.WithDevTools()` for the debug routes/component.
-- Debug mode (`core.WithDebug`) enables devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload), friendly JSON error output, and `.env` hot reload. These endpoints are intended for local development or protected environments; disable or gate them in production.
+- Debug mode and devtools are separate. Use `core.WithDebug()` for debug behavior, then mount `x/devtools` explicitly with `app.MountComponent(xdevtools.NewAppComponent(app))` when you want debug routes.
+- Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.
 
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, and other standard-library style methods that accept `func(w http.ResponseWriter, r *http.Request)`. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
 - **Middleware**: Chain middleware before boot with `app.Use(...)`. Keep middleware transport-only and explicit. Canonical observability order is `middleware/observability.RequestID`, `middleware/observability.Tracing`, `middleware/observability.HTTPMetrics`, `middleware/observability.AccessLog`, then `middleware/recovery.Recovery(logger)`.
 - **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
-- **Ops/Admin Endpoints**: Optional protected operations API for queue stats/replay, receipt lookup, channel health, and tenant quota inspection. Mount via `core/components/ops` and secure with a token or custom middleware. If auth is missing and `AllowInsecure` is false (default), requests are denied.
+- **Ops/Admin Endpoints**: Optional protected operations API for queue stats/replay, receipt lookup, channel health, and tenant quota inspection. Mount via `x/ops` and secure with a token or custom middleware. If auth is missing and `AllowInsecure` is false (default), requests are denied.
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
-- **WebSocket Hub**: `ConfigureWebSocket()` mounts a JWT-protected `/ws` endpoint, plus an optional broadcast endpoint (protected by a shared secret). Customize worker count and queue size via `WebSocketConfig`.
+- **WebSocket Hub**: `x/websocket` provides a JWT-protected `/ws` endpoint plus an optional broadcast endpoint (protected by a shared secret). Create a component with `x/websocket.DefaultWebSocketConfig()` and mount it explicitly.
 - **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures plus generic HMAC verification with replay protection and IP allowlists.
 - **Migrations**: Optional SQL schemas for modules/examples live in `docs/migrations/` (see notes for sms-gateway `sent_at` backfill).
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.

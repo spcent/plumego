@@ -1,20 +1,11 @@
 package core
 
-import (
-	"reflect"
-
-	"github.com/spcent/plumego/core/components/devtools"
-)
+import "reflect"
 
 func (a *App) declaredComponents() []Component {
 	a.mu.RLock()
 	comps := append([]Component{}, a.components...)
-	enableDevTools := a.devTools
 	a.mu.RUnlock()
-
-	if enableDevTools && !hasComponentType(comps, (*devtools.DevToolsComponent)(nil)) {
-		comps = append(comps, newDevToolsComponent(a))
-	}
 
 	return filterNilComponents(comps)
 }

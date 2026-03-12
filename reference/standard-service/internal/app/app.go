@@ -9,9 +9,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/core/components/pubsubdebug"
-	"github.com/spcent/plumego/core/components/webhook"
-	"github.com/spcent/plumego/reference/standard-service/internal/config"
 	"github.com/spcent/plumego/health"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
@@ -20,6 +17,10 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	webhookout "github.com/spcent/plumego/net/webhookout"
 	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/reference/standard-service/internal/config"
+	"github.com/spcent/plumego/x/devtools/pubsubdebug"
+	"github.com/spcent/plumego/x/webhook"
+	xwebsocket "github.com/spcent/plumego/x/websocket"
 )
 
 // App holds application-wide dependencies.
@@ -107,6 +108,16 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 	app.Use(observability.AccessLog(app.Logger()))
 	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(cors.CORS)
+
+	wsCfg := xwebsocket.DefaultWebSocketConfig()
+	wsCfg.Secret = []byte(cfg.WebSocketSecret)
+	if comp, err := xwebsocket.NewComponent(wsCfg, cfg.Core.Debug, app.Logger()); err == nil {
+		if err := app.MountComponent(comp); err != nil {
+			return nil, fmt.Errorf("mount websocket component: %w", err)
+		}
+	} else {
+		app.Logger().Warn("WebSocket disabled", plumelog.Fields{"error": err})
+	}
 
 	return &App{
 		Core:       app,

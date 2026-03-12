@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/core/internal/contractio"
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	webhookin "github.com/spcent/plumego/net/webhookin"

@@ -87,14 +87,6 @@ func WithDebug() Option {
 	}
 }
 
-// WithDevTools explicitly mounts the devtools component.
-// It does not enable debug mode by itself; pair it with WithDebug() when needed.
-func WithDevTools() Option {
-	return func(a *App) {
-		a.devTools = true
-	}
-}
-
 // WithLogger sets a custom logger for the App.
 func WithLogger(logger log.StructuredLogger) Option {
 	return func(a *App) {

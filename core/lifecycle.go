@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spcent/plumego/core/components/devtools"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
@@ -210,14 +209,7 @@ func (a *App) startServer() error {
 
 	a.logger.Info("Server running", log.Fields{"addr": cfg.addr})
 	if cfg.debug {
-		a.logger.Info("Debug mode enabled", log.Fields{
-			"routes":     devtools.DevToolsRoutesPath,
-			"middleware": devtools.DevToolsMiddlewarePath,
-			"config":     devtools.DevToolsConfigPath,
-			"metrics":    devtools.DevToolsMetricsPath,
-			"pprof":      devtools.DevToolsPprofBasePath,
-			"reload":     devtools.DevToolsReloadPath,
-		})
+		a.logger.Info("Debug mode enabled")
 	}
 
 	var err error

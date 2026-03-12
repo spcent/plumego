@@ -3,7 +3,7 @@ package core
 import (
 	"net/http"
 
-	"github.com/spcent/plumego/core/internal/contractio"
+	"github.com/spcent/plumego/internal/contractio"
 )
 
 // ensureHandler lazily builds the application's handler chain so App can satisfy http.Handler.

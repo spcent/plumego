@@ -187,13 +187,6 @@ func TestDeclaredComponents(t *testing.T) {
 	if len(components) != 0 {
 		t.Errorf("Expected 0 declared components, got %d", len(components))
 	}
-
-	app.config.Debug = true
-	app.devTools = true
-	components = app.declaredComponents()
-	if len(components) != 1 {
-		t.Errorf("Expected 1 declared component with explicit devtools, got %d", len(components))
-	}
 }
 
 // TestServeHTTP tests the ServeHTTP method

@@ -141,7 +141,7 @@ You will need a Go SQL driver (e.g. `pgx`, `pq`, or `mysql`) in your build.
 
 ## Ops/Admin Endpoints
 
-The demo wires `core/components/ops` under `/ops`. Set a token to protect it:
+The demo wires `x/ops` under `/ops`. Set a token to protect it:
 
 ```bash
 SMS_GATEWAY_OPS_TOKEN="dev-ops-token" go run ./examples/sms-gateway

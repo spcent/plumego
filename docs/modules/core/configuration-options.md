@@ -213,24 +213,7 @@ app := core.New(
 
 Notes:
 - `WithDebug` has no boolean parameter in v1.
-- Debug mode does not auto-mount devtools.
-
----
-
-### `WithDevTools`
-
-Explicitly mount the devtools component.
-
-```go
-func WithDevTools() Option
-```
-
-```go
-app := core.New(
-    core.WithDebug(),
-    core.WithDevTools(),
-)
-```
+- Debug mode does not auto-mount devtools; mount `x/devtools` explicitly with `app.MountComponent(...)`.
 
 ---
 

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/core/components/ops"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/message"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/pipeline"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/routing"
@@ -34,6 +33,7 @@ import (
 	"github.com/spcent/plumego/store/idempotency"
 	kvstore "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/tenant"
+	"github.com/spcent/plumego/x/ops"
 	tenantquota "github.com/spcent/plumego/x/tenant/quota"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )

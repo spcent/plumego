@@ -21,7 +21,6 @@ type App struct {
 	router        *router.Router       // HTTP router
 	middlewareReg *middleware.Registry // Middleware registry for all routes
 	logger        log.StructuredLogger // Logger instance
-	devTools      bool
 
 	// Runtime state (protected by mutex)
 	mu             sync.RWMutex

@@ -19,9 +19,16 @@ app := core.New(
     core.WithAddr(":8080"),
     core.WithLogger(plumelog.NewGLogger()),
     core.WithDebug(),
-    core.WithDevTools(),
     core.WithServerTimeouts(30*time.Second, 5*time.Second, 30*time.Second, 60*time.Second),
 )
+```
+
+Mount extension components explicitly before boot:
+
+```go
+if err := app.MountComponent(xdevtools.NewAppComponent(app)); err != nil {
+    log.Fatal(err)
+}
 ```
 
 ---
@@ -197,7 +204,7 @@ log.Fatal(srv.ListenAndServe())
 
 - `WithDebug` has no boolean parameter.
 - `WithDebug` no longer auto-mounts devtools.
-- Use `WithDevTools` to expose debug routes.
+- Use `app.MountComponent(xdevtools.NewAppComponent(app))` to expose debug routes.
 - `WithServerTimeouts` parameters are `(read, readHeader, write, idle)`.
 - Middleware configuration is done via `app.Use(...)`, not `With*` middleware options.
 - `core.App` now exposes public `Shutdown(ctx)` and `Server()` for explicit lifecycle control.

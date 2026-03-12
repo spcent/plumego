@@ -7,12 +7,11 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/reference/standard-service/internal/docsite"
-	"github.com/spcent/plumego/reference/standard-service/internal/handler"
 	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/reference/standard-service/internal/docsite"
+	"github.com/spcent/plumego/reference/standard-service/internal/handler"
 )
 
 // RegisterRoutes wires all HTTP routes for the reference application.
@@ -27,7 +26,6 @@ func (a *App) RegisterRoutes() error {
 		return err
 	}
 	a.registerHealth()
-	a.registerWebSocket()
 	a.registerAPI()
 	a.registerTest()
 	a.registerMetrics()
@@ -88,14 +86,6 @@ func (a *App) registerStatic() error {
 func (a *App) registerHealth() {
 	a.Core.Get("/health/ready", health.ReadinessHandler(a.Health).ServeHTTP)
 	a.Core.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
-}
-
-func (a *App) registerWebSocket() {
-	wsCfg := core.DefaultWebSocketConfig()
-	wsCfg.Secret = []byte(a.Cfg.WebSocketSecret)
-	if _, err := a.Core.ConfigureWebSocketWithOptions(wsCfg); err != nil {
-		log.Printf("websocket disabled: %v", err)
-	}
 }
 
 func (a *App) registerAPI() {

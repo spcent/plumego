@@ -35,15 +35,19 @@ import (
     plumelog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/observability"
     "github.com/spcent/plumego/middleware/recovery"
+    xdevtools "github.com/spcent/plumego/x/devtools"
 )
 
 func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
-        core.WithDevTools(),
         core.WithLogger(plumelog.NewGLogger()),
     )
+
+    if err := app.MountComponent(xdevtools.NewAppComponent(app)); err != nil {
+        log.Fatalf("mount devtools: %v", err)
+    }
 
     if err := app.Use(
         observability.RequestID(),
@@ -183,7 +187,6 @@ Common options:
 - `WithHTTP2`
 - `WithTLS` / `WithTLSConfig`
 - `WithDebug`
-- `WithDevTools`
 - `WithLogger`
 - `WithMethodNotAllowed`
 - `WithComponent` / `WithComponents`
