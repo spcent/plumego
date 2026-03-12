@@ -26,11 +26,15 @@ import (
 
 r := router.NewRouter()
 
-// Serve a built frontend directory (e.g., Next.js `out/`, Vite `dist/`)
-err := frontend.RegisterFromDir(r, "./dist",
+// Construct a mount first, then decide when to register it
+mount, err := frontend.NewMountFromDir("./dist",
     frontend.WithCacheControl("public, max-age=31536000"),
     frontend.WithIndexCacheControl("no-cache"),
 )
+if err != nil {
+    panic(err)
+}
+err = mount.Register(r)
 ```
 
 ### Embedded Filesystem
@@ -47,10 +51,11 @@ var distFS embed.FS
 
 func setupFrontend(r *router.Router) {
     subFS, _ := fs.Sub(distFS, "dist")
-    frontend.RegisterFS(r, http.FS(subFS),
+    mount, _ := frontend.NewMountFS(http.FS(subFS),
         frontend.WithPrefix("/"),
         frontend.WithFallback(true),
     )
+    _ = mount.Register(r)
 }
 ```
 

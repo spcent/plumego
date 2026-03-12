@@ -18,11 +18,15 @@ import (
 func main() {
     app := core.New(core.WithAddr(":8080"))
 
-    if err := frontend.RegisterFromDir(app.Router(), "./dist",
+    mount, err := frontend.NewMountFromDir("./dist",
         frontend.WithPrefix("/"),
         frontend.WithFallback(true),
         frontend.WithIndexCacheControl("no-cache"),
-    ); err != nil {
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    if err := mount.Register(app.Router()); err != nil {
         log.Fatal(err)
     }
 
@@ -35,9 +39,11 @@ func main() {
 ## SPA Routing
 
 ```go
-if err := frontend.RegisterFromDir(router, "./dist",
-    frontend.WithFallback(true),
-); err != nil {
+mount, err := frontend.NewMountFromDir("./dist", frontend.WithFallback(true))
+if err != nil {
+    return err
+}
+if err := mount.Register(router); err != nil {
     return err
 }
 ```
@@ -51,13 +57,17 @@ Request behavior:
 ## Recommended cache split
 
 ```go
-frontend.RegisterFromDir(router, "./dist",
+mount, err := frontend.NewMountFromDir("./dist",
     frontend.WithCacheControl("public, max-age=31536000, immutable"),
     frontend.WithIndexCacheControl("no-cache, no-store, must-revalidate"),
 )
+if err != nil {
+    return err
+}
+return mount.Register(router)
 ```
 
 ## Development vs production
 
-- Development: `RegisterFromDir(...)`
-- Production: `RegisterFS(...)` or `RegisterEmbedded(...)`
+- Development: `NewMountFromDir(...)`
+- Production: `NewMountFS(...)` or `NewMountEmbedded(...)`

@@ -124,7 +124,7 @@ func TestConfigureMetricsNoHandler(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for no handler available")
 	}
-	if err.Error() != "metrics enabled but no handler available" {
+	if err.Error() != "metrics enabled but no explicit handler or exporter available" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -163,6 +163,7 @@ func TestConfigureMetricsWithExplicitCollector(t *testing.T) {
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
 	cfg.Metrics.Collector = prom
+	cfg.Metrics.Exporter = metrics.NewPrometheusExporter(prom)
 
 	err := Configure(hooks, cfg)
 	if err != nil {
@@ -194,6 +195,25 @@ func TestConfigureMetricsWithExplicitHandler(t *testing.T) {
 	}
 }
 
+func TestConfigureMetricsWithExplicitExporter(t *testing.T) {
+	r := router.NewRouter()
+	prom := metrics.NewPrometheusCollector("test")
+
+	hooks := Hooks{
+		EnsureMutable: func(op, desc string) error { return nil },
+		EnsureRouter:  func() *router.Router { return r },
+	}
+	cfg := DefaultObservabilityConfig()
+	cfg.Metrics.Enabled = true
+	cfg.Metrics.Collector = prom
+	cfg.Metrics.Exporter = metrics.NewPrometheusExporter(prom)
+
+	err := Configure(hooks, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestConfigureMetricsCollectorFromHooks(t *testing.T) {
 	r := router.NewRouter()
 	prom := metrics.NewPrometheusCollector("hookns")
@@ -206,6 +226,7 @@ func TestConfigureMetricsCollectorFromHooks(t *testing.T) {
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
+	cfg.Metrics.Exporter = metrics.NewPrometheusExporter(prom)
 
 	err := Configure(hooks, cfg)
 	if err != nil {

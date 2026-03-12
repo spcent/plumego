@@ -129,16 +129,22 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/core"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
 )
 
 // New constructs the HTTP application with middleware and routes.
 func New() *core.App {
-	app := core.New(core.WithAddr(":8080"))
+	app := core.New(
+		core.WithAddr(":8080"),
+		core.WithLogger(plumelog.NewGLogger()),
+	)
 	if err := app.Use(
 		observability.RequestID(),
-		observability.Logging(app.Logger(), nil, nil),
+		observability.Tracing(nil),
+		observability.HTTPMetrics(nil),
+		observability.AccessLog(app.Logger()),
 		recovery.Recovery(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
@@ -327,15 +333,21 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/core"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
 )
 
 func main() {
-	app := core.New(core.WithAddr(":8080"))
+	app := core.New(
+		core.WithAddr(":8080"),
+		core.WithLogger(plumelog.NewGLogger()),
+	)
 	if err := app.Use(
 		observability.RequestID(),
-		observability.Logging(app.Logger(), nil, nil),
+		observability.Tracing(nil),
+		observability.HTTPMetrics(nil),
+		observability.AccessLog(app.Logger()),
 		recovery.Recovery(app.Logger()),
 	); err != nil {
 		log.Fatal(err)

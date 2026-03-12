@@ -3,12 +3,14 @@
 Plumego provides Prometheus/OpenTelemetry adapters and ready-to-use health endpoints.
 
 ## Metrics and tracing
-- `metrics.NewPrometheusCollector(namespace)` provides a Prometheus collector and `prom.Handler()`.
+- `metrics.NewPrometheusCollector(namespace)` provides the collector.
+- `metrics.NewPrometheusExporter(prom)` provides the `/metrics` HTTP exporter.
 - `metrics.NewOpenTelemetryTracer(serviceName)` provides a tracer compatible with observability middleware.
 - Inject hooks with `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
 
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
+exporter := metrics.NewPrometheusExporter(prom)
 tracer := metrics.NewOpenTelemetryTracer("my-service")
 
 app := core.New(
@@ -18,12 +20,14 @@ app := core.New(
 
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), prom, tracer),
+    observability.Tracing(tracer),
+    observability.HTTPMetrics(prom),
+    observability.AccessLog(app.Logger()),
 ); err != nil {
     log.Fatal(err)
 }
 
-app.Get("/metrics", prom.Handler().ServeHTTP)
+app.Get("/metrics", exporter.Handler().ServeHTTP)
 ```
 
 ## Health endpoints
@@ -34,6 +38,7 @@ if err != nil {
 }
 
 app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
 app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```

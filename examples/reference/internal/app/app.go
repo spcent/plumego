@@ -101,10 +101,12 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 	}
 
 	app := core.New(opts...)
-	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(observability.RequestID())
+	app.Use(observability.Tracing(tracer))
+	app.Use(observability.HTTPMetrics(prom))
+	app.Use(observability.AccessLog(app.Logger()))
+	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(cors.CORS)
-	app.Use(observability.Logging(app.Logger(), nil, nil))
 
 	return &App{
 		Core:       app,

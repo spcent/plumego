@@ -57,7 +57,7 @@ func (rw *responseWriter) BytesWritten() int {
 //		w.WriteHeader(http.StatusOK)
 //		w.Write([]byte("OK"))
 //	}))
-func MetricsMiddleware(collector MetricsCollector) func(http.Handler) http.Handler {
+func MetricsMiddleware(collector HTTPObserver) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			timer := NewTimer()
@@ -94,7 +94,7 @@ func MetricsMiddleware(collector MetricsCollector) func(http.Handler) http.Handl
 //		w.WriteHeader(http.StatusOK)
 //		w.Write([]byte("OK"))
 //	})))
-func MetricsHandler(collector MetricsCollector, handler http.Handler) http.Handler {
+func MetricsHandler(collector HTTPObserver, handler http.Handler) http.Handler {
 	return MetricsMiddleware(collector)(handler)
 }
 

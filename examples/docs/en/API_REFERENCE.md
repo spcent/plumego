@@ -152,13 +152,15 @@ Read events from `sub.C()` and `defer sub.Cancel()`.
 
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
+exporter := metrics.NewPrometheusExporter(prom)
 tracer := metrics.NewOpenTelemetryTracer("svc")
 healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
 if err != nil {
     log.Fatal(err)
 }
 
-app.Get("/metrics", prom.Handler().ServeHTTP)
+app.Get("/metrics", exporter.Handler().ServeHTTP)
+app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
 app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```

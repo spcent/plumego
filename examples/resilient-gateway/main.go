@@ -35,8 +35,11 @@ func main() {
 		core.WithDebug(),
 		core.WithLogger(plog.NewGLogger()),
 	)
+	app.Use(observability.RequestID())
+	app.Use(observability.Tracing(nil))
+	app.Use(observability.HTTPMetrics(nil))
+	app.Use(observability.AccessLog(app.Logger()))
 	app.Use(recovery.Recovery(app.Logger()))
-	app.Use(observability.Logging(app.Logger(), nil, nil))
 
 	// Create /api route group for middleware
 	apiGroup := app.Router().Group("/api")

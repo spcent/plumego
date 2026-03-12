@@ -9,7 +9,8 @@
 Current package surface is centered on explicit collectors:
 
 - `metrics.MetricsCollector` is the shared interface.
-- `metrics.NewPrometheusCollector(namespace)` provides an in-memory Prometheus-compatible HTTP exporter.
+- `metrics.NewPrometheusCollector(namespace)` provides the in-memory collector.
+- `metrics.NewPrometheusExporter(collector)` provides the Prometheus HTTP exporter.
 - `metrics.NewOpenTelemetryTracer(name)` provides tracing hooks compatible with the middleware observability layer.
 - `metrics.NewNoopCollector()` is the zero-cost default when you want the call sites but no export.
 
@@ -36,13 +37,14 @@ import (
 
 func main() {
     collector := metrics.NewPrometheusCollector("plumego")
+    exporter := metrics.NewPrometheusExporter(collector)
 
     app := core.New(
         core.WithAddr(":8080"),
         core.WithMetricsCollector(collector),
     )
 
-    if err := app.Router().AddRoute(http.MethodGet, "/metrics", collector.Handler()); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/metrics", exporter.Handler()); err != nil {
         log.Fatal(err)
     }
 
@@ -108,16 +110,38 @@ All collectors implement:
 
 This keeps instrumentation sites transport-agnostic and lets you swap exporters without changing call sites.
 
+### `HTTPObserver`
+
+Use `metrics.HTTPObserver` in transport middleware when you only need request metrics:
+
+- `ObserveHTTP(...)`
+
+This keeps HTTP-facing code from depending on MQ/KV/DB observer methods it never calls.
+
+### Narrow observer interfaces
+
+Use the smallest contract that matches the call site:
+
+- `metrics.Recorder` for generic `Record(...)` instrumentation
+- `metrics.PubSubObserver` for pub/sub metrics
+- `metrics.MQObserver` for queue and worker metrics
+- `metrics.KVObserver` for key-value metrics
+- `metrics.IPCObserver` for IPC metrics
+- `metrics.DBObserver` for database metrics
+
+This keeps module boundaries explicit and stops storage, queue, and AI instrumentation from depending on unrelated metrics methods.
+
 ### Prometheus collector
 
 Use when you want:
 
-- a scrapeable `/metrics` endpoint
+- a collector that feeds a scrapeable `/metrics` endpoint
 - no third-party dependency
 - bounded in-memory series retention
 
 ```go
 collector := metrics.NewPrometheusCollector("plumego").WithMaxMemory(20000)
+exporter := metrics.NewPrometheusExporter(collector)
 ```
 
 ### No-op collector

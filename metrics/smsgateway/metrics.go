@@ -37,12 +37,12 @@ type QueueStats struct {
 
 // Reporter provides a unified SMS gateway metrics interface.
 type Reporter struct {
-	Collector metrics.MetricsCollector
+	Collector metrics.Recorder
 	Now       func() time.Time
 }
 
 // NewReporter creates a new Reporter.
-func NewReporter(collector metrics.MetricsCollector) *Reporter {
+func NewReporter(collector metrics.Recorder) *Reporter {
 	return &Reporter{Collector: collector, Now: time.Now}
 }
 

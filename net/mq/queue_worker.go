@@ -23,7 +23,7 @@ type WorkerConfig struct {
 	RetryPolicy         RetryPolicy
 	LeaseExtendInterval time.Duration
 	ShutdownTimeout     time.Duration
-	MetricsCollector    metrics.MetricsCollector
+	MetricsCollector    metrics.MQObserver
 	Deduper             TaskDeduper
 	DedupeKeyFunc       func(Task) string
 	DedupeTTL           time.Duration

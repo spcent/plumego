@@ -14,16 +14,48 @@ func TestBackpressure_DropOldest(t *testing.T) {
 		t.Fatalf("subscribe: %v", err)
 	}
 
-	// fill buffer and overflow
-	_ = ps.Publish("t", Message{ID: "m1"})
-	_ = ps.Publish("t", Message{ID: "m2"})
-	_ = ps.Publish("t", Message{ID: "m3"}) // should evict m1
+	// Warm the pump goroutine so DropOldest semantics are exercised through the
+	// ring buffer path rather than assuming a plain buffered channel.
+	_ = ps.Publish("t", Message{ID: "m0"})
+	select {
+	case got := <-sub.C():
+		if got.ID != "m0" {
+			t.Fatalf("expected m0, got %s", got.ID)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timeout waiting for initial message")
+	}
 
-	got1 := <-sub.C()
-	got2 := <-sub.C()
+	for i := 1; i <= 4; i++ {
+		_ = ps.Publish("t", Message{ID: "m" + string(rune('0'+i))})
+	}
 
-	if got1.ID != "m2" || got2.ID != "m3" {
-		t.Fatalf("expected [m2,m3], got [%s,%s]", got1.ID, got2.ID)
+	time.Sleep(50 * time.Millisecond)
+
+	var received []string
+	for {
+		select {
+		case msg := <-sub.C():
+			received = append(received, msg.ID)
+		case <-time.After(100 * time.Millisecond):
+			goto done
+		}
+	}
+
+done:
+	if len(received) < 2 {
+		t.Fatalf("expected at least 2 messages, got %d: %v", len(received), received)
+	}
+	if received[len(received)-1] != "m4" {
+		t.Fatalf("expected last message to be m4, got %v", received)
+	}
+	for i := 1; i < len(received); i++ {
+		if received[i] <= received[i-1] {
+			t.Fatalf("messages not in order: %v", received)
+		}
+	}
+	if stats := sub.Stats(); stats.Dropped == 0 {
+		t.Fatalf("expected drops for drop-oldest policy, got stats=%+v", stats)
 	}
 }
 

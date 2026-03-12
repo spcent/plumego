@@ -3,12 +3,14 @@
 Plumego 提供 Prometheus / OpenTelemetry 适配器以及可直接挂载的健康检查端点。
 
 ## 指标与追踪
-- `metrics.NewPrometheusCollector(namespace)` 提供 Prometheus 采集器与 `prom.Handler()`。
+- `metrics.NewPrometheusCollector(namespace)` 提供采集器。
+- `metrics.NewPrometheusExporter(prom)` 提供 `/metrics` HTTP exporter。
 - `metrics.NewOpenTelemetryTracer(serviceName)` 提供与可观测性中间件兼容的 tracer。
 - 通过 `core.WithMetricsCollector(...)` 与 `core.WithTracer(...)` 注入。
 
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
+exporter := metrics.NewPrometheusExporter(prom)
 tracer := metrics.NewOpenTelemetryTracer("my-service")
 
 app := core.New(
@@ -18,12 +20,14 @@ app := core.New(
 
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), prom, tracer),
+    observability.Tracing(tracer),
+    observability.HTTPMetrics(prom),
+    observability.AccessLog(app.Logger()),
 ); err != nil {
     log.Fatal(err)
 }
 
-app.Get("/metrics", prom.Handler().ServeHTTP)
+app.Get("/metrics", exporter.Handler().ServeHTTP)
 ```
 
 ## 健康端点
@@ -34,6 +38,7 @@ if err != nil {
 }
 
 app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
 app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```

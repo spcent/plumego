@@ -12,7 +12,7 @@ import (
 type TaskQueue struct {
 	store   TaskStore
 	now     func() time.Time
-	metrics metrics.MetricsCollector
+	metrics metrics.MQObserver
 }
 
 type TaskQueueOption func(*TaskQueue)
@@ -23,7 +23,7 @@ func WithQueueNowFunc(now func() time.Time) TaskQueueOption {
 	}
 }
 
-func WithQueueMetricsCollector(collector metrics.MetricsCollector) TaskQueueOption {
+func WithQueueMetricsCollector(collector metrics.MQObserver) TaskQueueOption {
 	return func(q *TaskQueue) {
 		q.metrics = collector
 	}
@@ -195,6 +195,6 @@ func (q *TaskQueue) observe(ctx context.Context, op, topic string, start time.Ti
 	q.metrics.ObserveMQ(ctx, op, topic, time.Since(start), err, false)
 }
 
-func (q *TaskQueue) collector() metrics.MetricsCollector {
+func (q *TaskQueue) collector() metrics.MQObserver {
 	return q.metrics
 }

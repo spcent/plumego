@@ -32,6 +32,17 @@
 //   - Key-Value store operations
 //   - IPC (Inter-Process Communication) operations
 //
+// For narrower dependency boundaries, prefer the smallest interface that fits the
+// call site:
+//
+//   - Recorder for generic Record(...) instrumentation
+//   - HTTPObserver for HTTP middleware
+//   - PubSubObserver for pub/sub instrumentation
+//   - MQObserver for message queue instrumentation
+//   - KVObserver for key-value instrumentation
+//   - IPCObserver for IPC instrumentation
+//   - DBObserver for database instrumentation
+//
 // # Basic Usage
 //
 // Creating and using a Prometheus collector:
@@ -45,7 +56,8 @@
 //	collector.ObserveHTTP(ctx, "GET", "/api/users", 200, 1024, 50*time.Millisecond)
 //
 //	// Expose metrics endpoint
-//	http.Handle("/metrics", collector.Handler())
+//	exporter := metrics.NewPrometheusExporter(collector)
+//	http.Handle("/metrics", exporter.Handler())
 //
 // Using the OpenTelemetry tracer:
 //
@@ -129,13 +141,13 @@
 //
 // # Prometheus Integration
 //
-// The PrometheusCollector exposes metrics in Prometheus exposition format:
+// Pair the Prometheus collector with an explicit exporter for Prometheus exposition:
 //
 //	collector := metrics.NewPrometheusCollector("myapp").
 //		WithMaxMemory(50000)
 //
-//	// The handler produces Prometheus-compatible output
-//	http.Handle("/metrics", collector.Handler())
+//	exporter := metrics.NewPrometheusExporter(collector)
+//	http.Handle("/metrics", exporter.Handler())
 //
 // Metrics exposed:
 //   - {namespace}_http_requests_total - Counter of HTTP requests
@@ -242,7 +254,8 @@
 //
 //	// Create and register metrics collector
 //	collector := metrics.NewPrometheusCollector("myapp")
-//	app.Get("/metrics", collector.Handler().ServeHTTP)
+//	exporter := metrics.NewPrometheusExporter(collector)
+//	app.Get("/metrics", exporter.Handler().ServeHTTP)
 //
 //	// Use in middleware
 //	app.Use(metrics.MetricsMiddleware(collector))

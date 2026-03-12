@@ -11,13 +11,13 @@ import (
 // InstrumentedDistributedEngine wraps DistributedEngine with metrics collection.
 type InstrumentedDistributedEngine struct {
 	engine    *DistributedEngine
-	collector metrics.MetricsCollector
+	collector metrics.Recorder
 }
 
 // NewInstrumentedDistributedEngine creates an instrumented distributed engine.
 func NewInstrumentedDistributedEngine(
 	engine *DistributedEngine,
-	collector metrics.MetricsCollector,
+	collector metrics.Recorder,
 ) *InstrumentedDistributedEngine {
 	return &InstrumentedDistributedEngine{
 		engine:    engine,

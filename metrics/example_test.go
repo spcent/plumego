@@ -50,13 +50,14 @@ func ExampleNewPrometheusCollector() {
 // ExamplePrometheusCollector_Handler demonstrates serving metrics
 func ExamplePrometheusCollector_Handler() {
 	collector := metrics.NewPrometheusCollector("myapp")
+	exporter := metrics.NewPrometheusExporter(collector)
 	ctx := context.Background()
 
 	// Record some metrics
 	collector.ObserveHTTP(ctx, "GET", "/api/users", 200, 100, 50*time.Millisecond)
 
 	// Create HTTP handler
-	handler := collector.Handler()
+	handler := exporter.Handler()
 
 	// Serve metrics endpoint
 	req := httptest.NewRequest("GET", "/metrics", nil)
@@ -342,6 +343,7 @@ func ExamplePrometheusCollector_integration() {
 	// Create collector
 	collector := metrics.NewPrometheusCollector("myapp").
 		WithMaxMemory(10000)
+	exporter := metrics.NewPrometheusExporter(collector)
 
 	// Record various metrics
 	ctx := context.Background()
@@ -361,7 +363,7 @@ func ExamplePrometheusCollector_integration() {
 	fmt.Printf("Unique series: %d\n", stats.ActiveSeries)
 
 	// Expose metrics endpoint
-	handler := collector.Handler()
+	handler := exporter.Handler()
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)

@@ -71,7 +71,11 @@ type Config struct {
 	Quota *QuotaChecker
 
 	// MetricsCollector for observability; nil disables metrics.
-	MetricsCollector metrics.MetricsCollector
+	// It records queue-level metrics and messaging-specific metric records.
+	MetricsCollector interface {
+		metrics.MQObserver
+		metrics.Recorder
+	}
 
 	// Webhook is the outbound webhook service for delivery notifications.
 	// When set together with Bus, a WebhookNotifier is created automatically.

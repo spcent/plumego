@@ -4,6 +4,9 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/spcent/plumego/core"
 	plog "github.com/spcent/plumego/log"
@@ -55,8 +58,11 @@ func main() {
 
 	// Create Prometheus metrics collector
 	var metricsCollector metrics.MetricsCollector
+	var metricsHandler http.Handler
 	if cfg.Metrics.Enabled {
-		metricsCollector = metrics.NewPrometheusCollector(cfg.Metrics.Namespace)
+		promCollector := metrics.NewPrometheusCollector(cfg.Metrics.Namespace)
+		metricsCollector = promCollector
+		metricsHandler = metrics.NewPrometheusExporter(promCollector).Handler()
 		log.Printf("✓ Prometheus metrics enabled at %s", cfg.Metrics.Path)
 	}
 
@@ -109,8 +115,11 @@ func main() {
 
 	app := core.New(appOptions...)
 
+	app.Use(observability.RequestID())
+	app.Use(observability.Tracing(nil))
+	app.Use(observability.HTTPMetrics(nil))
+	app.Use(observability.AccessLog(logger))
 	app.Use(recovery.Recovery(app.Logger()))
-	app.Use(observability.Logging(logger, nil, nil))
 
 	// Configure middleware stack for /api routes
 	apiGroup := app.Router().Group("/api")
@@ -169,19 +178,17 @@ func main() {
 	v1Group := apiGroup.Group("/v1")
 
 	// Register enabled services
-	registerServices(v1Group, cfg, sd, metricsCollector)
+	registerServices(v1Group, cfg, sd)
 
 	// Metrics endpoint (Prometheus)
-	if cfg.Metrics.Enabled {
-		if promCollector, ok := metricsCollector.(*metrics.PrometheusCollector); ok {
-			app.Any(cfg.Metrics.Path, func(w http.ResponseWriter, r *http.Request) { promCollector.Handler().ServeHTTP(w, r) })
-			log.Printf("✓ Metrics endpoint registered: %s", cfg.Metrics.Path)
-		}
+	if metricsHandler != nil {
+		app.Any(cfg.Metrics.Path, func(w http.ResponseWriter, r *http.Request) { metricsHandler.ServeHTTP(w, r) })
+		log.Printf("✓ Metrics endpoint registered: %s", cfg.Metrics.Path)
 	}
 
 	// Admin API endpoints
 	if cfg.Admin.Enabled {
-		adminHandlers := NewAdminHandlers(cfg, metricsCollector)
+		adminHandlers := NewAdminHandlers(cfg)
 		adminGroup := app.Router().Group(cfg.Admin.Path)
 
 		// Apply admin API key authentication
@@ -275,13 +282,36 @@ Core Features:
 	log.Printf("Starting API Gateway on %s", cfg.Server.Addr)
 	log.Println("Visit http://localhost:8080/status for info")
 
-	if err := app.Boot(); err != nil {
-		log.Fatalf("Failed to start gateway: %v", err)
+	if err := app.Prepare(); err != nil {
+		log.Fatalf("Failed to prepare gateway: %v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	if err := app.Start(ctx); err != nil {
+		log.Fatalf("Failed to start gateway runtime: %v", err)
+	}
+
+	srv, err := app.Server()
+	if err != nil {
+		log.Fatalf("Failed to build HTTP server: %v", err)
+	}
+
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = app.Shutdown(shutdownCtx)
+	}()
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Failed to serve gateway: %v", err)
 	}
 }
 
 // registerServices registers all enabled services to the router group
-func registerServices(v1Group *router.Router, cfg *Config, sd *discovery.Static, metricsCollector metrics.MetricsCollector) {
+func registerServices(v1Group *router.Router, cfg *Config, sd *discovery.Static) {
 	// User Service
 	if cfg.Services.UserService.Enabled {
 		log.Printf("Registering User Service: %s -> %v (timeout=%v, retries=%d)",

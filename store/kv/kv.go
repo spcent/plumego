@@ -156,7 +156,7 @@ type KVStore struct {
 	closed int32
 
 	// Unified metrics collector
-	collector metrics.MetricsCollector
+	collector metrics.KVObserver
 }
 
 // Stats provides runtime statistics
@@ -1052,12 +1052,12 @@ func Default() (*KVStore, error) {
 }
 
 // SetMetricsCollector sets the unified metrics collector
-func (kv *KVStore) SetMetricsCollector(collector metrics.MetricsCollector) {
+func (kv *KVStore) SetMetricsCollector(collector metrics.KVObserver) {
 	kv.collector = collector
 }
 
 // GetMetricsCollector returns the current metrics collector
-func (kv *KVStore) GetMetricsCollector() metrics.MetricsCollector {
+func (kv *KVStore) GetMetricsCollector() metrics.KVObserver {
 	return kv.collector
 }
 

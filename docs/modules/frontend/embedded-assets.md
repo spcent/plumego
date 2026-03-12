@@ -4,7 +4,7 @@
 
 ## Using Plumego's built-in embedded directory
 
-`frontend.RegisterEmbedded(...)` serves assets from `frontend/embedded/` in this module.
+`frontend.NewMountEmbedded(...)` constructs a mount from assets under `frontend/embedded/` in this module.
 It returns an error when that directory has no real assets.
 
 ```go
@@ -21,12 +21,16 @@ import (
 func main() {
     app := core.New(core.WithAddr(":8080"))
 
-    if err := frontend.RegisterEmbedded(app.Router(),
+    mount, err := frontend.NewMountEmbedded(
         frontend.WithPrefix("/"),
         frontend.WithFallback(true),
         frontend.WithCacheControl("public, max-age=31536000, immutable"),
         frontend.WithIndexCacheControl("no-cache, no-store, must-revalidate"),
-    ); err != nil {
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    if err := mount.Register(app.Router()); err != nil {
         log.Fatal(err)
     }
 
@@ -47,10 +51,14 @@ if err != nil {
     log.Fatal(err)
 }
 
-if err := frontend.RegisterFS(app.Router(), http.FS(subFS),
+mount, err := frontend.NewMountFS(http.FS(subFS),
     frontend.WithPrefix("/"),
     frontend.WithFallback(true),
-); err != nil {
+)
+if err != nil {
+    log.Fatal(err)
+}
+if err := mount.Register(app.Router()); err != nil {
     log.Fatal(err)
 }
 ```

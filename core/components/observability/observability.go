@@ -17,6 +17,7 @@ type MetricsConfig struct {
 	Namespace string
 	MaxSeries int
 	Collector metrics.MetricsCollector
+	Exporter  metrics.Exporter
 	Handler   http.Handler
 }
 
@@ -99,23 +100,24 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 		collector = hooks.GetMetricsCollector()
 	}
 
-	if collector == nil {
+	exporter := cfg.Exporter
+	handler := cfg.Handler
+
+	if collector == nil && exporter == nil && handler == nil {
 		prom := metrics.NewPrometheusCollector(cfg.Namespace)
 		if cfg.MaxSeries > 0 {
 			prom.WithMaxMemory(cfg.MaxSeries)
 		}
 		collector = prom
+		exporter = metrics.NewPrometheusExporter(prom)
 	}
 
-	handler := cfg.Handler
-	if handler == nil {
-		if provider, ok := collector.(interface{ Handler() http.Handler }); ok {
-			handler = provider.Handler()
-		}
+	if handler == nil && exporter != nil {
+		handler = exporter.Handler()
 	}
 
 	if handler == nil {
-		return fmt.Errorf("metrics enabled but no handler available")
+		return fmt.Errorf("metrics enabled but no explicit handler or exporter available")
 	}
 
 	if err := router.AddRoute(http.MethodGet, path, handler); err != nil {

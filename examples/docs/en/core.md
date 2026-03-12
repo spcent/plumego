@@ -15,7 +15,9 @@ app := core.New(
 
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), nil, nil),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
     cors.CORS,
 ); err != nil {
@@ -76,6 +78,7 @@ You can also register runners and shutdown hooks via `WithRunner` / `app.Registe
 ## Reference-style wiring
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
+exporter := metrics.NewPrometheusExporter(prom)
 tracer := metrics.NewOpenTelemetryTracer("plumego")
 healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
 if err != nil {
@@ -92,13 +95,16 @@ app := core.New(
 
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), prom, tracer),
+    observability.Tracing(tracer),
+    observability.HTTPMetrics(prom),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatal(err)
 }
 
-app.Get("/metrics", prom.Handler().ServeHTTP)
+app.Get("/metrics", exporter.Handler().ServeHTTP)
+app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
 app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 

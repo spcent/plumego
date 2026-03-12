@@ -16,6 +16,7 @@ import (
 func main() {
 	// Create a Prometheus metrics collector
 	collector := metrics.NewPrometheusCollector("dbmetrics_example")
+	exporter := metrics.NewPrometheusExporter(collector)
 
 	// Open SQLite database (in production, use PostgreSQL/MySQL)
 	rawDB, err := sql.Open("sqlite3", ":memory:")
@@ -46,7 +47,7 @@ func main() {
 	go simulateWorkload(instrumentedDB)
 
 	// Expose metrics endpoint
-	http.Handle("/metrics", collector.Handler())
+	http.Handle("/metrics", exporter.Handler())
 	http.HandleFunc("/", handleRoot)
 	http.HandleFunc("/stats", handleStats(instrumentedDB))
 

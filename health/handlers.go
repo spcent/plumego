@@ -26,9 +26,8 @@ type ComponentsListResponse struct {
 	Count      int      `json:"count"`
 }
 
-// HealthHandler creates a comprehensive health check handler.
-// Pass debug=true to include runtime diagnostics in the response.
-func HealthHandler(manager HealthManager, debug bool) http.Handler {
+// SummaryHandler returns aggregate component health only.
+func SummaryHandler(manager HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if manager == nil {
 			contract.WriteError(w, r, contract.APIError{
@@ -44,13 +43,51 @@ func HealthHandler(manager HealthManager, debug bool) http.Handler {
 		defer cancel()
 
 		health := manager.CheckAllComponents(ctx)
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		_ = contract.WriteJSON(w, httpStatusForHealth(health.Status), health)
+	})
+}
 
+// DetailedHandler returns aggregate health plus build metadata.
+func DetailedHandler(manager HealthManager) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !requireManager(manager, w, r) {
+			return
+		}
+
+		ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
+		defer cancel()
+
+		health := manager.CheckAllComponents(ctx)
 		resp := HealthResponse{
 			HealthStatus: health,
 			BuildInfo:    GetBuildInfo(),
 		}
-		if debug {
-			resp.Runtime = getRuntimeInfo()
+
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		_ = contract.WriteJSON(w, httpStatusForHealth(health.Status), resp)
+	})
+}
+
+// HealthHandler creates a comprehensive health check handler.
+// Pass debug=true to include runtime diagnostics in the response.
+func HealthHandler(manager HealthManager, debug bool) http.Handler {
+	if !debug {
+		return DetailedHandler(manager)
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !requireManager(manager, w, r) {
+			return
+		}
+
+		ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
+		defer cancel()
+
+		health := manager.CheckAllComponents(ctx)
+		resp := HealthResponse{
+			HealthStatus: health,
+			BuildInfo:    GetBuildInfo(),
+			Runtime:      getRuntimeInfo(),
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")

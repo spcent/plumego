@@ -7,13 +7,18 @@ import (
 	"github.com/spcent/plumego/metrics"
 )
 
+type messagingMetrics interface {
+	metrics.MQObserver
+	metrics.Recorder
+}
+
 // metricsWrapper wraps the MetricsCollector to provide messaging-specific
 // helper methods for recording send latency, errors, and queue depth.
 type metricsWrapper struct {
-	collector metrics.MetricsCollector
+	collector messagingMetrics
 }
 
-func newMetrics(collector metrics.MetricsCollector) *metricsWrapper {
+func newMetrics(collector messagingMetrics) *metricsWrapper {
 	return &metricsWrapper{collector: collector}
 }
 

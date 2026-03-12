@@ -101,6 +101,71 @@ func TestRegisterWithPrefix(t *testing.T) {
 	}
 }
 
+func TestNewMountFSRegister(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "mount index")
+	writeTestFile(t, dir, "assets/app.js", "mount asset")
+
+	mount, err := NewMountFS(http.Dir(dir), WithPrefix("/app"))
+	if err != nil {
+		t.Fatalf("new mount: %v", err)
+	}
+	if got := mount.Prefix(); got != "/app" {
+		t.Fatalf("prefix: got %q want %q", got, "/app")
+	}
+	if mount.Handler() == nil {
+		t.Fatal("expected mount handler")
+	}
+
+	r := router.NewRouter()
+	if err := mount.Register(r); err != nil {
+		t.Fatalf("register mount: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app/assets/app.js", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("asset status: got %d want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "mount asset") {
+		t.Fatalf("unexpected asset body: %q", rec.Body.String())
+	}
+}
+
+func TestNewHandlerFS(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "handler index")
+
+	h, err := NewHandlerFS(http.Dir(dir))
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "handler index") {
+		t.Fatalf("unexpected body: %q", rec.Body.String())
+	}
+}
+
+func TestMountRegisterNilRouter(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	mount, err := NewMountFS(http.Dir(dir))
+	if err != nil {
+		t.Fatalf("new mount: %v", err)
+	}
+	if err := mount.Register(nil); err == nil {
+		t.Fatal("expected error for nil router")
+	}
+}
+
 func TestRegisterFromDirMissing(t *testing.T) {
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, "./does/not/exist"); err == nil {

@@ -395,6 +395,7 @@ if err != nil {
 
 app := core.New(core.WithHealthManager(healthManager))
 app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 
@@ -403,10 +404,11 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ## 可观测性适配器
 无需自行编写适配器，即可将日志中间件接入指标/链路追踪后端：
 
-- `metrics.NewPrometheusCollector(namespace)` 实现 `observability.MetricsCollector`，并通过 `collector.Handler()` 暴露 `/metrics` 处理程序。
+- `metrics.NewPrometheusCollector(namespace)` 实现 `observability.MetricsCollector`；如需 `/metrics` 端点，请显式搭配 `metrics.NewPrometheusExporter(collector)`。
 - `metrics.NewOpenTelemetryTracer(name)` 实现 `observability.Tracer`，发出带有 HTTP 元数据的 span。
 
 如 `examples/reference` 所示，使用 `core.WithMetricsCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`。
+如果某个模块只需要单一能力，优先依赖更窄的接口，例如 `metrics.HTTPObserver`、`metrics.MQObserver`、`metrics.DBObserver` 或 `metrics.Recorder`，而不是整个 `metrics.MetricsCollector`。
 
 如果希望一键启用 Prometheus 指标与 OpenTelemetry 风格追踪：
 

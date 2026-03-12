@@ -75,9 +75,7 @@ type RequestMetrics struct {
 //
 //	collector := &MyMetricsCollector{}
 //	handler := observability.Logging(log.NewGLogger(), collector, nil)(myHandler)
-type MetricsCollector interface {
-	ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
-}
+type MetricsCollector = metrics.HTTPObserver
 
 // TraceSpan represents a started tracing span.
 // Implementations must expose End to finalize the span and TraceID/SpanID for correlation.

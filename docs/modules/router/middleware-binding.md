@@ -23,7 +23,9 @@ Both `core.App.Use(...)` and `router.Router.Use(...)` consume this type.
 ```go
 if err := app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), nil, nil),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatal(err)
@@ -93,7 +95,7 @@ app := core.New(core.WithAddr(":8080"))
 _ = app.Use(observability.RequestID())
 
 r := app.Router()
-r.Use(observability.Logging(app.Logger(), nil, nil))
+r.Use(observability.AccessLog(app.Logger()))
 
 api := r.Group("/api")
 api.Use(authnMiddleware)
@@ -176,7 +178,9 @@ Recommended baseline includes panic recovery:
 ```go
 _ = app.Use(
     observability.RequestID(),
-    observability.Logging(app.Logger(), nil, nil),
+    observability.Tracing(nil),
+    observability.HTTPMetrics(nil),
+    observability.AccessLog(app.Logger()),
     recovery.Recovery(app.Logger()),
 )
 ```

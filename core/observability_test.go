@@ -18,6 +18,7 @@ func TestConfigureObservabilityMetrics(t *testing.T) {
 	cfg.Metrics.Enabled = true
 	cfg.Metrics.Path = "/metrics"
 	cfg.Metrics.Collector = prom
+	cfg.Metrics.Exporter = metrics.NewPrometheusExporter(prom)
 
 	if err := app.ConfigureObservability(cfg); err != nil {
 		t.Fatalf("configure observability: %v", err)

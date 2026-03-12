@@ -941,7 +941,7 @@ func (b *InProcBroker) Snapshot() MetricsSnapshot {
 }
 
 // SetMetricsCollector replaces the external metrics sink at runtime.
-func (b *InProcBroker) SetMetricsCollector(collector metrics.MetricsCollector) {
+func (b *InProcBroker) SetMetricsCollector(collector metrics.PubSubObserver) {
 	b.config.MetricsCollector = collector
 }
 

@@ -18,11 +18,20 @@ var embedded embed.FS
 // RegisterEmbedded mounts the embedded frontend bundle.
 // Returns an error if no embedded frontend assets are found.
 func RegisterEmbedded(r *router.Router, opts ...Option) error {
-	f, err := embeddedSub()
+	mount, err := NewMountEmbedded(opts...)
 	if err != nil {
 		return err
 	}
-	return RegisterFS(r, http.FS(f), opts...)
+	return mount.Register(r)
+}
+
+// NewMountEmbedded constructs a frontend mount from embedded assets.
+func NewMountEmbedded(opts ...Option) (*Mount, error) {
+	f, err := embeddedSub()
+	if err != nil {
+		return nil, err
+	}
+	return NewMountFS(http.FS(f), opts...)
 }
 
 // embeddedSub returns the embedded filesystem subdirectory containing frontend assets.

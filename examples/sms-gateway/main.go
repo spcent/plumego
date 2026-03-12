@@ -26,6 +26,7 @@ import (
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/metrics/smsgateway"
 	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/recovery"
 	tenantmw "github.com/spcent/plumego/middleware/tenant"
 	"github.com/spcent/plumego/net/mq"
 	mqstore "github.com/spcent/plumego/net/mq/store"
@@ -146,7 +147,11 @@ func main() {
 	handler = tenantmw.TenantResolver(tenantmw.TenantResolverOptions{
 		HeaderName: "X-Tenant-ID",
 	})(handler)
-	handler = observability.Logging(logger, collector, tracer)(handler)
+	handler = observability.RequestID()(handler)
+	handler = observability.Tracing(tracer)(handler)
+	handler = observability.HTTPMetrics(collector)(handler)
+	handler = observability.AccessLog(logger)(handler)
+	handler = recovery.Recovery(logger)(handler)
 
 	addr := getenv("SMS_GATEWAY_ADDR", "127.0.0.1:8089")
 	ln, err := net.Listen("tcp", addr)
@@ -294,7 +299,7 @@ func newIdempotencyStore() (idempotency.Store, func()) {
 	return store, cleanup
 }
 
-func newMessageRepository(ctx context.Context, collector metrics.MetricsCollector) (message.Store, func()) {
+func newMessageRepository(ctx context.Context, collector metrics.DBObserver) (message.Store, func()) {
 	dsn := strings.TrimSpace(os.Getenv("SMS_GATEWAY_MESSAGE_DSN"))
 	if dsn == "" {
 		return message.NewMemoryRepository(), func() {}

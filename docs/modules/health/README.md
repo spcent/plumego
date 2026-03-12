@@ -2,7 +2,7 @@
 
 > **Package Path**: `github.com/spcent/plumego/health` | **Stability**: High | **Priority**: P1
 
-The `health` package provides explicit health handlers and a `HealthManager` for liveness, readiness, component checks, health history, and build/runtime diagnostics.
+The `health` package provides explicit probe and diagnostics handlers plus a `HealthManager` for liveness, readiness, component checks, health history, and build/runtime diagnostics.
 
 ## Canonical Quick Start
 
@@ -39,10 +39,13 @@ func main() {
     if err := app.Router().AddRoute(http.MethodGet, "/health/ready", health.ReadinessHandler(manager)); err != nil {
         log.Fatal(err)
     }
-    if err := app.Router().AddRoute(http.MethodGet, "/health", health.HealthHandler(manager, false)); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/health", health.SummaryHandler(manager)); err != nil {
         log.Fatal(err)
     }
     if err := app.Router().AddRoute(http.MethodGet, "/health/build", health.BuildInfoHandler()); err != nil {
+        log.Fatal(err)
+    }
+    if err := app.Router().AddRoute(http.MethodGet, "/health/runtime", health.RuntimeInfoHandler()); err != nil {
         log.Fatal(err)
     }
 
@@ -83,10 +86,16 @@ func main() {
   Returns `200` when `manager.Readiness().Ready` is true, otherwise `503`.
 - `health.ReadinessHandlerWithManager(manager)`
   Recomputes component health and derives readiness from aggregate status.
+- `health.SummaryHandler(manager)`
+  Returns aggregate component health only.
+- `health.DetailedHandler(manager)`
+  Returns aggregate health plus build metadata.
 - `health.HealthHandler(manager, debug)`
-  Returns overall health plus build metadata. With `debug=true`, includes runtime diagnostics.
+  Legacy convenience wrapper around `DetailedHandler` / runtime-inclusive diagnostics.
 - `health.BuildInfoHandler()`
   Returns version, commit, and build time metadata.
+- `health.RuntimeInfoHandler()`
+  Returns Go runtime diagnostics only.
 - `health.ComponentHealthHandler(manager, name)`
   Returns the latest status for a single component.
 - `health.AllComponentsHealthHandler(manager)`

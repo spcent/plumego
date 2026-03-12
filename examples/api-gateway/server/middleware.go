@@ -12,7 +12,7 @@ import (
 )
 
 // AccessLogMiddleware provides structured logging for all requests
-func AccessLogMiddleware(logger plog.StructuredLogger, collector metrics.MetricsCollector) func(http.Handler) http.Handler {
+func AccessLogMiddleware(logger plog.StructuredLogger, collector metrics.HTTPObserver) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()

@@ -41,8 +41,9 @@ type latencyStats struct {
 //	defer collector.Clear()
 //
 //	// Use in HTTP middleware
+//	exporter := metrics.NewPrometheusExporter(collector)
 //	mux := http.NewServeMux()
-//	mux.Handle("/metrics", collector.Handler())
+//	mux.Handle("/metrics", exporter.Handler())
 //
 //	// Record metrics
 //	collector.ObserveHTTP(context.Background(), "GET", "/api/users", 200, 100, 50*time.Millisecond)
@@ -134,74 +135,10 @@ func (p *PrometheusCollector) recordHTTP(method, path string, status int, durati
 	p.durations[key] = stats
 }
 
-// Handler returns an HTTP handler that emits the current metrics snapshot.
-//
-// This handler exposes metrics in Prometheus exposition format (text/plain).
-// The endpoint can be scraped by Prometheus or viewed directly in a browser.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/metrics"
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	http.Handle("/metrics", collector.Handler())
-//	http.ListenAndServe(":8080", nil)
+// Handler returns a compatibility HTTP handler for Prometheus scraping.
+// Prefer constructing an explicit exporter with NewPrometheusExporter.
 func (p *PrometheusCollector) Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests, durations, uptime := p.snapshot()
-		smsSnapshot := p.snapshotSMSGateway()
-
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-
-		// Write metrics
-		fmt.Fprintf(w, "# HELP %s_http_requests_total Total number of HTTP requests processed.\n", p.namespace)
-		fmt.Fprintf(w, "# TYPE %s_http_requests_total counter\n", p.namespace)
-
-		reqKeys := sortedKeys(requests)
-		for _, k := range reqKeys {
-			fmt.Fprintf(w, "%s_http_requests_total{method=\"%s\",path=\"%s\",status=\"%s\"} %d\n",
-				p.namespace, escapeLabelValue(k.method), escapeLabelValue(k.path), escapeLabelValue(k.status), requests[k])
-		}
-
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "# HELP %s_http_request_duration_seconds_sum Sum of HTTP request latencies in seconds.\n", p.namespace)
-		fmt.Fprintf(w, "# TYPE %s_http_request_duration_seconds_summary summary\n", p.namespace)
-
-		durKeys := sortedKeys(durations)
-		for _, k := range durKeys {
-			stats := durations[k]
-			em, ep, es := escapeLabelValue(k.method), escapeLabelValue(k.path), escapeLabelValue(k.status)
-			fmt.Fprintf(w, "%s_http_request_duration_seconds_sum{method=\"%s\",path=\"%s\",status=\"%s\"} %.9f\n",
-				p.namespace, em, ep, es, stats.sum)
-			fmt.Fprintf(w, "%s_http_request_duration_seconds_count{method=\"%s\",path=\"%s\",status=\"%s\"} %d\n",
-				p.namespace, em, ep, es, stats.count)
-			// Add min and max as additional metrics
-			fmt.Fprintf(w, "%s_http_request_duration_seconds_min{method=\"%s\",path=\"%s\",status=\"%s\"} %.9f\n",
-				p.namespace, em, ep, es, stats.min)
-			fmt.Fprintf(w, "%s_http_request_duration_seconds_max{method=\"%s\",path=\"%s\",status=\"%s\"} %.9f\n",
-				p.namespace, em, ep, es, stats.max)
-		}
-
-		// Add uptime metric
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "# HELP %s_uptime_seconds Total uptime in seconds.\n", p.namespace)
-		fmt.Fprintf(w, "# TYPE %s_uptime_seconds gauge\n", p.namespace)
-		fmt.Fprintf(w, "%s_uptime_seconds %.3f\n", p.namespace, uptime.Seconds())
-
-		// Add total request count
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "# HELP %s_http_requests_total_all Total requests across all labels.\n", p.namespace)
-		fmt.Fprintf(w, "# TYPE %s_http_requests_total_all counter\n", p.namespace)
-		totalRequests := uint64(0)
-		for _, count := range requests {
-			totalRequests += count
-		}
-		fmt.Fprintf(w, "%s_http_requests_total_all %d\n", p.namespace, totalRequests)
-
-		if smsSnapshot != nil {
-			p.writeSMSGatewayMetrics(w, smsSnapshot)
-		}
-	})
+	return NewPrometheusExporter(p).Handler()
 }
 
 // GetStats returns statistics about the collected metrics.

@@ -32,6 +32,13 @@ type config struct {
 // Option mutates a config.
 type Option func(*config)
 
+// Mount describes an explicitly constructed frontend mount.
+// It separates bundle construction from router registration.
+type Mount struct {
+	prefix  string
+	handler http.Handler
+}
+
 // WithPrefix sets the mount prefix for the frontend bundle.
 func WithPrefix(prefix string) Option {
 	return func(cfg *config) {
@@ -110,29 +117,108 @@ func WithMIMETypes(mimeTypes map[string]string) Option {
 // RegisterFromDir mounts a built frontend directory (e.g. Next.js `out/`)
 // at the given prefix. Returns an error if the directory is missing or unreadable.
 func RegisterFromDir(r *router.Router, dir string, opts ...Option) error {
+	mount, err := NewMountFromDir(dir, opts...)
+	if err != nil {
+		return err
+	}
+	return mount.Register(r)
+}
+
+// NewMountFromDir constructs a frontend mount from a filesystem directory.
+func NewMountFromDir(dir string, opts ...Option) (*Mount, error) {
 	info, err := os.Stat(dir)
 	if err != nil {
-		return fmt.Errorf("frontend directory %q: %w", dir, err)
+		return nil, fmt.Errorf("frontend directory %q: %w", dir, err)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("frontend path %q is not a directory", dir)
+		return nil, fmt.Errorf("frontend path %q is not a directory", dir)
 	}
 	if _, err := os.ReadDir(dir); err != nil {
-		return fmt.Errorf("frontend directory %q not readable: %w", dir, err)
+		return nil, fmt.Errorf("frontend directory %q not readable: %w", dir, err)
 	}
-	return RegisterFS(r, http.Dir(dir), opts...)
+	return NewMountFS(http.Dir(dir), opts...)
 }
 
 // RegisterFS mounts a frontend bundle served from the provided http.FileSystem.
 // This is suitable for go:embed bundles using http.FS.
 func RegisterFS(r *router.Router, fsys http.FileSystem, opts ...Option) error {
+	mount, err := NewMountFS(fsys, opts...)
+	if err != nil {
+		return err
+	}
+	return mount.Register(r)
+}
+
+// NewMountFS constructs a frontend mount from an http.FileSystem.
+func NewMountFS(fsys http.FileSystem, opts ...Option) (*Mount, error) {
+	cfg, err := newConfig(opts...)
+	if err != nil {
+		return nil, err
+	}
+	h, err := NewHandlerFS(fsys, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &Mount{
+		prefix:  cfg.Prefix,
+		handler: h,
+	}, nil
+}
+
+// NewHandlerFS constructs a frontend handler without registering routes.
+func NewHandlerFS(fsys http.FileSystem, opts ...Option) (http.Handler, error) {
+	if fsys == nil {
+		return nil, errors.New("filesystem cannot be nil")
+	}
+	cfg, err := newConfig(opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &handler{cfg: *cfg, fs: fsys}, nil
+}
+
+// Prefix returns the normalized mount prefix.
+func (m *Mount) Prefix() string {
+	if m == nil {
+		return ""
+	}
+	return m.prefix
+}
+
+// Handler returns the mounted frontend handler.
+func (m *Mount) Handler() http.Handler {
+	if m == nil {
+		return nil
+	}
+	return m.handler
+}
+
+// Register attaches the mount to the provided router.
+func (m *Mount) Register(r *router.Router) error {
+	if m == nil {
+		return errors.New("mount cannot be nil")
+	}
 	if r == nil {
 		return errors.New("router cannot be nil")
 	}
-	if fsys == nil {
-		return errors.New("filesystem cannot be nil")
+	if m.handler == nil {
+		return errors.New("mount handler cannot be nil")
 	}
 
+	if m.prefix == "/" {
+		if err := r.AddRoute(router.ANY, "/", m.handler); err != nil {
+			return err
+		}
+		return r.AddRoute(router.ANY, "/*filepath", m.handler)
+	}
+
+	if err := r.AddRoute(router.ANY, m.prefix+"/*filepath", m.handler); err != nil {
+		return err
+	}
+	return r.AddRoute(router.ANY, m.prefix, m.handler)
+}
+
+func newConfig(opts ...Option) (*config, error) {
 	cfg := &config{
 		Prefix:    "/",
 		IndexFile: defaultIndex,
@@ -144,7 +230,7 @@ func RegisterFS(r *router.Router, fsys http.FileSystem, opts ...Option) error {
 
 	cleanedPrefix, err := normalizePrefix(cfg.Prefix)
 	if err != nil {
-		return fmt.Errorf("invalid prefix %q: %w", cfg.Prefix, err)
+		return nil, fmt.Errorf("invalid prefix %q: %w", cfg.Prefix, err)
 	}
 	cfg.Prefix = cleanedPrefix
 
@@ -153,32 +239,11 @@ func RegisterFS(r *router.Router, fsys http.FileSystem, opts ...Option) error {
 		indexFile = defaultIndex
 	}
 	if strings.Contains(indexFile, "/") || strings.Contains(indexFile, "\\") {
-		return fmt.Errorf("index file %q cannot contain path separators", cfg.IndexFile)
+		return nil, fmt.Errorf("index file %q cannot contain path separators", cfg.IndexFile)
 	}
 	cfg.IndexFile = indexFile
-
 	cfg.MIMETypes = normalizeMIMETypes(cfg.MIMETypes)
-
-	h := &handler{cfg: *cfg, fs: fsys}
-
-	if cleanedPrefix == "/" {
-		if err := r.AddRoute(router.ANY, "/", h); err != nil {
-			return err
-		}
-		if err := r.AddRoute(router.ANY, "/*filepath", h); err != nil {
-			return err
-		}
-	} else {
-		pattern := cleanedPrefix + "/*filepath"
-		if err := r.AddRoute(router.ANY, pattern, h); err != nil {
-			return err
-		}
-		if err := r.AddRoute(router.ANY, cleanedPrefix, h); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return cfg, nil
 }
 
 // normalizePrefix validates and normalizes the URL prefix.

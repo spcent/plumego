@@ -123,6 +123,43 @@ type MetricsCollector interface {
 	Clear()
 }
 
+// Recorder captures generic metric records without any domain-specific helpers.
+type Recorder interface {
+	Record(ctx context.Context, record MetricRecord)
+}
+
+// HTTPObserver captures only HTTP request metrics.
+// Use this narrower contract in transport middleware that should not depend on
+// the full cross-module metrics surface.
+type HTTPObserver interface {
+	ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
+}
+
+// PubSubObserver captures only pub/sub activity metrics.
+type PubSubObserver interface {
+	ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error)
+}
+
+// MQObserver captures only message queue activity metrics.
+type MQObserver interface {
+	ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool)
+}
+
+// KVObserver captures only key-value store activity metrics.
+type KVObserver interface {
+	ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool)
+}
+
+// IPCObserver captures only IPC activity metrics.
+type IPCObserver interface {
+	ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error)
+}
+
+// DBObserver captures only database activity metrics.
+type DBObserver interface {
+	ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error)
+}
+
 // CollectorStats provides a contract for collector statistics payloads.
 //
 // Mandatory fields for all collectors:

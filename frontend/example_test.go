@@ -106,6 +106,25 @@ func ExampleRegisterFS() {
 	http.ListenAndServe(":8080", r)
 }
 
+// ExampleNewMountFS demonstrates explicit construction before router wiring.
+func ExampleNewMountFS() {
+	r := router.NewRouter()
+
+	mount, err := frontend.NewMountFS(http.Dir("./dist"),
+		frontend.WithPrefix("/app"),
+		frontend.WithPrecompressed(true),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := mount.Register(r); err != nil {
+		panic(err)
+	}
+
+	http.ListenAndServe(":8080", r)
+}
+
 // ExampleWithPrefix demonstrates mounting at a non-root path
 func ExampleWithPrefix() {
 	r := router.NewRouter()

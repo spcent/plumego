@@ -42,7 +42,7 @@ func (e MockError) Error() string {
 	return string(e)
 }
 
-func TestHealthHandler(t *testing.T) {
+func TestSummaryHandler(t *testing.T) {
 	config := HealthCheckConfig{
 		MaxHistoryEntries:  100,
 		HistoryRetention:   24 * time.Hour,
@@ -62,7 +62,7 @@ func TestHealthHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rr := httptest.NewRecorder()
 
-	HealthHandler(manager, false).ServeHTTP(rr, req)
+	SummaryHandler(manager).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 when components are unhealthy, got %d", rr.Code)
@@ -75,6 +75,40 @@ func TestHealthHandler(t *testing.T) {
 
 	if health.Status != StatusUnhealthy {
 		t.Fatalf("expected unhealthy status, got %v", health.Status)
+	}
+}
+
+func TestDetailedHandler(t *testing.T) {
+	config := HealthCheckConfig{
+		MaxHistoryEntries:  100,
+		HistoryRetention:   24 * time.Hour,
+		AutoCleanupEnabled: false,
+	}
+	manager, err := NewHealthManager(config)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	mockHealthy := &MockChecker{name: "healthy", healthy: true}
+	manager.RegisterComponent(mockHealthy)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rr := httptest.NewRecorder()
+
+	DetailedHandler(manager).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	var response HealthResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if response.BuildInfo.Version == "" {
+		t.Fatal("expected build info in detailed response")
+	}
+	if response.Runtime != nil {
+		t.Fatal("expected runtime to be omitted in detailed response")
 	}
 }
 
@@ -340,6 +374,25 @@ func TestBuildInfoHandler(t *testing.T) {
 	}
 	if info.Version == "" {
 		t.Fatalf("version should be populated from defaults")
+	}
+}
+
+func TestRuntimeInfoHandler(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/runtime", nil)
+	rr := httptest.NewRecorder()
+
+	RuntimeInfoHandler().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", rr.Code)
+	}
+
+	var info RuntimeInfo
+	if err := json.Unmarshal(rr.Body.Bytes(), &info); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if info.GoVersion != runtime.Version() {
+		t.Fatalf("expected go version %s, got %s", runtime.Version(), info.GoVersion)
 	}
 }
 

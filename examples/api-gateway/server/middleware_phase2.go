@@ -99,16 +99,12 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 
 // AdminHandlers provides admin API handlers
 type AdminHandlers struct {
-	cfg              *Config
-	metricsCollector any // metrics.MetricsCollector
+	cfg *Config
 }
 
 // NewAdminHandlers creates admin API handlers
-func NewAdminHandlers(cfg *Config, metricsCollector any) *AdminHandlers {
-	return &AdminHandlers{
-		cfg:              cfg,
-		metricsCollector: metricsCollector,
-	}
+func NewAdminHandlers(cfg *Config) *AdminHandlers {
+	return &AdminHandlers{cfg: cfg}
 }
 
 // HandleStats returns gateway statistics

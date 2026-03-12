@@ -12,6 +12,7 @@ import (
 	"github.com/spcent/plumego/examples/reference/internal/handler"
 	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/metrics"
 )
 
 // RegisterRoutes wires all HTTP routes for the reference application.
@@ -112,7 +113,7 @@ func (a *App) registerTest() {
 
 func (a *App) registerMetrics() {
 	if a.Prom != nil {
-		a.Core.Get("/metrics", a.Prom.Handler().ServeHTTP)
+		a.Core.Get("/metrics", metrics.NewPrometheusExporter(a.Prom).Handler().ServeHTTP)
 	}
 }
 

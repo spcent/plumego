@@ -20,13 +20,14 @@ import "github.com/spcent/plumego/metrics"
 
 // Create a Prometheus collector
 collector := metrics.NewPrometheusCollector("myapp")
+exporter := metrics.NewPrometheusExporter(collector)
 
 // Record HTTP metrics
 ctx := context.Background()
 collector.ObserveHTTP(ctx, "GET", "/api/users", 200, 1024, 50*time.Millisecond)
 
 // Expose metrics endpoint
-http.Handle("/metrics", collector.Handler())
+http.Handle("/metrics", exporter.Handler())
 ```
 
 ## Installation
@@ -46,12 +47,13 @@ Prometheus-compatible metrics exposition in text format.
 ```go
 collector := metrics.NewPrometheusCollector("myapp").
     WithMaxMemory(10000)
+exporter := metrics.NewPrometheusExporter(collector)
 
 // Record metrics
 collector.ObserveHTTP(ctx, "GET", "/api/users", 200, 1024, 50*time.Millisecond)
 
 // Expose endpoint
-http.Handle("/metrics", collector.Handler())
+http.Handle("/metrics", exporter.Handler())
 ```
 
 **Metrics Exposed:**
@@ -289,9 +291,10 @@ app := core.New(
 
 // Create metrics collector
 collector := metrics.NewPrometheusCollector("myapp")
+exporter := metrics.NewPrometheusExporter(collector)
 
 // Expose metrics endpoint
-app.Get("/metrics", collector.Handler().ServeHTTP)
+app.Get("/metrics", exporter.Handler().ServeHTTP)
 
 // Use in middleware
 app.Use(middleware.Metrics(collector))

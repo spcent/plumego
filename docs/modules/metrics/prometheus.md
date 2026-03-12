@@ -4,9 +4,10 @@
 
 ## Overview
 
-`metrics.NewPrometheusCollector(namespace)` provides an in-memory collector with a built-in `http.Handler` for Prometheus scraping.
+`metrics.NewPrometheusCollector(namespace)` provides the in-memory collector.
+`metrics.NewPrometheusExporter(collector)` provides the HTTP exporter used for Prometheus scraping.
 
-It does not register itself with `core`. Mount the handler explicitly.
+It does not register itself with `core`. Mount the exporter explicitly.
 
 ## Canonical Setup
 
@@ -27,13 +28,14 @@ import (
 
 func main() {
     collector := metrics.NewPrometheusCollector("plumego").WithMaxMemory(10000)
+    exporter := metrics.NewPrometheusExporter(collector)
 
     app := core.New(
         core.WithAddr(":8080"),
         core.WithMetricsCollector(collector),
     )
 
-    if err := app.Router().AddRoute(http.MethodGet, "/metrics", collector.Handler()); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/metrics", exporter.Handler()); err != nil {
         log.Fatal(err)
     }
 

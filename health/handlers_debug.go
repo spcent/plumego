@@ -36,6 +36,14 @@ func getRuntimeInfo() *RuntimeInfo {
 	}
 }
 
+// RuntimeInfoHandler exposes runtime diagnostics only.
+func RuntimeInfoHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		_ = contract.WriteJSON(w, http.StatusOK, getRuntimeInfo())
+	})
+}
+
 // DebugHealthHandler returns comprehensive system diagnostics.
 // It should only be mounted in development or internal environments —
 // the caller (route registration) decides when to register this handler.

@@ -163,17 +163,17 @@ func (e *Error) Unwrap() error {
 
 // Config holds configuration for IPC connections
 type Config struct {
-	ConnectTimeout      time.Duration            // Timeout for connection establishment
-	ReadTimeout         time.Duration            // Timeout for read operations
-	WriteTimeout        time.Duration            // Timeout for write operations
-	BufferSize          int                      // Buffer size for read/write operations (Windows Named Pipe only)
-	UnixSocketPerm      uint32                   // Unix socket file permissions (e.g., 0700). Default: 0700 (owner only). Unix/Linux only.
-	UnixSocketDirPerm   uint32                   // Unix socket directory permissions (e.g., 0755). Default: 0755. Unix/Linux only.
-	KeepAlive           bool                     // Enable TCP keepalive for TCP connections. Default: true.
-	KeepAlivePeriod     time.Duration            // TCP keepalive period. Default: 30s. Only applies to TCP connections.
-	WindowsSecuritySDDL string                   // Windows security descriptor (SDDL string). Windows only. Empty = default security.
-	Metrics             metrics.MetricsCollector // Optional metrics collector
-	Logger              log.StructuredLogger     // Optional structured logger
+	ConnectTimeout      time.Duration        // Timeout for connection establishment
+	ReadTimeout         time.Duration        // Timeout for read operations
+	WriteTimeout        time.Duration        // Timeout for write operations
+	BufferSize          int                  // Buffer size for read/write operations (Windows Named Pipe only)
+	UnixSocketPerm      uint32               // Unix socket file permissions (e.g., 0700). Default: 0700 (owner only). Unix/Linux only.
+	UnixSocketDirPerm   uint32               // Unix socket directory permissions (e.g., 0755). Default: 0755. Unix/Linux only.
+	KeepAlive           bool                 // Enable TCP keepalive for TCP connections. Default: true.
+	KeepAlivePeriod     time.Duration        // TCP keepalive period. Default: 30s. Only applies to TCP connections.
+	WindowsSecuritySDDL string               // Windows security descriptor (SDDL string). Windows only. Empty = default security.
+	Metrics             metrics.IPCObserver  // Optional metrics collector
+	Logger              log.StructuredLogger // Optional structured logger
 }
 
 // DefaultConfig returns default configuration
@@ -259,7 +259,7 @@ func WithKeepAlivePeriod(period time.Duration) Option {
 }
 
 // WithMetrics sets the metrics collector
-func WithMetrics(m metrics.MetricsCollector) Option {
+func WithMetrics(m metrics.IPCObserver) Option {
 	return func(c *Config) {
 		c.Metrics = m
 	}

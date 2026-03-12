@@ -8,6 +8,9 @@
 
 Current registration APIs are explicit:
 
+- `frontend.NewMountFromDir(dir, opts...)`
+- `frontend.NewMountFS(fsys, opts...)`
+- `frontend.NewMountEmbedded(opts...)`
 - `frontend.RegisterFromDir(router, dir, opts...)`
 - `frontend.RegisterFS(router, fsys, opts...)`
 - `frontend.RegisterEmbedded(router, opts...)`
@@ -21,11 +24,15 @@ There is no implicit mount through `core`; you register the frontend bundle dire
 ```go
 app := core.New(core.WithAddr(":8080"))
 
-if err := frontend.RegisterFromDir(app.Router(), "./dist",
+mount, err := frontend.NewMountFromDir("./dist",
     frontend.WithPrefix("/"),
     frontend.WithFallback(true),
     frontend.WithCacheControl("public, max-age=3600"),
-); err != nil {
+)
+if err != nil {
+    log.Fatal(err)
+}
+if err := mount.Register(app.Router()); err != nil {
     log.Fatal(err)
 }
 
@@ -37,11 +44,15 @@ if err := app.Run(context.Background()); err != nil {
 ### Serve embedded assets
 
 ```go
-if err := frontend.RegisterEmbedded(app.Router(),
+mount, err := frontend.NewMountEmbedded(
     frontend.WithPrefix("/"),
     frontend.WithFallback(true),
     frontend.WithIndexCacheControl("no-cache, no-store, must-revalidate"),
-); err != nil {
+)
+if err != nil {
+    log.Fatal(err)
+}
+if err := mount.Register(app.Router()); err != nil {
     log.Fatal(err)
 }
 ```

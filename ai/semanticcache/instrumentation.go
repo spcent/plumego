@@ -11,11 +11,11 @@ import (
 // InstrumentedSemanticCache wraps SemanticCache with metrics collection.
 type InstrumentedSemanticCache struct {
 	cache     *SemanticCache
-	collector metrics.MetricsCollector
+	collector metrics.Recorder
 }
 
 // NewInstrumentedSemanticCache creates an instrumented semantic cache.
-func NewInstrumentedSemanticCache(cache *SemanticCache, collector metrics.MetricsCollector) *InstrumentedSemanticCache {
+func NewInstrumentedSemanticCache(cache *SemanticCache, collector metrics.Recorder) *InstrumentedSemanticCache {
 	return &InstrumentedSemanticCache{
 		cache:     cache,
 		collector: collector,
@@ -141,11 +141,11 @@ func (c *InstrumentedSemanticCache) Clear(ctx context.Context) error {
 // InstrumentedVectorStore wraps VectorStore with metrics collection.
 type InstrumentedVectorStore struct {
 	store     VectorStore
-	collector metrics.MetricsCollector
+	collector metrics.Recorder
 }
 
 // NewInstrumentedVectorStore creates an instrumented vector store.
-func NewInstrumentedVectorStore(store VectorStore, collector metrics.MetricsCollector) *InstrumentedVectorStore {
+func NewInstrumentedVectorStore(store VectorStore, collector metrics.Recorder) *InstrumentedVectorStore {
 	return &InstrumentedVectorStore{
 		store:     store,
 		collector: collector,

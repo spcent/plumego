@@ -396,6 +396,7 @@ if err != nil {
 
 app := core.New(core.WithHealthManager(healthManager))
 app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
 app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ```
 
@@ -404,10 +405,11 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 ## Observability Adapters
 No need to write your own adapters to hook logging middleware into metrics/tracing backends:
 
-- `metrics.NewPrometheusCollector(namespace)` implements `observability.MetricsCollector`, and exposes a `/metrics` handler via `collector.Handler()`.
+- `metrics.NewPrometheusCollector(namespace)` implements `observability.MetricsCollector`; pair it with `metrics.NewPrometheusExporter(collector)` for `/metrics`.
 - `metrics.NewOpenTelemetryTracer(name)` implements `observability.Tracer`, emitting spans with HTTP metadata.
 
 As shown in `examples/reference`, wire them into `core.New` using `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
+For narrower DI at module boundaries, prefer `metrics.HTTPObserver`, `metrics.MQObserver`, `metrics.DBObserver`, or `metrics.Recorder` instead of the full `metrics.MetricsCollector` when a call site only needs one capability.
 
 To enable a built-in Prometheus endpoint and OpenTelemetry-style tracer in one call:
 

@@ -99,8 +99,11 @@ func main() {
 		core.WithDebug(),
 		core.WithLogger(logger),
 	)
+	app.Use(observability.RequestID())
+	app.Use(observability.Tracing(nil))
+	app.Use(observability.HTTPMetrics(nil))
+	app.Use(observability.AccessLog(app.Logger()))
 	app.Use(recovery.Recovery(app.Logger()))
-	app.Use(observability.Logging(app.Logger(), nil, nil))
 
 	// Phase 1 Routes
 	app.Get("/", indexHandler)
