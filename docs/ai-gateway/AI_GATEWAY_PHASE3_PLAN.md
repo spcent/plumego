@@ -928,13 +928,13 @@ func (re *ResumableEngine) Resume(ctx context.Context, workflowID string) error 
 
 ```bash
 # Semantic cache benchmark
-go test -bench=BenchmarkSemanticCache -benchmem ./ai/cache/
+go test -bench=BenchmarkSemanticCache -benchmem ./x/ai/cache/
 
 # Streaming benchmark
-go test -bench=BenchmarkStreamingWorkflow -benchmem ./ai/orchestration/
+go test -bench=BenchmarkStreamingWorkflow -benchmem ./x/ai/orchestration/
 
 # Rate limiter benchmark
-go test -bench=BenchmarkRateLimiter -benchmem ./ai/ratelimit/
+go test -bench=BenchmarkRateLimiter -benchmem ./x/ai/ratelimit/
 ```
 
 ---
@@ -1112,4 +1112,4 @@ hybridCache := llmcache.NewHybridCache(
 
 **Last Updated**: 2026-02-04
 **Version**: 1.0.0-draft
-**Session**: https://claude.ai/code/session_016oLeQAZaJf2ihFwKHZujqt
+**Session**: https://claude.x/ai/code/session_016oLeQAZaJf2ihFwKHZujqt

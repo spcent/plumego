@@ -105,7 +105,7 @@ docs/
 7. **Security** (security/) — JWT, passwords, headers. Depends on: Middleware
 8. **Tenant** (tenant/) — Multi-tenancy. Depends on: Security, Config
 9. **Scheduler** (scheduler/) — Background tasks. Depends on: App
-10. **AI Gateway** (ai/) — LLM integration. Depends on: Middleware, Security
+10. **AI Gateway** (x/ai/) — LLM integration. Depends on: Middleware, Security
 
 ## Effort Estimation
 

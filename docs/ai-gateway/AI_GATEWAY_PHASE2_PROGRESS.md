@@ -14,7 +14,7 @@ Phase 2 adds production-ready enhancements to the AI Agent Gateway, focusing on 
 
 ### 1. **Prompt Template Engine** ✅ Complete
 
-**Location**: `ai/prompt/`
+**Location**: `x/ai/prompt/`
 
 **Status**: Production-ready
 
@@ -67,7 +67,7 @@ result, _ := engine.Render(ctx, tmpl.ID, map[string]any{
 
 ### 2. **Content Filter System** ✅ Complete
 
-**Location**: `ai/filter/`
+**Location**: `x/ai/filter/`
 
 **Status**: Production-ready
 
@@ -191,8 +191,8 @@ if !result.Allowed {
 ### Test Results
 | Module | Tests | Status |
 |--------|-------|--------|
-| ai/prompt | 15 | ✅ All passing |
-| ai/filter | 10 | ✅ All passing |
+| x/ai/prompt | 15 | ✅ All passing |
+| x/ai/filter | 10 | ✅ All passing |
 | **Total** | **25** | **✅ 100%** |
 
 ---
@@ -270,7 +270,7 @@ if !filterResult.Allowed {
 ### Using Prompt Templates
 
 ```go
-import "github.com/spcent/plumego/ai/prompt"
+import "github.com/spcent/plumego/x/ai/prompt"
 
 engine := prompt.NewEngine(prompt.NewMemoryStorage())
 
@@ -287,7 +287,7 @@ result, _ := engine.RenderByName(ctx, "code-review", map[string]any{
 ### Using Content Filters
 
 ```go
-import "github.com/spcent/plumego/ai/filter"
+import "github.com/spcent/plumego/x/ai/filter"
 
 // Create filters
 piiFilter := filter.NewPIIFilter()
@@ -370,9 +370,9 @@ if !result.Allowed {
 
 ## 📝 Documentation
 
-- [Prompt Template API](/ai/prompt/prompt.go)
-- [Content Filter API](/ai/filter/filter.go)
-- [Built-in Templates](/ai/prompt/builtin.go)
+- [Prompt Template API](/x/ai/prompt/prompt.go)
+- [Content Filter API](/x/ai/filter/filter.go)
+- [Built-in Templates](/x/ai/prompt/builtin.go)
 
 ---
 
@@ -402,10 +402,10 @@ if !result.Allowed {
 
 ```bash
 # Run all Phase 2 tests
-go test -v -timeout 20s ./ai/prompt/ ./ai/filter/
+go test -v -timeout 20s ./x/ai/prompt/ ./x/ai/filter/
 
 # Build check
-go build ./ai/prompt/ ./ai/filter/
+go build ./x/ai/prompt/ ./x/ai/filter/
 ```
 
 ---

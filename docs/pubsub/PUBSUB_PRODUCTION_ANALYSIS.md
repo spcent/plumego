@@ -788,7 +788,7 @@ plumego的pubsub包现已具备：
 
 **提交**: [6cbda1f](https://github.com/spcent/plumego/commit/6cbda1f)
 **分支**: `claude/pubsub-production-analysis-EwDF9`
-**会话**: https://claude.ai/code/session_01PqVMW58BoXfq1Y3fmNRk16
+**会话**: https://claude.x/ai/code/session_01PqVMW58BoXfq1Y3fmNRk16
 
 ---
 

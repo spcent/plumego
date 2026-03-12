@@ -35,7 +35,7 @@ forbidden_imports:
   - middleware/**
   - x/**
   - tenant/**
-  - ai/**
+  - x/ai/**
 
 test_commands:
   - go test -race -timeout 60s ./store/...

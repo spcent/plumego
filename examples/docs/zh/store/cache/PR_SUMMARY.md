@@ -489,7 +489,7 @@ Review and validation: plumego maintainers
 
 ## Session Link
 
-https://claude.ai/code/session_01T2hN5eiPByBCmNmHo96hgJ
+https://claude.x/ai/code/session_01T2hN5eiPByBCmNmHo96hgJ
 
 ---
 

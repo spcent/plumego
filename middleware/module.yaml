@@ -31,7 +31,7 @@ forbidden_imports:
   - store/**
   - x/**
   - tenant/**
-  - ai/**
+  - x/ai/**
 
 test_commands:
   - go test -race -timeout 60s ./middleware/...

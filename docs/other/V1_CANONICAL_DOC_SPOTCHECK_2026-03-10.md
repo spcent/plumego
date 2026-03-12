@@ -12,7 +12,7 @@ Scope: v1 canonical docs only (not historical planning docs)
 - `docs/modules/core/*.md`
 - `docs/modules/router/*.md`
 - `docs/modules/middleware/*.md`
-- `docs/modules/ai/*.md`
+- `docs/modules/x-ai/*.md`
 - `docs/modules/log/*.md`
 - `docs/modules/store/*.md`
 

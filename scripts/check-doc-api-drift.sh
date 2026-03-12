@@ -10,13 +10,12 @@ else
   targets=(
     README.md
     README_CN.md
-    docs/README.md
     docs/getting-started.md
     docs/modules/core/*.md
     docs/modules/router/*.md
     docs/modules/middleware/*.md
     docs/modules/health/*.md
-    docs/modules/ai/*.md
+    docs/modules/x-ai/*.md
     docs/modules/log/*.md
     docs/modules/store/*.md
   )

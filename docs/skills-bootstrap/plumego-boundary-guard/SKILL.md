@@ -7,7 +7,7 @@ description: Enforce Plumego module boundaries and architecture constraints. Use
 Prevent cross-module responsibility leakage.
 
 # Workflow
-1. Classify touched files by module: core/router/middleware/contract/security/tenant/store/ai/utils.
+1. Classify touched files by module: core/router/middleware/contract/security/tenant/store/x/ai/utils.
 2. Check boundary rules from AGENTS.md:
    - no routing behavior in core
    - no business logic in middleware

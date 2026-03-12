@@ -34,7 +34,7 @@ allowed_imports:
 forbidden_imports:
   - x/**
   - tenant/**
-  - ai/**
+  - x/ai/**
   - net/**
   - pubsub/**
   - rest/**

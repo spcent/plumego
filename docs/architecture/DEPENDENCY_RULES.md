@@ -26,4 +26,4 @@ Dependency rules exist to keep module ownership obvious.
 
 ## Migration Notes
 
-While the repository still contains legacy roots such as `tenant`, `ai`, `net`, `pubsub`, `validator`, and `utils`, new work should follow the target layout instead of extending those roots further.
+While the repository still contains legacy roots such as `tenant`, `net`, `pubsub`, `validator`, and `utils`, new work should follow the target layout instead of extending those roots further.

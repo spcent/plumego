@@ -138,4 +138,4 @@ broker.Subscribe("order.created", func(msg *mq.Message) error {
 
 - [Middleware: Proxy](../middleware/proxy.md) — HTTP reverse proxy
 - [Security](../security/) — Webhook signature verification
-- [AI: SSE](../ai/sse.md) — SSE streaming (AI-specific)
+- [AI: SSE](../x/ai/sse.md) — SSE streaming (AI-specific)

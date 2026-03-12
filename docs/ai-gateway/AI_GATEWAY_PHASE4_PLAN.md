@@ -116,7 +116,7 @@ type SearchQuery struct {
 
 **实现方案**:
 ```
-ai/marketplace/
+x/ai/marketplace/
 ├── registry.go          # Agent 注册表核心
 ├── registry_local.go    # 本地文件系统实现
 ├── registry_remote.go   # 远程仓库实现
@@ -1242,7 +1242,7 @@ Sprint 3 (多模态) ← Phase 1 (Provider抽象)
 
 ```
 plumego/
-├── ai/
+├── x/ai/
 │   ├── marketplace/         # Sprint 1
 │   │   ├── registry/
 │   │   ├── installer/

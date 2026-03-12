@@ -1,0 +1,64 @@
+name: x/ai
+path: x/ai
+layer: extension
+status: experimental
+owner: ai-gateway
+summary: AI gateway capabilities including providers, sessions, streaming, tools, and resilience helpers.
+
+responsibilities:
+  - Provider adapters
+  - Session and context management
+  - Streaming helpers
+  - Tool invocation primitives
+  - AI-focused resilience and caching helpers
+
+non_goals:
+  - Core app bootstrap
+  - Stable root-package entrypoints
+  - Generic persistence abstractions
+  - Business-specific prompt flows
+
+public_entrypoints:
+  - provider
+  - session
+  - streaming
+  - tool
+  - orchestration
+  - resilience
+
+allowed_imports:
+  - contract
+  - middleware
+  - security
+  - store
+  - log
+  - metrics
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/webhook/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/...
+  - go test -timeout 20s ./x/ai/...
+  - go vet ./x/ai/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - provider compatibility regression
+  - streaming behavior regression
+  - cache/session correctness regression
+
+review_checklist:
+  - Keep AI wiring explicit outside core
+  - Do not add hidden provider globals
+  - Keep transport concerns out of AI packages
+
+agent_hints:
+  - Prefer explicit handler-level composition
+  - Keep provider integrations isolated by subpackage
+  - Do not require core to know AI internals

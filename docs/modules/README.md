@@ -40,6 +40,7 @@ This page is the canonical entry for module docs.
 ## Extension Modules
 
 - [x/tenant](x-tenant/README.md): target multi-tenant extension boundary
+- [x/ai](x-ai/README.md): AI gateway capabilities
 
 ## Legacy Roots Being Retired
 
@@ -48,7 +49,6 @@ This page is the canonical entry for module docs.
 - [frontend](frontend/README.md): static/embedded asset mounting
 - [net](net/README.md): networking helpers (webhook/websocket/discovery/mq)
 - [scheduler](scheduler/README.md): cron/delayed/retry task scheduling
-- [ai](ai/README.md): AI gateway capabilities
 - [tenant](tenant/README.md): experimental multi-tenant primitives
 
 ## Notes

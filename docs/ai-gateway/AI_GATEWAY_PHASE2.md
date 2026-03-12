@@ -14,11 +14,11 @@ Phase 2 adds intelligent features for prompt management, content filtering, cach
 
 | Feature | Package | Description | Tests |
 |---------|---------|-------------|-------|
-| **Prompt Templates** | `ai/prompt` | Template engine with variables and versioning | 15/15 ✅ |
-| **Content Filtering** | `ai/filter` | PII, secret, and injection detection | 10/10 ✅ |
-| **LLM Caching** | `ai/llmcache` | Hash-based response caching with TTL | 11/11 ✅ |
-| **Enhanced Routing** | `ai/provider` | Task-based, cost-optimized, smart routing | 20/20 ✅ |
-| **Orchestration** | `ai/orchestration` | Multi-agent workflow execution | 11/11 ✅ |
+| **Prompt Templates** | `x/ai/prompt` | Template engine with variables and versioning | 15/15 ✅ |
+| **Content Filtering** | `x/ai/filter` | PII, secret, and injection detection | 10/10 ✅ |
+| **LLM Caching** | `x/ai/llmcache` | Hash-based response caching with TTL | 11/11 ✅ |
+| **Enhanced Routing** | `x/ai/provider` | Task-based, cost-optimized, smart routing | 20/20 ✅ |
+| **Orchestration** | `x/ai/orchestration` | Multi-agent workflow execution | 11/11 ✅ |
 
 **Total Phase 2 Tests**: 67/67 passing ✅
 **Combined Phase 1+2 Tests**: 122/122 passing ✅
@@ -728,11 +728,11 @@ import (
     "context"
     "time"
 
-    "github.com/spcent/plumego/ai/filter"
-    "github.com/spcent/plumego/ai/llmcache"
-    "github.com/spcent/plumego/ai/orchestration"
-    "github.com/spcent/plumego/ai/prompt"
-    "github.com/spcent/plumego/ai/provider"
+    "github.com/spcent/plumego/x/ai/filter"
+    "github.com/spcent/plumego/x/ai/llmcache"
+    "github.com/spcent/plumego/x/ai/orchestration"
+    "github.com/spcent/plumego/x/ai/prompt"
+    "github.com/spcent/plumego/x/ai/provider"
 )
 
 func main() {
@@ -802,20 +802,20 @@ All Phase 2 features have comprehensive test coverage:
 
 ```bash
 # Run all AI tests
-go test ./ai/...
+go test ./x/ai/...
 
 # Run specific Phase 2 tests
-go test ./ai/prompt/     # 15 tests
-go test ./ai/filter/     # 10 tests
-go test ./ai/llmcache/   # 11 tests
-go test ./ai/provider/   # 20 tests (includes routing)
-go test ./ai/orchestration/  # 11 tests
+go test ./x/ai/prompt/     # 15 tests
+go test ./x/ai/filter/     # 10 tests
+go test ./x/ai/llmcache/   # 11 tests
+go test ./x/ai/provider/   # 20 tests (includes routing)
+go test ./x/ai/orchestration/  # 11 tests
 
 # Run with race detector
-go test -race ./ai/...
+go test -race ./x/ai/...
 
 # Run with coverage
-go test -cover ./ai/...
+go test -cover ./x/ai/...
 ```
 
 ---
@@ -887,7 +887,7 @@ A: Simple keyword matching on the first 500 characters. It's fast and accurate e
 A: Current implementation is in-memory. For long-running workflows, consider adding persistence or using a dedicated workflow engine.
 
 **Q: Can I extend builtin filters?**
-A: Yes! Implement the `Filter` interface and add to your chain. See `ai/filter/filter.go` for examples.
+A: Yes! Implement the `Filter` interface and add to your chain. See `x/ai/filter/filter.go` for examples.
 
 ---
 
@@ -903,4 +903,4 @@ For questions or contributions, see the main [README.md](../README.md) and [AGEN
 
 **Last Updated**: 2026-02-04
 **Author**: Claude Code Agent
-**Session**: https://claude.ai/code/session_016oLeQAZaJf2ihFwKHZujqt
+**Session**: https://claude.x/ai/code/session_016oLeQAZaJf2ihFwKHZujqt

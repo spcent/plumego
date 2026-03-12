@@ -12,7 +12,7 @@ Phase 1 successfully implements the core foundation for transforming Plumego int
 
 ### 1. SSE (Server-Sent Events) ✅
 
-**Location**: `ai/sse/`
+**Location**: `x/ai/sse/`
 
 **Features**:
 - Full SSE protocol implementation
@@ -38,7 +38,7 @@ stream.Close()
 
 ### 2. Tokenizer ✅
 
-**Location**: `ai/tokenizer/`
+**Location**: `x/ai/tokenizer/`
 
 **Features**:
 - Unified tokenizer interface
@@ -68,7 +68,7 @@ usage := counter.Usage()
 
 ### 3. LLM Provider Abstraction ✅
 
-**Location**: `ai/provider/`
+**Location**: `x/ai/provider/`
 
 **Features**:
 - Unified Provider interface
@@ -120,7 +120,7 @@ for {
 
 ### 4. Session Management ✅
 
-**Location**: `ai/session/`
+**Location**: `x/ai/session/`
 
 **Features**:
 - Session lifecycle management
@@ -162,7 +162,7 @@ value, err := manager.GetContext(ctx, sess.ID, "key")
 
 ### 5. Tool Framework ✅
 
-**Location**: `ai/tool/`
+**Location**: `x/ai/tool/`
 
 **Features**:
 - Tool interface for custom functions
@@ -248,11 +248,11 @@ go run examples/ai-agent-gateway/main.go
 
 | Module | Tests | Status |
 |--------|-------|--------|
-| `ai/sse` | 9 | ✅ All passing |
-| `ai/tokenizer` | 11 | ✅ All passing |
-| `ai/provider` | 11 | ✅ All passing |
-| `ai/session` | 11 | ✅ All passing |
-| `ai/tool` | 13 | ✅ All passing |
+| `x/ai/sse` | 9 | ✅ All passing |
+| `x/ai/tokenizer` | 11 | ✅ All passing |
+| `x/ai/provider` | 11 | ✅ All passing |
+| `x/ai/session` | 11 | ✅ All passing |
+| `x/ai/tool` | 13 | ✅ All passing |
 | **Total** | **55** | **✅ 100%** |
 
 All tests pass with proper error handling, edge cases, and concurrent access patterns.
@@ -269,20 +269,20 @@ All tests pass with proper error handling, edge cases, and concurrent access pat
                     v
 ┌────────────────────────────────────────────────┐
 │              HTTP/SSE Endpoints                 │
-│                   (ai/sse)                      │
+│                   (x/ai/sse)                      │
 └───────────────────┬────────────────────────────┘
                     │
         ┌───────────┴───────────┐
         v                       v
 ┌───────────────────┐   ┌──────────────────┐
 │  Session Manager  │   │  Tool Registry   │
-│   (ai/session)    │   │    (ai/tool)     │
+│   (x/ai/session)    │   │    (x/ai/tool)     │
 └────────┬──────────┘   └────────┬─────────┘
          │                       │
          v                       v
 ┌───────────────────────────────────────────────┐
 │           Provider Manager                     │
-│            (ai/provider)                       │
+│            (x/ai/provider)                       │
 │  ┌─────────────────┬──────────────────────┐   │
 │  │ ClaudeProvider  │  OpenAIProvider      │   │
 │  └─────────────────┴──────────────────────┘   │
@@ -292,7 +292,7 @@ All tests pass with proper error handling, edge cases, and concurrent access pat
          v                     v
 ┌─────────────────┐   ┌─────────────────┐
 │   Tokenizer     │   │  Tool Execution │
-│ (ai/tokenizer)  │   │    (ai/tool)    │
+│ (x/ai/tokenizer)  │   │    (x/ai/tool)    │
 └─────────────────┘   └─────────────────┘
 ```
 
@@ -326,18 +326,18 @@ registry := tool.NewRegistry(tool.WithPolicy(policy))
 ### 3. Metrics Integration
 ```go
 // Already compatible with plumego metrics
-// ai/provider tracks:
+// x/ai/provider tracks:
 //   - Request count
 //   - Token usage
 //   - Latency
 //   - Error rates
 
-// ai/session tracks:
+// x/ai/session tracks:
 //   - Active sessions
 //   - Message count
 //   - Token consumption
 
-// ai/tool tracks:
+// x/ai/tool tracks:
 //   - Tool execution count
 //   - Success/failure rates
 //   - Execution duration
@@ -349,11 +349,11 @@ registry := tool.NewRegistry(tool.WithPolicy(policy))
 
 | Module | Status | Stability |
 |--------|--------|-----------|
-| `ai/sse` | ✅ Complete | **High** - Standard SSE protocol |
-| `ai/tokenizer` | ✅ Complete | **High** - Interface stable |
-| `ai/provider` | ✅ Complete | **Medium** - May add providers |
-| `ai/session` | ✅ Complete | **Medium** - May add features |
-| `ai/tool` | ✅ Complete | **High** - Core API stable |
+| `x/ai/sse` | ✅ Complete | **High** - Standard SSE protocol |
+| `x/ai/tokenizer` | ✅ Complete | **High** - Interface stable |
+| `x/ai/provider` | ✅ Complete | **Medium** - May add providers |
+| `x/ai/session` | ✅ Complete | **Medium** - May add features |
+| `x/ai/tool` | ✅ Complete | **High** - Core API stable |
 
 ---
 
@@ -472,7 +472,7 @@ Based on the original plan, Phase 2 will add:
 
 Run all tests:
 ```bash
-go test -v -timeout 20s ./ai/...
+go test -v -timeout 20s ./x/ai/...
 ```
 
 Run example:
@@ -482,7 +482,7 @@ go run examples/ai-agent-gateway/main.go
 
 Build check:
 ```bash
-go build ./ai/...
+go build ./x/ai/...
 ```
 
 ---
