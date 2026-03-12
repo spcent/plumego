@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
@@ -103,7 +103,7 @@ func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 		if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
 			r.Post(c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
-					contractio.WriteHTTPError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "POST only")
+					contract.WriteHTTPError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "POST only")
 					return
 				}
 				// Always require authentication for broadcast endpoint.
@@ -118,13 +118,13 @@ func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 				// Secrets in URLs can be leaked via server logs and Referer headers.
 
 				if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
-					contractio.WriteHTTPError(w, r, http.StatusUnauthorized, "unauthorized", "unauthorized")
+					contract.WriteHTTPError(w, r, http.StatusUnauthorized, "unauthorized", "unauthorized")
 					return
 				}
 
 				b, err := io.ReadAll(r.Body)
 				if err != nil {
-					contractio.WriteHTTPError(w, r, http.StatusInternalServerError, "read_body_failed", "Error reading request body")
+					contract.WriteHTTPError(w, r, http.StatusInternalServerError, "read_body_failed", "Error reading request body")
 					return
 				}
 

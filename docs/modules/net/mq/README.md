@@ -1,6 +1,6 @@
 # In-Memory Message Queue
 
-> **Package**: `github.com/spcent/plumego/net/mq` | **Feature**: Message broker
+> **Package**: `github.com/spcent/plumego/x/mq` | **Feature**: Message broker
 
 ## Overview
 
@@ -9,7 +9,7 @@ The `mq` package provides an in-process message queue with a pub/sub broker. It 
 ## Quick Start
 
 ```go
-import "github.com/spcent/plumego/net/mq"
+import "github.com/spcent/plumego/x/mq"
 
 // Create broker
 broker := mq.NewBroker(

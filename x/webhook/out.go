@@ -13,7 +13,6 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/utils/stringsx"
@@ -108,17 +107,17 @@ type targetDTO struct {
 func webhookCreateTarget(ctx *contract.Ctx, svc *Service) {
 	var req Target
 	if err := ctx.BindJSON(&req); err != nil {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	t, err := svc.CreateTarget(ctx.R.Context(), req)
 	if err != nil {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusCreated, targetToDTO(t))
+	contract.WriteContractResponse(ctx, http.StatusCreated, targetToDTO(t))
 }
 
 func webhookListTargets(ctx *contract.Ctx, svc *Service) {
@@ -136,7 +135,7 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 		Event:   event,
 	})
 	if err != nil {
-		contractio.WriteContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
+		contract.WriteContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
 		return
 	}
 
@@ -145,71 +144,71 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 		out = append(out, targetToDTO(t))
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{"items": out})
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{"items": out})
 }
 
 func webhookGetTarget(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	t, ok := svc.GetTarget(ctx.R.Context(), id)
 	if !ok {
-		contractio.WriteContractError(ctx, http.StatusNotFound, "not_found", "target not found")
+		contract.WriteContractError(ctx, http.StatusNotFound, "not_found", "target not found")
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	contract.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookPatchTarget(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	var req TargetPatch
 	if err := ctx.BindJSON(&req); err != nil {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, req)
 	if err != nil {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	contract.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookSetTargetEnabled(ctx *contract.Ctx, svc *Service, enable bool) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, TargetPatch{Enabled: &enable})
 	if err != nil {
 		if err == ErrNotFound {
-			contractio.WriteContractError(ctx, http.StatusNotFound, "not_found", "target not found")
+			contract.WriteContractError(ctx, http.StatusNotFound, "not_found", "target not found")
 			return
 		}
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	contract.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
 }
 
 func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmpty bool) {
 	event, ok := ctx.Param("event")
 	if !ok || strings.TrimSpace(event) == "" {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "event is required")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "event is required")
 		return
 	}
 
@@ -219,11 +218,11 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 	}
 
 	if token == "" && !allowEmpty {
-		contractio.WriteContractError(ctx, http.StatusForbidden, "forbidden", "triggering is disabled")
+		contract.WriteContractError(ctx, http.StatusForbidden, "forbidden", "triggering is disabled")
 		return
 	}
 	if token != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-		contractio.WriteContractError(ctx, http.StatusUnauthorized, "unauthorized", "invalid trigger token")
+		contract.WriteContractError(ctx, http.StatusUnauthorized, "unauthorized", "invalid trigger token")
 		return
 	}
 
@@ -232,17 +231,17 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 		Meta map[string]any `json:"meta"`
 	}
 	if err := ctx.BindJSON(&payload); err != nil {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
 		return
 	}
 
 	enqueued, err := svc.TriggerEvent(ctx.R.Context(), Event{Type: event, Data: payload.Data, Meta: payload.Meta})
 	if err != nil {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusAccepted, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusAccepted, map[string]any{
 		"enqueued": enqueued,
 		"event":    event,
 	})
@@ -283,7 +282,7 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 
 	deliveries, err := svc.ListDeliveries(ctx.R.Context(), filter)
 	if err != nil {
-		contractio.WriteContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
+		contract.WriteContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
 		return
 	}
 
@@ -323,25 +322,25 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 	}
 
 	resp := map[string]any{"items": out}
-	contractio.WriteContractResponse(ctx, http.StatusOK, resp)
+	contract.WriteContractResponse(ctx, http.StatusOK, resp)
 }
 
 func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	d, ok := svc.GetDelivery(ctx.R.Context(), id)
 	if !ok {
-		contractio.WriteContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
+		contract.WriteContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
 		return
 	}
 
 	payload := json.RawMessage(d.PayloadJSON)
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"id":                d.ID,
 		"target_id":         d.TargetID,
 		"event_id":          d.EventID,
@@ -362,21 +361,21 @@ func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
 func webhookReplayDelivery(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
 		return
 	}
 
 	d, err := svc.ReplayDelivery(ctx.R.Context(), id)
 	if errors.Is(err, ErrNotFound) {
-		contractio.WriteContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
+		contract.WriteContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
 		return
 	}
 	if err != nil {
-		contractio.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID})
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID})
 }
 
 func targetToDTO(t Target) targetDTO {

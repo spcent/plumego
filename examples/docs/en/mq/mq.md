@@ -214,7 +214,7 @@ func validateMessage(msg Message) error {
 === RUN   TestInProcBrokerMetrics
 --- PASS: TestInProcBrokerMetrics (0.00s)
 PASS
-ok  	github.com/spcent/plumego/net/mq	0.603s
+ok  	github.com/spcent/plumego/x/mq	0.603s
 ```
 
 ### After Improvements
@@ -236,7 +236,7 @@ ok  	github.com/spcent/plumego/net/mq	0.603s
 === RUN   TestInProcBrokerLongTopic
 --- PASS: TestInProcBrokerLongTopic (0.00s)
 PASS
-ok  	github.com/spcent/plumego/net/mq	0.698s
+ok  	github.com/spcent/plumego/x/mq	0.698s
 ```
 
 **Test Coverage Improvement:** 4 → 8 test cases (100% increase)

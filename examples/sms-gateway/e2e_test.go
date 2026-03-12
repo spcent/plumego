@@ -12,11 +12,11 @@ import (
 	"github.com/spcent/plumego/examples/sms-gateway/internal/routing"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/tasks"
 	logpkg "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/net/mq"
-	mqstore "github.com/spcent/plumego/net/mq/store"
 	"github.com/spcent/plumego/store/idempotency"
 	kvstore "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/tenant"
+	"github.com/spcent/plumego/x/mq"
+	mqstore "github.com/spcent/plumego/x/mq/store"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 

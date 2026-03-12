@@ -8,10 +8,9 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 type PubSubDebugComponent struct {
@@ -41,18 +40,18 @@ func (c *PubSubDebugComponent) RegisterRoutes(r *router.Router) {
 
 		r.Get(path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 			if pub == nil {
-				contractio.WriteContractError(ctx, http.StatusInternalServerError, "missing_pubsub", "pubsub is not configured")
+				contract.WriteContractError(ctx, http.StatusInternalServerError, "missing_pubsub", "pubsub is not configured")
 				return
 			}
 
 			type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
 
 			if ps, ok := pub.(snapshoter); ok {
-				contractio.WriteContractResponse(ctx, http.StatusOK, ps.Snapshot())
+				contract.WriteContractResponse(ctx, http.StatusOK, ps.Snapshot())
 				return
 			}
 
-			contractio.WriteContractError(ctx, http.StatusNotImplemented, "not_supported", "pubsub snapshot not supported by this implementation")
+			contract.WriteContractError(ctx, http.StatusNotImplemented, "not_supported", "pubsub snapshot not supported by this implementation")
 		}, r.Logger()))
 	})
 }

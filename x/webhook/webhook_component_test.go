@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 func TestWebhookBridge(t *testing.T) {

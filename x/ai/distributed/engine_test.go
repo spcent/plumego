@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/net/mq"
-	"github.com/spcent/plumego/pubsub"
 	kv "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/x/ai/orchestration"
+	"github.com/spcent/plumego/x/mq"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 func TestDistributedEngine_ExecuteAsync(t *testing.T) {

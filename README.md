@@ -434,20 +434,6 @@ No need to write your own adapters to hook logging middleware into metrics/traci
 As shown in `reference/standard-service`, wire them into `core.New` using `core.WithPrometheusCollector(...)` and `core.WithTracer(...)`, then mount request metrics explicitly with `observability.HTTPMetrics(app.HTTPMetrics())`.
 For narrower DI at module boundaries, prefer `metrics.HTTPObserver`, `metrics.MQObserver`, `metrics.DBObserver`, or `metrics.Recorder` instead of the full `metrics.AggregateCollector` when a call site only needs one capability.
 
-To enable a built-in Prometheus endpoint and OpenTelemetry-style tracer in one call:
-
-```go
-obs := core.DefaultObservabilityConfig()
-obs.Metrics.Enabled = true
-obs.Tracing.Enabled = true
-
-if err := app.ConfigureObservability(obs); err != nil {
-    log.Fatal(err)
-}
-```
-
-When tracing is enabled, logs include `trace_id` and `span_id`, and responses include `X-Span-ID` for correlation.
-
 ## Configuration Reference
 Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Config keys are normalized to lower_snake_case for lookups, so CamelCase and UPPER_SNAKE resolve to the same value. Durations in environment variables use milliseconds (the `_MS` suffix). Use the table below for predictable deployments.
 

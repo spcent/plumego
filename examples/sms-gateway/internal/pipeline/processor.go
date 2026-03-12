@@ -9,7 +9,7 @@ import (
 	"github.com/spcent/plumego/examples/sms-gateway/internal/routing"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/tasks"
 	"github.com/spcent/plumego/metrics/smsgateway"
-	"github.com/spcent/plumego/net/mq"
+	"github.com/spcent/plumego/x/mq"
 )
 
 // Processor wires queue tasks to provider sending + state transitions.

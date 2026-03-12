@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/net/mq"
 	"github.com/spcent/plumego/store/idempotency"
+	"github.com/spcent/plumego/x/mq"
 )
 
 func TestSMSGatewaySQLDeduper(t *testing.T) {

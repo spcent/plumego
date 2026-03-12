@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/spcent/plumego/net/mq"
+	"github.com/spcent/plumego/x/mq"
 )
 
 var (

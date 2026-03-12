@@ -3,7 +3,7 @@ package webhook
 import (
 	"time"
 
-	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 // WebhookOutConfig configures the outbound webhook management endpoints.

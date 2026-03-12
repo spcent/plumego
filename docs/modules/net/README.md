@@ -38,7 +38,7 @@ Moved extension surfaces:
 ### Service Discovery
 
 ```go
-import "github.com/spcent/plumego/net/discovery"
+import "github.com/spcent/plumego/x/discovery"
 
 // Static service registry
 registry := discovery.NewStatic(
@@ -52,7 +52,7 @@ addr, err := registry.Resolve("payment-service")
 ### Message Queue
 
 ```go
-import "github.com/spcent/plumego/net/mq"
+import "github.com/spcent/plumego/x/mq"
 
 broker := mq.NewBroker()
 broker.Start()

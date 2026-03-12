@@ -10,7 +10,6 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
@@ -204,7 +203,7 @@ func (c *Component) handleSummary(ctx *contract.Ctx) {
 		},
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, data)
+	contract.WriteContractResponse(ctx, http.StatusOK, data)
 }
 
 func (c *Component) handleQueueStats(ctx *contract.Ctx) {
@@ -248,7 +247,7 @@ func (c *Component) handleQueueStats(ctx *contract.Ctx) {
 		stats = []QueueStats{snapshot}
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"queues": stats,
 	})
 }
@@ -275,7 +274,7 @@ func (c *Component) handleQueueReplay(ctx *contract.Ctx) {
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"replay": result,
 	})
 }
@@ -302,7 +301,7 @@ func (c *Component) handleReceiptLookup(ctx *contract.Ctx) {
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"receipt": receipt,
 	})
 }
@@ -348,7 +347,7 @@ func (c *Component) handleChannelHealth(ctx *contract.Ctx) {
 		channels = []ChannelHealth{status}
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"channels": channels,
 	})
 }
@@ -375,7 +374,7 @@ func (c *Component) handleTenantQuota(ctx *contract.Ctx) {
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"quota": snapshot,
 	})
 }

@@ -7,11 +7,11 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/spcent/plumego/frontend"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/reference/standard-service/internal/docsite"
 	"github.com/spcent/plumego/reference/standard-service/internal/handler"
+	"github.com/spcent/plumego/x/frontend"
 )
 
 // RegisterRoutes wires all HTTP routes for the reference application.

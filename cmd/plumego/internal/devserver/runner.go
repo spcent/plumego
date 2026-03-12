@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 // AppRunner manages the user application lifecycle

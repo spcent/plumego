@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spcent/plumego/net/mq"
-	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/x/ai/orchestration"
+	"github.com/spcent/plumego/x/mq"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 // TaskStatus represents the status of a workflow task.

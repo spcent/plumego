@@ -46,7 +46,7 @@ subscriber
 ## Quick Start
 
 ```go
-import "github.com/spcent/plumego/pubsub"
+import "github.com/spcent/plumego/x/pubsub"
 
 // Create pubsub
 ps := pubsub.New()

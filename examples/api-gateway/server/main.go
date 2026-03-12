@@ -13,11 +13,11 @@ import (
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
-	"github.com/spcent/plumego/net/discovery"
-	"github.com/spcent/plumego/net/gateway"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/security/jwt"
 	kvstore "github.com/spcent/plumego/store/kv"
+	"github.com/spcent/plumego/x/discovery"
+	"github.com/spcent/plumego/x/gateway"
 )
 
 func main() {

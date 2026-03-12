@@ -11,7 +11,6 @@ import (
 	"github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
@@ -84,11 +83,11 @@ func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
 		payload := map[string]any{
 			"routes": r.Routes(),
 		}
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, payload)
+		contract.WriteHTTPResponse(w, req, http.StatusOK, payload)
 	}))
 
 	r.Get("/_config", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
+		contract.WriteHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
 	}))
 
 	r.Get("/_info", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -96,7 +95,7 @@ func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
 			"config": c.configSnapshot(),
 			"build":  health.GetBuildInfo(),
 		}
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, payload)
+		contract.WriteHTTPResponse(w, req, http.StatusOK, payload)
 	}))
 
 	r.Get(DevToolsRoutesPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -108,29 +107,29 @@ func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
 		payload := map[string]any{
 			"routes": r.Routes(),
 		}
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, payload)
+		contract.WriteHTTPResponse(w, req, http.StatusOK, payload)
 	}))
 
 	r.Get(DevToolsMiddlewarePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"middlewares": c.middlewareList(),
 		}
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, payload)
+		contract.WriteHTTPResponse(w, req, http.StatusOK, payload)
 	}))
 
 	r.Get(DevToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
+		contract.WriteHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
 	}))
 
 	r.Get(DevToolsMetricsPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if c.devMetrics == nil {
-			contractio.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
+			contract.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
 				"enabled": false,
 			})
 			return
 		}
 
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
+		contract.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
 			"enabled": true,
 			"http":    c.devMetrics.Snapshot(),
 			"db":      c.devMetrics.DBSnapshot(),
@@ -141,7 +140,7 @@ func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
 		if c.devMetrics != nil {
 			c.devMetrics.Clear()
 		}
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
+		contract.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
 			"status": "ok",
 		})
 	}))
@@ -170,7 +169,7 @@ func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
 			return
 		}
 
-		contractio.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
+		contract.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
 			"status": "ok",
 		})
 	}))

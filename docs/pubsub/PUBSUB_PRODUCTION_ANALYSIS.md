@@ -498,7 +498,7 @@ type RateLimitStats struct {
 
 ```bash
 $ go test ./pubsub -timeout 60s
-ok  	github.com/spcent/plumego/pubsub	15.458s
+ok  	github.com/spcent/plumego/x/pubsub	15.458s
 
 ✅ 所有测试通过
 ✅ 零外部依赖（仅Go标准库）

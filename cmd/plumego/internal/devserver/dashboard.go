@@ -13,12 +13,12 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/frontend"
 	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
-	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/x/frontend"
+	"github.com/spcent/plumego/x/pubsub"
 	"github.com/spcent/plumego/x/websocket"
 )
 

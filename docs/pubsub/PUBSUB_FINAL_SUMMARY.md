@@ -525,14 +525,14 @@ PASS: 限流控制 (13/13)
 PASS: Prometheus (15/15)
 PASS: 消费者组 (14/14)
 
-ok  github.com/spcent/plumego/pubsub  19.393s
+ok  github.com/spcent/plumego/x/pubsub  19.393s
 ```
 
 ### 并发安全
 
 ```bash
 $ go test -race ./pubsub
-ok  github.com/spcent/plumego/pubsub  25.123s
+ok  github.com/spcent/plumego/x/pubsub  25.123s
 ```
 
 ### 性能基准

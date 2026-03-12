@@ -1,7 +1,7 @@
 # net/ipc 包详细分析报告
 
 **分析日期**: 2026-01-30
-**包路径**: `github.com/spcent/plumego/net/ipc`
+**包路径**: `github.com/spcent/plumego/x/ipc`
 **分析范围**: 功能完整性、性能、安全性、代码质量
 
 ---

@@ -22,8 +22,8 @@ Distributed workflow execution system for AI agent orchestration across multiple
 import (
     "github.com/spcent/plumego/x/ai/distributed"
     "github.com/spcent/plumego/x/ai/orchestration"
-    "github.com/spcent/plumego/net/mq"
-    "github.com/spcent/plumego/pubsub"
+    "github.com/spcent/plumego/x/mq"
+    "github.com/spcent/plumego/x/pubsub"
     kv "github.com/spcent/plumego/store/kv"
 )
 

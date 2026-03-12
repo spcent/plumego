@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/net/gateway"
+	"github.com/spcent/plumego/x/gateway"
 )
 
 // Config holds the API gateway configuration

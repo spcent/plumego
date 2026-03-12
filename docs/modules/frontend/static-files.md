@@ -1,6 +1,6 @@
 # Serving Static Files
 
-> **Package**: `github.com/spcent/plumego/frontend` | **Feature**: Filesystem serving
+> **Package**: `github.com/spcent/plumego/x/frontend` | **Feature**: Filesystem serving
 
 ## Basic Setup
 
@@ -12,7 +12,7 @@ import (
     "log"
 
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego/frontend"
+    "github.com/spcent/plumego/x/frontend"
 )
 
 func main() {

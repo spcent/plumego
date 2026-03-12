@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/spcent/plumego/net/mq"
-	mqstore "github.com/spcent/plumego/net/mq/store"
+	"github.com/spcent/plumego/x/mq"
+	mqstore "github.com/spcent/plumego/x/mq/store"
 )
 
 func main() {

@@ -2,14 +2,15 @@ package distributed
 
 import (
 	"context"
-	kv "github.com/spcent/plumego/store/kv"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/net/mq"
-	"github.com/spcent/plumego/pubsub"
+	kv "github.com/spcent/plumego/store/kv"
+
 	"github.com/spcent/plumego/x/ai/orchestration"
+	"github.com/spcent/plumego/x/mq"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 func TestMQTaskQueue_Enqueue(t *testing.T) {

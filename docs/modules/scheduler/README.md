@@ -1,6 +1,6 @@
 # Scheduler Module
 
-> **Package Path**: `github.com/spcent/plumego/net/scheduler` | **Stability**: High | **Priority**: P1
+> **Package Path**: `github.com/spcent/plumego/x/scheduler` | **Stability**: High | **Priority**: P1
 
 ## Overview
 
@@ -20,7 +20,7 @@ The `scheduler/` package provides a complete task scheduling system for backgrou
 ### Basic Usage
 
 ```go
-import "github.com/spcent/plumego/net/scheduler"
+import "github.com/spcent/plumego/x/scheduler"
 
 // Create scheduler with 4 workers
 sch := scheduler.New(scheduler.WithWorkers(4))

@@ -104,20 +104,6 @@ Plumego 把“优雅启停 + 运行期护栏”变成了默认配置的一部分
 - `metrics.NewPrometheusCollector(namespace)` 实现 `middleware.MetricsCollector`，并提供 `/metrics` handler
 - `metrics.NewOpenTelemetryTracer(name)` 实现 `middleware.Tracer`，发 span 并带 HTTP 元数据
 
-并且支持一键启用默认可观测性配置：
-
-```go
-obs := core.DefaultObservabilityConfig()
-obs.Metrics.Enabled = true
-obs.Tracing.Enabled = true
-
-if err := app.ConfigureObservability(obs); err != nil {
-    log.Fatal(err)
-}
-```
-
-当 tracing 启用时，日志会包含 `trace_id` / `span_id`，响应包含 `X-Span-ID` 以便关联排障。 ([GitHub][1])
-
 ### WebSocket / Webhook / PubSub：面向“真实工程的边缘能力”
 
 Plumego 把这些能力同样做成“可挂载组件”：

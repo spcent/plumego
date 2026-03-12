@@ -15,9 +15,9 @@ import (
 	"github.com/spcent/plumego/middleware/cors"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
-	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/reference/standard-service/internal/config"
 	"github.com/spcent/plumego/x/devtools/pubsubdebug"
+	"github.com/spcent/plumego/x/pubsub"
 	"github.com/spcent/plumego/x/webhook"
 	xwebsocket "github.com/spcent/plumego/x/websocket"
 )

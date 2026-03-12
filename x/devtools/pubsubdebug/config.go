@@ -1,6 +1,6 @@
 package pubsubdebug
 
-import "github.com/spcent/plumego/pubsub"
+import "github.com/spcent/plumego/x/pubsub"
 
 // PubSubConfig configures the optional pubsub snapshot endpoint.
 type PubSubConfig struct {

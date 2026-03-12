@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 type Rule struct {

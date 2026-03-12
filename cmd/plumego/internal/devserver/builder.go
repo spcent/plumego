@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/pubsub"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 // Builder manages application builds

@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/spcent/plumego/net/scheduler"
+	"github.com/spcent/plumego/x/scheduler"
 )
 
 // This example showcases all the enhanced scheduler features:

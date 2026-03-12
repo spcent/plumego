@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/net/mq"
+	"github.com/spcent/plumego/x/mq"
 )
 
 const (

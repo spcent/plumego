@@ -11,12 +11,11 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/internal/contractio"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/pubsub"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/utils/jsonx"
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 type WebhookInComponent struct {
@@ -82,7 +81,7 @@ func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 		secret = strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		contractio.WriteContractError(ctx, http.StatusInternalServerError, "missing_secret", "GITHUB_WEBHOOK_SECRET is not configured")
+		contract.WriteContractError(ctx, http.StatusInternalServerError, "missing_secret", "GITHUB_WEBHOOK_SECRET is not configured")
 		return
 	}
 
@@ -92,7 +91,7 @@ func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 	}
 	raw, err := VerifyGitHub(ctx.R, secret, maxBody)
 	if err != nil {
-		contractio.WriteContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid GitHub signature")
+		contract.WriteContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid GitHub signature")
 		return
 	}
 
@@ -107,7 +106,7 @@ func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if delivery != "unknown" && d.SeenBefore("github:"+delivery) {
-		contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+		contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 			"ok":          true,
 			"provider":    "github",
 			"event_type":  event,
@@ -140,12 +139,12 @@ func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 
 	if err = c.pub.Publish(topic, msg); err != nil {
 		c.logger.Error("Failed to publish GitHub event", log.Fields{"error": err, "topic": topic, "event_id": delivery})
-		contractio.WriteContractError(ctx, http.StatusInternalServerError, "publish_failed",
+		contract.WriteContractError(ctx, http.StatusInternalServerError, "publish_failed",
 			"failed to forward event to internal bus")
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"ok":          true,
 		"provider":    "github",
 		"topic":       topic,
@@ -162,7 +161,7 @@ func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 		secret = strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		contractio.WriteContractError(ctx, http.StatusInternalServerError, "missing_secret", "STRIPE_WEBHOOK_SECRET is not configured")
+		contract.WriteContractError(ctx, http.StatusInternalServerError, "missing_secret", "STRIPE_WEBHOOK_SECRET is not configured")
 		return
 	}
 
@@ -177,7 +176,7 @@ func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 
 	raw, err := VerifyStripe(ctx.R, secret, StripeVerifyOptions{MaxBody: maxBody, Tolerance: tol})
 	if err != nil {
-		contractio.WriteContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid Stripe signature")
+		contract.WriteContractError(ctx, http.StatusUnauthorized, "invalid_signature", "invalid Stripe signature")
 		return
 	}
 
@@ -192,7 +191,7 @@ func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if evtID != "unknown" && d.SeenBefore("stripe:"+evtID) {
-		contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+		contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 			"ok":         true,
 			"provider":   "stripe",
 			"event_type": evtType,
@@ -225,12 +224,12 @@ func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 
 	if err = c.pub.Publish(topic, msg); err != nil {
 		c.logger.Error("Failed to publish Stripe event", log.Fields{"error": err, "topic": topic, "event_id": evtID})
-		contractio.WriteContractError(ctx, http.StatusInternalServerError, "publish_failed",
+		contract.WriteContractError(ctx, http.StatusInternalServerError, "publish_failed",
 			"failed to forward event to internal bus")
 		return
 	}
 
-	contractio.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
 		"ok":         true,
 		"provider":   "stripe",
 		"topic":      topic,

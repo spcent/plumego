@@ -1,6 +1,6 @@
 # Frontend Module
 
-> **Package Path**: `github.com/spcent/plumego/frontend` | **Stability**: Medium | **Priority**: P2
+> **Package Path**: `github.com/spcent/plumego/x/frontend` | **Stability**: Medium | **Priority**: P2
 
 ## Overview
 

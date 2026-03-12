@@ -1,6 +1,6 @@
 # Service Discovery
 
-> **Package**: `github.com/spcent/plumego/net/discovery` | **Backends**: Static, Consul
+> **Package**: `github.com/spcent/plumego/x/discovery` | **Backends**: Static, Consul
 
 ## Overview
 
@@ -23,7 +23,7 @@ type Discovery interface {
 Best for simple setups with known, fixed endpoints:
 
 ```go
-import "github.com/spcent/plumego/net/discovery"
+import "github.com/spcent/plumego/x/discovery"
 
 registry := discovery.NewStatic(
     discovery.Service{

@@ -1,6 +1,6 @@
 # Embedded Static Assets
 
-> **Package**: `github.com/spcent/plumego/frontend` | **Feature**: Binary bundling with `go:embed`
+> **Package**: `github.com/spcent/plumego/x/frontend` | **Feature**: Binary bundling with `go:embed`
 
 ## Using Plumego's built-in embedded directory
 
@@ -15,7 +15,7 @@ import (
     "log"
 
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego/frontend"
+    "github.com/spcent/plumego/x/frontend"
 )
 
 func main() {

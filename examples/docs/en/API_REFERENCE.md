@@ -59,7 +59,6 @@ r := app.Router()
 wsCfg := xwebsocket.DefaultWebSocketConfig()
 comp, err := xwebsocket.NewComponent(wsCfg, false, app.Logger())
 err = app.MountComponent(comp)
-err := app.ConfigureObservability(core.DefaultObservabilityConfig())
 ```
 
 ## Router (`router`)

@@ -12,8 +12,8 @@ import (
 	"github.com/spcent/plumego/examples/sms-gateway/internal/message"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/pipeline"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/tasks"
-	"github.com/spcent/plumego/net/mq"
-	mqstore "github.com/spcent/plumego/net/mq/store"
+	"github.com/spcent/plumego/x/mq"
+	mqstore "github.com/spcent/plumego/x/mq/store"
 )
 
 func TestSMSGatewaySQLPersistence(t *testing.T) {

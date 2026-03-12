@@ -9,9 +9,9 @@ import (
 	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/recovery"
-	gateway "github.com/spcent/plumego/net/gateway"
 	cb "github.com/spcent/plumego/security/resilience/circuitbreaker"
 	"github.com/spcent/plumego/tenant"
+	"github.com/spcent/plumego/x/gateway"
 	tenantquota "github.com/spcent/plumego/x/tenant/quota"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )

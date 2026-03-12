@@ -108,7 +108,7 @@ client := http.New(
 ### Quick Start
 
 ```go
-import "github.com/spcent/plumego/net/mq"
+import "github.com/spcent/plumego/x/mq"
 
 broker := mq.NewInProcBroker(nil)
 defer broker.Close()

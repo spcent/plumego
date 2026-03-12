@@ -433,20 +433,6 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 如 `reference/standard-service` 所示，使用 `core.WithPrometheusCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`，然后再通过 `observability.HTTPMetrics(app.HTTPMetrics())` 显式挂载请求指标中间件。
 如果某个模块只需要单一能力，优先依赖更窄的接口，例如 `metrics.HTTPObserver`、`metrics.MQObserver`、`metrics.DBObserver` 或 `metrics.Recorder`，而不是整个 `metrics.AggregateCollector`。
 
-如果希望一键启用 Prometheus 指标与 OpenTelemetry 风格追踪：
-
-```go
-obs := core.DefaultObservabilityConfig()
-obs.Metrics.Enabled = true
-obs.Tracing.Enabled = true
-
-if err := app.ConfigureObservability(obs); err != nil {
-    log.Fatal(err)
-}
-```
-
-开启追踪后日志会包含 `trace_id` 与 `span_id`，响应中也会回传 `X-Span-ID` 便于关联。
-
 ## 配置参考
 使用 `config.LoadEnv` 加载环境变量，或绑定命令行标志；`config.ConfigManager` 也提供 `LoadBestEffort` 用于跳过可选配置源失败，并提供 `ReloadWithValidation` 做事务式热加载；配置键在读取时会规范化为小写的 snake_case，因此 CamelCase 和 UPPER_SNAKE 会映射到同一值；带 `_MS` 后缀的环境变量单位为毫秒；使用下表实现可预测的部署。
 
