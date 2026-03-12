@@ -1,4 +1,4 @@
-# Plumego Modules Index (v1 Canonical)
+# Plumego Modules Index (Target Canonical)
 
 This page is the canonical entry for module docs.
 
@@ -6,11 +6,12 @@ This page is the canonical entry for module docs.
 - style baseline: `docs/CANONICAL_STYLE_GUIDE.md`
 - quick start: `docs/getting-started.md`
 
-## Stability Tiers
+## Repository Layers
 
-- `GA (v1.x compatibility)`: `core`, `router`, `middleware`, `contract`, `security`, `store`
-- `Compatibility`: convenience exports in top-level `plumego` package
-- `Experimental (not GA-stable in v1.0)`: `tenant/*`, `net/mq/*`
+- `Stable`: `core`, `router`, `middleware`, `contract`, `security`, `store`, `health`, `log`, `metrics`
+- `Extension`: `x/*`
+- `Reference`: `reference/*`
+- `Examples`: `examples/*`
 
 ## Read Path (Recommended)
 
@@ -20,8 +21,11 @@ This page is the canonical entry for module docs.
 4. [contract](contract/README.md)
 5. [security](security/README.md)
 6. [store](store/README.md)
+7. [health](health/README.md)
+8. [log](log/README.md)
+9. [metrics](metrics/README.md)
 
-## GA Modules
+## Stable Modules
 
 - [core](core/README.md): app lifecycle, boot, options, component/runner hooks
 - [router](router/README.md): route matching, groups, params, reverse routing
@@ -29,13 +33,17 @@ This page is the canonical entry for module docs.
 - [contract](contract/README.md): request context, response/error contracts
 - [security](security/README.md): JWT, headers, abuse/input defenses
 - [store](store/README.md): cache/db/file/kv/idempotency abstractions
+- [health](health/README.md): readiness and health primitives
+- [log](log/README.md): logging contracts and base implementations
+- [metrics](metrics/README.md): metrics contracts and collectors
 
-## Other Modules
+## Extension Modules
+
+- [x/tenant](x-tenant/README.md): target multi-tenant extension boundary
+
+## Legacy Roots Being Retired
 
 - [config](config/README.md): env + runtime config loading
-- [health](health/README.md): readiness/build/health primitives
-- [metrics](metrics/README.md): metrics/tracing adapters
-- [log](log/README.md): structured logging interfaces
 - [validator](validator/README.md): request/field validators
 - [frontend](frontend/README.md): static/embedded asset mounting
 - [net](net/README.md): networking helpers (webhook/websocket/discovery/mq)
@@ -45,5 +53,6 @@ This page is the canonical entry for module docs.
 
 ## Notes
 
-- Prefer explicit package APIs (`core`, `router`, `middleware`, `contract`) in production code and docs.
-- Historical planning docs are archived and should not override v1 canonical guidance.
+- Prefer explicit root stable package APIs in production code and docs.
+- Treat `x/*` as opt-in capability packs.
+- Historical planning docs should not override the target layout described in `docs/architecture/`.

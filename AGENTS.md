@@ -5,7 +5,7 @@ Operational guide for AI coding agents in `spcent/plumego`.
 ## 1) Mission and Constraints
 
 Plumego is a lightweight Go toolkit built on the standard library HTTP model.
-Optimize for: clarity, explicit control flow, backward compatibility, small reversible changes.
+Optimize for: clarity, explicit control flow, agent-friendly module ownership, small reversible changes.
 
 Hard constraints:
 - Preserve `net/http` compatibility
@@ -44,16 +44,25 @@ Canonical defaults:
 | `middleware/` | Cross-cutting HTTP middleware | High |
 | `contract/` | Context, structured errors, response helpers | High |
 | `security/` | JWT, input validation, headers, abuse guard | Critical |
-| `tenant/` | Multi-tenancy contracts and policy/quota primitives | High |
+| `health/` | Health models and readiness helpers | High |
+| `log/` | Logging interfaces and base implementations | High |
+| `metrics/` | Metrics interfaces and collectors | High |
 | `store/` | Persistence abstractions | Medium |
-| `ai/` | AI gateway capabilities | Medium |
-| `utils/` | Small shared helpers only | Low |
+| `x/tenant/` | Multi-tenancy extension boundary | Experimental |
+| `x/*` | Optional or fast-evolving capability packs | Experimental |
 
 Rules:
 - Do not move routing behavior into `core`
 - Do not put business logic in `middleware`
-- Do not put persistence/business logic in `utils`
+- Do not put tenant-aware logic in stable `middleware` or stable `store`
+- Do not add new library code under broad legacy roots like `net/`, `utils/`, `validator/`, `tenant/`, `ai/`
 - Changes in `core/`, `router/`, `middleware/`, `security/` require extra testing
+
+Target layout:
+- Stable library roots remain top-level: `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
+- Extension capability packs live under `x/*`
+- `reference/` defines canonical app layout
+- `examples/` are demos, not architectural authority
 
 ---
 
@@ -112,8 +121,9 @@ Sync targets: `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `env.exampl
 
 ## 8) Agent Workflow
 
-1. Identify module boundary and risk level
-2. Make minimal focused changes
-3. Add/update tests near changed behavior
-4. Run quality gates (§6)
-5. Sync docs if behavior or configuration changed
+1. Identify the target layer: stable root package or `x/*`
+2. Read `specs/repo.yaml`, `specs/dependency-rules.yaml`, and the target `<module>/module.yaml`
+3. Make minimal focused changes inside one primary module when possible
+4. Add/update tests near changed behavior
+5. Run quality gates (§6)
+6. Sync docs if behavior or configuration changed

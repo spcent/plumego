@@ -1,0 +1,33 @@
+required:
+  - name
+  - path
+  - layer
+  - status
+  - summary
+  - responsibilities
+  - non_goals
+  - allowed_imports
+  - forbidden_imports
+  - test_commands
+  - review_checklist
+  - agent_hints
+
+enums:
+  layer:
+    - stable
+    - extension
+    - tooling
+    - reference
+  status:
+    - ga
+    - beta
+    - experimental
+
+limits:
+  responsibilities_max: 7
+  non_goals_max: 7
+  allowed_imports_max: 12
+  forbidden_imports_max: 20
+  test_commands_max: 3
+  review_checklist_max: 5
+  agent_hints_max: 3

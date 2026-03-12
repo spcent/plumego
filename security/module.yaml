@@ -1,0 +1,58 @@
+name: security
+path: security
+layer: stable
+status: ga
+owner: security
+summary: Security helpers for auth, headers, input safety, and abuse protection.
+
+responsibilities:
+  - JWT helpers
+  - Security headers
+  - Input safety
+  - Abuse guard primitives
+  - Password helpers
+
+non_goals:
+  - App bootstrap
+  - Tenant policy orchestration
+  - Persistence logic
+
+public_entrypoints:
+  - jwt
+  - headers
+  - input
+  - abuse
+  - password
+
+allowed_imports:
+  - contract
+  - log
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 60s ./security/...
+  - go test -timeout 20s ./security/...
+  - go vet ./security/...
+
+doc_paths:
+  - docs/modules/security/README.md
+
+change_risks:
+  - auth bypass regression
+  - header policy regression
+  - deny-path regression
+
+review_checklist:
+  - Never log secrets
+  - Fail closed on verification errors
+  - Keep verification logic explicit
+
+agent_hints:
+  - Tenant policy stays in x/tenant
+  - Prefer timing-safe comparison for secrets
+  - Negative-path tests are mandatory for auth changes

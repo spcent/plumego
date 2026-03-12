@@ -10,6 +10,22 @@ Plumego is a lightweight Go HTTP toolkit built entirely on the standard library.
 
 The `core` package is the stable, primary entrypoint. The top-level `plumego` package provides convenience re-exports for common types and options.
 
+## Repository Direction
+
+The target repository layout is now:
+
+- stable root packages: `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
+- extension packages: `x/*`
+- canonical architecture docs: `docs/architecture/*`
+- machine-readable repo rules: `specs/*`
+
+For architecture planning and future refactors, prefer the rules in:
+
+- `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+- `specs/repo.yaml`
+- `specs/dependency-rules.yaml`
+- `<module>/module.yaml`
+
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
 - **Middleware Chain**: Logging, recovery, gzip, CORS, timeout (buffers up to 10 MiB by default), rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.

@@ -1,0 +1,57 @@
+name: router
+path: router
+layer: stable
+status: ga
+owner: runtime
+summary: HTTP route matching, params, groups, and reverse routing.
+
+responsibilities:
+  - Route matching
+  - Path parameters
+  - Route groups
+  - Reverse routing
+  - Static mount primitives
+
+non_goals:
+  - JSON responses
+  - Authentication
+  - Business validation
+  - Service construction
+
+public_entrypoints:
+  - Router
+  - Group
+  - Param
+
+allowed_imports:
+  - contract
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 60s ./router/...
+  - go test -timeout 20s ./router/...
+  - go vet ./router/...
+
+doc_paths:
+  - docs/modules/router/README.md
+
+change_risks:
+  - dispatch regression
+  - param extraction regression
+  - reverse routing regression
+
+review_checklist:
+  - Keep route registration grep-friendly
+  - Preserve explicit method-plus-path behavior
+  - Keep matching deterministic
+
+agent_hints:
+  - No response helpers here
+  - No middleware policy here
+  - No config loading here

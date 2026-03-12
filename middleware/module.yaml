@@ -1,0 +1,57 @@
+name: middleware
+path: middleware
+layer: stable
+status: ga
+owner: transport
+summary: Transport-only HTTP middleware.
+
+responsibilities:
+  - Middleware chaining
+  - Request and response cross-cutting concerns
+  - Recovery, logging, timeout, CORS, compression
+
+non_goals:
+  - Business DTO assembly
+  - Service injection
+  - Tenant policy
+  - Persistence access
+
+public_entrypoints:
+  - Middleware
+  - Registry
+
+allowed_imports:
+  - contract
+  - log
+  - metrics
+  - security
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+  - tenant/**
+  - ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./middleware/...
+  - go test -timeout 20s ./middleware/...
+  - go vet ./middleware/...
+
+doc_paths:
+  - docs/modules/middleware/README.md
+
+change_risks:
+  - middleware order regression
+  - double-next regression
+  - error-path regression
+
+review_checklist:
+  - next must be called exactly once
+  - Keep responsibility transport-only
+  - No request-scoped service locator
+
+agent_hints:
+  - Tenant middleware belongs in x/tenant
+  - Stateful policy should move out of middleware
+  - Keep behavior visible in tests

@@ -1,0 +1,68 @@
+name: core
+path: core
+layer: stable
+status: ga
+owner: runtime
+summary: App lifecycle and HTTP server assembly.
+
+responsibilities:
+  - App construction and options
+  - Route registration entrypoints
+  - Middleware registration entrypoints
+  - HTTP server lifecycle
+  - Startup and shutdown hooks
+
+non_goals:
+  - Route matching
+  - Feature-specific components
+  - Tenant-specific behavior
+  - Persistence logic
+
+public_entrypoints:
+  - New
+  - App
+  - Option
+
+allowed_imports:
+  - contract
+  - router
+  - middleware
+  - health
+  - log
+  - metrics
+
+forbidden_imports:
+  - x/**
+  - tenant/**
+  - ai/**
+  - net/**
+  - pubsub/**
+  - rest/**
+  - validator/**
+  - utils/**
+  - store/db
+  - store/cache
+  - store/file
+
+test_commands:
+  - go test -race -timeout 60s ./core/...
+  - go test -timeout 20s ./core/...
+  - go vet ./core/...
+
+doc_paths:
+  - docs/modules/core/README.md
+
+change_risks:
+  - startup regression
+  - shutdown regression
+  - route assembly regression
+
+review_checklist:
+  - Preserve net/http compatibility
+  - Keep bootstrap explicit
+  - Do not add hidden side effects
+
+agent_hints:
+  - Do not add feature-specific components here
+  - Route behavior belongs in router, not core
+  - Extension wiring should live outside core

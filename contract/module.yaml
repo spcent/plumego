@@ -1,0 +1,57 @@
+name: contract
+path: contract
+layer: stable
+status: ga
+owner: transport
+summary: Request and response contracts, error model, and context helpers.
+
+responsibilities:
+  - Structured error model
+  - Response helpers
+  - Request context helpers
+  - Trace and request metadata helpers
+
+non_goals:
+  - Route matching
+  - App bootstrap
+  - Persistence logic
+  - Business rules
+
+public_entrypoints:
+  - WriteError
+  - WriteResponse
+  - Ctx
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 60s ./contract/...
+  - go test -timeout 20s ./contract/...
+  - go vet ./contract/...
+
+doc_paths:
+  - docs/modules/contract/README.md
+
+change_risks:
+  - error shape regression
+  - response write regression
+  - request context regression
+
+review_checklist:
+  - Keep one error write path
+  - Keep transport helpers explicit
+  - Avoid leaking internals in responses
+
+agent_hints:
+  - Prefer stdlib-shaped helpers
+  - Do not introduce app wiring here
+  - Do not add business-specific response wrappers

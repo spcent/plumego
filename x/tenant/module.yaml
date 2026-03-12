@@ -1,0 +1,65 @@
+name: x/tenant
+path: x/tenant
+layer: extension
+status: experimental
+owner: multitenancy
+summary: Multi-tenant resolution, policy, quota, rate limit, and tenant-aware adapters.
+
+responsibilities:
+  - Tenant resolution
+  - Tenant policy evaluation
+  - Tenant quota management
+  - Tenant rate limiting
+  - Tenant-aware store adapters
+
+non_goals:
+  - Core app bootstrap
+  - Generic middleware registry
+  - Generic database abstractions
+  - Business tenant onboarding flows
+
+public_entrypoints:
+  - resolve
+  - policy
+  - quota
+  - ratelimit
+  - config
+  - store
+
+allowed_imports:
+  - contract
+  - middleware
+  - security
+  - store
+  - log
+  - metrics
+
+forbidden_imports:
+  - core/components/**
+  - x/ai/**
+  - x/webhook/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/tenant/...
+  - go test -timeout 20s ./x/tenant/...
+  - go vet ./x/tenant/...
+
+doc_paths:
+  - docs/modules/x-tenant/README.md
+  - docs/architecture/X_TENANT_BLUEPRINT.md
+
+change_risks:
+  - isolation regression
+  - deny-path regression
+  - middleware ordering regression
+
+review_checklist:
+  - Fail closed on tenant policy errors
+  - Keep tenant-aware logic out of stable store
+  - Keep tenant middleware transport-only
+
+agent_hints:
+  - Prefer subpackage-local middleware
+  - Do not require core to know tenant internals
+  - Reference apps should not depend on this by default

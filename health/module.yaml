@@ -1,0 +1,50 @@
+name: health
+path: health
+layer: stable
+status: ga
+owner: runtime
+summary: Health models and readiness helpers.
+
+responsibilities:
+  - Health status types
+  - Readiness helpers
+  - Health manager abstractions
+
+non_goals:
+  - Feature orchestration
+  - Transport-specific behavior
+
+public_entrypoints:
+  - HealthStatus
+  - HealthManager
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 60s ./health/...
+  - go test -timeout 20s ./health/...
+  - go vet ./health/...
+
+doc_paths:
+  - docs/modules/health/README.md
+
+change_risks:
+  - readiness regression
+  - health state regression
+
+review_checklist:
+  - Keep types simple and explicit
+  - Avoid feature-specific coupling
+
+agent_hints:
+  - Health is a support package, not an app feature catalog
+  - Keep transport concerns elsewhere

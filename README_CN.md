@@ -10,6 +10,22 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 
 `core` 包是稳定的主入口；顶层 `plumego` 包提供常用类型与选项的便捷 re-export。
 
+## 仓库演进方向
+
+目标仓库结构已经收敛为：
+
+- 稳定根级包：`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`
+- 扩展能力包：`x/*`
+- 架构权威文档：`docs/architecture/*`
+- 机器可读规则：`specs/*`
+
+后续架构规划与重构请优先参考：
+
+- `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+- `specs/repo.yaml`
+- `specs/dependency-rules.yaml`
+- `<模块>/module.yaml`
+
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
 - **中间件链**：日志、恢复、gzip、CORS、超时（默认缓冲上限 10 MiB）、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。

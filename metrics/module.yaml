@@ -1,0 +1,50 @@
+name: metrics
+path: metrics
+layer: stable
+status: ga
+owner: observability
+summary: Metrics interfaces and base collectors.
+
+responsibilities:
+  - Metrics collector interfaces
+  - Base collectors
+  - Minimal observability support contracts
+
+non_goals:
+  - App bootstrap
+  - Feature-specific dashboards
+  - Transport policy
+
+public_entrypoints:
+  - MetricsCollector
+
+allowed_imports:
+  - log
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 60s ./metrics/...
+  - go test -timeout 20s ./metrics/...
+  - go vet ./metrics/...
+
+doc_paths:
+  - docs/modules/metrics/README.md
+
+change_risks:
+  - collector compatibility regression
+  - metrics event regression
+
+review_checklist:
+  - Keep contracts small
+  - Avoid feature coupling
+
+agent_hints:
+  - Observability capability packs belong outside the stable layer
+  - Keep transport-specific logic out

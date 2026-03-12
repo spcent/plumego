@@ -1,0 +1,61 @@
+name: store
+path: store
+layer: stable
+status: ga
+owner: persistence
+summary: Stable storage primitives and implementations.
+
+responsibilities:
+  - DB helpers
+  - Cache primitives
+  - File storage
+  - KV storage
+  - Idempotency primitives
+
+non_goals:
+  - Tenant-aware adapters
+  - Business repositories
+  - AI-specific caches
+  - HTTP transport behavior
+
+public_entrypoints:
+  - db
+  - cache
+  - file
+  - kv
+  - idempotency
+
+allowed_imports:
+  - contract
+  - log
+  - metrics
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/**
+  - tenant/**
+  - ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./store/...
+  - go test -timeout 20s ./store/...
+  - go vet ./store/...
+
+doc_paths:
+  - docs/modules/store/README.md
+
+change_risks:
+  - persistence correctness regression
+  - concurrent access regression
+  - isolation regression
+
+review_checklist:
+  - Keep store APIs transport-agnostic
+  - No tenant-specific logic in stable store
+  - Prefer stdlib-compatible abstractions
+
+agent_hints:
+  - Move tenant-aware adapters to x/tenant/store
+  - Move feature-specific caches to the owning feature package
+  - Do not turn store into a business repository layer

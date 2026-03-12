@@ -1,0 +1,97 @@
+repo:
+  name: plumego
+  module: github.com/spcent/plumego
+  mode: agent-first
+  goals:
+    - Fast, low-regret iteration by agents
+    - Clear stable surface area
+    - Explicit module boundaries
+    - Minimal search and edit radius
+
+layers:
+  stable:
+    description: Long-lived public packages with narrow responsibilities.
+    paths:
+      - core
+      - router
+      - contract
+      - middleware
+      - security
+      - store
+      - health
+      - log
+      - metrics
+
+  extension:
+    description: Optional or fast-evolving capabilities.
+    paths:
+      - x/tenant
+      - x/ai
+      - x/websocket
+      - x/webhook
+      - x/scheduler
+      - x/frontend
+      - x/ops
+      - x/devtools
+      - x/messaging
+      - x/discovery
+      - x/gateway
+
+  tooling:
+    description: Developer tools, checks, and CLI.
+    paths:
+      - cmd
+      - internal/checks
+      - internal/testkit
+      - internal/buildmeta
+      - scripts
+
+  reference:
+    description: Canonical implementations and templates.
+    paths:
+      - reference
+      - templates
+
+  examples:
+    description: Small, focused demos.
+    paths:
+      - examples
+
+top_level_rules:
+  allowed_library_roots:
+    - core
+    - router
+    - contract
+    - middleware
+    - security
+    - store
+    - health
+    - log
+    - metrics
+    - x
+  discouraged_roots:
+    - ai
+    - tenant
+    - net
+    - pubsub
+    - rest
+    - validator
+    - utils
+    - frontend
+  rules:
+    - New library packages must live under a stable root or x/*
+    - Root package facade is forbidden in the target layout
+    - Reference apps define the canonical app structure
+
+agent_workflow:
+  required_steps:
+    - Identify target layer and module
+    - Read target module manifest
+    - Keep changes within one module when possible
+    - Run module tests first
+    - Run boundary checks second
+    - Run reference smoke checks last
+  defaults:
+    max_primary_modules_per_change: 1
+    max_files_per_card: 5
+    require_manifest_for_new_module: true

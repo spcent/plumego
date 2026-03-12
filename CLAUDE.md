@@ -4,6 +4,13 @@
 
 See `AGENTS.md` for the full operational guide (boundaries, rules, quality gates, workflow).
 
+Repository planning and future restructuring should also follow:
+
+- `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+- `specs/repo.yaml`
+- `specs/dependency-rules.yaml`
+- target `<module>/module.yaml`
+
 ## Claude-Specific Notes
 
 **Style authority:** `docs/CANONICAL_STYLE_GUIDE.md`

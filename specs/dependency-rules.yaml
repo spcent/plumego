@@ -1,0 +1,186 @@
+version: 1
+
+rules:
+  stable_must_not_depend_on_extension: true
+  library_must_not_depend_on_reference_or_examples: true
+  root_facade_forbidden: true
+
+modules:
+  contract:
+    path: contract
+    layer: stable
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/**
+      - examples/**
+      - reference/**
+      - templates/**
+      - cmd/**
+
+  health:
+    path: health
+    layer: stable
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/**
+
+  log:
+    path: log
+    layer: stable
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/**
+
+  metrics:
+    path: metrics
+    layer: stable
+    allow:
+      - stdlib
+      - log
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/**
+
+  router:
+    path: router
+    layer: stable
+    allow:
+      - stdlib
+      - contract
+    deny:
+      - core/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/**
+      - examples/**
+      - reference/**
+      - templates/**
+      - cmd/**
+
+  middleware:
+    path: middleware
+    layer: stable
+    allow:
+      - stdlib
+      - contract
+      - log
+      - metrics
+      - security
+    deny:
+      - core/**
+      - store/**
+      - x/**
+      - examples/**
+      - reference/**
+      - templates/**
+      - cmd/**
+
+  security:
+    path: security
+    layer: stable
+    allow:
+      - stdlib
+      - contract
+      - log
+    deny:
+      - core/**
+      - router/**
+      - store/**
+      - x/**
+      - examples/**
+      - reference/**
+      - templates/**
+      - cmd/**
+
+  store:
+    path: store
+    layer: stable
+    allow:
+      - stdlib
+      - contract
+      - log
+      - metrics
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - x/**
+      - examples/**
+      - reference/**
+      - templates/**
+      - cmd/**
+
+  core:
+    path: core
+    layer: stable
+    allow:
+      - stdlib
+      - contract
+      - router
+      - middleware
+      - health
+      - log
+      - metrics
+    deny:
+      - x/**
+      - examples/**
+      - reference/**
+      - templates/**
+      - cmd/**
+      - store/db/**
+      - store/cache/**
+      - store/file/**
+      - store/idempotency/**
+      - store/kv/**
+
+  x/tenant:
+    path: x/tenant
+    layer: extension
+    allow:
+      - stdlib
+      - contract
+      - middleware
+      - security
+      - store
+      - log
+      - metrics
+    deny:
+      - reference/**
+      - templates/**
+      - examples/**
+      - cmd/**
+
+special_rules:
+  forbidden_paths:
+    - plumego.go
+  forbidden_import_patterns:
+    - github.com/spcent/plumego
+  notes:
+    - Stable packages must never import x/*
+    - Router stays transport-structure only
+    - Middleware must stay transport-only and must not import store
+    - Tenant-aware storage belongs under x/tenant/store

@@ -1,0 +1,51 @@
+name: log
+path: log
+layer: stable
+status: ga
+owner: runtime
+summary: Logging interfaces and base implementations.
+
+responsibilities:
+  - Logging interfaces
+  - Base logger implementations
+  - Logging field helpers
+
+non_goals:
+  - Feature behavior
+  - Metrics collection
+  - Request policy decisions
+
+public_entrypoints:
+  - StructuredLogger
+  - NewGLogger
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 60s ./log/...
+  - go test -timeout 20s ./log/...
+  - go vet ./log/...
+
+doc_paths:
+  - docs/modules/log/README.md
+
+change_risks:
+  - logger compatibility regression
+  - field formatting regression
+
+review_checklist:
+  - Never log secrets
+  - Keep interfaces minimal
+
+agent_hints:
+  - Logging contracts should stay decoupled from feature packages
+  - Avoid app-specific semantics here
