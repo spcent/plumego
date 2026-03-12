@@ -59,27 +59,28 @@ func New(options ...Option) *App {
 
 // Re-export common configuration helpers for convenience.
 var (
-	WithRouter           = core.WithRouter
-	WithAddr             = core.WithAddr
-	WithEnvPath          = core.WithEnvPath
-	WithShutdownTimeout  = core.WithShutdownTimeout
-	WithServerTimeouts   = core.WithServerTimeouts
-	WithMaxHeaderBytes   = core.WithMaxHeaderBytes
-	WithHTTP2            = core.WithHTTP2
-	WithTLS              = core.WithTLS
-	WithTLSConfig        = core.WithTLSConfig
-	WithDebug            = core.WithDebug
-	WithDevTools         = core.WithDevTools
-	WithLogger           = core.WithLogger
-	WithComponent        = core.WithComponent
-	WithComponents       = core.WithComponents
-	WithMethodNotAllowed = core.WithMethodNotAllowed
-	WithShutdownHook     = core.WithShutdownHook
-	WithShutdownHooks    = core.WithShutdownHooks
-	WithRunner           = core.WithRunner
-	WithRunners          = core.WithRunners
-	WithMetricsCollector = core.WithMetricsCollector
-	WithTracer           = core.WithTracer
+	WithRouter              = core.WithRouter
+	WithAddr                = core.WithAddr
+	WithEnvPath             = core.WithEnvPath
+	WithShutdownTimeout     = core.WithShutdownTimeout
+	WithServerTimeouts      = core.WithServerTimeouts
+	WithMaxHeaderBytes      = core.WithMaxHeaderBytes
+	WithHTTP2               = core.WithHTTP2
+	WithTLS                 = core.WithTLS
+	WithTLSConfig           = core.WithTLSConfig
+	WithDebug               = core.WithDebug
+	WithDevTools            = core.WithDevTools
+	WithLogger              = core.WithLogger
+	WithComponent           = core.WithComponent
+	WithComponents          = core.WithComponents
+	WithMethodNotAllowed    = core.WithMethodNotAllowed
+	WithShutdownHook        = core.WithShutdownHook
+	WithShutdownHooks       = core.WithShutdownHooks
+	WithRunner              = core.WithRunner
+	WithRunners             = core.WithRunners
+	WithHTTPMetrics         = core.WithHTTPMetrics
+	WithPrometheusCollector = core.WithPrometheusCollector
+	WithTracer              = core.WithTracer
 )
 
 // DefaultWebSocketConfig exposes the default WebSocket settings.

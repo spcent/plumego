@@ -85,7 +85,7 @@ func main() {
 ## 配置基础
 - `.env` 应在 `main` 中显式加载；`core.WithEnvPath(...)` 只记录路径，供需要该信息的组件使用。
 - 地址、HTTP 超时、优雅关闭、header 限制、TLS、HTTP2 等通过 `core.With...` 选项配置。
-- 指标/链路追踪通过 `core.WithMetricsCollector(...)` 与 `core.WithTracer(...)` 注入。
+- 指标/链路追踪通过 `core.WithPrometheusCollector(...)` 与 `core.WithTracer(...)` 注入。
 
 ## 关键运行时能力
 - 路由：`app.Get/Post/Put/Delete/Patch/Any`；高级能力通过 `app.Router()`。

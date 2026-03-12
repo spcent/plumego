@@ -65,7 +65,7 @@ Decision: adopt **Option A** for v1.0 GA production guarantees.
 - `WithShutdownHooks`
 - `WithRunner`
 - `WithRunners`
-- `WithMetricsCollector`
+- `WithPrometheusCollector`
 - `WithTracer`
 - `WithHealthManager`
 

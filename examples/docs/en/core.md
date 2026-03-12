@@ -88,7 +88,7 @@ if err != nil {
 app := core.New(
     core.WithLogger(plumelog.NewGLogger()),
     core.WithAddr(":8080"),
-    core.WithMetricsCollector(prom),
+    core.WithPrometheusCollector(prom),
     core.WithTracer(tracer),
     core.WithHealthManager(healthManager),
 )

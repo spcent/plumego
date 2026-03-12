@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -36,9 +37,10 @@ type App struct {
 	handlerOnce sync.Once          // Ensures handler initialization happens once, can be reset for testing
 
 	// Optional components
-	metricsCollector metrics.MetricsCollector
-	tracer           observability.Tracer
-	healthManager    health.HealthManager
+	httpMetrics       metrics.HTTPObserver
+	prometheusMetrics *metrics.PrometheusCollector
+	tracer            observability.Tracer
+	healthManager     health.HealthManager
 
 	// Component management
 	components        []Component
@@ -101,4 +103,36 @@ func (a *App) Router() *router.Router {
 // Logger returns the configured application logger.
 func (a *App) Logger() log.StructuredLogger {
 	return a.logger
+}
+
+// HTTPMetrics returns a dynamic HTTP metrics observer bound to the app state.
+func (a *App) HTTPMetrics() metrics.HTTPObserver {
+	return appHTTPMetricsObserver{app: a}
+}
+
+// PrometheusCollector returns the configured Prometheus collector, if any.
+func (a *App) PrometheusCollector() *metrics.PrometheusCollector {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.prometheusMetrics
+}
+
+type appHTTPMetricsObserver struct {
+	app *App
+}
+
+func (o appHTTPMetricsObserver) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	if o.app == nil {
+		return
+	}
+
+	o.app.mu.RLock()
+	observer := o.app.httpMetrics
+	o.app.mu.RUnlock()
+
+	if observer == nil {
+		return
+	}
+
+	observer.ObserveHTTP(ctx, method, path, status, bytes, duration)
 }

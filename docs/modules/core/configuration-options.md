@@ -325,18 +325,34 @@ app := core.New(
 
 ## Observability Hook Options
 
-### `WithMetricsCollector`
+### `WithPrometheusCollector`
 
-Inject request metrics collector used by observability middleware.
+Store a Prometheus collector on the app for app-managed observability wiring.
 
 ```go
-func WithMetricsCollector(collector metrics.MetricsCollector) Option
+func WithPrometheusCollector(collector *metrics.PrometheusCollector) Option
 ```
 
 ```go
 app := core.New(
-    core.WithMetricsCollector(metricsCollector),
+    core.WithPrometheusCollector(metricsCollector),
 )
+```
+
+When you want middleware to follow the app-managed observer, wire it explicitly:
+
+```go
+app.Use(observability.HTTPMetrics(app.HTTPMetrics()))
+```
+
+---
+
+### `WithHTTPMetrics`
+
+Store a custom HTTP metrics observer on the app without requiring a Prometheus collector.
+
+```go
+func WithHTTPMetrics(observer metrics.HTTPObserver) Option
 ```
 
 ---

@@ -66,7 +66,7 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 		opts = append(opts, core.WithDebug())
 	}
 	if prom != nil {
-		opts = append(opts, core.WithMetricsCollector(prom))
+		opts = append(opts, core.WithPrometheusCollector(prom))
 	}
 	if tracer != nil {
 		opts = append(opts, core.WithTracer(tracer))
@@ -103,7 +103,7 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 	app := core.New(opts...)
 	app.Use(observability.RequestID())
 	app.Use(observability.Tracing(tracer))
-	app.Use(observability.HTTPMetrics(prom))
+	app.Use(observability.HTTPMetrics(app.HTTPMetrics()))
 	app.Use(observability.AccessLog(app.Logger()))
 	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(cors.CORS)

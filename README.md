@@ -408,7 +408,7 @@ No need to write your own adapters to hook logging middleware into metrics/traci
 - `metrics.NewPrometheusCollector(namespace)` implements `observability.MetricsCollector`; pair it with `metrics.NewPrometheusExporter(collector)` for `/metrics`.
 - `metrics.NewOpenTelemetryTracer(name)` implements `observability.Tracer`, emitting spans with HTTP metadata.
 
-As shown in `examples/reference`, wire them into `core.New` using `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
+As shown in `examples/reference`, wire them into `core.New` using `core.WithPrometheusCollector(...)` and `core.WithTracer(...)`, then mount request metrics explicitly with `observability.HTTPMetrics(app.HTTPMetrics())`.
 For narrower DI at module boundaries, prefer `metrics.HTTPObserver`, `metrics.MQObserver`, `metrics.DBObserver`, or `metrics.Recorder` instead of the full `metrics.MetricsCollector` when a call site only needs one capability.
 
 To enable a built-in Prometheus endpoint and OpenTelemetry-style tracer in one call:

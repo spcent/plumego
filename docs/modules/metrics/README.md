@@ -33,6 +33,7 @@ import (
 
     "github.com/spcent/plumego/core"
     "github.com/spcent/plumego/metrics"
+    "github.com/spcent/plumego/middleware/observability"
 )
 
 func main() {
@@ -41,8 +42,12 @@ func main() {
 
     app := core.New(
         core.WithAddr(":8080"),
-        core.WithMetricsCollector(collector),
+        core.WithPrometheusCollector(collector),
     )
+
+    if err := app.Use(observability.HTTPMetrics(app.HTTPMetrics())); err != nil {
+        log.Fatal(err)
+    }
 
     if err := app.Router().AddRoute(http.MethodGet, "/metrics", exporter.Handler()); err != nil {
         log.Fatal(err)
@@ -172,7 +177,9 @@ metrics.RecordError(ctx, collector, "cache_warm", 150*time.Millisecond, err)
 
 ## Integration Points
 
-- `core.WithMetricsCollector(...)` stores the collector on the app for components and middleware that need it.
+- `core.WithPrometheusCollector(...)` stores the Prometheus collector on the app.
+- `core.WithHTTPMetrics(...)` stores a non-Prometheus HTTP observer on the app.
+- `app.HTTPMetrics()` returns the current app-managed HTTP observer so middleware wiring stays explicit.
 - `core/components/observability` can wire `/metrics` and tracing when you opt into that component-level configuration.
 - `health.AttachMetrics(...)` bridges health checks into the health metrics collector.
 

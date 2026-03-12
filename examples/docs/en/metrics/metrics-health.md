@@ -6,7 +6,7 @@ Plumego provides Prometheus/OpenTelemetry adapters and ready-to-use health endpo
 - `metrics.NewPrometheusCollector(namespace)` provides the collector.
 - `metrics.NewPrometheusExporter(prom)` provides the `/metrics` HTTP exporter.
 - `metrics.NewOpenTelemetryTracer(serviceName)` provides a tracer compatible with observability middleware.
-- Inject hooks with `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
+- Inject hooks with `core.WithPrometheusCollector(...)` and `core.WithTracer(...)`.
 
 ```go
 prom := metrics.NewPrometheusCollector("plumego")
@@ -14,7 +14,7 @@ exporter := metrics.NewPrometheusExporter(prom)
 tracer := metrics.NewOpenTelemetryTracer("my-service")
 
 app := core.New(
-    core.WithMetricsCollector(prom),
+    core.WithPrometheusCollector(prom),
     core.WithTracer(tracer),
 )
 

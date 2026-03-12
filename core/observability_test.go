@@ -23,6 +23,9 @@ func TestConfigureObservabilityMetrics(t *testing.T) {
 	if err := app.ConfigureObservability(cfg); err != nil {
 		t.Fatalf("configure observability: %v", err)
 	}
+	if app.PrometheusCollector() != prom {
+		t.Fatalf("expected configured Prometheus collector to be stored on the app")
+	}
 
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

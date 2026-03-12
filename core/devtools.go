@@ -41,16 +41,12 @@ func attachDevMetrics(app *App, dev *metrics.DevCollector) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
 
-	if app.metricsCollector == nil {
-		app.metricsCollector = dev
+	if app.httpMetrics == nil {
+		app.httpMetrics = dev
 		return
 	}
 
-	if app.metricsCollector == dev {
-		return
-	}
-
-	app.metricsCollector = metrics.NewMultiCollector(app.metricsCollector, dev)
+	app.httpMetrics = metrics.NewMultiHTTPObserver(app.httpMetrics, dev)
 }
 
 func devtoolsMiddlewareList(app *App) []string {

@@ -407,7 +407,7 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 - `metrics.NewPrometheusCollector(namespace)` 实现 `observability.MetricsCollector`；如需 `/metrics` 端点，请显式搭配 `metrics.NewPrometheusExporter(collector)`。
 - `metrics.NewOpenTelemetryTracer(name)` 实现 `observability.Tracer`，发出带有 HTTP 元数据的 span。
 
-如 `examples/reference` 所示，使用 `core.WithMetricsCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`。
+如 `examples/reference` 所示，使用 `core.WithPrometheusCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`，然后再通过 `observability.HTTPMetrics(app.HTTPMetrics())` 显式挂载请求指标中间件。
 如果某个模块只需要单一能力，优先依赖更窄的接口，例如 `metrics.HTTPObserver`、`metrics.MQObserver`、`metrics.DBObserver` 或 `metrics.Recorder`，而不是整个 `metrics.MetricsCollector`。
 
 如果希望一键启用 Prometheus 指标与 OpenTelemetry 风格追踪：

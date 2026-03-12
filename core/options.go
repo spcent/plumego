@@ -175,10 +175,18 @@ func WithRunners(runners ...Runner) Option {
 	}
 }
 
-// WithMetricsCollector sets a metrics collector hook for observability middleware.
-func WithMetricsCollector(collector metrics.MetricsCollector) Option {
+// WithHTTPMetrics sets the HTTP metrics observer used by the app.
+func WithHTTPMetrics(observer metrics.HTTPObserver) Option {
 	return func(a *App) {
-		a.metricsCollector = collector
+		a.httpMetrics = observer
+	}
+}
+
+// WithPrometheusCollector sets the Prometheus collector used by the app.
+func WithPrometheusCollector(collector *metrics.PrometheusCollector) Option {
+	return func(a *App) {
+		a.prometheusMetrics = collector
+		a.httpMetrics = collector
 	}
 }
 

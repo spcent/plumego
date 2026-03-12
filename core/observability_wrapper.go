@@ -14,14 +14,20 @@ func (a *App) ConfigureObservability(cfg observability.ObservabilityConfig) erro
 		EnsureRouter: func() *router.Router {
 			return a.ensureRouter()
 		},
-		GetMetricsCollector: func() metrics.MetricsCollector {
+		GetPrometheusCollector: func() *metrics.PrometheusCollector {
 			a.mu.RLock()
 			defer a.mu.RUnlock()
-			return a.metricsCollector
+			return a.prometheusMetrics
 		},
-		SetMetricsCollector: func(c metrics.MetricsCollector) {
+		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {
 			a.mu.Lock()
-			a.metricsCollector = c
+			a.prometheusMetrics = c
+			a.httpMetrics = c
+			a.mu.Unlock()
+		},
+		SetHTTPMetrics: func(observer metrics.HTTPObserver) {
+			a.mu.Lock()
+			a.httpMetrics = observer
 			a.mu.Unlock()
 		},
 		GetTracer: func() mwobs.Tracer {

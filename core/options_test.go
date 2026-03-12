@@ -249,17 +249,28 @@ func TestWithRunners(t *testing.T) {
 	}
 }
 
-func TestWithMetricsCollector(t *testing.T) {
+func TestWithHTTPMetrics(t *testing.T) {
 	app := &App{}
 	collector := &mockMetricsCollector{
 		NoopCollector: metrics.NewNoopCollector(),
 	}
-	opt := WithMetricsCollector(collector)
+	opt := WithHTTPMetrics(collector)
 	opt(app)
-	// Since app.metricsCollector is an interface, we need to compare differently
-	// We can check if it's not nil and has the same underlying type
-	if app.metricsCollector == nil {
-		t.Errorf("expected metrics collector to be set")
+	if app.httpMetrics == nil {
+		t.Errorf("expected HTTP metrics observer to be set")
+	}
+}
+
+func TestWithPrometheusCollector(t *testing.T) {
+	app := &App{}
+	collector := metrics.NewPrometheusCollector("test")
+	opt := WithPrometheusCollector(collector)
+	opt(app)
+	if app.prometheusMetrics != collector {
+		t.Errorf("expected Prometheus collector to be set")
+	}
+	if app.httpMetrics != collector {
+		t.Errorf("expected HTTP metrics observer to point at Prometheus collector")
 	}
 }
 
@@ -292,8 +303,7 @@ func (m *mockRunner) Start(ctx context.Context) error { return nil }
 func (m *mockRunner) Stop(ctx context.Context) error  { return nil }
 
 // mockMetricsCollector embeds NoopCollector for cleaner mock implementation.
-// When new methods are added to MetricsCollector interface, this mock doesn't need updates
-// because NoopCollector implements all interface methods.
+// NoopCollector already satisfies HTTPObserver, so this mock stays small.
 type mockMetricsCollector struct {
 	*metrics.NoopCollector
 }

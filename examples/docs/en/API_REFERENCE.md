@@ -24,7 +24,7 @@ Common options:
 - `core.WithComponent(component)` / `core.WithComponents(...)`
 - `core.WithRunner(runner)` / `core.WithRunners(...)`
 - `core.WithShutdownHook(hook)` / `core.WithShutdownHooks(...)`
-- `core.WithMetricsCollector(collector)`
+- `core.WithPrometheusCollector(collector)`
 - `core.WithTracer(tracer)`
 - `core.WithHealthManager(manager)`
 

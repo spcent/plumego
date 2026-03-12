@@ -16,7 +16,7 @@ type MetricsConfig struct {
 	Path      string
 	Namespace string
 	MaxSeries int
-	Collector metrics.MetricsCollector
+	Collector *metrics.PrometheusCollector
 	Exporter  metrics.Exporter
 	Handler   http.Handler
 }
@@ -96,8 +96,8 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 	}
 
 	collector := cfg.Collector
-	if collector == nil && hooks.GetMetricsCollector != nil {
-		collector = hooks.GetMetricsCollector()
+	if collector == nil && hooks.GetPrometheusCollector != nil {
+		collector = hooks.GetPrometheusCollector()
 	}
 
 	exporter := cfg.Exporter
@@ -112,20 +112,25 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 		exporter = metrics.NewPrometheusExporter(prom)
 	}
 
-	if handler == nil && exporter != nil {
-		handler = exporter.Handler()
+	if handler == nil && exporter == nil && collector != nil {
+		exporter = metrics.NewPrometheusExporter(collector)
 	}
 
-	if handler == nil {
-		return fmt.Errorf("metrics enabled but no explicit handler or exporter available")
+	if handler == nil && exporter != nil {
+		handler = exporter.Handler()
 	}
 
 	if err := router.AddRoute(http.MethodGet, path, handler); err != nil {
 		return err
 	}
 
-	if hooks.SetMetricsCollector != nil {
-		hooks.SetMetricsCollector(collector)
+	if collector != nil {
+		if hooks.SetPrometheusCollector != nil {
+			hooks.SetPrometheusCollector(collector)
+		}
+		if hooks.SetHTTPMetrics != nil {
+			hooks.SetHTTPMetrics(collector)
+		}
 	}
 	return nil
 }
@@ -158,10 +163,11 @@ func normalizeObservabilityPath(path string) string {
 
 // Hooks provide access to the app wiring points needed by Configure.
 type Hooks struct {
-	EnsureMutable       func(op, desc string) error
-	EnsureRouter        func() *router.Router
-	GetMetricsCollector func() metrics.MetricsCollector
-	SetMetricsCollector func(metrics.MetricsCollector)
-	GetTracer           func() mwobs.Tracer
-	SetTracer           func(mwobs.Tracer)
+	EnsureMutable          func(op, desc string) error
+	EnsureRouter           func() *router.Router
+	GetPrometheusCollector func() *metrics.PrometheusCollector
+	SetPrometheusCollector func(*metrics.PrometheusCollector)
+	SetHTTPMetrics         func(metrics.HTTPObserver)
+	GetTracer              func() mwobs.Tracer
+	SetTracer              func(mwobs.Tracer)
 }

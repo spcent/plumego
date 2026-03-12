@@ -86,7 +86,7 @@ func main() {
 ## Configuration Basics
 - `.env` loading should happen explicitly in `main`; `core.WithEnvPath(...)` only records the path for components that need it.
 - Address / server timeouts / graceful shutdown / header size / TLS / HTTP2 via `core.With...` options.
-- Metrics/tracing hooks via `core.WithMetricsCollector(...)` and `core.WithTracer(...)`.
+- Metrics/tracing hooks via `core.WithPrometheusCollector(...)` and `core.WithTracer(...)`.
 
 ## Key Runtime Pieces
 - Router: `app.Get/Post/Put/Delete/Patch/Any`; advanced operations from `app.Router()`.

@@ -189,7 +189,7 @@ Common options:
 - `WithComponent` / `WithComponents`
 - `WithRunner` / `WithRunners`
 - `WithShutdownHook` / `WithShutdownHooks`
-- `WithMetricsCollector`
+- `WithPrometheusCollector`
 - `WithTracer`
 - `WithHealthManager`
 - `WithRouter`

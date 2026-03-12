@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/spcent/plumego/metrics"
 	mwobs "github.com/spcent/plumego/middleware/observability"
@@ -110,33 +109,16 @@ func TestConfigureMetricsNilEnsureRouter(t *testing.T) {
 	}
 }
 
-func TestConfigureMetricsNoHandler(t *testing.T) {
-	r := router.NewRouter()
-	hooks := Hooks{
-		EnsureMutable: func(op, desc string) error { return nil },
-		EnsureRouter:  func() *router.Router { return r },
-	}
-	cfg := DefaultObservabilityConfig()
-	cfg.Metrics.Enabled = true
-	cfg.Metrics.Collector = &noHandlerCollector{}
-
-	err := Configure(hooks, cfg)
-	if err == nil {
-		t.Fatal("expected error for no handler available")
-	}
-	if err.Error() != "metrics enabled but no explicit handler or exporter available" {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestConfigureMetricsWithPrometheus(t *testing.T) {
 	r := router.NewRouter()
-	var setCollector metrics.MetricsCollector
+	var setCollector *metrics.PrometheusCollector
+	var setHTTP metrics.HTTPObserver
 
 	hooks := Hooks{
-		EnsureMutable:       func(op, desc string) error { return nil },
-		EnsureRouter:        func() *router.Router { return r },
-		SetMetricsCollector: func(c metrics.MetricsCollector) { setCollector = c },
+		EnsureMutable:          func(op, desc string) error { return nil },
+		EnsureRouter:           func() *router.Router { return r },
+		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { setCollector = c },
+		SetHTTPMetrics:         func(observer metrics.HTTPObserver) { setHTTP = observer },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -148,17 +130,20 @@ func TestConfigureMetricsWithPrometheus(t *testing.T) {
 	if setCollector == nil {
 		t.Fatal("expected collector to be set")
 	}
+	if setHTTP == nil {
+		t.Fatal("expected HTTP metrics observer to be set")
+	}
 }
 
 func TestConfigureMetricsWithExplicitCollector(t *testing.T) {
 	r := router.NewRouter()
 	prom := metrics.NewPrometheusCollector("test")
-	var setCollector metrics.MetricsCollector
+	var setCollector *metrics.PrometheusCollector
 
 	hooks := Hooks{
-		EnsureMutable:       func(op, desc string) error { return nil },
-		EnsureRouter:        func() *router.Router { return r },
-		SetMetricsCollector: func(c metrics.MetricsCollector) { setCollector = c },
+		EnsureMutable:          func(op, desc string) error { return nil },
+		EnsureRouter:           func() *router.Router { return r },
+		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { setCollector = c },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -187,7 +172,6 @@ func TestConfigureMetricsWithExplicitHandler(t *testing.T) {
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
 	cfg.Metrics.Handler = handler
-	cfg.Metrics.Collector = &noHandlerCollector{}
 
 	err := Configure(hooks, cfg)
 	if err != nil {
@@ -219,10 +203,10 @@ func TestConfigureMetricsCollectorFromHooks(t *testing.T) {
 	prom := metrics.NewPrometheusCollector("hookns")
 
 	hooks := Hooks{
-		EnsureMutable:       func(op, desc string) error { return nil },
-		EnsureRouter:        func() *router.Router { return r },
-		GetMetricsCollector: func() metrics.MetricsCollector { return prom },
-		SetMetricsCollector: func(c metrics.MetricsCollector) {},
+		EnsureMutable:          func(op, desc string) error { return nil },
+		EnsureRouter:           func() *router.Router { return r },
+		GetPrometheusCollector: func() *metrics.PrometheusCollector { return prom },
+		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -319,9 +303,9 @@ func TestConfigureMetricsEmptyPath(t *testing.T) {
 	r := router.NewRouter()
 
 	hooks := Hooks{
-		EnsureMutable:       func(op, desc string) error { return nil },
-		EnsureRouter:        func() *router.Router { return r },
-		SetMetricsCollector: func(c metrics.MetricsCollector) {},
+		EnsureMutable:          func(op, desc string) error { return nil },
+		EnsureRouter:           func() *router.Router { return r },
+		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -337,9 +321,9 @@ func TestConfigureMetricsZeroMaxSeries(t *testing.T) {
 	r := router.NewRouter()
 
 	hooks := Hooks{
-		EnsureMutable:       func(op, desc string) error { return nil },
-		EnsureRouter:        func() *router.Router { return r },
-		SetMetricsCollector: func(c metrics.MetricsCollector) {},
+		EnsureMutable:          func(op, desc string) error { return nil },
+		EnsureRouter:           func() *router.Router { return r },
+		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -379,25 +363,6 @@ func TestConfigureMetricsWithNilSetCollector(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
-
-// noHandlerCollector implements MetricsCollector but does NOT have a Handler() method.
-type noHandlerCollector struct{}
-
-func (c *noHandlerCollector) Record(_ context.Context, _ metrics.MetricRecord) {}
-func (c *noHandlerCollector) ObserveHTTP(_ context.Context, _, _ string, _, _ int, _ time.Duration) {
-}
-func (c *noHandlerCollector) ObservePubSub(_ context.Context, _, _ string, _ time.Duration, _ error) {
-}
-func (c *noHandlerCollector) ObserveMQ(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {
-}
-func (c *noHandlerCollector) ObserveKV(_ context.Context, _, _ string, _ time.Duration, _ error, _ bool) {
-}
-func (c *noHandlerCollector) ObserveIPC(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
-}
-func (c *noHandlerCollector) ObserveDB(_ context.Context, _, _, _ string, _ int, _ time.Duration, _ error) {
-}
-func (c *noHandlerCollector) GetStats() metrics.CollectorStats { return metrics.CollectorStats{} }
-func (c *noHandlerCollector) Clear()                           {}
 
 // stubTracer satisfies mwobs.Tracer.
 type stubTracer struct{}

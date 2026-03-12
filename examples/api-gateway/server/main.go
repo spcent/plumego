@@ -57,7 +57,7 @@ func main() {
 		cfg.Services.ProductService.Timeout, cfg.Services.ProductService.RetryCount)
 
 	// Create Prometheus metrics collector
-	var metricsCollector metrics.MetricsCollector
+	var metricsCollector metrics.HTTPObserver
 	var metricsHandler http.Handler
 	if cfg.Metrics.Enabled {
 		promCollector := metrics.NewPrometheusCollector(cfg.Metrics.Namespace)

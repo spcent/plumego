@@ -32,7 +32,7 @@ func main() {
 
     app := core.New(
         core.WithAddr(":8080"),
-        core.WithMetricsCollector(collector),
+        core.WithPrometheusCollector(collector),
     )
 
     if err := app.Router().AddRoute(http.MethodGet, "/metrics", exporter.Handler()); err != nil {
