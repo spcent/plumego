@@ -2,7 +2,7 @@ name: x/pubsub
 path: x/pubsub
 layer: extension
 status: experimental
-summary: In-process publish-subscribe primitives and debugging support.
+summary: In-process publish-subscribe primitives used by x/messaging, x/webhook, and local debugging support.
 
 responsibilities:
   - Publish-subscribe broker primitives
@@ -34,6 +34,6 @@ review_checklist:
   - Preserve fan-out determinism
 
 agent_hints:
-  - Prefer local broker injection
-  - Keep pubsub transport-agnostic
+  - Treat x/pubsub as a primitive package; start new messaging feature discovery in x/messaging
+  - Prefer local broker injection and keep pubsub transport-agnostic
   - Do not move brokers into core

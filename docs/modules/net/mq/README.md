@@ -2,6 +2,8 @@
 
 > **Package**: `github.com/spcent/plumego/x/mq` | **Feature**: Message broker
 
+`x/mq` is a lower-level queue primitive package. For new feature discovery, start in `x/messaging` and drop to `x/mq` only when you need direct queue semantics.
+
 ## Overview
 
 The `mq` package provides an in-process message queue with a pub/sub broker. It supports priority queues, message acknowledgment, dead-letter queuing, persistence, deduplication, and TTL-based expiry.

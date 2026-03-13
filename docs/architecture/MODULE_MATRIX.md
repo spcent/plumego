@@ -28,7 +28,7 @@ This file is the high-level ownership matrix for the target repository.
 | `x/frontend` | Frontend/static asset capability pack | Experimental |
 | `x/ops` | Operations capability pack | Experimental |
 | `x/devtools` | Local development tools | Experimental |
-| `x/messaging` | MQ and PubSub capability pack | Experimental |
+| `x/messaging` | Canonical messaging capability pack; first discovery entrypoint for queue/pubsub workflows | Experimental |
 | `x/discovery` | Service discovery capability pack | Experimental |
 | `x/gateway` | Gateway and proxy capability pack | Experimental |
 

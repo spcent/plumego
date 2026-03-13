@@ -13,7 +13,7 @@ Use these entrypoints instead:
 | service discovery | `x/discovery` |
 | IPC | `x/ipc` |
 | messaging orchestration | `x/messaging` |
-| durable queueing | `x/mq` |
+| durable queueing primitive | `x/mq` |
 | inbound/outbound webhooks | `x/webhook` |
 | websocket utilities | `x/websocket` |
 
@@ -22,3 +22,5 @@ Use these entrypoints instead:
 ## Scope Note
 
 The subdocuments under this directory are migration notes or archived references. New application code should import `x/*` capability packs directly.
+
+For messaging-related work, start in `x/messaging` first. Open `x/mq` or `x/pubsub` only when the task is explicitly about queue or broker primitives.

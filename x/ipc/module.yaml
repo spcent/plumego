@@ -2,7 +2,7 @@ name: x/ipc
 path: x/ipc
 layer: extension
 status: experimental
-summary: Inter-process communication helpers and adapters.
+summary: Lower-level inter-process communication helpers; not the first discovery entrypoint for general messaging work.
 
 responsibilities:
   - IPC message transport
@@ -34,6 +34,6 @@ review_checklist:
   - Preserve failure visibility
 
 agent_hints:
-  - Keep IPC internals self-contained
-  - Prefer narrow adapters
+  - Prefer x/messaging or the owning extension before adding new IPC-facing features here
+  - Keep IPC internals self-contained with narrow adapters
   - Do not move IPC into core

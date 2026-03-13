@@ -115,3 +115,12 @@ Near-term restructuring follows this order:
 4. Remove the root package facade.
 5. Move feature catalogs and topology-heavy capabilities out of stable roots.
 6. Replace broad category roots such as `net`, `utils`, `validator`, `rest`, and `pubsub`.
+
+## Extension Discovery Defaults
+
+Agents should prefer these entrypoints when multiple related `x/*` packages exist:
+
+- Start messaging-related work in `x/messaging`; open `x/mq` or `x/pubsub` only when you already know the task is a queue primitive or broker primitive.
+- Start transport observability work in stable `middleware/*` packages; use `x/observability` only for higher-level adapter or export wiring.
+- Do not start new app structure from `x/rest`; prefer `reference/standard-service` and explicit route binding.
+- Treat `x/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.

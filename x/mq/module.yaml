@@ -2,7 +2,7 @@ name: x/mq
 path: x/mq
 layer: extension
 status: experimental
-summary: Queue primitives, persistence adapters, and worker coordination for asynchronous delivery.
+summary: Durable queue primitives and worker coordination used by the broader x/messaging capability pack.
 
 responsibilities:
   - Queue primitives
@@ -38,6 +38,6 @@ review_checklist:
   - Preserve persistence correctness
 
 agent_hints:
-  - Keep queue adapters local
-  - Prefer explicit worker wiring
+  - Treat x/mq as a lower-level queue primitive; start feature discovery in x/messaging
+  - Keep queue adapters local with explicit worker wiring
   - Do not move MQ into core

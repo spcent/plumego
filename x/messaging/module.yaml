@@ -2,7 +2,7 @@ name: x/messaging
 path: x/messaging
 layer: extension
 status: experimental
-summary: Message delivery orchestration built on explicit queue, scheduler, and webhook adapters.
+summary: Canonical messaging capability entrypoint built on explicit queue, pubsub, scheduler, and webhook adapters.
 
 responsibilities:
   - Message send orchestration
@@ -41,6 +41,6 @@ review_checklist:
   - Preserve error-path visibility
 
 agent_hints:
-  - Keep orchestration inside x/messaging
-  - Prefer explicit service wiring
+  - Start messaging-related discovery here before opening sibling x/* packages
+  - Keep orchestration inside x/messaging with explicit service wiring
   - Do not require core knowledge
