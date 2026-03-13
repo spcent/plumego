@@ -22,11 +22,18 @@ The target repository layout is now:
 For architecture planning and future refactors, prefer the rules in:
 
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+- `docs/CANONICAL_STYLE_GUIDE.md`
 - `specs/repo.yaml`
 - `specs/dependency-rules.yaml`
 - `<module>/module.yaml`
 
 Machine-enforced repo guardrails live under `internal/checks/*`. Historical exceptions are tracked explicitly in `specs/check-baseline/*` so CI can block new drift while existing migration debt is burned down.
+
+For new application work, use a single canonical path:
+
+- read `reference/standard-service` first for structure and wiring
+- keep scaffolds aligned with `templates/standard-service`
+- treat `examples/` as demos, not architectural authority
 
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.

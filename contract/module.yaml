@@ -15,6 +15,7 @@ non_goals:
   - Route matching
   - App bootstrap
   - Persistence logic
+  - Protocol gateway families
   - Business rules
 
 public_entrypoints:
@@ -49,9 +50,10 @@ change_risks:
 review_checklist:
   - Keep one error write path
   - Keep transport helpers explicit
+  - Keep protocol-specific wiring out of contract
   - Avoid leaking internals in responses
 
 agent_hints:
   - Prefer stdlib-shaped helpers
   - Do not introduce app wiring here
-  - Do not add business-specific response wrappers
+  - Do not add business-specific response wrappers or protocol gateway families here

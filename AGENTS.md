@@ -6,6 +6,7 @@ Operational guide for AI coding agents in `spcent/plumego`.
 
 Plumego is a lightweight Go toolkit built on the standard library HTTP model.
 Optimize for: clarity, explicit control flow, agent-friendly module ownership, small reversible changes.
+Default implementation path: canonical style guide -> repo specs -> module manifest -> `reference/standard-service`.
 
 Hard constraints:
 - Preserve `net/http` compatibility
@@ -53,8 +54,11 @@ Canonical defaults:
 
 Rules:
 - Do not move routing behavior into `core`
+- Keep `core` as a kernel, not a feature catalog
 - Do not put business logic in `middleware`
 - Do not put tenant-aware logic in stable `middleware` or stable `store`
+- Do not put HTTP health handlers in `health`
+- Do not put protocol gateway families in `contract`
 - Do not add new library code under broad legacy roots like `net/`, `utils/`, `validator/`, `tenant/`, `ai/`
 - Changes in `core/`, `router/`, `middleware/`, `security/` require extra testing
 
@@ -62,6 +66,7 @@ Target layout:
 - Stable library roots remain top-level: `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
 - Extension capability packs live under `x/*`
 - `reference/` defines canonical app layout
+- `templates/` mirrors canonical scaffold layout
 - `examples/` are demos, not architectural authority
 
 ---
@@ -127,8 +132,9 @@ Sync targets: `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `env.exampl
 ## 8) Agent Workflow
 
 1. Identify the target layer: stable root package or `x/*`
-2. Read `specs/repo.yaml`, `specs/dependency-rules.yaml`, and the target `<module>/module.yaml`
-3. Make minimal focused changes inside one primary module when possible
-4. Add/update tests near changed behavior
-5. Run quality gates (§6)
-6. Sync docs if behavior or configuration changed
+2. Read `docs/CANONICAL_STYLE_GUIDE.md` and `reference/standard-service` for app-shape tasks
+3. Read `specs/repo.yaml`, `specs/dependency-rules.yaml`, and the target `<module>/module.yaml`
+4. Make minimal focused changes inside one primary module when possible
+5. Add/update tests near changed behavior
+6. Run quality gates (§6)
+7. Sync docs if behavior or configuration changed

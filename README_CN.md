@@ -22,9 +22,16 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 后续架构规划与重构请优先参考：
 
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+- `docs/CANONICAL_STYLE_GUIDE.md`
 - `specs/repo.yaml`
 - `specs/dependency-rules.yaml`
 - `<模块>/module.yaml`
+
+新的应用结构工作应遵循唯一 canonical 路径：
+
+- 先看 `reference/standard-service`，以它作为目录结构和 wiring 的标准
+- 生成式脚手架要与 `templates/standard-service` 保持同构
+- `examples/` 只用于演示能力，不作为架构权威
 
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。

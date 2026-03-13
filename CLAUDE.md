@@ -6,10 +6,12 @@ See `AGENTS.md` for the full operational guide (boundaries, rules, quality gates
 
 Repository planning and future restructuring should also follow:
 
+- `docs/CANONICAL_STYLE_GUIDE.md`
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `specs/repo.yaml`
 - `specs/dependency-rules.yaml`
 - target `<module>/module.yaml`
+- `reference/standard-service`
 
 ## Claude-Specific Notes
 
@@ -17,6 +19,9 @@ Repository planning and future restructuring should also follow:
 
 **Required checks before final output:**
 ```bash
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/module-manifests
+go run ./internal/checks/reference-layout
 go test -timeout 20s ./...
 go vet ./...
 gofmt -w .
@@ -32,6 +37,7 @@ go test -race ./...
 - Error path: `contract.WriteError`
 - Middleware: `func(http.Handler) http.Handler`, transport-only
 - Dependency flow: constructor injection, not context service-locator
+- App shape: follow `reference/standard-service`, not `examples/`
 
 **Documentation sync targets:** `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `env.example`
 

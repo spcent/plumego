@@ -12,6 +12,7 @@ responsibilities:
 
 non_goals:
   - Feature orchestration
+  - HTTP endpoint ownership
   - Transport-specific behavior
 
 public_entrypoints:
@@ -43,8 +44,10 @@ change_risks:
 
 review_checklist:
   - Keep types simple and explicit
+  - Keep health HTTP handlers outside this module
   - Avoid feature-specific coupling
 
 agent_hints:
   - Health is a support package, not an app feature catalog
   - Keep transport concerns elsewhere
+  - Prefer reference or extension packages for health HTTP surfaces

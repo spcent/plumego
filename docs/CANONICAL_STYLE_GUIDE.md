@@ -10,6 +10,7 @@ Scope: `core`, `router`, `middleware`, official examples, docs, code generation,
 - **one obvious way** — one bootstrap, one route style, one handler shape, one decode path, one error shape, one test style
 - **explicit over implicit** — no hidden binding, no context service-locator, no magical response wrappers, no import-order behavior
 - **small-step refactorability** — narrow boundaries, stable interfaces, shallow call paths, minimal indirection
+- **single canonical path** — the reference app defines structure, templates mirror it, examples only demonstrate capabilities
 
 When convenience conflicts with predictability, choose predictability.
 
@@ -18,7 +19,8 @@ When convenience conflicts with predictability, choose predictability.
 ## 2. Package Roles
 
 ### `core`
-App construction, lifecycle, route registration entry points, middleware attachment, server startup. Must not become a feature catalog.
+App construction, lifecycle, route registration entry points, middleware attachment, server startup.
+Must stay a kernel and must not become a feature catalog or generic plugin container.
 
 ### `router`
 Route matching, params, grouping, route tree/lookup, static mounting.
@@ -27,9 +29,15 @@ Not allowed: repositories, validators, JSON writers, business response wrappers,
 ### `middleware`
 Transport-layer cross-cutting only: logging, recovery, timeout, request-id, CORS, auth adapters, rate-limiting, tracing, metrics.
 Not allowed: service injection, ORM lookup, business DTO assembly, hidden request binding, domain-policy branching.
+Prefer narrow packages such as `requestid`, `tracing`, `accesslog`, `recovery`, `timeout`.
 
 ### Extension packages
 `ai`, `ops`, `tenant`, websocket, webhook, scheduler — capability layers, not the core learning path. Must not define primary coding style.
+
+### Reference and Templates
+`reference/standard-service` is the only canonical application layout.
+`templates/standard-service` must mirror that layout for generated projects.
+`examples/` are proof-of-capability sandboxes and must not become architectural authority.
 
 ---
 
@@ -47,6 +55,8 @@ internal/domain/user/repository.go
 internal/platform/httpjson/response.go
 internal/platform/httperr/error.go
 ```
+
+This layout should be demonstrated first in `reference/standard-service` and copied by templates and scaffolds, not reinvented per example.
 
 - `cmd/` — startup only
 - `internal/httpapp/` — HTTP wiring only
@@ -258,6 +268,16 @@ Default behavior:
 - Prefer stdlib-shaped solutions
 - Follow this guide over package convenience APIs when both are possible
 - Preserve existing canonical patterns when editing nearby files
+- Read `reference/standard-service` before using `examples/` as shape guidance
+- Treat broad bucket names (`utils`, `validator`, `rest`, `pubsub`, `tenant`) as migration debt, not expansion targets
+
+## 15. Agent-First Repo Rules
+
+- Start app-structure work from `reference/standard-service`, not from examples
+- Keep each change centered on one primary module when possible
+- Prefer adding a new focused extension package over widening a stable root
+- Do not introduce new catch-all middleware buckets or protocol family roots
+- Keep scaffolds, docs, and the reference app synchronized
 - Avoid hidden context-based dependency flow
 - Avoid new wrapper abstractions unless justified
 

@@ -1,0 +1,64 @@
+name: x/data
+path: x/data
+layer: extension
+status: experimental
+owner: persistence
+summary: High-level data topology capabilities that should not live in the stable store layer.
+
+responsibilities:
+  - Read-write splitting orchestration
+  - Sharding and routing topology
+  - Data access policy composition
+  - Tenant-aware topology adapters
+
+non_goals:
+  - App bootstrap
+  - HTTP transport behavior
+  - Business repositories
+  - Stable store primitives
+
+public_entrypoints:
+  - topology
+  - routing
+  - composition
+
+allowed_imports:
+  - stdlib
+  - contract
+  - log
+  - metrics
+  - store
+  - x/tenant
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - examples/**
+  - reference/**
+  - templates/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/data/...
+  - go test -timeout 20s ./x/data/...
+  - go vet ./x/data/...
+
+doc_paths:
+  - docs/modules/x-data/README.md
+
+change_risks:
+  - topology regression
+  - isolation regression
+  - persistence correctness regression
+
+review_checklist:
+  - Keep stable store primitives out of this module
+  - Keep topology decisions explicit and reviewable
+  - Keep transport concerns out of this module
+
+agent_hints:
+  - Move sharding and rw orchestration here instead of widening store
+  - Keep business repositories in app code, not in x/data
+  - Prefer tenant-aware composition via x/tenant adapters

@@ -16,6 +16,7 @@ non_goals:
   - Tenant-aware adapters
   - Business repositories
   - AI-specific caches
+  - Read-write splitting and sharding topology defaults
   - HTTP transport behavior
 
 public_entrypoints:
@@ -53,9 +54,10 @@ change_risks:
 review_checklist:
   - Keep store APIs transport-agnostic
   - No tenant-specific logic in stable store
+  - Keep topology-heavy data features out of the stable layer
   - Prefer stdlib-compatible abstractions
 
 agent_hints:
   - Move tenant-aware adapters to x/tenant/store
   - Move feature-specific caches to the owning feature package
-  - Do not turn store into a business repository layer
+  - Do not turn store into a business repository layer; prefer x/data for topology-heavy capabilities

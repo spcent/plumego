@@ -180,7 +180,13 @@ special_rules:
   forbidden_import_patterns:
     - github.com/spcent/plumego
   notes:
+    - Reference app and matching templates define the canonical application shape
+    - Examples are demos and must not define the primary architecture
     - Stable packages must never import x/*
+    - Core stays a kernel and must not grow feature-catalog dependencies
     - Router stays transport-structure only
     - Middleware must stay transport-only and must not import store
     - Tenant-aware storage belongs under x/tenant/store
+    - Protocol gateway families belong in their owning extension package, not in contract
+    - Health HTTP endpoint ownership belongs outside health
+    - High-level data topology belongs in x/data or x/tenant, not in the stable store layer

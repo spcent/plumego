@@ -7,6 +7,21 @@ repo:
     - Clear stable surface area
     - Explicit module boundaries
     - Minimal search and edit radius
+    - Single canonical implementation path for new work
+
+canonical_authority:
+  style:
+    - docs/CANONICAL_STYLE_GUIDE.md
+  architecture:
+    - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  implementation:
+    - reference/standard-service
+  scaffolding_target:
+    - templates/standard-service
+  notes:
+    - Reference app defines the canonical application structure
+    - Templates must mirror reference structure for generated projects
+    - Examples are demos and validation sandboxes, not architectural authority
 
 layers:
   stable:
@@ -36,6 +51,7 @@ layers:
       - x/messaging
       - x/discovery
       - x/gateway
+      - x/data
 
   tooling:
     description: Developer tools, checks, and CLI.
@@ -82,10 +98,24 @@ top_level_rules:
     - New library packages must live under a stable root or x/*
     - Root package facade is forbidden in the target layout
     - Reference apps define the canonical app structure
+    - Templates must mirror reference app structure
+    - Examples must not define the primary coding style
+    - Stable roots should remain grep-friendly and narrow
+
+target_cleanup:
+  stable_layer_moves:
+    - health HTTP handlers move out of health and into reference or extensions
+    - protocol gateway adapters move out of contract and into owning extensions
+    - tenant-aware middleware stays under x/tenant, not middleware
+    - topology-heavy data features move out of stable store and into x/data or x/tenant
+  extension_taxonomy:
+    - messaging capabilities should converge under x/messaging
+    - transport adapters should converge under their owning extension instead of broad legacy buckets
 
 agent_workflow:
   required_steps:
     - Identify target layer and module
+    - Read canonical style and reference app when shaping app structure
     - Read target module manifest
     - Keep changes within one module when possible
     - Run module tests first

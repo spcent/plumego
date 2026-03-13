@@ -15,6 +15,7 @@ responsibilities:
 non_goals:
   - Route matching
   - Feature-specific components
+  - Feature catalog assembly
   - Tenant-specific behavior
   - Persistence logic
 
@@ -60,9 +61,10 @@ change_risks:
 review_checklist:
   - Preserve net/http compatibility
   - Keep bootstrap explicit
+  - Keep core as a kernel, not a feature catalog
   - Do not add hidden side effects
 
 agent_hints:
   - Do not add feature-specific components here
   - Route behavior belongs in router, not core
-  - Extension wiring should live outside core
+  - Prefer explicit app wiring in reference apps over generic plugin surfaces

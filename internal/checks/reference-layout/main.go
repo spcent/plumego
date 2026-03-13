@@ -39,9 +39,11 @@ func main() {
 func requiredPathViolations(repoRoot string) []string {
 	required := []string{
 		"docs/CANONICAL_STYLE_GUIDE.md",
+		"docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
 		"reference/standard-service",
 		"specs/repo.yaml",
 		"specs/dependency-rules.yaml",
+		"templates/standard-service",
 	}
 
 	var violations []string

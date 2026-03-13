@@ -14,6 +14,7 @@ non_goals:
   - Business DTO assembly
   - Service injection
   - Tenant policy
+  - Tenant resolution and quota orchestration
   - Persistence access
 
 public_entrypoints:
@@ -49,9 +50,10 @@ change_risks:
 review_checklist:
   - next must be called exactly once
   - Keep responsibility transport-only
+  - Prefer narrow middleware packages over umbrella buckets
   - No request-scoped service locator
 
 agent_hints:
   - Tenant middleware belongs in x/tenant
-  - Stateful policy should move out of middleware
+  - Stateful policy and catch-all buckets should move out of middleware
   - Keep behavior visible in tests
