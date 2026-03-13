@@ -195,8 +195,7 @@ Common options:
 - `WithComponent` / `WithComponents`
 - `WithRunner` / `WithRunners`
 - `WithShutdownHook` / `WithShutdownHooks`
-- `WithPrometheusCollector`
-- `WithTracer`
+- `WithHTTPMetrics`
 - `WithHealthManager`
 - `WithRouter`
 

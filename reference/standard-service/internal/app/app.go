@@ -69,10 +69,7 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 		opts = append(opts, core.WithDebug())
 	}
 	if prom != nil {
-		opts = append(opts, core.WithPrometheusCollector(prom))
-	}
-	if tracer != nil {
-		opts = append(opts, core.WithTracer(tracer))
+		opts = append(opts, core.WithHTTPMetrics(prom))
 	}
 
 	// Mount extension components via WithComponent

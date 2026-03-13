@@ -10,7 +10,6 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
-	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/router"
 )
 
@@ -36,10 +35,8 @@ type App struct {
 	handlerOnce sync.Once          // Ensures handler initialization happens once, can be reset for testing
 
 	// Optional components
-	httpMetrics       metrics.HTTPObserver
-	prometheusMetrics *metrics.PrometheusCollector
-	tracer            mwtracing.Tracer
-	healthManager     health.HealthManager
+	httpMetrics   metrics.HTTPObserver
+	healthManager health.HealthManager
 
 	// Component management
 	components        []Component
@@ -107,13 +104,6 @@ func (a *App) Logger() log.StructuredLogger {
 // HTTPMetrics returns a dynamic HTTP metrics observer bound to the app state.
 func (a *App) HTTPMetrics() metrics.HTTPObserver {
 	return appHTTPMetricsObserver{app: a}
-}
-
-// PrometheusCollector returns the configured Prometheus collector, if any.
-func (a *App) PrometheusCollector() *metrics.PrometheusCollector {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	return a.prometheusMetrics
 }
 
 type appHTTPMetricsObserver struct {

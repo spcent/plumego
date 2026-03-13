@@ -42,7 +42,7 @@ func main() {
 
     app := core.New(
         core.WithAddr(":8080"),
-        core.WithPrometheusCollector(collector),
+        core.WithHTTPMetrics(collector),
     )
 
     if err := app.Use(httpmetrics.Middleware(app.HTTPMetrics())); err != nil {
@@ -185,8 +185,7 @@ metrics.RecordError(ctx, collector, "cache_warm", 150*time.Millisecond, err)
 
 ## Integration Points
 
-- `core.WithPrometheusCollector(...)` stores the Prometheus collector on the app.
-- `core.WithHTTPMetrics(...)` stores a non-Prometheus HTTP observer on the app.
+- `core.WithHTTPMetrics(...)` stores the app-managed HTTP observer on the app.
 - `app.HTTPMetrics()` returns the current app-managed HTTP observer so middleware wiring stays explicit.
 - `core/components/observability` can wire `/metrics` and tracing when you opt into that component-level configuration.
 - `health.AttachMetricsTracker(...)` bridges health checks into the health metrics tracker.

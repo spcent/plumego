@@ -6,7 +6,6 @@ import (
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
-	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/router"
 )
 
@@ -171,21 +170,6 @@ func WithRunners(runners ...Runner) Option {
 func WithHTTPMetrics(observer metrics.HTTPObserver) Option {
 	return func(a *App) {
 		a.httpMetrics = observer
-	}
-}
-
-// WithPrometheusCollector sets the Prometheus collector used by the app.
-func WithPrometheusCollector(collector *metrics.PrometheusCollector) Option {
-	return func(a *App) {
-		a.prometheusMetrics = collector
-		a.httpMetrics = collector
-	}
-}
-
-// WithTracer sets a tracer hook for observability middleware.
-func WithTracer(tracer mwtracing.Tracer) Option {
-	return func(a *App) {
-		a.tracer = tracer
 	}
 }
 

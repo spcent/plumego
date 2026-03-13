@@ -12,7 +12,6 @@ import (
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/requestid"
-	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/router"
 )
 
@@ -253,29 +252,6 @@ func TestWithHTTPMetrics(t *testing.T) {
 	}
 }
 
-func TestWithPrometheusCollector(t *testing.T) {
-	app := &App{}
-	collector := metrics.NewPrometheusCollector("test")
-	opt := WithPrometheusCollector(collector)
-	opt(app)
-	if app.prometheusMetrics != collector {
-		t.Errorf("expected Prometheus collector to be set")
-	}
-	if app.httpMetrics != collector {
-		t.Errorf("expected HTTP metrics observer to point at Prometheus collector")
-	}
-}
-
-func TestWithTracer(t *testing.T) {
-	app := &App{}
-	tracer := &mockTracer{}
-	opt := WithTracer(tracer)
-	opt(app)
-	if app.tracer != tracer {
-		t.Errorf("expected tracer to be set")
-	}
-}
-
 // Mock implementations for testing
 type mockComponent struct {
 	BaseComponent
@@ -299,19 +275,3 @@ func (m *mockRunner) Stop(ctx context.Context) error  { return nil }
 type mockMetricsCollector struct {
 	*metrics.NoopCollector
 }
-
-type mockTracer struct{}
-
-func (m *mockTracer) Start(ctx context.Context, r *http.Request) (context.Context, mwtracing.TraceSpan) {
-	return ctx, &mockSpan{}
-}
-func (m *mockTracer) StartSpan(name string) any              { return nil }
-func (m *mockTracer) EndSpan(span any, err error)            {}
-func (m *mockTracer) SetTag(span any, key string, value any) {}
-func (m *mockTracer) Log(span any, fields map[string]any)    {}
-
-type mockSpan struct{}
-
-func (m *mockSpan) End(status, bytes int, traceID string) {}
-func (m *mockSpan) TraceID() string                       { return "" }
-func (m *mockSpan) SpanID() string                        { return "" }

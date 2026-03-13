@@ -308,49 +308,17 @@ app := core.New(
 
 ## Observability Hook Options
 
-### `WithPrometheusCollector`
-
-Store a Prometheus collector on the app for app-managed observability wiring.
-
-```go
-func WithPrometheusCollector(collector *metrics.PrometheusCollector) Option
-```
-
-```go
-app := core.New(
-    core.WithPrometheusCollector(metricsCollector),
-)
-```
-
-When you want middleware to follow the app-managed observer, wire it explicitly:
-
-```go
-app.Use(observability.HTTPMetrics(app.HTTPMetrics()))
-```
-
----
-
 ### `WithHTTPMetrics`
 
-Store a custom HTTP metrics observer on the app without requiring a Prometheus collector.
+Store a custom HTTP metrics observer on the app. `core` keeps only the narrow HTTP observer, not a concrete collector or tracer implementation.
 
 ```go
 func WithHTTPMetrics(observer metrics.HTTPObserver) Option
 ```
 
----
-
-### `WithTracer`
-
-Inject tracer used by observability middleware.
-
-```go
-func WithTracer(tracer observability.Tracer) Option
-```
-
 ```go
 app := core.New(
-    core.WithTracer(tracer),
+    core.WithHTTPMetrics(metricsCollector),
 )
 ```
 
@@ -385,10 +353,10 @@ Middleware is not configured by `With*` options in v1. Register middleware expli
 app := core.New(core.WithAddr(":8080"))
 
 if err := app.Use(
-    observability.RequestID(),
-    observability.Tracing(nil),
-    observability.HTTPMetrics(nil),
-    observability.AccessLog(app.Logger()),
+    requestid.Middleware(),
+    tracing.Middleware(nil),
+    httpmetrics.Middleware(nil),
+    accesslog.Middleware(app.Logger()),
     recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatalf("register middleware: %v", err)
@@ -412,10 +380,10 @@ app := core.New(
 )
 
 if err := app.Use(
-    observability.RequestID(),
-    observability.Tracing(nil),
-    observability.HTTPMetrics(nil),
-    observability.AccessLog(app.Logger()),
+    requestid.Middleware(),
+    tracing.Middleware(nil),
+    httpmetrics.Middleware(nil),
+    accesslog.Middleware(app.Logger()),
     recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatalf("register middleware: %v", err)
