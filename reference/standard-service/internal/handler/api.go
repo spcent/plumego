@@ -26,10 +26,10 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			"minimal_bootstrap",
 		},
 		"endpoints": map[string]string{
-			"root":      "/",
-			"healthz":   "/healthz",
-			"readyz":    "/readyz",
-			"api_hello": "/api/hello",
+			"root":       "/",
+			"healthz":    "/healthz",
+			"readyz":     "/readyz",
+			"api_hello":  "/api/hello",
 			"api_status": "/api/status",
 		},
 	}

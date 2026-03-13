@@ -44,17 +44,17 @@ func (s ResourceSpec) Normalized() ResourceSpec {
 	}
 	s.Prefix = normalizePrefix(s.Prefix)
 
+	if s.Options == nil {
+		s.Options = DefaultResourceOptions()
+	}
 	if s.QueryBuilder == nil {
-		s.QueryBuilder = NewQueryBuilder()
+		s.QueryBuilder = NewQueryBuilderFromOptions(s.Options)
 	}
 	if s.Hooks == nil {
 		s.Hooks = &NoOpResourceHooks{}
 	}
 	if s.Transformer == nil {
 		s.Transformer = &IdentityTransformer{}
-	}
-	if s.Options == nil {
-		s.Options = DefaultResourceOptions()
 	}
 	if !s.Routes.EnableBatch && !s.Routes.EnableHead && !s.Routes.EnableOptions {
 		s.Routes = DefaultRouteOptions()

@@ -36,5 +36,4 @@ review_checklist:
 agent_hints:
   - Treat x/pubsub as a primitive package; start new messaging feature discovery in x/messaging
   - Prefer local broker injection and keep pubsub transport-agnostic
-  - Do not move brokers into core
-  - Do not use x/pubsub as the first user-facing entrypoint for new messaging work
+  - Do not use x/pubsub as the first user-facing entrypoint for new messaging work or move brokers into core

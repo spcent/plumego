@@ -43,7 +43,5 @@ review_checklist:
 
 agent_hints:
   - Start messaging-related discovery here before opening sibling x/* packages
-  - Keep orchestration inside x/messaging with explicit service wiring
-  - Do not require core knowledge
+  - Keep orchestration inside x/messaging with explicit service wiring and app-facing entrypoints
   - Treat x/mq, x/pubsub, x/scheduler, and x/webhook as subordinate packages under this family
-  - Prefer RegisterRoutes and the x/messaging re-export entrypoints for new app-facing code

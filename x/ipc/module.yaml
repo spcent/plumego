@@ -34,7 +34,6 @@ review_checklist:
   - Preserve failure visibility
 
 agent_hints:
-  - Prefer x/messaging or the owning extension before adding new IPC-facing features here
-  - Keep IPC internals self-contained with narrow adapters
-  - Do not move IPC into core
   - Treat x/ipc as a primitive root, not a user-facing capability entrypoint
+  - Prefer x/messaging or the owning extension before adding new IPC-facing features here
+  - Keep IPC internals self-contained with narrow adapters and out of core

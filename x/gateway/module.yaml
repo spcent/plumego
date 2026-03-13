@@ -41,9 +41,6 @@ review_checklist:
   - Preserve transport determinism
 
 agent_hints:
-  - Keep gateway concerns inside x/gateway
-  - Prefer adapter-local helpers
-  - Do not require core knowledge
-  - Treat x/gateway as the only canonical entrypoint for gateway and edge transport work
-  - Use x/gateway entrypoints for app-facing proxy wiring
+  - Treat x/gateway as the canonical entrypoint for gateway and edge transport work
+  - Use x/gateway entrypoints for app-facing proxy wiring and keep helpers adapter-local
   - Route reusable resource-interface work to x/rest rather than mixing it into gateway

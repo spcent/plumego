@@ -41,8 +41,6 @@ review_checklist:
   - Preserve transport-only helpers
 
 agent_hints:
-  - Do not start new application bootstrap from x/rest
   - Use x/rest when standardizing reusable resource APIs and CRUD interface shape
-  - Keep resource ownership local with explicit route binding
-  - Prefer x/gateway for transport-edge proxy work and reference/standard-service for app bootstrap
   - Prefer ResourceSpec plus explicit Register*Routes helpers for new reusable resource APIs
+  - Do not start application bootstrap or transport-edge proxy work from x/rest; use reference/standard-service and x/gateway instead
