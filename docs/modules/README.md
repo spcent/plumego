@@ -1,10 +1,11 @@
-# Plumego Modules Index (Target Canonical)
+# Plumego Modules Index
 
 This page is the canonical entry for module docs.
 
 - v1 API freeze: `docs/other/V1_CORE_API_FREEZE.md`
 - style baseline: `docs/CANONICAL_STYLE_GUIDE.md`
 - quick start: `docs/getting-started.md`
+- top-level docs index: `docs/README.md`
 
 ## Repository Layers
 
@@ -58,3 +59,4 @@ This page is the canonical entry for module docs.
 - Prefer explicit root stable package APIs in production code and docs.
 - Treat `x/*` as opt-in capability packs.
 - Historical planning docs should not override the target layout described in `docs/architecture/`.
+- Archived topic writeups, plans, and reports now live under `docs/legacy/`.

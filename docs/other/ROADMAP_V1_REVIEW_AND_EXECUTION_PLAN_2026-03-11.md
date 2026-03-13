@@ -2,11 +2,11 @@
 
 状态: Active  
 日期: 2026-03-11  
-评审对象: `docs/ROADMAP_V1.md`
+评审对象: `docs/legacy/proposals/ROADMAP_V1.md`
 
 ## 1. 结论摘要
 
-`docs/ROADMAP_V1.md` 作为“设计原则草案”有价值，但作为当前 Plumego 的 `v1.0.0` 发布路线图并不合理，原因不是它不够激进，而是它把 **v1 定义成一次破坏兼容性的体系重写**，这与仓库当前已经公开的产品定位、文档承诺、API 状态和发布节奏冲突。
+`docs/legacy/proposals/ROADMAP_V1.md` 作为“设计原则草案”有价值，但作为当前 Plumego 的 `v1.0.0` 发布路线图并不合理，原因不是它不够激进，而是它把 **v1 定义成一次破坏兼容性的体系重写**，这与仓库当前已经公开的产品定位、文档承诺、API 状态和发布节奏冲突。
 
 更准确的判断是：
 
@@ -67,7 +67,7 @@ Violations:
 
 Minimal Fix Plan:
 
-1. 将 `docs/ROADMAP_V1.md` 降级为历史提案或 `v2 draft`
+1. 将 `docs/legacy/proposals/ROADMAP_V1.md` 视为历史提案或 `v2 draft`
 2. 以 GA 范围重新定义 v1：`core/router/middleware/contract/security/store`
 3. 将 AI、tenant、net/mq 等扩展能力明确拆分为 GA 外围或实验轨
 4. 所有后续改动按小步卡片推进，禁止跨模块推翻式重写
@@ -337,10 +337,10 @@ Plumego v1.0.0 的目标应定义为：
 ### Now
 
 Goal:
-- 将 `docs/ROADMAP_V1.md` 从“v1 发布路线图”纠偏为“历史提案/非当前 GA 计划”，避免继续误导贡献者
+- 将 `docs/legacy/proposals/ROADMAP_V1.md` 从“v1 发布路线图”纠偏为“历史提案/非当前 GA 计划”，避免继续误导贡献者
 
 Scope:
-- `docs/ROADMAP_V1.md`
+- `docs/legacy/proposals/ROADMAP_V1.md`
 - `docs/other/ROADMAP_V1_REVIEW_AND_EXECUTION_PLAN_2026-03-11.md`
 
 Non-goals:
@@ -348,7 +348,7 @@ Non-goals:
 - 不同时重写 README 全量内容
 
 Files:
-- `docs/ROADMAP_V1.md`
+- `docs/legacy/proposals/ROADMAP_V1.md`
 - `docs/other/ROADMAP_V1_REVIEW_AND_EXECUTION_PLAN_2026-03-11.md`
 
 Tests:
@@ -421,7 +421,7 @@ Goal:
 
 Scope:
 - `docs/modules/tenant/*`
-- `docs/tenant/*`
+- `docs/legacy/topics/tenant/*`
 - `docs/modules/mq/*` 或相关入口
 
 Non-goals:
@@ -474,7 +474,7 @@ Done Definition:
 
 ### 建议 1
 
-不要按当前 `docs/ROADMAP_V1.md` 继续推进 v1。  
+不要按当前 `docs/legacy/proposals/ROADMAP_V1.md` 继续推进 v1。  
 它应被重新定性为“架构理想蓝图”或“v2 draft”，而不是当前发布计划。
 
 ### 建议 2

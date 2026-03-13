@@ -1,6 +1,6 @@
 # Tenant Quick Start
 
-> Location note (March 10, 2026): this file is kept under `docs/tenant/` for legacy discoverability.
+> Location note (March 10, 2026): this file is kept under `docs/legacy/topics/tenant/` for legacy discoverability.
 > Canonical v1 tenant docs live in `docs/modules/tenant/*` and `README.md` / `README_CN.md`.
 
 Status: Experimental in v1

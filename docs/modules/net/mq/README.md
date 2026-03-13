@@ -269,5 +269,5 @@ Use `x/mq` for reliable task processing. Use `pubsub` for simple event distribut
 ## Related Documentation
 
 - [Net Overview](../README.md) — Network module
-- [Outbound Webhooks](../webhookout/README.md) — Webhook delivery queue
+- [Archived Webhook Out Migration](/Users/bingrong.yan/projects/go/plumego/docs/legacy/modules/net/webhookout/README.md) - Historical webhook delivery notes
 - [Scheduler](../../scheduler/README.md) — Task scheduling

@@ -1,6 +1,6 @@
 # WebSocket Migration
 
-`net/websocket` has been moved into [`x/websocket`](../x-websocket/README.md).
+`net/websocket` has been moved into [`x/websocket`](/Users/bingrong.yan/projects/go/plumego/docs/modules/x-websocket/README.md).
 
 Use `github.com/spcent/plumego/x/websocket` for:
 - `Hub`, `HubConfig`, `NewHub`, and `NewHubWithConfig`
@@ -8,7 +8,7 @@ Use `github.com/spcent/plumego/x/websocket` for:
 - `ServeWSWithAuth` and `ServeWSWithConfig`
 - `NewComponent` and `DefaultWebSocketConfig`
 
-This page is kept only as a migration marker for historical links.
+This page is kept only as an archived migration marker for historical links.
 
 ## Authentication
 
@@ -37,7 +37,7 @@ When `ReadLimit` is set, text-message validation max length is clamped to the sa
 
 ## Hub Semantics
 
-`MaxConnections` and `GetTotalCount()` are based on **room registrations**.
+`MaxConnections` and `GetTotalCount()` are based on room registrations.
 
 - One connection in one room = 1
 - One connection joined to 3 rooms = 3

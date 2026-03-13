@@ -63,12 +63,12 @@ From repository scan on 2026-03-10:
 - `docs/modules/router/route-groups.md` (42)
 - `docs/modules/router/middleware-binding.md` (29)
 - `docs/modules/middleware/README.md` (17)
-- `docs/tenant/TENANT_PRODUCTION_PLAN.md` (13)
-- `docs/tenant/TENANT_IMPLEMENTATION_CHECKLIST.md` (9)
+- `docs/legacy/topics/tenant/TENANT_PRODUCTION_PLAN.md` (13)
+- `docs/legacy/topics/tenant/TENANT_IMPLEMENTATION_CHECKLIST.md` (9)
 - `docs/modules/tenant/README.md` (8)
 - `docs/modules/router/README.md` (8)
 - `docs/modules/middleware/best-practices.md` (8)
-- `docs/tenant/TENANT_QUICKSTART.md` (7)
+- `docs/legacy/topics/tenant/TENANT_QUICKSTART.md` (7)
 - `docs/modules/core/lifecycle.md` (5)
 
 ## 4. Execution Order (Remaining)
@@ -105,7 +105,7 @@ Status: Mostly completed for canonical paths; continue spot-fix as new drift app
 
 Target files:
 - `docs/modules/tenant/*.md`
-- `docs/tenant/TENANT_QUICKSTART.md`
+- `docs/legacy/topics/tenant/TENANT_QUICKSTART.md`
 
 Acceptance:
 - Replace removed core options with explicit tenant middleware chain on router groups.

@@ -13,4 +13,4 @@ Use this package for:
 Do not import legacy `net/webhookin` or `net/webhookout` from new application code.
 
 Migration note:
-- older links under `docs/modules/net/webhookin` and `docs/modules/net/webhookout` now redirect here conceptually
+- archived migration notes live under `docs/legacy/modules/net/webhookin` and `docs/legacy/modules/net/webhookout`

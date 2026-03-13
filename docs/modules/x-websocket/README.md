@@ -13,4 +13,4 @@ Use this package for:
 Do not import legacy `net/websocket` from new application code.
 
 Migration note:
-- older links under `docs/modules/net/websocket` now redirect here conceptually
+- archived migration notes live under `docs/legacy/modules/net/websocket`
