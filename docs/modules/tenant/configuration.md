@@ -1,6 +1,6 @@
 # Tenant Configuration Management
 
-> **Package**: `github.com/spcent/plumego/tenant` | **Feature**: Per-tenant configuration
+> **Package**: `github.com/spcent/plumego/x/tenant/core` | **Feature**: Per-tenant configuration
 
 ## Overview
 
@@ -19,7 +19,7 @@ type ConfigManager interface {
 Best for testing and development:
 
 ```go
-import "github.com/spcent/plumego/tenant"
+import "github.com/spcent/plumego/x/tenant/core"
 
 // Create in-memory manager
 configMgr := tenant.NewInMemoryConfigManager()
@@ -66,7 +66,7 @@ For production use with automatic caching:
 
 ```go
 import (
-    "github.com/spcent/plumego/tenant"
+    "github.com/spcent/plumego/x/tenant/core"
     tenantconfig "github.com/spcent/plumego/x/tenant/config"
 )
 

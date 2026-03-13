@@ -1,0 +1,41 @@
+name: x/observability
+path: x/observability
+layer: extension
+status: experimental
+summary: Optional observability adapters and higher-level instrumentation helpers.
+
+responsibilities:
+  - Observability adapters
+  - Optional instrumentation helpers
+  - Export pipeline wiring
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business metrics policy
+
+allowed_imports:
+  - contract
+  - log
+  - metrics
+  - middleware
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/...
+  - go test -timeout 20s ./x/observability/...
+  - go vet ./x/observability/...
+
+review_checklist:
+  - Keep export behavior explicit
+  - Avoid hidden globals
+  - Preserve observability isolation
+
+agent_hints:
+  - Prefer adapter-local helpers
+  - Keep transport hooks explicit
+  - Do not require core knowledge

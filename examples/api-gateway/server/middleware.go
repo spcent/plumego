@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/spcent/plumego/internal/httputil"
 	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/utils"
 )
 
 // AccessLogMiddleware provides structured logging for all requests

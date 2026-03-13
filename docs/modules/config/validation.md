@@ -1,50 +1,36 @@
 # Configuration Validation
 
-> **Package**: `github.com/spcent/plumego/config`
+> Legacy note: the historical public `config/` root has been removed.
 
-Validation in the current package is explicit. Use manager accessors with validators or define a reusable schema.
+Validation should happen once during startup, after defaults, env, and flags have been applied.
 
-## Per-value validation
-
-```go
-apiKey, err := cfg.String("api_key", "", &config.Required{}, &config.MinLength{Min: 20})
-if err != nil {
-    log.Fatal(err)
-}
-
-port, err := cfg.Int("port", 8080, &config.Range{Min: 1, Max: 65535})
-if err != nil {
-    log.Fatal(err)
-}
-
-baseURL, err := cfg.String("api_base_url", "", &config.URL{})
-if err != nil {
-    log.Fatal(err)
-}
-```
-
-## Schema validation
+## Recommended Pattern
 
 ```go
-schema := config.NewConfigSchema().
-    AddField("app_env", &config.OneOf{Values: []string{"development", "staging", "production"}}).
-    AddField("jwt_secret", &config.Required{}, &config.MinLength{Min: 32}).
-    AddField("port", &config.Range{Min: 1, Max: 65535})
-
-if err := schema.Validate(cfg.GetAll()); err != nil {
-    log.Fatal(err)
-}
-```
-
-## Manual validation for cross-field rules
-
-```go
-func validate(cfg *config.Manager) error {
-    if cfg.GetBool("tls_enabled", false) {
-        if cfg.GetString("tls_cert_file", "") == "" || cfg.GetString("tls_key_file", "") == "" {
-            return fmt.Errorf("tls_cert_file and tls_key_file are required when tls_enabled=true")
-        }
+func Validate(cfg Config) error {
+    if cfg.Core.Addr == "" {
+        return fmt.Errorf("addr is required")
+    }
+    if cfg.WebSocketSecret != "" && len(cfg.WebSocketSecret) < 32 {
+        return fmt.Errorf("ws_secret must be at least 32 bytes")
+    }
+    if cfg.Core.Debug && cfg.EnableDocs == false {
+        return nil
     }
     return nil
 }
 ```
+
+## Cross-Field Validation
+
+```go
+if cfg.EnableWebhooks && cfg.WebhookToken == "" {
+    return fmt.Errorf("webhook token is required when webhooks are enabled")
+}
+```
+
+## Guidance
+
+- validate typed config, not raw `os.Getenv(...)` values spread through the codebase
+- fail before app bootstrap
+- keep security-sensitive checks explicit and easy to review

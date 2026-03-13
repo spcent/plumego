@@ -1,13 +1,1 @@
 # Existing extension roots still need manifests. New x/* modules must not rely on this baseline.
-x/devtools
-x/discovery
-x/frontend
-x/gateway
-x/ipc
-x/messaging
-x/mq
-x/observability
-x/ops
-x/pubsub
-x/rest
-x/scheduler

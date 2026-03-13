@@ -1,0 +1,39 @@
+name: x/ipc
+path: x/ipc
+layer: extension
+status: experimental
+summary: Inter-process communication helpers and adapters.
+
+responsibilities:
+  - IPC message transport
+  - IPC client/server helpers
+  - Explicit IPC adapters
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business workflow orchestration
+
+allowed_imports:
+  - contract
+  - log
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ipc/...
+  - go test -timeout 20s ./x/ipc/...
+  - go vet ./x/ipc/...
+
+review_checklist:
+  - Keep transport contracts explicit
+  - Avoid hidden process-wide side effects
+  - Preserve failure visibility
+
+agent_hints:
+  - Keep IPC internals self-contained
+  - Prefer narrow adapters
+  - Do not move IPC into core

@@ -36,12 +36,13 @@
 package input
 
 import (
+	"net"
+	"net/mail"
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/spcent/plumego/validator"
 )
 
 // IsToken reports whether value is a valid HTTP token (RFC 7230).
@@ -145,8 +146,6 @@ func isTchar(ch byte) bool {
 // Returns true if the email appears valid. This is a basic check for security
 // purposes, not a comprehensive email validation.
 //
-// This function delegates to validator.SecureEmail() for the actual validation logic.
-//
 // Example:
 //
 //	import "github.com/spcent/plumego/security/input"
@@ -159,17 +158,45 @@ func ValidateEmail(email string) bool {
 	if email == "" {
 		return false
 	}
-	rule := validator.SecureEmail()
-	err := rule.Validate(email)
-	return err == nil
+	if len(email) > 254 || strings.ContainsRune(email, 0) || !utf8.ValidString(email) {
+		return false
+	}
+
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Address != email {
+		return false
+	}
+
+	local, domain, ok := strings.Cut(email, "@")
+	if !ok || local == "" || domain == "" {
+		return false
+	}
+	if len(local) > 64 || strings.Contains(local, "..") || strings.Contains(domain, "..") {
+		return false
+	}
+	if strings.HasPrefix(local, ".") || strings.HasSuffix(local, ".") {
+		return false
+	}
+
+	labels := strings.Split(domain, ".")
+	if len(labels) < 2 {
+		return false
+	}
+	for _, label := range labels {
+		if label == "" {
+			return false
+		}
+		if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidateURL performs security-focused URL validation.
 //
 // Returns true if the URL is valid and safe to use. This function checks for
 // common security issues like javascript: URLs, file: URLs, and malformed URLs.
-//
-// This function delegates to validator.SecureURL() for the actual validation logic.
 //
 // Example:
 //
@@ -183,17 +210,47 @@ func ValidateURL(rawURL string) bool {
 	if rawURL == "" {
 		return false
 	}
-	rule := validator.SecureURL()
-	err := rule.Validate(rawURL)
-	return err == nil
+	if len(rawURL) > 2048 || strings.ContainsRune(rawURL, 0) || !utf8.ValidString(rawURL) {
+		return false
+	}
+
+	lowerURL := strings.ToLower(rawURL)
+	for _, blocked := range []string{"javascript:", "data:", "file:", "vbscript:"} {
+		if strings.HasPrefix(lowerURL, blocked) {
+			return false
+		}
+	}
+
+	if strings.HasPrefix(rawURL, "/") {
+		return !strings.HasPrefix(rawURL, "//")
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return false
+	}
+	if parsed.Port() != "" {
+		if _, err := net.LookupPort(parsed.Scheme, parsed.Port()); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidatePhone performs basic phone number validation.
 //
 // Returns true if the phone number appears valid. This is a basic check that
 // accepts E.164 format and common phone number patterns.
-//
-// This function delegates to validator.SecurePhone() for the actual validation logic.
 //
 // Example:
 //
@@ -207,9 +264,26 @@ func ValidatePhone(phone string) bool {
 	if phone == "" {
 		return false
 	}
-	rule := validator.SecurePhone()
-	err := rule.Validate(phone)
-	return err == nil
+	if !utf8.ValidString(phone) {
+		return false
+	}
+
+	digits := make([]rune, 0, len(phone))
+	for i, r := range phone {
+		switch {
+		case r >= '0' && r <= '9':
+			digits = append(digits, r)
+		case r == '+':
+			if i != 0 {
+				return false
+			}
+		case r == ' ' || r == '-' || r == '.' || r == '(' || r == ')':
+		default:
+			return false
+		}
+	}
+
+	return len(digits) >= 7 && len(digits) <= 15
 }
 
 // SanitizeHTML removes potentially dangerous HTML tags and attributes.

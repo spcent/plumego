@@ -16,7 +16,7 @@
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/utils/pool"
+//	import "github.com/spcent/plumego/internal/pool"
 //
 //	// Get a buffer, use it, then return it
 //	buf := pool.GetJSONBuffer()

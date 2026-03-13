@@ -38,7 +38,7 @@ func TestMiddlewareAdaptersRespectLayerBoundaries(t *testing.T) {
 			allowList: []string{
 				"github.com/spcent/plumego/contract",
 				"github.com/spcent/plumego/middleware",
-				"github.com/spcent/plumego/tenant",
+				"github.com/spcent/plumego/x/tenant/core",
 			},
 		},
 	}

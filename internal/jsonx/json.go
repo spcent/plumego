@@ -15,7 +15,7 @@
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/utils/jsonx"
+//	import "github.com/spcent/plumego/internal/jsonx"
 //
 //	payload := []byte(`{"user_id": "123", "active": true, "score": 98.5}`)
 //
@@ -29,7 +29,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/spcent/plumego/utils/pool"
+	"github.com/spcent/plumego/internal/pool"
 )
 
 // FieldString extracts a top-level string field from JSON (best-effort).

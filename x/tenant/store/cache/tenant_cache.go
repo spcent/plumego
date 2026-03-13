@@ -7,7 +7,7 @@ import (
 	"time"
 
 	storecache "github.com/spcent/plumego/store/cache"
-	"github.com/spcent/plumego/tenant"
+	"github.com/spcent/plumego/x/tenant/core"
 )
 
 // TenantCache wraps a Cache implementation and automatically scopes keys by tenant ID.

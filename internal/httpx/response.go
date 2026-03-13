@@ -13,7 +13,7 @@ import (
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/utils/httpx"
+//	import "github.com/spcent/plumego/internal/httpx"
 //
 //	response := httpx.Response{
 //		Code: 200,
@@ -36,7 +36,7 @@ type Response struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/utils/httpx"
+//	import "github.com/spcent/plumego/internal/httpx"
 //
 //	// Send simple JSON response
 //	data := map[string]string{"message": "Hello, World!"}

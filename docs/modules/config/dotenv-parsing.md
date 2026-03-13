@@ -1,70 +1,42 @@
 # .env File Parsing
 
-> **Package**: `github.com/spcent/plumego/config`
+> Legacy note: the historical public `config/` root has been removed.
 
-The current package supports `.env` parsing in two explicit forms:
+If an application wants `.env` support, keep it in app-owned startup code.
 
-- `config.LoadEnvFile(path, overwrite)` to write values into process environment
-- `config.NewFileSource(path, config.FormatEnv, watch)` to load `.env` content into a `config.Manager`
+## Rule
 
-## File format
+Loading `.env` mutates process environment state. Do it explicitly in `main` or your app-local `internal/config`, never inside shared library bootstrap.
 
-```bash
-APP_ADDR=:8080
-APP_DEBUG=true
-DB_URL="postgres://localhost/db"
-OPTIONAL_KEY=
-PORT = 8080
-```
-
-Comments beginning with `#` are ignored. Keys are normalized to snake_case in `Manager` source loading.
-
-## Load into process environment
+## Example
 
 ```go
-if err := config.LoadEnvFile(".env", false); err != nil {
-    log.Fatal(err)
+func Load() (Config, error) {
+    cfg := Defaults()
+
+    envFile := cfg.Core.EnvFile
+    if v := os.Getenv("APP_ENV_FILE"); v != "" {
+        envFile = v
+    }
+
+    if envFile != "" {
+        if _, err := os.Stat(envFile); err == nil {
+            if err := loadEnvFile(envFile); err != nil {
+                return cfg, err
+            }
+        }
+    }
+
+    return cfg, applyEnv(&cfg)
 }
 ```
 
-Use this in `main` when you explicitly want process-global mutation.
+## File Conventions
 
-## Load into a manager without mutating process environment
-
-```go
-cfg := config.NewManager(plumelog.NewGLogger())
-_ = cfg.AddSource(config.NewFileSource(".env.production", config.FormatEnv, false))
-if err := cfg.Load(context.Background()); err != nil {
-    log.Fatal(err)
-}
-```
-
-## Watching a `.env` file
-
-```go
-source := config.NewFileSource(".env", config.FormatEnv, true).WithWatchInterval(time.Second)
-```
-
-## Recommended file layout
-
-```bash
+```text
 .env.example
 .env.local
-.env.production
-.env.staging
 .env.test
 ```
 
-## Priority guidance
-
-Use explicit source ordering rather than relying on hidden default lookup:
-
-1. base file
-2. environment-specific file
-3. real environment variables
-
-```go
-_ = cfg.AddSource(config.NewFileSource(".env", config.FormatEnv, false))
-_ = cfg.AddSource(config.NewFileSource(".env.production", config.FormatEnv, false))
-_ = cfg.AddSource(config.NewEnvSource(""))
-```
+Do not make library behavior depend on implicit file discovery.

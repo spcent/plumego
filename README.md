@@ -32,7 +32,7 @@ Machine-enforced repo guardrails live under `internal/checks/*`. Historical exce
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
 - **Middleware Chain**: Logging, recovery, gzip, CORS, timeout (buffers up to 10 MiB by default), rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.
 - **Security Helpers**: JWT + password utilities, security header policies, input-safety helpers, and abuse guard primitives for baseline hardening.
-- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and message queues (the `net/mq` module includes a durable task queue mode; still experimental).
+- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and extension-backed discovery, messaging, and queueing via `x/discovery`, `x/messaging`, and `x/mq`.
 - **Idempotency Utilities**: Simple KV/SQL helpers for request deduplication via `store/idempotency`.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
@@ -190,7 +190,7 @@ import (
     "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
     tenantconfig "github.com/spcent/plumego/x/tenant/config"
-    "github.com/spcent/plumego/tenant"
+    tenant "github.com/spcent/plumego/x/tenant/core"
     tenantpolicy "github.com/spcent/plumego/x/tenant/policy"
     tenantquota "github.com/spcent/plumego/x/tenant/quota"
     tenantratelimit "github.com/spcent/plumego/x/tenant/ratelimit"
@@ -478,7 +478,7 @@ Use `config.LoadEnv` to load environment variables, or bind command-line flags; 
 | WebSocket.MaxConnections | 0 (unlimited)  | (config only)                 | -                               |
 | WebSocket.MaxRoomConnections | 0 (unlimited) | (config only)               | -                               |
 
-Use `config.Get*` helpers (see `config/env.go`) or Go's `flag` package to transform these sources into an `AppConfig`, then call `core.New(...)`.
+Keep configuration loading in your `main` package. Parse env vars, flags, or files into an `AppConfig`, then pass concrete values into `core.New(...)`. Canonical app scaffolds keep any shared helpers under app-local `internal/config` rather than a public root package.
 
 ## Development and Testing
 - Install Go 1.24+ (matching `go.mod`).

@@ -8,9 +8,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/internal/config"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"

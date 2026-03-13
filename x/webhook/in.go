@@ -11,10 +11,10 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/internal/jsonx"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
-	"github.com/spcent/plumego/utils/jsonx"
 	"github.com/spcent/plumego/x/pubsub"
 )
 

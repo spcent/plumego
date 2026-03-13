@@ -43,7 +43,7 @@ import (
 	"strings"
 	"time"
 
-	nethttp "github.com/spcent/plumego/net/http"
+	nethttp "github.com/spcent/plumego/internal/nethttp"
 )
 
 // Store is the interface for cache storage backends

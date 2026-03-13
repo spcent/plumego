@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 	"github.com/spcent/plumego/security/abuse"
-	"github.com/spcent/plumego/utils/httpx"
 )
 
 type abuseClock struct {
@@ -134,33 +134,33 @@ func TestAbuseGuardHeaderToggle(t *testing.T) {
 }
 
 func TestClientIP(t *testing.T) {
-	if got := httpx.ClientIP(nil); got != "" {
+	if got := internaltransport.ClientIP(nil); got != "" {
 		t.Fatalf("expected empty key for nil request, got %q", got)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
 	req.Header.Set("X-Forwarded-For", " 1.1.1.1 , 2.2.2.2 ")
 	req.RemoteAddr = "9.9.9.9:1234"
-	if got := httpx.ClientIP(req); got != "1.1.1.1" {
+	if got := internaltransport.ClientIP(req); got != "1.1.1.1" {
 		t.Fatalf("expected X-Forwarded-For to win, got %q", got)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "http://example.com", nil)
 	req.Header.Set("X-Real-IP", " 3.3.3.3 ")
 	req.RemoteAddr = "9.9.9.9:1234"
-	if got := httpx.ClientIP(req); got != "3.3.3.3" {
+	if got := internaltransport.ClientIP(req); got != "3.3.3.3" {
 		t.Fatalf("expected X-Real-IP to win, got %q", got)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "http://example.com", nil)
 	req.RemoteAddr = "5.5.5.5:8080"
-	if got := httpx.ClientIP(req); got != "5.5.5.5" {
+	if got := internaltransport.ClientIP(req); got != "5.5.5.5" {
 		t.Fatalf("expected host part from RemoteAddr, got %q", got)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "http://example.com", nil)
 	req.RemoteAddr = "6.6.6.6"
-	if got := httpx.ClientIP(req); got != "6.6.6.6" {
+	if got := internaltransport.ClientIP(req); got != "6.6.6.6" {
 		t.Fatalf("expected raw RemoteAddr when no port, got %q", got)
 	}
 }

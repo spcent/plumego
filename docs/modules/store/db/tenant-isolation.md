@@ -9,15 +9,18 @@
 ## Quick Start
 
 ```go
-import "github.com/spcent/plumego/store/db"
+import (
+    tenant "github.com/spcent/plumego/x/tenant/core"
+    tenantdb "github.com/spcent/plumego/x/tenant/store/db"
+)
 
-// Create tenant-aware database wrapper
+// Create tenant-aware database wrapper.
 tenantDB := tenantdb.NewTenantDB(database)
 
-// Query with context that has tenant ID
+// Query with context that has tenant ID.
 ctx := tenant.ContextWithTenantID(r.Context(), "tenant-123")
 
-// tenant_id = 'tenant-123' is automatically added
+// tenant_id = 'tenant-123' is automatically added.
 rows, err := tenantDB.QueryFromContext(ctx,
     "SELECT id, email, name FROM users WHERE active = ?", true,
 )
@@ -167,7 +170,7 @@ rawDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&totalUsers)
 ## Context Helper Functions
 
 ```go
-import "github.com/spcent/plumego/tenant"
+import tenant "github.com/spcent/plumego/x/tenant/core"
 
 // Add tenant ID to context
 ctx := tenant.ContextWithTenantID(context.Background(), "tenant-123")

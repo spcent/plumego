@@ -14,8 +14,8 @@ import (
 	"github.com/spcent/plumego/examples/sms-gateway/internal/routing"
 	"github.com/spcent/plumego/examples/sms-gateway/internal/tasks"
 	"github.com/spcent/plumego/store/idempotency"
-	"github.com/spcent/plumego/tenant"
 	"github.com/spcent/plumego/x/mq"
+	"github.com/spcent/plumego/x/tenant/core"
 )
 
 // ExampleSendHandler demonstrates wiring idempotency + state transitions in a handler.

@@ -1,6 +1,1 @@
 # Historical top-level library roots kept temporarily during migration.
-config
-net
-tenant
-utils
-validator

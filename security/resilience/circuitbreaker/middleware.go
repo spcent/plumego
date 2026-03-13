@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/utils"
 )
 
 // Middleware creates a circuit breaker middleware
@@ -98,13 +97,13 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	if !w.written {
 		w.WriteHeader(http.StatusOK)
 	}
-	return utils.SafeWrite(w.ResponseWriter, b)
+	return safeWrite(w.ResponseWriter, b)
 }
 
 // writeCircuitOpenResponse writes a 503 response when circuit is open
 func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
-	utils.EnsureNoSniff(w.Header())
+	ensureNoSniff(w.Header())
 	contract.WriteError(w, nil, contract.APIError{
 		Status:   http.StatusServiceUnavailable,
 		Code:     "CIRCUIT_OPEN",
@@ -120,7 +119,7 @@ func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 // writeTooManyRequestsResponse writes a 429 response for rate limiting
 func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
-	utils.EnsureNoSniff(w.Header())
+	ensureNoSniff(w.Header())
 	contract.WriteError(w, nil, contract.APIError{
 		Status:   http.StatusTooManyRequests,
 		Code:     "RATE_LIMITED",

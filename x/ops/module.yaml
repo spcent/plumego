@@ -1,0 +1,43 @@
+name: x/ops
+path: x/ops
+layer: extension
+status: experimental
+summary: Protected operations endpoints for queues, receipts, and runtime diagnostics.
+
+responsibilities:
+  - Ops endpoint mounting
+  - Queue and receipt admin hooks
+  - Explicit auth-gated diagnostics
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Tenant bootstrap policy
+
+allowed_imports:
+  - contract
+  - health
+  - log
+  - metrics
+  - middleware
+  - router
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ops/...
+  - go test -timeout 20s ./x/ops/...
+  - go vet ./x/ops/...
+
+review_checklist:
+  - Keep ops endpoints explicit
+  - Preserve auth boundaries
+  - Avoid hidden admin side effects
+
+agent_hints:
+  - Keep ops routing outside core
+  - Prefer hook-based behavior
+  - Fail closed on auth errors

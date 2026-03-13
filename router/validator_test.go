@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spcent/plumego/validator"
+	"github.com/spcent/plumego/internal/validator"
 )
 
 func TestRouteValidationGroupPrefix(t *testing.T) {

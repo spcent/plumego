@@ -7,7 +7,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	mw "github.com/spcent/plumego/middleware"
-	tenantcore "github.com/spcent/plumego/tenant"
+	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 

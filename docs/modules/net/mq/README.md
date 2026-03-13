@@ -254,7 +254,7 @@ mq_processing_duration_seconds{topic="orders"}
 
 ## Comparison with PubSub
 
-| Feature | `net/mq` | `pubsub` |
+| Feature | `x/mq` | `pubsub` |
 |---------|----------|----------|
 | Message persistence | ✅ | ❌ |
 | Priority queues | ✅ | ❌ |
@@ -264,7 +264,7 @@ mq_processing_duration_seconds{topic="orders"}
 | Fan-out | ✅ | ✅ |
 | Simplicity | Medium | High |
 
-Use `net/mq` for reliable task processing. Use `pubsub` for simple event distribution.
+Use `x/mq` for reliable task processing. Use `pubsub` for simple event distribution.
 
 ## Related Documentation
 

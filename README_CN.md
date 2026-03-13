@@ -8,7 +8,7 @@
 
 Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
 
-`core` 包是稳定的主入口；顶层 `plumego` 包提供常用类型与选项的便捷 re-export。
+`core` 包是稳定的主入口；请直接从稳定模块路径导入，不再通过根包 re-export 入口访问类型或选项。
 
 ## 仓库演进方向
 
@@ -30,7 +30,7 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
 - **中间件链**：日志、恢复、gzip、CORS、超时（默认缓冲上限 10 MiB）、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。
 - **安全辅助**：JWT + 密码工具、安全头策略、输入安全校验与基础防滥用组件，便于进行安全基线加固。
-- **集成扩展**：提供 `database/sql`、Redis 缓存与消息队列的轻量适配器/扩展点（`net/mq` 增加可靠任务队列能力，仍处于实验状态）。
+- **集成扩展**：提供 `database/sql`、Redis 缓存，以及通过 `x/discovery`、`x/messaging`、`x/mq` 暴露的服务发现、消息编排与队列能力。
 - **幂等工具**：提供 `store/idempotency` 的 KV/SQL 幂等存储接口。
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
 - **优雅生命周期**：环境变量加载、连接排水、就绪标志，以及可选的 TLS/HTTP2 配置，带有合理默认值。
@@ -187,7 +187,7 @@ import (
     "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
     tenantconfig "github.com/spcent/plumego/x/tenant/config"
-    "github.com/spcent/plumego/tenant"
+    tenant "github.com/spcent/plumego/x/tenant/core"
     tenantpolicy "github.com/spcent/plumego/x/tenant/policy"
     tenantquota "github.com/spcent/plumego/x/tenant/quota"
     tenantratelimit "github.com/spcent/plumego/x/tenant/ratelimit"
@@ -475,7 +475,7 @@ app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
 | WebSocket.MaxConnections   | 0 (unlimited)  | (config only)                 | -                                 |
 | WebSocket.MaxRoomConnections | 0 (unlimited) | (config only)                | -                                 |
 
-使用 `config.Get*` 辅助函数（参见 `config/env.go`）或 Go 的 `flag` 包，将这些来源转换为 `AppConfig`，然后调用 `core.New(...)`。
+将配置加载保留在你的 `main` 包中：把环境变量、命令行参数或配置文件显式解析成 `AppConfig`，再传给 `core.New(...)`。canonical 脚手架会把共享配置辅助逻辑放在应用自己的 `internal/config`，而不是公共根包。
 
 ## 开发与测试
 - 安装 Go 1.24+（匹配 `go.mod`）。

@@ -11,8 +11,7 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/utils"
-	"github.com/spcent/plumego/utils/httpx"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // RequestMetrics captures common observability attributes for a request.
@@ -192,7 +191,7 @@ func AccessLog(logger log.StructuredLogger) middleware.Middleware {
 			fields := contract.DefaultObservabilityPolicy.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
 			fields["bytes"] = metricsData.Bytes
 			fields["user_agent"] = metricsData.UserAgent
-			fields["client_ip"] = httpx.ClientIP(r)
+			fields["client_ip"] = internaltransport.ClientIP(r)
 			if metricsData.Route != "" {
 				fields["route"] = metricsData.Route
 			}
@@ -292,7 +291,7 @@ func Logging(logger log.StructuredLogger, metrics HTTPMetricsObserver, tracer Tr
 			fields := contract.DefaultObservabilityPolicy.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
 			fields["bytes"] = metricsData.Bytes
 			fields["user_agent"] = metricsData.UserAgent
-			fields["client_ip"] = httpx.ClientIP(r)
+			fields["client_ip"] = internaltransport.ClientIP(r)
 			if metricsData.Route != "" {
 				fields["route"] = metricsData.Route
 			}
@@ -369,7 +368,7 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 	// not user input. This middleware does not modify response content
 	// and therefore does not introduce XSS vulnerabilities.
 	// XSS protection should be implemented in handlers that generate HTML content.
-	n, err := utils.SafeWrite(r.ResponseWriter, p)
+	n, err := internaltransport.SafeWrite(r.ResponseWriter, p)
 	r.bytes += n
 	return n, err
 }

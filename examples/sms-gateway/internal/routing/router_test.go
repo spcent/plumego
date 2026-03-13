@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/tenant"
+	"github.com/spcent/plumego/x/tenant/core"
 )
 
 func TestPolicyRouterWithCachedProvider(t *testing.T) {

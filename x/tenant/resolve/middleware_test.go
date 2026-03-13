@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	tenantcore "github.com/spcent/plumego/tenant"
+	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
 
 func TestMiddlewareFromPrincipal(t *testing.T) {

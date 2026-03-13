@@ -1,6 +1,6 @@
 # Tenant Policy
 
-> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/x/tenant/policy`  
+> **Packages**: `github.com/spcent/plumego/x/tenant/core`, `github.com/spcent/plumego/x/tenant/policy`  
 > **Stability**: Experimental (v1)
 
 Tenant policy controls allowed models/tools/methods/paths per tenant.

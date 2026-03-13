@@ -1,6 +1,6 @@
 # Tenant Quota
 
-> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/x/tenant/quota`  
+> **Packages**: `github.com/spcent/plumego/x/tenant/core`, `github.com/spcent/plumego/x/tenant/quota`  
 > **Stability**: Experimental (v1)
 
 Quota management limits per-tenant request/token usage.

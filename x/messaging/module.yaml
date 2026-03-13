@@ -1,0 +1,46 @@
+name: x/messaging
+path: x/messaging
+layer: extension
+status: experimental
+summary: Message delivery orchestration built on explicit queue, scheduler, and webhook adapters.
+
+responsibilities:
+  - Message send orchestration
+  - Delivery provider abstraction
+  - Scheduling and queue coordination
+  - Receipt and stats APIs
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Tenant bootstrap policy
+
+allowed_imports:
+  - contract
+  - log
+  - metrics
+  - store
+  - x/mq
+  - x/pubsub
+  - x/scheduler
+  - x/webhook
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/messaging/...
+  - go test -timeout 20s ./x/messaging/...
+  - go vet ./x/messaging/...
+
+review_checklist:
+  - Keep message flow explicit
+  - Avoid hidden provider globals
+  - Preserve error-path visibility
+
+agent_hints:
+  - Keep orchestration inside x/messaging
+  - Prefer explicit service wiring
+  - Do not require core knowledge

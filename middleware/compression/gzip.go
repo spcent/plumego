@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/utils"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // Gzip compresses HTTP responses when the client supports it via Accept-Encoding.
@@ -127,7 +127,7 @@ func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 
 	if !shouldCompress {
 		w.compressionUsed = false
-		utils.EnsureNoSniff(w.ResponseWriter.Header())
+		internaltransport.EnsureNoSniff(w.ResponseWriter.Header())
 		w.ResponseWriter.WriteHeader(statusCode)
 		return
 	}
@@ -135,7 +135,7 @@ func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 	// Start buffering
 	w.bodyBuffer = make([]byte, 0, 1024) // Start with small buffer
 	w.compressionUsed = true
-	utils.EnsureNoSniff(w.ResponseWriter.Header())
+	internaltransport.EnsureNoSniff(w.ResponseWriter.Header())
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
@@ -146,7 +146,7 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 
 	// If not compressing, write directly
 	if !w.compressionUsed {
-		return utils.SafeWrite(w.ResponseWriter, p)
+		return internaltransport.SafeWrite(w.ResponseWriter, p)
 	}
 
 	// Buffer the data
@@ -174,7 +174,7 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 			// not user input. This middleware does not modify response content
 			// and therefore does not introduce XSS vulnerabilities.
 			// XSS protection should be implemented in handlers that generate HTML content.
-			n, err := utils.SafeWrite(w.ResponseWriter, w.bodyBuffer[totalWritten:end])
+			n, err := internaltransport.SafeWrite(w.ResponseWriter, w.bodyBuffer[totalWritten:end])
 			if err != nil {
 				// Ensure buffer is cleared even on error
 				w.bodyBuffer = nil

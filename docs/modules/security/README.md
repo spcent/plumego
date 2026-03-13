@@ -314,10 +314,7 @@ manager := jwt.NewManager(secret)
 ### ✅ Use Environment Variables
 
 ```go
-import "github.com/spcent/plumego/config"
-
-cfg := config.Load()
-secret := []byte(cfg.Get("JWT_SECRET", ""))
+secret := []byte(os.Getenv("JWT_SECRET"))
 if len(secret) < 32 {
     log.Fatal("JWT_SECRET must be at least 32 bytes")
 }

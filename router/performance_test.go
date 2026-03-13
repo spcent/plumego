@@ -8,7 +8,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 
-	"github.com/spcent/plumego/validator"
+	"github.com/spcent/plumego/internal/validator"
 )
 
 // BenchmarkRouterComparison compares performance between old and new router implementations

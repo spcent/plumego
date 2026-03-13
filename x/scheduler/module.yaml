@@ -1,0 +1,41 @@
+name: x/scheduler
+path: x/scheduler
+layer: extension
+status: experimental
+summary: In-process scheduling primitives for cron, delayed jobs, and retries.
+
+responsibilities:
+  - Scheduler primitives
+  - Delayed job execution
+  - Retry coordination
+  - Cron helpers
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business workflow orchestration
+
+allowed_imports:
+  - log
+  - metrics
+  - store
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/scheduler/...
+  - go test -timeout 20s ./x/scheduler/...
+  - go vet ./x/scheduler/...
+
+review_checklist:
+  - Keep scheduling behavior explicit
+  - Avoid hidden process-wide state
+  - Preserve retry determinism
+
+agent_hints:
+  - Prefer explicit job wiring
+  - Keep scheduler concerns self-contained
+  - Do not move scheduler into core

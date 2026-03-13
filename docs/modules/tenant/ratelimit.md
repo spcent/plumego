@@ -1,6 +1,6 @@
 # Tenant Rate Limit
 
-> **Packages**: `github.com/spcent/plumego/tenant`, `github.com/spcent/plumego/x/tenant/ratelimit`  
+> **Packages**: `github.com/spcent/plumego/x/tenant/core`, `github.com/spcent/plumego/x/tenant/ratelimit`  
 > **Stability**: Experimental (v1)
 
 Tenant rate limiting uses a per-tenant token bucket.

@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/spcent/plumego/utils/semver"
+	"github.com/spcent/plumego/internal/semver"
 )
 
 // Validator validates agent metadata and workflow templates.

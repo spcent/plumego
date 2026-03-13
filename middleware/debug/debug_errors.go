@@ -7,7 +7,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/utils"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // DebugErrorConfig controls how debug error responses are formatted.
@@ -171,9 +171,9 @@ func (r *debugErrorRecorder) flushTo(w http.ResponseWriter) {
 	// This does not introduce XSS vulnerabilities as it passes through existing responses.
 	// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
 	copyHeader(w.Header(), r.header)
-	utils.EnsureNoSniff(w.Header())
+	internaltransport.EnsureNoSniff(w.Header())
 	w.WriteHeader(r.statusCode())
-	_, _ = utils.SafeWrite(w, r.body.Bytes())
+	_, _ = internaltransport.SafeWrite(w, r.body.Bytes())
 }
 
 func shouldSkipDebugErrors(r *http.Request) bool {

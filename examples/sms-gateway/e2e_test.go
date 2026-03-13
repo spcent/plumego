@@ -14,9 +14,9 @@ import (
 	logpkg "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/store/idempotency"
 	kvstore "github.com/spcent/plumego/store/kv"
-	"github.com/spcent/plumego/tenant"
 	"github.com/spcent/plumego/x/mq"
 	mqstore "github.com/spcent/plumego/x/mq/store"
+	"github.com/spcent/plumego/x/tenant/core"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 

@@ -1,0 +1,40 @@
+name: x/frontend
+path: x/frontend
+layer: extension
+status: experimental
+summary: Static and embedded frontend serving helpers for explicit mounting.
+
+responsibilities:
+  - Static asset mounting
+  - Embedded asset serving
+  - Frontend fallback helpers
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business-specific UI flows
+
+allowed_imports:
+  - contract
+  - log
+  - router
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/frontend/...
+  - go test -timeout 20s ./x/frontend/...
+  - go vet ./x/frontend/...
+
+review_checklist:
+  - Keep mounting explicit
+  - Avoid hidden filesystem side effects
+  - Preserve net/http compatibility
+
+agent_hints:
+  - Keep frontend setup outside core
+  - Preserve explicit fallback behavior
+  - Prefer transport-only helpers

@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	plumecfg "github.com/spcent/plumego/config"
 	"github.com/spcent/plumego/core"
+	plumecfg "github.com/spcent/plumego/internal/config"
 	plumelog "github.com/spcent/plumego/log"
 )
 

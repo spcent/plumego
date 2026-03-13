@@ -16,7 +16,7 @@ import (
 // Example – plug in the project's unified collector:
 //
 //	import (
-//	    nethttp  "github.com/spcent/plumego/net/http"
+//	    nethttp  "github.com/spcent/plumego/internal/nethttp"
 //	    "github.com/spcent/plumego/metrics"
 //	)
 //

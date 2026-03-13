@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/spcent/plumego/tenant"
+	"github.com/spcent/plumego/x/tenant/core"
 )
 
 func TestNewTenantDB(t *testing.T) {

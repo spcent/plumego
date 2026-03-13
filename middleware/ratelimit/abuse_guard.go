@@ -10,8 +10,8 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 	"github.com/spcent/plumego/security/abuse"
-	"github.com/spcent/plumego/utils/httpx"
 )
 
 // AbuseGuardConfig configures the abuse guard middleware.
@@ -54,7 +54,7 @@ type AbuseGuardConfig struct {
 	Limiter *abuse.Limiter
 
 	// KeyFunc extracts a rate limiting key from the request (e.g., client IP)
-	// Default: httpx.ClientIP (uses X-Forwarded-For, X-Real-IP, or RemoteAddr)
+	// Default: transport.ClientIP (uses X-Forwarded-For, X-Real-IP, or RemoteAddr)
 	KeyFunc func(*http.Request) string
 
 	// Skip determines whether to skip rate limiting for a request
@@ -137,7 +137,7 @@ func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
 		config.Shards = defaults.Shards
 	}
 	if config.KeyFunc == nil {
-		config.KeyFunc = httpx.ClientIP
+		config.KeyFunc = internaltransport.ClientIP
 	}
 	if config.IncludeHeaders != nil {
 		includeHeaders = *config.IncludeHeaders

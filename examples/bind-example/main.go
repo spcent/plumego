@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/internal/validator"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/validator"
 )
 
 type CreateUserRequest struct {

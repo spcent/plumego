@@ -1,0 +1,41 @@
+name: x/rest
+path: x/rest
+layer: extension
+status: experimental
+summary: REST resource scaffolding and explicit CRUD helpers.
+
+responsibilities:
+  - REST resource helpers
+  - CRUD route scaffolding
+  - Explicit resource transport adapters
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business repository ownership
+
+allowed_imports:
+  - contract
+  - log
+  - router
+  - store
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/rest/...
+  - go test -timeout 20s ./x/rest/...
+  - go vet ./x/rest/...
+
+review_checklist:
+  - Keep resource wiring explicit
+  - Avoid hidden repository injection
+  - Preserve transport-only helpers
+
+agent_hints:
+  - Keep resource ownership local
+  - Prefer explicit route binding
+  - Do not require core knowledge

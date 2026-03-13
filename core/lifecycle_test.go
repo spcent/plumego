@@ -731,9 +731,9 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 	}
 
 	// Trigger shutdown
-		if err := app.Shutdown(context.Background()); err != nil {
-			t.Fatalf("shutdown returned unexpected error: %v", err)
-		}
+	if err := app.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown returned unexpected error: %v", err)
+	}
 
 	select {
 	case <-done:

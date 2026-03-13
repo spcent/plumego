@@ -1,0 +1,39 @@
+name: x/pubsub
+path: x/pubsub
+layer: extension
+status: experimental
+summary: In-process publish-subscribe primitives and debugging support.
+
+responsibilities:
+  - Publish-subscribe broker primitives
+  - Topic fan-out helpers
+  - Debug-friendly broker support
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business event workflow logic
+
+allowed_imports:
+  - log
+  - metrics
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/pubsub/...
+  - go test -timeout 20s ./x/pubsub/...
+  - go vet ./x/pubsub/...
+
+review_checklist:
+  - Keep pubsub semantics explicit
+  - Avoid hidden global brokers
+  - Preserve fan-out determinism
+
+agent_hints:
+  - Prefer local broker injection
+  - Keep pubsub transport-agnostic
+  - Do not move brokers into core

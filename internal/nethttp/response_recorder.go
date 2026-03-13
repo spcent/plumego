@@ -1,0 +1,80 @@
+package http
+
+import (
+	"bytes"
+	"net/http"
+
+	"github.com/spcent/plumego/internal/httputil"
+)
+
+// ResponseRecorder captures response data while still writing to the underlying writer.
+type ResponseRecorder struct {
+	http.ResponseWriter
+	statusCode int
+	header     http.Header
+	body       *bytes.Buffer
+	written    bool
+}
+
+// NewResponseRecorder creates a response recorder with sane defaults.
+func NewResponseRecorder(w http.ResponseWriter) *ResponseRecorder {
+	return &ResponseRecorder{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+		header:         make(http.Header),
+		body:           &bytes.Buffer{},
+	}
+}
+
+// Header returns the recorded header map.
+func (r *ResponseRecorder) Header() http.Header {
+	return r.header
+}
+
+// WriteHeader records the status code and writes headers to the underlying writer once.
+func (r *ResponseRecorder) WriteHeader(code int) {
+	if r.written {
+		return
+	}
+	r.statusCode = code
+	r.written = true
+
+	copyHeaders(r.ResponseWriter.Header(), r.header)
+	utils.EnsureNoSniff(r.ResponseWriter.Header())
+	r.ResponseWriter.WriteHeader(code)
+}
+
+// Write captures body bytes and writes through to the underlying writer.
+// SECURITY NOTE: This is middleware infrastructure that captures response data
+// from upstream handlers for metrics/logging purposes. It does not inject user
+// input into HTML contexts and therefore does not introduce XSS vulnerabilities.
+// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
+func (r *ResponseRecorder) Write(b []byte) (int, error) {
+	if !r.written {
+		r.WriteHeader(http.StatusOK)
+	}
+
+	r.body.Write(b)
+	return utils.SafeWrite(r.ResponseWriter, b)
+}
+
+// StatusCode returns the recorded status code.
+func (r *ResponseRecorder) StatusCode() int {
+	if r.statusCode == 0 {
+		return http.StatusOK
+	}
+	return r.statusCode
+}
+
+// Body returns the captured response body bytes.
+func (r *ResponseRecorder) Body() []byte {
+	return r.body.Bytes()
+}
+
+func copyHeaders(dst, src http.Header) {
+	for key, values := range src {
+		for _, value := range values {
+			dst.Add(key, value)
+		}
+	}
+}

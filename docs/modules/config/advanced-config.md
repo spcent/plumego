@@ -1,95 +1,80 @@
 # Advanced Configuration
 
-> **Package**: `github.com/spcent/plumego/config`
+> Legacy note: the historical public `config/` root has been removed.
 
-Advanced patterns in the current config package are built around explicit `Manager`, explicit `Source`, and explicit injection.
+Advanced configuration in Plumego is application-owned.
 
-## Struct-based loading
+## Canonical Pattern
+
+Keep configuration layering in one app-local package, usually `internal/config`:
+
+1. start from explicit defaults
+2. load optional `.env` or env vars
+3. apply command-line flags
+4. validate once
+5. pass concrete values into constructors
+
+## Recommended Layout
+
+```text
+cmd/myapp/main.go
+internal/config/config.go
+internal/config/env.go
+```
+
+## Example
 
 ```go
-package main
+package config
 
 import (
-    "context"
-    "log"
-    "time"
+    "flag"
+    "fmt"
+    "os"
 
-    "github.com/spcent/plumego/config"
-    plumelog "github.com/spcent/plumego/log"
+    "github.com/spcent/plumego/core"
 )
 
-type AppConfig struct {
-    AppAddr       string        `config:"app_addr"`
-    AppDebug      bool          `config:"app_debug"`
-    ReadTimeout   time.Duration `config:"read_timeout"`
-    WriteTimeout  time.Duration `config:"write_timeout"`
-    DatabaseURL   string        `config:"db_url"`
-    DatabaseConns int           `config:"db_max_conns"`
+type Config struct {
+    Core core.AppConfig
+    EnableDocs bool
 }
 
-func main() {
-    cfg := config.NewManager(plumelog.NewGLogger())
-    _ = cfg.AddSource(config.NewEnvSource(""))
-    _ = cfg.AddSource(config.NewFileSource(".env", config.FormatEnv, false))
-
-    if err := cfg.Load(context.Background()); err != nil {
-        log.Fatal(err)
-    }
-
-    var appConfig AppConfig
-    if err := cfg.Unmarshal(&appConfig); err != nil {
-        log.Fatal(err)
+func Defaults() Config {
+    return Config{
+        Core: core.AppConfig{
+            Addr: ":8080",
+            Debug: false,
+        },
+        EnableDocs: true,
     }
 }
-```
 
-## Feature flags
+func Load(args []string) (Config, error) {
+    cfg := Defaults()
 
-```go
-func featureFlags(cfg *config.Manager) struct {
-    Metrics bool
-    Tracing bool
-    Cache   bool
-} {
-    return struct {
-        Metrics bool
-        Tracing bool
-        Cache   bool
-    }{
-        Metrics: cfg.GetBool("feature_metrics", true),
-        Tracing: cfg.GetBool("feature_tracing", false),
-        Cache:   cfg.GetBool("feature_cache", true),
+    if v := os.Getenv("APP_ADDR"); v != "" {
+        cfg.Core.Addr = v
     }
+    if os.Getenv("APP_DEBUG") == "true" {
+        cfg.Core.Debug = true
+    }
+
+    fs := flag.NewFlagSet("myapp", flag.ContinueOnError)
+    fs.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
+    fs.BoolVar(&cfg.Core.Debug, "debug", cfg.Core.Debug, "enable debug mode")
+    fs.BoolVar(&cfg.EnableDocs, "enable-docs", cfg.EnableDocs, "enable docs")
+    if err := fs.Parse(args); err != nil {
+        return cfg, err
+    }
+
+    if cfg.Core.Addr == "" {
+        return cfg, fmt.Errorf("addr is required")
+    }
+    return cfg, nil
 }
 ```
 
-## Watching file-backed config
+## Within This Repository
 
-```go
-source := config.NewFileSource(".env", config.FormatEnv, true).WithWatchInterval(2 * time.Second)
-cfg := config.NewManager(plumelog.NewGLogger())
-
-_ = cfg.AddSource(source)
-_ = cfg.Load(context.Background())
-
-_ = cfg.Watch("app_debug", func(oldValue, newValue any) {
-    log.Printf("app_debug changed: %v -> %v", oldValue, newValue)
-})
-
-if err := cfg.StartWatchers(context.Background()); err != nil {
-    log.Fatal(err)
-}
-```
-
-## Source ordering
-
-Sources are merged in registration order, later sources win.
-
-```go
-cfg := config.NewManager(plumelog.NewGLogger())
-_ = cfg.AddSource(config.NewFileSource("base.env", config.FormatEnv, false))
-_ = cfg.AddSource(config.NewFileSource("override.env", config.FormatEnv, false))
-_ = cfg.AddSource(config.NewEnvSource(""))
-```
-
-This is the recommended way to model environment-specific overrides instead of hiding selection logic inside `config.Load()`.
+Reference applications inside this repo may use `plumego/internal/config` as an implementation helper. External applications must not import Plumego `internal/*` packages.

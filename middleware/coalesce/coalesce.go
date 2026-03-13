@@ -41,7 +41,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	mw "github.com/spcent/plumego/middleware"
-	nethttp "github.com/spcent/plumego/net/http"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // KeyFunc generates a unique key for request deduplication
@@ -206,7 +206,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 // executeRequest executes a new request and broadcasts to waiters
 func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key string, inflight *inFlightRequest, next http.Handler) {
 	// Create response recorder
-	recorder := nethttp.NewResponseRecorder(w)
+	recorder := internaltransport.NewResponseRecorder(w)
 
 	// Execute request
 	next.ServeHTTP(recorder, r)

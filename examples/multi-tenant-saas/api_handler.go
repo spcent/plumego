@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/tenant"
+	"github.com/spcent/plumego/x/tenant/core"
 	tenantdb "github.com/spcent/plumego/x/tenant/store/db"
 )
 

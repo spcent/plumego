@@ -150,19 +150,17 @@ addr, err := lb.Next("payment-service")
 
 ## HTTP Client Integration
 
+Use service discovery to resolve an address, then build the outbound request with the standard library:
+
 ```go
-import "github.com/spcent/plumego/net/http"
+addr, err := registry.Resolve("payment-service")
+if err != nil {
+    return err
+}
 
-// Create HTTP client with service discovery
-client := nethttp.NewClient(
-    nethttp.WithDiscovery(registry),
-    nethttp.WithTimeout(10*time.Second),
-    nethttp.WithRetry(3),
-)
-
-// Use service name instead of hardcoded URL
-resp, err := client.Get("http://payment-service/api/payments")
-// Resolves payment-service → payment-1:8080 or payment-2:8080
+client := &http.Client{Timeout: 10 * time.Second}
+resp, err := client.Get("http://" + addr + "/api/payments")
+// Resolves payment-service -> payment-1:8080 or payment-2:8080
 ```
 
 ## Service Health

@@ -30,10 +30,10 @@ import (
 	storedb "github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/store/idempotency"
 	kvstore "github.com/spcent/plumego/store/kv"
-	"github.com/spcent/plumego/tenant"
 	"github.com/spcent/plumego/x/mq"
 	mqstore "github.com/spcent/plumego/x/mq/store"
 	"github.com/spcent/plumego/x/ops"
+	"github.com/spcent/plumego/x/tenant/core"
 	tenantquota "github.com/spcent/plumego/x/tenant/quota"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )

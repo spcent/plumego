@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego/utils"
+	"github.com/spcent/plumego/internal/httputil"
 )
 
 // TracingMiddleware adds distributed tracing support

@@ -14,7 +14,7 @@ func TestFindDisallowedImportsHonorsBaselineAndSkipsTests(t *testing.T) {
 
 import (
 	"net/http"
-	"github.com/spcent/plumego/utils/httpx"
+	"github.com/spcent/plumego/internal/httpx"
 	"github.com/spcent/plumego/x/tenant/resolve"
 )
 
@@ -29,7 +29,7 @@ import "github.com/spcent/plumego/x/tenant/resolve"
 `)
 
 	violations, err := FindDisallowedImports(repo, map[string]struct{}{
-		"core/core.go|github.com/spcent/plumego/utils/httpx": {},
+		"core/core.go|github.com/spcent/plumego/internal/httpx": {},
 	})
 	if err != nil {
 		t.Fatalf("FindDisallowedImports: %v", err)

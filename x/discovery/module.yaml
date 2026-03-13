@@ -1,0 +1,40 @@
+name: x/discovery
+path: x/discovery
+layer: extension
+status: experimental
+summary: Service discovery primitives and adapters for gateway and client integration.
+
+responsibilities:
+  - Service instance discovery
+  - Resolver helpers
+  - Discovery adapters
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Tenant policy orchestration
+
+allowed_imports:
+  - contract
+  - log
+  - metrics
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/discovery/...
+  - go test -timeout 20s ./x/discovery/...
+  - go vet ./x/discovery/...
+
+review_checklist:
+  - Keep discovery behavior explicit
+  - Avoid hidden background state
+  - Preserve deterministic resolution paths
+
+agent_hints:
+  - Prefer small resolvers
+  - Keep transport concerns out of discovery
+  - Do not require core knowledge

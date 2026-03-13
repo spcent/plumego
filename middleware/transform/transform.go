@@ -38,7 +38,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	mw "github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/utils"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // RequestTransformer modifies an HTTP request
@@ -127,10 +127,10 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			} else {
 				w.Header().Del("Content-Length")
 			}
-			utils.EnsureNoSniff(w.Header())
+			internaltransport.EnsureNoSniff(w.Header())
 			w.WriteHeader(resp.StatusCode)
 			if len(transformedBody) > 0 {
-				_, _ = utils.SafeWrite(w, transformedBody)
+				_, _ = internaltransport.SafeWrite(w, transformedBody)
 			}
 		})
 	}

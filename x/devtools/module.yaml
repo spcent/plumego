@@ -1,0 +1,44 @@
+name: x/devtools
+path: x/devtools
+layer: extension
+status: experimental
+summary: Debug-only routes, env reload helpers, and development metrics wiring.
+
+responsibilities:
+  - Debug route registration
+  - Development metrics surfacing
+  - Env reload helpers
+  - Local profiling endpoints
+
+non_goals:
+  - Core bootstrap ownership
+  - Production admin policy
+  - Stable root entrypoints
+
+allowed_imports:
+  - contract
+  - health
+  - log
+  - metrics
+  - middleware
+  - router
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/devtools/...
+  - go test -timeout 20s ./x/devtools/...
+  - go vet ./x/devtools/...
+
+review_checklist:
+  - Keep debug behavior opt-in
+  - Avoid hidden runtime side effects
+  - Keep handlers explicit
+
+agent_hints:
+  - Devtools must stay debug-only
+  - Do not move debug routes into core
+  - Prefer explicit hooks over globals

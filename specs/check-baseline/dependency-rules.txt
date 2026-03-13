@@ -1,14 +1,1 @@
 # Historical stable-layer imports to retire gradually. New violations must not be added.
-contract/bind_helpers.go|github.com/spcent/plumego/validator
-contract/context_bind.go|github.com/spcent/plumego/validator
-contract/context_response.go|github.com/spcent/plumego/utils/pool
-middleware/coalesce/coalesce.go|github.com/spcent/plumego/net/http
-middleware/compression/gzip.go|github.com/spcent/plumego/utils
-middleware/debug/debug_errors.go|github.com/spcent/plumego/utils
-middleware/observability/logging.go|github.com/spcent/plumego/utils
-middleware/observability/logging.go|github.com/spcent/plumego/utils/httpx
-middleware/ratelimit/abuse_guard.go|github.com/spcent/plumego/utils/httpx
-middleware/transform/transform.go|github.com/spcent/plumego/utils
-security/input/input.go|github.com/spcent/plumego/validator
-security/resilience/circuitbreaker/middleware.go|github.com/spcent/plumego/utils
-store/cache/cache.go|github.com/spcent/plumego/utils

@@ -1,0 +1,45 @@
+name: x/gateway
+path: x/gateway
+layer: extension
+status: experimental
+summary: API gateway, proxy, balancing, caching, and edge transport helpers.
+
+responsibilities:
+  - Reverse proxy helpers
+  - Gateway routing and rewriting
+  - Balancing and cache adapters
+  - Gateway health helpers
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business-specific gateway policy
+
+allowed_imports:
+  - contract
+  - health
+  - log
+  - metrics
+  - middleware
+  - security
+  - store
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/gateway/...
+  - go test -timeout 20s ./x/gateway/...
+  - go vet ./x/gateway/...
+
+review_checklist:
+  - Keep proxy behavior explicit
+  - Avoid hidden globals
+  - Preserve transport determinism
+
+agent_hints:
+  - Keep gateway concerns inside x/gateway
+  - Prefer adapter-local helpers
+  - Do not require core knowledge

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/tenant"
 	tenantconfig "github.com/spcent/plumego/x/tenant/config"
+	"github.com/spcent/plumego/x/tenant/core"
 )
 
 // AdminHandler handles tenant administration

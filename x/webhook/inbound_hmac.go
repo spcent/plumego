@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/utils/httpx"
+	"github.com/spcent/plumego/internal/httpx"
 )
 
 // SignatureEncoding defines how the signature is encoded in headers.

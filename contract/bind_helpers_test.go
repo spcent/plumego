@@ -3,8 +3,6 @@ package contract
 import (
 	"net/http"
 	"testing"
-
-	"github.com/spcent/plumego/validator"
 )
 
 func TestBindErrorToAPIErrorFields(t *testing.T) {
@@ -12,7 +10,7 @@ func TestBindErrorToAPIErrorFields(t *testing.T) {
 		Email string `validate:"required,email"`
 	}
 
-	err := validator.Validate(&payload{})
+	err := validateStruct(&payload{})
 	if err == nil {
 		t.Fatalf("expected validation error")
 	}

@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/spcent/plumego/utils/pool"
 )
 
 var (
@@ -46,8 +44,8 @@ func (c *Ctx) JSON(status int, data any) error {
 	c.W.WriteHeader(status)
 
 	// Use pooled buffer for encoding to reduce allocations
-	buf := pool.GetBuffer()
-	defer pool.PutBuffer(buf)
+	buf := getJSONBuffer()
+	defer putJSONBuffer(buf)
 
 	if err := json.NewEncoder(buf).Encode(data); err != nil {
 		return err

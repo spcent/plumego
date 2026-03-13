@@ -1,0 +1,279 @@
+package contract
+
+import (
+	"fmt"
+	"net/mail"
+	"reflect"
+	"strconv"
+	"strings"
+	"unicode/utf8"
+)
+
+type validationIssue struct {
+	Field   string
+	Code    string
+	Message string
+}
+
+type validationErrors struct {
+	errors []validationIssue
+}
+
+func (ve validationErrors) Error() string {
+	if len(ve.errors) == 0 {
+		return ""
+	}
+
+	parts := make([]string, 0, len(ve.errors))
+	for _, item := range ve.errors {
+		parts = append(parts, fmt.Sprintf("%s: %s (%s)", item.Field, item.Message, item.Code))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func (ve validationErrors) Errors() []validationIssue {
+	return append([]validationIssue(nil), ve.errors...)
+}
+
+func validateStruct(dst any) error {
+	if dst == nil {
+		return nil
+	}
+
+	rv := reflect.ValueOf(dst)
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return nil
+	}
+
+	rt := rv.Type()
+	var issues []validationIssue
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+
+		tag := strings.TrimSpace(field.Tag.Get("validate"))
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		fieldValue := rv.Field(i)
+		fieldName := field.Name
+		for _, rule := range strings.Split(tag, ",") {
+			rule = strings.TrimSpace(rule)
+			if rule == "" {
+				continue
+			}
+
+			if issue := applyValidationRule(fieldName, fieldValue, rule); issue != nil {
+				issues = append(issues, *issue)
+			}
+		}
+	}
+
+	if len(issues) == 0 {
+		return nil
+	}
+	return validationErrors{errors: issues}
+}
+
+func applyValidationRule(fieldName string, value reflect.Value, rule string) *validationIssue {
+	name := rule
+	arg := ""
+	if idx := strings.Index(rule, "="); idx >= 0 {
+		name = strings.TrimSpace(rule[:idx])
+		arg = strings.TrimSpace(rule[idx+1:])
+	}
+
+	switch name {
+	case "required":
+		return validateRequired(fieldName, value)
+	case "email":
+		return validateEmail(fieldName, value)
+	case "min":
+		limit, err := strconv.ParseInt(arg, 10, 64)
+		if err != nil {
+			return &validationIssue{Field: fieldName, Code: "min", Message: "invalid min validator configuration"}
+		}
+		return validateMin(fieldName, value, limit)
+	case "max":
+		limit, err := strconv.ParseInt(arg, 10, 64)
+		if err != nil {
+			return &validationIssue{Field: fieldName, Code: "max", Message: "invalid max validator configuration"}
+		}
+		return validateMax(fieldName, value, limit)
+	default:
+		return nil
+	}
+}
+
+func validateRequired(fieldName string, value reflect.Value) *validationIssue {
+	if !value.IsValid() {
+		return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+	}
+
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+		}
+		value = value.Elem()
+	}
+
+	switch value.Kind() {
+	case reflect.String:
+		if strings.TrimSpace(value.String()) == "" {
+			return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+		}
+	case reflect.Slice, reflect.Map, reflect.Array, reflect.Chan:
+		if value.Len() == 0 {
+			return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+		}
+	default:
+		if value.IsZero() {
+			return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+		}
+	}
+
+	return nil
+}
+
+func validateEmail(fieldName string, value reflect.Value) *validationIssue {
+	s, ok := stringValue(value)
+	if !ok {
+		return &validationIssue{Field: fieldName, Code: "email", Message: "must be a string"}
+	}
+
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+
+	addr, err := mail.ParseAddress(s)
+	if err != nil || addr.Address != s {
+		return &validationIssue{Field: fieldName, Code: "email", Message: "invalid email format"}
+	}
+	return nil
+}
+
+func validateMin(fieldName string, value reflect.Value, limit int64) *validationIssue {
+	if !value.IsValid() {
+		return nil
+	}
+
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return nil
+		}
+		value = value.Elem()
+	}
+
+	switch value.Kind() {
+	case reflect.String:
+		text := value.String()
+		trimmed := strings.TrimSpace(text)
+		if parsed, ok := parseNumericString(trimmed); ok {
+			if parsed < float64(limit) {
+				return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
+			}
+			return nil
+		}
+		if int64(utf8.RuneCountInString(text)) < limit {
+			return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d characters", limit)}
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if value.Int() < limit {
+			return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		if limit > 0 && value.Uint() < uint64(limit) {
+			return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
+		}
+	case reflect.Float32, reflect.Float64:
+		if value.Float() < float64(limit) {
+			return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
+		}
+	}
+
+	return nil
+}
+
+func validateMax(fieldName string, value reflect.Value, limit int64) *validationIssue {
+	if !value.IsValid() {
+		return nil
+	}
+
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return nil
+		}
+		value = value.Elem()
+	}
+
+	switch value.Kind() {
+	case reflect.String:
+		text := value.String()
+		trimmed := strings.TrimSpace(text)
+		if parsed, ok := parseNumericString(trimmed); ok {
+			if parsed > float64(limit) {
+				return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
+			}
+			return nil
+		}
+		if int64(utf8.RuneCountInString(text)) > limit {
+			return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d characters", limit)}
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if value.Int() > limit {
+			return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		if value.Uint() > uint64(limit) {
+			return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
+		}
+	case reflect.Float32, reflect.Float64:
+		if value.Float() > float64(limit) {
+			return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
+		}
+	}
+
+	return nil
+}
+
+func stringValue(value reflect.Value) (string, bool) {
+	if !value.IsValid() {
+		return "", false
+	}
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return "", true
+		}
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.String {
+		return "", false
+	}
+	return value.String(), true
+}
+
+func parseNumericString(s string) (float64, bool) {
+	if s == "" {
+		return 0, false
+	}
+	if parsed, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return float64(parsed), true
+	}
+	if parsed, err := strconv.ParseUint(s, 10, 64); err == nil {
+		return float64(parsed), true
+	}
+	if parsed, err := strconv.ParseFloat(s, 64); err == nil {
+		return parsed, true
+	}
+	return 0, false
+}

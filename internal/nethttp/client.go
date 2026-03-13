@@ -11,7 +11,7 @@
 //
 // Example usage:
 //
-//	import nethttp "github.com/spcent/plumego/net/http"
+//	import nethttp "github.com/spcent/plumego/internal/nethttp"
 //
 //	client := nethttp.New(
 //	    nethttp.WithTimeout(10 * time.Second),

@@ -10,7 +10,7 @@
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/utils/stringsx"
+//	import "github.com/spcent/plumego/internal/stringsx"
 //
 //	// Mask a secret for logging
 //	apiKey := "myapikey_1234567890abcdefghijklmn"

@@ -16,7 +16,6 @@ import (
 	"strings"
 
 	logpkg "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/validator"
 )
 
 // BindJSON binds the request JSON body to the provided destination structure.
@@ -102,7 +101,7 @@ func (c *Ctx) BindAndValidateJSON(dst any) error {
 		return err
 	}
 
-	if err := validator.Validate(dst); err != nil {
+	if err := validateStruct(dst); err != nil {
 		return &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
 	}
 
@@ -122,7 +121,7 @@ func (c *Ctx) BindAndValidateJSONWithOptions(dst any, opts BindOptions) error {
 
 	validate := opts.Validator
 	if validate == nil {
-		validate = validator.Validate
+		validate = validateStruct
 	}
 	if err := validate(dst); err != nil {
 		bindErr := &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}

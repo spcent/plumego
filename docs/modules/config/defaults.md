@@ -1,47 +1,38 @@
 # Default Values
 
-> **Package**: `github.com/spcent/plumego/config`
+> Legacy note: the historical public `config/` root has been removed.
 
-Defaults are supplied explicitly by the caller.
+Defaults should be explicit, local, and reviewable.
 
-## Basic defaults
-
-```go
-addr := cfg.GetString("app_addr", ":8080")
-debug := cfg.GetBool("app_debug", false)
-timeout := cfg.GetDuration("app_timeout", 30*time.Second)
-```
-
-## Derived defaults
+## Recommended Pattern
 
 ```go
-env := cfg.GetString("app_env", "development")
-writeTimeout := 30 * time.Second
-if env == "production" {
-    writeTimeout = 15 * time.Second
-}
-```
-
-## Centralize defaults near startup
-
-```go
-type AppConfig struct {
-    Addr    string
-    Debug   bool
-    Timeout time.Duration
-}
-
-func loadAppConfig(cfg *config.Manager) AppConfig {
-    return AppConfig{
-        Addr:    cfg.GetString("app_addr", ":8080"),
-        Debug:   cfg.GetBool("app_debug", false),
-        Timeout: cfg.GetDuration("app_timeout", 30*time.Second),
+func Defaults() Config {
+    return Config{
+        Core: core.AppConfig{
+            Addr: ":8080",
+            Debug: false,
+            EnvFile: ".env",
+        },
+        EnableDocs: true,
+        EnableMetrics: true,
     }
 }
 ```
 
 ## Guidance
 
-- Use defaults for optional behavior.
-- Use validators for required values.
-- Keep defaults in one place so startup behavior is easy to inspect.
+- keep defaults in a single `Defaults()` function
+- keep derived defaults near startup
+- use defaults for optional behavior only
+- validate required values after env and flag overrides
+
+## Derived Defaults
+
+```go
+func ApplyEnvironmentDefaults(cfg *Config, env string) {
+    if env == "production" {
+        cfg.EnableDocs = false
+    }
+}
+```
