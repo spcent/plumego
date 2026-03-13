@@ -1,0 +1,21 @@
+# x/webhook
+
+## Purpose
+
+`x/webhook` provides inbound and outbound webhook helpers under the broader messaging family.
+
+## Use this module when
+
+- the task is narrow webhook verification or delivery mechanics
+- the task is not broader messaging orchestration
+
+## Do not use this module for
+
+- app bootstrap
+- general messaging family discovery
+
+## First files to read
+
+- `x/webhook/module.yaml`
+- `x/messaging/module.yaml`
+- `x/webhook/in.go` or `x/webhook/out.go`

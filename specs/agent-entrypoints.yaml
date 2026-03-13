@@ -1,0 +1,88 @@
+version: 1
+
+entrypoints:
+  app_bootstrap:
+    start_with:
+      - docs/CANONICAL_STYLE_GUIDE.md
+      - specs/repo.yaml
+      - reference/standard-service/main.go
+      - reference/standard-service/internal/app/app.go
+      - reference/standard-service/internal/app/routes.go
+    avoid:
+      - x/rest
+      - x/gateway
+      - x/webhook
+    notes:
+      - Use the reference app for canonical bootstrap shape.
+      - Keep route and middleware wiring explicit in app-local code.
+
+  http_endpoint:
+    start_with:
+      - docs/CANONICAL_STYLE_GUIDE.md
+      - reference/standard-service/internal/app/routes.go
+      - contract
+      - router
+    avoid:
+      - middleware
+    notes:
+      - Add one method-plus-path registration per line.
+      - Keep business logic out of transport helpers.
+
+  middleware:
+    start_with:
+      - middleware/module.yaml
+      - docs/modules/middleware/README.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+    avoid:
+      - core
+      - contract
+    notes:
+      - Middleware stays transport-only.
+      - Do not inject business DTOs or service-locator behavior.
+
+  gateway_edge_transport:
+    start_with:
+      - x/gateway/module.yaml
+      - x/gateway/entrypoints.go
+      - specs/extension-entrypoints.yaml
+    avoid:
+      - x/rest
+      - reference/standard-service
+    notes:
+      - Use x/gateway for proxying, balancing, and protocol-edge work.
+
+  resource_api_standardization:
+    start_with:
+      - x/rest/module.yaml
+      - x/rest/README.md
+      - x/rest/spec.go
+      - x/rest/entrypoints.go
+    avoid:
+      - core
+      - x/gateway
+    notes:
+      - Use ResourceSpec plus explicit Register*Routes helpers.
+      - Keep bootstrap shape in the reference app.
+
+  messaging:
+    start_with:
+      - x/messaging/module.yaml
+      - x/messaging/entrypoints.go
+      - specs/extension-entrypoints.yaml
+    avoid:
+      - x/mq
+      - x/pubsub
+      - x/webhook
+    notes:
+      - Start at x/messaging unless the task is clearly a lower-level primitive.
+
+  observability_admin:
+    start_with:
+      - x/observability/module.yaml
+      - x/ops/module.yaml
+    avoid:
+      - core
+      - health
+    notes:
+      - Use x/ops only for protected admin surfaces.
+      - Keep health HTTP ownership outside health.

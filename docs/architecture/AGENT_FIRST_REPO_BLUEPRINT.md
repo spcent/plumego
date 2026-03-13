@@ -54,9 +54,11 @@ Agents should treat these as the default read and write path:
 1. `docs/CANONICAL_STYLE_GUIDE.md`
 2. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 3. `specs/repo.yaml`
-4. `specs/dependency-rules.yaml`
-5. `<module>/module.yaml`
-6. `reference/standard-service`
+4. `specs/agent-entrypoints.yaml`
+5. `specs/dependency-rules.yaml`
+6. `specs/ownership.yaml`
+7. `<module>/module.yaml`
+8. `reference/standard-service`
 
 Rules:
 
@@ -99,9 +101,26 @@ Avoid growing broad buckets such as:
 
 1. `docs/CANONICAL_STYLE_GUIDE.md`
 2. `specs/repo.yaml`
-3. `specs/dependency-rules.yaml`
-4. `<module>/module.yaml`
-5. module code
+3. `specs/agent-entrypoints.yaml`
+4. `specs/dependency-rules.yaml`
+5. `specs/ownership.yaml`
+6. `<module>/module.yaml`
+7. module code
+
+## Machine-Readable Agent Workflow
+
+The repository should expose enough machine-readable metadata that an agent can
+decide where to start, who owns a boundary, and what recipe to follow without
+guessing.
+
+Required metadata lives under `specs/`:
+
+- `specs/agent-entrypoints.yaml`: task-to-entrypoint map and disallowed first reads
+- `specs/ownership.yaml`: owner, risk, and default validation per critical module
+- `specs/change-recipes/*.yaml`: standard task recipes for common change shapes
+
+Human-readable module primers live under `docs/modules/` and should mirror
+manifest-declared `doc_paths`.
 
 ## Migration Direction
 

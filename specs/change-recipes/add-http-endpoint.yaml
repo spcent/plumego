@@ -1,0 +1,14 @@
+name: add-http-endpoint
+scope: app-local HTTP feature work
+steps:
+  - Read docs/CANONICAL_STYLE_GUIDE.md.
+  - Read specs/repo.yaml and the target module manifest.
+  - Open reference/standard-service/internal/app/routes.go.
+  - Add one explicit route registration line.
+  - Add or update a handler with net/http shape.
+  - Use contract.WriteError for structured error responses.
+  - Add or update focused tests near the changed handler or module.
+  - Run module tests, then repository quality gates if the change is cross-cutting.
+stop_conditions:
+  - Do not add bootstrap behavior in x/*.
+  - Do not hide dependencies in request context.

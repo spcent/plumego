@@ -1,0 +1,11 @@
+name: add-middleware
+scope: transport-only middleware changes
+steps:
+  - Read middleware/module.yaml and docs/modules/middleware/README.md.
+  - Implement func(http.Handler) http.Handler.
+  - Keep behavior transport-only and order-sensitive.
+  - Add ordering and error-path tests.
+  - Run go test on ./middleware/... and then wider gates if stable roots changed.
+stop_conditions:
+  - Do not place business validation or DTO injection in middleware.
+  - Do not move middleware assembly into core internals.

@@ -1,0 +1,12 @@
+name: new-extension-module
+scope: adding a new x/* capability pack
+steps:
+  - Confirm the capability is optional or fast-evolving.
+  - Place it under x/* with a clear owning family.
+  - Add module.yaml with canonical discovery hints.
+  - Add or update docs/modules/<extension>/README.md when the module is user-facing.
+  - Update specs/extension-entrypoints.yaml if it changes family discovery.
+  - Add focused tests and run the module-manifests and dependency-rules checks.
+stop_conditions:
+  - Do not let extensions redefine the canonical app bootstrap path.
+  - Do not expose multiple first-entry packages for the same capability family.

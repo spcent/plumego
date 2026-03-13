@@ -18,11 +18,19 @@ canonical_authority:
     - reference/standard-service
   taxonomy:
     - specs/extension-entrypoints.yaml
+  workflow:
+    - specs/agent-entrypoints.yaml
+    - specs/ownership.yaml
+    - specs/change-recipes/add-http-endpoint.yaml
+    - specs/change-recipes/add-middleware.yaml
+    - specs/change-recipes/new-stable-module.yaml
+    - specs/change-recipes/new-extension-module.yaml
   notes:
     - Reference app defines the canonical application structure
     - reference/standard-service must depend only on stable root packages and stdlib
     - Extension demonstrations must not define the canonical path
     - Extension families must expose one canonical discovery entrypoint
+    - Agent workflow metadata must be machine-readable and live under specs/
 
 layers:
   stable:
@@ -105,9 +113,14 @@ target_cleanup:
     - transport adapters should converge under their owning extension instead of broad legacy buckets
 
 agent_workflow:
+  machine_readable_sources:
+    - specs/agent-entrypoints.yaml
+    - specs/ownership.yaml
+    - specs/change-recipes
   required_steps:
     - Identify target layer and module
     - Read canonical style and reference app when shaping app structure
+    - Read specs/agent-entrypoints.yaml for discovery defaults
     - Read target module manifest
     - Keep changes within one module when possible
     - Run module tests first

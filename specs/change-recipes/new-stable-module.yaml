@@ -1,0 +1,11 @@
+name: new-stable-module
+scope: adding a new stable-root library package
+steps:
+  - Confirm the capability cannot fit an existing stable root.
+  - Add module.yaml with narrow responsibilities and explicit non-goals.
+  - Add docs/modules/<name>/README.md.
+  - Update specs/repo.yaml and dependency rules if boundaries change.
+  - Add focused tests and quality-gate coverage.
+stop_conditions:
+  - Do not add broad legacy roots such as utils, validator, net, rest, or pubsub.
+  - Do not let the new stable root depend on x/*.
