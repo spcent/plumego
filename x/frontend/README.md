@@ -435,8 +435,8 @@ See `frontend_test.go` for test examples covering:
 ## Related Packages
 
 - `middleware.Gzip()`: Dynamic compression for API responses
-- `core.NewFrontendComponentFromDir()`: Component-based registration
-- `core.NewFrontendComponentFromFS()`: Component-based embedded serving
+- `frontend.RegisterFromDir()`: Explicit directory registration
+- `frontend.RegisterFS()`: Explicit embedded filesystem registration
 
 ## License
 

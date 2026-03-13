@@ -41,22 +41,7 @@ For new application work, use a single canonical path:
 - **Optional Services**: WebSocket, webhook, pub/sub, frontend, and other capability packs live under `x/*` and are intentionally excluded from the canonical app path.
 - **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `scheduler` package.
 
-## Compatibility APIs
-`core.Component`, `core.Runner`, and shutdown-hook helpers are compatibility surfaces for legacy extension wrappers. They are not part of the canonical starting path for new application work.
-
-```go
-type Component interface {
-    RegisterRoutes(r *router.Router)
-    RegisterMiddleware(m *middleware.Registry)
-    Start(ctx context.Context) error
-    Stop(ctx context.Context) error
-    Health() (name string, status health.HealthStatus)
-}
-```
-
-`HealthStatus` uses constrained values (`healthy`, `degraded`, `unhealthy`) to ensure components report health in a structured, type-safe way.
-
-For new code, wire routes, middleware, and background tasks explicitly in your application package instead of registering them through `core`.
+Wire routes, middleware, and background tasks explicitly in your application package. Plumego no longer carries a compatibility component layer in `core`.
 
 ## Quick Start
 Create a small `main.go`, wire routes and middleware explicitly, then start the server:
@@ -324,11 +309,6 @@ go run .
 Register background tasks with a minimal lifecycle interface:
 
 ```go
-type Runner interface {
-	Start(ctx context.Context) error
-	Stop(ctx context.Context) error
-}
-
 app.Register(myRunner)
 ```
 

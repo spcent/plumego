@@ -39,22 +39,7 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - **可选服务**：WebSocket、Webhook、Pub/Sub、前端托管等能力都位于 `x/*`，并且有意不进入 canonical 应用路径。
 - **任务调度**：通过 `scheduler` 包提供进程内 cron、延迟任务与可重试任务。
 
-## 兼容 API
-`core.Component`、`core.Runner` 和 shutdown-hook 相关 helper 属于兼容层能力，用于承接历史扩展封装；它们不属于新应用工作的 canonical 起点。
-
-```
-type Component interface {
-    RegisterRoutes(r *router.Router)
-    RegisterMiddleware(m *middleware.Registry)
-    Start(ctx context.Context) error
-    Stop(ctx context.Context) error
-    Health() (name string, status health.HealthStatus)
-}
-```
-
-`HealthStatus` 使用限定的状态值（`healthy`、`degraded`、`unhealthy`）确保组件以结构化且类型安全的方式报告健康状况。
-
-新代码应在应用自己的 wiring 包中显式注册路由、中间件和后台任务，而不是继续通过 `core` 做隐式注册。
+新代码应在应用自己的 wiring 包中显式注册路由、中间件和后台任务。Plumego 已经移除了 `core` 中的兼容组件层。
 
 ## 快速开始
 创建一个小型 `main.go`，显式连接路由和中间件，然后启动服务器：
@@ -306,11 +291,6 @@ rows, err := tenantDB.QueryFromContext(ctx,
 使用最小生命周期接口注册后台任务：
 
 ```go
-type Runner interface {
-	Start(ctx context.Context) error
-	Stop(ctx context.Context) error
-}
-
 app.Register(myRunner)
 ```
 

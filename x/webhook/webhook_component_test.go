@@ -87,7 +87,7 @@ func TestWebhookBridgeFirstNonEmpty(t *testing.T) {
 	}
 }
 
-func TestWebhookInComponentBasic(t *testing.T) {
+func TestWebhookInboundBasic(t *testing.T) {
 	ps := pubsub.New()
 	defer ps.Close()
 
@@ -100,10 +100,10 @@ func TestWebhookInComponentBasic(t *testing.T) {
 		StripePath:   "/webhooks/stripe",
 	}
 
-	comp := NewWebhookInComponent(cfg, ps, nil)
+	handler := NewInbound(cfg, ps, nil)
 
 	// Test Health
-	name, health := comp.Health()
+	name, health := handler.Health()
 	if name != "webhook_in" {
 		t.Errorf("expected name 'webhook_in', got %s", name)
 	}
@@ -113,31 +113,23 @@ func TestWebhookInComponentBasic(t *testing.T) {
 
 	// Test disabled component
 	disabledCfg := WebhookInConfig{Enabled: false}
-	disabledComp := NewWebhookInComponent(disabledCfg, ps, nil)
-	_, disabledHealth := disabledComp.Health()
+	disabledHandler := NewInbound(disabledCfg, ps, nil)
+	_, disabledHealth := disabledHandler.Health()
 	if disabledHealth.Status != "degraded" {
 		t.Errorf("expected degraded status for disabled component, got %s", disabledHealth.Status)
 	}
-
-	// Test Start/Stop
-	if err := comp.Start(context.Background()); err != nil {
-		t.Errorf("unexpected error from Start: %v", err)
-	}
-	if err := comp.Stop(context.Background()); err != nil {
-		t.Errorf("unexpected error from Stop: %v", err)
-	}
 }
 
-func TestWebhookOutComponentBasic(t *testing.T) {
+func TestWebhookOutboundBasic(t *testing.T) {
 	cfg := WebhookOutConfig{
 		Enabled:  true,
 		BasePath: "/webhooks",
 	}
 
-	comp := NewWebhookOutComponent(cfg)
+	handler := NewOutbound(cfg)
 
 	// Test Health
-	name, health := comp.Health()
+	name, health := handler.Health()
 	if name != "webhook_out" {
 		t.Errorf("expected name 'webhook_out', got %s", name)
 	}
@@ -147,17 +139,9 @@ func TestWebhookOutComponentBasic(t *testing.T) {
 
 	// Test disabled component
 	disabledCfg := WebhookOutConfig{Enabled: false}
-	disabledComp := NewWebhookOutComponent(disabledCfg)
-	_, disabledHealth := disabledComp.Health()
+	disabledHandler := NewOutbound(disabledCfg)
+	_, disabledHealth := disabledHandler.Health()
 	if disabledHealth.Status != "degraded" {
 		t.Errorf("expected degraded status for disabled component, got %s", disabledHealth.Status)
-	}
-
-	// Test Start/Stop
-	if err := comp.Start(context.Background()); err != nil {
-		t.Errorf("unexpected error from Start: %v", err)
-	}
-	if err := comp.Stop(context.Background()); err != nil {
-		t.Errorf("unexpected error from Stop: %v", err)
 	}
 }

@@ -3,10 +3,10 @@ path: x/websocket
 layer: extension
 status: experimental
 owner: realtime
-summary: WebSocket extension surface for hub primitives and explicit component mounting.
+summary: WebSocket extension surface for hub primitives and explicit route registration.
 
 responsibilities:
-  - WebSocket component mounting
+  - WebSocket route registration
   - App-facing hub aliases
   - Auth and broadcast entrypoints
   - Default websocket configuration
@@ -18,7 +18,7 @@ non_goals:
   - Business-specific websocket channels
 
 public_entrypoints:
-  - NewComponent
+  - New
   - DefaultWebSocketConfig
   - NewHub
   - NewHubWithConfig

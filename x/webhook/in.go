@@ -1,7 +1,6 @@
 package webhook
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -13,12 +12,11 @@ import (
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/internal/jsonx"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
-type WebhookInComponent struct {
+type Inbound struct {
 	cfg        WebhookInConfig
 	pub        pubsub.Broker
 	logger     log.StructuredLogger
@@ -26,7 +24,7 @@ type WebhookInComponent struct {
 	routesOnce sync.Once
 }
 
-func NewWebhookInComponent(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *WebhookInComponent {
+func NewInbound(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *Inbound {
 	if logger == nil {
 		logger = log.NewNoOpLogger()
 	}
@@ -35,10 +33,10 @@ func NewWebhookInComponent(cfg WebhookInConfig, fallbackPub pubsub.Broker, logge
 		pub = fallbackPub
 	}
 
-	return &WebhookInComponent{cfg: cfg, pub: pub, logger: logger}
+	return &Inbound{cfg: cfg, pub: pub, logger: logger}
 }
 
-func (c *WebhookInComponent) RegisterRoutes(r *router.Router) {
+func (c *Inbound) RegisterRoutes(r *router.Router) {
 	if !c.cfg.Enabled || c.pub == nil {
 		return
 	}
@@ -58,13 +56,7 @@ func (c *WebhookInComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *WebhookInComponent) RegisterMiddleware(_ *middleware.Registry) {}
-
-func (c *WebhookInComponent) Start(_ context.Context) error { return nil }
-
-func (c *WebhookInComponent) Stop(_ context.Context) error { return nil }
-
-func (c *WebhookInComponent) Health() (string, health.HealthStatus) {
+func (c *Inbound) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}
 
 	if !c.cfg.Enabled {
@@ -75,7 +67,7 @@ func (c *WebhookInComponent) Health() (string, health.HealthStatus) {
 	return "webhook_in", status
 }
 
-func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
+func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 	secret := strings.TrimSpace(c.cfg.GitHubSecret)
 	if secret == "" {
 		secret = strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET"))
@@ -155,7 +147,7 @@ func (c *WebhookInComponent) webhookInGitHub(ctx *contract.Ctx) {
 	})
 }
 
-func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
+func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 	secret := strings.TrimSpace(c.cfg.StripeSecret)
 	if secret == "" {
 		secret = strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))
@@ -240,7 +232,7 @@ func (c *WebhookInComponent) webhookInStripe(ctx *contract.Ctx) {
 	})
 }
 
-func (c *WebhookInComponent) ensureWebhookInDeduper() *Deduper {
+func (c *Inbound) ensureWebhookInDeduper() *Deduper {
 	if c.cfg.Deduper != nil {
 		return c.cfg.Deduper
 	}

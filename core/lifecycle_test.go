@@ -276,13 +276,6 @@ func TestStartServer(t *testing.T) {
 	})
 }
 
-func TestDeclaredComponentsAlwaysEmpty(t *testing.T) {
-	app := New()
-	if got := app.declaredComponents(); len(got) != 0 {
-		t.Fatalf("expected no declared components, got %d", len(got))
-	}
-}
-
 // TestConnectionTracker tests connection tracking and draining
 func TestConnectionTracker(t *testing.T) {
 	t.Run("new connection tracker with default interval", func(t *testing.T) {

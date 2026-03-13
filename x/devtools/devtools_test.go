@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewComponentDefaults(t *testing.T) {
-	c := NewComponent(Options{})
+	c := New(Options{})
 	if c == nil {
 		t.Fatal("expected non-nil component")
 	}
@@ -31,14 +31,14 @@ func TestNewComponentDefaults(t *testing.T) {
 }
 
 func TestNewComponentWithDebug(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	if !c.debug {
 		t.Fatal("expected debug true")
 	}
 }
 
 func TestHealthDebugEnabled(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	name, status := c.Health()
 	if name != "devtools" {
 		t.Fatalf("expected name devtools, got %q", name)
@@ -55,7 +55,7 @@ func TestHealthDebugEnabled(t *testing.T) {
 }
 
 func TestHealthDebugDisabled(t *testing.T) {
-	c := NewComponent(Options{Debug: false})
+	c := New(Options{Debug: false})
 	name, status := c.Health()
 	if name != "devtools" {
 		t.Fatalf("expected name devtools, got %q", name)
@@ -69,7 +69,7 @@ func TestHealthDebugDisabled(t *testing.T) {
 }
 
 func TestRegisterRoutesDebugFalse(t *testing.T) {
-	c := NewComponent(Options{Debug: false})
+	c := New(Options{Debug: false})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -85,7 +85,7 @@ func TestRegisterRoutesDebugFalse(t *testing.T) {
 }
 
 func TestRegisterRoutesDebugTrue(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -115,7 +115,7 @@ func TestRegisterRoutesDebugTrue(t *testing.T) {
 }
 
 func TestRoutesJSONEndpoint(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -141,7 +141,7 @@ func TestRoutesJSONEndpoint(t *testing.T) {
 }
 
 func TestConfigEndpointNoHook(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -167,7 +167,7 @@ func TestConfigEndpointNoHook(t *testing.T) {
 }
 
 func TestConfigEndpointWithHook(t *testing.T) {
-	c := NewComponent(Options{
+	c := New(Options{
 		Debug: true,
 		Hooks: Hooks{
 			ConfigSnapshot: func() map[string]any {
@@ -197,7 +197,7 @@ func TestConfigEndpointWithHook(t *testing.T) {
 }
 
 func TestMiddlewareEndpointNoHook(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -220,7 +220,7 @@ func TestMiddlewareEndpointNoHook(t *testing.T) {
 }
 
 func TestMiddlewareEndpointWithHook(t *testing.T) {
-	c := NewComponent(Options{
+	c := New(Options{
 		Debug: true,
 		Hooks: Hooks{
 			MiddlewareList: func() []string {
@@ -251,7 +251,7 @@ func TestMiddlewareEndpointWithHook(t *testing.T) {
 }
 
 func TestMetricsEndpoint(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -274,7 +274,7 @@ func TestMetricsEndpoint(t *testing.T) {
 }
 
 func TestMetricsClearEndpoint(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -288,7 +288,7 @@ func TestMetricsClearEndpoint(t *testing.T) {
 }
 
 func TestReloadEndpointNoEnvFile(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -303,7 +303,7 @@ func TestReloadEndpointNoEnvFile(t *testing.T) {
 }
 
 func TestReloadEndpointEnvFileNotFound(t *testing.T) {
-	c := NewComponent(Options{
+	c := New(Options{
 		Debug:   true,
 		EnvFile: "/nonexistent/.env",
 	})
@@ -326,7 +326,7 @@ func TestReloadEndpointSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewComponent(Options{
+	c := New(Options{
 		Debug:   true,
 		EnvFile: envFile,
 	})
@@ -343,21 +343,21 @@ func TestReloadEndpointSuccess(t *testing.T) {
 }
 
 func TestStartNoDebug(t *testing.T) {
-	c := NewComponent(Options{Debug: false})
+	c := New(Options{Debug: false})
 	if err := c.Start(context.Background()); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 }
 
 func TestStartNoEnvFile(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	if err := c.Start(context.Background()); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 }
 
 func TestStartEnvFileNotExist(t *testing.T) {
-	c := NewComponent(Options{
+	c := New(Options{
 		Debug:   true,
 		EnvFile: "/nonexistent/.env",
 	})
@@ -373,7 +373,7 @@ func TestStartAndStop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewComponent(Options{
+	c := New(Options{
 		Debug:   true,
 		EnvFile: envFile,
 	})
@@ -388,35 +388,35 @@ func TestStartAndStop(t *testing.T) {
 }
 
 func TestStopWithoutStart(t *testing.T) {
-	c := NewComponent(Options{})
+	c := New(Options{})
 	if err := c.Stop(context.Background()); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 }
 
-func TestRegisterMiddlewareAttachesDevMetrics(t *testing.T) {
+func TestAttachMetricsAttachesDevMetrics(t *testing.T) {
 	var attached *metrics.DevCollector
-	c := NewComponent(Options{
+	c := New(Options{
 		Hooks: Hooks{
 			AttachDevMetrics: func(dc *metrics.DevCollector) {
 				attached = dc
 			},
 		},
 	})
-	c.RegisterMiddleware(nil)
+	c.AttachMetrics()
 	if attached == nil {
 		t.Fatal("expected dev metrics to be attached via hook")
 	}
 }
 
-func TestRegisterMiddlewareNoHook(t *testing.T) {
-	c := NewComponent(Options{})
+func TestAttachMetricsNoHook(t *testing.T) {
+	c := New(Options{})
 	// Should not panic even without the hook
-	c.RegisterMiddleware(nil)
+	c.AttachMetrics()
 }
 
 func TestInfoEndpoint(t *testing.T) {
-	c := NewComponent(Options{
+	c := New(Options{
 		Debug: true,
 		Hooks: Hooks{
 			ConfigSnapshot: func() map[string]any {
@@ -449,7 +449,7 @@ func TestInfoEndpoint(t *testing.T) {
 }
 
 func TestRoutesTextEndpoint(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
@@ -467,7 +467,7 @@ func TestRoutesTextEndpoint(t *testing.T) {
 }
 
 func TestMetricsEndpointNilDevMetrics(t *testing.T) {
-	c := NewComponent(Options{Debug: true})
+	c := New(Options{Debug: true})
 	c.devMetrics = nil // force nil
 	r := router.NewRouter()
 	c.RegisterRoutes(r)

@@ -13,7 +13,6 @@ import (
 	"github.com/spcent/plumego/internal/config"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
 
@@ -34,7 +33,7 @@ const (
 	DevToolsReloadPath     = DevToolsBasePath + "/reload"
 )
 
-type DevToolsComponent struct {
+type DevTools struct {
 	debug   bool
 	logger  log.StructuredLogger
 	envFile string
@@ -60,11 +59,11 @@ type Options struct {
 	Hooks   Hooks
 }
 
-func NewComponent(opts Options) *DevToolsComponent {
+func New(opts Options) *DevTools {
 	if opts.Logger == nil {
 		opts.Logger = log.NewNoOpLogger()
 	}
-	return &DevToolsComponent{
+	return &DevTools{
 		debug:      opts.Debug,
 		logger:     opts.Logger,
 		envFile:    opts.EnvFile,
@@ -73,7 +72,7 @@ func NewComponent(opts Options) *DevToolsComponent {
 	}
 }
 
-func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
+func (c *DevTools) RegisterRoutes(r *router.Router) {
 	if !c.debug {
 		return
 	}
@@ -175,11 +174,11 @@ func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
 	}))
 }
 
-func (c *DevToolsComponent) RegisterMiddleware(_ *middleware.Registry) {
+func (c *DevTools) AttachMetrics() {
 	c.attachDevMetrics()
 }
 
-func (c *DevToolsComponent) Start(ctx context.Context) error {
+func (c *DevTools) Start(ctx context.Context) error {
 	if !c.debug || c.envFile == "" {
 		return nil
 	}
@@ -198,7 +197,7 @@ func (c *DevToolsComponent) Start(ctx context.Context) error {
 	return nil
 }
 
-func (c *DevToolsComponent) Stop(_ context.Context) error {
+func (c *DevTools) Stop(_ context.Context) error {
 	if c.watchStop != nil {
 		c.watchStop()
 	}
@@ -206,7 +205,7 @@ func (c *DevToolsComponent) Stop(_ context.Context) error {
 	return nil
 }
 
-func (c *DevToolsComponent) Health() (string, health.HealthStatus) {
+func (c *DevTools) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.debug}}
 	if !c.debug {
 		status.Status = health.StatusDegraded
@@ -215,7 +214,7 @@ func (c *DevToolsComponent) Health() (string, health.HealthStatus) {
 	return "devtools", status
 }
 
-func (c *DevToolsComponent) reloadEnv(ctx context.Context) error {
+func (c *DevTools) reloadEnv(ctx context.Context) error {
 	_ = ctx
 	if c.envFile == "" {
 		return fmt.Errorf("env file not configured")
@@ -233,14 +232,14 @@ func (c *DevToolsComponent) reloadEnv(ctx context.Context) error {
 	return nil
 }
 
-func (c *DevToolsComponent) attachDevMetrics() {
+func (c *DevTools) attachDevMetrics() {
 	if c.devMetrics == nil || c.hooks.AttachDevMetrics == nil {
 		return
 	}
 	c.hooks.AttachDevMetrics(c.devMetrics)
 }
 
-func (c *DevToolsComponent) watchEnvFile(ctx context.Context) {
+func (c *DevTools) watchEnvFile(ctx context.Context) {
 	defer c.watchWg.Done()
 
 	fileSource := config.NewFileSource(c.envFile, config.FormatEnv, true)
@@ -269,14 +268,14 @@ func (c *DevToolsComponent) watchEnvFile(ctx context.Context) {
 	}
 }
 
-func (c *DevToolsComponent) middlewareList() []string {
+func (c *DevTools) middlewareList() []string {
 	if c.hooks.MiddlewareList == nil {
 		return nil
 	}
 	return c.hooks.MiddlewareList()
 }
 
-func (c *DevToolsComponent) configSnapshot() map[string]any {
+func (c *DevTools) configSnapshot() map[string]any {
 	if c.hooks.ConfigSnapshot == nil {
 		return map[string]any{"debug": c.debug}
 	}

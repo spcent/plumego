@@ -8,6 +8,7 @@ summary: Webhook ingress, egress, and bridge primitives within the broader messa
 responsibilities:
   - Inbound webhook verification helpers
   - Outbound webhook delivery service aliases
+  - Explicit inbound and outbound route registration
   - PubSub-to-webhook bridge wiring
 
 non_goals:
@@ -48,7 +49,7 @@ doc_paths:
 change_risks:
   - signature verification regression
   - delivery retry regression
-  - component route regression
+  - route registration regression
 
 review_checklist:
   - Fail closed on verification errors

@@ -46,11 +46,11 @@ func TestDefaultWebSocketConfig(t *testing.T) {
 	}
 }
 
-func TestNewComponentSecretTooShort(t *testing.T) {
+func TestNewSecretTooShort(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = []byte("short")
 
-	_, err := NewComponent(cfg, false, nil)
+	_, err := New(cfg, false, nil)
 	if err == nil {
 		t.Fatal("expected error for short secret")
 	}
@@ -59,21 +59,21 @@ func TestNewComponentSecretTooShort(t *testing.T) {
 	}
 }
 
-func TestNewComponentEmptySecret(t *testing.T) {
+func TestNewEmptySecret(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = nil
 
-	_, err := NewComponent(cfg, false, nil)
+	_, err := New(cfg, false, nil)
 	if err == nil {
 		t.Fatal("expected error for nil secret")
 	}
 }
 
-func TestNewComponentValidSecret(t *testing.T) {
+func TestNewValidSecret(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestHealthHealthy(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,12 +113,12 @@ func TestHealthUnhealthyAfterStop(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := comp.Stop(context.Background()); err != nil {
+	if err := comp.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -131,42 +131,24 @@ func TestHealthUnhealthyAfterStop(t *testing.T) {
 	}
 }
 
-func TestStartReturnsNil(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-
-	comp, _ := NewComponent(cfg, false, nil)
-	if err := comp.Start(context.Background()); err != nil {
-		t.Fatalf("expected nil, got %v", err)
-	}
-}
-
 func TestStopNilHub(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, _ := NewComponent(cfg, false, nil)
+	comp, _ := New(cfg, false, nil)
 	// Stop once to set hub to nil
-	_ = comp.Stop(context.Background())
+	_ = comp.Shutdown(context.Background())
 	// Stop again should not panic
-	if err := comp.Stop(context.Background()); err != nil {
+	if err := comp.Shutdown(context.Background()); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
-}
-
-func TestRegisterMiddlewareNoop(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-
-	comp, _ := NewComponent(cfg, false, nil)
-	comp.RegisterMiddleware(nil) // should not panic
 }
 
 func TestBroadcastEndpointNoAuth(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +169,7 @@ func TestBroadcastEndpointWrongToken(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +192,7 @@ func TestBroadcastEndpointValidToken(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = secret
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +216,7 @@ func TestBroadcastDisabled(t *testing.T) {
 	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = false
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +239,7 @@ func TestRegisterRoutesIdempotent(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +255,7 @@ func TestHealthBroadcastEnabledInDetails(t *testing.T) {
 	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = false
 
-	comp, _ := NewComponent(cfg, false, nil)
+	comp, _ := New(cfg, false, nil)
 	_, status := comp.Health()
 
 	val, ok := status.Details["broadcastEnabled"]
@@ -290,7 +272,7 @@ func TestBroadcastEndpointEmptyBody(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = secret
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +295,7 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = secret
 
-	comp, err := NewComponent(cfg, false, nil)
+	comp, err := New(cfg, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +316,7 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestNewComponentCustomConfig(t *testing.T) {
+func TestNewCustomConfig(t *testing.T) {
 	cfg := WebSocketConfig{
 		WorkerCount:        4,
 		JobQueueSize:       128,
@@ -349,7 +331,7 @@ func TestNewComponentCustomConfig(t *testing.T) {
 		MaxRoomConnections: 10,
 	}
 
-	comp, err := NewComponent(cfg, true, nil)
+	comp, err := New(cfg, true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

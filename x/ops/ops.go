@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
@@ -18,8 +17,8 @@ import (
 
 const DefaultBasePath = "/ops"
 
-// Component exposes protected operations endpoints for queue/receipt/tenant management.
-type Component struct {
+// Handler exposes protected operations endpoints for queue/receipt/tenant management.
+type Handler struct {
 	cfg        Options
 	logger     log.StructuredLogger
 	routesOnce sync.Once
@@ -124,19 +123,19 @@ type QuotaUsage struct {
 	Tokens      int       `json:"tokens,omitempty"`
 }
 
-// NewComponent constructs an ops component.
-func NewComponent(opts Options) *Component {
+// New constructs an ops handler.
+func New(opts Options) *Handler {
 	logger := opts.Logger
 	if logger == nil {
 		logger = log.NewNoOpLogger()
 	}
-	return &Component{
+	return &Handler{
 		cfg:    opts,
 		logger: logger,
 	}
 }
 
-func (c *Component) RegisterRoutes(r *router.Router) {
+func (c *Handler) RegisterRoutes(r *router.Router) {
 	if !c.cfg.Enabled {
 		return
 	}
@@ -157,33 +156,7 @@ func (c *Component) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *Component) RegisterMiddleware(_ *middleware.Registry) {}
-
-func (c *Component) Start(_ context.Context) error { return nil }
-
-func (c *Component) Stop(_ context.Context) error { return nil }
-
-func (c *Component) Health() (string, health.HealthStatus) {
-	status := health.HealthStatus{
-		Status:  health.StatusHealthy,
-		Details: map[string]any{"enabled": c.cfg.Enabled},
-	}
-
-	if !c.cfg.Enabled {
-		status.Status = health.StatusDegraded
-		status.Message = "component disabled"
-		return "ops", status
-	}
-
-	if !c.cfg.Auth.AllowInsecure && !c.hasAuthConfigured() {
-		status.Status = health.StatusDegraded
-		status.Message = "ops auth not configured"
-	}
-
-	return "ops", status
-}
-
-func (c *Component) handleSummary(ctx *contract.Ctx) {
+func (c *Handler) handleSummary(ctx *contract.Ctx) {
 	if ctx == nil {
 		return
 	}
@@ -206,7 +179,7 @@ func (c *Component) handleSummary(ctx *contract.Ctx) {
 	contract.WriteContractResponse(ctx, http.StatusOK, data)
 }
 
-func (c *Component) handleQueueStats(ctx *contract.Ctx) {
+func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 	if ctx == nil {
 		return
 	}
@@ -252,7 +225,7 @@ func (c *Component) handleQueueStats(ctx *contract.Ctx) {
 	})
 }
 
-func (c *Component) handleQueueReplay(ctx *contract.Ctx) {
+func (c *Handler) handleQueueReplay(ctx *contract.Ctx) {
 	if ctx == nil {
 		return
 	}
@@ -279,7 +252,7 @@ func (c *Component) handleQueueReplay(ctx *contract.Ctx) {
 	})
 }
 
-func (c *Component) handleReceiptLookup(ctx *contract.Ctx) {
+func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 	if ctx == nil {
 		return
 	}
@@ -306,7 +279,7 @@ func (c *Component) handleReceiptLookup(ctx *contract.Ctx) {
 	})
 }
 
-func (c *Component) handleChannelHealth(ctx *contract.Ctx) {
+func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 	if ctx == nil {
 		return
 	}
@@ -352,7 +325,7 @@ func (c *Component) handleChannelHealth(ctx *contract.Ctx) {
 	})
 }
 
-func (c *Component) handleTenantQuota(ctx *contract.Ctx) {
+func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 	if ctx == nil {
 		return
 	}
@@ -379,7 +352,7 @@ func (c *Component) handleTenantQuota(ctx *contract.Ctx) {
 	})
 }
 
-func (c *Component) authMiddlewares() []middleware.Middleware {
+func (c *Handler) authMiddlewares() []middleware.Middleware {
 	var middlewares []middleware.Middleware
 
 	if c.cfg.Auth.Middleware != nil {
@@ -404,7 +377,7 @@ func (c *Component) authMiddlewares() []middleware.Middleware {
 	return middlewares
 }
 
-func (c *Component) hasAuthConfigured() bool {
+func (c *Handler) hasAuthConfigured() bool {
 	if c.cfg.Auth.Middleware != nil {
 		return true
 	}
@@ -417,7 +390,7 @@ func (c *Component) hasAuthConfigured() bool {
 	return false
 }
 
-func (c *Component) writeHookError(ctx *contract.Ctx, code string, err error) {
+func (c *Handler) writeHookError(ctx *contract.Ctx, code string, err error) {
 	if ctx == nil {
 		return
 	}

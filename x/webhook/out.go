@@ -1,7 +1,6 @@
 package webhook
 
 import (
-	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -14,20 +13,19 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/internal/stringsx"
-	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
 
-type WebhookOutComponent struct {
+type Outbound struct {
 	cfg        WebhookOutConfig
 	routesOnce sync.Once
 }
 
-func NewWebhookOutComponent(cfg WebhookOutConfig) *WebhookOutComponent {
-	return &WebhookOutComponent{cfg: cfg}
+func NewOutbound(cfg WebhookOutConfig) *Outbound {
+	return &Outbound{cfg: cfg}
 }
 
-func (c *WebhookOutComponent) RegisterRoutes(r *router.Router) {
+func (c *Outbound) RegisterRoutes(r *router.Router) {
 	if !c.cfg.Enabled || c.cfg.Service == nil {
 		return
 	}
@@ -57,23 +55,7 @@ func (c *WebhookOutComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *WebhookOutComponent) RegisterMiddleware(_ *middleware.Registry) {}
-
-func (c *WebhookOutComponent) Start(ctx context.Context) error {
-	if c.cfg.Enabled && c.cfg.Service != nil {
-		c.cfg.Service.Start(ctx)
-	}
-	return nil
-}
-
-func (c *WebhookOutComponent) Stop(_ context.Context) error {
-	if c.cfg.Enabled && c.cfg.Service != nil {
-		c.cfg.Service.Stop()
-	}
-	return nil
-}
-
-func (c *WebhookOutComponent) Health() (string, health.HealthStatus) {
+func (c *Outbound) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"enabled": c.cfg.Enabled}}
 
 	if !c.cfg.Enabled {

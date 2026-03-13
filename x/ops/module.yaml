@@ -5,7 +5,7 @@ status: experimental
 summary: Protected operations endpoints for queues, receipts, and runtime diagnostics.
 
 responsibilities:
-  - Ops endpoint mounting
+  - Ops route registration
   - Queue and receipt admin hooks
   - Explicit auth-gated diagnostics
 

@@ -18,7 +18,7 @@ type queueStatsResponse struct {
 
 func TestOpsQueueStatsSingle(t *testing.T) {
 	r := router.NewRouter()
-	comp := NewComponent(Options{
+	handler := New(Options{
 		Enabled: true,
 		Auth:    AuthConfig{AllowInsecure: true},
 		Hooks: Hooks{
@@ -28,7 +28,7 @@ func TestOpsQueueStatsSingle(t *testing.T) {
 		},
 	})
 
-	comp.RegisterRoutes(r)
+	handler.RegisterRoutes(r)
 
 	req := httptest.NewRequest(http.MethodGet, "/ops/queue?queue=primary", nil)
 	rec := httptest.NewRecorder()
@@ -53,7 +53,7 @@ func TestOpsQueueStatsSingle(t *testing.T) {
 
 func TestOpsAuthRequired(t *testing.T) {
 	r := router.NewRouter()
-	comp := NewComponent(Options{
+	handler := New(Options{
 		Enabled: true,
 		Hooks: Hooks{
 			QueueStats: func(ctx context.Context, queue string) (QueueStats, error) {
@@ -62,7 +62,7 @@ func TestOpsAuthRequired(t *testing.T) {
 		},
 	})
 
-	comp.RegisterRoutes(r)
+	handler.RegisterRoutes(r)
 
 	req := httptest.NewRequest(http.MethodGet, "/ops/queue?queue=primary", nil)
 	rec := httptest.NewRecorder()

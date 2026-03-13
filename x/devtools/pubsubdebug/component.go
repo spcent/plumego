@@ -1,39 +1,37 @@
 package pubsubdebug
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"sync"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
-type PubSubDebugComponent struct {
+type Handler struct {
 	cfg        PubSubConfig
 	defaultPub pubsub.Broker
 	routesOnce sync.Once
 }
 
-func NewPubSubDebugComponent(cfg PubSubConfig, fallbackPub pubsub.Broker) *PubSubDebugComponent {
-	return &PubSubDebugComponent{cfg: cfg, defaultPub: fallbackPub}
+func New(cfg PubSubConfig, fallbackPub pubsub.Broker) *Handler {
+	return &Handler{cfg: cfg, defaultPub: fallbackPub}
 }
 
-func (c *PubSubDebugComponent) RegisterRoutes(r *router.Router) {
-	if !c.cfg.Enabled {
+func (h *Handler) RegisterRoutes(r *router.Router) {
+	if !h.cfg.Enabled {
 		return
 	}
 
-	c.routesOnce.Do(func() {
-		pub := c.cfg.Pub
+	h.routesOnce.Do(func() {
+		pub := h.cfg.Pub
 		if pub == nil {
-			pub = c.defaultPub
+			pub = h.defaultPub
 		}
-		path := strings.TrimSpace(c.cfg.Path)
+		path := strings.TrimSpace(h.cfg.Path)
 		if path == "" {
 			path = "/_debug/pubsub"
 		}
@@ -56,21 +54,15 @@ func (c *PubSubDebugComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *PubSubDebugComponent) RegisterMiddleware(_ *middleware.Registry) {}
-
-func (c *PubSubDebugComponent) Start(_ context.Context) error { return nil }
-
-func (c *PubSubDebugComponent) Stop(_ context.Context) error { return nil }
-
-func (c *PubSubDebugComponent) Health() (string, health.HealthStatus) {
+func (h *Handler) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{
 		Status:  health.StatusHealthy,
-		Details: map[string]any{"enabled": c.cfg.Enabled},
+		Details: map[string]any{"enabled": h.cfg.Enabled},
 	}
 
-	if !c.cfg.Enabled {
+	if !h.cfg.Enabled {
 		status.Status = health.StatusDegraded
-		status.Message = "component disabled"
+		status.Message = "pubsub debug disabled"
 	}
 
 	return "pubsub_debug", status

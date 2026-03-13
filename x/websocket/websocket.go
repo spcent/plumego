@@ -14,7 +14,6 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
 
@@ -57,7 +56,7 @@ func DefaultWebSocketConfig() WebSocketConfig {
 	}
 }
 
-type WebSocketComponent struct {
+type Server struct {
 	config WebSocketConfig
 	debug  bool
 	logger log.StructuredLogger
@@ -68,7 +67,7 @@ type WebSocketComponent struct {
 
 const minWebSocketSecretLen = 32
 
-func NewComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*WebSocketComponent, error) {
+func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server, error) {
 	if len(cfg.Secret) < minWebSocketSecretLen {
 		return nil, fmt.Errorf(
 			"websocket secret must be at least %d bytes (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)",
@@ -83,7 +82,7 @@ func NewComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) 
 		MaxRoomConnections: cfg.MaxRoomConnections,
 	})
 
-	return &WebSocketComponent{
+	return &Server{
 		config: cfg,
 		debug:  debug,
 		logger: logger,
@@ -91,7 +90,7 @@ func NewComponent(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) 
 	}, nil
 }
 
-func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
+func (c *Server) RegisterRoutes(r *router.Router) {
 	c.routesOnce.Do(func() {
 		wsAuth := NewSimpleRoomAuth(c.config.Secret)
 
@@ -140,11 +139,7 @@ func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *WebSocketComponent) RegisterMiddleware(_ *middleware.Registry) {}
-
-func (c *WebSocketComponent) Start(_ context.Context) error { return nil }
-
-func (c *WebSocketComponent) Stop(ctx context.Context) error {
+func (c *Server) Shutdown(ctx context.Context) error {
 	if c.hub != nil {
 		err := c.hub.Shutdown(ctx)
 		c.hub = nil
@@ -153,7 +148,7 @@ func (c *WebSocketComponent) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (c *WebSocketComponent) Health() (string, health.HealthStatus) {
+func (c *Server) Health() (string, health.HealthStatus) {
 	status := health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"broadcastEnabled": c.config.BroadcastEnabled}}
 
 	if c.hub == nil {
@@ -165,4 +160,4 @@ func (c *WebSocketComponent) Health() (string, health.HealthStatus) {
 }
 
 // Hub exposes the underlying WebSocket hub for advanced usage.
-func (c *WebSocketComponent) Hub() *Hub { return c.hub }
+func (c *Server) Hub() *Hub { return c.hub }
