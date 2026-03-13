@@ -1,6 +1,6 @@
 # Plumego Canonical Style Guide
 
-Scope: `core`, `router`, `middleware`, official examples, docs, code generation, AI-agent workflows.
+Scope: `core`, `router`, `middleware`, official docs, code generation, AI-agent workflows.
 
 ---
 
@@ -10,7 +10,7 @@ Scope: `core`, `router`, `middleware`, official examples, docs, code generation,
 - **one obvious way** — one bootstrap, one route style, one handler shape, one decode path, one error shape, one test style
 - **explicit over implicit** — no hidden binding, no context service-locator, no magical response wrappers, no import-order behavior
 - **small-step refactorability** — narrow boundaries, stable interfaces, shallow call paths, minimal indirection
-- **single canonical path** — the reference app defines structure, templates mirror it, examples only demonstrate capabilities
+- **single canonical path** — the reference app defines structure
 
 When convenience conflicts with predictability, choose predictability.
 
@@ -36,8 +36,6 @@ Prefer narrow packages such as `requestid`, `tracing`, `accesslog`, `recovery`, 
 
 ### Reference and Templates
 `reference/standard-service` is the only canonical application layout.
-`templates/standard-service` must mirror that layout for generated projects.
-`examples/` are proof-of-capability sandboxes and must not become architectural authority.
 
 ---
 
@@ -268,12 +266,11 @@ Default behavior:
 - Prefer stdlib-shaped solutions
 - Follow this guide over package convenience APIs when both are possible
 - Preserve existing canonical patterns when editing nearby files
-- Read `reference/standard-service` before using `examples/` as shape guidance
 - Treat broad bucket names (`utils`, `validator`, `rest`, `pubsub`, `tenant`) as migration debt, not expansion targets
 
 ## 15. Agent-First Repo Rules
 
-- Start app-structure work from `reference/standard-service`, not from examples
+- Start app-structure work from `reference/standard-service`
 - Keep each change centered on one primary module when possible
 - Prefer adding a new focused extension package over widening a stable root
 - Do not introduce new catch-all middleware buckets or protocol family roots
@@ -302,7 +299,7 @@ Conflict rule: if existing code conflicts with this guide — preserve behavior 
 
 ## 15. Compatibility APIs
 
-- Must not appear in canonical docs or examples
+- Must not appear in canonical docs
 - Must be labeled clearly
 - New features must not build on compatibility-only surfaces
 - Migration always moves toward canonical, never away

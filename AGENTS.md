@@ -19,7 +19,7 @@ Hard constraints:
 
 ## 2) Canonical Style Authority
 
-`docs/CANONICAL_STYLE_GUIDE.md` is the canonical style source for docs, examples, scaffolds, and AI-generated code.
+`docs/CANONICAL_STYLE_GUIDE.md` is the canonical style source for docs, scaffolds, and AI-generated code.
 
 Precedence when guidance overlaps:
 1. Security and module-boundary constraints in this file
@@ -66,8 +66,6 @@ Target layout:
 - Stable library roots remain top-level: `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
 - Extension capability packs live under `x/*`
 - `reference/` defines canonical app layout
-- `templates/` mirrors canonical scaffold layout
-- `examples/` are demos, not architectural authority
 
 ---
 

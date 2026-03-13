@@ -129,14 +129,14 @@ import (
 	"log"
 
 	"github.com/spcent/plumego/core"
-	plumelog "github.com/spcent/plumego/log"
+	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/middleware/recovery"
 )
 
 app := core.New(
 	core.WithAddr(":8080"),
-	core.WithLogger(plumelog.NewGLogger()),
+	core.WithLogger(plog.NewGLogger()),
 )
 if err := app.Use(
 	requestid.Middleware(),
@@ -149,7 +149,6 @@ if err := app.Use(
 ## Next Steps
 
 - Browse `reference/standard-service/` for a full-featured application
-- See `examples/` for focused examples on routing, middleware, caching, and more
 - Read the source at `core/`, `router/`, and `contract/` for API details
 
 ## Canonical Note

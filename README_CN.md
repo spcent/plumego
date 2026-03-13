@@ -1,14 +1,10 @@
 # Plumego — 仅基于golang标准库的 Web 工具包
 
-![plumego logo](docs/branding/logo-v1/final/svg/plumego-primary-horizontal-light.svg)
-
 [![Go 版本](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![版本](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
 [![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
-
-`core` 包是稳定的主入口；请直接从稳定模块路径导入，不再通过根包 re-export 入口访问类型或选项。
 
 ## 仓库演进方向
 
@@ -30,8 +26,6 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 新的应用结构工作应遵循唯一 canonical 路径：
 
 - 先看 `reference/standard-service`，以它作为目录结构和 wiring 的标准
-- 生成式脚手架要与 `templates/standard-service` 保持同构
-- `examples/` 只用于演示能力，不作为架构权威
 
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
@@ -73,7 +67,7 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/core"
-    plumelog "github.com/spcent/plumego/log"
+    plog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/requestid"
     "github.com/spcent/plumego/middleware/recovery"
     xdevtools "github.com/spcent/plumego/x/devtools"
@@ -83,7 +77,7 @@ func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
-        core.WithLogger(plumelog.NewGLogger()),
+        core.WithLogger(plog.NewGLogger()),
     )
 
     if err := app.MountComponent(xdevtools.NewAppComponent(app)); err != nil {
@@ -322,21 +316,6 @@ rows, err := tenantDB.QueryFromContext(ctx,
 
 这样可防止跨租户数据泄露，并通过移除手动租户过滤简化业务逻辑。
 
-### 示例应用
-
-参见 `examples/multi-tenant-saas/` 完整示例，包含：
-- 租户 CRUD 操作的管理 API
-- 租户范围的业务 API
-- 带 retry-after 头的配额执行
-- 模型/工具的策略验证
-- 租户级请求分析
-
-运行示例：
-```bash
-cd examples/multi-tenant-saas
-go run .
-```
-
 ### 生产环境注意事项
 
 - **性能**：使用带 LRU 缓存的数据库配置管理器（支持 1000+ 租户）
@@ -552,7 +531,3 @@ plumego dev --debounce 1s
 
 ## 文档
 规范文档入口与优先级顺序：`docs/README.md`。
-
-详细文档请参见 `examples/docs` 目录：
-- `examples/docs/en/` - 英文文档
-- `examples/docs/zh/` - 中文文档

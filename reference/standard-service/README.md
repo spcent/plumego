@@ -14,5 +14,3 @@ Run it with:
 ```bash
 go run ./reference/standard-service
 ```
-
-When templates or docs need a project structure example, they should follow this directory instead of `examples/`.

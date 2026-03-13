@@ -37,7 +37,7 @@ go test -race ./...
 - Error path: `contract.WriteError`
 - Middleware: `func(http.Handler) http.Handler`, transport-only
 - Dependency flow: constructor injection, not context service-locator
-- App shape: follow `reference/standard-service`, not `examples/`
+- App shape: follow `reference/standard-service`
 
 **Documentation sync targets:** `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `env.example`
 

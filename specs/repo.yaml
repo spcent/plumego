@@ -16,20 +16,16 @@ canonical_authority:
     - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
   implementation:
     - reference/standard-service
-  scaffolding_target:
-    - templates/standard-service
   notes:
     - Reference app defines the canonical application structure
-    - Templates must mirror reference structure for generated projects
-    - Examples are demos and validation sandboxes, not architectural authority
 
 layers:
   stable:
     description: Long-lived public packages with narrow responsibilities.
     paths:
+      - contract
       - core
       - router
-      - contract
       - middleware
       - security
       - store
@@ -60,18 +56,11 @@ layers:
       - internal/checks
       - internal/testkit
       - internal/buildmeta
-      - scripts
 
   reference:
-    description: Canonical implementations and templates.
+    description: Canonical implementations.
     paths:
       - reference
-      - templates
-
-  examples:
-    description: Small, focused demos.
-    paths:
-      - examples
 
 top_level_rules:
   allowed_library_roots:
@@ -98,8 +87,6 @@ top_level_rules:
     - New library packages must live under a stable root or x/*
     - Root package facade is forbidden in the target layout
     - Reference apps define the canonical app structure
-    - Templates must mirror reference app structure
-    - Examples must not define the primary coding style
     - Stable roots should remain grep-friendly and narrow
 
 target_cleanup:

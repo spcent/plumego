@@ -1,14 +1,10 @@
 # Plumego — Standard Library Web Toolkit
 
-![plumego logo](docs/branding/logo-v1/final/svg/plumego-primary-horizontal-light.svg)
-
 [![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, WebSocket utilities, webhook pipelines, and static frontend hosting. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
-
-The `core` package is the stable, primary entrypoint. Import stable packages explicitly from their module paths rather than through a root package facade.
 
 ## Repository Direction
 
@@ -32,8 +28,6 @@ Machine-enforced repo guardrails live under `internal/checks/*`. Historical exce
 For new application work, use a single canonical path:
 
 - read `reference/standard-service` first for structure and wiring
-- keep scaffolds aligned with `templates/standard-service`
-- treat `examples/` as demos, not architectural authority
 
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
@@ -75,7 +69,7 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/core"
-    plumelog "github.com/spcent/plumego/log"
+    plog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/requestid"
     "github.com/spcent/plumego/middleware/recovery"
     xdevtools "github.com/spcent/plumego/x/devtools"
@@ -85,7 +79,7 @@ func main() {
     app := core.New(
         core.WithAddr(":8080"),
         core.WithDebug(),
-        core.WithLogger(plumelog.NewGLogger()),
+        core.WithLogger(plog.NewGLogger()),
     )
 
     if err := app.MountComponent(xdevtools.NewAppComponent(app)); err != nil {
@@ -555,7 +549,3 @@ For complete documentation, see `cmd/plumego/DEV_SERVER.md`.
 
 ## Documentation
 Canonical docs entrypoint and priority order: `docs/README.md`.
-
-For detailed documentation, see the `examples/docs` directory:
-- `examples/docs/en/` - English documentation
-- `examples/docs/zh/` - Chinese documentation

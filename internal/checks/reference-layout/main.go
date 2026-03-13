@@ -43,7 +43,6 @@ func requiredPathViolations(repoRoot string) []string {
 		"reference/standard-service",
 		"specs/repo.yaml",
 		"specs/dependency-rules.yaml",
-		"templates/standard-service",
 	}
 
 	var violations []string

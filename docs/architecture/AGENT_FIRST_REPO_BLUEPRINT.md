@@ -43,8 +43,6 @@ Non-library areas stay out of import-path design:
 
 - `cmd`
 - `reference`
-- `templates`
-- `examples`
 - `docs`
 - `specs`
 - `internal`
@@ -63,9 +61,6 @@ Agents should treat these as the default read and write path:
 Rules:
 
 - `reference/standard-service` is the only canonical application layout
-- `templates/standard-service` must mirror the reference layout for scaffolding
-- `examples/` demonstrate capabilities only; they do not define architecture
-- new docs and generators should point to `reference/standard-service`, not to `examples/`
 
 ## Hard Rules
 
@@ -74,7 +69,7 @@ Rules:
 - `core` is a kernel, not a feature catalog.
 - `middleware` remains transport-only.
 - Tenant-aware logic belongs in `x/tenant`, not in stable `middleware` or `store`.
-- Reference apps define the canonical app layout; examples do not.
+- Reference apps define the canonical app layout.
 - `health` keeps models and readiness state, not HTTP endpoint ownership.
 - `contract` keeps transport contracts, not protocol gateway families.
 - `store` stable layer keeps primitives; topology-heavy data features move to extensions.

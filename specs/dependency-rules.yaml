@@ -2,7 +2,7 @@ version: 1
 
 rules:
   stable_must_not_depend_on_extension: true
-  library_must_not_depend_on_reference_or_examples: true
+  library_must_not_depend_on_reference: true
   root_facade_forbidden: true
 
 modules:
@@ -18,9 +18,7 @@ modules:
       - security/**
       - store/**
       - x/**
-      - examples/**
       - reference/**
-      - templates/**
       - cmd/**
 
   health:
@@ -75,9 +73,7 @@ modules:
       - security/**
       - store/**
       - x/**
-      - examples/**
       - reference/**
-      - templates/**
       - cmd/**
 
   middleware:
@@ -93,9 +89,7 @@ modules:
       - core/**
       - store/**
       - x/**
-      - examples/**
       - reference/**
-      - templates/**
       - cmd/**
 
   security:
@@ -110,9 +104,7 @@ modules:
       - router/**
       - store/**
       - x/**
-      - examples/**
       - reference/**
-      - templates/**
       - cmd/**
 
   store:
@@ -129,9 +121,7 @@ modules:
       - middleware/**
       - security/**
       - x/**
-      - examples/**
       - reference/**
-      - templates/**
       - cmd/**
 
   core:
@@ -147,9 +137,7 @@ modules:
       - metrics
     deny:
       - x/**
-      - examples/**
       - reference/**
-      - templates/**
       - cmd/**
       - store/db/**
       - store/cache/**
@@ -170,8 +158,6 @@ modules:
       - metrics
     deny:
       - reference/**
-      - templates/**
-      - examples/**
       - cmd/**
 
 special_rules:
@@ -180,8 +166,7 @@ special_rules:
   forbidden_import_patterns:
     - github.com/spcent/plumego
   notes:
-    - Reference app and matching templates define the canonical application shape
-    - Examples are demos and must not define the primary architecture
+    - Reference app define the canonical application shape
     - Stable packages must never import x/*
     - Core stays a kernel and must not grow feature-catalog dependencies
     - Router stays transport-structure only
