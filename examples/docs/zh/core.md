@@ -104,9 +104,9 @@ if err := app.Use(
 }
 
 app.Get("/metrics", exporter.Handler().ServeHTTP)
-app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
-app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 
 ctx := context.Background()
 if err := app.Prepare(); err != nil {

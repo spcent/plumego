@@ -7,11 +7,11 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/reference/standard-service/internal/docsite"
 	"github.com/spcent/plumego/reference/standard-service/internal/handler"
 	"github.com/spcent/plumego/x/frontend"
+	opshealth "github.com/spcent/plumego/x/ops/healthhttp"
 )
 
 // RegisterRoutes wires all HTTP routes for the reference application.
@@ -84,8 +84,8 @@ func (a *App) registerStatic() error {
 }
 
 func (a *App) registerHealth() {
-	a.Core.Get("/health/ready", health.ReadinessHandler(a.Health).ServeHTTP)
-	a.Core.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+	a.Core.Get("/health/ready", opshealth.ReadinessHandler(a.Health).ServeHTTP)
+	a.Core.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 }
 
 func (a *App) registerAPI() {

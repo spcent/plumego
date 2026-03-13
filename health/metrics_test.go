@@ -2,7 +2,6 @@ package health
 
 import (
 	"context"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -271,72 +270,5 @@ func TestGenerateReport(t *testing.T) {
 
 	if report.Metrics.CheckCount != 2 {
 		t.Fatalf("expected 2 checks in metrics, got %d", report.Metrics.CheckCount)
-	}
-}
-
-func TestMetricsHandler(t *testing.T) {
-	config := HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := NewHealthManager(config)
-	if err != nil {
-		t.Fatalf("failed to create manager: %v", err)
-	}
-	collector := NewMetricsTracker(manager)
-
-	// Add some test data
-	collector.RecordCheck("test", time.Millisecond, true, StatusHealthy)
-
-	req := httptest.NewRequest("GET", "/metrics", nil)
-	rr := httptest.NewRecorder()
-
-	MetricsHandler(collector).ServeHTTP(rr, req)
-
-	if rr.Code != 200 {
-		t.Fatalf("expected status 200, got %d", rr.Code)
-	}
-
-	if contentType := rr.Header().Get("Content-Type"); contentType != "application/json" {
-		t.Fatalf("expected content type application/json, got %s", contentType)
-	}
-}
-
-func TestHealthReportHandler(t *testing.T) {
-	config := HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := NewHealthManager(config)
-	if err != nil {
-		t.Fatalf("failed to create manager: %v", err)
-	}
-	collector := NewMetricsTracker(manager)
-
-	// Register a healthy component
-	mock := &MockChecker{name: "healthy", healthy: true}
-	manager.RegisterComponent(mock)
-
-	// Add some metrics
-	collector.RecordCheck("healthy", time.Millisecond, true, StatusHealthy)
-
-	// Trigger a health check to update the overall status
-	ctx := context.Background()
-	manager.CheckAllComponents(ctx)
-
-	req := httptest.NewRequest("GET", "/health/report", nil)
-	rr := httptest.NewRecorder()
-
-	HealthReportHandler(collector).ServeHTTP(rr, req)
-
-	// Check if we get 200 or 503 based on the actual health status
-	if rr.Code != 200 && rr.Code != 503 {
-		t.Fatalf("expected status 200 or 503, got %d", rr.Code)
-	}
-
-	if contentType := rr.Header().Get("Content-Type"); contentType != "application/json" {
-		t.Fatalf("expected content type application/json, got %s", contentType)
 	}
 }

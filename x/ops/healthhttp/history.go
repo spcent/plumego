@@ -1,4 +1,4 @@
-package health
+package healthhttp
 
 import (
 	"encoding/csv"
@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/health"
 )
 
 // HealthHistoryHandler creates a handler that returns health check history.
-func HealthHistoryHandler(manager HealthManager) http.Handler {
+func HealthHistoryHandler(manager health.HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -22,7 +23,7 @@ func HealthHistoryHandler(manager HealthManager) http.Handler {
 }
 
 // HealthHistoryExportHandler creates a handler that exports health check history in various formats.
-func HealthHistoryExportHandler(manager HealthManager) http.Handler {
+func HealthHistoryExportHandler(manager health.HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -63,7 +64,7 @@ func HealthHistoryExportHandler(manager HealthManager) http.Handler {
 }
 
 // HealthHistoryStatsHandler returns statistics about health history.
-func HealthHistoryStatsHandler(manager HealthManager) http.Handler {
+func HealthHistoryStatsHandler(manager health.HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -73,9 +74,8 @@ func HealthHistoryStatsHandler(manager HealthManager) http.Handler {
 	})
 }
 
-// parseHistoryQuery parses query parameters from the request into a HealthHistoryQuery.
-func parseHistoryQuery(r *http.Request) (HealthHistoryQuery, error) {
-	q := HealthHistoryQuery{}
+func parseHistoryQuery(r *http.Request) (health.HealthHistoryQuery, error) {
+	q := health.HealthHistoryQuery{}
 	params := r.URL.Query()
 
 	if s := params.Get("start_time"); s != "" {
@@ -93,7 +93,7 @@ func parseHistoryQuery(r *http.Request) (HealthHistoryQuery, error) {
 	}
 
 	if s := params.Get("state"); s != "" {
-		state := HealthState(s)
+		state := health.HealthState(s)
 		if !isValidHealthState(state) {
 			return q, &invalidParamError{param: "state", msg: "valid states: healthy, degraded, unhealthy"}
 		}
@@ -119,7 +119,6 @@ func parseHistoryQuery(r *http.Request) (HealthHistoryQuery, error) {
 	return q, nil
 }
 
-// invalidParamError is a simple error type for query parameter validation.
 type invalidParamError struct {
 	param string
 	msg   string
@@ -129,13 +128,11 @@ func (e *invalidParamError) Error() string {
 	return e.param + ": " + e.msg
 }
 
-// writeHistoryCSV exports health history entries to CSV format.
-func writeHistoryCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
+func writeHistoryCSV(w http.ResponseWriter, entries []health.HealthHistoryEntry) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
 
 	writer := csv.NewWriter(w)
-
 	_ = writer.Write([]string{"Timestamp", "State", "Message", "Components", "Duration"})
 
 	for _, entry := range entries {
@@ -151,5 +148,14 @@ func writeHistoryCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 	writer.Flush()
 	if err := writer.Error(); err != nil {
 		http.Error(w, "failed to write CSV", http.StatusInternalServerError)
+	}
+}
+
+func isValidHealthState(state health.HealthState) bool {
+	switch state {
+	case health.StatusHealthy, health.StatusDegraded, health.StatusUnhealthy:
+		return true
+	default:
+		return false
 	}
 }

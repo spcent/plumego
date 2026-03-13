@@ -418,7 +418,7 @@ go run ./reference/standard-service
 ```
 
 ## Health Endpoints
-The `health` package now exposes HTTP handlers, eliminating the need to implement ready/build info checks yourself:
+HTTP probe and diagnostics handlers now live in `x/ops/healthhttp`, while `health` stays focused on managers, state, and check primitives:
 
 ```go
 healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
@@ -427,12 +427,25 @@ if err != nil {
 }
 
 app := core.New(core.WithHealthManager(healthManager))
-app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
-app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 ```
 
-`ReadinessHandler` returns readiness from the provided `HealthManager` (200 when ready, otherwise 503). When the manager is attached via `core.WithHealthManager`, the core lifecycle updates readiness automatically.
+```go
+import (
+    "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/health"
+    opshealth "github.com/spcent/plumego/x/ops/healthhttp"
+)
+
+app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
+```
+
+`opshealth.ReadinessHandler` returns readiness from the provided `HealthManager` (200 when ready, otherwise 503). When the manager is attached via `core.WithHealthManager`, the core lifecycle updates readiness automatically.
 
 ## Observability Adapters
 No need to write your own adapters to hook logging middleware into metrics/tracing backends:

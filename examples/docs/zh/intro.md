@@ -253,8 +253,8 @@ if err != nil {
 }
 
 app := core.New(core.WithHealthManager(healthManager))
-app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 ```
 
 ---

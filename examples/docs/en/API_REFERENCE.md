@@ -160,9 +160,9 @@ if err != nil {
 }
 
 app.Get("/metrics", exporter.Handler().ServeHTTP)
-app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
-app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 ```
 
 ## Deprecated patterns to avoid in v1 docs

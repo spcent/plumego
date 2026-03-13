@@ -1,4 +1,4 @@
-package protocol
+package protocolmw
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	contractproto "github.com/spcent/plumego/contract/protocol"
+	gatewayproto "github.com/spcent/plumego/x/gateway/protocol"
 )
 
 type stubProtocolRequest struct {
@@ -36,13 +36,10 @@ type stubAdapter struct {
 	lastBody string
 }
 
-func (a *stubAdapter) Name() string { return "stub" }
+func (a *stubAdapter) Name() string                             { return "stub" }
+func (a *stubAdapter) Handles(_ *gatewayproto.HTTPRequest) bool { return true }
 
-func (a *stubAdapter) Handles(_ *contractproto.HTTPRequest) bool {
-	return true
-}
-
-func (a *stubAdapter) Transform(_ context.Context, req *contractproto.HTTPRequest) (contractproto.Request, error) {
+func (a *stubAdapter) Transform(_ context.Context, req *gatewayproto.HTTPRequest) (gatewayproto.Request, error) {
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return nil, err
@@ -51,14 +48,14 @@ func (a *stubAdapter) Transform(_ context.Context, req *contractproto.HTTPReques
 	return &stubProtocolRequest{method: req.Method, body: body}, nil
 }
 
-func (a *stubAdapter) Execute(_ context.Context, req contractproto.Request) (contractproto.Response, error) {
+func (a *stubAdapter) Execute(_ context.Context, req gatewayproto.Request) (gatewayproto.Response, error) {
 	return &stubProtocolResponse{
 		status: http.StatusCreated,
 		body:   []byte("created:" + req.Method()),
 	}, nil
 }
 
-func (a *stubAdapter) Encode(_ context.Context, resp contractproto.Response, writer contractproto.ResponseWriter) error {
+func (a *stubAdapter) Encode(_ context.Context, resp gatewayproto.Response, writer gatewayproto.ResponseWriter) error {
 	writer.WriteHeader(resp.StatusCode())
 	body, err := io.ReadAll(resp.Body())
 	if err != nil {
@@ -181,7 +178,7 @@ func TestMiddlewareWithConfigReadBodyErrorUsesOnTransformError(t *testing.T) {
 
 func TestMiddlewareUsesRegisteredAdapter(t *testing.T) {
 	adapter := &stubAdapter{}
-	registry := contractproto.NewRegistry()
+	registry := gatewayproto.NewRegistry()
 	registry.Register(adapter)
 
 	nextCalled := false

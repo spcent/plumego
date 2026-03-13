@@ -93,7 +93,7 @@ func main() {
 - Middleware: register explicitly with `app.Use(...)`, group scope with `group.Use(...)`.
 - Contract helpers: `contract.WriteError`, `contract.WriteResponse`, `contract.AdaptCtxHandler`.
 - WebSocket: create an `x/websocket` component explicitly, then mount it with `app.MountComponent(...)`.
-- Health: `health.ReadinessHandler(manager)` and `health.BuildInfoHandler()`.
+- Health: `opshealth.ReadinessHandler(manager)` and `opshealth.BuildInfoHandler()`.
 
 ## Reference App
 `reference/standard-service` wires a production-like setup:

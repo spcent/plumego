@@ -2,7 +2,8 @@
 
 > **Package Path**: `github.com/spcent/plumego/health` | **Stability**: High | **Priority**: P1
 
-The `health` package provides explicit probe and diagnostics handlers plus a `HealthManager` for liveness, readiness, component checks, health history, and build/runtime diagnostics.
+The `health` package provides the `HealthManager`, readiness state, component checks, history, and build metadata primitives.
+HTTP probe and diagnostics handlers now live in `x/ops/healthhttp`.
 
 ## Canonical Quick Start
 
@@ -19,6 +20,7 @@ import (
 
     "github.com/spcent/plumego/core"
     "github.com/spcent/plumego/health"
+    opshealth "github.com/spcent/plumego/x/ops/healthhttp"
 )
 
 func main() {
@@ -33,19 +35,19 @@ func main() {
         core.WithHealthManager(manager),
     )
 
-    if err := app.Router().AddRoute(http.MethodGet, "/health/live", health.LiveHandler()); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/health/live", opshealth.LiveHandler()); err != nil {
         log.Fatal(err)
     }
-    if err := app.Router().AddRoute(http.MethodGet, "/health/ready", health.ReadinessHandler(manager)); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/health/ready", opshealth.ReadinessHandler(manager)); err != nil {
         log.Fatal(err)
     }
-    if err := app.Router().AddRoute(http.MethodGet, "/health", health.SummaryHandler(manager)); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/health", opshealth.SummaryHandler(manager)); err != nil {
         log.Fatal(err)
     }
-    if err := app.Router().AddRoute(http.MethodGet, "/health/build", health.BuildInfoHandler()); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/health/build", opshealth.BuildInfoHandler()); err != nil {
         log.Fatal(err)
     }
-    if err := app.Router().AddRoute(http.MethodGet, "/health/runtime", health.RuntimeInfoHandler()); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/health/runtime", opshealth.RuntimeInfoHandler()); err != nil {
         log.Fatal(err)
     }
 
@@ -78,27 +80,29 @@ func main() {
 }
 ```
 
-## Handler Matrix
+## HTTP Handler Matrix
 
-- `health.LiveHandler()`
+Handlers are extension-owned in `github.com/spcent/plumego/x/ops/healthhttp`.
+
+- `opshealth.LiveHandler()`
   Returns `200` with `alive` body.
-- `health.ReadinessHandler(manager)`
+- `opshealth.ReadinessHandler(manager)`
   Returns `200` when `manager.Readiness().Ready` is true, otherwise `503`.
-- `health.ReadinessHandlerWithManager(manager)`
+- `opshealth.ReadinessHandlerWithManager(manager)`
   Recomputes component health and derives readiness from aggregate status.
-- `health.SummaryHandler(manager)`
+- `opshealth.SummaryHandler(manager)`
   Returns aggregate component health only.
-- `health.DetailedHandler(manager)`
+- `opshealth.DetailedHandler(manager)`
   Returns aggregate health plus build metadata.
-- `health.HealthHandler(manager, debug)`
+- `opshealth.HealthHandler(manager, debug)`
   Legacy convenience wrapper around `DetailedHandler` / runtime-inclusive diagnostics.
-- `health.BuildInfoHandler()`
+- `opshealth.BuildInfoHandler()`
   Returns version, commit, and build time metadata.
-- `health.RuntimeInfoHandler()`
+- `opshealth.RuntimeInfoHandler()`
   Returns Go runtime diagnostics only.
-- `health.ComponentHealthHandler(manager, name)`
+- `opshealth.ComponentHealthHandler(manager, name)`
   Returns the latest status for a single component.
-- `health.AllComponentsHealthHandler(manager)`
+- `opshealth.AllComponentsHealthHandler(manager)`
   Returns the current health map for all registered components.
 
 ## Registering Component Checks

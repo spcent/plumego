@@ -9,7 +9,6 @@
 - 结构化错误 `APIError`
 - 请求绑定与校验辅助
 - 流式输出（NDJSON / text / SSE）
-- 协议适配契约（`contract/protocol`）
 
 ## 主要类型
 
@@ -36,4 +35,4 @@
 - [errors.md](errors.md)
 - [response.md](response.md)
 - [request.md](request.md)
-- [protocol/README.md](protocol/README.md)
+- [x-gateway/protocol.md](../x-gateway/protocol.md)

@@ -42,6 +42,9 @@ This page is the canonical entry for module docs.
 
 - [x/tenant](x-tenant/README.md): target multi-tenant extension boundary
 - [x/ai](x-ai/README.md): AI gateway capabilities
+- [x/gateway](x-gateway/README.md): gateway transport and protocol extensions
+- [x/ops](x-ops/README.md): protected diagnostics and operations HTTP surfaces
+- [x/data](x-data/README.md): data topology extensions beyond the stable store layer
 - [x/webhook](x-webhook/README.md): webhook ingress/egress extension surface
 - [x/websocket](x-websocket/README.md): websocket extension surface
 

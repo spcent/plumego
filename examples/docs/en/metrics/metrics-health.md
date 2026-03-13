@@ -38,13 +38,13 @@ if err != nil {
 }
 
 app := core.New(core.WithHealthManager(healthManager))
-app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
-app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 ```
 
-- `ReadinessHandler`: returns readiness from `healthManager` (`200` when ready, `503` when not ready).
-- `BuildInfoHandler`: returns build metadata JSON (`version`, `commit`, `build_time`).
+- `opshealth.ReadinessHandler`: returns readiness from `healthManager` (`200` when ready, `503` when not ready).
+- `opshealth.BuildInfoHandler`: returns build metadata JSON (`version`, `commit`, `build_time`).
 
 ## Component health reporting
 ```go

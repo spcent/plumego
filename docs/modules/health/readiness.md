@@ -19,6 +19,7 @@ import (
 
     "github.com/spcent/plumego/core"
     "github.com/spcent/plumego/health"
+    opshealth "github.com/spcent/plumego/x/ops/healthhttp"
 )
 
 func main() {
@@ -33,10 +34,10 @@ func main() {
         core.WithHealthManager(manager),
     )
 
-    if err := app.Router().AddRoute(http.MethodGet, "/health/ready", health.ReadinessHandler(manager)); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/health/ready", opshealth.ReadinessHandler(manager)); err != nil {
         log.Fatal(err)
     }
-    if err := app.Router().AddRoute(http.MethodGet, "/health/ready-checks", health.ReadinessHandlerWithManager(manager)); err != nil {
+    if err := app.Router().AddRoute(http.MethodGet, "/health/ready-checks", opshealth.ReadinessHandlerWithManager(manager)); err != nil {
         log.Fatal(err)
     }
 
@@ -71,12 +72,12 @@ func main() {
 
 ## Semantics
 
-`health.ReadinessHandler(manager)`:
+`opshealth.ReadinessHandler(manager)`:
 
 - returns `200` when `manager.Readiness().Ready == true`
 - returns `503` when readiness is false
 
-`health.ReadinessHandlerWithManager(manager)`:
+`opshealth.ReadinessHandlerWithManager(manager)`:
 
 - runs `CheckAllComponents(...)`
 - returns `200` for aggregate `healthy` or `degraded`

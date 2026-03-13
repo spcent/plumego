@@ -92,7 +92,7 @@ func main() {
 - 中间件：`app.Use(...)` 显式注册；`group.Use(...)` 做分组级控制。
 - Contract：`contract.WriteError`、`contract.WriteResponse`、`contract.AdaptCtxHandler`。
 - WebSocket：显式创建 `x/websocket` 组件，再通过 `app.MountComponent(...)` 挂载。
-- 健康检查：`health.ReadinessHandler(manager)` 与 `health.BuildInfoHandler()`。
+- 健康检查：`opshealth.ReadinessHandler(manager)` 与 `opshealth.BuildInfoHandler()`。
 
 ## 参考应用
 `reference/standard-service` 提供接近生产的组合示例：

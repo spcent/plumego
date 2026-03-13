@@ -1,30 +1,4 @@
-// Package protocol provides middleware for protocol gateway functionality
-//
-// This middleware enables plumego to act as a gateway for different protocols
-// (gRPC, GraphQL, etc.) without adding dependencies to the core.
-//
-// Users register protocol adapters that implement the ProtocolAdapter interface,
-// and the middleware routes requests to the appropriate adapter.
-//
-// Example usage:
-//
-//	import (
-//		"github.com/spcent/plumego/contract/protocol"
-//		protomw "github.com/spcent/plumego/middleware/protocol"
-//	)
-//
-//	// User implements adapter using their chosen library
-//	grpcAdapter := NewMyGRPCAdapter()
-//	graphqlAdapter := NewMyGraphQLAdapter()
-//
-//	// Register adapters
-//	registry := protocol.NewRegistry()
-//	registry.Register(grpcAdapter)
-//	registry.Register(graphqlAdapter)
-//
-//	// Use middleware
-//	app.Use(protomw.Middleware(registry))
-package protocol
+package protocolmw
 
 import (
 	"bytes"
@@ -32,16 +6,15 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/contract/protocol"
 	mw "github.com/spcent/plumego/middleware"
+	gatewayproto "github.com/spcent/plumego/x/gateway/protocol"
 )
 
-// Middleware creates a protocol gateway middleware
-func Middleware(registry *protocol.Registry) func(http.Handler) http.Handler {
+// Middleware creates protocol gateway middleware.
+func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Convert http.Request to HTTPRequest
-			httpReq := &protocol.HTTPRequest{
+			httpReq := &gatewayproto.HTTPRequest{
 				Method:   r.Method,
 				URL:      r.URL.String(),
 				Headers:  convertHeaders(r.Header),
@@ -49,35 +22,29 @@ func Middleware(registry *protocol.Registry) func(http.Handler) http.Handler {
 				Metadata: make(map[string]any),
 			}
 
-			// Try to find adapter
 			adapter := findAdapter(registry, httpReq)
 			if adapter == nil {
-				// No adapter found, pass through to next handler
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Transform request
 			req, err := adapter.Transform(r.Context(), httpReq)
 			if err != nil {
 				mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
 				return
 			}
 
-			// Execute protocol request
 			resp, err := adapter.Execute(r.Context(), req)
 			if err != nil {
 				mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 
-			// Create response writer wrapper
 			respWriter := &responseWriter{
 				ResponseWriter: w,
 				headers:        make(map[string][]string),
 			}
 
-			// Encode response
 			if err := adapter.Encode(r.Context(), resp, respWriter); err != nil {
 				mw.WriteTransportError(w, r, http.StatusInternalServerError, mw.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
@@ -86,20 +53,16 @@ func Middleware(registry *protocol.Registry) func(http.Handler) http.Handler {
 	}
 }
 
-// responseWriter wraps http.ResponseWriter to implement protocol.ResponseWriter
 type responseWriter struct {
 	http.ResponseWriter
 	headers map[string][]string
 	written bool
 }
 
-func (w *responseWriter) Header() map[string][]string {
-	return w.headers
-}
+func (w *responseWriter) Header() map[string][]string { return w.headers }
 
 func (w *responseWriter) Write(b []byte) (int, error) {
 	if !w.written {
-		// Copy headers to underlying writer before first write
 		for key, values := range w.headers {
 			for _, value := range values {
 				w.ResponseWriter.Header().Add(key, value)
@@ -112,7 +75,6 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 
 func (w *responseWriter) WriteHeader(statusCode int) {
 	if !w.written {
-		// Copy headers to underlying writer
 		for key, values := range w.headers {
 			for _, value := range values {
 				w.ResponseWriter.Header().Add(key, value)
@@ -123,14 +85,13 @@ func (w *responseWriter) WriteHeader(statusCode int) {
 	}
 }
 
-func findAdapter(registry *protocol.Registry, req *protocol.HTTPRequest) protocol.ProtocolAdapter {
+func findAdapter(registry *gatewayproto.Registry, req *gatewayproto.HTTPRequest) gatewayproto.ProtocolAdapter {
 	if registry == nil {
 		return nil
 	}
 	return registry.Find(req)
 }
 
-// convertHeaders converts http.Header to map[string][]string
 func convertHeaders(h http.Header) map[string][]string {
 	headers := make(map[string][]string)
 	for key, values := range h {
@@ -139,30 +100,19 @@ func convertHeaders(h http.Header) map[string][]string {
 	return headers
 }
 
-// Config holds protocol middleware configuration
+// Config holds protocol middleware configuration.
 type Config struct {
-	// Registry holds registered protocol adapters
-	Registry *protocol.Registry
-
-	// OnAdapterNotFound is called when no adapter is found
-	// If nil, request passes through to next handler
+	Registry          *gatewayproto.Registry
 	OnAdapterNotFound func(w http.ResponseWriter, r *http.Request)
-
-	// OnTransformError is called when transformation fails
-	OnTransformError func(w http.ResponseWriter, r *http.Request, err error)
-
-	// OnExecuteError is called when execution fails
-	OnExecuteError func(w http.ResponseWriter, r *http.Request, err error)
-
-	// OnEncodeError is called when encoding fails
-	OnEncodeError func(w http.ResponseWriter, r *http.Request, err error)
+	OnTransformError  func(w http.ResponseWriter, r *http.Request, err error)
+	OnExecuteError    func(w http.ResponseWriter, r *http.Request, err error)
+	OnEncodeError     func(w http.ResponseWriter, r *http.Request, err error)
 }
 
-// MiddlewareWithConfig creates a protocol gateway middleware with configuration
+// MiddlewareWithConfig creates protocol gateway middleware with configuration.
 func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Convert http.Request to HTTPRequest
 			bodyReader := r.Body
 			if bodyReader == nil {
 				bodyReader = http.NoBody
@@ -176,9 +126,9 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 				mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeProtocolTransformFail, "protocol request read failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
 				return
 			}
-			r.Body = io.NopCloser(bytes.NewReader(body)) // Restore for potential passthrough
+			r.Body = io.NopCloser(bytes.NewReader(body))
 
-			httpReq := &protocol.HTTPRequest{
+			httpReq := &gatewayproto.HTTPRequest{
 				Method:   r.Method,
 				URL:      r.URL.String(),
 				Headers:  convertHeaders(r.Header),
@@ -186,19 +136,16 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 				Metadata: make(map[string]any),
 			}
 
-			// Try to find adapter
 			adapter := findAdapter(config.Registry, httpReq)
 			if adapter == nil {
 				if config.OnAdapterNotFound != nil {
 					config.OnAdapterNotFound(w, r)
 					return
 				}
-				// Pass through to next handler
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Transform request
 			req, err := adapter.Transform(r.Context(), httpReq)
 			if err != nil {
 				if config.OnTransformError != nil {
@@ -209,7 +156,6 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Execute protocol request
 			resp, err := adapter.Execute(r.Context(), req)
 			if err != nil {
 				if config.OnExecuteError != nil {
@@ -220,13 +166,11 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Create response writer wrapper
 			respWriter := &responseWriter{
 				ResponseWriter: w,
 				headers:        make(map[string][]string),
 			}
 
-			// Encode response
 			if err := adapter.Encode(r.Context(), resp, respWriter); err != nil {
 				if config.OnEncodeError != nil {
 					config.OnEncodeError(w, r, err)

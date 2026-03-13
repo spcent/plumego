@@ -1,13 +1,13 @@
 # Liveness Probes
 
-> **Package**: `github.com/spcent/plumego/health` | **Purpose**: Detect whether process is alive
+> **Package**: `github.com/spcent/plumego/x/ops/healthhttp` | **Purpose**: Detect whether process is alive
 
 `LiveHandler` is intentionally simple: if the process can serve HTTP, liveness is `OK`.
 
 ## Canonical Usage
 
 ```go
-app.Get("/health/live", health.LiveHandler().ServeHTTP)
+app.Get("/health/live", opshealth.LiveHandler().ServeHTTP)
 ```
 
 Behavior:

@@ -1,23 +1,17 @@
-package health
+package healthhttp
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/spcent/plumego/contract"
-)
-
-const (
-	healthHandlerTimeout       = 10 * time.Second
-	componentHealthTimeout     = 5 * time.Second
-	allComponentsHealthTimeout = 15 * time.Second
+	"github.com/spcent/plumego/health"
 )
 
 // HealthResponse is the JSON body for the main health endpoint.
 type HealthResponse struct {
-	HealthStatus
-	BuildInfo BuildInfo    `json:"build_info,omitempty"`
-	Runtime   *RuntimeInfo `json:"runtime,omitempty"`
+	health.HealthStatus
+	BuildInfo health.BuildInfo `json:"build_info,omitempty"`
+	Runtime   *RuntimeInfo     `json:"runtime,omitempty"`
 }
 
 // ComponentsListResponse is the JSON body for the component list endpoint.
@@ -27,29 +21,7 @@ type ComponentsListResponse struct {
 }
 
 // SummaryHandler returns aggregate component health only.
-func SummaryHandler(manager HealthManager) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if manager == nil {
-			contract.WriteError(w, r, contract.APIError{
-				Status:   http.StatusServiceUnavailable,
-				Code:     "HEALTH_MANAGER_UNAVAILABLE",
-				Message:  "health manager is not configured",
-				Category: contract.CategoryForStatus(http.StatusServiceUnavailable),
-			})
-			return
-		}
-
-		ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
-		defer cancel()
-
-		health := manager.CheckAllComponents(ctx)
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, httpStatusForHealth(health.Status), health)
-	})
-}
-
-// DetailedHandler returns aggregate health plus build metadata.
-func DetailedHandler(manager HealthManager) http.Handler {
+func SummaryHandler(manager health.HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -58,23 +30,40 @@ func DetailedHandler(manager HealthManager) http.Handler {
 		ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
 		defer cancel()
 
-		health := manager.CheckAllComponents(ctx)
+		status := manager.CheckAllComponents(ctx)
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		_ = contract.WriteJSON(w, httpStatusForHealth(status.Status), status)
+	})
+}
+
+// DetailedHandler returns aggregate health plus build metadata.
+func DetailedHandler(manager health.HealthManager) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !requireManager(manager, w, r) {
+			return
+		}
+
+		ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
+		defer cancel()
+
+		status := manager.CheckAllComponents(ctx)
 		resp := HealthResponse{
-			HealthStatus: health,
-			BuildInfo:    GetBuildInfo(),
+			HealthStatus: status,
+			BuildInfo:    health.GetBuildInfo(),
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, httpStatusForHealth(health.Status), resp)
+		_ = contract.WriteJSON(w, httpStatusForHealth(status.Status), resp)
 	})
 }
 
 // HealthHandler creates a comprehensive health check handler.
 // Pass debug=true to include runtime diagnostics in the response.
-func HealthHandler(manager HealthManager, debug bool) http.Handler {
+func HealthHandler(manager health.HealthManager, debug bool) http.Handler {
 	if !debug {
 		return DetailedHandler(manager)
 	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -83,20 +72,20 @@ func HealthHandler(manager HealthManager, debug bool) http.Handler {
 		ctx, cancel := withCheckTimeout(r.Context(), healthHandlerTimeout)
 		defer cancel()
 
-		health := manager.CheckAllComponents(ctx)
+		status := manager.CheckAllComponents(ctx)
 		resp := HealthResponse{
-			HealthStatus: health,
-			BuildInfo:    GetBuildInfo(),
+			HealthStatus: status,
+			BuildInfo:    health.GetBuildInfo(),
 			Runtime:      getRuntimeInfo(),
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, httpStatusForHealth(health.Status), resp)
+		_ = contract.WriteJSON(w, httpStatusForHealth(status.Status), resp)
 	})
 }
 
 // ComponentHealthHandler creates a handler for checking a specific component's health.
-func ComponentHealthHandler(manager HealthManager, componentName string) http.Handler {
+func ComponentHealthHandler(manager health.HealthManager, componentName string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -107,7 +96,7 @@ func ComponentHealthHandler(manager HealthManager, componentName string) http.Ha
 
 		_ = manager.CheckComponent(ctx, componentName)
 
-		health, exists := manager.GetComponentHealth(componentName)
+		componentHealth, exists := manager.GetComponentHealth(componentName)
 		if !exists {
 			contract.WriteError(w, r, contract.APIError{
 				Status:   http.StatusNotFound,
@@ -118,12 +107,12 @@ func ComponentHealthHandler(manager HealthManager, componentName string) http.Ha
 			return
 		}
 
-		_ = contract.WriteJSON(w, httpStatusForHealth(health.Status), health)
+		_ = contract.WriteJSON(w, httpStatusForHealth(componentHealth.Status), componentHealth)
 	})
 }
 
 // AllComponentsHealthHandler creates a handler for checking all components' health.
-func AllComponentsHealthHandler(manager HealthManager) http.Handler {
+func AllComponentsHealthHandler(manager health.HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -146,7 +135,7 @@ func LiveHandler() http.Handler {
 }
 
 // ComponentsListHandler creates a handler that lists all registered components.
-func ComponentsListHandler(manager HealthManager) http.Handler {
+func ComponentsListHandler(manager health.HealthManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return

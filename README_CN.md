@@ -415,7 +415,7 @@ go run ./reference/standard-service
 ```
 
 ## 健康端点
-`health` 包现在暴露 HTTP 处理程序，无需自行实现就绪/构建信息检查：
+HTTP 探针和诊断处理程序现在位于 `x/ops/healthhttp`，`health` 则继续只负责 manager、状态与检查原语：
 
 ```go
 healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
@@ -424,12 +424,25 @@ if err != nil {
 }
 
 app := core.New(core.WithHealthManager(healthManager))
-app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
-app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 ```
 
-`ReadinessHandler` 会返回传入 `HealthManager` 的就绪状态（ready 为 true 时返回 200，否则 503）。当通过 `core.WithHealthManager` 挂载后，core 生命周期会自动更新 ready/not-ready 状态。
+```go
+import (
+    "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/health"
+    opshealth "github.com/spcent/plumego/x/ops/healthhttp"
+)
+
+app := core.New(core.WithHealthManager(healthManager))
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
+```
+
+`opshealth.ReadinessHandler` 会返回传入 `HealthManager` 的就绪状态（ready 为 true 时返回 200，否则 503）。当通过 `core.WithHealthManager` 挂载后，core 生命周期会自动更新 ready/not-ready 状态。
 
 ## 可观测性适配器
 无需自行编写适配器，即可将日志中间件接入指标/链路追踪后端：

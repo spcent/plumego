@@ -38,13 +38,13 @@ if err != nil {
 }
 
 app := core.New(core.WithHealthManager(healthManager))
-app.Get("/health", health.SummaryHandler(healthManager).ServeHTTP)
-app.Get("/health/ready", health.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health/build", health.BuildInfoHandler().ServeHTTP)
+app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
+app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
+app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 ```
 
-- `ReadinessHandler`：返回 `healthManager` 当前状态（ready=true 返回 `200`，否则 `503`）。
-- `BuildInfoHandler`：返回构建信息 JSON（`version`、`commit`、`build_time`）。
+- `opshealth.ReadinessHandler`：返回 `healthManager` 当前状态（ready=true 返回 `200`，否则 `503`）。
+- `opshealth.BuildInfoHandler`：返回构建信息 JSON（`version`、`commit`、`build_time`）。
 
 ## 组件健康上报
 ```go

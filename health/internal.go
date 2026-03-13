@@ -4,10 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
-
-	"github.com/spcent/plumego/contract"
 )
 
 var errManagerClosed = errors.New("manager is closed")
@@ -110,33 +107,6 @@ func sleepWithContext(ctx context.Context, delay time.Duration) bool {
 type componentCheckResult struct {
 	Name  string
 	Error error
-}
-
-// requireManager checks that the manager is not nil and writes an error response if it is.
-// Returns true if the manager is available.
-func requireManager(manager HealthManager, w http.ResponseWriter, r *http.Request) bool {
-	if manager == nil {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusServiceUnavailable,
-			Code:     "HEALTH_MANAGER_UNAVAILABLE",
-			Message:  "health manager is not configured",
-			Category: contract.CategoryForStatus(http.StatusServiceUnavailable),
-		})
-		return false
-	}
-	return true
-}
-
-// httpStatusForHealth maps a HealthState to the appropriate HTTP status code.
-func httpStatusForHealth(state HealthState) int {
-	switch state {
-	case StatusUnhealthy:
-		return http.StatusServiceUnavailable
-	case StatusDegraded:
-		return http.StatusPartialContent
-	default:
-		return http.StatusOK
-	}
 }
 
 // copyComponentHealth returns a shallow copy of ComponentHealth with a cloned Details map.
