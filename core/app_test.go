@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,57 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
-
-type stubComponent struct {
-	BaseComponent
-	path           string
-	middlewareName string
-	started        bool
-	stopped        bool
-	startErr       error
-}
-
-func (s *stubComponent) RegisterRoutes(r *router.Router) {
-	if s.path == "" {
-		s.path = "/stub"
-	}
-
-	r.Get(s.path, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	}))
-}
-
-func (s *stubComponent) RegisterMiddleware(reg *middleware.Registry) {
-	if s.middlewareName == "" {
-		return
-	}
-
-	reg.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Component", s.middlewareName)
-			next.ServeHTTP(w, r)
-		})
-	})
-}
-
-func (s *stubComponent) Start(_ context.Context) error {
-	s.started = true
-	return s.startErr
-}
-
-func (s *stubComponent) Stop(_ context.Context) error {
-	s.stopped = true
-	return nil
-}
-
-func (s *stubComponent) Health() (string, health.HealthStatus) {
-	return "stub", health.HealthStatus{Status: health.StatusHealthy, Details: map[string]any{"started": s.started, "stopped": s.stopped}}
-}
 
 func TestNewDefaults(t *testing.T) {
 	app := New()
@@ -267,55 +217,10 @@ func TestUseAfterStartPanics(t *testing.T) {
 	}
 }
 
-func TestComponentRegistrationAndMiddleware(t *testing.T) {
-	app := New(WithComponent(&stubComponent{path: "/component", middlewareName: "stub"}))
-
-	comps := app.mountComponents()
-	if len(comps) == 0 {
-		t.Fatalf("expected mounted components")
-	}
-
-	if err := app.setupServer(); err != nil {
-		t.Fatalf("setupServer returned error: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/component", nil)
-	resp := httptest.NewRecorder()
-
-	app.handler.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.Code)
-	}
-	if resp.Header().Get("X-Component") != "stub" {
-		t.Fatalf("expected middleware header from component")
-	}
+type funcRunner struct {
+	start func(context.Context) error
+	stop  func(context.Context) error
 }
 
-func TestStartComponentsStopsOnError(t *testing.T) {
-	good := &stubComponent{}
-	bad := &stubComponent{startErr: fmt.Errorf("boom")}
-
-	app := New()
-	err := app.startComponents(context.Background(), []Component{good, bad})
-	if err == nil {
-		t.Fatalf("expected error from component start")
-	}
-
-	if !good.started || !good.stopped {
-		t.Fatalf("expected successful component to be stopped after failure")
-	}
-}
-
-func TestMountComponent(t *testing.T) {
-	app := New()
-
-	if err := app.MountComponent(&stubComponent{path: "/mounted"}); err != nil {
-		t.Fatalf("mount component: %v", err)
-	}
-
-	comps := app.mountComponents()
-	if len(comps) != 1 {
-		t.Fatalf("expected 1 mounted component, got %d", len(comps))
-	}
-}
+func (f funcRunner) Start(ctx context.Context) error { return f.start(ctx) }
+func (f funcRunner) Stop(ctx context.Context) error  { return f.stop(ctx) }

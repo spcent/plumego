@@ -435,24 +435,15 @@ go test -race ./store/file/...
 
 ## Integration with Plumego
 
-### Component Registration
+### Explicit Route Registration
 ```go
-type FileStorageComponent struct {
-    storage  file.Storage
-    metadata file.MetadataManager
-    handler  *file.Handler
-}
+app := core.New()
 
-func (c *FileStorageComponent) RegisterRoutes(r *router.Router) {
-    r.HandleFunc("POST /api/files", c.handler.Upload)
-    r.HandleFunc("GET /api/files/{id}", c.handler.Download)
-    // ... other routes
-}
+fileHandler := file.NewHandler(storage, metadata)
 
-// Register with app
-app := core.New(
-    core.WithComponent(&FileStorageComponent{...}),
-)
+app.Post("/api/files", fileHandler.Upload)
+app.Get("/api/files/:id", fileHandler.Download)
+app.Get("/api/files/:id/info", fileHandler.Info)
 ```
 
 ### Middleware Integration

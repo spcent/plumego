@@ -3,12 +3,11 @@ path: x/webhook
 layer: extension
 status: experimental
 owner: integration
-summary: Webhook ingress, egress, and bridge components for explicit extension mounting.
+summary: Webhook ingress, egress, and bridge primitives within the broader messaging extension family.
 
 responsibilities:
   - Inbound webhook verification helpers
   - Outbound webhook delivery service aliases
-  - Webhook component mounting
   - PubSub-to-webhook bridge wiring
 
 non_goals:
@@ -16,10 +15,9 @@ non_goals:
   - Generic messaging abstractions
   - Stable root-package entrypoints
   - Business-specific webhook workflows
+  - Canonical family discovery for general messaging work
 
 public_entrypoints:
-  - NewWebhookInComponent
-  - NewWebhookOutComponent
   - NewService
   - NewMemStore
   - VerifyHMAC
@@ -58,6 +56,6 @@ review_checklist:
   - Keep app-level mounting explicit
 
 agent_hints:
-  - Use x/webhook for app-facing imports
-  - The implementation now lives directly in x/webhook
-  - Keep transport concerns inside the component layer
+  - Start new messaging feature discovery in x/messaging before opening x/webhook
+  - Open x/webhook directly only for narrow inbound verification or outbound delivery work
+  - Keep transport concerns explicit and local to the webhook layer

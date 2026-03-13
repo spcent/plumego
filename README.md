@@ -28,6 +28,7 @@ Machine-enforced repo guardrails live under `internal/checks/*`. Historical exce
 For new application work, use a single canonical path:
 
 - read `reference/standard-service` first for structure and wiring
+- `reference/standard-service` intentionally depends only on stable root packages; treat `x/*` examples as non-canonical
 
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
@@ -37,11 +38,11 @@ For new application work, use a single canonical path:
 - **Idempotency Utilities**: Simple KV/SQL helpers for request deduplication via `store/idempotency`.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
-- **Optional Services**: Built-in authenticated WebSocket hub, in-process Pub/Sub (with debug snapshots), inbound/outbound webhook routers, and static frontend serving from disk or embedded resources.
+- **Optional Services**: WebSocket, webhook, pub/sub, frontend, and other capability packs live under `x/*` and are intentionally excluded from the canonical app path.
 - **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `scheduler` package.
 
-## Components
-`core.App` orchestrates through pluggable components instead of hardcoded functionality. Components can register routes, middleware, and lifecycle hooks:
+## Compatibility APIs
+`core.Component`, `core.Runner`, and shutdown-hook helpers are compatibility surfaces for legacy extension wrappers. They are not part of the canonical starting path for new application work.
 
 ```go
 type Component interface {
@@ -55,16 +56,15 @@ type Component interface {
 
 `HealthStatus` uses constrained values (`healthy`, `degraded`, `unhealthy`) to ensure components report health in a structured, type-safe way.
 
-Use `core.WithComponent` (or `WithComponents`) when constructing the app to add functionality. Built-in features (Webhook management, inbound Webhook receiver, PubSub debug, WebSocket utilities, frontend serving) can all be mounted as components, so examples can mix only the parts they need.
+For new code, wire routes, middleware, and background tasks explicitly in your application package instead of registering them through `core`.
 
 ## Quick Start
-Create a small `main.go`, wire routes and middleware, then start the server:
+Create a small `main.go`, wire routes and middleware explicitly, then start the server:
 
 ```go
 package main
 
 import (
-    "context"
     "log"
     "net/http"
 
@@ -72,47 +72,26 @@ import (
     plog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/requestid"
     "github.com/spcent/plumego/middleware/recovery"
-    xdevtools "github.com/spcent/plumego/x/devtools"
 )
 
 func main() {
     app := core.New(
         core.WithAddr(":8080"),
-        core.WithDebug(),
         core.WithLogger(plog.NewGLogger()),
     )
 
-    if err := app.MountComponent(xdevtools.NewAppComponent(app)); err != nil {
-        log.Fatalf("mount devtools: %v", err)
-    }
-
-    if err := app.Use(
+    app.Use(
         requestid.Middleware(),
         recovery.Recovery(app.Logger()),
-    ); err != nil {
-        log.Fatalf("register middleware: %v", err)
-    }
+    )
 
-    if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-        w.Write([]byte("pong"))
-    })); err != nil {
-        log.Fatalf("register route: %v", err)
-    }
+    app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write([]byte("pong"))
+    })
 
-    if err := app.Prepare(); err != nil {
-        log.Fatalf("prepare app: %v", err)
-    }
-    if err := app.Start(context.Background()); err != nil {
-        log.Fatalf("start runtime: %v", err)
-    }
-
-    srv, err := app.Server()
-    if err != nil {
-        log.Fatalf("build server: %v", err)
-    }
-    defer app.Shutdown(context.Background())
-
-    log.Fatal(srv.ListenAndServe())
+    log.Println("server started at :8080")
+    log.Fatal(http.ListenAndServe(":8080", app))
 }
 ```
 
@@ -149,7 +128,7 @@ func main() {
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - The app defaults to a 10485760 byte (10 MiB) request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5000ms (5s) graceful shutdown window. Override via `core.With...` options.
 - Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
-- Debug mode and devtools are separate. Use `core.WithDebug()` for debug behavior, then mount `x/devtools` explicitly with `app.MountComponent(xdevtools.NewAppComponent(app))` when you want debug routes.
+- Debug mode and devtools are separate. Use `core.WithDebug()` for debug behavior; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
 - Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.
 
 ## Key Components
@@ -397,7 +376,7 @@ protected := middleware.Apply(
 The `security/jwt` package provides adapters (`jwtManager.Authenticator`, `jwt.PolicyAuthorizer`, `jwt.PermissionAuthorizer`) that implement these contracts while keeping your own storage and policy engines decoupled.
 
 ## Reference App
-`reference/standard-service` is an out-of-the-box `main` package that integrates common components:
+`reference/standard-service` is the canonical minimal `main` package. It depends only on stable root packages and demonstrates explicit wiring instead of extension assembly:
 
 - Configured WebSocket hub with JWT keys and broadcast endpoint
 - Inbound GitHub/Stripe Webhooks, publishing to in-process Pub/Sub
@@ -447,7 +426,7 @@ No need to write your own adapters to hook logging middleware into metrics/traci
 - `metrics.NewPrometheusCollector(namespace)` implements `httpmetrics.Observer`; pair it with `metrics.NewPrometheusExporter(collector)` for `/metrics`.
 - `metrics.NewOpenTelemetryTracer(name)` implements `tracing.Tracer`, emitting spans with HTTP metadata.
 
-As shown in `reference/standard-service`, keep the concrete collector and tracer in your application wiring, pass the collector to `core.WithHTTPMetrics(...)`, and mount request metrics explicitly with `httpmetrics.Middleware(app.HTTPMetrics())`.
+For observability-heavy applications, keep the concrete collector and tracer in your application wiring, pass the collector to `core.WithHTTPMetrics(...)`, and mount request metrics explicitly with `httpmetrics.Middleware(app.HTTPMetrics())`.
 For narrower DI at module boundaries, prefer `metrics.HTTPObserver`, `metrics.MQObserver`, `metrics.DBObserver`, or `metrics.Recorder` instead of the full `metrics.AggregateCollector` when a call site only needs one capability.
 
 ## Configuration Reference

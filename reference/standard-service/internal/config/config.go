@@ -17,14 +17,6 @@ import (
 // Config holds all application configuration.
 type Config struct {
 	Core core.AppConfig
-
-	WebSocketSecret string
-	GitHubSecret    string
-	StripeSecret    string
-	WebhookToken    string
-	EnableDocs      bool
-	EnableMetrics   bool
-	EnableWebhooks  bool
 }
 
 // Defaults returns safe configuration values for local development.
@@ -35,13 +27,6 @@ func Defaults() Config {
 			EnvFile: ".env",
 			Debug:   false,
 		},
-		WebSocketSecret: "dev-secret",
-		GitHubSecret:    "dev-github-secret",
-		StripeSecret:    "whsec_dev",
-		WebhookToken:    "dev-trigger",
-		EnableDocs:      true,
-		EnableMetrics:   true,
-		EnableWebhooks:  true,
 	}
 }
 
@@ -82,14 +67,6 @@ func applyEnv(cfg *Config) error {
 	cfg.Core.Addr = manager.GetString("app_addr", cfg.Core.Addr)
 	cfg.Core.EnvFile = manager.GetString("app_env_file", cfg.Core.EnvFile)
 	cfg.Core.Debug = manager.GetBool("app_debug", cfg.Core.Debug)
-
-	cfg.WebSocketSecret = manager.GetString("ws_secret", cfg.WebSocketSecret)
-	cfg.GitHubSecret = manager.GetString("github_webhook_secret", cfg.GitHubSecret)
-	cfg.StripeSecret = manager.GetString("stripe_webhook_secret", cfg.StripeSecret)
-	cfg.WebhookToken = manager.GetString("webhook_trigger_token", cfg.WebhookToken)
-	cfg.EnableDocs = manager.GetBool("enable_docs", cfg.EnableDocs)
-	cfg.EnableMetrics = manager.GetBool("enable_metrics", cfg.EnableMetrics)
-	cfg.EnableWebhooks = manager.GetBool("enable_webhooks", cfg.EnableWebhooks)
 	return nil
 }
 
@@ -97,9 +74,6 @@ func applyFlags(cfg *Config) {
 	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
 	flag.StringVar(&cfg.Core.EnvFile, "env-file", cfg.Core.EnvFile, "path to .env file")
 	flag.BoolVar(&cfg.Core.Debug, "debug", cfg.Core.Debug, "enable debug mode")
-	flag.BoolVar(&cfg.EnableDocs, "enable-docs", cfg.EnableDocs, "enable docs site")
-	flag.BoolVar(&cfg.EnableMetrics, "enable-metrics", cfg.EnableMetrics, "enable metrics")
-	flag.BoolVar(&cfg.EnableWebhooks, "enable-webhooks", cfg.EnableWebhooks, "enable webhooks")
 	flag.Parse()
 }
 

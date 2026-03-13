@@ -61,6 +61,9 @@ Agents should treat these as the default read and write path:
 Rules:
 
 - `reference/standard-service` is the only canonical application layout
+- `reference/standard-service` must depend only on stable root packages and the standard library
+- extension or feature demos must live outside `reference/standard-service`
+- each extension family must publish one canonical discovery entrypoint
 
 ## Hard Rules
 
@@ -116,6 +119,11 @@ Near-term restructuring follows this order:
 Agents should prefer these entrypoints when multiple related `x/*` packages exist:
 
 - Start messaging-related work in `x/messaging`; open `x/mq` or `x/pubsub` only when you already know the task is a queue primitive or broker primitive.
+- Treat `x/webhook` as a messaging sub-capability by default; start directly in `x/webhook` only for narrow webhook verification or delivery mechanics.
+- Start gateway and edge transport work in `x/gateway`; treat `x/ipc` as a narrow primitive.
+- Start reusable resource-interface and CRUD-standardization work in `x/rest`; keep bootstrap shape in `reference/standard-service` and edge proxy topology in `x/gateway`.
+- Start observability adapter work in `x/observability`; use `x/ops` only for protected admin endpoints and diagnostics surfaces.
+- Start frontend asset-serving work in `x/frontend`, but do not let frontend helpers define the canonical app path.
 - Start transport observability work in stable `middleware/*` packages; use `x/observability` only for higher-level adapter or export wiring.
 - Do not start new app structure from `x/rest`; prefer `reference/standard-service` and explicit route binding.
 - Treat `x/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.

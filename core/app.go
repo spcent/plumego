@@ -37,20 +37,6 @@ type App struct {
 	// Optional components
 	httpMetrics   metrics.HTTPObserver
 	healthManager health.HealthManager
-
-	// Component management
-	components        []Component
-	mountedComponents []Component
-	startedComponents []Component
-	componentStopOnce sync.Once
-	componentsMounted bool
-
-	runners        []Runner
-	startedRunners []Runner
-	runnerStopOnce sync.Once
-
-	shutdownHooks []ShutdownHook
-	shutdownOnce  sync.Once
 }
 
 // Option defines a function type for configuring the App.

@@ -41,3 +41,4 @@ agent_hints:
   - Keep ops routing outside core
   - Prefer hook-based behavior
   - Fail closed on auth errors
+  - Use x/ops for protected admin endpoints only; start broader observability discovery in x/observability

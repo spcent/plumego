@@ -2,7 +2,6 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -15,25 +14,23 @@ type APIHandler struct{}
 // Hello responds with service metadata and available endpoints.
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{
-		"message":   "hello from plumego reference",
+		"message":   "hello from plumego standard-service",
+		"service":   "plumego-reference",
+		"mode":      "canonical",
 		"timestamp": time.Now().Format(time.RFC3339),
 		"version":   "1.0.0",
 		"features": []string{
-			"WebSocket",
-			"Documentation",
-			"Webhook",
-			"Metrics",
-			"Health Check",
-			"Middleware",
-			"Pub/Sub",
+			"stable_root_only",
+			"explicit_routes",
+			"stdlib_handlers",
+			"minimal_bootstrap",
 		},
 		"endpoints": map[string]string{
-			"docs":      "/docs",
-			"webhooks":  "/webhooks",
-			"metrics":   "/metrics",
-			"health":    "/health/ready",
-			"websocket": "/ws",
-			"api":       "/api",
+			"root":      "/",
+			"healthz":   "/healthz",
+			"readyz":    "/readyz",
+			"api_hello": "/api/hello",
+			"api_status": "/api/status",
 		},
 	}
 	if err := contract.WriteResponse(w, r, http.StatusOK, resp, nil); err != nil {
@@ -43,79 +40,25 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 
 // Status responds with a summary of system health and component state.
 func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
-	startTime := time.Now().Add(-time.Hour) // simulate 1 hour uptime
-
 	resp := map[string]any{
-		"status":  "healthy",
-		"service": "plumego-reference",
-		"version": "1.0.0",
-		"system": map[string]any{
-			"uptime":     time.Since(startTime).String(),
-			"timestamp":  time.Now().Format(time.RFC3339),
-			"go_version": "1.24+",
+		"status":    "healthy",
+		"service":   "plumego-reference",
+		"version":   "1.0.0",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"structure": map[string]any{
+			"bootstrap":  "explicit",
+			"extensions": "excluded_from_canonical_path",
+			"handlers":   "net/http",
+			"routes":     "one_method_one_path_one_handler",
 		},
-		"components": map[string]any{
-			"websocket":   "enabled",
-			"webhook_in":  "enabled",
-			"webhook_out": "enabled",
-			"metrics":     "enabled",
-			"docs":        "enabled",
-			"pubsub":      "enabled",
-		},
-		"endpoints": map[string]string{
-			"root":      "/",
-			"docs":      "/docs",
-			"api":       "/api",
-			"metrics":   "/metrics",
-			"health":    "/health/ready",
-			"websocket": "/ws",
+		"modules": []string{
+			"core",
+			"router",
+			"contract",
+			"middleware",
 		},
 	}
 	if err := contract.WriteResponse(w, r, http.StatusOK, resp, nil); err != nil {
 		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
-}
-
-// Test supports format and delay query parameters for integration testing.
-func (h APIHandler) Test(w http.ResponseWriter, r *http.Request) {
-	format := r.URL.Query().Get("format")
-	delay := r.URL.Query().Get("delay")
-
-	if delay != "" {
-		if d, err := time.ParseDuration(delay); err == nil {
-			const maxDelay = 2 * time.Second
-			if d > maxDelay {
-				d = maxDelay
-			}
-			select {
-			case <-time.After(d):
-			case <-r.Context().Done():
-				return
-			}
-		}
-	}
-
-	switch format {
-	case "xml":
-		w.Header().Set("Content-Type", "application/xml")
-		fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>`+"\n"+
-			`<response><timestamp>%s</timestamp><format>xml</format><status>success</status></response>`,
-			time.Now().Format(time.RFC3339))
-	case "csv":
-		w.Header().Set("Content-Type", "text/csv")
-		fmt.Fprintf(w, "timestamp,format,status\n%s,csv,success\n", time.Now().Format(time.RFC3339))
-	case "plain":
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "Plain text response at %s", time.Now().Format(time.RFC3339))
-	default:
-		resp := map[string]any{
-			"format":       "json",
-			"timestamp":    time.Now().Format(time.RFC3339),
-			"status":       "success",
-			"query_params": r.URL.Query().Encode(),
-		}
-		if err := contract.WriteResponse(w, r, http.StatusOK, resp, nil); err != nil {
-			http.Error(w, "encoding error", http.StatusInternalServerError)
-		}
 	}
 }

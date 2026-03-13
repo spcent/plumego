@@ -1,16 +1,13 @@
 package core
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/router"
 )
@@ -158,30 +155,6 @@ func TestNewDefaultsToNoOpLogger(t *testing.T) {
 	}
 }
 
-func TestWithComponent(t *testing.T) {
-	app := &App{}
-	comp := &mockComponent{}
-	opt := WithComponent(comp)
-	opt(app)
-	if len(app.components) != 1 {
-		t.Errorf("expected 1 component, got %d", len(app.components))
-	}
-	if app.components[0] != comp {
-		t.Errorf("expected component to be set")
-	}
-}
-
-func TestWithComponents(t *testing.T) {
-	app := &App{}
-	comp1 := &mockComponent{}
-	comp2 := &mockComponent{}
-	opt := WithComponents(comp1, comp2)
-	opt(app)
-	if len(app.components) != 2 {
-		t.Errorf("expected 2 components, got %d", len(app.components))
-	}
-}
-
 func TestRequestIDMiddleware(t *testing.T) {
 	app := New()
 	app.Use(requestid.Middleware())
@@ -216,30 +189,6 @@ func TestWithMethodNotAllowed(t *testing.T) {
 	}
 }
 
-func TestWithRunner(t *testing.T) {
-	app := &App{}
-	runner := &mockRunner{}
-	opt := WithRunner(runner)
-	opt(app)
-	if len(app.runners) != 1 {
-		t.Errorf("expected 1 runner, got %d", len(app.runners))
-	}
-	if app.runners[0] != runner {
-		t.Errorf("expected runner to be set")
-	}
-}
-
-func TestWithRunners(t *testing.T) {
-	app := &App{}
-	r1 := &mockRunner{}
-	r2 := &mockRunner{}
-	opt := WithRunners(r1, r2)
-	opt(app)
-	if len(app.runners) != 2 {
-		t.Errorf("expected 2 runners, got %d", len(app.runners))
-	}
-}
-
 func TestWithHTTPMetrics(t *testing.T) {
 	app := &App{}
 	collector := &mockMetricsCollector{
@@ -251,24 +200,6 @@ func TestWithHTTPMetrics(t *testing.T) {
 		t.Errorf("expected HTTP metrics observer to be set")
 	}
 }
-
-// Mock implementations for testing
-type mockComponent struct {
-	BaseComponent
-}
-
-func (m *mockComponent) RegisterRoutes(r *router.Router)             {}
-func (m *mockComponent) RegisterMiddleware(reg *middleware.Registry) {}
-func (m *mockComponent) Start(ctx context.Context) error             { return nil }
-func (m *mockComponent) Stop(ctx context.Context) error              { return nil }
-func (m *mockComponent) Health() (string, health.HealthStatus) {
-	return "mock", health.HealthStatus{Status: health.StatusHealthy}
-}
-
-type mockRunner struct{}
-
-func (m *mockRunner) Start(ctx context.Context) error { return nil }
-func (m *mockRunner) Stop(ctx context.Context) error  { return nil }
 
 // mockMetricsCollector embeds NoopCollector for cleaner mock implementation.
 // NoopCollector already satisfies HTTPObserver, so this mock stays small.

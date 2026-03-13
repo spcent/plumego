@@ -8,8 +8,8 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-// Component describes a pluggable unit that can contribute routes,
-// middleware, and lifecycle hooks to the application.
+// Component is a compatibility interface for legacy extension wrappers.
+// It is not part of Plumego's canonical application path.
 type Component interface {
 	RegisterRoutes(r *router.Router)
 	RegisterMiddleware(m *middleware.Registry)
@@ -18,7 +18,8 @@ type Component interface {
 	Health() (name string, status health.HealthStatus)
 }
 
-// BaseComponent provides a default implementation for Component interface.
+// BaseComponent provides a default implementation for the compatibility
+// Component interface.
 type BaseComponent struct{}
 
 // RegisterRoutes implements Component.RegisterRoutes

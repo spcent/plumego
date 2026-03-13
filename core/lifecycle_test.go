@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,17 +12,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/router"
 )
-
-type funcRunner struct {
-	start func(context.Context) error
-	stop  func(context.Context) error
-}
-
-func (f funcRunner) Start(ctx context.Context) error { return f.start(ctx) }
-func (f funcRunner) Stop(ctx context.Context) error  { return f.stop(ctx) }
 
 func testListenAddr() string {
 	if addr := strings.TrimSpace(os.Getenv("PLUMEGO_TEST_ADDR")); addr != "" {
@@ -96,94 +85,24 @@ func TestBoot(t *testing.T) {
 	}
 }
 
-func TestBootStartsRunnersBeforeServer(t *testing.T) {
-	addr := requireNetwork(t)
-	app := New(WithAddr(addr))
-
-	startCalled := make(chan struct{})
-	allowReturn := make(chan struct{})
-	startSawStarted := false
-	runnerStopped := false
-
-	runnerStart := func(ctx context.Context) error {
-		startSawStarted = app.started
-		close(startCalled)
-		<-allowReturn
-		return nil
-	}
-	runnerStop := func(ctx context.Context) error {
-		runnerStopped = true
-		return nil
-	}
-
-	if err := app.Register(funcRunner{start: runnerStart, stop: runnerStop}); err != nil {
-		t.Fatalf("unexpected register error: %v", err)
-	}
-
-	hookCalled := false
-	if err := app.OnShutdown(func(ctx context.Context) error {
-		hookCalled = true
-		return nil
-	}); err != nil {
-		t.Fatalf("unexpected shutdown hook error: %v", err)
-	}
-
+func TestStartMarksAppReadyWithoutLegacyRuntimeHooks(t *testing.T) {
+	app := New()
 	app.Get("/boot-order", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	serverDone := make(chan error, 1)
-	go func() {
-		serverDone <- app.Boot()
-	}()
-
-	select {
-	case <-startCalled:
-	case <-time.After(2 * time.Second):
-		t.Fatalf("runner did not start in time")
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("prepare returned unexpected error: %v", err)
+	}
+	if err := app.Start(context.Background()); err != nil {
+		t.Fatalf("start returned unexpected error: %v", err)
 	}
 
-	close(allowReturn)
-
-	if startSawStarted {
-		t.Fatalf("runner should start before server sets started flag")
-	}
-
-	var started bool
-	deadline := time.After(2 * time.Second)
-	for {
-		app.mu.RLock()
-		started = app.started
-		app.mu.RUnlock()
-		if started {
-			break
-		}
-		select {
-		case <-deadline:
-			t.Fatalf("server did not start in time")
-		default:
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
-
-	time.Sleep(100 * time.Millisecond)
-	if err := app.Shutdown(context.Background()); err != nil {
-		t.Fatalf("shutdown returned unexpected error: %v", err)
-	}
-
-	select {
-	case err := <-serverDone:
-		if err != nil && err != http.ErrServerClosed {
-			t.Fatalf("unexpected boot error: %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("boot did not exit in time")
-	}
-	if !runnerStopped {
-		t.Fatalf("runner should stop on shutdown")
-	}
-	if !hookCalled {
-		t.Fatalf("shutdown hook should run on shutdown")
+	app.mu.RLock()
+	started := app.started
+	app.mu.RUnlock()
+	if !started {
+		t.Fatalf("expected app to be marked started")
 	}
 }
 
@@ -357,185 +276,11 @@ func TestStartServer(t *testing.T) {
 	})
 }
 
-// TestMountComponents tests component mounting
-func TestMountComponents(t *testing.T) {
-	t.Run("mount with components", func(t *testing.T) {
-		app := New()
-		app.router = router.NewRouter()
-		app.middlewareReg = middleware.NewRegistry()
-
-		// Add built-in components
-		app.components = []Component{
-			&stubComponent{path: "/comp1"},
-			&stubComponent{path: "/comp2"},
-		}
-
-		comps := app.mountComponents()
-
-		if len(comps) < 2 {
-			t.Errorf("expected at least 2 components, got %d", len(comps))
-		}
-
-		// Test routes are registered
-		req := httptest.NewRequest(http.MethodGet, "/comp1", nil)
-		rr := httptest.NewRecorder()
-		app.router.ServeHTTP(rr, req)
-
-		if rr.Code != http.StatusOK {
-			t.Errorf("expected route to be registered")
-		}
-	})
-
-	t.Run("mount with nil components", func(t *testing.T) {
-		app := New()
-		app.router = router.NewRouter()
-		app.middlewareReg = middleware.NewRegistry()
-		app.components = []Component{nil, &stubComponent{path: "/test"}}
-
-		comps := app.mountComponents()
-
-		// Debug: print what components were returned
-		t.Logf("mountComponents returned %d components", len(comps))
-		for i, c := range comps {
-			if c == nil {
-				t.Logf("  Component %d: nil", i)
-			} else {
-				t.Logf("  Component %d: %T", i, c)
-			}
-		}
-
-		// Filter out nil components for counting
-		nonNilComps := 0
-		for _, c := range comps {
-			if c != nil {
-				nonNilComps++
-			}
-		}
-
-		if nonNilComps != 1 {
-			t.Errorf("expected 1 non-nil component, got %d", nonNilComps)
-		}
-	})
-
-	t.Run("mount creates middleware registry if nil", func(t *testing.T) {
-		app := New()
-		app.router = router.NewRouter()
-		app.middlewareReg = nil
-
-		app.mountComponents()
-
-		if app.middlewareReg == nil {
-			t.Error("middleware registry should be created")
-		}
-	})
-}
-
-// TestStartComponents tests component startup with error handling
-func TestStartComponents(t *testing.T) {
-	t.Run("start all successfully", func(t *testing.T) {
-		app := New()
-		comp1 := &stubComponent{path: "/1"}
-		comp2 := &stubComponent{path: "/2"}
-		comp3 := &stubComponent{path: "/3"}
-
-		comps := []Component{comp1, comp2, comp3}
-		err := app.startComponents(context.Background(), comps)
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !comp1.started || !comp2.started || !comp3.started {
-			t.Error("all components should be started")
-		}
-		if len(app.startedComponents) != 3 {
-			t.Errorf("expected 3 started components, got %d", len(app.startedComponents))
-		}
-	})
-
-	t.Run("start with nil components", func(t *testing.T) {
-		app := New()
-		comps := []Component{nil, &stubComponent{path: "/test"}, nil}
-
-		err := app.startComponents(context.Background(), comps)
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("start with empty list", func(t *testing.T) {
-		app := New()
-		err := app.startComponents(context.Background(), []Component{})
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("start with error stops previous", func(t *testing.T) {
-		app := New()
-		comp1 := &stubComponent{path: "/1"}
-		comp2 := &stubComponent{path: "/2", startErr: fmt.Errorf("boom")}
-		comp3 := &stubComponent{path: "/3"}
-
-		comps := []Component{comp1, comp2, comp3}
-		err := app.startComponents(context.Background(), comps)
-
-		if err == nil {
-			t.Error("expected error from component start")
-		}
-		if !comp1.started {
-			t.Error("comp1 should be started")
-		}
-		// comp2.started will be true because Start() sets it before returning error
-		// The important thing is that comp3 was not started
-		if comp3.started {
-			t.Error("comp3 should not be started (comp2 failed)")
-		}
-		if !comp1.stopped {
-			t.Error("comp1 should be stopped after comp2 failure")
-		}
-	})
-}
-
-// TestStopComponents tests component shutdown
-func TestStopComponents(t *testing.T) {
-	t.Run("stop all components", func(t *testing.T) {
-		app := New()
-		comp1 := &stubComponent{path: "/1"}
-		comp2 := &stubComponent{path: "/2"}
-		comp3 := &stubComponent{path: "/3"}
-
-		app.startedComponents = []Component{comp1, comp2, comp3}
-
-		app.stopComponents(context.Background())
-
-		if !comp1.stopped || !comp2.stopped || !comp3.stopped {
-			t.Error("all components should be stopped")
-		}
-	})
-
-	t.Run("stop with nil components", func(t *testing.T) {
-		app := New()
-		app.startedComponents = []Component{nil, &stubComponent{path: "/test"}, nil}
-
-		app.stopComponents(context.Background())
-		// Should not panic
-	})
-
-	t.Run("stop only once", func(t *testing.T) {
-		app := New()
-		comp := &stubComponent{path: "/test"}
-		app.startedComponents = []Component{comp}
-
-		app.stopComponents(context.Background())
-		app.stopComponents(context.Background())
-
-		if !comp.stopped {
-			t.Error("component should be stopped")
-		}
-		// Should not panic on second call
-	})
+func TestDeclaredComponentsAlwaysEmpty(t *testing.T) {
+	app := New()
+	if got := app.declaredComponents(); len(got) != 0 {
+		t.Fatalf("expected no declared components, got %d", len(got))
+	}
 }
 
 // TestConnectionTracker tests connection tracking and draining
@@ -616,71 +361,6 @@ func TestConnectionTracker(t *testing.T) {
 		ct.drain(ctx)
 		// Should return immediately
 	})
-}
-
-// TestAppBootWithComponents tests boot process with components
-func TestAppBootWithComponents(t *testing.T) {
-	addr := requireNetwork(t)
-
-	// Create a test component that registers routes and middleware
-	testComp := &stubComponent{
-		path:           "/boot-component",
-		middlewareName: "boot-middleware",
-	}
-
-	app := New(
-		WithComponent(testComp),
-		WithAddr(addr),
-	)
-
-	// Add another route
-	app.Get("/boot-route", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("boot-route"))
-	})
-
-	// Start in background
-	serverDone := make(chan error)
-	go func() {
-		serverDone <- app.Boot()
-	}()
-
-	time.Sleep(100 * time.Millisecond)
-
-	// Test component route
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/boot-component", nil)
-	app.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Errorf("expected component route to work, got status %d", resp.Code)
-	}
-	if resp.Header().Get("X-Component") != "boot-middleware" {
-		t.Errorf("expected component middleware to be applied")
-	}
-
-	// Test regular route
-	resp2 := httptest.NewRecorder()
-	req2 := httptest.NewRequest(http.MethodGet, "/boot-route", nil)
-	app.ServeHTTP(resp2, req2)
-
-	if resp2.Code != http.StatusOK {
-		t.Errorf("expected regular route to work")
-	}
-
-	// Shutdown
-	if err := app.Shutdown(context.Background()); err != nil {
-		t.Fatalf("shutdown returned unexpected error: %v", err)
-	}
-
-	select {
-	case err := <-serverDone:
-		if err != nil && err != http.ErrServerClosed {
-			t.Errorf("boot returned error: %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Error("boot did not complete")
-	}
 }
 
 // TestAppBootWithLoggerLifecycle tests boot with logger that implements Lifecycle

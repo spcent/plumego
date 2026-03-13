@@ -148,7 +148,7 @@ if err := app.Use(
 
 ## Next Steps
 
-- Browse `reference/standard-service/` for a full-featured application
+- Browse `reference/standard-service/` for the minimal canonical application layout
 - Read the source at `core/`, `router/`, and `contract/` for API details
 
 ## Canonical Note

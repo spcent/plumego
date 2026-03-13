@@ -9,6 +9,7 @@ responsibilities:
   - Gateway routing and rewriting
   - Balancing and cache adapters
   - Gateway health helpers
+  - Canonical app-facing gateway entrypoints and explicit route helpers
 
 non_goals:
   - Core bootstrap ownership
@@ -43,3 +44,6 @@ agent_hints:
   - Keep gateway concerns inside x/gateway
   - Prefer adapter-local helpers
   - Do not require core knowledge
+  - Treat x/gateway as the only canonical entrypoint for gateway and edge transport work
+  - Use x/gateway entrypoints for app-facing proxy wiring
+  - Route reusable resource-interface work to x/rest rather than mixing it into gateway

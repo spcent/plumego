@@ -7,31 +7,6 @@ import (
 	"github.com/spcent/plumego/metrics"
 )
 
-// MountComponent appends a component before the app is prepared or started.
-func (a *App) MountComponent(component Component) error {
-	if component == nil {
-		return nil
-	}
-	if err := a.ensureMutable("mount_component", "mount component"); err != nil {
-		return err
-	}
-
-	a.mu.Lock()
-	a.components = append(a.components, component)
-	a.mu.Unlock()
-	return nil
-}
-
-// MountComponents appends multiple components before the app is prepared or started.
-func (a *App) MountComponents(components ...Component) error {
-	for _, component := range components {
-		if err := a.MountComponent(component); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // DebugEnabled reports whether debug mode is enabled.
 func (a *App) DebugEnabled() bool {
 	if a == nil || a.config == nil {

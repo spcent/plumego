@@ -26,6 +26,7 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 新的应用结构工作应遵循唯一 canonical 路径：
 
 - 先看 `reference/standard-service`，以它作为目录结构和 wiring 的标准
+- `reference/standard-service` 有意只依赖稳定根级包；`x/*` 示例都不属于 canonical 路径
 
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
@@ -35,11 +36,11 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - **幂等工具**：提供 `store/idempotency` 的 KV/SQL 幂等存储接口。
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
 - **优雅生命周期**：环境变量加载、连接排水、就绪标志，以及可选的 TLS/HTTP2 配置，带有合理默认值。
-- **可选服务**：内置带认证的 WebSocket 中心、进程内 Pub/Sub（带调试快照）、入站/出站 Webhook 路由器，以及从磁盘或嵌入资源提供静态前端。
+- **可选服务**：WebSocket、Webhook、Pub/Sub、前端托管等能力都位于 `x/*`，并且有意不进入 canonical 应用路径。
 - **任务调度**：通过 `scheduler` 包提供进程内 cron、延迟任务与可重试任务。
 
-## 组件
-`core.App` 通过可插拔组件进行编排，而不是硬编码功能。组件可以注册路由、中间件和生命周期钩子：
+## 兼容 API
+`core.Component`、`core.Runner` 和 shutdown-hook 相关 helper 属于兼容层能力，用于承接历史扩展封装；它们不属于新应用工作的 canonical 起点。
 
 ```
 type Component interface {
@@ -53,16 +54,15 @@ type Component interface {
 
 `HealthStatus` 使用限定的状态值（`healthy`、`degraded`、`unhealthy`）确保组件以结构化且类型安全的方式报告健康状况。
 
-在构造应用时使用 `core.WithComponent`（或 `WithComponents`）来添加功能。内置特性（Webhook 管理、入站 Webhook 接收器、PubSub 调试、WebSocket 辅助工具、前端服务）都可以作为组件挂载，因此示例可以只混合所需的部分。
+新代码应在应用自己的 wiring 包中显式注册路由、中间件和后台任务，而不是继续通过 `core` 做隐式注册。
 
 ## 快速开始
-创建一个小型 `main.go`，连接路由和中间件，然后启动服务器：
+创建一个小型 `main.go`，显式连接路由和中间件，然后启动服务器：
 
 ```go
 package main
 
 import (
-    "context"
     "log"
     "net/http"
 
@@ -70,47 +70,26 @@ import (
     plog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/requestid"
     "github.com/spcent/plumego/middleware/recovery"
-    xdevtools "github.com/spcent/plumego/x/devtools"
 )
 
 func main() {
     app := core.New(
         core.WithAddr(":8080"),
-        core.WithDebug(),
         core.WithLogger(plog.NewGLogger()),
     )
 
-    if err := app.MountComponent(xdevtools.NewAppComponent(app)); err != nil {
-        log.Fatalf("mount devtools: %v", err)
-    }
-
-    if err := app.Use(
+    app.Use(
         requestid.Middleware(),
         recovery.Recovery(app.Logger()),
-    ); err != nil {
-        log.Fatalf("register middleware: %v", err)
-    }
+    )
 
-    if err := app.AddRoute(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-        w.Write([]byte("pong"))
-    })); err != nil {
-        log.Fatalf("register route: %v", err)
-    }
+    app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write([]byte("pong"))
+    })
 
-    if err := app.Prepare(); err != nil {
-        log.Fatalf("prepare app: %v", err)
-    }
-    if err := app.Start(context.Background()); err != nil {
-        log.Fatalf("start runtime: %v", err)
-    }
-
-    srv, err := app.Server()
-    if err != nil {
-        log.Fatalf("build server: %v", err)
-    }
-    defer app.Shutdown(context.Background())
-
-    log.Fatal(srv.ListenAndServe())
+    log.Println("server started at :8080")
+    log.Fatal(http.ListenAndServe(":8080", app))
 }
 ```
 
@@ -147,7 +126,7 @@ func main() {
 - 常用变量：`AUTH_TOKEN`（ops 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - 应用默认包括 10485760 字节（10 MiB）请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5000ms（5 秒）优雅关闭窗口。可通过 `core.With...` 选项覆盖。
 - 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.SecurityHeaders(...)` 与 `middleware/ratelimit.AbuseGuard(...)`。
-- 调试模式与 devtools 已拆分：`core.WithDebug()` 只开启调试行为；需要调试路由时，应通过 `app.MountComponent(xdevtools.NewAppComponent(app))` 显式挂载 `x/devtools`。
+- 调试模式与 devtools 已拆分：`core.WithDebug()` 只开启调试行为；如果需要 devtools，请在应用本地 wiring 中显式注册相关路由，不要把它视为 canonical kernel 的一部分。
 - `/_debug` 下的调试端点（路由表、Middleware、配置快照、指标、pprof、手动重载）现在由 `x/devtools` 提供，而不是 `core` 内建。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
 
 ## 关键组件
@@ -379,7 +358,7 @@ protected := middleware.Apply(
 `security/jwt` 提供契约适配器（`jwtManager.Authenticator`、`jwt.PolicyAuthorizer`、`jwt.PermissionAuthorizer`），以保持存储与策略实现的解耦。
 
 ## 参考应用
-`reference/standard-service` 是一个开箱即用的 `main` 包，整合了常用组件：
+`reference/standard-service` 是 canonical 的最小 `main` 包。它只依赖稳定根级包，并通过显式 wiring 演示标准应用结构，而不是扩展装配：
 
 - 配置了带 JWT 密钥的 WebSocket 中心和广播端点
 - 入站 GitHub/Stripe Webhook，发布到进程内 Pub/Sub
@@ -429,7 +408,7 @@ app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 - `metrics.NewPrometheusCollector(namespace)` 实现 `httpmetrics.Observer`；如需 `/metrics` 端点，请显式搭配 `metrics.NewPrometheusExporter(collector)`。
 - `metrics.NewOpenTelemetryTracer(name)` 实现 `tracing.Tracer`，发出带有 HTTP 元数据的 span。
 
-如 `reference/standard-service` 所示，在应用装配层保留具体的 collector 和 tracer，通过 `core.WithHTTPMetrics(...)` 传入 collector，然后再通过 `httpmetrics.Middleware(app.HTTPMetrics())` 显式挂载请求指标中间件。
+对于可观测性较重的应用，在应用装配层保留具体的 collector 和 tracer，通过 `core.WithHTTPMetrics(...)` 传入 collector，然后再通过 `httpmetrics.Middleware(app.HTTPMetrics())` 显式挂载请求指标中间件。
 如果某个模块只需要单一能力，优先依赖更窄的接口，例如 `metrics.HTTPObserver`、`metrics.MQObserver`、`metrics.DBObserver` 或 `metrics.Recorder`，而不是整个 `metrics.AggregateCollector`。
 
 ## 配置参考

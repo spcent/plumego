@@ -405,9 +405,18 @@ func (c *DBResourceController[T]) WithValidator(v interface{ Validate(any) error
 	return c
 }
 
+// ApplySpec applies the reusable resource specification to the controller.
+func (c *DBResourceController[T]) ApplySpec(spec ResourceSpec) *DBResourceController[T] {
+	if c == nil {
+		return c
+	}
+	c.BaseContextResourceController.ApplySpec(spec)
+	return c
+}
+
 // IndexCtx handles GET /resource with database query, pagination, and transformation.
 func (c *DBResourceController[T]) IndexCtx(ctx *contract.Ctx) {
-	params := c.QueryBuilder.Parse(ctx.R)
+	params := c.ParseQueryParams(ctx.R)
 
 	if err := c.Hooks.BeforeList(ctx.R.Context(), params); err != nil {
 		ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})

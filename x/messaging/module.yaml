@@ -9,6 +9,7 @@ responsibilities:
   - Delivery provider abstraction
   - Scheduling and queue coordination
   - Receipt and stats APIs
+  - Canonical family entrypoints for broker, webhook, and HTTP route wiring
 
 non_goals:
   - Core bootstrap ownership
@@ -44,3 +45,5 @@ agent_hints:
   - Start messaging-related discovery here before opening sibling x/* packages
   - Keep orchestration inside x/messaging with explicit service wiring
   - Do not require core knowledge
+  - Treat x/mq, x/pubsub, x/scheduler, and x/webhook as subordinate packages under this family
+  - Prefer RegisterRoutes and the x/messaging re-export entrypoints for new app-facing code

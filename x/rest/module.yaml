@@ -2,16 +2,18 @@ name: x/rest
 path: x/rest
 layer: extension
 status: experimental
-summary: Legacy REST resource helpers; new transport-facing work should follow reference-app patterns instead of growing this root.
+summary: Unified resource-interface layer for reusable REST controllers, query parsing, pagination, and repository-backed resource wiring.
 
 responsibilities:
   - REST resource helpers
   - CRUD route scaffolding
   - Explicit resource transport adapters
+  - Reusable resource-interface conventions shared across services
+  - Canonical route registration helpers for resource controllers
 
 non_goals:
   - Core bootstrap ownership
-  - Stable root entrypoints
+  - Gateway and edge proxy ownership
   - Business repository ownership
 
 allowed_imports:
@@ -30,12 +32,17 @@ test_commands:
   - go test -timeout 20s ./x/rest/...
   - go vet ./x/rest/...
 
+doc_paths:
+  - x/rest/README.md
+
 review_checklist:
   - Keep resource wiring explicit
   - Avoid hidden repository injection
   - Preserve transport-only helpers
 
 agent_hints:
-  - Do not start new application structure from x/rest
+  - Do not start new application bootstrap from x/rest
+  - Use x/rest when standardizing reusable resource APIs and CRUD interface shape
   - Keep resource ownership local with explicit route binding
-  - Do not require core knowledge
+  - Prefer x/gateway for transport-edge proxy work and reference/standard-service for app bootstrap
+  - Prefer ResourceSpec plus explicit Register*Routes helpers for new reusable resource APIs

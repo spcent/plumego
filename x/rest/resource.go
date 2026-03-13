@@ -5,7 +5,12 @@
 // focuses on routing concerns only (path matching, parameter extraction, middleware
 // composition). Application-level REST scaffolding lives here.
 //
-// Stability: stable extension — not part of the minimal core runtime.
+// Stability: stable extension interface layer — not part of the minimal core runtime.
+//
+// x/rest is the shared home for reusable, transport-facing resource patterns:
+// query parsing, pagination, hookable CRUD controllers, and repository-backed
+// resource wiring. Use it when the goal is to standardize resource APIs across
+// services rather than to define the application's bootstrap shape.
 package rest
 
 import (
@@ -239,6 +244,37 @@ func NewQueryBuilder() *QueryBuilder {
 		allowedSorts:    make(map[string]bool),
 		allowedFilters:  make(map[string]bool),
 	}
+}
+
+// NewQueryBuilderFromOptions creates a QueryBuilder driven by resource options.
+func NewQueryBuilderFromOptions(opts *ResourceOptions) *QueryBuilder {
+	qb := NewQueryBuilder()
+	if opts == nil {
+		return qb
+	}
+
+	defaultSize := opts.DefaultPageSize
+	if defaultSize <= 0 {
+		defaultSize = qb.defaultPageSize
+	}
+
+	maxSize := opts.MaxPageSize
+	if maxSize <= 0 {
+		maxSize = qb.maxPageSize
+	}
+	if maxSize < defaultSize {
+		maxSize = defaultSize
+	}
+
+	qb.WithPageSize(defaultSize, maxSize)
+	if len(opts.AllowedSorts) > 0 {
+		qb.WithAllowedSorts(opts.AllowedSorts...)
+	}
+	if len(opts.AllowedFilters) > 0 {
+		qb.WithAllowedFilters(opts.AllowedFilters...)
+	}
+
+	return qb
 }
 
 // WithPageSize sets the default and maximum page size.
@@ -534,17 +570,43 @@ type BaseContextResourceController struct {
 	ParamExtractor *ParamExtractor
 	Hooks          ResourceHooks
 	Transformer    ResourceTransformer
+	Spec           ResourceSpec
 }
 
 // NewBaseContextResourceController creates a context-aware resource controller with defaults.
 func NewBaseContextResourceController(resourceName string) *BaseContextResourceController {
-	return &BaseContextResourceController{
+	controller := &BaseContextResourceController{
 		ResourceName:   resourceName,
 		QueryBuilder:   NewQueryBuilder(),
 		ParamExtractor: NewParamExtractor(),
 		Hooks:          &NoOpResourceHooks{},
 		Transformer:    &IdentityTransformer{},
 	}
+	ApplyResourceSpec(controller, DefaultResourceSpec(resourceName))
+	return controller
+}
+
+// ApplySpec applies the reusable resource specification to the controller.
+func (c *BaseContextResourceController) ApplySpec(spec ResourceSpec) *BaseContextResourceController {
+	ApplyResourceSpec(c, spec)
+	return c
+}
+
+// ParseQueryParams parses and normalizes resource query params from the request
+// using the controller's spec-driven defaults.
+func (c *BaseContextResourceController) ParseQueryParams(r *http.Request) *QueryParams {
+	if c == nil {
+		return NormalizeQueryParams(nil, nil)
+	}
+
+	builder := c.QueryBuilder
+	if builder == nil {
+		builder = queryBuilderFromSpec(c.Spec)
+		c.QueryBuilder = builder
+	}
+
+	params := builder.Parse(r)
+	return NormalizeQueryParams(params, c.Spec.Options)
 }
 
 func (c *BaseContextResourceController) notImplemented(ctx *contract.Ctx, method string) {
@@ -607,6 +669,62 @@ func DefaultResourceOptions() *ResourceOptions {
 		EnableHooks:       true,
 		EnableTransformer: false,
 	}
+}
+
+// NormalizeQueryParams applies resource-level defaults and allowlists to parsed query params.
+func NormalizeQueryParams(params *QueryParams, opts *ResourceOptions) *QueryParams {
+	if params == nil {
+		params = &QueryParams{}
+	}
+	if opts == nil {
+		return params
+	}
+
+	if params.Page <= 0 {
+		params.Page = 1
+	}
+	if params.PageSize <= 0 && opts.DefaultPageSize > 0 {
+		params.PageSize = opts.DefaultPageSize
+	}
+	if opts.MaxPageSize > 0 && params.PageSize > opts.MaxPageSize {
+		params.PageSize = opts.MaxPageSize
+	}
+	if params.PageSize > 0 {
+		params.Limit = params.PageSize
+		params.Offset = (params.Page - 1) * params.PageSize
+	}
+
+	if len(opts.AllowedFilters) > 0 && len(params.Filters) > 0 {
+		allowed := make(map[string]struct{}, len(opts.AllowedFilters))
+		for _, name := range opts.AllowedFilters {
+			allowed[name] = struct{}{}
+		}
+
+		filtered := make(map[string]string, len(params.Filters))
+		for key, value := range params.Filters {
+			if _, ok := allowed[key]; ok {
+				filtered[key] = value
+			}
+		}
+		params.Filters = filtered
+	}
+
+	if len(opts.AllowedSorts) > 0 && len(params.Sort) > 0 {
+		allowed := make(map[string]struct{}, len(opts.AllowedSorts))
+		for _, name := range opts.AllowedSorts {
+			allowed[name] = struct{}{}
+		}
+
+		filtered := make([]SortField, 0, len(params.Sort))
+		for _, sort := range params.Sort {
+			if _, ok := allowed[sort.Field]; ok {
+				filtered = append(filtered, sort)
+			}
+		}
+		params.Sort = filtered
+	}
+
+	return params
 }
 
 // ================================================

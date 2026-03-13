@@ -16,8 +16,13 @@ canonical_authority:
     - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
   implementation:
     - reference/standard-service
+  taxonomy:
+    - specs/extension-entrypoints.yaml
   notes:
     - Reference app defines the canonical application structure
+    - reference/standard-service must depend only on stable root packages and stdlib
+    - Extension demonstrations must not define the canonical path
+    - Extension families must expose one canonical discovery entrypoint
 
 layers:
   stable:
@@ -112,3 +117,4 @@ agent_workflow:
     max_primary_modules_per_change: 1
     max_files_per_card: 5
     require_manifest_for_new_module: true
+    prefer_extension_family_entrypoint: true

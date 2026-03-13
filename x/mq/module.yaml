@@ -41,3 +41,4 @@ agent_hints:
   - Treat x/mq as a lower-level queue primitive; start feature discovery in x/messaging
   - Keep queue adapters local with explicit worker wiring
   - Do not move MQ into core
+  - Do not use x/mq as the first user-facing entrypoint for new messaging work

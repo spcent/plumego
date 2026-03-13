@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/router"
 )
 
 // Boot is the legacy convenience entrypoint.
@@ -72,7 +70,7 @@ func (a *App) Server() (*http.Server, error) {
 	return server, nil
 }
 
-// Start starts component, runner, health, and logger runtime hooks.
+// Start starts logger lifecycle hooks and marks the app ready.
 func (a *App) Start(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -85,7 +83,6 @@ func (a *App) Start(ctx context.Context) error {
 	}
 	prepared := a.httpServer != nil
 	logger := a.logger
-	components := append([]Component{}, a.mountedComponents...)
 	a.mu.RUnlock()
 
 	if !prepared {
@@ -99,16 +96,6 @@ func (a *App) Start(ctx context.Context) error {
 		a.mu.Lock()
 		a.loggerStarted = true
 		a.mu.Unlock()
-	}
-
-	if err := a.startComponents(ctx, components); err != nil {
-		a.stopLoggerLifecycle(ctx)
-		return err
-	}
-	if err := a.startRunners(ctx); err != nil {
-		a.stopComponents(ctx)
-		a.stopLoggerLifecycle(ctx)
-		return err
 	}
 
 	a.mu.Lock()
@@ -299,9 +286,7 @@ func (a *App) handleShutdownSignal(stop <-chan struct{}) {
 }
 
 func (a *App) stopRuntime(ctx context.Context) {
-	a.stopRunners(ctx)
-	a.stopComponents(ctx)
-	a.runShutdownHooks(ctx)
+	_ = ctx
 }
 
 func (a *App) stopLoggerLifecycle(ctx context.Context) {
@@ -333,119 +318,6 @@ func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *
 	return &connectionTracker{logger: logger, interval: interval}
 }
 
-func (a *App) mountComponents() []Component {
-	components := a.declaredComponents()
-
-	if a.middlewareReg == nil {
-		a.middlewareReg = middleware.NewRegistry()
-	}
-	if a.router == nil {
-		a.router = router.NewRouter()
-	}
-	for _, c := range components {
-		c.RegisterMiddleware(a.middlewareReg)
-		c.RegisterRoutes(a.router)
-	}
-
-	a.router.Freeze()
-	a.mu.Lock()
-	a.componentsMounted = true
-	a.mountedComponents = append([]Component{}, components...)
-	a.mu.Unlock()
-
-	return components
-}
-
-func (a *App) startComponents(ctx context.Context, comps []Component) error {
-	components := filterNilComponents(comps)
-	if len(components) == 0 {
-		return nil
-	}
-
-	started := make([]Component, 0, len(components))
-	for _, c := range components {
-		if err := c.Start(ctx); err != nil {
-			for i := len(started) - 1; i >= 0; i-- {
-				_ = started[i].Stop(ctx)
-			}
-			return err
-		}
-		started = append(started, c)
-	}
-
-	a.mu.Lock()
-	a.startedComponents = started
-	a.mu.Unlock()
-	return nil
-}
-
-func (a *App) startRunners(ctx context.Context) error {
-	a.mu.RLock()
-	runners := append([]Runner{}, a.runners...)
-	a.mu.RUnlock()
-
-	runners = filterNilRunners(runners)
-	if len(runners) == 0 {
-		return nil
-	}
-
-	started := make([]Runner, 0, len(runners))
-	for _, runner := range runners {
-		if err := runner.Start(ctx); err != nil {
-			for i := len(started) - 1; i >= 0; i-- {
-				_ = started[i].Stop(ctx)
-			}
-			return err
-		}
-		started = append(started, runner)
-	}
-
-	a.mu.Lock()
-	a.startedRunners = started
-	a.mu.Unlock()
-	return nil
-}
-
-func (a *App) stopComponents(ctx context.Context) {
-	a.componentStopOnce.Do(func() {
-		a.mu.Lock()
-		comps := append([]Component{}, a.startedComponents...)
-		a.mu.Unlock()
-
-		for i := len(comps) - 1; i >= 0; i-- {
-			if comps[i] == nil {
-				continue
-			}
-			if err := comps[i].Stop(ctx); err != nil {
-				a.logger.WithFields(log.Fields{
-					"component_index": i,
-					"error":           err.Error(),
-				}).Error("failed to stop component")
-			}
-		}
-	})
-}
-
-func (a *App) stopRunners(ctx context.Context) {
-	a.runnerStopOnce.Do(func() {
-		a.mu.Lock()
-		runners := append([]Runner{}, a.startedRunners...)
-		a.mu.Unlock()
-
-		for i := len(runners) - 1; i >= 0; i-- {
-			if runners[i] == nil {
-				continue
-			}
-			if err := runners[i].Stop(ctx); err != nil {
-				a.logger.WithFields(log.Fields{
-					"runner_index": i,
-					"error":        err.Error(),
-				}).Error("failed to stop runner")
-			}
-		}
-	})
-}
-
 func (t *connectionTracker) track(_ net.Conn, state http.ConnState) {
 	switch state {
 	case http.StateNew:
@@ -472,24 +344,4 @@ func (t *connectionTracker) drain(ctx context.Context) {
 			}
 		}
 	}
-}
-
-func filterNilComponents(components []Component) []Component {
-	filtered := make([]Component, 0, len(components))
-	for _, comp := range components {
-		if comp != nil {
-			filtered = append(filtered, comp)
-		}
-	}
-	return filtered
-}
-
-func filterNilRunners(runners []Runner) []Runner {
-	filtered := make([]Runner, 0, len(runners))
-	for _, runner := range runners {
-		if runner != nil {
-			filtered = append(filtered, runner)
-		}
-	}
-	return filtered
 }

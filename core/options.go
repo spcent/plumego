@@ -96,72 +96,12 @@ func WithLogger(logger log.StructuredLogger) Option {
 	}
 }
 
-// WithComponent mounts a Component into the application lifecycle.
-func WithComponent(component Component) Option {
-	return func(a *App) {
-		if component != nil {
-			a.components = append(a.components, component)
-		}
-	}
-}
-
-// WithComponents mounts multiple Components into the application lifecycle.
-func WithComponents(components ...Component) Option {
-	return func(a *App) {
-		for _, component := range components {
-			if component != nil {
-				a.components = append(a.components, component)
-			}
-		}
-	}
-}
-
 // WithMethodNotAllowed enables 405 responses with Allow headers for method mismatches.
 func WithMethodNotAllowed(enabled bool) Option {
 	return func(a *App) {
 		r := a.ensureRouter()
 		if r != nil {
 			r.SetMethodNotAllowed(enabled)
-		}
-	}
-}
-
-// WithShutdownHook registers a shutdown hook.
-func WithShutdownHook(hook ShutdownHook) Option {
-	return func(a *App) {
-		if hook != nil {
-			a.shutdownHooks = append(a.shutdownHooks, hook)
-		}
-	}
-}
-
-// WithShutdownHooks registers multiple shutdown hooks.
-func WithShutdownHooks(hooks ...ShutdownHook) Option {
-	return func(a *App) {
-		for _, hook := range hooks {
-			if hook != nil {
-				a.shutdownHooks = append(a.shutdownHooks, hook)
-			}
-		}
-	}
-}
-
-// WithRunner registers a background runner in the application lifecycle.
-func WithRunner(runner Runner) Option {
-	return func(a *App) {
-		if runner != nil {
-			a.runners = append(a.runners, runner)
-		}
-	}
-}
-
-// WithRunners registers multiple background runners.
-func WithRunners(runners ...Runner) Option {
-	return func(a *App) {
-		for _, runner := range runners {
-			if runner != nil {
-				a.runners = append(a.runners, runner)
-			}
 		}
 	}
 }

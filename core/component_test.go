@@ -17,21 +17,9 @@ func TestHasComponentType(t *testing.T) {
 		t.Error("Expected false for nil components")
 	}
 
-	// Test with matching component type
-	app.components = []Component{
-		&stubComponent{},
-	}
-
-	result = app.hasComponentType(&stubComponent{})
-	if !result {
-		t.Error("Expected true for matching component type")
-	}
-
-	// Test with non-matching component type
-	type otherComponent struct{}
-	result = app.hasComponentType(&otherComponent{})
+	result = app.hasComponentType(&BaseComponent{})
 	if result {
-		t.Error("Expected false for non-matching component type")
+		t.Error("Expected false because component tracking has been removed")
 	}
 }
 
@@ -46,7 +34,7 @@ func TestAppLogger(t *testing.T) {
 	}
 }
 
-// TestDeclaredComponents tests explicit component assembly.
+// TestDeclaredComponents tests that core no longer tracks declared components.
 func TestDeclaredComponents(t *testing.T) {
 	app := &App{
 		config: &AppConfig{},

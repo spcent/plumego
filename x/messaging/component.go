@@ -3,21 +3,25 @@ package messaging
 import (
 	"context"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
 
 // Component wraps Service as a core.Component for plug-and-play
-// registration via core.WithComponent.
+// registration via legacy core component APIs.
+//
+// Deprecated: prefer RegisterRoutes plus explicit service Start/Stop wiring
+// in the application package.
 type Component struct {
 	svc    *Service
 	prefix string
 }
 
-// NewComponent creates a Component that registers routes under prefix.
+// NewComponent creates a legacy component wrapper that registers routes under prefix.
 // A typical prefix is "/api/v1/messages".
+//
+// Deprecated: prefer RegisterRoutes plus explicit service lifecycle wiring.
 func NewComponent(svc *Service, prefix string) *Component {
 	if prefix == "" {
 		prefix = "/api/v1/messages"
@@ -26,15 +30,7 @@ func NewComponent(svc *Service, prefix string) *Component {
 }
 
 func (c *Component) RegisterRoutes(r *router.Router) {
-	// Send
-	r.Post(c.prefix+"/send", contract.AdaptCtxHandler(c.svc.HandleSend, r.Logger()))
-	r.Post(c.prefix+"/batch", contract.AdaptCtxHandler(c.svc.HandleBatchSend, r.Logger()))
-	// Query
-	r.Get(c.prefix+"/stats", contract.AdaptCtxHandler(c.svc.HandleStats, r.Logger()))
-	r.Get(c.prefix+"/receipts", contract.AdaptCtxHandler(c.svc.HandleListReceipts, r.Logger()))
-	r.Get(c.prefix+"/:id/receipt", contract.AdaptCtxHandler(c.svc.HandleGetReceipt, r.Logger()))
-	// Operations
-	r.Get(c.prefix+"/channels", contract.AdaptCtxHandler(c.svc.HandleChannelHealth, r.Logger()))
+	RegisterRoutes(r, c.svc, c.prefix)
 }
 
 func (c *Component) RegisterMiddleware(_ *middleware.Registry) {}
