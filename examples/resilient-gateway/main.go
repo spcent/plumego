@@ -7,8 +7,11 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plog "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/middleware/requestid"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	cb "github.com/spcent/plumego/security/resilience/circuitbreaker"
 	"github.com/spcent/plumego/x/gateway"
 	"github.com/spcent/plumego/x/tenant/core"
@@ -35,10 +38,10 @@ func main() {
 		core.WithDebug(),
 		core.WithLogger(plog.NewGLogger()),
 	)
-	app.Use(observability.RequestID())
-	app.Use(observability.Tracing(nil))
-	app.Use(observability.HTTPMetrics(nil))
-	app.Use(observability.AccessLog(app.Logger()))
+	app.Use(requestid.Middleware())
+	app.Use(mwtracing.Middleware(nil))
+	app.Use(httpmetrics.Middleware(nil))
+	app.Use(accesslog.Middleware(app.Logger()))
 	app.Use(recovery.Recovery(app.Logger()))
 
 	// Create /api route group for middleware

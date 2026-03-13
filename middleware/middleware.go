@@ -6,11 +6,11 @@ import "net/http"
 //
 // Usage with core.App:
 //
-//	app.Use(observability.RequestID())
+//	app.Use(requestid.Middleware())
 //
 // Usage with a standalone handler:
 //
-//	h := middleware.Apply(finalHandler, observability.RequestID(), recovery.Recovery(logger))
+//	h := middleware.Apply(finalHandler, requestid.Middleware(), recovery.Recovery(logger))
 type Middleware func(http.Handler) http.Handler
 
 // Chain composes middleware in registration order.

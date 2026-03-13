@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/store/db/rw"
+	"github.com/spcent/plumego/x/data/rw"
 )
 
 // BenchmarkRoutingOverhead measures the overhead of routing decisions

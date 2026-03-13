@@ -22,10 +22,10 @@ Both `core.App.Use(...)` and `router.Router.Use(...)` consume this type.
 
 ```go
 if err := app.Use(
-    observability.RequestID(),
-    observability.Tracing(nil),
-    observability.HTTPMetrics(nil),
-    observability.AccessLog(app.Logger()),
+    requestid.Middleware(),
+    tracing.Middleware(nil),
+    httpmetrics.Middleware(nil),
+    accesslog.Middleware(app.Logger()),
     recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatal(err)
@@ -92,10 +92,10 @@ On response unwind, reverse order applies.
 ```go
 app := core.New(core.WithAddr(":8080"))
 
-_ = app.Use(observability.RequestID())
+_ = app.Use(requestid.Middleware())
 
 r := app.Router()
-r.Use(observability.AccessLog(app.Logger()))
+r.Use(accesslog.Middleware(app.Logger()))
 
 api := r.Group("/api")
 api.Use(authnMiddleware)
@@ -121,14 +121,14 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/middleware/requestid"
 )
 
 func main() {
     ctx := context.Background()
     app := core.New(core.WithAddr(":8080"))
 
-    if err := app.Use(observability.RequestID()); err != nil {
+    if err := app.Use(requestid.Middleware()); err != nil {
         log.Fatal(err)
     }
 
@@ -177,10 +177,10 @@ Recommended baseline includes panic recovery:
 
 ```go
 _ = app.Use(
-    observability.RequestID(),
-    observability.Tracing(nil),
-    observability.HTTPMetrics(nil),
-    observability.AccessLog(app.Logger()),
+    requestid.Middleware(),
+    tracing.Middleware(nil),
+    httpmetrics.Middleware(nil),
+    accesslog.Middleware(app.Logger()),
     recovery.Recovery(app.Logger()),
 )
 ```

@@ -9,11 +9,14 @@ import (
 
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/auth"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/limits"
-	"github.com/spcent/plumego/middleware/observability"
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/middleware/requestid"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/middleware/versioning"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
@@ -36,7 +39,22 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "request id",
-			mw:   observability.RequestID(),
+			mw:   requestid.Middleware(),
+			req:  httptest.NewRequest(http.MethodGet, "/", nil),
+		},
+		{
+			name: "tracing",
+			mw:   mwtracing.Middleware(nil),
+			req:  httptest.NewRequest(http.MethodGet, "/", nil),
+		},
+		{
+			name: "http metrics",
+			mw:   httpmetrics.Middleware(nil),
+			req:  httptest.NewRequest(http.MethodGet, "/", nil),
+		},
+		{
+			name: "access log",
+			mw:   accesslog.Middleware(log.NewNoOpLogger()),
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{

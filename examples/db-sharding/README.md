@@ -18,7 +18,7 @@ package main
 import (
 	"context"
 	"github.com/spcent/plumego/store/db"
-	"github.com/spcent/plumego/store/db/sharding"
+	"github.com/spcent/plumego/x/data/sharding"
 )
 
 func main() {
@@ -269,5 +269,5 @@ go run main.go
 ## See Also
 
 - [Database Sharding ROADMAP](../../store/db/ROADMAP.md)
-- [Read-Write Splitting](../../store/db/rw/)
-- [Sharding Strategies](../../store/db/sharding/)
+- [Read-Write Splitting](../../x/data/rw/)
+- [Sharding Strategies](../../x/data/sharding/)

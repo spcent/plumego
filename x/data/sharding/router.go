@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/spcent/plumego/store/db/rw"
+	"github.com/spcent/plumego/x/data/rw"
 )
 
 var (

@@ -11,7 +11,8 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/requestid"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/router"
 )
 
@@ -184,7 +185,7 @@ func TestWithComponents(t *testing.T) {
 
 func TestRequestIDMiddleware(t *testing.T) {
 	app := New()
-	app.Use(observability.RequestID())
+	app.Use(requestid.Middleware())
 	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -301,7 +302,7 @@ type mockMetricsCollector struct {
 
 type mockTracer struct{}
 
-func (m *mockTracer) Start(ctx context.Context, r *http.Request) (context.Context, observability.TraceSpan) {
+func (m *mockTracer) Start(ctx context.Context, r *http.Request) (context.Context, mwtracing.TraceSpan) {
 	return ctx, &mockSpan{}
 }
 func (m *mockTracer) StartSpan(name string) any              { return nil }

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/store/db/rw"
+	"github.com/spcent/plumego/x/data/rw"
 )
 
 func TestLoggingRouter_Creation(t *testing.T) {

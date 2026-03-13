@@ -14,9 +14,12 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	plog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/cors"
-	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/middleware/requestid"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
 // User represents a demo user resource.
@@ -297,10 +300,10 @@ func main() {
 		core.WithLogger(plog.NewGLogger()),
 	)
 	if err := app.Use(
-		observability.RequestID(),
-		observability.Tracing(nil),
-		observability.HTTPMetrics(nil),
-		observability.AccessLog(app.Logger()),
+		requestid.Middleware(),
+		mwtracing.Middleware(nil),
+		httpmetrics.Middleware(nil),
+		accesslog.Middleware(app.Logger()),
 		recovery.Recovery(app.Logger()),
 		cors.CORS,
 	); err != nil {

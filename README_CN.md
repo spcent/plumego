@@ -74,7 +74,7 @@ import (
 
     "github.com/spcent/plumego/core"
     plumelog "github.com/spcent/plumego/log"
-    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/middleware/requestid"
     "github.com/spcent/plumego/middleware/recovery"
     xdevtools "github.com/spcent/plumego/x/devtools"
 )
@@ -91,7 +91,7 @@ func main() {
     }
 
     if err := app.Use(
-        observability.RequestID(),
+        requestid.Middleware(),
         recovery.Recovery(app.Logger()),
     ); err != nil {
         log.Fatalf("register middleware: %v", err)
@@ -158,7 +158,7 @@ func main() {
 
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等标准库风格方法注册处理器（`func(w http.ResponseWriter, r *http.Request)`）。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
-- **中间件**：在启动前使用 `app.Use(...)` 显式链式添加，并保持传输层职责。推荐的可观测性顺序是 `middleware/observability.RequestID`、`middleware/observability.Tracing`、`middleware/observability.HTTPMetrics`、`middleware/observability.AccessLog`，之后再接 `middleware/recovery.Recovery(logger)`。
+- **中间件**：在启动前使用 `app.Use(...)` 显式链式添加，并保持传输层职责。推荐的可观测性顺序是 `middleware/requestid.Middleware`、`middleware/tracing.Middleware`、`middleware/httpmetrics.Middleware`、`middleware/accesslog.Middleware`，之后再接 `middleware/recovery.Recovery(logger)`。
 - **多租户（实验）**：提供租户隔离、配额管理、策略控制和数据库过滤能力，API 仍处于实验阶段，可能变更。详见[多租户](#多租户)章节。
 - **运维/管理端点**：可选的受保护运维 API，包含队列状态/重放、回执查询、通道健康、租户配额等能力。通过 `x/ops` 挂载，并使用令牌或自定义中间件保护；当 `AllowInsecure` 为 false（默认）且未配置鉴权时会拒绝访问。
 - **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
@@ -447,10 +447,10 @@ app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 ## 可观测性适配器
 无需自行编写适配器，即可将日志中间件接入指标/链路追踪后端：
 
-- `metrics.NewPrometheusCollector(namespace)` 实现 `observability.HTTPMetricsObserver`；如需 `/metrics` 端点，请显式搭配 `metrics.NewPrometheusExporter(collector)`。
-- `metrics.NewOpenTelemetryTracer(name)` 实现 `observability.Tracer`，发出带有 HTTP 元数据的 span。
+- `metrics.NewPrometheusCollector(namespace)` 实现 `httpmetrics.Observer`；如需 `/metrics` 端点，请显式搭配 `metrics.NewPrometheusExporter(collector)`。
+- `metrics.NewOpenTelemetryTracer(name)` 实现 `tracing.Tracer`，发出带有 HTTP 元数据的 span。
 
-如 `reference/standard-service` 所示，使用 `core.WithPrometheusCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`，然后再通过 `observability.HTTPMetrics(app.HTTPMetrics())` 显式挂载请求指标中间件。
+如 `reference/standard-service` 所示，使用 `core.WithPrometheusCollector(...)` 和 `core.WithTracer(...)` 将它们接入 `core.New`，然后再通过 `httpmetrics.Middleware(app.HTTPMetrics())` 显式挂载请求指标中间件。
 如果某个模块只需要单一能力，优先依赖更窄的接口，例如 `metrics.HTTPObserver`、`metrics.MQObserver`、`metrics.DBObserver` 或 `metrics.Recorder`，而不是整个 `metrics.AggregateCollector`。
 
 ## 配置参考

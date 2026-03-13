@@ -216,7 +216,7 @@ Configuration values can be overridden with environment variables:
 package main
 
 import (
-    "github.com/spcent/plumego/store/db/sharding/config"
+    "github.com/spcent/plumego/x/data/sharding/config"
 )
 
 func main() {
@@ -245,7 +245,7 @@ import (
     "log"
     "time"
 
-    "github.com/spcent/plumego/store/db/sharding/config"
+    "github.com/spcent/plumego/x/data/sharding/config"
 )
 
 func main() {
@@ -285,7 +285,7 @@ import (
     "log"
     "time"
 
-    "github.com/spcent/plumego/store/db/sharding/config"
+    "github.com/spcent/plumego/x/data/sharding/config"
 )
 
 func main() {

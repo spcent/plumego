@@ -27,7 +27,7 @@ ctx := context.Background()
 app := core.New(core.WithAddr(":8080"))
 r := app.Router()
 
-r.Use(observability.RequestID())
+r.Use(requestid.Middleware())
 
 api := r.Group("/api/v1")
 api.Get("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +66,7 @@ import (
     "net/http"
 
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/middleware/requestid"
     "github.com/spcent/plumego/router"
 )
 
@@ -74,7 +74,7 @@ func main() {
     ctx := context.Background()
     app := core.New(core.WithAddr(":8080"))
     r := app.Router()
-    r.Use(observability.RequestID())
+    r.Use(requestid.Middleware())
 
     api := r.Group("/api/v1")
     api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

@@ -130,8 +130,11 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/httpmetrics"
+	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/middleware/recovery"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
 // New constructs the HTTP application with middleware and routes.
@@ -141,10 +144,10 @@ func New() *core.App {
 		core.WithLogger(plumelog.NewGLogger()),
 	)
 	if err := app.Use(
-		observability.RequestID(),
-		observability.Tracing(nil),
-		observability.HTTPMetrics(nil),
-		observability.AccessLog(app.Logger()),
+		requestid.Middleware(),
+		mwtracing.Middleware(nil),
+		httpmetrics.Middleware(nil),
+		accesslog.Middleware(app.Logger()),
 		recovery.Recovery(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
@@ -334,8 +337,11 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/httpmetrics"
+	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/middleware/recovery"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
 func main() {
@@ -344,10 +350,10 @@ func main() {
 		core.WithLogger(plumelog.NewGLogger()),
 	)
 	if err := app.Use(
-		observability.RequestID(),
-		observability.Tracing(nil),
-		observability.HTTPMetrics(nil),
-		observability.AccessLog(app.Logger()),
+		requestid.Middleware(),
+		mwtracing.Middleware(nil),
+		httpmetrics.Middleware(nil),
+		accesslog.Middleware(app.Logger()),
 		recovery.Recovery(app.Logger()),
 	); err != nil {
 		log.Fatal(err)

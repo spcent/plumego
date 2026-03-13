@@ -1,4 +1,4 @@
-package observability
+package requestid
 
 import (
 	"context"
@@ -10,53 +10,47 @@ import (
 	"github.com/spcent/plumego/middleware"
 )
 
-type requestIDConfig struct {
+type config struct {
 	headerName       string
 	fallbackHeader   string
 	generate         func() string
 	includeInRequest bool
 }
 
-// RequestIDOption configures the RequestID middleware.
-type RequestIDOption func(*requestIDConfig)
+type Option func(*config)
 
-// WithRequestIDHeader sets the primary header name for request ids.
-func WithRequestIDHeader(name string) RequestIDOption {
-	return func(cfg *requestIDConfig) {
+func WithHeader(name string) Option {
+	return func(cfg *config) {
 		if name != "" {
 			cfg.headerName = name
 		}
 	}
 }
 
-// WithRequestIDFallbackHeader sets a secondary header to read when the primary is missing.
-func WithRequestIDFallbackHeader(name string) RequestIDOption {
-	return func(cfg *requestIDConfig) {
+func WithFallbackHeader(name string) Option {
+	return func(cfg *config) {
 		if name != "" {
 			cfg.fallbackHeader = name
 		}
 	}
 }
 
-// WithRequestIDGenerator sets the request id generator.
-func WithRequestIDGenerator(fn func() string) RequestIDOption {
-	return func(cfg *requestIDConfig) {
+func WithGenerator(fn func() string) Option {
+	return func(cfg *config) {
 		if fn != nil {
 			cfg.generate = fn
 		}
 	}
 }
 
-// WithRequestIDRequestHeader controls whether to write the id into the request header.
-func WithRequestIDRequestHeader(enabled bool) RequestIDOption {
-	return func(cfg *requestIDConfig) {
+func WithRequestHeader(enabled bool) Option {
+	return func(cfg *config) {
 		cfg.includeInRequest = enabled
 	}
 }
 
-// RequestID ensures each request has a trace/request id in context and response headers.
-func RequestID(opts ...RequestIDOption) middleware.Middleware {
-	cfg := requestIDConfig{
+func Middleware(opts ...Option) middleware.Middleware {
+	cfg := config{
 		headerName:       "X-Request-ID",
 		fallbackHeader:   "X-Trace-ID",
 		generate:         log.NewTraceID,

@@ -6,6 +6,8 @@
 
 The `store/` package provides data persistence abstractions for Plumego applications. It covers caching, database access, embedded key-value storage, file storage, and idempotent request handling.
 
+High-level data topology such as read-write splitting and sharding now lives under `x/data/*`, not under the stable `store` root.
+
 **Key Features**:
 - **Cache**: Interface-based caching with in-memory and Redis backends
 - **Database**: `database/sql` wrapper with metrics and query monitoring
@@ -22,6 +24,8 @@ The `store/` package provides data persistence abstractions for Plumego applicat
 | `store/kv` | Embedded key-value store with WAL |
 | `store/file` | File storage (local filesystem, S3) |
 | `store/idempotency` | Idempotent request handling |
+| `x/data/rw` | Read-write splitting orchestration |
+| `x/data/sharding` | Sharding and topology routing |
 
 ## Quick Start
 
@@ -119,3 +123,4 @@ handler := idempotency.Middleware(store)(paymentHandler)
 
 - [Tenant Module](../tenant/database-isolation.md) — Multi-tenant DB access
 - [Security Module](../security/) — Secure file handling
+- [x/data](../x-data/README.md) — Data topology extensions beyond the stable store layer

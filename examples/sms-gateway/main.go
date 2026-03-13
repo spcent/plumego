@@ -24,8 +24,11 @@ import (
 	logpkg "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/metrics/smsgateway"
-	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/middleware/requestid"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	plumrouter "github.com/spcent/plumego/router"
 	storedb "github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/store/idempotency"
@@ -147,10 +150,10 @@ func main() {
 	handler = tenantresolve.Middleware(tenantresolve.Options{
 		HeaderName: "X-Tenant-ID",
 	})(handler)
-	handler = observability.RequestID()(handler)
-	handler = observability.Tracing(tracer)(handler)
-	handler = observability.HTTPMetrics(collector)(handler)
-	handler = observability.AccessLog(logger)(handler)
+	handler = requestid.Middleware()(handler)
+	handler = mwtracing.Middleware(tracer)(handler)
+	handler = httpmetrics.Middleware(collector)(handler)
+	handler = accesslog.Middleware(logger)(handler)
 	handler = recovery.Recovery(logger)(handler)
 
 	addr := getenv("SMS_GATEWAY_ADDR", "127.0.0.1:8089")

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/store/db"
-	"github.com/spcent/plumego/store/db/rw"
-	"github.com/spcent/plumego/store/db/sharding"
+	"github.com/spcent/plumego/x/data/rw"
+	"github.com/spcent/plumego/x/data/sharding"
 )
 
 func main() {

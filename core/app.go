@@ -10,7 +10,7 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/middleware/observability"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/router"
 )
 
@@ -38,7 +38,7 @@ type App struct {
 	// Optional components
 	httpMetrics       metrics.HTTPObserver
 	prometheusMetrics *metrics.PrometheusCollector
-	tracer            observability.Tracer
+	tracer            mwtracing.Tracer
 	healthManager     health.HealthManager
 
 	// Component management

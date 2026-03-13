@@ -12,9 +12,12 @@ import (
 	"github.com/spcent/plumego/health"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/cors"
-	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/middleware/requestid"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/reference/standard-service/internal/config"
 	"github.com/spcent/plumego/x/devtools/pubsubdebug"
 	"github.com/spcent/plumego/x/pubsub"
@@ -101,10 +104,10 @@ func New(cfg config.Config, staticFS fs.FS) (*App, error) {
 	}
 
 	app := core.New(opts...)
-	app.Use(observability.RequestID())
-	app.Use(observability.Tracing(tracer))
-	app.Use(observability.HTTPMetrics(app.HTTPMetrics()))
-	app.Use(observability.AccessLog(app.Logger()))
+	app.Use(requestid.Middleware())
+	app.Use(mwtracing.Middleware(tracer))
+	app.Use(httpmetrics.Middleware(app.HTTPMetrics()))
+	app.Use(accesslog.Middleware(app.Logger()))
 	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(cors.CORS)
 

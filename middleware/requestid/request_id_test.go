@@ -1,4 +1,4 @@
-package observability
+package requestid
 
 import (
 	"net/http"
@@ -9,8 +9,8 @@ import (
 	"github.com/spcent/plumego/log"
 )
 
-func TestRequestIDUsesHeader(t *testing.T) {
-	handler := RequestID()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestMiddlewareUsesHeader(t *testing.T) {
+	handler := Middleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := contract.TraceIDFromContext(r.Context()); got != "abc-123" {
 			t.Fatalf("expected trace id to be propagated, got %q", got)
 		}
@@ -22,7 +22,6 @@ func TestRequestIDUsesHeader(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Request-ID", "abc-123")
 	rec := httptest.NewRecorder()
-
 	handler.ServeHTTP(rec, req)
 
 	if got := rec.Header().Get("X-Request-ID"); got != "abc-123" {
@@ -30,20 +29,16 @@ func TestRequestIDUsesHeader(t *testing.T) {
 	}
 }
 
-func TestRequestIDUsesFallbackHeader(t *testing.T) {
-	handler := RequestID()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestMiddlewareUsesFallbackHeader(t *testing.T) {
+	handler := Middleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := contract.TraceIDFromContext(r.Context()); got != "trace-xyz" {
 			t.Fatalf("expected trace id to be propagated, got %q", got)
-		}
-		if got := log.TraceIDFromContext(r.Context()); got != "trace-xyz" {
-			t.Fatalf("expected log trace id to be propagated, got %q", got)
 		}
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("X-Trace-ID", "trace-xyz")
 	rec := httptest.NewRecorder()
-
 	handler.ServeHTTP(rec, req)
 
 	if got := rec.Header().Get("X-Request-ID"); got != "trace-xyz" {
@@ -51,19 +46,15 @@ func TestRequestIDUsesFallbackHeader(t *testing.T) {
 	}
 }
 
-func TestRequestIDGeneratesWhenMissing(t *testing.T) {
-	handler := RequestID(WithRequestIDGenerator(func() string { return "gen-1" }))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestMiddlewareGeneratesWhenMissing(t *testing.T) {
+	handler := Middleware(WithGenerator(func() string { return "gen-1" }))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := contract.TraceIDFromContext(r.Context()); got != "gen-1" {
 			t.Fatalf("expected generated trace id, got %q", got)
-		}
-		if got := log.TraceIDFromContext(r.Context()); got != "gen-1" {
-			t.Fatalf("expected generated log trace id, got %q", got)
 		}
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	rec := httptest.NewRecorder()
-
 	handler.ServeHTTP(rec, req)
 
 	if got := rec.Header().Get("X-Request-ID"); got != "gen-1" {

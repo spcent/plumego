@@ -245,7 +245,7 @@
 //	import (
 //		"github.com/spcent/plumego/core"
 //		"github.com/spcent/plumego/metrics"
-//		"github.com/spcent/plumego/middleware/observability"
+//		"github.com/spcent/plumego/middleware/httpmetrics"
 //	)
 //
 //	app := core.New(

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/store/db"
-	"github.com/spcent/plumego/store/db/rw"
+	"github.com/spcent/plumego/x/data/rw"
 )
 
 func TestClusterConfig_Validate(t *testing.T) {

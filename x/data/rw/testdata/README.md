@@ -25,7 +25,7 @@ This directory contains a Docker Compose configuration for testing read/write sp
 ### 1. Start the Environment
 
 ```bash
-cd store/db/rw/testdata
+cd x/data/rw/testdata
 docker-compose up -d
 ```
 
@@ -95,7 +95,7 @@ root:rootpassword@tcp(localhost:3308)/testdb
 
 ```bash
 # From plumego root directory
-cd store/db/rw
+cd x/data/rw
 
 # Run integration tests (requires docker environment)
 go test -v -tags=integration -timeout 60s

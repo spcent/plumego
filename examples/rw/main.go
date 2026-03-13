@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/spcent/plumego/store/db/rw"
+	"github.com/spcent/plumego/x/data/rw"
 	// Import your database driver here
 	// For MySQL: _ "github.com/go-sql-driver/mysql"
 	// For PostgreSQL: _ "github.com/lib/pq"

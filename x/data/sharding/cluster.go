@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/store/db"
-	"github.com/spcent/plumego/store/db/rw"
+	"github.com/spcent/plumego/x/data/rw"
 )
 
 // ClusterDB is a transparent database interface that provides sharding capabilities

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/spcent/plumego/store/db/rw"
+	"github.com/spcent/plumego/x/data/rw"
 )
 
 // Test stubs for database connections (reused from rw package tests)

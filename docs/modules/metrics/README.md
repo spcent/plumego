@@ -33,7 +33,7 @@ import (
 
     "github.com/spcent/plumego/core"
     "github.com/spcent/plumego/metrics"
-    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/middleware/httpmetrics"
 )
 
 func main() {
@@ -45,7 +45,7 @@ func main() {
         core.WithPrometheusCollector(collector),
     )
 
-    if err := app.Use(observability.HTTPMetrics(app.HTTPMetrics())); err != nil {
+    if err := app.Use(httpmetrics.Middleware(app.HTTPMetrics())); err != nil {
         log.Fatal(err)
     }
 

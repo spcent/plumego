@@ -173,7 +173,7 @@ The instrumented DB works seamlessly with the plumego database cluster package:
 import (
     "github.com/spcent/plumego/metrics"
     "github.com/spcent/plumego/store/db"
-    "github.com/spcent/plumego/store/db/rw"
+    "github.com/spcent/plumego/x/data/rw"
 )
 
 // Create instrumented databases

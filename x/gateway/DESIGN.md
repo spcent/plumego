@@ -96,7 +96,7 @@ type Config struct {
 
 ### 2. Load Balancer Interface
 
-We'll reuse and adapt the existing `store/db/rw.LoadBalancer` interface:
+We'll reuse and adapt the existing `x/data/rw.LoadBalancer` interface:
 
 ```go
 type LoadBalancer interface {
@@ -347,7 +347,7 @@ app.Use("/ws/*", proxy.New(proxy.Config{
 - Use existing middleware support
 
 ### 2. Existing Load Balancers
-- Adapt `store/db/rw.LoadBalancer` interface
+- Adapt `x/data/rw.LoadBalancer` interface
 - Reuse round-robin, weighted, least-connections strategies
 - Add IP hash strategy
 

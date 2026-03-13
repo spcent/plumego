@@ -76,7 +76,7 @@ import (
 
     "github.com/spcent/plumego/core"
     plumelog "github.com/spcent/plumego/log"
-    "github.com/spcent/plumego/middleware/observability"
+    "github.com/spcent/plumego/middleware/requestid"
     "github.com/spcent/plumego/middleware/recovery"
     xdevtools "github.com/spcent/plumego/x/devtools"
 )
@@ -93,7 +93,7 @@ func main() {
     }
 
     if err := app.Use(
-        observability.RequestID(),
+        requestid.Middleware(),
         recovery.Recovery(app.Logger()),
     ); err != nil {
         log.Fatalf("register middleware: %v", err)
@@ -160,7 +160,7 @@ func main() {
 
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, and other standard-library style methods that accept `func(w http.ResponseWriter, r *http.Request)`. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
-- **Middleware**: Chain middleware before boot with `app.Use(...)`. Keep middleware transport-only and explicit. Canonical observability order is `middleware/observability.RequestID`, `middleware/observability.Tracing`, `middleware/observability.HTTPMetrics`, `middleware/observability.AccessLog`, then `middleware/recovery.Recovery(logger)`.
+- **Middleware**: Chain middleware before boot with `app.Use(...)`. Keep middleware transport-only and explicit. Canonical observability order is `middleware/requestid.Middleware`, `middleware/tracing.Middleware`, `middleware/httpmetrics.Middleware`, `middleware/accesslog.Middleware`, then `middleware/recovery.Recovery(logger)`.
 - **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
 - **Ops/Admin Endpoints**: Optional protected operations API for queue stats/replay, receipt lookup, channel health, and tenant quota inspection. Mount via `x/ops` and secure with a token or custom middleware. If auth is missing and `AllowInsecure` is false (default), requests are denied.
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
@@ -450,10 +450,10 @@ app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
 ## Observability Adapters
 No need to write your own adapters to hook logging middleware into metrics/tracing backends:
 
-- `metrics.NewPrometheusCollector(namespace)` implements `observability.HTTPMetricsObserver`; pair it with `metrics.NewPrometheusExporter(collector)` for `/metrics`.
-- `metrics.NewOpenTelemetryTracer(name)` implements `observability.Tracer`, emitting spans with HTTP metadata.
+- `metrics.NewPrometheusCollector(namespace)` implements `httpmetrics.Observer`; pair it with `metrics.NewPrometheusExporter(collector)` for `/metrics`.
+- `metrics.NewOpenTelemetryTracer(name)` implements `tracing.Tracer`, emitting spans with HTTP metadata.
 
-As shown in `reference/standard-service`, wire them into `core.New` using `core.WithPrometheusCollector(...)` and `core.WithTracer(...)`, then mount request metrics explicitly with `observability.HTTPMetrics(app.HTTPMetrics())`.
+As shown in `reference/standard-service`, wire them into `core.New` using `core.WithPrometheusCollector(...)` and `core.WithTracer(...)`, then mount request metrics explicitly with `httpmetrics.Middleware(app.HTTPMetrics())`.
 For narrower DI at module boundaries, prefer `metrics.HTTPObserver`, `metrics.MQObserver`, `metrics.DBObserver`, or `metrics.Recorder` instead of the full `metrics.AggregateCollector` when a call site only needs one capability.
 
 ## Configuration Reference

@@ -20,10 +20,10 @@ type Middleware func(http.Handler) http.Handler
 app := core.New(core.WithAddr(":8080"))
 
 if err := app.Use(
-    observability.RequestID(),
-    observability.Tracing(nil),
-    observability.HTTPMetrics(nil),
-    observability.AccessLog(app.Logger()),
+    requestid.Middleware(),
+    tracing.Middleware(nil),
+    httpmetrics.Middleware(nil),
+    accesslog.Middleware(app.Logger()),
     recovery.Recovery(app.Logger()),
 ); err != nil {
     log.Fatalf("register middleware: %v", err)
@@ -56,11 +56,11 @@ Wrap one handler manually.
 
 ## Built-in Middleware (Common)
 
-- request ID: `middleware/observability.RequestID(...)`
-- tracing: `middleware/observability.Tracing(...)`
-- HTTP metrics: `middleware/observability.HTTPMetrics(...)`
-- access log: `middleware/observability.AccessLog(...)`
-- combined convenience wrapper: `middleware/observability.Logging(...)`
+- request ID: `middleware/requestid.Middleware(...)`
+- tracing: `middleware/tracing.Middleware(...)`
+- HTTP metrics: `middleware/httpmetrics.Middleware(...)`
+- access log: `middleware/accesslog.Middleware(...)`
+- combined convenience wrapper: `middleware/accesslog.Logging(...)`
 - panic recovery: `middleware/recovery.Recovery(logger)`
 - CORS: `middleware/cors.CORS` / `middleware/cors.CORSWithOptions(...)`
 - security headers: `middleware/security.SecurityHeaders(...)`
@@ -78,10 +78,10 @@ Use only the middleware needed by your transport boundary.
 ```go
 h := middleware.Apply(
     http.HandlerFunc(finalHandler),
-    observability.RequestID(),
-    observability.Tracing(nil),
-    observability.HTTPMetrics(nil),
-    observability.AccessLog(logger),
+    requestid.Middleware(),
+    tracing.Middleware(nil),
+    httpmetrics.Middleware(nil),
+    accesslog.Middleware(logger),
     recovery.Recovery(logger),
 )
 
@@ -111,10 +111,10 @@ When components contribute middleware, use `middleware.Registry`:
 
 ```go
 reg := middleware.NewRegistry()
-reg.Use(observability.RequestID())
-reg.Use(observability.Tracing(nil))
-reg.Use(observability.HTTPMetrics(nil))
-reg.Use(observability.AccessLog(logger))
+reg.Use(requestid.Middleware())
+reg.Use(tracing.Middleware(nil))
+reg.Use(httpmetrics.Middleware(nil))
+reg.Use(accesslog.Middleware(logger))
 reg.Use(recovery.Recovery(logger))
 
 h := middleware.Apply(http.HandlerFunc(finalHandler), reg.Middlewares()...)

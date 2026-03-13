@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/metrics"
-	mwobs "github.com/spcent/plumego/middleware/observability"
+	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/router"
 )
 
@@ -219,11 +219,11 @@ func TestConfigureMetricsCollectorFromHooks(t *testing.T) {
 }
 
 func TestConfigureTracingOnly(t *testing.T) {
-	var setTracer mwobs.Tracer
+	var setTracer mwtracing.Tracer
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		SetTracer:     func(t mwobs.Tracer) { setTracer = t },
+		SetTracer:     func(t mwtracing.Tracer) { setTracer = t },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Tracing.Enabled = true
@@ -239,11 +239,11 @@ func TestConfigureTracingOnly(t *testing.T) {
 
 func TestConfigureTracingWithExplicitTracer(t *testing.T) {
 	explicit := &stubTracer{}
-	var setTracer mwobs.Tracer
+	var setTracer mwtracing.Tracer
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		SetTracer:     func(t mwobs.Tracer) { setTracer = t },
+		SetTracer:     func(t mwtracing.Tracer) { setTracer = t },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Tracing.Enabled = true
@@ -260,12 +260,12 @@ func TestConfigureTracingWithExplicitTracer(t *testing.T) {
 
 func TestConfigureTracingFromHooks(t *testing.T) {
 	hookTracer := &stubTracer{}
-	var setTracer mwobs.Tracer
+	var setTracer mwtracing.Tracer
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		GetTracer:     func() mwobs.Tracer { return hookTracer },
-		SetTracer:     func(t mwobs.Tracer) { setTracer = t },
+		GetTracer:     func() mwtracing.Tracer { return hookTracer },
+		SetTracer:     func(t mwtracing.Tracer) { setTracer = t },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Tracing.Enabled = true
@@ -364,10 +364,10 @@ func TestConfigureMetricsWithNilSetCollector(t *testing.T) {
 	}
 }
 
-// stubTracer satisfies mwobs.Tracer.
+// stubTracer satisfies mwtracing.Tracer.
 type stubTracer struct{}
 
-func (s *stubTracer) Start(ctx context.Context, _ *http.Request) (context.Context, mwobs.TraceSpan) {
+func (s *stubTracer) Start(ctx context.Context, _ *http.Request) (context.Context, mwtracing.TraceSpan) {
 	return ctx, &stubSpan{}
 }
 

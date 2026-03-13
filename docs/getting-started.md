@@ -130,7 +130,7 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/middleware/observability"
+	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/middleware/recovery"
 )
 
@@ -139,7 +139,7 @@ app := core.New(
 	core.WithLogger(plumelog.NewGLogger()),
 )
 if err := app.Use(
-	observability.RequestID(),
+	requestid.Middleware(),
 	recovery.Recovery(app.Logger()),
 ); err != nil {
 	log.Fatalf("register middleware: %v", err)
