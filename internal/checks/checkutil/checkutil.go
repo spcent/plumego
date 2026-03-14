@@ -95,6 +95,9 @@ func AllowedTopLevelDirs() map[string]struct{} {
 func ReadBaseline(path string) (map[string]struct{}, error) {
 	file, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]struct{}{}, nil
+		}
 		return nil, err
 	}
 	defer file.Close()

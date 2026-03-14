@@ -1,3 +1,0 @@
-# Existing extension roots still need manifests. New x/* modules must not rely on this baseline.
-# Current state: no active baseline entries.
-# Removal candidate: once checks tolerate absent baseline files, delete this empty file instead of keeping a placeholder.
