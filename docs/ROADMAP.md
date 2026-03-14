@@ -141,7 +141,7 @@ Exit criteria:
 
 ## Phase 4: Shrink Stable-Root Migration Debt
 
-Status: not started
+Status: in progress
 
 Goals:
 
@@ -156,6 +156,12 @@ Planned work:
 - ensure transport health handlers remain outside `health`
 - keep tenant-aware behavior out of stable `middleware` and `store`
 - shrink `specs/check-baseline/*` entries instead of letting them grow
+
+Execution approach:
+
+- start with metadata and check-baseline driven work before moving code
+- keep each debt-reduction card scoped to one stable root when possible
+- prefer boundary tightening and explicit migration notes over broad tree moves
 
 Exit criteria:
 
