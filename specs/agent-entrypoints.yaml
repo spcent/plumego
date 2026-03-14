@@ -125,6 +125,54 @@ entrypoints:
       - Use x/websocket for app-facing websocket transport work.
       - Keep websocket setup explicit and out of core.
 
+  frontend_asset_serving:
+    start_with:
+      - x/frontend/module.yaml
+      - x/frontend/README.md
+      - reference/standard-service
+    avoid:
+      - core
+      - router
+    notes:
+      - Use x/frontend for static asset serving and SPA fallback behavior.
+      - Do not let frontend helpers redefine the canonical application bootstrap path.
+
+  devtools_local_debug:
+    start_with:
+      - x/devtools/module.yaml
+      - x/devtools/devtools.go
+      - README.md
+    avoid:
+      - core
+      - reference/standard-service
+    notes:
+      - Use x/devtools for debug-only routes such as pprof, metrics snapshots, and env reload.
+      - Keep devtools explicitly mounted and gated outside production defaults.
+
+  service_discovery:
+    start_with:
+      - x/discovery/module.yaml
+      - specs/extension-entrypoints.yaml
+      - specs/repo.yaml
+    avoid:
+      - core
+      - store
+    notes:
+      - Use x/discovery for service lookup and dynamic endpoint discovery concerns.
+      - Keep discovery adapters out of stable roots unless they become durable primitives.
+
+  ops_admin_surface:
+    start_with:
+      - x/ops/module.yaml
+      - x/observability/module.yaml
+      - specs/extension-entrypoints.yaml
+    avoid:
+      - health
+      - core
+    notes:
+      - Use x/ops for protected admin endpoints and x/observability for broader adapter work.
+      - Keep HTTP health ownership outside health and keep admin surfaces explicitly gated.
+
   observability_admin:
     start_with:
       - x/observability/module.yaml

@@ -125,6 +125,7 @@ func main() {
 - 模块 owner 和默认验证入口位于 `specs/ownership.yaml`。
 - 标准变更 recipe 位于 `specs/change-recipes/*`。
 - 模块 primer 文档位于 `docs/modules/*`，并应与各模块 manifest 的 `doc_paths` 保持一致。
+- 次级任务族入口也已固定：前端静态资源从 `x/frontend` 开始，本地调试能力从 `x/devtools` 开始，服务发现从 `x/discovery` 开始，受保护管理端点从 `x/ops` 开始。
 
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等标准库风格方法注册处理器（`func(w http.ResponseWriter, r *http.Request)`）。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。

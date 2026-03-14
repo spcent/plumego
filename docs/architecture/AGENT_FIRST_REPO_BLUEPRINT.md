@@ -158,6 +158,8 @@ Agents should prefer these entrypoints when multiple related `x/*` packages exis
 - Start reusable resource-interface and CRUD-standardization work in `x/rest`; keep bootstrap shape in `reference/standard-service` and edge proxy topology in `x/gateway`.
 - Start observability adapter work in `x/observability`; use `x/ops` only for protected admin endpoints and diagnostics surfaces.
 - Start frontend asset-serving work in `x/frontend`, but do not let frontend helpers define the canonical app path.
+- Start local debug and developer-only route work in `x/devtools`; do not treat debug surfaces as part of `core`.
+- Start service discovery work in `x/discovery`; do not spread discovery concerns across stable roots.
 - Start transport observability work in stable `middleware/*` packages; use `x/observability` only for higher-level adapter or export wiring.
 - Do not start new app structure from `x/rest`; prefer `reference/standard-service` and explicit route binding.
 - Treat `x/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.
