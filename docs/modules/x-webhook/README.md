@@ -19,3 +19,23 @@
 - `x/webhook/module.yaml`
 - `x/messaging/module.yaml`
 - `x/webhook/in.go` or `x/webhook/out.go`
+
+## Public entrypoints
+
+- `NewService`
+- `NewMemStore`
+- `VerifyHMAC`
+- `VerifyGitHub`
+- `VerifyStripe`
+
+## Main risks when changing this module
+
+- signature verification regression
+- delivery retry regression
+- route registration regression
+
+## Canonical change shape
+
+- keep verification fail-closed
+- keep secrets and signatures out of logs
+- keep webhook transport concerns explicit and local to this layer

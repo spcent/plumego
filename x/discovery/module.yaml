@@ -29,6 +29,9 @@ test_commands:
   - go test -timeout 20s ./x/discovery/...
   - go vet ./x/discovery/...
 
+doc_paths:
+  - docs/modules/x-discovery/README.md
+
 review_checklist:
   - Keep discovery behavior explicit
   - Avoid hidden background state

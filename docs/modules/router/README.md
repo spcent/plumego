@@ -22,6 +22,18 @@
 - `router/router.go`
 - `router/group.go`
 
+## Public entrypoints
+
+- `Router`
+- `Group`
+- `Param`
+
+## Main risks when changing this module
+
+- dispatch regression
+- param extraction regression
+- reverse routing regression
+
 ## Canonical change shape
 
 - preserve deterministic dispatch

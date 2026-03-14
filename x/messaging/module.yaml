@@ -36,6 +36,9 @@ test_commands:
   - go test -timeout 20s ./x/messaging/...
   - go vet ./x/messaging/...
 
+doc_paths:
+  - docs/modules/x-messaging/README.md
+
 review_checklist:
   - Keep message flow explicit
   - Avoid hidden provider globals

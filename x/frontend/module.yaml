@@ -29,6 +29,9 @@ test_commands:
   - go test -timeout 20s ./x/frontend/...
   - go vet ./x/frontend/...
 
+doc_paths:
+  - docs/modules/x-frontend/README.md
+
 review_checklist:
   - Keep mounting explicit
   - Avoid hidden filesystem side effects

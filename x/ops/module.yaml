@@ -32,6 +32,9 @@ test_commands:
   - go test -timeout 20s ./x/ops/...
   - go vet ./x/ops/...
 
+doc_paths:
+  - docs/modules/x-ops/README.md
+
 review_checklist:
   - Keep ops endpoints explicit
   - Preserve auth boundaries

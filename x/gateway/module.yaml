@@ -35,6 +35,9 @@ test_commands:
   - go test -timeout 20s ./x/gateway/...
   - go vet ./x/gateway/...
 
+doc_paths:
+  - docs/modules/x-gateway/README.md
+
 review_checklist:
   - Keep proxy behavior explicit
   - Avoid hidden globals

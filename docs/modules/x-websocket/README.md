@@ -19,3 +19,24 @@
 - `x/websocket/module.yaml`
 - `x/websocket/websocket.go`
 - `reference/standard-service` when checking canonical bootstrap shape
+
+## Public entrypoints
+
+- `New`
+- `DefaultWebSocketConfig`
+- `NewHub`
+- `NewHubWithConfig`
+- `ServeWSWithAuth`
+- `ServeWSWithConfig`
+
+## Main risks when changing this module
+
+- websocket auth regression
+- broadcast behavior regression
+- connection lifecycle regression
+
+## Canonical change shape
+
+- keep websocket setup explicit and out of `core`
+- keep auth and broadcast gates reviewable
+- treat `x/websocket` as the app-facing websocket transport surface

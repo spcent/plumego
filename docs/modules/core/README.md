@@ -24,8 +24,21 @@
 - `core/options.go`
 - `reference/standard-service/internal/app/app.go`
 
+## Public entrypoints
+
+- `New`
+- `App`
+- `Option`
+
+## Main risks when changing this module
+
+- startup regression
+- shutdown regression
+- route assembly regression
+
 ## Canonical change shape
 
 - keep bootstrap explicit
 - keep lifecycle behavior reviewable
 - push feature-specific wiring back to app-local code or the owning extension
+- preserve `net/http` compatibility while keeping `core` as a kernel
