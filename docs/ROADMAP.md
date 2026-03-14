@@ -93,7 +93,7 @@ Exit criteria:
 
 ## Phase 3: Harden `x/rest` as the Reusable Resource Interface Layer
 
-Status: foundation in place
+Status: in progress
 
 Goals:
 
@@ -108,6 +108,12 @@ Planned work:
 - continue moving query, pagination, hooks, and transformer behavior toward spec-driven configuration
 - define clearer reusable error and response conventions where needed
 - document recommended layering between handlers, repositories, and `x/rest` controllers
+
+Execution approach:
+
+- land route-level tests first to lock the public registration surface
+- add examples before making deeper orchestration changes
+- keep each `x/rest` hardening step reversible and independently testable
 
 Exit criteria:
 
