@@ -47,6 +47,12 @@ Exit criteria:
 - manifests, primers, ownership data, and recipes stay in sync under checks
 - new contributors can follow the same workflow without tribal knowledge
 
+Execution surface:
+
+- `tasks/cards/` is the repo-native queue for reversible work items
+- task cards should stay small enough for one focused implementation pass
+- task cards are workflow assets, not archival prose
+
 ## Phase 2: Complete Extension Taxonomy Convergence
 
 Status: partially complete

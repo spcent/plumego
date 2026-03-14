@@ -40,6 +40,7 @@ For staged future work and sequencing, also read:
 
 - `docs/ROADMAP.md`
 - `specs/change-recipes/*`
+- `tasks/cards/*`
 
 When guidance overlaps, follow:
 
@@ -147,8 +148,9 @@ Update these when behavior, public API, config, security semantics, lifecycle be
 
 1. Identify the target layer: stable root or `x/*`.
 2. Read the canonical sources in Section 3.
-3. Confirm the owning module manifest and validation commands.
-4. Make the smallest coherent change.
-5. Add or update focused tests.
-6. Run validation in the order from Section 7.
-7. Sync docs only for implemented behavior changes.
+3. If a matching repo-native task card exists, follow it.
+4. Confirm the owning module manifest and validation commands.
+5. Make the smallest coherent change.
+6. Add or update focused tests.
+7. Run validation in the order from Section 7.
+8. Sync docs only for implemented behavior changes.

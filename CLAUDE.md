@@ -13,6 +13,7 @@ Repository planning and future restructuring should also follow:
 - `specs/ownership.yaml`
 - `specs/dependency-rules.yaml`
 - `specs/change-recipes/*`
+- `tasks/cards/*`
 - `docs/ROADMAP.md`
 - target `<module>/module.yaml`
 - `reference/standard-service`

@@ -25,12 +25,15 @@ canonical_authority:
     - specs/change-recipes/add-middleware.yaml
     - specs/change-recipes/new-stable-module.yaml
     - specs/change-recipes/new-extension-module.yaml
+  task_queue:
+    - tasks/cards
   notes:
     - Reference app defines the canonical application structure
     - reference/standard-service must depend only on stable root packages and stdlib
     - Extension demonstrations must not define the canonical path
     - Extension families must expose one canonical discovery entrypoint
     - Agent workflow metadata must be machine-readable and live under specs/
+    - Repo-native execution cards live under tasks/cards
 
 layers:
   stable:
@@ -117,10 +120,13 @@ agent_workflow:
     - specs/agent-entrypoints.yaml
     - specs/ownership.yaml
     - specs/change-recipes
+  execution_queue:
+    - tasks/cards
   required_steps:
     - Identify target layer and module
     - Read canonical style and reference app when shaping app structure
     - Read specs/agent-entrypoints.yaml for discovery defaults
+    - Read tasks/cards when the work should follow a repo-native task card
     - Read target module manifest
     - Keep changes within one module when possible
     - Run module tests first
