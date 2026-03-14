@@ -39,6 +39,7 @@ review_checklist:
   - Keep resource wiring explicit
   - Avoid hidden repository injection
   - Preserve transport-only helpers
+  - Keep response and error conventions aligned with contract helpers
 
 agent_hints:
   - Use x/rest when standardizing reusable resource APIs and CRUD interface shape

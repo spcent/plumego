@@ -109,6 +109,11 @@ Planned work:
 - define clearer reusable error and response conventions where needed
 - document recommended layering between handlers, repositories, and `x/rest` controllers
 
+Guidance constraints:
+
+- keep response and error conventions aligned with `contract`
+- do not turn `x/rest` into a bootstrap or transport-contract replacement layer
+
 Execution approach:
 
 - land route-level tests first to lock the public registration surface

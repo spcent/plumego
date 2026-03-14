@@ -40,6 +40,13 @@ Use these entrypoints by intent:
 3. Create a `DBResourceController` or custom context-aware controller
 4. Register routes explicitly in an app-local wiring package
 
+Recommended ownership split:
+
+- handler or app-local wiring: owns route binding and transport composition
+- `x/rest` controller: owns reusable CRUD transport behavior
+- repository: owns persistence and query execution
+- domain package: owns business validation and business rules
+
 ## Canonical example
 
 ```go
@@ -65,6 +72,13 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 - Keep route registration explicit; do not hide resource binding behind bootstrap side effects
 - Prefer one `ResourceSpec` per resource family instead of ad hoc controller-local defaults
 
+## Response and error guidance
+
+- keep using `contract.WriteError` for structured error responses
+- keep using contract-based response helpers for transport output
+- do not introduce a separate `x/rest`-specific response envelope family
+- treat `x/rest` as reusable controller and route-binding infrastructure, not as a replacement transport contract layer
+
 ## Extension points
 
 - `ResourceHooks`: before/after list, create, update, delete hooks
@@ -77,3 +91,4 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 - If the task is "standardize CRUD/resource API shape", start here
 - If the task is "proxy/edge transport", start in `x/gateway`
 - If the task is "bootstrap a service", start in `reference/standard-service`
+- If the task is "domain validation or business rules", keep that logic outside `x/rest`

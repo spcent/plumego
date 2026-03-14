@@ -147,6 +147,7 @@ func main() {
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
 - **WebSocket Transport**: `x/websocket` provides an app-facing server with explicit route registration, a JWT-protected `/ws` endpoint, and an optional broadcast endpoint protected by a shared secret.
 - **Messaging + Webhook**: Start new app-facing messaging work in `x/messaging`. Use `x/webhook` directly only for narrow inbound or outbound webhook mechanics such as signature verification, delivery replay, and trigger-token-protected webhook operations.
+- **Reusable Resource APIs**: Use `x/rest` for reusable CRUD and resource-interface standardization. Keep response/error contracts aligned with `contract`, keep route binding explicit, and keep domain validation outside `x/rest`.
 - **Migrations**: Optional SQL schemas for modules/examples live in `docs/migrations/` (see notes for sms-gateway `sent_at` backfill).
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
 
