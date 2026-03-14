@@ -576,11 +576,7 @@ type BaseContextResourceController struct {
 // NewBaseContextResourceController creates a context-aware resource controller with defaults.
 func NewBaseContextResourceController(resourceName string) *BaseContextResourceController {
 	controller := &BaseContextResourceController{
-		ResourceName:   resourceName,
-		QueryBuilder:   NewQueryBuilder(),
-		ParamExtractor: NewParamExtractor(),
-		Hooks:          &NoOpResourceHooks{},
-		Transformer:    &IdentityTransformer{},
+		ResourceName: resourceName,
 	}
 	ApplyResourceSpec(controller, DefaultResourceSpec(resourceName))
 	return controller

@@ -69,9 +69,15 @@ func ApplyResourceSpec(controller *BaseContextResourceController, spec ResourceS
 		return
 	}
 
+	if spec.Name == "" && controller.ResourceName != "" {
+		spec.Name = controller.ResourceName
+	}
 	spec = spec.Normalized()
 	controller.Spec = spec
 	controller.ResourceName = spec.Name
+	if controller.ParamExtractor == nil {
+		controller.ParamExtractor = NewParamExtractor()
+	}
 	controller.QueryBuilder = queryBuilderFromSpec(spec)
 	controller.Hooks = hooksFromSpec(spec)
 	controller.Transformer = transformerFromSpec(spec)
