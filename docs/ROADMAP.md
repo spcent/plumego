@@ -93,7 +93,7 @@ Exit criteria:
 
 ## Phase 3: Harden `x/rest` as the Reusable Resource Interface Layer
 
-Status: in progress
+Status: substantially complete
 
 Goals:
 
@@ -103,11 +103,24 @@ Goals:
 
 Planned work:
 
-- add route-level tests for `RegisterContextResourceRoutes(...)`
-- add examples showing `ResourceSpec -> repository -> routes`
+- keep route-level tests around `RegisterContextResourceRoutes(...)` current as the public registration surface evolves
+- keep examples showing `ResourceSpec -> repository -> routes` current as the canonical reuse path
 - continue moving query, pagination, hooks, and transformer behavior toward spec-driven configuration
-- define clearer reusable error and response conventions where needed
-- document recommended layering between handlers, repositories, and `x/rest` controllers
+- keep reusable error and response conventions aligned with `contract`
+- keep layering guidance between handlers, repositories, and `x/rest` controllers explicit
+
+Completed in this phase:
+
+- locked down the public route registration surface with focused `x/rest` route tests
+- added a canonical `x/rest` example for `ResourceSpec -> NewDBResource -> RegisterContextResourceRoutes(...)`
+- tightened `ApplyResourceSpec(...)` so controller defaults flow through one orchestration path
+- clarified `x/rest` response guidance and the layering boundary between app wiring, controllers, repositories, and domain logic
+
+Remaining work:
+
+- deepen spec-driven orchestration only when new duplication or ambiguity appears
+- add further examples if new reusable controller patterns emerge
+- keep `x/rest` guidance synchronized as the public API evolves
 
 Guidance constraints:
 
