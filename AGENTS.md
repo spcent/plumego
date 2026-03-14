@@ -134,6 +134,7 @@ Extra checks by change type:
 - Store: concurrent access and persistence correctness tests
 
 `specs/check-baseline/` contains temporary migration debt baselines. Reduce them; do not expand them casually.
+If a baseline file is empty, treat the file itself as migration debt and prefer removing the placeholder once the corresponding check can tolerate a missing baseline file.
 
 ## 8. Docs Sync
 

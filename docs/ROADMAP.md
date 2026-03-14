@@ -161,6 +161,8 @@ Current audit focus:
 
 - `store/cache/distributed` and `store/cache/redis` remain the clearest stable-store migration debt
 - they should be maintained for now, but they should not define the template for new stable-store additions
+- the current files under `specs/check-baseline/*` are empty placeholders rather than active exception lists
+- the next baseline-reduction candidate is teaching checks to tolerate absent baseline files so these empty placeholders can be removed
 
 Execution approach:
 
