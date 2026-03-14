@@ -134,8 +134,8 @@ entrypoints:
       - core
       - router
     notes:
-      - Use x/frontend for static asset serving and SPA fallback behavior.
-      - Do not let frontend helpers redefine the canonical application bootstrap path.
+      - Start frontend asset serving and SPA fallback work in x/frontend.
+      - Read reference/standard-service only to keep app shape aligned; do not treat x/frontend as a bootstrap surface.
 
   devtools_local_debug:
     start_with:
@@ -146,8 +146,8 @@ entrypoints:
       - core
       - reference/standard-service
     notes:
-      - Use x/devtools for debug-only routes such as pprof, metrics snapshots, and env reload.
-      - Keep devtools explicitly mounted and gated outside production defaults.
+      - Start local debug-only route work in x/devtools.
+      - Keep devtools explicitly mounted, production-gated, and outside canonical bootstrap.
 
   service_discovery:
     start_with:
@@ -158,8 +158,8 @@ entrypoints:
       - core
       - store
     notes:
-      - Use x/discovery for service lookup and dynamic endpoint discovery concerns.
-      - Keep discovery adapters out of stable roots unless they become durable primitives.
+      - Start service lookup and dynamic endpoint discovery work in x/discovery.
+      - Keep discovery adapters out of stable roots and do not turn x/discovery into application bootstrap.
 
   ops_admin_surface:
     start_with:
@@ -170,7 +170,7 @@ entrypoints:
       - health
       - core
     notes:
-      - Use x/ops for protected admin endpoints and x/observability for broader adapter work.
+      - Start protected admin endpoint work in x/ops and broader adapter work in x/observability.
       - Keep HTTP health ownership outside health and keep admin surfaces explicitly gated.
 
   observability_admin:

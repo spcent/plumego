@@ -33,3 +33,9 @@
 - keep discovery behavior explicit
 - keep resolvers small and composable
 - do not spread discovery concerns across stable roots
+
+## Boundary with bootstrap
+
+- `x/discovery` is a secondary capability root for resolver and discovery work, not an application bootstrap surface
+- keep discovery concerns out of stable roots unless they become durable primitives
+- keep service discovery wiring explicit in the owning application or extension

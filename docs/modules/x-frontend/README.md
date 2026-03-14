@@ -33,3 +33,9 @@
 - keep frontend mounting explicit
 - preserve transport-only helper behavior
 - do not let frontend helpers redefine the canonical app path
+
+## Boundary with bootstrap
+
+- `x/frontend` is a secondary capability root for asset serving, not an application bootstrap surface
+- read `reference/standard-service` only to align app shape and route wiring
+- keep frontend registration explicit in app-local code

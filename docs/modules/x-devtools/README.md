@@ -33,3 +33,9 @@
 - keep devtools opt-in
 - keep debug handlers explicit and locally mounted
 - do not move debug routes into `core`
+
+## Boundary with bootstrap
+
+- `x/devtools` is a secondary capability root for local diagnostics, not a bootstrap surface
+- keep devtools out of canonical application startup
+- mount debug routes explicitly and gate them outside production defaults

@@ -137,6 +137,7 @@ func main() {
 - Standard change recipes live in `specs/change-recipes/*`.
 - Module primers live in `docs/modules/*` and should match each manifest's `doc_paths`.
 - Secondary task-family defaults are also explicit: frontend asset work starts in `x/frontend`, local debug work starts in `x/devtools`, service discovery starts in `x/discovery`, and protected admin surfaces start in `x/ops`.
+- These secondary extension roots are capability entrypoints, not application bootstrap surfaces.
 
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, and other standard-library style methods that accept `func(w http.ResponseWriter, r *http.Request)`. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
