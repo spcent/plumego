@@ -4,7 +4,7 @@
 [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, WebSocket utilities, webhook pipelines, and static frontend hosting. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
+Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, security helpers, transport adapters, and optional `x/*` capability packs. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
 
 ## Repository Direction
 
@@ -20,8 +20,13 @@ For architecture planning and future refactors, prefer the rules in:
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `docs/CANONICAL_STYLE_GUIDE.md`
 - `specs/repo.yaml`
+- `specs/agent-entrypoints.yaml`
+- `specs/ownership.yaml`
 - `specs/dependency-rules.yaml`
+- `specs/change-recipes/*`
 - `<module>/module.yaml`
+
+For the staged future plan, see `docs/ROADMAP.md`.
 
 Machine-enforced repo guardrails live under `internal/checks/*`. Historical exceptions are tracked explicitly in `specs/check-baseline/*` so CI can block new drift while existing migration debt is burned down.
 
@@ -38,7 +43,7 @@ For new application work, use a single canonical path:
 - **Idempotency Utilities**: Simple KV/SQL helpers for request deduplication via `store/idempotency`.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
-- **Optional Services**: WebSocket, webhook, pub/sub, frontend, and other capability packs live under `x/*` and are intentionally excluded from the canonical app path.
+- **Optional Services**: WebSocket, webhook, frontend, gateway, messaging, and other capability packs live under `x/*` and are intentionally excluded from the canonical app path.
 - **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `scheduler` package.
 
 Wire routes, middleware, and background tasks explicitly in your application package. Plumego no longer carries a compatibility component layer in `core`.
@@ -116,14 +121,21 @@ func main() {
 - Debug mode and devtools are separate. Use `core.WithDebug()` for debug behavior; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
 - Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.
 
+## Agent-First Workflow
+- Canonical app bootstrap starts from `reference/standard-service`.
+- Machine-readable discovery rules live in `specs/agent-entrypoints.yaml`.
+- Module ownership and default validation live in `specs/ownership.yaml`.
+- Standard change recipes live in `specs/change-recipes/*`.
+- Module primers live in `docs/modules/*` and should match each manifest's `doc_paths`.
+
 ## Key Components
 - **Router**: Register handlers with `Get`, `Post`, and other standard-library style methods that accept `func(w http.ResponseWriter, r *http.Request)`. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
 - **Middleware**: Chain middleware before boot with `app.Use(...)`. Keep middleware transport-only and explicit. Canonical observability order is `middleware/requestid.Middleware`, `middleware/tracing.Middleware`, `middleware/httpmetrics.Middleware`, `middleware/accesslog.Middleware`, then `middleware/recovery.Recovery(logger)`.
 - **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
 - **Ops/Admin Endpoints**: Optional protected operations API for queue stats/replay, receipt lookup, channel health, and tenant quota inspection. Mount via `x/ops` and secure with a token or custom middleware. If auth is missing and `AllowInsecure` is false (default), requests are denied.
 - **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
-- **WebSocket Hub**: `x/websocket` provides a JWT-protected `/ws` endpoint plus an optional broadcast endpoint (protected by a shared secret). Create a component with `x/websocket.DefaultWebSocketConfig()` and mount it explicitly.
-- **Pub/Sub + Webhook**: Provides `pubsub.PubSub` to enable webhook fan-out. Outbound Webhook management includes target CRUD, delivery replay, and trigger tokens; inbound receivers handle GitHub/Stripe signatures plus generic HMAC verification with replay protection and IP allowlists.
+- **WebSocket Transport**: `x/websocket` provides an app-facing server with explicit route registration, a JWT-protected `/ws` endpoint, and an optional broadcast endpoint protected by a shared secret.
+- **Messaging + Webhook**: Start new app-facing messaging work in `x/messaging`. Use `x/webhook` directly only for narrow inbound or outbound webhook mechanics such as signature verification, delivery replay, and trigger-token-protected webhook operations.
 - **Migrations**: Optional SQL schemas for modules/examples live in `docs/migrations/` (see notes for sms-gateway `sent_at` backfill).
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
 

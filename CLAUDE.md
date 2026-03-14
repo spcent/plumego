@@ -9,7 +9,11 @@ Repository planning and future restructuring should also follow:
 - `docs/CANONICAL_STYLE_GUIDE.md`
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `specs/repo.yaml`
+- `specs/agent-entrypoints.yaml`
+- `specs/ownership.yaml`
 - `specs/dependency-rules.yaml`
+- `specs/change-recipes/*`
+- `docs/ROADMAP.md`
 - target `<module>/module.yaml`
 - `reference/standard-service`
 
@@ -39,6 +43,6 @@ go test -race ./...
 - Dependency flow: constructor injection, not context service-locator
 - App shape: follow `reference/standard-service`
 
-**Documentation sync targets:** `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `env.example`
+**Documentation sync targets:** `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `docs/ROADMAP.md`, `env.example`
 
 Use the handler pattern from `docs/CANONICAL_STYLE_GUIDE.md` consistently within one flow.

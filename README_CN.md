@@ -4,7 +4,7 @@
 [![版本](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
 [![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、WebSocket 辅助工具、Webhook 管道以及静态前端托管。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
+Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、安全辅助、传输适配器以及可选的 `x/*` 能力包。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
 
 ## 仓库演进方向
 
@@ -20,8 +20,13 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `docs/CANONICAL_STYLE_GUIDE.md`
 - `specs/repo.yaml`
+- `specs/agent-entrypoints.yaml`
+- `specs/ownership.yaml`
 - `specs/dependency-rules.yaml`
+- `specs/change-recipes/*`
 - `<模块>/module.yaml`
+
+未来阶段性规划见 `docs/ROADMAP.md`。
 
 新的应用结构工作应遵循唯一 canonical 路径：
 
@@ -36,7 +41,7 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - **幂等工具**：提供 `store/idempotency` 的 KV/SQL 幂等存储接口。
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
 - **优雅生命周期**：环境变量加载、连接排水、就绪标志，以及可选的 TLS/HTTP2 配置，带有合理默认值。
-- **可选服务**：WebSocket、Webhook、Pub/Sub、前端托管等能力都位于 `x/*`，并且有意不进入 canonical 应用路径。
+- **可选服务**：WebSocket、Webhook、前端托管、网关、消息等能力都位于 `x/*`，并且有意不进入 canonical 应用路径。
 - **任务调度**：通过 `scheduler` 包提供进程内 cron、延迟任务与可重试任务。
 
 新代码应在应用自己的 wiring 包中显式注册路由、中间件和后台任务。Plumego 已经移除了 `core` 中的兼容组件层。
@@ -114,14 +119,21 @@ func main() {
 - 调试模式与 devtools 已拆分：`core.WithDebug()` 只开启调试行为；如果需要 devtools，请在应用本地 wiring 中显式注册相关路由，不要把它视为 canonical kernel 的一部分。
 - `/_debug` 下的调试端点（路由表、Middleware、配置快照、指标、pprof、手动重载）现在由 `x/devtools` 提供，而不是 `core` 内建。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
 
+## Agent 优先工作流
+- canonical 应用启动路径从 `reference/standard-service` 开始。
+- 机器可读的任务入口规则位于 `specs/agent-entrypoints.yaml`。
+- 模块 owner 和默认验证入口位于 `specs/ownership.yaml`。
+- 标准变更 recipe 位于 `specs/change-recipes/*`。
+- 模块 primer 文档位于 `docs/modules/*`，并应与各模块 manifest 的 `doc_paths` 保持一致。
+
 ## 关键组件
 - **路由器**：使用 `Get`、`Post` 等标准库风格方法注册处理器（`func(w http.ResponseWriter, r *http.Request)`）。分组允许附加共享中间件，静态前端可以通过 `frontend.RegisterFromDir` 挂载，并支持缓存/回退选项（`frontend.WithCacheControl`、`frontend.WithIndexCacheControl`、`frontend.WithFallback`、`frontend.WithHeaders`）。
 - **中间件**：在启动前使用 `app.Use(...)` 显式链式添加，并保持传输层职责。推荐的可观测性顺序是 `middleware/requestid.Middleware`、`middleware/tracing.Middleware`、`middleware/httpmetrics.Middleware`、`middleware/accesslog.Middleware`，之后再接 `middleware/recovery.Recovery(logger)`。
 - **多租户（实验）**：提供租户隔离、配额管理、策略控制和数据库过滤能力，API 仍处于实验阶段，可能变更。详见[多租户](#多租户)章节。
 - **运维/管理端点**：可选的受保护运维 API，包含队列状态/重放、回执查询、通道健康、租户配额等能力。通过 `x/ops` 挂载，并使用令牌或自定义中间件保护；当 `AllowInsecure` 为 false（默认）且未配置鉴权时会拒绝访问。
 - **Contract 工具**：使用 `contract.WriteError` 输出统一错误结构，使用 `contract.WriteResponse` / `Ctx.Response` 输出带 trace id 的标准 JSON 响应。
-- **WebSocket 中心**：`x/websocket` 提供受 JWT 保护的 `/ws` 端点，以及可选的广播端点（受共享密钥保护）。通过 `x/websocket.DefaultWebSocketConfig()` 创建组件配置并显式挂载。
-- **Pub/Sub + Webhook**：提供 `pubsub.PubSub` 实现以启用 Webhook 分发。出站 Webhook 管理包括目标 CRUD、交付重放和触发令牌；入站接收器处理 GitHub/Stripe 签名，并提供通用 HMAC 验证、重放保护与 IP 白名单。
+- **WebSocket 传输**：`x/websocket` 提供面向应用的 server 与显式路由注册能力，包含受 JWT 保护的 `/ws` 端点，以及一个受共享密钥保护的可选广播端点。
+- **消息与 Webhook**：新的面向应用的消息能力应优先从 `x/messaging` 进入。只有在处理入站或出站 Webhook 细节时，才直接进入 `x/webhook`，例如签名校验、交付重放和触发令牌保护的 webhook 操作。
 - **健康检查 + 就绪**：生命周期钩子在启动/关闭期间标记就绪状态，构建元数据（`Version`、`Commit`、`BuildTime`）可通过 ldflags 注入。
 
 ## 多租户

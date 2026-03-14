@@ -1,102 +1,115 @@
 # AGENTS.md — plumego
 
-Operational guide for AI coding agents in `spcent/plumego`.
+Operational guide for AI coding agents working in `github.com/spcent/plumego`.
 
-## 1) Mission and Constraints
+## 1. Goal
 
-Plumego is a lightweight Go toolkit built on the standard library HTTP model.
-Optimize for: clarity, explicit control flow, agent-friendly module ownership, small reversible changes.
-Default implementation path: canonical style guide -> repo specs -> module manifest -> `reference/standard-service`.
+Plumego is an agent-first Go toolkit built on the standard-library HTTP model.
+Optimize for:
 
-Hard constraints:
-- Preserve `net/http` compatibility
-- Keep main module dependency-free (stdlib only)
-- Do not blur module boundaries
-- Do not introduce hidden global side effects
-- Never log secrets
+- clear module ownership
+- explicit control flow
+- small reversible changes
+- minimal search radius
+- one canonical implementation path
 
----
+## 2. Non-Negotiables
 
-## 2) Canonical Style Authority
+- Preserve `net/http` compatibility.
+- Keep the main module dependency-free (stdlib only) unless explicitly approved.
+- Do not blur stable-module boundaries.
+- Do not introduce hidden globals, `init()` registration, or context service-locator patterns.
+- Never log secrets, tokens, signatures, or private keys.
+- Fail closed on auth, verification, and policy errors.
+- Use timing-safe comparison for secret checks.
 
-`docs/CANONICAL_STYLE_GUIDE.md` is the canonical style source for docs, scaffolds, and AI-generated code.
+## 3. Read Order
 
-Precedence when guidance overlaps:
-1. Security and module-boundary constraints in this file
-2. Coding style from `docs/CANONICAL_STYLE_GUIDE.md`
-3. Existing local patterns in touched files
+Use this default path before making changes:
 
-Canonical defaults:
+1. `docs/CANONICAL_STYLE_GUIDE.md`
+2. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+3. `specs/repo.yaml`
+4. `specs/agent-entrypoints.yaml`
+5. `specs/dependency-rules.yaml`
+6. `specs/ownership.yaml`
+7. target `<module>/module.yaml`
+8. `reference/standard-service`
+
+For staged future work and sequencing, also read:
+
+- `docs/ROADMAP.md`
+- `specs/change-recipes/*`
+
+When guidance overlaps, follow:
+
+1. security and boundary rules in this file
+2. `docs/CANONICAL_STYLE_GUIDE.md`
+3. machine-readable repo specs
+4. existing local patterns in touched files
+
+## 4. Canonical Defaults
+
 - Handler shape: `func(http.ResponseWriter, *http.Request)`
-- Explicit route registration: one method + path + handler per line
-- Explicit JSON decode: `json.NewDecoder(r.Body).Decode(...)`
-- Single error write path: `contract.WriteError` with structured error codes
-- Constructor-based DI — no context service-locator pattern
+- Route wiring: one method + path + handler per line
+- JSON decode: `json.NewDecoder(r.Body).Decode(...)`
+- Error write path: `contract.WriteError` with structured error codes
+- DI: constructor-based and explicit in route wiring
 - Middleware: `func(http.Handler) http.Handler`, transport-only responsibility
+- Reference app: `reference/standard-service` is the only canonical application layout
 
----
+## 5. Module Boundaries
 
-## 3) Module Boundaries (Strict)
+Stable library roots:
 
-| Module | Responsibility | Stability |
-|---|---|---|
-| `core/` | App lifecycle, options, startup/shutdown | High |
-| `router/` | Routing, params, groups, reverse routing | High |
-| `middleware/` | Cross-cutting HTTP middleware | High |
-| `contract/` | Context, structured errors, response helpers | High |
-| `security/` | JWT, input validation, headers, abuse guard | Critical |
-| `health/` | Health models and readiness helpers | High |
-| `log/` | Logging interfaces and base implementations | High |
-| `metrics/` | Metrics interfaces and collectors | High |
-| `store/` | Persistence abstractions | Medium |
-| `x/tenant/` | Multi-tenancy extension boundary | Experimental |
-| `x/*` | Optional or fast-evolving capability packs | Experimental |
+- `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
 
-Rules:
-- Do not move routing behavior into `core`
-- Keep `core` as a kernel, not a feature catalog
-- Do not put business logic in `middleware`
-- Do not put tenant-aware logic in stable `middleware` or stable `store`
-- Do not put HTTP health handlers in `health`
-- Do not put protocol gateway families in `contract`
-- Do not add new library code under broad legacy roots like `net/`, `utils/`, `validator/`, `tenant/`, `ai/`
-- Changes in `core/`, `router/`, `middleware/`, `security/` require extra testing
+Extension roots:
 
-Target layout:
-- Stable library roots remain top-level: `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
-- Extension capability packs live under `x/*`
-- `reference/` defines canonical app layout
+- `x/*` for optional or fast-evolving capabilities
 
----
+Hard rules:
 
-## 4) API and Change Rules
+- Stable roots must not depend on `x/*`.
+- `core` is the app kernel, not a feature catalog.
+- `router` owns matching, params, groups, and reverse routing.
+- `middleware` stays transport-only; never hide business DTO assembly or service injection there.
+- `contract` owns transport contracts and response/error helpers, not protocol gateway families.
+- `health` owns models/readiness helpers, not HTTP handler ownership.
+- Tenant-aware logic belongs in `x/tenant`, not stable `middleware` or stable `store`.
+- New library code must live under a stable root or `x/*`; avoid broad legacy roots such as `net`, `utils`, `validator`, `tenant`, `ai`, `rest`, `pubsub`.
 
-Do:
-- Preserve stable public APIs unless explicitly asked otherwise
-- Provide migration notes for unavoidable breaking changes
-- Prefer standard library solutions over new dependencies
-- Keep edits minimal and scoped to the task
-- Add/update tests near changed behavior
-- Update docs when changing API/config/security/default behavior
+Task entrypoint defaults:
 
-Do not:
-- Introduce new handler styles or response/error helper families for one feature
-- Hide DI through request context
-- Inject business DTOs via middleware
-- Add non-stdlib dependencies to the main module without strong reason
+- HTTP endpoint work: start with the style guide, `reference/standard-service/internal/app/routes.go`, `contract`, and `router`.
+- Middleware work: start with `middleware/module.yaml` and `docs/modules/middleware/README.md`.
+- Security work: start with `security/module.yaml` and `docs/modules/security/README.md`.
+- Store work: start with `store/module.yaml` and `docs/modules/store/README.md`.
+- Gateway or edge transport work: start with `x/gateway`.
+- Resource API standardization: start with `x/rest`.
+- Messaging work: start with `x/messaging`.
+- Tenant work: start with `x/tenant` and `docs/architecture/X_TENANT_BLUEPRINT.md`.
+- WebSocket transport work: start with `x/websocket`.
+- Admin or observability surfaces: start with `x/observability` or `x/ops`, not `health`.
 
----
+## 6. Change Rules
 
-## 5) Security Rules
+- Keep changes minimal and scoped to one primary module when possible.
+- Preserve stable public APIs unless explicitly asked to change them.
+- If a breaking change is unavoidable, add migration notes.
+- Prefer standard-library solutions over new abstractions.
+- Add or update tests next to changed behavior.
+- Do not invent one-off handler styles, response envelopes, or helper families for a single feature.
 
-- Never log secrets, tokens, signatures, or private keys
-- Fail closed on verification/authentication errors
-- Use timing-safe comparison for secret checks
-- Keep verification logic explicit and easy to review
+## 7. Validation Order
 
----
+Default order:
 
-## 6) Quality Gates (Required)
+1. Run the target module tests from `specs/ownership.yaml` or `<module>/module.yaml`.
+2. Run boundary and manifest checks.
+3. Run repo-wide gates before final handoff.
+
+Required repo-wide gates:
 
 ```bash
 go run ./internal/checks/dependency-rules
@@ -109,30 +122,32 @@ gofmt -w .
 ```
 
 Extra checks by change type:
-- Routing: static/param/group/reverse-routing tests
-- Middleware: ordering and error-path tests
+
+- Routing: static, param, group, and reverse-routing coverage
+- Middleware: ordering and error-path coverage
 - Security: invalid token/signature negative tests
-- Tenant: quota/policy/isolation tests
+- Tenant: quota, policy, and isolation tests
 - Store: concurrent access and persistence correctness tests
 
-Check baselines live under `specs/check-baseline/`. Treat them as temporary migration debt lists; shrink them, do not expand them casually.
+`specs/check-baseline/` contains temporary migration debt baselines. Reduce them; do not expand them casually.
 
----
+## 8. Docs Sync
 
-## 7) Documentation Sync
+Update these when behavior, public API, config, security semantics, lifecycle behavior, or boundaries change:
 
-Update when changing public APIs, env variables/defaults, security behavior, startup/shutdown semantics, or module boundaries.
+- `README.md`
+- `README_CN.md`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `docs/ROADMAP.md`
+- `env.example`
 
-Sync targets: `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `env.example`
+## 9. Working Loop
 
----
-
-## 8) Agent Workflow
-
-1. Identify the target layer: stable root package or `x/*`
-2. Read `docs/CANONICAL_STYLE_GUIDE.md` and `reference/standard-service` for app-shape tasks
-3. Read `specs/repo.yaml`, `specs/dependency-rules.yaml`, and the target `<module>/module.yaml`
-4. Make minimal focused changes inside one primary module when possible
-5. Add/update tests near changed behavior
-6. Run quality gates (§6)
-7. Sync docs if behavior or configuration changed
+1. Identify the target layer: stable root or `x/*`.
+2. Read the canonical sources in Section 3.
+3. Confirm the owning module manifest and validation commands.
+4. Make the smallest coherent change.
+5. Add or update focused tests.
+6. Run validation in the order from Section 7.
+7. Sync docs only for implemented behavior changes.
