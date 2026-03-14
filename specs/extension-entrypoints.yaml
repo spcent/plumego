@@ -3,7 +3,7 @@ version: 1
 families:
   messaging:
     canonical_entrypoint: x/messaging
-    role: Capability entrypoint for message-oriented product work.
+    role: Only app-facing capability entrypoint for message-oriented product work.
     start_here:
       - x/messaging
     primitives:
@@ -12,9 +12,9 @@ families:
       - x/scheduler
       - x/webhook
     rules:
-      - Start new messaging feature discovery in x/messaging.
-      - Treat x/mq and x/pubsub as lower-level primitives, not user-facing entrypoints.
-      - Treat x/webhook as a messaging sub-capability unless the task is narrowly about webhook signature verification.
+      - Start all new app-facing messaging feature discovery in x/messaging.
+      - Treat x/mq and x/pubsub as subordinate primitives, not user-facing family entrypoints.
+      - Treat x/webhook as a subordinate messaging sub-capability unless the task is narrowly about webhook verification or delivery mechanics.
 
   gateway:
     canonical_entrypoint: x/gateway

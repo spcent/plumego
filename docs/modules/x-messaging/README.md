@@ -33,3 +33,12 @@
 - start app-facing messaging work here
 - keep orchestration explicit
 - keep `x/mq`, `x/pubsub`, `x/scheduler`, and `x/webhook` subordinate to this family
+
+## Subordinate packages
+
+Open sibling packages only when the task is already known to be narrow:
+
+- `x/mq`: durable queue primitives and worker coordination
+- `x/pubsub`: in-process broker primitives
+- `x/scheduler`: scheduling primitives
+- `x/webhook`: inbound verification or outbound delivery mechanics

@@ -2,7 +2,7 @@ name: x/messaging
 path: x/messaging
 layer: extension
 status: experimental
-summary: Canonical messaging capability entrypoint built on explicit queue, pubsub, scheduler, and webhook adapters.
+summary: The canonical and only app-facing messaging family entrypoint, built on explicit queue, pubsub, scheduler, and webhook adapters.
 
 responsibilities:
   - Message send orchestration
@@ -45,6 +45,6 @@ review_checklist:
   - Preserve error-path visibility
 
 agent_hints:
-  - Start messaging-related discovery here before opening sibling x/* packages
-  - Keep orchestration inside x/messaging with explicit service wiring and app-facing entrypoints
-  - Treat x/mq, x/pubsub, x/scheduler, and x/webhook as subordinate packages under this family
+  - Start all new app-facing messaging discovery here before opening sibling x/* packages
+  - Keep orchestration inside x/messaging with explicit service wiring and family-level entrypoints
+  - Treat x/mq, x/pubsub, x/scheduler, and x/webhook as subordinate packages under this family, not competing entrypoints

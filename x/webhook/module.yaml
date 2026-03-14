@@ -3,7 +3,7 @@ path: x/webhook
 layer: extension
 status: experimental
 owner: integration
-summary: Webhook ingress, egress, and bridge primitives within the broader messaging extension family.
+summary: Subordinate webhook ingress, egress, and bridge primitives within the broader messaging extension family.
 
 responsibilities:
   - Inbound webhook verification helpers
@@ -57,6 +57,6 @@ review_checklist:
   - Keep app-level mounting explicit
 
 agent_hints:
-  - Start new messaging feature discovery in x/messaging before opening x/webhook
+  - Start new app-facing messaging feature discovery in x/messaging before opening x/webhook
   - Open x/webhook directly only for narrow inbound verification or outbound delivery work
-  - Keep transport concerns explicit and local to the webhook layer
+  - Keep webhook transport concerns explicit and local without turning x/webhook into a family discovery root
