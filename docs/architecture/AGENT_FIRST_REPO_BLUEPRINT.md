@@ -106,12 +106,16 @@ Rules:
 - `store`: base persistence primitives only
 - `health`, `log`, `metrics`: support contracts and base implementations only
 
+Within observability concerns:
+
+- stable `middleware/*` owns transport observability primitives
+- `x/observability` owns broader adapter and export wiring
+
 Health HTTP exposure belongs in reference apps or owning extensions, not in the stable `health` root.
 
 Avoid growing broad buckets such as:
 
 - `middleware/tenant`
-- stable-root tenant policy helpers
 - `middleware/observability` as a catch-all feature catalog
 - `contract/protocol` as a cross-protocol family root
 - `health` HTTP handler packages

@@ -2,7 +2,7 @@ name: x/observability
 path: x/observability
 layer: extension
 status: experimental
-summary: The only app-facing entrypoint for broader observability adapters and export wiring; stable transport middleware lives under middleware/*.
+summary: The only app-facing entrypoint for broader observability adapters and export wiring; transport observability primitives remain in stable middleware packages.
 
 responsibilities:
   - Observability adapters
@@ -13,6 +13,7 @@ non_goals:
   - Core bootstrap ownership
   - Stable root entrypoints
   - Business metrics policy
+  - Transport-only middleware primitives
 
 allowed_imports:
   - contract
@@ -38,4 +39,4 @@ review_checklist:
 agent_hints:
   - Start broader observability adapter and export work here
   - Start transport observability primitives in middleware/requestid, middleware/tracing, middleware/httpmetrics, or middleware/accesslog
-  - Keep adapter-local helpers explicit and do not require core knowledge
+  - Keep adapter-local helpers explicit and do not turn middleware into an observability catalog

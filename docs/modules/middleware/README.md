@@ -29,3 +29,9 @@
 - add ordering and error-path tests
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
+
+## Boundary with observability
+
+- stable `middleware/*` owns transport-only observability primitives such as request IDs, tracing hooks, access logging, and HTTP metrics
+- `x/observability` owns broader adapter, export, and integration wiring
+- do not turn stable `middleware` into an observability catch-all catalog

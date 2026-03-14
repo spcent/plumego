@@ -3,7 +3,7 @@ path: middleware
 layer: stable
 status: ga
 owner: transport
-summary: Transport-only HTTP middleware.
+summary: Transport-only HTTP middleware, including request/response cross-cutting concerns and transport observability primitives.
 
 responsibilities:
   - Middleware chaining
@@ -15,6 +15,7 @@ non_goals:
   - Service injection
   - Tenant policy
   - Tenant resolution and quota orchestration
+  - Observability adapter or export catalogs
   - Persistence access
 
 public_entrypoints:
@@ -50,10 +51,11 @@ change_risks:
 review_checklist:
   - next must be called exactly once
   - Keep responsibility transport-only
+  - Keep observability behavior at the transport-primitive level
   - Prefer narrow middleware packages over umbrella buckets
   - No request-scoped service locator
 
 agent_hints:
   - Tenant middleware belongs in x/tenant
-  - Stateful policy and catch-all buckets should move out of middleware
+  - Stateful policy and observability catch-all buckets should move out of middleware
   - Keep behavior visible in tests
