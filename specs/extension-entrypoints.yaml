@@ -18,24 +18,24 @@ families:
 
   gateway:
     canonical_entrypoint: x/gateway
-    role: Capability entrypoint for API gateway, reverse proxy, and edge transport work.
+    role: Only app-facing capability entrypoint for API gateway, reverse proxy, and edge transport work.
     start_here:
       - x/gateway
     primitives:
       - x/ipc
     rules:
-      - Start new gateway and transport-edge discovery in x/gateway.
-      - Treat x/ipc as a narrow transport primitive, not a general app integration root.
+      - Start all new gateway and transport-edge discovery in x/gateway.
+      - Treat x/ipc as a narrow transport primitive, not a general app integration root or competing entrypoint.
 
   resource_api:
     canonical_entrypoint: x/rest
-    role: Shared interface layer for reusable resource APIs, CRUD conventions, pagination, and repository-backed controller wiring.
+    role: Only app-facing shared interface layer for reusable resource APIs, CRUD conventions, pagination, and repository-backed controller wiring.
     start_here:
       - x/rest
     primitives: []
     rules:
-      - Start reusable resource-interface and CRUD-standardization work in x/rest.
-      - Do not use x/rest to define application bootstrap or gateway proxy topology.
+      - Start all reusable resource-interface and CRUD-standardization work in x/rest.
+      - Do not use x/rest to define application bootstrap, gateway proxy topology, or edge transport wiring.
 
   observability:
     canonical_entrypoint: x/observability

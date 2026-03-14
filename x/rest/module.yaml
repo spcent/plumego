@@ -2,7 +2,7 @@ name: x/rest
 path: x/rest
 layer: extension
 status: experimental
-summary: Unified resource-interface layer for reusable REST controllers, query parsing, pagination, and repository-backed resource wiring.
+summary: The canonical and only app-facing reusable resource-interface layer for REST controllers, query parsing, pagination, and repository-backed resource wiring.
 
 responsibilities:
   - REST resource helpers
@@ -43,4 +43,4 @@ review_checklist:
 agent_hints:
   - Use x/rest when standardizing reusable resource APIs and CRUD interface shape
   - Prefer ResourceSpec plus explicit Register*Routes helpers for new reusable resource APIs
-  - Do not start application bootstrap or transport-edge proxy work from x/rest; use reference/standard-service and x/gateway instead
+  - Do not start application bootstrap, proxy topology, or edge transport work from x/rest; use reference/standard-service and x/gateway instead

@@ -1,6 +1,6 @@
 # x/rest
 
-`x/rest` is Plumego's reusable resource-interface layer.
+`x/rest` is Plumego's reusable resource-interface layer and the only app-facing entrypoint for reusable resource API standardization.
 
 It is the place for:
 
@@ -14,6 +14,7 @@ It is not the place for:
 
 - application bootstrap
 - gateway or reverse-proxy topology
+- edge transport wiring
 - business repository ownership
 
 ## Role in the repo

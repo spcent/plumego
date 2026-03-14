@@ -2,7 +2,7 @@ name: x/gateway
 path: x/gateway
 layer: extension
 status: experimental
-summary: API gateway, proxy, balancing, caching, and edge transport helpers.
+summary: The canonical and only app-facing gateway and edge transport entrypoint for proxying, balancing, caching, and rewrite helpers.
 
 responsibilities:
   - Reverse proxy helpers
@@ -44,6 +44,6 @@ review_checklist:
   - Preserve transport determinism
 
 agent_hints:
-  - Treat x/gateway as the canonical entrypoint for gateway and edge transport work
-  - Use x/gateway entrypoints for app-facing proxy wiring and keep helpers adapter-local
+  - Treat x/gateway as the only app-facing entrypoint for gateway and edge transport work
+  - Use x/gateway entrypoints for explicit proxy wiring and keep helpers adapter-local
   - Route reusable resource-interface work to x/rest rather than mixing it into gateway

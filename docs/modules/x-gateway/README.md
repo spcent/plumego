@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`x/gateway` is the app-facing extension surface for gateway and edge transport work.
+`x/gateway` is the only app-facing extension surface for gateway and edge transport work.
 
 ## Use this module when
 
@@ -31,5 +31,5 @@
 ## Canonical change shape
 
 - keep gateway behavior explicit and adapter-local
-- use `x/gateway` as the canonical entrypoint for edge transport work
+- use `x/gateway` as the only app-facing entrypoint for edge transport work
 - route reusable resource-interface work to `x/rest`
