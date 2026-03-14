@@ -40,6 +40,30 @@ entrypoints:
       - Middleware stays transport-only.
       - Do not inject business DTOs or service-locator behavior.
 
+  security:
+    start_with:
+      - security/module.yaml
+      - docs/modules/security/README.md
+      - AGENTS.md
+    avoid:
+      - middleware
+      - x/tenant
+    notes:
+      - Keep verification logic explicit and fail closed.
+      - Add negative-path tests for invalid tokens, signatures, and malformed input.
+
+  store:
+    start_with:
+      - store/module.yaml
+      - docs/modules/store/README.md
+      - specs/repo.yaml
+    avoid:
+      - x/tenant
+      - x/data
+    notes:
+      - Use stable store only for transport-agnostic persistence primitives.
+      - Move tenant-aware or topology-heavy behavior to the owning extension.
+
   gateway_edge_transport:
     start_with:
       - x/gateway/module.yaml
@@ -75,6 +99,31 @@ entrypoints:
       - x/webhook
     notes:
       - Start at x/messaging unless the task is clearly a lower-level primitive.
+
+  tenant:
+    start_with:
+      - x/tenant/module.yaml
+      - docs/modules/x-tenant/README.md
+      - docs/architecture/X_TENANT_BLUEPRINT.md
+    avoid:
+      - middleware
+      - store
+      - core
+    notes:
+      - Keep tenant-aware logic inside x/tenant and fail closed on policy errors.
+      - Do not move tenant resolution or tenant-aware adapters into stable roots.
+
+  websocket:
+    start_with:
+      - x/websocket/module.yaml
+      - docs/modules/x-websocket/README.md
+      - x/websocket/websocket.go
+    avoid:
+      - core
+      - router
+    notes:
+      - Use x/websocket for app-facing websocket transport work.
+      - Keep websocket setup explicit and out of core.
 
   observability_admin:
     start_with:
