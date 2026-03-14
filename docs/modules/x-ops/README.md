@@ -33,3 +33,9 @@
 - keep admin routing explicit and auth-gated
 - use `x/ops` only for protected admin surfaces
 - keep broader observability adapter work in `x/observability`
+
+## Boundary with x/observability
+
+- `x/ops`: protected admin endpoints, auth-gated diagnostics, and runtime control surfaces
+- `x/observability`: broader adapter, export, and diagnostics integration work
+- stable `middleware/*`: transport-only observability primitives

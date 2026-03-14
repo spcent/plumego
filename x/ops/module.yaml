@@ -2,7 +2,7 @@ name: x/ops
 path: x/ops
 layer: extension
 status: experimental
-summary: Protected operations endpoints for queues, receipts, and runtime diagnostics.
+summary: Protected operations endpoints for queues, receipts, and runtime diagnostics; not the broader observability discovery root.
 
 responsibilities:
   - Ops route registration
@@ -42,5 +42,5 @@ review_checklist:
 
 agent_hints:
   - Use x/ops for protected admin endpoints only; start broader observability discovery in x/observability
-  - Keep ops routing outside core and prefer hook-based behavior
-  - Fail closed on auth errors
+  - Keep ops routing outside core and keep admin surfaces explicitly auth-gated
+  - Fail closed on auth errors and do not let x/ops become a competing observability entrypoint

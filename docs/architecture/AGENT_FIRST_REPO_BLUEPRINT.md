@@ -156,7 +156,7 @@ Agents should prefer these entrypoints when multiple related `x/*` packages exis
 - Treat `x/webhook` as a messaging sub-capability by default; start directly in `x/webhook` only for narrow webhook verification or delivery mechanics.
 - Start gateway and edge transport work in `x/gateway`; treat `x/ipc` as a narrow primitive.
 - Start reusable resource-interface and CRUD-standardization work in `x/rest`; keep bootstrap shape in `reference/standard-service` and edge proxy topology in `x/gateway`.
-- Start observability adapter work in `x/observability`; use `x/ops` only for protected admin endpoints and diagnostics surfaces.
+- Start broader observability adapter and export work in `x/observability`; use `x/ops` only for protected admin endpoints and auth-gated diagnostics surfaces.
 - Start frontend asset-serving work in `x/frontend`, but do not let frontend helpers define the canonical app path.
 - Start local debug and developer-only route work in `x/devtools`; do not treat debug surfaces as part of `core`.
 - Start service discovery work in `x/discovery`; do not spread discovery concerns across stable roots.

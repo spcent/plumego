@@ -2,7 +2,7 @@ name: x/observability
 path: x/observability
 layer: extension
 status: experimental
-summary: Optional higher-level observability adapters; stable transport middleware lives under middleware/*.
+summary: The only app-facing entrypoint for broader observability adapters and export wiring; stable transport middleware lives under middleware/*.
 
 responsibilities:
   - Observability adapters
@@ -36,6 +36,6 @@ review_checklist:
   - Preserve observability isolation
 
 agent_hints:
-  - Start transport observability work in middleware/requestid, middleware/tracing, middleware/httpmetrics, or middleware/accesslog
-  - Prefer adapter-local helpers and keep transport hooks explicit
-  - Do not require core knowledge
+  - Start broader observability adapter and export work here
+  - Start transport observability primitives in middleware/requestid, middleware/tracing, middleware/httpmetrics, or middleware/accesslog
+  - Keep adapter-local helpers explicit and do not require core knowledge

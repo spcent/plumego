@@ -39,14 +39,15 @@ families:
 
   observability:
     canonical_entrypoint: x/observability
-    role: Capability entrypoint for adapter-heavy tracing, metrics export, and higher-level diagnostics.
+    role: Only app-facing capability entrypoint for broader observability adapter work, tracing export, metrics export, and higher-level diagnostics.
     start_here:
       - x/observability
     primitives:
       - x/ops
     rules:
+      - Start broader observability adapter and export discovery in x/observability.
       - Keep stable middleware transport-only.
-      - Use x/ops for protected admin endpoints only, not as the default observability discovery root.
+      - Use x/ops for protected admin endpoints only, not as the default observability discovery root or a competing observability entrypoint.
 
   frontend:
     canonical_entrypoint: x/frontend
