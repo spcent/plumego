@@ -4,6 +4,11 @@
 
 `store` holds persistence primitives and base abstractions.
 
+## v1 Status
+
+- `GA` in the Plumego v1 support matrix
+- Public compatibility is expected for the stable package surface
+
 ## Use this module when
 
 - defining stable storage contracts

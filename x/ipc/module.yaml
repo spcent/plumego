@@ -28,6 +28,9 @@ test_commands:
   - go test -timeout 20s ./x/ipc/...
   - go vet ./x/ipc/...
 
+doc_paths:
+  - docs/modules/x-ipc/README.md
+
 review_checklist:
   - Keep transport contracts explicit
   - Avoid hidden process-wide side effects

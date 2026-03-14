@@ -4,6 +4,11 @@
 
 `contract` defines structured transport contracts: request context helpers, API errors, and response helpers.
 
+## v1 Status
+
+- `GA` in the Plumego v1 support matrix
+- Public compatibility is expected for the stable package surface
+
 ## Use this module when
 
 - standardizing error response shape

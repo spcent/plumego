@@ -33,6 +33,18 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - 先看 `reference/standard-service`，以它作为目录结构和 wiring 的标准
 - `reference/standard-service` 有意只依赖稳定根级包；`x/*` 示例都不属于 canonical 路径
 
+## v1 支持矩阵
+
+Plumego 的 v1 发布范围覆盖当前仓库中所有已存在模块，但不同层级的兼容性承诺并不相同。
+
+| 范围 | v1 状态 | 兼容性承诺 | 模块 |
+| --- | --- | --- | --- |
+| 稳定根级库 | GA | 这些公开包构成 v1 的长期稳定 API 面 | `core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics` |
+| canonical 参考应用 | 支持的参考实现 | 保持与 canonical bootstrap 和稳定根级用法一致，但不作为扩展能力目录 | `reference/standard-service` |
+| CLI | 纳入 v1 发布范围 | 作为命令行工具受支持，而不是 Go import 面；命令行为和生成产物必须与 canonical 文档保持一致 | `cmd/plumego` |
+| 面向应用的扩展族 | Experimental | 纳入仓库质量门禁和发布范围，但 API / 配置兼容性尚未冻结 | `x/ai`、`x/data`、`x/devtools`、`x/discovery`、`x/frontend`、`x/gateway`、`x/messaging`、`x/observability`、`x/ops`、`x/rest`、`x/tenant`、`x/websocket` |
+| 从属扩展原语 | Experimental | 保持维护和测试，但发现入口应先从所属能力族开始，兼容性尚未冻结 | `x/ipc`、`x/mq`、`x/pubsub`、`x/scheduler`、`x/webhook` |
+
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
 - **中间件链**：日志、恢复、gzip、CORS、超时（默认缓冲上限 10 MiB）、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。

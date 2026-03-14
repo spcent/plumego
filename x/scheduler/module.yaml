@@ -30,6 +30,9 @@ test_commands:
   - go test -timeout 20s ./x/scheduler/...
   - go vet ./x/scheduler/...
 
+doc_paths:
+  - docs/modules/x-scheduler/README.md
+
 review_checklist:
   - Keep scheduling behavior explicit
   - Avoid hidden process-wide state

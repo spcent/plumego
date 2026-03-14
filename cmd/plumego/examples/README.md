@@ -107,7 +107,7 @@ Interactive menu for common development tasks.
 **Features:**
 - Start development server with hot reload
 - Run tests (with/without coverage)
-- Generate components, handlers, middleware
+- Generate handlers, middleware
 - Build application
 - Check project health
 - Analyze routes

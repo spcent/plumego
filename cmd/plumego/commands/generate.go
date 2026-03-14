@@ -13,7 +13,7 @@ import (
 type GenerateCmd struct{}
 
 func (c *GenerateCmd) Name() string  { return "generate" }
-func (c *GenerateCmd) Short() string { return "Generate components, middleware, handlers" }
+func (c *GenerateCmd) Short() string { return "Generate middleware, handlers" }
 
 func (c *GenerateCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("generate", flag.ContinueOnError)

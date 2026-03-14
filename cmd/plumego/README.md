@@ -2,6 +2,12 @@
 
 A code agent-friendly command-line tool for plumego projects. Designed for automation, CI/CD integration, and AI-assisted development workflows.
 
+## v1 Status
+
+- Included in the Plumego v1 release scope
+- Supported as a command-line tool, not as a Go library import surface
+- Command behavior and generated output are part of the v1 hardening scope and must stay aligned with the repository's canonical docs
+
 ## Features
 
 - **Machine-First Design**: JSON/YAML/Text output formats (default: JSON)
@@ -73,10 +79,10 @@ plumego dev --addr :3000
 
 ## Commands
 
-All 9 commands are fully implemented:
+The v1 CLI surface currently targets these 9 commands:
 
 1. **new** - Create projects from templates
-2. **generate** - Generate components, middleware, handlers, models
+2. **generate** - Generate middleware, handlers, models
 3. **dev** - Development server with hot reload
 4. **check** - Health and security validation
 5. **config** - Configuration management
@@ -85,7 +91,7 @@ All 9 commands are fully implemented:
 8. **test** - Enhanced test runner
 9. **inspect** - Runtime inspection
 
-See full documentation: [docs/CLI_DESIGN.md](../../docs/CLI_DESIGN.md)
+See module notes: [MODULE.md](./MODULE.md)
 
 ## CI/CD Integration
 

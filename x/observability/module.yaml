@@ -31,6 +31,9 @@ test_commands:
   - go test -timeout 20s ./x/observability/...
   - go vet ./x/observability/...
 
+doc_paths:
+  - docs/modules/x-observability/README.md
+
 review_checklist:
   - Keep export behavior explicit
   - Avoid hidden globals

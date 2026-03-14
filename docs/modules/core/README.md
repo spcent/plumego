@@ -4,6 +4,11 @@
 
 `core` is the HTTP application kernel. It owns app construction, route attachment, middleware attachment, and server lifecycle.
 
+## v1 Status
+
+- `GA` in the Plumego v1 support matrix
+- Public compatibility is expected for the stable package surface
+
 ## Use this module when
 
 - assembling an application from explicit routes and middleware

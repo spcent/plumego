@@ -4,6 +4,11 @@
 
 `security` contains reviewable authentication, header, input-safety, and abuse-guard primitives.
 
+## v1 Status
+
+- `GA` in the Plumego v1 support matrix
+- Public compatibility is expected for the stable package surface
+
 ## Use this module when
 
 - verifying tokens or signatures

@@ -4,6 +4,11 @@
 
 `x/data` contains topology-heavy and fast-evolving data capabilities such as sharding and advanced rw patterns.
 
+## v1 Status
+
+- `Experimental` in the Plumego v1 support matrix
+- Included in repository release scope, but compatibility is not frozen
+
 ## Use this module when
 
 - the task is beyond stable `store` primitives

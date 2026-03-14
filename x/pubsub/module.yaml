@@ -28,6 +28,9 @@ test_commands:
   - go test -timeout 20s ./x/pubsub/...
   - go vet ./x/pubsub/...
 
+doc_paths:
+  - docs/modules/x-pubsub/README.md
+
 review_checklist:
   - Keep pubsub semantics explicit
   - Avoid hidden global brokers

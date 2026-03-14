@@ -4,6 +4,11 @@
 
 `x/webhook` provides inbound and outbound webhook helpers under the broader messaging family.
 
+## v1 Status
+
+- `Experimental` in the Plumego v1 support matrix
+- Included in repository release scope, but compatibility is not frozen
+
 ## Use this module when
 
 - the task is narrow webhook verification or delivery mechanics

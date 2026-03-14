@@ -2,6 +2,11 @@
 
 `x/rest` is Plumego's reusable resource-interface layer and the only app-facing entrypoint for reusable resource API standardization.
 
+## v1 Status
+
+- `Experimental` in the Plumego v1 support matrix
+- Included in repository release scope, but compatibility is not frozen
+
 It is the place for:
 
 - shared CRUD controller patterns

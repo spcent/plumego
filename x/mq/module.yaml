@@ -32,6 +32,9 @@ test_commands:
   - go test -timeout 20s ./x/mq/...
   - go vet ./x/mq/...
 
+doc_paths:
+  - docs/modules/x-mq/README.md
+
 review_checklist:
   - Keep queue semantics explicit
   - Avoid hidden background side effects

@@ -4,6 +4,11 @@
 
 `x/frontend` provides explicit helpers for static asset serving, embedded frontend mounts, and SPA fallback behavior.
 
+## v1 Status
+
+- `Experimental` in the Plumego v1 support matrix
+- Included in repository release scope, but compatibility is not frozen
+
 ## Use this module when
 
 - the task is static asset serving

@@ -161,7 +161,7 @@ Global Flags:
 
 Available Commands:
   new         Create new project from template
-  generate    Generate components, middleware, handlers
+  generate    Generate middleware, handlers
   dev         Start development server with hot reload
   routes      Inspect registered routes
   check       Validate project health

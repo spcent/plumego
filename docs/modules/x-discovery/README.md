@@ -4,6 +4,11 @@
 
 `x/discovery` provides service discovery primitives and adapters for gateway and client integration.
 
+## v1 Status
+
+- `Experimental` in the Plumego v1 support matrix
+- Included in repository release scope, but compatibility is not frozen
+
 ## Use this module when
 
 - the task is service lookup or resolver behavior
