@@ -280,6 +280,7 @@ type manifestDoc struct {
 	Seen       map[string]bool
 	Scalars    map[string]string
 	ListCounts map[string]int
+	Lists      map[string][]string
 }
 
 func validateModuleManifest(repoRoot, path string) ([]string, error) {
@@ -345,6 +346,17 @@ func validateModuleManifest(repoRoot, path string) ([]string, error) {
 		}
 	}
 
+	for _, docPath := range doc.Lists["doc_paths"] {
+		targetPath := filepath.Join(repoRoot, filepath.FromSlash(docPath))
+		if _, err := os.Stat(targetPath); err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, fmt.Sprintf("%s: doc_paths target %q does not exist", filepath.ToSlash(path), docPath))
+				continue
+			}
+			return nil, err
+		}
+	}
+
 	return violations, nil
 }
 
@@ -359,6 +371,7 @@ func parseManifest(path string) (manifestDoc, error) {
 		Seen:       map[string]bool{},
 		Scalars:    map[string]string{},
 		ListCounts: map[string]int{},
+		Lists:      map[string][]string{},
 	}
 
 	currentKey := ""
@@ -389,6 +402,11 @@ func parseManifest(path string) (manifestDoc, error) {
 		}
 		if strings.HasPrefix(strings.TrimSpace(line), "- ") {
 			doc.ListCounts[currentKey]++
+			value := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "- "))
+			value = strings.Trim(value, "\"'")
+			if value != "" {
+				doc.Lists[currentKey] = append(doc.Lists[currentKey], value)
+			}
 		}
 	}
 

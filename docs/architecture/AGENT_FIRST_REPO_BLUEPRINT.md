@@ -46,6 +46,21 @@ Non-library areas stay out of import-path design:
 - `docs`
 - `specs`
 - `internal`
+- `tasks`
+
+## Repository Control Surfaces
+
+The repository uses three different top-level control surfaces on purpose:
+
+- `docs/`: human-readable explanation, architecture decisions, module primers, and roadmap
+- `specs/`: machine-readable repository rules, ownership data, dependency constraints, and change recipes
+- `tasks/`: repo-native execution cards that agents can consume as a work queue
+
+This split is intentional and should remain stable:
+
+- do not move `specs/` under `docs/`; that would blur executable rules with explanatory prose
+- keep machine-readable repository contracts at the top level so discovery and checks stay simple
+- keep task cards outside `docs/` when they are meant to drive execution rather than serve as archival prose
 
 ## Canonical Implementation Path
 

@@ -110,6 +110,32 @@ agent_hints:
 	}
 }
 
+func TestValidateModuleManifestsRequiresDeclaredDocPathsToExist(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "core", "module.yaml"), validManifestWithDocPaths("core", "stable", "docs/modules/core/README.md"))
+	writeFile(t, filepath.Join(repo, "docs", "modules", "core", "README.md"), "# core\n")
+
+	violations, err := ValidateModuleManifests(repo)
+	if err != nil {
+		t.Fatalf("ValidateModuleManifests existing docs: %v", err)
+	}
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations for existing doc_paths, got %v", violations)
+	}
+
+	writeFile(t, filepath.Join(repo, "x", "webhook", "module.yaml"), validManifestWithDocPaths("x/webhook", "extension", "docs/modules/x-webhook/README.md"))
+
+	violations, err = ValidateModuleManifests(repo)
+	if err != nil {
+		t.Fatalf("ValidateModuleManifests missing docs: %v", err)
+	}
+
+	joined := strings.Join(violations, "\n")
+	if !strings.Contains(joined, `doc_paths target "docs/modules/x-webhook/README.md" does not exist`) {
+		t.Fatalf("expected missing doc_paths violation, got:\n%s", joined)
+	}
+}
+
 func TestFindUnexpectedTopLevelDirsHonorsBaseline(t *testing.T) {
 	repo := t.TempDir()
 	for _, dir := range []string{"core", "docs", "x", "legacy"} {
@@ -155,6 +181,18 @@ func validManifest(path, layer string) string {
 		"test_commands:\n  - go test ./...\n" +
 		"review_checklist:\n  - stay explicit\n" +
 		"agent_hints:\n  - keep modules small\n"
+}
+
+func validManifestWithDocPaths(path, layer string, docPaths ...string) string {
+	manifest := validManifest(path, layer)
+	if len(docPaths) == 0 {
+		return manifest
+	}
+	manifest += "doc_paths:\n"
+	for _, docPath := range docPaths {
+		manifest += "  - " + docPath + "\n"
+	}
+	return manifest
 }
 
 func writeFile(t *testing.T, path, content string) {

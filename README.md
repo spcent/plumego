@@ -14,6 +14,15 @@ The target repository layout is now:
 - extension packages: `x/*`
 - canonical architecture docs: `docs/architecture/*`
 - machine-readable repo rules: `specs/*`
+- repo-native execution cards: `tasks/*`
+
+Repository control-plane split:
+
+- `docs/`: human-readable explanation, architecture, primers, and roadmap
+- `specs/`: machine-readable rules, ownership, dependency policy, and change recipes
+- `tasks/`: executable work cards and agent-facing task queue
+
+Do not move `specs/` into `docs/`. In Plumego, `specs/` is a first-class repository control surface rather than supporting prose.
 
 For architecture planning and future refactors, prefer the rules in:
 
