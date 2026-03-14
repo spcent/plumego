@@ -155,18 +155,15 @@ Planned work:
 - continue checking for observability or protocol catch-all behavior in stable roots
 - ensure transport health handlers remain outside `health`
 - keep tenant-aware behavior out of stable `middleware` and `store`
-- shrink `specs/check-baseline/*` entries instead of letting them grow
 
 Current audit focus:
 
 - `store/cache/distributed` and `store/cache/redis` remain the clearest stable-store migration debt
 - they should be maintained for now, but they should not define the template for new stable-store additions
-- the current files under `specs/check-baseline/*` are empty placeholders rather than active exception lists
-- the next baseline-reduction candidate is teaching checks to tolerate absent baseline files so these empty placeholders can be removed
 
 Execution approach:
 
-- start with metadata and check-baseline driven work before moving code
+- start with metadata and checker-driven work before moving code
 - keep each debt-reduction card scoped to one stable root when possible
 - prefer boundary tightening and explicit migration notes over broad tree moves
 
@@ -209,7 +206,6 @@ Goals:
 
 Planned work:
 
-- close remaining migration debt tracked in `specs/check-baseline/*`
 - audit public APIs for clarity before final v1 freeze
 - expand race, integration, and negative-path coverage for critical roots
 - run release-readiness reviews against documentation, examples, env defaults, and quality gates

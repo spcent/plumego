@@ -37,7 +37,7 @@ For architecture planning and future refactors, prefer the rules in:
 
 For the staged future plan, see `docs/ROADMAP.md`.
 
-Machine-enforced repo guardrails live under `internal/checks/*`. Historical exceptions are tracked explicitly in `specs/check-baseline/*` so CI can block new drift while existing migration debt is burned down.
+Machine-enforced repo guardrails live under `internal/checks/*` and are enforced directly in CI.
 
 For new application work, use a single canonical path:
 
