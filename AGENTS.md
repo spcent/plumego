@@ -113,6 +113,7 @@ Required repo-wide gates:
 
 ```bash
 go run ./internal/checks/dependency-rules
+go run ./internal/checks/agent-workflow
 go run ./internal/checks/module-manifests
 go run ./internal/checks/reference-layout
 go test -race -timeout 60s ./...
