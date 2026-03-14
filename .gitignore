@@ -8,6 +8,7 @@
 *.so
 *.dylib
 *.test
+cmd/plumego/plumego
 
 # Logs and temporary files
 *.log
