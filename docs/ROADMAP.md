@@ -157,6 +157,11 @@ Planned work:
 - keep tenant-aware behavior out of stable `middleware` and `store`
 - shrink `specs/check-baseline/*` entries instead of letting them grow
 
+Current audit focus:
+
+- `store/cache/distributed` and `store/cache/redis` remain the clearest stable-store migration debt
+- they should be maintained for now, but they should not define the template for new stable-store additions
+
 Execution approach:
 
 - start with metadata and check-baseline driven work before moving code

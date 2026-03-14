@@ -27,3 +27,16 @@
 - keep interfaces narrow
 - keep concurrent behavior testable
 - move topology-heavy features to owning extensions
+
+## Current migration debt
+
+The stable `store` root still contains two packages that should be treated as migration debt rather than a pattern to extend:
+
+- `store/cache/distributed`
+- `store/cache/redis`
+
+Current rule:
+
+- keep these packages working
+- do not add new topology-heavy or provider-heavy siblings under stable `store`
+- route new topology-heavy data capabilities to `x/data` or `x/tenant`

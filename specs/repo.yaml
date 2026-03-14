@@ -111,6 +111,7 @@ target_cleanup:
     - protocol gateway adapters move out of contract and into owning extensions
     - tenant-aware middleware stays under x/tenant, not middleware
     - topology-heavy data features move out of stable store and into x/data or x/tenant
+    - store/cache/distributed and store/cache/redis remain temporary migration debt and must not become the template for new stable-store packages
   extension_taxonomy:
     - messaging capabilities should converge under x/messaging
     - transport adapters should converge under their owning extension instead of broad legacy buckets
