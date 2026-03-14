@@ -104,6 +104,8 @@ Rules:
 - `store`: base persistence primitives only
 - `health`, `log`, `metrics`: support contracts and base implementations only
 
+Health HTTP exposure belongs in reference apps or owning extensions, not in the stable `health` root.
+
 Avoid growing broad buckets such as:
 
 - `middleware/tenant`

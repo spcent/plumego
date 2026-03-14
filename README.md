@@ -150,6 +150,7 @@ func main() {
 - **Reusable Resource APIs**: Use `x/rest` for reusable CRUD and resource-interface standardization. Keep response/error contracts aligned with `contract`, keep route binding explicit, and keep domain validation outside `x/rest`.
 - **Migrations**: Optional SQL schemas for modules/examples live in `docs/migrations/` (see notes for sms-gateway `sent_at` backfill).
 - **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
+- **Health Boundary**: The stable `health` package owns readiness models and in-process state only. HTTP health endpoints should live in `reference/standard-service` or extension packages such as `x/ops/healthhttp`, not in `health` itself.
 
 ## Multi-Tenancy
 

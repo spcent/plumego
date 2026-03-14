@@ -25,3 +25,9 @@
 
 - keep health state transport-agnostic
 - expose HTTP handlers from reference or extensions, not from health itself
+
+## Boundary with HTTP exposure
+
+- `health` owns state and models, not HTTP routes
+- expose health endpoints from `reference/standard-service` or extension packages such as `x/ops/healthhttp`
+- do not let `health` grow transport helpers or endpoint registration APIs

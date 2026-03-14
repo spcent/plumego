@@ -3,7 +3,7 @@ path: health
 layer: stable
 status: ga
 owner: runtime
-summary: Health models and readiness helpers.
+summary: Health models and readiness helpers, not an HTTP endpoint package.
 
 responsibilities:
   - Health status types
@@ -50,4 +50,4 @@ review_checklist:
 agent_hints:
   - Health is a support package, not an app feature catalog
   - Keep transport concerns elsewhere
-  - Prefer reference or extension packages for health HTTP surfaces
+  - Prefer reference or extension packages for health HTTP surfaces; do not add HTTP handlers here
