@@ -25,7 +25,7 @@ The next stages should harden this shape instead of adding new generic abstracti
 
 ## Phase 1: Finish the Agent Workflow Control Plane
 
-Status: in progress
+Status: complete
 
 Goals:
 
@@ -55,7 +55,7 @@ Execution surface:
 
 ## Phase 2: Complete Extension Taxonomy Convergence
 
-Status: partially complete
+Status: in progress
 
 Goals:
 
