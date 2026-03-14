@@ -78,6 +78,8 @@ Hard rules:
 - `contract` owns transport contracts and response/error helpers, not protocol gateway families.
 - `health` owns models/readiness helpers, not HTTP handler ownership.
 - Tenant-aware logic belongs in `x/tenant`, not stable `middleware` or stable `store`.
+- Stable `middleware` must not grow tenant resolution, tenant policy, or tenant quota behavior.
+- Stable `store` must not grow tenant-aware adapters or tenant-specific storage policy.
 - New library code must live under a stable root or `x/*`; avoid broad legacy roots such as `net`, `utils`, `validator`, `tenant`, `ai`, `rest`, `pubsub`.
 
 Task entrypoint defaults:

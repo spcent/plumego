@@ -171,7 +171,9 @@ special_rules:
     - Core stays a kernel and must not grow feature-catalog dependencies
     - Router stays transport-structure only
     - Middleware must stay transport-only and must not import store
+    - Stable middleware must not grow tenant resolution, tenant policy, or tenant quota behavior
     - Tenant-aware storage belongs under x/tenant/store
+    - Stable store must not grow tenant-aware adapters or tenant-specific storage policy
     - Protocol gateway families belong in their owning extension package, not in contract
     - Health HTTP endpoint ownership belongs outside health
     - High-level data topology belongs in x/data or x/tenant, not in the stable store layer

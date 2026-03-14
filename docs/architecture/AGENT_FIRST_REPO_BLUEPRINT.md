@@ -89,6 +89,8 @@ Rules:
 - `core` is a kernel, not a feature catalog.
 - `middleware` remains transport-only.
 - Tenant-aware logic belongs in `x/tenant`, not in stable `middleware` or `store`.
+- Stable `middleware` must not grow tenant resolution, tenant policy, or tenant quota behavior.
+- Stable `store` must not grow tenant-aware adapters or tenant-specific storage policy.
 - Reference apps define the canonical app layout.
 - `health` keeps models and readiness state, not HTTP endpoint ownership.
 - `contract` keeps transport contracts, not protocol gateway families.
@@ -109,6 +111,7 @@ Health HTTP exposure belongs in reference apps or owning extensions, not in the 
 Avoid growing broad buckets such as:
 
 - `middleware/tenant`
+- stable-root tenant policy helpers
 - `middleware/observability` as a catch-all feature catalog
 - `contract/protocol` as a cross-protocol family root
 - `health` HTTP handler packages

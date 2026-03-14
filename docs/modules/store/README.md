@@ -13,6 +13,7 @@
 ## Do not use this module for
 
 - tenant-aware storage policy
+- tenant-aware adapters
 - sharding or heavy topology defaults in stable roots
 - app bootstrap
 
@@ -39,4 +40,5 @@ Current rule:
 
 - keep these packages working
 - do not add new topology-heavy or provider-heavy siblings under stable `store`
+- do not add tenant-aware adapters or tenant-specific storage policy under stable `store`
 - route new topology-heavy data capabilities to `x/data` or `x/tenant`

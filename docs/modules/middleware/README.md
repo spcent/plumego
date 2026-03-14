@@ -14,6 +14,7 @@
 
 - business validation
 - tenant policy catalogs
+- tenant resolution or tenant quota enforcement
 - service construction
 
 ## First files to read
@@ -27,3 +28,4 @@
 - implement `func(http.Handler) http.Handler`
 - add ordering and error-path tests
 - keep side effects explicit and local
+- keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
