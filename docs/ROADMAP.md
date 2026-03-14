@@ -55,7 +55,7 @@ Execution surface:
 
 ## Phase 2: Complete Extension Taxonomy Convergence
 
-Status: in progress
+Status: substantially complete
 
 Goals:
 
@@ -65,11 +65,25 @@ Goals:
 
 Planned work:
 
-- continue converging messaging behavior under `x/messaging`
-- define clearer subordinate status for `x/mq`, `x/pubsub`, `x/webhook`, and `x/scheduler`
-- continue converging edge transport work under `x/gateway`
-- tighten boundaries between `x/ops` and `x/observability`
-- document discovery defaults for `x/frontend`, `x/devtools`, and `x/discovery`
+- keep `x/messaging` as the only app-facing messaging family entrypoint
+- keep `x/mq`, `x/pubsub`, `x/webhook`, and `x/scheduler` explicitly subordinate
+- keep `x/gateway` and `x/rest` as non-overlapping entrypoints
+- keep `x/ops` and `x/observability` as non-overlapping discovery roots
+- keep `x/frontend`, `x/devtools`, and `x/discovery` clearly documented as secondary capability roots, not bootstrap surfaces
+
+Completed in this phase:
+
+- converged messaging-family discovery onto `x/messaging`
+- clarified subordinate status for `x/mq`, `x/pubsub`, and `x/webhook`
+- separated `x/gateway` from `x/rest` at the metadata and primer level
+- separated `x/ops` from `x/observability` at the metadata and primer level
+- completed secondary discovery guidance for `x/frontend`, `x/devtools`, and `x/discovery`
+
+Remaining work:
+
+- keep `x/scheduler` explicitly subordinate in family-level documentation
+- watch for taxonomy drift as new extensions or adapters are added
+- add stronger checks if future ambiguity reappears in manifests or top-level docs
 
 Exit criteria:
 
