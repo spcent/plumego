@@ -2,22 +2,17 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
-	"unicode"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/devserver"
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
 	"github.com/spcent/plumego/cmd/plumego/internal/watcher"
-	"github.com/spcent/plumego/x/pubsub"
 )
 
 // DevCmd starts the development server. The newDashboard field allows
@@ -51,30 +46,59 @@ func (c *DevCmd) Name() string  { return "dev" }
 func (c *DevCmd) Short() string { return "Start development server with dashboard and hot reload" }
 
 func (c *DevCmd) Run(ctx *Context, args []string) error {
+	// Check for help flag
+	if containsHelpFlag(args) {
+		help := `Usage: plumego dev [options]
+
+Start the Plumego development server with hot reload and dashboard.
+
+Options:
+  --dir <path>          Project directory (default: .)
+  --addr <address>      Application listen address (default: :8080)
+  --dashboard-addr <address>  Dashboard listen address (default: 127.0.0.1:9999)
+  --watch <patterns>    Watch patterns (default: **/*.go)
+  --exclude <patterns>  Exclude patterns
+  --debounce <duration>  Debounce duration (default: 500ms)
+  --no-reload           Disable hot reload
+  --build-cmd <cmd>     Custom build command
+  --run-cmd <cmd>       Custom run command
+
+Examples:
+  plumego dev                      # Start dev server in current directory
+  plumego dev --addr :3000         # Start dev server on port 3000
+  plumego dev --dir ./src          # Start dev server in src directory
+  plumego dev --watch "**/*.go,**/*.html"  # Watch Go and HTML files
+  plumego dev --no-reload          # Start dev server without hot reload
+  plumego dev --build-cmd "go build -o app" --run-cmd "./app"  # Custom build and run commands
+`
+		ctx.Out.Print(help)
+		return nil
+	}
+
 	opts, err := parseDevArgs(args)
 	if err != nil {
-		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+		return NewAppError(1, fmt.Sprintf("invalid flags: %v", err), "")
 	}
 
 	return c.runWithContext(context.Background(), ctx.Out, opts)
 }
 
 func parseDevArgs(args []string) (devOptions, error) {
-	fs := flag.NewFlagSet("dev", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-
 	opts := devOptions{}
-	fs.StringVar(&opts.dir, "dir", ".", "Project directory")
-	fs.StringVar(&opts.addr, "addr", ":8080", "Application listen address")
-	fs.StringVar(&opts.dashboardAddr, "dashboard-addr", "127.0.0.1:9999", "Dashboard listen address")
-	fs.StringVar(&opts.watchPatterns, "watch", "**/*.go", "Watch patterns")
-	fs.StringVar(&opts.excludePatterns, "exclude", "", "Exclude patterns")
-	fs.StringVar(&opts.debounceStr, "debounce", "500ms", "Debounce duration")
-	fs.BoolVar(&opts.noReload, "no-reload", false, "Disable hot reload")
-	fs.StringVar(&opts.buildCmd, "build-cmd", "", "Custom build command")
-	fs.StringVar(&opts.runCmd, "run-cmd", "", "Custom run command")
 
-	if err := fs.Parse(args); err != nil {
+	_, err := ParseFlags("dev", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&opts.dir, "dir", ".", "Project directory")
+		fs.StringVar(&opts.addr, "addr", ":8080", "Application listen address")
+		fs.StringVar(&opts.dashboardAddr, "dashboard-addr", "127.0.0.1:9999", "Dashboard listen address")
+		fs.StringVar(&opts.watchPatterns, "watch", "**/*.go", "Watch patterns")
+		fs.StringVar(&opts.excludePatterns, "exclude", "", "Exclude patterns")
+		fs.StringVar(&opts.debounceStr, "debounce", "500ms", "Debounce duration")
+		fs.BoolVar(&opts.noReload, "no-reload", false, "Disable hot reload")
+		fs.StringVar(&opts.buildCmd, "build-cmd", "", "Custom build command")
+		fs.StringVar(&opts.runCmd, "run-cmd", "", "Custom run command")
+	})
+
+	if err != nil {
 		return devOptions{}, err
 	}
 
@@ -87,12 +111,12 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 
 	debounce, err := time.ParseDuration(opts.debounceStr)
 	if err != nil {
-		return out.Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
+		return NewAppError(1, fmt.Sprintf("invalid debounce duration: %v", err), "")
 	}
 
 	absDir, err := resolveDir(opts.dir)
 	if err != nil {
-		return out.Error(err.Error(), 1)
+		return NewAppError(1, err.Error(), "")
 	}
 
 	if err := emitDevStart(out, absDir, opts.addr, opts.dashboardAddr); err != nil {
@@ -112,10 +136,10 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	if opts.buildCmd != "" {
 		cmd, args, err := parseCommandLine(opts.buildCmd)
 		if err != nil {
-			return out.Error(fmt.Sprintf("invalid build command: %v", err), 1)
+			return NewAppError(1, fmt.Sprintf("invalid build command: %v", err), "")
 		}
 		if cmd == "" {
-			return out.Error("build command is empty", 1)
+			return NewAppError(1, "build command is empty", "")
 		}
 		cfg.CustomBuildCmd = cmd
 		cfg.CustomBuildArgs = args
@@ -124,10 +148,10 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	if opts.runCmd != "" {
 		cmd, args, err := parseCommandLine(opts.runCmd)
 		if err != nil {
-			return out.Error(fmt.Sprintf("invalid run command: %v", err), 1)
+			return NewAppError(1, fmt.Sprintf("invalid run command: %v", err), "")
 		}
 		if cmd == "" {
-			return out.Error("run command is empty", 1)
+			return NewAppError(1, "run command is empty", "")
 		}
 		cfg.CustomRunCmd = cmd
 		cfg.CustomRunArgs = args
@@ -135,19 +159,19 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 
 	dash, err := c.newDashboard(cfg)
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to create dashboard: %v", err), 1)
+		return NewAppError(1, fmt.Sprintf("failed to create dashboard: %v", err), "")
 	}
 
 	if out.Format() != "text" {
 		stopForwarder, err := startDevEventForwarder(runCtx, out, dash.GetPubSub())
 		if err != nil {
-			return out.Error(fmt.Sprintf("failed to subscribe to dev events: %v", err), 1)
+			return NewAppError(1, fmt.Sprintf("failed to subscribe to dev events: %v", err), "")
 		}
 		defer stopForwarder()
 	}
 
 	if err := dash.Start(runCtx); err != nil {
-		return out.Error(fmt.Sprintf("failed to start dashboard: %v", err), 1)
+		return NewAppError(1, fmt.Sprintf("failed to start dashboard: %v", err), "")
 	}
 
 	if err := emitDashboardStarted(out, opts.dashboardAddr); err != nil {
@@ -155,7 +179,7 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	}
 
 	if err := dash.BuildAndRun(runCtx); err != nil {
-		return out.Error(fmt.Sprintf("failed to build and run: %v", err), 1)
+		return NewAppError(1, fmt.Sprintf("failed to build and run: %v", err), "")
 	}
 	if err := emitAppReady(out, opts.addr); err != nil {
 		return err
@@ -195,7 +219,7 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	w, err := watcher.NewWatcher(absDir, watches, excludes, debounce)
 	if err != nil {
 		dash.Stop(runCtx)
-		return out.Error(fmt.Sprintf("failed to create watcher: %v", err), 1)
+		return NewAppError(1, fmt.Sprintf("failed to create watcher: %v", err), "")
 	}
 	defer w.Close()
 
@@ -254,394 +278,4 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 			return nil
 		}
 	}
-}
-
-func parsePatterns(s string) []string {
-	if s == "" {
-		return nil
-	}
-
-	patterns := strings.Split(s, ",")
-	result := make([]string, 0, len(patterns))
-
-	for _, p := range patterns {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, p)
-		}
-	}
-
-	return result
-}
-
-func parseCommandLine(input string) (string, []string, error) {
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return "", nil, nil
-	}
-
-	var args []string
-	var buf strings.Builder
-	inSingle := false
-	inDouble := false
-	escaped := false
-
-	flush := func() {
-		if buf.Len() > 0 {
-			args = append(args, buf.String())
-			buf.Reset()
-		}
-	}
-
-	for _, r := range input {
-		if escaped {
-			buf.WriteRune(r)
-			escaped = false
-			continue
-		}
-
-		if r == '\\' && !inSingle {
-			escaped = true
-			continue
-		}
-
-		if r == '\'' && !inDouble {
-			inSingle = !inSingle
-			continue
-		}
-
-		if r == '"' && !inSingle {
-			inDouble = !inDouble
-			continue
-		}
-
-		if !inSingle && !inDouble && unicode.IsSpace(r) {
-			flush()
-			continue
-		}
-
-		buf.WriteRune(r)
-	}
-
-	if escaped {
-		return "", nil, fmt.Errorf("unfinished escape sequence")
-	}
-	if inSingle || inDouble {
-		return "", nil, fmt.Errorf("unterminated quote")
-	}
-
-	flush()
-	if len(args) == 0 {
-		return "", nil, fmt.Errorf("empty command")
-	}
-
-	return args[0], args[1:], nil
-}
-
-func startDevEventForwarder(ctx context.Context, out *output.Formatter, ps *pubsub.InProcBroker) (func(), error) {
-	patterns := []string{"app.*", "build.*"}
-	opts := pubsub.DefaultSubOptions()
-	subs := make([]pubsub.Subscription, 0, len(patterns))
-
-	for _, pattern := range patterns {
-		sub, err := ps.SubscribePatternWithContext(ctx, pattern, opts)
-		if err != nil {
-			for _, existing := range subs {
-				existing.Cancel()
-			}
-			return func() {}, err
-		}
-		subs = append(subs, sub)
-		go forwardDevEvents(ctx, out, sub)
-	}
-
-	return func() {
-		for _, sub := range subs {
-			sub.Cancel()
-		}
-	}, nil
-}
-
-func forwardDevEvents(ctx context.Context, out *output.Formatter, sub pubsub.Subscription) {
-	for {
-		select {
-		case <-ctx.Done():
-			sub.Cancel()
-			return
-		case msg, ok := <-sub.C():
-			if !ok {
-				return
-			}
-			emitPubSubEvent(out, msg)
-		}
-	}
-}
-
-func emitPubSubEvent(out *output.Formatter, msg pubsub.Message) {
-	event := output.Event{
-		Event: msg.Topic,
-	}
-	if !msg.Time.IsZero() {
-		event.Time = msg.Time.Format(time.RFC3339)
-	}
-
-	switch msg.Topic {
-	case devserver.EventBuildStart:
-		event.Message = "Build started"
-		if data, ok := msg.Data.(devserver.BuildEvent); ok {
-			event.Data = buildEventData(data)
-		}
-	case devserver.EventBuildSuccess:
-		event.Message = "Build succeeded"
-		if data, ok := msg.Data.(devserver.BuildEvent); ok {
-			event.Data = buildEventData(data)
-		}
-	case devserver.EventBuildFail:
-		event.Message = "Build failed"
-		event.Level = "error"
-		if data, ok := msg.Data.(devserver.BuildEvent); ok {
-			event.Data = buildEventData(data)
-		}
-	case devserver.EventAppStart, devserver.EventAppStop, devserver.EventAppRestart:
-		if data, ok := msg.Data.(devserver.AppLifecycleEvent); ok {
-			event.Data = map[string]any{
-				"state": data.State,
-			}
-			if data.PID != 0 {
-				event.Data["pid"] = data.PID
-			}
-			if data.Error != "" {
-				event.Data["error"] = data.Error
-				event.Level = "error"
-			}
-			event.Message = "Application " + data.State
-		}
-	case devserver.EventAppLog, devserver.EventAppError:
-		if data, ok := msg.Data.(devserver.LogEvent); ok {
-			event.Level = data.Level
-			event.Message = data.Message
-			event.Data = map[string]any{
-				"source": data.Source,
-			}
-		}
-	default:
-		event.Data = toEventMap(msg.Data)
-	}
-
-	_ = out.Event(event)
-}
-
-func buildEventData(data devserver.BuildEvent) map[string]any {
-	payload := map[string]any{
-		"success": data.Success,
-	}
-	if data.Duration > 0 {
-		payload["duration_ms"] = data.Duration.Milliseconds()
-	}
-	if data.Output != "" {
-		payload["output"] = data.Output
-	}
-	if data.Error != "" {
-		payload["error"] = data.Error
-	}
-	return payload
-}
-
-func toEventMap(data any) map[string]any {
-	switch v := data.(type) {
-	case map[string]any:
-		return v
-	case map[string]string:
-		out := make(map[string]any, len(v))
-		for k, val := range v {
-			out[k] = val
-		}
-		return out
-	default:
-		raw, err := json.Marshal(data)
-		if err != nil {
-			return map[string]any{"value": fmt.Sprintf("%v", data)}
-		}
-		var out map[string]any
-		if err := json.Unmarshal(raw, &out); err != nil {
-			return map[string]any{"value": fmt.Sprintf("%v", data)}
-		}
-		return out
-	}
-}
-
-func emitDevStart(out *output.Formatter, absDir, addr, dashboardAddr string) error {
-	if out.Format() == "text" {
-		message := fmt.Sprintf(
-			"Starting Plumego Dev Server\n   Project: %s\n   App URL: http://localhost%s\n   Dashboard URL: http://localhost%s\n",
-			absDir,
-			addr,
-			dashboardAddr,
-		)
-		return out.Event(output.Event{
-			Event:   "starting",
-			Message: message,
-		})
-	}
-
-	return out.Event(output.Event{
-		Event:   "starting",
-		Message: "Plumego Dev Server starting",
-		Data: map[string]any{
-			"project":        absDir,
-			"app_addr":       addr,
-			"dashboard_addr": dashboardAddr,
-		},
-	})
-}
-
-func emitDashboardStarted(out *output.Formatter, dashboardAddr string) error {
-	if out.Format() == "text" {
-		return out.Event(output.Event{
-			Event:   "dashboard_started",
-			Message: fmt.Sprintf("Dashboard started at http://localhost%s\n", dashboardAddr),
-		})
-	}
-
-	return out.Event(output.Event{
-		Event:   "dashboard_started",
-		Message: "Dashboard started",
-		Data: map[string]any{
-			"url": fmt.Sprintf("http://localhost%s", dashboardAddr),
-		},
-	})
-}
-
-func emitAppReady(out *output.Formatter, addr string) error {
-	if out.Format() == "text" {
-		return nil
-	}
-
-	return out.Event(output.Event{
-		Event:   "ready",
-		Message: "Application ready",
-		Data: map[string]any{
-			"url": fmt.Sprintf("http://localhost%s", addr),
-		},
-	})
-}
-
-func emitWatching(out *output.Formatter) error {
-	if out.Format() == "text" {
-		return out.Event(output.Event{
-			Event:   "watching",
-			Message: "Watching for changes...\n   Press Ctrl+C to stop",
-		})
-	}
-
-	return out.Event(output.Event{
-		Event:   "watching",
-		Message: "Watching for changes",
-	})
-}
-
-func emitReloadDisabled(out *output.Formatter) error {
-	return out.Event(output.Event{
-		Event:   "reload_disabled",
-		Message: "Auto reload disabled.\nPress Ctrl+C to stop",
-		Data: map[string]any{
-			"auto_reload": false,
-		},
-	})
-}
-
-func emitFileChanged(out *output.Formatter, path string) error {
-	if out.Format() == "text" {
-		return out.Event(output.Event{
-			Event:   "file_changed",
-			Message: fmt.Sprintf("\nFile changed: %s", path),
-			Data: map[string]any{
-				"path": path,
-			},
-		})
-	}
-
-	return out.Event(output.Event{
-		Event:   "file_changed",
-		Message: "File changed",
-		Data: map[string]any{
-			"path": path,
-		},
-	})
-}
-
-func emitReloadFailed(out *output.Formatter, reloadErr error) error {
-	message := "Reload failed"
-	if out.Format() == "text" {
-		message = fmt.Sprintf("Reload failed: %v", reloadErr)
-	}
-
-	return out.Event(output.Event{
-		Event:   "reload_failed",
-		Level:   "error",
-		Message: message,
-		Data: map[string]any{
-			"error": reloadErr.Error(),
-		},
-	})
-}
-
-func emitReloadComplete(out *output.Formatter) error {
-	if out.Format() == "text" {
-		return out.Event(output.Event{
-			Event:   "reload_complete",
-			Message: "Reload complete\n",
-		})
-	}
-
-	return out.Event(output.Event{
-		Event:   "reload_complete",
-		Message: "Reload complete",
-	})
-}
-
-func emitWatcherError(out *output.Formatter, watchErr error) error {
-	message := "Watcher error"
-	if out.Format() == "text" {
-		message = fmt.Sprintf("Watcher error: %v", watchErr)
-	}
-
-	return out.Event(output.Event{
-		Event:   "watcher_error",
-		Level:   "warn",
-		Message: message,
-		Data: map[string]any{
-			"error": watchErr.Error(),
-		},
-	})
-}
-
-func emitShutdown(out *output.Formatter) error {
-	if out.Format() == "text" {
-		return out.Event(output.Event{
-			Event:   "stopped",
-			Message: "\nShutting down...",
-			Data: map[string]any{
-				"code": 0,
-			},
-		})
-	}
-
-	return out.Event(output.Event{
-		Event:   "stopped",
-		Message: "Shutting down",
-		Data: map[string]any{
-			"code": 0,
-		},
-	})
-}
-
-// getExecutableDir returns the directory containing the plumego executable.
-func getExecutableDir() string {
-	ex, err := os.Executable()
-	if err != nil {
-		wd, _ := os.Getwd()
-		return wd
-	}
-	return filepath.Dir(ex)
 }

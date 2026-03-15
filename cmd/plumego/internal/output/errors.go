@@ -36,5 +36,14 @@ func ExitCode(err error) (int, bool) {
 	if errors.As(err, &exitErr) {
 		return exitErr.Code, true
 	}
+
+	// Check for AppError from commands package
+	var appErr interface {
+		Code() int
+	}
+	if errors.As(err, &appErr) {
+		return appErr.Code(), true
+	}
+
 	return 0, false
 }

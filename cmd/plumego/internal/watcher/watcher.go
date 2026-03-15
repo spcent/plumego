@@ -34,7 +34,7 @@ func NewWatcher(dir string, include, exclude []string, debounce time.Duration) (
 		include:  include,
 		exclude:  exclude,
 		debounce: debounce,
-		events:   make(chan string, 10),
+		events:   make(chan string, 100), // Increase buffer size
 		errors:   make(chan error, 10),
 		done:     make(chan bool),
 	}
@@ -67,13 +67,26 @@ func (w *Watcher) watch() {
 	// Initial scan
 	w.scanFiles(fileModTimes)
 
-	ticker := time.NewTicker(500 * time.Millisecond)
+	// Use a variable ticker that adjusts based on directory size
+	scanInterval := 500 * time.Millisecond
+	ticker := time.NewTicker(scanInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			w.scanFiles(fileModTimes)
+			// Scan files and adjust interval based on number of files
+			fileCount := w.scanFiles(fileModTimes)
+
+			// Adjust scan interval based on file count
+			if fileCount > 1000 {
+				scanInterval = 1000 * time.Millisecond
+			} else if fileCount > 100 {
+				scanInterval = 750 * time.Millisecond
+			} else {
+				scanInterval = 500 * time.Millisecond
+			}
+			ticker.Reset(scanInterval)
 
 			// Check if we should emit a pending event
 			if w.pending != "" && time.Since(w.lastChange) > w.debounce {
@@ -87,7 +100,9 @@ func (w *Watcher) watch() {
 	}
 }
 
-func (w *Watcher) scanFiles(modTimes map[string]time.Time) {
+func (w *Watcher) scanFiles(modTimes map[string]time.Time) int {
+	fileCount := 0
+
 	filepath.Walk(w.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -128,8 +143,11 @@ func (w *Watcher) scanFiles(modTimes map[string]time.Time) {
 			w.pending = relPath
 		}
 
+		fileCount++
 		return nil
 	})
+
+	return fileCount
 }
 
 func (w *Watcher) shouldWatch(path string) bool {

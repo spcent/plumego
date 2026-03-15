@@ -96,7 +96,20 @@ func (r *RootCmd) Run(args []string) error {
 		EnvFile: global.EnvFile,
 	}
 
-	return cmd.Run(ctx, args[1:])
+	// Run the command
+	err = cmd.Run(ctx, args[1:])
+	if err != nil {
+		// Check if it's an AppError
+		if appErr, ok := err.(*AppError); ok {
+			return r.formatter.Error(appErr.Message, appErr.Code(), map[string]any{
+				"detail": appErr.Detail,
+			})
+		}
+		// Otherwise, return the error as is
+		return err
+	}
+
+	return nil
 }
 
 type globalFlags struct {
@@ -154,34 +167,45 @@ Usage:
   plumego [global-flags] <command> [command-flags] [args]
 
 Global Flags:
-  -f, --format <type>    Output format: json, yaml, text (default: json)
+  -f, --format <type>    Output format: json, yaml, text (default: text)
   -q, --quiet            Suppress non-essential output
   -v, --verbose          Detailed logging
       --no-color         Disable color output
       --env-file <path>  Environment file path (default: .env)
 
 Available Commands:
-  new         Create new project from template
-  generate    Generate middleware, handlers
-  dev         Start development server with hot reload
-  routes      Inspect registered routes
-  check       Validate project health
-  config      Configuration management
-  migrate     Database migrations
-  test        Enhanced test running
-  build       Build application
-  inspect     Inspect running application
-  serve       Start static file server
+  new         Create new project from template with different boilerplate options
+  generate    Generate middleware, handlers, and other components
+  dev         Start development server with dashboard and hot reload
+  routes      Inspect registered routes and their details
+  check       Validate project health and security
+  config      Manage project configuration
+  migrate     Run database migrations
+  test        Run tests with enhanced features
+  build       Build application for deployment
+  inspect     Inspect running application details
+  serve       Start static file server for development
   version     Show version information
 
 Use "plumego <command> --help" for more information about a command.
 
 Examples:
+  # Create a new project
   plumego new myapp --template api
+
+  # Generate a handler
   plumego generate handler Auth
+
+  # Start development server
   plumego dev --addr :3000
+  
+  # Inspect routes
   plumego routes --format json
+  
+  # Check project health
   plumego check --security
+  
+  # Serve static files
   plumego serve
   plumego serve ./public --addr :3000
 

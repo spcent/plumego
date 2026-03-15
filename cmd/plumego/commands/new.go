@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -17,23 +16,60 @@ func (c *NewCmd) Name() string  { return "new" }
 func (c *NewCmd) Short() string { return "Create new project from template" }
 
 func (c *NewCmd) Run(ctx *Context, args []string) error {
-	fs := flag.NewFlagSet("new", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
+	// Check for help flag
+	if containsHelpFlag(args) {
+		help := `Usage: plumego new [options] <project-name>
 
-	templateFlag := fs.String("template", "canonical", "Project template (canonical, minimal, api, fullstack, microservice)")
-	moduleFlag := fs.String("module", "", "Go module path")
-	dirFlag := fs.String("dir", "", "Output directory")
-	force := fs.Bool("force", false, "Overwrite existing directory")
-	noGit := fs.Bool("no-git", false, "Skip git initialization")
-	dryRun := fs.Bool("dry-run", false, "Preview without creating")
+Create a new Plumego project from a template.
 
-	if err := fs.Parse(args); err != nil {
-		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+Options:
+  --template <name>   Project template (canonical, minimal, api, fullstack, microservice) (default: canonical)
+  --module <path>     Go module path (default: project name)
+  --dir <path>        Output directory (default: ./<project-name>)
+  --force             Overwrite existing directory
+  --no-git            Skip git initialization
+  --dry-run           Preview without creating files
+
+Templates:
+  canonical     Standard Plumego project structure with all features
+  minimal       Minimal project structure with basic setup
+  api           API-focused project with routes and middleware
+  fullstack     Fullstack project with frontend integration
+  microservice  Microservice-oriented project structure
+
+Examples:
+  plumego new myapp                      # Create project with canonical template
+  plumego new myapp --template api       # Create API-focused project
+  plumego new myapp --module github.com/myuser/myapp  # Set custom module path
+  plumego new myapp --dir ./projects/myapp  # Set custom output directory
+  plumego new myapp --dry-run            # Preview without creating files
+`
+		ctx.Out.Print(help)
+		return nil
 	}
 
-	positionals := fs.Args()
+	var templateFlag *string
+	var moduleFlag *string
+	var dirFlag *string
+	var force *bool
+	var noGit *bool
+	var dryRun *bool
+
+	positionals, err := ParseFlags("new", args, func(fs *flag.FlagSet) {
+		templateFlag = fs.String("template", "canonical", "Project template (canonical, minimal, api, fullstack, microservice)")
+		moduleFlag = fs.String("module", "", "Go module path")
+		dirFlag = fs.String("dir", "", "Output directory")
+		force = fs.Bool("force", false, "Overwrite existing directory")
+		noGit = fs.Bool("no-git", false, "Skip git initialization")
+		dryRun = fs.Bool("dry-run", false, "Preview without creating")
+	})
+
+	if err != nil {
+		return NewAppError(1, fmt.Sprintf("invalid flags: %v", err), "")
+	}
+
 	if len(positionals) == 0 {
-		return ctx.Out.Error("project name required", 1)
+		return NewAppError(1, "project name required", "")
 	}
 
 	projectName := positionals[0]
@@ -54,7 +90,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 	ctx.Out.Verbose(fmt.Sprintf("Directory: %s", dir))
 
 	if _, err := os.Stat(dir); err == nil && !*force {
-		return ctx.Out.Error(fmt.Sprintf("directory %s already exists (use --force to overwrite)", dir), 2)
+		return NewAppError(2, fmt.Sprintf("directory %s already exists (use --force to overwrite)", dir), "")
 	}
 
 	validTemplates := []string{"canonical", "minimal", "api", "fullstack", "microservice"}
@@ -66,7 +102,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 		}
 	}
 	if !valid {
-		return ctx.Out.Error(fmt.Sprintf("invalid template: %s (valid: canonical, minimal, api, fullstack, microservice)", template), 3)
+		return NewAppError(3, fmt.Sprintf("invalid template: %s (valid: canonical, minimal, api, fullstack, microservice)", template), "")
 	}
 
 	if *dryRun {
@@ -83,7 +119,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 
 	files, err := scaffold.CreateProject(dir, projectName, module, template, !*noGit)
 	if err != nil {
-		return ctx.Out.Error(fmt.Sprintf("failed to create project: %v", err), 1)
+		return NewAppError(1, fmt.Sprintf("failed to create project: %v", err), "")
 	}
 
 	return ctx.Out.Success("Project created successfully", map[string]any{

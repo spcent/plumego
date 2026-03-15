@@ -9,6 +9,8 @@
 *.dylib
 *.test
 cmd/plumego/plumego
+cmd/plumego/commands/myapp/
+cmd/plumego/commands/testapp/
 
 # Logs and temporary files
 *.log
