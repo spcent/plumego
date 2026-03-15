@@ -168,25 +168,38 @@ Exit criteria met:
 
 ## Phase 5: Reference and Scaffold System
 
-Status: not started
+Status: substantially complete
 
 Goals:
 
 - make the canonical app path easy to copy without reintroducing hidden patterns
 - ensure scaffolds follow the same rules as the reference app
 
-Planned work:
+Completed work:
 
-- add a minimal scaffold generator or template set based on `reference/standard-service`
-- add reference variants outside the canonical path for `x/messaging`, `x/gateway`, `x/websocket`, and `x/webhook`
-- keep feature references clearly marked as non-canonical
-- add checks that canonical references do not drift into `x/*`
+- `reference/standard-service` is the single canonical application layout demonstrating
+  explicit route registration, constructor-based wiring, and stdlib-only dependencies
+- `cmd/plumego new` scaffold command generates projects from templates (`minimal`, `api`,
+  `fullstack`, `microservice`) each based on the canonical `reference/standard-service` structure
+- `cmd/plumego generate` code generation command produces handlers, middleware, and related
+  boilerplate aligned with the canonical style
+- scaffold templates follow the same explicit wiring rules as the canonical reference; no hidden
+  registration or global init patterns are introduced
 
-Exit criteria:
+Remaining work:
 
-- new projects start from the same explicit structure every time
-- feature demos do not pollute the canonical learning path
-- scaffold output stays aligned with docs and specs
+- add reference variants outside the canonical path for `x/messaging`, `x/gateway`,
+  `x/websocket`, and `x/webhook` — feature demos should be clearly non-canonical
+- add a check that canonical references do not drift into `x/*`
+
+Exit criteria met:
+
+- new projects start from the same explicit structure via `cmd/plumego new`
+- scaffold output follows the canonical style and is aligned with docs and specs
+
+Remaining exit criteria:
+
+- feature demos do not pollute the canonical learning path (reference variants still needed)
 
 ## Phase 6: Release Readiness Toward v1
 
@@ -216,8 +229,8 @@ Completed work:
 
 Remaining work:
 
-- Phase 5 (reference and scaffold system) remains not started; its completion is a precondition
-  for calling v1 fully ready, but the API freeze itself is unblocked
+- Phase 5 scaffold work is substantially complete; the remaining Phase 5 item (non-canonical
+  extension reference variants) does not block the API freeze
 - keep `x/*` extension packages aligned with stable-root changes as the canonical reference
   evolves
 
