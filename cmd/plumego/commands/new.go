@@ -20,7 +20,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("new", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	templateFlag := fs.String("template", "minimal", "Project template (minimal, api, fullstack, microservice)")
+	templateFlag := fs.String("template", "canonical", "Project template (canonical, minimal, api, fullstack, microservice)")
 	moduleFlag := fs.String("module", "", "Go module path")
 	dirFlag := fs.String("dir", "", "Output directory")
 	force := fs.Bool("force", false, "Overwrite existing directory")
@@ -57,7 +57,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Error(fmt.Sprintf("directory %s already exists (use --force to overwrite)", dir), 2)
 	}
 
-	validTemplates := []string{"minimal", "api", "fullstack", "microservice"}
+	validTemplates := []string{"canonical", "minimal", "api", "fullstack", "microservice"}
 	valid := false
 	for _, t := range validTemplates {
 		if template == t {
@@ -66,7 +66,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 		}
 	}
 	if !valid {
-		return ctx.Out.Error(fmt.Sprintf("invalid template: %s (valid: minimal, api, fullstack, microservice)", template), 3)
+		return ctx.Out.Error(fmt.Sprintf("invalid template: %s (valid: canonical, minimal, api, fullstack, microservice)", template), 3)
 	}
 
 	if *dryRun {

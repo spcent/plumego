@@ -227,6 +227,59 @@ func FindMissingModuleManifests(repoRoot string, baseline map[string]struct{}) (
 	return missing, nil
 }
 
+// FindReferenceXImports scans all .go files under refDir (relative to repoRoot)
+// and returns violations for any file that imports from the x/ extension layer.
+// This enforces that the canonical reference app stays free of extension imports.
+func FindReferenceXImports(repoRoot, refDir string) ([]string, error) {
+	dir := filepath.Join(repoRoot, refDir)
+	blockedPrefix := modulePath + "/x/"
+
+	var violations []string
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+
+		fset := token.NewFileSet()
+		node, parseErr := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		if parseErr != nil {
+			return fmt.Errorf("parse imports %s: %w", path, parseErr)
+		}
+
+		relPath, relErr := filepath.Rel(repoRoot, path)
+		if relErr != nil {
+			return relErr
+		}
+		relPath = filepath.ToSlash(relPath)
+
+		for _, imp := range node.Imports {
+			importPath, unquoteErr := strconv.Unquote(imp.Path.Value)
+			if unquoteErr != nil {
+				return fmt.Errorf("unquote import %s: %w", path, unquoteErr)
+			}
+			if strings.HasPrefix(importPath, blockedPrefix) {
+				violations = append(violations, relPath+"|"+importPath)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
 func FindUnexpectedTopLevelDirs(repoRoot string, allowed, baseline map[string]struct{}) ([]string, error) {
 	entries, err := os.ReadDir(repoRoot)
 	if err != nil {
