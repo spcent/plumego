@@ -16,14 +16,14 @@ const (
 	MinCacheCapacity = 10
 )
 
-// CacheEntry represents a cached route match result
-type CacheEntry struct {
+// cacheEntry represents a cached route match result
+type cacheEntry struct {
 	key   string
 	value *MatchResult
 }
 
-// PatternCacheEntry represents a cached route pattern for parameterized routes
-type PatternCacheEntry struct {
+// patternCacheEntry represents a cached route pattern for parameterized routes
+type patternCacheEntry struct {
 	pattern     string             // Route pattern like /users/:id
 	result      *MatchResult       // Cached match result (without param values)
 	precompiled precompiledPattern // Pre-split pattern for fast matching
@@ -41,7 +41,7 @@ type RouteCache struct {
 
 	// Pattern cache for parameterized routes
 	// Key: method, Value: list of pattern entries sorted by specificity
-	patternCache map[string][]PatternCacheEntry
+	patternCache map[string][]patternCacheEntry
 	patternMu    sync.RWMutex
 
 	// Metrics
@@ -58,7 +58,7 @@ func NewRouteCache(capacity int) *RouteCache {
 		capacity:     capacity,
 		cache:        make(map[string]*list.Element),
 		list:         list.New(),
-		patternCache: make(map[string][]PatternCacheEntry),
+		patternCache: make(map[string][]patternCacheEntry),
 	}
 }
 
@@ -75,7 +75,7 @@ func (rc *RouteCache) Get(key string) (*MatchResult, bool) {
 
 	// Check if already at front - if so, no need to move
 	isAtFront := element == rc.list.Front()
-	value := element.Value.(*CacheEntry).value
+	value := element.Value.(*cacheEntry).value
 	rc.mu.RUnlock()
 
 	// Only acquire write lock if we need to move the element
@@ -99,7 +99,7 @@ func (rc *RouteCache) Lookup(method, path, key string) (*MatchResult, []string, 
 	element, exists := rc.cache[key]
 	if exists {
 		isAtFront := element == rc.list.Front()
-		value := element.Value.(*CacheEntry).value
+		value := element.Value.(*cacheEntry).value
 		rc.mu.RUnlock()
 
 		if !isAtFront {
@@ -185,7 +185,7 @@ func (rc *RouteCache) Set(key string, value *MatchResult) {
 	// Check if key already exists
 	if element, exists := rc.cache[key]; exists {
 		rc.list.MoveToFront(element)
-		element.Value.(*CacheEntry).value = value
+		element.Value.(*cacheEntry).value = value
 		return
 	}
 
@@ -195,12 +195,12 @@ func (rc *RouteCache) Set(key string, value *MatchResult) {
 		oldest := rc.list.Back()
 		if oldest != nil {
 			rc.list.Remove(oldest)
-			delete(rc.cache, oldest.Value.(*CacheEntry).key)
+			delete(rc.cache, oldest.Value.(*cacheEntry).key)
 		}
 	}
 
 	// Add new entry
-	entry := &CacheEntry{key: key, value: value}
+	entry := &cacheEntry{key: key, value: value}
 	element := rc.list.PushFront(entry)
 	rc.cache[key] = element
 }
@@ -225,7 +225,7 @@ func (rc *RouteCache) SetPattern(method, pattern string, result *MatchResult) {
 	// Add new pattern entry with precompiled parts for fast matching.
 	// Sort by specificity so cache lookup mirrors trie matching:
 	// more static segments first, then params, wildcard last.
-	entry := PatternCacheEntry{
+	entry := patternCacheEntry{
 		pattern:     pattern,
 		result:      result,
 		precompiled: newPrecompiledPattern(pattern),
@@ -240,7 +240,7 @@ func (rc *RouteCache) SetPattern(method, pattern string, result *MatchResult) {
 	}
 
 	// Insert without creating a temporary slice.
-	patterns = append(patterns, PatternCacheEntry{}) // grow by one
+	patterns = append(patterns, patternCacheEntry{}) // grow by one
 	copy(patterns[insertAt+1:], patterns[insertAt:]) // shift right
 	patterns[insertAt] = entry
 
@@ -266,8 +266,8 @@ func patternSpecificityScore(pattern string) int {
 	return score
 }
 
-// IsParameterized checks if a route pattern contains parameters or wildcards
-func IsParameterized(pattern string) bool {
+// isParameterized checks if a route pattern contains parameters or wildcards
+func isParameterized(pattern string) bool {
 	return strings.Contains(pattern, ":") || strings.Contains(pattern, "*")
 }
 
@@ -279,7 +279,7 @@ func (rc *RouteCache) Clear() {
 	rc.mu.Unlock()
 
 	rc.patternMu.Lock()
-	rc.patternCache = make(map[string][]PatternCacheEntry)
+	rc.patternCache = make(map[string][]patternCacheEntry)
 	rc.patternMu.Unlock()
 
 	atomic.StoreUint64(&rc.hits, 0)

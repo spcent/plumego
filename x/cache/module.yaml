@@ -1,0 +1,57 @@
+name: x/cache
+path: x/cache
+layer: extension
+status: experimental
+owner: platform
+summary: Extension-layer cache adapters and topology-heavy cache implementations built on store/cache abstractions.
+
+responsibilities:
+  - Distributed cache with consistent hashing, replication, and failover
+  - Redis client adapter implementing store/cache.Cache
+
+non_goals:
+  - Core cache interface definitions (those live in store/cache)
+  - Tenant-aware cache adapters (those live in x/tenant/store/cache)
+  - In-memory cache implementations (those live in store/cache)
+
+public_entrypoints:
+  - distributed
+  - redis
+
+allowed_imports:
+  - stdlib
+  - store/cache
+  - contract
+  - log
+  - metrics
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/tenant/**
+  - x/ai/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/cache/...
+  - go test -timeout 20s ./x/cache/...
+  - go vet ./x/cache/...
+
+doc_paths:
+  - docs/modules/x-cache/README.md
+
+change_risks:
+  - distributed cache correctness regression
+  - hash ring consistency regression
+  - redis adapter contract regression
+
+review_checklist:
+  - Keep distributed and redis implementations behind store/cache.Cache interface
+  - Do not add tenant-specific logic here
+  - Do not add topology decisions to stable store
+
+agent_hints:
+  - Use this package for topology-heavy or provider-specific cache needs
+  - Prefer store/cache.MemoryCache for in-process caching
+  - For tenant-aware caching use x/tenant/store/cache

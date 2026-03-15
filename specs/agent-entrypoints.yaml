@@ -183,3 +183,18 @@ entrypoints:
     notes:
       - Use x/ops only for protected admin surfaces.
       - Keep health HTTP ownership outside health.
+
+  scaffold:
+    start_with:
+      - cmd/plumego/commands/new.go
+      - cmd/plumego/internal/scaffold/scaffold.go
+      - reference/standard-service
+    avoid:
+      - reference/with-messaging
+      - reference/with-gateway
+      - reference/with-websocket
+      - reference/with-webhook
+    notes:
+      - Use the canonical template (plumego new --template=canonical) to start new projects.
+      - Scaffold output mirrors reference/standard-service exactly.
+      - Feature references under reference/with-* are non-canonical demos; do not use them as bootstrap surfaces.

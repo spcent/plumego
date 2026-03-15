@@ -25,6 +25,15 @@ func main() {
 	}
 	violations = append(violations, requiredPathViolations(repoRoot)...)
 
+	// Verify reference/standard-service has no x/* imports (canonical drift check).
+	xViolations, err := checkutil.FindReferenceXImports(repoRoot, "reference/standard-service")
+	if err != nil {
+		failf("check canonical reference x/* drift: %v", err)
+	}
+	for _, v := range xViolations {
+		violations = append(violations, "canonical reference imports x/*: "+v)
+	}
+
 	if len(violations) == 0 {
 		return
 	}
@@ -41,6 +50,10 @@ func requiredPathViolations(repoRoot string) []string {
 		"docs/CANONICAL_STYLE_GUIDE.md",
 		"docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
 		"reference/standard-service",
+		"reference/with-messaging",
+		"reference/with-gateway",
+		"reference/with-websocket",
+		"reference/with-webhook",
 		"specs/repo.yaml",
 		"specs/dependency-rules.yaml",
 	}

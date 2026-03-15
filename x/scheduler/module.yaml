@@ -2,7 +2,7 @@ name: x/scheduler
 path: x/scheduler
 layer: extension
 status: experimental
-summary: In-process scheduling primitives for cron, delayed jobs, and retries.
+summary: Subordinate in-process scheduling primitives for cron, delayed jobs, and retries within the broader x/messaging capability family.
 
 responsibilities:
   - Scheduler primitives
@@ -39,6 +39,6 @@ review_checklist:
   - Preserve retry determinism
 
 agent_hints:
-  - Prefer explicit job wiring
-  - Keep scheduler concerns self-contained
-  - Do not move scheduler into core
+  - Treat x/scheduler as a subordinate scheduling primitive; start app-facing messaging feature discovery in x/messaging
+  - Open x/scheduler directly only for narrow cron, delayed job, or retry coordination work
+  - Do not use x/scheduler as a competing family entrypoint for new messaging work or move it into core

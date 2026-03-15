@@ -1,85 +1,9 @@
 package metrics
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
-
-func TestResponseWriter(t *testing.T) {
-	rec := httptest.NewRecorder()
-	rw := &responseWriter{ResponseWriter: rec, status: http.StatusOK}
-
-	rw.WriteHeader(http.StatusCreated)
-	n, err := rw.Write([]byte("test"))
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if n != 4 {
-		t.Fatalf("expected 4 bytes written, got %d", n)
-	}
-	if rw.Status() != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d", rw.Status())
-	}
-	if rw.BytesWritten() != 4 {
-		t.Fatalf("expected 4 bytes, got %d", rw.BytesWritten())
-	}
-}
-
-func TestMetricsMiddleware(t *testing.T) {
-	collector := NewBaseMetricsCollector()
-	middleware := MetricsMiddleware(collector)
-
-	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	}))
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	records := collector.GetRecords()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
-	}
-
-	if records[0].Labels[labelPath] != "/test" {
-		t.Fatalf("expected path /test, got %s", records[0].Labels[labelPath])
-	}
-	if records[0].Labels[labelStatus] != "200" {
-		t.Fatalf("expected status 200, got %s", records[0].Labels[labelStatus])
-	}
-}
-
-func TestMetricsHandler(t *testing.T) {
-	collector := NewBaseMetricsCollector()
-
-	handler := MetricsHandler(collector, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte("Accepted"))
-	}))
-
-	req := httptest.NewRequest("POST", "/api/data", nil)
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	records := collector.GetRecords()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
-	}
-
-	if records[0].Labels[labelMethod] != "POST" {
-		t.Fatalf("expected method POST, got %s", records[0].Labels[labelMethod])
-	}
-	if records[0].Labels[labelStatus] != "202" {
-		t.Fatalf("expected status 202, got %s", records[0].Labels[labelStatus])
-	}
-}
 
 func TestAggregator(t *testing.T) {
 	agg := NewAggregator(1 * time.Minute)
@@ -281,23 +205,6 @@ func TestPercentile(t *testing.T) {
 }
 
 // Benchmarks
-func BenchmarkMetricsMiddleware(b *testing.B) {
-	collector := NewNoopCollector()
-	middleware := MetricsMiddleware(collector)
-
-	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest("GET", "/test", nil)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-	}
-}
-
 func BenchmarkAggregatorRecord(b *testing.B) {
 	agg := NewAggregator(1 * time.Minute)
 

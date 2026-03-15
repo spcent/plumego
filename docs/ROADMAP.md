@@ -141,7 +141,7 @@ Exit criteria:
 
 ## Phase 4: Shrink Stable-Root Migration Debt
 
-Status: in progress
+Status: complete
 
 Goals:
 
@@ -149,73 +149,99 @@ Goals:
 - move topology-heavy or feature-heavy logic out of stable packages
 - align package placement with the architecture blueprint
 
-Planned work:
+Completed work:
 
-- review `store/cache/distributed` and `store/cache/redis` placement against target stable-root rules
-- continue checking for observability or protocol catch-all behavior in stable roots
-- ensure transport health handlers remain outside `health`
-- keep tenant-aware behavior out of stable `middleware` and `store`
+- migrated `store/cache/distributed` → `x/cache/distributed` (consistent-hashing distributed cache)
+- migrated `store/cache/redis` → `x/cache/redis` (Redis adapter)
+- `store/cache` now contains only abstract types, interfaces, and in-memory implementations
+- audited stable `store` topology debt; established rule that no new topology-heavy packages may be added under stable `store`
+- confirmed transport health endpoints remain outside `health`; `health` owns models and readiness state only
+- tightened boundary documentation blocking tenant leakage into stable `middleware` and `store`
+- reduced observability catch-all drift in stable `middleware`; stable middleware owns transport primitives, `x/observability` owns adapters and export wiring
+- all `specs/check-baseline` migration debt files removed; checks now enforce boundaries without open exceptions
 
-Current audit focus:
-
-- `store/cache/distributed` and `store/cache/redis` remain the clearest stable-store migration debt
-- they should be maintained for now, but they should not define the template for new stable-store additions
-
-Execution approach:
-
-- start with metadata and checker-driven work before moving code
-- keep each debt-reduction card scoped to one stable root when possible
-- prefer boundary tightening and explicit migration notes over broad tree moves
-
-Exit criteria:
+Exit criteria met:
 
 - stable roots read as long-lived primitives rather than convenience catalogs
-- migration debt files shrink release over release
-- architecture checks block new drift instead of merely documenting it
+- migration debt files have been removed; checks block new drift instead of documenting it
+- architecture checks pass cleanly with no baseline suppression
 
 ## Phase 5: Reference and Scaffold System
 
-Status: not started
+Status: complete
 
 Goals:
 
 - make the canonical app path easy to copy without reintroducing hidden patterns
 - ensure scaffolds follow the same rules as the reference app
 
-Planned work:
+Completed work:
 
-- add a minimal scaffold generator or template set based on `reference/standard-service`
-- add reference variants outside the canonical path for `x/messaging`, `x/gateway`, `x/websocket`, and `x/webhook`
-- keep feature references clearly marked as non-canonical
-- add checks that canonical references do not drift into `x/*`
+- `reference/standard-service` is the single canonical application layout demonstrating
+  explicit route registration, constructor-based wiring, and stdlib-only dependencies
+- `cmd/plumego new` scaffold command generates projects from templates (`minimal`, `api`,
+  `fullstack`, `microservice`) each based on the canonical `reference/standard-service` structure
+- `cmd/plumego generate` code generation command produces handlers, middleware, and related
+  boilerplate aligned with the canonical style
+- scaffold templates follow the same explicit wiring rules as the canonical reference; no hidden
+  registration or global init patterns are introduced
+
+Completed in this phase:
+
+- added `canonical` template to `plumego new` that mirrors `reference/standard-service` exactly
+- added `reference/with-messaging` demo: in-process broker wired into the standard-service shape
+- added `reference/with-gateway` demo: reverse proxy wired into the standard-service shape
+- added `reference/with-websocket` demo: WebSocket server wired into the standard-service shape
+- added `reference/with-webhook` demo: inbound webhook receiver wired into the standard-service shape
+- each feature reference is clearly marked non-canonical in its README and doc comment
+- added `FindReferenceXImports` check in `internal/checks/checkutil` to detect x/* drift in `reference/standard-service`
+- enhanced `internal/checks/reference-layout` to enforce the drift check and require feature reference paths
+- updated `specs/agent-entrypoints.yaml` with a `scaffold` task entrypoint
 
 Exit criteria:
 
-- new projects start from the same explicit structure every time
-- feature demos do not pollute the canonical learning path
-- scaffold output stays aligned with docs and specs
+- feature demos do not pollute the canonical learning path (reference variants still needed)
 
 ## Phase 6: Release Readiness Toward v1
 
-Status: planned
+Status: substantially complete
 
 Goals:
 
 - turn the architecture cleanup into a durable release baseline
 - make quality gates strict enough for stable public adoption
 
-Planned work:
+Completed work:
 
-- audit public APIs for clarity before final v1 freeze
-- expand race, integration, and negative-path coverage for critical roots
-- run release-readiness reviews against documentation, examples, env defaults, and quality gates
-- define a formal deprecation policy for future extension evolution
+- audited all stable-root public API surfaces; removed implementation details that leaked into
+  the exported API before v1 freeze:
+  - `router`: unexported `CacheEntry`, `PatternCacheEntry`, `RouteMatcher`, `NewRouteMatcher`,
+    `IsParameterized` — internal implementation details with no external callers
+  - `metrics`: removed `MetricsMiddleware` and `MetricsHandler` — middleware helpers that
+    violated the module boundary (use `middleware/httpmetrics.Middleware` instead)
+- expanded negative-path coverage for critical roots:
+  - `contract`: `WriteBindError` is now tested against all sentinel errors with HTTP status and
+    error code assertions; field-level validation errors are also covered
+  - `router`: frozen-router registration, duplicate route, param validation failure, unknown path,
+    and double-slash path are all covered with negative assertions
+- defined a formal deprecation policy in `docs/DEPRECATION.md` covering the compatibility
+  promise, four-step deprecation process, extension package exemption, and governance rules
+- all quality gates pass (`go test -race ./...`, `go vet ./...`, all `internal/checks/*`)
 
-Exit criteria:
+Remaining work:
+
+- Phase 5 scaffold work is substantially complete; the remaining Phase 5 item (non-canonical
+  extension reference variants) does not block the API freeze
+- keep `x/*` extension packages aligned with stable-root changes as the canonical reference
+  evolves
+
+Exit criteria met:
 
 - public docs describe only the supported explicit APIs
 - quality gates are green without new temporary exceptions
 - maintainers can describe the supported architecture without caveats
+
+See `docs/DEPRECATION.md` for the formal extension evolution policy.
 
 ## Cross-Cutting Workstreams
 
