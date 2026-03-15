@@ -471,7 +471,6 @@ func (s *Service) recordTaskFailure(
 	duration time.Duration,
 	providerIssue bool,
 ) {
-	s.totalFailed.Add(1)
 	if providerIssue && s.monitor != nil {
 		s.monitor.RecordFailure(channel, err)
 	}
@@ -484,6 +483,7 @@ func (s *Service) recordTaskFailure(
 		Error:     err.Error(),
 		Attempts:  attempts,
 	})
+	s.totalFailed.Add(1)
 }
 
 func (s *Service) publishResult(result SendResult) {
