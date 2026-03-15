@@ -141,7 +141,7 @@ Exit criteria:
 
 ## Phase 4: Shrink Stable-Root Migration Debt
 
-Status: in progress
+Status: complete
 
 Goals:
 
@@ -154,24 +154,17 @@ Completed work:
 - migrated `store/cache/distributed` → `x/cache/distributed` (consistent-hashing distributed cache)
 - migrated `store/cache/redis` → `x/cache/redis` (Redis adapter)
 - `store/cache` now contains only abstract types, interfaces, and in-memory implementations
+- audited stable `store` topology debt; established rule that no new topology-heavy packages may be added under stable `store`
+- confirmed transport health endpoints remain outside `health`; `health` owns models and readiness state only
+- tightened boundary documentation blocking tenant leakage into stable `middleware` and `store`
+- reduced observability catch-all drift in stable `middleware`; stable middleware owns transport primitives, `x/observability` owns adapters and export wiring
+- all `specs/check-baseline` migration debt files removed; checks now enforce boundaries without open exceptions
 
-Remaining work:
-
-- continue checking for observability or protocol catch-all behavior in stable roots
-- ensure transport health handlers remain outside `health`
-- keep tenant-aware behavior out of stable `middleware` and `store`
-
-Execution approach:
-
-- start with metadata and checker-driven work before moving code
-- keep each debt-reduction card scoped to one stable root when possible
-- prefer boundary tightening and explicit migration notes over broad tree moves
-
-Exit criteria:
+Exit criteria met:
 
 - stable roots read as long-lived primitives rather than convenience catalogs
-- migration debt files shrink release over release
-- architecture checks block new drift instead of merely documenting it
+- migration debt files have been removed; checks block new drift instead of documenting it
+- architecture checks pass cleanly with no baseline suppression
 
 ## Phase 5: Reference and Scaffold System
 
