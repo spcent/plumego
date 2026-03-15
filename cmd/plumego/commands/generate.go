@@ -32,7 +32,7 @@ func (c *GenerateCmd) Run(ctx *Context, args []string) error {
 	}
 
 	if len(positionals) < 2 {
-		return ctx.Out.Error("generate type and name required (e.g., plumego generate component Auth)", 1)
+		return ctx.Out.Error("generate type and name required (e.g., plumego generate handler Auth)", 1)
 	}
 
 	genType := positionals[0]

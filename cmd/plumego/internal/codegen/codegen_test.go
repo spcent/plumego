@@ -7,23 +7,6 @@ import (
 	"testing"
 )
 
-// TestGenerateComponentCode_NoTODO verifies the component template has no // TODO.
-func TestGenerateComponentCode_NoTODO(t *testing.T) {
-	content := generateComponentCode("Auth", "handlers")
-	if strings.Contains(content, "// TODO") {
-		t.Errorf("component code contains '// TODO':\n%s", content)
-	}
-}
-
-// TestGenerateComponentCode_Parseable verifies the component template is valid Go.
-func TestGenerateComponentCode_Parseable(t *testing.T) {
-	content := generateComponentCode("Auth", "handlers")
-	fset := token.NewFileSet()
-	if _, err := parser.ParseFile(fset, "auth.go", content, parser.AllErrors); err != nil {
-		t.Errorf("component code parse error: %v\ncontent:\n%s", err, content)
-	}
-}
-
 // TestGenerateMiddlewareCode_NoTODO verifies the middleware template has no // TODO.
 func TestGenerateMiddlewareCode_NoTODO(t *testing.T) {
 	content := generateMiddlewareCode("Logging", "middleware")

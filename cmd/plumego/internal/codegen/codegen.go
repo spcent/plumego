@@ -30,8 +30,6 @@ type GenerateResult struct {
 // Generate generates code based on options
 func Generate(dir string, opts GenerateOptions) (*GenerateResult, error) {
 	switch opts.Type {
-	case "component":
-		return generateComponent(dir, opts)
 	case "middleware":
 		return generateMiddleware(dir, opts)
 	case "handler":
@@ -41,56 +39,6 @@ func Generate(dir string, opts GenerateOptions) (*GenerateResult, error) {
 	default:
 		return nil, fmt.Errorf("unknown generation type: %s", opts.Type)
 	}
-}
-
-func generateComponent(dir string, opts GenerateOptions) (*GenerateResult, error) {
-	result := &GenerateResult{
-		Type:  "component",
-		Name:  opts.Name,
-		Files: make(map[string][]string),
-		Imports: []string{
-			"net/http",
-			"github.com/spcent/plumego/core",
-		},
-	}
-
-	outputPath := opts.OutputPath
-	if outputPath == "" {
-		componentDir := strings.ToLower(opts.Name)
-		outputPath = filepath.Join(dir, "internal", "httpapp", "handlers", componentDir+".go")
-	}
-
-	packageName := opts.PackageName
-	if packageName == "" {
-		packageName = "handlers"
-	}
-
-	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
-		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
-	}
-
-	content := generateComponentCode(opts.Name, packageName)
-
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
-		return nil, fmt.Errorf("failed to write file: %w", err)
-	}
-
-	result.Files["created"] = []string{outputPath}
-
-	if opts.WithTests {
-		testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
-		testContent := generateComponentTestCode(opts.Name, packageName)
-		if err := os.WriteFile(testPath, []byte(testContent), 0644); err != nil {
-			return nil, fmt.Errorf("failed to write test file: %w", err)
-		}
-		result.Files["created"] = append(result.Files["created"], testPath)
-	}
-
-	return result, nil
 }
 
 func generateMiddleware(dir string, opts GenerateOptions) (*GenerateResult, error) {
@@ -233,58 +181,6 @@ func generateModel(dir string, opts GenerateOptions) (*GenerateResult, error) {
 }
 
 // --- Code templates ---
-
-// generateComponentCode generates a minimal handler struct with a health endpoint.
-// No service dependency is included; extend the handler struct as needed.
-func generateComponentCode(name, pkg string) string {
-	lower := strings.ToLower(name)
-	return fmt.Sprintf(`package %s
-
-import (
-	"net/http"
-)
-
-// %sHandler handles HTTP requests for the %s component.
-type %sHandler struct{}
-
-// Health responds with the component status.
-func (h %sHandler) Health(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`+"`"+`{"status":"ok"}`+"`"+`))
-}
-
-// RegisterRoutes registers the component routes on mux.
-func (h %sHandler) RegisterRoutes(mux interface {
-	Get(string, http.HandlerFunc)
-}) {
-	mux.Get("/%s/health", h.Health)
-}
-`, pkg, name, lower, name, name, name, lower)
-}
-
-func generateComponentTestCode(name, pkg string) string {
-	return fmt.Sprintf(`package %s
-
-import (
-	"net/http"
-	"net/http/httptest"
-	"testing"
-)
-
-func Test%sHandler_Health(t *testing.T) {
-	h := %sHandler{}
-
-	req := httptest.NewRequest(http.MethodGet, "/%s/health", nil)
-	rec := httptest.NewRecorder()
-	h.Health(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %%d", rec.Code)
-	}
-}
-`, pkg, name, name, strings.ToLower(name))
-}
 
 // generateMiddlewareCode generates canonical middleware: func(http.Handler) http.Handler.
 func generateMiddlewareCode(name, pkg string) string {

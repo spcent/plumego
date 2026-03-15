@@ -178,7 +178,7 @@ Use "plumego <command> --help" for more information about a command.
 
 Examples:
   plumego new myapp --template api
-  plumego generate component Auth
+  plumego generate handler Auth
   plumego dev --addr :3000
   plumego routes --format json
   plumego check --security
