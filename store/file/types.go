@@ -5,10 +5,11 @@ import (
 	"time"
 )
 
-// File represents file metadata stored in the database.
+// File represents file metadata. This is the pure, tenant-agnostic record
+// returned by store/file operations. Callers that need tenant isolation should
+// use the tenant-aware types in x/data/file.
 type File struct {
 	ID            string         `json:"id" db:"id"`
-	TenantID      string         `json:"tenant_id" db:"tenant_id"`
 	Name          string         `json:"name" db:"name"`
 	Path          string         `json:"path" db:"path"`
 	Size          int64          `json:"size" db:"size"`
@@ -28,8 +29,9 @@ type File struct {
 }
 
 // PutOptions contains options for uploading a file.
+// Tenant identity is not part of the stable store layer; use x/data/file.PutOptions
+// when tenant-scoped uploads are required.
 type PutOptions struct {
-	TenantID      string         // Tenant ID for multi-tenancy
 	Reader        io.Reader      // File content
 	FileName      string         // Original filename
 	ContentType   string         // MIME type
@@ -51,8 +53,9 @@ type FileStat struct {
 }
 
 // Query contains parameters for querying file metadata.
+// Tenant filtering is not part of the stable store layer; use x/data/file.Query
+// when tenant-scoped queries are required.
 type Query struct {
-	TenantID   string
 	UploadedBy string
 	MimeType   string
 	StartTime  time.Time

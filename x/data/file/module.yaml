@@ -1,0 +1,59 @@
+name: x/data/file
+path: x/data/file
+layer: extension
+status: experimental
+owner: persistence
+summary: Tenant-aware file storage implementations backed by store/file interfaces.
+
+responsibilities:
+  - Tenant-aware local filesystem storage
+  - Tenant-aware S3-compatible storage
+  - Tenant-scoped metadata management (PostgreSQL)
+  - AWS Signature V4 signing for S3 requests
+  - Database migration files for file metadata schema
+
+non_goals:
+  - HTTP transport behavior (see x/fileapi)
+  - Storage interface definitions (those live in store/file)
+  - Business repositories
+  - App bootstrap
+
+public_entrypoints:
+  - LocalStorage
+  - S3Storage
+  - DBMetadataManager
+  - Storage (interface)
+  - MetadataManager (interface)
+
+allowed_imports:
+  - stdlib
+  - contract
+  - log
+  - metrics
+  - store/file
+  - x/tenant
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - examples/**
+  - reference/**
+  - templates/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/data/file/...
+  - go test -timeout 20s ./x/data/file/...
+  - go vet ./x/data/file/...
+
+change_risks:
+  - persistence correctness regression
+  - tenant isolation regression
+  - concurrent access regression
+
+review_checklist:
+  - Keep transport concerns out of this module
+  - Verify tenant path isolation in storage implementations
+  - Keep topology decisions explicit and reviewable

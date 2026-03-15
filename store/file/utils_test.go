@@ -9,7 +9,7 @@ func TestGenerateID(t *testing.T) {
 	// Generate multiple IDs
 	ids := make(map[string]bool)
 	for i := 0; i < 1000; i++ {
-		id := generateID()
+		id := GenerateID()
 
 		// Check length (32 hex chars)
 		if len(id) != 32 {
@@ -81,9 +81,9 @@ func TestIsPathSafe(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isPathSafe(tt.path)
+			got := IsPathSafe(tt.path)
 			if got != tt.want {
-				t.Errorf("isPathSafe(%q) = %v, want %v", tt.path, got, tt.want)
+				t.Errorf("IsPathSafe(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}
@@ -111,9 +111,9 @@ func TestMimeToExt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.mimeType, func(t *testing.T) {
-			got := mimeToExt(tt.mimeType)
+			got := MimeToExt(tt.mimeType)
 			if got != tt.want {
-				t.Errorf("mimeToExt(%q) = %q, want %q", tt.mimeType, got, tt.want)
+				t.Errorf("MimeToExt(%q) = %q, want %q", tt.mimeType, got, tt.want)
 			}
 		})
 	}
@@ -144,9 +144,9 @@ func TestExtToMime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ext, func(t *testing.T) {
-			got := extToMime(tt.ext)
+			got := ExtToMime(tt.ext)
 			if got != tt.want {
-				t.Errorf("extToMime(%q) = %q, want %q", tt.ext, got, tt.want)
+				t.Errorf("ExtToMime(%q) = %q, want %q", tt.ext, got, tt.want)
 			}
 		})
 	}
@@ -155,7 +155,7 @@ func TestExtToMime(t *testing.T) {
 // Benchmark ID generation
 func BenchmarkGenerateID(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		generateID()
+		GenerateID()
 	}
 }
 
@@ -170,7 +170,7 @@ func BenchmarkIsPathSafe(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		isPathSafe(testPaths[i%len(testPaths)])
+		IsPathSafe(testPaths[i%len(testPaths)])
 	}
 }
 
@@ -178,19 +178,19 @@ func BenchmarkIsPathSafe(b *testing.B) {
 func TestIsPathSafeEdgeCases(t *testing.T) {
 	// Very long path
 	longPath := strings.Repeat("a/", 500) + "file.txt"
-	if !isPathSafe(longPath) {
+	if !IsPathSafe(longPath) {
 		t.Error("Long safe path should be allowed")
 	}
 
 	// Unicode characters
 	unicodePath := "租户/文件.txt"
-	if !isPathSafe(unicodePath) {
+	if !IsPathSafe(unicodePath) {
 		t.Error("Unicode path should be allowed")
 	}
 
 	// Special characters (but safe)
 	specialPath := "tenant_123/file-name.txt"
-	if !isPathSafe(specialPath) {
+	if !IsPathSafe(specialPath) {
 		t.Error("Path with dash and underscore should be allowed")
 	}
 }
