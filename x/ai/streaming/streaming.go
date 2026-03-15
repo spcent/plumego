@@ -1,4 +1,7 @@
 // Package streaming provides real-time progress updates for AI workflow orchestration.
+//
+// Stability: stable — this package follows semantic versioning guarantees.
+// Breaking changes require a major version bump.
 package streaming
 
 import (

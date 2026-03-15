@@ -18,6 +18,22 @@ non_goals:
   - Generic persistence abstractions
   - Business-specific prompt flows
 
+# Stability tiers for subpackages.
+# stable   — API is covered by semantic versioning; breaking changes require a major version bump.
+# experimental — API may change in future releases without a deprecation period.
+stability_tiers:
+  stable:
+    - provider      # Provider interface, CompletionRequest/Response, streaming types
+    - session       # Manager, Session, Storage interface
+    - streaming     # StreamManager, StreamingEngine, ProgressUpdate
+    - tool          # Tool interface, Registry, FuncTool, Policy
+  experimental:
+    - orchestration  # Agent workflow engine; step types may evolve
+    - semanticcache  # Embedding-based caching; vector store backends in active development
+    - marketplace    # Agent/workflow registry; installation and rating APIs unfinished
+    - distributed    # Distributed execution; queue and persistence contracts not yet stable
+    - resilience     # Wrapper API may be consolidated with circuitbreaker/ratelimit
+
 public_entrypoints:
   - provider
   - session

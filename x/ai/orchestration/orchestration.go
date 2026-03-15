@@ -1,4 +1,7 @@
 // Package orchestration provides agent workflow orchestration.
+//
+// Stability: experimental — API may change between minor releases without a deprecation period.
+// Step types and Engine configuration are still evolving.
 package orchestration
 
 import (
