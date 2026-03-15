@@ -168,7 +168,7 @@ Exit criteria met:
 
 ## Phase 5: Reference and Scaffold System
 
-Status: substantially complete
+Status: complete
 
 Goals:
 
@@ -186,18 +186,19 @@ Completed work:
 - scaffold templates follow the same explicit wiring rules as the canonical reference; no hidden
   registration or global init patterns are introduced
 
-Remaining work:
+Completed in this phase:
 
-- add reference variants outside the canonical path for `x/messaging`, `x/gateway`,
-  `x/websocket`, and `x/webhook` — feature demos should be clearly non-canonical
-- add a check that canonical references do not drift into `x/*`
+- added `canonical` template to `plumego new` that mirrors `reference/standard-service` exactly
+- added `reference/with-messaging` demo: in-process broker wired into the standard-service shape
+- added `reference/with-gateway` demo: reverse proxy wired into the standard-service shape
+- added `reference/with-websocket` demo: WebSocket server wired into the standard-service shape
+- added `reference/with-webhook` demo: inbound webhook receiver wired into the standard-service shape
+- each feature reference is clearly marked non-canonical in its README and doc comment
+- added `FindReferenceXImports` check in `internal/checks/checkutil` to detect x/* drift in `reference/standard-service`
+- enhanced `internal/checks/reference-layout` to enforce the drift check and require feature reference paths
+- updated `specs/agent-entrypoints.yaml` with a `scaffold` task entrypoint
 
-Exit criteria met:
-
-- new projects start from the same explicit structure via `cmd/plumego new`
-- scaffold output follows the canonical style and is aligned with docs and specs
-
-Remaining exit criteria:
+Exit criteria:
 
 - feature demos do not pollute the canonical learning path (reference variants still needed)
 
