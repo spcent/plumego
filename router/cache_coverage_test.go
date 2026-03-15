@@ -237,7 +237,7 @@ func TestPatternSpecificityScore(t *testing.T) {
 	}
 }
 
-// --- IsParameterized ---
+// --- isParameterized ---
 
 func TestIsParameterized(t *testing.T) {
 	tests := []struct {
@@ -251,9 +251,9 @@ func TestIsParameterized(t *testing.T) {
 		{"/:param/static", true},
 	}
 	for _, tt := range tests {
-		got := IsParameterized(tt.pattern)
+		got := isParameterized(tt.pattern)
 		if got != tt.want {
-			t.Errorf("IsParameterized(%q) = %v, want %v", tt.pattern, got, tt.want)
+			t.Errorf("isParameterized(%q) = %v, want %v", tt.pattern, got, tt.want)
 		}
 	}
 }

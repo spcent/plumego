@@ -85,7 +85,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if result.RoutePattern != "" && IsParameterized(result.RoutePattern) {
+	if result.RoutePattern != "" && isParameterized(result.RoutePattern) {
 		r.state.routeCache.SetPattern(req.Method, result.RoutePattern, result)
 	} else {
 		r.state.routeCache.Set(cacheKey, result)
