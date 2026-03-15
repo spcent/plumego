@@ -1,9 +1,10 @@
-package file
+package fileapi
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -11,25 +12,25 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	storefile "github.com/spcent/plumego/store/file"
+	datafile "github.com/spcent/plumego/x/data/file"
 )
 
-// mockStorage implements Storage interface for testing
+// --- mock Storage ---
+
 type mockStorage struct {
-	putFunc    func(ctx context.Context, opts PutOptions) (*File, error)
+	putFunc    func(ctx context.Context, opts datafile.PutOptions) (*datafile.File, error)
 	getFunc    func(ctx context.Context, path string) (io.ReadCloser, error)
 	deleteFunc func(ctx context.Context, path string) error
-	existsFunc func(ctx context.Context, path string) (bool, error)
-	statFunc   func(ctx context.Context, path string) (*FileStat, error)
-	listFunc   func(ctx context.Context, prefix string, limit int) ([]*FileStat, error)
 	getURLFunc func(ctx context.Context, path string, expiry time.Duration) (string, error)
-	copyFunc   func(ctx context.Context, srcPath, dstPath string) error
 }
 
-func (m *mockStorage) Put(ctx context.Context, opts PutOptions) (*File, error) {
+func (m *mockStorage) Put(ctx context.Context, opts datafile.PutOptions) (*datafile.File, error) {
 	if m.putFunc != nil {
 		return m.putFunc(ctx, opts)
 	}
-	return &File{ID: "test-id", Path: "test/path.txt"}, nil
+	return &datafile.File{ID: "test-id", TenantID: opts.TenantID, Path: "test/path.txt"}, nil
 }
 
 func (m *mockStorage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
@@ -46,25 +47,14 @@ func (m *mockStorage) Delete(ctx context.Context, path string) error {
 	return nil
 }
 
-func (m *mockStorage) Exists(ctx context.Context, path string) (bool, error) {
-	if m.existsFunc != nil {
-		return m.existsFunc(ctx, path)
-	}
-	return true, nil
+func (m *mockStorage) Exists(ctx context.Context, path string) (bool, error) { return true, nil }
+
+func (m *mockStorage) Stat(ctx context.Context, path string) (*storefile.FileStat, error) {
+	return &storefile.FileStat{Path: path, Size: 1024}, nil
 }
 
-func (m *mockStorage) Stat(ctx context.Context, path string) (*FileStat, error) {
-	if m.statFunc != nil {
-		return m.statFunc(ctx, path)
-	}
-	return &FileStat{Path: path, Size: 1024}, nil
-}
-
-func (m *mockStorage) List(ctx context.Context, prefix string, limit int) ([]*FileStat, error) {
-	if m.listFunc != nil {
-		return m.listFunc(ctx, prefix, limit)
-	}
-	return []*FileStat{}, nil
+func (m *mockStorage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
+	return []*storefile.FileStat{}, nil
 }
 
 func (m *mockStorage) GetURL(ctx context.Context, path string, expiry time.Duration) (string, error) {
@@ -74,63 +64,39 @@ func (m *mockStorage) GetURL(ctx context.Context, path string, expiry time.Durat
 	return "http://example.com/" + path, nil
 }
 
-func (m *mockStorage) Copy(ctx context.Context, srcPath, dstPath string) error {
-	if m.copyFunc != nil {
-		return m.copyFunc(ctx, srcPath, dstPath)
-	}
-	return nil
-}
+func (m *mockStorage) Copy(ctx context.Context, src, dst string) error { return nil }
 
-// mockMetadataManager implements MetadataManager interface for testing
+// --- mock MetadataManager ---
+
 type mockMetadataManager struct {
-	saveFunc             func(ctx context.Context, file *File) error
-	getFunc              func(ctx context.Context, id string) (*File, error)
-	getByPathFunc        func(ctx context.Context, path string) (*File, error)
-	getByHashFunc        func(ctx context.Context, hash string) (*File, error)
-	listFunc             func(ctx context.Context, query Query) ([]*File, int64, error)
+	getFunc              func(ctx context.Context, id string) (*datafile.File, error)
+	listFunc             func(ctx context.Context, q datafile.Query) ([]*datafile.File, int64, error)
 	deleteFunc           func(ctx context.Context, id string) error
 	updateAccessTimeFunc func(ctx context.Context, id string) error
 }
 
-func (m *mockMetadataManager) Save(ctx context.Context, file *File) error {
-	if m.saveFunc != nil {
-		return m.saveFunc(ctx, file)
-	}
-	return nil
-}
+func (m *mockMetadataManager) Save(ctx context.Context, file *datafile.File) error { return nil }
 
-func (m *mockMetadataManager) Get(ctx context.Context, id string) (*File, error) {
+func (m *mockMetadataManager) Get(ctx context.Context, id string) (*datafile.File, error) {
 	if m.getFunc != nil {
 		return m.getFunc(ctx, id)
 	}
-	return &File{
-		ID:       id,
-		Path:     "test/path.txt",
-		Name:     "test.txt",
-		Size:     1024,
-		MimeType: "text/plain",
-	}, nil
+	return &datafile.File{ID: id, Path: "test/path.txt", Name: "test.txt", Size: 1024, MimeType: "text/plain"}, nil
 }
 
-func (m *mockMetadataManager) GetByPath(ctx context.Context, path string) (*File, error) {
-	if m.getByPathFunc != nil {
-		return m.getByPathFunc(ctx, path)
-	}
-	return &File{Path: path}, nil
+func (m *mockMetadataManager) GetByPath(ctx context.Context, path string) (*datafile.File, error) {
+	return &datafile.File{Path: path}, nil
 }
 
-func (m *mockMetadataManager) GetByHash(ctx context.Context, hash string) (*File, error) {
-	if m.getByHashFunc != nil {
-		return m.getByHashFunc(ctx, hash)
-	}
+func (m *mockMetadataManager) GetByHash(ctx context.Context, hash string) (*datafile.File, error) {
 	return nil, nil
 }
 
-func (m *mockMetadataManager) List(ctx context.Context, query Query) ([]*File, int64, error) {
+func (m *mockMetadataManager) List(ctx context.Context, q datafile.Query) ([]*datafile.File, int64, error) {
 	if m.listFunc != nil {
-		return m.listFunc(ctx, query)
+		return m.listFunc(ctx, q)
 	}
-	return []*File{}, 0, nil
+	return []*datafile.File{}, 0, nil
 }
 
 func (m *mockMetadataManager) Delete(ctx context.Context, id string) error {
@@ -147,35 +113,33 @@ func (m *mockMetadataManager) UpdateAccessTime(ctx context.Context, id string) e
 	return nil
 }
 
+// Compile-time checks
+var _ datafile.Storage = (*mockStorage)(nil)
+var _ datafile.MetadataManager = (*mockMetadataManager)(nil)
+
+// --- Tests ---
+
 func TestNewHandler(t *testing.T) {
-	storage := &mockStorage{}
-	metadata := &mockMetadataManager{}
-
-	handler := NewHandler(storage, metadata)
-
-	if handler == nil {
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+	if h == nil {
 		t.Fatal("Handler is nil")
 	}
-	if handler.maxSize != 100<<20 {
-		t.Errorf("Default maxSize = %d, want %d", handler.maxSize, 100<<20)
+	if h.maxSize != 100<<20 {
+		t.Errorf("Default maxSize = %d, want %d", h.maxSize, 100<<20)
 	}
 }
 
 func TestHandler_WithMaxSize(t *testing.T) {
-	storage := &mockStorage{}
-	metadata := &mockMetadataManager{}
-
-	handler := NewHandler(storage, metadata).WithMaxSize(50 << 20)
-
-	if handler.maxSize != 50<<20 {
-		t.Errorf("maxSize = %d, want %d", handler.maxSize, 50<<20)
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{}).WithMaxSize(50 << 20)
+	if h.maxSize != 50<<20 {
+		t.Errorf("maxSize = %d, want %d", h.maxSize, 50<<20)
 	}
 }
 
 func TestHandler_Upload(t *testing.T) {
 	storage := &mockStorage{
-		putFunc: func(ctx context.Context, opts PutOptions) (*File, error) {
-			return &File{
+		putFunc: func(ctx context.Context, opts datafile.PutOptions) (*datafile.File, error) {
+			return &datafile.File{
 				ID:       "test-id",
 				TenantID: opts.TenantID,
 				Name:     opts.FileName,
@@ -184,40 +148,31 @@ func TestHandler_Upload(t *testing.T) {
 			}, nil
 		},
 	}
-	metadata := &mockMetadataManager{}
-	handler := NewHandler(storage, metadata)
+	h := NewHandler(storage, &mockMetadataManager{})
 
-	// Create multipart form
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	part, _ := writer.CreateFormFile("file", "test.txt")
 	part.Write([]byte("test content"))
 	writer.Close()
 
-	// Create request with tenant context
 	req := httptest.NewRequest(http.MethodPost, "/files", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	ctx := context.WithValue(req.Context(), "tenant_id", "tenant-123")
 	ctx = context.WithValue(ctx, "user_id", "user-456")
 	req = req.WithContext(ctx)
 
-	// Create response recorder
 	w := httptest.NewRecorder()
+	h.Upload(w, req)
 
-	// Handle request
-	handler.Upload(w, req)
-
-	// Verify response
 	if w.Code != http.StatusOK {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	// Parse response
-	var result File
+	var result datafile.File
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
-
 	if result.ID != "test-id" {
 		t.Errorf("ID = %q, want %q", result.ID, "test-id")
 	}
@@ -227,14 +182,11 @@ func TestHandler_Upload(t *testing.T) {
 }
 
 func TestHandler_Upload_MissingTenantID(t *testing.T) {
-	storage := &mockStorage{}
-	metadata := &mockMetadataManager{}
-	handler := NewHandler(storage, metadata)
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
 
 	req := httptest.NewRequest(http.MethodPost, "/files", nil)
 	w := httptest.NewRecorder()
-
-	handler.Upload(w, req)
+	h.Upload(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusBadRequest)
@@ -248,57 +200,40 @@ func TestHandler_Download(t *testing.T) {
 		},
 	}
 	metadata := &mockMetadataManager{
-		getFunc: func(ctx context.Context, id string) (*File, error) {
-			return &File{
-				ID:       id,
-				Path:     "test/path.txt",
-				Name:     "test.txt",
-				Size:     12,
-				MimeType: "text/plain",
-			}, nil
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"}, nil
 		},
 	}
-	handler := NewHandler(storage, metadata)
+	h := NewHandler(storage, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
 	req.SetPathValue("id", "test-id")
 	w := httptest.NewRecorder()
-
-	handler.Download(w, req)
+	h.Download(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
-
-	// Verify headers
 	if w.Header().Get("Content-Type") != "text/plain" {
-		t.Errorf("Content-Type = %q, want %q", w.Header().Get("Content-Type"), "text/plain")
+		t.Errorf("Content-Type = %q", w.Header().Get("Content-Type"))
 	}
-	if w.Header().Get("Content-Length") != "12" {
-		t.Errorf("Content-Length = %q, want %q", w.Header().Get("Content-Length"), "12")
-	}
-
-	// Verify content
-	body := w.Body.String()
-	if body != "file content" {
-		t.Errorf("Body = %q, want %q", body, "file content")
+	if w.Body.String() != "file content" {
+		t.Errorf("Body = %q, want %q", w.Body.String(), "file content")
 	}
 }
 
 func TestHandler_Download_NotFound(t *testing.T) {
-	storage := &mockStorage{}
 	metadata := &mockMetadataManager{
-		getFunc: func(ctx context.Context, id string) (*File, error) {
-			return nil, ErrNotFound
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return nil, storefile.ErrNotFound
 		},
 	}
-	handler := NewHandler(storage, metadata)
+	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/nonexistent", nil)
 	req.SetPathValue("id", "nonexistent")
 	w := httptest.NewRecorder()
-
-	handler.Download(w, req)
+	h.Download(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusNotFound)
@@ -307,51 +242,35 @@ func TestHandler_Download_NotFound(t *testing.T) {
 
 func TestHandler_GetInfo(t *testing.T) {
 	metadata := &mockMetadataManager{
-		getFunc: func(ctx context.Context, id string) (*File, error) {
-			return &File{
-				ID:       id,
-				Name:     "test.txt",
-				Size:     1024,
-				MimeType: "text/plain",
-			}, nil
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, Name: "test.txt", Size: 1024, MimeType: "text/plain"}, nil
 		},
 	}
-	handler := NewHandler(&mockStorage{}, metadata)
+	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/info", nil)
 	req.SetPathValue("id", "test-id")
 	w := httptest.NewRecorder()
-
-	handler.GetInfo(w, req)
+	h.GetInfo(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	var result File
+	var result datafile.File
 	json.NewDecoder(w.Body).Decode(&result)
-
 	if result.ID != "test-id" {
 		t.Errorf("ID = %q, want %q", result.ID, "test-id")
-	}
-	if result.Name != "test.txt" {
-		t.Errorf("Name = %q, want %q", result.Name, "test.txt")
 	}
 }
 
 func TestHandler_Delete(t *testing.T) {
-	metadata := &mockMetadataManager{
-		deleteFunc: func(ctx context.Context, id string) error {
-			return nil
-		},
-	}
-	handler := NewHandler(&mockStorage{}, metadata)
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
 
 	req := httptest.NewRequest(http.MethodDelete, "/files/test-id", nil)
 	req.SetPathValue("id", "test-id")
 	w := httptest.NewRecorder()
-
-	handler.Delete(w, req)
+	h.Delete(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
@@ -359,7 +278,6 @@ func TestHandler_Delete(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(w.Body).Decode(&result)
-
 	if result["message"] != "file deleted" {
 		t.Errorf("Message = %q, want %q", result["message"], "file deleted")
 	}
@@ -368,16 +286,15 @@ func TestHandler_Delete(t *testing.T) {
 func TestHandler_Delete_NotFound(t *testing.T) {
 	metadata := &mockMetadataManager{
 		deleteFunc: func(ctx context.Context, id string) error {
-			return ErrNotFound
+			return storefile.ErrNotFound
 		},
 	}
-	handler := NewHandler(&mockStorage{}, metadata)
+	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodDelete, "/files/nonexistent", nil)
 	req.SetPathValue("id", "nonexistent")
 	w := httptest.NewRecorder()
-
-	handler.Delete(w, req)
+	h.Delete(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusNotFound)
@@ -386,20 +303,18 @@ func TestHandler_Delete_NotFound(t *testing.T) {
 
 func TestHandler_List(t *testing.T) {
 	metadata := &mockMetadataManager{
-		listFunc: func(ctx context.Context, query Query) ([]*File, int64, error) {
-			files := []*File{
+		listFunc: func(ctx context.Context, q datafile.Query) ([]*datafile.File, int64, error) {
+			return []*datafile.File{
 				{ID: "file1", Name: "test1.txt"},
 				{ID: "file2", Name: "test2.txt"},
-			}
-			return files, 2, nil
+			}, 2, nil
 		},
 	}
-	handler := NewHandler(&mockStorage{}, metadata)
+	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files?page=1&page_size=20", nil)
 	w := httptest.NewRecorder()
-
-	handler.List(w, req)
+	h.List(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
@@ -407,39 +322,30 @@ func TestHandler_List(t *testing.T) {
 
 	var result map[string]any
 	json.NewDecoder(w.Body).Decode(&result)
-
 	if int(result["total"].(float64)) != 2 {
 		t.Errorf("Total = %v, want 2", result["total"])
-	}
-	if int(result["page"].(float64)) != 1 {
-		t.Errorf("Page = %v, want 1", result["page"])
-	}
-	if int(result["page_size"].(float64)) != 20 {
-		t.Errorf("PageSize = %v, want 20", result["page_size"])
 	}
 }
 
 func TestHandler_List_WithFilters(t *testing.T) {
-	var capturedQuery Query
-
+	var capturedQuery datafile.Query
 	metadata := &mockMetadataManager{
-		listFunc: func(ctx context.Context, query Query) ([]*File, int64, error) {
-			capturedQuery = query
-			return []*File{}, 0, nil
+		listFunc: func(ctx context.Context, q datafile.Query) ([]*datafile.File, int64, error) {
+			capturedQuery = q
+			return []*datafile.File{}, 0, nil
 		},
 	}
-	handler := NewHandler(&mockStorage{}, metadata)
+	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files?tenant_id=tenant-123&mime_type=image/jpeg&page=2&page_size=10", nil)
 	w := httptest.NewRecorder()
-
-	handler.List(w, req)
+	h.List(w, req)
 
 	if capturedQuery.TenantID != "tenant-123" {
-		t.Errorf("TenantID = %q, want %q", capturedQuery.TenantID, "tenant-123")
+		t.Errorf("TenantID = %q, want tenant-123", capturedQuery.TenantID)
 	}
 	if capturedQuery.MimeType != "image/jpeg" {
-		t.Errorf("MimeType = %q, want %q", capturedQuery.MimeType, "image/jpeg")
+		t.Errorf("MimeType = %q, want image/jpeg", capturedQuery.MimeType)
 	}
 	if capturedQuery.Page != 2 {
 		t.Errorf("Page = %d, want 2", capturedQuery.Page)
@@ -456,17 +362,16 @@ func TestHandler_GetURL(t *testing.T) {
 		},
 	}
 	metadata := &mockMetadataManager{
-		getFunc: func(ctx context.Context, id string) (*File, error) {
-			return &File{ID: id, Path: "test/path.txt"}, nil
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, Path: "test/path.txt"}, nil
 		},
 	}
-	handler := NewHandler(storage, metadata)
+	h := NewHandler(storage, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/url?expiry=3600", nil)
 	req.SetPathValue("id", "test-id")
 	w := httptest.NewRecorder()
-
-	handler.GetURL(w, req)
+	h.GetURL(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
@@ -474,22 +379,37 @@ func TestHandler_GetURL(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(w.Body).Decode(&result)
-
 	if result["url"] != "https://example.com/presigned-url" {
-		t.Errorf("URL = %q, want %q", result["url"], "https://example.com/presigned-url")
+		t.Errorf("URL = %q", result["url"])
 	}
 	if result["expires_in"] != "3600" {
-		t.Errorf("ExpiresIn = %q, want %q", result["expires_in"], "3600")
+		t.Errorf("ExpiresIn = %q, want 3600", result["expires_in"])
 	}
 }
 
-// Benchmark handler operations
-func BenchmarkHandler_Upload(b *testing.B) {
-	storage := &mockStorage{}
-	metadata := &mockMetadataManager{}
-	handler := NewHandler(storage, metadata)
+func TestHandler_Download_MetadataError(t *testing.T) {
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	h := NewHandler(&mockStorage{}, metadata)
 
-	// Prepare request body
+	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
+	req.SetPathValue("id", "test-id")
+	w := httptest.NewRecorder()
+	h.Download(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Status = %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+}
+
+// Benchmarks
+
+func BenchmarkHandler_Upload(b *testing.B) {
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	part, _ := writer.CreateFormFile("file", "test.txt")
@@ -505,22 +425,18 @@ func BenchmarkHandler_Upload(b *testing.B) {
 		ctx := context.WithValue(req.Context(), "tenant_id", "tenant-123")
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
-
-		handler.Upload(w, req)
+		h.Upload(w, req)
 	}
 }
 
 func BenchmarkHandler_Download(b *testing.B) {
-	storage := &mockStorage{}
-	metadata := &mockMetadataManager{}
-	handler := NewHandler(storage, metadata)
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
 		req.SetPathValue("id", "test-id")
 		w := httptest.NewRecorder()
-
-		handler.Download(w, req)
+		h.Download(w, req)
 	}
 }

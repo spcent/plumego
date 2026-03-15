@@ -1,4 +1,12 @@
-package file
+// Package fileapi provides an HTTP handler for tenant-aware file operations.
+// It composes x/data/file storage and metadata implementations with the
+// contract error model.
+//
+// Tenant identity must be placed in the request context under the key
+// "tenant_id" (string) before reaching any handler method — typically by a
+// middleware in the calling application. User identity is read from the
+// optional "user_id" context key.
+package fileapi
 
 import (
 	"context"
@@ -11,84 +19,77 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	storefile "github.com/spcent/plumego/store/file"
+	datafile "github.com/spcent/plumego/x/data/file"
 )
 
 // Handler provides HTTP endpoints for file operations.
 type Handler struct {
-	storage  Storage
-	metadata MetadataManager
-	maxSize  int64 // Max file size in bytes
+	storage  datafile.Storage
+	metadata datafile.MetadataManager
+	maxSize  int64
 }
 
-// NewHandler creates a new file handler.
-func NewHandler(storage Storage, metadata MetadataManager) *Handler {
+// NewHandler creates a new file handler with a default maximum upload size of
+// 100 MiB.
+func NewHandler(storage datafile.Storage, metadata datafile.MetadataManager) *Handler {
 	return &Handler{
 		storage:  storage,
 		metadata: metadata,
-		maxSize:  100 << 20, // Default 100 MiB
+		maxSize:  100 << 20,
 	}
 }
 
-// WithMaxSize sets the maximum file size.
+// WithMaxSize sets the maximum allowed file size for uploads.
 func (h *Handler) WithMaxSize(size int64) *Handler {
 	h.maxSize = size
 	return h
 }
 
-// RegisterRoutes registers file handling routes to a router.
-// This method is compatible with plumego's router interface.
+// RegisterRoutes registers file handling routes to the given ServeMux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /files", h.Upload)
 	mux.HandleFunc("GET /files/{id}", h.Download)
 	mux.HandleFunc("GET /files/{id}/info", h.GetInfo)
+	mux.HandleFunc("GET /files/{id}/url", h.GetURL)
 	mux.HandleFunc("DELETE /files/{id}", h.Delete)
 	mux.HandleFunc("GET /files", h.List)
-	mux.HandleFunc("GET /files/{id}/url", h.GetURL)
 }
 
 // Upload handles file upload via multipart form.
 // POST /files
-// Form fields:
-//   - file: file data (required)
-//   - generate_thumb: whether to generate thumbnail (optional, default false)
-//   - thumb_width: thumbnail width (optional, default 200)
-//   - thumb_height: thumbnail height (optional, default 200)
+// Form fields: file (required), generate_thumb, thumb_width, thumb_height.
+// Requires "tenant_id" in request context.
 func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Extract tenant ID from context
 	tenantID, ok := ctx.Value("tenant_id").(string)
 	if !ok || tenantID == "" {
 		h.writeError(w, r, http.StatusBadRequest, "missing tenant_id in context")
 		return
 	}
 
-	// Extract user ID from context
 	userID, _ := ctx.Value("user_id").(string)
 
-	// Parse multipart form
 	if err := r.ParseMultipartForm(h.maxSize); err != nil {
 		h.writeError(w, r, http.StatusBadRequest, fmt.Sprintf("failed to parse form: %v", err))
 		return
 	}
 
-	// Get file from form
-	file, header, err := r.FormFile("file")
+	f, header, err := r.FormFile("file")
 	if err != nil {
 		h.writeError(w, r, http.StatusBadRequest, fmt.Sprintf("missing file: %v", err))
 		return
 	}
-	defer file.Close()
+	defer f.Close()
 
-	// Parse options
 	generateThumb := r.FormValue("generate_thumb") == "true"
 	thumbWidth, _ := strconv.Atoi(r.FormValue("thumb_width"))
 	thumbHeight, _ := strconv.Atoi(r.FormValue("thumb_height"))
 
-	// Build put options
-	opts := PutOptions{
+	opts := datafile.PutOptions{
 		TenantID:      tenantID,
-		Reader:        file,
+		Reader:        f,
 		FileName:      header.Filename,
 		ContentType:   header.Header.Get("Content-Type"),
 		GenerateThumb: generateThumb,
@@ -98,14 +99,12 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		Metadata:      make(map[string]any),
 	}
 
-	// Upload file
 	result, err := h.storage.Put(ctx, opts)
 	if err != nil {
 		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("upload failed: %v", err))
 		return
 	}
 
-	// Return file metadata
 	h.writeJSON(w, http.StatusOK, result)
 }
 
@@ -120,21 +119,14 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get file metadata
 	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
-		if err == ErrNotFound {
-			h.writeError(w, r, http.StatusNotFound, "file not found")
-		} else {
-			h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
-		}
+		h.writeMetadataError(w, r, err)
 		return
 	}
 
-	// Update access time (async, ignore errors)
 	go h.metadata.UpdateAccessTime(context.Background(), fileID)
 
-	// Get file content
 	reader, err := h.storage.Get(ctx, fileMeta.Path)
 	if err != nil {
 		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to read file: %v", err))
@@ -142,13 +134,10 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	defer reader.Close()
 
-	// Set response headers
 	w.Header().Set("Content-Type", fileMeta.MimeType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileMeta.Size))
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileMeta.Name))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileMeta.Name))
 	w.Header().Set("Cache-Control", "public, max-age=31536000")
-
-	// Stream file content
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, reader)
 }
@@ -156,7 +145,6 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 // GetInfo returns file metadata.
 // GET /files/{id}/info
 func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
@@ -164,14 +152,9 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get file metadata
-	fileMeta, err := h.metadata.Get(ctx, fileID)
+	fileMeta, err := h.metadata.Get(r.Context(), fileID)
 	if err != nil {
-		if err == ErrNotFound {
-			h.writeError(w, r, http.StatusNotFound, "file not found")
-		} else {
-			h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
-		}
+		h.writeMetadataError(w, r, err)
 		return
 	}
 
@@ -181,7 +164,6 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 // Delete soft-deletes a file.
 // DELETE /files/{id}
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
@@ -189,39 +171,30 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Soft delete in metadata
-	if err := h.metadata.Delete(ctx, fileID); err != nil {
-		if err == ErrNotFound {
-			h.writeError(w, r, http.StatusNotFound, "file not found")
-		} else {
-			h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("delete failed: %v", err))
-		}
+	if err := h.metadata.Delete(r.Context(), fileID); err != nil {
+		h.writeMetadataError(w, r, err)
 		return
 	}
 
 	h.writeJSON(w, http.StatusOK, map[string]string{"message": "file deleted"})
 }
 
-// List returns paginated list of files.
+// List returns a paginated list of files.
 // GET /files?page=1&page_size=20&tenant_id=xxx&mime_type=image/jpeg&uploaded_by=user1
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Parse query parameters
-	query := Query{
-		Page:     1,
-		PageSize: 20,
-	}
+	query := datafile.Query{Page: 1, PageSize: 20}
 
-	if page := r.URL.Query().Get("page"); page != "" {
-		if p, err := strconv.Atoi(page); err == nil {
-			query.Page = p
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil {
+			query.Page = v
 		}
 	}
 
-	if pageSize := r.URL.Query().Get("page_size"); pageSize != "" {
-		if ps, err := strconv.Atoi(pageSize); err == nil && ps > 0 && ps <= 100 {
-			query.PageSize = ps
+	if ps := r.URL.Query().Get("page_size"); ps != "" {
+		if v, err := strconv.Atoi(ps); err == nil && v > 0 && v <= 100 {
+			query.PageSize = v
 		}
 	}
 
@@ -230,35 +203,31 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	query.MimeType = r.URL.Query().Get("mime_type")
 	query.OrderBy = r.URL.Query().Get("order_by")
 
-	if startTime := r.URL.Query().Get("start_time"); startTime != "" {
-		if t, err := time.Parse(time.RFC3339, startTime); err == nil {
+	if s := r.URL.Query().Get("start_time"); s != "" {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
 			query.StartTime = t
 		}
 	}
 
-	if endTime := r.URL.Query().Get("end_time"); endTime != "" {
-		if t, err := time.Parse(time.RFC3339, endTime); err == nil {
+	if s := r.URL.Query().Get("end_time"); s != "" {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
 			query.EndTime = t
 		}
 	}
 
-	// Query files
 	files, total, err := h.metadata.List(ctx, query)
 	if err != nil {
 		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("list failed: %v", err))
 		return
 	}
 
-	// Build response
-	resp := map[string]any{
+	h.writeJSON(w, http.StatusOK, map[string]any{
 		"items":      files,
 		"total":      total,
 		"page":       query.Page,
 		"page_size":  query.PageSize,
 		"total_page": (total + int64(query.PageSize) - 1) / int64(query.PageSize),
-	}
-
-	h.writeJSON(w, http.StatusOK, resp)
+	})
 }
 
 // GetURL returns a temporary access URL for the file.
@@ -272,58 +241,33 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse expiry duration
-	expiry := 15 * time.Minute // Default 15 minutes
-	if expiryStr := r.URL.Query().Get("expiry"); expiryStr != "" {
-		if seconds, err := strconv.Atoi(expiryStr); err == nil && seconds > 0 {
+	expiry := 15 * time.Minute
+	if s := r.URL.Query().Get("expiry"); s != "" {
+		if seconds, err := strconv.Atoi(s); err == nil && seconds > 0 {
 			expiry = time.Duration(seconds) * time.Second
 		}
 	}
 
-	// Get file metadata
 	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
-		if err == ErrNotFound {
-			h.writeError(w, r, http.StatusNotFound, "file not found")
-		} else {
-			h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to get metadata: %v", err))
-		}
+		h.writeMetadataError(w, r, err)
 		return
 	}
 
-	// Get URL from storage
-	url, err := h.storage.GetURL(ctx, fileMeta.Path, expiry)
+	fileURL, err := h.storage.GetURL(ctx, fileMeta.Path, expiry)
 	if err != nil {
 		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to generate url: %v", err))
 		return
 	}
 
 	h.writeJSON(w, http.StatusOK, map[string]string{
-		"url":        url,
-		"expires_in": fmt.Sprintf("%d", int(expiry.Seconds())),
-	})
-}
-
-// writeJSON writes a JSON response.
-func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-// writeError writes an error response.
-func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, status int, message string) {
-	contract.WriteError(w, r, contract.APIError{
-		Status:   status,
-		Code:     http.StatusText(status),
-		Message:  message,
-		Category: contract.CategoryForStatus(status),
+		"url":        fileURL,
+		"expires_in": strconv.Itoa(int(expiry.Seconds())),
 	})
 }
 
 // ServeHTTP implements http.Handler for middleware chaining.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Route based on method and path
 	path := r.URL.Path
 	method := r.Method
 
@@ -347,5 +291,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.List(w, r)
 	default:
 		h.writeError(w, r, http.StatusNotFound, "not found")
+	}
+}
+
+func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, status int, message string) {
+	contract.WriteError(w, r, contract.APIError{
+		Status:   status,
+		Code:     http.StatusText(status),
+		Message:  message,
+		Category: contract.CategoryForStatus(status),
+	})
+}
+
+func (h *Handler) writeMetadataError(w http.ResponseWriter, r *http.Request, err error) {
+	if err == storefile.ErrNotFound {
+		h.writeError(w, r, http.StatusNotFound, "file not found")
+	} else {
+		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("metadata error: %v", err))
 	}
 }

@@ -73,7 +73,6 @@ CREATE INDEX idx_files_tenant_created ON files(tenant_id, created_at DESC) WHERE
 -- JSONB index for metadata queries (GIN index)
 CREATE INDEX idx_files_metadata ON files USING GIN (metadata) WHERE deleted_at IS NULL;
 
--- Comments for documentation
 COMMENT ON TABLE files IS 'File storage metadata table with support for local and S3 storage';
 COMMENT ON COLUMN files.id IS 'Unique file identifier (32-char hex)';
 COMMENT ON COLUMN files.tenant_id IS 'Tenant identifier for multi-tenancy isolation';

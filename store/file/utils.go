@@ -7,15 +7,15 @@ import (
 	"strings"
 )
 
-// generateID generates a random file ID (32 bytes, hex-encoded).
-func generateID() string {
+// GenerateID generates a random file ID (32 bytes, hex-encoded).
+func GenerateID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
-// isPathSafe checks if a path is safe to use (prevents path traversal attacks).
-func isPathSafe(path string) bool {
+// IsPathSafe checks if a path is safe to use (prevents path traversal attacks).
+func IsPathSafe(path string) bool {
 	// Reject paths containing ".."
 	if strings.Contains(path, "..") {
 		return false
@@ -35,8 +35,8 @@ func isPathSafe(path string) bool {
 	return true
 }
 
-// mimeToExt converts a MIME type to a file extension.
-func mimeToExt(mimeType string) string {
+// MimeToExt converts a MIME type to a file extension.
+func MimeToExt(mimeType string) string {
 	mimeMap := map[string]string{
 		"image/jpeg":       ".jpg",
 		"image/png":        ".png",
@@ -60,8 +60,8 @@ func mimeToExt(mimeType string) string {
 	return ""
 }
 
-// extToMime converts a file extension to a MIME type.
-func extToMime(ext string) string {
+// ExtToMime converts a file extension to a MIME type.
+func ExtToMime(ext string) string {
 	ext = strings.ToLower(ext)
 	if !strings.HasPrefix(ext, ".") {
 		ext = "." + ext

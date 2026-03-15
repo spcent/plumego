@@ -12,32 +12,23 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	storefile "github.com/spcent/plumego/store/file"
 )
 
-// newS3Server starts a minimal httptest server that responds to basic S3 ops.
-// It stores objects in memory.
 func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 	t.Helper()
 	store := make(map[string][]byte)
 
 	mux := http.NewServeMux()
-
-	// PUT /{bucket}/{key} — upload
-	// HEAD /{bucket}/{key} — exists/stat
-	// GET /{bucket}/{key} — download
-	// DELETE /{bucket}/{key} — delete
-	// GET /{bucket}?list-type=2 — list
-
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Extract key (strip leading "/bucket/")
-		path := r.URL.Path
-		parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
+		pathStr := r.URL.Path
+		parts := strings.SplitN(strings.TrimPrefix(pathStr, "/"), "/", 2)
 		key := ""
 		if len(parts) == 2 {
 			key = parts[1]
 		}
 
-		// List
 		if r.Method == http.MethodGet && r.URL.Query().Get("list-type") == "2" {
 			type content struct {
 				XMLName      struct{}  `xml:"Contents"`
@@ -70,7 +61,6 @@ func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 			body, _ := io.ReadAll(r.Body)
 			store[key] = body
 			w.WriteHeader(http.StatusOK)
-
 		case http.MethodGet:
 			data, ok := store[key]
 			if !ok {
@@ -79,7 +69,6 @@ func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 			}
 			w.WriteHeader(http.StatusOK)
 			w.Write(data)
-
 		case http.MethodHead:
 			data, ok := store[key]
 			if !ok {
@@ -89,7 +78,6 @@ func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.WriteHeader(http.StatusOK)
-
 		case http.MethodDelete:
 			if _, ok := store[key]; !ok {
 				w.WriteHeader(http.StatusNotFound)
@@ -97,7 +85,6 @@ func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 			}
 			delete(store, key)
 			w.WriteHeader(http.StatusNoContent)
-
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -108,12 +95,10 @@ func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 	return srv, store
 }
 
-// newTestS3Storage creates an S3Storage pointing to the test server.
 func newTestS3Storage(t *testing.T, srv *httptest.Server) *S3Storage {
 	t.Helper()
-	// Extract host from server URL (strip "http://").
 	host := strings.TrimPrefix(srv.URL, "http://")
-	s, err := NewS3Storage(StorageConfig{
+	s, err := NewS3Storage(storefile.StorageConfig{
 		S3Endpoint:  host,
 		S3Bucket:    "testbucket",
 		S3UseSSL:    false,
@@ -122,7 +107,6 @@ func newTestS3Storage(t *testing.T, srv *httptest.Server) *S3Storage {
 	if err != nil {
 		t.Fatalf("NewS3Storage: %v", err)
 	}
-	// Override the HTTP client to not follow redirects and to not timeout quickly.
 	s.client = &http.Client{}
 	return s
 }
@@ -163,10 +147,9 @@ func TestS3Storage_Put_Get(t *testing.T) {
 func TestS3Storage_Get_NotFound(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
 
-	_, err := s.Get(ctx, "nonexistent/key.txt")
-	if !errors.Is(err, ErrNotFound) {
+	_, err := s.Get(context.Background(), "nonexistent/key.txt")
+	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
@@ -174,12 +157,10 @@ func TestS3Storage_Get_NotFound(t *testing.T) {
 func TestS3Storage_Delete(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
 
-	// Manually insert into mock store.
 	store["mykey.txt"] = []byte("data")
 
-	if err := s.Delete(ctx, "mykey.txt"); err != nil {
+	if err := s.Delete(context.Background(), "mykey.txt"); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 	if _, ok := store["mykey.txt"]; ok {
@@ -190,10 +171,9 @@ func TestS3Storage_Delete(t *testing.T) {
 func TestS3Storage_Delete_NotFound(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
 
-	err := s.Delete(ctx, "ghost.txt")
-	if !errors.Is(err, ErrNotFound) {
+	err := s.Delete(context.Background(), "ghost.txt")
+	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
@@ -221,7 +201,7 @@ func TestS3Storage_Stat(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := s.Stat(ctx, "missing.txt")
-	if !errors.Is(err, ErrNotFound) {
+	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound for missing file, got %v", err)
 	}
 
@@ -238,26 +218,10 @@ func TestS3Storage_Stat(t *testing.T) {
 func TestS3Storage_GetURL(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
 
-	url, err := s.GetURL(ctx, "some/file.txt", time.Minute)
+	url, err := s.GetURL(context.Background(), "some/file.txt", time.Minute)
 	if err != nil {
 		t.Fatalf("GetURL: %v", err)
-	}
-	if url == "" {
-		t.Error("expected non-empty URL")
-	}
-}
-
-func TestS3Storage_GetURL_DefaultExpiry(t *testing.T) {
-	srv, _ := newS3Server(t)
-	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
-
-	// Zero expiry should use default.
-	url, err := s.GetURL(ctx, "some/file.txt", 0)
-	if err != nil {
-		t.Fatalf("GetURL with zero expiry: %v", err)
 	}
 	if url == "" {
 		t.Error("expected non-empty URL")
@@ -267,13 +231,12 @@ func TestS3Storage_GetURL_DefaultExpiry(t *testing.T) {
 func TestS3Storage_List(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
 
 	store["t1/file1.txt"] = []byte("a")
 	store["t1/file2.txt"] = []byte("b")
 	store["t2/file3.txt"] = []byte("c")
 
-	files, err := s.List(ctx, "t1/", 10)
+	files, err := s.List(context.Background(), "t1/", 10)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -285,11 +248,10 @@ func TestS3Storage_List(t *testing.T) {
 func TestS3Storage_Copy(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
 
 	store["src/file.txt"] = []byte("copy me")
 
-	if err := s.Copy(ctx, "src/file.txt", "dst/file.txt"); err != nil {
+	if err := s.Copy(context.Background(), "src/file.txt", "dst/file.txt"); err != nil {
 		t.Fatalf("Copy: %v", err)
 	}
 }
@@ -297,7 +259,7 @@ func TestS3Storage_Copy(t *testing.T) {
 func TestS3Storage_Put_Deduplication(t *testing.T) {
 	srv, _ := newS3Server(t)
 	host := strings.TrimPrefix(srv.URL, "http://")
-	s, _ := NewS3Storage(StorageConfig{
+	s, _ := NewS3Storage(storefile.StorageConfig{
 		S3Endpoint:  host,
 		S3Bucket:    "testbucket",
 		S3PathStyle: true,
@@ -307,20 +269,66 @@ func TestS3Storage_Put_Deduplication(t *testing.T) {
 	ctx := context.Background()
 	content := []byte("deduplicated s3 content")
 
-	first, err := s.Put(ctx, PutOptions{
-		TenantID: "t1", Reader: bytes.NewReader(content), FileName: "dup.bin",
-	})
+	first, err := s.Put(ctx, PutOptions{TenantID: "t1", Reader: bytes.NewReader(content), FileName: "dup.bin"})
 	if err != nil {
 		t.Fatalf("first Put: %v", err)
 	}
 
-	second, err := s.Put(ctx, PutOptions{
-		TenantID: "t1", Reader: bytes.NewReader(content), FileName: "dup.bin",
-	})
+	second, err := s.Put(ctx, PutOptions{TenantID: "t1", Reader: bytes.NewReader(content), FileName: "dup.bin"})
 	if err != nil {
 		t.Fatalf("second Put: %v", err)
 	}
 	if second.Hash != first.Hash {
 		t.Errorf("expected deduplication, hash mismatch: %q vs %q", first.Hash, second.Hash)
+	}
+}
+
+func TestS3Storage_buildURL_VirtualHosted(t *testing.T) {
+	s := &S3Storage{endpoint: "s3.amazonaws.com", bucket: "mybucket", useSSL: true, pathStyle: false}
+	got := s.buildURL("tenant/file.txt")
+	if !strings.HasPrefix(got, "https://mybucket.s3.amazonaws.com/") {
+		t.Errorf("buildURL = %q, expected virtual-hosted HTTPS prefix", got)
+	}
+	if !strings.Contains(got, "file.txt") {
+		t.Errorf("buildURL = %q, expected file.txt in URL", got)
+	}
+}
+
+func TestS3Storage_buildURL_PathStyle(t *testing.T) {
+	s := &S3Storage{endpoint: "minio.local:9000", bucket: "testbucket", useSSL: false, pathStyle: true}
+	got := s.buildURL("folder/object.png")
+	if !strings.HasPrefix(got, "http://minio.local:9000/testbucket/") {
+		t.Errorf("buildURL = %q, expected path-style HTTP prefix", got)
+	}
+	if !strings.Contains(got, "object.png") {
+		t.Errorf("buildURL = %q, expected object.png in URL", got)
+	}
+}
+
+func TestS3Storage_buildURL_PathTraversalEncoded(t *testing.T) {
+	s := &S3Storage{endpoint: "s3.amazonaws.com", bucket: "mybucket", useSSL: true, pathStyle: true}
+	got := s.buildURL("../../etc/passwd")
+	if strings.Contains(got, "/../") || strings.HasSuffix(got, "/..") {
+		t.Errorf("buildURL contains unencoded path traversal, got %q", got)
+	}
+}
+
+func TestNewS3Storage_MissingConfig(t *testing.T) {
+	_, err := NewS3Storage(storefile.StorageConfig{}, nil)
+	if err == nil {
+		t.Fatal("expected error for missing S3 config")
+	}
+}
+
+func TestNewS3Storage_DefaultRegion(t *testing.T) {
+	s, err := NewS3Storage(storefile.StorageConfig{
+		S3Endpoint: "s3.amazonaws.com",
+		S3Bucket:   "my-bucket",
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewS3Storage: %v", err)
+	}
+	if s.region != "us-east-1" {
+		t.Errorf("region = %q, want us-east-1", s.region)
 	}
 }

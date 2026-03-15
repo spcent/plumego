@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	storefile "github.com/spcent/plumego/store/file"
 )
 
-// DBMetadataManager implements MetadataManager using a SQL database.
+// DBMetadataManager implements MetadataManager using a PostgreSQL database.
 type DBMetadataManager struct {
 	db *sql.DB
 }
@@ -69,7 +71,7 @@ func (m *DBMetadataManager) Get(ctx context.Context, id string) (*File, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return nil, storefile.ErrNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -83,7 +85,7 @@ func (m *DBMetadataManager) Get(ctx context.Context, id string) (*File, error) {
 }
 
 // GetByPath retrieves file metadata by path.
-func (m *DBMetadataManager) GetByPath(ctx context.Context, path string) (*File, error) {
+func (m *DBMetadataManager) GetByPath(ctx context.Context, p string) (*File, error) {
 	query := `
 		SELECT id, tenant_id, name, path, size, mime_type, extension, hash,
 		       width, height, thumbnail_path, storage_type, metadata,
@@ -95,7 +97,7 @@ func (m *DBMetadataManager) GetByPath(ctx context.Context, path string) (*File, 
 	var file File
 	var metadataJSON []byte
 
-	err := m.db.QueryRowContext(ctx, query, path).Scan(
+	err := m.db.QueryRowContext(ctx, query, p).Scan(
 		&file.ID, &file.TenantID, &file.Name, &file.Path, &file.Size,
 		&file.MimeType, &file.Extension, &file.Hash, &file.Width, &file.Height,
 		&file.ThumbnailPath, &file.StorageType, &metadataJSON,
@@ -104,7 +106,7 @@ func (m *DBMetadataManager) GetByPath(ctx context.Context, path string) (*File, 
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
+		return nil, storefile.ErrNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -140,7 +142,7 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, nil // Not an error, file doesn't exist
+		return nil, nil // not found, not an error
 	}
 	if err != nil {
 		return nil, err
@@ -155,7 +157,6 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 
 // List retrieves file metadata matching the query.
 func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int64, error) {
-	// Build WHERE conditions
 	conditions := []string{"deleted_at IS NULL"}
 	args := []any{}
 	argIndex := 1
@@ -190,20 +191,13 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 		argIndex++
 	}
 
-	whereClause := ""
-	if len(conditions) > 0 {
-		whereClause = "WHERE " + strings.Join(conditions, " AND ")
-	}
+	whereClause := "WHERE " + strings.Join(conditions, " AND ")
 
-	// Count total
 	var total int64
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM files %s", whereClause)
-	err := m.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
-	if err != nil {
+	if err := m.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files "+whereClause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	// Pagination
 	if query.Page < 1 {
 		query.Page = 1
 	}
@@ -212,7 +206,6 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 	}
 	offset := (query.Page - 1) * query.PageSize
 
-	// Sanitize orderBy to prevent SQL injection by allowing only known columns/directions.
 	orderBy := "created_at DESC"
 	switch query.OrderBy {
 	case "created_at":
@@ -227,7 +220,6 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 		orderBy = "size ASC"
 	case "size_desc":
 		orderBy = "size DESC"
-		// Add more allowed sort options here as needed, keeping the mapping explicit.
 	}
 
 	listQuery := fmt.Sprintf(`
@@ -253,14 +245,13 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 		var file File
 		var metadataJSON []byte
 
-		err := rows.Scan(
+		if err := rows.Scan(
 			&file.ID, &file.TenantID, &file.Name, &file.Path, &file.Size,
 			&file.MimeType, &file.Extension, &file.Hash, &file.Width, &file.Height,
 			&file.ThumbnailPath, &file.StorageType, &metadataJSON,
 			&file.UploadedBy, &file.CreatedAt, &file.UpdatedAt,
 			&file.LastAccessAt, &file.DeletedAt,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, 0, err
 		}
 
@@ -276,15 +267,17 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 
 // Delete soft-deletes file metadata.
 func (m *DBMetadataManager) Delete(ctx context.Context, id string) error {
-	query := `UPDATE files SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL`
-	result, err := m.db.ExecContext(ctx, query, time.Now(), id)
+	result, err := m.db.ExecContext(ctx,
+		`UPDATE files SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL`,
+		time.Now(), id,
+	)
 	if err != nil {
 		return err
 	}
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return ErrNotFound
+		return storefile.ErrNotFound
 	}
 
 	return nil
@@ -292,7 +285,9 @@ func (m *DBMetadataManager) Delete(ctx context.Context, id string) error {
 
 // UpdateAccessTime updates the last access timestamp.
 func (m *DBMetadataManager) UpdateAccessTime(ctx context.Context, id string) error {
-	query := `UPDATE files SET last_access_at = $1 WHERE id = $2`
-	_, err := m.db.ExecContext(ctx, query, time.Now(), id)
+	_, err := m.db.ExecContext(ctx,
+		`UPDATE files SET last_access_at = $1 WHERE id = $2`,
+		time.Now(), id,
+	)
 	return err
 }
