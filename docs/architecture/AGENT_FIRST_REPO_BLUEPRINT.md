@@ -38,6 +38,7 @@ Optional or fast-moving capabilities live under `x/`:
 - `x/discovery`
 - `x/gateway`
 - `x/data`
+- `x/fileapi`
 
 Non-library areas stay out of import-path design:
 
@@ -172,3 +173,4 @@ Agents should prefer these entrypoints when multiple related `x/*` packages exis
 - Start transport observability work in stable `middleware/*` packages; use `x/observability` only for higher-level adapter or export wiring.
 - Do not start new app structure from `x/rest`; prefer `reference/standard-service` and explicit route binding.
 - Treat `x/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.
+- Start tenant-aware file HTTP operations in `x/fileapi`; keep storage implementations in `x/data/file` and storage interface definitions in `store/file`.

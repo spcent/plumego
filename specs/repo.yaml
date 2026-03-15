@@ -64,6 +64,7 @@ layers:
       - x/discovery
       - x/gateway
       - x/data
+      - x/fileapi
 
   tooling:
     description: Developer tools, checks, and CLI.
