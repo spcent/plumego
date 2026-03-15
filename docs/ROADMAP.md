@@ -190,25 +190,44 @@ Exit criteria:
 
 ## Phase 6: Release Readiness Toward v1
 
-Status: planned
+Status: substantially complete
 
 Goals:
 
 - turn the architecture cleanup into a durable release baseline
 - make quality gates strict enough for stable public adoption
 
-Planned work:
+Completed work:
 
-- audit public APIs for clarity before final v1 freeze
-- expand race, integration, and negative-path coverage for critical roots
-- run release-readiness reviews against documentation, examples, env defaults, and quality gates
-- define a formal deprecation policy for future extension evolution
+- audited all stable-root public API surfaces; removed implementation details that leaked into
+  the exported API before v1 freeze:
+  - `router`: unexported `CacheEntry`, `PatternCacheEntry`, `RouteMatcher`, `NewRouteMatcher`,
+    `IsParameterized` — internal implementation details with no external callers
+  - `metrics`: removed `MetricsMiddleware` and `MetricsHandler` — middleware helpers that
+    violated the module boundary (use `middleware/httpmetrics.Middleware` instead)
+- expanded negative-path coverage for critical roots:
+  - `contract`: `WriteBindError` is now tested against all sentinel errors with HTTP status and
+    error code assertions; field-level validation errors are also covered
+  - `router`: frozen-router registration, duplicate route, param validation failure, unknown path,
+    and double-slash path are all covered with negative assertions
+- defined a formal deprecation policy in `docs/DEPRECATION.md` covering the compatibility
+  promise, four-step deprecation process, extension package exemption, and governance rules
+- all quality gates pass (`go test -race ./...`, `go vet ./...`, all `internal/checks/*`)
 
-Exit criteria:
+Remaining work:
+
+- Phase 5 (reference and scaffold system) remains not started; its completion is a precondition
+  for calling v1 fully ready, but the API freeze itself is unblocked
+- keep `x/*` extension packages aligned with stable-root changes as the canonical reference
+  evolves
+
+Exit criteria met:
 
 - public docs describe only the supported explicit APIs
 - quality gates are green without new temporary exceptions
 - maintainers can describe the supported architecture without caveats
+
+See `docs/DEPRECATION.md` for the formal extension evolution policy.
 
 ## Cross-Cutting Workstreams
 

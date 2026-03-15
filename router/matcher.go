@@ -4,44 +4,20 @@ import (
 	"strings"
 )
 
-// RouteMatcher performs efficient trie-based route matching.
-// This is a lightweight matcher used during HTTP request processing for
-// non-cached route lookups. It traverses the radix tree structure to find
-// the best matching route for a given URL path.
+// routeMatcher performs efficient trie-based route matching.
+// It traverses the radix tree structure to find the best matching route for a given URL path.
 //
 // Matching strategy:
 //  1. Try static path segments first (exact match)
 //  2. Try parameter segments (dynamic segments like ":id")
 //  3. Try wildcard segments (catch-all segments like "*path")
-//
-// Example:
-//
-//	tree := &node{...} // Radix tree structure
-//	matcher := NewRouteMatcher(tree)
-//	result := matcher.Match([]string{"users", "123"})
-//	// result.Handler contains the matched handler
-//	// result.ParamValues contains ["123"]
-type RouteMatcher struct {
+type routeMatcher struct {
 	root *node
 }
 
-// NewRouteMatcher creates a new route matcher for the given tree root.
-// The matcher is lightweight and can be reused for multiple matching operations.
-// This is primarily used internally by the Router for route matching.
-//
-// Parameters:
-//   - root: Root node of the radix tree
-//
-// Returns:
-//   - *RouteMatcher: A new route matcher instance
-//
-// Example:
-//
-//	// Internal usage within Router.handleRouteMatch:
-//	matcher := NewRouteMatcher(tree)
-//	result := matcher.Match([]string{"users", "123"})
-func NewRouteMatcher(root *node) *RouteMatcher {
-	return &RouteMatcher{
+// newRouteMatcher creates a new route matcher for the given tree root.
+func newRouteMatcher(root *node) *routeMatcher {
+	return &routeMatcher{
 		root: root,
 	}
 }
@@ -57,13 +33,13 @@ func NewRouteMatcher(root *node) *RouteMatcher {
 //
 // Example:
 //
-//	matcher := NewRouteMatcher(root)
+//	matcher := newRouteMatcher(root)
 //	result := matcher.Match([]string{"users", "123"})
 //	if result != nil {
 //	    handler := result.Handler
 //	    params := result.ParamValues // ["123"]
 //	}
-func (rm *RouteMatcher) Match(parts []string) *MatchResult {
+func (rm *routeMatcher) Match(parts []string) *MatchResult {
 	if rm.root == nil {
 		return nil
 	}
@@ -157,7 +133,7 @@ func (rm *RouteMatcher) Match(parts []string) *MatchResult {
 //
 // Returns:
 //   - *node: Matching child node, or nil if not found
-func (rm *RouteMatcher) findChildForPath(parent *node, path string) *node {
+func (rm *routeMatcher) findChildForPath(parent *node, path string) *node {
 	// Fast path: empty parent or no children
 	if parent == nil || len(parent.children) == 0 {
 		return nil
@@ -206,7 +182,7 @@ func (rm *RouteMatcher) findChildForPath(parent *node, path string) *node {
 
 // findChildByByte finds a child node whose path starts with the given byte.
 // Uses indices for O(1) lookup when available, falls back to linear search.
-func (rm *RouteMatcher) findChildByByte(parent *node, b byte) *node {
+func (rm *routeMatcher) findChildByByte(parent *node, b byte) *node {
 	if parent == nil || len(parent.children) == 0 {
 		return nil
 	}
@@ -230,11 +206,11 @@ func (rm *RouteMatcher) findChildByByte(parent *node, b byte) *node {
 }
 
 // findParamChild finds a param child node (path starting with ":").
-func (rm *RouteMatcher) findParamChild(parent *node) *node {
+func (rm *routeMatcher) findParamChild(parent *node) *node {
 	return rm.findChildByByte(parent, ':')
 }
 
 // findWildChild finds a wildcard child node (path starting with "*").
-func (rm *RouteMatcher) findWildChild(parent *node) *node {
+func (rm *routeMatcher) findWildChild(parent *node) *node {
 	return rm.findChildByByte(parent, '*')
 }

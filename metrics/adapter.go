@@ -1,102 +1,10 @@
 package metrics
 
 import (
-	"net/http"
 	"sort"
 	"sync"
 	"time"
 )
-
-// responseWriter wraps http.ResponseWriter to capture status code and bytes written.
-// This is useful for custom middleware that needs to record metrics.
-type responseWriter struct {
-	http.ResponseWriter
-	status int
-	bytes  int
-}
-
-// WriteHeader captures the status code before writing the header.
-func (rw *responseWriter) WriteHeader(status int) {
-	rw.status = status
-	rw.ResponseWriter.WriteHeader(status)
-}
-
-// Write captures the number of bytes written.
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	n, err := rw.ResponseWriter.Write(b)
-	rw.bytes += n
-	return n, err
-}
-
-// Status returns the captured HTTP status code.
-func (rw *responseWriter) Status() int {
-	return rw.status
-}
-
-// BytesWritten returns the total number of bytes written.
-func (rw *responseWriter) BytesWritten() int {
-	return rw.bytes
-}
-
-// MetricsMiddleware creates a simple HTTP middleware that records metrics.
-//
-// This is a lightweight alternative to the full observability.Logging middleware
-// when you only need metrics and not logging.
-//
-// Example:
-//
-//	import (
-//		"github.com/spcent/plumego/metrics"
-//		"net/http"
-//	)
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//	middleware := metrics.MetricsMiddleware(collector)
-//
-//	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//		w.WriteHeader(http.StatusOK)
-//		w.Write([]byte("OK"))
-//	}))
-func MetricsMiddleware(collector HTTPObserver) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			timer := NewTimer()
-			rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-
-			next.ServeHTTP(rw, r)
-
-			collector.ObserveHTTP(
-				r.Context(),
-				r.Method,
-				r.URL.Path,
-				rw.status,
-				rw.bytes,
-				timer.Elapsed(),
-			)
-		})
-	}
-}
-
-// MetricsHandler wraps an HTTP handler with automatic metric recording.
-//
-// This is a convenience function that combines a handler with MetricsMiddleware.
-//
-// Example:
-//
-//	import (
-//		"github.com/spcent/plumego/metrics"
-//		"net/http"
-//	)
-//
-//	collector := metrics.NewPrometheusCollector("myapp")
-//
-//	http.Handle("/api/users", metrics.MetricsHandler(collector, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//		w.WriteHeader(http.StatusOK)
-//		w.Write([]byte("OK"))
-//	})))
-func MetricsHandler(collector HTTPObserver, handler http.Handler) http.Handler {
-	return MetricsMiddleware(collector)(handler)
-}
 
 // Aggregator aggregates metrics over time windows.
 //

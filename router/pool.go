@@ -28,17 +28,17 @@ func putParamValues(s *[]string) {
 
 var routeMatcherPool = sync.Pool{
 	New: func() any {
-		return &RouteMatcher{}
+		return &routeMatcher{}
 	},
 }
 
-func getRouteMatcher(root *node) *RouteMatcher {
-	rm := routeMatcherPool.Get().(*RouteMatcher)
+func getRouteMatcher(root *node) *routeMatcher {
+	rm := routeMatcherPool.Get().(*routeMatcher)
 	rm.root = root
 	return rm
 }
 
-func putRouteMatcher(rm *RouteMatcher) {
+func putRouteMatcher(rm *routeMatcher) {
 	if rm == nil {
 		return
 	}
