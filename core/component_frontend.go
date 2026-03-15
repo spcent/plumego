@@ -51,7 +51,7 @@ func (c *frontendComponent) RegisterRoutes(r *router.Router) {
 	c.result.registered = true
 }
 
-func (c *frontendComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *frontendComponent) RegisterMiddleware(_ *middleware.Chain) {}
 
 func (c *frontendComponent) Start(_ context.Context) error { return nil }
 

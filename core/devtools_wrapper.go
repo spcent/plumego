@@ -75,7 +75,7 @@ func devtoolsMiddlewareList(app *App) []string {
 		return nil
 	}
 
-	middlewares := app.middlewareReg.Middlewares()
+	middlewares := app.middlewareReg.Snapshot()
 	list := make([]string, 0, len(middlewares))
 	for _, mw := range middlewares {
 		list = append(list, formatType(mw))

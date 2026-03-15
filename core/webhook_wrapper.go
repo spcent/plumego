@@ -29,7 +29,7 @@ func (a *App) ConfigureWebhookIn() {
 
 	comp := newWebhookInComponent(cfg.WebhookIn, pub, logger)
 	comp.RegisterRoutes(a.ensureRouter())
-	comp.RegisterMiddleware(a.ensureMiddlewareRegistry())
+	comp.RegisterMiddleware(a.ensureMiddlewareChain())
 
 	a.mu.Lock()
 	a.components = append(a.components, comp)
@@ -49,7 +49,7 @@ func (a *App) ConfigureWebhookOut() {
 
 	comp := newWebhookOutComponent(cfg.WebhookOut)
 	comp.RegisterRoutes(a.ensureRouter())
-	comp.RegisterMiddleware(a.ensureMiddlewareRegistry())
+	comp.RegisterMiddleware(a.ensureMiddlewareChain())
 
 	a.mu.Lock()
 	a.components = append(a.components, comp)

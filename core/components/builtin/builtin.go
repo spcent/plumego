@@ -17,7 +17,7 @@ import (
 // Component mirrors core.Component for selection purposes.
 type Component interface {
 	RegisterRoutes(r *router.Router)
-	RegisterMiddleware(m *middleware.Registry)
+	RegisterMiddleware(m *middleware.Chain)
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 	Health() (name string, status health.HealthStatus)

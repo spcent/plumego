@@ -142,7 +142,7 @@ func (c *WebSocketComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *WebSocketComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *WebSocketComponent) RegisterMiddleware(_ *middleware.Chain) {}
 
 func (c *WebSocketComponent) Start(_ context.Context) error { return nil }
 

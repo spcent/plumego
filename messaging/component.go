@@ -38,7 +38,7 @@ func (c *Component) RegisterRoutes(r *router.Router) {
 	r.Get(c.prefix+"/channels", contract.AdaptCtxHandler(c.svc.HandleChannelHealth, r.Logger()))
 }
 
-func (c *Component) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *Component) RegisterMiddleware(_ *middleware.Chain) {}
 
 func (c *Component) Start(ctx context.Context) error {
 	return c.svc.Start(ctx)

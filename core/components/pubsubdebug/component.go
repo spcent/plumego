@@ -58,7 +58,7 @@ func (c *PubSubDebugComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *PubSubDebugComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *PubSubDebugComponent) RegisterMiddleware(_ *middleware.Chain) {}
 
 func (c *PubSubDebugComponent) Start(_ context.Context) error { return nil }
 

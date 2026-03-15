@@ -13,7 +13,7 @@ import (
 // middleware, and lifecycle hooks to the application.
 type Component interface {
 	RegisterRoutes(r *router.Router)
-	RegisterMiddleware(m *middleware.Registry)
+	RegisterMiddleware(m *middleware.Chain)
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 	Health() (name string, status health.HealthStatus)
@@ -29,7 +29,7 @@ type BaseComponent struct{}
 func (b *BaseComponent) RegisterRoutes(r *router.Router) {}
 
 // RegisterMiddleware implements Component.RegisterMiddleware
-func (b *BaseComponent) RegisterMiddleware(m *middleware.Registry) {}
+func (b *BaseComponent) RegisterMiddleware(m *middleware.Chain) {}
 
 // Dependencies implements Component.Dependencies
 func (b *BaseComponent) Dependencies() []reflect.Type {

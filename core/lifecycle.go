@@ -296,7 +296,7 @@ func (a *App) mountComponents() []Component {
 	declared = append(declared, a.components...)
 
 	if a.middlewareReg == nil {
-		a.middlewareReg = middleware.NewRegistry()
+		a.middlewareReg = middleware.NewChain()
 	}
 
 	components := filterNilComponents(declared)

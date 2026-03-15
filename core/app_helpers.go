@@ -45,10 +45,10 @@ func (a *App) ensureRouter() *router.Router {
 	return r
 }
 
-func (a *App) ensureMiddlewareRegistry() *middleware.Registry {
+func (a *App) ensureMiddlewareChain() *middleware.Chain {
 	a.mu.Lock()
 	if a.middlewareReg == nil {
-		a.middlewareReg = middleware.NewRegistry()
+		a.middlewareReg = middleware.NewChain()
 	}
 	reg := a.middlewareReg
 	a.mu.Unlock()

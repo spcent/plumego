@@ -131,7 +131,7 @@ func TestFrontendComponentRegisterMiddleware(t *testing.T) {
 	component := NewFrontendComponentFromDir("/test")
 
 	// Should not panic
-	reg := middleware.NewRegistry()
+	reg := middleware.NewChain()
 	component.RegisterMiddleware(reg)
 }
 
@@ -193,7 +193,7 @@ func TestPubSubDebugComponentRegisterMiddleware(t *testing.T) {
 	}
 
 	component := newPubSubDebugComponent(cfg, nil)
-	reg := middleware.NewRegistry()
+	reg := middleware.NewChain()
 
 	// Should not panic
 	component.RegisterMiddleware(reg)

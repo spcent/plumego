@@ -177,7 +177,7 @@ func (c *DevToolsComponent) RegisterRoutes(r *router.Router) {
 	}))
 }
 
-func (c *DevToolsComponent) RegisterMiddleware(_ *middleware.Registry) {
+func (c *DevToolsComponent) RegisterMiddleware(_ *middleware.Chain) {
 	c.attachDevMetrics()
 }
 

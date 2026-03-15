@@ -35,7 +35,7 @@ func (s *stubComponent) RegisterRoutes(r *router.Router) {
 	}))
 }
 
-func (s *stubComponent) RegisterMiddleware(reg *middleware.Registry) {
+func (s *stubComponent) RegisterMiddleware(reg *middleware.Chain) {
 	if s.middlewareName == "" {
 		return
 	}

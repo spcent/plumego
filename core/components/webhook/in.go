@@ -61,7 +61,7 @@ func (c *WebhookInComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *WebhookInComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *WebhookInComponent) RegisterMiddleware(_ *middleware.Chain) {}
 
 func (c *WebhookInComponent) Start(_ context.Context) error { return nil }
 

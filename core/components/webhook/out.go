@@ -60,7 +60,7 @@ func (c *WebhookOutComponent) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *WebhookOutComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *WebhookOutComponent) RegisterMiddleware(_ *middleware.Chain) {}
 
 func (c *WebhookOutComponent) Start(ctx context.Context) error {
 	if c.cfg.Enabled && c.cfg.Service != nil {

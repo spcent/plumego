@@ -20,7 +20,7 @@ type TenantConfigComponent struct {
 func (c *TenantConfigComponent) RegisterRoutes(_ *router.Router) {}
 
 // RegisterMiddleware implements Component.
-func (c *TenantConfigComponent) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *TenantConfigComponent) RegisterMiddleware(_ *middleware.Chain) {}
 
 // Start implements Component.
 func (c *TenantConfigComponent) Start(ctx context.Context) error {

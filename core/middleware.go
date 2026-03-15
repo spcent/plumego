@@ -23,7 +23,7 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 		return err
 	}
 
-	reg := a.ensureMiddlewareRegistry()
+	reg := a.ensureMiddlewareChain()
 	reg.Use(middlewares...)
 	return nil
 }
@@ -81,16 +81,15 @@ func (a *App) applyGuardrails() {
 
 	if len(guards) > 0 {
 		// Hardening middleware should execute before user-specified middleware.
-		reg := a.ensureMiddlewareRegistry()
+		reg := a.ensureMiddlewareChain()
 		reg.Prepend(guards...)
 	}
 }
 
 // buildHandler builds the combined handler with current middleware stack.
 func (a *App) buildHandler() {
-	reg := a.ensureMiddlewareRegistry()
+	chain := a.ensureMiddlewareChain()
 	r := a.ensureRouter()
-	chain := middleware.NewChain(reg.Middlewares()...)
 	handler := chain.Apply(r)
 
 	a.mu.Lock()

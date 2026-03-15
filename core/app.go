@@ -27,7 +27,7 @@ type App struct {
 	// Core components (immutable after construction)
 	config        *AppConfig           // Application configuration
 	router        *router.Router       // HTTP router
-	middlewareReg *middleware.Registry // Middleware registry for all routes
+	middlewareReg *middleware.Chain    // Middleware chain for all routes
 	logger        log.StructuredLogger // Logger instance
 
 	// Runtime state (protected by mutex)
@@ -96,7 +96,7 @@ func New(options ...Option) *App {
 	app := &App{
 		config:        defaultConfig,
 		router:        router.NewRouter(),
-		middlewareReg: middleware.NewRegistry(),
+		middlewareReg: middleware.NewChain(),
 		logger:        log.NewGLogger(),
 	}
 

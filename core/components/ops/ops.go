@@ -159,7 +159,7 @@ func (c *Component) RegisterRoutes(r *router.Router) {
 	})
 }
 
-func (c *Component) RegisterMiddleware(_ *middleware.Registry) {}
+func (c *Component) RegisterMiddleware(_ *middleware.Chain) {}
 
 func (c *Component) Start(_ context.Context) error { return nil }
 

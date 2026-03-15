@@ -464,7 +464,7 @@ func TestMountComponents(t *testing.T) {
 	t.Run("mount with components", func(t *testing.T) {
 		app := New()
 		app.router = router.NewRouter()
-		app.middlewareReg = middleware.NewRegistry()
+		app.middlewareReg = middleware.NewChain()
 
 		// Add built-in components
 		app.components = []Component{
@@ -491,7 +491,7 @@ func TestMountComponents(t *testing.T) {
 	t.Run("mount with nil components", func(t *testing.T) {
 		app := New()
 		app.router = router.NewRouter()
-		app.middlewareReg = middleware.NewRegistry()
+		app.middlewareReg = middleware.NewChain()
 		app.components = []Component{nil, &stubComponent{path: "/test"}}
 
 		comps := app.mountComponents()

@@ -296,7 +296,7 @@ func (c *%sComponent) RegisterRoutes(r *router.Router) {
 }
 
 // RegisterMiddleware registers middleware for this component
-func (c *%sComponent) RegisterMiddleware(m *middleware.Registry) {
+func (c *%sComponent) RegisterMiddleware(m *middleware.Chain) {
 	// No middleware registered by default.
 }
 

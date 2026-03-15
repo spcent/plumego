@@ -453,10 +453,10 @@ type mockComponent struct {
 	BaseComponent
 }
 
-func (m *mockComponent) RegisterRoutes(r *router.Router)             {}
-func (m *mockComponent) RegisterMiddleware(reg *middleware.Registry) {}
-func (m *mockComponent) Start(ctx context.Context) error             { return nil }
-func (m *mockComponent) Stop(ctx context.Context) error              { return nil }
+func (m *mockComponent) RegisterRoutes(r *router.Router)          {}
+func (m *mockComponent) RegisterMiddleware(reg *middleware.Chain) {}
+func (m *mockComponent) Start(ctx context.Context) error          { return nil }
+func (m *mockComponent) Stop(ctx context.Context) error           { return nil }
 func (m *mockComponent) Health() (string, health.HealthStatus) {
 	return "mock", health.HealthStatus{Status: health.StatusHealthy}
 }
