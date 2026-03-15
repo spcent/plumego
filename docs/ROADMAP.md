@@ -251,336 +251,376 @@ See `docs/DEPRECATION.md` for the formal extension evolution policy.
 
 ---
 
-## Phase 7: CLI 完善与代码生成质量提升
+## Phase 7: CLI Code Generation Quality
 
-Status: planned
+Status: complete
 
 Goals:
 
-- 消除 `cmd/plumego generate` 生成代码中残留的 `// TODO` 占位符
-- 让脚手架生成的代码可以直接编译运行，而不只是提示用户还需要填写
-- 对齐 `plumego new` 各模板与 `reference/standard-service` 最新结构
+- eliminate bare `// TODO` placeholders from `cmd/plumego generate` output
+- make scaffold-generated code compile and run without manual editing
+- align `plumego new` templates with the current `reference/standard-service` structure
 
-背景：
+Background:
 
-当前 `cmd/plumego/internal/codegen` 和 `cmd/plumego/internal/scaffold` 在生成
-handler、repository、service 骨架时会输出 `// TODO: define service methods` 以及
-`json.Encode(CreateXResponse{ID: "TODO"})` 等占位内容。这会让初次使用者困惑并且
-无法直接运行。
+`cmd/plumego/internal/codegen` and `cmd/plumego/internal/scaffold` previously emitted
+`// TODO: define service methods` and stub values such as `ID: "TODO"` in generated
+handlers, repositories, and services. This confused first-time users and prevented
+generated projects from passing `go build ./...` without manual changes.
 
-Planned work:
+Completed work:
 
-- 将 handler 生成模板替换为可直接编译的最小实现（使用 `contract.WriteResponse` 返回 stub 响应）
-- 将 repository 生成模板替换为接口+内存实现骨架，而非空注释
-- 将 service 生成模板替换为带方法签名的可编译 stub
-- 为 `plumego new` 的 `fullstack` 和 `microservice` 模板补全缺失文件
-- 补充 `plumego generate` 的集成测试，确保每条代码生成路径产出可编译的 Go 文件
-- 对 `cmd/plumego` 命令行参数做更友好的错误提示
+- replaced handler generation templates with minimal compilable implementations; each
+  handler calls its injected service rather than returning stub values
+- replaced repository generation with an interface plus in-memory implementation skeleton
+- replaced service generation with method signatures that compile without editing
+- completed missing files for the `fullstack` and `microservice` scaffold templates
+- added focused tests in `codegen` and `scaffold` packages verifying that every generated
+  Go file parses cleanly and contains no bare `// TODO` lines
+- removed the `generate component` subcommand; `generate handler` is the single entry
+  point for generating handler files
 
 Non-goals:
 
-- 不改变生成代码的结构约定（仍遵循 canonical style）
-- 不引入模板引擎外部依赖
+- do not change the structural conventions of generated code (canonical style is preserved)
+- do not introduce external template-engine dependencies
 
-Exit criteria:
+Exit criteria met:
 
-- `plumego new <name>` 生成的任意模板都可直接 `go build ./...` 通过
-- `plumego generate handler <Name>` 生成的 handler 文件零编译错误
-- `plumego generate` 生成的文件不含裸 `// TODO: ...` 占位行
+- any template produced by `plumego new <name>` passes `go build ./...` without edits
+- `plumego generate handler <Name>` produces a handler file with zero compile errors
+- no generated file contains a bare `// TODO: ...` placeholder line
 
 ---
 
-## Phase 8: x/ai 扩展层稳定路径
+## Phase 8: x/ai Extension Stabilisation Path
 
 Status: planned
 
 Goals:
 
-- 明确 `x/ai` 各子包从实验性到稳定的升级路径
-- 收敛 AI provider 接口，覆盖当前已实现的 Claude 和 OpenAI 适配器
-- 补齐 orchestration、semanticcache、multimodal 的集成测试
+- define a clear promotion path for `x/ai` sub-packages from experimental to stable
+- converge the AI provider interface to cover the existing Claude and OpenAI adapters
+- fill integration-test gaps in `orchestration`, `semanticcache`, and `multimodal`
 
-背景：
+Background:
 
-`x/ai` 已经有相当深度的实现，包括：provider 抽象、Claude/OpenAI 适配器、
-orchestration 工作流、语义缓存（含向量存储）、多模态输入、SSE 流式输出、
-AI 专用限流与熔断、工具调用（tool use）框架。
-但整体仍标记为 experimental，且内部存在 `SPRINT2_ENHANCEMENTS.md` 等
-开发草稿文档，说明部分功能还在迭代中。
+`x/ai` already has substantial depth: provider abstraction, Claude and OpenAI adapters,
+multi-step orchestration workflows, semantic cache with vector storage, multimodal input,
+SSE streaming output, AI-specific rate limiting and circuit breaking, and a tool-use
+framework. The package is still marked experimental and contains internal development
+draft documents (e.g. `SPRINT2_ENHANCEMENTS.md`) indicating some features are still
+iterating.
 
 Planned work:
 
-- 确定 `x/ai` 内哪些子包可以升级为稳定 API（候选：`provider`、`session`、`streaming`、`tool`）
-- 确定哪些子包保持实验性（候选：`orchestration`、`semanticcache`、`marketplace`、`distributed`）
-- 清理内部开发草稿（如 `SPRINT2_ENHANCEMENTS.md`），将相关内容迁移到正式 doc 或 CHANGELOG
-- 为 `provider.Provider` 接口补充 mock 实现，供下游测试用例使用
-- 为 `orchestration.Workflow` 的多步 agent 场景补充集成测试
-- 为 `semanticcache` 补充离线向量检索和 cache hit/miss 的端到端测试
-- 在 `docs/modules/x-ai` 中明确各子包的稳定等级和使用建议
-- 将 `x/ai/marketplace` 的 provider 注册模式与 `x/ai/provider` 接口对齐
+- identify which `x/ai` sub-packages are candidates for stable API promotion
+  (candidates: `provider`, `session`, `streaming`, `tool`)
+- identify which sub-packages should remain experimental
+  (candidates: `orchestration`, `semanticcache`, `marketplace`, `distributed`)
+- remove internal development drafts such as `SPRINT2_ENHANCEMENTS.md`; migrate
+  relevant content to formal docs or CHANGELOG
+- add a mock implementation of `provider.Provider` for use in downstream tests
+- add integration tests for multi-step agent scenarios in `orchestration.Workflow`
+- add end-to-end tests for `semanticcache` covering offline vector retrieval and
+  cache hit/miss paths
+- document the stability tier of each sub-package in `docs/modules/x-ai`
+- align the provider registration pattern in `x/ai/marketplace` with the
+  `x/ai/provider` interface
 
 Non-goals:
 
-- 不将 `x/ai` 提升为稳定根包
-- 不在 `x/ai` 内部实现业务提示词（prompt flow）逻辑
-- 不依赖 `x/tenant` 或核心 bootstrap 层
+- do not promote `x/ai` to a stable root package
+- do not implement business-level prompt flow logic inside `x/ai`
+- do not introduce dependencies on `x/tenant` or the core bootstrap layer
 
 Exit criteria:
 
-- `x/ai/provider`、`x/ai/session`、`x/ai/streaming`、`x/ai/tool` 的公开接口在文档中
-  明确标注稳定等级
-- 无内部开发草稿文档遗留在包目录下
-- AI provider mock 可被下游测试直接引用
-- 所有测试在 `-race` 下通过
+- the public interfaces of `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, and
+  `x/ai/tool` have documented stability tiers
+- no internal development draft documents remain in package directories
+- the AI provider mock is directly usable by downstream test suites
+- all tests pass under `-race`
 
 ---
 
-## Phase 9: x/tenant 多租户稳定路径
+## Phase 9: x/tenant Multi-Tenancy Production Readiness
 
 Status: planned
 
 Goals:
 
-- 让 `x/tenant` 从实验性推进到可用于生产的参考实现
-- 提供生产级 JWT 租户 ID 校验（替代简单的 header 提取）
-- 为分布式场景提供租户配额的持久化存储适配器
+- advance `x/tenant` from experimental to a production-reference implementation
+- provide production-grade JWT-based tenant ID extraction (replacing simple header reads)
+- add a persistent distributed quota storage adapter for multi-instance deployments
 
-背景：
+Background:
 
-`x/tenant` 目前拥有完整的多租户中间件栈（resolve → ratelimit → quota → policy），
-但存在以下生产短板：
-1. 默认租户解析使用 header（`X-Tenant-ID`），未提供 JWT claim 提取路径
-2. 配额存储默认为内存实现（`InMemoryQuotaStore`），多实例部署下无法共享状态
-3. 租户配置数据库后端（`DBTenantConfigManager`）的 SQL schema 和迁移脚本
-   需要补全文档
-4. 租户隔离的数据库查询过滤（`TenantDB`）目前仅支持单表 `WHERE tenant_id = ?`，
-   尚不支持 JOIN 查询的透明注入
+`x/tenant` already has a complete multi-tenancy middleware stack
+(resolve → ratelimit → quota → policy), but has the following production gaps:
+- default tenant resolution reads `X-Tenant-ID` from a request header; no JWT claim
+  extraction path exists
+- quota storage defaults to an in-memory implementation (`InMemoryQuotaStore`) that
+  cannot share state across instances
+- the SQL schema and migration scripts for `DBTenantConfigManager` are undocumented
+- `TenantDB` query interception supports only single-table `WHERE tenant_id = ?`
+  and does not transparently inject tenant filtering into JOIN queries
 
 Planned work:
 
-- 在 `x/tenant/resolve` 中增加 JWT claim 提取方式的租户解析适配器
-- 在 `x/tenant/store` 中增加基于 Redis 的分布式配额存储适配器
-- 补全 `x/tenant/config` 的数据库 schema（SQL 迁移文件）到 `docs/migrations/`
-- 明确 `TenantDB` 的查询拦截范围限制，在文档中标注不支持的 SQL 模式
-- 为 `x/tenant` 补充端到端集成测试：配额耗尽 + retry-after header 验证
-- 在 `docs/architecture/X_TENANT_BLUEPRINT.md` 中增加生产部署建议章节
+- add a JWT claim extraction adapter in `x/tenant/resolve`
+- add a Redis-backed distributed quota storage adapter in `x/tenant/store`
+- publish the `x/tenant/config` database schema as SQL migration files under
+  `docs/migrations/`
+- document the query interception scope of `TenantDB` and explicitly note unsupported
+  SQL patterns in the package README
+- add end-to-end integration tests for `x/tenant` covering quota exhaustion and
+  `Retry-After` header validation
+- add a production deployment guidance section to
+  `docs/architecture/X_TENANT_BLUEPRINT.md`
 
 Non-goals:
 
-- 不在 `x/tenant` 内实现租户 CRUD 业务接口（属于各应用的 domain 层）
-- 不在稳定根包中引入任何租户感知代码
+- do not implement tenant CRUD business APIs inside `x/tenant`; that belongs to each
+  application's domain layer
+- do not introduce any tenant-aware code into stable root packages
 
 Exit criteria:
 
-- JWT 租户解析路径有完整示例和测试
-- Redis 配额存储适配器通过并发测试
-- `docs/migrations/` 包含租户相关 schema
-- `TenantDB` 的 SQL 支持范围在 README 中明确标注
+- the JWT tenant resolution path has a complete example and test coverage
+- the Redis quota storage adapter passes concurrent stress tests
+- `docs/migrations/` contains the tenant-related schema files
+- the supported SQL scope of `TenantDB` is documented in the package README
 
 ---
 
-## Phase 10: x/discovery 服务发现后端扩展
+## Phase 10: x/discovery Backend Expansion
 
 Status: planned
 
 Goals:
 
-- 实现 `x/discovery` 包注释中已标注为 "future" 的服务发现后端
-- 保持与 `x/gateway` 反向代理的显式集成路径
+- implement the service discovery backends annotated as "future" in `x/discovery`
+- keep the explicit integration path with the `x/gateway` reverse proxy
 
-背景：
+Background:
 
-`x/discovery` 目前只有两个后端实现：
-- `discovery.NewStatic(...)` — 静态配置
+`x/discovery` currently has two backend implementations:
+- `discovery.NewStatic(...)` — static configuration
 - `discovery.NewConsul(...)` — Consul
 
-包注释中已明确提到 Kubernetes 和 etcd 作为未来后端，但尚未实现。
-`x/gateway` 的反向代理依赖 `discovery.Provider` 接口，这是两者之间的唯一耦合点。
+Kubernetes and etcd are named as future backends in package comments but are not yet
+implemented. The `x/gateway` reverse proxy depends on the `discovery.Provider`
+interface, which is the only coupling point between the two packages.
 
 Planned work:
 
-- 实现 `x/discovery` Kubernetes 后端（基于 Endpoints API 或 EndpointSlices）
-- 实现 `x/discovery` etcd 后端（基于 etcd v3 client 接口 + 显式依赖注入）
-- 为两个新后端提供独立的集成测试（使用 Docker 或 test container）
-- 在 `docs/modules/x-discovery` 更新后端选择指南
-- 确保新后端的依赖通过显式构造函数注入，不引入全局 init 注册
+- implement a Kubernetes backend for `x/discovery` using the Endpoints API or
+  EndpointSlices
+- implement an etcd backend for `x/discovery` using the etcd v3 client interface
+  with explicit dependency injection
+- add independent integration tests for each new backend (using Docker or
+  test containers)
+- update the backend selection guide in `docs/modules/x-discovery`
+- ensure all new backend dependencies flow through explicit constructors; no global
+  `init`-style registration
 
 Non-goals:
 
-- 不实现 ZooKeeper 或其他注册中心后端（优先 k8s + etcd）
-- 不将 discovery 逻辑放入稳定根包
+- do not implement a ZooKeeper or other registry backend (Kubernetes and etcd are the
+  priority)
+- do not place discovery logic inside stable root packages
 
 Exit criteria:
 
-- Kubernetes 和 etcd 后端各有完整示例和 mock 测试
-- `x/discovery` 模块所有后端的接口契约一致
-- 与 `x/gateway` 的集成路径有 reference demo
+- the Kubernetes and etcd backends each have a complete example and mock-based tests
+- all `x/discovery` backends satisfy the same interface contract
+- the integration path with `x/gateway` has a reference demo
 
 ---
 
-## Phase 11: x/data 数据层稳定化
+## Phase 11: x/data Layer Stabilisation
 
 Status: planned
 
 Goals:
 
-- 明确 `x/data` 三个子包（`file`、`rw`、`sharding`）的稳定化优先级
-- 为读写分离（`rw`）和分片（`sharding`）提供清晰的生产使用说明
-- 收敛 `x/fileapi` 在扩展层分类中的位置
+- clarify the stabilisation priority of the three `x/data` sub-packages
+  (`file`, `rw`, `sharding`)
+- provide clear production usage guidance for the read/write split (`rw`) and
+  sharding (`sharding`) adapters
+- register `x/fileapi` in the extension taxonomy
 
-背景：
+Background:
 
-`x/data` 包含：
-- `x/data/file`：租户感知文件存储实现
-- `x/data/rw`：读写分离 DB 适配器
-- `x/data/sharding`：分片路由（支持 JSON 配置的 cluster + 负载均衡策略）
+`x/data` contains:
+- `x/data/file`: tenant-aware file storage implementation
+- `x/data/rw`: read/write split database adapter
+- `x/data/sharding`: shard routing with JSON-configured cluster and load balancing
 
-`x/fileapi` 是独立的 HTTP 文件上传/下载 handler，目前未出现在
-`docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` 或 `specs/repo.yaml` 的扩展包清单中，
-属于架构孤儿。
+`x/fileapi` is a standalone HTTP file upload/download handler that currently does not
+appear in `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` or the extension paths in
+`specs/repo.yaml`, making it an architectural orphan.
 
 Planned work:
 
-- 将 `x/fileapi` 添加到 `specs/repo.yaml` 的 `extension.paths` 清单
-- 将 `x/fileapi` 添加到 `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-- 明确 `x/data/rw` 的使用场景和限制（只读副本 lag 处理、failover 策略）
-- 补充 `x/data/sharding` 的分片策略文档和配置示例
-- 确认 `x/data` 和 `x/fileapi` 模块不依赖稳定根包之外的内容
-- 为 `x/fileapi` 补充端到端 handler 测试（multipart upload + tenant context）
+- add `x/fileapi` to the `extension.paths` list in `specs/repo.yaml`
+- add `x/fileapi` to `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+- document the usage scope and limitations of `x/data/rw` (read-replica lag
+  handling, failover strategy)
+- add sharding strategy documentation and configuration examples for
+  `x/data/sharding`
+- verify that `x/data` and `x/fileapi` do not depend on anything outside the stable
+  root packages
+- add end-to-end handler tests for `x/fileapi` covering multipart upload, download,
+  and tenant isolation
 
 Non-goals:
 
-- 不将 `x/data` 提升为稳定根包
-- 不在 `x/data` 中实现业务级数据访问层
+- do not promote `x/data` to a stable root package
+- do not implement business-level data access logic inside `x/data`
 
 Exit criteria:
 
-- `x/fileapi` 出现在架构蓝图和 specs 清单中
-- `x/data/rw` 和 `x/data/sharding` 各有使用说明文档
-- `x/fileapi` 的 handler 测试覆盖上传、下载、租户隔离三条主路径
+- `x/fileapi` appears in the architecture blueprint and the `specs/repo.yaml`
+  extension list
+- `x/data/rw` and `x/data/sharding` each have usage documentation
+- `x/fileapi` handler tests cover upload, download, and tenant isolation paths
 
 ---
 
-## Phase 12: x/observability 与 x/gateway 测试覆盖加固
+## Phase 12: x/observability and x/gateway Test Coverage
 
 Status: planned
 
 Goals:
 
-- 将 `x/observability` 和 `x/gateway` 的测试覆盖从当前最小水平提升到功能级覆盖
-- 保持 `x/gateway` 的熔断、负载均衡和缓存行为有显式测试保护
+- raise `x/observability` and `x/gateway` test coverage from minimal to
+  feature-level
+- ensure `x/gateway` circuit breaking, load balancing, and caching behaviour are
+  protected by explicit tests
 
-背景：
+Background:
 
-当前测试数量：
-- `x/observability`：1 个测试文件（仅基础 config 覆盖）
-- `x/gateway`：4 个测试文件（主要覆盖路由和代理转发）
+Current test file counts:
+- `x/observability`: 1 test file (basic config coverage only)
+- `x/gateway`: 4 test files (primarily routing and proxy forwarding)
 
-`x/gateway` 含有 `cache`、`protocol`、`protocolmw` 等子包，但测试主要集中在主包级别；
-`x/observability` 的 Prometheus + OpenTelemetry 集成路径几乎没有测试。
+`x/gateway` has sub-packages `cache`, `protocol`, and `protocolmw` whose behaviour
+is mostly untested at the sub-package level. The Prometheus and OpenTelemetry
+integration paths in `x/observability` have almost no test coverage.
 
 Planned work:
 
-- 为 `x/observability` 添加 Prometheus 指标注册和导出路径的测试
-- 为 `x/observability` 添加 OpenTelemetry tracer hook 的 span 属性测试
-- 为 `x/gateway/cache` 添加缓存命中/未命中/失效的独立测试
-- 为 `x/gateway` 负载均衡策略（round-robin、weighted）添加分发均匀性测试
-- 为 `x/gateway` 的熔断（circuit breaker）添加开路/半开路状态转换测试
-- 为 `x/gateway` 的 TLS 透传和协议适配器补充配置级测试
+- add tests for Prometheus metric registration and export paths in `x/observability`
+- add span attribute tests for the OpenTelemetry tracer hook in `x/observability`
+- add independent tests for cache hit, miss, and eviction in `x/gateway/cache`
+- add distribution uniformity tests for round-robin and weighted load balancing in
+  `x/gateway`
+- add open/half-open state transition tests for the circuit breaker in `x/gateway`
+- add configuration-level tests for TLS passthrough and protocol adapters in
+  `x/gateway`
 
 Non-goals:
 
-- 不引入外部服务依赖（所有测试用 httptest 或 mock）
-- 不更改已稳定的 public API
+- do not introduce external service dependencies; all tests use `httptest` or mocks
+- do not change any stable public API
 
 Exit criteria:
 
-- `x/observability` 测试文件数量 ≥ 4，覆盖 metrics + tracing 两条路径
-- `x/gateway` 负载均衡和熔断行为均有显式测试
-- 所有新增测试在 `-race` 下通过
+- `x/observability` has at least 4 test files covering both metrics and tracing paths
+- load balancing and circuit breaking behaviour in `x/gateway` each have explicit tests
+- all new tests pass under `-race`
 
 ---
 
-## Phase 13: 开发者体验与文档体系完善
+## Phase 13: Developer Experience and Documentation Sync
 
 Status: planned
 
 Goals:
 
-- 让新用户可以在 15 分钟内从 `plumego new` 到第一个可运行的服务
-- 让 README_CN.md 与 README.md 内容保持同步
-- 补全 `x/ai`、`x/data`、`x/tenant` 的实用示例
+- let a new user go from `plumego new` to a running service without reading broad prose
+- keep `README_CN.md` content synchronized with `README.md`
+- add runnable minimal examples for `x/ai`, `x/data`, and `x/tenant`
 
-背景：
+Background:
 
-- `README_CN.md` 存在内容落后于 `README.md` 的风险，特别是在 Phase 5（脚手架）
-  和 Phase 6（v1 API 冻结）完成之后
-- `x/ai` 虽有大量功能，但缺少一个端到端可运行的最小示例（query one LLM and print response）
-- `examples/multi-tenant-saas/` 在 README.md 中被引用，但实际路径位于 `reference/` 下，
-  路径引用需要修正
+- `README_CN.md` risks falling behind `README.md` now that the scaffold (Phase 5) and
+  v1 API freeze (Phase 6) work is complete
+- `x/ai` has substantial functionality but lacks a single end-to-end runnable minimal
+  example (query one provider and print the response)
+- `README.md` references `examples/multi-tenant-saas/` but the actual path is under
+  `reference/`; the link needs correcting
 
 Planned work:
 
-- 同步 `README_CN.md` 的以下章节至与 `README.md` 一致：
-  - Agent-First Workflow
-  - v1 Support Matrix
-  - Development Server with Dashboard
-  - 配置参考表（Configuration Reference）
-- 在 `reference/` 下添加 `with-ai` demo：单 provider 完成一次 chat completion 请求
-- 修正 README.md 中 `examples/multi-tenant-saas/` 的路径引用
-- 在 `docs/modules/x-ai` 中补充子包选择指南（何时用 provider，何时用 orchestration）
-- 确认 `env.example` 包含 AI provider 相关变量（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`）
+- synchronize the following sections of `README_CN.md` with `README.md`:
+  Agent-First Workflow, v1 Support Matrix, Development Server with Dashboard,
+  Configuration Reference table
+- add a `reference/with-ai` demo: a single provider completing one chat completion
+  request using a mock backend
+- correct the `examples/multi-tenant-saas/` path reference in `README.md`
+- add a sub-package selection guide to `docs/modules/x-ai` explaining when to use
+  `provider` versus `orchestration`
+- confirm that `env.example` contains all AI provider environment variables
+  (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`)
 
 Non-goals:
 
-- 不在 reference 示例中引入网络依赖（AI provider 调用可用 mock）
-- 不修改 `README.md` 的整体结构
+- do not introduce live network dependencies in reference examples; AI provider calls
+  use a mock
+- do not change the overall structure of `README.md`
 
 Exit criteria:
 
-- `README_CN.md` 在所有章节上与 `README.md` 一致（内容等价，语言不同）
-- `env.example` 包含所有 x/* 扩展需要的环境变量
-- `reference/with-ai` demo 存在且 `go run .` 可执行（使用 mock provider）
-- README.md 中所有 `examples/` 路径引用指向实际存在的目录
+- `README_CN.md` is content-equivalent to `README.md` across all sections
+- `env.example` covers all environment variables required by `x/*` extensions
+- `reference/with-ai` exists and `go run .` succeeds using a mock provider
+- all `examples/` path references in `README.md` point to directories that exist
 
 ---
 
-## Phase 14: 扩展层 API 冻结候选评估
+## Phase 14: Extension Layer API Freeze Candidate Evaluation
 
-Status: planned（依赖 Phase 7–13 完成）
+Status: planned (depends on Phases 7–13)
 
 Goals:
 
-- 对使用量最高的 `x/*` 包进行稳定性评估
-- 确定哪些 `x/*` 包可以在 v2 版本中升级为 GA
-- 更新 `docs/DEPRECATION.md` 覆盖扩展层的稳定化流程
+- evaluate the stability of the highest-usage `x/*` packages
+- determine which `x/*` packages can be promoted to GA in a future major version
+- update `docs/DEPRECATION.md` to cover the extension layer promotion process
 
-背景：
+Background:
 
-当前所有 `x/*` 包均为 `status: experimental`，不提供兼容性保证。
-随着 `x/tenant`、`x/rest`、`x/ai` 等包逐渐成熟，需要建立一个正式的评估和
-晋级机制，而不是永久维持在 experimental 状态。
+All `x/*` packages are currently `status: experimental` with no compatibility
+guarantee. As `x/tenant`, `x/rest`, `x/ai`, and related packages mature, a formal
+evaluation and promotion mechanism is needed rather than keeping everything permanently
+experimental.
 
 Planned work:
 
-- 定义 `x/*` 包从 experimental → stable-candidate → GA 的三段式晋级标准：
-  - experimental：API 可能变更，无兼容性保证
-  - stable-candidate：API 冻结期 ≥ 2 个小版本，无重大变更，测试覆盖完整
-  - GA：进入主版本兼容性承诺范围
-- 更新每个扩展包的 `module.yaml` 增加 `stability_track` 字段
-- 对以下候选包进行首轮评估：`x/rest`、`x/websocket`、`x/webhook`、`x/scheduler`
-- 更新 `docs/DEPRECATION.md` 加入扩展层晋级章节
+- define a three-stage promotion standard for `x/*` packages:
+  - experimental: API may change, no compatibility guarantee
+  - stable-candidate: API frozen for at least 2 minor releases, no breaking changes,
+    full test coverage
+  - GA: enters the major-version compatibility commitment
+- add a `stability_track` field to each extension package's `module.yaml`
+- run a first-round evaluation of: `x/rest`, `x/websocket`, `x/webhook`,
+  `x/scheduler`
+- add an extension layer promotion section to `docs/DEPRECATION.md`
 
 Non-goals:
 
-- 不在此阶段实际提升任何包的兼容性等级（仅完成评估框架）
-- 不修改稳定根包的现有兼容性承诺
+- do not actually promote any package's compatibility level in this phase; only
+  complete the evaluation framework
+- do not modify the existing compatibility commitment for stable root packages
 
 Exit criteria:
 
-- 晋级标准文档存在并通过 agent 可发现
-- 每个候选包的 `module.yaml` 记录了当前稳定轨迹
-- `docs/DEPRECATION.md` 的扩展层章节内容完整
+- the promotion standard document exists and is agent-discoverable
+- each candidate package's `module.yaml` records its current stability track
+- the extension layer section of `docs/DEPRECATION.md` is complete
 
 ---
 
