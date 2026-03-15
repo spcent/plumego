@@ -149,17 +149,17 @@ Goals:
 - move topology-heavy or feature-heavy logic out of stable packages
 - align package placement with the architecture blueprint
 
-Planned work:
+Completed work:
 
-- review `store/cache/distributed` and `store/cache/redis` placement against target stable-root rules
+- migrated `store/cache/distributed` → `x/cache/distributed` (consistent-hashing distributed cache)
+- migrated `store/cache/redis` → `x/cache/redis` (Redis adapter)
+- `store/cache` now contains only abstract types, interfaces, and in-memory implementations
+
+Remaining work:
+
 - continue checking for observability or protocol catch-all behavior in stable roots
 - ensure transport health handlers remain outside `health`
 - keep tenant-aware behavior out of stable `middleware` and `store`
-
-Current audit focus:
-
-- `store/cache/distributed` and `store/cache/redis` remain the clearest stable-store migration debt
-- they should be maintained for now, but they should not define the template for new stable-store additions
 
 Execution approach:
 

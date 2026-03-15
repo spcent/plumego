@@ -145,6 +145,23 @@ modules:
       - store/idempotency/**
       - store/kv/**
 
+  x/cache:
+    path: x/cache
+    layer: extension
+    allow:
+      - stdlib
+      - store/cache
+      - contract
+      - log
+      - metrics
+    deny:
+      - core/**
+      - middleware/**
+      - x/tenant/**
+      - x/ai/**
+      - reference/**
+      - cmd/**
+
   x/tenant:
     path: x/tenant
     layer: extension
@@ -177,3 +194,4 @@ special_rules:
     - Protocol gateway families belong in their owning extension package, not in contract
     - Health HTTP endpoint ownership belongs outside health
     - High-level data topology belongs in x/data or x/tenant, not in the stable store layer
+    - Topology-heavy and provider-specific cache implementations belong in x/cache, not stable store/cache
