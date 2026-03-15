@@ -254,7 +254,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 			handler = result.Handler
 		} else {
 			chain := middleware.NewChain(combined...)
-			handler = chain.Apply(result.Handler)
+			handler = chain.Build(result.Handler)
 			result.storeCached(version, handler)
 		}
 	}

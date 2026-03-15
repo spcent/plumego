@@ -45,14 +45,14 @@ func (a *App) ensureRouter() *router.Router {
 	return r
 }
 
-func (a *App) ensureMiddlewareRegistry() *middleware.Registry {
+func (a *App) ensureMiddlewareChain() *middleware.Chain {
 	a.mu.Lock()
-	if a.middlewareReg == nil {
-		a.middlewareReg = middleware.NewRegistry()
+	if a.middlewareChain == nil {
+		a.middlewareChain = middleware.NewChain()
 	}
-	reg := a.middlewareReg
+	chain := a.middlewareChain
 	a.mu.Unlock()
-	return reg
+	return chain
 }
 
 func (a *App) configSnapshot() AppConfig {

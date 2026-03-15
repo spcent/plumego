@@ -6,111 +6,125 @@ import (
 	"testing"
 )
 
-func TestApply(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+// trace records the execution order of middleware and handler labels.
+type trace []string
 
-	mw := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Apply", "true")
-			next.ServeHTTP(w, r)
-		})
+func (t *trace) mark(label string) {
+	*t = append(*t, label)
+}
+
+func (t trace) assertEqual(tb testing.TB, want ...string) {
+	tb.Helper()
+	if len(t) != len(want) {
+		tb.Fatalf("trace length mismatch: got %v, want %v", []string(t), want)
 	}
-
-	wrapped := Apply(handler, mw)
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
-
-	if rr.Header().Get("X-Apply") != "true" {
-		t.Error("expected X-Apply header to be set")
+	for i := range want {
+		if t[i] != want[i] {
+			tb.Fatalf("trace[%d]: got %q, want %q (full trace: %v)", i, t[i], want[i], []string(t))
+		}
 	}
 }
 
-func TestApplyMultipleOrder(t *testing.T) {
-	var order []string
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mw1 := func(next http.Handler) http.Handler {
+// tracer returns a Middleware that appends label to tr before calling next.
+func tracer(tr *trace, label string) Middleware {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "mw1")
+			tr.mark(label)
 			next.ServeHTTP(w, r)
 		})
-	}
-
-	mw2 := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "mw2")
-			next.ServeHTTP(w, r)
-		})
-	}
-
-	wrapped := Apply(handler, mw1, mw2)
-	req := httptest.NewRequest("GET", "/test", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
-
-	expected := []string{"mw1", "mw2", "handler"}
-	if !equalStringSlice(order, expected) {
-		t.Fatalf("expected order %v, got %v", expected, order)
 	}
 }
 
-func TestApplyWithoutMiddlewareKeepsHandlerSemantics(t *testing.T) {
+// tracingHandler returns an http.Handler that appends label to tr.
+func tracingHandler(tr *trace, label string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tr.mark(label)
+	})
+}
+
+func serve(h http.Handler) {
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+}
+
+// TestApplySingleMiddleware verifies that Apply wraps the handler with one middleware.
+func TestApplySingleMiddleware(t *testing.T) {
+	var tr trace
+	h := Apply(tracingHandler(&tr, "handler"), tracer(&tr, "mw"))
+	serve(h)
+	tr.assertEqual(t, "mw", "handler")
+}
+
+// TestApplyRegistrationEqualsExecutionOrder verifies that Apply(h, A, B, C)
+// produces execution order A → B → C → handler.
+func TestApplyRegistrationEqualsExecutionOrder(t *testing.T) {
+	var tr trace
+	h := Apply(tracingHandler(&tr, "handler"),
+		tracer(&tr, "A"),
+		tracer(&tr, "B"),
+		tracer(&tr, "C"),
+	)
+	serve(h)
+	tr.assertEqual(t, "A", "B", "C", "handler")
+}
+
+// TestApplyWithoutMiddlewarePassesThrough verifies that Apply with no
+// middleware delegates directly to the handler.
+func TestApplyWithoutMiddlewarePassesThrough(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
-
-	wrapped := Apply(handler)
 	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
-
+	Apply(handler).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rr.Code)
 	}
 }
 
-func TestChainUseAfterConstruction(t *testing.T) {
-	var order []string
-
-	mw := func(name string) Middleware {
-		return func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				order = append(order, name)
-				next.ServeHTTP(w, r)
-			})
-		}
-	}
-
-	chain := NewChain(mw("a"))
-	chain.Use(mw("b"))
-	chain.Use(mw("c"))
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-	})
-
-	req := httptest.NewRequest("GET", "/", nil)
-	chain.Apply(handler).ServeHTTP(httptest.NewRecorder(), req)
-
-	expected := []string{"a", "b", "c", "handler"}
-	if !equalStringSlice(order, expected) {
-		t.Fatalf("expected %v, got %v", expected, order)
-	}
+// TestChainNewChainRegistrationEqualsExecutionOrder verifies that NewChain(A, B, C)
+// produces execution order A → B → C → handler.
+func TestChainNewChainRegistrationEqualsExecutionOrder(t *testing.T) {
+	var tr trace
+	chain := NewChain(
+		tracer(&tr, "A"),
+		tracer(&tr, "B"),
+		tracer(&tr, "C"),
+	)
+	serve(chain.Build(tracingHandler(&tr, "handler")))
+	tr.assertEqual(t, "A", "B", "C", "handler")
 }
 
+// TestChainUseAppendsInRegistrationOrder verifies that successive Use calls
+// append middleware that execute after previously registered middleware.
+func TestChainUseAppendsInRegistrationOrder(t *testing.T) {
+	var tr trace
+	chain := NewChain(tracer(&tr, "A"))
+	chain.Use(tracer(&tr, "B"))
+	chain.Use(tracer(&tr, "C"))
+	serve(chain.Build(tracingHandler(&tr, "handler")))
+	tr.assertEqual(t, "A", "B", "C", "handler")
+}
+
+// TestChainBuildIsImmutableSnapshot verifies that calling Use after Build
+// does not affect the already-built handler.
+func TestChainBuildIsImmutableSnapshot(t *testing.T) {
+	var tr trace
+	chain := NewChain(tracer(&tr, "A"))
+	h := chain.Build(tracingHandler(&tr, "handler"))
+
+	// Add B after snapshot is taken.
+	chain.Use(tracer(&tr, "B"))
+
+	serve(h)
+	// B must not appear: the snapshot was taken before Use("B").
+	tr.assertEqual(t, "A", "handler")
+}
+
+// TestChainLen verifies Len reflects the number of registered middlewares.
 func TestChainLen(t *testing.T) {
 	chain := NewChain()
 	if chain.Len() != 0 {
 		t.Fatalf("expected 0, got %d", chain.Len())
 	}
-
 	noop := func(next http.Handler) http.Handler { return next }
 	chain.Use(noop).Use(noop).Use(noop)
 	if chain.Len() != 3 {
@@ -118,66 +132,18 @@ func TestChainLen(t *testing.T) {
 	}
 }
 
-func TestRegistryLen(t *testing.T) {
-	reg := NewRegistry()
-	if reg.Len() != 0 {
-		t.Fatalf("expected 0, got %d", reg.Len())
-	}
-
-	noop := func(next http.Handler) http.Handler { return next }
-	reg.Use(noop, noop)
-	if reg.Len() != 2 {
-		t.Fatalf("expected 2, got %d", reg.Len())
-	}
-
-	reg.Prepend(noop)
-	if reg.Len() != 3 {
-		t.Fatalf("expected 3, got %d", reg.Len())
+// TestChainBuildTwiceProducesIdenticalOrder verifies that calling Build
+// multiple times on the same chain produces the same execution order.
+func TestChainBuildTwiceProducesIdenticalOrder(t *testing.T) {
+	for range 3 {
+		var tr trace
+		chain := NewChain(tracer(&tr, "A"), tracer(&tr, "B"))
+		serve(chain.Build(tracingHandler(&tr, "handler")))
+		tr.assertEqual(t, "A", "B", "handler")
 	}
 }
 
-func TestRegistryNilSafety(t *testing.T) {
-	var reg *Registry
-	reg.Use(func(next http.Handler) http.Handler { return next })
-	reg.Prepend(func(next http.Handler) http.Handler { return next })
-	if reg.Len() != 0 {
-		t.Fatal("nil registry Len should be 0")
-	}
-	if reg.Middlewares() != nil {
-		t.Fatal("nil registry Middlewares should be nil")
-	}
-}
-
-func TestRegistryPrependOrder(t *testing.T) {
-	var order []string
-
-	mw := func(name string) Middleware {
-		return func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				order = append(order, name)
-				next.ServeHTTP(w, r)
-			})
-		}
-	}
-
-	reg := NewRegistry()
-	reg.Use(mw("b"))
-	reg.Use(mw("c"))
-	reg.Prepend(mw("a"))
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-	})
-
-	chain := NewChain(reg.Middlewares()...)
-	req := httptest.NewRequest("GET", "/", nil)
-	chain.Apply(handler).ServeHTTP(httptest.NewRecorder(), req)
-
-	expected := []string{"a", "b", "c", "handler"}
-	if !equalStringSlice(order, expected) {
-		t.Fatalf("expected %v, got %v", expected, order)
-	}
-}
+// Benchmarks
 
 func noopMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -187,7 +153,7 @@ func noopMiddleware(next http.Handler) http.Handler {
 
 var benchHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
-func BenchmarkChainApply(b *testing.B) {
+func BenchmarkChainBuild(b *testing.B) {
 	sizes := []int{1, 5, 10, 20}
 	for _, n := range sizes {
 		mws := make([]Middleware, n)
@@ -197,7 +163,7 @@ func BenchmarkChainApply(b *testing.B) {
 		b.Run(benchName(n), func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				NewChain(mws...).Apply(benchHandler)
+				NewChain(mws...).Build(benchHandler)
 			}
 		})
 	}
@@ -211,23 +177,13 @@ func BenchmarkChainServeHTTP(b *testing.B) {
 		for i := range mws {
 			mws[i] = noopMiddleware
 		}
-		handler := NewChain(mws...).Apply(benchHandler)
+		handler := NewChain(mws...).Build(benchHandler)
 		b.Run(benchName(n), func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
 				handler.ServeHTTP(httptest.NewRecorder(), req)
 			}
 		})
-	}
-}
-
-func BenchmarkRegistryUse(b *testing.B) {
-	b.ReportAllocs()
-	for b.Loop() {
-		reg := NewRegistry()
-		for range 10 {
-			reg.Use(noopMiddleware)
-		}
 	}
 }
 
@@ -244,16 +200,4 @@ func benchName(n int) string {
 	default:
 		return "Nmw"
 	}
-}
-
-func equalStringSlice(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
