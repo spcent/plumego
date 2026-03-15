@@ -45,6 +45,7 @@ func Execute(info BuildInfo) error {
 	root.Register(&TestCmd{})
 	root.Register(&BuildCmd{})
 	root.Register(&InspectCmd{})
+	root.Register(&ServeCmd{})
 	root.Register(&VersionCmd{
 		Version:   info.Version,
 		GitCommit: info.GitCommit,
@@ -170,6 +171,7 @@ Available Commands:
   test        Enhanced test running
   build       Build application
   inspect     Inspect running application
+  serve       Start static file server
   version     Show version information
 
 Use "plumego <command> --help" for more information about a command.
@@ -180,6 +182,8 @@ Examples:
   plumego dev --addr :3000
   plumego routes --format json
   plumego check --security
+  plumego serve
+  plumego serve ./public --addr :3000
 
 Documentation:
   https://github.com/spcent/plumego/tree/main/docs
