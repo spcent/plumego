@@ -16,10 +16,10 @@ import (
 // App represents the main application instance.
 type App struct {
 	// Core components (immutable after construction)
-	config        *AppConfig           // Application configuration
-	router        *router.Router       // HTTP router
-	middlewareReg *middleware.Registry // Middleware registry for all routes
-	logger        log.StructuredLogger // Logger instance
+	config          *AppConfig           // Application configuration
+	router          *router.Router       // HTTP router
+	middlewareChain *middleware.Chain    // Middleware pipeline for all routes
+	logger          log.StructuredLogger // Logger instance
 
 	// Runtime state (protected by mutex)
 	mu             sync.RWMutex
@@ -60,10 +60,10 @@ func New(options ...Option) *App {
 	}
 
 	app := &App{
-		config:        defaultConfig,
-		router:        router.NewRouter(),
-		middlewareReg: middleware.NewRegistry(),
-		logger:        log.NewNoOpLogger(),
+		config:          defaultConfig,
+		router:          router.NewRouter(),
+		middlewareChain: middleware.NewChain(),
+		logger:          log.NewNoOpLogger(),
 	}
 
 	for _, opt := range options {

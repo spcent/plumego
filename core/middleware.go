@@ -10,16 +10,18 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 		return err
 	}
 
-	reg := a.ensureMiddlewareRegistry()
-	reg.Use(middlewares...)
+	chain := a.ensureMiddlewareChain()
+	for _, mw := range middlewares {
+		chain.Use(mw)
+	}
 	return nil
 }
 
 // buildHandler builds the combined handler with current middleware stack.
 func (a *App) buildHandler() {
-	reg := a.ensureMiddlewareRegistry()
+	chain := a.ensureMiddlewareChain()
 	r := a.ensureRouter()
-	handler := middleware.Apply(r, reg.Middlewares()...)
+	handler := chain.Build(r)
 
 	a.mu.Lock()
 	a.handler = handler

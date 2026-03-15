@@ -61,11 +61,11 @@ func (a *App) ConfigSnapshot() map[string]any {
 
 // MiddlewareNames returns the registered middleware type names.
 func (a *App) MiddlewareNames() []string {
-	if a == nil || a.middlewareReg == nil {
+	if a == nil || a.middlewareChain == nil {
 		return nil
 	}
 
-	middlewares := a.middlewareReg.Middlewares()
+	middlewares := a.middlewareChain.Snapshot()
 	list := make([]string, 0, len(middlewares))
 	for _, mw := range middlewares {
 		name := fmt.Sprintf("%T", mw)
