@@ -143,11 +143,14 @@ func getTemplateContent(file, name, module, template string) string {
 	case "README.md":
 		return getReadmeContent(name, template)
 	default:
-		return getDefaultFileContent(file)
+		return getDefaultFileContent(file, name, module)
 	}
 }
 
-func getDefaultFileContent(file string) string {
+func getDefaultFileContent(file, name, module string) string {
+	if module == "" {
+		module = "example.com/app"
+	}
 	switch filepath.Base(file) {
 	case "app.go":
 		return `package httpapp
@@ -190,18 +193,30 @@ func ListenAndServe(app *core.App) error {
 }
 `
 	case "routes.go":
-		return `package httpapp
+		return fmt.Sprintf(`package httpapp
 
 import (
 	"github.com/spcent/plumego/core"
 
-	"internal/httpapp/handlers"
+	userdom "%s/internal/domain/user"
+	"%s/internal/httpapp/handlers"
 )
 
+// registerRoutes wires all HTTP routes with explicit handler construction.
 func registerRoutes(app *core.App) {
 	app.Get("/healthz", handlers.Health)
+
+	// Wire user domain: repository → service → handler.
+	userRepo := userdom.NewMemRepository()
+	userSvc := userdom.NewService(userRepo)
+	userH := handlers.UserHandler{Service: userSvc}
+
+	api := app.Router().Group("/api/v1")
+	api.Get("/users", userH.List)
+	api.Get("/users/:id", userH.Get)
+	api.Post("/users", userH.Create)
 }
-`
+`, module, module)
 	case "health.go":
 		return `package handlers
 
@@ -209,72 +224,217 @@ import (
 	"net/http"
 )
 
+// Health responds with a simple JSON liveness check.
 func Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(` + "`" + `{"status":"ok"}` + "`" + `))
 }
 `
+	case "api.go":
+		return fmt.Sprintf(`package handlers
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/spcent/plumego/contract"
+)
+
+// APIHandler handles general API endpoints.
+type APIHandler struct{}
+
+// Hello responds with service metadata.
+func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
+	resp := map[string]any{
+		"message":   "hello from %s",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := contract.WriteResponse(w, r, http.StatusOK, resp, nil); err != nil {
+		http.Error(w, "encoding error", http.StatusInternalServerError)
+	}
+}
+`, name)
 	case "user.go":
-		return `package handlers
+		return fmt.Sprintf(`package handlers
 
 import (
 	"encoding/json"
 	"net/http"
+
+	userdom %q
 )
 
+// UserHandler handles HTTP requests for the user domain.
 type UserHandler struct {
-	Service UserService
+	Service userdom.Service
 }
 
-type UserService interface {
-	// TODO: define service methods
+type createUserRequest struct {
+	Name  string `+"`json:\"name\"`"+`
+	Email string `+"`json:\"email\"`"+`
 }
 
-type CreateUserRequest struct {
-	Name  string ` + "`" + `json:"name"` + "`" + `
-	Email string ` + "`" + `json:"email"` + "`" + `
+// List handles GET /api/v1/users
+func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
+	users, err := h.Service.List(r.Context())
+	if err != nil {
+		http.Error(w, "failed to list users", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(users)
 }
 
-type CreateUserResponse struct {
-	ID string ` + "`" + `json:"id"` + "`" + `
+// Get handles GET /api/v1/users/:id
+func (h UserHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	u, err := h.Service.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(u)
 }
 
+// Create handles POST /api/v1/users
 func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req CreateUserRequest
+	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-
-	// TODO: call h.Service
+	u, err := h.Service.Create(r.Context(), req.Name, req.Email)
+	if err != nil {
+		http.Error(w, "failed to create user", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(CreateUserResponse{ID: "TODO"})
+	_ = json.NewEncoder(w).Encode(u)
 }
-`
+`, module+"/internal/domain/user")
 	case "service.go":
 		return `package user
 
-// Service defines the user domain operations.
+import "context"
+
+// Service defines the domain operations for users.
 type Service interface {
-	// TODO: define service methods
+	Create(ctx context.Context, name, email string) (*User, error)
+	GetByID(ctx context.Context, id string) (*User, error)
+	List(ctx context.Context) ([]*User, error)
 }
 
-type service struct{}
+type service struct {
+	repo Repository
+}
 
-// NewService constructs a new user Service.
-func NewService() Service {
-	return &service{}
+// NewService constructs a Service backed by repo.
+func NewService(repo Repository) Service {
+	return &service{repo: repo}
+}
+
+func (s *service) Create(ctx context.Context, name, email string) (*User, error) {
+	return s.repo.Insert(ctx, name, email)
+}
+
+func (s *service) GetByID(ctx context.Context, id string) (*User, error) {
+	return s.repo.FindByID(ctx, id)
+}
+
+func (s *service) List(ctx context.Context) ([]*User, error) {
+	return s.repo.FindAll(ctx)
 }
 `
 	case "repository.go":
 		return `package user
 
-// Repository defines the user persistence operations.
-type Repository interface {
-	// TODO: define repository methods
+import (
+	"context"
+	"fmt"
+	"sync"
+)
+
+// User represents a user entity.
+type User struct {
+	ID    string ` + "`json:\"id\"`" + `
+	Name  string ` + "`json:\"name\"`" + `
+	Email string ` + "`json:\"email\"`" + `
 }
+
+// Repository defines persistence operations for users.
+type Repository interface {
+	Insert(ctx context.Context, name, email string) (*User, error)
+	FindByID(ctx context.Context, id string) (*User, error)
+	FindAll(ctx context.Context) ([]*User, error)
+}
+
+type memRepository struct {
+	mu    sync.Mutex
+	items map[string]*User
+	seq   int
+}
+
+// NewMemRepository returns an in-memory Repository implementation.
+func NewMemRepository() Repository {
+	return &memRepository{items: make(map[string]*User)}
+}
+
+func (r *memRepository) Insert(_ context.Context, name, email string) (*User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.seq++
+	u := &User{ID: fmt.Sprintf("%d", r.seq), Name: name, Email: email}
+	r.items[u.ID] = u
+	return u, nil
+}
+
+func (r *memRepository) FindByID(_ context.Context, id string) (*User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	u, ok := r.items[id]
+	if !ok {
+		return nil, fmt.Errorf("user not found: %s", id)
+	}
+	return u, nil
+}
+
+func (r *memRepository) FindAll(_ context.Context) ([]*User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]*User, 0, len(r.items))
+	for _, u := range r.items {
+		out = append(out, u)
+	}
+	return out, nil
+}
+`
+	case "metrics.go":
+		return `package handlers
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/spcent/plumego/contract"
+)
+
+// MetricsHandler handles the service metrics summary endpoint.
+type MetricsHandler struct{}
+
+// Summary responds with a basic runtime metrics snapshot.
+func (h MetricsHandler) Summary(w http.ResponseWriter, r *http.Request) {
+	if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+		"uptime":    time.Since(startTime).String(),
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}, nil); err != nil {
+		http.Error(w, "encoding error", http.StatusInternalServerError)
+	}
+}
+
+var startTime = time.Now()
 `
 	case "response.go":
 		return `package httpjson
@@ -302,8 +462,8 @@ import (
 
 // ErrorResponse is the canonical error shape for this service.
 type ErrorResponse struct {
-	Code    string ` + "`" + `json:"code"` + "`" + `
-	Message string ` + "`" + `json:"message"` + "`" + `
+	Code    string ` + "`json:\"code\"`" + `
+	Message string ` + "`json:\"message\"`" + `
 }
 
 // Write writes a structured JSON error response.
@@ -324,7 +484,12 @@ func Internal(w http.ResponseWriter, code, message string) {
 }
 `
 		}
-		return fmt.Sprintf("// TODO: Implement %s\npackage main\n", file)
+		// Derive package name from directory for other error.go files.
+		pkg := filepath.Base(filepath.Dir(file))
+		if pkg == "." || pkg == "" {
+			pkg = "main"
+		}
+		return fmt.Sprintf("package %s\n", pkg)
 	case "Dockerfile":
 		return `FROM golang:1.24-alpine AS builder
 WORKDIR /app
@@ -350,8 +515,65 @@ services:
     environment:
       - APP_ADDR=:8080
 `
+	case "index.html":
+		return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>%s</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <h1>%s</h1>
+  <div id="app"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
+`, name, name)
+	case "app.js":
+		return `// Entry point for the frontend application.
+document.addEventListener('DOMContentLoaded', function () {
+  fetch('/healthz')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      document.getElementById('app').textContent = 'Status: ' + data.status;
+    })
+    .catch(function (err) {
+      document.getElementById('app').textContent = 'Error: ' + err.message;
+    });
+});
+`
+	case "styles.css":
+		return `/* Application styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 2rem;
+  color: #1a1a1a;
+}
+
+h1 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+`
 	default:
-		return fmt.Sprintf("// TODO: Implement %s\npackage main\n", file)
+		// Derive a compilable Go file with the correct package name.
+		ext := filepath.Ext(file)
+		if ext != ".go" {
+			return ""
+		}
+		pkg := filepath.Base(filepath.Dir(file))
+		if pkg == "." || pkg == "" {
+			pkg = "main"
+		}
+		return fmt.Sprintf("package %s\n", pkg)
 	}
 }
 
@@ -543,8 +765,8 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 `
 }
 
-func getCanonicalConfigGoContent(module string) string {
-	return fmt.Sprintf(`// Package config loads and validates the application configuration.
+func getCanonicalConfigGoContent(_ string) string {
+	return `// Package config loads and validates the application configuration.
 package config
 
 import (
@@ -651,11 +873,12 @@ func loadEnvFile(path string) error {
 	}
 	return plumecfg.LoadEnv(path, true)
 }
-`, module)
+`
 }
 
 func getMainGoContent(module, template string) string {
 	_ = module // module path is in go.mod, not needed inline
+	_ = template
 	return `package main
 
 import (
