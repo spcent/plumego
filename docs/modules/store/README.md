@@ -34,16 +34,16 @@
 - keep concurrent behavior testable
 - move topology-heavy features to owning extensions
 
-## Current migration debt
+## Extension-layer cache implementations
 
-The stable `store` root still contains two packages that should be treated as migration debt rather than a pattern to extend:
+Topology-heavy and provider-specific cache implementations have been migrated out of the stable root and now live in `x/cache`:
 
-- `store/cache/distributed`
-- `store/cache/redis`
+- `x/cache/distributed` — consistent-hashing distributed cache with replication and failover
+- `x/cache/redis` — Redis client adapter implementing `store/cache.Cache`
 
 Current rule:
 
-- keep these packages working
-- do not add new topology-heavy or provider-heavy siblings under stable `store`
+- do not add new topology-heavy or provider-heavy siblings under stable `store/cache`
 - do not add tenant-aware adapters or tenant-specific storage policy under stable `store`
-- route new topology-heavy data capabilities to `x/data` or `x/tenant`
+- route new topology-heavy cache capabilities to `x/cache`
+- route tenant-aware cache adapters to `x/tenant/store/cache`
