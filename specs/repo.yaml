@@ -54,16 +54,24 @@ layers:
     paths:
       - x/tenant
       - x/ai
-      - x/websocket
-      - x/webhook
-      - x/scheduler
-      - x/frontend
-      - x/ops
-      - x/devtools
-      - x/messaging
-      - x/discovery
-      - x/gateway
+      - x/cache
       - x/data
+      - x/devtools
+      - x/discovery
+      - x/fileapi
+      - x/frontend
+      - x/gateway
+      - x/ipc
+      - x/messaging
+      - x/mq
+      - x/observability
+      - x/ops
+      - x/pubsub
+      - x/rest
+      - x/scheduler
+      - x/tenant
+      - x/webhook
+      - x/websocket
 
   tooling:
     description: Developer tools, checks, and CLI.
@@ -115,6 +123,57 @@ target_cleanup:
   extension_taxonomy:
     - messaging capabilities should converge under x/messaging
     - transport adapters should converge under their owning extension instead of broad legacy buckets
+
+x_family_taxonomy:
+  primary_families:
+    - name: x/tenant
+      role: Multi-tenant resolution, policy, quota, and tenant-aware adapters
+    - name: x/messaging
+      role: Canonical messaging entrypoint (coordinates mq, pubsub, scheduler, webhook sub-families)
+    - name: x/gateway
+      role: Reverse proxy, load balancing, service discovery, protocol edge
+    - name: x/rest
+      role: Reusable resource-interface layer, CRUD standardization
+    - name: x/websocket
+      role: WebSocket transport
+    - name: x/frontend
+      role: Frontend asset serving and SPA fallback
+    - name: x/observability
+      role: Observability adapters, export wiring, admin surfaces
+    - name: x/files
+      role: HTTP file upload/download and file storage (canonical home; x/fileapi is a deprecated predecessor)
+    - name: x/data
+      role: Data topology (read-write split, sharding, distributed cache, ML primitives)
+    - name: x/ai
+      role: AI provider abstraction, orchestration, semantic caching, streaming, tool-use
+  subordinate_families:
+    x/messaging:
+      - x/mq        # queue primitive
+      - x/pubsub    # pub-sub primitive
+      - x/scheduler # task scheduling
+      - x/webhook   # webhook receiver
+    x/gateway:
+      - x/discovery # service discovery
+      - x/ipc       # in-process transport
+    x/observability:
+      - x/ops       # protected admin endpoints
+      - x/devtools  # local debug routes
+    x/data:
+      - x/cache     # distributed cache and Redis adapters
+  agent_routing:
+    - intent: "Change kernel, lifecycle, route structure, transport contracts, transport middleware, auth primitives, storage primitives"
+      destination: stable root
+      packages: [core, router, contract, middleware, security, store, health, log, metrics]
+    - intent: "Change product capability, business feature, protocol adaptation, extension behavior"
+      destination: "x/*"
+      start_with_primary_family: true
+    - intent: "Change application wiring, bootstrap, dependency injection, route registration"
+      destination: reference/scaffold
+      paths: [reference/standard-service, internal/scaffold]
+    - intent: "Change architecture rules, boundary definitions, quality gates, machine-readable specs"
+      destination: specs/
+    - intent: "Change execution plan, work items, task sequencing"
+      destination: tasks/cards/
 
 agent_workflow:
   machine_readable_sources:

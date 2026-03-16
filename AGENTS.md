@@ -59,7 +59,26 @@ When guidance overlaps, follow:
 - Middleware: `func(http.Handler) http.Handler`, transport-only responsibility
 - Reference app: `reference/standard-service` is the only canonical application layout
 
-## 5. Module Boundaries
+## 5. Agent Navigation Rules
+
+Five rules determine where to work. Read this before scanning the entrypoints list.
+
+| Intent | Destination |
+|---|---|
+| Change kernel, lifecycle, route structure, transport contracts, transport middleware, auth primitives, storage primitives | stable root |
+| Change product capability, business feature, protocol adaptation, extension behavior | `x/*` |
+| Change application wiring, bootstrap, DI, route registration | `reference/standard-service` or `internal/scaffold` |
+| Change architecture rules, boundary definitions, quality gates | `specs/` |
+| Change execution plan, work items, task sequencing | `tasks/cards/` |
+
+**Stable roots (9):** `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
+
+**x/* primary families (10):** `x/tenant`, `x/messaging`, `x/gateway`, `x/rest`, `x/websocket`, `x/frontend`, `x/observability`, `x/files`, `x/data`, `x/ai`
+
+Always start at a primary family, not a subordinate (`x/mq`, `x/pubsub`, `x/ops`, `x/cache`, `x/devtools`, etc.).
+See `specs/agent-entrypoints.yaml` for the full routing table and detailed entrypoints.
+
+## 6. Module Boundaries
 
 Stable library roots:
 
@@ -88,14 +107,17 @@ Task entrypoint defaults:
 - Middleware work: start with `middleware/module.yaml` and `docs/modules/middleware/README.md`.
 - Security work: start with `security/module.yaml` and `docs/modules/security/README.md`.
 - Store work: start with `store/module.yaml` and `docs/modules/store/README.md`.
-- Gateway or edge transport work: start with `x/gateway`.
+- Gateway or edge transport work: start with `x/gateway` (includes service discovery and IPC).
 - Resource API standardization: start with `x/rest`.
-- Messaging work: start with `x/messaging`.
+- Messaging work: start with `x/messaging` (not `x/mq` or `x/pubsub` directly).
 - Tenant work: start with `x/tenant` and `docs/architecture/X_TENANT_BLUEPRINT.md`.
 - WebSocket transport work: start with `x/websocket`.
-- Admin or observability surfaces: start with `x/observability` or `x/ops`, not `health`.
+- File upload/download/storage work: start with `x/files`.
+- Admin or observability surfaces: start with `x/observability` (includes ops and devtools), not `health`.
+- AI capability work: start with `x/ai`.
+- Data topology work (sharding, rw-split, cache): start with `x/data`.
 
-## 6. Change Rules
+## 7. Change Rules
 
 - Keep changes minimal and scoped to one primary module when possible.
 - Preserve stable public APIs unless explicitly asked to change them.
@@ -104,7 +126,7 @@ Task entrypoint defaults:
 - Add or update tests next to changed behavior.
 - Do not invent one-off handler styles, response envelopes, or helper families for a single feature.
 
-## 7. Validation Order
+## 8. Validation Order
 
 Default order:
 
@@ -136,7 +158,7 @@ Extra checks by change type:
 `specs/check-baseline/` contains temporary migration debt baselines. Reduce them; do not expand them casually.
 If a baseline file is empty, treat the file itself as migration debt and prefer removing the placeholder once the corresponding check can tolerate a missing baseline file.
 
-## 8. Docs Sync
+## 9. Docs Sync
 
 Update these when behavior, public API, config, security semantics, lifecycle behavior, or boundaries change:
 
@@ -147,7 +169,7 @@ Update these when behavior, public API, config, security semantics, lifecycle be
 - `docs/ROADMAP.md`
 - `env.example`
 
-## 9. Working Loop
+## 10. Working Loop
 
 1. Identify the target layer: stable root or `x/*`.
 2. Read the canonical sources in Section 3.

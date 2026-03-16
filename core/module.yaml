@@ -11,6 +11,7 @@ responsibilities:
   - Middleware registration entrypoints
   - HTTP server lifecycle
   - Startup and shutdown hooks
+  - Runtime introspection (config snapshot, middleware list, observer attachment)
 
 non_goals:
   - Route matching
