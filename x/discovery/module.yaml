@@ -2,7 +2,9 @@ name: x/discovery
 path: x/discovery
 layer: extension
 status: experimental
-summary: Service discovery primitives and adapters for gateway and client integration.
+summary: Subordinate service discovery primitives and adapters within the x/gateway family.
+
+parent_family: x/gateway
 
 responsibilities:
   - Service instance discovery
@@ -38,6 +40,6 @@ review_checklist:
   - Preserve deterministic resolution paths
 
 agent_hints:
-  - Prefer small resolvers
+  - Treat x/discovery as a subordinate of x/gateway; start service discovery work in x/gateway before opening this package directly
   - Keep transport concerns out of discovery
   - Do not require core knowledge

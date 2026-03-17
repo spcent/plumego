@@ -3,7 +3,9 @@ path: x/cache
 layer: extension
 status: experimental
 owner: platform
-summary: Extension-layer cache adapters and topology-heavy cache implementations built on store/cache abstractions.
+summary: Subordinate extension-layer cache adapters and topology-heavy cache implementations within the x/data family.
+
+parent_family: x/data
 
 responsibilities:
   - Distributed cache with consistent hashing, replication, and failover
@@ -52,6 +54,6 @@ review_checklist:
   - Do not add topology decisions to stable store
 
 agent_hints:
-  - Use this package for topology-heavy or provider-specific cache needs
-  - Prefer store/cache.MemoryCache for in-process caching
+  - Treat x/cache as a subordinate of x/data; start distributed cache work in x/data before opening this package directly
+  - Prefer store/cache.MemoryCache for in-process caching; open x/cache only for distributed or Redis topology
   - For tenant-aware caching use x/tenant/store/cache

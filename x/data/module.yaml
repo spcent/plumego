@@ -5,6 +5,10 @@ status: experimental
 owner: persistence
 summary: High-level data topology capabilities that should not live in the stable store layer.
 
+subordinate_families:
+  - package: x/cache
+    role: distributed cache with consistent hashing, replication, failover, and Redis adapter
+
 responsibilities:
   - Read-write splitting orchestration
   - Sharding and routing topology
@@ -61,4 +65,4 @@ review_checklist:
 agent_hints:
   - Move sharding and rw orchestration here instead of widening store
   - Keep business repositories in app code, not in x/data
-  - Prefer tenant-aware composition via x/tenant adapters
+  - x/cache is a subordinate package for distributed/Redis cache topology; start cache work here before opening x/cache directly

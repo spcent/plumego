@@ -4,6 +4,8 @@ layer: extension
 status: experimental
 summary: Subordinate in-process publish-subscribe primitives used by x/messaging, x/webhook, and local debugging support.
 
+parent_family: x/messaging
+
 responsibilities:
   - Publish-subscribe broker primitives
   - Topic fan-out helpers

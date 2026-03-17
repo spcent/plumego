@@ -4,6 +4,16 @@ layer: extension
 status: experimental
 summary: The canonical and only app-facing messaging family entrypoint, built on explicit queue, pubsub, scheduler, and webhook adapters.
 
+subordinate_families:
+  - package: x/mq
+    role: durable queue primitive and worker coordination
+  - package: x/pubsub
+    role: in-process publish-subscribe broker primitives
+  - package: x/scheduler
+    role: cron, delayed job, and retry coordination
+  - package: x/webhook
+    role: inbound verification and outbound delivery
+
 responsibilities:
   - Message send orchestration
   - Delivery provider abstraction
