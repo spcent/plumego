@@ -493,3 +493,94 @@ func isStableRoot(path string) bool {
 	}
 	return false
 }
+
+// XPrimaryFamilies is the canonical set of x/* primary family packages.
+// Subordinate packages (x/mq, x/ops, etc.) are not listed here.
+var XPrimaryFamilies = map[string]struct{}{
+	"x/tenant":        {},
+	"x/messaging":     {},
+	"x/gateway":       {},
+	"x/rest":          {},
+	"x/websocket":     {},
+	"x/frontend":      {},
+	"x/observability": {},
+	"x/files":         {},
+	"x/data":          {},
+	"x/ai":            {},
+}
+
+// XFamiliesWithSubordinates is the subset of primary families that coordinate
+// subordinate packages and must declare a subordinate_families block.
+var XFamiliesWithSubordinates = map[string]struct{}{
+	"x/messaging":     {},
+	"x/gateway":       {},
+	"x/observability": {},
+	"x/data":          {},
+}
+
+// ValidateStableBoundaryDeclarations checks that every stable root module.yaml
+// declares a non-empty strict_boundary field.
+func ValidateStableBoundaryDeclarations(repoRoot string) ([]string, error) {
+	var violations []string
+	for _, root := range StableRoots {
+		path := filepath.Join(repoRoot, root, "module.yaml")
+		doc, err := parseManifest(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue // missing manifest is reported by FindMissingModuleManifests
+			}
+			return nil, err
+		}
+		if !doc.Seen["strict_boundary"] || strings.TrimSpace(doc.Scalars["strict_boundary"]) == "" {
+			violations = append(violations, filepath.ToSlash(filepath.Join(root, "module.yaml"))+": stable root is missing strict_boundary declaration")
+		}
+	}
+	sort.Strings(violations)
+	return violations, nil
+}
+
+// ValidateXFamilyTaxonomy checks that:
+//   - x/* primary families that coordinate subordinates declare subordinate_families
+//   - x/* packages that declare parent_family reference a recognized primary family
+func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
+	xDir := filepath.Join(repoRoot, "x")
+	entries, err := os.ReadDir(xDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var violations []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		pkg := "x/" + entry.Name()
+		manifestPath := filepath.Join(xDir, entry.Name(), "module.yaml")
+		if _, err := os.Stat(manifestPath); err != nil {
+			continue // missing manifest is reported by FindMissingModuleManifests
+		}
+
+		doc, err := parseManifest(manifestPath)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := XFamiliesWithSubordinates[pkg]; ok {
+			if !doc.Seen["subordinate_families"] {
+				violations = append(violations, pkg+"/module.yaml: primary family must declare subordinate_families")
+			}
+		}
+
+		if parentFamily := strings.TrimSpace(doc.Scalars["parent_family"]); parentFamily != "" {
+			if _, ok := XPrimaryFamilies[parentFamily]; !ok {
+				violations = append(violations, pkg+"/module.yaml: parent_family "+strconv.Quote(parentFamily)+" is not a recognized primary x/* family")
+			}
+		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}

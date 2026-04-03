@@ -27,6 +27,11 @@ func main() {
 	if err != nil {
 		failf("validate module manifests: %v", err)
 	}
+	boundaryViolations, err := checkutil.ValidateStableBoundaryDeclarations(repoRoot)
+	if err != nil {
+		failf("validate stable boundary declarations: %v", err)
+	}
+	violations = append(violations, boundaryViolations...)
 
 	if len(missing) == 0 && len(violations) == 0 {
 		return

@@ -168,6 +168,86 @@ func TestFindUnexpectedTopLevelDirsHonorsBaseline(t *testing.T) {
 	}
 }
 
+func TestValidateStableBoundaryDeclarationsReportsWhenMissing(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "core", "module.yaml"), validManifestWithStrictBoundary("core", "stable", "kernel"))
+	writeFile(t, filepath.Join(repo, "router", "module.yaml"), validManifest("router", "stable"))
+	// other stable roots absent → skipped (FindMissingModuleManifests handles them)
+
+	violations, err := ValidateStableBoundaryDeclarations(repo)
+	if err != nil {
+		t.Fatalf("ValidateStableBoundaryDeclarations: %v", err)
+	}
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d: %v", len(violations), violations)
+	}
+	if !strings.Contains(violations[0], "router/module.yaml") || !strings.Contains(violations[0], "strict_boundary") {
+		t.Fatalf("unexpected violation: %q", violations[0])
+	}
+}
+
+func TestValidateStableBoundaryDeclarationsPassesWhenPresent(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "core", "module.yaml"), validManifestWithStrictBoundary("core", "stable", "kernel"))
+	writeFile(t, filepath.Join(repo, "router", "module.yaml"), validManifestWithStrictBoundary("router", "stable", "route_structure"))
+
+	violations, err := ValidateStableBoundaryDeclarations(repo)
+	if err != nil {
+		t.Fatalf("ValidateStableBoundaryDeclarations: %v", err)
+	}
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations, got: %v", violations)
+	}
+}
+
+func TestValidateXFamilyTaxonomyDetectsViolations(t *testing.T) {
+	repo := t.TempDir()
+
+	// x/messaging lacks subordinate_families → violation
+	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), validManifest("x/messaging", "extension"))
+
+	// x/mq declares an unknown parent_family → violation
+	writeFile(t, filepath.Join(repo, "x", "mq", "module.yaml"), validManifestWithParentFamily("x/mq", "extension", "x/nonexistent"))
+
+	// x/gateway has subordinate_families → no violation
+	writeFile(t, filepath.Join(repo, "x", "gateway", "module.yaml"), validManifestWithSubordinateFamilies("x/gateway", "extension"))
+
+	// x/pubsub declares a valid parent_family → no violation
+	writeFile(t, filepath.Join(repo, "x", "pubsub", "module.yaml"), validManifestWithParentFamily("x/pubsub", "extension", "x/messaging"))
+
+	violations, err := ValidateXFamilyTaxonomy(repo)
+	if err != nil {
+		t.Fatalf("ValidateXFamilyTaxonomy: %v", err)
+	}
+	// expect exactly 2: x/messaging missing subordinate_families, x/mq unknown parent
+	if len(violations) != 2 {
+		t.Fatalf("expected 2 violations, got %d: %v", len(violations), violations)
+	}
+	joined := strings.Join(violations, "\n")
+	if !strings.Contains(joined, "x/messaging/module.yaml") || !strings.Contains(joined, "subordinate_families") {
+		t.Fatalf("expected subordinate_families violation for x/messaging, got:\n%s", joined)
+	}
+	if !strings.Contains(joined, "x/mq/module.yaml") || !strings.Contains(joined, "x/nonexistent") {
+		t.Fatalf("expected parent_family violation for x/mq, got:\n%s", joined)
+	}
+}
+
+func TestValidateXFamilyTaxonomyPassesForValidSetup(t *testing.T) {
+	repo := t.TempDir()
+
+	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), validManifestWithSubordinateFamilies("x/messaging", "extension"))
+	writeFile(t, filepath.Join(repo, "x", "mq", "module.yaml"), validManifestWithParentFamily("x/mq", "extension", "x/messaging"))
+	writeFile(t, filepath.Join(repo, "x", "rest", "module.yaml"), validManifest("x/rest", "extension"))
+
+	violations, err := ValidateXFamilyTaxonomy(repo)
+	if err != nil {
+		t.Fatalf("ValidateXFamilyTaxonomy: %v", err)
+	}
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations, got: %v", violations)
+	}
+}
+
 func validManifest(path, layer string) string {
 	return "name: " + path + "\n" +
 		"path: " + path + "\n" +
@@ -193,6 +273,18 @@ func validManifestWithDocPaths(path, layer string, docPaths ...string) string {
 		manifest += "  - " + docPath + "\n"
 	}
 	return manifest
+}
+
+func validManifestWithStrictBoundary(path, layer, boundary string) string {
+	return validManifest(path, layer) + "strict_boundary: " + boundary + "\n"
+}
+
+func validManifestWithParentFamily(path, layer, parent string) string {
+	return validManifest(path, layer) + "parent_family: " + parent + "\n"
+}
+
+func validManifestWithSubordinateFamilies(path, layer string) string {
+	return validManifest(path, layer) + "subordinate_families:\n  - package: x/sub\n    role: subordinate\n"
 }
 
 func writeFile(t *testing.T, path, content string) {

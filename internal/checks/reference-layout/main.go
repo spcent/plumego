@@ -34,6 +34,16 @@ func main() {
 		violations = append(violations, "canonical reference imports x/*: "+v)
 	}
 
+	// Verify x/* family taxonomy: subordinate_families on primary families,
+	// valid parent_family references on subordinate packages.
+	taxonomyViolations, err := checkutil.ValidateXFamilyTaxonomy(repoRoot)
+	if err != nil {
+		failf("validate x/* family taxonomy: %v", err)
+	}
+	for _, v := range taxonomyViolations {
+		violations = append(violations, "x/* taxonomy: "+v)
+	}
+
 	if len(violations) == 0 {
 		return
 	}
