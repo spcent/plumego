@@ -1,4 +1,7 @@
 // Package provider provides a unified interface for LLM providers.
+//
+// Stability: stable — this package follows semantic versioning guarantees.
+// Breaking changes require a major version bump.
 package provider
 
 import (

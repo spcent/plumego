@@ -1,4 +1,7 @@
 // Package session provides conversation session management for AI agents.
+//
+// Stability: stable — this package follows semantic versioning guarantees.
+// Breaking changes require a major version bump.
 package session
 
 import (
