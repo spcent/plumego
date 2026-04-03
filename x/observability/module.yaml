@@ -4,6 +4,12 @@ layer: extension
 status: experimental
 summary: The only app-facing entrypoint for broader observability adapters and export wiring; transport observability primitives remain in stable middleware packages.
 
+subordinate_families:
+  - package: x/ops
+    role: protected auth-gated admin and diagnostics endpoints
+  - package: x/devtools
+    role: debug-only routes, env reload helpers, and local profiling
+
 responsibilities:
   - Observability adapters
   - Optional instrumentation helpers
@@ -40,6 +46,6 @@ review_checklist:
   - Preserve observability isolation
 
 agent_hints:
-  - Start broader observability adapter and export work here
+  - Start broader observability adapter and export work here; x/ops and x/devtools are subordinate packages
   - Start transport observability primitives in middleware/requestid, middleware/tracing, middleware/httpmetrics, or middleware/accesslog
   - Keep adapter-local helpers explicit and do not turn middleware into an observability catalog

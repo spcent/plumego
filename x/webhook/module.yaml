@@ -5,6 +5,8 @@ status: experimental
 owner: integration
 summary: Subordinate webhook ingress, egress, and bridge primitives within the broader messaging extension family.
 
+parent_family: x/messaging
+
 responsibilities:
   - Inbound webhook verification helpers
   - Outbound webhook delivery service aliases

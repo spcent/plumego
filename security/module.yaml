@@ -5,6 +5,8 @@ status: ga
 owner: security
 summary: Security helpers for auth, headers, input safety, and abuse protection.
 
+strict_boundary: auth_primitives
+
 responsibilities:
   - JWT helpers
   - Security headers
@@ -16,6 +18,7 @@ non_goals:
   - App bootstrap
   - Tenant policy orchestration
   - Persistence logic
+  - Session lifecycle management and revocation (belongs in application or x/* layer)
 
 public_entrypoints:
   - jwt

@@ -2,7 +2,9 @@ name: x/ops
 path: x/ops
 layer: extension
 status: experimental
-summary: Protected operations endpoints for queues, receipts, and runtime diagnostics; not the broader observability discovery root.
+summary: Subordinate protected operations endpoints for queues, receipts, and runtime diagnostics within the x/observability family.
+
+parent_family: x/observability
 
 responsibilities:
   - Ops route registration

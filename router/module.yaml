@@ -5,6 +5,8 @@ status: ga
 owner: runtime
 summary: HTTP route matching, params, groups, and reverse routing.
 
+strict_boundary: route_structure
+
 responsibilities:
   - Route matching
   - Path parameters
@@ -17,6 +19,7 @@ non_goals:
   - Authentication
   - Business validation
   - Service construction
+  - Tenant routing or feature-flag route factories
 
 public_entrypoints:
   - Router

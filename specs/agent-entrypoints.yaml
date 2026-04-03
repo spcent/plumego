@@ -1,5 +1,48 @@
 version: 1
 
+# Five-rule quick navigation. Read this first before scanning entrypoints below.
+routing_rules:
+  - intent: "Change kernel, lifecycle, route structure, transport contracts, transport middleware, auth primitives, or storage primitives"
+    destination: stable root
+    packages: [core, router, contract, middleware, security, store, health, log, metrics]
+    notes:
+      - "These 9 packages are the only stable library roots."
+      - "Stable roots must never import x/*."
+
+  - intent: "Change product capability, business feature, protocol adaptation, or extension behavior"
+    destination: "x/*"
+    primary_families:
+      - x/tenant       # multi-tenant resolution, policy, quota
+      - x/messaging    # all messaging work (start here, not x/mq or x/pubsub directly)
+      - x/gateway      # proxying, balancing, discovery, protocol edge
+      - x/rest         # resource API standardization
+      - x/websocket    # WebSocket transport
+      - x/frontend     # asset serving and SPA fallback
+      - x/observability # adapters, export wiring, admin surfaces
+      - x/files        # file upload/download/storage (canonical home)
+      - x/data         # data topology: rw-split, sharding, cache
+      - x/ai           # AI provider, orchestration, semantic caching, streaming
+    notes:
+      - "Always start with the primary family, not a subordinate (x/mq, x/pubsub, x/ops, x/cache, etc.)."
+      - "x/fileapi is a deprecated predecessor; use x/files for new file work."
+
+  - intent: "Change application wiring, bootstrap shape, dependency injection, or route registration"
+    destination: reference/scaffold
+    paths: [reference/standard-service, internal/scaffold]
+    notes:
+      - "reference/standard-service is the only canonical app layout."
+      - "internal/scaffold drives plumego new output."
+
+  - intent: "Change architecture rules, boundary definitions, quality gates, or machine-readable specs"
+    destination: specs/
+    notes:
+      - "Boundary and rule changes go here."
+
+  - intent: "Change execution plan, work items, or task sequencing"
+    destination: tasks/cards/
+    notes:
+      - "Repo-native execution cards live under tasks/cards/."
+
 entrypoints:
   package_hotspots:
     start_with:

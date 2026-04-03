@@ -5,6 +5,8 @@ status: ga
 owner: persistence
 summary: Stable storage primitives and base abstractions. Topology-heavy cache implementations have been migrated to x/cache.
 
+strict_boundary: persistence_primitives
+
 responsibilities:
   - DB helpers
   - Cache primitives
@@ -18,6 +20,7 @@ non_goals:
   - AI-specific caches
   - Read-write splitting and sharding topology defaults
   - HTTP transport behavior
+  - Business-level idempotency semantics (domain-specific dedup rules, e.g. payment deduplication policies, belong in the application or x/* layer)
 
 public_entrypoints:
   - db
@@ -60,4 +63,4 @@ review_checklist:
 agent_hints:
   - Move tenant-aware adapters to x/tenant/store
   - For distributed or provider-specific cache needs use x/cache (distributed, redis)
-  - Do not add topology-heavy or provider-heavy siblings under stable store
+  - Do not add topology-heavy, provider-heavy, or business-level idempotency logic here; store/idempotency is a transport-agnostic dedup primitive only

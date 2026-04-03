@@ -5,6 +5,8 @@ status: ga
 owner: observability
 summary: Metrics interfaces and base collectors.
 
+strict_boundary: metrics_contracts
+
 responsibilities:
   - Metrics collector interfaces
   - Base collectors
@@ -14,6 +16,7 @@ non_goals:
   - App bootstrap
   - Feature-specific dashboards
   - Transport policy
+  - Export pipeline wiring and adapters (belong in x/observability)
 
 public_entrypoints:
   - MetricsCollector
@@ -48,3 +51,4 @@ review_checklist:
 agent_hints:
   - Observability capability packs belong outside the stable layer
   - Keep transport-specific logic out
+  - For export pipeline wiring and Prometheus or OTel adapters use x/observability

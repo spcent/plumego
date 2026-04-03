@@ -4,6 +4,8 @@ layer: extension
 status: experimental
 summary: Subordinate durable queue primitives and worker coordination used by the broader x/messaging capability pack.
 
+parent_family: x/messaging
+
 responsibilities:
   - Queue primitives
   - Task persistence

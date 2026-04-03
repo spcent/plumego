@@ -5,6 +5,8 @@ status: ga
 owner: transport
 summary: Transport-only HTTP middleware, including request/response cross-cutting concerns and transport observability primitives.
 
+strict_boundary: transport_primitives
+
 responsibilities:
   - Middleware chaining
   - Request and response cross-cutting concerns
@@ -17,6 +19,7 @@ non_goals:
   - Tenant resolution and quota orchestration
   - Observability adapter or export catalogs
   - Persistence access
+  - Authentication token verification logic (belongs in injected Authenticator implementations)
 
 public_entrypoints:
   - Middleware

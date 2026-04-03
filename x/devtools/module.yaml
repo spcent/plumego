@@ -2,7 +2,9 @@ name: x/devtools
 path: x/devtools
 layer: extension
 status: experimental
-summary: Debug-only routes, env reload helpers, and development metrics wiring.
+summary: Subordinate debug-only routes, env reload helpers, and local profiling within the x/observability family.
+
+parent_family: x/observability
 
 responsibilities:
   - Debug route registration
@@ -42,6 +44,6 @@ review_checklist:
   - Keep handlers explicit
 
 agent_hints:
-  - Devtools must stay debug-only
+  - Treat x/devtools as a subordinate of x/observability; start debug work in x/observability before opening this package directly
+  - Devtools must stay debug-only and must not be mounted in production without an explicit gate
   - Do not move debug routes into core
-  - Prefer explicit hooks over globals

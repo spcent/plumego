@@ -2,7 +2,9 @@ name: x/ipc
 path: x/ipc
 layer: extension
 status: experimental
-summary: Lower-level inter-process communication helpers; not the first discovery entrypoint for general messaging work.
+summary: Subordinate inter-process communication transport helpers within the x/gateway family.
+
+parent_family: x/gateway
 
 responsibilities:
   - IPC message transport
@@ -38,5 +40,5 @@ review_checklist:
 
 agent_hints:
   - Treat x/ipc as a primitive root, not a user-facing capability entrypoint
-  - Prefer x/messaging or the owning extension before adding new IPC-facing features here
+  - Treat x/ipc as a subordinate of x/gateway; start IPC-facing work in x/gateway before opening this package directly
   - Keep IPC internals self-contained with narrow adapters and out of core

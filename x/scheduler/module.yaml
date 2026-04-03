@@ -4,6 +4,8 @@ layer: extension
 status: experimental
 summary: Subordinate in-process scheduling primitives for cron, delayed jobs, and retries within the broader x/messaging capability family.
 
+parent_family: x/messaging
+
 responsibilities:
   - Scheduler primitives
   - Delayed job execution

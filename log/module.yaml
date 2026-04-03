@@ -5,6 +5,8 @@ status: ga
 owner: runtime
 summary: Logging interfaces and base implementations.
 
+strict_boundary: logging
+
 responsibilities:
   - Logging interfaces
   - Base logger implementations
@@ -14,6 +16,7 @@ non_goals:
   - Feature behavior
   - Metrics collection
   - Request policy decisions
+  - Structured log aggregation or export backends (belong in x/observability)
 
 public_entrypoints:
   - StructuredLogger
@@ -49,3 +52,4 @@ review_checklist:
 agent_hints:
   - Logging contracts should stay decoupled from feature packages
   - Avoid app-specific semantics here
+  - Never log secrets, tokens, or private keys; this is a non-negotiable security requirement

@@ -4,6 +4,12 @@ layer: extension
 status: experimental
 summary: The canonical and only app-facing gateway and edge transport entrypoint for proxying, balancing, caching, and rewrite helpers.
 
+subordinate_families:
+  - package: x/discovery
+    role: service instance discovery, resolver helpers, and discovery adapters
+  - package: x/ipc
+    role: inter-process communication transport helpers
+
 responsibilities:
   - Reverse proxy helpers
   - Gateway routing and rewriting
@@ -45,5 +51,5 @@ review_checklist:
 
 agent_hints:
   - Treat x/gateway as the only app-facing entrypoint for gateway and edge transport work
-  - Use x/gateway entrypoints for explicit proxy wiring and keep helpers adapter-local
+  - x/discovery and x/ipc are subordinate packages; start discovery and IPC work here before opening them directly
   - Route reusable resource-interface work to x/rest rather than mixing it into gateway
