@@ -5,6 +5,8 @@ status: ga
 owner: persistence
 summary: Stable storage primitives and base abstractions. Topology-heavy cache implementations have been migrated to x/cache.
 
+strict_boundary: persistence_primitives
+
 responsibilities:
   - DB helpers
   - Cache primitives

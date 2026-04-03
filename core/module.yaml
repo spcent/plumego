@@ -5,6 +5,8 @@ status: ga
 owner: runtime
 summary: App lifecycle and HTTP server assembly.
 
+strict_boundary: kernel
+
 responsibilities:
   - App construction and options
   - Route registration entrypoints
@@ -19,6 +21,7 @@ non_goals:
   - Feature catalog assembly
   - Tenant-specific behavior
   - Persistence logic
+  - Extension registration facades (explicit wiring in reference apps and x/* packages instead)
 
 public_entrypoints:
   - New
