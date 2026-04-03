@@ -1,6 +1,32 @@
 version: 1
 
 entrypoints:
+  package_hotspots:
+    start_with:
+      - specs/package-index.yaml
+      - specs/agent-entrypoints.yaml
+    avoid:
+      - docs/ROADMAP.md
+      - broad repo search before checking the hotspot index
+    notes:
+      - Use specs/package-index.yaml when module-level guidance is not specific enough.
+      - The package index is intentionally sparse and only covers ambiguity hotspots.
+      - Prefer the package index for choosing the first package, then read the owning module manifest.
+
+  file_api:
+    start_with:
+      - x/fileapi/module.yaml
+      - docs/modules/x-fileapi/README.md
+      - x/fileapi/handler.go
+    avoid:
+      - store/file
+      - x/data/file
+    notes:
+      - Start file upload, download, metadata, and URL transport work in x/fileapi.
+      - Consult specs/package-index.yaml when deciding between x/fileapi, x/data/file, and store/file.
+      - Use x/data/file only when changing tenant-aware storage or metadata implementations.
+      - Use store/file only for pure transport-agnostic file interfaces and helpers.
+
   app_bootstrap:
     start_with:
       - docs/CANONICAL_STYLE_GUIDE.md
@@ -38,6 +64,7 @@ entrypoints:
       - contract
     notes:
       - Middleware stays transport-only.
+      - Use specs/package-index.yaml for hotspot middleware packages such as requestid and httpmetrics.
       - Do not inject business DTOs or service-locator behavior.
 
   security:
@@ -74,6 +101,7 @@ entrypoints:
       - reference/standard-service
     notes:
       - Use x/gateway for proxying, balancing, and protocol-edge work.
+      - Use specs/package-index.yaml when refining package choice inside x/gateway or when deciding between x/gateway and x/rest.
 
   resource_api_standardization:
     start_with:
@@ -86,6 +114,7 @@ entrypoints:
       - x/gateway
     notes:
       - Use ResourceSpec plus explicit Register*Routes helpers.
+      - Use specs/package-index.yaml if you need package-level guidance inside x/rest versus neighboring transport packages.
       - Keep bootstrap shape in the reference app.
 
   messaging:
@@ -111,6 +140,7 @@ entrypoints:
       - core
     notes:
       - Keep tenant-aware logic inside x/tenant and fail closed on policy errors.
+      - Use specs/package-index.yaml when deciding between x/tenant/core and x/tenant/store/db.
       - Do not move tenant resolution or tenant-aware adapters into stable roots.
 
   websocket:

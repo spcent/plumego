@@ -42,6 +42,9 @@ test_commands:
   - go test -timeout 20s ./x/fileapi/...
   - go vet ./x/fileapi/...
 
+doc_paths:
+  - docs/modules/x-fileapi/README.md
+
 review_checklist:
   - Tenant extraction must come from context, never from request body or path
   - All handler methods must use contract.WriteError for error responses

@@ -168,6 +168,233 @@ func TestFindUnexpectedTopLevelDirsHonorsBaseline(t *testing.T) {
 	}
 }
 
+func TestReadRepoExtensionRootsParsesDeclaredExtensionPaths(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "specs", "repo.yaml"), `layers:
+  stable:
+    paths:
+      - core
+  extension:
+    paths:
+      - x/ai
+      - x/fileapi
+      - x/websocket
+`)
+
+	roots, err := ReadRepoExtensionRoots(repo)
+	if err != nil {
+		t.Fatalf("ReadRepoExtensionRoots: %v", err)
+	}
+
+	for _, want := range []string{"x/ai", "x/fileapi", "x/websocket"} {
+		if _, ok := roots[want]; !ok {
+			t.Fatalf("expected %s in parsed extension roots, got %v", want, roots)
+		}
+	}
+	if len(roots) != 3 {
+		t.Fatalf("expected exactly 3 roots, got %d: %v", len(roots), roots)
+	}
+}
+
+func TestFindOrphanedExtensionRootsReportsUndeclaredXDirs(t *testing.T) {
+	repo := t.TempDir()
+	for _, dir := range []string{"x/ai", "x/fileapi", "x/websocket"} {
+		if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(dir)), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+
+	orphans, err := FindOrphanedExtensionRoots(repo, map[string]struct{}{
+		"x/ai":        {},
+		"x/websocket": {},
+	})
+	if err != nil {
+		t.Fatalf("FindOrphanedExtensionRoots: %v", err)
+	}
+	if len(orphans) != 1 || orphans[0] != "x/fileapi" {
+		t.Fatalf("unexpected orphaned extension roots: %v", orphans)
+	}
+}
+
+func TestFindEmptyMisleadingDirsFlagsEmptyPackageLikeDirs(t *testing.T) {
+	repo := t.TempDir()
+	for _, dir := range []string{
+		"contract/protocol",
+		"x/fileapi",
+		"x/data/file/migrations",
+		"x/data/file/testdata",
+	} {
+		if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(dir)), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	writeFile(t, filepath.Join(repo, "x", "fileapi", "handler.go"), "package fileapi\n")
+
+	empty, err := FindEmptyMisleadingDirs(repo)
+	if err != nil {
+		t.Fatalf("FindEmptyMisleadingDirs: %v", err)
+	}
+
+	if len(empty) != 1 || empty[0] != "contract/protocol" {
+		t.Fatalf("unexpected empty misleading dirs: %v", empty)
+	}
+}
+
+func TestReadCanonicalExtensionEntrypointsParsesCanonicalRoots(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "specs", "extension-entrypoints.yaml"), `families:
+  gateway:
+    canonical_entrypoint: x/gateway
+  resource_api:
+    canonical_entrypoint: x/rest
+`)
+
+	roots, err := ReadCanonicalExtensionEntrypoints(repo)
+	if err != nil {
+		t.Fatalf("ReadCanonicalExtensionEntrypoints: %v", err)
+	}
+	if len(roots) != 2 || roots[0] != "x/gateway" || roots[1] != "x/rest" {
+		t.Fatalf("unexpected canonical entrypoints: %v", roots)
+	}
+}
+
+func TestFindExtensionPrimerCoverageViolationsRequiresDocPaths(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "x", "gateway", "module.yaml"), validManifestWithDocPaths("x/gateway", "extension", "docs/modules/x-gateway/README.md"))
+	writeFile(t, filepath.Join(repo, "docs", "modules", "x-gateway", "README.md"), "# x/gateway\n")
+	writeFile(t, filepath.Join(repo, "x", "rest", "module.yaml"), validManifest("x/rest", "extension"))
+
+	violations, err := FindExtensionPrimerCoverageViolations(repo, []string{"x/gateway", "x/rest", "x/fileapi"})
+	if err != nil {
+		t.Fatalf("FindExtensionPrimerCoverageViolations: %v", err)
+	}
+
+	joined := strings.Join(violations, "\n")
+	if !strings.Contains(joined, `x/rest is a canonical extension entrypoint`) {
+		t.Fatalf("expected missing doc_paths violation for x/rest, got:\n%s", joined)
+	}
+	if !strings.Contains(joined, `x/fileapi is a canonical extension entrypoint but has no module.yaml`) {
+		t.Fatalf("expected missing module.yaml violation for x/fileapi, got:\n%s", joined)
+	}
+	if strings.Contains(joined, "x/gateway") && !strings.Contains(joined, "x/fileapi") && !strings.Contains(joined, "x/rest") {
+		t.Fatalf("unexpected violation set: %s", joined)
+	}
+}
+
+func TestReadPackageIndexParsesPackagesAndStartPaths(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "specs", "package-index.yaml"), `packages:
+  x/fileapi:
+    start_with:
+      - x/fileapi/module.yaml
+      - x/fileapi/handler.go
+  contract:
+    start_with:
+      - contract/module.yaml
+`)
+
+	entries, err := ReadPackageIndex(repo)
+	if err != nil {
+		t.Fatalf("ReadPackageIndex: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 package index entries, got %d: %v", len(entries), entries)
+	}
+	if got := entries["x/fileapi"].StartWith; len(got) != 2 {
+		t.Fatalf("expected 2 start_with paths for x/fileapi, got %v", got)
+	}
+}
+
+func TestFindPackageIndexCoverageViolationsRequiresExistingPackageAndStartFiles(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "x", "fileapi", "module.yaml"), "name: x/fileapi\n")
+	writeFile(t, filepath.Join(repo, "contract", "module.yaml"), "name: contract\n")
+
+	violations, err := FindPackageIndexCoverageViolations(repo, map[string]packageIndexEntry{
+		"x/fileapi": {
+			Path:      "x/fileapi",
+			StartWith: []string{"x/fileapi/module.yaml", "x/fileapi/handler.go"},
+		},
+		"contract": {
+			Path:      "contract",
+			StartWith: nil,
+		},
+		"x/missing": {
+			Path:      "x/missing",
+			StartWith: []string{"x/missing/module.yaml"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FindPackageIndexCoverageViolations: %v", err)
+	}
+
+	joined := strings.Join(violations, "\n")
+	for _, want := range []string{
+		`specs/package-index.yaml package x/fileapi references missing start_with path x/fileapi/handler.go`,
+		`specs/package-index.yaml package contract must declare at least one start_with path`,
+		`specs/package-index.yaml package x/missing does not exist in the repository`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected violation containing %q, got:\n%s", want, joined)
+		}
+	}
+}
+
+func TestFindStableHTTPSurfaceViolationsFlagsAppFacingHandlersOutsideCoreAndRouter(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "store", "blob", "handler.go"), `package blob
+
+import "net/http"
+
+func Upload(w http.ResponseWriter, r *http.Request) {}
+`)
+	writeFile(t, filepath.Join(repo, "health", "admin", "routes.go"), `package admin
+
+import "github.com/spcent/plumego/router"
+
+func RegisterRoutes(r *router.Router) {}
+`)
+	writeFile(t, filepath.Join(repo, "core", "routing.go"), `package core
+
+import "net/http"
+
+type App struct{}
+
+func (a *App) HandleFunc(pattern string, handler http.HandlerFunc) {}
+`)
+	writeFile(t, filepath.Join(repo, "metrics", "exporter.go"), `package metrics
+
+import "net/http"
+
+type Exporter struct{}
+
+func (e *Exporter) Handler() http.Handler { return nil }
+`)
+
+	violations, err := FindStableHTTPSurfaceViolations(repo)
+	if err != nil {
+		t.Fatalf("FindStableHTTPSurfaceViolations: %v", err)
+	}
+
+	joined := strings.Join(violations, "\n")
+	for _, want := range []string{
+		`stable package health/admin/routes.go exposes route registration helper RegisterRoutes`,
+		`stable package store/blob/handler.go exposes app-facing HTTP handler surface Upload`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected violation containing %q, got:\n%s", want, joined)
+		}
+	}
+	for _, unwanted := range []string{
+		"core/routing.go",
+		"metrics/exporter.go",
+	} {
+		if strings.Contains(joined, unwanted) {
+			t.Fatalf("did not expect %q in violations:\n%s", unwanted, joined)
+		}
+	}
+}
+
 func validManifest(path, layer string) string {
 	return "name: " + path + "\n" +
 		"path: " + path + "\n" +

@@ -54,17 +54,23 @@ layers:
     paths:
       - x/tenant
       - x/ai
+      - x/cache
+      - x/data
+      - x/devtools
+      - x/discovery
+      - x/fileapi
+      - x/frontend
+      - x/gateway
+      - x/ipc
+      - x/messaging
+      - x/mq
+      - x/observability
+      - x/ops
+      - x/pubsub
+      - x/rest
       - x/websocket
       - x/webhook
       - x/scheduler
-      - x/frontend
-      - x/ops
-      - x/devtools
-      - x/messaging
-      - x/discovery
-      - x/gateway
-      - x/data
-      - x/fileapi
 
   tooling:
     description: Developer tools, checks, and CLI.
@@ -102,6 +108,7 @@ top_level_rules:
     - frontend
   rules:
     - New library packages must live under a stable root or x/*
+    - Every top-level x/* extension root must be declared in layers.extension.paths
     - Root package facade is forbidden in the target layout
     - Reference apps define the canonical app structure
     - Stable roots should remain grep-friendly and narrow
