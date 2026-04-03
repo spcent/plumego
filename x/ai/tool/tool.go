@@ -1,4 +1,7 @@
 // Package tool provides function calling framework for AI agents.
+//
+// Stability: stable — this package follows semantic versioning guarantees.
+// Breaking changes require a major version bump.
 package tool
 
 import (

@@ -28,6 +28,7 @@ Optional or fast-moving capabilities live under `x/`:
 
 - `x/tenant`
 - `x/ai`
+- `x/fileapi`
 - `x/websocket`
 - `x/webhook`
 - `x/scheduler`
@@ -38,6 +39,7 @@ Optional or fast-moving capabilities live under `x/`:
 - `x/discovery`
 - `x/gateway`
 - `x/data`
+- `x/fileapi`
 
 Non-library areas stay out of import-path design:
 
@@ -166,9 +168,11 @@ Agents should prefer these entrypoints when multiple related `x/*` packages exis
 - Start gateway and edge transport work in `x/gateway`; treat `x/ipc` as a narrow primitive.
 - Start reusable resource-interface and CRUD-standardization work in `x/rest`; keep bootstrap shape in `reference/standard-service` and edge proxy topology in `x/gateway`.
 - Start broader observability adapter and export work in `x/observability`; use `x/ops` only for protected admin endpoints and auth-gated diagnostics surfaces.
+- Start app-facing file upload and download transport work in `x/fileapi`; keep tenant-aware storage implementations in `x/data/file` and pure storage interfaces in `store/file`.
 - Start frontend asset-serving work in `x/frontend`, but do not let frontend helpers define the canonical app path.
 - Start local debug and developer-only route work in `x/devtools`; do not treat debug surfaces as part of `core`.
 - Start service discovery work in `x/discovery`; do not spread discovery concerns across stable roots.
 - Start transport observability work in stable `middleware/*` packages; use `x/observability` only for higher-level adapter or export wiring.
 - Do not start new app structure from `x/rest`; prefer `reference/standard-service` and explicit route binding.
 - Treat `x/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.
+- Start tenant-aware file HTTP operations in `x/fileapi`; keep storage implementations in `x/data/file` and storage interface definitions in `store/file`.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,6 +19,7 @@ type ConfigWatcher struct {
 	doneCh   chan struct{}
 	interval time.Duration
 	lastMod  time.Time
+	started  atomic.Bool
 }
 
 // WatcherOption is a functional option for ConfigWatcher
@@ -69,8 +71,10 @@ func NewConfigWatcher(path string, opts ...WatcherOption) (*ConfigWatcher, error
 	return watcher, nil
 }
 
-// Start starts watching the configuration file for changes
+// Start starts watching the configuration file for changes.
+// It must be called at most once. Stop will block until Start returns.
 func (w *ConfigWatcher) Start(ctx context.Context) error {
+	w.started.Store(true)
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 	defer close(w.doneCh)
@@ -90,10 +94,13 @@ func (w *ConfigWatcher) Start(ctx context.Context) error {
 	}
 }
 
-// Stop stops the configuration watcher
+// Stop signals the watcher to stop and waits for it to exit.
+// It is a no-op if Start was never called.
 func (w *ConfigWatcher) Stop() {
 	close(w.stopCh)
-	<-w.doneCh
+	if w.started.Load() {
+		<-w.doneCh
+	}
 }
 
 // checkAndReload checks if the configuration file has changed and reloads it

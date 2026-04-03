@@ -2,6 +2,7 @@ package sharding
 
 import (
 	"fmt"
+	"sync"
 )
 
 // ListStrategy implements list-based (explicit mapping) sharding.
@@ -22,6 +23,8 @@ import (
 //   - Not suitable for high-cardinality keys
 //   - Adding new values requires configuration updates
 type ListStrategy struct {
+	mu sync.RWMutex
+
 	// mapping stores the explicit key -> shard mappings
 	mapping map[any]int
 
@@ -78,12 +81,16 @@ func (l *ListStrategy) Shard(key any, numShards int) (int, error) {
 		return 0, err
 	}
 
-	// Look up the key in the mapping
+	l.mu.RLock()
 	shardIdx, exists := l.mapping[key]
+	defaultShard := l.defaultShard
+	l.mu.RUnlock()
+
+	// Look up the key in the mapping
 	if !exists {
 		// Key not found - use default shard if configured
-		if l.defaultShard >= 0 {
-			shardIdx = l.defaultShard
+		if defaultShard >= 0 {
+			shardIdx = defaultShard
 		} else {
 			return 0, fmt.Errorf("%w: key %v", ErrNoMatchingList, key)
 		}
@@ -125,6 +132,8 @@ func (l *ListStrategy) Name() string {
 // AddMapping adds or updates a key-to-shard mapping.
 // This is useful for dynamically updating the strategy configuration.
 func (l *ListStrategy) AddMapping(key any, shard int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.mapping[key] = shard
 }
 
@@ -132,12 +141,16 @@ func (l *ListStrategy) AddMapping(key any, shard int) {
 // After removal, the key will use the default shard if configured,
 // or return an error.
 func (l *ListStrategy) RemoveMapping(key any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	delete(l.mapping, key)
 }
 
 // GetMapping returns the current key-to-shard mappings.
 // Returns a copy to prevent external modification.
 func (l *ListStrategy) GetMapping() map[any]int {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	result := make(map[any]int, len(l.mapping))
 	for k, v := range l.mapping {
 		result[k] = v
@@ -148,11 +161,15 @@ func (l *ListStrategy) GetMapping() map[any]int {
 // SetDefaultShard sets the default shard for unmapped keys.
 // Set to -1 to disable default shard (unmapped keys will error).
 func (l *ListStrategy) SetDefaultShard(shard int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.defaultShard = shard
 }
 
 // GetDefaultShard returns the current default shard setting.
 // Returns -1 if no default shard is configured.
 func (l *ListStrategy) GetDefaultShard() int {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	return l.defaultShard
 }

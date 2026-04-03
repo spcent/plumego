@@ -109,6 +109,7 @@ top_level_rules:
     - frontend
   rules:
     - New library packages must live under a stable root or x/*
+    - Every top-level x/* extension root must be declared in layers.extension.paths
     - Root package facade is forbidden in the target layout
     - Reference apps define the canonical app structure
     - Stable roots should remain grep-friendly and narrow

@@ -1,4 +1,7 @@
 // Package semanticcache provides semantic caching for LLM responses using embeddings.
+//
+// Stability: experimental — API may change between minor releases without a deprecation period.
+// Vector store backends and embedding provider integrations are still under active development.
 package semanticcache
 
 import (

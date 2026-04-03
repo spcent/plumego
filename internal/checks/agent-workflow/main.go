@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/spcent/plumego/internal/checks/checkutil"
 )
 
 func main() {
@@ -67,6 +69,52 @@ func workflowViolations(repoRoot string) ([]string, error) {
 			violations = append(violations, fmt.Sprintf("specs/repo.yaml does not reference workflow recipe %s", recipePath))
 		}
 	}
+
+	declaredExtensions, err := checkutil.ReadRepoExtensionRoots(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	orphans, err := checkutil.FindOrphanedExtensionRoots(repoRoot, declaredExtensions)
+	if err != nil {
+		return nil, err
+	}
+	for _, orphan := range orphans {
+		violations = append(violations, fmt.Sprintf("extension root %s exists in x/ but is not declared in specs/repo.yaml layers.extension.paths", orphan))
+	}
+
+	emptyDirs, err := checkutil.FindEmptyMisleadingDirs(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	for _, dir := range emptyDirs {
+		violations = append(violations, fmt.Sprintf("empty directory %s is misleading in a package tree; remove it or add real contents", dir))
+	}
+
+	canonicalEntrypoints, err := checkutil.ReadCanonicalExtensionEntrypoints(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	primerViolations, err := checkutil.FindExtensionPrimerCoverageViolations(repoRoot, canonicalEntrypoints)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, primerViolations...)
+
+	packageIndex, err := checkutil.ReadPackageIndex(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	packageIndexViolations, err := checkutil.FindPackageIndexCoverageViolations(repoRoot, packageIndex)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, packageIndexViolations...)
+
+	httpSurfaceViolations, err := checkutil.FindStableHTTPSurfaceViolations(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, httpSurfaceViolations...)
 
 	return violations, nil
 }

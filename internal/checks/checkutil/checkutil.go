@@ -3,6 +3,7 @@ package checkutil
 import (
 	"bufio"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -84,12 +85,130 @@ var manifestEnums = map[string]map[string]struct{}{
 	},
 }
 
+var stableHTTPSurfaceExemptRoots = map[string]struct{}{
+	"core":   {},
+	"router": {},
+}
+
+var suspiciousHTTPSurfaceFiles = map[string]struct{}{
+	"api.go":          {},
+	"endpoint.go":     {},
+	"endpoints.go":    {},
+	"handler.go":      {},
+	"handlers.go":     {},
+	"http_handler.go": {},
+	"route.go":        {},
+	"routes.go":       {},
+}
+
+var routeRegistrationNames = map[string]struct{}{
+	"Any":            {},
+	"AnyNamed":       {},
+	"Delete":         {},
+	"DeleteNamed":    {},
+	"Get":            {},
+	"GetNamed":       {},
+	"Handle":         {},
+	"HandleFunc":     {},
+	"Mount":          {},
+	"Patch":          {},
+	"PatchNamed":     {},
+	"Post":           {},
+	"PostNamed":      {},
+	"Put":            {},
+	"PutNamed":       {},
+	"RegisterRoutes": {},
+	"Routes":         {},
+	"ServeHTTP":      {},
+}
+
 func AllowedTopLevelDirs() map[string]struct{} {
 	out := make(map[string]struct{}, len(allowedTopLevelDirs))
 	for _, dir := range allowedTopLevelDirs {
 		out[dir] = struct{}{}
 	}
 	return out
+}
+
+func ReadRepoExtensionRoots(repoRoot string) (map[string]struct{}, error) {
+	repoSpecPath := filepath.Join(repoRoot, "specs", "repo.yaml")
+	file, err := os.Open(repoSpecPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	roots := map[string]struct{}{}
+	scanner := bufio.NewScanner(file)
+	inLayers := false
+	inExtension := false
+	inPaths := false
+
+	for scanner.Scan() {
+		raw := strings.TrimRight(scanner.Text(), " \t")
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
+		switch {
+		case indent == 0 && trimmed == "layers:":
+			inLayers = true
+			inExtension = false
+			inPaths = false
+			continue
+		case indent == 0:
+			inLayers = false
+			inExtension = false
+			inPaths = false
+		}
+
+		if !inLayers {
+			continue
+		}
+
+		switch {
+		case indent == 2 && trimmed == "extension:":
+			inExtension = true
+			inPaths = false
+			continue
+		case indent == 2:
+			inExtension = false
+			inPaths = false
+		}
+
+		if !inExtension {
+			continue
+		}
+
+		switch {
+		case indent == 4 && trimmed == "paths:":
+			inPaths = true
+			continue
+		case indent == 4:
+			inPaths = false
+		}
+
+		if !inPaths {
+			continue
+		}
+		if indent < 6 || !strings.HasPrefix(trimmed, "- ") {
+			continue
+		}
+
+		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+		value = strings.Trim(value, "\"'")
+		if value == "" {
+			continue
+		}
+		roots[value] = struct{}{}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return roots, nil
 }
 
 func ReadBaseline(path string) (map[string]struct{}, error) {
@@ -305,6 +424,86 @@ func FindUnexpectedTopLevelDirs(repoRoot string, allowed, baseline map[string]st
 	return unexpected, nil
 }
 
+func FindOrphanedExtensionRoots(repoRoot string, declared map[string]struct{}) ([]string, error) {
+	xDir := filepath.Join(repoRoot, "x")
+	entries, err := os.ReadDir(xDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var orphans []string
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		rel := filepath.ToSlash(filepath.Join("x", entry.Name()))
+		if _, ok := declared[rel]; ok {
+			continue
+		}
+		orphans = append(orphans, rel)
+	}
+
+	sort.Strings(orphans)
+	return orphans, nil
+}
+
+func FindEmptyMisleadingDirs(repoRoot string) ([]string, error) {
+	roots := append([]string{}, StableRoots...)
+	roots = append(roots, "x")
+
+	var empty []string
+	for _, root := range roots {
+		rootPath := filepath.Join(repoRoot, root)
+		if _, err := os.Stat(rootPath); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+
+		err := filepath.WalkDir(rootPath, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() {
+				return nil
+			}
+			if path == rootPath {
+				return nil
+			}
+
+			name := d.Name()
+			if strings.HasPrefix(name, ".") || name == "testdata" || name == "migrations" {
+				return nil
+			}
+
+			entries, err := os.ReadDir(path)
+			if err != nil {
+				return err
+			}
+			if len(entries) != 0 {
+				return nil
+			}
+
+			rel, err := filepath.Rel(repoRoot, path)
+			if err != nil {
+				return err
+			}
+			empty = append(empty, filepath.ToSlash(rel))
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	sort.Strings(empty)
+	return empty, nil
+}
+
 func ValidateModuleManifests(repoRoot string) ([]string, error) {
 	patterns := []string{
 		filepath.Join(repoRoot, "*", "module.yaml"),
@@ -338,6 +537,359 @@ type manifestDoc struct {
 	Scalars    map[string]string
 	ListCounts map[string]int
 	Lists      map[string][]string
+}
+
+type packageIndexEntry struct {
+	Path      string
+	StartWith []string
+}
+
+func ReadCanonicalExtensionEntrypoints(repoRoot string) ([]string, error) {
+	path := filepath.Join(repoRoot, "specs", "extension-entrypoints.yaml")
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var roots []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "canonical_entrypoint:") {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(line, "canonical_entrypoint:"))
+		value = strings.Trim(value, "\"'")
+		if value != "" {
+			roots = append(roots, value)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	sort.Strings(roots)
+	return roots, nil
+}
+
+func FindExtensionPrimerCoverageViolations(repoRoot string, roots []string) ([]string, error) {
+	var violations []string
+	for _, root := range roots {
+		manifestPath := filepath.Join(repoRoot, filepath.FromSlash(root), "module.yaml")
+		if _, err := os.Stat(manifestPath); err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, fmt.Sprintf("%s is a canonical extension entrypoint but has no module.yaml", root))
+				continue
+			}
+			return nil, err
+		}
+
+		doc, err := parseManifest(manifestPath)
+		if err != nil {
+			return nil, err
+		}
+		if len(doc.Lists["doc_paths"]) == 0 {
+			violations = append(violations, fmt.Sprintf("%s is a canonical extension entrypoint but %s does not declare doc_paths primer coverage", root, filepath.ToSlash(manifestPath)))
+		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func ReadPackageIndex(repoRoot string) (map[string]packageIndexEntry, error) {
+	path := filepath.Join(repoRoot, "specs", "package-index.yaml")
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	out := map[string]packageIndexEntry{}
+	scanner := bufio.NewScanner(file)
+	inPackages := false
+	inStartWith := false
+	currentPath := ""
+
+	for scanner.Scan() {
+		raw := strings.TrimRight(scanner.Text(), " \t")
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
+		switch {
+		case indent == 0 && trimmed == "packages:":
+			inPackages = true
+			inStartWith = false
+			currentPath = ""
+			continue
+		case indent == 0:
+			inPackages = false
+			inStartWith = false
+			currentPath = ""
+		}
+
+		if !inPackages {
+			continue
+		}
+
+		switch {
+		case indent == 2 && strings.HasSuffix(trimmed, ":"):
+			currentPath = strings.TrimSuffix(trimmed, ":")
+			out[currentPath] = packageIndexEntry{Path: currentPath}
+			inStartWith = false
+			continue
+		case indent == 2:
+			currentPath = ""
+			inStartWith = false
+		}
+
+		if currentPath == "" {
+			continue
+		}
+
+		switch {
+		case indent == 4 && trimmed == "start_with:":
+			inStartWith = true
+			continue
+		case indent == 4:
+			inStartWith = false
+		}
+
+		if !inStartWith {
+			continue
+		}
+		if indent < 6 || !strings.HasPrefix(trimmed, "- ") {
+			continue
+		}
+
+		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+		value = strings.Trim(value, "\"'")
+		if value == "" {
+			continue
+		}
+		entry := out[currentPath]
+		entry.StartWith = append(entry.StartWith, value)
+		out[currentPath] = entry
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func FindPackageIndexCoverageViolations(repoRoot string, entries map[string]packageIndexEntry) ([]string, error) {
+	var violations []string
+	for pkgPath, entry := range entries {
+		dirPath := filepath.Join(repoRoot, filepath.FromSlash(pkgPath))
+		info, err := os.Stat(dirPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, fmt.Sprintf("specs/package-index.yaml package %s does not exist in the repository", pkgPath))
+				continue
+			}
+			return nil, err
+		}
+		if !info.IsDir() {
+			violations = append(violations, fmt.Sprintf("specs/package-index.yaml package %s is not a directory", pkgPath))
+			continue
+		}
+
+		if len(entry.StartWith) == 0 {
+			violations = append(violations, fmt.Sprintf("specs/package-index.yaml package %s must declare at least one start_with path", pkgPath))
+			continue
+		}
+
+		for _, startPath := range entry.StartWith {
+			target := filepath.Join(repoRoot, filepath.FromSlash(startPath))
+			if _, err := os.Stat(target); err != nil {
+				if os.IsNotExist(err) {
+					violations = append(violations, fmt.Sprintf("specs/package-index.yaml package %s references missing start_with path %s", pkgPath, startPath))
+					continue
+				}
+				return nil, err
+			}
+		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func FindStableHTTPSurfaceViolations(repoRoot string) ([]string, error) {
+	var violations []string
+	for _, root := range StableRoots {
+		if _, exempt := stableHTTPSurfaceExemptRoots[root]; exempt {
+			continue
+		}
+
+		rootPath := filepath.Join(repoRoot, root)
+		if _, err := os.Stat(rootPath); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+
+		err := filepath.WalkDir(rootPath, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+
+			fset := token.NewFileSet()
+			node, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				return fmt.Errorf("parse file %s: %w", path, err)
+			}
+
+			relPath, err := filepath.Rel(repoRoot, path)
+			if err != nil {
+				return err
+			}
+			relPath = filepath.ToSlash(relPath)
+			fileSuspicious := isSuspiciousHTTPSurfaceFile(filepath.Base(path))
+
+			for _, decl := range node.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || fn.Name == nil {
+					continue
+				}
+
+				name := fn.Name.Name
+				switch {
+				case fileSuspicious && (hasStandardHTTPHandlerSignature(fn.Type) || returnsHandlerLike(fn.Type)):
+					violations = append(violations, fmt.Sprintf("stable package %s exposes app-facing HTTP handler surface %s; move handlers to core, reference/standard-service, or x/*", relPath, name))
+				case isRouteRegistrationSurface(fn):
+					violations = append(violations, fmt.Sprintf("stable package %s exposes route registration helper %s; move app-facing route wiring to core, router, reference/standard-service, or x/*", relPath, name))
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func isSuspiciousHTTPSurfaceFile(name string) bool {
+	_, ok := suspiciousHTTPSurfaceFiles[name]
+	return ok
+}
+
+func isRouteRegistrationSurface(fn *ast.FuncDecl) bool {
+	if fn == nil || fn.Name == nil {
+		return false
+	}
+	name := fn.Name.Name
+	if name == "ServeHTTP" {
+		return true
+	}
+	if _, ok := routeRegistrationNames[name]; !ok {
+		return false
+	}
+
+	return hasRouterLikeParam(fn.Type) || (hasStringParam(fn.Type) && hasHandlerLikeParam(fn.Type))
+}
+
+func hasStandardHTTPHandlerSignature(fn *ast.FuncType) bool {
+	if fn == nil || fn.Params == nil || len(fn.Params.List) != 2 {
+		return false
+	}
+
+	return isHTTPResponseWriter(fn.Params.List[0].Type) && isPointerToSelector(fn.Params.List[1].Type, "http", "Request")
+}
+
+func hasHandlerLikeParam(fn *ast.FuncType) bool {
+	if fn == nil || fn.Params == nil {
+		return false
+	}
+	for _, field := range fn.Params.List {
+		if isSelector(field.Type, "http", "Handler") || isSelector(field.Type, "http", "HandlerFunc") {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRouterLikeParam(fn *ast.FuncType) bool {
+	if fn == nil || fn.Params == nil {
+		return false
+	}
+	for _, field := range fn.Params.List {
+		switch {
+		case isSelector(field.Type, "router", "Router"):
+			return true
+		case isPointerToSelector(field.Type, "router", "Router"):
+			return true
+		case isSelector(field.Type, "http", "ServeMux"):
+			return true
+		case isPointerToSelector(field.Type, "http", "ServeMux"):
+			return true
+		}
+	}
+	return false
+}
+
+func hasStringParam(fn *ast.FuncType) bool {
+	if fn == nil || fn.Params == nil {
+		return false
+	}
+	for _, field := range fn.Params.List {
+		if ident, ok := field.Type.(*ast.Ident); ok && ident.Name == "string" {
+			return true
+		}
+	}
+	return false
+}
+
+func returnsHandlerLike(fn *ast.FuncType) bool {
+	if fn == nil || fn.Results == nil {
+		return false
+	}
+	for _, field := range fn.Results.List {
+		if isSelector(field.Type, "http", "Handler") || isSelector(field.Type, "http", "HandlerFunc") {
+			return true
+		}
+	}
+	return false
+}
+
+func isHTTPResponseWriter(expr ast.Expr) bool {
+	return isSelector(expr, "http", "ResponseWriter")
+}
+
+func isSelector(expr ast.Expr, pkg, name string) bool {
+	selector, ok := expr.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := selector.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	return ident.Name == pkg && selector.Sel.Name == name
+}
+
+func isPointerToSelector(expr ast.Expr, pkg, name string) bool {
+	star, ok := expr.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	return isSelector(star.X, pkg, name)
 }
 
 func validateModuleManifest(repoRoot, path string) ([]string, error) {

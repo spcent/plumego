@@ -275,7 +275,6 @@ func TestHealthCheckerContextCancellation(t *testing.T) {
 		primary:       primary,
 		replicas:      []*sql.DB{replica},
 		replicaHealth: []bool{true},
-		stopCh:        make(chan struct{}),
 	}
 
 	// Start with cancellable context

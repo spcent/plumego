@@ -1,0 +1,81 @@
+name: x/data/sharding
+path: x/data/sharding
+layer: extension
+status: experimental
+owner: persistence
+summary: Database sharding router that distributes SQL queries across multiple rw.Cluster shards using configurable strategies and cross-shard policies.
+
+responsibilities:
+  - Shard key resolution from SQL query arguments
+  - SQL query rewriting for physical table names per shard
+  - Query routing to single or multiple shards based on resolved key
+  - Cross-shard query policies (Deny, First, All)
+  - Pluggable sharding strategies (Hash, Mod, Range, List, Custom)
+  - Per-shard and per-router query metrics
+  - Dynamic configuration watching via x/data/sharding/config
+
+non_goals:
+  - Primary-replica splitting within a shard (see x/data/rw)
+  - Storage interface definitions (see store)
+  - HTTP transport behavior
+  - Business repositories
+  - App bootstrap
+
+public_entrypoints:
+  - Router
+  - NewRouter
+  - RouterConfig
+  - DefaultRouterConfig
+  - RouterOption
+  - WithCrossShardPolicy
+  - WithDefaultShard
+  - WithMetrics
+  - CrossShardPolicy
+  - CrossShardDeny
+  - CrossShardFirst
+  - CrossShardAll
+  - Strategy
+  - ShardingRuleRegistry
+  - ShardKeyResolver
+  - NewShardKeyResolver
+  - SQLRewriter
+  - NewSQLRewriter
+
+allowed_imports:
+  - stdlib
+  - database/sql
+  - github.com/spcent/plumego/x/data/rw
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - contract/**
+  - examples/**
+  - reference/**
+  - templates/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/data/sharding/...
+  - go test -timeout 20s ./x/data/sharding/...
+  - go vet ./x/data/sharding/...
+
+change_risks:
+  - topology regression
+  - persistence correctness regression
+  - cross-shard data isolation regression
+  - SQL rewriting correctness regression
+
+review_checklist:
+  - Cross-shard deny policy must be the safe default; document any deviation
+  - Shard key resolution must be deterministic for a given input
+  - SQL rewriting must not alter query semantics, only table name suffixes
+  - BeginTxOnShard must be used for explicit shard-scoped transactions; BeginTx without a default shard must error
+
+agent_hints:
+  - Build each shard as an rw.Cluster and pass the slice to NewRouter
+  - Use CrossShardDeny (the default) unless you explicitly need fan-out reads
+  - Use BeginTxOnShard when the transaction's shard is known at call time
+  - Dynamic config changes are available under x/data/sharding/config

@@ -1,6 +1,19 @@
 version: 1
 
 families:
+  file_api:
+    canonical_entrypoint: x/fileapi
+    role: Only app-facing capability entrypoint for tenant-aware file upload, download, metadata, and temporary URL transport.
+    start_here:
+      - x/fileapi
+    primitives:
+      - x/data/file
+      - store/file
+    rules:
+      - Start app-facing file upload and download transport work in x/fileapi.
+      - Treat x/data/file as the tenant-aware storage and metadata implementation layer, not the first app-facing discovery root.
+      - Treat store/file as pure storage interfaces and computation helpers, not an HTTP surface.
+
   messaging:
     canonical_entrypoint: x/messaging
     role: Only app-facing capability entrypoint for message-oriented product work.
