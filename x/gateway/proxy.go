@@ -269,6 +269,9 @@ func (p *Proxy) createBackendRequest(r *http.Request, backend *Backend) *http.Re
 	backendReq.URL.Scheme = backend.ParsedURL.Scheme
 	backendReq.URL.Host = backend.ParsedURL.Host
 
+	// Clear RequestURI: http.Client.Do rejects requests with a non-empty RequestURI
+	backendReq.RequestURI = ""
+
 	// Apply path rewriting if configured
 	if p.config.PathRewrite != nil {
 		applyPathRewrite(backendReq, p.config.PathRewrite)
