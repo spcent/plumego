@@ -78,28 +78,34 @@ func (hc *HealthChecker) checkAll(cluster *Cluster) {
 
 		cluster.metrics.HealthCheckCount.Add(1)
 
-		// Update failure/success counters
+		// Update failure/success counters under hc.mu, then release the lock
+		// before calling cluster.markReplicaHealth to avoid lock-order inversion
+		// (hc.mu → cluster.mu would deadlock if another goroutine holds cluster.mu
+		// and tries to acquire hc.mu).
+		var shouldMark bool
+		var markHealthy bool
+
 		hc.mu.Lock()
 		if err != nil {
-			// Ping failed
 			hc.failures[i]++
 			hc.successes[i] = 0
-
-			// Mark as unhealthy if threshold reached
 			if currentHealth[i] && hc.failures[i] >= hc.config.FailureThreshold {
-				cluster.markReplicaHealth(i, false)
+				shouldMark = true
+				markHealthy = false
 			}
 		} else {
-			// Ping succeeded
 			hc.successes[i]++
 			hc.failures[i] = 0
-
-			// Mark as healthy if threshold reached
 			if !currentHealth[i] && hc.successes[i] >= hc.config.RecoveryThreshold {
-				cluster.markReplicaHealth(i, true)
+				shouldMark = true
+				markHealthy = true
 			}
 		}
 		hc.mu.Unlock()
+
+		if shouldMark {
+			cluster.markReplicaHealth(i, markHealthy)
+		}
 	}
 }
 

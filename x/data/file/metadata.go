@@ -78,7 +78,9 @@ func (m *DBMetadataManager) Get(ctx context.Context, id string) (*File, error) {
 	}
 
 	if len(metadataJSON) > 0 {
-		json.Unmarshal(metadataJSON, &file.Metadata)
+		if err := json.Unmarshal(metadataJSON, &file.Metadata); err != nil {
+			return nil, fmt.Errorf("unmarshal metadata for id %s: %w", file.ID, err)
+		}
 	}
 
 	return &file, nil
@@ -113,7 +115,9 @@ func (m *DBMetadataManager) GetByPath(ctx context.Context, p string) (*File, err
 	}
 
 	if len(metadataJSON) > 0 {
-		json.Unmarshal(metadataJSON, &file.Metadata)
+		if err := json.Unmarshal(metadataJSON, &file.Metadata); err != nil {
+			return nil, fmt.Errorf("unmarshal metadata for path %s: %w", file.Path, err)
+		}
 	}
 
 	return &file, nil
@@ -149,7 +153,9 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 	}
 
 	if len(metadataJSON) > 0 {
-		json.Unmarshal(metadataJSON, &file.Metadata)
+		if err := json.Unmarshal(metadataJSON, &file.Metadata); err != nil {
+			return nil, fmt.Errorf("unmarshal metadata for hash %s: %w", file.Hash, err)
+		}
 	}
 
 	return &file, nil
@@ -256,7 +262,9 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 		}
 
 		if len(metadataJSON) > 0 {
-			json.Unmarshal(metadataJSON, &file.Metadata)
+			if err := json.Unmarshal(metadataJSON, &file.Metadata); err != nil {
+				return nil, 0, fmt.Errorf("unmarshal metadata for id %s: %w", file.ID, err)
+			}
 		}
 
 		results = append(results, &file)

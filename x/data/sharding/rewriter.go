@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // SQLRewriter rewrites SQL queries by replacing logical table names with physical table names.
@@ -22,9 +23,12 @@ type SQLRewriter struct {
 
 // rewriteCache caches SQL rewrite results for performance
 type rewriteCache struct {
-	mu      sync.RWMutex
-	cache   map[string]map[int]string // query -> shardIndex -> rewritten query
-	maxSize int
+	mu       sync.RWMutex
+	cache    map[string]map[int]string // query -> shardIndex -> rewritten query
+	maxSize  int
+	requests atomic.Uint64
+	hits     atomic.Uint64
+	misses   atomic.Uint64
 }
 
 // RewriteResult contains the result of SQL rewriting
@@ -268,15 +272,19 @@ type CacheStats struct {
 
 // get retrieves a cached rewritten query
 func (c *rewriteCache) get(query string, shardIndex int) string {
+	c.requests.Add(1)
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if shardMap, ok := c.cache[query]; ok {
 		if rewritten, ok := shardMap[shardIndex]; ok {
+			c.hits.Add(1)
 			return rewritten
 		}
 	}
 
+	c.misses.Add(1)
 	return ""
 }
 
@@ -301,27 +309,40 @@ func (c *rewriteCache) put(query string, shardIndex int, rewritten string) {
 	c.cache[query][shardIndex] = rewritten
 }
 
-// clear clears the cache
+// clear clears the cache and resets all counters.
 func (c *rewriteCache) clear() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	c.cache = make(map[string]map[int]string)
+	c.mu.Unlock()
+
+	c.requests.Store(0)
+	c.hits.Store(0)
+	c.misses.Store(0)
 }
 
 // stats returns cache statistics
 func (c *rewriteCache) stats() CacheStats {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	entries := 0
 	for _, shardMap := range c.cache {
 		entries += len(shardMap)
 	}
+	c.mu.RUnlock()
+
+	requests := c.requests.Load()
+	hits := c.hits.Load()
+	var hitRate float64
+	if requests > 0 {
+		hitRate = float64(hits) / float64(requests)
+	}
 
 	return CacheStats{
-		Entries: entries,
-		MaxSize: c.maxSize,
+		Entries:  entries,
+		MaxSize:  c.maxSize,
+		HitRate:  hitRate,
+		Requests: requests,
+		Hits:     hits,
+		Misses:   c.misses.Load(),
 	}
 }
 

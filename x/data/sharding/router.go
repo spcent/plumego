@@ -28,13 +28,16 @@ var (
 type CrossShardPolicy int
 
 const (
-	// CrossShardDeny rejects queries that cannot be routed to a single shard
+	// CrossShardDeny rejects queries that cannot be routed to a single shard.
 	CrossShardDeny CrossShardPolicy = iota
 
-	// CrossShardFirst executes the query on the first shard only
+	// CrossShardFirst executes the query on the first shard only.
 	CrossShardFirst
 
-	// CrossShardAll executes the query on all shards concurrently
+	// CrossShardAll fans the query out to all shards concurrently and returns
+	// the first successful *sql.Rows. Results from the remaining shards are
+	// discarded. Use this for approximate or existence-style queries only; it
+	// does NOT merge result sets from all shards.
 	CrossShardAll
 )
 
@@ -244,53 +247,51 @@ func (r *Router) QueryContext(ctx context.Context, query string, args ...any) (*
 	return shard.QueryContext(ctx, rewrittenQuery, args...)
 }
 
-// QueryRowContext executes a query that returns at most one row
-// Routes to a replica (or primary) of the appropriate shard
+// QueryRowContext executes a query that returns at most one row.
+// Routes to a replica (or primary) of the appropriate shard.
+// On resolution failure the DefaultShardIndex (if set) is used with the
+// original query so non-sharded tables still work. On rewrite failure the
+// resolved shard is used with the original query rather than silently
+// redirecting to an unrelated shard.
 func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	r.recordQuery()
 
-	// Resolve the shard for this query
+	// Resolve the shard for this query.
 	resolved, err := r.resolver.Resolve(query, args)
 	if err != nil {
 		r.recordRoutingError()
-		// Return a Row with error - the error will surface when Scan is called
-		// We cannot return error directly as QueryRowContext doesn't return error
-		// Use a fallback approach: try default shard if configured
+		// Resolution failed: fall back to DefaultShardIndex if configured so
+		// that non-sharded (unkeyed) queries still work against a single shard.
 		if r.config.DefaultShardIndex >= 0 {
-			shard := r.shards[r.config.DefaultShardIndex]
-			return shard.QueryRowContext(ctx, query, args...)
+			return r.shards[r.config.DefaultShardIndex].QueryRowContext(ctx, query, args...)
 		}
-		// No default, return from first shard (will likely error on Scan)
 		return r.shards[0].QueryRowContext(ctx, query, args...)
 	}
 
-	// Validate shard index
+	// Validate shard index.
 	if resolved.ShardIndex < 0 || resolved.ShardIndex >= len(r.shards) {
 		r.recordRoutingError()
-		// Fallback to default or first shard
 		if r.config.DefaultShardIndex >= 0 {
-			shard := r.shards[r.config.DefaultShardIndex]
-			return shard.QueryRowContext(ctx, query, args...)
+			return r.shards[r.config.DefaultShardIndex].QueryRowContext(ctx, query, args...)
 		}
 		return r.shards[0].QueryRowContext(ctx, query, args...)
 	}
 
-	// Record metrics
+	// Record metrics.
 	r.recordShardQuery(resolved.ShardIndex)
 
-	// Rewrite SQL if needed (for physical table names)
+	// Rewrite SQL if needed (for physical table names).
 	rewrittenQuery, err := r.rewriter.Rewrite(query, resolved.ShardIndex)
 	if err != nil {
 		r.recordRoutingError()
-		// Fallback to default or first shard with original query
-		if r.config.DefaultShardIndex >= 0 {
-			shard := r.shards[r.config.DefaultShardIndex]
-			return shard.QueryRowContext(ctx, query, args...)
-		}
-		return r.shards[0].QueryRowContext(ctx, query, args...)
+		// Rewrite failed but we already know the target shard: execute the
+		// original (non-rewritten) query on it rather than redirecting to an
+		// unrelated shard. For non-sharded tables this is harmless; for sharded
+		// tables the query may fail, but at least it targets the correct node.
+		return r.shards[resolved.ShardIndex].QueryRowContext(ctx, query, args...)
 	}
 
-	// Execute on the resolved shard
+	// Execute on the resolved shard.
 	shard := r.shards[resolved.ShardIndex]
 	return shard.QueryRowContext(ctx, rewrittenQuery, args...)
 }
@@ -342,8 +343,10 @@ func (r *Router) handleCrossShardQuery(ctx context.Context, query string, args [
 	}
 }
 
-// queryAllShards executes a query on all shards concurrently
-// Returns the first successful result or an error if all fail
+// queryAllShards executes a query on all shards concurrently.
+// It returns the first successful *sql.Rows and closes all other result sets.
+// This implements the CrossShardAll policy; note that it does NOT merge rows
+// from multiple shards — callers receive data from exactly one shard.
 func (r *Router) queryAllShards(ctx context.Context, query string, args []any) (*sql.Rows, error) {
 	type result struct {
 		rows  *sql.Rows
@@ -354,7 +357,7 @@ func (r *Router) queryAllShards(ctx context.Context, query string, args []any) (
 	results := make(chan result, len(r.shards))
 	var wg sync.WaitGroup
 
-	// Launch queries on all shards concurrently
+	// Launch queries on all shards concurrently.
 	for i, shard := range r.shards {
 		wg.Add(1)
 		go func(idx int, s *rw.Cluster) {
@@ -364,26 +367,27 @@ func (r *Router) queryAllShards(ctx context.Context, query string, args []any) (
 		}(i, shard)
 	}
 
-	// Close results channel when all goroutines complete
+	// Close the results channel once all goroutines have written.
+	// The channel is buffered so goroutines never block regardless of whether
+	// the consumer is still reading.
 	go func() {
 		wg.Wait()
 		close(results)
 	}()
 
-	// Collect results
+	// Collect results; keep the first success and close all others immediately.
 	var firstSuccess *sql.Rows
-	var errors []error
+	var errs []error
 
 	for res := range results {
-		if res.err == nil {
-			if firstSuccess == nil {
-				firstSuccess = res.rows
-			} else {
-				// Close additional successful results
-				res.rows.Close()
-			}
+		if res.err != nil {
+			errs = append(errs, fmt.Errorf("shard %d: %w", res.shard, res.err))
+			continue
+		}
+		if firstSuccess == nil {
+			firstSuccess = res.rows
 		} else {
-			errors = append(errors, fmt.Errorf("shard %d: %w", res.shard, res.err))
+			res.rows.Close()
 		}
 	}
 
@@ -391,8 +395,8 @@ func (r *Router) queryAllShards(ctx context.Context, query string, args []any) (
 		return firstSuccess, nil
 	}
 
-	if len(errors) > 0 {
-		return nil, fmt.Errorf("%w: %v", ErrAllShardsFailed, errors)
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("%w: %v", ErrAllShardsFailed, errs)
 	}
 
 	return nil, ErrAllShardsFailed
@@ -463,14 +467,15 @@ func (r *Router) Metrics() RouterMetrics {
 	}
 }
 
-// recordQuery increments total query count
+// recordQuery increments total query count only.
+// SingleShardQueries is incremented separately in recordShardQuery to avoid
+// double-counting cross-shard queries.
 func (r *Router) recordQuery() {
 	if !r.config.EnableMetrics {
 		return
 	}
 	r.mu.Lock()
 	r.metrics.TotalQueries++
-	r.metrics.SingleShardQueries++
 	r.mu.Unlock()
 }
 
@@ -494,12 +499,15 @@ func (r *Router) recordRoutingError() {
 	r.mu.Unlock()
 }
 
-// recordShardQuery increments query count for a specific shard
+// recordShardQuery increments query count for a specific shard and the
+// SingleShardQueries total. It must be called only for queries routed to
+// exactly one shard (not cross-shard fan-out).
 func (r *Router) recordShardQuery(shardIndex int) {
 	if !r.config.EnableMetrics {
 		return
 	}
 	r.mu.Lock()
+	r.metrics.SingleShardQueries++
 	if shardIndex >= 0 && shardIndex < len(r.metrics.ShardQueryCounts) {
 		r.metrics.ShardQueryCounts[shardIndex]++
 	}
