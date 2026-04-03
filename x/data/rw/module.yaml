@@ -1,0 +1,80 @@
+name: x/data/rw
+path: x/data/rw
+layer: extension
+status: experimental
+owner: persistence
+summary: Primary-replica read-write cluster orchestration with load balancing, health checking, and routing policies.
+
+responsibilities:
+  - Primary-replica cluster lifecycle management
+  - Read routing to healthy replicas via configurable load balancer
+  - Write routing always to primary
+  - Transaction-aware routing (transactions always use primary)
+  - Replica health checking with configurable thresholds
+  - Automatic fallback to primary when all replicas are down
+  - Per-cluster query metrics
+
+non_goals:
+  - Sharding or horizontal partitioning (see x/data/sharding)
+  - Storage interface definitions (see store)
+  - HTTP transport behavior
+  - Business repositories
+  - App bootstrap
+
+public_entrypoints:
+  - Cluster
+  - New
+  - Config
+  - HealthCheckConfig
+  - DefaultHealthCheckConfig
+  - LoadBalancer
+  - NewRoundRobinBalancer
+  - NewWeightedBalancer
+  - RoutingPolicy
+  - NewSQLTypePolicy
+  - NewTransactionAwarePolicy
+  - NewAlwaysPrimaryPolicy
+  - NewCompositePolicy
+  - ForcePrimary
+  - PreferReplica
+  - MarkInTransaction
+  - IsForcePrimary
+  - IsPreferReplica
+  - IsInTransaction
+
+allowed_imports:
+  - stdlib
+  - database/sql
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - contract/**
+  - examples/**
+  - reference/**
+  - templates/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/data/rw/...
+  - go test -timeout 20s ./x/data/rw/...
+  - go vet ./x/data/rw/...
+
+change_risks:
+  - topology regression
+  - persistence correctness regression
+  - concurrent access regression
+
+review_checklist:
+  - Writes and transactions must always route to the primary
+  - Load balancer must skip unhealthy replicas
+  - Health checker must not block query paths
+  - FallbackToPrimary behavior must be explicit and tested
+
+agent_hints:
+  - Compose with x/data/sharding by passing a Cluster as each shard in the Router
+  - Use ForcePrimary(ctx) when read-after-write consistency is required
+  - Use PreferReplica(ctx) to override write-detecting heuristics for specific read queries
+  - Health checking is opt-in via Config.HealthCheck.Enabled

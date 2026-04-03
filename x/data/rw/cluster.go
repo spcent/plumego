@@ -86,10 +86,6 @@ type Cluster struct {
 
 	// Metrics
 	metrics ClusterMetrics
-
-	// Lifecycle
-	stopCh chan struct{}
-	wg     sync.WaitGroup
 }
 
 // ClusterMetrics holds cluster metrics
@@ -143,7 +139,6 @@ func New(config Config) (*Cluster, error) {
 		healthConfig:  config.HealthCheck,
 		fallback:      config.FallbackToPrimary,
 		replicaHealth: make([]bool, len(config.Replicas)),
-		stopCh:        make(chan struct{}),
 	}
 
 	// Initially mark all replicas as healthy
@@ -237,24 +232,29 @@ func (c *Cluster) PingContext(ctx context.Context) error {
 	return nil
 }
 
-// Close closes all database connections
+// Close stops the health checker and closes all database connections.
+// It waits for the health checker goroutine to exit before closing connections
+// to prevent pings against already-closed *sql.DB handles.
 func (c *Cluster) Close() error {
-	// Stop health checker
-	close(c.stopCh)
-	c.wg.Wait()
-
-	// Close primary
-	if err := c.primary.Close(); err != nil {
-		return err
+	if c.health != nil {
+		c.health.Stop()
 	}
 
-	// Close replicas
-	for _, replica := range c.replicas {
+	var errs []error
+
+	if err := c.primary.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("primary: %w", err))
+	}
+
+	for i, replica := range c.replicas {
 		if err := replica.Close(); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("replica %d: %w", i, err))
 		}
 	}
 
+	if len(errs) > 0 {
+		return errs[0]
+	}
 	return nil
 }
 
