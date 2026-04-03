@@ -9,14 +9,8 @@ import (
 	"unicode/utf8"
 )
 
-type validationIssue struct {
-	Field   string
-	Code    string
-	Message string
-}
-
 type validationErrors struct {
-	errors []validationIssue
+	errors []FieldError
 }
 
 func (ve validationErrors) Error() string {
@@ -31,8 +25,8 @@ func (ve validationErrors) Error() string {
 	return strings.Join(parts, "; ")
 }
 
-func (ve validationErrors) Errors() []validationIssue {
-	return append([]validationIssue(nil), ve.errors...)
+func (ve validationErrors) Errors() []FieldError {
+	return append([]FieldError(nil), ve.errors...)
 }
 
 func validateStruct(dst any) error {
@@ -52,7 +46,7 @@ func validateStruct(dst any) error {
 	}
 
 	rt := rv.Type()
-	var issues []validationIssue
+	var issues []FieldError
 	for i := 0; i < rt.NumField(); i++ {
 		field := rt.Field(i)
 		if field.PkgPath != "" {
@@ -84,7 +78,7 @@ func validateStruct(dst any) error {
 	return validationErrors{errors: issues}
 }
 
-func applyValidationRule(fieldName string, value reflect.Value, rule string) *validationIssue {
+func applyValidationRule(fieldName string, value reflect.Value, rule string) *FieldError {
 	name := rule
 	arg := ""
 	if idx := strings.Index(rule, "="); idx >= 0 {
@@ -100,13 +94,13 @@ func applyValidationRule(fieldName string, value reflect.Value, rule string) *va
 	case "min":
 		limit, err := strconv.ParseInt(arg, 10, 64)
 		if err != nil {
-			return &validationIssue{Field: fieldName, Code: "min", Message: "invalid min validator configuration"}
+			return &FieldError{Field: fieldName, Code: "min", Message: "invalid min validator configuration"}
 		}
 		return validateMin(fieldName, value, limit)
 	case "max":
 		limit, err := strconv.ParseInt(arg, 10, 64)
 		if err != nil {
-			return &validationIssue{Field: fieldName, Code: "max", Message: "invalid max validator configuration"}
+			return &FieldError{Field: fieldName, Code: "max", Message: "invalid max validator configuration"}
 		}
 		return validateMax(fieldName, value, limit)
 	default:
@@ -114,14 +108,14 @@ func applyValidationRule(fieldName string, value reflect.Value, rule string) *va
 	}
 }
 
-func validateRequired(fieldName string, value reflect.Value) *validationIssue {
+func validateRequired(fieldName string, value reflect.Value) *FieldError {
 	if !value.IsValid() {
-		return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+		return &FieldError{Field: fieldName, Code: "required", Message: "field is required"}
 	}
 
 	if value.Kind() == reflect.Ptr {
 		if value.IsNil() {
-			return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+			return &FieldError{Field: fieldName, Code: "required", Message: "field is required"}
 		}
 		value = value.Elem()
 	}
@@ -129,25 +123,25 @@ func validateRequired(fieldName string, value reflect.Value) *validationIssue {
 	switch value.Kind() {
 	case reflect.String:
 		if strings.TrimSpace(value.String()) == "" {
-			return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+			return &FieldError{Field: fieldName, Code: "required", Message: "field is required"}
 		}
 	case reflect.Slice, reflect.Map, reflect.Array, reflect.Chan:
 		if value.Len() == 0 {
-			return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+			return &FieldError{Field: fieldName, Code: "required", Message: "field is required"}
 		}
 	default:
 		if value.IsZero() {
-			return &validationIssue{Field: fieldName, Code: "required", Message: "field is required"}
+			return &FieldError{Field: fieldName, Code: "required", Message: "field is required"}
 		}
 	}
 
 	return nil
 }
 
-func validateEmail(fieldName string, value reflect.Value) *validationIssue {
+func validateEmail(fieldName string, value reflect.Value) *FieldError {
 	s, ok := stringValue(value)
 	if !ok {
-		return &validationIssue{Field: fieldName, Code: "email", Message: "must be a string"}
+		return &FieldError{Field: fieldName, Code: "email", Message: "must be a string"}
 	}
 
 	s = strings.TrimSpace(s)
@@ -157,12 +151,12 @@ func validateEmail(fieldName string, value reflect.Value) *validationIssue {
 
 	addr, err := mail.ParseAddress(s)
 	if err != nil || addr.Address != s {
-		return &validationIssue{Field: fieldName, Code: "email", Message: "invalid email format"}
+		return &FieldError{Field: fieldName, Code: "email", Message: "invalid email format"}
 	}
 	return nil
 }
 
-func validateMin(fieldName string, value reflect.Value, limit int64) *validationIssue {
+func validateMin(fieldName string, value reflect.Value, limit int64) *FieldError {
 	if !value.IsValid() {
 		return nil
 	}
@@ -180,31 +174,31 @@ func validateMin(fieldName string, value reflect.Value, limit int64) *validation
 		trimmed := strings.TrimSpace(text)
 		if parsed, ok := parseNumericString(trimmed); ok {
 			if parsed < float64(limit) {
-				return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
+				return &FieldError{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
 			}
 			return nil
 		}
 		if int64(utf8.RuneCountInString(text)) < limit {
-			return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d characters", limit)}
+			return &FieldError{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d characters", limit)}
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if value.Int() < limit {
-			return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
+			return &FieldError{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if limit > 0 && value.Uint() < uint64(limit) {
-			return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
+			return &FieldError{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
 		}
 	case reflect.Float32, reflect.Float64:
 		if value.Float() < float64(limit) {
-			return &validationIssue{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
+			return &FieldError{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
 		}
 	}
 
 	return nil
 }
 
-func validateMax(fieldName string, value reflect.Value, limit int64) *validationIssue {
+func validateMax(fieldName string, value reflect.Value, limit int64) *FieldError {
 	if !value.IsValid() {
 		return nil
 	}
@@ -222,24 +216,24 @@ func validateMax(fieldName string, value reflect.Value, limit int64) *validation
 		trimmed := strings.TrimSpace(text)
 		if parsed, ok := parseNumericString(trimmed); ok {
 			if parsed > float64(limit) {
-				return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
+				return &FieldError{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
 			}
 			return nil
 		}
 		if int64(utf8.RuneCountInString(text)) > limit {
-			return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d characters", limit)}
+			return &FieldError{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d characters", limit)}
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if value.Int() > limit {
-			return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
+			return &FieldError{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if value.Uint() > uint64(limit) {
-			return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
+			return &FieldError{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
 		}
 	case reflect.Float32, reflect.Float64:
 		if value.Float() > float64(limit) {
-			return &validationIssue{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
+			return &FieldError{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
 		}
 	}
 

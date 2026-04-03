@@ -176,7 +176,7 @@ func (c *Handler) handleSummary(ctx *contract.Ctx) {
 		},
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, data)
+	_ = ctx.Response(http.StatusOK, data, nil)
 }
 
 func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
@@ -220,9 +220,9 @@ func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 		stats = []QueueStats{snapshot}
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"queues": stats,
-	})
+	}, nil)
 }
 
 func (c *Handler) handleQueueReplay(ctx *contract.Ctx) {
@@ -247,9 +247,9 @@ func (c *Handler) handleQueueReplay(ctx *contract.Ctx) {
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"replay": result,
-	})
+	}, nil)
 }
 
 func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
@@ -274,9 +274,9 @@ func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"receipt": receipt,
-	})
+	}, nil)
 }
 
 func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
@@ -320,9 +320,9 @@ func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 		channels = []ChannelHealth{status}
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"channels": channels,
-	})
+	}, nil)
 }
 
 func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
@@ -347,9 +347,9 @@ func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"quota": snapshot,
-	})
+	}, nil)
 }
 
 func (c *Handler) authMiddlewares() []middleware.Middleware {

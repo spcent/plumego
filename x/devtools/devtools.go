@@ -82,11 +82,11 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 		payload := map[string]any{
 			"routes": r.Routes(),
 		}
-		contract.WriteHTTPResponse(w, req, http.StatusOK, payload)
+		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
 	}))
 
 	r.Get("/_config", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		contract.WriteHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
+		_ = contract.WriteResponse(w, req, http.StatusOK, c.configSnapshot(), nil)
 	}))
 
 	r.Get("/_info", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -94,7 +94,7 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 			"config": c.configSnapshot(),
 			"build":  health.GetBuildInfo(),
 		}
-		contract.WriteHTTPResponse(w, req, http.StatusOK, payload)
+		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
 	}))
 
 	r.Get(DevToolsRoutesPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -106,42 +106,42 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 		payload := map[string]any{
 			"routes": r.Routes(),
 		}
-		contract.WriteHTTPResponse(w, req, http.StatusOK, payload)
+		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
 	}))
 
 	r.Get(DevToolsMiddlewarePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"middlewares": c.middlewareList(),
 		}
-		contract.WriteHTTPResponse(w, req, http.StatusOK, payload)
+		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
 	}))
 
 	r.Get(DevToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		contract.WriteHTTPResponse(w, req, http.StatusOK, c.configSnapshot())
+		_ = contract.WriteResponse(w, req, http.StatusOK, c.configSnapshot(), nil)
 	}))
 
 	r.Get(DevToolsMetricsPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if c.devMetrics == nil {
-			contract.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
+			_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
 				"enabled": false,
-			})
+			}, nil)
 			return
 		}
 
-		contract.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
+		_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
 			"enabled": true,
 			"http":    c.devMetrics.Snapshot(),
 			"db":      c.devMetrics.DBSnapshot(),
-		})
+		}, nil)
 	}))
 
 	r.Post(DevToolsMetricsClear, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if c.devMetrics != nil {
 			c.devMetrics.Clear()
 		}
-		contract.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
+		_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
 			"status": "ok",
-		})
+		}, nil)
 	}))
 
 	// pprof endpoints (debug-only)
@@ -168,9 +168,9 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 			return
 		}
 
-		contract.WriteHTTPResponse(w, req, http.StatusOK, map[string]any{
+		_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
 			"status": "ok",
-		})
+		}, nil)
 	}))
 }
 

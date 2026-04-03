@@ -618,35 +618,44 @@ func TestTraceContextManagement(t *testing.T) {
 	}
 }
 
-func TestLegacyTraceIDKeyCompatibility(t *testing.T) {
-	originalCtx := context.Background()
-
-	// Test with new trace context
-	traceContext := TraceContext{
-		TraceID: "legacy-trace-id",
-		SpanID:  "legacy-span-id",
+func TestTraceIDFromContext(t *testing.T) {
+	// TraceID is read from TraceContext stored by ContextWithTraceContext.
+	ctx := ContextWithTraceContext(context.Background(), TraceContext{
+		TraceID: "test-trace-id",
+		SpanID:  "test-span-id",
+	})
+	if got := TraceIDFromContext(ctx); got != "test-trace-id" {
+		t.Fatalf("expected trace ID %q, got %q", "test-trace-id", got)
 	}
 
-	ctx := ContextWithTraceContext(originalCtx, traceContext)
+	// Empty context returns empty string.
+	if got := TraceIDFromContext(context.Background()); got != "" {
+		t.Fatalf("expected empty trace ID for empty context, got %q", got)
+	}
+}
 
-	// Legacy function should return trace ID from new context
-	traceID := TraceIDFromContext(ctx)
-	if traceID != "legacy-trace-id" {
-		t.Fatalf("expected legacy function to return trace ID from new context")
+func TestWithTraceIDString(t *testing.T) {
+	// Sets TraceID when no TraceContext exists yet.
+	ctx := WithTraceIDString(context.Background(), "new-id")
+	if got := TraceIDFromContext(ctx); got != "new-id" {
+		t.Fatalf("expected %q, got %q", "new-id", got)
 	}
 
-	// Test with old-style context value
-	oldCtx := context.WithValue(originalCtx, TraceIDKey{}, "old-trace-id")
-	oldTraceID := TraceIDFromContext(oldCtx)
-	if oldTraceID != "old-trace-id" {
-		t.Fatalf("expected legacy function to work with old-style context")
+	// Preserves existing SpanID when updating TraceID.
+	base := ContextWithTraceContext(context.Background(), TraceContext{
+		TraceID: "old-id",
+		SpanID:  "span-abc",
+	})
+	updated := WithTraceIDString(base, "new-id")
+	tc := TraceContextFromContext(updated)
+	if tc == nil {
+		t.Fatal("expected TraceContext to be set")
 	}
-
-	// Test with empty context
-	emptyCtx := context.Background()
-	emptyTraceID := TraceIDFromContext(emptyCtx)
-	if emptyTraceID != "" {
-		t.Fatalf("expected empty trace ID for empty context")
+	if string(tc.TraceID) != "new-id" {
+		t.Fatalf("expected TraceID %q, got %q", "new-id", tc.TraceID)
+	}
+	if string(tc.SpanID) != "span-abc" {
+		t.Fatalf("expected SpanID to be preserved, got %q", tc.SpanID)
 	}
 }
 

@@ -759,18 +759,24 @@ func TraceContextFromContext(ctx context.Context) *TraceContext {
 	return nil
 }
 
-// Legacy TraceIDKey for backward compatibility
-type TraceIDKey struct{}
-
-// TraceIDFromContext extracts the trace id injected by the Logging middleware.
+// TraceIDFromContext extracts the trace id from the context.
 func TraceIDFromContext(ctx context.Context) string {
 	if tc := TraceContextFromContext(ctx); tc != nil {
 		return string(tc.TraceID)
 	}
-	if v, ok := ctx.Value(TraceIDKey{}).(string); ok {
-		return v
-	}
 	return ""
+}
+
+// WithTraceIDString stores the given trace ID string in the context.
+// If a TraceContext already exists, only its TraceID field is updated so that
+// span and baggage information are preserved.
+func WithTraceIDString(ctx context.Context, id string) context.Context {
+	if existing := TraceContextFromContext(ctx); existing != nil {
+		updated := *existing
+		updated.TraceID = TraceID(id)
+		return ContextWithTraceContext(ctx, updated)
+	}
+	return ContextWithTraceContext(ctx, TraceContext{TraceID: TraceID(id)})
 }
 
 // Utility functions

@@ -486,7 +486,7 @@ func TestRequestContextFrom(t *testing.T) {
 func TestCtxResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
-	r = r.WithContext(context.WithValue(r.Context(), TraceIDKey{}, "trace-xyz"))
+	r = r.WithContext(ContextWithTraceContext(r.Context(), TraceContext{TraceID: "trace-xyz"}))
 	ctx := NewCtx(w, r, nil)
 
 	err := ctx.Response(http.StatusOK, map[string]string{"status": "ok"}, map[string]any{"page": 1})

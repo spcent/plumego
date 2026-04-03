@@ -1,7 +1,6 @@
 package accesslog
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -58,7 +57,7 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := internalobs.EnsureTraceID(r)
-			ctx := context.WithValue(r.Context(), contract.TraceIDKey{}, traceID)
+			ctx := contract.WithTraceIDString(r.Context(), traceID)
 			ctx = log.WithTraceID(ctx, traceID)
 
 			recorder := internalobs.NewResponseRecorder(w)
@@ -73,13 +72,16 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 			if spanTraceID != "" {
 				traceID = spanTraceID
 			}
-			ctx = context.WithValue(ctx, contract.TraceIDKey{}, traceID)
+			ctx = contract.WithTraceIDString(ctx, traceID)
 			ctx = log.WithTraceID(ctx, traceID)
-			if spanID != "" && contract.TraceContextFromContext(ctx) == nil {
-				ctx = contract.ContextWithTraceContext(ctx, contract.TraceContext{
-					TraceID: contract.TraceID(traceID),
-					SpanID:  contract.SpanID(spanID),
-				})
+			if spanID != "" {
+				existing := contract.TraceContextFromContext(ctx)
+				if existing == nil || existing.SpanID == "" {
+					ctx = contract.ContextWithTraceContext(ctx, contract.TraceContext{
+						TraceID: contract.TraceID(traceID),
+						SpanID:  contract.SpanID(spanID),
+					})
+				}
 			}
 
 			r = r.WithContext(ctx)

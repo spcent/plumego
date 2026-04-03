@@ -42,7 +42,7 @@ func (eh *ErrorHandler) Handle(
 	apiErr := eh.toAPIError(wrappedErr)
 
 	// Write error response
-	WriteError(w, r, apiErr)
+	_ = WriteError(w, r, apiErr)
 }
 
 // HandlePanic recovers from panic and converts to error
@@ -101,8 +101,21 @@ func (eh *ErrorHandler) toAPIError(err error) APIError {
 		return NewInternalError(chain.Error())
 	}
 
-	// Handle APIError directly
+	// Handle APIError directly; fill any missing required fields so callers
+	// always receive a fully-populated value regardless of how it was built.
 	if apiErr, ok := err.(APIError); ok {
+		if apiErr.Status == 0 {
+			apiErr.Status = http.StatusInternalServerError
+		}
+		if apiErr.Code == "" {
+			apiErr.Code = http.StatusText(apiErr.Status)
+		}
+		if apiErr.Category == "" {
+			apiErr.Category = CategoryForStatus(apiErr.Status)
+			if apiErr.Category == "" {
+				apiErr.Category = CategoryServer
+			}
+		}
 		return apiErr
 	}
 

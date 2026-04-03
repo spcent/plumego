@@ -1,7 +1,6 @@
 package requestid
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
@@ -69,7 +68,7 @@ func Middleware(opts ...Option) middleware.Middleware {
 				id = cfg.generate()
 			}
 
-			ctx := context.WithValue(r.Context(), contract.TraceIDKey{}, id)
+			ctx := contract.WithTraceIDString(r.Context(), id)
 			ctx = log.WithTraceID(ctx, id)
 			r, _ = contract.DefaultObservabilityPolicy.AttachRequestID(ctx, w, r, id, cfg.includeInRequest)
 			if cfg.headerName != "" && cfg.headerName != contract.RequestIDHeader {

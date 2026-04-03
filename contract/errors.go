@@ -78,6 +78,11 @@ const (
 )
 
 // APIError represents a normalized error payload for HTTP responses and logging.
+//
+// Callers outside this package should build APIError values through the
+// convenience constructors (NewValidationError, NewNotFoundError, …) or
+// NewErrorBuilder(), rather than struct literals, to guarantee that all
+// required fields (Status, Code, Category) are populated consistently.
 type APIError struct {
 	Status   int            `json:"-"`
 	Code     string         `json:"code"`
@@ -98,7 +103,9 @@ type ErrorResponse struct {
 }
 
 // WriteError writes a structured error response with trace context when available.
-func WriteError(w http.ResponseWriter, r *http.Request, err APIError) {
+// It returns the encoding error, if any; callers may ignore it when the response
+// headers have already been sent.
+func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	if err.Status == 0 {
 		err.Status = http.StatusInternalServerError
 	}
@@ -124,7 +131,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(err.Status)
 
-	_ = json.NewEncoder(w).Encode(ErrorResponse{Error: err})
+	return json.NewEncoder(w).Encode(ErrorResponse{Error: err})
 }
 
 // CategoryForStatus maps an HTTP status to a default error category.
