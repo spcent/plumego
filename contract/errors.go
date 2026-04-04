@@ -357,8 +357,10 @@ func ValidateError(err APIError) []string {
 	return validationErrors
 }
 
-// Common error builders for frequently used error patterns.
+// Legacy convenience constructors — use NewErrorBuilder() in new code.
+// See CANONICAL_STYLE_GUIDE.md §16.3.
 
+// Deprecated: Use NewErrorBuilder() instead.
 func NewValidationError(field, message string) APIError {
 	return NewErrorBuilder().
 		Status(http.StatusBadRequest).
@@ -371,6 +373,7 @@ func NewValidationError(field, message string) APIError {
 		Build()
 }
 
+// Deprecated: Use NewErrorBuilder() instead.
 func NewNotFoundError(resource string) APIError {
 	return NewErrorBuilder().
 		Status(http.StatusNotFound).
@@ -382,6 +385,7 @@ func NewNotFoundError(resource string) APIError {
 		Build()
 }
 
+// Deprecated: Use NewErrorBuilder() instead.
 func NewUnauthorizedError(message string) APIError {
 	if message == "" {
 		message = "authentication required"
@@ -395,6 +399,7 @@ func NewUnauthorizedError(message string) APIError {
 		Build()
 }
 
+// Deprecated: Use NewErrorBuilder() instead.
 func NewForbiddenError(message string) APIError {
 	if message == "" {
 		message = "access forbidden"
@@ -408,6 +413,7 @@ func NewForbiddenError(message string) APIError {
 		Build()
 }
 
+// Deprecated: Use NewErrorBuilder() instead.
 func NewTimeoutError(message string) APIError {
 	if message == "" {
 		message = "operation timed out"
@@ -421,6 +427,7 @@ func NewTimeoutError(message string) APIError {
 		Build()
 }
 
+// Deprecated: Use NewErrorBuilder() instead.
 func NewInternalError(message string) APIError {
 	if message == "" {
 		message = "internal server error"
@@ -434,6 +441,7 @@ func NewInternalError(message string) APIError {
 		Build()
 }
 
+// Deprecated: Use NewErrorBuilder() instead.
 func NewRateLimitError(message string) APIError {
 	if message == "" {
 		message = "rate limit exceeded"
@@ -447,6 +455,7 @@ func NewRateLimitError(message string) APIError {
 		Build()
 }
 
+// Deprecated: Use NewErrorBuilder() instead.
 func NewBadRequestError(message string) APIError {
 	if message == "" {
 		message = "bad request"

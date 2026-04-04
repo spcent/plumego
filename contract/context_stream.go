@@ -11,9 +11,6 @@ import (
 	"time"
 )
 
-// ErrSSEInvalidField is returned when an SSE event field contains invalid characters.
-var ErrSSEInvalidField = errors.New("SSE event field contains invalid characters (newlines not allowed in id/event)")
-
 // ErrUnsupportedStreamSource is returned when Stream receives a Source value whose
 // type does not match any of the accepted streaming primitives.
 var ErrUnsupportedStreamSource = errors.New("unsupported StreamSource type")

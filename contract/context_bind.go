@@ -146,6 +146,18 @@ func (c *Ctx) BindQuery(dst any) error {
 	return bindQuery(c.Query, dst)
 }
 
+// BindAndValidateQuery binds query parameters and then validates the struct
+// using the same "validate" struct tags as BindAndValidateJSON.
+func (c *Ctx) BindAndValidateQuery(dst any) error {
+	if err := c.BindQuery(dst); err != nil {
+		return err
+	}
+	if err := validateStruct(dst); err != nil {
+		return &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+	}
+	return nil
+}
+
 // bindQuery maps URL query values to struct fields using the "query" struct tag.
 func bindQuery(values url.Values, dst any) error {
 	rv := reflect.ValueOf(dst)

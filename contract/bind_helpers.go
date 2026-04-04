@@ -95,6 +95,6 @@ func BindErrorToAPIError(err error) APIError {
 }
 
 // WriteBindError writes a binding/validation error using the standard error envelope.
-func WriteBindError(w http.ResponseWriter, r *http.Request, err error) {
-	_ = WriteError(w, r, BindErrorToAPIError(err))
+func WriteBindError(w http.ResponseWriter, r *http.Request, err error) error {
+	return WriteError(w, r, BindErrorToAPIError(err))
 }

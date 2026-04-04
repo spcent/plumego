@@ -19,15 +19,15 @@ func (c *Ctx) ErrorJSON(status int, errCode string, message string, details map[
 	if category == "" {
 		category = CategoryBusiness
 	}
-	payload := APIError{
-		Status:   status,
-		Code:     errCode,
-		Message:  message,
-		Details:  details,
-		TraceID:  c.TraceID,
-		Category: category,
-	}
-	return c.JSON(status, payload)
+	payload := NewErrorBuilder().
+		Status(status).
+		Category(category).
+		Code(errCode).
+		Message(message).
+		TraceID(c.TraceID).
+		Details(details).
+		Build()
+	return WriteError(c.W, c.R, payload)
 }
 
 // Response writes a standardized success response that includes trace id when available.

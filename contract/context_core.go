@@ -203,6 +203,9 @@ func RouteNameFromContext(ctx context.Context) string {
 
 // Param returns a single path parameter from the request's context.
 // The boolean indicates whether the parameter was present.
+//
+// Deprecated: Use (*Ctx).Param instead. This package-level function is kept
+// for router-internal use only; handlers should access params via Ctx.
 func Param(r *http.Request, key string) (string, bool) {
 	rc := RequestContextFrom(r.Context())
 	if rc.Params == nil {

@@ -28,16 +28,16 @@ func TestErrorJSON(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
 
-	var response APIError
+	var response ErrorResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 
-	if response.Code != "invalid_request" {
-		t.Errorf("expected code 'invalid_request', got '%s'", response.Code)
+	if response.Error.Code != "invalid_request" {
+		t.Errorf("expected code 'invalid_request', got '%s'", response.Error.Code)
 	}
-	if response.Message != "Bad request" {
-		t.Errorf("expected message 'Bad request', got '%s'", response.Message)
+	if response.Error.Message != "Bad request" {
+		t.Errorf("expected message 'Bad request', got '%s'", response.Error.Message)
 	}
 }
 
@@ -68,13 +68,13 @@ func TestErrorJSONCategoryFromStatus(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			var response APIError
+			var response ErrorResponse
 			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 				t.Fatalf("failed to parse response: %v", err)
 			}
 
-			if response.Category != tt.expectedCategory {
-				t.Errorf("status %d: expected category %q, got %q", tt.status, tt.expectedCategory, response.Category)
+			if response.Error.Category != tt.expectedCategory {
+				t.Errorf("status %d: expected category %q, got %q", tt.status, tt.expectedCategory, response.Error.Category)
 			}
 		})
 	}
