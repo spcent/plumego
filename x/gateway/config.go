@@ -182,7 +182,13 @@ func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 			Category(contract.CategoryServer).
 			Build())
 	case err == ErrBackendTimeout:
-		contract.WriteError(w, r, contract.NewTimeoutError("Gateway Timeout"))
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusRequestTimeout).
+			Category(contract.CategoryTimeout).
+			Type(contract.ErrTypeTimeout).
+			Code(contract.CodeTimeout).
+			Message("Gateway Timeout").
+			Build())
 	default:
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadGateway).

@@ -117,7 +117,13 @@ func (c *Server) RegisterRoutes(r *router.Router) {
 				// Secrets in URLs can be leaked via server logs and Referer headers.
 
 				if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
-					_ = contract.WriteError(w, r, contract.NewUnauthorizedError("unauthorized"))
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+						Status(http.StatusUnauthorized).
+						Category(contract.CategoryAuthentication).
+						Type(contract.ErrTypeUnauthorized).
+						Code(contract.CodeUnauthorized).
+						Message("unauthorized").
+						Build())
 					return
 				}
 

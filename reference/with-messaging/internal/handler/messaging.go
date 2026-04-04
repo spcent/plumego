@@ -23,11 +23,23 @@ func (h MessagingHandler) Publish(w http.ResponseWriter, r *http.Request) {
 		Payload string `json:"payload"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		_ = contract.WriteError(w, r, contract.NewBadRequestError("invalid JSON body"))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryClient).
+			Type(contract.ErrTypeValidation).
+			Code(contract.CodeBadRequest).
+			Message("invalid JSON body").
+			Build())
 		return
 	}
 	if body.Topic == "" {
-		_ = contract.WriteError(w, r, contract.NewBadRequestError("topic is required"))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryClient).
+			Type(contract.ErrTypeValidation).
+			Code(contract.CodeBadRequest).
+			Message("topic is required").
+			Build())
 		return
 	}
 
@@ -38,7 +50,13 @@ func (h MessagingHandler) Publish(w http.ResponseWriter, r *http.Request) {
 		Data:  body.Payload,
 	}
 	if err := h.Broker.Publish(body.Topic, msg); err != nil {
-		_ = contract.WriteError(w, r, contract.NewInternalError("failed to publish event"))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Category(contract.CategoryServer).
+			Type(contract.ErrTypeInternal).
+			Code(contract.CodeInternalError).
+			Message("failed to publish event").
+			Build())
 		return
 	}
 

@@ -119,7 +119,13 @@ func TokenBucket(config Config) func(http.Handler) http.Handler {
 				allowed, bucket, err = consumeTokenNonAtomic(cfg, key, now)
 			}
 			if err != nil {
-				contract.WriteError(w, r, contract.NewInternalError("Rate limiter internal error"))
+				contract.WriteError(w, r, contract.NewErrorBuilder().
+					Status(http.StatusInternalServerError).
+					Category(contract.CategoryServer).
+					Type(contract.ErrTypeInternal).
+					Code(contract.CodeInternalError).
+					Message("Rate limiter internal error").
+					Build())
 				return
 			}
 
@@ -154,7 +160,13 @@ func TokenBucket(config Config) func(http.Handler) http.Handler {
 			w.Header().Set("Retry-After", strconv.FormatInt(int64(retryAfter.Seconds())+1, 10))
 
 			// Return 429 Too Many Requests
-			contract.WriteError(w, r, contract.NewRateLimitError("Rate limit exceeded"))
+			contract.WriteError(w, r, contract.NewErrorBuilder().
+				Status(http.StatusTooManyRequests).
+				Category(contract.CategoryRateLimit).
+				Type(contract.ErrTypeRateLimited).
+				Code(contract.CodeRateLimited).
+				Message("Rate limit exceeded").
+				Build())
 		})
 	}
 }

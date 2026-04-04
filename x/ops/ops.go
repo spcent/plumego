@@ -194,7 +194,15 @@ func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 
 	if queue == "" {
 		if c.cfg.Hooks.QueueList == nil {
-			contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("queue", "queue parameter required"))
+			contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Status(http.StatusBadRequest).
+				Category(contract.CategoryValidation).
+				Type(contract.ErrTypeValidation).
+				Code(contract.CodeValidationError).
+				Message("validation failed for field 'queue': queue parameter required").
+				Detail("field", "queue").
+				Detail("validation_message", "queue parameter required").
+				Build())
 			return
 		}
 		queues, err := c.cfg.Hooks.QueueList(ctx.R.Context())
@@ -264,7 +272,15 @@ func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 
 	messageID := strings.TrimSpace(ctx.Query.Get("message_id"))
 	if messageID == "" {
-		contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("message_id", "message_id parameter required"))
+		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryValidation).
+			Type(contract.ErrTypeValidation).
+			Code(contract.CodeValidationError).
+			Message("validation failed for field 'message_id': message_id parameter required").
+			Detail("field", "message_id").
+			Detail("validation_message", "message_id parameter required").
+			Build())
 		return
 	}
 
@@ -294,7 +310,15 @@ func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 
 	if provider == "" {
 		if c.cfg.Hooks.ChannelList == nil {
-			contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("provider", "provider parameter required"))
+			contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Status(http.StatusBadRequest).
+				Category(contract.CategoryValidation).
+				Type(contract.ErrTypeValidation).
+				Code(contract.CodeValidationError).
+				Message("validation failed for field 'provider': provider parameter required").
+				Detail("field", "provider").
+				Detail("validation_message", "provider parameter required").
+				Build())
 			return
 		}
 		list, err := c.cfg.Hooks.ChannelList(ctx.R.Context())
@@ -337,7 +361,15 @@ func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 
 	tenantID := strings.TrimSpace(ctx.Query.Get("tenant_id"))
 	if tenantID == "" {
-		contract.WriteError(ctx.W, ctx.R, contract.NewValidationError("tenant_id", "tenant_id parameter required"))
+		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryValidation).
+			Type(contract.ErrTypeValidation).
+			Code(contract.CodeValidationError).
+			Message("validation failed for field 'tenant_id': tenant_id parameter required").
+			Detail("field", "tenant_id").
+			Detail("validation_message", "tenant_id parameter required").
+			Build())
 		return
 	}
 
@@ -424,7 +456,13 @@ func writeNotImplemented(ctx *contract.Ctx, code, message string) {
 func denyAllMiddleware() middleware.Middleware {
 	return func(_ http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contract.WriteError(w, r, contract.NewUnauthorizedError("ops auth required"))
+			contract.WriteError(w, r, contract.NewErrorBuilder().
+				Status(http.StatusUnauthorized).
+				Category(contract.CategoryAuthentication).
+				Type(contract.ErrTypeUnauthorized).
+				Code(contract.CodeUnauthorized).
+				Message("ops auth required").
+				Build())
 		})
 	}
 }

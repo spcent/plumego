@@ -652,7 +652,13 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 
 	// Publish locally
 	if err := dps.InProcBroker.Publish(cm.Topic, cm.Message); err != nil {
-		contract.WriteError(w, r, contract.NewInternalError(err.Error()))
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Category(contract.CategoryServer).
+			Type(contract.ErrTypeInternal).
+			Code(contract.CodeInternalError).
+			Message(err.Error()).
+			Build())
 		dps.clusterErrors.Add(1)
 		return
 	}

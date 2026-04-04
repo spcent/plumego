@@ -113,7 +113,13 @@ func applyAuthOptions(opts ...AuthOption) authOptions {
 }
 
 func writeAuthInternal(w http.ResponseWriter, r *http.Request, message string) {
-	contract.WriteError(w, r, contract.NewInternalError(message))
+	contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(http.StatusInternalServerError).
+		Category(contract.CategoryServer).
+		Type(contract.ErrTypeInternal).
+		Code(contract.CodeInternalError).
+		Message(message).
+		Build())
 }
 
 func defaultAuthErrorHandler(realm string) AuthErrorHandler {
@@ -137,24 +143,39 @@ func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 }
 
 func authErrorToAPIError(err error) contract.APIError {
+	unauthorized := func(msg string) contract.APIError {
+		return contract.NewErrorBuilder().
+			Status(http.StatusUnauthorized).
+			Category(contract.CategoryAuthentication).
+			Type(contract.ErrTypeUnauthorized).
+			Code(contract.CodeUnauthorized).
+			Message(msg).
+			Build()
+	}
 	switch {
 	case errors.Is(err, contract.ErrUnauthorized):
-		return contract.NewForbiddenError("access forbidden")
+		return contract.NewErrorBuilder().
+			Status(http.StatusForbidden).
+			Category(contract.CategoryAuthentication).
+			Type(contract.ErrTypeForbidden).
+			Code(contract.CodeForbidden).
+			Message("access forbidden").
+			Build()
 	case errors.Is(err, contract.ErrInvalidToken):
-		return contract.NewUnauthorizedError("invalid token")
+		return unauthorized("invalid token")
 	case errors.Is(err, contract.ErrExpiredToken):
-		return contract.NewUnauthorizedError("token expired")
+		return unauthorized("token expired")
 	case errors.Is(err, contract.ErrSessionRevoked):
-		return contract.NewUnauthorizedError("session revoked")
+		return unauthorized("session revoked")
 	case errors.Is(err, contract.ErrSessionExpired):
-		return contract.NewUnauthorizedError("session expired")
+		return unauthorized("session expired")
 	case errors.Is(err, contract.ErrRefreshReused):
-		return contract.NewUnauthorizedError("refresh token reuse detected")
+		return unauthorized("refresh token reuse detected")
 	case errors.Is(err, contract.ErrTokenVersionMismatch):
-		return contract.NewUnauthorizedError("token version mismatch")
+		return unauthorized("token version mismatch")
 	case errors.Is(err, contract.ErrUnauthenticated):
 		fallthrough
 	default:
-		return contract.NewUnauthorizedError("authentication required")
+		return unauthorized("authentication required")
 	}
 }
