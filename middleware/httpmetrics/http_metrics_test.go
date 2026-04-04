@@ -36,7 +36,7 @@ func TestMiddlewareObservesRoutePattern(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodPost, "/users/42", nil)
-	req = req.WithContext(context.WithValue(req.Context(), contract.RequestContextKey{}, contract.RequestContext{
+	req = req.WithContext(contract.WithRequestContext(req.Context(), contract.RequestContext{
 		RoutePattern: "/users/:id",
 	}))
 	rec := httptest.NewRecorder()

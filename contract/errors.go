@@ -11,6 +11,11 @@ import (
 	"github.com/spcent/plumego/log"
 )
 
+// WarnFunc is invoked when WriteError receives an APIError with missing required
+// fields (Status, Code, or Category). It defaults to a no-op; override in tests
+// or at application startup to surface misconfigured callers.
+var WarnFunc = func(msg string) {}
+
 // ErrorCategory describes the high-level class of an API error for observability.
 type ErrorCategory string
 
@@ -77,6 +82,54 @@ const (
 	ErrTypeOperationNotAllowed ErrorType = "operation_not_allowed"
 )
 
+// errorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
+type errorTypeMeta struct {
+	Category ErrorCategory
+	Code     string
+	Status   int
+}
+
+// errorTypeLookup maps every ErrorType to its canonical metadata.
+// Use ErrorType.Meta() to look up a type's defaults rather than duplicating
+// switch statements across the codebase.
+var errorTypeLookup = map[ErrorType]errorTypeMeta{
+	// Validation
+	ErrTypeValidation:    {CategoryValidation, CodeValidationError, http.StatusBadRequest},
+	ErrTypeRequired:      {CategoryValidation, CodeRequired, http.StatusBadRequest},
+	ErrTypeInvalidFormat: {CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
+	ErrTypeOutOfRange:    {CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
+	ErrTypeDuplicate:     {CategoryValidation, CodeDuplicate, http.StatusBadRequest},
+	// Auth
+	ErrTypeUnauthorized: {CategoryAuthentication, CodeUnauthorized, http.StatusUnauthorized},
+	ErrTypeForbidden:    {CategoryAuthentication, CodeForbidden, http.StatusForbidden},
+	ErrTypeInvalidToken: {CategoryAuthentication, CodeInvalidToken, http.StatusUnauthorized},
+	ErrTypeExpiredToken: {CategoryAuthentication, CodeExpiredToken, http.StatusUnauthorized},
+	// Resource
+	ErrTypeNotFound:      {CategoryClient, CodeResourceNotFound, http.StatusNotFound},
+	ErrTypeConflict:      {CategoryClient, CodeConflict, http.StatusConflict},
+	ErrTypeAlreadyExists: {CategoryClient, CodeAlreadyExists, http.StatusConflict},
+	ErrTypeGone:          {CategoryClient, CodeGone, http.StatusGone},
+	// System
+	ErrTypeInternal:    {CategoryServer, CodeInternalError, http.StatusInternalServerError},
+	ErrTypeUnavailable: {CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
+	ErrTypeTimeout:     {CategoryTimeout, CodeTimeout, http.StatusRequestTimeout},
+	ErrTypeRateLimited: {CategoryRateLimit, CodeRateLimited, http.StatusTooManyRequests},
+	ErrTypeMaintenance: {CategoryServer, CodeMaintenance, http.StatusServiceUnavailable},
+	// Business
+	ErrTypeInvalidState:        {CategoryBusiness, CodeInvalidState, http.StatusUnprocessableEntity},
+	ErrTypeInsufficientFunds:   {CategoryBusiness, CodeInsufficientFunds, http.StatusUnprocessableEntity},
+	ErrTypeOperationNotAllowed: {CategoryBusiness, CodeOperationNotAllowed, http.StatusUnprocessableEntity},
+}
+
+// Meta returns the canonical Category, Code, and HTTP status for the ErrorType.
+// If the type is unrecognized, it returns server-error defaults.
+func (t ErrorType) Meta() errorTypeMeta {
+	if m, ok := errorTypeLookup[t]; ok {
+		return m
+	}
+	return errorTypeMeta{CategoryServer, CodeInternalError, http.StatusInternalServerError}
+}
+
 // APIError represents a normalized error payload for HTTP responses and logging.
 //
 // Callers outside this package should build APIError values through the
@@ -105,7 +158,16 @@ type ErrorResponse struct {
 // WriteError writes a structured error response with trace context when available.
 // It returns the encoding error, if any; callers may ignore it when the response
 // headers have already been sent.
+//
+// Prefer building APIError values through the convenience constructors or
+// NewErrorBuilder() so that required fields are always populated. WriteError
+// keeps fallback defaults for backward compatibility and calls WarnFunc when
+// required fields are missing.
 func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
+	if issues := ValidateError(err); len(issues) > 0 {
+		WarnFunc("WriteError received partially-populated APIError: " + strings.Join(issues, "; "))
+	}
+
 	if err.Status == 0 {
 		err.Status = http.StatusInternalServerError
 	}
@@ -256,7 +318,21 @@ func (b *ErrorBuilder) Details(details map[string]any) *ErrorBuilder {
 }
 
 // Build creates the final APIError instance.
+// It fills any missing Status, Code, and Category with safe defaults so that
+// every value returned by a builder is fully populated.
 func (b *ErrorBuilder) Build() APIError {
+	if b.err.Status == 0 {
+		b.err.Status = http.StatusInternalServerError
+	}
+	if b.err.Code == "" {
+		b.err.Code = http.StatusText(b.err.Status)
+	}
+	if b.err.Category == "" {
+		b.err.Category = CategoryForStatus(b.err.Status)
+		if b.err.Category == "" {
+			b.err.Category = CategoryServer
+		}
+	}
 	return b.err
 }
 

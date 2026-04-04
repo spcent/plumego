@@ -14,6 +14,228 @@ import (
 // ErrSSEInvalidField is returned when an SSE event field contains invalid characters.
 var ErrSSEInvalidField = errors.New("SSE event field contains invalid characters (newlines not allowed in id/event)")
 
+// ErrUnsupportedStreamSource is returned when Stream receives a Source value whose
+// type does not match any of the accepted streaming primitives.
+var ErrUnsupportedStreamSource = errors.New("unsupported StreamSource type")
+
+// StreamFormat selects the wire format for a streaming response.
+type StreamFormat string
+
+const (
+	StreamFormatJSON StreamFormat = "json" // newline-delimited JSON (application/x-ndjson)
+	StreamFormatText StreamFormat = "text" // plain-text lines (text/plain; charset=utf-8)
+	StreamFormatSSE  StreamFormat = "sse"  // Server-Sent Events (text/event-stream)
+)
+
+// StreamConfig describes a streaming operation passed to Ctx.Stream.
+//
+// Source must be one of the following concrete types:
+//   - []any            — JSON or Text items streamed from a slice
+//   - []string         — Text lines streamed from a slice
+//   - []SSEEvent       — SSE events streamed from a slice
+//   - <-chan any        — JSON or Text items streamed from a channel
+//   - <-chan string     — Text items streamed from a channel
+//   - <-chan SSEEvent   — SSE events streamed from a channel
+//   - func() (any, error)      — JSON or Text generator
+//   - func() (string, error)   — Text generator
+//   - func() (SSEEvent, error) — SSE generator
+//   - io.Reader                — binary streaming (Format is ignored)
+//
+// ChunkSize > 0 enables chunked flushing (slice sources only).
+// MaxRetry > 0 enables automatic retries on transient errors (generator sources only).
+type StreamConfig struct {
+	Format     StreamFormat
+	Source     any
+	ChunkSize  int
+	MaxRetry   int
+	RetryDelay time.Duration
+}
+
+// Stream dispatches a streaming response according to cfg.
+// It replaces the family of Stream* methods and supports all format/source combinations.
+func (c *Ctx) Stream(cfg StreamConfig) error {
+	switch src := cfg.Source.(type) {
+	case io.Reader:
+		chunkSize := cfg.ChunkSize
+		if chunkSize <= 0 {
+			chunkSize = 32 * 1024
+		}
+		return c.streamBinaryReader(src, chunkSize)
+
+	case []any:
+		if cfg.ChunkSize > 0 {
+			return c.streamJSONSliceChunked(src, cfg.ChunkSize)
+		}
+		ctx, err := c.initStream("application/x-ndjson")
+		if err != nil {
+			return err
+		}
+		return streamFromSlice(ctx, src, c.jsonWrite())
+
+	case []string:
+		if cfg.Format == StreamFormatSSE {
+			// treat strings as SSE data lines
+			events := make([]SSEEvent, len(src))
+			for i, s := range src {
+				events[i] = SSEEvent{Data: s}
+			}
+			if cfg.ChunkSize > 0 {
+				return c.streamSSESliceChunked(events, cfg.ChunkSize)
+			}
+			return c.streamSSESlice(events)
+		}
+		if cfg.ChunkSize > 0 {
+			return c.streamTextSliceChunked(src, cfg.ChunkSize)
+		}
+		ctx, err := c.initStream("text/plain; charset=utf-8")
+		if err != nil {
+			return err
+		}
+		return streamFromSlice(ctx, src, c.textWrite())
+
+	case []SSEEvent:
+		if cfg.ChunkSize > 0 {
+			return c.streamSSESliceChunked(src, cfg.ChunkSize)
+		}
+		return c.streamSSESlice(src)
+
+	case <-chan any:
+		ctx, err := c.initStream("application/x-ndjson")
+		if err != nil {
+			return err
+		}
+		return streamFromChan(ctx, src, c.jsonWrite())
+
+	case <-chan string:
+		ctx, err := c.initStream("text/plain; charset=utf-8")
+		if err != nil {
+			return err
+		}
+		return streamFromChan(ctx, src, c.textWrite())
+
+	case <-chan SSEEvent:
+		ctx := c.streamContext()
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		sw, err := c.RespondWithSSE()
+		if err != nil {
+			return err
+		}
+		return streamFromChan(ctx, src, sw.Write)
+
+	case func() (any, error):
+		ctx, err := c.initStream("application/x-ndjson")
+		if err != nil {
+			return err
+		}
+		if cfg.MaxRetry > 0 {
+			return streamFromGenWithRetry(ctx, src, cfg.MaxRetry, cfg.RetryDelay, c.jsonWrite())
+		}
+		return streamFromGen(ctx, src, c.jsonWrite())
+
+	case func() (string, error):
+		ctx, err := c.initStream("text/plain; charset=utf-8")
+		if err != nil {
+			return err
+		}
+		if cfg.MaxRetry > 0 {
+			return streamFromGenWithRetry(ctx, src, cfg.MaxRetry, cfg.RetryDelay, c.textWrite())
+		}
+		return streamFromGen(ctx, src, c.textWrite())
+
+	case func() (SSEEvent, error):
+		ctx := c.streamContext()
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		sw, err := c.RespondWithSSE()
+		if err != nil {
+			return err
+		}
+		if cfg.MaxRetry > 0 {
+			return streamFromGenWithRetry(ctx, src, cfg.MaxRetry, cfg.RetryDelay, sw.Write)
+		}
+		return streamFromGen(ctx, src, sw.Write)
+
+	default:
+		return ErrUnsupportedStreamSource
+	}
+}
+
+// --- shared slice/chunked helpers called by Stream and deprecated wrappers ---
+
+func (c *Ctx) streamBinaryReader(reader io.Reader, chunkSize int) error {
+	ctx, err := c.initStream("application/octet-stream")
+	if err != nil {
+		return err
+	}
+	buf := make([]byte, chunkSize)
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		n, readErr := reader.Read(buf)
+		if n > 0 {
+			if _, err := c.W.Write(buf[:n]); err != nil {
+				return err
+			}
+			c.flush()
+		}
+		if readErr == io.EOF {
+			return nil
+		}
+		if readErr != nil {
+			return readErr
+		}
+	}
+}
+
+func (c *Ctx) streamJSONSliceChunked(items []any, chunkSize int) error {
+	ctx, err := c.initStream("application/x-ndjson")
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(c.W)
+	return streamFromSliceChunked(ctx, items, chunkSize, enc.Encode, c.flush)
+}
+
+func (c *Ctx) streamTextSliceChunked(lines []string, chunkSize int) error {
+	ctx, err := c.initStream("text/plain; charset=utf-8")
+	if err != nil {
+		return err
+	}
+	write := func(line string) error {
+		_, err := fmt.Fprintf(c.W, "%s\n", line)
+		return err
+	}
+	return streamFromSliceChunked(ctx, lines, chunkSize, write, c.flush)
+}
+
+func (c *Ctx) streamSSESlice(events []SSEEvent) error {
+	ctx := c.streamContext()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sw, err := c.RespondWithSSE()
+	if err != nil {
+		return err
+	}
+	return streamFromSlice(ctx, events, sw.Write)
+}
+
+func (c *Ctx) streamSSESliceChunked(events []SSEEvent, chunkSize int) error {
+	ctx := c.streamContext()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sw, err := c.RespondWithSSE()
+	if err != nil {
+		return err
+	}
+	return streamFromSliceChunked(ctx, events, chunkSize, sw.Write, c.flush)
+}
+
 // sanitizeSSEField strips newline characters from SSE id and event fields
 // to prevent protocol injection attacks.
 func sanitizeSSEField(s string) string {
@@ -304,199 +526,102 @@ func (c *Ctx) WriteSSE(event SSEEvent) error {
 	return sw.Write(event)
 }
 
-// --- Slice-based streaming ---
+// --- Deprecated slice-based streaming ---
+// Use Stream(StreamConfig{Format: StreamFormatJSON, Source: items}) instead.
 
-// StreamJSON streams items as newline-delimited JSON, flushing after each item.
+// Deprecated: Use Stream with StreamConfig instead.
 func (c *Ctx) StreamJSON(items []any) error {
-	ctx, err := c.initStream("application/x-ndjson")
-	if err != nil {
-		return err
-	}
-	return streamFromSlice(ctx, items, c.jsonWrite())
+	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: items})
 }
 
-// StreamText streams lines of text, flushing after each line.
+// Deprecated: Use Stream with StreamConfig instead.
 func (c *Ctx) StreamText(lines []string) error {
-	ctx, err := c.initStream("text/plain; charset=utf-8")
-	if err != nil {
-		return err
-	}
-	return streamFromSlice(ctx, lines, c.textWrite())
+	return c.Stream(StreamConfig{Format: StreamFormatText, Source: lines})
 }
 
 // StreamBinary streams binary data in chunks of the given size.
+// Deprecated: Use Stream with StreamConfig{Source: reader, ChunkSize: chunkSize} instead.
 func (c *Ctx) StreamBinary(reader io.Reader, chunkSize int) error {
 	if err := validateChunkSize(chunkSize); err != nil {
 		return err
 	}
-	ctx, err := c.initStream("application/octet-stream")
-	if err != nil {
-		return err
-	}
-	buf := make([]byte, chunkSize)
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		n, readErr := reader.Read(buf)
-		if n > 0 {
-			if _, err := c.W.Write(buf[:n]); err != nil {
-				return err
-			}
-			c.flush()
-		}
-		if readErr == io.EOF {
-			return nil
-		}
-		if readErr != nil {
-			return readErr
-		}
-	}
+	return c.Stream(StreamConfig{Source: reader, ChunkSize: chunkSize})
 }
 
-// --- Channel-based streaming ---
+// --- Deprecated channel-based streaming ---
 
-// StreamJSONWithChannel streams JSON items from a channel, flushing after each item.
+// Deprecated: Use Stream with StreamConfig instead.
 func (c *Ctx) StreamJSONWithChannel(itemChan <-chan any) error {
-	ctx, err := c.initStream("application/x-ndjson")
-	if err != nil {
-		return err
-	}
-	return streamFromChan(ctx, itemChan, c.jsonWrite())
+	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: itemChan})
 }
 
-// StreamTextWithChannel streams text lines from a channel, flushing after each line.
+// Deprecated: Use Stream with StreamConfig instead.
 func (c *Ctx) StreamTextWithChannel(lineChan <-chan string) error {
-	ctx, err := c.initStream("text/plain; charset=utf-8")
-	if err != nil {
-		return err
-	}
-	return streamFromChan(ctx, lineChan, c.textWrite())
+	return c.Stream(StreamConfig{Format: StreamFormatText, Source: lineChan})
 }
 
-// StreamSSEWithChannel streams Server-Sent Events from a channel.
+// Deprecated: Use Stream with StreamConfig instead.
 func (c *Ctx) StreamSSEWithChannel(eventChan <-chan SSEEvent) error {
-	ctx := c.streamContext()
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	sw, err := c.RespondWithSSE()
-	if err != nil {
-		return err
-	}
-	return streamFromChan(ctx, eventChan, sw.Write)
+	return c.Stream(StreamConfig{Format: StreamFormatSSE, Source: eventChan})
 }
 
-// --- Generator-based streaming ---
+// --- Deprecated generator-based streaming ---
 
-// StreamJSONWithGenerator streams JSON items from a generator function until it returns io.EOF.
+// Deprecated: Use Stream with StreamConfig instead.
 func (c *Ctx) StreamJSONWithGenerator(generator func() (any, error)) error {
-	ctx, err := c.initStream("application/x-ndjson")
-	if err != nil {
-		return err
-	}
-	return streamFromGen(ctx, generator, c.jsonWrite())
+	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: generator})
 }
 
-// StreamTextWithGenerator streams text lines from a generator function until it returns io.EOF.
+// Deprecated: Use Stream with StreamConfig instead.
 func (c *Ctx) StreamTextWithGenerator(generator func() (string, error)) error {
-	ctx, err := c.initStream("text/plain; charset=utf-8")
-	if err != nil {
-		return err
-	}
-	return streamFromGen(ctx, generator, c.textWrite())
+	return c.Stream(StreamConfig{Format: StreamFormatText, Source: generator})
 }
 
-// StreamSSEWithGenerator streams Server-Sent Events from a generator function until it returns io.EOF.
+// Deprecated: Use Stream with StreamConfig instead.
 func (c *Ctx) StreamSSEWithGenerator(generator func() (SSEEvent, error)) error {
-	ctx := c.streamContext()
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	sw, err := c.RespondWithSSE()
-	if err != nil {
-		return err
-	}
-	return streamFromGen(ctx, generator, sw.Write)
+	return c.Stream(StreamConfig{Format: StreamFormatSSE, Source: generator})
 }
 
-// --- Chunked streaming ---
+// --- Deprecated chunked streaming ---
 
-// StreamJSONChunked streams JSON items, flushing every chunkSize items.
+// Deprecated: Use Stream with StreamConfig{ChunkSize: chunkSize} instead.
 func (c *Ctx) StreamJSONChunked(items []any, chunkSize int) error {
 	if err := validateChunkSize(chunkSize); err != nil {
 		return err
 	}
-	ctx, err := c.initStream("application/x-ndjson")
-	if err != nil {
-		return err
-	}
-	enc := json.NewEncoder(c.W)
-	return streamFromSliceChunked(ctx, items, chunkSize, enc.Encode, c.flush)
+	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: items, ChunkSize: chunkSize})
 }
 
-// StreamTextChunked streams text lines, flushing every chunkSize lines.
+// Deprecated: Use Stream with StreamConfig{ChunkSize: chunkSize} instead.
 func (c *Ctx) StreamTextChunked(lines []string, chunkSize int) error {
 	if err := validateChunkSize(chunkSize); err != nil {
 		return err
 	}
-	ctx, err := c.initStream("text/plain; charset=utf-8")
-	if err != nil {
-		return err
-	}
-	write := func(line string) error {
-		_, err := fmt.Fprintf(c.W, "%s\n", line)
-		return err
-	}
-	return streamFromSliceChunked(ctx, lines, chunkSize, write, c.flush)
+	return c.Stream(StreamConfig{Format: StreamFormatText, Source: lines, ChunkSize: chunkSize})
 }
 
 // StreamSSEChunked streams Server-Sent Events, flushing every chunkSize events.
-// Note: SSEWriter.Write already flushes after each event; the chunk flush is an additional guarantee.
+// Deprecated: Use Stream with StreamConfig{ChunkSize: chunkSize} instead.
 func (c *Ctx) StreamSSEChunked(events []SSEEvent, chunkSize int) error {
 	if err := validateChunkSize(chunkSize); err != nil {
 		return err
 	}
-	ctx := c.streamContext()
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	sw, err := c.RespondWithSSE()
-	if err != nil {
-		return err
-	}
-	return streamFromSliceChunked(ctx, events, chunkSize, sw.Write, c.flush)
+	return c.Stream(StreamConfig{Format: StreamFormatSSE, Source: events, ChunkSize: chunkSize})
 }
 
-// --- Streaming with retry ---
+// --- Deprecated streaming with retry ---
 
-// StreamJSONWithRetry streams JSON items from a generator, retrying up to maxRetries times on error.
+// Deprecated: Use Stream with StreamConfig{MaxRetry: maxRetries, RetryDelay: retryDelay} instead.
 func (c *Ctx) StreamJSONWithRetry(generator func() (any, error), maxRetries int, retryDelay time.Duration) error {
-	ctx, err := c.initStream("application/x-ndjson")
-	if err != nil {
-		return err
-	}
-	return streamFromGenWithRetry(ctx, generator, maxRetries, retryDelay, c.jsonWrite())
+	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: generator, MaxRetry: maxRetries, RetryDelay: retryDelay})
 }
 
-// StreamTextWithRetry streams text lines from a generator, retrying up to maxRetries times on error.
+// Deprecated: Use Stream with StreamConfig{MaxRetry: maxRetries, RetryDelay: retryDelay} instead.
 func (c *Ctx) StreamTextWithRetry(generator func() (string, error), maxRetries int, retryDelay time.Duration) error {
-	ctx, err := c.initStream("text/plain; charset=utf-8")
-	if err != nil {
-		return err
-	}
-	return streamFromGenWithRetry(ctx, generator, maxRetries, retryDelay, c.textWrite())
+	return c.Stream(StreamConfig{Format: StreamFormatText, Source: generator, MaxRetry: maxRetries, RetryDelay: retryDelay})
 }
 
-// StreamSSEWithRetry streams Server-Sent Events from a generator, retrying up to maxRetries times on error.
+// Deprecated: Use Stream with StreamConfig{MaxRetry: maxRetries, RetryDelay: retryDelay} instead.
 func (c *Ctx) StreamSSEWithRetry(generator func() (SSEEvent, error), maxRetries int, retryDelay time.Duration) error {
-	ctx := c.streamContext()
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	sw, err := c.RespondWithSSE()
-	if err != nil {
-		return err
-	}
-	return streamFromGenWithRetry(ctx, generator, maxRetries, retryDelay, sw.Write)
+	return c.Stream(StreamConfig{Format: StreamFormatSSE, Source: generator, MaxRetry: maxRetries, RetryDelay: retryDelay})
 }

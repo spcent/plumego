@@ -1,7 +1,6 @@
 package router
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -491,8 +490,8 @@ func TestRouteParamsOverrideExistingContext(t *testing.T) {
 	}))
 
 	baseReq := httptest.NewRequest(http.MethodGet, "/users/123", nil)
-	ctx := context.WithValue(baseReq.Context(), contract.ParamsContextKey{}, map[string]string{"id": "ctx"})
-	ctx = context.WithValue(ctx, contract.RequestContextKey{}, contract.RequestContext{
+	ctx := contract.WithParams(baseReq.Context(), map[string]string{"id": "ctx"})
+	ctx = contract.WithRequestContext(ctx, contract.RequestContext{
 		Params: map[string]string{"id": "ctx2"},
 	})
 	req := baseReq.WithContext(ctx)

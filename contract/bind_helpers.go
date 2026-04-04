@@ -3,17 +3,16 @@ package contract
 import (
 	"errors"
 	"net/http"
-
-	logpkg "github.com/spcent/plumego/log"
 )
 
 // BindOptions configures JSON binding/validation for Ctx helpers.
 type BindOptions struct {
-	MaxBodyBytes          int64
+	// MaxBodySize caps the body size checked after the initial read.
+	// Zero means no additional cap beyond what is set in RequestConfig.
+	MaxBodySize           int64
 	DisallowUnknownFields bool
 	DisableValidation     bool
 	Validator             func(any) error
-	Logger                logpkg.StructuredLogger
 	Redact                func(any) any
 }
 

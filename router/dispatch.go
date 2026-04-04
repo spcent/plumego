@@ -1,7 +1,6 @@
 package router
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"sort"
@@ -219,10 +218,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	}
 
 	ctx := req.Context()
-	existingRC, ok := ctx.Value(contract.RequestContextKey{}).(contract.RequestContext)
-	if !ok {
-		existingRC = contract.RequestContext{}
-	}
+	existingRC := contract.RequestContextFrom(ctx)
 
 	if len(params) > 0 {
 		existingRC.Params = params
@@ -236,7 +232,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	}
 
 	// Merge params into context using a single WithValue call.
-	ctx = context.WithValue(ctx, contract.RequestContextKey{}, existingRC)
+	ctx = contract.WithRequestContext(ctx, existingRC)
 	reqWithParams := req.WithContext(ctx)
 
 	// Obtain the handler (possibly from middleware-chain cache).

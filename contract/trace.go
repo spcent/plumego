@@ -742,16 +742,14 @@ func WithErrorAttributes(attrs map[string]any) ErrorOption {
 
 type traceContextKey struct{}
 
-var traceContextKeyVar traceContextKey
-
 // ContextWithTraceContext adds trace context to the context.
 func ContextWithTraceContext(ctx context.Context, traceContext TraceContext) context.Context {
-	return context.WithValue(ctx, traceContextKeyVar, &traceContext)
+	return context.WithValue(ctx, traceContextKey{}, &traceContext)
 }
 
 // TraceContextFromContext retrieves trace context from the context.
 func TraceContextFromContext(ctx context.Context) *TraceContext {
-	if v := ctx.Value(traceContextKeyVar); v != nil {
+	if v := ctx.Value(traceContextKey{}); v != nil {
 		if tc, ok := v.(*TraceContext); ok {
 			return tc
 		}

@@ -259,7 +259,7 @@ func TestNewCtxAppliesRequestTimeout(t *testing.T) {
 }
 
 func TestParamsAndRequestContextHelpers(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(context.WithValue(context.Background(), ParamsContextKey{}, map[string]string{"id": "42"}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(context.WithValue(context.Background(), paramsContextKey{}, map[string]string{"id": "42"}))
 	if val, ok := Param(req, "id"); !ok || val != "42" {
 		t.Fatalf("unexpected Param lookup: %v %v", val, ok)
 	}
