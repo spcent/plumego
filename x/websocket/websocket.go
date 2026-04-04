@@ -102,7 +102,7 @@ func (c *Server) RegisterRoutes(r *router.Router) {
 		if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
 			r.Post(c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
-					_ = contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "method_not_allowed", Message: "POST only", Category: contract.CategoryForStatus(http.StatusMethodNotAllowed)})
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code("method_not_allowed").Message("POST only").Category(contract.CategoryClient).Build())
 					return
 				}
 				// Always require authentication for broadcast endpoint.
@@ -117,13 +117,13 @@ func (c *Server) RegisterRoutes(r *router.Router) {
 				// Secrets in URLs can be leaked via server logs and Referer headers.
 
 				if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
-					_ = contract.WriteError(w, r, contract.APIError{Status: http.StatusUnauthorized, Code: "unauthorized", Message: "unauthorized", Category: contract.CategoryForStatus(http.StatusUnauthorized)})
+					_ = contract.WriteError(w, r, contract.NewUnauthorizedError("unauthorized"))
 					return
 				}
 
 				b, err := io.ReadAll(r.Body)
 				if err != nil {
-					_ = contract.WriteError(w, r, contract.APIError{Status: http.StatusInternalServerError, Code: "read_body_failed", Message: "Error reading request body", Category: contract.CategoryForStatus(http.StatusInternalServerError)})
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusInternalServerError).Code("read_body_failed").Message("Error reading request body").Build())
 					return
 				}
 

@@ -232,13 +232,13 @@ func debugErrorPayload(status int, r *http.Request, cfg DebugErrorConfig, body [
 		details = nil
 	}
 
-	return contract.APIError{
-		Status:   status,
-		Code:     code,
-		Message:  message,
-		Category: category,
-		Details:  details,
-	}
+	return contract.NewErrorBuilder().
+		Status(status).
+		Code(code).
+		Message(message).
+		Category(category).
+		Details(details).
+		Build()
 }
 
 func truncateBody(body []byte, limit int) string {

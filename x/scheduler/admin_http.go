@@ -34,7 +34,7 @@ func (h *AdminHandler) WithPrefix(prefix string) *AdminHandler {
 // ServeHTTP implements http.Handler.
 func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.scheduler == nil {
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: "scheduler not configured", Category: contract.CategoryServer})
+		contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusServiceUnavailable).Code("SERVICE_UNAVAILABLE").Message("scheduler not configured").Category(contract.CategoryServer).Build())
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, h.prefix)
@@ -141,7 +141,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 				http.NotFound(w, r)
 				return
 			}
-			contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "TRIGGER_FAILED", Message: err.Error(), Category: contract.CategoryClient})
+			contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Code("TRIGGER_FAILED").Message(err.Error()).Category(contract.CategoryClient).Build())
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "triggered"})
@@ -338,10 +338,10 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func writeMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
-	contract.WriteError(w, r, contract.APIError{
-		Status:   http.StatusMethodNotAllowed,
-		Code:     "METHOD_NOT_ALLOWED",
-		Message:  "method not allowed",
-		Category: contract.CategoryClient,
-	})
+	contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(http.StatusMethodNotAllowed).
+		Code("METHOD_NOT_ALLOWED").
+		Message("method not allowed").
+		Category(contract.CategoryClient).
+		Build())
 }

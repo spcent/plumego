@@ -168,23 +168,23 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 
 	// Basic HTTP validation first
 	if r.Method != http.MethodGet {
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "method not allowed", Category: contract.CategoryClient})
+		contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code("METHOD_NOT_ALLOWED").Message("method not allowed").Category(contract.CategoryClient).Build())
 		return
 	}
 	if !headerContains(r.Header, "Connection", "Upgrade") || !headerContains(r.Header, "Upgrade", "websocket") {
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "bad request", Category: contract.CategoryClient})
+		contract.WriteError(w, r, contract.NewBadRequestError("bad request"))
 		return
 	}
 
 	// Validate WebSocket key
 	key := r.Header.Get("Sec-WebSocket-Key")
 	if key == "" {
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "bad request", Category: contract.CategoryClient})
+		contract.WriteError(w, r, contract.NewBadRequestError("bad request"))
 		return
 	}
 	if err := ValidateWebSocketKey(key); err != nil {
 		cfg.Hub.invalidWSKeys.Add(1)
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: err.Error(), Category: contract.CategoryClient})
+		contract.WriteError(w, r, contract.NewBadRequestError(err.Error()))
 		return
 	}
 
@@ -205,7 +205,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		if errors.Is(err, ErrRoomFull) {
 			status = http.StatusTooManyRequests
 		}
-		contract.WriteError(w, r, contract.APIError{Status: status, Code: "JOIN_DENIED", Message: err.Error(), Category: contract.CategoryClient})
+		contract.WriteError(w, r, contract.NewErrorBuilder().Status(status).Code("JOIN_DENIED").Message(err.Error()).Category(contract.CategoryClient).Build())
 		return
 	}
 

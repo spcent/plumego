@@ -337,12 +337,12 @@ func (s *statusCodeWriter) Write(b []byte) (int, error) {
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusMethodNotAllowed,
-			Code:     "method_not_allowed",
-			Message:  "method not allowed",
-			Category: contract.CategoryClient,
-		})
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusMethodNotAllowed).
+			Code("method_not_allowed").
+			Message("method not allowed").
+			Category(contract.CategoryClient).
+			Build())
 		return
 	}
 
@@ -519,12 +519,12 @@ func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message str
 			return
 		}
 	}
-	contract.WriteError(w, r, contract.APIError{
-		Status:   code,
-		Code:     "internal_error",
-		Message:  message,
-		Category: contract.CategoryServer,
-	})
+	contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(code).
+		Code("internal_error").
+		Message(message).
+		Category(contract.CategoryServer).
+		Build())
 }
 
 // acceptsToken reports whether the client's Accept-Encoding header contains the

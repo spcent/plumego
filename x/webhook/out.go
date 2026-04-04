@@ -89,13 +89,13 @@ type targetDTO struct {
 func webhookCreateTarget(ctx *contract.Ctx, svc *Service) {
 	var req Target
 	if err := ctx.BindJSON(&req); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "invalid_json", Message: "invalid JSON payload", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}
 
 	t, err := svc.CreateTarget(ctx.R.Context(), req)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: err.Error(), Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
@@ -117,7 +117,7 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 		Event:   event,
 	})
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusInternalServerError, Code: "store_error", Message: err.Error(), Category: contract.CategoryForStatus(http.StatusInternalServerError)})
+		_ = contract.WriteError(ctx.W, ctx.R, errStoreError(err.Error()))
 		return
 	}
 
@@ -132,13 +132,13 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 func webhookGetTarget(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: "id is required", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	t, ok := svc.GetTarget(ctx.R.Context(), id)
 	if !ok {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusNotFound, Code: "not_found", Message: "target not found", Category: contract.CategoryForStatus(http.StatusNotFound)})
+		_ = contract.WriteError(ctx.W, ctx.R, errNotFound("target not found"))
 		return
 	}
 
@@ -148,19 +148,19 @@ func webhookGetTarget(ctx *contract.Ctx, svc *Service) {
 func webhookPatchTarget(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: "id is required", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	var req TargetPatch
 	if err := ctx.BindJSON(&req); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "invalid_json", Message: "invalid JSON payload", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, req)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: err.Error(), Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
@@ -170,17 +170,17 @@ func webhookPatchTarget(ctx *contract.Ctx, svc *Service) {
 func webhookSetTargetEnabled(ctx *contract.Ctx, svc *Service, enable bool) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: "id is required", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, TargetPatch{Enabled: &enable})
 	if err != nil {
 		if err == ErrNotFound {
-			_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusNotFound, Code: "not_found", Message: "target not found", Category: contract.CategoryForStatus(http.StatusNotFound)})
+			_ = contract.WriteError(ctx.W, ctx.R, errNotFound("target not found"))
 			return
 		}
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: err.Error(), Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
@@ -190,7 +190,7 @@ func webhookSetTargetEnabled(ctx *contract.Ctx, svc *Service, enable bool) {
 func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmpty bool) {
 	event, ok := ctx.Param("event")
 	if !ok || strings.TrimSpace(event) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: "event is required", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("event is required"))
 		return
 	}
 
@@ -200,11 +200,11 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 	}
 
 	if token == "" && !allowEmpty {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusForbidden, Code: "forbidden", Message: "triggering is disabled", Category: contract.CategoryForStatus(http.StatusForbidden)})
+		_ = contract.WriteError(ctx.W, ctx.R, errForbidden("triggering is disabled"))
 		return
 	}
 	if token != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusUnauthorized, Code: "unauthorized", Message: "invalid trigger token", Category: contract.CategoryForStatus(http.StatusUnauthorized)})
+		_ = contract.WriteError(ctx.W, ctx.R, errUnauthorized("invalid trigger token"))
 		return
 	}
 
@@ -213,13 +213,13 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 		Meta map[string]any `json:"meta"`
 	}
 	if err := ctx.BindJSON(&payload); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "invalid_json", Message: "invalid JSON payload", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}
 
 	enqueued, err := svc.TriggerEvent(ctx.R.Context(), Event{Type: event, Data: payload.Data, Meta: payload.Meta})
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: err.Error(), Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
@@ -264,7 +264,7 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 
 	deliveries, err := svc.ListDeliveries(ctx.R.Context(), filter)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusInternalServerError, Code: "store_error", Message: err.Error(), Category: contract.CategoryForStatus(http.StatusInternalServerError)})
+		_ = contract.WriteError(ctx.W, ctx.R, errStoreError(err.Error()))
 		return
 	}
 
@@ -310,13 +310,13 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: "id is required", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	d, ok := svc.GetDelivery(ctx.R.Context(), id)
 	if !ok {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusNotFound, Code: "not_found", Message: "delivery not found", Category: contract.CategoryForStatus(http.StatusNotFound)})
+		_ = contract.WriteError(ctx.W, ctx.R, errNotFound("delivery not found"))
 		return
 	}
 
@@ -343,21 +343,47 @@ func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
 func webhookReplayDelivery(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: "id is required", Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	d, err := svc.ReplayDelivery(ctx.R.Context(), id)
 	if errors.Is(err, ErrNotFound) {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusNotFound, Code: "not_found", Message: "delivery not found", Category: contract.CategoryForStatus(http.StatusNotFound)})
+		_ = contract.WriteError(ctx.W, ctx.R, errNotFound("delivery not found"))
 		return
 	}
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusBadRequest, Code: "bad_request", Message: err.Error(), Category: contract.CategoryForStatus(http.StatusBadRequest)})
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
 	_ = ctx.Response(http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID}, nil)
+}
+
+// --- package-local error helpers (use ErrorBuilder to guarantee fully populated APIError) ---
+
+func errBadRequest(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusBadRequest).Code("bad_request").Message(msg).Build()
+}
+
+func errInvalidJSON() contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusBadRequest).Code("invalid_json").Message("invalid JSON payload").Build()
+}
+
+func errNotFound(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusNotFound).Code("not_found").Message(msg).Build()
+}
+
+func errStoreError(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusInternalServerError).Code("store_error").Message(msg).Build()
+}
+
+func errForbidden(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusForbidden).Code("forbidden").Message(msg).Build()
+}
+
+func errUnauthorized(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusUnauthorized).Code("unauthorized").Message(msg).Build()
 }
 
 func targetToDTO(t Target) targetDTO {

@@ -560,21 +560,11 @@ func (dps *DistributedPubSub) checkNodeHealth() {
 
 func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusMethodNotAllowed,
-			Code:     "METHOD_NOT_ALLOWED",
-			Message:  "method not allowed",
-			Category: contract.CategoryClient,
-		})
+		contract.WriteError(w, r, errClusterMethodNotAllowed())
 		return
 	}
 	if !dps.authenticateClusterRequest(r) {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusUnauthorized,
-			Code:     "UNAUTHORIZED",
-			Message:  "invalid cluster auth token",
-			Category: contract.CategoryAuthentication,
-		})
+		contract.WriteError(w, r, errClusterUnauthorized())
 		return
 	}
 
@@ -590,32 +580,22 @@ func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Reques
 
 func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusMethodNotAllowed,
-			Code:     "METHOD_NOT_ALLOWED",
-			Message:  "method not allowed",
-			Category: contract.CategoryClient,
-		})
+		contract.WriteError(w, r, errClusterMethodNotAllowed())
 		return
 	}
 	if !dps.authenticateClusterRequest(r) {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusUnauthorized,
-			Code:     "UNAUTHORIZED",
-			Message:  "invalid cluster auth token",
-			Category: contract.CategoryAuthentication,
-		})
+		contract.WriteError(w, r, errClusterUnauthorized())
 		return
 	}
 
 	var payload heartbeatPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusBadRequest,
-			Code:     "INVALID_PAYLOAD",
-			Message:  "invalid payload",
-			Category: contract.CategoryClient,
-		})
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("INVALID_PAYLOAD").
+			Message("invalid payload").
+			Category(contract.CategoryClient).
+			Build())
 		return
 	}
 
@@ -651,32 +631,22 @@ func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Req
 
 func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusMethodNotAllowed,
-			Code:     "METHOD_NOT_ALLOWED",
-			Message:  "method not allowed",
-			Category: contract.CategoryClient,
-		})
+		contract.WriteError(w, r, errClusterMethodNotAllowed())
 		return
 	}
 	if !dps.authenticateClusterRequest(r) {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusUnauthorized,
-			Code:     "UNAUTHORIZED",
-			Message:  "invalid cluster auth token",
-			Category: contract.CategoryAuthentication,
-		})
+		contract.WriteError(w, r, errClusterUnauthorized())
 		return
 	}
 
 	var cm clusterMessage
 	if err := json.NewDecoder(r.Body).Decode(&cm); err != nil {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusBadRequest,
-			Code:     "INVALID_MESSAGE",
-			Message:  "invalid message",
-			Category: contract.CategoryClient,
-		})
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("INVALID_MESSAGE").
+			Message("invalid message").
+			Category(contract.CategoryClient).
+			Build())
 		return
 	}
 
@@ -695,21 +665,11 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 
 func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusMethodNotAllowed,
-			Code:     "METHOD_NOT_ALLOWED",
-			Message:  "method not allowed",
-			Category: contract.CategoryClient,
-		})
+		contract.WriteError(w, r, errClusterMethodNotAllowed())
 		return
 	}
 	if !dps.authenticateClusterRequest(r) {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusUnauthorized,
-			Code:     "UNAUTHORIZED",
-			Message:  "invalid cluster auth token",
-			Category: contract.CategoryAuthentication,
-		})
+		contract.WriteError(w, r, errClusterUnauthorized())
 		return
 	}
 
@@ -788,4 +748,14 @@ type ClusterStats struct {
 	ClusterForwards  uint64
 	ClusterErrors    uint64
 	Heartbeats       uint64
+}
+
+// --- package-local error helpers for cluster HTTP handlers ---
+
+func errClusterMethodNotAllowed() contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code("METHOD_NOT_ALLOWED").Message("method not allowed").Category(contract.CategoryClient).Build()
+}
+
+func errClusterUnauthorized() contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusUnauthorized).Code("UNAUTHORIZED").Message("invalid cluster auth token").Category(contract.CategoryAuthentication).Build()
 }

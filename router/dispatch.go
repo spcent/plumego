@@ -46,12 +46,12 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			allowed := r.allowedMethods(path)
 			if len(allowed) > 0 {
 				w.Header().Set("Allow", strings.Join(allowed, ", "))
-				contract.WriteError(w, req, contract.APIError{
-					Status:   http.StatusMethodNotAllowed,
-					Code:     "METHOD_NOT_ALLOWED",
-					Message:  http.StatusText(http.StatusMethodNotAllowed),
-					Category: contract.CategoryClient,
-				})
+				contract.WriteError(w, req, contract.NewErrorBuilder().
+					Status(http.StatusMethodNotAllowed).
+					Code("METHOD_NOT_ALLOWED").
+					Message(http.StatusText(http.StatusMethodNotAllowed)).
+					Category(contract.CategoryClient).
+					Build())
 				return
 			}
 		}
@@ -197,12 +197,12 @@ func (r *Router) writeValidationError(w http.ResponseWriter, req *http.Request, 
 		return false
 	}
 	if err := validation.Validate(params); err != nil {
-		contract.WriteError(w, req, contract.APIError{
-			Status:   http.StatusBadRequest,
-			Code:     "VALIDATION_ERROR",
-			Message:  err.Error(),
-			Category: contract.CategoryValidation,
-		})
+		contract.WriteError(w, req, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("VALIDATION_ERROR").
+			Message(err.Error()).
+			Category(contract.CategoryValidation).
+			Build())
 		return true
 	}
 	return false

@@ -401,24 +401,24 @@ func (c *Handler) writeHookError(ctx *contract.Ctx, code string, err error) {
 			"path":  ctx.R.URL.Path,
 		})
 	}
-	contract.WriteError(ctx.W, ctx.R, contract.APIError{
-		Status:   http.StatusInternalServerError,
-		Code:     code,
-		Message:  "internal error",
-		Category: contract.CategoryServer,
-	})
+	contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		Status(http.StatusInternalServerError).
+		Code(code).
+		Message("internal error").
+		Category(contract.CategoryServer).
+		Build())
 }
 
 func writeNotImplemented(ctx *contract.Ctx, code, message string) {
 	if ctx == nil {
 		return
 	}
-	contract.WriteError(ctx.W, ctx.R, contract.APIError{
-		Status:   http.StatusNotImplemented,
-		Code:     code,
-		Message:  message,
-		Category: contract.CategoryServer,
-	})
+	contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		Status(http.StatusNotImplemented).
+		Code(code).
+		Message(message).
+		Category(contract.CategoryServer).
+		Build())
 }
 
 func denyAllMiddleware() middleware.Middleware {

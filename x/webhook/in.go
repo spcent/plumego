@@ -73,7 +73,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 		secret = strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusInternalServerError, Code: "missing_secret", Message: "GITHUB_WEBHOOK_SECRET is not configured", Category: contract.CategoryForStatus(http.StatusInternalServerError)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInMissingSecret("GITHUB_WEBHOOK_SECRET is not configured"))
 		return
 	}
 
@@ -83,7 +83,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 	}
 	raw, err := VerifyGitHub(ctx.R, secret, maxBody)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusUnauthorized, Code: "invalid_signature", Message: "invalid GitHub signature", Category: contract.CategoryForStatus(http.StatusUnauthorized)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInInvalidSignature("invalid GitHub signature"))
 		return
 	}
 
@@ -131,7 +131,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 
 	if err = c.pub.Publish(topic, msg); err != nil {
 		c.logger.Error("Failed to publish GitHub event", log.Fields{"error": err, "topic": topic, "event_id": delivery})
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusInternalServerError, Code: "publish_failed", Message: "failed to forward event to internal bus", Category: contract.CategoryForStatus(http.StatusInternalServerError)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInPublishFailed())
 		return
 	}
 
@@ -152,7 +152,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 		secret = strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusInternalServerError, Code: "missing_secret", Message: "STRIPE_WEBHOOK_SECRET is not configured", Category: contract.CategoryForStatus(http.StatusInternalServerError)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInMissingSecret("STRIPE_WEBHOOK_SECRET is not configured"))
 		return
 	}
 
@@ -167,7 +167,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 
 	raw, err := VerifyStripe(ctx.R, secret, StripeVerifyOptions{MaxBody: maxBody, Tolerance: tol})
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusUnauthorized, Code: "invalid_signature", Message: "invalid Stripe signature", Category: contract.CategoryForStatus(http.StatusUnauthorized)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInInvalidSignature("invalid Stripe signature"))
 		return
 	}
 
@@ -215,7 +215,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 
 	if err = c.pub.Publish(topic, msg); err != nil {
 		c.logger.Error("Failed to publish Stripe event", log.Fields{"error": err, "topic": topic, "event_id": evtID})
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusInternalServerError, Code: "publish_failed", Message: "failed to forward event to internal bus", Category: contract.CategoryForStatus(http.StatusInternalServerError)})
+		_ = contract.WriteError(ctx.W, ctx.R, errInPublishFailed())
 		return
 	}
 
@@ -267,4 +267,18 @@ func sanitizeTopicSuffix(s string) string {
 		}
 	}
 	return strings.ToLower(b.String())
+}
+
+// --- package-local error helpers for inbound webhook handlers ---
+
+func errInMissingSecret(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusInternalServerError).Code("missing_secret").Message(msg).Build()
+}
+
+func errInInvalidSignature(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusUnauthorized).Code("invalid_signature").Message(msg).Build()
+}
+
+func errInPublishFailed() contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusInternalServerError).Code("publish_failed").Message("failed to forward event to internal bus").Build()
 }

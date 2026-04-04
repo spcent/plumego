@@ -159,12 +159,12 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 
 	r.Post(DevToolsReloadPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if err := c.reloadEnv(req.Context()); err != nil {
-			contract.WriteError(w, req, contract.APIError{
-				Status:   http.StatusBadRequest,
-				Code:     "env_reload_failed",
-				Category: contract.CategoryClient,
-				Message:  err.Error(),
-			})
+			contract.WriteError(w, req, contract.NewErrorBuilder().
+				Status(http.StatusBadRequest).
+				Code("env_reload_failed").
+				Message(err.Error()).
+				Category(contract.CategoryClient).
+				Build())
 			return
 		}
 

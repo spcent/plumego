@@ -827,12 +827,12 @@ func AuthorizeMiddleware(policy AuthZPolicy) middleware.Middleware {
 }
 
 func writeAuthError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
-	contract.WriteError(w, r, contract.APIError{
-		Status:   status,
-		Code:     code,
-		Message:  message,
-		Category: contract.CategoryAuthentication,
-	})
+	contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(status).
+		Code(code).
+		Message(message).
+		Category(contract.CategoryAuthentication).
+		Build())
 }
 
 func checkPolicy(policy AuthZPolicy, auth AuthorizationClaims) bool {

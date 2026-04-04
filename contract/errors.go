@@ -447,6 +447,19 @@ func NewRateLimitError(message string) APIError {
 		Build()
 }
 
+func NewBadRequestError(message string) APIError {
+	if message == "" {
+		message = "bad request"
+	}
+	return NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Category(CategoryClient).
+		Type(ErrTypeValidation).
+		Code(CodeBadRequest).
+		Message(message).
+		Build()
+}
+
 // HTTPStatusFromCategory returns the representative HTTP status for a category.
 // This is an intentionally coarse mapping; when a more specific ErrorType is
 // known, use ErrorType.Meta().Status instead.

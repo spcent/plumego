@@ -2,6 +2,7 @@ package contract
 
 // Canonical API error codes used by the contract module.
 const (
+	CodeBadRequest       = "BAD_REQUEST"
 	CodeValidationError  = "VALIDATION_ERROR"
 	CodeResourceNotFound = "RESOURCE_NOT_FOUND"
 	CodeUnauthorized     = "UNAUTHORIZED"

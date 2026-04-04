@@ -39,7 +39,7 @@ func Configure(hooks Hooks) {
 	r := hooks.EnsureRouter()
 	r.Get(path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 		if pub == nil {
-			_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusInternalServerError, Code: "missing_pubsub", Message: "pubsub is not configured", Category: contract.CategoryForStatus(http.StatusInternalServerError)})
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("pubsub is not configured"))
 			return
 		}
 
@@ -50,7 +50,7 @@ func Configure(hooks Hooks) {
 			return
 		}
 
-		_ = contract.WriteError(ctx.W, ctx.R, contract.APIError{Status: http.StatusNotImplemented, Code: "not_supported", Message: "pubsub snapshot not supported by this implementation", Category: contract.CategoryForStatus(http.StatusNotImplemented)})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotImplemented).Code("not_supported").Message("pubsub snapshot not supported by this implementation").Category(contract.CategoryServer).Build())
 	}, r.Logger()))
 }
 
