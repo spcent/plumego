@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/spcent/plumego/log"
 )
+
+// WarnFunc is invoked when WriteError receives an APIError with missing required
+// fields (Status, Code, or Category). It defaults to a no-op; override in tests
+// or at application startup to surface misconfigured callers.
+var WarnFunc = func(msg string) {}
 
 // ErrorCategory describes the high-level class of an API error for observability.
 type ErrorCategory string
@@ -77,7 +80,60 @@ const (
 	ErrTypeOperationNotAllowed ErrorType = "operation_not_allowed"
 )
 
+// errorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
+type errorTypeMeta struct {
+	Category ErrorCategory
+	Code     string
+	Status   int
+}
+
+// errorTypeLookup maps every ErrorType to its canonical metadata.
+// Use ErrorType.Meta() to look up a type's defaults rather than duplicating
+// switch statements across the codebase.
+var errorTypeLookup = map[ErrorType]errorTypeMeta{
+	// Validation
+	ErrTypeValidation:    {CategoryValidation, CodeValidationError, http.StatusBadRequest},
+	ErrTypeRequired:      {CategoryValidation, CodeRequired, http.StatusBadRequest},
+	ErrTypeInvalidFormat: {CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
+	ErrTypeOutOfRange:    {CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
+	ErrTypeDuplicate:     {CategoryValidation, CodeDuplicate, http.StatusBadRequest},
+	// Auth
+	ErrTypeUnauthorized: {CategoryAuthentication, CodeUnauthorized, http.StatusUnauthorized},
+	ErrTypeForbidden:    {CategoryAuthentication, CodeForbidden, http.StatusForbidden},
+	ErrTypeInvalidToken: {CategoryAuthentication, CodeInvalidToken, http.StatusUnauthorized},
+	ErrTypeExpiredToken: {CategoryAuthentication, CodeExpiredToken, http.StatusUnauthorized},
+	// Resource
+	ErrTypeNotFound:      {CategoryClient, CodeResourceNotFound, http.StatusNotFound},
+	ErrTypeConflict:      {CategoryClient, CodeConflict, http.StatusConflict},
+	ErrTypeAlreadyExists: {CategoryClient, CodeAlreadyExists, http.StatusConflict},
+	ErrTypeGone:          {CategoryClient, CodeGone, http.StatusGone},
+	// System
+	ErrTypeInternal:    {CategoryServer, CodeInternalError, http.StatusInternalServerError},
+	ErrTypeUnavailable: {CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
+	ErrTypeTimeout:     {CategoryTimeout, CodeTimeout, http.StatusRequestTimeout},
+	ErrTypeRateLimited: {CategoryRateLimit, CodeRateLimited, http.StatusTooManyRequests},
+	ErrTypeMaintenance: {CategoryServer, CodeMaintenance, http.StatusServiceUnavailable},
+	// Business
+	ErrTypeInvalidState:        {CategoryBusiness, CodeInvalidState, http.StatusUnprocessableEntity},
+	ErrTypeInsufficientFunds:   {CategoryBusiness, CodeInsufficientFunds, http.StatusUnprocessableEntity},
+	ErrTypeOperationNotAllowed: {CategoryBusiness, CodeOperationNotAllowed, http.StatusUnprocessableEntity},
+}
+
+// Meta returns the canonical Category, Code, and HTTP status for the ErrorType.
+// If the type is unrecognized, it returns server-error defaults.
+func (t ErrorType) Meta() errorTypeMeta {
+	if m, ok := errorTypeLookup[t]; ok {
+		return m
+	}
+	return errorTypeMeta{CategoryServer, CodeInternalError, http.StatusInternalServerError}
+}
+
 // APIError represents a normalized error payload for HTTP responses and logging.
+//
+// Callers outside this package should build APIError values through the
+// convenience constructors (NewValidationError, NewNotFoundError, …) or
+// NewErrorBuilder(), rather than struct literals, to guarantee that all
+// required fields (Status, Code, Category) are populated consistently.
 type APIError struct {
 	Status   int            `json:"-"`
 	Code     string         `json:"code"`
@@ -98,7 +154,18 @@ type ErrorResponse struct {
 }
 
 // WriteError writes a structured error response with trace context when available.
-func WriteError(w http.ResponseWriter, r *http.Request, err APIError) {
+// It returns the encoding error, if any; callers may ignore it when the response
+// headers have already been sent.
+//
+// Prefer building APIError values through the convenience constructors or
+// NewErrorBuilder() so that required fields are always populated. WriteError
+// keeps fallback defaults for backward compatibility and calls WarnFunc when
+// required fields are missing.
+func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
+	if issues := ValidateError(err); len(issues) > 0 {
+		WarnFunc("WriteError received partially-populated APIError: " + strings.Join(issues, "; "))
+	}
+
 	if err.Status == 0 {
 		err.Status = http.StatusInternalServerError
 	}
@@ -124,7 +191,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(err.Status)
 
-	_ = json.NewEncoder(w).Encode(ErrorResponse{Error: err})
+	return json.NewEncoder(w).Encode(ErrorResponse{Error: err})
 }
 
 // CategoryForStatus maps an HTTP status to a default error category.
@@ -249,111 +316,22 @@ func (b *ErrorBuilder) Details(details map[string]any) *ErrorBuilder {
 }
 
 // Build creates the final APIError instance.
+// It fills any missing Status, Code, and Category with safe defaults so that
+// every value returned by a builder is fully populated.
 func (b *ErrorBuilder) Build() APIError {
+	if b.err.Status == 0 {
+		b.err.Status = http.StatusInternalServerError
+	}
+	if b.err.Code == "" {
+		b.err.Code = http.StatusText(b.err.Status)
+	}
+	if b.err.Category == "" {
+		b.err.Category = CategoryForStatus(b.err.Status)
+		if b.err.Category == "" {
+			b.err.Category = CategoryServer
+		}
+	}
 	return b.err
-}
-
-// ErrorChain represents a chain of errors for tracking error propagation.
-type ErrorChain struct {
-	root      error
-	errors    []WrappedError
-	timestamp time.Time
-}
-
-// WrappedError represents an error in the chain with context.
-type WrappedError struct {
-	Error     error
-	Message   string
-	Category  ErrorCategory
-	Type      ErrorType
-	Timestamp time.Time
-	Context   map[string]any
-}
-
-// NewErrorChain creates a new error chain starting with the given error.
-func NewErrorChain(err error) *ErrorChain {
-	return &ErrorChain{
-		root:      err,
-		errors:    make([]WrappedError, 0),
-		timestamp: time.Now(),
-	}
-}
-
-// Add adds a new error to the chain with context.
-func (ec *ErrorChain) Add(err error, message string, category ErrorCategory, errorType ErrorType) *ErrorChain {
-	wrapped := WrappedError{
-		Error:     err,
-		Message:   message,
-		Category:  category,
-		Type:      errorType,
-		Timestamp: time.Now(),
-		Context:   make(map[string]any),
-	}
-	ec.errors = append(ec.errors, wrapped)
-	return ec
-}
-
-// AddContext adds context information to the last error in the chain.
-func (ec *ErrorChain) AddContext(key string, value any) *ErrorChain {
-	if len(ec.errors) > 0 {
-		ec.errors[len(ec.errors)-1].Context[key] = value
-	}
-	return ec
-}
-
-// Error returns the root error of the chain.
-func (ec *ErrorChain) Error() string {
-	if ec.root != nil {
-		return ec.root.Error()
-	}
-	if len(ec.errors) > 0 {
-		return ec.errors[len(ec.errors)-1].Message
-	}
-	return "unknown error"
-}
-
-// Root returns the root error of the chain.
-func (ec *ErrorChain) Root() error {
-	return ec.root
-}
-
-// Errors returns all errors in the chain.
-func (ec *ErrorChain) Errors() []WrappedError {
-	return ec.errors
-}
-
-// Latest returns the most recent error in the chain.
-func (ec *ErrorChain) Latest() *WrappedError {
-	if len(ec.errors) == 0 {
-		return nil
-	}
-	return &ec.errors[len(ec.errors)-1]
-}
-
-// HasCategory checks if any error in the chain has the given category.
-func (ec *ErrorChain) HasCategory(category ErrorCategory) bool {
-	for _, err := range ec.errors {
-		if err.Category == category {
-			return true
-		}
-	}
-	return false
-}
-
-// IsTimeoutError checks if the error chain contains timeout errors.
-func (ec *ErrorChain) IsTimeoutError() bool {
-	return ec.HasCategory(CategoryTimeout) ||
-		ec.HasErrorType(ErrTypeTimeout)
-}
-
-// HasErrorType checks if any error in the chain has the given error type.
-func (ec *ErrorChain) HasErrorType(errorType ErrorType) bool {
-	for _, err := range ec.errors {
-		if err.Type == errorType {
-			return true
-		}
-	}
-	return false
 }
 
 // ValidateError validates an APIError and returns validation errors if any.
@@ -469,7 +447,22 @@ func NewRateLimitError(message string) APIError {
 		Build()
 }
 
-// HTTPStatusFromCategory returns the appropriate HTTP status code for an error category.
+func NewBadRequestError(message string) APIError {
+	if message == "" {
+		message = "bad request"
+	}
+	return NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Category(CategoryClient).
+		Type(ErrTypeValidation).
+		Code(CodeBadRequest).
+		Message(message).
+		Build()
+}
+
+// HTTPStatusFromCategory returns the representative HTTP status for a category.
+// This is an intentionally coarse mapping; when a more specific ErrorType is
+// known, use ErrorType.Meta().Status instead.
 func HTTPStatusFromCategory(category ErrorCategory) int {
 	switch category {
 	case CategoryClient, CategoryValidation:
@@ -537,338 +530,4 @@ func IsRetryableError(err APIError) bool {
 
 	// Also retry if it's a timeout error
 	return err.Category == CategoryTimeout
-}
-
-// ErrorMetrics represents metrics for error tracking and monitoring.
-// All methods are safe for concurrent use.
-type ErrorMetrics struct {
-	mu            sync.Mutex
-	TotalErrors   int64                   `json:"total_errors"`
-	ByCategory    map[ErrorCategory]int64 `json:"by_category"`
-	ByType        map[ErrorType]int64     `json:"by_type"`
-	ByStatus      map[int]int64           `json:"by_status"`
-	LastErrorTime time.Time               `json:"last_error_time"`
-}
-
-// ErrorContext represents contextual information for error wrapping
-type ErrorContext struct {
-	Operation string         `json:"operation"`
-	Module    string         `json:"module"`
-	Params    map[string]any `json:"params,omitempty"`
-}
-
-// WrappedErrorWithContext represents an error with full context
-type WrappedErrorWithContext struct {
-	Err     error        `json:"error"`
-	Context ErrorContext `json:"context"`
-	Message string       `json:"message"`
-	When    time.Time    `json:"when"`
-}
-
-// Error implements the error interface
-func (w *WrappedErrorWithContext) Error() string {
-	if w.Message != "" {
-		return w.Message
-	}
-	if w.Err != nil {
-		return w.Err.Error()
-	}
-	return "unknown error"
-}
-
-// Unwrap returns the underlying error for errors.Is/As support
-func (w *WrappedErrorWithContext) Unwrap() error {
-	return w.Err
-}
-
-// NewWrappedError creates a new wrapped error with context
-func NewWrappedError(err error, operation, module string, params map[string]any) *WrappedErrorWithContext {
-	return &WrappedErrorWithContext{
-		Err: err,
-		Context: ErrorContext{
-			Operation: operation,
-			Module:    module,
-			Params:    params,
-		},
-		When: time.Now(),
-	}
-}
-
-// WrapError wraps an existing error with additional context.
-// If err is already a *WrappedErrorWithContext, a new value is created that merges
-// the existing and new context rather than mutating the original.
-func WrapError(err error, operation, module string, params map[string]any) error {
-	if err == nil {
-		return nil
-	}
-
-	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
-		// Build merged params without mutating wrapped.
-		// Only allocate if at least one source has entries.
-		var mergedParams map[string]any
-		if len(wrapped.Context.Params) > 0 || len(params) > 0 {
-			mergedParams = make(map[string]any, len(wrapped.Context.Params)+len(params))
-			for k, v := range wrapped.Context.Params {
-				mergedParams[k] = v
-			}
-			for k, v := range params {
-				mergedParams[k] = v
-			}
-		}
-
-		op := wrapped.Context.Operation
-		if op == "" {
-			op = operation
-		}
-		mod := wrapped.Context.Module
-		if mod == "" {
-			mod = module
-		}
-
-		return &WrappedErrorWithContext{
-			Err:     wrapped.Err,
-			Message: wrapped.Message,
-			When:    wrapped.When,
-			Context: ErrorContext{
-				Operation: op,
-				Module:    mod,
-				Params:    mergedParams,
-			},
-		}
-	}
-
-	return NewWrappedError(err, operation, module, params)
-}
-
-// WrapErrorf creates a wrapped error with a formatted message
-func WrapErrorf(err error, format string, args ...any) error {
-	if err == nil {
-		return nil
-	}
-	message := fmt.Sprintf(format, args...)
-	return &WrappedErrorWithContext{
-		Err:     err,
-		Message: message,
-		When:    time.Now(),
-	}
-}
-
-// IsRetryable checks if an error is retryable based on its type and context
-func IsRetryable(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if chain, ok := err.(*ErrorChain); ok {
-		if chain.IsTimeoutError() {
-			return true
-		}
-		if latest := chain.Latest(); latest != nil && latest.Error != nil {
-			if IsRetryable(latest.Error) {
-				return true
-			}
-		}
-		if root := chain.Root(); root != nil {
-			return IsRetryable(root)
-		}
-		return false
-	}
-
-	// Check if it's an APIError directly
-	if apiErr, ok := err.(APIError); ok {
-		return IsRetryableError(apiErr)
-	}
-
-	// Check if it's a wrapped error with APIError
-	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
-		// Check if wrapped error is an APIError by checking if it has Status field
-		if apiErr, ok := wrapped.Err.(APIError); ok {
-			return IsRetryableError(apiErr)
-		}
-		// Recursively check wrapped errors
-		return IsRetryable(wrapped.Err)
-	}
-
-	// Network errors are typically retryable
-	if netErr, ok := err.(interface{ Temporary() bool }); ok {
-		return netErr.Temporary()
-	}
-
-	if netErr, ok := err.(interface{ Timeout() bool }); ok {
-		return netErr.Timeout()
-	}
-
-	return false
-}
-
-// GetErrorDetails extracts detailed information from an error
-func GetErrorDetails(err error) map[string]any {
-	if err == nil {
-		return nil
-	}
-
-	details := make(map[string]any)
-
-	if chain, ok := err.(*ErrorChain); ok {
-		details["message"] = chain.Error()
-		details["timestamp"] = chain.timestamp
-		if root := chain.Root(); root != nil {
-			details["root"] = GetErrorDetails(root)
-		}
-		if len(chain.errors) > 0 {
-			entries := make([]map[string]any, 0, len(chain.errors))
-			for _, wrapped := range chain.errors {
-				entry := map[string]any{
-					"message":  wrapped.Message,
-					"category": wrapped.Category,
-					"type":     wrapped.Type,
-					"when":     wrapped.Timestamp,
-				}
-				if len(wrapped.Context) > 0 {
-					entry["context"] = wrapped.Context
-				}
-				if wrapped.Error != nil {
-					entry["error"] = wrapped.Error.Error()
-				}
-				entries = append(entries, entry)
-			}
-			details["chain"] = entries
-		}
-		return details
-	}
-
-	// Handle WrappedErrorWithContext
-	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
-		details["message"] = wrapped.Error()
-		details["when"] = wrapped.When
-		if wrapped.Context.Operation != "" {
-			details["operation"] = wrapped.Context.Operation
-		}
-		if wrapped.Context.Module != "" {
-			details["module"] = wrapped.Context.Module
-		}
-		if len(wrapped.Context.Params) > 0 {
-			details["params"] = wrapped.Context.Params
-		}
-		// Recursively get details from wrapped error
-		if wrapped.Err != nil {
-			details["wrapped_error"] = GetErrorDetails(wrapped.Err)
-		}
-		return details
-	}
-
-	// Handle APIError (which is a struct, not an error interface)
-	// We check for the type by looking at the struct fields
-	if apiErr, ok := err.(APIError); ok {
-		details["status"] = apiErr.Status
-		details["code"] = apiErr.Code
-		details["category"] = apiErr.Category
-		details["message"] = apiErr.Message
-		if len(apiErr.Details) > 0 {
-			details["details"] = apiErr.Details
-		}
-		if apiErr.TraceID != "" {
-			details["trace_id"] = apiErr.TraceID
-		}
-		return details
-	}
-
-	// Basic error information
-	details["message"] = err.Error()
-	details["type"] = fmt.Sprintf("%T", err)
-
-	return details
-}
-
-// FormatError formats an error for logging with full context
-func FormatError(err error) string {
-	if err == nil {
-		return ""
-	}
-
-	details := GetErrorDetails(err)
-
-	// Simple string representation for logging
-	var parts []string
-	if msg, ok := details["message"].(string); ok {
-		parts = append(parts, msg)
-	}
-	if op, ok := details["operation"].(string); ok {
-		parts = append(parts, fmt.Sprintf("op=%s", op))
-	}
-	if mod, ok := details["module"].(string); ok {
-		parts = append(parts, fmt.Sprintf("module=%s", mod))
-	}
-	if status, ok := details["status"].(int); ok {
-		parts = append(parts, fmt.Sprintf("status=%d", status))
-	}
-	if code, ok := details["code"].(string); ok {
-		parts = append(parts, fmt.Sprintf("code=%s", code))
-	}
-
-	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
-}
-
-// PanicToError converts a panic to an error (for recovery)
-func PanicToError(r any) error {
-	if r == nil {
-		return nil
-	}
-
-	switch v := r.(type) {
-	case error:
-		return WrapError(v, "panic_recovery", "recovery", nil)
-	case string:
-		return fmt.Errorf("panic: %s", v)
-	default:
-		return fmt.Errorf("panic: %v", v)
-	}
-}
-
-// Must wraps a function that returns an error and panics if it fails
-// This is useful for initialization code where errors should be fatal
-func Must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-// Must1 wraps a function that returns (T, error) and panics if it fails
-func Must1[T any](v T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Must2 wraps a function that returns (T1, T2, error) and panics if it fails
-func Must2[T1, T2 any](v1 T1, v2 T2, err error) (T1, T2) {
-	if err != nil {
-		panic(err)
-	}
-	return v1, v2
-}
-
-// NewErrorMetrics creates a new ErrorMetrics instance.
-func NewErrorMetrics() *ErrorMetrics {
-	return &ErrorMetrics{
-		ByCategory: make(map[ErrorCategory]int64),
-		ByType:     make(map[ErrorType]int64),
-		ByStatus:   make(map[int]int64),
-	}
-}
-
-// RecordError records an error in the metrics. Safe for concurrent use.
-func (em *ErrorMetrics) RecordError(err APIError) {
-	now := time.Now()
-
-	em.mu.Lock()
-	em.TotalErrors++
-	em.ByCategory[err.Category]++
-	em.ByStatus[err.Status]++
-	if errorType, ok := err.Details["type"].(ErrorType); ok {
-		em.ByType[errorType]++
-	}
-	em.LastErrorTime = now
-	em.mu.Unlock()
 }

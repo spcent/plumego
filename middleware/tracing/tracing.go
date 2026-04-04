@@ -25,21 +25,24 @@ func Middleware(tracer Tracer) middleware.Middleware {
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := internalobs.EnsureTraceID(r)
-			ctx := context.WithValue(r.Context(), contract.TraceIDKey{}, traceID)
+			ctx := contract.WithTraceIDString(r.Context(), traceID)
 			ctx = log.WithTraceID(ctx, traceID)
 
 			ctx, span := tracer.Start(ctx, r)
 			spanTraceID, spanID := internalobs.ExtractSpanContext(ctx, span)
 			if spanTraceID != "" {
 				traceID = spanTraceID
-				ctx = context.WithValue(ctx, contract.TraceIDKey{}, traceID)
+				ctx = contract.WithTraceIDString(ctx, traceID)
 				ctx = log.WithTraceID(ctx, traceID)
 			}
-			if spanID != "" && contract.TraceContextFromContext(ctx) == nil {
-				ctx = contract.ContextWithTraceContext(ctx, contract.TraceContext{
-					TraceID: contract.TraceID(traceID),
-					SpanID:  contract.SpanID(spanID),
-				})
+			if spanID != "" {
+				existing := contract.TraceContextFromContext(ctx)
+				if existing == nil || existing.SpanID == "" {
+					ctx = contract.WithTraceContext(ctx, contract.TraceContext{
+						TraceID: contract.TraceID(traceID),
+						SpanID:  contract.SpanID(spanID),
+					})
+				}
 			}
 
 			r = r.WithContext(ctx)

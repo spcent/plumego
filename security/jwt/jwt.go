@@ -792,7 +792,7 @@ func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middlew
 
 			ctx := context.WithValue(r.Context(), claimsContextKey, claims)
 			if principal := PrincipalFromClaims(claims); principal != nil {
-				ctx = contract.ContextWithPrincipal(ctx, principal)
+				ctx = contract.WithPrincipal(ctx, principal)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -827,12 +827,12 @@ func AuthorizeMiddleware(policy AuthZPolicy) middleware.Middleware {
 }
 
 func writeAuthError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
-	contract.WriteError(w, r, contract.APIError{
-		Status:   status,
-		Code:     code,
-		Message:  message,
-		Category: contract.CategoryAuthentication,
-	})
+	contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(status).
+		Code(code).
+		Message(message).
+		Category(contract.CategoryAuthentication).
+		Build())
 }
 
 func checkPolicy(policy AuthZPolicy, auth AuthorizationClaims) bool {

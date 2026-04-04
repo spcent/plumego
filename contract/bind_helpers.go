@@ -3,18 +3,16 @@ package contract
 import (
 	"errors"
 	"net/http"
-	"reflect"
-
-	logpkg "github.com/spcent/plumego/log"
 )
 
 // BindOptions configures JSON binding/validation for Ctx helpers.
 type BindOptions struct {
-	MaxBodyBytes          int64
+	// MaxBodySize caps the body size checked after the initial read.
+	// Zero means no additional cap beyond what is set in RequestConfig.
+	MaxBodySize           int64
 	DisallowUnknownFields bool
 	DisableValidation     bool
 	Validator             func(any) error
-	Logger                logpkg.StructuredLogger
 	Redact                func(any) any
 }
 
@@ -25,11 +23,17 @@ type FieldError struct {
 	Message string `json:"message"`
 }
 
+// fieldErrorProvider is implemented by validationErrors (and any custom validator
+// that produces []FieldError directly).
+type fieldErrorProvider interface {
+	Errors() []FieldError
+}
+
 // FieldErrorsFrom extracts field-level validation errors from an error.
 func FieldErrorsFrom(err error) []FieldError {
 	for current := err; current != nil; current = errors.Unwrap(current) {
-		if fields, ok := extractFieldErrors(current); ok {
-			return fields
+		if p, ok := current.(fieldErrorProvider); ok {
+			return p.Errors()
 		}
 	}
 	return nil
@@ -92,60 +96,5 @@ func BindErrorToAPIError(err error) APIError {
 
 // WriteBindError writes a binding/validation error using the standard error envelope.
 func WriteBindError(w http.ResponseWriter, r *http.Request, err error) {
-	WriteError(w, r, BindErrorToAPIError(err))
-}
-
-func extractFieldErrors(err error) ([]FieldError, bool) {
-	if err == nil {
-		return nil, false
-	}
-
-	method := reflect.ValueOf(err).MethodByName("Errors")
-	if !method.IsValid() || method.Type().NumIn() != 0 || method.Type().NumOut() != 1 {
-		return nil, false
-	}
-
-	results := method.Call(nil)
-	if len(results) != 1 {
-		return nil, false
-	}
-
-	value := results[0]
-	if value.Kind() != reflect.Slice {
-		return nil, false
-	}
-
-	fields := make([]FieldError, 0, value.Len())
-	for i := 0; i < value.Len(); i++ {
-		item := value.Index(i)
-		if item.Kind() == reflect.Pointer {
-			if item.IsNil() {
-				continue
-			}
-			item = item.Elem()
-		}
-		if item.Kind() != reflect.Struct {
-			return nil, false
-		}
-
-		field := FieldError{
-			Field:   structStringField(item, "Field"),
-			Code:    structStringField(item, "Code"),
-			Message: structStringField(item, "Message"),
-		}
-		if field.Field == "" && field.Code == "" && field.Message == "" {
-			return nil, false
-		}
-		fields = append(fields, field)
-	}
-
-	return fields, len(fields) > 0
-}
-
-func structStringField(item reflect.Value, name string) string {
-	field := item.FieldByName(name)
-	if !field.IsValid() || field.Kind() != reflect.String {
-		return ""
-	}
-	return field.String()
+	_ = WriteError(w, r, BindErrorToAPIError(err))
 }

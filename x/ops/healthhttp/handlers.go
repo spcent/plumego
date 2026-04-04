@@ -98,12 +98,11 @@ func ComponentHealthHandler(manager health.HealthManager, componentName string) 
 
 		componentHealth, exists := manager.GetComponentHealth(componentName)
 		if !exists {
-			contract.WriteError(w, r, contract.APIError{
-				Status:   http.StatusNotFound,
-				Code:     "COMPONENT_NOT_FOUND",
-				Message:  "component not found",
-				Category: contract.CategoryForStatus(http.StatusNotFound),
-			})
+			contract.WriteError(w, r, contract.NewErrorBuilder().
+				Status(http.StatusNotFound).
+				Code("COMPONENT_NOT_FOUND").
+				Message("component not found").
+				Build())
 			return
 		}
 

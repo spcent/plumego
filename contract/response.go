@@ -36,37 +36,3 @@ func WriteResponse(w http.ResponseWriter, r *http.Request, status int, data any,
 	}
 	return WriteJSON(w, status, resp)
 }
-
-func WriteContractResponse(ctx *Ctx, status int, data any) {
-	if ctx == nil {
-		return
-	}
-	_ = ctx.Response(status, data, nil)
-}
-
-func WriteContractError(ctx *Ctx, status int, code, message string) {
-	if ctx == nil {
-		return
-	}
-	apiErr := APIError{
-		Status:   status,
-		Code:     code,
-		Message:  message,
-		Category: CategoryForStatus(status),
-	}
-	WriteError(ctx.W, ctx.R, apiErr)
-}
-
-func WriteHTTPResponse(w http.ResponseWriter, r *http.Request, status int, data any) {
-	_ = WriteResponse(w, r, status, data, nil)
-}
-
-func WriteHTTPError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
-	apiErr := APIError{
-		Status:   status,
-		Code:     code,
-		Message:  message,
-		Category: CategoryForStatus(status),
-	}
-	WriteError(w, r, apiErr)
-}

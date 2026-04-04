@@ -37,12 +37,11 @@ func withCheckTimeout(ctx context.Context, timeout time.Duration) (context.Conte
 
 func requireManager(manager health.HealthManager, w http.ResponseWriter, r *http.Request) bool {
 	if manager == nil {
-		contract.WriteError(w, r, contract.APIError{
-			Status:   http.StatusServiceUnavailable,
-			Code:     "HEALTH_MANAGER_UNAVAILABLE",
-			Message:  "health manager is not configured",
-			Category: contract.CategoryForStatus(http.StatusServiceUnavailable),
-		})
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusServiceUnavailable).
+			Code("HEALTH_MANAGER_UNAVAILABLE").
+			Message("health manager is not configured").
+			Build())
 		return false
 	}
 	return true

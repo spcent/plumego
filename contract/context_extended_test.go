@@ -430,7 +430,7 @@ func TestParamsFromContext(t *testing.T) {
 
 	// Test with RequestContext
 	rc := RequestContext{Params: map[string]string{"id": "123"}}
-	ctx := context.WithValue(context.Background(), RequestContextKey{}, rc)
+	ctx := context.WithValue(context.Background(), requestContextKey{}, rc)
 	result = ParamsFromContext(ctx)
 	if result == nil || result["id"] != "123" {
 		t.Error("expected params from RequestContext")
@@ -438,7 +438,7 @@ func TestParamsFromContext(t *testing.T) {
 
 	// Test with ParamsContextKey (legacy)
 	params := map[string]string{"name": "test"}
-	ctx = context.WithValue(context.Background(), ParamsContextKey{}, params)
+	ctx = context.WithValue(context.Background(), paramsContextKey{}, params)
 	result = ParamsFromContext(ctx)
 	if result == nil || result["name"] != "test" {
 		t.Error("expected params from ParamsContextKey")
@@ -465,7 +465,7 @@ func TestRequestContextFrom(t *testing.T) {
 		RoutePattern: "/users/:id",
 		RouteName:    "user_show",
 	}
-	ctx := context.WithValue(context.Background(), RequestContextKey{}, rc)
+	ctx := context.WithValue(context.Background(), requestContextKey{}, rc)
 	result = RequestContextFrom(ctx)
 	if result.Params == nil || result.Params["id"] != "123" {
 		t.Error("expected RequestContext with params")
@@ -476,7 +476,7 @@ func TestRequestContextFrom(t *testing.T) {
 
 	// Test fallback to ParamsContextKey
 	params := map[string]string{"name": "test"}
-	ctx = context.WithValue(context.Background(), ParamsContextKey{}, params)
+	ctx = context.WithValue(context.Background(), paramsContextKey{}, params)
 	result = RequestContextFrom(ctx)
 	if result.Params == nil || result.Params["name"] != "test" {
 		t.Error("expected fallback to ParamsContextKey")
@@ -486,7 +486,7 @@ func TestRequestContextFrom(t *testing.T) {
 func TestCtxResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
-	r = r.WithContext(context.WithValue(r.Context(), TraceIDKey{}, "trace-xyz"))
+	r = r.WithContext(WithTraceContext(r.Context(), TraceContext{TraceID: "trace-xyz"}))
 	ctx := NewCtx(w, r, nil)
 
 	err := ctx.Response(http.StatusOK, map[string]string{"status": "ok"}, map[string]any{"page": 1})
@@ -509,7 +509,7 @@ func TestCtxResponse(t *testing.T) {
 func TestParamFromRequest(t *testing.T) {
 	// Test with RequestContext
 	rc := RequestContext{Params: map[string]string{"id": "123"}}
-	ctx := context.WithValue(context.Background(), RequestContextKey{}, rc)
+	ctx := context.WithValue(context.Background(), requestContextKey{}, rc)
 	r := httptest.NewRequest("GET", "/test", nil)
 	r = r.WithContext(ctx)
 

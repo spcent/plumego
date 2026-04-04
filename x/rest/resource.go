@@ -76,16 +76,15 @@ func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data any) {
 
 // WriteError writes a standardized error response.
 func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message string, details any) {
-	apiErr := contract.APIError{
-		Status:   status,
-		Code:     http.StatusText(status),
-		Message:  message,
-		Category: contract.CategoryForStatus(status),
-	}
+	b := contract.NewErrorBuilder().
+		Status(status).
+		Code(http.StatusText(status)).
+		Message(message).
+		Category(contract.CategoryForStatus(status))
 	if details != nil {
-		apiErr.Details = map[string]any{"details": details}
+		b = b.Detail("details", details)
 	}
-	contract.WriteError(w, nil, apiErr)
+	contract.WriteError(w, nil, b.Build())
 }
 
 // WriteResponse writes a contract response payload and includes trace id when available.

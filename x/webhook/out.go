@@ -89,17 +89,17 @@ type targetDTO struct {
 func webhookCreateTarget(ctx *contract.Ctx, svc *Service) {
 	var req Target
 	if err := ctx.BindJSON(&req); err != nil {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}
 
 	t, err := svc.CreateTarget(ctx.R.Context(), req)
 	if err != nil {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusCreated, targetToDTO(t))
+	_ = ctx.Response(http.StatusCreated, targetToDTO(t), nil)
 }
 
 func webhookListTargets(ctx *contract.Ctx, svc *Service) {
@@ -117,7 +117,7 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 		Event:   event,
 	})
 	if err != nil {
-		contract.WriteContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
+		_ = contract.WriteError(ctx.W, ctx.R, errStoreError(err.Error()))
 		return
 	}
 
@@ -126,71 +126,71 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 		out = append(out, targetToDTO(t))
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{"items": out})
+	_ = ctx.Response(http.StatusOK, map[string]any{"items": out}, nil)
 }
 
 func webhookGetTarget(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	t, ok := svc.GetTarget(ctx.R.Context(), id)
 	if !ok {
-		contract.WriteContractError(ctx, http.StatusNotFound, "not_found", "target not found")
+		_ = contract.WriteError(ctx.W, ctx.R, errNotFound("target not found"))
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	_ = ctx.Response(http.StatusOK, targetToDTO(t), nil)
 }
 
 func webhookPatchTarget(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	var req TargetPatch
 	if err := ctx.BindJSON(&req); err != nil {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, req)
 	if err != nil {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	_ = ctx.Response(http.StatusOK, targetToDTO(t), nil)
 }
 
 func webhookSetTargetEnabled(ctx *contract.Ctx, svc *Service, enable bool) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, TargetPatch{Enabled: &enable})
 	if err != nil {
 		if err == ErrNotFound {
-			contract.WriteContractError(ctx, http.StatusNotFound, "not_found", "target not found")
+			_ = contract.WriteError(ctx.W, ctx.R, errNotFound("target not found"))
 			return
 		}
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, targetToDTO(t))
+	_ = ctx.Response(http.StatusOK, targetToDTO(t), nil)
 }
 
 func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmpty bool) {
 	event, ok := ctx.Param("event")
 	if !ok || strings.TrimSpace(event) == "" {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "event is required")
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("event is required"))
 		return
 	}
 
@@ -200,11 +200,11 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 	}
 
 	if token == "" && !allowEmpty {
-		contract.WriteContractError(ctx, http.StatusForbidden, "forbidden", "triggering is disabled")
+		_ = contract.WriteError(ctx.W, ctx.R, errForbidden("triggering is disabled"))
 		return
 	}
 	if token != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-		contract.WriteContractError(ctx, http.StatusUnauthorized, "unauthorized", "invalid trigger token")
+		_ = contract.WriteError(ctx.W, ctx.R, errUnauthorized("invalid trigger token"))
 		return
 	}
 
@@ -213,20 +213,20 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 		Meta map[string]any `json:"meta"`
 	}
 	if err := ctx.BindJSON(&payload); err != nil {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "invalid_json", "invalid JSON payload")
+		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}
 
 	enqueued, err := svc.TriggerEvent(ctx.R.Context(), Event{Type: event, Data: payload.Data, Meta: payload.Meta})
 	if err != nil {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusAccepted, map[string]any{
+	_ = ctx.Response(http.StatusAccepted, map[string]any{
 		"enqueued": enqueued,
 		"event":    event,
-	})
+	}, nil)
 }
 
 func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
@@ -264,7 +264,7 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 
 	deliveries, err := svc.ListDeliveries(ctx.R.Context(), filter)
 	if err != nil {
-		contract.WriteContractError(ctx, http.StatusInternalServerError, "store_error", err.Error())
+		_ = contract.WriteError(ctx.W, ctx.R, errStoreError(err.Error()))
 		return
 	}
 
@@ -304,25 +304,25 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 	}
 
 	resp := map[string]any{"items": out}
-	contract.WriteContractResponse(ctx, http.StatusOK, resp)
+	_ = ctx.Response(http.StatusOK, resp, nil)
 }
 
 func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	d, ok := svc.GetDelivery(ctx.R.Context(), id)
 	if !ok {
-		contract.WriteContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
+		_ = contract.WriteError(ctx.W, ctx.R, errNotFound("delivery not found"))
 		return
 	}
 
 	payload := json.RawMessage(d.PayloadJSON)
 
-	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"id":                d.ID,
 		"target_id":         d.TargetID,
 		"event_id":          d.EventID,
@@ -337,27 +337,53 @@ func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
 		"payload_json":      payload,
 		"created_at":        d.CreatedAt,
 		"updated_at":        d.UpdatedAt,
-	})
+	}, nil)
 }
 
 func webhookReplayDelivery(ctx *contract.Ctx, svc *Service) {
 	id, ok := ctx.Param("id")
 	if !ok || strings.TrimSpace(id) == "" {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", "id is required")
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest("id is required"))
 		return
 	}
 
 	d, err := svc.ReplayDelivery(ctx.R.Context(), id)
 	if errors.Is(err, ErrNotFound) {
-		contract.WriteContractError(ctx, http.StatusNotFound, "not_found", "delivery not found")
+		_ = contract.WriteError(ctx.W, ctx.R, errNotFound("delivery not found"))
 		return
 	}
 	if err != nil {
-		contract.WriteContractError(ctx, http.StatusBadRequest, "bad_request", err.Error())
+		_ = contract.WriteError(ctx.W, ctx.R, errBadRequest(err.Error()))
 		return
 	}
 
-	contract.WriteContractResponse(ctx, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID})
+	_ = ctx.Response(http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID}, nil)
+}
+
+// --- package-local error helpers (use ErrorBuilder to guarantee fully populated APIError) ---
+
+func errBadRequest(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusBadRequest).Code("bad_request").Message(msg).Build()
+}
+
+func errInvalidJSON() contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusBadRequest).Code("invalid_json").Message("invalid JSON payload").Build()
+}
+
+func errNotFound(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusNotFound).Code("not_found").Message(msg).Build()
+}
+
+func errStoreError(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusInternalServerError).Code("store_error").Message(msg).Build()
+}
+
+func errForbidden(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusForbidden).Code("forbidden").Message(msg).Build()
+}
+
+func errUnauthorized(msg string) contract.APIError {
+	return contract.NewErrorBuilder().Status(http.StatusUnauthorized).Code("unauthorized").Message(msg).Build()
 }
 
 func targetToDTO(t Target) targetDTO {

@@ -60,7 +60,7 @@ func (p ObservabilityPolicy) AttachRequestID(ctx context.Context, w http.Respons
 	if r == nil {
 		return r, ctx
 	}
-	ctx = context.WithValue(ctx, TraceIDKey{}, id)
+	ctx = WithTraceIDString(ctx, id)
 	if includeInRequest {
 		r.Header.Set(RequestIDHeader, id)
 	}

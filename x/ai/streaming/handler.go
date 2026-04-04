@@ -75,14 +75,14 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 // HandleExecute handles HTTP POST requests to execute workflows with streaming.
 func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: "Method not allowed", Category: contract.CategoryClient})
+		contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code("METHOD_NOT_ALLOWED").Message("Method not allowed").Category(contract.CategoryClient).Build())
 		return
 	}
 
 	// Parse request
 	var req WorkflowRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		contract.WriteError(w, r, contract.APIError{Status: http.StatusBadRequest, Code: "INVALID_REQUEST", Message: fmt.Sprintf("Invalid request: %v", err), Category: contract.CategoryClient})
+		contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Code("INVALID_REQUEST").Message(fmt.Sprintf("Invalid request: %v", err)).Category(contract.CategoryClient).Build())
 		return
 	}
 

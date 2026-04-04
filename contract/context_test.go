@@ -259,7 +259,7 @@ func TestNewCtxAppliesRequestTimeout(t *testing.T) {
 }
 
 func TestParamsAndRequestContextHelpers(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(context.WithValue(context.Background(), ParamsContextKey{}, map[string]string{"id": "42"}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(context.WithValue(context.Background(), paramsContextKey{}, map[string]string{"id": "42"}))
 	if val, ok := Param(req, "id"); !ok || val != "42" {
 		t.Fatalf("unexpected Param lookup: %v %v", val, ok)
 	}
@@ -336,16 +336,17 @@ func TestAdaptCtxHandler(t *testing.T) {
 func TestStreamChunkSizeValidation(t *testing.T) {
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
 
-	if err := ctx.StreamBinary(strings.NewReader("data"), 0); !errors.Is(err, ErrInvalidChunkSize) {
-		t.Fatalf("expected invalid chunk size error, got %v", err)
+	// Negative ChunkSize is always invalid regardless of source type.
+	if err := ctx.Stream(StreamConfig{Source: strings.NewReader("data"), ChunkSize: -1}); !errors.Is(err, ErrInvalidChunkSize) {
+		t.Fatalf("expected invalid chunk size error for io.Reader, got %v", err)
 	}
 
-	if err := ctx.StreamJSONChunked([]any{map[string]string{"a": "b"}}, 0); !errors.Is(err, ErrInvalidChunkSize) {
-		t.Fatalf("expected invalid chunk size error, got %v", err)
+	if err := ctx.Stream(StreamConfig{Format: StreamFormatJSON, Source: []any{map[string]string{"a": "b"}}, ChunkSize: -1}); !errors.Is(err, ErrInvalidChunkSize) {
+		t.Fatalf("expected invalid chunk size error for []any, got %v", err)
 	}
 
-	if err := ctx.StreamTextChunked([]string{"line"}, -1); !errors.Is(err, ErrInvalidChunkSize) {
-		t.Fatalf("expected invalid chunk size error, got %v", err)
+	if err := ctx.Stream(StreamConfig{Format: StreamFormatText, Source: []string{"line"}, ChunkSize: -1}); !errors.Is(err, ErrInvalidChunkSize) {
+		t.Fatalf("expected invalid chunk size error for []string, got %v", err)
 	}
 }
 

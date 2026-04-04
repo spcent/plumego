@@ -104,32 +104,28 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	ensureNoSniff(w.Header())
-	contract.WriteError(w, nil, contract.APIError{
-		Status:   http.StatusServiceUnavailable,
-		Code:     "CIRCUIT_OPEN",
-		Message:  "Circuit breaker is open. The service is temporarily unavailable.",
-		Category: contract.CategoryServer,
-		Details: map[string]any{
-			"circuit": cb.Name(),
-			"state":   cb.State().String(),
-		},
-	})
+	contract.WriteError(w, nil, contract.NewErrorBuilder().
+		Status(http.StatusServiceUnavailable).
+		Code("CIRCUIT_OPEN").
+		Message("Circuit breaker is open. The service is temporarily unavailable.").
+		Category(contract.CategoryServer).
+		Detail("circuit", cb.Name()).
+		Detail("state", cb.State().String()).
+		Build())
 }
 
 // writeTooManyRequestsResponse writes a 429 response for rate limiting
 func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	ensureNoSniff(w.Header())
-	contract.WriteError(w, nil, contract.APIError{
-		Status:   http.StatusTooManyRequests,
-		Code:     "RATE_LIMITED",
-		Message:  "Circuit breaker is in half-open state. Too many concurrent requests.",
-		Category: contract.CategoryRateLimit,
-		Details: map[string]any{
-			"circuit": cb.Name(),
-			"state":   cb.State().String(),
-		},
-	})
+	contract.WriteError(w, nil, contract.NewErrorBuilder().
+		Status(http.StatusTooManyRequests).
+		Code("RATE_LIMITED").
+		Message("Circuit breaker is in half-open state. Too many concurrent requests.").
+		Category(contract.CategoryRateLimit).
+		Detail("circuit", cb.Name()).
+		Detail("state", cb.State().String()).
+		Build())
 }
 
 // ErrServerError indicates a server error (5xx)

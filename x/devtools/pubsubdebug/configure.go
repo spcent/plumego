@@ -39,18 +39,18 @@ func Configure(hooks Hooks) {
 	r := hooks.EnsureRouter()
 	r.Get(path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 		if pub == nil {
-			contract.WriteContractError(ctx, http.StatusInternalServerError, "missing_pubsub", "pubsub is not configured")
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("pubsub is not configured"))
 			return
 		}
 
 		type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
 
 		if ps, ok := pub.(snapshoter); ok {
-			contract.WriteContractResponse(ctx, http.StatusOK, ps.Snapshot())
+			_ = ctx.Response(http.StatusOK, ps.Snapshot(), nil)
 			return
 		}
 
-		contract.WriteContractError(ctx, http.StatusNotImplemented, "not_supported", "pubsub snapshot not supported by this implementation")
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotImplemented).Code("not_supported").Message("pubsub snapshot not supported by this implementation").Category(contract.CategoryServer).Build())
 	}, r.Logger()))
 }
 

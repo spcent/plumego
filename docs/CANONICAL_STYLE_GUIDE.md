@@ -287,6 +287,97 @@ Do not introduce:
 - New business logic inside middleware
 - New package roles that blur core boundaries
 
+---
+
+## 16. `contract` Package Rules
+
+`contract` owns **transport primitives only**: request/response envelopes, error
+types, HTTP writing helpers, context key accessors, and binding helpers.
+
+### 16.1 Scope boundary
+
+The following categories **do not belong** in `contract` and must live in `x/*`:
+
+| Concern | Correct home |
+|---|---|
+| Tracing infrastructure (Tracer, Span, Collector, Sampler) | `x/observability` |
+| Session lifecycle (SessionStore, SessionValidator, RefreshManager) | `x/tenant` or `x/security` |
+| Metrics collection | `x/observability` |
+| Business-domain validation rules | caller / domain package |
+
+`contract` may export context keys and ID accessor functions for tracing and
+auth, but must not own the full instrumentation or session management subsystem.
+
+### 16.2 Context accessor naming
+
+All context accessor pairs in `contract` use the **With/From** pattern:
+
+```go
+// correct
+func WithFoo(ctx context.Context, v Foo) context.Context
+func FooFromContext(ctx context.Context) Foo
+
+// wrong — mixed prefix order
+func ContextWithFoo(ctx context.Context, v Foo) context.Context  // ← forbidden
+func FooFromContext(ctx context.Context) Foo
+```
+
+Context key types are always **unexported** zero-value structs and always
+**inlined** at the call site — no package-level variable:
+
+```go
+type fooContextKey struct{}
+
+// correct
+context.WithValue(ctx, fooContextKey{}, v)
+
+// wrong
+var fooKey fooContextKey            // ← unnecessary variable
+context.WithValue(ctx, fooKey, v)
+```
+
+### 16.3 Error construction path
+
+Two canonical paths exist; choose the most specific:
+
+| When | Use |
+|---|---|
+| Building from a known `ErrorType` | `ErrorType.Meta()` then fill Message |
+| Custom or multi-field error | `NewErrorBuilder()` fluent chain |
+
+**Do not add** new `NewXxxError(...)` convenience constructors for each scenario.
+The 7 existing constructors (`NewValidationError`, `NewNotFoundError`, etc.) are
+legacy; prefer `ErrorBuilder` in new code.
+
+### 16.4 Success response path
+
+One canonical path:
+
+```go
+// preferred
+contract.WriteResponse(w, r, http.StatusOK, data, meta)
+// or via Ctx
+ctx.Response(http.StatusOK, data, meta)
+```
+
+`WriteJSON` and `Ctx.JSON` are low-level primitives for cases with no envelope;
+they must not be used in application handlers directly. If you are writing a
+handler, use `WriteResponse` / `ctx.Response`.
+
+Do not invent per-feature envelope shapes.
+
+### 16.5 Deprecated API policy
+
+When replacing an API in `contract`:
+
+1. Mark the old symbol: `// Deprecated: Use Foo instead.` (first line of doc comment).
+2. **Do not** keep it as a wrapper for more than one minor release.
+3. Replace all callers in the same PR that introduces the new API, then delete
+   the old symbol — zero dead wrappers at merge time.
+
+Exception: if external callers exist and cannot be migrated in one PR, document
+the deprecation deadline in the commit message and a task card.
+
 Change strategy:
 1. Keep public behavior unchanged
 2. Align local code to canonical style

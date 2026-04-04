@@ -61,7 +61,7 @@ func (c *Ctx) BindJSONWithOptions(dst any, opts BindOptions) error {
 		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
 
-	if opts.MaxBodyBytes > 0 && int64(len(data)) > opts.MaxBodyBytes {
+	if opts.MaxBodySize > 0 && int64(len(data)) > opts.MaxBodySize {
 		return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
 	}
 
@@ -264,7 +264,7 @@ func logBindError(c *Ctx, payload any, opts BindOptions, err error) {
 	if c == nil {
 		return
 	}
-	logger := opts.Logger
+	logger := c.Logger
 	if logger == nil {
 		return
 	}

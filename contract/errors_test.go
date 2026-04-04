@@ -3,7 +3,6 @@ package contract
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -136,68 +135,6 @@ func TestErrorBuilderChaining(t *testing.T) {
 
 	if err.Details["resource"] != "user" || err.Details["id"] != "123" {
 		t.Fatalf("expected details to be set, got %v", err.Details)
-	}
-}
-
-func TestErrorChain(t *testing.T) {
-	rootErr := errors.New("root error")
-	chain := NewErrorChain(rootErr)
-
-	// Add errors to chain
-	chain.Add(errors.New("validation error"), "validation failed", CategoryValidation, ErrTypeValidation)
-	chain.Add(errors.New("database error"), "database operation failed", CategoryServer, ErrTypeInternal)
-
-	if chain.Root() != rootErr {
-		t.Fatalf("expected root error to be preserved")
-	}
-
-	if len(chain.Errors()) != 2 {
-		t.Fatalf("expected 2 errors in chain, got %d", len(chain.Errors()))
-	}
-
-	latest := chain.Latest()
-	if latest == nil || latest.Category != CategoryServer {
-		t.Fatalf("expected latest error to be server error")
-	}
-
-	if !chain.HasCategory(CategoryValidation) {
-		t.Fatalf("expected chain to have validation category")
-	}
-
-	if !chain.HasErrorType(ErrTypeInternal) {
-		t.Fatalf("expected chain to have internal error type")
-	}
-}
-
-func TestErrorChainContext(t *testing.T) {
-	chain := NewErrorChain(errors.New("test error"))
-
-	chain.Add(errors.New("validation error"), "validation failed", CategoryValidation, ErrTypeValidation)
-	chain.AddContext("field", "email")
-	chain.AddContext("value", "invalid")
-
-	latest := chain.Latest()
-	if latest == nil {
-		t.Fatalf("expected latest error to exist")
-	}
-
-	if latest.Context["field"] != "email" {
-		t.Fatalf("expected field context to be set")
-	}
-
-	if latest.Context["value"] != "invalid" {
-		t.Fatalf("expected value context to be set")
-	}
-}
-
-func TestErrorChainTimeoutDetection(t *testing.T) {
-	chain := NewErrorChain(errors.New("timeout error"))
-
-	// Add timeout error
-	chain.Add(errors.New("operation timeout"), "operation timed out", CategoryTimeout, ErrTypeTimeout)
-
-	if !chain.IsTimeoutError() {
-		t.Fatalf("expected chain to detect timeout error")
 	}
 }
 
@@ -394,7 +331,7 @@ func TestErrorResponseWithTraceID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// Simulate trace ID in context
-	ctx := ContextWithTraceContext(req.Context(), TraceContext{
+	ctx := WithTraceContext(req.Context(), TraceContext{
 		TraceID: "test-trace-id",
 		SpanID:  "test-span-id",
 	})
@@ -422,7 +359,7 @@ func TestErrorResponseWithTraceID(t *testing.T) {
 func TestWriteErrorPreservesTraceID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := ContextWithTraceContext(req.Context(), TraceContext{
+	ctx := WithTraceContext(req.Context(), TraceContext{
 		TraceID: "context-trace-id",
 		SpanID:  "context-span-id",
 	})
@@ -481,34 +418,6 @@ func TestErrorLogging(t *testing.T) {
 
 	if loggedFields["service"] != "database" {
 		t.Fatalf("expected service detail in logged fields")
-	}
-}
-
-func TestErrorMetrics(t *testing.T) {
-	metrics := NewErrorMetrics()
-
-	// Record various errors
-	errors := []APIError{
-		{Status: http.StatusBadRequest, Category: CategoryValidation, Details: map[string]any{"type": ErrTypeValidation}},
-		{Status: http.StatusNotFound, Category: CategoryClient, Details: map[string]any{"type": ErrTypeNotFound}},
-		{Status: http.StatusInternalServerError, Category: CategoryServer, Details: map[string]any{"type": ErrTypeInternal}},
-		{Status: http.StatusBadRequest, Category: CategoryValidation, Details: map[string]any{"type": ErrTypeValidation}},
-	}
-
-	for _, err := range errors {
-		metrics.RecordError(err)
-	}
-
-	if metrics.TotalErrors != 4 {
-		t.Fatalf("expected 4 total errors, got %d", metrics.TotalErrors)
-	}
-
-	if metrics.ByCategory[CategoryValidation] != 2 {
-		t.Fatalf("expected 2 validation errors, got %d", metrics.ByCategory[CategoryValidation])
-	}
-
-	if metrics.ByStatus[http.StatusBadRequest] != 2 {
-		t.Fatalf("expected 2 bad request errors, got %d", metrics.ByStatus[http.StatusBadRequest])
 	}
 }
 
@@ -644,32 +553,46 @@ func TestErrorBuilderDetails(t *testing.T) {
 	}
 }
 
-func TestErrorChainWithEmptyRoot(t *testing.T) {
-	chain := NewErrorChain(nil)
+func TestWriteErrorZeroValueEmitsWarning(t *testing.T) {
+	var warnings []string
+	prev := WarnFunc
+	WarnFunc = func(msg string) { warnings = append(warnings, msg) }
+	defer func() { WarnFunc = prev }()
 
-	chain.Add(errors.New("first error"), "first error occurred", CategoryServer, ErrTypeInternal)
+	w := httptest.NewRecorder()
+	_ = WriteError(w, nil, APIError{})
 
-	if chain.Error() != "first error occurred" {
-		t.Fatalf("expected chain error to be the message of the latest error")
+	if len(warnings) == 0 {
+		t.Fatal("expected WarnFunc to be called for zero-value APIError")
 	}
-
-	if len(chain.Errors()) != 1 {
-		t.Fatalf("expected 1 error in chain")
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
 	}
 }
 
-func TestErrorChainNoErrors(t *testing.T) {
-	chain := NewErrorChain(errors.New("root"))
+func TestErrorBuilderBuildFillsDefaults(t *testing.T) {
+	// A builder with no explicit Status/Code/Category should produce a fully-
+	// populated APIError after Build().
+	got := NewErrorBuilder().Message("something went wrong").Build()
 
-	if chain.Error() != "root" {
-		t.Fatalf("expected chain error to be root error")
+	if got.Status == 0 {
+		t.Error("Build() must set a non-zero Status")
 	}
-
-	if chain.Latest() != nil {
-		t.Fatalf("expected latest to be nil when no errors added")
+	if got.Code == "" {
+		t.Error("Build() must set a non-empty Code")
 	}
+	if got.Category == "" {
+		t.Error("Build() must set a non-empty Category")
+	}
+	// A fully-populated APIError from the builder should not trigger WarnFunc.
+	var warnCalled bool
+	prev := WarnFunc
+	WarnFunc = func(string) { warnCalled = true }
+	defer func() { WarnFunc = prev }()
 
-	if chain.HasCategory(CategoryValidation) {
-		t.Fatalf("expected chain to not have validation category")
+	w := httptest.NewRecorder()
+	_ = WriteError(w, nil, got)
+	if warnCalled {
+		t.Error("WarnFunc must not be called for a fully-populated APIError from the builder")
 	}
 }

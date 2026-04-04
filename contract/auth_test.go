@@ -16,7 +16,7 @@ func TestContextWithPrincipal_RoundTrip(t *testing.T) {
 		Scopes:   []string{"read", "write"},
 	}
 
-	ctx := contract.ContextWithPrincipal(context.Background(), p)
+	ctx := contract.WithPrincipal(context.Background(), p)
 	got := contract.PrincipalFromContext(ctx)
 	if got == nil {
 		t.Fatal("expected non-nil principal from context")
@@ -87,8 +87,8 @@ func TestContextWithPrincipal_Overwrite(t *testing.T) {
 	p1 := &contract.Principal{Subject: "user-1"}
 	p2 := &contract.Principal{Subject: "user-2"}
 
-	ctx := contract.ContextWithPrincipal(context.Background(), p1)
-	ctx = contract.ContextWithPrincipal(ctx, p2)
+	ctx := contract.WithPrincipal(context.Background(), p1)
+	ctx = contract.WithPrincipal(ctx, p2)
 
 	got := contract.PrincipalFromContext(ctx)
 	if got == nil {
@@ -121,7 +121,7 @@ func TestRequestWithPrincipal_NewRequest(t *testing.T) {
 }
 
 func TestPrincipalFromContext_NilPrincipalStored(t *testing.T) {
-	ctx := contract.ContextWithPrincipal(context.Background(), nil)
+	ctx := contract.WithPrincipal(context.Background(), nil)
 	got := contract.PrincipalFromContext(ctx)
 	if got != nil {
 		t.Fatalf("expected nil for explicitly stored nil principal, got %+v", got)

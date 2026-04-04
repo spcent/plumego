@@ -31,12 +31,11 @@ func HealthHistoryExportHandler(manager health.HealthManager) http.Handler {
 
 		query, err := parseHistoryQuery(r)
 		if err != nil {
-			contract.WriteError(w, r, contract.APIError{
-				Status:   http.StatusBadRequest,
-				Code:     "INVALID_QUERY",
-				Message:  err.Error(),
-				Category: contract.CategoryForStatus(http.StatusBadRequest),
-			})
+			contract.WriteError(w, r, contract.NewErrorBuilder().
+				Status(http.StatusBadRequest).
+				Code("INVALID_QUERY").
+				Message(err.Error()).
+				Build())
 			return
 		}
 
@@ -53,12 +52,11 @@ func HealthHistoryExportHandler(manager health.HealthManager) http.Handler {
 		case "json":
 			_ = contract.WriteJSON(w, http.StatusOK, result)
 		default:
-			contract.WriteError(w, r, contract.APIError{
-				Status:   http.StatusBadRequest,
-				Code:     "INVALID_FORMAT",
-				Message:  "supported formats: json, csv",
-				Category: contract.CategoryForStatus(http.StatusBadRequest),
-			})
+			contract.WriteError(w, r, contract.NewErrorBuilder().
+				Status(http.StatusBadRequest).
+				Code("INVALID_FORMAT").
+				Message("supported formats: json, csv").
+				Build())
 		}
 	})
 }

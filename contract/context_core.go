@@ -22,7 +22,11 @@ type RequestContext struct {
 	RouteName    string
 }
 
-type RequestContextKey struct{}
+// Context keys are unexported zero-value structs to avoid collisions with other
+// packages. External callers must use the With* and *From* accessor functions
+// (e.g. WithRequestContext, RequestContextFrom) rather than context.WithValue
+// with the key types directly.
+type requestContextKey struct{}
 
 // RequestConfig holds configuration for request processing.
 type RequestConfig struct {
@@ -142,7 +146,19 @@ func (e *BindError) Unwrap() error {
 	return e.Err
 }
 
-type ParamsContextKey struct{}
+type paramsContextKey struct{}
+
+// WithRequestContext stores rc in ctx using the package-internal requestContextKey.
+// Use this instead of context.WithValue with the old exported key.
+func WithRequestContext(ctx context.Context, rc RequestContext) context.Context {
+	return context.WithValue(ctx, requestContextKey{}, rc)
+}
+
+// WithParams stores params in ctx using the package-internal paramsContextKey.
+// Use this instead of context.WithValue with the old exported key.
+func WithParams(ctx context.Context, params map[string]string) context.Context {
+	return context.WithValue(ctx, paramsContextKey{}, params)
+}
 
 // ParamsFromContext returns route parameters stored in the request context.
 // It returns nil if no parameters were attached.
@@ -150,11 +166,11 @@ func ParamsFromContext(ctx context.Context) map[string]string {
 	if ctx == nil {
 		return nil
 	}
-	if params, ok := ctx.Value(ParamsContextKey{}).(map[string]string); ok {
+	if params, ok := ctx.Value(paramsContextKey{}).(map[string]string); ok {
 		return params
 	}
 
-	if rc, ok := ctx.Value(RequestContextKey{}).(RequestContext); ok {
+	if rc, ok := ctx.Value(requestContextKey{}).(RequestContext); ok {
 		return rc.Params
 	}
 
@@ -168,7 +184,7 @@ func RequestContextFrom(ctx context.Context) RequestContext {
 		return RequestContext{}
 	}
 
-	if rc, ok := ctx.Value(RequestContextKey{}).(RequestContext); ok {
+	if rc, ok := ctx.Value(requestContextKey{}).(RequestContext); ok {
 		return rc
 	}
 

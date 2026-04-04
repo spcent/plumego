@@ -301,12 +301,12 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
 }
 
 func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, status int, message string) {
-	contract.WriteError(w, r, contract.APIError{
-		Status:   status,
-		Code:     http.StatusText(status),
-		Message:  message,
-		Category: contract.CategoryForStatus(status),
-	})
+	contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(status).
+		Code(http.StatusText(status)).
+		Message(message).
+		Category(contract.CategoryForStatus(status)).
+		Build())
 }
 
 func (h *Handler) writeMetadataError(w http.ResponseWriter, r *http.Request, err error) {
