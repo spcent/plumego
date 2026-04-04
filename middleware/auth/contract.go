@@ -57,7 +57,7 @@ func Authenticate(authenticator contract.Authenticator, opts ...AuthOption) midd
 				return
 			}
 
-			ctx := contract.ContextWithPrincipal(r.Context(), principal)
+			ctx := contract.WithPrincipal(r.Context(), principal)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

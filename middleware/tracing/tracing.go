@@ -38,7 +38,7 @@ func Middleware(tracer Tracer) middleware.Middleware {
 			if spanID != "" {
 				existing := contract.TraceContextFromContext(ctx)
 				if existing == nil || existing.SpanID == "" {
-					ctx = contract.ContextWithTraceContext(ctx, contract.TraceContext{
+					ctx = contract.WithTraceContext(ctx, contract.TraceContext{
 						TraceID: contract.TraceID(traceID),
 						SpanID:  contract.SpanID(spanID),
 					})

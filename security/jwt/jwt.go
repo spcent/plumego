@@ -792,7 +792,7 @@ func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middlew
 
 			ctx := context.WithValue(r.Context(), claimsContextKey, claims)
 			if principal := PrincipalFromClaims(claims); principal != nil {
-				ctx = contract.ContextWithPrincipal(ctx, principal)
+				ctx = contract.WithPrincipal(ctx, principal)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

@@ -121,7 +121,7 @@ func TestAuthorizeMiddleware(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.ContextWithPrincipal(req.Context(), principal))
+	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -140,7 +140,7 @@ func TestAuthorizeMiddlewareForbidden(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.ContextWithPrincipal(req.Context(), principal))
+	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -163,7 +163,7 @@ func TestSessionCheckMiddleware(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.ContextWithPrincipal(req.Context(), principal))
+	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -183,7 +183,7 @@ func TestSessionCheckMissingSessionID(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.ContextWithPrincipal(req.Context(), principal))
+	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -206,7 +206,7 @@ func TestSessionCheckRevokedSession(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.ContextWithPrincipal(req.Context(), principal))
+	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

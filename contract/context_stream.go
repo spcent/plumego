@@ -53,7 +53,11 @@ type StreamConfig struct {
 
 // Stream dispatches a streaming response according to cfg.
 // It replaces the family of Stream* methods and supports all format/source combinations.
+// A negative ChunkSize returns ErrInvalidChunkSize; zero means no chunking (or default for io.Reader).
 func (c *Ctx) Stream(cfg StreamConfig) error {
+	if cfg.ChunkSize < 0 {
+		return ErrInvalidChunkSize
+	}
 	switch src := cfg.Source.(type) {
 	case io.Reader:
 		chunkSize := cfg.ChunkSize
@@ -524,104 +528,4 @@ func (c *Ctx) WriteSSE(event SSEEvent) error {
 		return err
 	}
 	return sw.Write(event)
-}
-
-// --- Deprecated slice-based streaming ---
-// Use Stream(StreamConfig{Format: StreamFormatJSON, Source: items}) instead.
-
-// Deprecated: Use Stream with StreamConfig instead.
-func (c *Ctx) StreamJSON(items []any) error {
-	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: items})
-}
-
-// Deprecated: Use Stream with StreamConfig instead.
-func (c *Ctx) StreamText(lines []string) error {
-	return c.Stream(StreamConfig{Format: StreamFormatText, Source: lines})
-}
-
-// StreamBinary streams binary data in chunks of the given size.
-// Deprecated: Use Stream with StreamConfig{Source: reader, ChunkSize: chunkSize} instead.
-func (c *Ctx) StreamBinary(reader io.Reader, chunkSize int) error {
-	if err := validateChunkSize(chunkSize); err != nil {
-		return err
-	}
-	return c.Stream(StreamConfig{Source: reader, ChunkSize: chunkSize})
-}
-
-// --- Deprecated channel-based streaming ---
-
-// Deprecated: Use Stream with StreamConfig instead.
-func (c *Ctx) StreamJSONWithChannel(itemChan <-chan any) error {
-	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: itemChan})
-}
-
-// Deprecated: Use Stream with StreamConfig instead.
-func (c *Ctx) StreamTextWithChannel(lineChan <-chan string) error {
-	return c.Stream(StreamConfig{Format: StreamFormatText, Source: lineChan})
-}
-
-// Deprecated: Use Stream with StreamConfig instead.
-func (c *Ctx) StreamSSEWithChannel(eventChan <-chan SSEEvent) error {
-	return c.Stream(StreamConfig{Format: StreamFormatSSE, Source: eventChan})
-}
-
-// --- Deprecated generator-based streaming ---
-
-// Deprecated: Use Stream with StreamConfig instead.
-func (c *Ctx) StreamJSONWithGenerator(generator func() (any, error)) error {
-	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: generator})
-}
-
-// Deprecated: Use Stream with StreamConfig instead.
-func (c *Ctx) StreamTextWithGenerator(generator func() (string, error)) error {
-	return c.Stream(StreamConfig{Format: StreamFormatText, Source: generator})
-}
-
-// Deprecated: Use Stream with StreamConfig instead.
-func (c *Ctx) StreamSSEWithGenerator(generator func() (SSEEvent, error)) error {
-	return c.Stream(StreamConfig{Format: StreamFormatSSE, Source: generator})
-}
-
-// --- Deprecated chunked streaming ---
-
-// Deprecated: Use Stream with StreamConfig{ChunkSize: chunkSize} instead.
-func (c *Ctx) StreamJSONChunked(items []any, chunkSize int) error {
-	if err := validateChunkSize(chunkSize); err != nil {
-		return err
-	}
-	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: items, ChunkSize: chunkSize})
-}
-
-// Deprecated: Use Stream with StreamConfig{ChunkSize: chunkSize} instead.
-func (c *Ctx) StreamTextChunked(lines []string, chunkSize int) error {
-	if err := validateChunkSize(chunkSize); err != nil {
-		return err
-	}
-	return c.Stream(StreamConfig{Format: StreamFormatText, Source: lines, ChunkSize: chunkSize})
-}
-
-// StreamSSEChunked streams Server-Sent Events, flushing every chunkSize events.
-// Deprecated: Use Stream with StreamConfig{ChunkSize: chunkSize} instead.
-func (c *Ctx) StreamSSEChunked(events []SSEEvent, chunkSize int) error {
-	if err := validateChunkSize(chunkSize); err != nil {
-		return err
-	}
-	return c.Stream(StreamConfig{Format: StreamFormatSSE, Source: events, ChunkSize: chunkSize})
-}
-
-// --- Deprecated streaming with retry ---
-
-// Deprecated: Use Stream with StreamConfig{MaxRetry: maxRetries, RetryDelay: retryDelay} instead.
-func (c *Ctx) StreamJSONWithRetry(generator func() (any, error), maxRetries int, retryDelay time.Duration) error {
-	return c.Stream(StreamConfig{Format: StreamFormatJSON, Source: generator, MaxRetry: maxRetries, RetryDelay: retryDelay})
-}
-
-// Deprecated: Use Stream with StreamConfig{MaxRetry: maxRetries, RetryDelay: retryDelay} instead.
-func (c *Ctx) StreamTextWithRetry(generator func() (string, error), maxRetries int, retryDelay time.Duration) error {
-	return c.Stream(StreamConfig{Format: StreamFormatText, Source: generator, MaxRetry: maxRetries, RetryDelay: retryDelay})
-}
-
-// Deprecated: Use Stream with StreamConfig{MaxRetry: maxRetries, RetryDelay: retryDelay} instead.
-func (c *Ctx) StreamSSEWithRetry(generator func() (SSEEvent, error), maxRetries int, retryDelay time.Duration) error {
-	return c.Stream(StreamConfig{Format: StreamFormatSSE, Source: generator, MaxRetry: maxRetries, RetryDelay: retryDelay})
 }

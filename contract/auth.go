@@ -147,9 +147,15 @@ type Principal struct {
 
 type principalContextKey struct{}
 
-// ContextWithPrincipal attaches a principal to a context.
-func ContextWithPrincipal(ctx context.Context, p *Principal) context.Context {
+// WithPrincipal attaches a principal to a context.
+func WithPrincipal(ctx context.Context, p *Principal) context.Context {
 	return context.WithValue(ctx, principalContextKey{}, p)
+}
+
+// ContextWithPrincipal attaches a principal to a context.
+// Deprecated: Use WithPrincipal instead.
+func ContextWithPrincipal(ctx context.Context, p *Principal) context.Context {
+	return WithPrincipal(ctx, p)
 }
 
 // PrincipalFromContext extracts a principal from a context.
@@ -175,7 +181,7 @@ func RequestWithPrincipal(r *http.Request, p *Principal) *http.Request {
 	if r == nil {
 		return nil
 	}
-	return r.WithContext(ContextWithPrincipal(r.Context(), p))
+	return r.WithContext(WithPrincipal(r.Context(), p))
 }
 
 type RefreshClaims struct {

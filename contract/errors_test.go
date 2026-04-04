@@ -331,7 +331,7 @@ func TestErrorResponseWithTraceID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// Simulate trace ID in context
-	ctx := ContextWithTraceContext(req.Context(), TraceContext{
+	ctx := WithTraceContext(req.Context(), TraceContext{
 		TraceID: "test-trace-id",
 		SpanID:  "test-span-id",
 	})
@@ -359,7 +359,7 @@ func TestErrorResponseWithTraceID(t *testing.T) {
 func TestWriteErrorPreservesTraceID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := ContextWithTraceContext(req.Context(), TraceContext{
+	ctx := WithTraceContext(req.Context(), TraceContext{
 		TraceID: "context-trace-id",
 		SpanID:  "context-span-id",
 	})

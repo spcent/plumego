@@ -589,7 +589,7 @@ func TestTraceContextManagement(t *testing.T) {
 		},
 	}
 
-	ctx := ContextWithTraceContext(originalCtx, traceContext)
+	ctx := WithTraceContext(originalCtx, traceContext)
 
 	// Retrieve context
 	retrieved := TraceContextFromContext(ctx)
@@ -620,7 +620,7 @@ func TestTraceContextManagement(t *testing.T) {
 
 func TestTraceIDFromContext(t *testing.T) {
 	// TraceID is read from TraceContext stored by ContextWithTraceContext.
-	ctx := ContextWithTraceContext(context.Background(), TraceContext{
+	ctx := WithTraceContext(context.Background(), TraceContext{
 		TraceID: "test-trace-id",
 		SpanID:  "test-span-id",
 	})
@@ -642,7 +642,7 @@ func TestWithTraceIDString(t *testing.T) {
 	}
 
 	// Preserves existing SpanID when updating TraceID.
-	base := ContextWithTraceContext(context.Background(), TraceContext{
+	base := WithTraceContext(context.Background(), TraceContext{
 		TraceID: "old-id",
 		SpanID:  "span-abc",
 	})

@@ -498,7 +498,7 @@ func (t *Tracer) StartTrace(ctx context.Context, name string, options ...TraceOp
 		}
 	}
 
-	ctx = ContextWithTraceContext(ctx, spanContext)
+	ctx = WithTraceContext(ctx, spanContext)
 
 	t.mu.Lock()
 	t.activeSpans[spanID] = span
@@ -569,7 +569,7 @@ func (t *Tracer) StartChildSpan(ctx context.Context, parentSpan *Span, name stri
 		}
 	}
 
-	ctx = ContextWithTraceContext(ctx, spanContext)
+	ctx = WithTraceContext(ctx, spanContext)
 
 	t.mu.Lock()
 	t.activeSpans[spanID] = span
@@ -742,9 +742,15 @@ func WithErrorAttributes(attrs map[string]any) ErrorOption {
 
 type traceContextKey struct{}
 
-// ContextWithTraceContext adds trace context to the context.
-func ContextWithTraceContext(ctx context.Context, traceContext TraceContext) context.Context {
+// WithTraceContext adds trace context to the context.
+func WithTraceContext(ctx context.Context, traceContext TraceContext) context.Context {
 	return context.WithValue(ctx, traceContextKey{}, &traceContext)
+}
+
+// ContextWithTraceContext adds trace context to the context.
+// Deprecated: Use WithTraceContext instead.
+func ContextWithTraceContext(ctx context.Context, traceContext TraceContext) context.Context {
+	return WithTraceContext(ctx, traceContext)
 }
 
 // TraceContextFromContext retrieves trace context from the context.
@@ -772,9 +778,9 @@ func WithTraceIDString(ctx context.Context, id string) context.Context {
 	if existing := TraceContextFromContext(ctx); existing != nil {
 		updated := *existing
 		updated.TraceID = TraceID(id)
-		return ContextWithTraceContext(ctx, updated)
+		return WithTraceContext(ctx, updated)
 	}
-	return ContextWithTraceContext(ctx, TraceContext{TraceID: TraceID(id)})
+	return WithTraceContext(ctx, TraceContext{TraceID: TraceID(id)})
 }
 
 // Utility functions

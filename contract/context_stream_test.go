@@ -19,7 +19,7 @@ func TestStreamJSONWithChannel(t *testing.T) {
 	ch <- map[string]any{"id": 2}
 	close(ch)
 
-	if err := ctx.StreamJSONWithChannel(ch); err != nil {
+	if err := ctx.Stream(StreamConfig{Format: StreamFormatJSON, Source: (<-chan any)(ch)}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -53,7 +53,7 @@ func TestStreamTextWithGenerator(t *testing.T) {
 		return v, nil
 	}
 
-	if err := ctx.StreamTextWithGenerator(gen); err != nil {
+	if err := ctx.Stream(StreamConfig{Format: StreamFormatText, Source: gen}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -80,7 +80,7 @@ func TestStreamSSEWithGenerator(t *testing.T) {
 		return v, nil
 	}
 
-	if err := ctx.StreamSSEWithGenerator(gen); err != nil {
+	if err := ctx.Stream(StreamConfig{Format: StreamFormatSSE, Source: gen}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -110,7 +110,7 @@ func TestStreamJSONWithRetry(t *testing.T) {
 		}
 	}
 
-	if err := ctx.StreamJSONWithRetry(gen, 1, time.Millisecond); err != nil {
+	if err := ctx.Stream(StreamConfig{Format: StreamFormatJSON, Source: gen, MaxRetry: 1, RetryDelay: time.Millisecond}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if calls != 3 {
@@ -130,7 +130,7 @@ func TestStreamTextWithRetryExhausted(t *testing.T) {
 		return "", failErr
 	}
 
-	err := ctx.StreamTextWithRetry(gen, 1, time.Millisecond)
+	err := ctx.Stream(StreamConfig{Format: StreamFormatText, Source: gen, MaxRetry: 1, RetryDelay: time.Millisecond})
 	if !errors.Is(err, failErr) {
 		t.Fatalf("expected original error, got %v", err)
 	}
@@ -147,7 +147,7 @@ func TestStreamSSEWithChannelCanceled(t *testing.T) {
 	ch := make(chan SSEEvent)
 	defer close(ch)
 
-	err := ctx.StreamSSEWithChannel(ch)
+	err := ctx.Stream(StreamConfig{Format: StreamFormatSSE, Source: (<-chan SSEEvent)(ch)})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context canceled, got %v", err)
 	}
