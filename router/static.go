@@ -55,7 +55,8 @@ func normalizeStaticPrefix(prefix string) string {
 
 // getFilePathFromRequest extracts and cleans the file path from request
 func getFilePathFromRequest(req *http.Request) (string, bool) {
-	relPath, ok := contract.Param(req, "filepath")
+	params := contract.ParamsFromContext(req.Context())
+	relPath, ok := params["filepath"]
 	if !ok {
 		return "", false
 	}

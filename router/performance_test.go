@@ -6,8 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spcent/plumego/contract"
-
 	"github.com/spcent/plumego/internal/validator"
 )
 
@@ -223,12 +221,12 @@ func TestOptimizedRouterFeatures(t *testing.T) {
 
 	// Register routes
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
 
 	r.Get("/posts/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte("post-" + id))
 	}))
 

@@ -410,6 +410,6 @@ func normalizeStoredPattern(pattern string) string {
 //	    fmt.Fprintf(w, "User: %s", id)
 //	}))
 func Param(r *http.Request, name string) string {
-	v, _ := contract.Param(r, name)
-	return v
+	rc := contract.RequestContextFrom(r.Context())
+	return rc.Params[name]
 }

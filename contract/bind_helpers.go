@@ -13,7 +13,6 @@ type BindOptions struct {
 	DisallowUnknownFields bool
 	DisableValidation     bool
 	Validator             func(any) error
-	Redact                func(any) any
 }
 
 // FieldError represents a field-level validation error.

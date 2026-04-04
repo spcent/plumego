@@ -125,20 +125,14 @@ func (c *Ctx) File(path string) error {
 	return nil
 }
 
-// SetCookie adds a Set-Cookie header to the response.
-func (c *Ctx) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool) {
-	if path == "" {
-		path = "/"
+// SetCookie adds a Set-Cookie header using the provided cookie configuration.
+// Use http.Cookie{} to specify all attributes including SameSite.
+// If cookie.Path is empty it defaults to "/".
+func (c *Ctx) SetCookie(cookie *http.Cookie) {
+	if cookie.Path == "" {
+		cookie.Path = "/"
 	}
-	http.SetCookie(c.W, &http.Cookie{
-		Name:     name,
-		Value:    value,
-		MaxAge:   maxAge,
-		Path:     path,
-		Domain:   domain,
-		Secure:   secure,
-		HttpOnly: httpOnly,
-	})
+	http.SetCookie(c.W, cookie)
 }
 
 // Cookie returns the named cookie from the request.

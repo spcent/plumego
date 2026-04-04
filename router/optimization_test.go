@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/spcent/plumego/contract"
 )
 
 // BenchmarkOptimizedRouteMatching tests optimized route matching performance
@@ -87,16 +85,16 @@ func TestOptimizedMatcher(t *testing.T) {
 		w.Write([]byte("static"))
 	}))
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
 	r.Get("/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
-		postId, _ := contract.Param(r, "postId")
+		id, _ := ParamFromRequest(r, "id")
+		postId, _ := ParamFromRequest(r, "postId")
 		w.Write([]byte(fmt.Sprintf("user-%s-post-%s", id, postId)))
 	}))
 	r.Get("/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		filepath, _ := contract.Param(r, "filepath")
+		filepath, _ := ParamFromRequest(r, "filepath")
 		w.Write([]byte("file-" + filepath))
 	}))
 

@@ -201,53 +201,54 @@ func RouteNameFromContext(ctx context.Context) string {
 	return RequestContextFrom(ctx).RouteName
 }
 
-// Param returns a single path parameter from the request's context.
-// The boolean indicates whether the parameter was present.
-//
-// Deprecated: Use (*Ctx).Param instead. This package-level function is kept
-// for router-internal use only; handlers should access params via Ctx.
-func Param(r *http.Request, key string) (string, bool) {
-	rc := RequestContextFrom(r.Context())
-	if rc.Params == nil {
-		return "", false
-	}
-	val, ok := rc.Params[key]
-	return val, ok
-}
-
 // NewCtx builds a unified request context for handlers using the net/http primitives.
 func NewCtx(w http.ResponseWriter, r *http.Request, params map[string]string) *Ctx {
 	return newCtxWithLogger(w, r, params, nil)
 }
 
-// DefaultRequestConfig provides sensible defaults for request processing.
-var DefaultRequestConfig = &RequestConfig{
+// NewCtxWithConfig builds a unified request context with a custom RequestConfig,
+// allowing callers to override the default without mutating global state.
+func NewCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]string, cfg RequestConfig) *Ctx {
+	return newCtxWithLoggerAndConfig(w, r, params, nil, &cfg)
+}
+
+var defaultConfig = RequestConfig{
 	MaxBodySize:       10 * 1024 * 1024, // 10MB
 	EnableBodyCache:   true,
 	EnableCompression: false,
 	RequestTimeout:    30 * time.Second,
 }
 
+// DefaultConfig returns a copy of the default request processing configuration.
+// Modify the returned value freely; it does not affect the package default.
+func DefaultConfig() RequestConfig {
+	return defaultConfig
+}
+
 func defaultRequestConfig() *RequestConfig {
-	if DefaultRequestConfig == nil {
-		return &RequestConfig{}
-	}
-	cfg := *DefaultRequestConfig
+	cfg := defaultConfig
 	return &cfg
 }
 
 // newCtxWithLogger allows injecting a logger while keeping NewCtx minimal for compatibility.
 func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]string, logger log.StructuredLogger) *Ctx {
+	return newCtxWithLoggerAndConfig(w, r, params, logger, nil)
+}
+
+// newCtxWithLoggerAndConfig is the canonical constructor; nil cfg uses the package default.
+func newCtxWithLoggerAndConfig(w http.ResponseWriter, r *http.Request, params map[string]string, logger log.StructuredLogger, cfg *RequestConfig) *Ctx {
 	if params == nil {
 		params = map[string]string{}
 	}
 
-	config := defaultRequestConfig()
+	if cfg == nil {
+		cfg = defaultRequestConfig()
+	}
 
 	var cancel context.CancelFunc
 	deadline, hasDeadline := r.Context().Deadline()
-	if !hasDeadline && config.RequestTimeout > 0 {
-		timeoutCtx, cancelFunc := context.WithTimeout(r.Context(), config.RequestTimeout)
+	if !hasDeadline && cfg.RequestTimeout > 0 {
+		timeoutCtx, cancelFunc := context.WithTimeout(r.Context(), cfg.RequestTimeout)
 		cancel = cancelFunc
 		r = r.WithContext(timeoutCtx)
 		deadline, _ = timeoutCtx.Deadline()
@@ -261,7 +262,7 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 
 	// Detect compression
 	compressionEnabled := false
-	if config.EnableCompression {
+	if cfg.EnableCompression {
 		contentEncoding := strings.ToLower(r.Header.Get("Content-Encoding"))
 		if contentEncoding == "gzip" || contentEncoding == "deflate" {
 			compressionEnabled = true
@@ -278,7 +279,7 @@ func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]
 		Logger:   logger,
 		TraceID:  traceID,
 		Deadline: deadline,
-		Config:   config,
+		Config:   cfg,
 
 		startedAt:          time.Now(),
 		compressionEnabled: atomic.Bool{},

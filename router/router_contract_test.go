@@ -165,7 +165,7 @@ func TestAnyFallbackWithCache(t *testing.T) {
 func TestTrailingSlashNormalization(t *testing.T) {
 	r := NewRouter()
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte(id))
 	}))
 
@@ -199,7 +199,7 @@ func TestInternalDoubleSlashNotNormalized(t *testing.T) {
 func TestWildcardParamCapturesRemainder(t *testing.T) {
 	r := NewRouter()
 	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path, _ := contract.Param(r, "path")
+		path, _ := ParamFromRequest(r, "path")
 		w.Write([]byte(path))
 	}))
 
@@ -218,7 +218,7 @@ func TestWildcardParamCapturesRemainder(t *testing.T) {
 func TestEncodedSpaceParamIsDecoded(t *testing.T) {
 	r := NewRouter()
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte(id))
 	}))
 
@@ -252,7 +252,7 @@ func TestEncodedSlashDoesNotMatchSingleSegmentParam(t *testing.T) {
 func TestEncodedSlashMatchesWildcardParam(t *testing.T) {
 	r := NewRouter()
 	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path, _ := contract.Param(r, "path")
+		path, _ := ParamFromRequest(r, "path")
 		w.Write([]byte(path))
 	}))
 
@@ -271,7 +271,7 @@ func TestEncodedSlashMatchesWildcardParam(t *testing.T) {
 func TestDuplicateParamKeysLastWins(t *testing.T) {
 	r := NewRouter()
 	r.Get("/teams/:id/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte(id))
 	}))
 
@@ -291,7 +291,7 @@ func TestGroupParamKeysLastWins(t *testing.T) {
 	r := NewRouter()
 	group := r.Group("/orgs/:id")
 	group.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte(id))
 	}))
 
@@ -326,7 +326,7 @@ func TestGroupParamDoesNotMatchEncodedSlash(t *testing.T) {
 func TestRouteCacheDoesNotLeakParams(t *testing.T) {
 	r := NewRouter(WithCacheCapacity(10))
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte(id))
 	}))
 
@@ -477,7 +477,7 @@ func TestCachedMatchPreservesNestedGroupOrder(t *testing.T) {
 func TestRouteParamsOverrideExistingContext(t *testing.T) {
 	r := NewRouter()
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		rc := contract.RequestContextFrom(r.Context())
 
 		if id != "123" {
