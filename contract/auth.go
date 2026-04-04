@@ -147,16 +147,14 @@ type Principal struct {
 
 type principalContextKey struct{}
 
-var principalContextKeyVar principalContextKey
-
 // ContextWithPrincipal attaches a principal to a context.
 func ContextWithPrincipal(ctx context.Context, p *Principal) context.Context {
-	return context.WithValue(ctx, principalContextKeyVar, p)
+	return context.WithValue(ctx, principalContextKey{}, p)
 }
 
 // PrincipalFromContext extracts a principal from a context.
 func PrincipalFromContext(ctx context.Context) *Principal {
-	if v := ctx.Value(principalContextKeyVar); v != nil {
+	if v := ctx.Value(principalContextKey{}); v != nil {
 		if p, ok := v.(*Principal); ok {
 			return p
 		}

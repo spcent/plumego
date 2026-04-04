@@ -7,22 +7,13 @@ import (
 	"github.com/spcent/plumego/log"
 )
 
-// ErrorHandler provides unified error handling utilities
-type ErrorHandler struct {
-	logger log.StructuredLogger
-}
-
-// NewErrorHandler creates a new error handler
-func NewErrorHandler(logger log.StructuredLogger) *ErrorHandler {
-	return &ErrorHandler{
-		logger: logger,
-	}
-}
-
-// Handle handles an error with context and returns an appropriate response
-func (eh *ErrorHandler) Handle(
+// HandleError wraps err with operation context, logs it, and writes a JSON error
+// response. It is a drop-in replacement for the old ErrorHandler.Handle method
+// without requiring a handler object to be constructed first.
+func HandleError(
 	w http.ResponseWriter,
 	r *http.Request,
+	logger log.StructuredLogger,
 	err error,
 	operation string,
 	module string,
@@ -32,77 +23,17 @@ func (eh *ErrorHandler) Handle(
 		return
 	}
 
-	// Wrap error with context
 	wrappedErr := WrapError(err, operation, module, params)
-
-	// Log the error with full context
-	eh.logError(r, wrappedErr)
-
-	// Convert to APIError for response
-	apiErr := eh.toAPIError(wrappedErr)
-
-	// Write error response
-	_ = WriteError(w, r, apiErr)
+	logErrorWithContext(logger, r, wrappedErr)
+	_ = WriteError(w, r, toAPIError(wrappedErr))
 }
 
-// HandlePanic recovers from panic and converts to error
-func (eh *ErrorHandler) HandlePanic(r any) error {
-	if r == nil {
-		return nil
-	}
-
-	err := PanicToError(r)
-
-	// Log panic with stack trace
-	if eh.logger != nil {
-		eh.logger.WithFields(log.Fields{
-			"panic":     r,
-			"stack":     string(debug.Stack()),
-			"operation": "panic_recovery",
-		}).Error("Recovered from panic")
-	}
-
-	return err
-}
-
-// Wrap adds context to an error
-func (eh *ErrorHandler) Wrap(err error, operation, module string, params map[string]any) error {
-	return WrapError(err, operation, module, params)
-}
-
-// Wrapf adds context to an error with formatted message
-func (eh *ErrorHandler) Wrapf(err error, format string, args ...any) error {
-	return WrapErrorf(err, format, args...)
-}
-
-// IsRetryable checks if an error is retryable
-func (eh *ErrorHandler) IsRetryable(err error) bool {
-	return IsRetryable(err)
-}
-
-// ToAPIError converts any error to APIError
-func (eh *ErrorHandler) ToAPIError(err error) APIError {
-	return eh.toAPIError(err)
-}
-
-// toAPIError converts an error to APIError
-func (eh *ErrorHandler) toAPIError(err error) APIError {
+// toAPIError converts any error to a fully-populated APIError.
+func toAPIError(err error) APIError {
 	if err == nil {
 		return NewInternalError("unknown error")
 	}
 
-	if chain, ok := err.(*ErrorChain); ok {
-		if latest := chain.Latest(); latest != nil && latest.Error != nil {
-			return eh.toAPIError(latest.Error)
-		}
-		if root := chain.Root(); root != nil {
-			return eh.toAPIError(root)
-		}
-		return NewInternalError(chain.Error())
-	}
-
-	// Handle APIError directly; fill any missing required fields so callers
-	// always receive a fully-populated value regardless of how it was built.
 	if apiErr, ok := err.(APIError); ok {
 		if apiErr.Status == 0 {
 			apiErr.Status = http.StatusInternalServerError
@@ -119,27 +50,21 @@ func (eh *ErrorHandler) toAPIError(err error) APIError {
 		return apiErr
 	}
 
-	// Handle WrappedErrorWithContext
 	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
-		// If wrapped error is APIError, use it
 		if apiErr, ok := wrapped.Err.(APIError); ok {
 			return apiErr
 		}
-		// If wrapped error is another wrapped error, recurse
 		if wrapped.Err != nil {
-			return eh.toAPIError(wrapped.Err)
+			return toAPIError(wrapped.Err)
 		}
-		// Otherwise create internal error
 		return NewInternalError(wrapped.Error())
 	}
 
-	// Handle standard errors
 	return NewInternalError(err.Error())
 }
 
-// logError logs an error with full context
-func (eh *ErrorHandler) logError(r *http.Request, err error) {
-	if eh.logger == nil || err == nil {
+func logErrorWithContext(logger log.StructuredLogger, r *http.Request, err error) {
+	if logger == nil || err == nil {
 		return
 	}
 
@@ -161,80 +86,39 @@ func (eh *ErrorHandler) logError(r *http.Request, err error) {
 		}
 	}
 
-	// Add trace ID if available
 	if r != nil {
 		if traceID := TraceIDFromContext(r.Context()); traceID != "" {
 			fields["trace_id"] = traceID
 		}
 	}
 
-	eh.logger.WithFields(fields).Error(FormatError(err))
+	logger.WithFields(fields).Error(FormatError(err))
 }
 
-// WithTrace adds trace context to an error
-func (eh *ErrorHandler) WithTrace(err error, r *http.Request) error {
-	if err == nil || r == nil {
-		return err
+// HandlePanic converts a recovered panic value to a wrapped error.
+func HandlePanic(logger log.StructuredLogger, r any) error {
+	if r == nil {
+		return nil
 	}
 
-	traceID := TraceIDFromContext(r.Context())
-	if traceID == "" {
-		return err
+	err := PanicToError(r)
+
+	if logger != nil {
+		logger.WithFields(log.Fields{
+			"panic":     r,
+			"stack":     string(debug.Stack()),
+			"operation": "panic_recovery",
+		}).Error("Recovered from panic")
 	}
 
-	return WrapError(err, "add_trace", "error_handler", map[string]any{
-		"trace_id": traceID,
-	})
-}
-
-// withDetails merges additional params into an APIError's Details map.
-func withDetails(err APIError, params map[string]any) APIError {
-	for k, v := range params {
-		err.Details[k] = v
-	}
 	return err
 }
 
-// ValidationError creates a validation error with context
-func (eh *ErrorHandler) ValidationError(field, message string, params map[string]any) APIError {
-	return withDetails(NewValidationError(field, message), params)
-}
-
-// NotFoundError creates a not found error with context
-func (eh *ErrorHandler) NotFoundError(resource string, params map[string]any) APIError {
-	return withDetails(NewNotFoundError(resource), params)
-}
-
-// UnauthorizedError creates an unauthorized error with context
-func (eh *ErrorHandler) UnauthorizedError(message string, params map[string]any) APIError {
-	return withDetails(NewUnauthorizedError(message), params)
-}
-
-// ForbiddenError creates a forbidden error with context
-func (eh *ErrorHandler) ForbiddenError(message string, params map[string]any) APIError {
-	return withDetails(NewForbiddenError(message), params)
-}
-
-// TimeoutError creates a timeout error with context
-func (eh *ErrorHandler) TimeoutError(message string, params map[string]any) APIError {
-	return withDetails(NewTimeoutError(message), params)
-}
-
-// InternalError creates an internal error with context
-func (eh *ErrorHandler) InternalError(message string, params map[string]any) APIError {
-	return withDetails(NewInternalError(message), params)
-}
-
-// RateLimitError creates a rate limit error with context
-func (eh *ErrorHandler) RateLimitError(message string, params map[string]any) APIError {
-	return withDetails(NewRateLimitError(message), params)
-}
-
-// SafeExecute executes a function and handles any errors safely
-func (eh *ErrorHandler) SafeExecute(fn func() error, operation, module string, params map[string]any) (err error) {
+// SafeExecute runs fn and wraps any returned error or panic with the given context.
+func SafeExecute(fn func() error, operation, module string, params map[string]any) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = WrapError(eh.HandlePanic(r), operation, module, params)
+			err = WrapError(PanicToError(r), operation, module, params)
 		}
 	}()
 
@@ -243,20 +127,4 @@ func (eh *ErrorHandler) SafeExecute(fn func() error, operation, module string, p
 		return WrapError(err, operation, module, params)
 	}
 	return nil
-}
-
-// SafeExecuteWithResult executes a function that returns a result and error
-func SafeExecuteWithResult[T any](fn func() (T, error), operation, module string, params map[string]any) (result T, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			result = *new(T)
-			err = WrapError(PanicToError(r), operation, module, params)
-		}
-	}()
-
-	result, err = fn()
-	if err != nil {
-		return *new(T), WrapError(err, operation, module, params)
-	}
-	return result, nil
 }

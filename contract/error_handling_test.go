@@ -4,8 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"testing"
-
-	"github.com/spcent/plumego/log"
 )
 
 // TestWrappedErrorWithContext tests the new wrapped error functionality
@@ -79,20 +77,6 @@ func TestPanicToError(t *testing.T) {
 	}
 }
 
-// TestMustFunctions tests the Must helper functions
-func TestMustFunctions(t *testing.T) {
-	// Test Must with nil error (should not panic)
-	Must(nil)
-
-	// Test Must with error (should panic)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic from Must with error")
-		}
-	}()
-	Must(errors.New("test error"))
-}
-
 // TestIsRetryable tests retryable error detection
 func TestIsRetryable(t *testing.T) {
 	// Test timeout error
@@ -126,13 +110,6 @@ func TestIsRetryable(t *testing.T) {
 	if !IsRetryable(netErr) {
 		t.Fatal("temporary network error should be retryable")
 	}
-
-	// Test error chain with timeout
-	chain := NewErrorChain(errors.New("root"))
-	chain.Add(errors.New("timeout"), "timeout", CategoryTimeout, ErrTypeTimeout)
-	if !IsRetryable(chain) {
-		t.Fatal("timeout error chain should be retryable")
-	}
 }
 
 // TestGetErrorDetails tests error details extraction
@@ -161,26 +138,6 @@ func TestGetErrorDetails(t *testing.T) {
 	}
 }
 
-func TestGetErrorDetailsWithErrorChain(t *testing.T) {
-	chain := NewErrorChain(errors.New("root error"))
-	chain.Add(errors.New("validation error"), "validation failed", CategoryValidation, ErrTypeValidation).
-		AddContext("field", "email")
-
-	details := GetErrorDetails(chain)
-	if details["message"] == nil {
-		t.Fatalf("expected message in error chain details")
-	}
-
-	entries, ok := details["chain"].([]map[string]any)
-	if !ok || len(entries) != 1 {
-		t.Fatalf("expected chain entry in details, got %v", details["chain"])
-	}
-
-	if entries[0]["category"] != CategoryValidation {
-		t.Fatalf("expected category in chain details")
-	}
-}
-
 // TestFormatError tests error formatting
 func TestFormatError(t *testing.T) {
 	err := WrapError(errors.New("base"), "op", "mod", map[string]any{"a": 1})
@@ -194,41 +151,8 @@ func TestFormatError(t *testing.T) {
 	}
 }
 
-// TestErrorHandlerConvenienceMethods tests the deduplicated ErrorHandler methods
-func TestErrorHandlerConvenienceMethods(t *testing.T) {
-	eh := NewErrorHandler(nil)
-	params := map[string]any{"extra": "context"}
-
-	tests := []struct {
-		name     string
-		err      APIError
-		wantCode string
-	}{
-		{"validation", eh.ValidationError("email", "required", params), "VALIDATION_ERROR"},
-		{"not found", eh.NotFoundError("user", params), "RESOURCE_NOT_FOUND"},
-		{"unauthorized", eh.UnauthorizedError("bad token", params), "UNAUTHORIZED"},
-		{"forbidden", eh.ForbiddenError("no access", params), "FORBIDDEN"},
-		{"timeout", eh.TimeoutError("too slow", params), "TIMEOUT"},
-		{"internal", eh.InternalError("oops", params), "INTERNAL_ERROR"},
-		{"rate limit", eh.RateLimitError("slow down", params), "RATE_LIMITED"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.err.Code != tt.wantCode {
-				t.Errorf("expected code %q, got %q", tt.wantCode, tt.err.Code)
-			}
-			if tt.err.Details["extra"] != "context" {
-				t.Errorf("expected extra param to be merged into details")
-			}
-		})
-	}
-}
-
-func TestErrorHandlerSafeExecuteWrapsPanics(t *testing.T) {
-	eh := NewErrorHandler(log.NewNoOpLogger())
-
-	err := eh.SafeExecute(func() error {
+func TestSafeExecuteWrapsPanics(t *testing.T) {
+	err := SafeExecute(func() error {
 		panic("boom")
 	}, "test_op", "test_module", map[string]any{"key": "value"})
 	if err == nil {

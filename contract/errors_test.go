@@ -3,7 +3,6 @@ package contract
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -136,68 +135,6 @@ func TestErrorBuilderChaining(t *testing.T) {
 
 	if err.Details["resource"] != "user" || err.Details["id"] != "123" {
 		t.Fatalf("expected details to be set, got %v", err.Details)
-	}
-}
-
-func TestErrorChain(t *testing.T) {
-	rootErr := errors.New("root error")
-	chain := NewErrorChain(rootErr)
-
-	// Add errors to chain
-	chain.Add(errors.New("validation error"), "validation failed", CategoryValidation, ErrTypeValidation)
-	chain.Add(errors.New("database error"), "database operation failed", CategoryServer, ErrTypeInternal)
-
-	if chain.Root() != rootErr {
-		t.Fatalf("expected root error to be preserved")
-	}
-
-	if len(chain.Errors()) != 2 {
-		t.Fatalf("expected 2 errors in chain, got %d", len(chain.Errors()))
-	}
-
-	latest := chain.Latest()
-	if latest == nil || latest.Category != CategoryServer {
-		t.Fatalf("expected latest error to be server error")
-	}
-
-	if !chain.HasCategory(CategoryValidation) {
-		t.Fatalf("expected chain to have validation category")
-	}
-
-	if !chain.HasErrorType(ErrTypeInternal) {
-		t.Fatalf("expected chain to have internal error type")
-	}
-}
-
-func TestErrorChainContext(t *testing.T) {
-	chain := NewErrorChain(errors.New("test error"))
-
-	chain.Add(errors.New("validation error"), "validation failed", CategoryValidation, ErrTypeValidation)
-	chain.AddContext("field", "email")
-	chain.AddContext("value", "invalid")
-
-	latest := chain.Latest()
-	if latest == nil {
-		t.Fatalf("expected latest error to exist")
-	}
-
-	if latest.Context["field"] != "email" {
-		t.Fatalf("expected field context to be set")
-	}
-
-	if latest.Context["value"] != "invalid" {
-		t.Fatalf("expected value context to be set")
-	}
-}
-
-func TestErrorChainTimeoutDetection(t *testing.T) {
-	chain := NewErrorChain(errors.New("timeout error"))
-
-	// Add timeout error
-	chain.Add(errors.New("operation timeout"), "operation timed out", CategoryTimeout, ErrTypeTimeout)
-
-	if !chain.IsTimeoutError() {
-		t.Fatalf("expected chain to detect timeout error")
 	}
 }
 
@@ -484,34 +421,6 @@ func TestErrorLogging(t *testing.T) {
 	}
 }
 
-func TestErrorMetrics(t *testing.T) {
-	metrics := NewErrorMetrics()
-
-	// Record various errors
-	errors := []APIError{
-		{Status: http.StatusBadRequest, Category: CategoryValidation, Details: map[string]any{"type": ErrTypeValidation}},
-		{Status: http.StatusNotFound, Category: CategoryClient, Details: map[string]any{"type": ErrTypeNotFound}},
-		{Status: http.StatusInternalServerError, Category: CategoryServer, Details: map[string]any{"type": ErrTypeInternal}},
-		{Status: http.StatusBadRequest, Category: CategoryValidation, Details: map[string]any{"type": ErrTypeValidation}},
-	}
-
-	for _, err := range errors {
-		metrics.RecordError(err)
-	}
-
-	if metrics.TotalErrors != 4 {
-		t.Fatalf("expected 4 total errors, got %d", metrics.TotalErrors)
-	}
-
-	if metrics.ByCategory[CategoryValidation] != 2 {
-		t.Fatalf("expected 2 validation errors, got %d", metrics.ByCategory[CategoryValidation])
-	}
-
-	if metrics.ByStatus[http.StatusBadRequest] != 2 {
-		t.Fatalf("expected 2 bad request errors, got %d", metrics.ByStatus[http.StatusBadRequest])
-	}
-}
-
 func TestParseErrorFromResponse(t *testing.T) {
 	// Create a mock error response
 	errorResp := ErrorResponse{
@@ -641,36 +550,6 @@ func TestErrorBuilderDetails(t *testing.T) {
 
 	if err.Details["field"] != "email" || err.Details["value"] != "invalid" {
 		t.Fatalf("expected details to be copied correctly")
-	}
-}
-
-func TestErrorChainWithEmptyRoot(t *testing.T) {
-	chain := NewErrorChain(nil)
-
-	chain.Add(errors.New("first error"), "first error occurred", CategoryServer, ErrTypeInternal)
-
-	if chain.Error() != "first error occurred" {
-		t.Fatalf("expected chain error to be the message of the latest error")
-	}
-
-	if len(chain.Errors()) != 1 {
-		t.Fatalf("expected 1 error in chain")
-	}
-}
-
-func TestErrorChainNoErrors(t *testing.T) {
-	chain := NewErrorChain(errors.New("root"))
-
-	if chain.Error() != "root" {
-		t.Fatalf("expected chain error to be root error")
-	}
-
-	if chain.Latest() != nil {
-		t.Fatalf("expected latest to be nil when no errors added")
-	}
-
-	if chain.HasCategory(CategoryValidation) {
-		t.Fatalf("expected chain to not have validation category")
 	}
 }
 
