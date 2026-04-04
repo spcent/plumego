@@ -22,6 +22,14 @@ Optimize for:
 - Never log secrets, tokens, signatures, or private keys.
 - Fail closed on auth, verification, and policy errors.
 - Use timing-safe comparison for secret checks.
+- Context accessor pairs follow `With{Type}` + `{Type}FromContext` order; context
+  key types are unexported zero-value structs inlined at the call site — no package-level variable.
+- `contract` contains transport primitives only. Tracing infrastructure, session
+  lifecycle management, and metric collection do not belong in `contract`.
+- Deprecated symbols must be removed in the same PR that replaces their last
+  caller. Do not leave dead wrappers behind.
+- One canonical success-response path per layer; one canonical error-construction
+  path per layer. Do not add per-feature response helpers or per-scenario error constructors.
 
 ## 3. Read Order
 
@@ -94,7 +102,10 @@ Hard rules:
 - `core` is the app kernel, not a feature catalog.
 - `router` owns matching, params, groups, and reverse routing.
 - `middleware` stays transport-only; never hide business DTO assembly or service injection there.
-- `contract` owns transport contracts and response/error helpers, not protocol gateway families.
+- `contract` owns transport contracts and response/error helpers, not protocol gateway families,
+  observability infrastructure, or session lifecycle management.
+  Tracing subsystems (Tracer, Span, Collector, Sampler) belong in `x/observability`.
+  Session management (SessionStore, SessionValidator, RefreshManager) belongs in `x/tenant`.
 - `health` owns models/readiness helpers, not HTTP handler ownership.
 - Tenant-aware logic belongs in `x/tenant`, not stable `middleware` or stable `store`.
 - Stable `middleware` must not grow tenant resolution, tenant policy, or tenant quota behavior.

@@ -20,6 +20,26 @@ modules:
       - x/**
       - reference/**
       - cmd/**
+    # ── Scope constraints (enforced at review time) ──────────────────────────
+    # contract owns: request/response envelopes, error types, HTTP helpers,
+    # context key accessors, binding helpers.
+    # contract must NOT contain:
+    #   - Tracing infrastructure: Tracer, Span, SpanCollector, Sampler  → x/observability
+    #   - Session lifecycle: SessionStore, SessionValidator, RefreshManager → x/tenant
+    #   - Metric aggregation types                                       → x/observability
+    # ── API shape rules ──────────────────────────────────────────────────────
+    # context_accessors:
+    #   pattern: With{Type}(ctx, v) + {Type}FromContext(ctx)   (no ContextWith* prefix)
+    #   key_type: unexported zero-value struct, always inlined (no package-level var)
+    # error_construction:
+    #   canonical: NewErrorBuilder() or ErrorType.Meta()
+    #   forbidden: adding New{Specific}Error() constructors beyond existing 7
+    # response_write:
+    #   canonical: WriteResponse(w, r, status, data, meta) / ctx.Response(...)
+    #   forbidden: per-handler response envelope shapes
+    # deprecation:
+    #   policy: remove deprecated symbols in the same PR as the last caller migration;
+    #           no dead wrapper functions at merge time
 
   health:
     path: health
