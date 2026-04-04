@@ -177,5 +177,65 @@ Update these when behavior, public API, config, security semantics, lifecycle be
 4. Confirm the owning module manifest and validation commands.
 5. Make the smallest coherent change.
 6. Add or update focused tests.
-7. Run validation in the order from Section 7.
+7. Run validation in the order from Section 8.
 8. Sync docs only for implemented behavior changes.
+
+## 11. Milestone Execution Protocol
+
+Milestones are multi-step, single-PR scopes authored by a human and executed
+autonomously by Codex in `--yolo` mode. When invoked with a milestone spec:
+
+### Entry
+
+1. The spec file is in `tasks/milestones/active/M-NNN.md`.
+2. Read every file listed under **Context** in the spec before touching code.
+3. The spec's **Tasks** list is the execution plan — follow it in order.
+4. Keep changes scoped to the **Affected Modules** listed in the spec.
+
+### Execution Rules
+
+- One commit per logical task step when the step produces a stable intermediate state.
+- All commits go to the branch named in the spec: `milestone/M-NNN-<slug>`.
+- Create that branch from `main` if it does not exist.
+- Do not open sub-tasks outside the spec's **Tasks** list. If a blocker is discovered,
+  stop, document it at the bottom of the spec under `## Blocker`, and push the branch.
+
+### Validation Before Push
+
+Run the full gate sequence from Section 8. All commands must exit 0.
+`gofmt -l .` must produce no output.
+Fix any failures before pushing. Do not push a red state.
+
+### Commit Convention
+
+```
+feat(<module>): <short description> [M-NNN]
+```
+
+For the final commit after all tasks pass:
+
+```
+milestone(M-NNN): <spec title>
+
+- <bullet per completed task>
+- all quality gates pass
+```
+
+### PR
+
+After pushing the branch, open a PR targeting `main` with:
+
+- **Title:** `milestone(M-NNN): <spec title>`
+- **Body:** paste the full output of the acceptance criteria commands.
+- Move the spec file from `tasks/milestones/active/` to `tasks/milestones/done/`
+  and add an `## Outcome` section with the PR number and gate output summary.
+
+### Human Review Checkpoint
+
+The PR is the only human gate. Codex does not wait for confirmation at any
+intermediate step. The human reviewer checks:
+
+1. All CI gates green.
+2. Diff stays within the spec's **Affected Modules** and **Out of Scope** list.
+3. No stable root depends on `x/*` (automated by `dependency-rules` check).
+4. No new undeclared external dependencies in `go.mod`.
