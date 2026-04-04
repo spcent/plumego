@@ -40,14 +40,28 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 		workflowID = r.URL.Query().Get("id")
 	}
 	if workflowID == "" {
-		contract.WriteError(w, r, contract.NewValidationError("workflow_id", "workflow_id required"))
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryValidation).
+			Type(contract.ErrTypeValidation).
+			Code(contract.CodeValidationError).
+			Message("validation failed for field 'workflow_id': workflow_id required").
+			Detail("field", "workflow_id").
+			Detail("validation_message", "workflow_id required").
+			Build())
 		return
 	}
 
 	// Create SSE stream
 	stream, err := sse.NewStream(r.Context(), w)
 	if err != nil {
-		contract.WriteError(w, r, contract.NewInternalError(fmt.Sprintf("Failed to create SSE stream: %v", err)))
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Category(contract.CategoryServer).
+			Type(contract.ErrTypeInternal).
+			Code(contract.CodeInternalError).
+			Message(fmt.Sprintf("Failed to create SSE stream: %v", err)).
+			Build())
 		return
 	}
 
@@ -87,14 +101,28 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.WorkflowID == "" {
-		contract.WriteError(w, r, contract.NewValidationError("workflow_id", "workflow_id required"))
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryValidation).
+			Type(contract.ErrTypeValidation).
+			Code(contract.CodeValidationError).
+			Message("validation failed for field 'workflow_id': workflow_id required").
+			Detail("field", "workflow_id").
+			Detail("validation_message", "workflow_id required").
+			Build())
 		return
 	}
 
 	// Create SSE stream
 	stream, err := sse.NewStream(r.Context(), w)
 	if err != nil {
-		contract.WriteError(w, r, contract.NewInternalError(fmt.Sprintf("Failed to create SSE stream: %v", err)))
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Category(contract.CategoryServer).
+			Type(contract.ErrTypeInternal).
+			Code(contract.CodeInternalError).
+			Message(fmt.Sprintf("Failed to create SSE stream: %v", err)).
+			Build())
 		return
 	}
 
@@ -156,7 +184,13 @@ func HandleWithCallback(
 		// Create workflow from callback
 		workflow, err := callback(r.Context())
 		if err != nil {
-			contract.WriteError(w, r, contract.NewInternalError(fmt.Sprintf("Failed to create workflow: %v", err)))
+			contract.WriteError(w, r, contract.NewErrorBuilder().
+				Status(http.StatusInternalServerError).
+				Category(contract.CategoryServer).
+				Type(contract.ErrTypeInternal).
+				Code(contract.CodeInternalError).
+				Message(fmt.Sprintf("Failed to create workflow: %v", err)).
+				Build())
 			return
 		}
 

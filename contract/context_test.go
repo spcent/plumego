@@ -237,16 +237,12 @@ func TestBindAndValidateJSONErrors(t *testing.T) {
 }
 
 func TestNewCtxAppliesRequestTimeout(t *testing.T) {
-	originalConfig := DefaultRequestConfig
-	DefaultRequestConfig = &RequestConfig{
+	cfg := RequestConfig{
 		RequestTimeout: 50 * time.Millisecond,
 	}
-	t.Cleanup(func() {
-		DefaultRequestConfig = originalConfig
-	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+	ctx := NewCtxWithConfig(httptest.NewRecorder(), req, nil, cfg)
 
 	if ctx.Deadline.IsZero() {
 		t.Fatalf("expected deadline to be set from request timeout")
@@ -260,8 +256,8 @@ func TestNewCtxAppliesRequestTimeout(t *testing.T) {
 
 func TestParamsAndRequestContextHelpers(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(context.WithValue(context.Background(), paramsContextKey{}, map[string]string{"id": "42"}))
-	if val, ok := Param(req, "id"); !ok || val != "42" {
-		t.Fatalf("unexpected Param lookup: %v %v", val, ok)
+	if val, ok := ParamsFromContext(req.Context())["id"]; !ok || val != "42" {
+		t.Fatalf("unexpected ParamsFromContext lookup: %v %v", val, ok)
 	}
 
 	rc := RequestContextFrom(req.Context())

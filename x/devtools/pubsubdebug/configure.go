@@ -39,7 +39,13 @@ func Configure(hooks Hooks) {
 	r := hooks.EnsureRouter()
 	r.Get(path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 		if pub == nil {
-			_ = contract.WriteError(ctx.W, ctx.R, contract.NewInternalError("pubsub is not configured"))
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Status(http.StatusInternalServerError).
+				Category(contract.CategoryServer).
+				Type(contract.ErrTypeInternal).
+				Code(contract.CodeInternalError).
+				Message("pubsub is not configured").
+				Build())
 			return
 		}
 

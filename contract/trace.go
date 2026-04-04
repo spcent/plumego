@@ -44,12 +44,6 @@ func WithTraceContext(ctx context.Context, traceContext TraceContext) context.Co
 	return context.WithValue(ctx, traceContextKey{}, &traceContext)
 }
 
-// ContextWithTraceContext adds trace context to a context.
-// Deprecated: Use WithTraceContext instead.
-func ContextWithTraceContext(ctx context.Context, traceContext TraceContext) context.Context {
-	return WithTraceContext(ctx, traceContext)
-}
-
 // TraceContextFromContext retrieves trace context from a context.
 func TraceContextFromContext(ctx context.Context) *TraceContext {
 	if v := ctx.Value(traceContextKey{}); v != nil {
@@ -71,13 +65,20 @@ func TraceIDFromContext(ctx context.Context) string {
 // WithTraceIDString stores the given trace ID string in the context.
 // If a TraceContext already exists, only its TraceID field is updated so that
 // span and baggage information are preserved.
+// The id is validated via ParseTraceID; if invalid, WarnFunc is called and
+// the raw string is stored unchanged so callers are not silently misled.
 func WithTraceIDString(ctx context.Context, id string) context.Context {
+	parsed, err := ParseTraceID(id)
+	if err != nil {
+		WarnFunc("WithTraceIDString: " + err.Error() + " (storing raw value: " + id + ")")
+		parsed = TraceID(id)
+	}
 	if existing := TraceContextFromContext(ctx); existing != nil {
 		updated := *existing
-		updated.TraceID = TraceID(id)
+		updated.TraceID = parsed
 		return WithTraceContext(ctx, updated)
 	}
-	return WithTraceContext(ctx, TraceContext{TraceID: TraceID(id)})
+	return WithTraceContext(ctx, TraceContext{TraceID: parsed})
 }
 
 // ParseTraceID parses and validates a trace ID string.

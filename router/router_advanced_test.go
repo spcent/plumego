@@ -21,23 +21,23 @@ func TestAdvancedRouteMatching(t *testing.T) {
 	}))
 
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
 
 	r.Get("/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
-		postId, _ := contract.Param(r, "postId")
+		id, _ := ParamFromRequest(r, "id")
+		postId, _ := ParamFromRequest(r, "postId")
 		w.Write([]byte(fmt.Sprintf("user-%s-post-%s", id, postId)))
 	}))
 
 	r.Get("/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		filepath, _ := contract.Param(r, "filepath")
+		filepath, _ := ParamFromRequest(r, "filepath")
 		w.Write([]byte("file-" + filepath))
 	}))
 
 	r.Post("/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path, _ := contract.Param(r, "path")
+		path, _ := ParamFromRequest(r, "path")
 		w.Write([]byte("any-" + path))
 	}))
 
@@ -137,7 +137,7 @@ func TestContextPropagation(t *testing.T) {
 		}
 
 		// Check Param helper
-		id, ok := contract.Param(r, "id")
+		id, ok := ParamFromRequest(r, "id")
 		if !ok || id != "123" {
 			t.Errorf("Param helper: expected 123, got %s", id)
 		}
@@ -239,7 +239,7 @@ func TestConcurrentRequests(t *testing.T) {
 	r := NewRouter()
 
 	r.Get("/concurrent/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := contract.Param(r, "id")
+		id, _ := ParamFromRequest(r, "id")
 		w.Write([]byte(id))
 	}))
 

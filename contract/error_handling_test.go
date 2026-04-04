@@ -80,7 +80,13 @@ func TestPanicToError(t *testing.T) {
 // TestIsRetryable tests retryable error detection
 func TestIsRetryable(t *testing.T) {
 	// Test timeout error
-	timeoutErr := NewTimeoutError("timeout")
+	timeoutErr := NewErrorBuilder().
+		Status(http.StatusRequestTimeout).
+		Category(CategoryTimeout).
+		Type(ErrTypeTimeout).
+		Code(CodeTimeout).
+		Message("timeout").
+		Build()
 	t.Logf("Timeout Error: %+v", timeoutErr)
 	t.Logf("Status: %d, Category: %s", timeoutErr.Status, timeoutErr.Category)
 
@@ -100,7 +106,14 @@ func TestIsRetryable(t *testing.T) {
 	}
 
 	// Test non-retryable error
-	notFoundErr := NewNotFoundError("resource")
+	notFoundErr := NewErrorBuilder().
+		Status(http.StatusNotFound).
+		Category(CategoryClient).
+		Type(ErrTypeNotFound).
+		Code(CodeResourceNotFound).
+		Message("resource 'resource' not found").
+		Detail("resource", "resource").
+		Build()
 	if IsRetryable(notFoundErr) {
 		t.Fatal("not found error should not be retryable")
 	}
@@ -115,7 +128,15 @@ func TestIsRetryable(t *testing.T) {
 // TestGetErrorDetails tests error details extraction
 func TestGetErrorDetails(t *testing.T) {
 	// Test APIError
-	apiErr := NewValidationError("email", "invalid format")
+	apiErr := NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Category(CategoryValidation).
+		Type(ErrTypeValidation).
+		Code(CodeValidationError).
+		Message("validation failed for field 'email': invalid format").
+		Detail("field", "email").
+		Detail("validation_message", "invalid format").
+		Build()
 	details := GetErrorDetails(apiErr)
 	if details["status"] != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %v", details["status"])

@@ -163,7 +163,13 @@ func sessionIDFromPrincipal(p *contract.Principal) (string, bool) {
 }
 
 func writeSessionInternal(w http.ResponseWriter, r *http.Request, message string) {
-	contract.WriteError(w, r, contract.NewInternalError(message))
+	contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(http.StatusInternalServerError).
+		Category(contract.CategoryServer).
+		Type(contract.ErrTypeInternal).
+		Code(contract.CodeInternalError).
+		Message(message).
+		Build())
 }
 
 func defaultSessionErrorHandler() SessionErrorHandler {
@@ -183,18 +189,27 @@ func defaultSessionErrorHandler() SessionErrorHandler {
 }
 
 func sessionErrorToAPIError(err error) contract.APIError {
+	unauthorized := func(msg string) contract.APIError {
+		return contract.NewErrorBuilder().
+			Status(http.StatusUnauthorized).
+			Category(contract.CategoryAuthentication).
+			Type(contract.ErrTypeUnauthorized).
+			Code(contract.CodeUnauthorized).
+			Message(msg).
+			Build()
+	}
 	switch {
 	case errors.Is(err, contract.ErrSessionRevoked):
-		return contract.NewUnauthorizedError("session revoked")
+		return unauthorized("session revoked")
 	case errors.Is(err, contract.ErrSessionExpired):
-		return contract.NewUnauthorizedError("session expired")
+		return unauthorized("session expired")
 	case errors.Is(err, contract.ErrRefreshReused):
-		return contract.NewUnauthorizedError("refresh token reuse detected")
+		return unauthorized("refresh token reuse detected")
 	case errors.Is(err, contract.ErrTokenVersionMismatch):
-		return contract.NewUnauthorizedError("token version mismatch")
+		return unauthorized("token version mismatch")
 	case errors.Is(err, contract.ErrUnauthenticated):
 		fallthrough
 	default:
-		return contract.NewUnauthorizedError("authentication required")
+		return unauthorized("authentication required")
 	}
 }

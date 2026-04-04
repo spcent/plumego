@@ -45,12 +45,6 @@ func WithPrincipal(ctx context.Context, p *Principal) context.Context {
 	return context.WithValue(ctx, principalContextKey{}, p)
 }
 
-// ContextWithPrincipal attaches a principal to a context.
-// Deprecated: Use WithPrincipal instead.
-func ContextWithPrincipal(ctx context.Context, p *Principal) context.Context {
-	return WithPrincipal(ctx, p)
-}
-
 // PrincipalFromContext extracts a principal from a context.
 func PrincipalFromContext(ctx context.Context) *Principal {
 	if v := ctx.Value(principalContextKey{}); v != nil {

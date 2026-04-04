@@ -146,6 +146,44 @@ func (c *Ctx) BindQuery(dst any) error {
 	return bindQuery(c.Query, dst)
 }
 
+// ShouldBindQuery is an alias for BindQuery. It signals that the caller
+// is responsible for handling the returned error without writing a response.
+func (c *Ctx) ShouldBindQuery(dst any) error {
+	return c.BindQuery(dst)
+}
+
+// BindAndValidateQuery binds query parameters and then validates the struct
+// using the same "validate" struct tags as BindAndValidateJSON.
+func (c *Ctx) BindAndValidateQuery(dst any) error {
+	if err := c.BindQuery(dst); err != nil {
+		return err
+	}
+	if err := validateStruct(dst); err != nil {
+		return &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+	}
+	return nil
+}
+
+// BindAndValidateQueryWithOptions binds query parameters and conditionally validates
+// the struct based on the provided options. MaxBodySize and DisallowUnknownFields in
+// opts do not apply to query parameters and are silently ignored.
+func (c *Ctx) BindAndValidateQueryWithOptions(dst any, opts BindOptions) error {
+	if err := c.BindQuery(dst); err != nil {
+		return err
+	}
+	if opts.DisableValidation {
+		return nil
+	}
+	validate := opts.Validator
+	if validate == nil {
+		validate = validateStruct
+	}
+	if err := validate(dst); err != nil {
+		return &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+	}
+	return nil
+}
+
 // bindQuery maps URL query values to struct fields using the "query" struct tag.
 func bindQuery(values url.Values, dst any) error {
 	rv := reflect.ValueOf(dst)
@@ -277,11 +315,7 @@ func logBindError(c *Ctx, payload any, opts BindOptions, err error) {
 	}
 
 	if v := FieldErrorsFrom(err); len(v) > 0 && payload != nil {
-		if opts.Redact != nil {
-			fields["payload"] = opts.Redact(payload)
-		} else {
-			fields["payload"] = DefaultObservabilityPolicy.RedactFields(map[string]any{"payload": payload})["payload"]
-		}
+		fields["payload"] = DefaultObservabilityPolicy.RedactFields(map[string]any{"payload": payload})["payload"]
 		fields["validation_fields"] = v
 	}
 

@@ -8,7 +8,7 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-func TestContextWithPrincipal_RoundTrip(t *testing.T) {
+func TestWithPrincipal_RoundTrip(t *testing.T) {
 	p := &contract.Principal{
 		Subject:  "user-1",
 		TenantID: "tenant-a",
@@ -83,7 +83,7 @@ func TestRequestWithPrincipal_Nil(t *testing.T) {
 	}
 }
 
-func TestContextWithPrincipal_Overwrite(t *testing.T) {
+func TestWithPrincipal_Overwrite(t *testing.T) {
 	p1 := &contract.Principal{Subject: "user-1"}
 	p2 := &contract.Principal{Subject: "user-2"}
 

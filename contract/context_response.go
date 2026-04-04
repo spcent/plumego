@@ -19,15 +19,15 @@ func (c *Ctx) ErrorJSON(status int, errCode string, message string, details map[
 	if category == "" {
 		category = CategoryBusiness
 	}
-	payload := APIError{
-		Status:   status,
-		Code:     errCode,
-		Message:  message,
-		Details:  details,
-		TraceID:  c.TraceID,
-		Category: category,
-	}
-	return c.JSON(status, payload)
+	payload := NewErrorBuilder().
+		Status(status).
+		Category(category).
+		Code(errCode).
+		Message(message).
+		TraceID(c.TraceID).
+		Details(details).
+		Build()
+	return WriteError(c.W, c.R, payload)
 }
 
 // Response writes a standardized success response that includes trace id when available.
@@ -125,20 +125,16 @@ func (c *Ctx) File(path string) error {
 	return nil
 }
 
-// SetCookie adds a Set-Cookie header to the response.
-func (c *Ctx) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool) {
-	if path == "" {
-		path = "/"
+// SetCookie adds a Set-Cookie header using the provided cookie configuration.
+// Use http.Cookie{} to specify all attributes including SameSite.
+// If cookie.Path is empty it defaults to "/".
+func (c *Ctx) SetCookie(cookie *http.Cookie) {
+	if cookie.Path == "" {
+		cookie.Path = "/"
 	}
-	http.SetCookie(c.W, &http.Cookie{
-		Name:     name,
-		Value:    value,
-		MaxAge:   maxAge,
-		Path:     path,
-		Domain:   domain,
-		Secure:   secure,
-		HttpOnly: httpOnly,
-	})
+	// Ensure cookies are only sent over secure HTTPS connections.
+	cookie.Secure = true
+	http.SetCookie(c.W, cookie)
 }
 
 // Cookie returns the named cookie from the request.

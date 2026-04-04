@@ -138,9 +138,17 @@ func TestErrorBuilderChaining(t *testing.T) {
 	}
 }
 
-func TestCommonErrorConstructors(t *testing.T) {
-	// Test validation error
-	valErr := NewValidationError("email", "invalid format")
+func TestCommonErrorBuilders(t *testing.T) {
+	// Test validation error via builder
+	valErr := NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Category(CategoryValidation).
+		Type(ErrTypeValidation).
+		Code(CodeValidationError).
+		Message("validation failed for field 'email': invalid format").
+		Detail("field", "email").
+		Detail("validation_message", "invalid format").
+		Build()
 	if valErr.Category != CategoryValidation {
 		t.Fatalf("expected validation category")
 	}
@@ -148,8 +156,15 @@ func TestCommonErrorConstructors(t *testing.T) {
 		t.Fatalf("expected field detail")
 	}
 
-	// Test not found error
-	notFoundErr := NewNotFoundError("user")
+	// Test not found error via builder
+	notFoundErr := NewErrorBuilder().
+		Status(http.StatusNotFound).
+		Category(CategoryClient).
+		Type(ErrTypeNotFound).
+		Code(CodeResourceNotFound).
+		Message("resource 'user' not found").
+		Detail("resource", "user").
+		Build()
 	if notFoundErr.Category != CategoryClient {
 		t.Fatalf("expected client category for not found")
 	}
@@ -157,20 +172,38 @@ func TestCommonErrorConstructors(t *testing.T) {
 		t.Fatalf("expected resource detail")
 	}
 
-	// Test unauthorized error
-	authErr := NewUnauthorizedError("invalid token")
+	// Test unauthorized error via builder
+	authErr := NewErrorBuilder().
+		Status(http.StatusUnauthorized).
+		Category(CategoryAuthentication).
+		Type(ErrTypeUnauthorized).
+		Code(CodeUnauthorized).
+		Message("invalid token").
+		Build()
 	if authErr.Category != CategoryAuthentication {
 		t.Fatalf("expected authentication category")
 	}
 
-	// Test timeout error
-	timeoutErr := NewTimeoutError("database timeout")
+	// Test timeout error via builder
+	timeoutErr := NewErrorBuilder().
+		Status(http.StatusRequestTimeout).
+		Category(CategoryTimeout).
+		Type(ErrTypeTimeout).
+		Code(CodeTimeout).
+		Message("database timeout").
+		Build()
 	if timeoutErr.Category != CategoryTimeout {
 		t.Fatalf("expected timeout category")
 	}
 
-	// Test rate limit error
-	rateLimitErr := NewRateLimitError("too many requests")
+	// Test rate limit error via builder
+	rateLimitErr := NewErrorBuilder().
+		Status(http.StatusTooManyRequests).
+		Category(CategoryRateLimit).
+		Type(ErrTypeRateLimited).
+		Code(CodeRateLimited).
+		Message("too many requests").
+		Build()
 	if rateLimitErr.Category != CategoryRateLimit {
 		t.Fatalf("expected rate limit category")
 	}

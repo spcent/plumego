@@ -130,8 +130,7 @@ func (t ErrorType) Meta() errorTypeMeta {
 
 // APIError represents a normalized error payload for HTTP responses and logging.
 //
-// Callers outside this package should build APIError values through the
-// convenience constructors (NewValidationError, NewNotFoundError, …) or
+// Callers outside this package should build APIError values through
 // NewErrorBuilder(), rather than struct literals, to guarantee that all
 // required fields (Status, Code, Category) are populated consistently.
 type APIError struct {
@@ -157,10 +156,9 @@ type ErrorResponse struct {
 // It returns the encoding error, if any; callers may ignore it when the response
 // headers have already been sent.
 //
-// Prefer building APIError values through the convenience constructors or
-// NewErrorBuilder() so that required fields are always populated. WriteError
-// keeps fallback defaults for backward compatibility and calls WarnFunc when
-// required fields are missing.
+// Prefer building APIError values through NewErrorBuilder() so that required
+// fields are always populated. WriteError keeps fallback defaults for
+// backward compatibility and calls WarnFunc when required fields are missing.
 func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	if issues := ValidateError(err); len(issues) > 0 {
 		WarnFunc("WriteError received partially-populated APIError: " + strings.Join(issues, "; "))
@@ -355,109 +353,6 @@ func ValidateError(err APIError) []string {
 	}
 
 	return validationErrors
-}
-
-// Common error builders for frequently used error patterns.
-
-func NewValidationError(field, message string) APIError {
-	return NewErrorBuilder().
-		Status(http.StatusBadRequest).
-		Category(CategoryValidation).
-		Type(ErrTypeValidation).
-		Code(CodeValidationError).
-		Message(fmt.Sprintf("validation failed for field '%s': %s", field, message)).
-		Detail("field", field).
-		Detail("validation_message", message).
-		Build()
-}
-
-func NewNotFoundError(resource string) APIError {
-	return NewErrorBuilder().
-		Status(http.StatusNotFound).
-		Category(CategoryClient).
-		Type(ErrTypeNotFound).
-		Code(CodeResourceNotFound).
-		Message(fmt.Sprintf("resource '%s' not found", resource)).
-		Detail("resource", resource).
-		Build()
-}
-
-func NewUnauthorizedError(message string) APIError {
-	if message == "" {
-		message = "authentication required"
-	}
-	return NewErrorBuilder().
-		Status(http.StatusUnauthorized).
-		Category(CategoryAuthentication).
-		Type(ErrTypeUnauthorized).
-		Code(CodeUnauthorized).
-		Message(message).
-		Build()
-}
-
-func NewForbiddenError(message string) APIError {
-	if message == "" {
-		message = "access forbidden"
-	}
-	return NewErrorBuilder().
-		Status(http.StatusForbidden).
-		Category(CategoryAuthentication).
-		Type(ErrTypeForbidden).
-		Code(CodeForbidden).
-		Message(message).
-		Build()
-}
-
-func NewTimeoutError(message string) APIError {
-	if message == "" {
-		message = "operation timed out"
-	}
-	return NewErrorBuilder().
-		Status(http.StatusRequestTimeout).
-		Category(CategoryTimeout).
-		Type(ErrTypeTimeout).
-		Code(CodeTimeout).
-		Message(message).
-		Build()
-}
-
-func NewInternalError(message string) APIError {
-	if message == "" {
-		message = "internal server error"
-	}
-	return NewErrorBuilder().
-		Status(http.StatusInternalServerError).
-		Category(CategoryServer).
-		Type(ErrTypeInternal).
-		Code(CodeInternalError).
-		Message(message).
-		Build()
-}
-
-func NewRateLimitError(message string) APIError {
-	if message == "" {
-		message = "rate limit exceeded"
-	}
-	return NewErrorBuilder().
-		Status(http.StatusTooManyRequests).
-		Category(CategoryRateLimit).
-		Type(ErrTypeRateLimited).
-		Code(CodeRateLimited).
-		Message(message).
-		Build()
-}
-
-func NewBadRequestError(message string) APIError {
-	if message == "" {
-		message = "bad request"
-	}
-	return NewErrorBuilder().
-		Status(http.StatusBadRequest).
-		Category(CategoryClient).
-		Type(ErrTypeValidation).
-		Code(CodeBadRequest).
-		Message(message).
-		Build()
 }
 
 // HTTPStatusFromCategory returns the representative HTTP status for a category.

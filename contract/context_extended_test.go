@@ -28,16 +28,16 @@ func TestErrorJSON(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
 
-	var response APIError
+	var response ErrorResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 
-	if response.Code != "invalid_request" {
-		t.Errorf("expected code 'invalid_request', got '%s'", response.Code)
+	if response.Error.Code != "invalid_request" {
+		t.Errorf("expected code 'invalid_request', got '%s'", response.Error.Code)
 	}
-	if response.Message != "Bad request" {
-		t.Errorf("expected message 'Bad request', got '%s'", response.Message)
+	if response.Error.Message != "Bad request" {
+		t.Errorf("expected message 'Bad request', got '%s'", response.Error.Message)
 	}
 }
 
@@ -68,13 +68,13 @@ func TestErrorJSONCategoryFromStatus(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			var response APIError
+			var response ErrorResponse
 			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 				t.Fatalf("failed to parse response: %v", err)
 			}
 
-			if response.Category != tt.expectedCategory {
-				t.Errorf("status %d: expected category %q, got %q", tt.status, tt.expectedCategory, response.Category)
+			if response.Error.Category != tt.expectedCategory {
+				t.Errorf("status %d: expected category %q, got %q", tt.status, tt.expectedCategory, response.Error.Category)
 			}
 		})
 	}
@@ -279,13 +279,8 @@ func TestGetRequestDuration(t *testing.T) {
 }
 
 func TestIsCompressed(t *testing.T) {
-	originalConfig := DefaultRequestConfig
-	config := defaultRequestConfig()
-	config.EnableCompression = true
-	DefaultRequestConfig = config
-	t.Cleanup(func() {
-		DefaultRequestConfig = originalConfig
-	})
+	cfg := DefaultConfig()
+	cfg.EnableCompression = true
 
 	tests := []struct {
 		name            string
@@ -305,7 +300,7 @@ func TestIsCompressed(t *testing.T) {
 			if tt.contentEncoding != "" {
 				r.Header.Set("Content-Encoding", tt.contentEncoding)
 			}
-			ctx := NewCtx(w, r, nil)
+			ctx := NewCtxWithConfig(w, r, nil, cfg)
 
 			if ctx.IsCompressed() != tt.expected {
 				t.Errorf("expected %v, got %v", tt.expected, ctx.IsCompressed())
@@ -513,7 +508,8 @@ func TestParamFromRequest(t *testing.T) {
 	r := httptest.NewRequest("GET", "/test", nil)
 	r = r.WithContext(ctx)
 
-	val, ok := Param(r, "id")
+	params := ParamsFromContext(r.Context())
+	val, ok := params["id"]
 	if !ok {
 		t.Error("expected param to exist")
 	}
@@ -522,14 +518,15 @@ func TestParamFromRequest(t *testing.T) {
 	}
 
 	// Test with missing param
-	val, ok = Param(r, "missing")
+	_, ok = params["missing"]
 	if ok {
 		t.Error("expected param to not exist")
 	}
 
 	// Test with no context
 	r = httptest.NewRequest("GET", "/test", nil)
-	val, ok = Param(r, "id")
+	params = ParamsFromContext(r.Context())
+	_, ok = params["id"]
 	if ok {
 		t.Error("expected param to not exist")
 	}
@@ -564,19 +561,14 @@ func TestBindErrorUnwrap(t *testing.T) {
 }
 
 func TestCtxCompression(t *testing.T) {
-	originalConfig := DefaultRequestConfig
-	config := defaultRequestConfig()
-	config.EnableCompression = true
-	DefaultRequestConfig = config
-	t.Cleanup(func() {
-		DefaultRequestConfig = originalConfig
-	})
+	cfg := DefaultConfig()
+	cfg.EnableCompression = true
 
 	// Test with gzip
 	r := httptest.NewRequest("POST", "/test", nil)
 	r.Header.Set("Content-Encoding", "gzip")
 	w := httptest.NewRecorder()
-	ctx := NewCtx(w, r, nil)
+	ctx := NewCtxWithConfig(w, r, nil, cfg)
 
 	if !ctx.IsCompressed() {
 		t.Error("expected compression to be enabled")
@@ -586,7 +578,7 @@ func TestCtxCompression(t *testing.T) {
 	r = httptest.NewRequest("POST", "/test", nil)
 	r.Header.Set("Content-Encoding", "deflate")
 	w = httptest.NewRecorder()
-	ctx = NewCtx(w, r, nil)
+	ctx = NewCtxWithConfig(w, r, nil, cfg)
 
 	if !ctx.IsCompressed() {
 		t.Error("expected compression to be enabled")
@@ -764,7 +756,16 @@ func TestSetCookie(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx := NewCtx(w, httptest.NewRequest(http.MethodGet, "/", nil), nil)
 
-	ctx.SetCookie("session", "abc123", 3600, "/app", "example.com", true, true)
+	ctx.SetCookie(&http.Cookie{
+		Name:     "session",
+		Value:    "abc123",
+		MaxAge:   3600,
+		Path:     "/app",
+		Domain:   "example.com",
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
 
 	cookies := w.Result().Cookies()
 	if len(cookies) != 1 {
@@ -786,13 +787,19 @@ func TestSetCookie(t *testing.T) {
 	if !c.Secure || !c.HttpOnly {
 		t.Error("expected Secure and HttpOnly to be true")
 	}
+
+	// Verify SameSite=Strict appears in the Set-Cookie header
+	setCookie := w.Header().Get("Set-Cookie")
+	if !strings.Contains(setCookie, "SameSite=Strict") {
+		t.Errorf("expected SameSite=Strict in Set-Cookie header, got: %s", setCookie)
+	}
 }
 
 func TestSetCookieDefaultPath(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx := NewCtx(w, httptest.NewRequest(http.MethodGet, "/", nil), nil)
 
-	ctx.SetCookie("token", "xyz", 0, "", "", false, false)
+	ctx.SetCookie(&http.Cookie{Name: "token", Value: "xyz"})
 
 	cookies := w.Result().Cookies()
 	if len(cookies) != 1 {
@@ -1046,4 +1053,71 @@ func TestCtxBodyReadOnce(t *testing.T) {
 	if ctx.GetBodySize() != int64(len(body)) {
 		t.Errorf("expected body size %d, got %d", len(body), ctx.GetBodySize())
 	}
+}
+
+func TestShouldBindQuery(t *testing.T) {
+	type Q struct {
+		Name string `query:"name"`
+	}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/?name=alice", nil)
+	ctx := NewCtx(w, r, nil)
+
+	var q Q
+	if err := ctx.ShouldBindQuery(&q); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if q.Name != "alice" {
+		t.Errorf("expected 'alice', got %q", q.Name)
+	}
+}
+
+func TestBindAndValidateQueryWithOptions(t *testing.T) {
+	type Q struct {
+		Name string `query:"name" validate:"required"`
+	}
+
+	t.Run("valid with default validator", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/?name=bob", nil)
+		ctx := NewCtx(w, r, nil)
+
+		var q Q
+		if err := ctx.BindAndValidateQueryWithOptions(&q, BindOptions{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if q.Name != "bob" {
+			t.Errorf("expected 'bob', got %q", q.Name)
+		}
+	})
+
+	t.Run("validation disabled skips required check", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/", nil)
+		ctx := NewCtx(w, r, nil)
+
+		var q Q
+		if err := ctx.BindAndValidateQueryWithOptions(&q, BindOptions{DisableValidation: true}); err != nil {
+			t.Fatalf("unexpected error when validation disabled: %v", err)
+		}
+	})
+
+	t.Run("custom validator called", func(t *testing.T) {
+		called := false
+		customValidator := func(v any) error {
+			called = true
+			return nil
+		}
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/?name=carl", nil)
+		ctx := NewCtx(w, r, nil)
+
+		var q Q
+		if err := ctx.BindAndValidateQueryWithOptions(&q, BindOptions{Validator: customValidator}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !called {
+			t.Error("expected custom validator to be called")
+		}
+	})
 }

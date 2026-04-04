@@ -31,7 +31,13 @@ func HandleError(
 // toAPIError converts any error to a fully-populated APIError.
 func toAPIError(err error) APIError {
 	if err == nil {
-		return NewInternalError("unknown error")
+		return NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Category(CategoryServer).
+			Type(ErrTypeInternal).
+			Code(CodeInternalError).
+			Message("unknown error").
+			Build()
 	}
 
 	if apiErr, ok := err.(APIError); ok {
@@ -57,10 +63,22 @@ func toAPIError(err error) APIError {
 		if wrapped.Err != nil {
 			return toAPIError(wrapped.Err)
 		}
-		return NewInternalError(wrapped.Error())
+		return NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Category(CategoryServer).
+			Type(ErrTypeInternal).
+			Code(CodeInternalError).
+			Message(wrapped.Error()).
+			Build()
 	}
 
-	return NewInternalError(err.Error())
+	return NewErrorBuilder().
+		Status(http.StatusInternalServerError).
+		Category(CategoryServer).
+		Type(ErrTypeInternal).
+		Code(CodeInternalError).
+		Message(err.Error()).
+		Build()
 }
 
 func logErrorWithContext(logger log.StructuredLogger, r *http.Request, err error) {
