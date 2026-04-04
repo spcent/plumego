@@ -132,6 +132,8 @@ func (c *Ctx) SetCookie(cookie *http.Cookie) {
 	if cookie.Path == "" {
 		cookie.Path = "/"
 	}
+	// Ensure cookies are only sent over secure HTTPS connections.
+	cookie.Secure = true
 	http.SetCookie(c.W, cookie)
 }
 
