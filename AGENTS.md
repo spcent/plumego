@@ -225,14 +225,29 @@ milestone(M-NNN): <spec title>
 - all quality gates pass
 ```
 
+### Parallel Task Execution
+
+The spec's **Tasks** section divides work into named phases:
+
+- **Sequential phase:** execute steps in listed order; each step must complete before the next.
+- **Parallel phase:** all checklist items are independent; run them concurrently.
+- Phase order is always sequential (Phase 1 before Phase 2, etc.).
+
+When no phase labels are present, treat all tasks as sequential.
+
 ### PR
 
-After pushing the branch, open a PR targeting `main` with:
+After pushing the branch, open a PR targeting `main`:
 
 - **Title:** `milestone(M-NNN): <spec title>`
-- **Body:** paste the full output of the acceptance criteria commands.
-- Move the spec file from `tasks/milestones/active/` to `tasks/milestones/done/`
-  and add an `## Outcome` section with the PR number and gate output summary.
+- **Body:** fill `docs/github-workflows/milestone-pr-template.md` with actual content:
+  - Approach section: describe decisions made, not just files changed.
+  - Architecture Decisions table: confirm each spec decision was followed; flag deviations.
+  - Scope boundary table: list every changed file with its module.
+  - Gate output: paste verbatim terminal output inside the `<details>` block.
+- Move the spec from `tasks/milestones/active/` to `tasks/milestones/done/`
+  and append an `## Outcome` section with PR number and gate output summary.
+- Update `tasks/milestones/ROADMAP.md`: set status to `[PR]`.
 
 ### Human Review Checkpoint
 
@@ -240,6 +255,55 @@ The PR is the only human gate. Codex does not wait for confirmation at any
 intermediate step. The human reviewer checks:
 
 1. All CI gates green.
-2. Diff stays within the spec's **Affected Modules** and **Out of Scope** list.
-3. No stable root depends on `x/*` (automated by `dependency-rules` check).
-4. No new undeclared external dependencies in `go.mod`.
+2. Approach section matches intent.
+3. No Architecture Decision violations in the table.
+4. Diff stays within the spec's **Affected Modules** and **Out of Scope** list.
+5. No stable root depends on `x/*` (enforced by `dependency-rules` check).
+6. `go.mod` unchanged (no new external dependencies).
+
+## 12. Delegation Contract
+
+What humans decide vs. what Codex decides autonomously.
+
+### Human Decides (in the Milestone Spec)
+
+| Concern | Where in spec |
+|---------|---------------|
+| Goal — what must be true when done | `## Goal` |
+| Which modules are in scope | `## Affected Modules` |
+| Non-obvious architectural constraints | `## Architecture Decisions` |
+| What files to read before coding | `## Context` |
+| Task breakdown and phase order | `## Tasks` |
+| Acceptance criteria (exact commands) | `## Acceptance Criteria` |
+| Hard stops | `## Out of Scope` |
+| Milestone ordering and dependencies | `tasks/milestones/ROADMAP.md` |
+
+### Codex Decides Autonomously
+
+| Concern | Constraint |
+|---------|------------|
+| Internal file structure within declared modules | Must follow `docs/CANONICAL_STYLE_GUIDE.md` |
+| Naming of types, vars, funcs (not public API) | Must follow existing patterns in touched files |
+| Test file layout and table structure | Must place tests next to changed files |
+| Commit granularity within a phase | One commit per stable intermediate state |
+| Order within a parallel phase | Any order; phases still run sequentially |
+| Formatting and gofmt compliance | Enforced before push |
+| Which helper functions to extract | Only if canonical style clearly calls for it |
+
+### Codex Must NOT Decide
+
+- Whether to touch modules outside **Affected Modules**.
+- Whether to change stable root public APIs (unless spec explicitly lists it).
+- Whether to add entries to `go.mod`.
+- Whether to skip or soften a failing quality gate.
+- Whether a deviation from an **Architecture Decision** is acceptable (surface it in the PR instead).
+
+### Escalation Protocol
+
+If Codex reaches a genuine decision point not covered by the spec:
+
+1. Document it under `## Open Questions → Codex` in the spec file.
+2. Record what decision was made and why.
+3. If the decision might violate an Architecture Decision or Out of Scope rule,
+   open a **Draft PR** instead of a regular PR and flag it in the PR body.
+4. Do not silently deviate and hope the reviewer catches it.

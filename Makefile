@@ -1,7 +1,7 @@
 # plumego — root Makefile
 # Minimal targets. Most work happens via codex --yolo or go toolchain directly.
 
-.PHONY: help milestone gates fmt vet test test-race setup-hooks
+.PHONY: help milestone check-spec new-milestone gates fmt vet test test-race setup-hooks
 
 # Default: show help
 help:
@@ -25,8 +25,34 @@ milestone: ## Run a milestone spec: make milestone M=active/M-001
 	  ls tasks/milestones/active/*.md 2>/dev/null | sed 's|tasks/milestones/||; s|\.md||'; \
 	  exit 1; \
 	fi
+	@echo "Validating spec before launch ..."
+	@scripts/check-spec tasks/milestones/$(M).md || (echo "Fix spec errors above, then re-run."; exit 1)
 	@echo "Launching codex --yolo on $$SPEC ..."
 	codex --yolo "$(shell cat tasks/milestones/$(M).md)"
+
+check-spec: ## Validate a milestone spec: make check-spec M=active/M-001
+	@if [ -z "$(M)" ]; then \
+	  echo "Error: M is required. Example: make check-spec M=active/M-001"; \
+	  exit 1; \
+	fi
+	@scripts/check-spec tasks/milestones/$(M).md
+
+new-milestone: ## Scaffold a new milestone spec: make new-milestone N=001 TITLE="My feature"
+	@if [ -z "$(N)" ] || [ -z "$(TITLE)" ]; then \
+	  echo "Error: N and TITLE are required."; \
+	  echo "  Example: make new-milestone N=001 TITLE=\"Add ResourceHandler\""; \
+	  exit 1; \
+	fi
+	@DEST=tasks/milestones/active/M-$(N).md; \
+	if [ -f "$$DEST" ]; then \
+	  echo "Error: $$DEST already exists."; exit 1; \
+	fi; \
+	cp tasks/milestones/TEMPLATE.md "$$DEST"; \
+	sed -i "s/M-XXX: <Title>/M-$(N): $(TITLE)/" "$$DEST"; \
+	sed -i "s|milestone/M-XXX-<slug>|milestone/M-$(N)-<slug>|" "$$DEST"; \
+	echo "Created: $$DEST"; \
+	echo "Next: fill in Goal, Architecture Decisions, Context, Tasks, then:"; \
+	echo "  make check-spec M=active/M-$(N)"
 
 # ── Quality Gates (run locally, mirrors CI) ───────────────────────────────────
 

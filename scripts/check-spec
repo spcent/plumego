@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# check-spec — validate a milestone spec before handing it to Codex.
+#
+# Usage: scripts/check-spec tasks/milestones/active/M-001.md
+#        make check-spec M=active/M-001
+#
+# Exits 0 if the spec is valid, 1 if it has structural problems.
+# Does NOT check content quality — that is the human's responsibility.
+
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BOLD='\033[1m'; RESET='\033[0m'
+
+usage() {
+  echo "Usage: $0 <spec-file>"
+  echo "  Example: $0 tasks/milestones/active/M-001.md"
+  exit 1
+}
+
+[ $# -lt 1 ] && usage
+
+SPEC="$1"
+
+if [ ! -f "$SPEC" ]; then
+  echo -e "${RED}Error:${RESET} File not found: $SPEC"
+  exit 1
+fi
+
+FAILED=0
+WARNINGS=0
+
+check() {
+  local label="$1"; local pattern="$2"
+  if grep -q "$pattern" "$SPEC" 2>/dev/null; then
+    echo -e "  ${GREEN}OK${RESET}    $label"
+  else
+    echo -e "  ${RED}MISS${RESET}  $label"
+    FAILED=1
+  fi
+}
+
+warn() {
+  local label="$1"; local pattern="$2"; local msg="$3"
+  if grep -q "$pattern" "$SPEC" 2>/dev/null; then
+    echo -e "  ${YELLOW}WARN${RESET}  $label — $msg"
+    WARNINGS=1
+  fi
+}
+
+echo -e "\n${BOLD}Spec: $SPEC${RESET}\n"
+
+# ── Required Sections ─────────────────────────────────────────────────────────
+echo "Required sections:"
+check "Title (# M-)"                    "^# M-"
+check "Branch declaration"              "^\- \*\*Branch:\*\*"
+check "Goal section"                    "^## Goal"
+check "Architecture Decisions section"  "^## Architecture Decisions"
+check "Context section"                 "^## Context"
+check "Affected Modules section"        "^## Affected Modules"
+check "Tasks section"                   "^## Tasks"
+check "Acceptance Criteria section"     "^## Acceptance Criteria"
+check "Out of Scope section"            "^## Out of Scope"
+check "Open Questions section"          "^## Open Questions"
+check "Done Definition section"         "^## Done Definition"
+
+# ── Required Commands in Acceptance Criteria ──────────────────────────────────
+echo ""
+echo "Required gate commands in Acceptance Criteria:"
+check "dependency-rules check"    "dependency-rules"
+check "agent-workflow check"      "agent-workflow"
+check "module-manifests check"    "module-manifests"
+check "reference-layout check"    "reference-layout"
+check "go test race"              "go test -race"
+check "go test standard"          "go test -timeout"
+check "go vet"                    "go vet"
+check "gofmt"                     "gofmt"
+
+# ── Primary Module declared ───────────────────────────────────────────────────
+echo ""
+echo "Module declarations:"
+check "Primary module set"        "\*\*Primary:\*\*"
+
+# ── Template Placeholders (should be replaced) ────────────────────────────────
+echo ""
+echo "Template placeholder check:"
+warn "M-XXX placeholder still present"  "M-XXX"      "replace with real milestone ID"
+warn "primary-module placeholder"        "primary-module"  "replace with real module path"
+warn "slug placeholder"                  "M-XXX-<slug>"    "replace with real slug"
+warn "Title placeholder"                 "^# M-.*<Title>"  "replace with real title"
+
+# ── File exists in active/ ────────────────────────────────────────────────────
+echo ""
+if [[ "$SPEC" == */active/* ]]; then
+  echo -e "  ${GREEN}OK${RESET}    Spec is in active/ directory"
+else
+  echo -e "  ${YELLOW}WARN${RESET}  Spec is not in active/ — is it ready for execution?"
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+echo ""
+if [ $FAILED -ne 0 ]; then
+  echo -e "${RED}${BOLD}Spec is INVALID — missing required sections or commands.${RESET}"
+  echo -e "Fix the issues above before running codex --yolo."
+  exit 1
+fi
+
+if [ $WARNINGS -ne 0 ]; then
+  echo -e "${YELLOW}${BOLD}Spec has warnings — confirm placeholders are intentional.${RESET}"
+  echo -e "If placeholders remain, Codex will execute with incomplete context."
+  exit 0
+fi
+
+echo -e "${GREEN}${BOLD}Spec is valid. Ready for: make milestone M=${SPEC#tasks/milestones/}${RESET}"
+echo -e "Tip: also check tasks/milestones/ROADMAP.md is updated."
+# strip .md for the make command hint
+SPEC_KEY="${SPEC%.md}"
+SPEC_KEY="${SPEC_KEY#tasks/milestones/}"
+echo -e "     Run: ${BOLD}make milestone M=${SPEC_KEY}${RESET}"
