@@ -1,7 +1,7 @@
 # plumego — root Makefile
 # Minimal targets. Most work happens via codex --yolo or go toolchain directly.
 
-.PHONY: help milestone gates fmt vet test test-race
+.PHONY: help milestone gates fmt vet test test-race setup-hooks
 
 # Default: show help
 help:
@@ -55,3 +55,14 @@ test: ## Run tests (standard timeout)
 
 test-race: ## Run tests with race detector
 	go test -race -timeout 60s ./...
+
+# ── Git Hooks ─────────────────────────────────────────────────────────────────
+
+setup-hooks: ## Install local git hooks (pre-push quality gates)
+	@cp scripts/pre-push .git/hooks/pre-push
+	@chmod +x .git/hooks/pre-push
+	@echo "Installed: .git/hooks/pre-push"
+	@echo "Quality gates now run automatically before every git push."
+	@echo "  milestone/* branches: full gate suite"
+	@echo "  other branches:       quick check (vet + fmt + tests)"
+	@echo "Skip once with: git push --no-verify"

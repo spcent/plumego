@@ -47,6 +47,29 @@ The only manual node is the PR review.
 
 ---
 
+## One-Time Local Setup
+
+Install the pre-push git hook so quality gates run locally before every push
+(including when Codex pushes a milestone branch):
+
+```bash
+make setup-hooks
+```
+
+After this, `git push` on a `milestone/*` branch automatically runs the full
+gate suite and blocks the push if any gate fails — identical to CI, but instant
+and without waiting for GitHub Actions.
+
+| Branch pattern | Local gate triggered |
+|----------------|----------------------|
+| `milestone/*`  | Full suite (all 8 gates) |
+| `main`, `claude/*`, `feature/*` | Quick check (vet + fmt + tests) |
+| anything else  | No gate (push proceeds) |
+
+To skip the hook for a one-off push: `git push --no-verify`
+
+---
+
 ## Step-by-Step Workflow
 
 ### 1. Write a Milestone Spec

@@ -206,6 +206,10 @@ Run the full gate sequence from Section 8. All commands must exit 0.
 `gofmt -l .` must produce no output.
 Fix any failures before pushing. Do not push a red state.
 
+If the local pre-push hook is installed (`make setup-hooks`), it runs the full
+gate suite automatically before `git push` on a `milestone/*` branch and blocks
+the push on failure. This mirrors CI and catches issues before they reach GitHub.
+
 ### Commit Convention
 
 ```
