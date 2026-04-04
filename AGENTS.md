@@ -137,6 +137,38 @@ Task entrypoint defaults:
 - Add or update tests next to changed behavior.
 - Do not invent one-off handler styles, response envelopes, or helper families for a single feature.
 
+### 7.1 Completeness Protocol for Symbol Changes
+
+When a card removes, renames, or changes the behavior of any exported symbol,
+follow these steps before writing any code:
+
+1. **Enumerate all sites first.**
+   Run `grep -rn 'SymbolName' . --include='*.go'` and collect the full list.
+   Do not start editing until you have the complete picture.
+
+2. **Address every site.**
+   For each file in the list, decide: migrate, update assertion, or add an
+   explicit `_ =` discard with a TODO comment. No site is left as-is.
+
+3. **Verify zero residual references.**
+   After editing, re-run the same grep. For a deletion the result must be
+   empty. For a rename the old name must not appear.
+
+4. **Include test updates in the same commit.**
+   If a response format changes (e.g. envelope wrapping), update every test
+   that asserts on the old format in the same atomic commit. A passing build
+   and a failing test suite is not done.
+
+5. **A card is done only when:**
+   - `go build ./...` exits 0
+   - `go test ./...` exits 0 (or targeted packages per the card)
+   - The symbol-removal grep is empty (for deletions)
+   - No caller silently discards a now-returning function without an explicit `_`
+
+This protocol addresses the pattern seen in cards 0503/0509 where exported
+key *types* were removed but deprecated *function wrappers* that delegated to
+them were left behind.
+
 ## 8. Validation Order
 
 Default order:

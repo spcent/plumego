@@ -40,3 +40,17 @@ Read order:
 5. the active card itself
 
 The active queue is an execution surface, not an archive.
+
+## Execution Completeness Checklist
+
+For any card that removes or changes an exported symbol, the executor MUST:
+
+1. Run `grep -rn 'OldSymbolName' . --include='*.go'` **before** editing to get
+   the full caller list.
+2. Address every file in the list in the same PR (migrate, update, or explicitly
+   discard with `_ =`).
+3. After editing, re-run the grep — for deletions the result must be empty.
+4. Update tests that assert on the old behaviour in the same commit.
+5. Mark Done only after `go build ./...` and `go test` both pass.
+
+See `AGENTS.md §7.1` for the full protocol.
