@@ -108,33 +108,3 @@ func (a *App) Patch(path string, handler http.HandlerFunc) error {
 func (a *App) Any(path string, handler http.HandlerFunc) error {
 	return a.addRoute(router.ANY, path, handler)
 }
-
-// GetNamed registers a named GET route.
-func (a *App) GetNamed(name, path string, handler http.HandlerFunc) error {
-	return a.addNamedRoute(router.GET, name, path, handler)
-}
-
-// PostNamed registers a named POST route.
-func (a *App) PostNamed(name, path string, handler http.HandlerFunc) error {
-	return a.addNamedRoute(router.POST, name, path, handler)
-}
-
-// PutNamed registers a named PUT route.
-func (a *App) PutNamed(name, path string, handler http.HandlerFunc) error {
-	return a.addNamedRoute(router.PUT, name, path, handler)
-}
-
-// DeleteNamed registers a named DELETE route.
-func (a *App) DeleteNamed(name, path string, handler http.HandlerFunc) error {
-	return a.addNamedRoute(router.DELETE, name, path, handler)
-}
-
-// PatchNamed registers a named PATCH route.
-func (a *App) PatchNamed(name, path string, handler http.HandlerFunc) error {
-	return a.addNamedRoute(router.PATCH, name, path, handler)
-}
-
-// AnyNamed registers a named route for any HTTP method.
-func (a *App) AnyNamed(name, path string, handler http.HandlerFunc) error {
-	return a.addNamedRoute(router.ANY, name, path, handler)
-}

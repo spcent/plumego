@@ -72,56 +72,40 @@ func TestAny(t *testing.T) {
 
 func TestNamedRouteRegistration(t *testing.T) {
 	tests := []struct {
-		name     string
-		method   string
-		path     string
-		route    string
-		register func(*App, string, string, http.HandlerFunc) error
+		name   string
+		method string
+		path   string
+		route  string
 	}{
 		{
 			name:   "get",
 			method: http.MethodGet,
 			path:   "/named/get/:id",
 			route:  "named.get",
-			register: func(app *App, route, path string, h http.HandlerFunc) error {
-				return app.GetNamed(route, path, h)
-			},
 		},
 		{
 			name:   "post",
 			method: http.MethodPost,
 			path:   "/named/post/:id",
 			route:  "named.post",
-			register: func(app *App, route, path string, h http.HandlerFunc) error {
-				return app.PostNamed(route, path, h)
-			},
 		},
 		{
 			name:   "put",
 			method: http.MethodPut,
 			path:   "/named/put/:id",
 			route:  "named.put",
-			register: func(app *App, route, path string, h http.HandlerFunc) error {
-				return app.PutNamed(route, path, h)
-			},
 		},
 		{
 			name:   "delete",
 			method: http.MethodDelete,
 			path:   "/named/delete/:id",
 			route:  "named.delete",
-			register: func(app *App, route, path string, h http.HandlerFunc) error {
-				return app.DeleteNamed(route, path, h)
-			},
 		},
 		{
 			name:   "patch",
 			method: http.MethodPatch,
 			path:   "/named/patch/:id",
 			route:  "named.patch",
-			register: func(app *App, route, path string, h http.HandlerFunc) error {
-				return app.PatchNamed(route, path, h)
-			},
 		},
 	}
 
@@ -129,7 +113,7 @@ func TestNamedRouteRegistration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := newTestApp()
 			called := false
-			mustRegisterRoute(t, tt.register(app, tt.route, tt.path, func(w http.ResponseWriter, r *http.Request) {
+			mustRegisterRoute(t, app.AddRouteWithName(tt.method, tt.path, tt.route, func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusNoContent)
 			}))
