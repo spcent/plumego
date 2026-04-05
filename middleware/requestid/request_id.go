@@ -68,9 +68,8 @@ func Middleware(opts ...Option) middleware.Middleware {
 				id = cfg.generate()
 			}
 
-			ctx := contract.WithTraceIDString(r.Context(), id)
-			ctx = log.WithTraceID(ctx, id)
-			r = contract.DefaultObservabilityPolicy.AttachRequestID(ctx, w, r, id, cfg.includeInRequest)
+			r = contract.DefaultObservabilityPolicy.AttachRequestID(w, r, id, cfg.includeInRequest)
+			r = r.WithContext(log.WithTraceID(r.Context(), id))
 			if cfg.headerName != "" && cfg.headerName != contract.RequestIDHeader {
 				if cfg.includeInRequest {
 					r.Header.Set(cfg.headerName, id)

@@ -114,10 +114,7 @@ func applyAuthOptions(opts ...AuthOption) authOptions {
 
 func writeAuthInternal(w http.ResponseWriter, r *http.Request, message string) {
 	contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusInternalServerError).
-		Category(contract.CategoryServer).
 		Type(contract.ErrTypeInternal).
-		Code(contract.CodeInternalError).
 		Message(message).
 		Build())
 }

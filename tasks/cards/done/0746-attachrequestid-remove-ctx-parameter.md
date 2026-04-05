@@ -99,3 +99,14 @@ Done Definition:
 - The middleware test suite passes without changes to test assertions.
 - `grep -rn "AttachRequestID"` finds only the definition and one updated call site.
 - All tests pass.
+
+Outcome:
+- Completed by removing the caller-supplied context parameter from
+  `AttachRequestID` and updating `middleware/requestid` to add the log trace ID
+  after the policy rewrites the request from `r.Context()`.
+
+Validation Run:
+- `gofmt -w contract/observability_policy.go middleware/requestid/request_id.go`
+- `rg -n "AttachRequestID\\(" . -g '*.go'`
+- `go test -timeout 20s ./contract/... ./middleware/requestid/...`
+- `go vet ./...`

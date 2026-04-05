@@ -234,25 +234,25 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", ErrInvalidParam, err)
 		}
 		fv.SetInt(n)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n, err := strconv.ParseUint(val, 10, 64)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", ErrInvalidParam, err)
 		}
 		fv.SetUint(n)
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(val, 64)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", ErrInvalidParam, err)
 		}
 		fv.SetFloat(n)
 	case reflect.Bool:
 		b, err := strconv.ParseBool(val)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", ErrInvalidParam, err)
 		}
 		fv.SetBool(b)
 	case reflect.Slice:

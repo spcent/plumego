@@ -1,7 +1,6 @@
 package contract
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -66,11 +65,11 @@ func (p ObservabilityPolicy) RequestIDFromRequest(r *http.Request) string {
 }
 
 // AttachRequestID writes request id to request context and response header.
-func (p ObservabilityPolicy) AttachRequestID(ctx context.Context, w http.ResponseWriter, r *http.Request, id string, includeInRequest bool) *http.Request {
+func (p ObservabilityPolicy) AttachRequestID(w http.ResponseWriter, r *http.Request, id string, includeInRequest bool) *http.Request {
 	if r == nil {
 		return r
 	}
-	ctx = WithTraceIDString(ctx, id)
+	ctx := WithTraceIDString(r.Context(), id)
 	if includeInRequest {
 		r.Header.Set(RequestIDHeader, id)
 	}

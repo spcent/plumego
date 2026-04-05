@@ -131,3 +131,13 @@ Done Definition:
 - The redundant pre-`Type` calls are removed from `middleware/auth/contract.go`.
 - New tests covering both orderings pass.
 - All existing tests pass.
+
+Outcome:
+- Completed by documenting the overwrite behavior of `ErrorBuilder.Type()`,
+  removing redundant pre-`Type` builder calls from `middleware/auth`, and
+  adding tests for both “before Type gets overwritten” and “after Type wins”.
+
+Validation Run:
+- `gofmt -w contract/errors.go contract/errors_test.go middleware/auth/contract.go`
+- `go test -timeout 20s ./contract/... ./middleware/auth/...`
+- `go vet ./...`

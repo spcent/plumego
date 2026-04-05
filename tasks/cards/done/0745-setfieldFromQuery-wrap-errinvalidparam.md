@@ -123,3 +123,13 @@ Done Definition:
   parameter values.
 - The original `strconv` error is still reachable via `errors.As`.
 - All existing tests pass.
+
+Outcome:
+- Completed by wrapping query parse failures with `ErrInvalidParam` inside
+  `setFieldFromQuery` and extending the existing invalid-query test to assert
+  both `errors.Is` and `errors.As`.
+
+Validation Run:
+- `gofmt -w contract/context_bind.go contract/context_extended_test.go`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -723,6 +724,13 @@ func TestBindQueryInvalidType(t *testing.T) {
 	}
 	if bindErr.Status != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", bindErr.Status)
+	}
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected errors.Is(err, ErrInvalidParam) to be true, got %v", err)
+	}
+	var numErr *strconv.NumError
+	if !errors.As(err, &numErr) {
+		t.Fatalf("expected strconv.NumError to remain reachable, got %v", err)
 	}
 }
 

@@ -118,6 +118,36 @@ func TestErrorBuilder(t *testing.T) {
 	}
 }
 
+func TestBuilderTypeOverwritesPriorFields(t *testing.T) {
+	got := NewErrorBuilder().
+		Status(999).
+		Code("CUSTOM").
+		Category(CategoryServer).
+		Type(ErrTypeNotFound).
+		Build()
+
+	if got.Status != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, got.Status)
+	}
+	if got.Code != CodeResourceNotFound {
+		t.Fatalf("expected code %q, got %q", CodeResourceNotFound, got.Code)
+	}
+	if got.Category != CategoryClient {
+		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
+	}
+}
+
+func TestBuilderStatusAfterTypeWins(t *testing.T) {
+	got := NewErrorBuilder().
+		Type(ErrTypeNotFound).
+		Status(http.StatusUnprocessableEntity).
+		Build()
+
+	if got.Status != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, got.Status)
+	}
+}
+
 func TestErrorBuilderChaining(t *testing.T) {
 	err := NewErrorBuilder().
 		Status(http.StatusNotFound).

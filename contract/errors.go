@@ -311,7 +311,10 @@ func (b *ErrorBuilder) Severity(severity ErrorSeverity) *ErrorBuilder {
 	return b
 }
 
-// Type sets the specific error type for the error.
+// Type sets the error type and populates Category, Code, and Status with the
+// canonical values for that type. Any Category, Code, or Status set before
+// calling Type will be overwritten. To customize those fields beyond the type
+// defaults, call Category, Code, or Status after Type.
 func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
 	if errorType == "" {
 		return b
