@@ -133,3 +133,13 @@ Done Definition:
 - `BindErrorToAPIError` assigns `ErrTypeValidation` only when `FieldError`
   items are present.
 - New tests pass; all existing tests pass.
+
+Outcome:
+- Completed by changing the default bind-error `ErrorType` to
+  `ErrTypeInvalidFormat` and only switching to `ErrTypeValidation` when
+  field-level validation details are present.
+
+Validation Run:
+- `gofmt -w contract/bind_helpers.go contract/bind_helpers_test.go`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

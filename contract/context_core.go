@@ -3,6 +3,7 @@ package contract
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -352,7 +353,7 @@ func (c *Ctx) Param(key string) (string, bool) {
 func (c *Ctx) MustParam(key string) (string, error) {
 	val, ok := c.Param(key)
 	if !ok || val == "" {
-		return "", errors.New("missing param: " + key)
+		return "", fmt.Errorf("%w: %s", ErrMissingParam, key)
 	}
 	return val, nil
 }

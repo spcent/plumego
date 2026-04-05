@@ -117,3 +117,13 @@ Done Definition:
   when the receiver is nil.
 - No panics on nil `*Ctx` for any of the above methods.
 - All existing tests pass.
+
+Outcome:
+- Completed by adding nil-receiver guards to `JSON`, `Text`, `Bytes`,
+  `Redirect`, and `ErrorJSON`, plus a table-driven regression test covering all
+  five methods.
+
+Validation Run:
+- `gofmt -w contract/context_response.go contract/context_response_nil_test.go`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

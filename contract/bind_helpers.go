@@ -49,7 +49,7 @@ func BindErrorToAPIError(err error) APIError {
 	code := CodeRequestBindError
 	message := "invalid request payload"
 	category := CategoryValidation
-	errorType := ErrTypeValidation
+	errorType := ErrTypeInvalidFormat
 
 	switch {
 	case errors.Is(err, ErrRequestBodyTooLarge):
@@ -78,6 +78,7 @@ func BindErrorToAPIError(err error) APIError {
 	}
 
 	if len(fields) > 0 {
+		errorType = ErrTypeValidation
 		code = CodeValidationError
 		message = "validation failed"
 	}

@@ -15,6 +15,9 @@ var (
 )
 
 func (c *Ctx) ErrorJSON(status int, errCode string, message string, details map[string]any) error {
+	if c == nil {
+		return ErrContextNil
+	}
 	category := CategoryForStatus(status)
 	if category == "" {
 		category = CategoryBusiness
@@ -40,6 +43,9 @@ func (c *Ctx) Response(status int, data any, meta map[string]any) error {
 
 // JSON writes a JSON response with the given status code.
 func (c *Ctx) JSON(status int, data any) error {
+	if c == nil {
+		return ErrContextNil
+	}
 	c.W.Header().Set("Content-Type", "application/json")
 	c.W.WriteHeader(status)
 
@@ -58,6 +64,9 @@ func (c *Ctx) JSON(status int, data any) error {
 
 // Text writes a plain text response with the given status code.
 func (c *Ctx) Text(status int, text string) error {
+	if c == nil {
+		return ErrContextNil
+	}
 	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	c.W.WriteHeader(status)
 	_, err := io.WriteString(c.W, text)
@@ -66,6 +75,9 @@ func (c *Ctx) Text(status int, text string) error {
 
 // Bytes writes a binary response with the given status code.
 func (c *Ctx) Bytes(status int, data []byte) error {
+	if c == nil {
+		return ErrContextNil
+	}
 	c.W.Header().Set("Content-Type", "application/octet-stream")
 	c.W.WriteHeader(status)
 	_, err := c.W.Write(data)
@@ -76,6 +88,9 @@ func (c *Ctx) Bytes(status int, data []byte) error {
 // Note: This accepts any URL including external ones. Use SafeRedirect to
 // restrict redirects to same-origin paths only.
 func (c *Ctx) Redirect(status int, location string) error {
+	if c == nil {
+		return ErrContextNil
+	}
 	http.Redirect(c.W, c.R, location, status)
 	return nil
 }

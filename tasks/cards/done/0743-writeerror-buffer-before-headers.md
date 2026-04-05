@@ -97,3 +97,13 @@ Done Definition:
 - `WriteError` encodes into a buffer before committing headers.
 - An encoding failure returns an error and writes nothing to `w`.
 - All existing tests pass.
+
+Outcome:
+- Completed by buffering `WriteError` JSON output before setting headers and by
+  adding a regression test that verifies encoding failures leave the recorder
+  untouched.
+
+Validation Run:
+- `gofmt -w contract/errors.go contract/errors_test.go`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

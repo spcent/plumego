@@ -189,13 +189,22 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(err.Status)
-
-	return json.NewEncoder(w).Encode(ErrorResponse{
+	resp := ErrorResponse{
 		Error:   err,
 		TraceID: err.TraceID,
-	})
+	}
+
+	buf := getJSONBuffer()
+	defer putJSONBuffer(buf)
+
+	if encErr := json.NewEncoder(buf).Encode(resp); encErr != nil {
+		return encErr
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(err.Status)
+	_, writeErr := w.Write(buf.Bytes())
+	return writeErr
 }
 
 // CategoryForStatus maps an HTTP status to a default error category.
@@ -457,15 +466,15 @@ func IsServerError(err APIError) bool {
 
 // IsAPIErrorRetryable checks if the API error is retryable based on its status code.
 func IsAPIErrorRetryable(err APIError) bool {
-	// Retryable status codes: 408, 429, 500, 502, 503, 504
-	retryableCodes := []int{408, 429, 500, 502, 503, 504}
-
-	for _, code := range retryableCodes {
-		if err.Status == code {
-			return true
-		}
+	switch err.Status {
+	case http.StatusRequestTimeout,
+		http.StatusTooManyRequests,
+		http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
 	}
 
-	// Also retry if it's a timeout error
 	return err.Category == CategoryTimeout
 }

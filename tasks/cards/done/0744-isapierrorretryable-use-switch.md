@@ -59,3 +59,12 @@ Tests:
 Done Definition:
 - `IsAPIErrorRetryable` uses a `switch` with no slice allocation.
 - All existing retryable-code tests pass.
+
+Outcome:
+- Completed by replacing the per-call retryable-status slice with a `switch`
+  over the same fixed set of HTTP status codes.
+
+Validation Run:
+- `gofmt -w contract/errors.go`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

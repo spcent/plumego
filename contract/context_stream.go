@@ -11,9 +11,11 @@ import (
 	"time"
 )
 
-// ErrUnsupportedStreamSource is returned when Stream receives a Source value whose
-// type does not match any of the accepted streaming primitives.
-var ErrUnsupportedStreamSource = errors.New("unsupported StreamSource type")
+var (
+	// ErrUnsupportedStreamSource is returned when Stream receives a Source value whose
+	// type does not match any of the accepted streaming primitives.
+	ErrUnsupportedStreamSource = errors.New("unsupported StreamSource type")
+)
 
 // StreamFormat selects the wire format for a streaming response.
 type StreamFormat string
@@ -276,8 +278,10 @@ type SSEWriter struct {
 	f http.Flusher
 }
 
-// ErrSSENotSupported is returned when the response writer doesn't support SSE.
-var ErrSSENotSupported = errors.New("SSE not supported: response writer does not implement http.Flusher")
+var (
+	// ErrSSENotSupported is returned when the response writer doesn't support SSE.
+	ErrSSENotSupported = errors.New("SSE not supported: response writer does not implement http.Flusher")
+)
 
 // NewSSEWriter creates an SSE writer for the given response writer.
 // The caller must set SSE response headers before writing events; use

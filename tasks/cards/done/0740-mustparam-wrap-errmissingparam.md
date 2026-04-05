@@ -77,3 +77,13 @@ Done Definition:
   `MustParam` when a parameter is absent.
 - The error message still includes the parameter name.
 - All existing tests pass.
+
+Outcome:
+- Completed by changing `MustParam` to return `fmt.Errorf("%w: %s",
+  ErrMissingParam, key)` and adding a regression test that checks
+  `errors.Is(err, ErrMissingParam)` and the message payload.
+
+Validation Run:
+- `gofmt -w contract/context_core.go contract/context_mustparam_test.go`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

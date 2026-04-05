@@ -62,3 +62,14 @@ Done Definition:
   inside `var(...)` blocks.
 - No standalone `var` sentinel declarations remain in `context_stream.go`.
 - All tests pass.
+
+Outcome:
+- Completed by consolidating both sentinel declarations in
+  `contract/context_stream.go` into `var (...)` blocks without changing error
+  messages or behavior.
+
+Validation Run:
+- `gofmt -w contract/context_stream.go`
+- `rg -n "var ErrUnsupportedStreamSource|var ErrSSENotSupported" contract/context_stream.go`
+- `go vet ./contract/...`
+- `go build ./...`

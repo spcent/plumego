@@ -604,6 +604,31 @@ func TestWriteErrorZeroValueEmitsWarning(t *testing.T) {
 	}
 }
 
+func TestWriteErrorEncodingFailureDoesNotCommitHeaders(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	err := WriteError(recorder, nil, NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Category(CategoryClient).
+		Code("BAD_DETAIL").
+		Message("bad detail").
+		Detail("bad", make(chan int)).
+		Build())
+	if err == nil {
+		t.Fatal("expected encoding error, got nil")
+	}
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected headers to remain uncommitted, got status %d", recorder.Code)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("expected no body on encoding failure, got %q", recorder.Body.String())
+	}
+	if contentType := recorder.Header().Get("Content-Type"); contentType != "" {
+		t.Fatalf("expected no content type on encoding failure, got %q", contentType)
+	}
+}
+
 func TestErrorBuilderBuildFillsDefaults(t *testing.T) {
 	// A builder with no explicit Status/Code/Category should produce a fully-
 	// populated APIError after Build().
