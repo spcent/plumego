@@ -30,7 +30,14 @@ func (ve validationErrors) Errors() []FieldError {
 }
 
 func validateStruct(dst any) error {
+	return validateStructAtDepth(dst, "", 0)
+}
+
+func validateStructAtDepth(dst any, prefix string, depth int) error {
 	if dst == nil {
+		return nil
+	}
+	if depth > 10 {
 		return nil
 	}
 
@@ -53,22 +60,31 @@ func validateStruct(dst any) error {
 			continue
 		}
 
-		tag := strings.TrimSpace(field.Tag.Get("validate"))
-		if tag == "" || tag == "-" {
-			continue
-		}
-
 		fieldValue := rv.Field(i)
 		fieldName := field.Name
-		for _, rule := range strings.Split(tag, ",") {
-			rule = strings.TrimSpace(rule)
-			if rule == "" {
-				continue
-			}
+		if prefix != "" {
+			fieldName = prefix + "." + fieldName
+		}
 
-			if issue := applyValidationRule(fieldName, fieldValue, rule); issue != nil {
-				issues = append(issues, *issue)
+		tag := strings.TrimSpace(field.Tag.Get("validate"))
+		if tag == "-" {
+			continue
+		}
+		if tag != "" {
+			for _, rule := range strings.Split(tag, ",") {
+				rule = strings.TrimSpace(rule)
+				if rule == "" {
+					continue
+				}
+
+				if issue := applyValidationRule(fieldName, fieldValue, rule); issue != nil {
+					issues = append(issues, *issue)
+				}
 			}
+		}
+
+		if nestedErr := validateNestedStructField(fieldValue, fieldName, depth+1); len(nestedErr.errors) > 0 {
+			issues = append(issues, nestedErr.Errors()...)
 		}
 	}
 
@@ -76,6 +92,34 @@ func validateStruct(dst any) error {
 		return nil
 	}
 	return validationErrors{errors: issues}
+}
+
+func validateNestedStructField(value reflect.Value, fieldName string, depth int) validationErrors {
+	if !value.IsValid() {
+		return validationErrors{}
+	}
+
+	switch value.Kind() {
+	case reflect.Ptr:
+		if value.IsNil() || value.Elem().Kind() != reflect.Struct {
+			return validationErrors{}
+		}
+		if err := validateStructAtDepth(value.Interface(), fieldName, depth); err != nil {
+			if issues, ok := err.(validationErrors); ok {
+				return issues
+			}
+		}
+	case reflect.Struct:
+		if value.CanAddr() {
+			if err := validateStructAtDepth(value.Addr().Interface(), fieldName, depth); err != nil {
+				if issues, ok := err.(validationErrors); ok {
+					return issues
+				}
+			}
+		}
+	}
+
+	return validationErrors{}
 }
 
 func applyValidationRule(fieldName string, value reflect.Value, rule string) *FieldError {
@@ -104,7 +148,7 @@ func applyValidationRule(fieldName string, value reflect.Value, rule string) *Fi
 		}
 		return validateMax(fieldName, value, limit)
 	default:
-		return nil
+		return &FieldError{Field: fieldName, Code: "unknown_rule", Message: fmt.Sprintf("unknown validation rule: %q", name)}
 	}
 }
 
@@ -171,13 +215,6 @@ func validateMin(fieldName string, value reflect.Value, limit int64) *FieldError
 	switch value.Kind() {
 	case reflect.String:
 		text := value.String()
-		trimmed := strings.TrimSpace(text)
-		if parsed, ok := parseNumericString(trimmed); ok {
-			if parsed < float64(limit) {
-				return &FieldError{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d", limit)}
-			}
-			return nil
-		}
 		if int64(utf8.RuneCountInString(text)) < limit {
 			return &FieldError{Field: fieldName, Code: "min", Message: fmt.Sprintf("must be at least %d characters", limit)}
 		}
@@ -213,13 +250,6 @@ func validateMax(fieldName string, value reflect.Value, limit int64) *FieldError
 	switch value.Kind() {
 	case reflect.String:
 		text := value.String()
-		trimmed := strings.TrimSpace(text)
-		if parsed, ok := parseNumericString(trimmed); ok {
-			if parsed > float64(limit) {
-				return &FieldError{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d", limit)}
-			}
-			return nil
-		}
 		if int64(utf8.RuneCountInString(text)) > limit {
 			return &FieldError{Field: fieldName, Code: "max", Message: fmt.Sprintf("must be at most %d characters", limit)}
 		}

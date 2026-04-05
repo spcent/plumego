@@ -164,7 +164,7 @@ func (c *Ctx) Stream(cfg StreamConfig) error {
 	}
 }
 
-// --- shared slice/chunked helpers called by Stream and deprecated wrappers ---
+// --- internal streaming helpers called by Stream ---
 
 func (c *Ctx) streamBinaryReader(reader io.Reader, chunkSize int) error {
 	ctx, err := c.initStream("application/octet-stream")
@@ -279,8 +279,10 @@ type SSEWriter struct {
 // ErrSSENotSupported is returned when the response writer doesn't support SSE.
 var ErrSSENotSupported = errors.New("SSE not supported: response writer does not implement http.Flusher")
 
-// NewSSEWriter creates a new SSE writer.
-// Returns an error if the response writer doesn't support flushing.
+// NewSSEWriter creates an SSE writer for the given response writer.
+// The caller must set SSE response headers before writing events; use
+// Ctx.RespondWithSSE when possible because it sets headers and creates the
+// writer atomically. Returns ErrSSENotSupported when flushing is unavailable.
 func NewSSEWriter(w http.ResponseWriter) (*SSEWriter, error) {
 	f, ok := w.(http.Flusher)
 	if !ok {
@@ -327,13 +329,6 @@ func (c *Ctx) streamContext() context.Context {
 		return context.Background()
 	}
 	return c.R.Context()
-}
-
-func validateChunkSize(chunkSize int) error {
-	if chunkSize <= 0 {
-		return ErrInvalidChunkSize
-	}
-	return nil
 }
 
 func sleepWithContext(ctx context.Context, delay time.Duration) error {
@@ -442,7 +437,8 @@ func streamFromSliceChunked[T any](ctx context.Context, items []T, chunkSize int
 	return nil
 }
 
-// streamFromGenWithRetry calls gen in a loop, retrying up to maxRetries times on transient errors.
+// streamFromGenWithRetry calls gen in a loop and consumes at most maxRetries
+// total retry attempts across the full stream.
 func streamFromGenWithRetry[T any](ctx context.Context, gen func() (T, error), maxRetries int, delay time.Duration, write func(T) error) error {
 	retries := 0
 	for {
@@ -463,7 +459,6 @@ func streamFromGenWithRetry[T any](ctx context.Context, gen func() (T, error), m
 			}
 			return err
 		}
-		retries = 0
 		if err := write(item); err != nil {
 			return err
 		}
@@ -498,9 +493,7 @@ func (c *Ctx) textWrite() func(string) error {
 // RespondWithSSE starts a Server-Sent Events response.
 // Returns an SSEWriter for sending events, or an error if SSE is not supported.
 func (c *Ctx) RespondWithSSE() (*SSEWriter, error) {
-	c.W.Header().Set("Content-Type", "text/event-stream")
-	c.W.Header().Set("Cache-Control", "no-cache")
-	c.W.Header().Set("Connection", "keep-alive")
+	c.SetSSEHeaders()
 	c.W.WriteHeader(http.StatusOK)
 	return NewSSEWriter(c.W)
 }
@@ -518,7 +511,9 @@ func (c *Ctx) SetSSEHeaders() {
 	c.W.Header().Set("Connection", "keep-alive")
 }
 
-// WriteSSE writes a single SSE event and flushes.
+// Deprecated: WriteSSE creates a new SSEWriter on every call and does not set
+// SSE headers. Use RespondWithSSE to obtain an *SSEWriter and call sw.Write()
+// for each event.
 func (c *Ctx) WriteSSE(event SSEEvent) error {
 	sw, err := NewSSEWriter(c.W)
 	if err != nil {

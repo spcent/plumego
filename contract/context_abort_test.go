@@ -69,7 +69,7 @@ func TestErrorAppend(t *testing.T) {
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
 	defer ctx.Close()
 
-	if len(ctx.Errors) != 0 {
+	if len(ctx.CollectedErrors()) != 0 {
 		t.Fatal("new context should have no errors")
 	}
 
@@ -82,10 +82,11 @@ func TestErrorAppend(t *testing.T) {
 	}
 	ctx.Error(err2)
 
-	if len(ctx.Errors) != 2 {
-		t.Fatalf("expected 2 errors, got %d", len(ctx.Errors))
+	collected := ctx.CollectedErrors()
+	if len(collected) != 2 {
+		t.Fatalf("expected 2 errors, got %d", len(collected))
 	}
-	if ctx.Errors[0] != err1 || ctx.Errors[1] != err2 {
+	if collected[0] != err1 || collected[1] != err2 {
 		t.Fatal("errors should be in append order")
 	}
 }
@@ -96,7 +97,7 @@ func TestErrorNilIgnored(t *testing.T) {
 
 	ctx.Error(nil)
 
-	if len(ctx.Errors) != 0 {
+	if len(ctx.CollectedErrors()) != 0 {
 		t.Fatal("nil errors should not be appended")
 	}
 }

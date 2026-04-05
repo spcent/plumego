@@ -10,7 +10,7 @@ import (
 // along with a boolean indicating whether the parameter was present.
 // For handler code using Ctx, prefer Ctx.Param instead.
 func ParamFromRequest(r *http.Request, name string) (string, bool) {
-	rc := contract.RequestContextFrom(r.Context())
+	rc := contract.RequestContextFromContext(r.Context())
 	if rc.Params == nil {
 		return "", false
 	}

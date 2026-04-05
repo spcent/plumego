@@ -109,8 +109,11 @@ func validateRedirectURL(location string, r *http.Request) error {
 	}
 
 	// Absolute URL: check that the host matches the request host
-	if r != nil && r.Host != "" {
+	if r != nil {
 		requestHost := r.Host
+		if requestHost == "" && r.URL != nil {
+			requestHost = r.URL.Host
+		}
 		if strings.EqualFold(parsed.Host, requestHost) {
 			return nil
 		}

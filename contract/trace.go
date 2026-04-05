@@ -29,12 +29,15 @@ const (
 // TraceContext is the minimal tracing context propagated via HTTP and stored in context.Context.
 // Full tracing infrastructure (Tracer, Span, Collector, Sampler) lives in x/observability/tracer.
 type TraceContext struct {
-	TraceID      TraceID           `json:"trace_id"`
-	SpanID       SpanID            `json:"span_id"`
-	ParentSpanID *SpanID           `json:"parent_span_id,omitempty"`
-	Baggage      map[string]string `json:"baggage,omitempty"`
-	Flags        TraceFlags        `json:"flags"`
-	Sampled      bool              `json:"sampled"`
+	TraceID      TraceID `json:"trace_id"`
+	SpanID       SpanID  `json:"span_id"`
+	ParentSpanID *SpanID `json:"parent_span_id,omitempty"`
+	// Baggage carries W3C baggage key-value pairs.
+	// Extraction from HTTP headers and injection into outgoing requests is not
+	// implemented in this package; use x/observability for full propagation support.
+	Baggage map[string]string `json:"baggage,omitempty"`
+	Flags   TraceFlags        `json:"flags"`
+	Sampled bool              `json:"sampled"`
 }
 
 type traceContextKey struct{}

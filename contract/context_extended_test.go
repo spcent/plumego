@@ -204,7 +204,7 @@ func TestParam(t *testing.T) {
 
 func TestMustParam(t *testing.T) {
 	ctx := &Ctx{
-		Params: map[string]string{"id": "123", "empty": "  "},
+		Params: map[string]string{"id": "123", "empty": "", "spaces": "  "},
 	}
 
 	// Test existing param
@@ -229,6 +229,9 @@ func TestMustParam(t *testing.T) {
 	_, err = ctx.MustParam("empty")
 	if err == nil {
 		t.Error("expected error for empty param")
+	}
+	if val, err := ctx.MustParam("spaces"); err != nil || val != "  " {
+		t.Fatalf("expected raw whitespace value to round-trip, got value=%q err=%v", val, err)
 	}
 }
 
@@ -354,8 +357,8 @@ func TestClientIPFromRequest(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "X-Forwarded-For",
-			headers:  map[string]string{"X-Forwarded-For": "203.0.113.1"},
+			name:     "X-Forwarded-For last hop wins",
+			headers:  map[string]string{"X-Forwarded-For": "198.51.100.9, 203.0.113.1"},
 			remoteIP: "192.168.1.1:8080",
 			expected: "203.0.113.1",
 		},
@@ -404,8 +407,8 @@ func TestValidateCtxHandler(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for nil handler")
 	}
-	if !strings.Contains(err.Error(), "cannot be nil") {
-		t.Errorf("expected 'cannot be nil' error, got '%v'", err)
+	if !errors.Is(err, ErrHandlerNil) {
+		t.Errorf("expected ErrHandlerNil, got '%v'", err)
 	}
 
 	// Test with valid handler
@@ -447,9 +450,9 @@ func TestParamsFromContext(t *testing.T) {
 	}
 }
 
-func TestRequestContextFrom(t *testing.T) {
+func TestRequestContextFromContext(t *testing.T) {
 	// Test with nil context
-	result := RequestContextFrom(t.Context())
+	result := RequestContextFromContext(t.Context())
 	if result.Params != nil {
 		t.Error("expected empty RequestContext")
 	}
@@ -461,7 +464,7 @@ func TestRequestContextFrom(t *testing.T) {
 		RouteName:    "user_show",
 	}
 	ctx := context.WithValue(context.Background(), requestContextKey{}, rc)
-	result = RequestContextFrom(ctx)
+	result = RequestContextFromContext(ctx)
 	if result.Params == nil || result.Params["id"] != "123" {
 		t.Error("expected RequestContext with params")
 	}
@@ -472,7 +475,7 @@ func TestRequestContextFrom(t *testing.T) {
 	// Test fallback to ParamsContextKey
 	params := map[string]string{"name": "test"}
 	ctx = context.WithValue(context.Background(), paramsContextKey{}, params)
-	result = RequestContextFrom(ctx)
+	result = RequestContextFromContext(ctx)
 	if result.Params == nil || result.Params["name"] != "test" {
 		t.Error("expected fallback to ParamsContextKey")
 	}
@@ -611,7 +614,7 @@ func TestCtxConfigDefaults(t *testing.T) {
 	}
 }
 
-func TestShouldBindJSON(t *testing.T) {
+func TestBindJSONAliasRemoval(t *testing.T) {
 	body := bytes.NewBufferString(`{"name":"demo","age":30}`)
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
 
@@ -619,7 +622,7 @@ func TestShouldBindJSON(t *testing.T) {
 		Name string `json:"name"`
 		Age  int    `json:"age"`
 	}
-	if err := ctx.ShouldBindJSON(&payload); err != nil {
+	if err := ctx.BindJSON(&payload); err != nil {
 		t.Fatalf("expected successful bind, got %v", err)
 	}
 	if payload.Name != "demo" || payload.Age != 30 {
@@ -627,11 +630,11 @@ func TestShouldBindJSON(t *testing.T) {
 	}
 }
 
-func TestShouldBindJSONError(t *testing.T) {
+func TestBindJSONError(t *testing.T) {
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("")), nil)
 
 	var payload struct{ Name string }
-	err := ctx.ShouldBindJSON(&payload)
+	err := ctx.BindJSON(&payload)
 	if err == nil {
 		t.Fatal("expected error for empty body")
 	}
@@ -1055,7 +1058,7 @@ func TestCtxBodyReadOnce(t *testing.T) {
 	}
 }
 
-func TestShouldBindQuery(t *testing.T) {
+func TestBindQueryAliasRemoval(t *testing.T) {
 	type Q struct {
 		Name string `query:"name"`
 	}
@@ -1064,7 +1067,7 @@ func TestShouldBindQuery(t *testing.T) {
 	ctx := NewCtx(w, r, nil)
 
 	var q Q
-	if err := ctx.ShouldBindQuery(&q); err != nil {
+	if err := ctx.BindQuery(&q); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if q.Name != "alice" {

@@ -511,12 +511,12 @@ func NewParamExtractor() *ParamExtractor { return &ParamExtractor{} }
 
 // GetID returns the ":id" path parameter from the request context.
 func (pe *ParamExtractor) GetID(r *http.Request) string {
-	return contract.RequestContextFrom(r.Context()).Params["id"]
+	return contract.RequestContextFromContext(r.Context()).Params["id"]
 }
 
 // GetParam returns a named path parameter from the request context.
 func (pe *ParamExtractor) GetParam(r *http.Request, name string) string {
-	return contract.RequestContextFrom(r.Context()).Params[name]
+	return contract.RequestContextFromContext(r.Context()).Params[name]
 }
 
 // GetQueryParam returns a query parameter value.

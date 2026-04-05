@@ -23,8 +23,8 @@ type RequestContext struct {
 }
 
 // Context keys are unexported zero-value structs to avoid collisions with other
-// packages. External callers must use the With* and *From* accessor functions
-// (e.g. WithRequestContext, RequestContextFrom) rather than context.WithValue
+// packages. External callers must use the With* and *FromContext accessor functions
+// (e.g. WithRequestContext, RequestContextFromContext) rather than context.WithValue
 // with the key types directly.
 type requestContextKey struct{}
 
@@ -50,10 +50,10 @@ type Ctx struct {
 	Deadline time.Time
 	Config   *RequestConfig
 
-	// Errors collects non-fatal errors encountered during request processing.
-	// Middleware and handlers can append errors without immediately aborting,
-	// and downstream code can inspect them for logging or aggregated responses.
-	Errors []error
+	// errors collects non-fatal errors encountered during request processing.
+	// Middleware and handlers should append through Error() and read through
+	// CollectedErrors() so mutation stays encapsulated in one canonical path.
+	errors []error
 
 	// Request state tracking
 	startedAt          time.Time
@@ -177,9 +177,9 @@ func ParamsFromContext(ctx context.Context) map[string]string {
 	return nil
 }
 
-// RequestContextFrom returns the RequestContext stored in the given context.
+// RequestContextFromContext returns the RequestContext stored in the given context.
 // If none is present, it falls back to parameters stored via ParamsFromContext for backward compatibility.
-func RequestContextFrom(ctx context.Context) RequestContext {
+func RequestContextFromContext(ctx context.Context) RequestContext {
 	if ctx == nil {
 		return RequestContext{}
 	}
@@ -193,12 +193,12 @@ func RequestContextFrom(ctx context.Context) RequestContext {
 
 // RoutePatternFromContext returns the matched route pattern stored in the request context.
 func RoutePatternFromContext(ctx context.Context) string {
-	return RequestContextFrom(ctx).RoutePattern
+	return RequestContextFromContext(ctx).RoutePattern
 }
 
 // RouteNameFromContext returns the matched route name stored in the request context.
 func RouteNameFromContext(ctx context.Context) string {
-	return RequestContextFrom(ctx).RouteName
+	return RequestContextFromContext(ctx).RouteName
 }
 
 // NewCtx builds a unified request context for handlers using the net/http primitives.
@@ -327,9 +327,18 @@ func (c *Ctx) IsAborted() bool {
 // returns the same error for convenient inline use.
 func (c *Ctx) Error(err error) error {
 	if err != nil {
-		c.Errors = append(c.Errors, err)
+		c.errors = append(c.errors, err)
 	}
 	return err
+}
+
+// CollectedErrors returns a snapshot of the non-fatal errors collected so far.
+// Mutating the returned slice does not affect the context.
+func (c *Ctx) CollectedErrors() []error {
+	if c == nil || len(c.errors) == 0 {
+		return nil
+	}
+	return append([]error(nil), c.errors...)
 }
 
 func (c *Ctx) Param(key string) (string, bool) {
@@ -342,7 +351,7 @@ func (c *Ctx) Param(key string) (string, bool) {
 
 func (c *Ctx) MustParam(key string) (string, error) {
 	val, ok := c.Param(key)
-	if !ok || strings.TrimSpace(val) == "" {
+	if !ok || val == "" {
 		return "", errors.New("missing param: " + key)
 	}
 	return val, nil
@@ -394,9 +403,16 @@ func (c *Ctx) GetBodySize() int64 {
 }
 
 func clientIPFromRequest(r *http.Request) string {
-	// Prioritize standard proxy headers while avoiding common pitfalls like multiple values.
-	if ip := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]); ip != "" {
-		return ip
+	// X-Forwarded-For is only trustworthy when appended by infrastructure you control.
+	// Use the last non-empty value rather than the first client-supplied value.
+	if r == nil {
+		return ""
+	}
+	parts := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if ip := strings.TrimSpace(parts[i]); ip != "" {
+			return ip
+		}
 	}
 	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
 		return ip
@@ -415,7 +431,7 @@ type CtxHandlerFunc func(*Ctx)
 // AdaptCtxHandler converts a CtxHandlerFunc to a standard http.Handler to keep net/http compatibility.
 func AdaptCtxHandler(h CtxHandlerFunc, logger log.StructuredLogger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rc := RequestContextFrom(r.Context())
+		rc := RequestContextFromContext(r.Context())
 		ctx := newCtxWithLogger(w, r, rc.Params, logger)
 		defer ctx.Close()
 		h(ctx)
@@ -425,7 +441,7 @@ func AdaptCtxHandler(h CtxHandlerFunc, logger log.StructuredLogger) http.Handler
 // ValidateCtxHandler returns an error when the handler is nil to give clearer feedback to callers.
 func ValidateCtxHandler(h CtxHandlerFunc) error {
 	if h == nil {
-		return errors.New("context handler cannot be nil")
+		return ErrHandlerNil
 	}
 	return nil
 }

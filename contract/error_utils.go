@@ -41,24 +41,21 @@ func toAPIError(err error) APIError {
 	}
 
 	if apiErr, ok := err.(APIError); ok {
-		if apiErr.Status == 0 {
-			apiErr.Status = http.StatusInternalServerError
-		}
-		if apiErr.Code == "" {
-			apiErr.Code = http.StatusText(apiErr.Status)
-		}
-		if apiErr.Category == "" {
-			apiErr.Category = CategoryForStatus(apiErr.Status)
-			if apiErr.Category == "" {
-				apiErr.Category = CategoryServer
-			}
-		}
-		return apiErr
+		return NewErrorBuilder().
+			Type(apiErr.Type).
+			Severity(apiErr.Severity).
+			Status(apiErr.Status).
+			Code(apiErr.Code).
+			Message(apiErr.Message).
+			Category(apiErr.Category).
+			TraceID(apiErr.TraceID).
+			Details(apiErr.Details).
+			Build()
 	}
 
 	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
 		if apiErr, ok := wrapped.Err.(APIError); ok {
-			return apiErr
+			return toAPIError(apiErr)
 		}
 		if wrapped.Err != nil {
 			return toAPIError(wrapped.Err)
@@ -94,12 +91,6 @@ func logErrorWithContext(logger log.StructuredLogger, r *http.Request, err error
 
 	if params, ok := details["params"].(map[string]any); ok {
 		for k, v := range params {
-			fields[k] = v
-		}
-	}
-
-	if wrappedErr, ok := err.(*WrappedErrorWithContext); ok {
-		for k, v := range wrappedErr.Context.Params {
 			fields[k] = v
 		}
 	}
@@ -145,4 +136,21 @@ func SafeExecute(fn func() error, operation, module string, params map[string]an
 		return WrapError(err, operation, module, params)
 	}
 	return nil
+}
+
+// SafeExecuteWithResult runs fn and wraps any returned error or panic with the
+// given context, returning the zero value of T on failure.
+func SafeExecuteWithResult[T any](fn func() (T, error), operation, module string, params map[string]any) (result T, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = *new(T)
+			err = WrapError(PanicToError(r), operation, module, params)
+		}
+	}()
+
+	result, err = fn()
+	if err != nil {
+		return *new(T), WrapError(err, operation, module, params)
+	}
+	return result, nil
 }

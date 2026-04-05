@@ -46,7 +46,7 @@ func ExtractSpanContext(ctx context.Context, span metrics.TraceSpan) (string, st
 }
 
 func BuildRequestMetrics(r *http.Request, recorder *ResponseRecorder, started time.Time, traceID string) RequestMetrics {
-	rc := contract.RequestContextFrom(r.Context())
+	rc := contract.RequestContextFromContext(r.Context())
 	metricsData := RequestMetrics{
 		Method:    r.Method,
 		Path:      r.URL.Path,

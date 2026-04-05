@@ -260,7 +260,7 @@ func TestParamsAndRequestContextHelpers(t *testing.T) {
 		t.Fatalf("unexpected ParamsFromContext lookup: %v %v", val, ok)
 	}
 
-	rc := RequestContextFrom(req.Context())
+	rc := RequestContextFromContext(req.Context())
 	if rc.Params["id"] != "42" {
 		t.Fatalf("request context did not surface params")
 	}

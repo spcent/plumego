@@ -18,9 +18,18 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) error {
 	if w == nil {
 		return ErrResponseWriterNil
 	}
+
+	buf := getJSONBuffer()
+	defer putJSONBuffer(buf)
+
+	if err := json.NewEncoder(buf).Encode(payload); err != nil {
+		return err
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	return json.NewEncoder(w).Encode(payload)
+	_, err := w.Write(buf.Bytes())
+	return err
 }
 
 // WriteResponse writes a standardized success response and injects trace id when available.

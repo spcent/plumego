@@ -52,8 +52,10 @@ func NewWrappedError(err error, operation, module string, params map[string]any)
 }
 
 // WrapError wraps an existing error with additional context.
-// If err is already a *WrappedErrorWithContext, a new value is created that merges
-// the existing and new context rather than mutating the original.
+// If err is already a *WrappedErrorWithContext, the inner operation/module take
+// precedence and outer calls only fill fields that were previously empty.
+// This preserves the original failure location; outer callers can still inspect
+// the wrapped error chain via errors.Is/errors.As.
 func WrapError(err error, operation, module string, params map[string]any) error {
 	if err == nil {
 		return nil
@@ -95,7 +97,8 @@ func WrapError(err error, operation, module string, params map[string]any) error
 	return NewWrappedError(err, operation, module, params)
 }
 
-// WrapErrorf creates a wrapped error with a formatted message.
+// WrapErrorf creates a message-only wrapper with no operation or module context.
+// Use WrapError when structured context is required for logging or diagnostics.
 func WrapErrorf(err error, format string, args ...any) error {
 	if err == nil {
 		return nil
@@ -109,26 +112,23 @@ func WrapErrorf(err error, format string, args ...any) error {
 
 // IsRetryable reports whether err represents a transient condition that a caller
 // may safely retry. It unwraps WrappedErrorWithContext chains and delegates to
-// IsRetryableError for APIError values.
+// IsAPIErrorRetryable for APIError values.
 func IsRetryable(err error) bool {
 	if err == nil {
 		return false
 	}
 
 	if apiErr, ok := err.(APIError); ok {
-		return IsRetryableError(apiErr)
+		return IsAPIErrorRetryable(apiErr)
 	}
 
 	if wrapped, ok := err.(*WrappedErrorWithContext); ok {
 		if apiErr, ok := wrapped.Err.(APIError); ok {
-			return IsRetryableError(apiErr)
+			return IsAPIErrorRetryable(apiErr)
 		}
 		return IsRetryable(wrapped.Err)
 	}
 
-	if netErr, ok := err.(interface{ Temporary() bool }); ok {
-		return netErr.Temporary()
-	}
 	if netErr, ok := err.(interface{ Timeout() bool }); ok {
 		return netErr.Timeout()
 	}
@@ -168,6 +168,12 @@ func GetErrorDetails(err error) map[string]any {
 		details["code"] = apiErr.Code
 		details["category"] = apiErr.Category
 		details["message"] = apiErr.Message
+		if apiErr.Type != "" {
+			details["type"] = apiErr.Type
+		}
+		if apiErr.Severity != "" {
+			details["severity"] = apiErr.Severity
+		}
 		if len(apiErr.Details) > 0 {
 			details["details"] = apiErr.Details
 		}
@@ -224,21 +230,4 @@ func PanicToError(r any) error {
 	default:
 		return fmt.Errorf("panic: %v", v)
 	}
-}
-
-// SafeExecuteWithResult runs fn and wraps any returned error or panic with the
-// given context, returning the zero value of T on failure.
-func SafeExecuteWithResult[T any](fn func() (T, error), operation, module string, params map[string]any) (result T, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			result = *new(T)
-			err = WrapError(PanicToError(r), operation, module, params)
-		}
-	}()
-
-	result, err = fn()
-	if err != nil {
-		return *new(T), WrapError(err, operation, module, params)
-	}
-	return result, nil
 }

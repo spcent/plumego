@@ -218,7 +218,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	}
 
 	ctx := req.Context()
-	existingRC := contract.RequestContextFrom(ctx)
+	existingRC := contract.RequestContextFromContext(ctx)
 
 	if len(params) > 0 {
 		existingRC.Params = params

@@ -121,7 +121,7 @@ func TestRequestContextHelpers(t *testing.T) {
 	r := NewRouter()
 
 	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rc := contract.RequestContextFrom(r.Context())
+		rc := contract.RequestContextFromContext(r.Context())
 		name, _ := ParamFromRequest(r, "name")
 		if rc.Params["name"] != name {
 			t.Fatalf("request context params mismatch: got %s want %s", rc.Params["name"], name)
@@ -152,7 +152,7 @@ func TestContextHandlerRegistration(t *testing.T) {
 	r := NewRouter()
 
 	r.Get("/ctx/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rc := contract.RequestContextFrom(r.Context())
+		rc := contract.RequestContextFromContext(r.Context())
 		if rc.Params == nil {
 			t.Fatalf("expected RequestContext to be present")
 		}

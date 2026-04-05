@@ -70,7 +70,7 @@ func Middleware(opts ...Option) middleware.Middleware {
 
 			ctx := contract.WithTraceIDString(r.Context(), id)
 			ctx = log.WithTraceID(ctx, id)
-			r, _ = contract.DefaultObservabilityPolicy.AttachRequestID(ctx, w, r, id, cfg.includeInRequest)
+			r = contract.DefaultObservabilityPolicy.AttachRequestID(ctx, w, r, id, cfg.includeInRequest)
 			if cfg.headerName != "" && cfg.headerName != contract.RequestIDHeader {
 				if cfg.includeInRequest {
 					r.Header.Set(cfg.headerName, id)

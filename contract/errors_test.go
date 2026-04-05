@@ -308,21 +308,21 @@ func TestRetryableErrorDetection(t *testing.T) {
 
 	for _, status := range retryableStatuses {
 		err := APIError{Status: status}
-		if !IsRetryableError(err) {
+		if !IsAPIErrorRetryable(err) {
 			t.Fatalf("expected status %d to be retryable", status)
 		}
 	}
 
 	for _, status := range nonRetryableStatuses {
 		err := APIError{Status: status}
-		if IsRetryableError(err) {
+		if IsAPIErrorRetryable(err) {
 			t.Fatalf("expected status %d to not be retryable", status)
 		}
 	}
 
 	// Test timeout error
 	timeoutErr := APIError{Category: CategoryTimeout, Status: http.StatusOK}
-	if !IsRetryableError(timeoutErr) {
+	if !IsAPIErrorRetryable(timeoutErr) {
 		t.Fatalf("expected timeout error to be retryable")
 	}
 }
@@ -384,7 +384,7 @@ func TestErrorResponseWithTraceID(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if response.Error.TraceID != "test-trace-id" {
+	if response.TraceID != "test-trace-id" {
 		t.Fatalf("expected trace ID in response")
 	}
 }
@@ -413,7 +413,7 @@ func TestWriteErrorPreservesTraceID(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", decodeErr)
 	}
 
-	if response.Error.TraceID != "explicit-trace-id" {
+	if response.TraceID != "explicit-trace-id" {
 		t.Fatalf("expected explicit trace ID to be preserved")
 	}
 }
@@ -449,8 +449,9 @@ func TestErrorLogging(t *testing.T) {
 		t.Fatalf("expected code in logged fields")
 	}
 
-	if loggedFields["service"] != "database" {
-		t.Fatalf("expected service detail in logged fields")
+	details, ok := loggedFields["details"].(map[string]any)
+	if !ok || details["service"] != "database" {
+		t.Fatalf("expected service detail in namespaced details, got %v", loggedFields["details"])
 	}
 }
 
@@ -552,12 +553,12 @@ func TestErrorBuilderWithSeverityAndType(t *testing.T) {
 		Message("validation warning").
 		Build()
 
-	if err.Details["severity"] != SeverityWarning {
-		t.Fatalf("expected severity to be set in details")
+	if err.Severity != SeverityWarning {
+		t.Fatalf("expected severity to be set on APIError")
 	}
 
-	if err.Details["type"] != ErrTypeValidation {
-		t.Fatalf("expected type to be set in details")
+	if err.Type != ErrTypeValidation {
+		t.Fatalf("expected type to be set on APIError")
 	}
 }
 

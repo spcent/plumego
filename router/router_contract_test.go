@@ -478,7 +478,7 @@ func TestRouteParamsOverrideExistingContext(t *testing.T) {
 	r := NewRouter()
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := ParamFromRequest(r, "id")
-		rc := contract.RequestContextFrom(r.Context())
+		rc := contract.RequestContextFromContext(r.Context())
 
 		if id != "123" {
 			t.Fatalf("expected Param id %q, got %q", "123", id)
@@ -507,7 +507,7 @@ func TestRouteParamsOverrideExistingContext(t *testing.T) {
 func TestRequestContextIncludesRoutePatternAndName(t *testing.T) {
 	r := NewRouter()
 	err := r.AddRouteWithOptions(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rc := contract.RequestContextFrom(r.Context())
+		rc := contract.RequestContextFromContext(r.Context())
 		if rc.RoutePattern != "/users/:id" {
 			t.Fatalf("expected route pattern %q, got %q", "/users/:id", rc.RoutePattern)
 		}
@@ -536,7 +536,7 @@ func TestRouteContextVisibleToOuterMiddleware(t *testing.T) {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			next.ServeHTTP(w, r)
-			gotPattern = contract.RequestContextFrom(r.Context()).RoutePattern
+			gotPattern = contract.RequestContextFromContext(r.Context()).RoutePattern
 		})
 	})
 

@@ -25,16 +25,26 @@ type ObservabilityPolicy struct {
 // DefaultObservabilityPolicy is the shared observability policy.
 var DefaultObservabilityPolicy = NewObservabilityPolicy()
 
-// NewObservabilityPolicy creates a policy with safe defaults.
-func NewObservabilityPolicy() ObservabilityPolicy {
+// NewObservabilityPolicy creates a policy with safe defaults and optional
+// application-specific sensitive key patterns.
+func NewObservabilityPolicy(extraSensitiveKeys ...string) ObservabilityPolicy {
+	keys := map[string]struct{}{
+		"token":     {},
+		"secret":    {},
+		"signature": {},
+		"password":  {},
+	}
+	for _, key := range extraSensitiveKeys {
+		key = strings.ToLower(strings.TrimSpace(key))
+		if key == "" {
+			continue
+		}
+		keys[key] = struct{}{}
+	}
+
 	return ObservabilityPolicy{
-		mask: "***",
-		sensitiveKeys: map[string]struct{}{
-			"token":     {},
-			"secret":    {},
-			"signature": {},
-			"password":  {},
-		},
+		mask:          "***",
+		sensitiveKeys: keys,
 	}
 }
 
@@ -56,9 +66,9 @@ func (p ObservabilityPolicy) RequestIDFromRequest(r *http.Request) string {
 }
 
 // AttachRequestID writes request id to request context and response header.
-func (p ObservabilityPolicy) AttachRequestID(ctx context.Context, w http.ResponseWriter, r *http.Request, id string, includeInRequest bool) (*http.Request, context.Context) {
+func (p ObservabilityPolicy) AttachRequestID(ctx context.Context, w http.ResponseWriter, r *http.Request, id string, includeInRequest bool) *http.Request {
 	if r == nil {
-		return r, ctx
+		return r
 	}
 	ctx = WithTraceIDString(ctx, id)
 	if includeInRequest {
@@ -67,7 +77,7 @@ func (p ObservabilityPolicy) AttachRequestID(ctx context.Context, w http.Respons
 	if w != nil {
 		w.Header().Set(RequestIDHeader, id)
 	}
-	return r.WithContext(ctx), ctx
+	return r.WithContext(ctx)
 }
 
 // MiddlewareLogFields returns the canonical structured log fields for middleware logs.

@@ -30,25 +30,7 @@ func (c *Ctx) BindJSON(dst any) error {
 		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
 
-	if len(bytes.TrimSpace(data)) == 0 {
-		return &BindError{Status: http.StatusBadRequest, Message: ErrEmptyRequestBody.Error(), Err: ErrEmptyRequestBody}
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	// DisallowUnknownFields could be enabled if you want strict mode:
-	// decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(dst); err != nil {
-		// Preserve the specific JSON parse error while keeping errors.Is(err, ErrInvalidJSON) true.
-		return &BindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: joinSentinel(ErrInvalidJSON, err)}
-	}
-
-	// Ensure no trailing data
-	if decoder.Decode(&struct{}{}) != io.EOF {
-		return &BindError{Status: http.StatusBadRequest, Message: ErrUnexpectedExtraData.Error(), Err: ErrUnexpectedExtraData}
-	}
-
-	return nil
+	return decodeJSONBody(data, dst, false)
 }
 
 // BindJSONWithOptions binds the request JSON body with configurable options.
@@ -64,13 +46,28 @@ func (c *Ctx) BindJSONWithOptions(dst any, opts BindOptions) error {
 	if opts.MaxBodySize > 0 && int64(len(data)) > opts.MaxBodySize {
 		return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
 	}
+	// opts.MaxBodySize, if positive, enforces a stricter per-call cap on the
+	// already-read body. RequestConfig.MaxBodySize enforces read-time limits.
+	return decodeJSONBody(data, dst, opts.DisallowUnknownFields)
+}
 
+// joinSentinel wraps sentinel and cause together so that errors.Is(e, sentinel)
+// is true while the original cause is still reachable for logging and diagnosis.
+// If cause is nil or identical to sentinel, sentinel is returned directly.
+func joinSentinel(sentinel, cause error) error {
+	if cause == nil || cause == sentinel {
+		return sentinel
+	}
+	return fmt.Errorf("%w: %w", sentinel, cause)
+}
+
+func decodeJSONBody(data []byte, dst any, disallowUnknown bool) error {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return &BindError{Status: http.StatusBadRequest, Message: ErrEmptyRequestBody.Error(), Err: ErrEmptyRequestBody}
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
-	if opts.DisallowUnknownFields {
+	if disallowUnknown {
 		decoder.DisallowUnknownFields()
 	}
 
@@ -85,24 +82,19 @@ func (c *Ctx) BindJSONWithOptions(dst any, opts BindOptions) error {
 	return nil
 }
 
-// joinSentinel wraps sentinel and cause together so that errors.Is(e, sentinel)
-// is true while the original cause is still reachable for logging and diagnosis.
-// If cause is nil or identical to sentinel, sentinel is returned directly.
-func joinSentinel(sentinel, cause error) error {
-	if cause == nil || cause == sentinel {
-		return sentinel
-	}
-	return fmt.Errorf("%w: %w", sentinel, cause)
-}
-
 // BindAndValidateJSON binds the request body to dst and validates it using struct tags.
 func (c *Ctx) BindAndValidateJSON(dst any) error {
+	var bindErr error
 	if err := c.BindJSON(dst); err != nil {
-		return err
+		bindErr = err
+		logBindError(c, dst, BindOptions{}, bindErr)
+		return bindErr
 	}
 
 	if err := validateStruct(dst); err != nil {
-		return &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+		bindErr = &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+		logBindError(c, dst, BindOptions{}, bindErr)
+		return bindErr
 	}
 
 	return nil
@@ -132,34 +124,24 @@ func (c *Ctx) BindAndValidateJSONWithOptions(dst any, opts BindOptions) error {
 	return nil
 }
 
-// ShouldBindJSON is an alias for BindJSON. It binds the request JSON body to dst
-// and returns the error for the caller to handle. The naming follows the convention
-// where "Should" methods return errors without writing a response.
-func (c *Ctx) ShouldBindJSON(dst any) error {
-	return c.BindJSON(dst)
-}
-
 // BindQuery binds URL query parameters to the provided struct using the "query" struct tag.
-// It supports string, int, int64, float64, bool, and slice-of-string fields.
+// It supports scalar primitives, pointer-to-scalar fields, and primitive slices.
 // Fields without a "query" tag are skipped. A tag value of "-" also skips the field.
 func (c *Ctx) BindQuery(dst any) error {
 	return bindQuery(c.Query, dst)
-}
-
-// ShouldBindQuery is an alias for BindQuery. It signals that the caller
-// is responsible for handling the returned error without writing a response.
-func (c *Ctx) ShouldBindQuery(dst any) error {
-	return c.BindQuery(dst)
 }
 
 // BindAndValidateQuery binds query parameters and then validates the struct
 // using the same "validate" struct tags as BindAndValidateJSON.
 func (c *Ctx) BindAndValidateQuery(dst any) error {
 	if err := c.BindQuery(dst); err != nil {
+		logBindError(c, dst, BindOptions{}, err)
 		return err
 	}
 	if err := validateStruct(dst); err != nil {
-		return &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+		bindErr := &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+		logBindError(c, dst, BindOptions{}, bindErr)
+		return bindErr
 	}
 	return nil
 }
@@ -169,6 +151,7 @@ func (c *Ctx) BindAndValidateQuery(dst any) error {
 // opts do not apply to query parameters and are silently ignored.
 func (c *Ctx) BindAndValidateQueryWithOptions(dst any, opts BindOptions) error {
 	if err := c.BindQuery(dst); err != nil {
+		logBindError(c, dst, opts, err)
 		return err
 	}
 	if opts.DisableValidation {
@@ -179,7 +162,9 @@ func (c *Ctx) BindAndValidateQueryWithOptions(dst any, opts BindOptions) error {
 		validate = validateStruct
 	}
 	if err := validate(dst); err != nil {
-		return &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+		bindErr := &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+		logBindError(c, dst, opts, bindErr)
+		return bindErr
 	}
 	return nil
 }
@@ -203,7 +188,8 @@ func bindQuery(values url.Values, dst any) error {
 			continue
 		}
 
-		// Split tag to get the name (ignore options like omitempty for now)
+		// query:"name,omitempty" is accepted for parity with common Go tags.
+		// Query binding already behaves as omitempty-by-default for absent values.
 		name := strings.SplitN(tag, ",", 2)[0]
 		queryVal := values.Get(name)
 		queryVals := values[name]
@@ -232,6 +218,17 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 	}
 
 	switch fv.Kind() {
+	case reflect.Ptr:
+		if fv.Type().Elem().Kind() == reflect.Ptr {
+			return nil
+		}
+		elem := reflect.New(fv.Type().Elem()).Elem()
+		if err := setFieldFromQuery(elem, val, vals); err != nil {
+			return err
+		}
+		ptr := reflect.New(fv.Type().Elem())
+		ptr.Elem().Set(elem)
+		fv.Set(ptr)
 	case reflect.String:
 		fv.SetString(val)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -260,8 +257,18 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 		fv.SetBool(b)
 	case reflect.Slice:
 		if fv.Type().Elem().Kind() == reflect.String {
-			fv.Set(reflect.ValueOf(vals))
+			fv.Set(reflect.ValueOf(append([]string(nil), vals...)))
+			return nil
 		}
+		result := reflect.MakeSlice(fv.Type(), 0, len(vals))
+		for _, item := range vals {
+			elem := reflect.New(fv.Type().Elem()).Elem()
+			if err := setFieldFromQuery(elem, item, []string{item}); err != nil {
+				return err
+			}
+			result = reflect.Append(result, elem)
+		}
+		fv.Set(result)
 	}
 	return nil
 }
@@ -315,11 +322,38 @@ func logBindError(c *Ctx, payload any, opts BindOptions, err error) {
 	}
 
 	if v := FieldErrorsFrom(err); len(v) > 0 && payload != nil {
-		fields["payload"] = DefaultObservabilityPolicy.RedactFields(map[string]any{"payload": payload})["payload"]
+		fields["payload"] = redactPayloadForLog(payload)
 		fields["validation_fields"] = v
 	}
 
 	logger.WarnCtx(c.R.Context(), "request binding failed", logpkg.Fields(DefaultObservabilityPolicy.RedactFields(fields)))
+}
+
+func redactPayloadForLog(payload any) any {
+	switch value := payload.(type) {
+	case map[string]any:
+		return DefaultObservabilityPolicy.RedactFields(value)
+	case []any:
+		return DefaultObservabilityPolicy.redactValue(value)
+	default:
+		if mapped, err := structToMap(payload); err == nil {
+			return DefaultObservabilityPolicy.RedactFields(mapped)
+		}
+		return DefaultObservabilityPolicy.RedactFields(map[string]any{"payload": payload})["payload"]
+	}
+}
+
+func structToMap(payload any) (map[string]any, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var mapped map[string]any
+	if err := json.Unmarshal(data, &mapped); err != nil {
+		return nil, err
+	}
+	return mapped, nil
 }
 
 func (c *Ctx) bodyBytes() ([]byte, error) {

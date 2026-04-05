@@ -131,7 +131,7 @@ func TestContextPropagation(t *testing.T) {
 		}
 
 		// Check request context
-		rc := contract.RequestContextFrom(r.Context())
+		rc := contract.RequestContextFromContext(r.Context())
 		if rc.Params["id"] != "123" {
 			t.Errorf("param id in request context: expected 123, got %s", rc.Params["id"])
 		}

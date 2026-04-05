@@ -118,10 +118,10 @@ func TestIsRetryable(t *testing.T) {
 		t.Fatal("not found error should not be retryable")
 	}
 
-	// Test network error
-	netErr := &temporaryError{temporary: true}
+	// Test timeout-style network error
+	netErr := &timeoutError{timeout: true}
 	if !IsRetryable(netErr) {
-		t.Fatal("temporary network error should be retryable")
+		t.Fatal("timeout network error should be retryable")
 	}
 }
 
@@ -211,16 +211,16 @@ func TestSafeExecuteWithResultWrapsPanics(t *testing.T) {
 
 // Helper types and functions
 
-type temporaryError struct {
-	temporary bool
+type timeoutError struct {
+	timeout bool
 }
 
-func (e *temporaryError) Error() string {
-	return "temporary error"
+func (e *timeoutError) Error() string {
+	return "timeout error"
 }
 
-func (e *temporaryError) Temporary() bool {
-	return e.temporary
+func (e *timeoutError) Timeout() bool {
+	return e.timeout
 }
 
 func contains(s, substr string) bool {

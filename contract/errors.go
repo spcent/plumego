@@ -138,7 +138,9 @@ type APIError struct {
 	Code     string         `json:"code"`
 	Message  string         `json:"message"`
 	Category ErrorCategory  `json:"category"`
-	TraceID  string         `json:"trace_id,omitempty"`
+	Type     ErrorType      `json:"type,omitempty"`
+	Severity ErrorSeverity  `json:"severity,omitempty"`
+	TraceID  string         `json:"-"`
 	Details  map[string]any `json:"details,omitempty"`
 }
 
@@ -149,7 +151,8 @@ func (e APIError) Error() string {
 
 // ErrorResponse wraps the error payload for consistent JSON responses.
 type ErrorResponse struct {
-	Error APIError `json:"error"`
+	Error   APIError `json:"error"`
+	TraceID string   `json:"trace_id,omitempty"`
 }
 
 // WriteError writes a structured error response with trace context when available.
@@ -189,7 +192,10 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(err.Status)
 
-	return json.NewEncoder(w).Encode(ErrorResponse{Error: err})
+	return json.NewEncoder(w).Encode(ErrorResponse{
+		Error:   err,
+		TraceID: err.TraceID,
+	})
 }
 
 // CategoryForStatus maps an HTTP status to a default error category.
@@ -234,8 +240,14 @@ func ErrorLogger(logger log.StructuredLogger, r *http.Request, err APIError) {
 		fields["trace_id"] = err.TraceID
 	}
 
-	for k, v := range err.Details {
-		fields[k] = v
+	if err.Type != "" {
+		fields["type"] = err.Type
+	}
+	if err.Severity != "" {
+		fields["severity"] = err.Severity
+	}
+	if len(err.Details) > 0 {
+		fields["details"] = err.Details
 	}
 
 	logger.WithFields(fields).Error(err.Message)
@@ -281,15 +293,25 @@ func (b *ErrorBuilder) Category(category ErrorCategory) *ErrorBuilder {
 	return b
 }
 
-// Severity sets the severity level for the error by adding it to details.
+// Severity sets the severity level for the error.
 func (b *ErrorBuilder) Severity(severity ErrorSeverity) *ErrorBuilder {
-	b.err.Details["severity"] = severity
+	if severity == "" {
+		return b
+	}
+	b.err.Severity = severity
 	return b
 }
 
 // Type sets the specific error type for the error.
 func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
-	b.err.Details["type"] = errorType
+	if errorType == "" {
+		return b
+	}
+	meta := errorType.Meta()
+	b.err.Type = errorType
+	b.err.Category = meta.Category
+	b.err.Code = meta.Code
+	b.err.Status = meta.Status
 	return b
 }
 
@@ -351,8 +373,25 @@ func ValidateError(err APIError) []string {
 	if err.Category == "" {
 		validationErrors = append(validationErrors, "error category is required")
 	}
+	if err.Type != "" {
+		if _, ok := errorTypeLookup[err.Type]; !ok {
+			validationErrors = append(validationErrors, "invalid error type")
+		}
+	}
+	if err.Severity != "" && !isValidErrorSeverity(err.Severity) {
+		validationErrors = append(validationErrors, "invalid error severity")
+	}
 
 	return validationErrors
+}
+
+func isValidErrorSeverity(severity ErrorSeverity) bool {
+	switch severity {
+	case SeverityInfo, SeverityWarning, SeverityError, SeverityCritical:
+		return true
+	default:
+		return false
+	}
 }
 
 // HTTPStatusFromCategory returns the representative HTTP status for a category.
@@ -391,14 +430,18 @@ func ParseErrorFromResponse(resp *http.Response) (APIError, error) {
 
 	var errorResp ErrorResponse
 	if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
-		return APIError{
-			Status:   resp.StatusCode,
-			Code:     http.StatusText(resp.StatusCode),
-			Message:  fmt.Sprintf("failed to parse error response: %v", err),
-			Category: CategoryServer,
-		}, nil
+		return NewErrorBuilder().
+			Type(ErrTypeInternal).
+			Status(resp.StatusCode).
+			Code(http.StatusText(resp.StatusCode)).
+			Category(CategoryServer).
+			Message(fmt.Sprintf("failed to parse error response: %v", err)).
+			Build(), nil
 	}
 
+	if errorResp.Error.TraceID == "" {
+		errorResp.Error.TraceID = errorResp.TraceID
+	}
 	return errorResp.Error, nil
 }
 
@@ -412,8 +455,8 @@ func IsServerError(err APIError) bool {
 	return err.Status >= 500
 }
 
-// IsRetryableError checks if the error is retryable based on its status code.
-func IsRetryableError(err APIError) bool {
+// IsAPIErrorRetryable checks if the API error is retryable based on its status code.
+func IsAPIErrorRetryable(err APIError) bool {
 	// Retryable status codes: 408, 429, 500, 502, 503, 504
 	retryableCodes := []int{408, 429, 500, 502, 503, 504}
 

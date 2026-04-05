@@ -7,8 +7,11 @@ import (
 
 // BindOptions configures JSON binding/validation for Ctx helpers.
 type BindOptions struct {
-	// MaxBodySize caps the body size checked after the initial read.
-	// Zero means no additional cap beyond what is set in RequestConfig.
+	// MaxBodySize is a per-call size limit applied after the body has already
+	// been read into memory. It does not prevent memory allocation for bodies
+	// within the global RequestConfig.MaxBodySize limit. Use RequestConfig.
+	// MaxBodySize for read-time protection; use this field only for stricter
+	// endpoint-specific post-read caps.
 	MaxBodySize           int64
 	DisallowUnknownFields bool
 	DisableValidation     bool
@@ -80,9 +83,9 @@ func BindErrorToAPIError(err error) APIError {
 	}
 
 	builder := NewErrorBuilder().
+		Type(errorType).
 		Status(status).
 		Category(category).
-		Type(errorType).
 		Code(code).
 		Message(message)
 
