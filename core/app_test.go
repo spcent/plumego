@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewDefaults(t *testing.T) {
-	app := New(DefaultConfig())
+	app := New(DefaultConfig(), AppDependencies{})
 
 	if app.config.Addr != ":8080" {
 		t.Fatalf("default addr should be :8080, got %s", app.config.Addr)
@@ -24,7 +24,7 @@ func TestNewAppliesTypedConfigAndOptions(t *testing.T) {
 	cfg.Addr = ":9090"
 	cfg.TLS = TLSConfig{Enabled: true, CertFile: "cert", KeyFile: "key"}
 
-	app := New(cfg)
+	app := New(cfg, AppDependencies{})
 
 	if app.config.Addr != ":9090" {
 		t.Fatalf("addr should be :9090, got %s", app.config.Addr)
@@ -130,7 +130,7 @@ func TestUseAfterServeHTTPReturnsError(t *testing.T) {
 func TestPrepareBuildsHTTPServer(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":5555"
-	app := New(cfg)
+	app := New(cfg, AppDependencies{})
 	mustRegisterRoute(t, app.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -158,7 +158,7 @@ func TestPrepareBuildsHTTPServer(t *testing.T) {
 func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":5555"
-	app := New(cfg)
+	app := New(cfg, AppDependencies{})
 
 	app.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +203,7 @@ func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 
 func TestUseAfterStartPanics(t *testing.T) {
 	app := newTestApp()
-	app.started = true
+	app.preparationState = PreparationStateServerPrepared
 
 	err := app.Use(func(next http.Handler) http.Handler { return next })
 	if err == nil {

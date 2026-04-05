@@ -171,7 +171,7 @@ func TestAddRouteReturnsRegistrationErrors(t *testing.T) {
 		t.Fatalf("expected duplicate route error")
 	}
 
-	app.started = true
+	app.preparationState = PreparationStateServerPrepared
 	if err := app.AddRoute(http.MethodGet, "/after-start", handler); err == nil {
 		t.Fatalf("expected add route to fail after app started")
 	}
@@ -211,7 +211,7 @@ func TestMethodHelpersReturnRegistrationErrors(t *testing.T) {
 		t.Fatalf("expected duplicate get registration error")
 	}
 
-	app.started = true
+	app.preparationState = PreparationStateServerPrepared
 	if err := app.Post("/after-start", handler); err == nil {
 		t.Fatalf("expected post registration to fail after app started")
 	}

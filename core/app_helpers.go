@@ -11,15 +11,11 @@ import (
 
 func (a *App) ensureMutable(operation, action string) error {
 	a.mu.RLock()
-	started := a.started
-	frozen := a.configFrozen
+	state := a.preparationState
 	a.mu.RUnlock()
 
-	if started {
-		return wrapCoreError(fmt.Errorf("cannot %s after app has started", action), operation, nil)
-	}
-	if frozen {
-		return wrapCoreError(fmt.Errorf("cannot %s after app has been initialized", action), operation, nil)
+	if state != PreparationStateMutable {
+		return wrapCoreError(fmt.Errorf("cannot %s after app has been prepared", action), operation, nil)
 	}
 	return nil
 }
@@ -30,7 +26,9 @@ func wrapCoreError(err error, operation string, params map[string]any) error {
 
 func (a *App) freezeConfig() {
 	a.mu.Lock()
-	a.configFrozen = true
+	if a.preparationState == PreparationStateMutable {
+		a.preparationState = PreparationStateHandlerPrepared
+	}
 	a.mu.Unlock()
 }
 
@@ -42,8 +40,6 @@ func (a *App) ensureRouter() *router.Router {
 	a.mu.RLock()
 	r := a.router
 	a.mu.RUnlock()
-
-	a.syncRouterConfig(r)
 	return r
 }
 

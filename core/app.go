@@ -19,8 +19,7 @@ type App struct {
 
 	// Runtime state (protected by mutex)
 	mu           sync.RWMutex
-	started      bool // Whether runtime hooks have started
-	configFrozen bool // Whether configuration has been frozen
+	preparationState PreparationState // Tracks mutation and preparation phase
 
 	// Server components
 	httpServer  *http.Server       // HTTP server instance
@@ -29,23 +28,18 @@ type App struct {
 	handlerOnce sync.Once          // Ensures handler initialization happens once, can be reset for testing
 }
 
-// Option defines a function type for configuring non-config app dependencies.
-type Option func(*App)
-
-// New creates a new App instance with the provided typed config and options.
-func New(cfg AppConfig, options ...Option) *App {
+// New creates a new App instance with typed config and typed dependencies.
+func New(cfg AppConfig, dependencies AppDependencies) *App {
 	config := cfg
 	app := &App{
 		config:          &config,
 		router:          router.NewRouter(),
 		middlewareChain: middleware.NewChain(),
-		logger:          log.NewNoOpLogger(),
+		logger:          resolveLogger(dependencies),
+		preparationState: PreparationStateMutable,
 	}
 
-	for _, opt := range options {
-		opt(app)
-	}
-
+	// Apply typed router policy once at construction.
 	app.syncRouterConfig(app.router)
 
 	return app

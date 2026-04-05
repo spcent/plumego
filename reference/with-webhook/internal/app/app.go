@@ -25,7 +25,7 @@ type App struct {
 
 // New constructs the App with an inbound webhook receiver backed by an in-process broker.
 func New(cfg config.Config) (*App, error) {
-	a := core.New(cfg.Core, core.WithLogger(plumelog.NewGLogger()))
+	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewGLogger()})
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
 	a.Use(accesslog.Middleware(a.Logger()))

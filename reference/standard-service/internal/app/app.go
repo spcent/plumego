@@ -22,7 +22,7 @@ type App struct {
 
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
-	app := core.New(cfg.Core, core.WithLogger(plumelog.NewGLogger()))
+	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewGLogger()})
 	app.Use(requestid.Middleware())
 	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(accesslog.Middleware(app.Logger()))

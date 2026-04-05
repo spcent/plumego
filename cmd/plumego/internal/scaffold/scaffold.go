@@ -172,7 +172,7 @@ import (
 func New() *core.App {
 	cfg := core.DefaultConfig()
 	cfg.Addr = ":8080"
-	app := core.New(cfg, core.WithLogger(plumelog.NewGLogger()))
+	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewGLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),
@@ -644,7 +644,7 @@ type App struct {
 
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
-	a := core.New(cfg.Core, core.WithLogger(plumelog.NewGLogger()))
+	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewGLogger()})
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
 	a.Use(accesslog.Middleware(a.Logger()))
@@ -916,7 +916,7 @@ import (
 func main() {
 	cfg := core.DefaultConfig()
 	cfg.Addr = ":8080"
-	app := core.New(cfg, core.WithLogger(plumelog.NewGLogger()))
+	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewGLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),

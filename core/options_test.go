@@ -9,19 +9,17 @@ import (
 	"github.com/spcent/plumego/middleware/requestid"
 )
 
-func TestWithLogger(t *testing.T) {
-	app := newTestApp()
+func TestAppDependenciesLogger(t *testing.T) {
 	logger := log.NewGLogger()
-	opt := WithLogger(logger)
-	opt(app)
+	app := New(DefaultConfig(), AppDependencies{Logger: logger})
 	if app.logger != logger {
 		t.Errorf("expected logger to be set")
 	}
 }
 
-func TestWithLoggerDoesNotMirrorIntoDefaultRouter(t *testing.T) {
+func TestAppDependenciesLoggerDoesNotMirrorIntoDefaultRouter(t *testing.T) {
 	logger := log.NewGLogger()
-	app := newTestApp(WithLogger(logger))
+	app := New(DefaultConfig(), AppDependencies{Logger: logger})
 
 	if app.Logger() != logger {
 		t.Fatal("expected App.Logger to return the configured logger")
@@ -31,14 +29,15 @@ func TestWithLoggerDoesNotMirrorIntoDefaultRouter(t *testing.T) {
 	}
 }
 
-func TestWithLoggerNil(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic when nil logger is passed")
-		}
-	}()
-
-	WithLogger(nil)(newTestApp())
+func TestNewWithNilLoggerFallsBackToNoOpLogger(t *testing.T) {
+	var logger log.StructuredLogger
+	app := New(DefaultConfig(), AppDependencies{Logger: logger})
+	if app.logger == nil {
+		t.Fatal("expected logger to be initialized")
+	}
+	if _, ok := app.logger.(*log.NoOpLogger); !ok {
+		t.Fatalf("expected NoOpLogger when nil logger is provided, got %T", app.logger)
+	}
 }
 
 func TestNewDefaultsToNoOpLogger(t *testing.T) {
@@ -70,7 +69,7 @@ func TestRequestIDMiddleware(t *testing.T) {
 func TestMethodNotAllowedConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Router.MethodNotAllowed = true
-	app := New(cfg)
+	app := New(cfg, AppDependencies{})
 	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -90,7 +89,7 @@ func TestMethodNotAllowedConfig(t *testing.T) {
 func TestRouterConfiguresOwnedMethodNotAllowedPolicy(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Router.MethodNotAllowed = true
-	app := New(cfg)
+	app := New(cfg, AppDependencies{})
 	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -108,5 +107,27 @@ func TestRouterConfiguresOwnedMethodNotAllowedPolicy(t *testing.T) {
 	}
 	if rec.Header().Get("Allow") != http.MethodGet {
 		t.Fatalf("expected Allow header to include GET")
+	}
+}
+
+func TestRoutesAndLookupDoNotResyncRouterPolicy(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Router.MethodNotAllowed = true
+	app := New(cfg, AppDependencies{})
+
+	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	if !app.router.MethodNotAllowedEnabled() {
+		t.Fatal("expected owned router to have method-not-allowed enabled from constructor ownership")
+	}
+
+	app.config.Router.MethodNotAllowed = false
+	_ = app.Routes()
+	_ = app.URL("missing")
+
+	if !app.router.MethodNotAllowedEnabled() {
+		t.Fatal("expected read paths to not re-sync router policy")
 	}
 }

@@ -9,6 +9,6 @@ func mustRegisterRoute(t *testing.T, err error) {
 	}
 }
 
-func newTestApp(options ...Option) *App {
-	return New(DefaultConfig(), options...)
+func newTestApp() *App {
+	return New(DefaultConfig(), AppDependencies{})
 }

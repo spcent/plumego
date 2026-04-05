@@ -40,7 +40,7 @@ func main() {
 	ctx := context.Background()
 	cfg := core.DefaultConfig()
 	cfg.Addr = ":8080"
-	app := core.New(cfg, core.WithLogger(plog.NewGLogger()))
+	app := core.New(cfg, core.AppDependencies{Logger: plog.NewGLogger()})
 
 	if err := app.Use(
 		requestid.Middleware(),

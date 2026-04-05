@@ -21,9 +21,8 @@ func TestRuntimeSnapshotIncludesStableFields(t *testing.T) {
 		CertFile: "cert.pem",
 		KeyFile:  "key.pem",
 	}
-	app := New(cfg)
-	app.started = true
-	app.configFrozen = true
+	app := New(cfg, AppDependencies{})
+	app.preparationState = PreparationStateServerPrepared
 	app.httpServer = &http.Server{}
 
 	snapshot := app.RuntimeSnapshot()

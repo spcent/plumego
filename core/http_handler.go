@@ -29,6 +29,9 @@ func (a *App) ensureServerPrepared() error {
 	a.mu.RLock()
 	if a.httpServer != nil {
 		a.mu.RUnlock()
+		a.mu.Lock()
+		a.preparationState = PreparationStateServerPrepared
+		a.mu.Unlock()
 		return nil
 	}
 	handler := a.handler
@@ -57,6 +60,7 @@ func (a *App) ensureServerPrepared() error {
 	defer a.mu.Unlock()
 
 	if a.httpServer != nil {
+		a.preparationState = PreparationStateServerPrepared
 		return nil
 	}
 
@@ -72,6 +76,7 @@ func (a *App) ensureServerPrepared() error {
 	}
 	a.connTracker = newConnectionTracker(a.logger, settings.DrainInterval)
 	a.httpServer.ConnState = a.connTracker.track
+	a.preparationState = PreparationStateServerPrepared
 
 	if !settings.HTTP2Enabled {
 		a.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))

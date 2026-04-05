@@ -16,19 +16,6 @@ func (a *App) Prepare() error {
 	if err := a.ensureServerPrepared(); err != nil {
 		return err
 	}
-
-	a.mu.RLock()
-	started := a.started
-	a.mu.RUnlock()
-
-	if started {
-		return nil
-	}
-
-	a.mu.Lock()
-	a.started = true
-	a.mu.Unlock()
-
 	return nil
 }
 
@@ -66,10 +53,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 			shutdownErr = wrapCoreError(err, "shutdown_app", nil)
 		}
 	}
-
-	a.mu.Lock()
-	a.started = false
-	a.mu.Unlock()
 
 	return shutdownErr
 }

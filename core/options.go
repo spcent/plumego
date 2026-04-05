@@ -4,12 +4,15 @@ import (
 	"github.com/spcent/plumego/log"
 )
 
-// WithLogger sets a custom logger for the App.
-func WithLogger(logger log.StructuredLogger) Option {
-	return func(a *App) {
-		if logger == nil {
-			panic("core logger cannot be nil")
-		}
-		a.logger = logger
+// AppDependencies carries constructor-owned dependencies for App.
+type AppDependencies struct {
+	// Logger used by request and lifecycle-adjacent helpers.
+	Logger log.StructuredLogger
+}
+
+func resolveLogger(dependencies AppDependencies) log.StructuredLogger {
+	if dependencies.Logger == nil {
+		return log.NewNoOpLogger()
 	}
+	return dependencies.Logger
 }

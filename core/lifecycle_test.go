@@ -128,7 +128,7 @@ func TestPrepareServeAndShutdown(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = addr
 
-	app := New(cfg)
+	app := New(cfg, AppDependencies{})
 
 	// Add a test route
 	mustRegisterRoute(t, app.Get("/boot-test", func(w http.ResponseWriter, r *http.Request) {
@@ -191,10 +191,10 @@ func TestPrepareMarksAppStarted(t *testing.T) {
 	}
 
 	app.mu.RLock()
-	started := app.started
+	state := app.preparationState
 	app.mu.RUnlock()
-	if !started {
-		t.Fatalf("expected app to be marked started")
+	if state != PreparationStateServerPrepared {
+		t.Fatalf("expected app to be server prepared, got %q", state)
 	}
 }
 
@@ -253,7 +253,7 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 			cfg.MaxHeaderBytes = tt.config.MaxHeaderBytes
 			cfg.EnableHTTP2 = tt.config.EnableHTTP2
 			cfg.DrainInterval = tt.config.DrainInterval
-			app := New(cfg)
+			app := New(cfg, AppDependencies{})
 
 			// Add a route to ensure handler is created
 			mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -291,7 +291,7 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 func TestPrepareRejectsMissingTLSFiles(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.TLS = TLSConfig{Enabled: true}
-	app := New(cfg)
+	app := New(cfg, AppDependencies{})
 
 	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -329,7 +329,7 @@ func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 	cfg.Addr = addr
 	cfg.TLS = TLSConfig{Enabled: true, CertFile: certFile, KeyFile: keyFile}
 
-	app := New(cfg)
+	app := New(cfg, AppDependencies{})
 
 	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -493,7 +493,7 @@ func TestPrepareAndShutdownDoNotDriveLoggerLifecycle(t *testing.T) {
 	logger := &testLifecycleLogger{}
 	cfg := DefaultConfig()
 	cfg.Addr = addr
-	app := New(cfg, WithLogger(logger))
+	app := New(cfg, AppDependencies{Logger: logger})
 
 	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

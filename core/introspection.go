@@ -9,18 +9,10 @@ func (a *App) RuntimeSnapshot() RuntimeSnapshot {
 
 	a.mu.RLock()
 	cfg := *a.config
-	configFrozen := a.configFrozen
-	serverPrepared := a.httpServer != nil
+	state := a.preparationState
 	a.mu.RUnlock()
 
 	snapshot := projectServerSettings(cfg).runtimeSnapshot()
-	switch {
-	case serverPrepared:
-		snapshot.PreparationState = PreparationStateServerPrepared
-	case configFrozen:
-		snapshot.PreparationState = PreparationStateHandlerPrepared
-	default:
-		snapshot.PreparationState = PreparationStateMutable
-	}
+	snapshot.PreparationState = state
 	return snapshot
 }
