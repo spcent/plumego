@@ -46,3 +46,11 @@ Do not use `x/tenant` for:
 - keep policy and quota checks reviewable
 - keep tenant-aware adapters subordinate to the owning tenant package
 - do not push tenant semantics back into stable roots
+- keep tenant-aware SQL rewriting explicit about its safe subset: simple single-statement query scoping may be automated in `x/tenant/store/db`, while complex or admin SQL must stay manual via `RawDB()`
+- adapter misconfiguration or missing tenant context must fail closed rather than silently running an unscoped query
+
+## Current Readiness Surface
+
+- resolution guidance is example-backed for principal-first and custom-extractor flows
+- tenant store/db guidance is explicit about its supported SQL rewrite subset and fail-closed misconfiguration behavior
+- quota, policy, and rate-limit behavior is covered at both core and middleware boundaries for denial, `Retry-After`, and tenant isolation paths

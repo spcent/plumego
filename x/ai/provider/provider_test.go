@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"io"
 	"testing"
 )
 
@@ -189,6 +190,79 @@ func TestManager_Get_NotFound(t *testing.T) {
 	_, err := manager.Get("nonexistent")
 	if err == nil {
 		t.Error("Get() should return error for nonexistent provider")
+	}
+}
+
+func TestMockProvider_QueueReuseAndCalls(t *testing.T) {
+	mock := NewMockProvider("mock")
+	mock.QueueResponse(&CompletionResponse{
+		Model: "mock-model",
+		Content: []ContentBlock{
+			{Type: ContentTypeText, Text: "queued response"},
+		},
+	})
+
+	req := &CompletionRequest{Model: "mock-model"}
+	first, err := mock.Complete(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Complete() first call error = %v", err)
+	}
+
+	second, err := mock.Complete(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Complete() second call error = %v", err)
+	}
+
+	if first.GetText() != "queued response" || second.GetText() != "queued response" {
+		t.Fatalf("queued response should be reused, got %q and %q", first.GetText(), second.GetText())
+	}
+
+	if mock.CallCount() != 2 {
+		t.Fatalf("CallCount() = %d, want 2", mock.CallCount())
+	}
+
+	if len(mock.Calls()) != 2 {
+		t.Fatalf("Calls() count = %d, want 2", len(mock.Calls()))
+	}
+}
+
+func TestMockProvider_ErrorAndStreaming(t *testing.T) {
+	mock := NewMockProvider("mock")
+	mock.SetError(io.ErrUnexpectedEOF)
+
+	if _, err := mock.Complete(context.Background(), &CompletionRequest{Model: "mock-model"}); err == nil {
+		t.Fatal("Complete() should return configured error")
+	}
+	if _, err := mock.CompleteStream(context.Background(), &CompletionRequest{Model: "mock-model"}); err == nil {
+		t.Fatal("CompleteStream() should return configured error")
+	}
+
+	mock.SetError(nil)
+	mock.SetStreamChunks([]*StreamChunk{
+		{
+			Type: "content_block_delta",
+			Delta: &ContentDelta{
+				Type: ContentTypeText,
+				Text: "chunk-1",
+			},
+		},
+	})
+
+	stream, err := mock.CompleteStream(context.Background(), &CompletionRequest{Model: "mock-model"})
+	if err != nil {
+		t.Fatalf("CompleteStream() error = %v", err)
+	}
+
+	chunk, err := stream.Next()
+	if err != nil {
+		t.Fatalf("Next() error = %v", err)
+	}
+	if chunk.Delta == nil || chunk.Delta.Text != "chunk-1" {
+		t.Fatalf("chunk text = %v, want chunk-1", chunk.Delta)
+	}
+
+	if _, err := stream.Next(); err != io.EOF {
+		t.Fatalf("Next() after final chunk = %v, want io.EOF", err)
 	}
 }
 

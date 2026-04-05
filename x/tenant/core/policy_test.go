@@ -230,6 +230,38 @@ func TestConfigPolicyEvaluator_NilEvaluator(t *testing.T) {
 	}
 }
 
+func TestConfigPolicyEvaluator_TenantPoliciesAreIsolated(t *testing.T) {
+	mgr := NewInMemoryConfigManager()
+	mgr.SetTenantConfig(Config{
+		TenantID: "tenant-a",
+		Policy: PolicyConfig{
+			AllowedModels: []string{"gpt-4"},
+		},
+	})
+	mgr.SetTenantConfig(Config{
+		TenantID: "tenant-b",
+		Policy: PolicyConfig{
+			AllowedModels: []string{"claude-3"},
+		},
+	})
+
+	evaluator := NewConfigPolicyEvaluator(mgr)
+	ctx := context.Background()
+
+	allowed, err := evaluator.Evaluate(ctx, "tenant-a", PolicyRequest{Model: "gpt-4"})
+	if err != nil || !allowed.Allowed {
+		t.Fatalf("tenant-a expected allowed, got (%+v, %v)", allowed, err)
+	}
+
+	denied, err := evaluator.Evaluate(ctx, "tenant-b", PolicyRequest{Model: "gpt-4"})
+	if err != ErrPolicyDenied {
+		t.Fatalf("tenant-b expected ErrPolicyDenied, got %v", err)
+	}
+	if denied.Allowed {
+		t.Fatal("tenant-b should not inherit tenant-a policy")
+	}
+}
+
 func TestConfigPolicyEvaluator_OnlyModelRestricted(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{

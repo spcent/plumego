@@ -65,6 +65,22 @@ func TestSetRetryAfterHeader(t *testing.T) {
 	})
 }
 
+func TestTransportQuotaRejectionHeadersCompose(t *testing.T) {
+	w := httptest.NewRecorder()
+	transport.SetQuotaHeaders(w, 1, 2)
+	transport.SetRetryAfterHeader(w, 45*time.Second)
+
+	if got := w.Header().Get("X-Quota-Remaining-Requests"); got != "1" {
+		t.Errorf("X-Quota-Remaining-Requests = %q, want 1", got)
+	}
+	if got := w.Header().Get("X-Quota-Remaining-Tokens"); got != "2" {
+		t.Errorf("X-Quota-Remaining-Tokens = %q, want 2", got)
+	}
+	if got := w.Header().Get("Retry-After"); got != "45" {
+		t.Errorf("Retry-After = %q, want 45", got)
+	}
+}
+
 func TestSetRateLimitHeaders(t *testing.T) {
 	t.Run("limit and remaining", func(t *testing.T) {
 		w := httptest.NewRecorder()

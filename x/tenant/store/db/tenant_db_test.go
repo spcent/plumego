@@ -78,6 +78,28 @@ func TestWithTenantColumnAcceptsValid(t *testing.T) {
 	}
 }
 
+func TestTenantDB_ErrAndOperationsFailClosedOnInvalidColumn(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	tdb := NewTenantDB(db, WithTenantColumn("tenant-id"))
+	if tdb.Err() == nil {
+		t.Fatal("Err() should report invalid tenant column configuration")
+	}
+
+	ctx := tenant.ContextWithTenantID(context.Background(), "t-123")
+	if _, err := tdb.QueryFromContext(ctx, "SELECT * FROM users"); err == nil {
+		t.Fatal("QueryFromContext() should fail for invalid tenant column configuration")
+	}
+
+	row := tdb.QueryRowFromContext(ctx, "SELECT * FROM users WHERE id = ?", 1)
+	var id int
+	if err := row.Scan(&id); err == nil {
+		t.Fatal("QueryRowFromContext().Scan should fail for invalid tenant column configuration")
+	}
+}
+
 func TestTenantDB_RawDB(t *testing.T) {
 	connector := &stubConnector{conn: &stubConn{}}
 	db := sql.OpenDB(connector)
@@ -367,6 +389,30 @@ func TestAddTenantToInsert(t *testing.T) {
 	}
 	if len(args) != 3 || args[0] != "alice" || args[1] != "alice@example.com" || args[2] != "t-123" {
 		t.Errorf("unexpected args: %v", args)
+	}
+}
+
+func TestAddTenantToInsert_MultipleRows(t *testing.T) {
+	tdb := &TenantDB{tenantColumn: "tenant_id"}
+
+	query, args := tdb.addTenantFilter(
+		"INSERT INTO users (name, email) VALUES (?, ?), (?, ?)",
+		"t-123",
+		[]any{"alice", "alice@example.com", "bob", "bob@example.com"},
+	)
+
+	expected := "INSERT INTO users (name, email, tenant_id) VALUES (?, ?, ?), (?, ?, ?)"
+	if query != expected {
+		t.Errorf("expected %q, got %q", expected, query)
+	}
+	if len(args) != 6 {
+		t.Fatalf("expected 6 args, got %d", len(args))
+	}
+	want := []any{"alice", "alice@example.com", "t-123", "bob", "bob@example.com", "t-123"}
+	for i := range want {
+		if args[i] != want[i] {
+			t.Fatalf("args[%d] = %v, want %v (full args: %v)", i, args[i], want[i], args)
+		}
 	}
 }
 

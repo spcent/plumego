@@ -65,18 +65,20 @@ Non-goals:
 
 ## Phase 9: `x/tenant` Production Readiness
 
-Status: planned
+Status: in progress
 
 Current state:
 
 - `x/tenant` already has dedicated families for `resolve`, `policy`, `quota`, `ratelimit`, `config`, `session`, and tenant-aware `store` adapters
 - tenant-aware logic is intentionally excluded from stable `middleware` and stable `store`
+- runnable offline examples now cover principal-first and custom-extractor tenant resolution flows
+- tenant-aware `store/db` docs and tests now spell out the supported query-scoping subset and fail-closed misconfiguration behavior
+- quota, policy, and rate-limit coverage now includes `Retry-After`, canonical deny responses, and tenant-scoped isolation checks
 
 Next work:
 
-- add production-oriented examples for tenant resolution beyond header-only flows
-- document supported query-scoping behavior and sharp edges in tenant-aware store adapters
-- expand end-to-end coverage for quota exhaustion, deny paths, isolation, and `Retry-After` behavior
+- add broader production-oriented resolution examples only when additional transport patterns are exercised in code
+- expand higher-level end-to-end coverage across combined resolution, policy, quota, and rate-limit middleware chains
 - extend `docs/architecture/X_TENANT_BLUEPRINT.md` only as implemented behavior changes land
 
 Non-goals:

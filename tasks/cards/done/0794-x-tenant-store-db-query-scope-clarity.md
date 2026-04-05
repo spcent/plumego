@@ -1,4 +1,4 @@
-# Card 0804
+# Card 0794
 
 Priority: P1
 State: active
@@ -43,3 +43,11 @@ Done Definition:
 - No stable-root boundary drift is introduced while clarifying the tenant-aware adapter.
 
 Outcome:
+- Expanded `x/tenant/store/db` package docs to describe the supported query-rewrite subset, explicit sharp edges, and fail-closed behavior for missing tenant context or invalid tenant-column configuration.
+- Synced the tenant module primer and tenant architecture blueprint with the actual `store/db` adapter behavior and boundary expectations.
+- Added focused tests for fail-closed invalid-column configuration and multi-row `INSERT ... VALUES` tenant-argument rewriting.
+
+Validation Run:
+- `go test -timeout 20s ./x/tenant/store/db`
+- `go test -race -timeout 60s ./x/tenant/store/db`
+- `go vet ./x/tenant/...`

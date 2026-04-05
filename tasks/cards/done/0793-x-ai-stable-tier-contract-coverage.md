@@ -1,4 +1,4 @@
-# Card 0803
+# Card 0793
 
 Priority: P1
 State: active
@@ -9,7 +9,7 @@ Owned Files:
 - `x/ai/streaming/streaming_test.go`
 - `x/ai/tool/tool_test.go`
 Depends On:
-- `0802-x-ai-offline-stable-tier-examples.md`
+- `0792-x-ai-offline-stable-tier-examples.md`
 
 Goal:
 - Deepen contract coverage around the stable-tier `x/ai` packages before any broader stability claims.
@@ -44,3 +44,11 @@ Done Definition:
 - Test coverage strengthens confidence without introducing hidden globals or network-dependent paths.
 
 Outcome:
+- Added focused contract tests for `x/ai/provider.MockProvider`, `x/ai/session.Manager`, `x/ai/streaming.StreamManager`, and `x/ai/tool.Registry`.
+- The new assertions lock in queue reuse and streaming EOF behavior, message-limit persistence semantics, closed-stream error handling, allow-list filtering, and error-result metrics.
+- Coverage stayed package-local and avoided broadening into experimental `x/ai` subpackages.
+
+Validation Run:
+- `go test -timeout 20s ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `go test -race -timeout 60s ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `go vet ./x/ai/...`

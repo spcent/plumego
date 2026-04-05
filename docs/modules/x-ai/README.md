@@ -3,6 +3,8 @@
 ## Purpose
 
 `x/ai` is the experimental capability family for AI-related adapters and workflows.
+Import the owning subpackage directly; the root `x/ai` package is only a
+module marker and not a canonical bootstrap surface.
 
 ## v1 Status
 
@@ -12,7 +14,7 @@
 ## Use this module when
 
 - the task is clearly AI capability work
-- provider, orchestration, streaming, or prompt tooling is involved
+- provider, session, streaming, tool, or orchestration work is involved
 
 ## Do not use this module for
 
@@ -27,6 +29,9 @@ declares subpackage-level tiers:
 - stable-tier subpackages: `provider`, `session`, `streaming`, `tool`
 - experimental subpackages: `orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience`
 
+Treat additional supporting subpackages under `x/ai/*` as experimental unless
+the manifest explicitly promotes them.
+
 Treat the manifest as the canonical source when these tiers change.
 
 ## Common entrypoints
@@ -37,6 +42,16 @@ Treat the manifest as the canonical source when these tiers change.
 - `x/ai/tool` — tool registration and execution policy
 - `x/ai/orchestration` — multi-step agent workflow composition
 - `x/ai/semanticcache` — embedding/vector-backed semantic cache flows
+
+The stable-tier entrypoints are `provider`, `session`, `streaming`, and `tool`.
+Use other `x/ai/*` packages with experimental-module expectations.
+
+## Runnable offline examples
+
+- `x/ai/provider/example_test.go` — mock-backed provider usage without network calls
+- `x/ai/session/example_test.go` — in-memory session lifecycle and active-context retrieval
+- `x/ai/streaming/example_test.go` — SSE-backed progress updates with an in-memory recorder
+- `x/ai/tool/example_test.go` — offline tool registration, policy filtering, and execution
 
 ## First files to read
 

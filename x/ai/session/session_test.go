@@ -127,6 +127,41 @@ func TestManager_AppendMessage(t *testing.T) {
 	}
 }
 
+func TestManager_AppendMessage_MessageLimitExceeded(t *testing.T) {
+	storage := NewMemoryStorage()
+	manager := NewManager(storage, WithConfig(Config{
+		DefaultTTL:  24 * time.Hour,
+		MaxMessages: 1,
+		MaxTokens:   1000,
+		AutoTrim:    false,
+	}))
+
+	session, err := manager.Create(context.Background(), CreateOptions{})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	if err := manager.AppendMessage(context.Background(), session.ID, provider.NewTextMessage(provider.RoleUser, "first")); err != nil {
+		t.Fatalf("AppendMessage(first) error = %v", err)
+	}
+
+	err = manager.AppendMessage(context.Background(), session.ID, provider.NewTextMessage(provider.RoleUser, "second"))
+	if err == nil {
+		t.Fatal("AppendMessage(second) should fail when message limit is exceeded")
+	}
+
+	updated, err := manager.Get(context.Background(), session.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if len(updated.Messages) != 1 {
+		t.Fatalf("stored message count = %d, want 1", len(updated.Messages))
+	}
+	if updated.Messages[0].GetText() != "first" {
+		t.Fatalf("stored message = %q, want first", updated.Messages[0].GetText())
+	}
+}
+
 func TestManager_GetMessages(t *testing.T) {
 	storage := NewMemoryStorage()
 	manager := NewManager(storage)
@@ -211,6 +246,20 @@ func TestManager_SetContext(t *testing.T) {
 
 	if value != "value1" {
 		t.Errorf("Context value = %v, want 'value1'", value)
+	}
+}
+
+func TestManager_GetContext_NotFound(t *testing.T) {
+	storage := NewMemoryStorage()
+	manager := NewManager(storage)
+
+	session, err := manager.Create(context.Background(), CreateOptions{})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	if _, err := manager.GetContext(context.Background(), session.ID, "missing"); err == nil {
+		t.Fatal("GetContext() should return error for missing key")
 	}
 }
 

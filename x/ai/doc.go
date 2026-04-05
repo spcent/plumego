@@ -1,33 +1,17 @@
-// Package ai provides AI gateway capabilities for Plumego extensions.
+// Package ai documents Plumego's AI capability family.
 //
-// This package includes:
-//   - SSE (Server-Sent Events): Stream real-time responses to clients
-//   - Provider: Unified interface for LLM providers (Claude, OpenAI, etc.)
-//   - Session: Conversation management with context window control
-//   - Tokenizer: Token counting and quota management
-//   - Tool: Function calling framework for agent actions
+// The x/ai module remains experimental overall. Its manifest defines the
+// canonical stability split:
+//   - stable-tier subpackages: provider, session, streaming, tool
+//   - experimental subpackages: orchestration, semanticcache, marketplace,
+//     distributed, resilience
 //
-// Example usage:
+// Additional supporting subpackages under x/ai should be treated as
+// experimental unless and until the module manifest says otherwise.
 //
-//	import (
-//		"net/http"
+// Import the owning subpackage directly; this root package is only a module
+// marker and does not provide a canonical bootstrap entrypoint.
 //
-//		"github.com/spcent/plumego/core"
-//		"github.com/spcent/plumego/x/ai/provider"
-//		"github.com/spcent/plumego/x/ai/session"
-//	)
-//
-//	func main() {
-//		model := provider.NewClaudeProvider(apiKey)
-//		sessions := session.NewManager(session.NewMemoryStorage())
-//
-//		cfg := core.DefaultConfig()
-//		cfg.Addr = ":8080"
-//		app := core.New(cfg)
-//		app.Post("/chat", func(w http.ResponseWriter, r *http.Request) {
-//			_ = model
-//			_ = sessions
-//			w.WriteHeader(http.StatusNotImplemented)
-//		})
-//	}
+// Keep AI wiring explicit in handlers or owning extensions. Do not add hidden
+// provider globals, implicit registration, or stable-root dependencies.
 package ai

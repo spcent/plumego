@@ -1,4 +1,4 @@
-# Card 0801
+# Card 0791
 
 Priority: P1
 State: active
@@ -41,3 +41,10 @@ Done Definition:
 - No stale prose suggests hidden registration, implicit globals, or stable-root promotion.
 
 Outcome:
+- `docs/modules/x-ai/README.md` now states that the root `x/ai` package is only a module marker, narrows the recommended entrypoints to the stable-tier and explicit orchestration work, and clarifies that supporting subpackages stay experimental unless the manifest promotes them.
+- `x/ai/doc.go` now documents the manifest-defined stability split and removes the bootstrap-shaped example that implied `x/ai` was a direct application entrypoint.
+
+Validation Run:
+- `go run ./internal/checks/module-manifests`
+- `go test -timeout 20s ./x/ai/...`
+- `go vet ./x/ai/...`

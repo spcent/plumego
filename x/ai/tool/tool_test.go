@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/spcent/plumego/x/ai/provider"
 )
@@ -141,6 +142,21 @@ func TestRegistry_ToProviderTools(t *testing.T) {
 	}
 }
 
+func TestRegistry_ListForContext(t *testing.T) {
+	policy := NewAllowListPolicy([]string{"echo"})
+	registry := NewRegistry(WithPolicy(policy))
+	registry.Register(NewEchoTool())
+	registry.Register(NewCalculatorTool())
+
+	tools := registry.ListForContext(context.Background())
+	if len(tools) != 1 {
+		t.Fatalf("ListForContext() count = %d, want 1", len(tools))
+	}
+	if tools[0].Name() != "echo" {
+		t.Fatalf("ListForContext() tool = %q, want echo", tools[0].Name())
+	}
+}
+
 func TestAllowListPolicy(t *testing.T) {
 	policy := NewAllowListPolicy([]string{"echo", "calculator"})
 
@@ -188,6 +204,33 @@ func TestRegistry_WithPolicy(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("Execute(calculator) should be blocked by policy")
+	}
+}
+
+func TestRegistry_Execute_ErrorResultIncludesMetrics(t *testing.T) {
+	registry := NewRegistry()
+	errTool := NewFuncTool("fail", "always fails", map[string]any{"type": "object"}, func(ctx context.Context, input map[string]any) (any, error) {
+		return nil, fmt.Errorf("boom")
+	})
+	if err := registry.Register(errTool); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+
+	result, err := registry.Execute(context.Background(), "fail", map[string]any{})
+	if err == nil {
+		t.Fatal("Execute() should return tool error")
+	}
+	if result == nil || !result.IsError {
+		t.Fatal("Execute() should return an error result")
+	}
+	if result.Error == nil || result.Error.Error() != "boom" {
+		t.Fatalf("result.Error = %v, want boom", result.Error)
+	}
+	if result.Metrics.Timestamp.IsZero() {
+		t.Fatal("Metrics.Timestamp should be set")
+	}
+	if result.Metrics.Duration < 0 || result.Metrics.Duration > time.Second {
+		t.Fatalf("Metrics.Duration = %v, want bounded non-negative duration", result.Metrics.Duration)
 	}
 }
 

@@ -1,4 +1,4 @@
-# Card 0802
+# Card 0792
 
 Priority: P1
 State: active
@@ -10,7 +10,7 @@ Owned Files:
 - `x/ai/tool/example_test.go`
 - `docs/modules/x-ai/README.md`
 Depends On:
-- `0801-x-ai-stability-tier-doc-sync.md`
+- `0791-x-ai-stability-tier-doc-sync.md`
 
 Goal:
 - Add runnable offline examples for the stable-tier `x/ai` packages without requiring live network calls.
@@ -45,3 +45,10 @@ Done Definition:
 - The primer points readers at the example-backed stable-tier entrypoints instead of abstract promises.
 
 Outcome:
+- Added runnable offline examples for `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, and `x/ai/tool` using stable-tier public APIs only.
+- The examples rely on in-memory helpers and mock-backed providers, so they execute under `go test` without network calls or bootstrap wiring.
+- `docs/modules/x-ai/README.md` now points readers at the new example entrypoints instead of only describing them abstractly.
+
+Validation Run:
+- `go test -timeout 20s ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `go test -race -timeout 60s ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`

@@ -318,6 +318,51 @@ func TestInMemoryQuotaManager_RetryAfter(t *testing.T) {
 	}
 }
 
+func TestInMemoryQuotaManager_DeniedResultReportsCurrentRemainingBudget(t *testing.T) {
+	mgr := NewInMemoryConfigManager()
+	mgr.SetTenantConfig(Config{
+		TenantID: "budget-test",
+		Quota: QuotaConfig{
+			RequestsPerMinute: 5,
+			TokensPerMinute:   10,
+		},
+	})
+
+	quotaMgr := NewInMemoryQuotaManager(mgr)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	first, err := quotaMgr.Allow(ctx, "budget-test", QuotaRequest{
+		Requests: 1,
+		Tokens:   8,
+		Now:      now,
+	})
+	if err != nil || !first.Allowed {
+		t.Fatalf("first Allow() = (%+v, %v), want allowed", first, err)
+	}
+
+	denied, err := quotaMgr.Allow(ctx, "budget-test", QuotaRequest{
+		Requests: 1,
+		Tokens:   3,
+		Now:      now,
+	})
+	if err != ErrQuotaExceeded {
+		t.Fatalf("expected ErrQuotaExceeded, got %v", err)
+	}
+	if denied.Allowed {
+		t.Fatal("denied result should not be allowed")
+	}
+	if denied.RemainingRequests != 4 {
+		t.Fatalf("RemainingRequests = %d, want 4", denied.RemainingRequests)
+	}
+	if denied.RemainingTokens != 2 {
+		t.Fatalf("RemainingTokens = %d, want 2", denied.RemainingTokens)
+	}
+	if denied.RetryAfter <= 0 {
+		t.Fatalf("RetryAfter = %v, want positive duration", denied.RetryAfter)
+	}
+}
+
 func TestInMemoryQuotaManager_Concurrent(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{

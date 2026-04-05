@@ -54,13 +54,15 @@ change_risks:
   - isolation regression
   - deny-path regression
   - middleware ordering regression
+  - quota feedback regression
 
 review_checklist:
   - Fail closed on tenant policy errors
   - Keep tenant-aware logic out of stable store
   - Keep tenant middleware transport-only
+  - Keep Retry-After and remaining-budget headers aligned with quota and rate-limit decisions
 
 agent_hints:
-  - Prefer subpackage-local middleware
+  - Prefer subpackage-local middleware and example-backed resolve/transport flows over new tenant bootstrap shapes
   - Do not require core to know tenant internals
   - Reference apps should not depend on this by default

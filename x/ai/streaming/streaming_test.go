@@ -109,6 +109,28 @@ func TestStreamManager(t *testing.T) {
 		}
 	})
 
+	t.Run("SendUpdateClosedStream", func(t *testing.T) {
+		sm := NewStreamManager()
+
+		w := httptest.NewRecorder()
+		stream, _ := sse.NewStream(context.Background(), w)
+		sm.Register("workflow-1", stream)
+
+		if err := stream.Close(); err != nil {
+			t.Fatalf("Close() error = %v", err)
+		}
+
+		err := sm.SendUpdate("workflow-1", &ProgressUpdate{
+			WorkflowID: "workflow-1",
+			StepName:   "closed",
+			Status:     StatusStarted,
+			Timestamp:  time.Now(),
+		})
+		if err == nil {
+			t.Fatal("SendUpdate() should fail for a closed stream")
+		}
+	})
+
 	t.Run("Close", func(t *testing.T) {
 		sm := NewStreamManager()
 
