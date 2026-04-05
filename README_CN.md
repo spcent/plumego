@@ -22,6 +22,8 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - `specs/`：机器可读规则、ownership、依赖策略与 change recipe
 - `tasks/`：可执行工作卡与 agent 面向的任务队列
 
+不要把 `specs/` 挪进 `docs/`。在 Plumego 中，`specs/` 是一等仓库控制面，而不是附属说明文档。
+
 后续架构规划与重构请优先参考：
 
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
@@ -35,7 +37,9 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - `specs/change-recipes/*`
 - `<模块>/module.yaml`
 
-未来阶段性规划见 `docs/ROADMAP.md`。
+当前优先级与剩余扩展工作见 `docs/ROADMAP.md`。
+
+机器强制执行的仓库护栏位于 `internal/checks/*`，并直接在 CI 中执行。
 
 新的应用结构工作应遵循唯一 canonical 路径：
 
@@ -80,6 +84,7 @@ import (
     "log"
     "net/http"
 
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
     plog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/requestid"
@@ -92,14 +97,19 @@ func main() {
         core.WithLogger(plog.NewGLogger()),
     )
 
-    app.Use(
+    if err := app.Use(
         requestid.Middleware(),
         recovery.Recovery(app.Logger()),
-    )
+    ); err != nil {
+        log.Fatalf("register middleware: %v", err)
+    }
 
     app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-        w.WriteHeader(http.StatusOK)
-        _, _ = w.Write([]byte("pong"))
+        if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+            "message": "pong",
+        }, nil); err != nil {
+            http.Error(w, "write response", http.StatusInternalServerError)
+        }
     })
 
     log.Println("server started at :8080")
@@ -123,10 +133,11 @@ func main() {
 - 标准变更 recipe 位于 `specs/change-recipes/*`。
 - 模块 primer 文档位于 `docs/modules/*`，并应与各模块 manifest 的 `doc_paths` 保持一致。
 - 次级任务族入口也已固定：前端静态资源从 `x/frontend` 开始，本地调试能力从 `x/devtools` 开始，服务发现从 `x/discovery` 开始，受保护管理端点从 `x/ops` 开始。
+- 这些次级扩展根是能力入口，不是应用 bootstrap surface。
 
 ## 能力导览
 
-根 README 只保留入口信息。具体能力说明统一放在 `docs/modules/*`。
+根 README 作为入口页使用。具体能力说明统一放在 `docs/modules/*`。
 
 稳定根级模块：
 

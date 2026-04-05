@@ -25,7 +25,7 @@ Tests:
 - `go run ./internal/checks/agent-workflow`
 
 Docs Sync:
-- Keep the new check aligned with the stable-root boundary rules in `AGENTS.md`, `docs/CANONICAL_STYLE_GUIDE.md`, and `docs/ROADMAP_AGENT_NATIVE.md`.
+- Keep the new check aligned with the stable-root boundary rules in `AGENTS.md`, `docs/CANONICAL_STYLE_GUIDE.md`, and `docs/ROADMAP.md`.
 
 Done Definition:
 - Stable-root packages fail checks when they expose clearly app-facing HTTP handlers or route registration helpers.

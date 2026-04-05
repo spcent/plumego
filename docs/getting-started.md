@@ -27,6 +27,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	plog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/recovery"
@@ -47,8 +48,11 @@ func main() {
 	}
 
 	app.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("hello"))
+		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+			"message": "hello",
+		}, nil); err != nil {
+			http.Error(w, "write response", http.StatusInternalServerError)
+		}
 	})
 
 	log.Println("server started at :8080")
@@ -104,4 +108,5 @@ Read these next, in order:
 - `reference/standard-service` is the canonical application layout.
 - `x/*` packages are optional capability families, not the default bootstrap path.
 - Prefer explicit route wiring and explicit middleware registration.
-- Prefer `contract.WriteError` and `contract.WriteResponse` when building JSON APIs.
+- Prefer `contract.WriteError` and `contract.WriteResponse` for JSON APIs.
+- When the example stops being enough, copy structure from `reference/standard-service` instead of inventing a new bootstrap shape.

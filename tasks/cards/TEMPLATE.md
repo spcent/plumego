@@ -1,4 +1,4 @@
-# Card C-XXX
+# Card C-XXXX
 
 Milestone:
 Priority:

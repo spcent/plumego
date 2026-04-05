@@ -14,11 +14,11 @@ Non-goals:
 - Do not add new transport adapters.
 
 Files:
-- `specs/extension-entrypoints.yaml`
+- `specs/extension-taxonomy.yaml`
 - `x/gateway/module.yaml`
 - `x/rest/module.yaml`
 - `docs/modules/x-gateway/README.md`
-- `x/rest/README.md`
+- `docs/modules/x-rest/README.md`
 
 Tests:
 - `go run ./internal/checks/module-manifests`

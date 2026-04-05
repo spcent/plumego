@@ -15,7 +15,7 @@ Non-goals:
 - Do not redesign queue or broker internals.
 
 Files:
-- `specs/extension-entrypoints.yaml`
+- `specs/extension-taxonomy.yaml`
 - `x/messaging/module.yaml`
 - `x/mq/module.yaml`
 - `x/pubsub/module.yaml`

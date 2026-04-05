@@ -15,7 +15,7 @@ Scope:
   - Extension package evolution rules (Experimental; no freeze).
   - What is not considered a breaking change.
   - Governance (owner approval requirements by risk level).
-  - Cross-links to `specs/ownership.yaml`, `docs/ROADMAP.md`, `AGENTS.md`.
+  - Cross-links to `<module>/module.yaml`, `docs/ROADMAP.md`, `AGENTS.md`.
 
 Non-goals:
 - Do not deprecate any existing symbol in this card.

@@ -14,7 +14,7 @@ Non-goals:
 - Do not add new admin endpoints.
 
 Files:
-- `specs/extension-entrypoints.yaml`
+- `specs/extension-taxonomy.yaml`
 - `x/ops/module.yaml`
 - `x/observability/module.yaml`
 - `docs/modules/x-ops/README.md`

@@ -1,16 +1,18 @@
 name: Milestone Quality Gates
 
-# SETUP: .github/ is in .gitignore for this repo.
+# Example milestone-only workflow.
+# Plumego itself already ships `.github/workflows/quality-gates.yml` as the live CI workflow.
+# Copy this file only if you want an additional milestone/*-focused workflow in this repo
+# or in a downstream repository.
+#
 # To activate this workflow, run once:
 #   mkdir -p .github/workflows
 #   cp docs/github-workflows/milestone-gates.yml .github/workflows/
 #   git add -f .github/workflows/milestone-gates.yml
 #   git commit -m "ci: add milestone quality gates workflow"
 #
-# Or remove .github/ from .gitignore and re-add the file normally.
-#
 # Runs automatically on milestone branches and on PRs targeting main from
-# milestone/* branches. This is the only CI gate before human review.
+# milestone/* branches.
 
 on:
   push:

@@ -16,8 +16,8 @@ Non-goals:
 
 Files:
 - `specs/repo.yaml`
-- `specs/extension-entrypoints.yaml`
-- `specs/agent-entrypoints.yaml`
+- `specs/extension-taxonomy.yaml`
+- `specs/task-routing.yaml`
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `docs/modules/x-fileapi/README.md`
 

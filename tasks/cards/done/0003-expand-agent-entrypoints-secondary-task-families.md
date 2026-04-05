@@ -3,7 +3,7 @@
 Priority: P1
 
 Goal:
-- Expand `specs/agent-entrypoints.yaml` to cover remaining common task families at finer granularity.
+- Expand `specs/task-routing.yaml` to cover remaining common task families at finer granularity.
 
 Scope:
 - frontend
@@ -16,7 +16,7 @@ Non-goals:
 - Do not redefine already-stable entrypoints for `security`, `store`, `tenant`, or `websocket`.
 
 Files:
-- `specs/agent-entrypoints.yaml`
+- `specs/task-routing.yaml`
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `README.md`
 - `README_CN.md`

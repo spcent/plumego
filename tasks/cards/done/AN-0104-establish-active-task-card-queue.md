@@ -17,7 +17,7 @@ Non-goals:
 Files:
 - `tasks/cards/README.md`
 - `tasks/cards/active/README.md`
-- `docs/ROADMAP_AGENT_NATIVE.md`
+- `docs/ROADMAP.md`
 
 Tests:
 - `go run ./internal/checks/agent-workflow`
@@ -33,7 +33,7 @@ Done Definition:
 Outcome:
 - `tasks/cards/README.md` now defines the lifecycle vocabulary for `active`, `blocked`, `done`, and `superseded`.
 - `tasks/cards/active/README.md` now defines how the live queue should be maintained while only `active/` and `done/` exist physically.
-- `docs/ROADMAP_AGENT_NATIVE.md` now marks Phase 4 as in progress and records what has already been established versus what remains.
+- The roadmap documentation now records the active queue as a real execution surface rather than an aspirational one.
 
 Validation Run:
 - `go run ./internal/checks/agent-workflow`

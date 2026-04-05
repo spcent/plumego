@@ -15,16 +15,16 @@ Non-goals:
 - Do not replace module manifests with package-level metadata.
 
 Files:
-- `specs/package-index.yaml`
-- `specs/agent-entrypoints.yaml`
-- `docs/PRODUCT_PRD_AGENT_NATIVE.md`
-- `docs/ROADMAP_AGENT_NATIVE.md`
+- `specs/package-hotspots.yaml`
+- `specs/task-routing.yaml`
+- `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+- `docs/ROADMAP.md`
 
 Tests:
 - `go run ./internal/checks/agent-workflow`
 
 Docs Sync:
-- Keep package-level control plane intent aligned between the PRD, roadmap, and specs.
+- Keep package-level control plane intent aligned between the blueprint, roadmap, and specs.
 
 Done Definition:
 - Plumego has a defined package-level metadata contract for hotspot packages.
@@ -32,7 +32,7 @@ Done Definition:
 - The first hotspot package list is explicit and bounded.
 
 Outcome:
-- Added `specs/package-index.yaml` as the first machine-readable hotspot package discovery surface.
+- Added `specs/package-hotspots.yaml` as the machine-readable hotspot package discovery surface.
 - Registered the first bounded hotspot package set:
   - `x/fileapi`
   - `x/data/file`
@@ -43,8 +43,8 @@ Outcome:
   - `middleware/httpmetrics`
   - `middleware/requestid`
   - `contract`
-- Updated `specs/agent-entrypoints.yaml` so module-level task entrypoints explicitly point to `specs/package-index.yaml` when package choice needs refinement.
-- Updated the PRD and agent-native roadmap to treat the package index as the package-level control-plane surface.
+- Updated `specs/task-routing.yaml` so task entrypoints explicitly point to `specs/package-hotspots.yaml` when package choice needs refinement.
+- Updated the architecture and roadmap docs to treat package hotspots as the package-level control-plane surface.
 
 Validation Run:
 - `go run ./internal/checks/agent-workflow`

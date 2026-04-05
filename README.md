@@ -37,7 +37,7 @@ For architecture planning and future refactors, prefer the rules in:
 - `specs/change-recipes/*`
 - `<module>/module.yaml`
 
-For the staged future plan, see `docs/ROADMAP.md`.
+For current priorities and remaining extension work, see `docs/ROADMAP.md`.
 
 Machine-enforced repo guardrails live under `internal/checks/*` and are enforced directly in CI.
 
@@ -84,6 +84,7 @@ import (
     "log"
     "net/http"
 
+    "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
     plog "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/middleware/requestid"
@@ -96,14 +97,19 @@ func main() {
         core.WithLogger(plog.NewGLogger()),
     )
 
-    app.Use(
+    if err := app.Use(
         requestid.Middleware(),
         recovery.Recovery(app.Logger()),
-    )
+    ); err != nil {
+        log.Fatalf("register middleware: %v", err)
+    }
 
     app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-        w.WriteHeader(http.StatusOK)
-        _, _ = w.Write([]byte("pong"))
+        if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+            "message": "pong",
+        }, nil); err != nil {
+            http.Error(w, "write response", http.StatusInternalServerError)
+        }
     })
 
     log.Println("server started at :8080")

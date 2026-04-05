@@ -3,6 +3,9 @@
 Companion lightweight pipeline spec:
 [`docs/MILESTONE_PIPELINE.md`](./MILESTONE_PIPELINE.md)
 
+Live repository CI runs through `.github/workflows/quality-gates.yml`.
+`docs/github-workflows/milestone-gates.yml` is an example milestone-only workflow asset, not the repository's primary CI definition.
+
 ## The Model
 
 ```
@@ -35,7 +38,8 @@ Companion lightweight pipeline spec:
                          │  PR opened
                          ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  CI (docs/github-workflows/milestone-gates.yml)             │
+│  CI (.github/workflows/quality-gates.yml or copied         │
+│      docs/github-workflows/milestone-gates.yml)            │
 │  Reruns all gates, posts result table to PR comment         │
 └────────────────────────┬─────────────────────────────────────┘
                          │  CI green
@@ -267,7 +271,8 @@ If two milestones accidentally touch the same file, run them sequentially.
 | `tasks/milestones/ROADMAP.md` | Pipeline view, dependency DAG |
 | `tasks/cards/TEMPLATE.md` | Worker card template |
 | `docs/github-workflows/milestone-pr-template.md` | PR body template (Codex fills) |
-| `docs/github-workflows/milestone-gates.yml` | CI workflow (copy to `.github/workflows/`) |
+| `docs/github-workflows/milestone-gates.yml` | Optional milestone-only workflow example |
+| `.github/workflows/quality-gates.yml` | Live repository CI workflow |
 | `scripts/check-spec` | Spec validator |
 | `scripts/pre-push` | Local pre-push gate hook |
 | `AGENTS.md §11` | Milestone execution protocol |

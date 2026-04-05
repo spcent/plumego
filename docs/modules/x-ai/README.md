@@ -19,8 +19,41 @@
 - stable root abstractions
 - generic HTTP bootstrap
 
+## Stability tiers
+
+The family is still experimental overall, but `x/ai/module.yaml` already
+declares subpackage-level tiers:
+
+- stable-tier subpackages: `provider`, `session`, `streaming`, `tool`
+- experimental subpackages: `orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience`
+
+Treat the manifest as the canonical source when these tiers change.
+
+## Common entrypoints
+
+- `x/ai/provider` — provider abstraction and provider adapters
+- `x/ai/session` — AI session lifecycle and state handling
+- `x/ai/streaming` — streaming primitives and stream coordination
+- `x/ai/tool` — tool registration and execution policy
+- `x/ai/orchestration` — multi-step agent workflow composition
+- `x/ai/semanticcache` — embedding/vector-backed semantic cache flows
+
 ## First files to read
 
 - `x/ai/module.yaml`
 - the owning subpackage under `x/ai/*`
 - `specs/repo.yaml`
+
+## Boundary rules
+
+- keep AI wiring explicit in handlers or owning extensions
+- do not add hidden provider globals or registration side effects
+- keep transport-only concerns out of `x/ai`
+- do not require stable roots to know AI internals
+
+## Validation focus
+
+- `go test -race -timeout 60s ./x/ai/...`
+- `go test -timeout 20s ./x/ai/...`
+- `go vet ./x/ai/...`
+- when stable-tier APIs change, add coverage at the provider, session, streaming, or tool boundary instead of documenting speculative guarantees

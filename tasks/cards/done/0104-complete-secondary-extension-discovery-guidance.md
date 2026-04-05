@@ -14,7 +14,7 @@ Non-goals:
 - Do not change quality gates.
 
 Files:
-- `specs/agent-entrypoints.yaml`
+- `specs/task-routing.yaml`
 - `docs/modules/x-frontend/README.md`
 - `docs/modules/x-devtools/README.md`
 - `docs/modules/x-discovery/README.md`
