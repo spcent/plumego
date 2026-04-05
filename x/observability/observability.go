@@ -7,7 +7,6 @@ import (
 
 	"github.com/spcent/plumego/metrics"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
-	"github.com/spcent/plumego/router"
 )
 
 // MetricsConfig configures the built-in metrics endpoint and collector wiring.
@@ -85,10 +84,9 @@ func Configure(hooks Hooks, cfg ObservabilityConfig) error {
 }
 
 func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
-	if hooks.EnsureRouter == nil {
-		return fmt.Errorf("observability hooks missing EnsureRouter")
+	if hooks.RegisterRoute == nil {
+		return fmt.Errorf("observability hooks missing RegisterRoute")
 	}
-	router := hooks.EnsureRouter()
 
 	path := normalizeObservabilityPath(cfg.Path)
 	if path == "" {
@@ -120,7 +118,7 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 		handler = exporter.Handler()
 	}
 
-	if err := router.AddRoute(http.MethodGet, path, handler); err != nil {
+	if err := hooks.RegisterRoute(http.MethodGet, path, handler); err != nil {
 		return err
 	}
 
@@ -164,7 +162,7 @@ func normalizeObservabilityPath(path string) string {
 // Hooks provide access to the app wiring points needed by Configure.
 type Hooks struct {
 	EnsureMutable          func(op, desc string) error
-	EnsureRouter           func() *router.Router
+	RegisterRoute          func(method, path string, handler http.Handler) error
 	GetPrometheusCollector func() *metrics.PrometheusCollector
 	SetPrometheusCollector func(*metrics.PrometheusCollector)
 	AttachHTTPObserver     func(metrics.HTTPObserver)

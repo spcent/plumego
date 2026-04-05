@@ -16,7 +16,14 @@ import (
 // Config holds all application configuration.
 type Config struct {
 	Core     core.AppConfig
+	App      AppConfig
 	WSSecret string // JWT secret for WebSocket auth (min 32 bytes, set via WS_SECRET)
+}
+
+// AppConfig holds app-local, non-kernel configuration.
+type AppConfig struct {
+	EnvFile string
+	Debug   bool
 }
 
 // Defaults returns safe configuration values for local development.
@@ -24,7 +31,10 @@ func Defaults() Config {
 	coreCfg := core.DefaultConfig()
 	coreCfg.Addr = ":8084"
 	return Config{
-		Core:     coreCfg,
+		Core: coreCfg,
+		App: AppConfig{
+			EnvFile: ".env",
+		},
 		WSSecret: os.Getenv("WS_SECRET"),
 	}
 }
@@ -33,8 +43,8 @@ func Defaults() Config {
 func Load() (Config, error) {
 	cfg := Defaults()
 
-	cfg.Core.EnvFile = resolveEnvFile(os.Args, cfg.Core.EnvFile)
-	if err := loadEnvFile(cfg.Core.EnvFile); err != nil {
+	cfg.App.EnvFile = resolveEnvFile(os.Args, cfg.App.EnvFile)
+	if err := loadEnvFile(cfg.App.EnvFile); err != nil {
 		return cfg, err
 	}
 
@@ -66,16 +76,16 @@ func applyEnv(cfg *Config) error {
 		return err
 	}
 	cfg.Core.Addr = manager.GetString("app_addr", cfg.Core.Addr)
-	cfg.Core.EnvFile = manager.GetString("app_env_file", cfg.Core.EnvFile)
-	cfg.Core.Debug = manager.GetBool("app_debug", cfg.Core.Debug)
+	cfg.App.EnvFile = manager.GetString("app_env_file", cfg.App.EnvFile)
+	cfg.App.Debug = manager.GetBool("app_debug", cfg.App.Debug)
 	cfg.WSSecret = manager.GetString("ws_secret", cfg.WSSecret)
 	return nil
 }
 
 func applyFlags(cfg *Config) {
 	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
-	flag.StringVar(&cfg.Core.EnvFile, "env-file", cfg.Core.EnvFile, "path to .env file")
-	flag.BoolVar(&cfg.Core.Debug, "debug", cfg.Core.Debug, "enable debug mode")
+	flag.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
+	flag.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "enable debug mode")
 	flag.Parse()
 }
 

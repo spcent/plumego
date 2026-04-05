@@ -3,6 +3,7 @@ package devtools
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -48,7 +49,7 @@ type DevTools struct {
 }
 
 type Hooks struct {
-	Snapshot         func() core.RuntimeSnapshot
+	RuntimeSnapshot  func() core.RuntimeSnapshot
 	MiddlewareList   func() []string
 	AttachDevMetrics func(*metrics.DevCollector)
 }
@@ -58,6 +59,20 @@ type Options struct {
 	Logger  log.StructuredLogger
 	EnvFile string
 	Hooks   Hooks
+}
+
+// ConfigSnapshot exposes the devtools-owned config/runtime payload returned by
+// the debug config endpoint.
+type ConfigSnapshot struct {
+	Debug   bool   `json:"debug"`
+	EnvFile string `json:"env_file"`
+	core.RuntimeSnapshot
+}
+
+type routeRegistrar interface {
+	AddRoute(method, path string, handler http.Handler) error
+	Routes() []router.RouteInfo
+	Print(io.Writer)
 }
 
 func New(opts Options) *DevTools {
@@ -73,55 +88,69 @@ func New(opts Options) *DevTools {
 	}
 }
 
-func (c *DevTools) RegisterRoutes(r *router.Router) {
+func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 	if !c.debug {
-		return
+		return nil
 	}
 
 	// Legacy aliases for CLI compatibility.
-	r.Get("/_routes", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodGet, "/_routes", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"routes": r.Routes(),
 		}
 		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
-	}))
+	})); err != nil {
+		return err
+	}
 
-	r.Get("/_config", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodGet, "/_config", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_ = contract.WriteResponse(w, req, http.StatusOK, c.snapshotMap(), nil)
-	}))
+	})); err != nil {
+		return err
+	}
 
-	r.Get("/_info", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodGet, "/_info", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"config": c.snapshotMap(),
 			"build":  health.GetBuildInfo(),
 		}
 		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
-	}))
+	})); err != nil {
+		return err
+	}
 
-	r.Get(DevToolsRoutesPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	if err := r.AddRoute(http.MethodGet, DevToolsRoutesPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		r.Print(w)
-	}))
+	})); err != nil {
+		return err
+	}
 
-	r.Get(DevToolsRoutesJSONPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodGet, DevToolsRoutesJSONPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"routes": r.Routes(),
 		}
 		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
-	}))
+	})); err != nil {
+		return err
+	}
 
-	r.Get(DevToolsMiddlewarePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodGet, DevToolsMiddlewarePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"middlewares": c.middlewareList(),
 		}
 		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
-	}))
+	})); err != nil {
+		return err
+	}
 
-	r.Get(DevToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodGet, DevToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_ = contract.WriteResponse(w, req, http.StatusOK, c.snapshotMap(), nil)
-	}))
+	})); err != nil {
+		return err
+	}
 
-	r.Get(DevToolsMetricsPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodGet, DevToolsMetricsPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if c.devMetrics == nil {
 			_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
 				"enabled": false,
@@ -134,31 +163,49 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 			"http":    c.devMetrics.Snapshot(),
 			"db":      c.devMetrics.DBSnapshot(),
 		}, nil)
-	}))
+	})); err != nil {
+		return err
+	}
 
-	r.Post(DevToolsMetricsClear, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodPost, DevToolsMetricsClear, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if c.devMetrics != nil {
 			c.devMetrics.Clear()
 		}
 		_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
 			"status": "ok",
 		}, nil)
-	}))
+	})); err != nil {
+		return err
+	}
 
 	// pprof endpoints (debug-only)
-	r.Get(DevToolsPprofBasePath, http.HandlerFunc(pprof.Index))
-	r.Get(DevToolsPprofCmdline, http.HandlerFunc(pprof.Cmdline))
-	r.Get(DevToolsPprofProfile, http.HandlerFunc(pprof.Profile))
-	r.Get(DevToolsPprofSymbol, http.HandlerFunc(pprof.Symbol))
-	r.Post(DevToolsPprofSymbol, http.HandlerFunc(pprof.Symbol))
-	r.Get(DevToolsPprofTrace, http.HandlerFunc(pprof.Trace))
+	if err := r.AddRoute(http.MethodGet, DevToolsPprofBasePath, http.HandlerFunc(pprof.Index)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodGet, DevToolsPprofCmdline, http.HandlerFunc(pprof.Cmdline)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodGet, DevToolsPprofProfile, http.HandlerFunc(pprof.Profile)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodGet, DevToolsPprofSymbol, http.HandlerFunc(pprof.Symbol)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodPost, DevToolsPprofSymbol, http.HandlerFunc(pprof.Symbol)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodGet, DevToolsPprofTrace, http.HandlerFunc(pprof.Trace)); err != nil {
+		return err
+	}
 
 	for _, name := range []string{"allocs", "block", "goroutine", "heap", "mutex", "threadcreate"} {
 		path := DevToolsPprofBasePath + "/" + name
-		r.Get(path, pprof.Handler(name))
+		if err := r.AddRoute(http.MethodGet, path, pprof.Handler(name)); err != nil {
+			return err
+		}
 	}
 
-	r.Post(DevToolsReloadPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := r.AddRoute(http.MethodPost, DevToolsReloadPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if err := c.reloadEnv(req.Context()); err != nil {
 			contract.WriteError(w, req, contract.NewErrorBuilder().
 				Status(http.StatusBadRequest).
@@ -172,7 +219,10 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 		_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
 			"status": "ok",
 		}, nil)
-	}))
+	})); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *DevTools) AttachMetrics() {
@@ -276,14 +326,15 @@ func (c *DevTools) middlewareList() []string {
 	return c.hooks.MiddlewareList()
 }
 
-func (c *DevTools) snapshot() core.RuntimeSnapshot {
-	if c.hooks.Snapshot != nil {
-		return c.hooks.Snapshot()
-	}
-	return core.RuntimeSnapshot{
+func (c *DevTools) snapshot() ConfigSnapshot {
+	snapshot := ConfigSnapshot{
 		Debug:   c.debug,
 		EnvFile: c.envFile,
 	}
+	if c.hooks.RuntimeSnapshot != nil {
+		snapshot.RuntimeSnapshot = c.hooks.RuntimeSnapshot()
+	}
+	return snapshot
 }
 
 func (c *DevTools) snapshotMap() map[string]any {
@@ -292,7 +343,6 @@ func (c *DevTools) snapshotMap() map[string]any {
 		"addr":                snapshot.Addr,
 		"debug":               snapshot.Debug,
 		"env_file":            snapshot.EnvFile,
-		"shutdown_timeout":    snapshot.ShutdownTimeout,
 		"read_timeout":        snapshot.ReadTimeout,
 		"read_header_timeout": snapshot.ReadHeaderTimeout,
 		"write_timeout":       snapshot.WriteTimeout,

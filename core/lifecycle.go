@@ -107,36 +107,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 	return shutdownErr
 }
 
-func (a *App) setupServer() error {
-	return a.ensurePrepared()
-}
-
-type serverRuntimeConfig struct {
-	addr              string
-	readTimeout       time.Duration
-	readHeaderTimeout time.Duration
-	writeTimeout      time.Duration
-	idleTimeout       time.Duration
-	maxHeaderBytes    int
-	drainInterval     time.Duration
-	enableHTTP2       bool
-	tls               TLSConfig
-}
-
-func (a *App) serverRuntimeConfigLocked() serverRuntimeConfig {
-	return serverRuntimeConfig{
-		addr:              a.config.Addr,
-		readTimeout:       a.config.ReadTimeout,
-		readHeaderTimeout: a.config.ReadHeaderTimeout,
-		writeTimeout:      a.config.WriteTimeout,
-		idleTimeout:       a.config.IdleTimeout,
-		maxHeaderBytes:    a.config.MaxHeaderBytes,
-		drainInterval:     a.config.DrainInterval,
-		enableHTTP2:       a.config.EnableHTTP2,
-		tls:               a.config.TLS,
-	}
-}
-
 func (a *App) stopLoggerLifecycle(ctx context.Context) {
 	a.mu.RLock()
 	started := a.loggerStarted

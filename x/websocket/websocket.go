@@ -14,8 +14,11 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/router"
 )
+
+type routeRegistrar interface {
+	AddRoute(method, path string, handler http.Handler) error
+}
 
 // WebSocketConfig defines the configuration for WebSocket.
 type WebSocketConfig struct {
@@ -90,17 +93,21 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 	}, nil
 }
 
-func (c *Server) RegisterRoutes(r *router.Router) {
+func (c *Server) RegisterRoutes(r routeRegistrar) error {
+	var regErr error
 	c.routesOnce.Do(func() {
 		wsAuth := NewSimpleRoomAuth(c.config.Secret)
 
-		r.Get(c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		regErr = r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ServeWSWithAuth(w, r, c.hub, wsAuth, c.config.SendQueueSize,
 				c.config.SendTimeout, c.config.SendBehavior)
 		}))
+		if regErr != nil {
+			return
+		}
 
 		if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
-			r.Post(c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			regErr = r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
 					_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code("method_not_allowed").Message("POST only").Category(contract.CategoryClient).Build())
 					return
@@ -143,6 +150,7 @@ func (c *Server) RegisterRoutes(r *router.Router) {
 			}))
 		}
 	})
+	return regErr
 }
 
 func (c *Server) Shutdown(ctx context.Context) error {

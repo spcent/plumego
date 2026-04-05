@@ -22,7 +22,9 @@ func (a *App) RegisterRoutes() error {
 	}
 
 	// Register WebSocket upgrade and broadcast routes via the ws.Server helper.
-	a.WS.RegisterRoutes(a.Core.Router())
+	if err := a.WS.RegisterRoutes(a.Core); err != nil {
+		return err
+	}
 
 	return nil
 }

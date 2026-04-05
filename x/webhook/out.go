@@ -13,7 +13,6 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/internal/stringsx"
-	"github.com/spcent/plumego/router"
 )
 
 type Outbound struct {
@@ -25,11 +24,12 @@ func NewOutbound(cfg WebhookOutConfig) *Outbound {
 	return &Outbound{cfg: cfg}
 }
 
-func (c *Outbound) RegisterRoutes(r *router.Router) {
+func (c *Outbound) RegisterRoutes(r routeRegistrar) error {
 	if !c.cfg.Enabled || c.cfg.Service == nil {
-		return
+		return nil
 	}
 
+	var regErr error
 	c.routesOnce.Do(func() {
 		base := strings.TrimSpace(c.cfg.BasePath)
 		if base == "" {
@@ -38,21 +38,41 @@ func (c *Outbound) RegisterRoutes(r *router.Router) {
 
 		svc := c.cfg.Service
 
-		r.Post(base+"/targets", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookCreateTarget(ctx, svc) }))
-		r.Get(base+"/targets", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookListTargets(ctx, svc) }))
-		r.Get(base+"/targets/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookGetTarget(ctx, svc) }))
-		r.Patch(base+"/targets/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookPatchTarget(ctx, svc) }))
-		r.Post(base+"/targets/:id/enable", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, true) }))
-		r.Post(base+"/targets/:id/disable", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, false) }))
+		if regErr = r.AddRoute(http.MethodPost, base+"/targets", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookCreateTarget(ctx, svc) })); regErr != nil {
+			return
+		}
+		if regErr = r.AddRoute(http.MethodGet, base+"/targets", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookListTargets(ctx, svc) })); regErr != nil {
+			return
+		}
+		if regErr = r.AddRoute(http.MethodGet, base+"/targets/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookGetTarget(ctx, svc) })); regErr != nil {
+			return
+		}
+		if regErr = r.AddRoute(http.MethodPatch, base+"/targets/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookPatchTarget(ctx, svc) })); regErr != nil {
+			return
+		}
+		if regErr = r.AddRoute(http.MethodPost, base+"/targets/:id/enable", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, true) })); regErr != nil {
+			return
+		}
+		if regErr = r.AddRoute(http.MethodPost, base+"/targets/:id/disable", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, false) })); regErr != nil {
+			return
+		}
 
-		r.Post(base+"/events/:event", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
+		if regErr = r.AddRoute(http.MethodPost, base+"/events/:event", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 			webhookTriggerEvent(ctx, svc, c.cfg.TriggerToken, c.cfg.AllowEmptyToken)
-		}))
+		})); regErr != nil {
+			return
+		}
 
-		r.Get(base+"/deliveries", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookListDeliveries(ctx, svc, c.cfg.DefaultPageLimit) }))
-		r.Get(base+"/deliveries/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookGetDelivery(ctx, svc) }))
-		r.Post(base+"/deliveries/:id/replay", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookReplayDelivery(ctx, svc) }))
+		if regErr = r.AddRoute(http.MethodGet, base+"/deliveries", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookListDeliveries(ctx, svc, c.cfg.DefaultPageLimit) })); regErr != nil {
+			return
+		}
+		if regErr = r.AddRoute(http.MethodGet, base+"/deliveries/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookGetDelivery(ctx, svc) })); regErr != nil {
+			return
+		}
+		regErr = r.AddRoute(http.MethodPost, base+"/deliveries/:id/replay", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookReplayDelivery(ctx, svc) }))
 	})
+
+	return regErr
 }
 
 func (c *Outbound) Health() (string, health.HealthStatus) {

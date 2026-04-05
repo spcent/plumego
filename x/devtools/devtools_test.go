@@ -170,17 +170,15 @@ func TestConfigEndpointNoHook(t *testing.T) {
 
 func TestConfigEndpointWithHook(t *testing.T) {
 	c := New(Options{
-		Debug: true,
+		Debug:   true,
+		EnvFile: ".env.test",
 		Hooks: Hooks{
-			Snapshot: func() core.RuntimeSnapshot {
+			RuntimeSnapshot: func() core.RuntimeSnapshot {
 				return core.RuntimeSnapshot{
-					Addr:            ":9090",
-					Debug:           true,
-					EnvFile:         ".env.test",
-					ShutdownTimeout: 7 * time.Second,
-					DrainInterval:   250 * time.Millisecond,
-					Started:         true,
-					ServerPrepared:  true,
+					Addr:           ":9090",
+					DrainInterval:  250 * time.Millisecond,
+					Started:        true,
+					ServerPrepared: true,
 				}
 			},
 		},
@@ -436,13 +434,12 @@ func TestAttachMetricsNoHook(t *testing.T) {
 
 func TestInfoEndpoint(t *testing.T) {
 	c := New(Options{
-		Debug: true,
+		Debug:   true,
+		EnvFile: ".env.test",
 		Hooks: Hooks{
-			Snapshot: func() core.RuntimeSnapshot {
+			RuntimeSnapshot: func() core.RuntimeSnapshot {
 				return core.RuntimeSnapshot{
-					Addr:    ":8088",
-					Debug:   true,
-					EnvFile: ".env.info",
+					Addr: ":8088",
 				}
 			},
 		},
@@ -467,8 +464,8 @@ func TestInfoEndpoint(t *testing.T) {
 	if !ok {
 		t.Fatal("expected config in /_info response")
 	}
-	if config["env_file"] != ".env.info" {
-		t.Fatalf("expected env_file=.env.info, got %v", config["env_file"])
+	if config["env_file"] != ".env.test" {
+		t.Fatalf("expected env_file=.env.test, got %v", config["env_file"])
 	}
 	if _, ok := data["build"]; !ok {
 		t.Fatal("expected build in /_info response")

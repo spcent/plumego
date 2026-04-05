@@ -6,9 +6,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/spcent/plumego/router"
 )
 
 func TestNewDefaults(t *testing.T) {
@@ -17,45 +14,23 @@ func TestNewDefaults(t *testing.T) {
 	if app.config.Addr != ":8080" {
 		t.Fatalf("default addr should be :8080, got %s", app.config.Addr)
 	}
-	if app.config.EnvFile != ".env" {
-		t.Fatalf("default env file should be .env, got %s", app.config.EnvFile)
-	}
-	if app.config.ShutdownTimeout != 5*time.Second {
-		t.Fatalf("default shutdown timeout should be 5s, got %v", app.config.ShutdownTimeout)
-	}
 	if app.config.TLS.Enabled {
 		t.Fatalf("TLS should be disabled by default")
 	}
 }
 
 func TestNewAppliesTypedConfigAndOptions(t *testing.T) {
-	customRouter := router.NewRouter()
 	cfg := DefaultConfig()
 	cfg.Addr = ":9090"
-	cfg.EnvFile = ".custom.env"
-	cfg.ShutdownTimeout = 2 * time.Second
 	cfg.TLS = TLSConfig{Enabled: true, CertFile: "cert", KeyFile: "key"}
-	cfg.Debug = true
 
-	app := New(cfg, WithRouter(customRouter))
+	app := New(cfg)
 
-	if app.router != customRouter {
-		t.Fatalf("custom router should be set")
-	}
 	if app.config.Addr != ":9090" {
 		t.Fatalf("addr should be :9090, got %s", app.config.Addr)
 	}
-	if app.config.EnvFile != ".custom.env" {
-		t.Fatalf("env file should be .custom.env, got %s", app.config.EnvFile)
-	}
-	if app.config.ShutdownTimeout != 2*time.Second {
-		t.Fatalf("shutdown timeout should be 2s, got %v", app.config.ShutdownTimeout)
-	}
 	if !app.config.TLS.Enabled || app.config.TLS.CertFile != "cert" || app.config.TLS.KeyFile != "key" {
 		t.Fatalf("TLS config should be populated when enabled")
-	}
-	if !app.config.Debug {
-		t.Fatalf("debug flag should be true when config enables debug")
 	}
 }
 

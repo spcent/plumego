@@ -39,6 +39,10 @@ type Mount struct {
 	handler http.Handler
 }
 
+type routeRegistrar interface {
+	AddRoute(method, path string, handler http.Handler) error
+}
+
 // WithPrefix sets the mount prefix for the frontend bundle.
 func WithPrefix(prefix string) Option {
 	return func(cfg *config) {
@@ -116,7 +120,7 @@ func WithMIMETypes(mimeTypes map[string]string) Option {
 
 // RegisterFromDir mounts a built frontend directory (e.g. Next.js `out/`)
 // at the given prefix. Returns an error if the directory is missing or unreadable.
-func RegisterFromDir(r *router.Router, dir string, opts ...Option) error {
+func RegisterFromDir(r routeRegistrar, dir string, opts ...Option) error {
 	mount, err := NewMountFromDir(dir, opts...)
 	if err != nil {
 		return err
@@ -141,7 +145,7 @@ func NewMountFromDir(dir string, opts ...Option) (*Mount, error) {
 
 // RegisterFS mounts a frontend bundle served from the provided http.FileSystem.
 // This is suitable for go:embed bundles using http.FS.
-func RegisterFS(r *router.Router, fsys http.FileSystem, opts ...Option) error {
+func RegisterFS(r routeRegistrar, fsys http.FileSystem, opts ...Option) error {
 	mount, err := NewMountFS(fsys, opts...)
 	if err != nil {
 		return err
@@ -194,7 +198,7 @@ func (m *Mount) Handler() http.Handler {
 }
 
 // Register attaches the mount to the provided router.
-func (m *Mount) Register(r *router.Router) error {
+func (m *Mount) Register(r routeRegistrar) error {
 	if m == nil {
 		return errors.New("mount cannot be nil")
 	}

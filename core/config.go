@@ -11,11 +11,8 @@ type TLSConfig struct {
 
 // AppConfig defines application configuration.
 type AppConfig struct {
-	Addr            string        // Server address
-	EnvFile         string        // Path to .env file
-	TLS             TLSConfig     // TLS configuration
-	Debug           bool          // Debug mode
-	ShutdownTimeout time.Duration // Graceful shutdown timeout
+	Addr string    // Server address
+	TLS  TLSConfig // TLS configuration
 	// HTTP server hardening
 	ReadTimeout       time.Duration // Maximum duration for reading the entire request, including the body
 	ReadHeaderTimeout time.Duration // Maximum duration for reading the request headers (slowloris protection)
@@ -30,10 +27,7 @@ type AppConfig struct {
 func DefaultConfig() AppConfig {
 	return AppConfig{
 		Addr:              ":8080",
-		EnvFile:           ".env",
 		TLS:               TLSConfig{Enabled: false},
-		Debug:             false,
-		ShutdownTimeout:   5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -55,9 +49,6 @@ type RuntimeTLSSnapshot struct {
 // by first-party tooling and debug surfaces.
 type RuntimeSnapshot struct {
 	Addr              string             `json:"addr"`
-	Debug             bool               `json:"debug"`
-	EnvFile           string             `json:"env_file"`
-	ShutdownTimeout   time.Duration      `json:"shutdown_timeout"`
 	ReadTimeout       time.Duration      `json:"read_timeout"`
 	ReadHeaderTimeout time.Duration      `json:"read_header_timeout"`
 	WriteTimeout      time.Duration      `json:"write_timeout"`
@@ -69,4 +60,22 @@ type RuntimeSnapshot struct {
 	Started           bool               `json:"started"`
 	ConfigFrozen      bool               `json:"config_frozen"`
 	ServerPrepared    bool               `json:"server_prepared"`
+}
+
+func projectRuntimeSnapshot(cfg AppConfig) RuntimeSnapshot {
+	return RuntimeSnapshot{
+		Addr:              cfg.Addr,
+		ReadTimeout:       cfg.ReadTimeout,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
+		MaxHeaderBytes:    cfg.MaxHeaderBytes,
+		HTTP2Enabled:      cfg.EnableHTTP2,
+		DrainInterval:     cfg.DrainInterval,
+		TLS: RuntimeTLSSnapshot{
+			Enabled:  cfg.TLS.Enabled,
+			CertFile: cfg.TLS.CertFile,
+			KeyFile:  cfg.TLS.KeyFile,
+		},
+	}
 }

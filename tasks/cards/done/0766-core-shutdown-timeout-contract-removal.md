@@ -1,7 +1,7 @@
 # Card 0766
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/config.go`
@@ -70,3 +70,10 @@ Done Definition:
   not enforce.
 
 Outcome:
+- Removed `ShutdownTimeout` from `core.AppConfig` and `core.RuntimeSnapshot`, so
+  caller-provided shutdown contexts are now the only timeout contract exposed by
+  the kernel.
+- Dropped the dead `shutdown_timeout` field from first-party devtools/debug
+  payloads and updated analyzer expectations to match the narrowed snapshot.
+- Removed root README mentions that implied `core` enforced a config-owned
+  shutdown window.

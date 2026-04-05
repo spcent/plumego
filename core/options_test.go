@@ -7,18 +7,7 @@ import (
 
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/router"
 )
-
-func TestWithRouter(t *testing.T) {
-	app := &App{}
-	r := router.NewRouter()
-	opt := WithRouter(r)
-	opt(app)
-	if app.router != r {
-		t.Errorf("expected router to be set")
-	}
-}
 
 func TestWithLogger(t *testing.T) {
 	app := &App{}
@@ -37,22 +26,8 @@ func TestWithLoggerDoesNotMirrorIntoDefaultRouter(t *testing.T) {
 	if app.Logger() != logger {
 		t.Fatal("expected App.Logger to return the configured logger")
 	}
-	if app.Router().Logger() != nil {
+	if app.router.Logger() != nil {
 		t.Fatal("expected default router logger to remain unset")
-	}
-}
-
-func TestWithLoggerDoesNotOverrideCustomRouterLogger(t *testing.T) {
-	appLogger := log.NewGLogger()
-	routerLogger := &log.NoOpLogger{}
-	customRouter := router.NewRouter(router.WithLogger(routerLogger))
-	app := newTestApp(WithRouter(customRouter), WithLogger(appLogger))
-
-	if app.Logger() != appLogger {
-		t.Fatal("expected App.Logger to return the configured app logger")
-	}
-	if app.Router().Logger() != routerLogger {
-		t.Fatal("expected custom router logger to be preserved")
 	}
 }
 
@@ -110,53 +85,24 @@ func TestWithMethodNotAllowed(t *testing.T) {
 	}
 }
 
-func TestWithMethodNotAllowedOrderIndependentWithCustomRouter(t *testing.T) {
-	makeApp := func(opts ...Option) *App {
-		app := newTestApp(opts...)
-		mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
-		return app
+func TestWithMethodNotAllowedConfiguresOwnedRouter(t *testing.T) {
+	app := newTestApp(WithMethodNotAllowed(true))
+	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	if !app.router.MethodNotAllowedEnabled() {
+		t.Fatal("expected owned router to have method-not-allowed enabled")
 	}
 
-	testCases := []struct {
-		name string
-		opts []Option
-	}{
-		{
-			name: "before custom router",
-			opts: []Option{
-				WithMethodNotAllowed(true),
-				WithRouter(router.NewRouter()),
-			},
-		},
-		{
-			name: "after custom router",
-			opts: []Option{
-				WithRouter(router.NewRouter()),
-				WithMethodNotAllowed(true),
-			},
-		},
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/only", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
 	}
-
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			app := makeApp(tt.opts...)
-
-			if !app.Router().MethodNotAllowedEnabled() {
-				t.Fatal("expected custom router to have method-not-allowed enabled")
-			}
-
-			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/only", nil)
-			app.ServeHTTP(rec, req)
-
-			if rec.Code != http.StatusMethodNotAllowed {
-				t.Fatalf("expected 405, got %d", rec.Code)
-			}
-			if rec.Header().Get("Allow") != http.MethodGet {
-				t.Fatalf("expected Allow header to include GET")
-			}
-		})
+	if rec.Header().Get("Allow") != http.MethodGet {
+		t.Fatalf("expected Allow header to include GET")
 	}
 }

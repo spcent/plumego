@@ -10,9 +10,6 @@ import (
 func TestRuntimeSnapshotIncludesStableFields(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":9090"
-	cfg.EnvFile = ".env.test"
-	cfg.Debug = true
-	cfg.ShutdownTimeout = 7 * time.Second
 	cfg.ReadTimeout = 11 * time.Second
 	cfg.ReadHeaderTimeout = 3 * time.Second
 	cfg.WriteTimeout = 13 * time.Second
@@ -34,15 +31,6 @@ func TestRuntimeSnapshotIncludesStableFields(t *testing.T) {
 
 	if snapshot.Addr != ":9090" {
 		t.Fatalf("addr = %q, want %q", snapshot.Addr, ":9090")
-	}
-	if snapshot.EnvFile != ".env.test" {
-		t.Fatalf("env file = %q, want %q", snapshot.EnvFile, ".env.test")
-	}
-	if !snapshot.Debug {
-		t.Fatal("expected debug=true")
-	}
-	if snapshot.ShutdownTimeout != 7*time.Second {
-		t.Fatalf("shutdown timeout = %v, want %v", snapshot.ShutdownTimeout, 7*time.Second)
 	}
 	if snapshot.ReadTimeout != 11*time.Second {
 		t.Fatalf("read timeout = %v, want %v", snapshot.ReadTimeout, 11*time.Second)
@@ -83,11 +71,8 @@ func TestRuntimeSnapshotNilApp(t *testing.T) {
 	var app *App
 	snapshot := app.RuntimeSnapshot()
 
-	if snapshot.Debug {
-		t.Fatal("expected zero snapshot for nil app")
-	}
-	if snapshot.EnvFile != "" {
-		t.Fatalf("env file = %q, want empty", snapshot.EnvFile)
+	if snapshot.Addr != "" {
+		t.Fatalf("addr = %q, want empty", snapshot.Addr)
 	}
 }
 

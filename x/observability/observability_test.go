@@ -11,6 +11,12 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
+func addRouteHook(r *router.Router) func(method, path string, handler http.Handler) error {
+	return func(method, path string, handler http.Handler) error {
+		return r.AddRoute(method, path, handler)
+	}
+}
+
 func TestDefaultMetricsConfig(t *testing.T) {
 	cfg := DefaultMetricsConfig()
 	if cfg.Enabled {
@@ -93,7 +99,7 @@ func TestConfigureBothDisabled(t *testing.T) {
 	}
 }
 
-func TestConfigureMetricsNilEnsureRouter(t *testing.T) {
+func TestConfigureMetricsNilRegisterRoute(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
 	}
@@ -102,9 +108,9 @@ func TestConfigureMetricsNilEnsureRouter(t *testing.T) {
 
 	err := Configure(hooks, cfg)
 	if err == nil {
-		t.Fatal("expected error for nil EnsureRouter")
+		t.Fatal("expected error for nil RegisterRoute")
 	}
-	if err.Error() != "observability hooks missing EnsureRouter" {
+	if err.Error() != "observability hooks missing RegisterRoute" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -116,7 +122,7 @@ func TestConfigureMetricsWithPrometheus(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
-		EnsureRouter:           func() *router.Router { return r },
+		RegisterRoute:          addRouteHook(r),
 		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { setCollector = c },
 		AttachHTTPObserver:     func(observer metrics.HTTPObserver) { setHTTP = observer },
 	}
@@ -142,7 +148,7 @@ func TestConfigureMetricsWithExplicitCollector(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
-		EnsureRouter:           func() *router.Router { return r },
+		RegisterRoute:          addRouteHook(r),
 		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { setCollector = c },
 	}
 	cfg := DefaultObservabilityConfig()
@@ -167,7 +173,7 @@ func TestConfigureMetricsWithExplicitHandler(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		EnsureRouter:  func() *router.Router { return r },
+		RegisterRoute: addRouteHook(r),
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -185,7 +191,7 @@ func TestConfigureMetricsWithExplicitExporter(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		EnsureRouter:  func() *router.Router { return r },
+		RegisterRoute: addRouteHook(r),
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -204,7 +210,7 @@ func TestConfigureMetricsCollectorFromHooks(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
-		EnsureRouter:           func() *router.Router { return r },
+		RegisterRoute:          addRouteHook(r),
 		GetPrometheusCollector: func() *metrics.PrometheusCollector { return prom },
 		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
 	}
@@ -304,7 +310,7 @@ func TestConfigureMetricsEmptyPath(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
-		EnsureRouter:           func() *router.Router { return r },
+		RegisterRoute:          addRouteHook(r),
 		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
@@ -322,7 +328,7 @@ func TestConfigureMetricsZeroMaxSeries(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
-		EnsureRouter:           func() *router.Router { return r },
+		RegisterRoute:          addRouteHook(r),
 		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
@@ -353,7 +359,7 @@ func TestConfigureMetricsWithNilSetCollector(t *testing.T) {
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
-		EnsureRouter:  func() *router.Router { return r },
+		RegisterRoute: addRouteHook(r),
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true

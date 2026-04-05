@@ -32,7 +32,7 @@ func New(cfg config.Config) (*App, error) {
 	wsCfg := websocket.DefaultWebSocketConfig()
 	wsCfg.Secret = []byte(cfg.WSSecret)
 
-	ws, err := websocket.New(wsCfg, cfg.Core.Debug, a.Logger())
+	ws, err := websocket.New(wsCfg, cfg.App.Debug, a.Logger())
 	if err != nil {
 		return nil, fmt.Errorf("create websocket server: %w", err)
 	}

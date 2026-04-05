@@ -1,7 +1,7 @@
 # Card 0767
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/config.go`
@@ -84,3 +84,13 @@ Done Definition:
 - `RuntimeSnapshot` only carries state the kernel actually owns.
 
 Outcome:
+- Removed `Debug` and `EnvFile` from `core.AppConfig` and `core.RuntimeSnapshot`,
+  so the kernel now exposes only HTTP runtime state it actually owns.
+- Switched first-party reference and scaffolded config loaders to an app-local
+  `cfg.App` section that owns `EnvFile` and `Debug`.
+- Made `x/devtools` own the merged debug config payload through
+  `devtools.ConfigSnapshot`, with `core.RuntimeSnapshot` flowing in only as the
+  kernel runtime subset.
+- Updated the devserver analyzer/dashboard path to consume the devtools-owned
+  config snapshot instead of treating `/_debug/config` as a raw `core`
+  contract.

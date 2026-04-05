@@ -75,7 +75,6 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	// Create plumego app for dashboard
 	appCfg := core.DefaultConfig()
 	appCfg.Addr = cfg.DashboardAddr
-	appCfg.Debug = true
 	app := core.New(appCfg, core.WithLogger(plog.NewGLogger()))
 	if err := app.Use(
 		requestid.Middleware(),
@@ -205,23 +204,24 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 		return fmt.Errorf("register /api/stop: %w", err)
 	}
 
-	// Static UI files
-	router := d.app.Router()
-
 	// Try embedded UI first, then fallback to disk
 	if HasEmbeddedUI() {
 		uiFS, err := GetUIFS()
 		if err == nil {
-			frontend.RegisterFS(router, http.FS(uiFS),
+			if err := frontend.RegisterFS(d.app, http.FS(uiFS),
 				frontend.WithPrefix("/"),
 				frontend.WithIndex("index.html"),
-			)
+			); err != nil {
+				return fmt.Errorf("register embedded ui: %w", err)
+			}
 		}
 	} else if uiPath != "" {
-		frontend.RegisterFromDir(router, uiPath,
+		if err := frontend.RegisterFromDir(d.app, uiPath,
 			frontend.WithPrefix("/"),
 			frontend.WithIndex("index.html"),
-		)
+		); err != nil {
+			return fmt.Errorf("register ui dir: %w", err)
+		}
 	}
 
 	return nil

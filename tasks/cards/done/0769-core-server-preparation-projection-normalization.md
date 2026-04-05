@@ -1,7 +1,7 @@
 # Card 0769
 
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/http_handler.go`
@@ -60,3 +60,9 @@ Done Definition:
 - Snapshot and preparation code stay aligned through shared normalization.
 
 Outcome:
+- Removed the dead private `setupServer()` wrapper and the duplicate
+  `serverRuntimeConfig` projection from `core/lifecycle.go`.
+- Added a single shared `projectRuntimeSnapshot(...)` helper that now feeds both
+  prepared `http.Server` construction and `RuntimeSnapshot()` export.
+- Updated the core primer to describe the single internal preparation
+  projection, keeping server preparation and snapshot behavior aligned.

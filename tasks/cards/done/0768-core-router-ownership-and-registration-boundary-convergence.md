@@ -1,7 +1,7 @@
 # Card 0768
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app.go`
@@ -81,3 +81,12 @@ Done Definition:
 - Raw router mutation is no longer part of first-party bootstrap.
 
 Outcome:
+- Removed `core.WithRouter(...)` and the raw `App.Router()` escape hatch, while
+  adding `App.URL(...)`, `App.Routes()`, and `App.Print(...)` as explicit owned
+  router views.
+- Migrated first-party websocket, webhook, devtools, frontend, pubsub-debug,
+  and observability registration helpers to explicit app-owned registration
+  contracts based on route registration methods instead of raw router mutation.
+- Updated reference apps and the dev dashboard to wire extension routes through
+  `*core.App` directly, and tightened the core primer to describe `core` as the
+  router owner.

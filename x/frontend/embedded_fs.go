@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-
-	"github.com/spcent/plumego/router"
 )
 
 // embedded contains optional frontend assets placed under the embedded/ directory.
@@ -17,7 +15,7 @@ var embedded embed.FS
 
 // RegisterEmbedded mounts the embedded frontend bundle.
 // Returns an error if no embedded frontend assets are found.
-func RegisterEmbedded(r *router.Router, opts ...Option) error {
+func RegisterEmbedded(r routeRegistrar, opts ...Option) error {
 	mount, err := NewMountEmbedded(opts...)
 	if err != nil {
 		return err

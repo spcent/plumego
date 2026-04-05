@@ -70,6 +70,15 @@ func (a *App) AddRouteWithName(method, path, name string, handler http.Handler) 
 	return a.addNamedRoute(method, name, path, handler)
 }
 
+// URL resolves a named route against the owned app router.
+func (a *App) URL(name string, params ...string) string {
+	r := a.ensureRouter()
+	if r == nil {
+		return ""
+	}
+	return r.URL(name, params...)
+}
+
 // HandleFunc registers a handler function for the given path (any HTTP method).
 func (a *App) HandleFunc(pattern string, handler http.HandlerFunc) error {
 	return a.addRoute(router.ANY, pattern, handler)

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"io"
 	"net/http"
 	"sync"
 
@@ -18,7 +19,7 @@ type App struct {
 	router          *router.Router       // HTTP router
 	middlewareChain *middleware.Chain    // Middleware pipeline for all routes
 	logger          log.StructuredLogger // Logger instance
-	// Declarative router option state applied to both default and custom routers.
+	// Declarative router option state applied to the owned app router.
 	hasRouterMethodNotAllowed bool
 	routerMethodNotAllowed    bool
 
@@ -61,12 +62,25 @@ func New(cfg AppConfig, options ...Option) *App {
 	return app
 }
 
-// Router returns the underlying router for advanced configuration.
-func (a *App) Router() *router.Router {
-	return a.router
-}
-
 // Logger returns the configured application logger.
 func (a *App) Logger() log.StructuredLogger {
 	return a.logger
+}
+
+// Routes returns the owned route table snapshot.
+func (a *App) Routes() []router.RouteInfo {
+	r := a.ensureRouter()
+	if r == nil {
+		return nil
+	}
+	return r.Routes()
+}
+
+// Print writes the owned route table to w.
+func (a *App) Print(w io.Writer) {
+	r := a.ensureRouter()
+	if r == nil {
+		return
+	}
+	r.Print(w)
 }

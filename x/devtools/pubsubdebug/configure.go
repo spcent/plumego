@@ -5,13 +5,12 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
 // Configure registers a snapshot endpoint when enabled.
 func Configure(hooks Hooks) {
-	if hooks.EnsureMutable == nil || hooks.ConfigSnapshot == nil || hooks.EnsureRouter == nil {
+	if hooks.EnsureMutable == nil || hooks.ConfigSnapshot == nil || hooks.RegisterRoute == nil {
 		return
 	}
 
@@ -36,8 +35,7 @@ func Configure(hooks Hooks) {
 		path = "/_debug/pubsub"
 	}
 
-	r := hooks.EnsureRouter()
-	r.Get(path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
+	_ = hooks.RegisterRoute(http.MethodGet, path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 		if pub == nil {
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 				Status(http.StatusInternalServerError).
@@ -66,5 +64,5 @@ type Hooks struct {
 	LogError       func(msg string, err error)
 	ConfigSnapshot func() PubSubConfig
 	DefaultPubSub  func() pubsub.Broker
-	EnsureRouter   func() *router.Router
+	RegisterRoute  func(method, path string, handler http.Handler) error
 }

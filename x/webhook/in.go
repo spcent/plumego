@@ -12,9 +12,12 @@ import (
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/internal/jsonx"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
+
+type routeRegistrar interface {
+	AddRoute(method, path string, handler http.Handler) error
+}
 
 type Inbound struct {
 	cfg        WebhookInConfig
@@ -36,24 +39,30 @@ func NewInbound(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.Struc
 	return &Inbound{cfg: cfg, pub: pub, logger: logger}
 }
 
-func (c *Inbound) RegisterRoutes(r *router.Router) {
+func (c *Inbound) RegisterRoutes(r routeRegistrar) error {
 	if !c.cfg.Enabled || c.pub == nil {
-		return
+		return nil
 	}
 
+	var regErr error
 	c.routesOnce.Do(func() {
 		gitHubPath := strings.TrimSpace(c.cfg.GitHubPath)
 		if gitHubPath == "" {
 			gitHubPath = "/webhooks/github"
 		}
-		r.Post(gitHubPath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }))
+		regErr = r.AddRoute(http.MethodPost, gitHubPath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }))
+		if regErr != nil {
+			return
+		}
 
 		stripePath := strings.TrimSpace(c.cfg.StripePath)
 		if stripePath == "" {
 			stripePath = "/webhooks/stripe"
 		}
-		r.Post(stripePath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
+		regErr = r.AddRoute(http.MethodPost, stripePath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
 	})
+
+	return regErr
 }
 
 func (c *Inbound) Health() (string, health.HealthStatus) {

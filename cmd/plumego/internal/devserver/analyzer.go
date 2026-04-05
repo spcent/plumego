@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/x/devtools"
 )
 
 // RouteInfo represents information about a route
@@ -114,8 +114,8 @@ func (a *Analyzer) ProbeEndpoints() []RouteInfo {
 	return discovered
 }
 
-// GetAppSnapshot fetches the application's stable runtime/config snapshot.
-func (a *Analyzer) GetAppSnapshot() (core.RuntimeSnapshot, error) {
+// GetAppSnapshot fetches the application's devtools config/runtime snapshot.
+func (a *Analyzer) GetAppSnapshot() (devtools.ConfigSnapshot, error) {
 	configURL := a.appURL + "/_debug/config"
 
 	client := &http.Client{
@@ -124,15 +124,15 @@ func (a *Analyzer) GetAppSnapshot() (core.RuntimeSnapshot, error) {
 
 	resp, err := client.Get(configURL)
 	if err != nil {
-		return core.RuntimeSnapshot{}, fmt.Errorf("failed to fetch config: %w", err)
+		return devtools.ConfigSnapshot{}, fmt.Errorf("failed to fetch config: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var payload struct {
-		Data core.RuntimeSnapshot `json:"data"`
+		Data devtools.ConfigSnapshot `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return core.RuntimeSnapshot{}, fmt.Errorf("failed to parse config: %w", err)
+		return devtools.ConfigSnapshot{}, fmt.Errorf("failed to parse config: %w", err)
 	}
 
 	return payload.Data, nil

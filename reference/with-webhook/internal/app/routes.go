@@ -22,7 +22,9 @@ func (a *App) RegisterRoutes() error {
 	}
 
 	// Register inbound webhook routes (/webhooks/github, /webhooks/stripe).
-	a.Inbound.RegisterRoutes(a.Core.Router())
+	if err := a.Inbound.RegisterRoutes(a.Core); err != nil {
+		return err
+	}
 
 	return nil
 }

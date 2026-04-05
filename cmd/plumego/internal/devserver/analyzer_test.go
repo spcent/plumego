@@ -18,7 +18,6 @@ func TestGetAppSnapshot(t *testing.T) {
 				"addr":                ":8080",
 				"debug":               true,
 				"env_file":            ".env.test",
-				"shutdown_timeout":    int64((5 * time.Second).Nanoseconds()),
 				"read_timeout":        int64((30 * time.Second).Nanoseconds()),
 				"read_header_timeout": int64((5 * time.Second).Nanoseconds()),
 				"write_timeout":       int64((30 * time.Second).Nanoseconds()),

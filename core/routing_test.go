@@ -134,7 +134,7 @@ func TestNamedRouteRegistration(t *testing.T) {
 				w.WriteHeader(http.StatusNoContent)
 			}))
 
-			url := app.Router().URL(tt.route, "id", "42")
+			url := app.URL(tt.route, "id", "42")
 			req := httptest.NewRequest(tt.method, url, nil)
 			rr := httptest.NewRecorder()
 			app.ServeHTTP(rr, req)
@@ -188,7 +188,7 @@ func TestAddRouteWithNameRegistersURLAndReturnsErrors(t *testing.T) {
 		t.Fatalf("unexpected add named route error: %v", err)
 	}
 
-	if got := app.Router().URL("users.show", "id", "42"); got != "/users/42" {
+	if got := app.URL("users.show", "id", "42"); got != "/users/42" {
 		t.Fatalf("named route URL = %q, want %q", got, "/users/42")
 	}
 

@@ -3,15 +3,7 @@ package core
 import (
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/router"
 )
-
-// WithRouter sets the router for the App.
-func WithRouter(router *router.Router) Option {
-	return func(a *App) {
-		a.router = router
-	}
-}
 
 // WithLogger sets a custom logger for the App.
 func WithLogger(logger log.StructuredLogger) Option {

@@ -21,27 +21,11 @@ func (a *App) RuntimeSnapshot() RuntimeSnapshot {
 	serverPrepared := a.httpServer != nil
 	a.mu.RUnlock()
 
-	return RuntimeSnapshot{
-		Addr:              cfg.Addr,
-		Debug:             cfg.Debug,
-		EnvFile:           cfg.EnvFile,
-		ShutdownTimeout:   cfg.ShutdownTimeout,
-		ReadTimeout:       cfg.ReadTimeout,
-		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
-		WriteTimeout:      cfg.WriteTimeout,
-		IdleTimeout:       cfg.IdleTimeout,
-		MaxHeaderBytes:    cfg.MaxHeaderBytes,
-		HTTP2Enabled:      cfg.EnableHTTP2,
-		DrainInterval:     cfg.DrainInterval,
-		TLS: RuntimeTLSSnapshot{
-			Enabled:  cfg.TLS.Enabled,
-			CertFile: cfg.TLS.CertFile,
-			KeyFile:  cfg.TLS.KeyFile,
-		},
-		Started:        started,
-		ConfigFrozen:   configFrozen,
-		ServerPrepared: serverPrepared,
-	}
+	snapshot := projectRuntimeSnapshot(cfg)
+	snapshot.Started = started
+	snapshot.ConfigFrozen = configFrozen
+	snapshot.ServerPrepared = serverPrepared
+	return snapshot
 }
 
 // MiddlewareNames returns the registered middleware type names.
