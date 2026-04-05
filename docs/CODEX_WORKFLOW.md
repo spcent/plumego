@@ -112,6 +112,8 @@ make new-verify M=active/M-001
 make check-verify M=active/M-001
 ```
 
+`make milestone` now requires the companion plan file to exist and pass `make check-plan`.
+
 Update `tasks/milestones/ROADMAP.md`: add a row for M-001, declare dependencies.
 
 ### Step 3 — Launch Codex
@@ -241,6 +243,7 @@ If two milestones accidentally touch the same file, run them sequentially.
 | Symptom | Cause | Action |
 |---------|-------|--------|
 | `make check-spec` shows MISS | Required section missing | Fill section, re-run |
+| `make milestone` refuses to launch | Companion plan file missing | Run `make new-plan`, fill it, then `make check-plan` |
 | `make check-plan` fails | Plan missing or malformed | Run `make new-plan`, fill fields, re-run |
 | `make check-card` warns about legacy shape | Card predates milestone pipeline metadata | Add milestone ownership fields or keep as legacy queue item |
 | `make check-verify` fails | Verify report missing required gate sections | Scaffold with `make new-verify`, then fill evidence |

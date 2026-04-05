@@ -19,16 +19,26 @@ milestone: ## Run a milestone spec: make milestone M=active/M-001
 	  exit 1; \
 	fi
 	@SPEC=tasks/milestones/$(M).md; \
+	PLAN=tasks/milestones/$${SPEC##*/}; \
+	PLAN=$${PLAN%.md}.plan.md; \
 	if [ ! -f "$$SPEC" ]; then \
 	  echo "Error: $$SPEC not found."; \
 	  echo "Available specs:"; \
 	  ls tasks/milestones/active/*.md 2>/dev/null | sed 's|tasks/milestones/||; s|\.md||'; \
 	  exit 1; \
-	fi
-	@echo "Validating spec before launch ..."
-	@scripts/check-spec tasks/milestones/$(M).md || (echo "Fix spec errors above, then re-run."; exit 1)
-	@echo "Launching codex --yolo on $$SPEC ..."
-	codex --yolo "$(shell cat tasks/milestones/$(M).md)"
+	fi; \
+	if [ ! -f "$$PLAN" ]; then \
+	  echo "Error: $$PLAN not found."; \
+	  echo "Run: make new-plan M=$(M)"; \
+	  echo "Then fill the plan and validate it with: make check-plan M=$(M)"; \
+	  exit 1; \
+	fi; \
+	echo "Validating spec before launch ..."; \
+	scripts/check-spec "$$SPEC" || { echo "Fix spec errors above, then re-run."; exit 1; }; \
+	echo "Validating plan before launch ..."; \
+	scripts/check-spec "$$PLAN" || { echo "Fix plan errors above, then re-run."; exit 1; }; \
+	echo "Launching codex --yolo on $$SPEC ..."; \
+	codex --yolo "$$(cat "$$SPEC")"
 
 check-spec: ## Validate a milestone spec: make check-spec M=active/M-001
 	@if [ -z "$(M)" ]; then \

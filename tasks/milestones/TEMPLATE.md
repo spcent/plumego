@@ -17,6 +17,16 @@
 - **Depends on:** (none) <!-- or: M-001, M-002 -->
 - **Parallel OK:** yes <!-- yes = independent of other active milestones -->
 
+<!--
+  Companion artifacts expected for this milestone:
+  - Plan:   tasks/milestones/M-XXX.plan.md
+  - Verify: tasks/milestones/M-XXX.verify.md
+  Before `make milestone`, scaffold the plan with:
+    make new-plan M=active/M-XXX
+  Before PR packaging, fill the verify report with:
+    make new-verify M=active/M-XXX
+-->
+
 ---
 
 ## Goal
@@ -145,6 +155,8 @@ Expected: all exit 0; `gofmt -l .` outputs nothing.
 
 - [ ] All Acceptance Criteria commands exit 0.
 - [ ] `gofmt -l .` produces no output.
+- [ ] `tasks/milestones/M-XXX.plan.md` exists and matches the milestone scope.
+- [ ] `tasks/milestones/M-XXX.verify.md` is filled before PR packaging.
 - [ ] Branch `milestone/M-XXX-<slug>` pushed.
 - [ ] PR open, title `milestone(M-XXX): <Title>`.
 - [ ] PR body filled from milestone-pr-template.md with actual gate output.

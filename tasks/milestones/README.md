@@ -37,6 +37,11 @@ Codex reads `AGENTS.md` automatically on startup for behavior boundaries.
 The milestone spec is the task prompt — it provides goal, scope, ordered steps,
 and acceptance criteria.
 
+Launch gate:
+
+- `make milestone M=active/M-001` now requires `tasks/milestones/M-001.plan.md`
+  to exist and pass `make check-plan M=active/M-001`.
+
 Optional scaffold helpers:
 
 ```bash

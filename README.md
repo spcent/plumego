@@ -72,7 +72,10 @@ Plumego v1 release scope covers every checked-in module in this repository, but 
 Wire routes, middleware, and background tasks explicitly in your application package. Plumego no longer carries a compatibility component layer in `core`.
 
 ## Quick Start
-Create a small `main.go`, wire routes and middleware explicitly, then start the server:
+
+For the canonical quick-start path, read [`docs/getting-started.md`](./docs/getting-started.md) first, then open [`reference/standard-service`](./reference/standard-service).
+
+Smallest runnable example:
 
 ```go
 package main
@@ -108,33 +111,6 @@ func main() {
 }
 ```
 
-`core.App` also implements `http.Handler`, so it can be mounted directly into a standard library server:
-
-```go
-package main
-
-import (
-    "log"
-    "net/http"
-
-    "github.com/spcent/plumego/contract"
-    "github.com/spcent/plumego/core"
-)
-
-func main() {
-    app := core.New(core.WithAddr(":8080"))
-
-    app.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-        _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
-            "status": "ok",
-        }, nil)
-    })
-
-    log.Println("server started at :8080")
-    log.Fatal(http.ListenAndServe(":8080", app))
-}
-```
-
 ## Configuration Basics
 - Environment variables should be loaded explicitly in your `main` package. `core.WithEnvPath` only records the path for components that need it, such as devtools reload support.
 - `core.New(...)` defaults to a `NoOpLogger`. If you expect request/runtime logs, inject a real logger with `core.WithLogger(...)`.
@@ -153,256 +129,41 @@ func main() {
 - Secondary task-family defaults are also explicit: frontend asset work starts in `x/frontend`, local debug work starts in `x/devtools`, service discovery starts in `x/discovery`, and protected admin surfaces start in `x/ops`.
 - These secondary extension roots are capability entrypoints, not application bootstrap surfaces.
 
-## Key Components
-- **Router**: Register handlers with `Get`, `Post`, and other standard-library style methods that accept `func(w http.ResponseWriter, r *http.Request)`. Groups allow attaching shared middleware, and static frontends can be mounted via `frontend.RegisterFromDir` with cache/fallback options (`frontend.WithCacheControl`, `frontend.WithIndexCacheControl`, `frontend.WithFallback`, `frontend.WithHeaders`).
-- **Middleware**: Chain middleware before boot with `app.Use(...)`. Keep middleware transport-only and explicit. Canonical observability order is `middleware/requestid.Middleware`, `middleware/tracing.Middleware`, `middleware/httpmetrics.Middleware`, `middleware/accesslog.Middleware`, then `middleware/recovery.Recovery(logger)`.
-- **Observability Boundary**: Keep transport observability primitives in stable `middleware/*`. Use `x/observability` for broader adapter, export, and integration wiring instead of turning middleware into a catch-all observability catalog.
-- **Multi-Tenancy (experimental)**: Tenant isolation with quota enforcement, policy controls, and database filtering. The API is experimental and may change. See [Multi-Tenancy](#multi-tenancy) for details.
-- **Ops/Admin Endpoints**: Optional protected operations API for queue stats/replay, receipt lookup, channel health, and tenant quota inspection. Mount via `x/ops` and secure with a token or custom middleware. If auth is missing and `AllowInsecure` is false (default), requests are denied.
-- **Contract Helpers**: Use `contract.WriteError` for error payloads and `contract.WriteResponse` / `Ctx.Response` for consistent JSON responses with trace IDs.
-- **WebSocket Transport**: `x/websocket` provides an app-facing server with explicit route registration, a JWT-protected `/ws` endpoint, and an optional broadcast endpoint protected by a shared secret.
-- **Messaging + Webhook**: Start new app-facing messaging work in `x/messaging`. Use `x/webhook` directly only for narrow inbound or outbound webhook mechanics such as signature verification, delivery replay, and trigger-token-protected webhook operations.
-- **Reusable Resource APIs**: Use `x/rest` for reusable CRUD and resource-interface standardization. Keep response/error contracts aligned with `contract`, keep route binding explicit, and keep domain validation outside `x/rest`.
-- **Migrations**: Optional SQL schemas for modules/examples live in `docs/migrations/` (see notes for sms-gateway `sent_at` backfill).
-- **Health + Readiness**: Lifecycle hooks mark readiness during startup/shutdown; build metadata (`Version`, `Commit`, `BuildTime`) can be injected via ldflags.
-- **Health Boundary**: The stable `health` package owns readiness models and in-process state only. HTTP health endpoints should live in `reference/standard-service` or extension packages such as `x/ops/healthhttp`, not in `health` itself.
+## Capability Guides
 
-## Multi-Tenancy
+Use the root README as an entry page. Detailed capability guidance lives in `docs/modules/*`.
 
-Plumego provides experimental multi-tenancy primitives for SaaS applications with tenant isolation, quota enforcement, and policy controls.
+Stable roots:
 
-### Features
+- [core](./docs/modules/core/README.md) — app kernel, lifecycle, shared runtime wiring
+- [router](./docs/modules/router/README.md) — matching, params, groups, reverse routing
+- [middleware](./docs/modules/middleware/README.md) — transport-only middleware
+- [contract](./docs/modules/contract/README.md) — response and error contracts
+- [security](./docs/modules/security/README.md) — auth, headers, input-safety, abuse guard
+- [store](./docs/modules/store/README.md) — persistence primitives
+- [health](./docs/modules/health/README.md) — readiness state and health models
+- [log](./docs/modules/log/README.md) and [metrics](./docs/modules/metrics/README.md) — base logging and metrics contracts
 
-- **Tenant Configuration**: Flexible storage backends (in-memory, database with LRU caching)
-- **Rate Limiting**: Per-tenant token bucket (requests/second with burst control)
-- **Quota Management**: Per-tenant usage limits across minute/hour/day/month windows with fixed-window enforcement
-- **Policy Controls**: Per-tenant allow-lists for models and tools
-- **Routing Policy Cache**: Tenant-specific routing policy with cache wrapper
-- **Database Isolation**: Automatic tenant filtering for all SQL queries via the `x/tenant/store/db` `TenantDB` wrapper
-- **Middleware Stack**: Tenant resolution → Rate limiting → Quota checking → Policy enforcement
-- **Audit Hooks**: Optional callbacks for monitoring quota/policy violations
+App-facing extension families:
 
-### Quick Setup
-
-```go
-import (
-    "context"
-    "database/sql"
-    "log"
-    "net/http"
-    "time"
-
-    "github.com/spcent/plumego/contract"
-    "github.com/spcent/plumego/core"
-    tenantconfig "github.com/spcent/plumego/x/tenant/config"
-    tenant "github.com/spcent/plumego/x/tenant/core"
-    tenantpolicy "github.com/spcent/plumego/x/tenant/policy"
-    tenantquota "github.com/spcent/plumego/x/tenant/quota"
-    tenantratelimit "github.com/spcent/plumego/x/tenant/ratelimit"
-    tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
-    tenantdb "github.com/spcent/plumego/x/tenant/store/db"
-)
-
-func setupTenantApp(database *sql.DB) *core.App {
-    // Create tenant config manager with caching.
-    tenantMgr := tenantconfig.NewDBTenantConfigManager(
-        database,
-        tenantconfig.WithTenantCache(1000, 5*time.Minute),
-    )
-
-    // Create managers used by tenant middleware.
-    quotaMgr := tenant.NewWindowQuotaManager(tenantMgr, tenant.NewInMemoryQuotaStore())
-    policyEval := tenant.NewConfigPolicyEvaluator(tenantMgr)
-    rateLimiter := tenant.NewTokenBucketRateLimiter(
-        &tenant.RateLimitConfigProviderFromConfig{Manager: tenantMgr},
-    )
-
-    // Tenant-aware DB wrapper for query isolation.
-    tenantDB := tenantdb.NewTenantDB(database)
-
-    app := core.New(core.WithAddr(":8080"))
-    api := app.Router().Group("/api")
-
-    // Canonical explicit middleware chain.
-    api.Use(tenantresolve.Middleware(tenantresolve.Options{
-        HeaderName: "X-Tenant-ID",
-    }))
-    api.Use(tenantratelimit.Middleware(tenantratelimit.Options{
-        Limiter: rateLimiter,
-    }))
-    api.Use(tenantquota.Middleware(tenantquota.Options{
-        Manager: quotaMgr,
-        Hooks: tenant.Hooks{
-            OnQuota: func(ctx context.Context, decision tenant.QuotaDecision) {
-                if !decision.Allowed {
-                    log.Printf("quota exceeded for %s", decision.TenantID)
-                }
-            },
-        },
-    }))
-    api.Use(tenantpolicy.Middleware(tenantpolicy.Options{
-        Evaluator: policyEval,
-    }))
-
-    api.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        rows, err := tenantDB.QueryFromContext(
-            r.Context(),
-            "SELECT id, email FROM users WHERE active = ?",
-            true,
-        )
-        if err != nil {
-            contract.WriteError(w, r, contract.APIError{
-                Status:   http.StatusInternalServerError,
-                Code:     "db_query_failed",
-                Message:  "query failed",
-                Category: contract.CategoryServer,
-            })
-            return
-        }
-        defer rows.Close()
-        _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"}, nil)
-    }))
-
-    return app
-}
-```
-
-If you manage tenant config in code (or provide your own config provider), you can set multi-window quotas like:
-
-```go
-tenantMgr := tenant.NewInMemoryConfigManager()
-tenantMgr.SetTenantConfig(tenant.Config{
-    TenantID: "tenant-id",
-    Quota: tenant.QuotaConfig{
-        Limits: []tenant.QuotaLimit{
-            {Window: tenant.QuotaWindowDay, Requests: 200000},
-            {Window: tenant.QuotaWindowMonth, Tokens: 10_000_000},
-        },
-    },
-    Policy: tenant.PolicyConfig{
-        AllowedModels: []string{"gpt-4o-mini"},
-        AllowedTools:  []string{"search"},
-    },
-    RateLimit: tenant.RateLimitConfig{
-        RequestsPerSecond: 50,
-        Burst:             100,
-    },
-})
-
-// Route policy cache (optional)
-routePolicyStore := tenant.NewInMemoryRoutePolicyStore()
-_ = routePolicyStore.SetRoutePolicy(context.Background(), tenant.RoutePolicy{
-    TenantID: "tenant-id",
-    Strategy: "weighted",
-    Payload:  []byte(`{"rules":[{"provider":"a","weight":70},{"provider":"b","weight":30}]}`),
-})
-routePolicyCache := tenant.NewInMemoryRoutePolicyCache(1000, 5*time.Minute)
-routePolicyProvider := tenant.NewCachedRoutePolicyProvider(routePolicyStore, routePolicyCache)
-
-// Optional: tenant-aware token bucket from the same config manager.
-rateLimiter := tenant.NewTokenBucketRateLimiter(
-    &tenant.RateLimitConfigProviderFromConfig{Manager: tenantMgr},
-)
-_ = routePolicyProvider
-_ = rateLimiter
-```
-
-### Automatic Query Filtering
-
-The `x/tenant/store/db` `TenantDB` wrapper automatically filters all queries by tenant ID:
-
-```go
-// Your query
-rows, err := tenantDB.QueryFromContext(ctx,
-    "SELECT * FROM users WHERE active = ?", true)
-
-// Automatically becomes
-"SELECT * FROM users WHERE tenant_id = ? AND active = ?"
-// with tenant_id from context
-```
-
-This prevents cross-tenant data leaks and simplifies business logic by removing manual tenant filtering.
-
-### Example Application
-
-See `examples/multi-tenant-saas/` for a complete working example with:
-- Admin API for tenant CRUD operations
-- Tenant-scoped business API
-- Quota enforcement with retry-after headers
-- Policy validation for models/tools
-- Request analytics per tenant
-
-Run it:
-```bash
-cd examples/multi-tenant-saas
-go run .
-```
-
-### Production Considerations
-
-- **Performance**: Use database-backed config manager with LRU caching (1000+ tenants)
-- **Security**: Replace header-based tenant ID with signed JWT tokens
-- **Monitoring**: Enable quota/policy hooks for metrics collection
-- **Scaling**: Run multiple instances behind load balancer with shared database
-
-## Background Runners
-Register background tasks with a minimal lifecycle interface:
-
-```go
-app.Register(myRunner)
-```
-
-Runners start before the HTTP server and stop during graceful shutdown.
-
-## Task Scheduling
-Use the `scheduler` package for in-process cron and delayed jobs:
-
-```go
-sch := scheduler.New(scheduler.WithWorkers(2))
-sch.Start()
-defer sch.Stop(context.Background())
-
-sch.AddCron("cleanup", "0 * * * *", func(ctx context.Context) error {
-    // hourly task
-    return nil
-})
-
-sch.Delay("one-off", 5*time.Second, func(ctx context.Context) error {
-    return nil
-})
-```
-
-Optional helpers include a minimal admin handler (`scheduler.NewAdminHandler`) and pluggable persistence (`scheduler.WithStore` with the in-memory or KV store).
-You can also register a panic handler and metrics sink via `scheduler.WithPanicHandler` and `scheduler.WithMetricsSink`.
-Job status snapshots now include a unified state machine (`queued`, `scheduled`, `running`, `retrying`, `failed`, `canceled`, `completed`) with a `StateUpdated` timestamp. The `JobQuery` filter supports state-based filtering via the `States` field.
-The admin handler accepts a `state` query parameter on `/scheduler/jobs` (repeatable) to filter by job state.
-
-## Auth Contracts
-Plumego keeps authentication, authorization, and session validation separate through interfaces in `contract`. Compose them with middleware rather than relying on framework magic:
-
-```go
-app.Use(auth.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
-app.Use(auth.SessionCheck(sessionStore, sessionValidator))
-app.Use(auth.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""))
-
-protected := middleware.Apply(
-	http.HandlerFunc(adminHandler),
-	auth.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)),
-	auth.SessionCheck(sessionStore, sessionValidator),
-	auth.Authorize(jwt.PolicyAuthorizer{Policy: jwt.AuthZPolicy{AnyRole: []string{"admin"}}}, "", ""),
-)
-```
-
-The `security/jwt` package provides adapters (`jwtManager.Authenticator`, `jwt.PolicyAuthorizer`, `jwt.PermissionAuthorizer`) that implement these contracts while keeping your own storage and policy engines decoupled.
+- [x/tenant](./docs/modules/x-tenant/README.md) — multi-tenancy, quota, policy, tenant-aware data paths
+- [x/rest](./x/rest/README.md) — reusable resource APIs and CRUD standardization
+- [x/websocket](./docs/modules/x-websocket/README.md) — WebSocket transport
+- [x/messaging](./docs/modules/x-messaging/README.md) — messaging entrypoint
+- [x/fileapi](./docs/modules/x-fileapi/README.md) — file upload/download transport
+- [x/gateway](./docs/modules/x-gateway/README.md) and [x/discovery](./docs/modules/x-discovery/README.md) — edge transport and service discovery
+- [x/frontend](./docs/modules/x-frontend/README.md) — frontend asset serving
+- [x/observability](./docs/modules/x-observability/README.md), [x/ops](./docs/modules/x-ops/README.md), and [x/devtools](./docs/modules/x-devtools/README.md) — observability, protected admin surfaces, and local debug tools
+- [x/data](./docs/modules/x-data/README.md), [x/cache](./docs/modules/x-cache/README.md), and [x/ai](./docs/modules/x-ai/README.md) — topology-heavy data features, cache adapters, and AI capabilities
 
 ## Reference App
-`reference/standard-service` is the canonical minimal `main` package. It depends only on stable root packages and demonstrates explicit wiring instead of extension assembly:
+`reference/standard-service` is the canonical reference application. It depends only on stable root packages and demonstrates:
 
-- Configured WebSocket hub with JWT keys and broadcast endpoint
-- Inbound GitHub/Stripe Webhooks, publishing to in-process Pub/Sub
-- In-memory store for outbound Webhook management
-- Static frontend served from embedded resources
-- Prometheus metrics, OpenTelemetry tracing, and health endpoints mounted to the router
+- default application layout
+- explicit bootstrap flow in `main.go`
+- explicit route registration in `internal/app/routes.go`
+- app-local configuration under `internal/config`
+- minimal stable-root-only wiring
 
 Run it with:
 
@@ -410,88 +171,12 @@ Run it with:
 go run ./reference/standard-service
 ```
 
-## Health Endpoints
-HTTP probe and diagnostics handlers now live in `x/ops/healthhttp`, while `health` stays focused on managers, state, and check primitives:
+## Further Reading
 
-```go
-healthManager, err := health.NewHealthManager(health.HealthCheckConfig{})
-if err != nil {
-    log.Fatal(err)
-}
-
-app := core.New(core.WithHealthManager(healthManager))
-app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
-app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
-```
-
-```go
-import (
-    "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego/health"
-    opshealth "github.com/spcent/plumego/x/ops/healthhttp"
-)
-
-app := core.New(core.WithHealthManager(healthManager))
-app.Get("/health/ready", opshealth.ReadinessHandler(healthManager).ServeHTTP)
-app.Get("/health", opshealth.SummaryHandler(healthManager).ServeHTTP)
-app.Get("/health/build", opshealth.BuildInfoHandler().ServeHTTP)
-```
-
-`opshealth.ReadinessHandler` returns readiness from the provided `HealthManager` (200 when ready, otherwise 503). When the manager is attached via `core.WithHealthManager`, the core lifecycle updates readiness automatically.
-
-## Observability Adapters
-No need to write your own adapters to hook logging middleware into metrics/tracing backends:
-
-- `metrics.NewPrometheusCollector(namespace)` implements `httpmetrics.Observer`; pair it with `metrics.NewPrometheusExporter(collector)` for `/metrics`.
-- `metrics.NewOpenTelemetryTracer(name)` implements `tracing.Tracer`, emitting spans with HTTP metadata.
-
-For observability-heavy applications, keep the concrete collector and tracer in your application wiring, pass the collector to `core.WithHTTPMetrics(...)`, and mount request metrics explicitly with `httpmetrics.Middleware(app.HTTPMetrics())`.
-For narrower DI at module boundaries, prefer `metrics.HTTPObserver`, `metrics.MQObserver`, `metrics.DBObserver`, or `metrics.Recorder` instead of the full `metrics.AggregateCollector` when a call site only needs one capability.
-
-## Configuration Reference
-Use `config.LoadEnv` to load environment variables, or bind command-line flags; `config.ConfigManager` also provides `LoadBestEffort` to skip optional source failures and `ReloadWithValidation` for transactional hot reloads. Config keys are normalized to lower_snake_case for lookups, so CamelCase and UPPER_SNAKE resolve to the same value. Durations in environment variables use milliseconds (the `_MS` suffix). Use the table below for predictable deployments.
-
-| AppConfig Field          | Default        | Environment Variable           | Flag Example                     |
-|--------------------------|----------------|--------------------------------|----------------------------------|
-| Addr                     | :8080          | APP_ADDR                      | --addr :8080                    |
-| EnvFile                  | .env           | APP_ENV_FILE                  | --env-file .env                 |
-| Debug                    | false          | APP_DEBUG                     | --debug                         |
-| ShutdownTimeout          | 5000ms         | APP_SHUTDOWN_TIMEOUT_MS       | --shutdown-timeout 5000ms       |
-| ReadTimeout              | 30000ms        | APP_READ_TIMEOUT_MS           | --read-timeout 30000ms          |
-| ReadHeaderTimeout        | 5000ms         | APP_READ_HEADER_TIMEOUT_MS    | --read-header-timeout 5000ms    |
-| WriteTimeout             | 30000ms        | APP_WRITE_TIMEOUT_MS          | --write-timeout 30000ms         |
-| IdleTimeout              | 60000ms        | APP_IDLE_TIMEOUT_MS           | --idle-timeout 60000ms          |
-| MaxHeaderBytes           | 1048576        | APP_MAX_HEADER_BYTES          | --max-header-bytes 1048576      |
-| EnableHTTP2              | true           | APP_ENABLE_HTTP2              | --http2=false                   |
-| DrainInterval            | 500ms          | APP_DRAIN_INTERVAL_MS         | --drain-interval 500ms          |
-| MaxBodyBytes             | 10485760       | APP_MAX_BODY_BYTES            | --max-body-bytes 10485760       |
-| MaxConcurrency           | 256            | APP_MAX_CONCURRENCY           | --max-concurrency 256           |
-| QueueDepth               | 512            | APP_QUEUE_DEPTH               | --queue-depth 512               |
-| QueueTimeout             | 250ms          | APP_QUEUE_TIMEOUT_MS          | --queue-timeout 250ms           |
-| TLS.Enabled              | false          | TLS_ENABLED                   | --tls                           |
-| TLS.CertFile             | (empty)        | TLS_CERT_FILE                 | --tls-cert /path/cert.pem       |
-| TLS.KeyFile              | (empty)        | TLS_KEY_FILE                  | --tls-key /path/key.pem         |
-| PubSub.Enabled           | false          | PUBSUB_DEBUG_ENABLED          | --pubsub-debug                  |
-| PubSub.Path              | /_debug/pubsub | PUBSUB_DEBUG_PATH             | --pubsub-path /_debug/pubsub    |
-| WebhookOut.TriggerToken  | (empty)        | WEBHOOK_TRIGGER_TOKEN         | --webhook-trigger-token TOKEN   |
-| WebhookOut.BasePath      | /webhooks      | (inherit)                     | --webhook-base /webhooks        |
-| WebhookOut.IncludeStats  | false          | WEBHOOK_INCLUDE_STATS         | --webhook-include-stats         |
-| WebhookOut.DefaultPageLimit| 0 (no default) | WEBHOOK_DEFAULT_PAGE_LIMIT    | --webhook-page-limit 50         |
-| WebhookIn.GitHubSecret   | env or config  | GITHUB_WEBHOOK_SECRET         | --github-secret value           |
-| WebhookIn.StripeSecret   | env or config  | STRIPE_WEBHOOK_SECRET         | --stripe-secret value           |
-| WebhookIn.MaxBodyBytes   | 1048576        | WEBHOOK_MAX_BODY_BYTES        | --webhook-max-body 1048576      |
-| WebhookIn.StripeTolerance| 300000ms       | WEBHOOK_STRIPE_TOLERANCE_MS   | --stripe-tolerance 300000ms     |
-| WebhookIn.TopicPrefixGitHub| in.github.     | WEBHOOK_TOPIC_PREFIX_GITHUB   | --github-topic-prefix in.github.|
-| WebhookIn.TopicPrefixStripe | in.stripe.     | WEBHOOK_TOPIC_PREFIX_STRIPE   | --stripe-topic-prefix in.stripe.|
-| WebSocket.Secret         | env or config  | WS_SECRET                     | --ws-secret value               |
-| WebSocket.WSRoutePath    | /ws            | WS_ROUTE_PATH                 | --ws-route /ws                  |
-| WebSocket.BroadcastPath  | /_admin/broadcast | WS_BROADCAST_PATH          | --ws-broadcast /_admin/broadcast|
-| WebSocket.BroadcastEnabled| true           | WS_BROADCAST_ENABLED          | --ws-broadcast-enabled=false    |
-| WebSocket.MaxConnections | 0 (unlimited)  | (config only)                 | -                               |
-| WebSocket.MaxRoomConnections | 0 (unlimited) | (config only)               | -                               |
-
-Keep configuration loading in your `main` package. Parse env vars, flags, or files into an `AppConfig`, then pass concrete values into `core.New(...)`. Canonical app scaffolds keep any shared helpers under app-local `internal/config` rather than a public root package.
+- [`docs/getting-started.md`](./docs/getting-started.md) — smallest runnable example
+- [`docs/README.md`](./docs/README.md) — docs entrypoint
+- [`env.example`](./env.example) — environment variable reference
+- [`cmd/plumego/DEV_SERVER.md`](./cmd/plumego/DEV_SERVER.md) — dev server and dashboard details
 
 ## Development and Testing
 - Install Go 1.24+ (matching `go.mod`).
@@ -509,7 +194,7 @@ The dashboard is **enabled by default** - simply run `plumego dev` to get starte
 - `plumego dev` dashboard is a local developer tool that runs a separate dashboard server; it is not intended to be exposed publicly in production environments.
 - The dashboard may query the app’s `/_debug` endpoints for routes/config/metrics/pprof when available, so keep debug endpoints gated outside local/dev usage.
 
-### Quick Start
+### Start the Dev Server
 
 ```bash
 plumego dev
