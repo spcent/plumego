@@ -61,9 +61,6 @@ func main() {
 	if err := app.Prepare(); err != nil {
 		log.Fatalf("prepare server: %v", err)
 	}
-	if err := app.Start(ctx); err != nil {
-		log.Fatalf("start runtime: %v", err)
-	}
 	srv, err := app.Server()
 	if err != nil {
 		log.Fatalf("get server: %v", err)

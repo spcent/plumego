@@ -14,7 +14,7 @@ responsibilities:
   - Middleware registration entrypoints
   - HTTP server lifecycle
   - Startup and shutdown hooks
-  - Runtime introspection (config snapshot, middleware list, observer attachment)
+  - Runtime introspection (config snapshot, middleware list)
 
 non_goals:
   - Route matching
@@ -33,7 +33,6 @@ allowed_imports:
   - contract
   - router
   - middleware
-  - health
   - log
   - metrics
 

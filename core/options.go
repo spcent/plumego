@@ -13,11 +13,3 @@ func WithLogger(logger log.StructuredLogger) Option {
 		a.logger = logger
 	}
 }
-
-// WithMethodNotAllowed enables 405 responses with Allow headers for method mismatches.
-func WithMethodNotAllowed(enabled bool) Option {
-	return func(a *App) {
-		a.hasRouterMethodNotAllowed = true
-		a.routerMethodNotAllowed = enabled
-	}
-}

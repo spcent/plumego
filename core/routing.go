@@ -79,16 +79,6 @@ func (a *App) URL(name string, params ...string) string {
 	return r.URL(name, params...)
 }
 
-// HandleFunc registers a handler function for the given path (any HTTP method).
-func (a *App) HandleFunc(pattern string, handler http.HandlerFunc) error {
-	return a.addRoute(router.ANY, pattern, handler)
-}
-
-// Handle registers a handler for the given path (any HTTP method).
-func (a *App) Handle(pattern string, handler http.Handler) error {
-	return a.addRoute(router.ANY, pattern, handler)
-}
-
 // Get registers a GET route with the given handler.
 func (a *App) Get(path string, handler http.HandlerFunc) error {
 	return a.addRoute(router.GET, path, handler)

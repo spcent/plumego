@@ -3,8 +3,6 @@ package core
 import (
 	"fmt"
 	"strings"
-
-	"github.com/spcent/plumego/metrics"
 )
 
 // RuntimeSnapshot returns the stable runtime/config snapshot consumed by
@@ -42,21 +40,4 @@ func (a *App) MiddlewareNames() []string {
 		list = append(list, name)
 	}
 	return list
-}
-
-// AttachHTTPObserver fans out HTTP metrics to an additional observer.
-func (a *App) AttachHTTPObserver(observer metrics.HTTPObserver) {
-	if a == nil || observer == nil {
-		return
-	}
-
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.httpMetrics == nil {
-		a.httpMetrics = observer
-		return
-	}
-
-	a.httpMetrics = metrics.NewMultiHTTPObserver(a.httpMetrics, observer)
 }

@@ -1,7 +1,7 @@
 # Card 0777
 
 Priority: P0
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app.go`
@@ -63,3 +63,9 @@ Done Definition:
 - Tests and module docs reflect the collapsed lifecycle contract.
 
 Outcome:
+- Removed `(*App).Start(...)` as a separate public lifecycle phase.
+- Moved logger lifecycle activation into `Prepare()`, making it the single
+  explicit pre-serve activation step.
+- Simplified runtime state by removing the extra logger-start tracking path.
+- Updated core lifecycle tests and module docs to reflect the collapsed
+  lifecycle.

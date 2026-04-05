@@ -123,7 +123,7 @@ func assertWrappedCoreError(t *testing.T, err error, operation string, message s
 	}
 }
 
-func TestPrepareStartServeAndShutdown(t *testing.T) {
+func TestPrepareServeAndShutdown(t *testing.T) {
 	addr := requireNetwork(t)
 	cfg := DefaultConfig()
 	cfg.Addr = addr
@@ -138,9 +138,6 @@ func TestPrepareStartServeAndShutdown(t *testing.T) {
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
-	}
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("start returned unexpected error: %v", err)
 	}
 	srv, err := app.Server()
 	if err != nil {
@@ -183,7 +180,7 @@ func TestPrepareStartServeAndShutdown(t *testing.T) {
 	}
 }
 
-func TestStartMarksAppReadyWithoutLegacyRuntimeHooks(t *testing.T) {
+func TestPrepareMarksAppStarted(t *testing.T) {
 	app := newTestApp()
 	mustRegisterRoute(t, app.Get("/boot-order", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -191,9 +188,6 @@ func TestStartMarksAppReadyWithoutLegacyRuntimeHooks(t *testing.T) {
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
-	}
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("start returned unexpected error: %v", err)
 	}
 
 	app.mu.RLock()
@@ -317,15 +311,7 @@ func TestServerReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
 	assertWrappedCoreError(t, err, "get_server", "server not prepared")
 }
 
-func TestStartReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
-	app := newTestApp()
-
-	err := app.Start(context.Background())
-
-	assertWrappedCoreError(t, err, "start_app", "app not prepared")
-}
-
-func TestStartReturnsWrappedErrorWhenAlreadyStarted(t *testing.T) {
+func TestPrepareIsIdempotentAfterActivation(t *testing.T) {
 	app := newTestApp()
 	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -334,11 +320,9 @@ func TestStartReturnsWrappedErrorWhenAlreadyStarted(t *testing.T) {
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
 	}
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("start returned unexpected error: %v", err)
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("second prepare returned unexpected error: %v", err)
 	}
-
-	assertWrappedCoreError(t, app.Start(context.Background()), "start_app", "app already started")
 }
 
 func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
@@ -357,9 +341,6 @@ func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
-	}
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("start returned unexpected error: %v", err)
 	}
 	srv, err := app.Server()
 	if err != nil {
@@ -510,7 +491,7 @@ func (l *testLifecycleLogger) Info(msg string, fields ...log.Fields)  {}
 func (l *testLifecycleLogger) Error(msg string, fields ...log.Fields) {}
 func (l *testLifecycleLogger) Debug(msg string, fields ...log.Fields) {}
 
-func TestPrepareStartServeAndShutdownWithLoggerLifecycle(t *testing.T) {
+func TestPrepareServeAndShutdownWithLoggerLifecycle(t *testing.T) {
 	addr := requireNetwork(t)
 	logger := &testLifecycleLogger{}
 	cfg := DefaultConfig()
@@ -523,9 +504,6 @@ func TestPrepareStartServeAndShutdownWithLoggerLifecycle(t *testing.T) {
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
-	}
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("start returned unexpected error: %v", err)
 	}
 	srv, err := app.Server()
 	if err != nil {

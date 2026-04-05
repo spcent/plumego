@@ -1,12 +1,10 @@
 package core
 
 import (
-	"io"
 	"net/http"
 	"sync"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
@@ -18,24 +16,17 @@ type App struct {
 	router          *router.Router       // HTTP router
 	middlewareChain *middleware.Chain    // Middleware pipeline for all routes
 	logger          log.StructuredLogger // Logger instance
-	// Declarative router option state applied to the owned app router.
-	hasRouterMethodNotAllowed bool
-	routerMethodNotAllowed    bool
 
 	// Runtime state (protected by mutex)
-	mu            sync.RWMutex
-	started       bool // Whether runtime hooks have started
-	configFrozen  bool // Whether configuration has been frozen
-	loggerStarted bool
+	mu           sync.RWMutex
+	started      bool // Whether runtime hooks have started
+	configFrozen bool // Whether configuration has been frozen
 
 	// Server components
 	httpServer  *http.Server       // HTTP server instance
 	connTracker *connectionTracker // Connection tracker for WebSocket
 	handler     http.Handler       // Combined handler with middleware applied
 	handlerOnce sync.Once          // Ensures handler initialization happens once, can be reset for testing
-
-	// Optional components
-	httpMetrics metrics.HTTPObserver
 }
 
 // Option defines a function type for configuring non-config app dependencies.
@@ -55,7 +46,7 @@ func New(cfg AppConfig, options ...Option) *App {
 		opt(app)
 	}
 
-	app.syncRouterConfig(app.router, app.hasRouterMethodNotAllowed, app.routerMethodNotAllowed)
+	app.syncRouterConfig(app.router)
 
 	return app
 }
@@ -72,13 +63,4 @@ func (a *App) Routes() []router.RouteInfo {
 		return nil
 	}
 	return r.Routes()
-}
-
-// Print writes the owned route table to w.
-func (a *App) Print(w io.Writer) {
-	r := a.ensureRouter()
-	if r == nil {
-		return
-	}
-	r.Print(w)
 }

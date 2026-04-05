@@ -117,9 +117,6 @@ func main() {
     if err := app.Prepare(); err != nil {
         log.Fatalf("prepare server: %v", err)
     }
-    if err := app.Start(ctx); err != nil {
-        log.Fatalf("start runtime: %v", err)
-    }
     srv, err := app.Server()
     if err != nil {
         log.Fatalf("get server: %v", err)
@@ -142,7 +139,7 @@ func main() {
 - `core` 现在走 config-first 构造：先从 `core.DefaultConfig()` 取得基线，再调整 typed `core.AppConfig`，最后传给 `core.New(cfg, ...)`。
 - `core.New(cfg, ...)` 默认使用 `NoOpLogger`。如果希望有请求日志或运行期日志，请显式注入 `core.WithLogger(...)`。
 - 常用变量：`AUTH_TOKEN`（ops 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
-- 应用默认包括 10485760 字节（10 MiB）请求体限制、256 并发请求限制（带队列）以及 HTTP 读/写超时。需要覆盖时，请直接修改 `core.AppConfig` 上的字段。
+- `core.AppConfig` 负责服务地址、TLS 以及 HTTP 服务超时/硬化设置。请求体限制与并发限制属于显式中间件 wiring，不属于 `core` 自身配置。
 - TLS 仍走同一条显式启动路径：`Prepare()` 会把证书与私钥加载进准备好的 `*http.Server`，随后调用方基于 `Server()` 返回的实例选择 `ListenAndServe()` 或 `ListenAndServeTLS("", "")`。
 - 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.SecurityHeaders(...)` 与 `middleware/ratelimit.AbuseGuard(...)`。
 - 调试模式与 devtools 已拆分：调试开关应放在应用本地配置里，例如参考实现中的 `cfg.App.Debug`；如果需要 devtools，请在应用本地 wiring 中显式注册相关路由，不要把它视为 canonical kernel 的一部分。

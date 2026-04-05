@@ -262,9 +262,6 @@ func (d *Dashboard) Start(ctx context.Context) error {
 	if err := d.app.Prepare(); err != nil {
 		return fmt.Errorf("prepare dashboard app: %w", err)
 	}
-	if err := d.app.Start(ctx); err != nil {
-		return fmt.Errorf("start dashboard app: %w", err)
-	}
 	srv, err := d.app.Server()
 	if err != nil {
 		return fmt.Errorf("get dashboard server: %w", err)

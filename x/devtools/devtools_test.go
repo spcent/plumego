@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -487,6 +488,9 @@ func TestRoutesTextEndpoint(t *testing.T) {
 	ct := rec.Header().Get("Content-Type")
 	if ct != "text/plain; charset=utf-8" {
 		t.Fatalf("expected text/plain content type, got %q", ct)
+	}
+	if body := rec.Body.String(); !strings.HasPrefix(body, "Registered Routes:\n") {
+		t.Fatalf("expected rendered routes text, got %q", body)
 	}
 }
 

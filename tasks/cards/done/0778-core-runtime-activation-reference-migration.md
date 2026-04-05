@@ -1,7 +1,7 @@
 # Card 0778
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `reference/standard-service/internal/app/app.go`
@@ -56,3 +56,7 @@ Done Definition:
 - Reference tests and repo-wide gates pass with the migrated bootstraps.
 
 Outcome:
+- Migrated all five reference applications off `core.Start(...)`.
+- Kept the reference app structure unchanged while aligning each bootstrap with
+  the collapsed `Prepare() + Server() + Shutdown()` lifecycle.
+- Removed the old start-runtime phase from the canonical reference layouts.

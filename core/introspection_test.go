@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -74,49 +73,4 @@ func TestRuntimeSnapshotNilApp(t *testing.T) {
 	if snapshot.Addr != "" {
 		t.Fatalf("addr = %q, want empty", snapshot.Addr)
 	}
-}
-
-func TestAttachHTTPObserverComposesObservers(t *testing.T) {
-	app := newTestApp()
-	first := &recordingHTTPObserver{}
-	second := &recordingHTTPObserver{}
-
-	app.AttachHTTPObserver(first)
-	app.AttachHTTPObserver(nil)
-	app.AttachHTTPObserver(second)
-
-	if app.httpMetrics == nil {
-		t.Fatal("expected httpMetrics to be attached")
-	}
-
-	app.httpMetrics.ObserveHTTP(context.Background(), http.MethodGet, "/metrics", http.StatusOK, 128, 5*time.Millisecond)
-
-	if first.calls != 1 {
-		t.Fatalf("first observer calls = %d, want 1", first.calls)
-	}
-	if second.calls != 1 {
-		t.Fatalf("second observer calls = %d, want 1", second.calls)
-	}
-}
-
-func TestAttachHTTPObserverNilAppAndObserver(t *testing.T) {
-	var app *App
-	observer := &recordingHTTPObserver{}
-
-	app.AttachHTTPObserver(observer)
-
-	app = newTestApp()
-	app.AttachHTTPObserver(nil)
-
-	if app.httpMetrics != nil {
-		t.Fatal("expected nil observer to be ignored")
-	}
-}
-
-type recordingHTTPObserver struct {
-	calls int
-}
-
-func (o *recordingHTTPObserver) ObserveHTTP(context.Context, string, string, int, int, time.Duration) {
-	o.calls++
 }

@@ -9,10 +9,16 @@ type TLSConfig struct {
 	KeyFile  string // Path to TLS private key file
 }
 
+// RouterConfig defines owned router behavior policy.
+type RouterConfig struct {
+	MethodNotAllowed bool // Whether to return 405 with Allow header on method mismatch
+}
+
 // AppConfig defines application configuration.
 type AppConfig struct {
-	Addr string    // Server address
-	TLS  TLSConfig // TLS configuration
+	Addr   string       // Server address
+	TLS    TLSConfig    // TLS configuration
+	Router RouterConfig // Router behavior policy
 	// HTTP server hardening
 	ReadTimeout       time.Duration // Maximum duration for reading the entire request, including the body
 	ReadHeaderTimeout time.Duration // Maximum duration for reading the request headers (slowloris protection)
@@ -28,6 +34,7 @@ func DefaultConfig() AppConfig {
 	return AppConfig{
 		Addr:              ":8080",
 		TLS:               TLSConfig{Enabled: false},
+		Router:            RouterConfig{MethodNotAllowed: false},
 		ReadTimeout:       30 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      30 * time.Second,

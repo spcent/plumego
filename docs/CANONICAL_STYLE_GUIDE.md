@@ -68,7 +68,8 @@ This layout should be demonstrated first in `reference/standard-service` and cop
 
 ```go
 func main() {
-    app := core.New()
+    cfg := core.DefaultConfig()
+    app := core.New(cfg)
 
     if err := app.Use(RequestID(), Recovery(), RequestLogger()); err != nil {
         log.Fatal(err)
@@ -79,9 +80,6 @@ func main() {
     }
 
     if err := app.Prepare(); err != nil {
-        log.Fatal(err)
-    }
-    if err := app.Start(context.Background()); err != nil {
         log.Fatal(err)
     }
     srv, err := app.Server()
@@ -120,6 +118,7 @@ func registerRoutes(app *core.App) error {
 
 - One method + one path + one handler per line
 - Route registration errors must be returned to the caller; do not log and continue
+- Use `app.Any(...)` for catch-all method registration; do not introduce overlapping helper aliases for the same ANY-route behavior
 - Static registration; no reflection or discovery
 - Must remain grep-friendly — path and handler discoverable by search
 - Groups: path prefix and shared middleware only; not for hidden policy or service injection
@@ -257,8 +256,10 @@ Route wiring file must make clear: who constructs the handler, what its dependen
 
 ```go
 func TestHealth(t *testing.T) {
-    app := core.New()
-    app.Get("/healthz", healthHandler)
+    app := core.New(core.DefaultConfig())
+    if err := app.Get("/healthz", healthHandler); err != nil {
+        t.Fatal(err)
+    }
 
     req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
     rec := httptest.NewRecorder()
@@ -499,9 +500,11 @@ func registerRoutes(app *core.App, userHandler handlers.UserHandler) {
 
 ```go
 func TestCreateUser(t *testing.T) {
-    app := core.New()
+    app := core.New(core.DefaultConfig())
     h := handlers.UserHandler{Service: stubUserService{ID: "u_123"}}
-    app.Post("/users", h.Create)
+    if err := app.Post("/users", h.Create); err != nil {
+        t.Fatal(err)
+    }
 
     body := strings.NewReader(`{"name":"alice","email":"a@example.com"}`)
     req := httptest.NewRequest(http.MethodPost, "/users", body)

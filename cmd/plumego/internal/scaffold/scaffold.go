@@ -659,9 +659,6 @@ func (a *App) Start() error {
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %%w", err)
 	}
-	if err := a.Core.Start(ctx); err != nil {
-		return fmt.Errorf("start runtime: %%w", err)
-	}
 	srv, err := a.Core.Server()
 	if err != nil {
 		return fmt.Errorf("get server: %%w", err)

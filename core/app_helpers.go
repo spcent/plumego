@@ -41,21 +41,25 @@ func (a *App) ensureRouter() *router.Router {
 
 	a.mu.RLock()
 	r := a.router
-	hasMethodNotAllowed := a.hasRouterMethodNotAllowed
-	methodNotAllowed := a.routerMethodNotAllowed
 	a.mu.RUnlock()
 
-	a.syncRouterConfig(r, hasMethodNotAllowed, methodNotAllowed)
+	a.syncRouterConfig(r)
 	return r
 }
 
-func (a *App) syncRouterConfig(r *router.Router, hasMethodNotAllowed bool, methodNotAllowed bool) {
-	if r == nil {
+func (a *App) syncRouterConfig(r *router.Router) {
+	if a == nil || r == nil {
 		return
 	}
-	if hasMethodNotAllowed {
-		r.SetMethodNotAllowed(methodNotAllowed)
+
+	a.mu.RLock()
+	cfg := a.config
+	a.mu.RUnlock()
+	if cfg == nil {
+		return
 	}
+
+	r.SetMethodNotAllowed(cfg.Router.MethodNotAllowed)
 }
 
 func (a *App) ensureMiddlewareChain() *middleware.Chain {

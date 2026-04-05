@@ -17,6 +17,25 @@ func (a *App) Prepare() error {
 		return err
 	}
 
+	a.mu.RLock()
+	started := a.started
+	logger := a.logger
+	a.mu.RUnlock()
+
+	if started {
+		return nil
+	}
+
+	if lifecycle, ok := logger.(log.Lifecycle); ok {
+		if err := lifecycle.Start(context.Background()); err != nil {
+			return wrapCoreError(err, "prepare_app", nil)
+		}
+	}
+
+	a.mu.Lock()
+	a.started = true
+	a.mu.Unlock()
+
 	return nil
 }
 
@@ -32,41 +51,6 @@ func (a *App) Server() (*http.Server, error) {
 	return server, nil
 }
 
-// Start starts logger lifecycle hooks and marks the runtime started.
-func (a *App) Start(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	a.mu.RLock()
-	if a.started {
-		a.mu.RUnlock()
-		return wrapCoreError(fmt.Errorf("app already started"), "start_app", nil)
-	}
-	prepared := a.httpServer != nil
-	logger := a.logger
-	a.mu.RUnlock()
-
-	if !prepared {
-		return wrapCoreError(fmt.Errorf("app not prepared"), "start_app", nil)
-	}
-
-	if lifecycle, ok := logger.(log.Lifecycle); ok {
-		if err := lifecycle.Start(ctx); err != nil {
-			return wrapCoreError(err, "start_app", nil)
-		}
-		a.mu.Lock()
-		a.loggerStarted = true
-		a.mu.Unlock()
-	}
-
-	a.mu.Lock()
-	a.started = true
-	a.mu.Unlock()
-
-	return nil
-}
-
 // Shutdown gracefully stops the HTTP server and all runtime hooks.
 func (a *App) Shutdown(ctx context.Context) error {
 	if ctx == nil {
@@ -76,6 +60,8 @@ func (a *App) Shutdown(ctx context.Context) error {
 	a.mu.RLock()
 	httpServer := a.httpServer
 	connTracker := a.connTracker
+	started := a.started
+	logger := a.logger
 	a.mu.RUnlock()
 
 	if connTracker != nil {
@@ -90,29 +76,17 @@ func (a *App) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	a.stopLoggerLifecycle(ctx)
+	if started {
+		if lifecycle, ok := logger.(log.Lifecycle); ok {
+			_ = lifecycle.Stop(ctx)
+		}
+	}
 
 	a.mu.Lock()
 	a.started = false
 	a.mu.Unlock()
 
 	return shutdownErr
-}
-
-func (a *App) stopLoggerLifecycle(ctx context.Context) {
-	a.mu.RLock()
-	started := a.loggerStarted
-	logger := a.logger
-	a.mu.RUnlock()
-	if !started {
-		return
-	}
-	if lifecycle, ok := logger.(log.Lifecycle); ok {
-		_ = lifecycle.Stop(ctx)
-	}
-	a.mu.Lock()
-	a.loggerStarted = false
-	a.mu.Unlock()
 }
 
 type connectionTracker struct {

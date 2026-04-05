@@ -67,8 +67,10 @@ func TestRequestIDMiddleware(t *testing.T) {
 	}
 }
 
-func TestWithMethodNotAllowed(t *testing.T) {
-	app := newTestApp(WithMethodNotAllowed(true))
+func TestMethodNotAllowedConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Router.MethodNotAllowed = true
+	app := New(cfg)
 	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -85,8 +87,10 @@ func TestWithMethodNotAllowed(t *testing.T) {
 	}
 }
 
-func TestWithMethodNotAllowedConfiguresOwnedRouter(t *testing.T) {
-	app := newTestApp(WithMethodNotAllowed(true))
+func TestRouterConfiguresOwnedMethodNotAllowedPolicy(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Router.MethodNotAllowed = true
+	app := New(cfg)
 	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))

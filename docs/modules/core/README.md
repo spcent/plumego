@@ -35,7 +35,6 @@
 - `App`
 - `Option`
 - `(*App).Prepare`
-- `(*App).Start`
 - `(*App).Server`
 - `(*App).Shutdown`
 
@@ -48,17 +47,17 @@
 ## Canonical change shape
 
 - keep bootstrap explicit
-- construct apps through `DefaultConfig()` / `AppConfig` plus non-config `Option`s, instead of per-field config helper options
+- construct apps through `DefaultConfig()` / `AppConfig`, and reserve `Option` for non-config dependency injection only
 - keep lifecycle behavior reviewable
-- keep one canonical lifecycle path: `Prepare` + `Start` + `Server` + `Shutdown`
-- split handler preparation from server preparation: `ServeHTTP` only freezes config/router state and builds the handler, while `Prepare` is the explicit path that allocates `http.Server` and connection tracking
+- keep one canonical lifecycle path: `Prepare` + `Server` + `Shutdown`
+- split handler preparation from server preparation: `ServeHTTP` only freezes config/router state and builds the handler, while `Prepare` is the explicit path that allocates `http.Server`, starts runtime hooks, and prepares connection tracking
 - keep server preparation and runtime snapshots aligned through one shared internal projection, instead of duplicating field-by-field remaps across lifecycle helpers
 - keep TLS on the same public serve path: `Prepare` loads configured certificates into the returned `*http.Server`, and callers use `ListenAndServeTLS("", "")` on that prepared server when TLS is enabled
 - keep `core` as the first-party router owner: route wiring goes through `App.AddRoute` / `App.Get` / `App.Post` and reverse URL lookup goes through `App.URL(...)`, not raw router replacement or mutation
-- attach HTTP metrics observers through `AttachHTTPObserver` when app-local wiring needs fan-out metrics collection
+- keep HTTP request metrics explicit in middleware/app-local wiring; `core` does not own live observer attachment state
 - keep readiness ownership out of `core`; callers own the outer serve loop, so readiness signaling must stay app-local instead of pretending the kernel knows when traffic can flow
 - keep app-local debug flags and env-file metadata outside `core`; the kernel owns HTTP runtime state, not devtools metadata transport
 - keep the app logger kernel-owned on `App.Logger()`; `core` does not mirror it into router state
-- treat router-affecting options as declarative app construction input, not eager side effects
+- keep router behavior policy in typed config, not in `Option`
 - push feature-specific wiring back to app-local code or the owning extension
 - preserve `net/http` compatibility while keeping `core` as a kernel

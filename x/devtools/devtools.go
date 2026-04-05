@@ -3,10 +3,10 @@ package devtools
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/spcent/plumego/contract"
@@ -72,7 +72,6 @@ type ConfigSnapshot struct {
 type routeRegistrar interface {
 	AddRoute(method, path string, handler http.Handler) error
 	Routes() []router.RouteInfo
-	Print(io.Writer)
 }
 
 func New(opts Options) *DevTools {
@@ -121,7 +120,7 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 
 	if err := r.AddRoute(http.MethodGet, DevToolsRoutesPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		r.Print(w)
+		_, _ = w.Write([]byte(renderRoutesText(r.Routes())))
 	})); err != nil {
 		return err
 	}
@@ -223,6 +222,19 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 		return err
 	}
 	return nil
+}
+
+func renderRoutesText(routes []router.RouteInfo) string {
+	var b strings.Builder
+	b.WriteString("Registered Routes:\n")
+	for _, route := range routes {
+		label := route.Path
+		if strings.Contains(route.Path, "/*") {
+			label += "   [wildcard]"
+		}
+		fmt.Fprintf(&b, "%-6s %s\n", route.Method, label)
+	}
+	return b.String()
 }
 
 func (c *DevTools) AttachMetrics() {

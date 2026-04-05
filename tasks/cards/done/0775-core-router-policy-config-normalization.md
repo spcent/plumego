@@ -1,7 +1,7 @@
 # Card 0775
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/config.go`
@@ -57,3 +57,9 @@ Done Definition:
 - Tests and docs reflect the config-first construction contract.
 
 Outcome:
+- Moved owned router method-mismatch policy into typed `AppConfig`.
+- Removed `core.WithMethodNotAllowed(...)` and the matching app shadow state.
+- Kept `core.Option` focused on non-config dependency injection such as logger
+  wiring.
+- Updated tests and core module docs to reflect the normalized config-first
+  contract.

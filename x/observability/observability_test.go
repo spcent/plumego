@@ -118,13 +118,11 @@ func TestConfigureMetricsNilRegisterRoute(t *testing.T) {
 func TestConfigureMetricsWithPrometheus(t *testing.T) {
 	r := router.NewRouter()
 	var setCollector *metrics.PrometheusCollector
-	var setHTTP metrics.HTTPObserver
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHook(r),
 		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { setCollector = c },
-		AttachHTTPObserver:     func(observer metrics.HTTPObserver) { setHTTP = observer },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -135,9 +133,6 @@ func TestConfigureMetricsWithPrometheus(t *testing.T) {
 	}
 	if setCollector == nil {
 		t.Fatal("expected collector to be set")
-	}
-	if setHTTP == nil {
-		t.Fatal("expected HTTP metrics observer to be set")
 	}
 }
 

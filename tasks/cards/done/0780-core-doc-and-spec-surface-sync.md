@@ -1,7 +1,7 @@
 # Card 0780
 
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `docs/CANONICAL_STYLE_GUIDE.md`
@@ -60,3 +60,9 @@ Done Definition:
 - Module metadata no longer advertises removed dependencies or responsibilities.
 
 Outcome:
+- Updated the canonical style guide to the current config-first bootstrap and
+  explicit route-registration contract.
+- Removed stale observer-attachment and `health` import claims from
+  `core/module.yaml`.
+- Brought style guide, module docs, and manifest metadata back into alignment
+  with the cleaned-up `core` surface.

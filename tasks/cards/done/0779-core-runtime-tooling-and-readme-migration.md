@@ -1,7 +1,7 @@
 # Card 0779
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `cmd/plumego/internal/scaffold/scaffold.go`
@@ -58,3 +58,7 @@ Done Definition:
 - Generated and documented app bootstrap matches the canonical lifecycle.
 
 Outcome:
+- Migrated scaffold and devserver bootstraps off `core.Start(...)`.
+- Updated root guides and getting-started docs to the collapsed lifecycle.
+- Removed stale README claims that request-body limits and concurrency limits
+  are part of `core.AppConfig`.

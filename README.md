@@ -117,9 +117,6 @@ func main() {
     if err := app.Prepare(); err != nil {
         log.Fatalf("prepare server: %v", err)
     }
-    if err := app.Start(ctx); err != nil {
-        log.Fatalf("start runtime: %v", err)
-    }
     srv, err := app.Server()
     if err != nil {
         log.Fatalf("get server: %v", err)
@@ -142,7 +139,7 @@ func main() {
 - `core` construction is config-first: start from `core.DefaultConfig()`, adjust the typed `core.AppConfig`, then pass it to `core.New(cfg, ...)`.
 - `core.New(cfg, ...)` defaults to a `NoOpLogger`. If you expect request/runtime logs, inject a real logger with `core.WithLogger(...)`.
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
-- The app defaults to a 10485760 byte (10 MiB) request body limit, 256 concurrent requests (with queue), and HTTP read/write timeouts. Override them through fields on `core.AppConfig`.
+- `core.AppConfig` owns server address, TLS, and HTTP server timeout/hardening settings. Request body limits and concurrency limits belong to explicit middleware wiring, not to `core` itself.
 - TLS stays on the same explicit serve path: `Prepare()` loads cert/key material into the prepared `*http.Server`, then callers choose `ListenAndServe()` or `ListenAndServeTLS("", "")` on the server returned by `Server()`.
 - Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
 - Debug mode and devtools are separate. Keep debug flags in app-local config, for example `cfg.App.Debug` in the reference layout; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.

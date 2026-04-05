@@ -1,7 +1,7 @@
 # Card 0774
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app.go`
@@ -59,3 +59,9 @@ Done Definition:
 - First-party docs no longer describe dead observer attachment behavior.
 
 Outcome:
+- Removed write-only `httpMetrics` state and `AttachHTTPObserver(...)` from
+  `core`.
+- Simplified `x/observability.Hooks` so metrics wiring no longer pretends the
+  kernel can attach a live request observer.
+- Updated tests and core module docs to reflect explicit middleware-owned HTTP
+  metrics wiring.

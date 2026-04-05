@@ -1,7 +1,7 @@
 # Card 0776
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app.go`
@@ -59,3 +59,10 @@ Done Definition:
 - First-party docs and devtools use the converged route surface.
 
 Outcome:
+- Kept `Any(...)` as the single explicit ANY-route registration helper in
+  `core` and removed the overlapping `Handle(...)` / `HandleFunc(...)`
+  aliases.
+- Removed `App.Print(...)` so route table formatting is no longer owned by the
+  kernel.
+- Updated devtools to render route text from `Routes()` and tightened the style
+  guide toward one canonical route surface.
