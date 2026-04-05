@@ -158,7 +158,7 @@ func TestPrepareBuildsHTTPServer(t *testing.T) {
 	}
 }
 
-func TestServeHTTPTriggersSamePreparedStateAsPrepare(t *testing.T) {
+func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":5555"
 	app := New(cfg)
@@ -188,12 +188,19 @@ func TestServeHTTPTriggersSamePreparedStateAsPrepare(t *testing.T) {
 	if !snapshot.ConfigFrozen {
 		t.Fatalf("expected config to be frozen after ServeHTTP")
 	}
-	if !snapshot.ServerPrepared {
-		t.Fatalf("expected server to be prepared after ServeHTTP")
+	if snapshot.ServerPrepared {
+		t.Fatalf("expected server to remain unprepared after ServeHTTP")
+	}
+	if _, err := app.Server(); err == nil {
+		t.Fatalf("expected Server to fail before Prepare")
+	}
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error after ServeHTTP: %v", err)
 	}
 	server, err := app.Server()
 	if err != nil {
-		t.Fatalf("Server returned error after ServeHTTP: %v", err)
+		t.Fatalf("Server returned error after Prepare: %v", err)
 	}
 	if server.Addr != ":5555" {
 		t.Fatalf("httpServer addr should be :5555, got %s", server.Addr)

@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 )
 
@@ -97,6 +99,28 @@ func requireNetwork(t *testing.T) string {
 	}
 	_ = ln.Close()
 	return addr
+}
+
+func assertWrappedCoreError(t *testing.T, err error, operation string, message string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != message {
+		t.Fatalf("error message = %q, want %q", err.Error(), message)
+	}
+
+	var wrapped *contract.WrappedErrorWithContext
+	if !errors.As(err, &wrapped) {
+		t.Fatalf("expected wrapped core error, got %T", err)
+	}
+	if wrapped.Context.Operation != operation {
+		t.Fatalf("operation = %q, want %q", wrapped.Context.Operation, operation)
+	}
+	if wrapped.Context.Module != "core" {
+		t.Fatalf("module = %q, want %q", wrapped.Context.Module, "core")
+	}
 }
 
 func TestPrepareStartServeAndShutdown(t *testing.T) {
@@ -282,9 +306,39 @@ func TestPrepareRejectsMissingTLSFiles(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	if err := app.Prepare(); err == nil {
-		t.Fatal("expected TLS validation error")
+	assertWrappedCoreError(t, app.Prepare(), "prepare_server", "TLS enabled but certificate or key file not provided")
+}
+
+func TestServerReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
+	app := newTestApp()
+
+	_, err := app.Server()
+
+	assertWrappedCoreError(t, err, "get_server", "server not prepared")
+}
+
+func TestStartReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
+	app := newTestApp()
+
+	err := app.Start(context.Background())
+
+	assertWrappedCoreError(t, err, "start_app", "app not prepared")
+}
+
+func TestStartReturnsWrappedErrorWhenAlreadyStarted(t *testing.T) {
+	app := newTestApp()
+	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("prepare returned unexpected error: %v", err)
 	}
+	if err := app.Start(context.Background()); err != nil {
+		t.Fatalf("start returned unexpected error: %v", err)
+	}
+
+	assertWrappedCoreError(t, app.Start(context.Background()), "start_app", "app already started")
 }
 
 func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {

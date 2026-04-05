@@ -22,7 +22,7 @@ func (a *App) addRoute(method, path string, handler http.Handler) error {
 
 	r := a.ensureRouter()
 	if r == nil {
-		return contract.WrapError(fmt.Errorf("router not configured"), "add_route", "core", nil)
+		return wrapCoreError(fmt.Errorf("router not configured"), "add_route", nil)
 	}
 
 	return r.AddRoute(method, path, handler)
@@ -43,7 +43,7 @@ func (a *App) addNamedRoute(method, name, path string, handler http.Handler) err
 
 	r := a.ensureRouter()
 	if r == nil {
-		return contract.WrapError(fmt.Errorf("router not configured"), "add_route", "core", nil)
+		return wrapCoreError(fmt.Errorf("router not configured"), "add_route", nil)
 	}
 
 	return r.AddRouteWithName(method, path, name, handler)

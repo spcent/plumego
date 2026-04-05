@@ -13,7 +13,7 @@ import (
 
 // Prepare freezes routing/middleware state and constructs the HTTP server.
 func (a *App) Prepare() error {
-	if err := a.ensurePrepared(); err != nil {
+	if err := a.ensureServerPrepared(); err != nil {
 		return err
 	}
 
@@ -27,12 +27,12 @@ func (a *App) Server() (*http.Server, error) {
 	a.mu.RUnlock()
 
 	if server == nil {
-		return nil, fmt.Errorf("server not prepared")
+		return nil, wrapCoreError(fmt.Errorf("server not prepared"), "get_server", nil)
 	}
 	return server, nil
 }
 
-// Start starts logger lifecycle hooks and marks the app ready.
+// Start starts logger lifecycle hooks and marks the runtime started.
 func (a *App) Start(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -41,19 +41,19 @@ func (a *App) Start(ctx context.Context) error {
 	a.mu.RLock()
 	if a.started {
 		a.mu.RUnlock()
-		return fmt.Errorf("app already started")
+		return wrapCoreError(fmt.Errorf("app already started"), "start_app", nil)
 	}
 	prepared := a.httpServer != nil
 	logger := a.logger
 	a.mu.RUnlock()
 
 	if !prepared {
-		return fmt.Errorf("app not prepared")
+		return wrapCoreError(fmt.Errorf("app not prepared"), "start_app", nil)
 	}
 
 	if lifecycle, ok := logger.(log.Lifecycle); ok {
 		if err := lifecycle.Start(ctx); err != nil {
-			return err
+			return wrapCoreError(err, "start_app", nil)
 		}
 		a.mu.Lock()
 		a.loggerStarted = true
@@ -63,10 +63,6 @@ func (a *App) Start(ctx context.Context) error {
 	a.mu.Lock()
 	a.started = true
 	a.mu.Unlock()
-
-	if a.healthManager != nil {
-		a.healthManager.MarkReady()
-	}
 
 	return nil
 }
@@ -82,10 +78,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 	connTracker := a.connTracker
 	a.mu.RUnlock()
 
-	if a.healthManager != nil {
-		a.healthManager.MarkNotReady("shutting down")
-	}
-
 	if connTracker != nil {
 		go connTracker.drain(ctx)
 	}
@@ -94,7 +86,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 	if httpServer != nil {
 		if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
 			a.logger.Error("Server shutdown error", log.Fields{"error": err})
-			shutdownErr = err
+			shutdownErr = wrapCoreError(err, "shutdown_app", nil)
 		}
 	}
 

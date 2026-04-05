@@ -1,7 +1,7 @@
 # Card 0771
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/http_handler.go`
@@ -61,3 +61,11 @@ Done Definition:
 - `ServerPrepared` reflects prepared-server state only, not first request use.
 
 Outcome:
+- Split preparation into `ensureHandlerPrepared()` and
+  `ensureServerPrepared()`.
+- Narrowed `ServeHTTP` so direct handler use freezes config/router state and
+  builds only the composed handler.
+- Kept `Prepare()` as the only path that allocates `http.Server` and
+  connection tracking.
+- Updated tests and docs so `RuntimeSnapshot.ServerPrepared` reflects prepared
+  server state only.

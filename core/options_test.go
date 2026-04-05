@@ -10,7 +10,7 @@ import (
 )
 
 func TestWithLogger(t *testing.T) {
-	app := &App{}
+	app := newTestApp()
 	logger := log.NewGLogger()
 	opt := WithLogger(logger)
 	opt(app)
@@ -38,7 +38,7 @@ func TestWithLoggerNil(t *testing.T) {
 		}
 	}()
 
-	WithLogger(nil)(&App{})
+	WithLogger(nil)(newTestApp())
 }
 
 func TestNewDefaultsToNoOpLogger(t *testing.T) {

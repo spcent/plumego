@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -11,6 +13,10 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 	}
 
 	chain := a.ensureMiddlewareChain()
+	if chain == nil {
+		return wrapCoreError(fmt.Errorf("middleware chain not configured"), "use_middleware", nil)
+	}
+
 	for _, mw := range middlewares {
 		chain.Use(mw)
 	}
@@ -21,6 +27,13 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 func (a *App) buildHandler() {
 	chain := a.ensureMiddlewareChain()
 	r := a.ensureRouter()
+	if chain == nil || r == nil {
+		a.mu.Lock()
+		a.handler = nil
+		a.mu.Unlock()
+		return
+	}
+
 	handler := chain.Build(r)
 
 	a.mu.Lock()

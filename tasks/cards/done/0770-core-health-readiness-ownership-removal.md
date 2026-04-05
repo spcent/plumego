@@ -1,7 +1,7 @@
 # Card 0770
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app.go`
@@ -57,3 +57,10 @@ Done Definition:
 - Docs/tests treat readiness as app-local wiring, not kernel-owned behavior.
 
 Outcome:
+- Removed `WithHealthManager(...)` and the `healthManager` field from `core`,
+  so the kernel no longer pretends to own readiness signaling.
+- Dropped `MarkReady()` / `MarkNotReady(...)` calls from `core.Start` and
+  `core.Shutdown`, keeping readiness ownership in app-local code instead of the
+  kernel.
+- Updated the core primer to stop describing health-readiness wiring as a
+  kernel concern.

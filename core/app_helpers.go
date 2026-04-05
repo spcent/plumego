@@ -16,12 +16,16 @@ func (a *App) ensureMutable(operation, action string) error {
 	a.mu.RUnlock()
 
 	if started {
-		return contract.WrapError(fmt.Errorf("cannot %s after app has started", action), operation, "core", nil)
+		return wrapCoreError(fmt.Errorf("cannot %s after app has started", action), operation, nil)
 	}
 	if frozen {
-		return contract.WrapError(fmt.Errorf("cannot %s after app has been initialized", action), operation, "core", nil)
+		return wrapCoreError(fmt.Errorf("cannot %s after app has been initialized", action), operation, nil)
 	}
 	return nil
+}
+
+func wrapCoreError(err error, operation string, params map[string]any) error {
+	return contract.WrapError(err, operation, "core", params)
 }
 
 func (a *App) freezeConfig() {
@@ -31,14 +35,15 @@ func (a *App) freezeConfig() {
 }
 
 func (a *App) ensureRouter() *router.Router {
-	a.mu.Lock()
-	if a.router == nil {
-		a.router = router.NewRouter()
+	if a == nil {
+		return nil
 	}
+
+	a.mu.RLock()
 	r := a.router
 	hasMethodNotAllowed := a.hasRouterMethodNotAllowed
 	methodNotAllowed := a.routerMethodNotAllowed
-	a.mu.Unlock()
+	a.mu.RUnlock()
 
 	a.syncRouterConfig(r, hasMethodNotAllowed, methodNotAllowed)
 	return r
@@ -54,12 +59,13 @@ func (a *App) syncRouterConfig(r *router.Router, hasMethodNotAllowed bool, metho
 }
 
 func (a *App) ensureMiddlewareChain() *middleware.Chain {
-	a.mu.Lock()
-	if a.middlewareChain == nil {
-		a.middlewareChain = middleware.NewChain()
+	if a == nil {
+		return nil
 	}
+
+	a.mu.RLock()
 	chain := a.middlewareChain
-	a.mu.Unlock()
+	a.mu.RUnlock()
 	return chain
 }
 

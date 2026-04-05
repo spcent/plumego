@@ -1,7 +1,7 @@
 # Card 0772
 
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app_helpers.go`
@@ -57,3 +57,10 @@ Done Definition:
 - Kernel invariants are explicit and simpler to reason about.
 
 Outcome:
+- Removed lazy router and middleware-chain recreation from `core.App`
+  internals.
+- Kept invalid or nil app values out of the normal runtime path instead of
+  silently repairing them.
+- Updated middleware wiring to fail explicitly when owned kernel internals are
+  missing.
+- Updated option tests to use real apps built through `New(...)`.

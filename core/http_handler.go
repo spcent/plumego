@@ -8,10 +8,9 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-// ensurePrepared performs the canonical one-time preparation transition shared
-// by Prepare and ServeHTTP. It freezes config/router state, builds the handler,
-// and constructs the backing http.Server.
-func (a *App) ensurePrepared() error {
+// ensureHandlerPrepared performs the one-time transition required for using the
+// app as an http.Handler. It freezes config/router state and builds the handler.
+func (a *App) ensureHandlerPrepared() {
 	a.handlerOnce.Do(func() {
 		a.freezeConfig()
 		r := a.ensureRouter()
@@ -20,6 +19,12 @@ func (a *App) ensurePrepared() error {
 		}
 		a.buildHandler()
 	})
+}
+
+// ensureServerPrepared constructs the backing http.Server for the explicit
+// Prepare/Server lifecycle path.
+func (a *App) ensureServerPrepared() error {
+	a.ensureHandlerPrepared()
 
 	a.mu.RLock()
 	if a.httpServer != nil {
@@ -31,17 +36,17 @@ func (a *App) ensurePrepared() error {
 	a.mu.RUnlock()
 
 	if handler == nil {
-		return fmt.Errorf("handler not configured")
+		return wrapCoreError(fmt.Errorf("handler not configured"), "prepare_server", nil)
 	}
 
 	var tlsConfig *tls.Config
 	if snapshot.TLS.Enabled {
 		if snapshot.TLS.CertFile == "" || snapshot.TLS.KeyFile == "" {
-			return fmt.Errorf("TLS enabled but certificate or key file not provided")
+			return wrapCoreError(fmt.Errorf("TLS enabled but certificate or key file not provided"), "prepare_server", nil)
 		}
 		cert, err := tls.LoadX509KeyPair(snapshot.TLS.CertFile, snapshot.TLS.KeyFile)
 		if err != nil {
-			return fmt.Errorf("load tls certificate: %w", err)
+			return wrapCoreError(fmt.Errorf("load tls certificate: %w", err), "prepare_server", nil)
 		}
 		tlsConfig = &tls.Config{
 			Certificates: []tls.Certificate{cert},
@@ -77,10 +82,7 @@ func (a *App) ensurePrepared() error {
 
 // ServeHTTP allows App to be used directly with net/http servers.
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := a.ensurePrepared(); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusServiceUnavailable).Code("handler_not_configured").Message(err.Error()).Build())
-		return
-	}
+	a.ensureHandlerPrepared()
 
 	a.mu.RLock()
 	handler := a.handler

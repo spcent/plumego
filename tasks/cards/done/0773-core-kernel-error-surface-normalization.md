@@ -1,7 +1,7 @@
 # Card 0773
 
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app_helpers.go`
@@ -56,3 +56,8 @@ Done Definition:
 - Tests assert against the normalized contract instead of mixed ad hoc strings.
 
 Outcome:
+- Added one internal `wrapCoreError(...)` path and used it across mutability,
+  routing, preparation, and lifecycle failures.
+- Normalized `Prepare`, `Server`, `Start`, and `Shutdown` to return wrapped
+  kernel errors with `core` module metadata instead of bare `fmt.Errorf(...)`.
+- Updated lifecycle tests to assert the wrapped error contract directly.

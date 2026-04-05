@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
@@ -36,8 +35,7 @@ type App struct {
 	handlerOnce sync.Once          // Ensures handler initialization happens once, can be reset for testing
 
 	// Optional components
-	httpMetrics   metrics.HTTPObserver
-	healthManager health.HealthManager
+	httpMetrics metrics.HTTPObserver
 }
 
 // Option defines a function type for configuring non-config app dependencies.
