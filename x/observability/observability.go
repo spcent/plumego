@@ -128,8 +128,8 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 		if hooks.SetPrometheusCollector != nil {
 			hooks.SetPrometheusCollector(collector)
 		}
-		if hooks.SetHTTPMetrics != nil {
-			hooks.SetHTTPMetrics(collector)
+		if hooks.AttachHTTPObserver != nil {
+			hooks.AttachHTTPObserver(collector)
 		}
 	}
 	return nil
@@ -167,7 +167,7 @@ type Hooks struct {
 	EnsureRouter           func() *router.Router
 	GetPrometheusCollector func() *metrics.PrometheusCollector
 	SetPrometheusCollector func(*metrics.PrometheusCollector)
-	SetHTTPMetrics         func(metrics.HTTPObserver)
+	AttachHTTPObserver     func(metrics.HTTPObserver)
 	GetTracer              func() mwtracing.Tracer
 	SetTracer              func(mwtracing.Tracer)
 }

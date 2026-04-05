@@ -17,7 +17,7 @@
 //		"github.com/spcent/plumego/core"
 //	)
 //
-//	app := core.New()
+//	app := core.New(core.DefaultConfig())
 //
 //	// Register proxy as a route handler
 //	app.Any("/api/*", gateway.New(gateway.Config{

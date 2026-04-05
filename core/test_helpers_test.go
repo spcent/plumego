@@ -8,3 +8,7 @@ func mustRegisterRoute(t *testing.T, err error) {
 		t.Fatalf("register route: %v", err)
 	}
 }
+
+func newTestApp(options ...Option) *App {
+	return New(DefaultConfig(), options...)
+}

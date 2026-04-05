@@ -73,11 +73,10 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	}
 
 	// Create plumego app for dashboard
-	app := core.New(
-		core.WithAddr(cfg.DashboardAddr),
-		core.WithDebug(),
-		core.WithLogger(plog.NewGLogger()),
-	)
+	appCfg := core.DefaultConfig()
+	appCfg.Addr = cfg.DashboardAddr
+	appCfg.Debug = true
+	app := core.New(appCfg, core.WithLogger(plog.NewGLogger()))
 	if err := app.Use(
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),

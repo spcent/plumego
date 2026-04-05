@@ -170,10 +170,9 @@ import (
 
 // New constructs the HTTP application with middleware and routes.
 func New() *core.App {
-	app := core.New(
-		core.WithAddr(":8080"),
-		core.WithLogger(plumelog.NewGLogger()),
-	)
+	cfg := core.DefaultConfig()
+	cfg.Addr = ":8080"
+	app := core.New(cfg, core.WithLogger(plumelog.NewGLogger()))
 	if err := app.Use(
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),
@@ -645,16 +644,7 @@ type App struct {
 
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
-	opts := []core.Option{
-		core.WithAddr(cfg.Core.Addr),
-		core.WithEnvPath(cfg.Core.EnvFile),
-		core.WithLogger(plumelog.NewGLogger()),
-	}
-	if cfg.Core.Debug {
-		opts = append(opts, core.WithDebug())
-	}
-
-	a := core.New(opts...)
+	a := core.New(cfg.Core, core.WithLogger(plumelog.NewGLogger()))
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
 	a.Use(accesslog.Middleware(a.Logger()))
@@ -678,6 +668,12 @@ func (a *App) Start() error {
 	}
 	defer a.Core.Shutdown(ctx)
 
+	if a.Cfg.Core.TLS.Enabled {
+		if err := srv.ListenAndServeTLS("", ""); err != nil {
+			return fmt.Errorf("server stopped: %%w", err)
+		}
+		return nil
+	}
 	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("server stopped: %%w", err)
 	}
@@ -806,12 +802,10 @@ type Config struct {
 
 // Defaults returns safe configuration values for local development.
 func Defaults() Config {
+	coreCfg := core.DefaultConfig()
+	coreCfg.Addr = ":8080"
 	return Config{
-		Core: core.AppConfig{
-			Addr:    ":8080",
-			EnvFile: ".env",
-			Debug:   false,
-		},
+		Core: coreCfg,
 	}
 }
 
@@ -913,10 +907,9 @@ import (
 )
 
 func main() {
-	app := core.New(
-		core.WithAddr(":8080"),
-		core.WithLogger(plumelog.NewGLogger()),
-	)
+	cfg := core.DefaultConfig()
+	cfg.Addr = ":8080"
+	app := core.New(cfg, core.WithLogger(plumelog.NewGLogger()))
 	if err := app.Use(
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),

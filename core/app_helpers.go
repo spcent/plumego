@@ -36,21 +36,17 @@ func (a *App) ensureRouter() *router.Router {
 		a.router = router.NewRouter()
 	}
 	r := a.router
-	logger := a.logger
 	hasMethodNotAllowed := a.hasRouterMethodNotAllowed
 	methodNotAllowed := a.routerMethodNotAllowed
 	a.mu.Unlock()
 
-	a.syncRouterConfig(r, logger, hasMethodNotAllowed, methodNotAllowed)
+	a.syncRouterConfig(r, hasMethodNotAllowed, methodNotAllowed)
 	return r
 }
 
-func (a *App) syncRouterConfig(r *router.Router, logger log.StructuredLogger, hasMethodNotAllowed bool, methodNotAllowed bool) {
+func (a *App) syncRouterConfig(r *router.Router, hasMethodNotAllowed bool, methodNotAllowed bool) {
 	if r == nil {
 		return
-	}
-	if logger != nil {
-		r.SetLogger(logger)
 	}
 	if hasMethodNotAllowed {
 		r.SetMethodNotAllowed(methodNotAllowed)

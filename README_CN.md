@@ -95,10 +95,9 @@ import (
 
 func main() {
     ctx := context.Background()
-    app := core.New(
-        core.WithAddr(":8080"),
-        core.WithLogger(plog.NewGLogger()),
-    )
+    cfg := core.DefaultConfig()
+    cfg.Addr = ":8080"
+    app := core.New(cfg, core.WithLogger(plog.NewGLogger()))
 
     if err := app.Use(
         requestid.Middleware(),
@@ -128,19 +127,25 @@ func main() {
     defer app.Shutdown(ctx)
 
     log.Println("server started at :8080")
-    if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-        log.Fatalf("server stopped: %v", err)
+    serveErr := srv.ListenAndServe()
+    if srv.TLSConfig != nil {
+        serveErr = srv.ListenAndServeTLS("", "")
+    }
+    if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+        log.Fatalf("server stopped: %v", serveErr)
     }
 }
 ```
 
 ## 配置基础
-- 环境变量应在 `main` 包中显式加载。`core.WithEnvPath` 仅记录路径，供需要该信息的组件使用，例如 devtools 热重载。
-- `core.New(...)` 默认使用 `NoOpLogger`。如果希望有请求日志或运行期日志，请显式注入 `core.WithLogger(...)`。
+- 环境变量应在 `main` 包中显式加载。若应用本地工具需要知道当前 `.env` 路径，例如 devtools 热重载，请通过 `cfg.EnvFile` 明确传入。
+- `core` 现在走 config-first 构造：先从 `core.DefaultConfig()` 取得基线，再调整 typed `core.AppConfig`，最后传给 `core.New(cfg, ...)`。
+- `core.New(cfg, ...)` 默认使用 `NoOpLogger`。如果希望有请求日志或运行期日志，请显式注入 `core.WithLogger(...)`。
 - 常用变量：`AUTH_TOKEN`（ops 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
-- 应用默认包括 10485760 字节（10 MiB）请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5000ms（5 秒）优雅关闭窗口。可通过 `core.With...` 选项覆盖。
+- 应用默认包括 10485760 字节（10 MiB）请求体限制、256 并发请求限制（带队列）、HTTP 读/写超时，以及 5000ms（5 秒）优雅关闭窗口。需要覆盖时，请直接修改 `core.AppConfig` 上的字段。
+- TLS 仍走同一条显式启动路径：`Prepare()` 会把证书与私钥加载进准备好的 `*http.Server`，随后调用方基于 `Server()` 返回的实例选择 `ListenAndServe()` 或 `ListenAndServeTLS("", "")`。
 - 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.SecurityHeaders(...)` 与 `middleware/ratelimit.AbuseGuard(...)`。
-- 调试模式与 devtools 已拆分：`core.WithDebug()` 只开启调试行为；如果需要 devtools，请在应用本地 wiring 中显式注册相关路由，不要把它视为 canonical kernel 的一部分。
+- 调试模式与 devtools 已拆分：通过 `cfg.Debug = true` 开启调试行为；如果需要 devtools，请在应用本地 wiring 中显式注册相关路由，不要把它视为 canonical kernel 的一部分。
 - `/_debug` 下的调试端点（路由表、Middleware、配置快照、指标、pprof、手动重载）现在由 `x/devtools` 提供，而不是 `core` 内建。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
 - 当接入 `x/devtools` 时，`/_debug/config` 会暴露 first-party tooling 使用的稳定运行时快照：地址、env 文件、服务超时、shutdown/drain 配置、TLS 配置以及生命周期标志。
 
@@ -214,7 +219,7 @@ go run ./reference/standard-service
 仪表盘**默认启用** - 只需运行 `plumego dev` 即可开始使用。
 
 **定位差异与生产建议**
-- `core.WithDebug` 会暴露应用级 `/_debug` 端点，属于应用自身调试接口，生产环境应关闭或加访问控制。
+- `cfg.Debug = true` 会暴露应用级 `/_debug` 端点，属于应用自身调试接口，生产环境应关闭或加访问控制。
 - `plumego dev` 仪表盘是本地开发工具，运行独立的仪表盘服务，不建议在生产环境对外暴露。
 - 仪表盘可能读取应用的 `/_debug` 端点用于路由/配置/指标/pprof 展示，因此仅建议在本地或受控环境启用。
 

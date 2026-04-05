@@ -26,6 +26,24 @@ type AppConfig struct {
 	DrainInterval     time.Duration // How often to log in-flight connection counts while draining
 }
 
+// DefaultConfig returns the canonical baseline application configuration.
+func DefaultConfig() AppConfig {
+	return AppConfig{
+		Addr:              ":8080",
+		EnvFile:           ".env",
+		TLS:               TLSConfig{Enabled: false},
+		Debug:             false,
+		ShutdownTimeout:   5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1 MiB
+		EnableHTTP2:       true,
+		DrainInterval:     500 * time.Millisecond,
+	}
+}
+
 // RuntimeTLSSnapshot exposes the stable TLS subset used by first-party tooling.
 type RuntimeTLSSnapshot struct {
 	Enabled  bool   `json:"enabled"`

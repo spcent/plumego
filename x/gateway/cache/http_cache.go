@@ -15,7 +15,7 @@
 //		"github.com/spcent/plumego/core"
 //	)
 //
-//	app := core.New()
+//	app := core.New(core.DefaultConfig())
 //
 //	// Simple caching with defaults
 //	app.Use(cache.Middleware(cache.Config{

@@ -22,16 +22,7 @@ type App struct {
 
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
-	opts := []core.Option{
-		core.WithAddr(cfg.Core.Addr),
-		core.WithEnvPath(cfg.Core.EnvFile),
-		core.WithLogger(plumelog.NewGLogger()),
-	}
-	if cfg.Core.Debug {
-		opts = append(opts, core.WithDebug())
-	}
-
-	app := core.New(opts...)
+	app := core.New(cfg.Core, core.WithLogger(plumelog.NewGLogger()))
 	app.Use(requestid.Middleware())
 	app.Use(recovery.Recovery(app.Logger()))
 	app.Use(accesslog.Middleware(app.Logger()))
@@ -58,6 +49,12 @@ func (a *App) Start() error {
 	}
 	defer a.Core.Shutdown(ctx)
 
+	if a.Cfg.Core.TLS.Enabled {
+		if err := srv.ListenAndServeTLS("", ""); err != nil {
+			return fmt.Errorf("server stopped: %w", err)
+		}
+		return nil
+	}
 	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("server stopped: %w", err)
 	}

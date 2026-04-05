@@ -248,9 +248,9 @@
 //		"github.com/spcent/plumego/middleware/httpmetrics"
 //	)
 //
-//	app := core.New(
-//		core.WithAddr(":8080"),
-//	)
+//	cfg := core.DefaultConfig()
+//	cfg.Addr = ":8080"
+//	app := core.New(cfg)
 //
 //	// Create and register metrics collector
 //	collector := metrics.NewPrometheusCollector("myapp")

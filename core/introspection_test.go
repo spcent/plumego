@@ -1,31 +1,31 @@
 package core
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
 )
 
 func TestRuntimeSnapshotIncludesStableFields(t *testing.T) {
-	app := New(
-		WithAddr(":9090"),
-		WithEnvPath(".env.test"),
-		WithDebug(),
-		WithShutdownTimeout(7*time.Second),
-	)
-
-	app.config.ReadTimeout = 11 * time.Second
-	app.config.ReadHeaderTimeout = 3 * time.Second
-	app.config.WriteTimeout = 13 * time.Second
-	app.config.IdleTimeout = 17 * time.Second
-	app.config.MaxHeaderBytes = 2048
-	app.config.EnableHTTP2 = false
-	app.config.DrainInterval = 250 * time.Millisecond
-	app.config.TLS = TLSConfig{
+	cfg := DefaultConfig()
+	cfg.Addr = ":9090"
+	cfg.EnvFile = ".env.test"
+	cfg.Debug = true
+	cfg.ShutdownTimeout = 7 * time.Second
+	cfg.ReadTimeout = 11 * time.Second
+	cfg.ReadHeaderTimeout = 3 * time.Second
+	cfg.WriteTimeout = 13 * time.Second
+	cfg.IdleTimeout = 17 * time.Second
+	cfg.MaxHeaderBytes = 2048
+	cfg.EnableHTTP2 = false
+	cfg.DrainInterval = 250 * time.Millisecond
+	cfg.TLS = TLSConfig{
 		Enabled:  true,
 		CertFile: "cert.pem",
 		KeyFile:  "key.pem",
 	}
+	app := New(cfg)
 	app.started = true
 	app.configFrozen = true
 	app.httpServer = &http.Server{}
@@ -89,4 +89,49 @@ func TestRuntimeSnapshotNilApp(t *testing.T) {
 	if snapshot.EnvFile != "" {
 		t.Fatalf("env file = %q, want empty", snapshot.EnvFile)
 	}
+}
+
+func TestAttachHTTPObserverComposesObservers(t *testing.T) {
+	app := newTestApp()
+	first := &recordingHTTPObserver{}
+	second := &recordingHTTPObserver{}
+
+	app.AttachHTTPObserver(first)
+	app.AttachHTTPObserver(nil)
+	app.AttachHTTPObserver(second)
+
+	if app.httpMetrics == nil {
+		t.Fatal("expected httpMetrics to be attached")
+	}
+
+	app.httpMetrics.ObserveHTTP(context.Background(), http.MethodGet, "/metrics", http.StatusOK, 128, 5*time.Millisecond)
+
+	if first.calls != 1 {
+		t.Fatalf("first observer calls = %d, want 1", first.calls)
+	}
+	if second.calls != 1 {
+		t.Fatalf("second observer calls = %d, want 1", second.calls)
+	}
+}
+
+func TestAttachHTTPObserverNilAppAndObserver(t *testing.T) {
+	var app *App
+	observer := &recordingHTTPObserver{}
+
+	app.AttachHTTPObserver(observer)
+
+	app = newTestApp()
+	app.AttachHTTPObserver(nil)
+
+	if app.httpMetrics != nil {
+		t.Fatal("expected nil observer to be ignored")
+	}
+}
+
+type recordingHTTPObserver struct {
+	calls int
+}
+
+func (o *recordingHTTPObserver) ObserveHTTP(context.Context, string, string, int, int, time.Duration) {
+	o.calls++
 }

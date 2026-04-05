@@ -21,12 +21,10 @@ type Config struct {
 
 // Defaults returns safe configuration values for local development.
 func Defaults() Config {
+	coreCfg := core.DefaultConfig()
+	coreCfg.Addr = ":8083"
 	return Config{
-		Core: core.AppConfig{
-			Addr:    ":8083",
-			EnvFile: ".env",
-			Debug:   false,
-		},
+		Core:           coreCfg,
 		GatewayBackend: "http://localhost:9090",
 	}
 }

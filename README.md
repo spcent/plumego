@@ -95,10 +95,9 @@ import (
 
 func main() {
     ctx := context.Background()
-    app := core.New(
-        core.WithAddr(":8080"),
-        core.WithLogger(plog.NewGLogger()),
-    )
+    cfg := core.DefaultConfig()
+    cfg.Addr = ":8080"
+    app := core.New(cfg, core.WithLogger(plog.NewGLogger()))
 
     if err := app.Use(
         requestid.Middleware(),
@@ -128,19 +127,25 @@ func main() {
     defer app.Shutdown(ctx)
 
     log.Println("server started at :8080")
-    if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-        log.Fatalf("server stopped: %v", err)
+    serveErr := srv.ListenAndServe()
+    if srv.TLSConfig != nil {
+        serveErr = srv.ListenAndServeTLS("", "")
+    }
+    if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+        log.Fatalf("server stopped: %v", serveErr)
     }
 }
 ```
 
 ## Configuration Basics
-- Environment variables should be loaded explicitly in your `main` package. `core.WithEnvPath` only records the path for components that need it, such as devtools reload support.
-- `core.New(...)` defaults to a `NoOpLogger`. If you expect request/runtime logs, inject a real logger with `core.WithLogger(...)`.
+- Environment variables should be loaded explicitly in your `main` package. Set `cfg.EnvFile` when app-local tooling needs to know which `.env` file is in use, such as devtools reload support.
+- `core` construction is config-first: start from `core.DefaultConfig()`, adjust the typed `core.AppConfig`, then pass it to `core.New(cfg, ...)`.
+- `core.New(cfg, ...)` defaults to a `NoOpLogger`. If you expect request/runtime logs, inject a real logger with `core.WithLogger(...)`.
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
-- The app defaults to a 10485760 byte (10 MiB) request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5000ms (5s) graceful shutdown window. Override via `core.With...` options.
+- The app defaults to a 10485760 byte (10 MiB) request body limit, 256 concurrent requests (with queue), HTTP read/write timeouts, and a 5000ms (5s) graceful shutdown window. Override them through fields on `core.AppConfig`.
+- TLS stays on the same explicit serve path: `Prepare()` loads cert/key material into the prepared `*http.Server`, then callers choose `ListenAndServe()` or `ListenAndServeTLS("", "")` on the server returned by `Server()`.
 - Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
-- Debug mode and devtools are separate. Use `core.WithDebug()` for debug behavior; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
+- Debug mode and devtools are separate. Set `cfg.Debug = true` for debug behavior; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
 - Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.
 - When `x/devtools` is wired, `/_debug/config` exposes the stable runtime snapshot used by first-party tooling: address, env file, server timeouts, shutdown/drain settings, TLS config, and lifecycle flags.
 
@@ -214,7 +219,7 @@ The `plumego` CLI includes a powerful development server built with the plumego 
 The dashboard is **enabled by default** - simply run `plumego dev` to get started.
 
 **Positioning & Production Guidance**
-- `core.WithDebug` exposes application devtools under `/_debug`. These are app endpoints and should be disabled or protected in production.
+- `cfg.Debug = true` exposes application devtools under `/_debug`. These are app endpoints and should be disabled or protected in production.
 - `plumego dev` dashboard is a local developer tool that runs a separate dashboard server; it is not intended to be exposed publicly in production environments.
 - The dashboard may query the app’s `/_debug` endpoints for routes/config/metrics/pprof when available, so keep debug endpoints gated outside local/dev usage.
 

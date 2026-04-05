@@ -13,7 +13,7 @@
 //		"github.com/spcent/plumego/core"
 //	)
 //
-//	app := core.New()
+//	app := core.New(core.DefaultConfig())
 //
 //	// Simple rate limiting
 //	app.Use(ratelimit.TokenBucket(ratelimit.Config{

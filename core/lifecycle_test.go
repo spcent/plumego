@@ -2,6 +2,13 @@ package core
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +20,62 @@ import (
 
 	"github.com/spcent/plumego/log"
 )
+
+func writeTestTLSCertFiles(t *testing.T) (string, string) {
+	t.Helper()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate rsa key: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "127.0.0.1",
+		},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+	}
+
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("create certificate: %v", err)
+	}
+
+	certFile, err := os.CreateTemp("", "plumego-test-cert-*.pem")
+	if err != nil {
+		t.Fatalf("create cert temp file: %v", err)
+	}
+	keyFile, err := os.CreateTemp("", "plumego-test-key-*.pem")
+	if err != nil {
+		t.Fatalf("create key temp file: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Remove(certFile.Name())
+		_ = os.Remove(keyFile.Name())
+	})
+
+	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: der}); err != nil {
+		t.Fatalf("write cert pem: %v", err)
+	}
+	if err := pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}); err != nil {
+		t.Fatalf("write key pem: %v", err)
+	}
+	if err := certFile.Close(); err != nil {
+		t.Fatalf("close cert file: %v", err)
+	}
+	if err := keyFile.Close(); err != nil {
+		t.Fatalf("close key file: %v", err)
+	}
+
+	return certFile.Name(), keyFile.Name()
+}
 
 func testListenAddr() string {
 	if addr := strings.TrimSpace(os.Getenv("PLUMEGO_TEST_ADDR")); addr != "" {
@@ -38,8 +101,10 @@ func requireNetwork(t *testing.T) string {
 
 func TestPrepareStartServeAndShutdown(t *testing.T) {
 	addr := requireNetwork(t)
+	cfg := DefaultConfig()
+	cfg.Addr = addr
 
-	app := New(WithAddr(addr))
+	app := New(cfg)
 
 	// Add a test route
 	mustRegisterRoute(t, app.Get("/boot-test", func(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +160,7 @@ func TestPrepareStartServeAndShutdown(t *testing.T) {
 }
 
 func TestStartMarksAppReadyWithoutLegacyRuntimeHooks(t *testing.T) {
-	app := New()
+	app := newTestApp()
 	mustRegisterRoute(t, app.Get("/boot-order", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -115,8 +180,8 @@ func TestStartMarksAppReadyWithoutLegacyRuntimeHooks(t *testing.T) {
 	}
 }
 
-// TestSetupServer tests server setup functionality
-func TestSetupServer(t *testing.T) {
+// TestPrepareConfiguresHTTPServer tests server preparation via the canonical public API.
+func TestPrepareConfiguresHTTPServer(t *testing.T) {
 	tests := []struct {
 		name        string
 		config      AppConfig
@@ -161,23 +226,23 @@ func TestSetupServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := New()
-			// Copy config values to app's config
-			app.config.Addr = tt.config.Addr
-			app.config.ReadTimeout = tt.config.ReadTimeout
-			app.config.ReadHeaderTimeout = tt.config.ReadHeaderTimeout
-			app.config.WriteTimeout = tt.config.WriteTimeout
-			app.config.IdleTimeout = tt.config.IdleTimeout
-			app.config.MaxHeaderBytes = tt.config.MaxHeaderBytes
-			app.config.EnableHTTP2 = tt.config.EnableHTTP2
-			app.config.DrainInterval = tt.config.DrainInterval
+			cfg := DefaultConfig()
+			cfg.Addr = tt.config.Addr
+			cfg.ReadTimeout = tt.config.ReadTimeout
+			cfg.ReadHeaderTimeout = tt.config.ReadHeaderTimeout
+			cfg.WriteTimeout = tt.config.WriteTimeout
+			cfg.IdleTimeout = tt.config.IdleTimeout
+			cfg.MaxHeaderBytes = tt.config.MaxHeaderBytes
+			cfg.EnableHTTP2 = tt.config.EnableHTTP2
+			cfg.DrainInterval = tt.config.DrainInterval
+			app := New(cfg)
 
 			// Add a route to ensure handler is created
 			mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			}))
 
-			err := app.setupServer()
+			err := app.Prepare()
 
 			if tt.expectError && err == nil {
 				t.Error("expected error but got none")
@@ -196,93 +261,99 @@ func TestSetupServer(t *testing.T) {
 				if app.connTracker == nil {
 					t.Error("connTracker should be created")
 				}
+				snapshot := app.RuntimeSnapshot()
+				if !snapshot.ConfigFrozen {
+					t.Error("expected config to be frozen after Prepare")
+				}
+				if !snapshot.ServerPrepared {
+					t.Error("expected server_prepared after Prepare")
+				}
 			}
 		})
 	}
 }
 
-// TestStartServer tests server startup with graceful shutdown
-func TestStartServer(t *testing.T) {
-	// Test with TLS - skip actual TLS server due to certificate complexity
-	t.Run("TLS success", func(t *testing.T) {
-		// Skip this test as TLS requires valid certificates
-		// The TLS logic is tested indirectly through other tests
-		t.Skip("Skipping TLS test due to certificate complexity")
-	})
+func TestPrepareRejectsMissingTLSFiles(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TLS = TLSConfig{Enabled: true}
+	app := New(cfg)
 
-	// Test TLS with missing files
-	t.Run("TLS missing files", func(t *testing.T) {
-		app := New()
-		app.config.Addr = ":0"
-		app.config.TLS.Enabled = true
-		app.config.TLS.CertFile = ""
-		app.config.TLS.KeyFile = ""
-		app.config.ShutdownTimeout = 1 * time.Second
+	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
 
-		mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
+	if err := app.Prepare(); err == nil {
+		t.Fatal("expected TLS validation error")
+	}
+}
 
-		if err := app.setupServer(); err != nil {
-			t.Fatalf("setupServer failed: %v", err)
+func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
+	addr := requireNetwork(t)
+	certFile, keyFile := writeTestTLSCertFiles(t)
+	cfg := DefaultConfig()
+	cfg.Addr = addr
+	cfg.TLS = TLSConfig{Enabled: true, CertFile: certFile, KeyFile: keyFile}
+
+	app := New(cfg)
+
+	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("prepare returned unexpected error: %v", err)
+	}
+	if err := app.Start(context.Background()); err != nil {
+		t.Fatalf("start returned unexpected error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		t.Fatalf("server returned unexpected error: %v", err)
+	}
+	if srv.TLSConfig == nil || len(srv.TLSConfig.Certificates) != 1 {
+		t.Fatalf("expected prepared server to have loaded TLS certificate")
+	}
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("listen tcp: %v", err)
+	}
+	defer ln.Close()
+
+	serverDone := make(chan error)
+	go func() {
+		serverDone <- srv.ServeTLS(ln, "", "")
+	}()
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+		Timeout: 2 * time.Second,
+	}
+	resp, err := client.Get("https://" + ln.Addr().String() + "/test")
+	if err != nil {
+		t.Fatalf("https get: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	if err := app.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown returned unexpected error: %v", err)
+	}
+
+	select {
+	case err := <-serverDone:
+		if err != nil && err != http.ErrServerClosed {
+			t.Errorf("unexpected error: %v", err)
 		}
-
-		err := app.startServer()
-		if err == nil {
-			t.Fatal("expected TLS validation error")
-		}
-
-		app.mu.RLock()
-		started := app.started
-		app.mu.RUnlock()
-		if started {
-			t.Fatal("app should not be marked started when TLS validation fails")
-		}
-	})
-
-	// Test regular HTTP
-	t.Run("HTTP success", func(t *testing.T) {
-		addr := requireNetwork(t)
-		app := New()
-		app.config.Addr = addr
-		app.config.ShutdownTimeout = 1 * time.Second
-
-		mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("ok"))
-		}))
-
-		if err := app.setupServer(); err != nil {
-			t.Fatalf("setupServer failed: %v", err)
-		}
-
-		serverDone := make(chan error)
-		go func() {
-			serverDone <- app.startServer()
-		}()
-
-		time.Sleep(100 * time.Millisecond)
-
-		// Test the server is running
-		addr = app.httpServer.Addr
-		if _, _, err := net.SplitHostPort(addr); err != nil {
-			t.Errorf("expected host:port address, got %s", addr)
-		}
-
-		// Trigger shutdown
-		if err := app.Shutdown(context.Background()); err != nil {
-			t.Fatalf("shutdown returned unexpected error: %v", err)
-		}
-
-		select {
-		case err := <-serverDone:
-			if err != nil && err != http.ErrServerClosed {
-				t.Errorf("unexpected error: %v", err)
-			}
-		case <-time.After(3 * time.Second):
-			t.Error("server did not shut down in time")
-		}
-	})
+	case <-time.After(3 * time.Second):
+		t.Error("server did not shut down in time")
+	}
 }
 
 // TestConnectionTracker tests connection tracking and draining
@@ -388,10 +459,9 @@ func (l *testLifecycleLogger) Debug(msg string, fields ...log.Fields) {}
 func TestPrepareStartServeAndShutdownWithLoggerLifecycle(t *testing.T) {
 	addr := requireNetwork(t)
 	logger := &testLifecycleLogger{}
-	app := New(
-		WithLogger(logger),
-		WithAddr(addr),
-	)
+	cfg := DefaultConfig()
+	cfg.Addr = addr
+	app := New(cfg, WithLogger(logger))
 
 	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

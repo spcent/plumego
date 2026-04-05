@@ -1,10 +1,8 @@
 package core
 
 import (
-	"context"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
@@ -25,11 +23,10 @@ type App struct {
 	routerMethodNotAllowed    bool
 
 	// Runtime state (protected by mutex)
-	mu             sync.RWMutex
-	started        bool // Whether runtime hooks have started
-	configFrozen   bool // Whether configuration has been frozen
-	loggerStarted  bool
-	signalHandling bool
+	mu            sync.RWMutex
+	started       bool // Whether runtime hooks have started
+	configFrozen  bool // Whether configuration has been frozen
+	loggerStarted bool
 
 	// Server components
 	httpServer  *http.Server       // HTTP server instance
@@ -42,28 +39,14 @@ type App struct {
 	healthManager health.HealthManager
 }
 
-// Option defines a function type for configuring the App.
+// Option defines a function type for configuring non-config app dependencies.
 type Option func(*App)
 
-// New creates a new App instance with the provided options.
-func New(options ...Option) *App {
-	defaultConfig := &AppConfig{
-		Addr:              ":8080",
-		EnvFile:           ".env",
-		TLS:               TLSConfig{Enabled: false},
-		Debug:             false,
-		ShutdownTimeout:   5 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    1 << 20, // 1 MiB
-		EnableHTTP2:       true,
-		DrainInterval:     500 * time.Millisecond,
-	}
-
+// New creates a new App instance with the provided typed config and options.
+func New(cfg AppConfig, options ...Option) *App {
+	config := cfg
 	app := &App{
-		config:          defaultConfig,
+		config:          &config,
 		router:          router.NewRouter(),
 		middlewareChain: middleware.NewChain(),
 		logger:          log.NewNoOpLogger(),
@@ -73,7 +56,7 @@ func New(options ...Option) *App {
 		opt(app)
 	}
 
-	app.syncRouterConfig(app.router, app.logger, app.hasRouterMethodNotAllowed, app.routerMethodNotAllowed)
+	app.syncRouterConfig(app.router, app.hasRouterMethodNotAllowed, app.routerMethodNotAllowed)
 
 	return app
 }
@@ -86,29 +69,4 @@ func (a *App) Router() *router.Router {
 // Logger returns the configured application logger.
 func (a *App) Logger() log.StructuredLogger {
 	return a.logger
-}
-
-// HTTPMetrics returns a dynamic HTTP metrics observer bound to the app state.
-func (a *App) HTTPMetrics() metrics.HTTPObserver {
-	return appHTTPMetricsObserver{app: a}
-}
-
-type appHTTPMetricsObserver struct {
-	app *App
-}
-
-func (o appHTTPMetricsObserver) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	if o.app == nil {
-		return
-	}
-
-	o.app.mu.RLock()
-	observer := o.app.httpMetrics
-	o.app.mu.RUnlock()
-
-	if observer == nil {
-		return
-	}
-
-	observer.ObserveHTTP(ctx, method, path, status, bytes, duration)
 }

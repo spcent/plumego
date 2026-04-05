@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 )
 
 func TestNewDefaults(t *testing.T) {
-	app := New()
+	app := New(DefaultConfig())
 
 	if app.config.Addr != ":8080" {
 		t.Fatalf("default addr should be :8080, got %s", app.config.Addr)
@@ -29,17 +28,16 @@ func TestNewDefaults(t *testing.T) {
 	}
 }
 
-func TestOptionsApply(t *testing.T) {
+func TestNewAppliesTypedConfigAndOptions(t *testing.T) {
 	customRouter := router.NewRouter()
+	cfg := DefaultConfig()
+	cfg.Addr = ":9090"
+	cfg.EnvFile = ".custom.env"
+	cfg.ShutdownTimeout = 2 * time.Second
+	cfg.TLS = TLSConfig{Enabled: true, CertFile: "cert", KeyFile: "key"}
+	cfg.Debug = true
 
-	app := New(
-		WithRouter(customRouter),
-		WithAddr(":9090"),
-		WithEnvPath(".custom.env"),
-		WithShutdownTimeout(2*time.Second),
-		WithTLS("cert", "key"),
-		WithDebug(),
-	)
+	app := New(cfg, WithRouter(customRouter))
 
 	if app.router != customRouter {
 		t.Fatalf("custom router should be set")
@@ -57,12 +55,12 @@ func TestOptionsApply(t *testing.T) {
 		t.Fatalf("TLS config should be populated when enabled")
 	}
 	if !app.config.Debug {
-		t.Fatalf("debug flag should be true when WithDebug is used")
+		t.Fatalf("debug flag should be true when config enables debug")
 	}
 }
 
 func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
-	app := New()
+	app := newTestApp()
 
 	mustRegisterRoute(t, app.Get("/router", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -80,15 +78,9 @@ func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 		})
 	})
 
-	if err := app.setupServer(); err != nil {
-		t.Fatalf("setupServer returned error: %v", err)
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
 	}
-
-	tmpFile, err := os.CreateTemp("", "app_env")
-	if err != nil {
-		t.Fatalf("failed to create temp env file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
 
 	tests := []struct {
 		path     string
@@ -97,13 +89,11 @@ func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 		{path: "/router", expected: "router"},
 		{path: "/mux", expected: "mux"},
 	}
-	tmpFile.Close()
-
 	for _, tt := range tests {
 		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
 		rr := httptest.NewRecorder()
 
-		app.handler.ServeHTTP(rr, req)
+		app.ServeHTTP(rr, req)
 
 		if rr.Header().Get("X-Test") != "applied" {
 			t.Fatalf("middleware header missing for path %s", tt.path)
@@ -115,7 +105,7 @@ func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 }
 
 func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
-	app := New()
+	app := newTestApp()
 
 	app.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +133,7 @@ func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 }
 
 func TestUseAfterServeHTTPReturnsError(t *testing.T) {
-	app := New()
+	app := newTestApp()
 
 	mustRegisterRoute(t, app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -163,7 +153,9 @@ func TestUseAfterServeHTTPReturnsError(t *testing.T) {
 }
 
 func TestPrepareBuildsHTTPServer(t *testing.T) {
-	app := New(WithAddr(":5555"))
+	cfg := DefaultConfig()
+	cfg.Addr = ":5555"
+	app := New(cfg)
 	mustRegisterRoute(t, app.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -182,33 +174,59 @@ func TestPrepareBuildsHTTPServer(t *testing.T) {
 	if server.Handler == nil {
 		t.Fatalf("httpServer handler should not be nil")
 	}
+	snapshot := app.RuntimeSnapshot()
+	if !snapshot.ConfigFrozen {
+		t.Fatalf("expected config to be frozen after Prepare")
+	}
+	if !snapshot.ServerPrepared {
+		t.Fatalf("expected server to be prepared after Prepare")
+	}
 }
 
-func TestSetupServerBuildsHTTPServer(t *testing.T) {
-	app := New(WithAddr(":5555"))
+func TestServeHTTPTriggersSamePreparedStateAsPrepare(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Addr = ":5555"
+	app := New(cfg)
 
-	// add middleware to ensure chain builds without panic
 	app.Use(func(next http.Handler) http.Handler {
-		return next
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Prepared", "true")
+			next.ServeHTTP(w, r)
+		})
 	})
+	mustRegisterRoute(t, app.Get("/prepared", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
 
-	if err := app.setupServer(); err != nil {
-		t.Fatalf("setupServer returned error: %v", err)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/prepared", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	if rec.Header().Get("X-Prepared") != "true" {
+		t.Fatalf("expected prepared middleware to run")
 	}
 
-	if app.httpServer == nil {
-		t.Fatalf("httpServer should be created during setupServer")
+	snapshot := app.RuntimeSnapshot()
+	if !snapshot.ConfigFrozen {
+		t.Fatalf("expected config to be frozen after ServeHTTP")
 	}
-	if app.httpServer.Addr != ":5555" {
-		t.Fatalf("httpServer addr should be :5555, got %s", app.httpServer.Addr)
+	if !snapshot.ServerPrepared {
+		t.Fatalf("expected server to be prepared after ServeHTTP")
 	}
-	if app.httpServer.Handler == nil {
-		t.Fatalf("httpServer handler should not be nil")
+	server, err := app.Server()
+	if err != nil {
+		t.Fatalf("Server returned error after ServeHTTP: %v", err)
+	}
+	if server.Addr != ":5555" {
+		t.Fatalf("httpServer addr should be :5555, got %s", server.Addr)
 	}
 }
 
 func TestUseAfterStartPanics(t *testing.T) {
-	app := New()
+	app := newTestApp()
 	app.started = true
 
 	err := app.Use(func(next http.Handler) http.Handler { return next })

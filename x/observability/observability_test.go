@@ -118,7 +118,7 @@ func TestConfigureMetricsWithPrometheus(t *testing.T) {
 		EnsureMutable:          func(op, desc string) error { return nil },
 		EnsureRouter:           func() *router.Router { return r },
 		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { setCollector = c },
-		SetHTTPMetrics:         func(observer metrics.HTTPObserver) { setHTTP = observer },
+		AttachHTTPObserver:     func(observer metrics.HTTPObserver) { setHTTP = observer },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true

@@ -20,12 +20,10 @@ type Config struct {
 
 // Defaults returns safe configuration values for local development.
 func Defaults() Config {
+	coreCfg := core.DefaultConfig()
+	coreCfg.Addr = ":8085"
 	return Config{
-		Core: core.AppConfig{
-			Addr:    ":8085",
-			EnvFile: ".env",
-			Debug:   false,
-		},
+		Core: coreCfg,
 	}
 }
 

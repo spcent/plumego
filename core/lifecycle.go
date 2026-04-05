@@ -2,8 +2,6 @@ package core
 
 import (
 	"context"
-	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,7 +13,7 @@ import (
 
 // Prepare freezes routing/middleware state and constructs the HTTP server.
 func (a *App) Prepare() error {
-	if err := a.setupServer(); err != nil {
+	if err := a.ensurePrepared(); err != nil {
 		return err
 	}
 
@@ -79,24 +77,27 @@ func (a *App) Shutdown(ctx context.Context) error {
 		ctx = context.Background()
 	}
 
-	cfg := a.serverStartConfig()
+	a.mu.RLock()
+	httpServer := a.httpServer
+	connTracker := a.connTracker
+	a.mu.RUnlock()
+
 	if a.healthManager != nil {
 		a.healthManager.MarkNotReady("shutting down")
 	}
 
-	if cfg.connTracker != nil {
-		go cfg.connTracker.drain(ctx)
+	if connTracker != nil {
+		go connTracker.drain(ctx)
 	}
 
 	var shutdownErr error
-	if cfg.httpServer != nil {
-		if err := cfg.httpServer.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if httpServer != nil {
+		if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
 			a.logger.Error("Server shutdown error", log.Fields{"error": err})
 			shutdownErr = err
 		}
 	}
 
-	a.stopRuntime(ctx)
 	a.stopLoggerLifecycle(ctx)
 
 	a.mu.Lock()
@@ -107,70 +108,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 }
 
 func (a *App) setupServer() error {
-	a.mu.RLock()
-	if a.httpServer != nil {
-		a.mu.RUnlock()
-		return nil
-	}
-	a.mu.RUnlock()
-
-	a.ensureHandler()
-
-	a.mu.RLock()
-	handler := a.handler
-	cfg := a.serverRuntimeConfigLocked()
-	a.mu.RUnlock()
-
-	if handler == nil {
-		return fmt.Errorf("handler not configured")
-	}
-
-	a.mu.Lock()
-	a.httpServer = &http.Server{
-		Addr:              cfg.addr,
-		Handler:           handler,
-		ReadTimeout:       cfg.readTimeout,
-		ReadHeaderTimeout: cfg.readHeaderTimeout,
-		WriteTimeout:      cfg.writeTimeout,
-		IdleTimeout:       cfg.idleTimeout,
-		MaxHeaderBytes:    cfg.maxHeaderBytes,
-	}
-
-	a.connTracker = newConnectionTracker(a.logger, cfg.drainInterval)
-	a.httpServer.ConnState = a.connTracker.track
-
-	if !cfg.enableHTTP2 {
-		a.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))
-	}
-	a.mu.Unlock()
-
-	return nil
-}
-
-func (a *App) startServer() error {
-	cfg := a.serverStartConfig()
-	if cfg.httpServer == nil {
-		return fmt.Errorf("server not configured")
-	}
-
-	if cfg.tlsEnabled && (cfg.tlsCertFile == "" || cfg.tlsKeyFile == "") {
-		a.logger.Error("TLS enabled but certificate or key file not provided")
-		return fmt.Errorf("TLS enabled but certificate or key file not provided")
-	}
-
-	a.logger.Info("Server running", log.Fields{"addr": cfg.addr})
-	if cfg.debug {
-		a.logger.Info("Debug mode enabled")
-	}
-
-	var err error
-	if cfg.tlsEnabled {
-		a.logger.Info("HTTPS enabled", log.Fields{"cert": cfg.tlsCertFile})
-		err = cfg.httpServer.ListenAndServeTLS(cfg.tlsCertFile, cfg.tlsKeyFile)
-	} else {
-		err = cfg.httpServer.ListenAndServe()
-	}
-	return err
+	return a.ensurePrepared()
 }
 
 type serverRuntimeConfig struct {
@@ -182,17 +120,7 @@ type serverRuntimeConfig struct {
 	maxHeaderBytes    int
 	drainInterval     time.Duration
 	enableHTTP2       bool
-}
-
-type serverStartConfig struct {
-	addr            string
-	debug           bool
-	shutdownTimeout time.Duration
-	tlsEnabled      bool
-	tlsCertFile     string
-	tlsKeyFile      string
-	httpServer      *http.Server
-	connTracker     *connectionTracker
+	tls               TLSConfig
 }
 
 func (a *App) serverRuntimeConfigLocked() serverRuntimeConfig {
@@ -205,27 +133,8 @@ func (a *App) serverRuntimeConfigLocked() serverRuntimeConfig {
 		maxHeaderBytes:    a.config.MaxHeaderBytes,
 		drainInterval:     a.config.DrainInterval,
 		enableHTTP2:       a.config.EnableHTTP2,
+		tls:               a.config.TLS,
 	}
-}
-
-func (a *App) serverStartConfig() serverStartConfig {
-	a.mu.RLock()
-	cfg := serverStartConfig{
-		addr:            a.config.Addr,
-		debug:           a.config.Debug,
-		shutdownTimeout: a.config.ShutdownTimeout,
-		tlsEnabled:      a.config.TLS.Enabled,
-		tlsCertFile:     a.config.TLS.CertFile,
-		tlsKeyFile:      a.config.TLS.KeyFile,
-		httpServer:      a.httpServer,
-		connTracker:     a.connTracker,
-	}
-	a.mu.RUnlock()
-	return cfg
-}
-
-func (a *App) stopRuntime(ctx context.Context) {
-	_ = ctx
 }
 
 func (a *App) stopLoggerLifecycle(ctx context.Context) {

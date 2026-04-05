@@ -17,7 +17,7 @@
 //		"github.com/spcent/plumego/core"
 //	)
 //
-//	app := core.New()
+//	app := core.New(core.DefaultConfig())
 //
 //	// Simple coalescing with defaults
 //	app.Use(coalesce.Middleware(coalesce.Config{}))

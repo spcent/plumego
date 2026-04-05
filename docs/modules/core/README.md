@@ -48,8 +48,13 @@
 ## Canonical change shape
 
 - keep bootstrap explicit
+- construct apps through `DefaultConfig()` / `AppConfig` plus non-config `Option`s, instead of per-field config helper options
 - keep lifecycle behavior reviewable
 - keep one canonical lifecycle path: `Prepare` + `Start` + `Server` + `Shutdown`
+- treat `Prepare` and first-use `ServeHTTP` as the same one-time preparation boundary: both freeze config/router state and make the app serve-ready through the same internal transition
+- keep TLS on the same public serve path: `Prepare` loads configured certificates into the returned `*http.Server`, and callers use `ListenAndServeTLS("", "")` on that prepared server when TLS is enabled
+- attach HTTP metrics observers through `AttachHTTPObserver` when app-local wiring needs fan-out metrics collection
+- keep the app logger kernel-owned on `App.Logger()`; `core` does not mirror it into router state
 - treat router-affecting options as declarative app construction input, not eager side effects
 - push feature-specific wiring back to app-local code or the owning extension
 - preserve `net/http` compatibility while keeping `core` as a kernel

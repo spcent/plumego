@@ -21,7 +21,7 @@ func TestGetPostPutDeletePatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
-			app := New()
+			app := newTestApp()
 			called := false
 			mustRegisterRoute(t, tt.register(app, tt.path, func(w http.ResponseWriter, r *http.Request) {
 				called = true
@@ -46,7 +46,7 @@ func TestGetPostPutDeletePatch(t *testing.T) {
 }
 
 func TestAny(t *testing.T) {
-	app := New()
+	app := newTestApp()
 
 	called := false
 	mustRegisterRoute(t, app.Any("/any", func(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +127,7 @@ func TestNamedRouteRegistration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := New()
+			app := newTestApp()
 			called := false
 			mustRegisterRoute(t, tt.register(app, tt.route, tt.path, func(w http.ResponseWriter, r *http.Request) {
 				called = true
@@ -153,7 +153,7 @@ func TestNamedRouteRegistration(t *testing.T) {
 }
 
 func TestAddRouteReturnsRegistrationErrors(t *testing.T) {
-	app := New()
+	app := newTestApp()
 
 	if err := app.AddRoute(http.MethodGet, "/strict", nil); err == nil {
 		t.Fatalf("expected nil-handler registration error")
@@ -178,7 +178,7 @@ func TestAddRouteReturnsRegistrationErrors(t *testing.T) {
 }
 
 func TestAddRouteWithNameRegistersURLAndReturnsErrors(t *testing.T) {
-	app := New()
+	app := newTestApp()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -198,7 +198,7 @@ func TestAddRouteWithNameRegistersURLAndReturnsErrors(t *testing.T) {
 }
 
 func TestMethodHelpersReturnRegistrationErrors(t *testing.T) {
-	app := New()
+	app := newTestApp()
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

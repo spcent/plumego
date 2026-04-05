@@ -21,7 +21,9 @@
 //		model := provider.NewClaudeProvider(apiKey)
 //		sessions := session.NewManager(session.NewMemoryStorage())
 //
-//		app := core.New(core.WithAddr(":8080"))
+//		cfg := core.DefaultConfig()
+//		cfg.Addr = ":8080"
+//		app := core.New(cfg)
 //		app.Post("/chat", func(w http.ResponseWriter, r *http.Request) {
 //			_ = model
 //			_ = sessions

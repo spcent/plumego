@@ -25,16 +25,7 @@ type App struct {
 
 // New constructs the App with an inbound webhook receiver backed by an in-process broker.
 func New(cfg config.Config) (*App, error) {
-	opts := []core.Option{
-		core.WithAddr(cfg.Core.Addr),
-		core.WithEnvPath(cfg.Core.EnvFile),
-		core.WithLogger(plumelog.NewGLogger()),
-	}
-	if cfg.Core.Debug {
-		opts = append(opts, core.WithDebug())
-	}
-
-	a := core.New(opts...)
+	a := core.New(cfg.Core, core.WithLogger(plumelog.NewGLogger()))
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
 	a.Use(accesslog.Middleware(a.Logger()))
@@ -65,6 +56,12 @@ func (a *App) Start() error {
 	}
 	defer a.Core.Shutdown(ctx)
 
+	if a.Cfg.Core.TLS.Enabled {
+		if err := srv.ListenAndServeTLS("", ""); err != nil {
+			return fmt.Errorf("server stopped: %w", err)
+		}
+		return nil
+	}
 	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("server stopped: %w", err)
 	}
