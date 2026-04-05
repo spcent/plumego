@@ -9,7 +9,7 @@ summary: App lifecycle and HTTP server assembly.
 strict_boundary: kernel
 
 responsibilities:
-  - App construction and options
+  - App construction and constructor dependencies
   - Route registration entrypoints
   - Middleware registration entrypoints
   - HTTP server lifecycle

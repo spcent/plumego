@@ -69,7 +69,7 @@ This layout should be demonstrated first in `reference/standard-service` and cop
 ```go
 func main() {
     cfg := core.DefaultConfig()
-    app := core.New(cfg)
+    app := core.New(cfg, core.AppDependencies{})
 
     if err := app.Use(RequestID(), Recovery(), RequestLogger()); err != nil {
         log.Fatal(err)
@@ -257,7 +257,7 @@ Route wiring file must make clear: who constructs the handler, what its dependen
 
 ```go
 func TestHealth(t *testing.T) {
-    app := core.New(core.DefaultConfig())
+    app := core.New(core.DefaultConfig(), core.AppDependencies{})
     if err := app.Get("/healthz", healthHandler); err != nil {
         t.Fatal(err)
     }
@@ -504,7 +504,7 @@ func registerRoutes(app *core.App, userHandler handlers.UserHandler) error {
 
 ```go
 func TestCreateUser(t *testing.T) {
-    app := core.New(core.DefaultConfig())
+    app := core.New(core.DefaultConfig(), core.AppDependencies{})
     h := handlers.UserHandler{Service: stubUserService{ID: "u_123"}}
     if err := app.Post("/users", h.Create); err != nil {
         t.Fatal(err)
