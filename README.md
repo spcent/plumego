@@ -147,7 +147,7 @@ Stable roots:
 App-facing extension families:
 
 - [x/tenant](./docs/modules/x-tenant/README.md) — multi-tenancy, quota, policy, tenant-aware data paths
-- [x/rest](./x/rest/README.md) — reusable resource APIs and CRUD standardization
+- [x/rest](./docs/modules/x-rest/README.md) — reusable resource APIs and CRUD standardization
 - [x/websocket](./docs/modules/x-websocket/README.md) — WebSocket transport
 - [x/messaging](./docs/modules/x-messaging/README.md) — messaging entrypoint
 - [x/fileapi](./docs/modules/x-fileapi/README.md) — file upload/download transport

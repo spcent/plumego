@@ -120,7 +120,7 @@ tasks:
   resource_api_standardization:
     start_with:
       - x/rest/module.yaml
-      - x/rest/README.md
+      - docs/modules/x-rest/README.md
       - x/rest/spec.go
       - x/rest/entrypoints.go
     avoid:

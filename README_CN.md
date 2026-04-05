@@ -142,7 +142,7 @@ func main() {
 面向应用的扩展能力族：
 
 - [x/tenant](./docs/modules/x-tenant/README.md) — 多租户、配额、策略与租户感知数据路径
-- [x/rest](./x/rest/README.md) — 资源 API 与 CRUD 标准化
+- [x/rest](./docs/modules/x-rest/README.md) — 资源 API 与 CRUD 标准化
 - [x/websocket](./docs/modules/x-websocket/README.md) — WebSocket 传输
 - [x/messaging](./docs/modules/x-messaging/README.md) — 消息能力入口
 - [x/fileapi](./docs/modules/x-fileapi/README.md) — 文件上传/下载传输

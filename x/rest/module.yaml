@@ -35,7 +35,7 @@ test_commands:
   - go vet ./x/rest/...
 
 doc_paths:
-  - x/rest/README.md
+  - docs/modules/x-rest/README.md
 
 review_checklist:
   - Keep resource wiring explicit
