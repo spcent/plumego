@@ -49,7 +49,7 @@ func TestParamRoutes(t *testing.T) {
 
 	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name, _ := ParamFromRequest(r, "name")
-		ctxParams := contract.ParamsFromContext(r.Context())
+		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams["name"] != name {
 			t.Fatalf("context params mismatch: got %s want %s", ctxParams["name"], name)
 		}
@@ -59,7 +59,7 @@ func TestParamRoutes(t *testing.T) {
 	r.Get("/users/:id/books/:bookId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := ParamFromRequest(r, "id")
 		bookID, _ := ParamFromRequest(r, "bookId")
-		ctxParams := contract.ParamsFromContext(r.Context())
+		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams["id"] != id || ctxParams["bookId"] != bookID {
 			t.Fatalf("context params mismatch: %v", ctxParams)
 		}
@@ -91,7 +91,7 @@ func TestParamsInjectedIntoContext(t *testing.T) {
 	r := NewRouter()
 
 	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctxParams := contract.ParamsFromContext(r.Context())
+		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams == nil {
 			t.Fatalf("expected params in context")
 		}
@@ -270,7 +270,7 @@ func TestRouteGroup(t *testing.T) {
 
 	v1.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := ParamFromRequest(r, "id")
-		ctxParams := contract.ParamsFromContext(r.Context())
+		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams["id"] != id {
 			t.Fatalf("expected id in context")
 		}

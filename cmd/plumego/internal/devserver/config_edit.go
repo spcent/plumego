@@ -33,13 +33,21 @@ type ConfigEditRequest struct {
 func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
-		ctx.JSON(400, map[string]any{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeValidation).
+			Code("config_edit_path_invalid").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	entries, exists, modTime, err := readEnvEntries(path)
 	if err != nil {
-		ctx.JSON(500, map[string]any{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("config_edit_read_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
@@ -52,25 +60,37 @@ func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
 		payload.Updated = modTime.Format(time.RFC3339)
 	}
 
-	ctx.JSON(200, payload)
+	_ = ctx.Response(200, payload, nil)
 }
 
 func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
-		ctx.JSON(400, map[string]any{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeValidation).
+			Code("config_edit_path_invalid").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	var req ConfigEditRequest
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.JSON(400, map[string]any{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeValidation).
+			Code("invalid_request").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	entries := normalizeConfigEntries(req.Entries)
 	if err := writeEnvEntries(path, entries); err != nil {
-		ctx.JSON(500, map[string]any{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("config_edit_write_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
@@ -82,13 +102,17 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 
 	if req.Restart {
 		if err := d.Rebuild(ctx.R.Context()); err != nil {
-			ctx.JSON(500, map[string]any{"error": err.Error()})
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Type(contract.ErrTypeInternal).
+				Code("app_rebuild_failed").
+				Message(err.Error()).
+				Build())
 			return
 		}
 		response["restarted"] = true
 	}
 
-	ctx.JSON(200, response)
+	_ = ctx.Response(200, response, nil)
 }
 
 func (d *Dashboard) resolveConfigEditPath() (string, string, error) {

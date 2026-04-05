@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Compile-time checks that all concrete logger types satisfy StructuredLogger.
@@ -151,7 +153,7 @@ func (l *gLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
 
 func (l *gLogger) logWithLevel(level Level, msg string, fields Fields, ctx context.Context) {
 	combined := mergeFields(l.fields, fields)
-	if traceID := TraceIDFromContext(ctx); traceID != "" {
+	if traceID := contract.TraceIDFromContext(ctx); traceID != "" {
 		combined["trace_id"] = traceID
 	}
 	formatted := l.formatFields(combined)

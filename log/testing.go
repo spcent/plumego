@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // LogEntry holds a single captured log entry.
@@ -187,7 +189,7 @@ func (l *TestLogger) capture(level Level, msg string, fields Fields) {
 }
 
 func (l *TestLogger) withTrace(ctx context.Context, fields Fields) Fields {
-	if traceID := TraceIDFromContext(ctx); traceID != "" {
+	if traceID := contract.TraceIDFromContext(ctx); traceID != "" {
 		out := mergeFields(fields, Fields{"trace_id": traceID})
 		return out
 	}

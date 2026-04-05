@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	internalobs "github.com/spcent/plumego/middleware/internal/observability"
@@ -26,23 +25,15 @@ func Middleware(tracer Tracer) middleware.Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := internalobs.EnsureTraceID(r)
 			ctx := contract.WithTraceIDString(r.Context(), traceID)
-			ctx = log.WithTraceID(ctx, traceID)
 
 			ctx, span := tracer.Start(ctx, r)
 			spanTraceID, spanID := internalobs.ExtractSpanContext(ctx, span)
 			if spanTraceID != "" {
 				traceID = spanTraceID
 				ctx = contract.WithTraceIDString(ctx, traceID)
-				ctx = log.WithTraceID(ctx, traceID)
 			}
 			if spanID != "" {
-				existing := contract.TraceContextFromContext(ctx)
-				if existing == nil || existing.SpanID == "" {
-					ctx = contract.WithTraceContext(ctx, contract.TraceContext{
-						TraceID: contract.TraceID(traceID),
-						SpanID:  contract.SpanID(spanID),
-					})
-				}
+				ctx = contract.WithSpanIDString(ctx, spanID)
 			}
 
 			r = r.WithContext(ctx)

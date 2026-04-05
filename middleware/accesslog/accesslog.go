@@ -20,6 +20,7 @@ func Middleware(logger log.StructuredLogger) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := internalobs.EnsureTraceID(r)
+			r = r.WithContext(contract.WithTraceIDString(r.Context(), traceID))
 			w.Header().Set(contract.RequestIDHeader, traceID)
 			recorder := internalobs.NewResponseRecorder(w)
 			start := time.Now()
@@ -58,7 +59,6 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := internalobs.EnsureTraceID(r)
 			ctx := contract.WithTraceIDString(r.Context(), traceID)
-			ctx = log.WithTraceID(ctx, traceID)
 
 			recorder := internalobs.NewResponseRecorder(w)
 			start := time.Now()
@@ -73,15 +73,8 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 				traceID = spanTraceID
 			}
 			ctx = contract.WithTraceIDString(ctx, traceID)
-			ctx = log.WithTraceID(ctx, traceID)
 			if spanID != "" {
-				existing := contract.TraceContextFromContext(ctx)
-				if existing == nil || existing.SpanID == "" {
-					ctx = contract.WithTraceContext(ctx, contract.TraceContext{
-						TraceID: contract.TraceID(traceID),
-						SpanID:  contract.SpanID(spanID),
-					})
-				}
+				ctx = contract.WithSpanIDString(ctx, spanID)
 			}
 
 			r = r.WithContext(ctx)

@@ -11,8 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/spcent/plumego/log"
 )
 
 // RequestContext contains request-scoped data that should be shared across middleware and handlers.
@@ -46,7 +44,6 @@ type Ctx struct {
 	Query    url.Values
 	Headers  http.Header
 	ClientIP string
-	Logger   log.StructuredLogger
 	TraceID  string
 	Deadline time.Time
 	Config   *RequestConfig
@@ -147,39 +144,13 @@ func (e *BindError) Unwrap() error {
 	return e.Err
 }
 
-type paramsContextKey struct{}
-
 // WithRequestContext stores rc in ctx using the package-internal requestContextKey.
 // Use this instead of context.WithValue with the old exported key.
 func WithRequestContext(ctx context.Context, rc RequestContext) context.Context {
 	return context.WithValue(ctx, requestContextKey{}, rc)
 }
 
-// WithParams stores params in ctx using the package-internal paramsContextKey.
-// Use this instead of context.WithValue with the old exported key.
-func WithParams(ctx context.Context, params map[string]string) context.Context {
-	return context.WithValue(ctx, paramsContextKey{}, params)
-}
-
-// ParamsFromContext returns route parameters stored in the request context.
-// It returns nil if no parameters were attached.
-func ParamsFromContext(ctx context.Context) map[string]string {
-	if ctx == nil {
-		return nil
-	}
-	if params, ok := ctx.Value(paramsContextKey{}).(map[string]string); ok {
-		return params
-	}
-
-	if rc, ok := ctx.Value(requestContextKey{}).(RequestContext); ok {
-		return rc.Params
-	}
-
-	return nil
-}
-
 // RequestContextFromContext returns the RequestContext stored in the given context.
-// If none is present, it falls back to parameters stored via ParamsFromContext for backward compatibility.
 func RequestContextFromContext(ctx context.Context) RequestContext {
 	if ctx == nil {
 		return RequestContext{}
@@ -189,7 +160,7 @@ func RequestContextFromContext(ctx context.Context) RequestContext {
 		return rc
 	}
 
-	return RequestContext{Params: ParamsFromContext(ctx)}
+	return RequestContext{}
 }
 
 // RoutePatternFromContext returns the matched route pattern stored in the request context.
@@ -204,13 +175,13 @@ func RouteNameFromContext(ctx context.Context) string {
 
 // NewCtx builds a unified request context for handlers using the net/http primitives.
 func NewCtx(w http.ResponseWriter, r *http.Request, params map[string]string) *Ctx {
-	return newCtxWithLogger(w, r, params, nil)
+	return newCtxWithConfig(w, r, params, nil)
 }
 
 // NewCtxWithConfig builds a unified request context with a custom RequestConfig,
 // allowing callers to override the default without mutating global state.
 func NewCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]string, cfg RequestConfig) *Ctx {
-	return newCtxWithLoggerAndConfig(w, r, params, nil, &cfg)
+	return newCtxWithConfig(w, r, params, &cfg)
 }
 
 var defaultConfig = RequestConfig{
@@ -231,13 +202,8 @@ func defaultRequestConfig() *RequestConfig {
 	return &cfg
 }
 
-// newCtxWithLogger allows injecting a logger while keeping NewCtx minimal for compatibility.
-func newCtxWithLogger(w http.ResponseWriter, r *http.Request, params map[string]string, logger log.StructuredLogger) *Ctx {
-	return newCtxWithLoggerAndConfig(w, r, params, logger, nil)
-}
-
-// newCtxWithLoggerAndConfig is the canonical constructor; nil cfg uses the package default.
-func newCtxWithLoggerAndConfig(w http.ResponseWriter, r *http.Request, params map[string]string, logger log.StructuredLogger, cfg *RequestConfig) *Ctx {
+// newCtxWithConfig is the canonical constructor; nil cfg uses the package default.
+func newCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]string, cfg *RequestConfig) *Ctx {
 	if params == nil {
 		params = map[string]string{}
 	}
@@ -257,10 +223,6 @@ func newCtxWithLoggerAndConfig(w http.ResponseWriter, r *http.Request, params ma
 
 	traceID := TraceIDFromContext(r.Context())
 
-	if logger == nil {
-		logger = log.NewNoOpLogger()
-	}
-
 	// Detect compression
 	compressionEnabled := false
 	if cfg.EnableCompression {
@@ -277,7 +239,6 @@ func newCtxWithLoggerAndConfig(w http.ResponseWriter, r *http.Request, params ma
 		Query:    r.URL.Query(),
 		Headers:  r.Header,
 		ClientIP: clientIPFromRequest(r),
-		Logger:   logger,
 		TraceID:  traceID,
 		Deadline: deadline,
 		Config:   cfg,
@@ -437,10 +398,10 @@ func clientIPFromRequest(r *http.Request) string {
 type CtxHandlerFunc func(*Ctx)
 
 // AdaptCtxHandler converts a CtxHandlerFunc to a standard http.Handler to keep net/http compatibility.
-func AdaptCtxHandler(h CtxHandlerFunc, logger log.StructuredLogger) http.Handler {
+func AdaptCtxHandler(h CtxHandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := RequestContextFromContext(r.Context())
-		ctx := newCtxWithLogger(w, r, rc.Params, logger)
+		ctx := newCtxWithConfig(w, r, rc.Params, nil)
 		defer ctx.Close()
 		h(ctx)
 	})

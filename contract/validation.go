@@ -29,7 +29,9 @@ func (ve validationErrors) Errors() []FieldError {
 	return append([]FieldError(nil), ve.errors...)
 }
 
-func validateStruct(dst any) error {
+// ValidateStruct validates a struct using the package's `validate` tag rules.
+// It is the explicit validation step after BindJSON or BindQuery.
+func ValidateStruct(dst any) error {
 	return validateStructAtDepth(dst, "", 0)
 }
 

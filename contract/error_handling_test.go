@@ -172,43 +172,6 @@ func TestFormatError(t *testing.T) {
 	}
 }
 
-func TestSafeExecuteWrapsPanics(t *testing.T) {
-	err := SafeExecute(func() error {
-		panic("boom")
-	}, "test_op", "test_module", map[string]any{"key": "value"})
-	if err == nil {
-		t.Fatal("expected wrapped panic error")
-	}
-
-	details := GetErrorDetails(err)
-	if details["operation"] != "test_op" {
-		t.Fatalf("expected wrapped operation, got %v", details["operation"])
-	}
-	if details["module"] != "test_module" {
-		t.Fatalf("expected wrapped module, got %v", details["module"])
-	}
-}
-
-func TestSafeExecuteWithResultWrapsPanics(t *testing.T) {
-	got, err := SafeExecuteWithResult(func() (int, error) {
-		panic("boom")
-	}, "result_op", "result_module", map[string]any{"key": "value"})
-	if err == nil {
-		t.Fatal("expected wrapped panic error")
-	}
-	if got != 0 {
-		t.Fatalf("expected zero value result, got %d", got)
-	}
-
-	details := GetErrorDetails(err)
-	if details["operation"] != "result_op" {
-		t.Fatalf("expected wrapped operation, got %v", details["operation"])
-	}
-	if details["module"] != "result_module" {
-		t.Fatalf("expected wrapped module, got %v", details["module"])
-	}
-}
-
 // Helper types and functions
 
 type timeoutError struct {

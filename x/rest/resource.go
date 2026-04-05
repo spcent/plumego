@@ -605,10 +605,13 @@ func (c *BaseContextResourceController) ParseQueryParams(r *http.Request) *Query
 }
 
 func (c *BaseContextResourceController) notImplemented(ctx *contract.Ctx, method string) {
-	ctx.JSON(http.StatusNotImplemented, map[string]string{
-		"error":   "Not Implemented",
-		"message": fmt.Sprintf("The %s method is not implemented for the %s resource", method, c.ResourceName),
-	})
+	_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		Status(http.StatusNotImplemented).
+		Code("not_implemented").
+		Message(fmt.Sprintf("The %s method is not implemented for the %s resource", method, c.ResourceName)).
+		Detail("method", method).
+		Detail("resource", c.ResourceName).
+		Build())
 }
 
 func (c *BaseContextResourceController) IndexCtx(ctx *contract.Ctx) {

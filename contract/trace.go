@@ -44,11 +44,17 @@ type traceContextKey struct{}
 
 // WithTraceContext adds trace context to a context.
 func WithTraceContext(ctx context.Context, traceContext TraceContext) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return context.WithValue(ctx, traceContextKey{}, &traceContext)
 }
 
 // TraceContextFromContext retrieves trace context from a context.
 func TraceContextFromContext(ctx context.Context) *TraceContext {
+	if ctx == nil {
+		return nil
+	}
 	if v := ctx.Value(traceContextKey{}); v != nil {
 		if tc, ok := v.(*TraceContext); ok {
 			return tc
@@ -82,6 +88,25 @@ func WithTraceIDString(ctx context.Context, id string) context.Context {
 		return WithTraceContext(ctx, updated)
 	}
 	return WithTraceContext(ctx, TraceContext{TraceID: parsed})
+}
+
+// WithSpanIDString stores the given span ID string in the context.
+// If a TraceContext already exists, only its SpanID field is updated so that
+// trace and baggage information are preserved.
+// The id is validated via ParseSpanID; if invalid, WarnFunc is called and
+// the raw string is stored unchanged so callers are not silently misled.
+func WithSpanIDString(ctx context.Context, id string) context.Context {
+	parsed, err := ParseSpanID(id)
+	if err != nil {
+		WarnFunc("WithSpanIDString: " + err.Error() + " (storing raw value: " + id + ")")
+		parsed = SpanID(id)
+	}
+	if existing := TraceContextFromContext(ctx); existing != nil {
+		updated := *existing
+		updated.SpanID = parsed
+		return WithTraceContext(ctx, updated)
+	}
+	return WithTraceContext(ctx, TraceContext{SpanID: parsed})
 }
 
 // ParseTraceID parses and validates a trace ID string.

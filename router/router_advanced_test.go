@@ -125,7 +125,7 @@ func TestContextPropagation(t *testing.T) {
 
 	r.Get("/test/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check params in context
-		params := contract.ParamsFromContext(r.Context())
+		params := contract.RequestContextFromContext(r.Context()).Params
 		if params["id"] != "123" {
 			t.Errorf("param id in context: expected 123, got %s", params["id"])
 		}

@@ -1,7 +1,6 @@
 package contract
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -14,52 +13,12 @@ var (
 	ErrUnsafeRedirect = errors.New("unsafe redirect: external URLs are not allowed")
 )
 
-func (c *Ctx) ErrorJSON(status int, errCode string, message string, details map[string]any) error {
-	if c == nil {
-		return ErrContextNil
-	}
-	category := CategoryForStatus(status)
-	if category == "" {
-		category = CategoryBusiness
-	}
-	payload := NewErrorBuilder().
-		Status(status).
-		Category(category).
-		Code(errCode).
-		Message(message).
-		TraceID(c.TraceID).
-		Details(details).
-		Build()
-	return WriteError(c.W, c.R, payload)
-}
-
 // Response writes a standardized success response that includes trace id when available.
 func (c *Ctx) Response(status int, data any, meta map[string]any) error {
 	if c == nil {
 		return ErrContextNil
 	}
 	return WriteResponse(c.W, c.R, status, data, meta)
-}
-
-// JSON writes a JSON response with the given status code.
-func (c *Ctx) JSON(status int, data any) error {
-	if c == nil {
-		return ErrContextNil
-	}
-	c.W.Header().Set("Content-Type", "application/json")
-	c.W.WriteHeader(status)
-
-	// Use pooled buffer for encoding to reduce allocations
-	buf := getJSONBuffer()
-	defer putJSONBuffer(buf)
-
-	if err := json.NewEncoder(buf).Encode(data); err != nil {
-		return err
-	}
-
-	// Write the buffer content to response writer
-	_, err := c.W.Write(buf.Bytes())
-	return err
 }
 
 // Text writes a plain text response with the given status code.

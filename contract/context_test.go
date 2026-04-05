@@ -11,8 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/spcent/plumego/log"
 )
 
 func TestNewCtxPopulatesFields(t *testing.T) {
@@ -41,17 +39,19 @@ func TestNewCtxPopulatesFields(t *testing.T) {
 		t.Fatalf("expected deadline to be copied")
 	}
 
-	if _, ok := ctx.Logger.(*log.NoOpLogger); !ok {
-		t.Fatalf("expected NoOpLogger by default, got %T", ctx.Logger)
+	if ctx.TraceID != "" {
+		t.Fatalf("expected empty trace id on request without trace context, got %q", ctx.TraceID)
 	}
 }
 
 func TestCtxResponseHelpers(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	ctx := NewCtx(recorder, httptest.NewRequest(http.MethodGet, "/", nil), nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(WithTraceContext(req.Context(), TraceContext{TraceID: "trace-123"}))
+	ctx := NewCtx(recorder, req, nil)
 
-	if err := ctx.JSON(http.StatusAccepted, map[string]string{"msg": "ok"}); err != nil {
-		t.Fatalf("json response failed: %v", err)
+	if err := ctx.Response(http.StatusAccepted, map[string]string{"msg": "ok"}, map[string]any{"source": "test"}); err != nil {
+		t.Fatalf("response failed: %v", err)
 	}
 
 	if recorder.Code != http.StatusAccepted {
@@ -62,13 +62,23 @@ func TestCtxResponseHelpers(t *testing.T) {
 		t.Fatalf("expected json content type, got %s", ct)
 	}
 
-	var payload map[string]string
+	var payload Response
 	if err := json.NewDecoder(recorder.Body).Decode(&payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if payload["msg"] != "ok" {
+	data, ok := payload.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("expected response data object, got %T", payload.Data)
+	}
+	if data["msg"] != "ok" {
 		t.Fatalf("unexpected payload: %+v", payload)
+	}
+	if payload.TraceID != "trace-123" {
+		t.Fatalf("expected trace id, got %q", payload.TraceID)
+	}
+	if payload.Meta == nil || payload.Meta["source"] != "test" {
+		t.Fatalf("unexpected meta: %+v", payload.Meta)
 	}
 }
 
@@ -190,7 +200,7 @@ func TestBindJSONErrors(t *testing.T) {
 	}
 }
 
-func TestBindAndValidateJSON(t *testing.T) {
+func TestBindJSONThenValidateStruct(t *testing.T) {
 	body := bytes.NewBufferString(`{"email":"demo@example.com","password":"superpass","username":"demo"}`)
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
 
@@ -201,8 +211,11 @@ func TestBindAndValidateJSON(t *testing.T) {
 	}
 
 	var p payload
-	if err := ctx.BindAndValidateJSON(&p); err != nil {
-		t.Fatalf("expected successful bind+validate, got %v", err)
+	if err := ctx.BindJSON(&p); err != nil {
+		t.Fatalf("expected successful bind, got %v", err)
+	}
+	if err := ValidateStruct(&p); err != nil {
+		t.Fatalf("expected successful validate, got %v", err)
 	}
 
 	if p.Email == "" || p.Password == "" || p.Username == "" {
@@ -210,7 +223,7 @@ func TestBindAndValidateJSON(t *testing.T) {
 	}
 }
 
-func TestBindAndValidateJSONErrors(t *testing.T) {
+func TestValidateStructErrorsAfterBindJSON(t *testing.T) {
 	body := bytes.NewBufferString(`{"email":"invalid","password":"short","username":"de"}`)
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
 
@@ -221,18 +234,17 @@ func TestBindAndValidateJSONErrors(t *testing.T) {
 	}
 
 	var p payload
-	err := ctx.BindAndValidateJSON(&p)
+	if err := ctx.BindJSON(&p); err != nil {
+		t.Fatalf("expected bind to succeed, got %v", err)
+	}
+
+	err := ValidateStruct(&p)
 	if err == nil {
 		t.Fatalf("expected validation error")
 	}
 
-	var bindErr *BindError
-	if !errors.As(err, &bindErr) {
-		t.Fatalf("expected BindError, got %T", err)
-	}
-
-	if !strings.Contains(bindErr.Message, "Email") {
-		t.Fatalf("unexpected bind error message: %s", bindErr.Message)
+	if !strings.Contains(err.Error(), "Email") {
+		t.Fatalf("unexpected validation error message: %s", err.Error())
 	}
 }
 
@@ -255,18 +267,11 @@ func TestNewCtxAppliesRequestTimeout(t *testing.T) {
 }
 
 func TestParamsAndRequestContextHelpers(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(context.WithValue(context.Background(), paramsContextKey{}, map[string]string{"id": "42"}))
-	if val, ok := ParamsFromContext(req.Context())["id"]; !ok || val != "42" {
-		t.Fatalf("unexpected ParamsFromContext lookup: %v %v", val, ok)
-	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(WithRequestContext(context.Background(), RequestContext{Params: map[string]string{"id": "42"}}))
 
 	rc := RequestContextFromContext(req.Context())
 	if rc.Params["id"] != "42" {
 		t.Fatalf("request context did not surface params")
-	}
-
-	if params := ParamsFromContext(context.Background()); params != nil {
-		t.Fatalf("expected nil params for empty context")
 	}
 }
 
@@ -310,11 +315,10 @@ func TestCtxHelpers(t *testing.T) {
 }
 
 func TestAdaptCtxHandler(t *testing.T) {
-	logger := log.NewGLogger()
 	called := false
 	h := AdaptCtxHandler(func(c *Ctx) {
 		called = true
-	}, logger)
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()

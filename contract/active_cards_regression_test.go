@@ -1,186 +1,46 @@
 package contract
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/spcent/plumego/log"
 )
 
-type captureStructuredLogger struct {
-	fields  log.Fields
-	onWarn  func(msg string, fields log.Fields)
-	onError func(msg string, fields log.Fields)
-}
-
-func (l *captureStructuredLogger) WithFields(fields log.Fields) log.StructuredLogger {
-	merged := make(log.Fields, len(l.fields)+len(fields))
-	for k, v := range l.fields {
-		merged[k] = v
-	}
-	for k, v := range fields {
-		merged[k] = v
-	}
-	return &captureStructuredLogger{
-		fields:  merged,
-		onWarn:  l.onWarn,
-		onError: l.onError,
-	}
-}
-
-func (l *captureStructuredLogger) With(key string, value any) log.StructuredLogger {
-	return l.WithFields(log.Fields{key: value})
-}
-
-func (l *captureStructuredLogger) Debug(msg string, fields ...log.Fields) {}
-func (l *captureStructuredLogger) Info(msg string, fields ...log.Fields)  {}
-func (l *captureStructuredLogger) Fatal(msg string, fields ...log.Fields) {}
-func (l *captureStructuredLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {
-}
-func (l *captureStructuredLogger) DebugCtx(ctx context.Context, msg string, fields ...log.Fields) {
-}
-func (l *captureStructuredLogger) InfoCtx(ctx context.Context, msg string, fields ...log.Fields) {}
-
-func (l *captureStructuredLogger) Warn(msg string, fields ...log.Fields) {
-	if l.onWarn != nil {
-		l.onWarn(msg, mergeLogFields(l.fields, fields...))
-	}
-}
-
-func (l *captureStructuredLogger) Error(msg string, fields ...log.Fields) {
-	if l.onError != nil {
-		l.onError(msg, mergeLogFields(l.fields, fields...))
-	}
-}
-
-func (l *captureStructuredLogger) WarnCtx(ctx context.Context, msg string, fields ...log.Fields) {
-	l.Warn(msg, fields...)
-}
-
-func (l *captureStructuredLogger) ErrorCtx(ctx context.Context, msg string, fields ...log.Fields) {
-	l.Error(msg, fields...)
-}
-
-func mergeLogFields(base log.Fields, extra ...log.Fields) log.Fields {
-	merged := make(log.Fields, len(base))
-	for k, v := range base {
-		merged[k] = v
-	}
-	for _, fields := range extra {
-		for k, v := range fields {
-			merged[k] = v
-		}
-	}
-	return merged
-}
-
-func TestBindAndValidateMethodsLogOnce(t *testing.T) {
+func TestBindJSONAndValidateStructExplicitFlow(t *testing.T) {
 	type payload struct {
 		Name string `json:"name" validate:"required"`
 	}
 
-	tests := []struct {
-		name string
-		run  func(ctx *Ctx) error
-	}{
-		{
-			name: "BindAndValidateJSON",
-			run: func(ctx *Ctx) error {
-				var dst payload
-				return ctx.BindAndValidateJSON(&dst)
-			},
-		},
-		{
-			name: "BindAndValidateJSONWithOptions",
-			run: func(ctx *Ctx) error {
-				var dst payload
-				return ctx.BindAndValidateJSONWithOptions(&dst, BindOptions{})
-			},
-		},
-		{
-			name: "BindAndValidateQuery",
-			run: func(ctx *Ctx) error {
-				type query struct {
-					Page int `query:"page"`
-				}
-				var dst query
-				return ctx.BindAndValidateQuery(&dst)
-			},
-		},
-		{
-			name: "BindAndValidateQueryWithOptions",
-			run: func(ctx *Ctx) error {
-				type query struct {
-					Page int `query:"page"`
-				}
-				var dst query
-				return ctx.BindAndValidateQueryWithOptions(&dst, BindOptions{})
-			},
-		},
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":""}`))
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	var dst payload
+	if err := ctx.BindJSON(&dst); err != nil {
+		t.Fatalf("expected bind to succeed, got %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			warnCount := 0
-			logger := &captureStructuredLogger{
-				onWarn: func(msg string, fields log.Fields) {
-					warnCount++
-				},
-			}
-
-			var ctx *Ctx
-			if strings.Contains(tt.name, "Query") {
-				req := httptest.NewRequest(http.MethodGet, "/?page=bad", nil)
-				ctx = NewCtx(httptest.NewRecorder(), req, nil)
-			} else {
-				req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":""}`))
-				ctx = NewCtx(httptest.NewRecorder(), req, nil)
-			}
-			ctx.Logger = logger
-
-			if err := tt.run(ctx); err == nil {
-				t.Fatal("expected bind/validate error")
-			}
-			if warnCount != 1 {
-				t.Fatalf("expected exactly one warn log, got %d", warnCount)
-			}
-		})
+	if err := ValidateStruct(&dst); err == nil {
+		t.Fatal("expected validation error")
 	}
 }
 
-func TestLogBindErrorRedactsStructPayload(t *testing.T) {
-	type loginRequest struct {
-		Email    string `json:"email" validate:"required,email"`
-		Password string `json:"password" validate:"required"`
-	}
-
-	var captured log.Fields
-	logger := &captureStructuredLogger{
-		onWarn: func(msg string, fields log.Fields) {
-			captured = fields
-		},
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"email":"not-an-email","password":"super-secret"}`))
+func TestBindJSONRejectsMultipleBindOptions(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":"alice"}`))
 	ctx := NewCtx(httptest.NewRecorder(), req, nil)
-	ctx.Logger = logger
 
-	var payload loginRequest
-	if err := ctx.BindAndValidateJSON(&payload); err == nil {
-		t.Fatal("expected validation error")
+	var dst struct {
+		Name string `json:"name"`
 	}
-
-	rawPayload, ok := captured["payload"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected payload fields to be logged as a map, got %T", captured["payload"])
+	err := ctx.BindJSON(&dst, BindOptions{}, BindOptions{})
+	if err == nil {
+		t.Fatal("expected bind options error")
 	}
-	if rawPayload["password"] != "***" {
-		t.Fatalf("expected password to be redacted, got %v", rawPayload["password"])
+	var bindErr *BindError
+	if !errors.As(err, &bindErr) {
+		t.Fatalf("expected BindError, got %T", err)
 	}
 }
 
@@ -235,7 +95,7 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		Address address
 	}
 
-	err := validateStruct(&user{})
+	err := ValidateStruct(&user{})
 	fields := FieldErrorsFrom(err)
 	if len(fields) == 0 || fields[0].Field != "Address.Street" {
 		t.Fatalf("expected nested validation failure, got %v", fields)
@@ -244,7 +104,7 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 	type badRules struct {
 		Name string `validate:"requried"`
 	}
-	err = validateStruct(&badRules{})
+	err = ValidateStruct(&badRules{})
 	fields = FieldErrorsFrom(err)
 	if len(fields) == 0 || fields[0].Code != "unknown_rule" {
 		t.Fatalf("expected unknown_rule failure, got %v", fields)
@@ -254,7 +114,7 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		Code string `validate:"min=10"`
 		Name string `validate:"max=10"`
 	}
-	err = validateStruct(&stringLengths{Code: "42", Name: "hello world"})
+	err = ValidateStruct(&stringLengths{Code: "42", Name: "hello world"})
 	fields = FieldErrorsFrom(err)
 	if len(fields) != 2 {
 		t.Fatalf("expected string min/max failures, got %v", fields)
@@ -277,7 +137,7 @@ func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
 	type level1 struct{ Child level2 }
 	type root struct{ Child level1 }
 
-	err := validateStruct(&root{})
+	err := ValidateStruct(&root{})
 	if err == nil {
 		t.Fatal("expected depth-limit error, got nil")
 	}
@@ -365,35 +225,6 @@ func TestWrapErrorInnerParamWinsOnConflict(t *testing.T) {
 	}
 }
 
-func TestErrorLoggerReservedFieldsAreStable(t *testing.T) {
-	var captured log.Fields
-	logger := &captureStructuredLogger{
-		onError: func(msg string, fields log.Fields) {
-			captured = fields
-		},
-	}
-
-	err := NewErrorBuilder().
-		Status(http.StatusBadRequest).
-		Category(CategoryClient).
-		Code("BAD_REQUEST").
-		Message("bad request").
-		Detail("code", "OVERRIDE").
-		Detail("status", "oops").
-		Detail("trace_id", "fake-trace").
-		Build()
-
-	ErrorLogger(logger, nil, err)
-
-	if captured["code"] != "BAD_REQUEST" || captured["status"] != http.StatusBadRequest {
-		t.Fatalf("expected typed fields to win, got %v", captured)
-	}
-	details, ok := captured["details"].(map[string]any)
-	if !ok || details["code"] != "OVERRIDE" {
-		t.Fatalf("expected detail map to remain namespaced, got %v", captured["details"])
-	}
-}
-
 func TestWriteErrorAndParseErrorUseTopLevelTraceIDAndTypedFields(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -432,10 +263,14 @@ func TestWriteErrorAndParseErrorUseTopLevelTraceIDAndTypedFields(t *testing.T) {
 	}
 }
 
-func TestToAPIErrorNormalizesExistingAPIError(t *testing.T) {
-	got := toAPIError(APIError{Message: "boom"})
-	if got.Status != http.StatusInternalServerError || got.Code == "" || got.Category == "" {
-		t.Fatalf("expected normalized APIError, got %+v", got)
+func TestErrorBuilderStatusOnlyDerivesCategoryRegression(t *testing.T) {
+	got := NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code("BAD_REQUEST").
+		Message("bad request").
+		Build()
+	if got.Category != CategoryClient {
+		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
 	}
 }
 

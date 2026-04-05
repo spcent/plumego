@@ -208,8 +208,8 @@ func (r *Router) SetLogger(logger log.StructuredLogger) {
 }
 
 // Logger returns the logger associated with this router (or nil if unset).
-// Components that need to pass a logger to contract.AdaptCtxHandler can use
-// this to obtain the one configured via WithLogger or SetLogger.
+// Components that need direct logger access can use this to obtain the one
+// configured via WithLogger or SetLogger.
 func (r *Router) Logger() log.StructuredLogger {
 	return r.logger
 }

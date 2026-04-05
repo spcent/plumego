@@ -14,13 +14,17 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-
-	logpkg "github.com/spcent/plumego/log"
 )
 
 // BindJSON binds the request JSON body to the provided destination structure.
-// It performs minimal validation and returns a BindError on failure.
-func (c *Ctx) BindJSON(dst any) error {
+// It performs minimal decoding and returns a BindError on failure.
+// An optional BindOptions value can tighten per-call JSON behavior.
+func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
+	bindOpts, err := normalizeJSONBindOptions(opts)
+	if err != nil {
+		return err
+	}
+
 	data, err := c.bodyBytes()
 	if err != nil {
 		if errors.Is(err, ErrRequestBodyTooLarge) {
@@ -30,25 +34,12 @@ func (c *Ctx) BindJSON(dst any) error {
 		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
 
-	return decodeJSONBody(data, dst, false)
-}
-
-// BindJSONWithOptions binds the request JSON body with configurable options.
-func (c *Ctx) BindJSONWithOptions(dst any, opts BindOptions) error {
-	data, err := c.bodyBytes()
-	if err != nil {
-		if errors.Is(err, ErrRequestBodyTooLarge) {
-			return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: err}
-		}
-		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
-	}
-
-	if opts.MaxBodySize > 0 && int64(len(data)) > opts.MaxBodySize {
+	if bindOpts.MaxBodySize > 0 && int64(len(data)) > bindOpts.MaxBodySize {
 		return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
 	}
-	// opts.MaxBodySize, if positive, enforces a stricter per-call cap on the
+	// bindOpts.MaxBodySize, if positive, enforces a stricter per-call cap on the
 	// already-read body. RequestConfig.MaxBodySize enforces read-time limits.
-	return decodeJSONBody(data, dst, opts.DisallowUnknownFields)
+	return decodeJSONBody(data, dst, bindOpts.DisallowUnknownFields)
 }
 
 // joinSentinel wraps sentinel and cause together so that errors.Is(e, sentinel)
@@ -82,91 +73,12 @@ func decodeJSONBody(data []byte, dst any, disallowUnknown bool) error {
 	return nil
 }
 
-// BindAndValidateJSON binds the request body to dst and validates it using struct tags.
-func (c *Ctx) BindAndValidateJSON(dst any) error {
-	var bindErr error
-	if err := c.BindJSON(dst); err != nil {
-		bindErr = err
-		logBindError(c, dst, BindOptions{}, bindErr)
-		return bindErr
-	}
-
-	if err := validateStruct(dst); err != nil {
-		bindErr = &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
-		logBindError(c, dst, BindOptions{}, bindErr)
-		return bindErr
-	}
-
-	return nil
-}
-
-// BindAndValidateJSONWithOptions binds and validates JSON payloads with configurable options.
-func (c *Ctx) BindAndValidateJSONWithOptions(dst any, opts BindOptions) error {
-	if err := c.BindJSONWithOptions(dst, opts); err != nil {
-		logBindError(c, dst, opts, err)
-		return err
-	}
-
-	if opts.DisableValidation {
-		return nil
-	}
-
-	validate := opts.Validator
-	if validate == nil {
-		validate = validateStruct
-	}
-	if err := validate(dst); err != nil {
-		bindErr := &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
-		logBindError(c, dst, opts, bindErr)
-		return bindErr
-	}
-
-	return nil
-}
-
 // BindQuery binds URL query parameters to the provided struct using the "query" struct tag.
 // It supports scalar primitives, pointer-to-scalar fields, and primitive slices.
 // Fields without a "query" tag are skipped. A tag value of "-" also skips the field.
+// Validation is an explicit second step via ValidateStruct.
 func (c *Ctx) BindQuery(dst any) error {
 	return bindQuery(c.Query, dst)
-}
-
-// BindAndValidateQuery binds query parameters and then validates the struct
-// using the same "validate" struct tags as BindAndValidateJSON.
-func (c *Ctx) BindAndValidateQuery(dst any) error {
-	if err := c.BindQuery(dst); err != nil {
-		logBindError(c, dst, BindOptions{}, err)
-		return err
-	}
-	if err := validateStruct(dst); err != nil {
-		bindErr := &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
-		logBindError(c, dst, BindOptions{}, bindErr)
-		return bindErr
-	}
-	return nil
-}
-
-// BindAndValidateQueryWithOptions binds query parameters and conditionally validates
-// the struct based on the provided options. MaxBodySize and DisallowUnknownFields in
-// opts do not apply to query parameters and are silently ignored.
-func (c *Ctx) BindAndValidateQueryWithOptions(dst any, opts BindOptions) error {
-	if err := c.BindQuery(dst); err != nil {
-		logBindError(c, dst, opts, err)
-		return err
-	}
-	if opts.DisableValidation {
-		return nil
-	}
-	validate := opts.Validator
-	if validate == nil {
-		validate = validateStruct
-	}
-	if err := validate(dst); err != nil {
-		bindErr := &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
-		logBindError(c, dst, opts, bindErr)
-		return bindErr
-	}
-	return nil
 }
 
 // bindQuery maps URL query values to struct fields using the "query" struct tag.
@@ -305,55 +217,18 @@ func (c *Ctx) SaveUploadedFile(file *multipart.FileHeader, dst string) error {
 	return err
 }
 
-func logBindError(c *Ctx, payload any, opts BindOptions, err error) {
-	if c == nil {
-		return
-	}
-	logger := c.Logger
-	if logger == nil {
-		return
-	}
-
-	fields := logpkg.Fields{
-		"error":    err.Error(),
-		"method":   c.R.Method,
-		"path":     c.R.URL.Path,
-		"trace_id": TraceIDFromContext(c.R.Context()),
-	}
-
-	if v := FieldErrorsFrom(err); len(v) > 0 && payload != nil {
-		fields["payload"] = redactPayloadForLog(payload)
-		fields["validation_fields"] = v
-	}
-
-	logger.WarnCtx(c.R.Context(), "request binding failed", logpkg.Fields(DefaultObservabilityPolicy.RedactFields(fields)))
-}
-
-func redactPayloadForLog(payload any) any {
-	switch value := payload.(type) {
-	case map[string]any:
-		return DefaultObservabilityPolicy.RedactFields(value)
-	case []any:
-		return DefaultObservabilityPolicy.redactValue(value)
+func normalizeJSONBindOptions(opts []BindOptions) (BindOptions, error) {
+	switch len(opts) {
+	case 0:
+		return BindOptions{}, nil
+	case 1:
+		return opts[0], nil
 	default:
-		if mapped, err := structToMap(payload); err == nil {
-			return DefaultObservabilityPolicy.RedactFields(mapped)
+		return BindOptions{}, &BindError{
+			Status:  http.StatusBadRequest,
+			Message: "BindJSON accepts at most one BindOptions value",
 		}
-		return DefaultObservabilityPolicy.RedactFields(map[string]any{"payload": payload})["payload"]
 	}
-}
-
-func structToMap(payload any) (map[string]any, error) {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	var mapped map[string]any
-	if err := json.Unmarshal(data, &mapped); err != nil {
-		return nil, err
-	}
-	return mapped, nil
 }
 
 func (c *Ctx) bodyBytes() ([]byte, error) {

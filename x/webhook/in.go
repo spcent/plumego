@@ -46,13 +46,13 @@ func (c *Inbound) RegisterRoutes(r *router.Router) {
 		if gitHubPath == "" {
 			gitHubPath = "/webhooks/github"
 		}
-		r.Post(gitHubPath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }, r.Logger()))
+		r.Post(gitHubPath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }))
 
 		stripePath := strings.TrimSpace(c.cfg.StripePath)
 		if stripePath == "" {
 			stripePath = "/webhooks/stripe"
 		}
-		r.Post(stripePath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }, r.Logger()))
+		r.Post(stripePath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
 	})
 }
 

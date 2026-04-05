@@ -56,7 +56,7 @@ func (h *Handler) RegisterRoutes(r *router.Router) {
 			}
 
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotImplemented).Code("not_supported").Message("pubsub snapshot not supported by this implementation").Category(contract.CategoryServer).Build())
-		}, r.Logger()))
+		}))
 	})
 }
 

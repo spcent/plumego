@@ -119,14 +119,16 @@ func (d *Dashboard) handleDeps(ctx *contract.Ctx) {
 
 	graph, err := d.depsCache.Get(timeoutCtx, d.projectDir, refreshEnabled)
 	if err != nil {
-		ctx.JSON(500, map[string]any{
-			"error": err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("dependency_graph_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	filtered := filterDependencyGraph(graph, includeStdlib, maxNodes)
-	ctx.JSON(200, filtered)
+	_ = ctx.Response(200, filtered, nil)
 }
 
 func buildDependencyGraph(ctx context.Context, dir string) (*DependencyGraph, error) {

@@ -11,7 +11,7 @@ func TestBindErrorToAPIErrorFields(t *testing.T) {
 		Email string `validate:"required,email"`
 	}
 
-	err := validateStruct(&payload{})
+	err := ValidateStruct(&payload{})
 	if err == nil {
 		t.Fatalf("expected validation error")
 	}

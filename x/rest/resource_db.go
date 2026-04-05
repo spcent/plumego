@@ -419,173 +419,285 @@ func (c *DBResourceController[T]) IndexCtx(ctx *contract.Ctx) {
 	params := c.ParseQueryParams(ctx.R)
 
 	if err := c.Hooks.BeforeList(ctx.R.Context(), params); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("invalid_list_request").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	results, total, err := c.repository.FindAll(ctx.R.Context(), params)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch records"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("list_failed").
+			Message("failed to fetch records").
+			Build())
 		return
 	}
 
 	transformedResults, err := c.Transformer.TransformCollection(ctx.R.Context(), results)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to transform results"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("transform_collection_failed").
+			Message("failed to transform results").
+			Build())
 		return
 	}
 
 	if err := c.Hooks.AfterList(ctx.R.Context(), params, transformedResults); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("after_list_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, PaginatedResponse{
+	_ = ctx.Response(http.StatusOK, PaginatedResponse{
 		Data:       transformedResults,
 		Pagination: NewPaginationMeta(params.Page, params.PageSize, total),
-	})
+	}, nil)
 }
 
 // ShowCtx handles GET /resource/:id.
 func (c *DBResourceController[T]) ShowCtx(ctx *contract.Ctx) {
 	id := c.ParamExtractor.GetID(ctx.R)
 	if id == "" {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "ID is required"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeRequired).
+			Code("missing_id").
+			Message("id is required").
+			Build())
 		return
 	}
 
 	result, err := c.repository.FindByID(ctx.R.Context(), id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusNotFound, map[string]string{"error": "Record not found"})
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Type(contract.ErrTypeNotFound).
+				Code("not_found").
+				Message("record not found").
+				Build())
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch record"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("show_failed").
+			Message("failed to fetch record").
+			Build())
 		return
 	}
 
 	transformedResult, err := c.Transformer.Transform(ctx.R.Context(), result)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to transform result"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("transform_failed").
+			Message("failed to transform result").
+			Build())
 		return
 	}
-	ctx.JSON(http.StatusOK, transformedResult)
+	_ = ctx.Response(http.StatusOK, transformedResult, nil)
 }
 
 // CreateCtx handles POST /resource.
 func (c *DBResourceController[T]) CreateCtx(ctx *contract.Ctx) {
 	var data T
 	if err := ctx.BindJSON(&data); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeValidation).
+			Code("invalid_request").
+			Message("invalid request body").
+			Build())
 		return
 	}
 
 	if c.validator != nil {
 		if err := c.validator.Validate(data); err != nil {
-			ctx.JSON(http.StatusUnprocessableEntity, map[string]any{"error": "Validation failed", "details": err})
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Status(http.StatusUnprocessableEntity).
+				Category(contract.CategoryValidation).
+				Code("validation_failed").
+				Message("validation failed").
+				Detail("details", err).
+				Build())
 			return
 		}
 	}
 
 	if err := c.Hooks.BeforeCreate(ctx.R.Context(), &data); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("before_create_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	if err := c.repository.Create(ctx.R.Context(), &data); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create record"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("create_failed").
+			Message("failed to create record").
+			Build())
 		return
 	}
 
 	if err := c.Hooks.AfterCreate(ctx.R.Context(), &data); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("after_create_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	transformedResult, err := c.Transformer.Transform(ctx.R.Context(), &data)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to transform result"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("transform_failed").
+			Message("failed to transform result").
+			Build())
 		return
 	}
-	ctx.JSON(http.StatusCreated, transformedResult)
+	_ = ctx.Response(http.StatusCreated, transformedResult, nil)
 }
 
 // UpdateCtx handles PUT /resource/:id.
 func (c *DBResourceController[T]) UpdateCtx(ctx *contract.Ctx) {
 	id := c.ParamExtractor.GetID(ctx.R)
 	if id == "" {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "ID is required"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeRequired).
+			Code("missing_id").
+			Message("id is required").
+			Build())
 		return
 	}
 
 	var data T
 	if err := ctx.BindJSON(&data); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeValidation).
+			Code("invalid_request").
+			Message("invalid request body").
+			Build())
 		return
 	}
 
 	if c.validator != nil {
 		if err := c.validator.Validate(data); err != nil {
-			ctx.JSON(http.StatusUnprocessableEntity, map[string]any{"error": "Validation failed", "details": err})
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Status(http.StatusUnprocessableEntity).
+				Category(contract.CategoryValidation).
+				Code("validation_failed").
+				Message("validation failed").
+				Detail("details", err).
+				Build())
 			return
 		}
 	}
 
 	if err := c.Hooks.BeforeUpdate(ctx.R.Context(), id, &data); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("before_update_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	if err := c.repository.Update(ctx.R.Context(), id, &data); err != nil {
 		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusNotFound, map[string]string{"error": "Record not found"})
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Type(contract.ErrTypeNotFound).
+				Code("not_found").
+				Message("record not found").
+				Build())
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update record"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("update_failed").
+			Message("failed to update record").
+			Build())
 		return
 	}
 
 	if err := c.Hooks.AfterUpdate(ctx.R.Context(), id, &data); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("after_update_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	transformedResult, err := c.Transformer.Transform(ctx.R.Context(), &data)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to transform result"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("transform_failed").
+			Message("failed to transform result").
+			Build())
 		return
 	}
-	ctx.JSON(http.StatusOK, transformedResult)
+	_ = ctx.Response(http.StatusOK, transformedResult, nil)
 }
 
 // DeleteCtx handles DELETE /resource/:id.
 func (c *DBResourceController[T]) DeleteCtx(ctx *contract.Ctx) {
 	id := c.ParamExtractor.GetID(ctx.R)
 	if id == "" {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "ID is required"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeRequired).
+			Code("missing_id").
+			Message("id is required").
+			Build())
 		return
 	}
 
 	if err := c.Hooks.BeforeDelete(ctx.R.Context(), id); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("before_delete_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	if err := c.repository.Delete(ctx.R.Context(), id); err != nil {
 		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusNotFound, map[string]string{"error": "Record not found"})
+			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+				Type(contract.ErrTypeNotFound).
+				Code("not_found").
+				Message("record not found").
+				Build())
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to delete record"})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("delete_failed").
+			Message("failed to delete record").
+			Build())
 		return
 	}
 
 	if err := c.Hooks.AfterDelete(ctx.R.Context(), id); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("after_delete_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
-	ctx.JSON(http.StatusNoContent, nil)
+	_ = ctx.Response(http.StatusNoContent, nil, nil)
 }
 
 // ================================================

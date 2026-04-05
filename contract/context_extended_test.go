@@ -15,12 +15,16 @@ import (
 	"time"
 )
 
-func TestErrorJSON(t *testing.T) {
+func TestWriteErrorWithBuilder(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
-	ctx := NewCtx(w, r, nil)
 
-	err := ctx.ErrorJSON(http.StatusBadRequest, "invalid_request", "Bad request", map[string]any{"field": "name"})
+	err := WriteError(w, r, NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code("invalid_request").
+		Message("Bad request").
+		Detail("field", "name").
+		Build())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -40,9 +44,12 @@ func TestErrorJSON(t *testing.T) {
 	if response.Error.Message != "Bad request" {
 		t.Errorf("expected message 'Bad request', got '%s'", response.Error.Message)
 	}
+	if response.Error.Category != CategoryClient {
+		t.Errorf("expected category %q, got %q", CategoryClient, response.Error.Category)
+	}
 }
 
-func TestErrorJSONCategoryFromStatus(t *testing.T) {
+func TestCategoryForStatus(t *testing.T) {
 	tests := []struct {
 		name             string
 		status           int
@@ -60,22 +67,8 @@ func TestErrorJSONCategoryFromStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/test", nil)
-			ctx := NewCtx(w, r, nil)
-
-			err := ctx.ErrorJSON(tt.status, "TEST", "test message", nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			var response ErrorResponse
-			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-				t.Fatalf("failed to parse response: %v", err)
-			}
-
-			if response.Error.Category != tt.expectedCategory {
-				t.Errorf("status %d: expected category %q, got %q", tt.status, tt.expectedCategory, response.Error.Category)
+			if got := CategoryForStatus(tt.status); got != tt.expectedCategory {
+				t.Errorf("status %d: expected category %q, got %q", tt.status, tt.expectedCategory, got)
 			}
 		})
 	}
@@ -420,37 +413,6 @@ func TestValidateCtxHandler(t *testing.T) {
 	}
 }
 
-func TestParamsFromContext(t *testing.T) {
-	// Test with nil context
-	result := ParamsFromContext(t.Context())
-	if result != nil {
-		t.Error("expected nil for nil context")
-	}
-
-	// Test with RequestContext
-	rc := RequestContext{Params: map[string]string{"id": "123"}}
-	ctx := context.WithValue(context.Background(), requestContextKey{}, rc)
-	result = ParamsFromContext(ctx)
-	if result == nil || result["id"] != "123" {
-		t.Error("expected params from RequestContext")
-	}
-
-	// Test with ParamsContextKey (legacy)
-	params := map[string]string{"name": "test"}
-	ctx = context.WithValue(context.Background(), paramsContextKey{}, params)
-	result = ParamsFromContext(ctx)
-	if result == nil || result["name"] != "test" {
-		t.Error("expected params from ParamsContextKey")
-	}
-
-	// Test with empty context
-	ctx = context.Background()
-	result = ParamsFromContext(ctx)
-	if result != nil {
-		t.Error("expected nil for empty context")
-	}
-}
-
 func TestRequestContextFromContext(t *testing.T) {
 	// Test with nil context
 	result := RequestContextFromContext(t.Context())
@@ -471,14 +433,6 @@ func TestRequestContextFromContext(t *testing.T) {
 	}
 	if result.RoutePattern != "/users/:id" || result.RouteName != "user_show" {
 		t.Error("expected route fields from RequestContext")
-	}
-
-	// Test fallback to ParamsContextKey
-	params := map[string]string{"name": "test"}
-	ctx = context.WithValue(context.Background(), paramsContextKey{}, params)
-	result = RequestContextFromContext(ctx)
-	if result.Params == nil || result.Params["name"] != "test" {
-		t.Error("expected fallback to ParamsContextKey")
 	}
 }
 
@@ -512,7 +466,7 @@ func TestParamFromRequest(t *testing.T) {
 	r := httptest.NewRequest("GET", "/test", nil)
 	r = r.WithContext(ctx)
 
-	params := ParamsFromContext(r.Context())
+	params := RequestContextFromContext(r.Context()).Params
 	val, ok := params["id"]
 	if !ok {
 		t.Error("expected param to exist")
@@ -529,9 +483,8 @@ func TestParamFromRequest(t *testing.T) {
 
 	// Test with no context
 	r = httptest.NewRequest("GET", "/test", nil)
-	params = ParamsFromContext(r.Context())
-	_, ok = params["id"]
-	if ok {
+	params = RequestContextFromContext(r.Context()).Params
+	if _, ok = params["id"]; ok {
 		t.Error("expected param to not exist")
 	}
 }
@@ -1083,52 +1036,39 @@ func TestBindQueryAliasRemoval(t *testing.T) {
 	}
 }
 
-func TestBindAndValidateQueryWithOptions(t *testing.T) {
+func TestBindQueryThenValidateStruct(t *testing.T) {
 	type Q struct {
 		Name string `query:"name" validate:"required"`
 	}
 
-	t.Run("valid with default validator", func(t *testing.T) {
+	t.Run("valid query", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/?name=bob", nil)
 		ctx := NewCtx(w, r, nil)
 
 		var q Q
-		if err := ctx.BindAndValidateQueryWithOptions(&q, BindOptions{}); err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		if err := ctx.BindQuery(&q); err != nil {
+			t.Fatalf("unexpected bind error: %v", err)
+		}
+		if err := ValidateStruct(&q); err != nil {
+			t.Fatalf("unexpected validation error: %v", err)
 		}
 		if q.Name != "bob" {
 			t.Errorf("expected 'bob', got %q", q.Name)
 		}
 	})
 
-	t.Run("validation disabled skips required check", func(t *testing.T) {
+	t.Run("missing required field fails validation", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/", nil)
 		ctx := NewCtx(w, r, nil)
 
 		var q Q
-		if err := ctx.BindAndValidateQueryWithOptions(&q, BindOptions{DisableValidation: true}); err != nil {
-			t.Fatalf("unexpected error when validation disabled: %v", err)
+		if err := ctx.BindQuery(&q); err != nil {
+			t.Fatalf("unexpected bind error: %v", err)
 		}
-	})
-
-	t.Run("custom validator called", func(t *testing.T) {
-		called := false
-		customValidator := func(v any) error {
-			called = true
-			return nil
-		}
-		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/?name=carl", nil)
-		ctx := NewCtx(w, r, nil)
-
-		var q Q
-		if err := ctx.BindAndValidateQueryWithOptions(&q, BindOptions{Validator: customValidator}); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !called {
-			t.Error("expected custom validator to be called")
+		if err := ValidateStruct(&q); err == nil {
+			t.Fatal("expected validation error for missing required field")
 		}
 	})
 }

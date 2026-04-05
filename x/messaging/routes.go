@@ -17,10 +17,10 @@ func RegisterRoutes(r *router.Router, svc *Service, prefix string) {
 	}
 	prefix = strings.TrimRight(prefix, "/")
 
-	r.Post(prefix+"/send", contract.AdaptCtxHandler(svc.HandleSend, r.Logger()))
-	r.Post(prefix+"/batch", contract.AdaptCtxHandler(svc.HandleBatchSend, r.Logger()))
-	r.Get(prefix+"/stats", contract.AdaptCtxHandler(svc.HandleStats, r.Logger()))
-	r.Get(prefix+"/receipts", contract.AdaptCtxHandler(svc.HandleListReceipts, r.Logger()))
-	r.Get(prefix+"/:id/receipt", contract.AdaptCtxHandler(svc.HandleGetReceipt, r.Logger()))
-	r.Get(prefix+"/channels", contract.AdaptCtxHandler(svc.HandleChannelHealth, r.Logger()))
+	r.Post(prefix+"/send", contract.AdaptCtxHandler(svc.HandleSend))
+	r.Post(prefix+"/batch", contract.AdaptCtxHandler(svc.HandleBatchSend))
+	r.Get(prefix+"/stats", contract.AdaptCtxHandler(svc.HandleStats))
+	r.Get(prefix+"/receipts", contract.AdaptCtxHandler(svc.HandleListReceipts))
+	r.Get(prefix+"/:id/receipt", contract.AdaptCtxHandler(svc.HandleGetReceipt))
+	r.Get(prefix+"/channels", contract.AdaptCtxHandler(svc.HandleChannelHealth))
 }

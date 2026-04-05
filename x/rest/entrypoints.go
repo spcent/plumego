@@ -58,16 +58,15 @@ func RegisterContextResourceRoutes(r *router.Router, prefix string, controller C
 		return
 	}
 	prefix = normalizePrefix(prefix)
-	logger := r.Logger()
 
-	r.Get(prefix, contract.AdaptCtxHandler(controller.IndexCtx, logger))
-	r.Get(prefix+"/:id", contract.AdaptCtxHandler(controller.ShowCtx, logger))
-	r.Post(prefix, contract.AdaptCtxHandler(controller.CreateCtx, logger))
-	r.Put(prefix+"/:id", contract.AdaptCtxHandler(controller.UpdateCtx, logger))
-	r.Delete(prefix+"/:id", contract.AdaptCtxHandler(controller.DeleteCtx, logger))
-	r.Patch(prefix+"/:id", contract.AdaptCtxHandler(controller.PatchCtx, logger))
-	r.Post(prefix+"/batch", contract.AdaptCtxHandler(controller.BatchCreateCtx, logger))
-	r.Delete(prefix+"/batch", contract.AdaptCtxHandler(controller.BatchDeleteCtx, logger))
+	r.Get(prefix, contract.AdaptCtxHandler(controller.IndexCtx))
+	r.Get(prefix+"/:id", contract.AdaptCtxHandler(controller.ShowCtx))
+	r.Post(prefix, contract.AdaptCtxHandler(controller.CreateCtx))
+	r.Put(prefix+"/:id", contract.AdaptCtxHandler(controller.UpdateCtx))
+	r.Delete(prefix+"/:id", contract.AdaptCtxHandler(controller.DeleteCtx))
+	r.Patch(prefix+"/:id", contract.AdaptCtxHandler(controller.PatchCtx))
+	r.Post(prefix+"/batch", contract.AdaptCtxHandler(controller.BatchCreateCtx))
+	r.Delete(prefix+"/batch", contract.AdaptCtxHandler(controller.BatchDeleteCtx))
 }
 
 func normalizePrefix(prefix string) string {

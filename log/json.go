@@ -7,6 +7,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // JSONLogger implements StructuredLogger with JSON output format.
@@ -184,7 +186,7 @@ func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, ctx cont
 	entry["time"] = time.Now().UTC().Format(time.RFC3339Nano)
 	entry["level"] = levelName(level)
 	entry["msg"] = msg
-	if traceID := TraceIDFromContext(ctx); traceID != "" {
+	if traceID := contract.TraceIDFromContext(ctx); traceID != "" {
 		entry["trace_id"] = traceID
 	}
 

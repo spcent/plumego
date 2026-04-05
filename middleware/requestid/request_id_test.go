@@ -6,16 +6,12 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 )
 
 func TestMiddlewareUsesHeader(t *testing.T) {
 	handler := Middleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := contract.TraceIDFromContext(r.Context()); got != "abc-123" {
 			t.Fatalf("expected trace id to be propagated, got %q", got)
-		}
-		if got := log.TraceIDFromContext(r.Context()); got != "abc-123" {
-			t.Fatalf("expected log trace id to be propagated, got %q", got)
 		}
 	}))
 

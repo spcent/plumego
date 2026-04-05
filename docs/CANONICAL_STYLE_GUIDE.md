@@ -358,16 +358,22 @@ context.WithValue(ctx, fooKey, v)
 
 ### 16.3 Error construction path
 
-Two canonical paths exist; choose the most specific:
+One canonical path:
 
-| When | Use |
-|---|---|
-| Building from a known `ErrorType` | `ErrorType.Meta()` then fill Message |
-| Custom or multi-field error | `NewErrorBuilder()` fluent chain |
+```go
+err := contract.NewErrorBuilder().
+    Type(contract.ErrTypeValidation).
+    Message("validation failed").
+    Build()
 
-**Do not add** new `NewXxxError(...)` convenience constructors for each scenario.
-The 7 existing constructors (`NewValidationError`, `NewNotFoundError`, etc.) are
-legacy; prefer `ErrorBuilder` in new code.
+_ = contract.WriteError(w, r, err)
+```
+
+Use `Type(...)` when a known `ErrorType` exists, then override `Code`, `Status`,
+or `Category` only when the transport contract truly needs a deviation.
+
+**Do not add** `Ctx.ErrorJSON`, `HandleError`, `SafeExecute`, or new
+`NewXxxError(...)` convenience layers on top of this path.
 
 ### 16.4 Success response path
 
@@ -380,9 +386,9 @@ contract.WriteResponse(w, r, http.StatusOK, data, meta)
 ctx.Response(http.StatusOK, data, meta)
 ```
 
-`WriteJSON` and `Ctx.JSON` are low-level primitives for cases with no envelope;
-they must not be used in application handlers directly. If you are writing a
-handler, use `WriteResponse` / `ctx.Response`.
+`WriteJSON` is a low-level raw-payload writer. It is not the `Ctx`-level success
+path. If you are writing a `Ctx` handler, use `ctx.Response`. If you are
+writing a plain `http.Handler`, use `WriteResponse`.
 
 Do not invent per-feature envelope shapes.
 

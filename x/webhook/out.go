@@ -38,20 +38,20 @@ func (c *Outbound) RegisterRoutes(r *router.Router) {
 
 		svc := c.cfg.Service
 
-		r.Post(base+"/targets", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookCreateTarget(ctx, svc) }, r.Logger()))
-		r.Get(base+"/targets", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookListTargets(ctx, svc) }, r.Logger()))
-		r.Get(base+"/targets/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookGetTarget(ctx, svc) }, r.Logger()))
-		r.Patch(base+"/targets/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookPatchTarget(ctx, svc) }, r.Logger()))
-		r.Post(base+"/targets/:id/enable", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, true) }, r.Logger()))
-		r.Post(base+"/targets/:id/disable", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, false) }, r.Logger()))
+		r.Post(base+"/targets", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookCreateTarget(ctx, svc) }))
+		r.Get(base+"/targets", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookListTargets(ctx, svc) }))
+		r.Get(base+"/targets/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookGetTarget(ctx, svc) }))
+		r.Patch(base+"/targets/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookPatchTarget(ctx, svc) }))
+		r.Post(base+"/targets/:id/enable", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, true) }))
+		r.Post(base+"/targets/:id/disable", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, false) }))
 
 		r.Post(base+"/events/:event", contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
 			webhookTriggerEvent(ctx, svc, c.cfg.TriggerToken, c.cfg.AllowEmptyToken)
-		}, r.Logger()))
+		}))
 
-		r.Get(base+"/deliveries", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookListDeliveries(ctx, svc, c.cfg.DefaultPageLimit) }, r.Logger()))
-		r.Get(base+"/deliveries/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookGetDelivery(ctx, svc) }, r.Logger()))
-		r.Post(base+"/deliveries/:id/replay", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookReplayDelivery(ctx, svc) }, r.Logger()))
+		r.Get(base+"/deliveries", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookListDeliveries(ctx, svc, c.cfg.DefaultPageLimit) }))
+		r.Get(base+"/deliveries/:id", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookGetDelivery(ctx, svc) }))
+		r.Post(base+"/deliveries/:id/replay", contract.AdaptCtxHandler(func(ctx *contract.Ctx) { webhookReplayDelivery(ctx, svc) }))
 	})
 }
 

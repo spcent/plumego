@@ -1,88 +1,11 @@
 package contract
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/spcent/plumego/log"
 )
-
-// mockStructuredLogger implements StructuredLogger for testing
-type mockStructuredLogger struct {
-	onError func(msg string, fields log.Fields)
-	fields  log.Fields
-}
-
-func (m *mockStructuredLogger) WithFields(fields log.Fields) log.StructuredLogger {
-	// Create a new logger with the combined fields
-	newLogger := &mockStructuredLogger{
-		onError: m.onError,
-		fields:  make(log.Fields),
-	}
-	// Copy existing fields
-	for k, v := range m.fields {
-		newLogger.fields[k] = v
-	}
-	// Add new fields
-	for k, v := range fields {
-		newLogger.fields[k] = v
-	}
-	return newLogger
-}
-
-func (m *mockStructuredLogger) With(key string, value any) log.StructuredLogger {
-	return m.WithFields(log.Fields{key: value})
-}
-
-func (m *mockStructuredLogger) Debug(msg string, fields ...log.Fields) {
-	// Not used in this test
-}
-
-func (m *mockStructuredLogger) Info(msg string, fields ...log.Fields) {
-	// Not used in this test
-}
-
-func (m *mockStructuredLogger) Warn(msg string, fields ...log.Fields) {
-	// Not used in this test
-}
-
-func (m *mockStructuredLogger) Error(msg string, fields ...log.Fields) {
-	if m.onError != nil {
-		combinedFields := make(log.Fields)
-		for k, v := range m.fields {
-			combinedFields[k] = v
-		}
-		if len(fields) > 0 {
-			for k, v := range fields[0] {
-				combinedFields[k] = v
-			}
-		}
-		m.onError(msg, combinedFields)
-	}
-}
-
-func (m *mockStructuredLogger) DebugCtx(ctx context.Context, msg string, fields ...log.Fields) {
-	// Not used in this test
-}
-
-func (m *mockStructuredLogger) InfoCtx(ctx context.Context, msg string, fields ...log.Fields) {
-	// Not used in this test
-}
-
-func (m *mockStructuredLogger) WarnCtx(ctx context.Context, msg string, fields ...log.Fields) {
-	// Not used in this test
-}
-
-func (m *mockStructuredLogger) ErrorCtx(ctx context.Context, msg string, fields ...log.Fields) {
-	// Not used in this test
-}
-
-func (m *mockStructuredLogger) Fatal(msg string, fields ...log.Fields) {}
-
-func (m *mockStructuredLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {}
 
 func TestErrorBuilder(t *testing.T) {
 	builder := NewErrorBuilder()
@@ -448,43 +371,6 @@ func TestWriteErrorPreservesTraceID(t *testing.T) {
 	}
 }
 
-func TestErrorLogging(t *testing.T) {
-	// Create a mock logger that captures log entries
-	var loggedFields map[string]any
-	var loggedMessage string
-
-	mockLogger := &mockStructuredLogger{
-		onError: func(msg string, fields log.Fields) {
-			loggedFields = fields
-			loggedMessage = msg
-		},
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	err := APIError{
-		Status:   http.StatusInternalServerError,
-		Code:     "INTERNAL_ERROR",
-		Message:  "internal server error",
-		Category: CategoryServer,
-		Details:  map[string]any{"service": "database"},
-	}
-
-	ErrorLogger(mockLogger, req, err)
-
-	if loggedMessage != "internal server error" {
-		t.Fatalf("expected logged message to match")
-	}
-
-	if loggedFields["code"] != "INTERNAL_ERROR" {
-		t.Fatalf("expected code in logged fields")
-	}
-
-	details, ok := loggedFields["details"].(map[string]any)
-	if !ok || details["service"] != "database" {
-		t.Fatalf("expected service detail in namespaced details, got %v", loggedFields["details"])
-	}
-}
-
 func TestParseErrorFromResponse(t *testing.T) {
 	// Create a mock error response
 	errorResp := ErrorResponse{
@@ -683,5 +569,17 @@ func TestErrorBuilderBuildFillsDefaults(t *testing.T) {
 	_ = WriteError(w, nil, got)
 	if warnCalled {
 		t.Error("WarnFunc must not be called for a fully-populated APIError from the builder")
+	}
+}
+
+func TestErrorBuilderStatusOnlyDerivesCategory(t *testing.T) {
+	got := NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code("bad_request").
+		Message("bad request").
+		Build()
+
+	if got.Category != CategoryClient {
+		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
 	}
 }

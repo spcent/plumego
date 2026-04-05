@@ -101,7 +101,7 @@ func TestWriteBindErrorValidationWithFields(t *testing.T) {
 		Email string `validate:"required,email"`
 		Name  string `validate:"required"`
 	}
-	validateErr := validateStruct(&payload{})
+	validateErr := ValidateStruct(&payload{})
 	if validateErr == nil {
 		t.Skip("validator not available")
 	}

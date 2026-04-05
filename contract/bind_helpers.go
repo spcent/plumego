@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-// BindOptions configures JSON binding/validation for Ctx helpers.
+// BindOptions configures JSON binding for Ctx helpers.
 type BindOptions struct {
 	// MaxBodySize is a per-call size limit applied after the body has already
 	// been read into memory. It does not prevent memory allocation for bodies
@@ -14,8 +14,6 @@ type BindOptions struct {
 	// endpoint-specific post-read caps.
 	MaxBodySize           int64
 	DisallowUnknownFields bool
-	DisableValidation     bool
-	Validator             func(any) error
 }
 
 // FieldError represents a field-level validation error.

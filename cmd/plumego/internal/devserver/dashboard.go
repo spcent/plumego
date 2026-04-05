@@ -154,7 +154,7 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 
 	// API endpoints (without Group - register directly)
 	adaptCtx := func(handler contract.CtxHandlerFunc) http.HandlerFunc {
-		return contract.AdaptCtxHandler(handler, d.app.Logger()).ServeHTTP
+		return contract.AdaptCtxHandler(handler).ServeHTTP
 	}
 
 	if err := d.app.Get("/api/info", adaptCtx(d.handleInfo)); err != nil {
@@ -377,7 +377,7 @@ func (d *Dashboard) Rebuild(ctx context.Context) error {
 // HTTP Handlers
 
 func (d *Dashboard) handleInfo(ctx *contract.Ctx) {
-	ctx.JSON(http.StatusOK, d.getDashboardInfo())
+	_ = ctx.Response(http.StatusOK, d.getDashboardInfo(), nil)
 }
 
 func (d *Dashboard) handleStatus(ctx *contract.Ctx) {
@@ -399,13 +399,13 @@ func (d *Dashboard) handleStatus(ctx *contract.Ctx) {
 		},
 	}
 
-	ctx.JSON(http.StatusOK, status)
+	_ = ctx.Response(http.StatusOK, status, nil)
 }
 
 func (d *Dashboard) handleHealth(ctx *contract.Ctx) {
 	healthy := d.runner.IsRunning()
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"healthy": healthy,
 		"checks": map[string]string{
 			"app": func() string {
@@ -415,61 +415,66 @@ func (d *Dashboard) handleHealth(ctx *contract.Ctx) {
 				return "stopped"
 			}(),
 		},
-	})
+	}, nil)
 }
 
 func (d *Dashboard) handleBuild(ctx *contract.Ctx) {
 	if err := d.builder.Build(); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]any{
-			"success": false,
-			"error":   err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("build_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Build completed successfully",
-	})
+	}, nil)
 }
 
 func (d *Dashboard) handleRestart(ctx *contract.Ctx) {
 	bgCtx := context.Background()
 
 	if err := d.Rebuild(bgCtx); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]any{
-			"success": false,
-			"error":   err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("app_restart_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application restarted successfully",
-	})
+	}, nil)
 }
 
 func (d *Dashboard) handleStop(ctx *contract.Ctx) {
 	if err := d.runner.Stop(); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]any{
-			"success": false,
-			"error":   err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("app_stop_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application stopped successfully",
-	})
+	}, nil)
 }
 
 func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
-			"error": "Application is not running",
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeUnavailable).
+			Code("app_not_running").
+			Message("application is not running").
+			Build())
 		return
 	}
 
@@ -479,37 +484,41 @@ func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 		// Fallback to probing if debug endpoint is not available
 		routes = d.analyzer.ProbeEndpoints()
 		if len(routes) == 0 {
-			ctx.JSON(http.StatusOK, map[string]any{
+			_ = ctx.Response(http.StatusOK, map[string]any{
 				"routes": []RouteInfo{},
 				"error":  "Could not fetch routes: " + err.Error(),
-			})
+			}, nil)
 			return
 		}
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"routes": routes,
 		"count":  len(routes),
-	})
+	}, nil)
 }
 
 func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
-			"error": "Application is not running",
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeUnavailable).
+			Code("app_not_running").
+			Message("application is not running").
+			Build())
 		return
 	}
 
 	snapshot, err := d.analyzer.GetAppSnapshot()
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]any{
-			"error": "Could not fetch config: " + err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("config_fetch_failed").
+			Message("could not fetch config: "+err.Error()).
+			Build())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, snapshot)
+	_ = ctx.Response(http.StatusOK, snapshot, nil)
 }
 
 func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {
@@ -546,70 +555,78 @@ func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {
 	metrics["alerts"] = alerts
 	metrics["thresholds"] = thresholds
 
-	ctx.JSON(http.StatusOK, metrics)
+	_ = ctx.Response(http.StatusOK, metrics, nil)
 }
 
 func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
-			"success": false,
-			"error":   "Application is not running",
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeUnavailable).
+			Code("app_not_running").
+			Message("application is not running").
+			Build())
 		return
 	}
 
 	if err := d.analyzer.ClearDevMetrics(); err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]any{
-			"success": false,
-			"error":   err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("metrics_clear_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"success": true,
-	})
+	}, nil)
 }
 
 func (d *Dashboard) handlePprofTypes(ctx *contract.Ctx) {
-	ctx.JSON(http.StatusOK, map[string]any{
+	_ = ctx.Response(http.StatusOK, map[string]any{
 		"types": pprofProfiles(),
-	})
+	}, nil)
 }
 
 func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
-			"error": "Application is not running",
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeUnavailable).
+			Code("app_not_running").
+			Message("application is not running").
+			Build())
 		return
 	}
 
 	profileType, seconds, err := parsePprofRequest(ctx)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]any{
-			"error": err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeValidation).
+			Code("invalid_pprof_request").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	payload, contentType, err := d.analyzer.FetchPprof(profileType, seconds)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, map[string]any{
-			"error": err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeInternal).
+			Code("pprof_fetch_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	if download := strings.TrimSpace(ctx.Query.Get("download")); download == "0" || strings.EqualFold(download, "false") {
-		ctx.JSON(http.StatusOK, map[string]any{
+		_ = ctx.Response(http.StatusOK, map[string]any{
 			"type":         profileType,
 			"seconds":      seconds,
 			"content_type": contentType,
 			"size_bytes":   len(payload),
 			"preview_hex":  previewHex(payload, 96),
 			"download_url": fmt.Sprintf("/api/pprof/raw?type=%s&seconds=%d", profileType, seconds),
-		})
+		}, nil)
 		return
 	}
 
@@ -622,32 +639,35 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 
 func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
-		ctx.JSON(http.StatusServiceUnavailable, map[string]any{
-			"success": false,
-			"error":   "Application is not running",
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeUnavailable).
+			Code("app_not_running").
+			Message("application is not running").
+			Build())
 		return
 	}
 
 	var req APITestRequest
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]any{
-			"success": false,
-			"error":   err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeValidation).
+			Code("invalid_request").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
 	resp, err := d.analyzer.DoAPITest(req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, map[string]any{
-			"success": false,
-			"error":   err.Error(),
-		})
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Type(contract.ErrTypeValidation).
+			Code("api_test_failed").
+			Message(err.Error()).
+			Build())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, resp)
+	_ = ctx.Response(http.StatusOK, resp, nil)
 }
 
 // Helper methods

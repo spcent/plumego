@@ -147,12 +147,12 @@ func (c *Handler) RegisterRoutes(r *router.Router) {
 			group.Use(mw)
 		}
 
-		group.Get("", contract.AdaptCtxHandler(c.handleSummary, group.Logger()))
-		group.Get("/queue", contract.AdaptCtxHandler(c.handleQueueStats, group.Logger()))
-		group.Post("/queue/replay", contract.AdaptCtxHandler(c.handleQueueReplay, group.Logger()))
-		group.Get("/receipts", contract.AdaptCtxHandler(c.handleReceiptLookup, group.Logger()))
-		group.Get("/channels", contract.AdaptCtxHandler(c.handleChannelHealth, group.Logger()))
-		group.Get("/tenants/quota", contract.AdaptCtxHandler(c.handleTenantQuota, group.Logger()))
+		group.Get("", contract.AdaptCtxHandler(c.handleSummary))
+		group.Get("/queue", contract.AdaptCtxHandler(c.handleQueueStats))
+		group.Post("/queue/replay", contract.AdaptCtxHandler(c.handleQueueReplay))
+		group.Get("/receipts", contract.AdaptCtxHandler(c.handleReceiptLookup))
+		group.Get("/channels", contract.AdaptCtxHandler(c.handleChannelHealth))
+		group.Get("/tenants/quota", contract.AdaptCtxHandler(c.handleTenantQuota))
 	})
 }
 
@@ -244,7 +244,11 @@ func (c *Handler) handleQueueReplay(ctx *contract.Ctx) {
 	}
 
 	var req QueueReplayRequest
-	if err := ctx.BindAndValidateJSON(&req); err != nil {
+	if err := ctx.BindJSON(&req); err != nil {
+		_ = contract.WriteBindError(ctx.W, ctx.R, err)
+		return
+	}
+	if err := contract.ValidateStruct(&req); err != nil {
 		_ = contract.WriteBindError(ctx.W, ctx.R, err)
 		return
 	}

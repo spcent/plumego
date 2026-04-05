@@ -69,7 +69,6 @@ func Middleware(opts ...Option) middleware.Middleware {
 			}
 
 			r = contract.DefaultObservabilityPolicy.AttachRequestID(w, r, id, cfg.includeInRequest)
-			r = r.WithContext(log.WithTraceID(r.Context(), id))
 			if cfg.headerName != "" && cfg.headerName != contract.RequestIDHeader {
 				if cfg.includeInRequest {
 					r.Header.Set(cfg.headerName, id)

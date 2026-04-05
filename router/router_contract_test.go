@@ -490,8 +490,7 @@ func TestRouteParamsOverrideExistingContext(t *testing.T) {
 	}))
 
 	baseReq := httptest.NewRequest(http.MethodGet, "/users/123", nil)
-	ctx := contract.WithParams(baseReq.Context(), map[string]string{"id": "ctx"})
-	ctx = contract.WithRequestContext(ctx, contract.RequestContext{
+	ctx := contract.WithRequestContext(baseReq.Context(), contract.RequestContext{
 		Params: map[string]string{"id": "ctx2"},
 	})
 	req := baseReq.WithContext(ctx)

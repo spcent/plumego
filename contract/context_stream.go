@@ -121,7 +121,7 @@ func (c *Ctx) Stream(cfg StreamConfig) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		sw, err := c.RespondWithSSE()
+		sw, err := c.initSSEStream()
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (c *Ctx) Stream(cfg StreamConfig) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		sw, err := c.RespondWithSSE()
+		sw, err := c.initSSEStream()
 		if err != nil {
 			return err
 		}
@@ -220,7 +220,7 @@ func (c *Ctx) streamSSESlice(events []SSEEvent) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	sw, err := c.RespondWithSSE()
+	sw, err := c.initSSEStream()
 	if err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func (c *Ctx) streamSSESliceChunked(events []SSEEvent, chunkSize int) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	sw, err := c.RespondWithSSE()
+	sw, err := c.initSSEStream()
 	if err != nil {
 		return err
 	}
@@ -284,9 +284,8 @@ var (
 )
 
 // NewSSEWriter creates an SSE writer for the given response writer.
-// The caller must set SSE response headers before writing events; use
-// Ctx.RespondWithSSE when possible because it sets headers and creates the
-// writer atomically. Returns ErrSSENotSupported when flushing is unavailable.
+// The caller must set SSE response headers before writing events.
+// Returns ErrSSENotSupported when flushing is unavailable.
 func NewSSEWriter(w http.ResponseWriter) (*SSEWriter, error) {
 	f, ok := w.(http.Flusher)
 	if !ok {
@@ -372,6 +371,14 @@ func (c *Ctx) initStream(contentType string) (context.Context, error) {
 	c.W.Header().Set("Content-Type", contentType)
 	c.W.WriteHeader(http.StatusOK)
 	return ctx, nil
+}
+
+func (c *Ctx) initSSEStream() (*SSEWriter, error) {
+	c.W.Header().Set("Content-Type", "text/event-stream")
+	c.W.Header().Set("Cache-Control", "no-cache")
+	c.W.Header().Set("Connection", "keep-alive")
+	c.W.WriteHeader(http.StatusOK)
+	return NewSSEWriter(c.W)
 }
 
 // streamFromSlice iterates a slice, calling write for each element.
@@ -490,38 +497,4 @@ func (c *Ctx) textWrite() func(string) error {
 		c.flush()
 		return nil
 	}
-}
-
-// --- SSE API ---
-
-// RespondWithSSE starts a Server-Sent Events response.
-// Returns an SSEWriter for sending events, or an error if SSE is not supported.
-func (c *Ctx) RespondWithSSE() (*SSEWriter, error) {
-	c.SetSSEHeaders()
-	c.W.WriteHeader(http.StatusOK)
-	return NewSSEWriter(c.W)
-}
-
-// IsSSESupported reports whether the response writer supports SSE flushing.
-func (c *Ctx) IsSSESupported() bool {
-	_, ok := c.W.(http.Flusher)
-	return ok
-}
-
-// SetSSEHeaders sets the standard SSE response headers without writing the status line.
-func (c *Ctx) SetSSEHeaders() {
-	c.W.Header().Set("Content-Type", "text/event-stream")
-	c.W.Header().Set("Cache-Control", "no-cache")
-	c.W.Header().Set("Connection", "keep-alive")
-}
-
-// Deprecated: WriteSSE creates a new SSEWriter on every call and does not set
-// SSE headers. Use RespondWithSSE to obtain an *SSEWriter and call sw.Write()
-// for each event.
-func (c *Ctx) WriteSSE(event SSEEvent) error {
-	sw, err := NewSSEWriter(c.W)
-	if err != nil {
-		return err
-	}
-	return sw.Write(event)
 }

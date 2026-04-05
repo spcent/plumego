@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/x/data/rw"
 )
@@ -274,7 +275,7 @@ func TestLoggingRouter_WithTraceID(t *testing.T) {
 	// Create context with trace ID
 	ctx := context.Background()
 	traceID := "test-trace-123"
-	ctx = log.WithTraceID(ctx, traceID)
+	ctx = contract.WithTraceContext(ctx, contract.TraceContext{TraceID: contract.TraceID(traceID)})
 
 	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
 

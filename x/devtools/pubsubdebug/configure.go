@@ -57,7 +57,7 @@ func Configure(hooks Hooks) {
 		}
 
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotImplemented).Code("not_supported").Message("pubsub snapshot not supported by this implementation").Category(contract.CategoryServer).Build())
-	}, r.Logger()))
+	}))
 }
 
 // Hooks provide the minimal integration points for Configure.

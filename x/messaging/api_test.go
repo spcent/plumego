@@ -74,12 +74,12 @@ func TestClassifyServiceError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, code := classifyServiceError(tt.err)
-			if status != tt.wantStatus {
-				t.Fatalf("status=%d, want %d", status, tt.wantStatus)
+			apiErr := classifyServiceError(tt.err)
+			if apiErr.Status != tt.wantStatus {
+				t.Fatalf("status=%d, want %d", apiErr.Status, tt.wantStatus)
 			}
-			if code != tt.wantCode {
-				t.Fatalf("code=%s, want %s", code, tt.wantCode)
+			if apiErr.Code != tt.wantCode {
+				t.Fatalf("code=%s, want %s", apiErr.Code, tt.wantCode)
 			}
 		})
 	}

@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/spcent/plumego/log"
 )
 
 const (
@@ -80,8 +78,8 @@ func (p ObservabilityPolicy) AttachRequestID(w http.ResponseWriter, r *http.Requ
 }
 
 // MiddlewareLogFields returns the canonical structured log fields for middleware logs.
-func (p ObservabilityPolicy) MiddlewareLogFields(r *http.Request, status int, duration time.Duration) log.Fields {
-	fields := log.Fields{
+func (p ObservabilityPolicy) MiddlewareLogFields(r *http.Request, status int, duration time.Duration) map[string]any {
+	fields := map[string]any{
 		"method":     "",
 		"path":       "",
 		"status":     status,

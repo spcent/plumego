@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestNewJSONLogger(t *testing.T) {
@@ -156,7 +158,7 @@ func TestJSONLogger_InfoCtx(t *testing.T) {
 
 	ctx := context.Background()
 	traceID := "trace-123"
-	ctx = WithTraceID(ctx, traceID)
+	ctx = contract.WithTraceContext(ctx, contract.TraceContext{TraceID: contract.TraceID(traceID)})
 
 	logger.InfoCtx(ctx, "test message", Fields{"key": "value"})
 
@@ -219,7 +221,7 @@ func TestJSONLogger_ContextLevels(t *testing.T) {
 			})
 
 			ctx := context.Background()
-			ctx = WithTraceID(ctx, "test-trace")
+			ctx = contract.WithTraceContext(ctx, contract.TraceContext{TraceID: "test-trace"})
 
 			tt.logFunc(logger, ctx)
 
@@ -361,7 +363,7 @@ func TestJSONLogger_ReservedFieldsCannotOverrideCoreKeys(t *testing.T) {
 		},
 	})
 
-	ctx := WithTraceID(context.Background(), "trace-from-ctx")
+	ctx := contract.WithTraceContext(context.Background(), contract.TraceContext{TraceID: "trace-from-ctx"})
 	logger.InfoCtx(ctx, "actual message", Fields{
 		"level":    "SHOULD_NOT_APPLY",
 		"msg":      "SHOULD_NOT_APPLY",

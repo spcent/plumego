@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/spcent/plumego/log"
 )
 
 // WarnFunc is invoked when WriteError receives an APIError with missing required
@@ -229,39 +227,6 @@ func CategoryForStatus(status int) ErrorCategory {
 	}
 }
 
-// ErrorLogger converts an error into structured logging fields while preserving correlation ids.
-func ErrorLogger(logger log.StructuredLogger, r *http.Request, err APIError) {
-	if logger == nil {
-		return
-	}
-
-	fields := log.Fields{
-		"code":     err.Code,
-		"status":   err.Status,
-		"category": err.Category,
-	}
-
-	if err.TraceID == "" && r != nil {
-		err.TraceID = TraceIDFromContext(r.Context())
-	}
-
-	if err.TraceID != "" {
-		fields["trace_id"] = err.TraceID
-	}
-
-	if err.Type != "" {
-		fields["type"] = err.Type
-	}
-	if err.Severity != "" {
-		fields["severity"] = err.Severity
-	}
-	if len(err.Details) > 0 {
-		fields["details"] = err.Details
-	}
-
-	logger.WithFields(fields).Error(err.Message)
-}
-
 // ErrorBuilder provides a fluent builder for creating APIError instances.
 type ErrorBuilder struct {
 	err APIError
@@ -271,9 +236,8 @@ type ErrorBuilder struct {
 func NewErrorBuilder() *ErrorBuilder {
 	return &ErrorBuilder{
 		err: APIError{
-			Status:   http.StatusInternalServerError,
-			Category: CategoryServer,
-			Details:  make(map[string]any),
+			Status:  http.StatusInternalServerError,
+			Details: make(map[string]any),
 		},
 	}
 }
