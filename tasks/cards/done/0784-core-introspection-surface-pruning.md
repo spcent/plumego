@@ -1,7 +1,7 @@
 # Card 0784
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/introspection.go`
@@ -56,3 +56,10 @@ Done Definition:
 - Middleware-name presentation lives only in tooling that actually needs it, if
   at all.
 - Module docs/metadata reflect the pruned introspection surface.
+
+Outcome:
+- Removed `(*App).MiddlewareNames()` from `core` because it was an unused
+  presentation helper rather than owned kernel state.
+- Verified that the symbol has no remaining Go call sites after removal.
+- Updated `core/module.yaml` so runtime introspection now only advertises the
+  remaining config snapshot surface.

@@ -19,17 +19,10 @@ func (a *App) Prepare() error {
 
 	a.mu.RLock()
 	started := a.started
-	logger := a.logger
 	a.mu.RUnlock()
 
 	if started {
 		return nil
-	}
-
-	if lifecycle, ok := logger.(log.Lifecycle); ok {
-		if err := lifecycle.Start(context.Background()); err != nil {
-			return wrapCoreError(err, "prepare_app", nil)
-		}
 	}
 
 	a.mu.Lock()
@@ -51,7 +44,7 @@ func (a *App) Server() (*http.Server, error) {
 	return server, nil
 }
 
-// Shutdown gracefully stops the HTTP server and all runtime hooks.
+// Shutdown gracefully stops the prepared HTTP server.
 func (a *App) Shutdown(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -60,8 +53,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 	a.mu.RLock()
 	httpServer := a.httpServer
 	connTracker := a.connTracker
-	started := a.started
-	logger := a.logger
 	a.mu.RUnlock()
 
 	if connTracker != nil {
@@ -73,12 +64,6 @@ func (a *App) Shutdown(ctx context.Context) error {
 		if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
 			a.logger.Error("Server shutdown error", log.Fields{"error": err})
 			shutdownErr = wrapCoreError(err, "shutdown_app", nil)
-		}
-	}
-
-	if started {
-		if lifecycle, ok := logger.(log.Lifecycle); ok {
-			_ = lifecycle.Stop(ctx)
 		}
 	}
 

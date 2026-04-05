@@ -55,14 +55,8 @@ func TestRuntimeSnapshotIncludesStableFields(t *testing.T) {
 	if !snapshot.TLS.Enabled || snapshot.TLS.CertFile != "cert.pem" || snapshot.TLS.KeyFile != "key.pem" {
 		t.Fatalf("unexpected tls snapshot: %+v", snapshot.TLS)
 	}
-	if !snapshot.Started {
-		t.Fatal("expected started=true")
-	}
-	if !snapshot.ConfigFrozen {
-		t.Fatal("expected config_frozen=true")
-	}
-	if !snapshot.ServerPrepared {
-		t.Fatal("expected server_prepared=true")
+	if snapshot.PreparationState != PreparationStateServerPrepared {
+		t.Fatalf("preparation_state = %q, want %q", snapshot.PreparationState, PreparationStateServerPrepared)
 	}
 }
 
@@ -72,5 +66,8 @@ func TestRuntimeSnapshotNilApp(t *testing.T) {
 
 	if snapshot.Addr != "" {
 		t.Fatalf("addr = %q, want empty", snapshot.Addr)
+	}
+	if snapshot.PreparationState != "" {
+		t.Fatalf("preparation_state = %q, want empty", snapshot.PreparationState)
 	}
 }

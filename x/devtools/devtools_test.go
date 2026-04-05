@@ -176,10 +176,9 @@ func TestConfigEndpointWithHook(t *testing.T) {
 		Hooks: Hooks{
 			RuntimeSnapshot: func() core.RuntimeSnapshot {
 				return core.RuntimeSnapshot{
-					Addr:           ":9090",
-					DrainInterval:  250 * time.Millisecond,
-					Started:        true,
-					ServerPrepared: true,
+					Addr:             ":9090",
+					DrainInterval:    250 * time.Millisecond,
+					PreparationState: core.PreparationStateServerPrepared,
 				}
 			},
 		},
@@ -206,11 +205,8 @@ func TestConfigEndpointWithHook(t *testing.T) {
 	if data["env_file"] != ".env.test" {
 		t.Fatalf("expected env_file=.env.test, got %v", data["env_file"])
 	}
-	if data["started"] != true {
-		t.Fatalf("expected started=true, got %v", data["started"])
-	}
-	if data["server_prepared"] != true {
-		t.Fatalf("expected server_prepared=true, got %v", data["server_prepared"])
+	if data["preparation_state"] != string(core.PreparationStateServerPrepared) {
+		t.Fatalf("expected preparation_state=%q, got %v", core.PreparationStateServerPrepared, data["preparation_state"])
 	}
 }
 

@@ -362,9 +362,7 @@ func (c *DevTools) snapshotMap() map[string]any {
 		"max_header_bytes":    snapshot.MaxHeaderBytes,
 		"http2_enabled":       snapshot.HTTP2Enabled,
 		"drain_interval":      snapshot.DrainInterval,
-		"started":             snapshot.Started,
-		"config_frozen":       snapshot.ConfigFrozen,
-		"server_prepared":     snapshot.ServerPrepared,
+		"preparation_state":   snapshot.PreparationState,
 		"tls": map[string]any{
 			"enabled":   snapshot.TLS.Enabled,
 			"cert_file": snapshot.TLS.CertFile,

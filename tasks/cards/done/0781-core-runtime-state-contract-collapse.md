@@ -1,7 +1,7 @@
 # Card 0781
 
 Priority: P0
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/config.go`
@@ -64,3 +64,12 @@ Done Definition:
   overlapping booleans.
 - First-party tooling and tests assert the new normalized state directly.
 - No stale `Started` / `ConfigFrozen` / `ServerPrepared` contract remains.
+
+Outcome:
+- Replaced the exported `Started`, `ConfigFrozen`, and `ServerPrepared` runtime
+  snapshot booleans with one `PreparationState` contract.
+- Normalized `core.RuntimeSnapshot()` to report `mutable`,
+  `handler_prepared`, or `server_prepared` based on the actual kernel
+  preparation transition.
+- Updated devtools payloads and analyzer/core/devtools tests to assert the
+  single preparation-state field instead of overlapping booleans.

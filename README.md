@@ -106,13 +106,15 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+    if err := app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
         if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
             "message": "pong",
         }, nil); err != nil {
             http.Error(w, "write response", http.StatusInternalServerError)
         }
-    })
+    }); err != nil {
+        log.Fatalf("register route: %v", err)
+    }
 
     if err := app.Prepare(); err != nil {
         log.Fatalf("prepare server: %v", err)
@@ -138,13 +140,14 @@ func main() {
 - Environment variables should be loaded explicitly in your `main` package. Keep `.env` path ownership in app-local config, for example `cfg.App.EnvFile` in the reference layout, when tooling such as devtools reload needs to know which file is active.
 - `core` construction is config-first: start from `core.DefaultConfig()`, adjust the typed `core.AppConfig`, then pass it to `core.New(cfg, ...)`.
 - `core.New(cfg, ...)` defaults to a `NoOpLogger`. If you expect request/runtime logs, inject a real logger with `core.WithLogger(...)`.
+- Logger lifecycle ownership stays with the caller. `Prepare()` and `Shutdown(ctx)` do not initialize, flush, or close injected logger implementations for you.
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - `core.AppConfig` owns server address, TLS, and HTTP server timeout/hardening settings. Request body limits and concurrency limits belong to explicit middleware wiring, not to `core` itself.
 - TLS stays on the same explicit serve path: `Prepare()` loads cert/key material into the prepared `*http.Server`, then callers choose `ListenAndServe()` or `ListenAndServeTLS("", "")` on the server returned by `Server()`.
 - Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
 - Debug mode and devtools are separate. Keep debug flags in app-local config, for example `cfg.App.Debug` in the reference layout; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
 - Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.
-- When `x/devtools` is wired, `/_debug/config` exposes the stable runtime snapshot used by first-party tooling: address, env file, server timeouts, drain settings, TLS config, and lifecycle flags.
+- When `x/devtools` is wired, `/_debug/config` exposes the stable runtime snapshot used by first-party tooling: address, env file, server timeouts, drain settings, TLS config, and the kernel `preparation_state`.
 
 ## Agent-First Workflow
 - Canonical app bootstrap starts from `reference/standard-service`.

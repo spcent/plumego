@@ -1,7 +1,7 @@
 # Card 0782
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/config.go`
@@ -54,3 +54,11 @@ Done Definition:
 - `core` has one canonical internal projection for server settings.
 - `Prepare()` and runtime introspection no longer duplicate field mapping logic.
 - Tests cover the normalized projection path instead of duplicated mappings.
+
+Outcome:
+- Replaced the duplicated `AppConfig -> RuntimeSnapshot -> http.Server`
+  mapping chain with one internal `serverSettings` projection.
+- Updated `RuntimeSnapshot()` and `ensureServerPrepared()` to derive from the
+  same internal server-settings representation.
+- Removed the old `projectRuntimeSnapshot(...)` helper so server settings are
+  projected exactly once inside `core`.

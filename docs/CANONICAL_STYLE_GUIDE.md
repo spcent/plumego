@@ -491,8 +491,11 @@ func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 ### Route wiring
 
 ```go
-func registerRoutes(app *core.App, userHandler handlers.UserHandler) {
-    app.Post("/users", userHandler.Create)
+func registerRoutes(app *core.App, userHandler handlers.UserHandler) error {
+    if err := app.Post("/users", userHandler.Create); err != nil {
+        return err
+    }
+    return nil
 }
 ```
 

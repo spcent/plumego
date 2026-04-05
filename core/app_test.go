@@ -150,11 +150,8 @@ func TestPrepareBuildsHTTPServer(t *testing.T) {
 		t.Fatalf("httpServer handler should not be nil")
 	}
 	snapshot := app.RuntimeSnapshot()
-	if !snapshot.ConfigFrozen {
-		t.Fatalf("expected config to be frozen after Prepare")
-	}
-	if !snapshot.ServerPrepared {
-		t.Fatalf("expected server to be prepared after Prepare")
+	if snapshot.PreparationState != PreparationStateServerPrepared {
+		t.Fatalf("preparation_state = %q, want %q", snapshot.PreparationState, PreparationStateServerPrepared)
 	}
 }
 
@@ -185,11 +182,8 @@ func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 	}
 
 	snapshot := app.RuntimeSnapshot()
-	if !snapshot.ConfigFrozen {
-		t.Fatalf("expected config to be frozen after ServeHTTP")
-	}
-	if snapshot.ServerPrepared {
-		t.Fatalf("expected server to remain unprepared after ServeHTTP")
+	if snapshot.PreparationState != PreparationStateHandlerPrepared {
+		t.Fatalf("preparation_state = %q, want %q", snapshot.PreparationState, PreparationStateHandlerPrepared)
 	}
 	if _, err := app.Server(); err == nil {
 		t.Fatalf("expected Server to fail before Prepare")

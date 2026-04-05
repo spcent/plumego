@@ -280,11 +280,8 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 					t.Error("connTracker should be created")
 				}
 				snapshot := app.RuntimeSnapshot()
-				if !snapshot.ConfigFrozen {
-					t.Error("expected config to be frozen after Prepare")
-				}
-				if !snapshot.ServerPrepared {
-					t.Error("expected server_prepared after Prepare")
+				if snapshot.PreparationState != PreparationStateServerPrepared {
+					t.Errorf("preparation_state = %q, want %q", snapshot.PreparationState, PreparationStateServerPrepared)
 				}
 			}
 		})
@@ -491,7 +488,7 @@ func (l *testLifecycleLogger) Info(msg string, fields ...log.Fields)  {}
 func (l *testLifecycleLogger) Error(msg string, fields ...log.Fields) {}
 func (l *testLifecycleLogger) Debug(msg string, fields ...log.Fields) {}
 
-func TestPrepareServeAndShutdownWithLoggerLifecycle(t *testing.T) {
+func TestPrepareAndShutdownDoNotDriveLoggerLifecycle(t *testing.T) {
 	addr := requireNetwork(t)
 	logger := &testLifecycleLogger{}
 	cfg := DefaultConfig()
@@ -517,20 +514,18 @@ func TestPrepareServeAndShutdownWithLoggerLifecycle(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	// Check logger was started
-	if !logger.startCalled.Load() {
-		t.Error("logger Start should have been called")
+	if logger.startCalled.Load() {
+		t.Error("logger Start should not be called by core")
 	}
 
-	// Trigger shutdown
 	if err := app.Shutdown(context.Background()); err != nil {
 		t.Fatalf("shutdown returned unexpected error: %v", err)
 	}
 
 	select {
 	case <-done:
-		if !logger.stopCalled.Load() {
-			t.Error("logger Stop should have been called")
+		if logger.stopCalled.Load() {
+			t.Error("logger Stop should not be called by core")
 		}
 	case <-time.After(1 * time.Second):
 		t.Error("server did not complete")

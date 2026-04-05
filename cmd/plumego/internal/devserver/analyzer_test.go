@@ -25,9 +25,7 @@ func TestGetAppSnapshot(t *testing.T) {
 				"max_header_bytes":    1048576,
 				"http2_enabled":       true,
 				"drain_interval":      int64((500 * time.Millisecond).Nanoseconds()),
-				"started":             true,
-				"config_frozen":       true,
-				"server_prepared":     true,
+				"preparation_state":   "server_prepared",
 				"tls": map[string]any{
 					"enabled":   true,
 					"cert_file": "cert.pem",
@@ -50,8 +48,8 @@ func TestGetAppSnapshot(t *testing.T) {
 	if snapshot.EnvFile != ".env.test" {
 		t.Fatalf("env_file = %q, want %q", snapshot.EnvFile, ".env.test")
 	}
-	if !snapshot.Started || !snapshot.ConfigFrozen || !snapshot.ServerPrepared {
-		t.Fatalf("unexpected lifecycle flags: %+v", snapshot)
+	if snapshot.PreparationState != "server_prepared" {
+		t.Fatalf("unexpected preparation_state: %+v", snapshot)
 	}
 	if !snapshot.TLS.Enabled || snapshot.TLS.CertFile != "cert.pem" || snapshot.TLS.KeyFile != "key.pem" {
 		t.Fatalf("unexpected tls snapshot: %+v", snapshot.TLS)

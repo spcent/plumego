@@ -38,10 +38,9 @@ import (
 
 func main() {
 	ctx := context.Background()
-	app := core.New(
-		core.WithAddr(":8080"),
-		core.WithLogger(plog.NewGLogger()),
-	)
+	cfg := core.DefaultConfig()
+	cfg.Addr = ":8080"
+	app := core.New(cfg, core.WithLogger(plog.NewGLogger()))
 
 	if err := app.Use(
 		requestid.Middleware(),
@@ -50,13 +49,15 @@ func main() {
 		log.Fatalf("register middleware: %v", err)
 	}
 
-	app.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
+	if err := app.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
 		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
 			"message": "hello",
 		}, nil); err != nil {
 			http.Error(w, "write response", http.StatusInternalServerError)
 		}
-	})
+	}); err != nil {
+		log.Fatalf("register route: %v", err)
+	}
 
 	if err := app.Prepare(); err != nil {
 		log.Fatalf("prepare server: %v", err)

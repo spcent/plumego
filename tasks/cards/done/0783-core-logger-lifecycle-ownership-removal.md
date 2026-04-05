@@ -1,7 +1,7 @@
 # Card 0783
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app.go`
@@ -61,3 +61,12 @@ Done Definition:
 - `core` no longer starts or stops logger lifecycle hooks.
 - The kernel logger is treated as a passive injected dependency.
 - Tests and docs no longer describe hidden logger lifecycle ownership.
+
+Outcome:
+- Removed `log.Lifecycle` start/stop handling from `Prepare()` and
+  `Shutdown(ctx)`.
+- Kept logger injection on `core.WithLogger(...)` but made the logger a passive
+  dependency owned by the caller.
+- Reversed the lifecycle test to assert that `core` does not invoke injected
+  logger lifecycle hooks, and updated module/root docs to describe the stricter
+  ownership boundary.

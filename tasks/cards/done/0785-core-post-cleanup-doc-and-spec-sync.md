@@ -1,7 +1,7 @@
 # Card 0785
 
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `docs/modules/core/README.md`
@@ -64,3 +64,12 @@ Done Definition:
 - No stale runtime-state, logger-lifecycle, or middleware-list guidance
   remains.
 - Repo-native source-of-truth files are aligned with the implemented cleanup.
+
+Outcome:
+- Updated root READMEs and `docs/getting-started.md` to the current config-first
+  `core.New(cfg, ...)` API and explicit route-registration error handling.
+- Replaced stale `/_debug/config` lifecycle-flag wording with the normalized
+  `preparation_state` contract.
+- Synced the style guide and module metadata to the cleaned-up core surface so
+  canonical docs no longer advertise removed helpers or outdated lifecycle
+  semantics.

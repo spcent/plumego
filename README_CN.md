@@ -106,13 +106,15 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+    if err := app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
         if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
             "message": "pong",
         }, nil); err != nil {
             http.Error(w, "write response", http.StatusInternalServerError)
         }
-    })
+    }); err != nil {
+        log.Fatalf("register route: %v", err)
+    }
 
     if err := app.Prepare(); err != nil {
         log.Fatalf("prepare server: %v", err)
@@ -138,13 +140,14 @@ func main() {
 - 环境变量应在 `main` 包中显式加载。若应用本地工具需要知道当前 `.env` 路径，例如 devtools 热重载，请把它放在应用本地配置里，例如参考实现中的 `cfg.App.EnvFile`。
 - `core` 现在走 config-first 构造：先从 `core.DefaultConfig()` 取得基线，再调整 typed `core.AppConfig`，最后传给 `core.New(cfg, ...)`。
 - `core.New(cfg, ...)` 默认使用 `NoOpLogger`。如果希望有请求日志或运行期日志，请显式注入 `core.WithLogger(...)`。
+- Logger 生命周期归调用方所有。`Prepare()` 和 `Shutdown(ctx)` 不会替你初始化、flush 或关闭注入的 logger 实现。
 - 常用变量：`AUTH_TOKEN`（ops 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - `core.AppConfig` 负责服务地址、TLS 以及 HTTP 服务超时/硬化设置。请求体限制与并发限制属于显式中间件 wiring，不属于 `core` 自身配置。
 - TLS 仍走同一条显式启动路径：`Prepare()` 会把证书与私钥加载进准备好的 `*http.Server`，随后调用方基于 `Server()` 返回的实例选择 `ListenAndServe()` 或 `ListenAndServeTLS("", "")`。
 - 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.SecurityHeaders(...)` 与 `middleware/ratelimit.AbuseGuard(...)`。
 - 调试模式与 devtools 已拆分：调试开关应放在应用本地配置里，例如参考实现中的 `cfg.App.Debug`；如果需要 devtools，请在应用本地 wiring 中显式注册相关路由，不要把它视为 canonical kernel 的一部分。
 - `/_debug` 下的调试端点（路由表、Middleware、配置快照、指标、pprof、手动重载）现在由 `x/devtools` 提供，而不是 `core` 内建。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
-- 当接入 `x/devtools` 时，`/_debug/config` 会暴露 first-party tooling 使用的稳定运行时快照：地址、env 文件、服务超时、drain 配置、TLS 配置以及生命周期标志。
+- 当接入 `x/devtools` 时，`/_debug/config` 会暴露 first-party tooling 使用的稳定运行时快照：地址、env 文件、服务超时、drain 配置、TLS 配置以及内核的 `preparation_state`。
 
 ## Agent 优先工作流
 - canonical 应用启动路径从 `reference/standard-service` 开始。
