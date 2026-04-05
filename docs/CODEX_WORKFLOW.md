@@ -1,5 +1,8 @@
 # Codex Workflow — Milestone-Driven Agent Delegation
 
+Companion lightweight pipeline spec:
+[`docs/MILESTONE_PIPELINE.md`](./MILESTONE_PIPELINE.md)
+
 ## The Model
 
 ```
@@ -97,6 +100,17 @@ make check-spec M=active/M-001
 
 Checks all required sections and gate commands are present.  
 Fix any `MISS` lines. Warnings about placeholders mean the spec is incomplete.
+
+If you are using the full pipeline artifacts, scaffold and validate them too:
+
+```bash
+make new-plan M=active/M-001
+make check-plan M=active/M-001
+make new-card ID=001 SLUG=slice-router-work M=M-001
+make check-card C=active/C-001-slice-router-work
+make new-verify M=active/M-001
+make check-verify M=active/M-001
+```
 
 Update `tasks/milestones/ROADMAP.md`: add a row for M-001, declare dependencies.
 
@@ -227,6 +241,9 @@ If two milestones accidentally touch the same file, run them sequentially.
 | Symptom | Cause | Action |
 |---------|-------|--------|
 | `make check-spec` shows MISS | Required section missing | Fill section, re-run |
+| `make check-plan` fails | Plan missing or malformed | Run `make new-plan`, fill fields, re-run |
+| `make check-card` warns about legacy shape | Card predates milestone pipeline metadata | Add milestone ownership fields or keep as legacy queue item |
+| `make check-verify` fails | Verify report missing required gate sections | Scaffold with `make new-verify`, then fill evidence |
 | Codex opens Draft PR with Open Questions | Hit unresolvable decision point | Answer in spec, re-run Codex on branch |
 | Pre-push hook blocks push | Gate failure | Fix failure, `git push` again |
 | CI gate `dependency-rules` fails | Stable root imports `x/*` | Check new import paths in diff |
@@ -242,7 +259,10 @@ If two milestones accidentally touch the same file, run them sequentially.
 | File | Purpose |
 |------|---------|
 | `tasks/milestones/TEMPLATE.md` | Spec template |
+| `tasks/milestones/PLAN_TEMPLATE.md` | Planner handoff template |
+| `tasks/milestones/VERIFY_TEMPLATE.md` | Verifier evidence template |
 | `tasks/milestones/ROADMAP.md` | Pipeline view, dependency DAG |
+| `tasks/cards/TEMPLATE.md` | Worker card template |
 | `docs/github-workflows/milestone-pr-template.md` | PR body template (Codex fills) |
 | `docs/github-workflows/milestone-gates.yml` | CI workflow (copy to `.github/workflows/`) |
 | `scripts/check-spec` | Spec validator |

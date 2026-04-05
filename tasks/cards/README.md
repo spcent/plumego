@@ -6,6 +6,12 @@ Directory layout:
 
 - `tasks/cards/active/` — current working queue
 - `tasks/cards/done/` — completed card archive
+- `tasks/cards/TEMPLATE.md` — canonical field template for new cards
+
+Scaffold helpers:
+
+- `make new-card ID=001 SLUG=slice-router-work M=M-001`
+- `make check-card C=active/C-001-slice-router-work`
 
 Lifecycle states:
 
@@ -43,6 +49,14 @@ Each card should define:
 - Tests
 - Docs Sync
 - Done Definition
+
+Recommended execution metadata:
+
+- Milestone
+- Primary Module
+- Owned Files
+- Depends On
+- Outcome
 
 Optional operational fields when useful:
 

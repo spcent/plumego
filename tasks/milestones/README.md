@@ -37,6 +37,15 @@ Codex reads `AGENTS.md` automatically on startup for behavior boundaries.
 The milestone spec is the task prompt — it provides goal, scope, ordered steps,
 and acceptance criteria.
 
+Optional scaffold helpers:
+
+```bash
+make new-plan M=active/M-001
+make check-plan M=active/M-001
+make new-verify M=active/M-001
+make check-verify M=active/M-001
+```
+
 ## How to Write an Effective Spec
 
 A good spec has five parts:
@@ -46,6 +55,12 @@ A good spec has five parts:
 3. **Tasks** — ordered, atomic steps small enough to verify individually.
 4. **Acceptance Criteria** — the exact commands that must pass (maps to quality gates).
 5. **Out of Scope** — hard stops to prevent scope creep.
+
+Companion execution artifacts:
+
+- `tasks/milestones/PLAN_TEMPLATE.md` — planner handoff for card slicing
+- `tasks/milestones/VERIFY_TEMPLATE.md` — verifier evidence bundle before PR packaging
+- `tasks/cards/TEMPLATE.md` — worker-facing card shape
 
 Keep specs under ~80 lines. If it grows longer, split it into two milestones.
 

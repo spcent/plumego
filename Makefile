@@ -1,7 +1,7 @@
 # plumego — root Makefile
 # Minimal targets. Most work happens via codex --yolo or go toolchain directly.
 
-.PHONY: help milestone check-spec new-milestone gates fmt vet test test-race setup-hooks
+.PHONY: help milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify gates fmt vet test test-race setup-hooks
 
 # Default: show help
 help:
@@ -37,6 +37,41 @@ check-spec: ## Validate a milestone spec: make check-spec M=active/M-001
 	fi
 	@scripts/check-spec tasks/milestones/$(M).md
 
+check-plan: ## Validate a milestone plan: make check-plan M=active/M-001
+	@if [ -z "$(M)" ]; then \
+	  echo "Error: M is required. Example: make check-plan M=active/M-001"; \
+	  exit 1; \
+	fi
+	@ID=$${M##*/}; \
+	PLAN=tasks/milestones/$$ID.plan.md; \
+	if [ ! -f "$$PLAN" ]; then \
+	  echo "Error: $$PLAN not found."; \
+	  echo "Create it with: make new-plan M=$(M)"; \
+	  exit 1; \
+	fi; \
+	scripts/check-spec "$$PLAN"
+
+check-verify: ## Validate a milestone verify report: make check-verify M=active/M-001
+	@if [ -z "$(M)" ]; then \
+	  echo "Error: M is required. Example: make check-verify M=active/M-001"; \
+	  exit 1; \
+	fi
+	@ID=$${M##*/}; \
+	VERIFY=tasks/milestones/$$ID.verify.md; \
+	if [ ! -f "$$VERIFY" ]; then \
+	  echo "Error: $$VERIFY not found."; \
+	  echo "Create it with: make new-verify M=$(M)"; \
+	  exit 1; \
+	fi; \
+	scripts/check-spec "$$VERIFY"
+
+check-card: ## Validate a task card: make check-card C=active/C-001-slice-router-work
+	@if [ -z "$(C)" ]; then \
+	  echo "Error: C is required. Example: make check-card C=active/C-001-slice-router-work"; \
+	  exit 1; \
+	fi
+	@scripts/check-spec tasks/cards/$(C).md
+
 new-milestone: ## Scaffold a new milestone spec: make new-milestone N=001 TITLE="My feature"
 	@if [ -z "$(N)" ] || [ -z "$(TITLE)" ]; then \
 	  echo "Error: N and TITLE are required."; \
@@ -47,12 +82,95 @@ new-milestone: ## Scaffold a new milestone spec: make new-milestone N=001 TITLE=
 	if [ -f "$$DEST" ]; then \
 	  echo "Error: $$DEST already exists."; exit 1; \
 	fi; \
+	rewrite() { expr="$$1"; file="$$2"; tmp=$$(mktemp); sed "$$expr" "$$file" > "$$tmp" && mv "$$tmp" "$$file"; }; \
 	cp tasks/milestones/TEMPLATE.md "$$DEST"; \
-	sed -i "s/M-XXX: <Title>/M-$(N): $(TITLE)/" "$$DEST"; \
-	sed -i "s|milestone/M-XXX-<slug>|milestone/M-$(N)-<slug>|" "$$DEST"; \
+	TITLE_ESC=$$(printf '%s\n' "$(TITLE)" | sed 's/[&/]/\\&/g'); \
+	rewrite "s/M-XXX: <Title>/M-$(N): $$TITLE_ESC/" "$$DEST"; \
+	rewrite "s|milestone/M-XXX-<slug>|milestone/M-$(N)-<slug>|" "$$DEST"; \
 	echo "Created: $$DEST"; \
 	echo "Next: fill in Goal, Architecture Decisions, Context, Tasks, then:"; \
 	echo "  make check-spec M=active/M-$(N)"
+
+new-plan: ## Scaffold a milestone plan: make new-plan M=active/M-001
+	@if [ -z "$(M)" ]; then \
+	  echo "Error: M is required. Example: make new-plan M=active/M-001"; \
+	  exit 1; \
+	fi
+	@SPEC=tasks/milestones/$(M).md; \
+	if [ ! -f "$$SPEC" ]; then \
+	  echo "Error: $$SPEC not found."; \
+	  exit 1; \
+	fi; \
+	ID=$$(sed -n 's/^# \(M-[0-9][0-9][0-9]\): .*$$/\1/p' "$$SPEC" | head -n1); \
+	TITLE=$$(sed -n 's/^# M-[0-9][0-9][0-9]: \(.*\)$$/\1/p' "$$SPEC" | head -n1); \
+	if [ -z "$$ID" ] || [ -z "$$TITLE" ]; then \
+	  echo "Error: could not derive milestone ID/title from $$SPEC"; \
+	  exit 1; \
+	fi; \
+	DEST=tasks/milestones/$$ID.plan.md; \
+	if [ -f "$$DEST" ]; then \
+	  echo "Error: $$DEST already exists."; \
+	  exit 1; \
+	fi; \
+	rewrite() { expr="$$1"; file="$$2"; tmp=$$(mktemp); sed "$$expr" "$$file" > "$$tmp" && mv "$$tmp" "$$file"; }; \
+	cp tasks/milestones/PLAN_TEMPLATE.md "$$DEST"; \
+	TITLE_ESC=$$(printf '%s\n' "$$TITLE" | sed 's/[&/]/\\&/g'); \
+	rewrite "s/^# Plan for M-XXX: <Title>/# Plan for $$ID: $$TITLE_ESC/" "$$DEST"; \
+	rewrite "s/M-XXX/$$ID/g" "$$DEST"; \
+	rewrite "s/<Title>/$$TITLE_ESC/g" "$$DEST"; \
+	echo "Created: $$DEST"; \
+	echo "Next: fill the plan fields, then:"; \
+	echo "  make check-plan M=$(M)"
+
+new-verify: ## Scaffold a milestone verify report: make new-verify M=active/M-001
+	@if [ -z "$(M)" ]; then \
+	  echo "Error: M is required. Example: make new-verify M=active/M-001"; \
+	  exit 1; \
+	fi
+	@SPEC=tasks/milestones/$(M).md; \
+	if [ ! -f "$$SPEC" ]; then \
+	  echo "Error: $$SPEC not found."; \
+	  exit 1; \
+	fi; \
+	ID=$$(sed -n 's/^# \(M-[0-9][0-9][0-9]\): .*$$/\1/p' "$$SPEC" | head -n1); \
+	TITLE=$$(sed -n 's/^# M-[0-9][0-9][0-9]: \(.*\)$$/\1/p' "$$SPEC" | head -n1); \
+	if [ -z "$$ID" ] || [ -z "$$TITLE" ]; then \
+	  echo "Error: could not derive milestone ID/title from $$SPEC"; \
+	  exit 1; \
+	fi; \
+	DEST=tasks/milestones/$$ID.verify.md; \
+	if [ -f "$$DEST" ]; then \
+	  echo "Error: $$DEST already exists."; \
+	  exit 1; \
+	fi; \
+	rewrite() { expr="$$1"; file="$$2"; tmp=$$(mktemp); sed "$$expr" "$$file" > "$$tmp" && mv "$$tmp" "$$file"; }; \
+	cp tasks/milestones/VERIFY_TEMPLATE.md "$$DEST"; \
+	TITLE_ESC=$$(printf '%s\n' "$$TITLE" | sed 's/[&/]/\\&/g'); \
+	rewrite "s/^# Verify M-XXX: <Title>/# Verify $$ID: $$TITLE_ESC/" "$$DEST"; \
+	rewrite "s/M-XXX/$$ID/g" "$$DEST"; \
+	rewrite "s/<Title>/$$TITLE_ESC/g" "$$DEST"; \
+	echo "Created: $$DEST"; \
+	echo "Next: fill the verify report, then:"; \
+	echo "  make check-verify M=$(M)"
+
+new-card: ## Scaffold a task card: make new-card ID=001 SLUG=slice-router-work M=M-001
+	@if [ -z "$(ID)" ] || [ -z "$(SLUG)" ] || [ -z "$(M)" ]; then \
+	  echo "Error: ID, SLUG, and M are required."; \
+	  echo "  Example: make new-card ID=001 SLUG=slice-router-work M=M-001"; \
+	  exit 1; \
+	fi
+	@DEST=tasks/cards/active/C-$(ID)-$(SLUG).md; \
+	if [ -f "$$DEST" ]; then \
+	  echo "Error: $$DEST already exists."; \
+	  exit 1; \
+	fi; \
+	rewrite() { expr="$$1"; file="$$2"; tmp=$$(mktemp); sed "$$expr" "$$file" > "$$tmp" && mv "$$tmp" "$$file"; }; \
+	cp tasks/cards/TEMPLATE.md "$$DEST"; \
+	rewrite "s/^# Card C-XXX/# Card C-$(ID)/" "$$DEST"; \
+	rewrite "s/^Milestone:/Milestone: $(M)/" "$$DEST"; \
+	echo "Created: $$DEST"; \
+	echo "Next: fill the card fields, then:"; \
+	echo "  make check-card C=active/C-$(ID)-$(SLUG)"
 
 # ── Quality Gates (run locally, mirrors CI) ───────────────────────────────────
 
