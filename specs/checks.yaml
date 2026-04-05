@@ -1,12 +1,25 @@
-default:
-  format:
-    - gofmt -w .
-  verify:
+version: 1
+
+module_defaults:
+  validations_from: module.yaml:test_commands
+
+repo:
+  execution_order:
+    - module_tests
+    - boundary_checks
+    - repo_wide_checks
+  boundary_checks:
+    - go run ./internal/checks/dependency-rules
+    - go run ./internal/checks/agent-workflow
+    - go run ./internal/checks/module-manifests
+    - go run ./internal/checks/reference-layout
+  repo_wide_checks:
     - go test -race -timeout 60s ./...
     - go test -timeout 20s ./...
     - go vet ./...
+    - gofmt -w .
 
-staged:
+profiles:
   stable_core:
     - go test -race -timeout 60s ./core/... ./router/... ./contract/... ./middleware/...
     - go vet ./core/... ./router/... ./contract/... ./middleware/...
@@ -16,8 +29,3 @@ staged:
   x_tenant:
     - go test -race -timeout 60s ./x/tenant/...
     - go vet ./x/tenant/...
-
-checks:
-  - go run ./internal/checks/dependency-rules
-  - go run ./internal/checks/module-manifests
-  - go run ./internal/checks/reference-layout

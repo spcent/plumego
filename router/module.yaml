@@ -3,6 +3,7 @@ path: router
 layer: stable
 status: ga
 owner: runtime
+risk: high
 summary: HTTP route matching, params, groups, and reverse routing.
 
 strict_boundary: route_structure

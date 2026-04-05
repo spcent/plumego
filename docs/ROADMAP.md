@@ -44,7 +44,7 @@ Planned work:
 - add `tasks/cards/*.md` for reversible work items
 - add a checker that verifies every manifest `doc_paths` target exists
 - add a checker that verifies `specs/change-recipes/*` remain discoverable from canonical repo metadata
-- expand `specs/agent-entrypoints.yaml` to cover more task families at finer granularity
+- expand `specs/task-routing.yaml` to cover more task families at finer granularity
 - keep `docs/modules/*` synchronized with module manifests
 
 Exit criteria:
@@ -202,7 +202,7 @@ Completed in this phase:
 - each feature reference is clearly marked non-canonical in its README and doc comment
 - added `FindReferenceXImports` check in `internal/checks/checkutil` to detect x/* drift in `reference/standard-service`
 - enhanced `internal/checks/reference-layout` to enforce the drift check and require feature reference paths
-- updated `specs/agent-entrypoints.yaml` with a `scaffold` task entrypoint
+- updated `specs/task-routing.yaml` with a `scaffold` task entrypoint
 
 Exit criteria:
 

@@ -3,6 +3,7 @@ path: x/websocket
 layer: extension
 status: experimental
 owner: realtime
+risk: medium
 summary: WebSocket extension surface for hub primitives and explicit route registration.
 
 responsibilities:

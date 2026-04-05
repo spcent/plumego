@@ -25,7 +25,7 @@
 
 - `x/frontend/module.yaml`
 - `x/frontend/README.md`
-- `specs/agent-entrypoints.yaml`
+- `specs/task-routing.yaml`
 
 ## Main risks when changing this module
 

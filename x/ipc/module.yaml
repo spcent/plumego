@@ -2,6 +2,8 @@ name: x/ipc
 path: x/ipc
 layer: extension
 status: experimental
+owner: edge
+risk: medium
 summary: Subordinate inter-process communication transport helpers within the x/gateway family.
 
 parent_family: x/gateway

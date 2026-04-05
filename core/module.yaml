@@ -3,6 +3,7 @@ path: core
 layer: stable
 status: ga
 owner: runtime
+risk: high
 summary: App lifecycle and HTTP server assembly.
 
 strict_boundary: kernel

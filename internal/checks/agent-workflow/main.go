@@ -90,15 +90,31 @@ func workflowViolations(repoRoot string) ([]string, error) {
 		violations = append(violations, fmt.Sprintf("empty directory %s is misleading in a package tree; remove it or add real contents", dir))
 	}
 
-	canonicalEntrypoints, err := checkutil.ReadCanonicalExtensionEntrypoints(repoRoot)
+	taxonomy, err := checkutil.ReadExtensionTaxonomy(repoRoot)
 	if err != nil {
 		return nil, err
 	}
-	primerViolations, err := checkutil.FindExtensionPrimerCoverageViolations(repoRoot, canonicalEntrypoints)
+	taxonomyViolations, err := checkutil.FindExtensionTaxonomyCoverageViolations(repoRoot, declaredExtensions, taxonomy)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, taxonomyViolations...)
+
+	primerViolations, err := checkutil.FindExtensionPrimerCoverageViolations(repoRoot, taxonomy.CanonicalRoots)
 	if err != nil {
 		return nil, err
 	}
 	violations = append(violations, primerViolations...)
+
+	taskRouting, err := checkutil.ReadTaskRouting(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	taskRoutingViolations, err := checkutil.FindTaskRoutingCoverageViolations(repoRoot, taskRouting)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, taskRoutingViolations...)
 
 	packageIndex, err := checkutil.ReadPackageIndex(repoRoot)
 	if err != nil {

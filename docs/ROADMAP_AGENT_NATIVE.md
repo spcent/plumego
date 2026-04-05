@@ -111,8 +111,8 @@ The current repository already moved several concerns into better locations, but
   - a sub-capability of `x/data`
 - add `docs/modules/x-fileapi/README.md`
 - update `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` to reflect the actual extension topology
-- update `specs/repo.yaml` and `specs/extension-entrypoints.yaml` accordingly
-- update `specs/agent-entrypoints.yaml` with file API discovery rules if needed
+- update `specs/repo.yaml` and `specs/extension-taxonomy.yaml` accordingly
+- update `specs/task-routing.yaml` with file API discovery rules if needed
 - remove or explicitly forbid the empty `contract/protocol` residue
 - add a check that flags orphaned extension roots and empty misleading package directories
 
@@ -147,7 +147,7 @@ Agents currently know how to choose the right module most of the time. They stil
 #### Deliverables
 
 - introduce a package-level metadata format for selected hot paths
-- establish `specs/package-index.yaml` as the package-level hotspot discovery surface
+- establish `specs/package-hotspots.yaml` as the package-level hotspot discovery surface
 - start with hot packages where wrong entrypoint cost is high
 - define for each package:
   - layer
@@ -215,7 +215,7 @@ Import rules are necessary but insufficient. A package can still violate archite
 - empty misleading package directory checks are in place
 - orphaned extension root checks are in place
 - module primer coverage for canonical app-facing extension roots is now enforced
-- `specs/package-index.yaml` package path and `start_with` path coverage is now enforced
+- `specs/package-hotspots.yaml` package path and `start_with` path coverage is now enforced
 - stable-root app-facing HTTP surface leakage checks are now in place
 - task-family coverage checks remain open
 
@@ -476,8 +476,8 @@ Non-goals:
 
 Files:
 - `specs/repo.yaml`
-- `specs/extension-entrypoints.yaml`
-- `specs/agent-entrypoints.yaml`
+- `specs/extension-taxonomy.yaml`
+- `specs/task-routing.yaml`
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `docs/modules/x-fileapi/README.md`
 
@@ -509,8 +509,8 @@ Non-goals:
 - Do not annotate the entire repo.
 
 Files:
-- `specs/package-index.yaml`
-- `specs/agent-entrypoints.yaml`
+- `specs/package-hotspots.yaml`
+- `specs/task-routing.yaml`
 - `docs/PRODUCT_PRD_AGENT_NATIVE.md`
 - `docs/ROADMAP_AGENT_NATIVE.md`
 

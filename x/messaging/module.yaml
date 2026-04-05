@@ -2,6 +2,8 @@ name: x/messaging
 path: x/messaging
 layer: extension
 status: experimental
+owner: messaging
+risk: medium
 summary: The canonical and only app-facing messaging family entrypoint, built on explicit queue, pubsub, scheduler, and webhook adapters.
 
 subordinate_families:

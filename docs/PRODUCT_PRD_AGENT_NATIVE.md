@@ -287,7 +287,7 @@ This requires:
 
 The first package-level discovery surface should live in:
 
-- `specs/package-index.yaml`
+- `specs/package-hotspots.yaml`
 
 This index should stay intentionally sparse and cover only packages where the wrong first package choice causes meaningful rework.
 
@@ -447,7 +447,7 @@ Success criteria:
 
 - no competition with existing family entrypoints
 - no stable-root pollution
-- agent can find the new family from `specs/extension-entrypoints.yaml`
+- agent can find the new family from `specs/extension-taxonomy.yaml`
 
 ### 12.3 Journey C: Generate a New Service
 

@@ -3,6 +3,7 @@ path: x/webhook
 layer: extension
 status: experimental
 owner: integration
+risk: medium
 summary: Subordinate webhook ingress, egress, and bridge primitives within the broader messaging extension family.
 
 parent_family: x/messaging

@@ -9,6 +9,8 @@ import (
 
 func TestFindDisallowedImportsHonorsBaselineAndSkipsTests(t *testing.T) {
 	repo := t.TempDir()
+	writeRepoSpec(t, repo)
+	writeDependencyRulesSpec(t, repo)
 
 	writeFile(t, filepath.Join(repo, "core", "core.go"), `package core
 
@@ -72,10 +74,13 @@ func TestFindMissingModuleManifestsHonorsBaseline(t *testing.T) {
 
 func TestValidateModuleManifestsReportsSchemaAndPathViolations(t *testing.T) {
 	repo := t.TempDir()
+	writeManifestSchema(t, repo)
 	writeFile(t, filepath.Join(repo, "core", "module.yaml"), `name: wrong
 path: wrong
 layer: unstable
 status: ga
+owner: runtime
+risk: high
 summary: bad manifest
 responsibilities:
   - one
@@ -112,6 +117,7 @@ agent_hints:
 
 func TestValidateModuleManifestsRequiresDeclaredDocPathsToExist(t *testing.T) {
 	repo := t.TempDir()
+	writeManifestSchema(t, repo)
 	writeFile(t, filepath.Join(repo, "core", "module.yaml"), validManifestWithDocPaths("core", "stable", "docs/modules/core/README.md"))
 	writeFile(t, filepath.Join(repo, "docs", "modules", "core", "README.md"), "# core\n")
 
@@ -202,6 +208,7 @@ func TestValidateStableBoundaryDeclarationsPassesWhenPresent(t *testing.T) {
 
 func TestValidateXFamilyTaxonomyDetectsViolations(t *testing.T) {
 	repo := t.TempDir()
+	writeExtensionTaxonomySpec(t, repo)
 
 	// x/messaging lacks subordinate_families → violation
 	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), validManifest("x/messaging", "extension"))
@@ -234,6 +241,7 @@ func TestValidateXFamilyTaxonomyDetectsViolations(t *testing.T) {
 
 func TestValidateXFamilyTaxonomyPassesForValidSetup(t *testing.T) {
 	repo := t.TempDir()
+	writeExtensionTaxonomySpec(t, repo)
 
 	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), validManifestWithSubordinateFamilies("x/messaging", "extension"))
 	writeFile(t, filepath.Join(repo, "x", "mq", "module.yaml"), validManifestWithParentFamily("x/mq", "extension", "x/messaging"))
@@ -245,6 +253,9 @@ func TestValidateXFamilyTaxonomyPassesForValidSetup(t *testing.T) {
 	}
 	if len(violations) != 0 {
 		t.Fatalf("expected no violations, got: %v", violations)
+	}
+}
+
 func TestReadRepoExtensionRootsParsesDeclaredExtensionPaths(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "specs", "repo.yaml"), `layers:
@@ -319,11 +330,15 @@ func TestFindEmptyMisleadingDirsFlagsEmptyPackageLikeDirs(t *testing.T) {
 
 func TestReadCanonicalExtensionEntrypointsParsesCanonicalRoots(t *testing.T) {
 	repo := t.TempDir()
-	writeFile(t, filepath.Join(repo, "specs", "extension-entrypoints.yaml"), `families:
+	writeFile(t, filepath.Join(repo, "specs", "extension-taxonomy.yaml"), `families:
   gateway:
-    canonical_entrypoint: x/gateway
+    canonical_root: x/gateway
+    roots:
+      - x/gateway
   resource_api:
-    canonical_entrypoint: x/rest
+    canonical_root: x/rest
+    roots:
+      - x/rest
 `)
 
 	roots, err := ReadCanonicalExtensionEntrypoints(repo)
@@ -360,7 +375,7 @@ func TestFindExtensionPrimerCoverageViolationsRequiresDocPaths(t *testing.T) {
 
 func TestReadPackageIndexParsesPackagesAndStartPaths(t *testing.T) {
 	repo := t.TempDir()
-	writeFile(t, filepath.Join(repo, "specs", "package-index.yaml"), `packages:
+	writeFile(t, filepath.Join(repo, "specs", "package-hotspots.yaml"), `packages:
   x/fileapi:
     start_with:
       - x/fileapi/module.yaml
@@ -407,9 +422,9 @@ func TestFindPackageIndexCoverageViolationsRequiresExistingPackageAndStartFiles(
 
 	joined := strings.Join(violations, "\n")
 	for _, want := range []string{
-		`specs/package-index.yaml package x/fileapi references missing start_with path x/fileapi/handler.go`,
-		`specs/package-index.yaml package contract must declare at least one start_with path`,
-		`specs/package-index.yaml package x/missing does not exist in the repository`,
+		`specs/package-hotspots.yaml package x/fileapi references missing start_with path x/fileapi/handler.go`,
+		`specs/package-hotspots.yaml package contract must declare at least one start_with path`,
+		`specs/package-hotspots.yaml package x/missing does not exist in the repository`,
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("expected violation containing %q, got:\n%s", want, joined)
@@ -477,6 +492,8 @@ func validManifest(path, layer string) string {
 		"path: " + path + "\n" +
 		"layer: " + layer + "\n" +
 		"status: ga\n" +
+		"owner: runtime\n" +
+		"risk: medium\n" +
 		"summary: example\n" +
 		"responsibilities:\n  - keep scope tight\n" +
 		"non_goals:\n  - do not sprawl\n" +
@@ -509,6 +526,113 @@ func validManifestWithParentFamily(path, layer, parent string) string {
 
 func validManifestWithSubordinateFamilies(path, layer string) string {
 	return validManifest(path, layer) + "subordinate_families:\n  - package: x/sub\n    role: subordinate\n"
+}
+
+func writeRepoSpec(t *testing.T, repo string) {
+	t.Helper()
+	writeFile(t, filepath.Join(repo, "specs", "repo.yaml"), `repo:
+  module: github.com/spcent/plumego
+layers:
+  stable:
+    paths:
+      - core
+      - router
+      - contract
+      - middleware
+      - security
+      - store
+      - health
+      - log
+      - metrics
+  extension:
+    paths:
+      - x/ai
+      - x/fileapi
+      - x/websocket
+`)
+}
+
+func writeManifestSchema(t *testing.T, repo string) {
+	t.Helper()
+	writeFile(t, filepath.Join(repo, "specs", "module-manifest.schema.yaml"), `required:
+  - name
+  - path
+  - layer
+  - status
+  - owner
+  - risk
+  - summary
+  - responsibilities
+  - non_goals
+  - allowed_imports
+  - forbidden_imports
+  - test_commands
+  - review_checklist
+  - agent_hints
+
+enums:
+  layer:
+    - stable
+    - extension
+    - tooling
+    - reference
+  status:
+    - ga
+    - beta
+    - experimental
+  risk:
+    - low
+    - medium
+    - high
+    - critical
+
+limits:
+  responsibilities_max: 7
+  non_goals_max: 7
+  allowed_imports_max: 12
+  forbidden_imports_max: 20
+  test_commands_max: 3
+  review_checklist_max: 5
+  agent_hints_max: 3
+`)
+}
+
+func writeDependencyRulesSpec(t *testing.T, repo string) {
+	t.Helper()
+	writeFile(t, filepath.Join(repo, "specs", "dependency-rules.yaml"), `modules:
+  core:
+    path: core
+    deny:
+      - x/**
+special_rules:
+  forbidden_paths:
+    - plumego.go
+  forbidden_import_patterns:
+    - github.com/spcent/plumego
+`)
+}
+
+func writeExtensionTaxonomySpec(t *testing.T, repo string) {
+	t.Helper()
+	writeFile(t, filepath.Join(repo, "specs", "extension-taxonomy.yaml"), `families:
+  tenant:
+    canonical_root: x/tenant
+    roots:
+      - x/tenant
+  messaging:
+    canonical_root: x/messaging
+    roots:
+      - x/messaging
+      - x/mq
+  resource_api:
+    canonical_root: x/rest
+    roots:
+      - x/rest
+  gateway:
+    canonical_root: x/gateway
+    roots:
+      - x/gateway
+`)
 }
 
 func writeFile(t *testing.T, path, content string) {

@@ -9,9 +9,11 @@ Repository planning and future restructuring should also follow:
 - `docs/CANONICAL_STYLE_GUIDE.md`
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `specs/repo.yaml`
-- `specs/agent-entrypoints.yaml`
-- `specs/ownership.yaml`
+- `specs/task-routing.yaml`
+- `specs/extension-taxonomy.yaml`
+- `specs/package-hotspots.yaml`
 - `specs/dependency-rules.yaml`
+- `specs/checks.yaml`
 - `specs/change-recipes/*`
 - `tasks/cards/*`
 - `docs/ROADMAP.md`

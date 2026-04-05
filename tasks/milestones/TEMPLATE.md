@@ -48,7 +48,7 @@
 
 1. `AGENTS.md` (loaded automatically by Codex)
 2. `specs/dependency-rules.yaml`
-3. `specs/agent-entrypoints.yaml`
+3. `specs/task-routing.yaml`
 4. `<primary-module>/module.yaml`
 5. <!-- e.g. `specs/change-recipes/add-http-endpoint.yaml` -->
 6. <!-- e.g. `reference/standard-service/internal/app/routes.go` -->

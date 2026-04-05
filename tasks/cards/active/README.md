@@ -36,7 +36,7 @@ Read order:
 1. `docs/CANONICAL_STYLE_GUIDE.md`
 2. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 3. `specs/repo.yaml`
-4. `specs/agent-entrypoints.yaml`
+4. `specs/task-routing.yaml`
 5. the active card itself
 
 The active queue is an execution surface, not an archive.

@@ -42,47 +42,9 @@ var allowedTopLevelDirs = []string{
 	"security",
 	"specs",
 	"store",
+	"scripts",
 	"tasks",
 	"x",
-}
-
-var requiredManifestKeys = []string{
-	"name",
-	"path",
-	"layer",
-	"status",
-	"summary",
-	"responsibilities",
-	"non_goals",
-	"allowed_imports",
-	"forbidden_imports",
-	"test_commands",
-	"review_checklist",
-	"agent_hints",
-}
-
-var manifestListLimits = map[string]int{
-	"responsibilities":  7,
-	"non_goals":         7,
-	"allowed_imports":   12,
-	"forbidden_imports": 20,
-	"test_commands":     3,
-	"review_checklist":  5,
-	"agent_hints":       3,
-}
-
-var manifestEnums = map[string]map[string]struct{}{
-	"layer": {
-		"stable":    {},
-		"extension": {},
-		"tooling":   {},
-		"reference": {},
-	},
-	"status": {
-		"ga":           {},
-		"beta":         {},
-		"experimental": {},
-	},
 }
 
 var stableHTTPSurfaceExemptRoots = map[string]struct{}{
@@ -237,18 +199,26 @@ func ReadBaseline(path string) (map[string]struct{}, error) {
 }
 
 func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]string, error) {
-	blockedPrefixes := []string{
-		modulePath + "/config",
-		modulePath + "/net",
-		modulePath + "/tenant",
-		modulePath + "/utils",
-		modulePath + "/validator",
-		modulePath + "/x/",
+	rules, err := ReadDependencyRules(repoRoot)
+	if err != nil {
+		return nil, err
 	}
+
+	var moduleNames []string
+	for name := range rules.Modules {
+		moduleNames = append(moduleNames, name)
+	}
+	sort.Strings(moduleNames)
+
 	var violations []string
 
-	for _, root := range StableRoots {
-		dir := filepath.Join(repoRoot, root)
+	for _, name := range moduleNames {
+		rule := rules.Modules[name]
+		if rule.Path == "" {
+			continue
+		}
+
+		dir := filepath.Join(repoRoot, filepath.FromSlash(rule.Path))
 		if _, err := os.Stat(dir); err != nil {
 			if os.IsNotExist(err) {
 				continue
@@ -283,7 +253,31 @@ func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]str
 				if err != nil {
 					return fmt.Errorf("unquote import %s: %w", path, err)
 				}
-				if !isDisallowedImport(importPath, blockedPrefixes) {
+				if !strings.HasPrefix(importPath, rules.ModulePath) {
+					continue
+				}
+
+				relImportPath := ""
+				if importPath != rules.ModulePath {
+					relImportPath = strings.TrimPrefix(importPath, rules.ModulePath+"/")
+				}
+
+				disallowed := false
+				for _, pattern := range rule.Deny {
+					if matchesRepoPattern(relImportPath, pattern) {
+						disallowed = true
+						break
+					}
+				}
+				if !disallowed {
+					for _, pattern := range rules.ForbiddenImportPatterns {
+						if matchesForbiddenImportPattern(importPath, relImportPath, pattern, rules.ModulePath) {
+							disallowed = true
+							break
+						}
+					}
+				}
+				if !disallowed {
 					continue
 				}
 
@@ -299,6 +293,22 @@ func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]str
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	for _, forbiddenPath := range rules.ForbiddenPaths {
+		target := filepath.Join(repoRoot, filepath.FromSlash(forbiddenPath))
+		if _, err := os.Stat(target); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+
+		key := "FORBIDDEN_PATH|" + forbiddenPath
+		if _, ok := baseline[key]; ok {
+			continue
+		}
+		violations = append(violations, key)
 	}
 
 	sort.Strings(violations)
@@ -505,23 +515,45 @@ func FindEmptyMisleadingDirs(repoRoot string) ([]string, error) {
 }
 
 func ValidateModuleManifests(repoRoot string) ([]string, error) {
-	patterns := []string{
-		filepath.Join(repoRoot, "*", "module.yaml"),
-		filepath.Join(repoRoot, "x", "*", "module.yaml"),
+	schema, err := ReadManifestSchema(repoRoot)
+	if err != nil {
+		return nil, err
 	}
+
 	var paths []string
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
+	err = filepath.WalkDir(repoRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil, err
+			return err
 		}
-		paths = append(paths, matches...)
+		if d.IsDir() || d.Name() != "module.yaml" {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(repoRoot, path)
+		if err != nil {
+			return err
+		}
+		relPath = filepath.ToSlash(relPath)
+		if strings.Count(relPath, "/") == 1 {
+			root := strings.Split(relPath, "/")[0]
+			if isStableRoot(root) {
+				paths = append(paths, path)
+			}
+			return nil
+		}
+		if strings.HasPrefix(relPath, "x/") {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	sort.Strings(paths)
 
 	var violations []string
 	for _, path := range paths {
-		items, err := validateModuleManifest(repoRoot, path)
+		items, err := validateModuleManifest(repoRoot, path, schema)
 		if err != nil {
 			return nil, err
 		}
@@ -545,32 +577,11 @@ type packageIndexEntry struct {
 }
 
 func ReadCanonicalExtensionEntrypoints(repoRoot string) ([]string, error) {
-	path := filepath.Join(repoRoot, "specs", "extension-entrypoints.yaml")
-	file, err := os.Open(path)
+	doc, err := ReadExtensionTaxonomy(repoRoot)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-
-	var roots []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if !strings.HasPrefix(line, "canonical_entrypoint:") {
-			continue
-		}
-		value := strings.TrimSpace(strings.TrimPrefix(line, "canonical_entrypoint:"))
-		value = strings.Trim(value, "\"'")
-		if value != "" {
-			roots = append(roots, value)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	sort.Strings(roots)
-	return roots, nil
+	return doc.CanonicalRoots, nil
 }
 
 func FindExtensionPrimerCoverageViolations(repoRoot string, roots []string) ([]string, error) {
@@ -599,7 +610,7 @@ func FindExtensionPrimerCoverageViolations(repoRoot string, roots []string) ([]s
 }
 
 func ReadPackageIndex(repoRoot string) (map[string]packageIndexEntry, error) {
-	path := filepath.Join(repoRoot, "specs", "package-index.yaml")
+	path := filepath.Join(repoRoot, "specs", "package-hotspots.yaml")
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -689,18 +700,18 @@ func FindPackageIndexCoverageViolations(repoRoot string, entries map[string]pack
 		info, err := os.Stat(dirPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				violations = append(violations, fmt.Sprintf("specs/package-index.yaml package %s does not exist in the repository", pkgPath))
+				violations = append(violations, fmt.Sprintf("specs/package-hotspots.yaml package %s does not exist in the repository", pkgPath))
 				continue
 			}
 			return nil, err
 		}
 		if !info.IsDir() {
-			violations = append(violations, fmt.Sprintf("specs/package-index.yaml package %s is not a directory", pkgPath))
+			violations = append(violations, fmt.Sprintf("specs/package-hotspots.yaml package %s is not a directory", pkgPath))
 			continue
 		}
 
 		if len(entry.StartWith) == 0 {
-			violations = append(violations, fmt.Sprintf("specs/package-index.yaml package %s must declare at least one start_with path", pkgPath))
+			violations = append(violations, fmt.Sprintf("specs/package-hotspots.yaml package %s must declare at least one start_with path", pkgPath))
 			continue
 		}
 
@@ -708,12 +719,71 @@ func FindPackageIndexCoverageViolations(repoRoot string, entries map[string]pack
 			target := filepath.Join(repoRoot, filepath.FromSlash(startPath))
 			if _, err := os.Stat(target); err != nil {
 				if os.IsNotExist(err) {
-					violations = append(violations, fmt.Sprintf("specs/package-index.yaml package %s references missing start_with path %s", pkgPath, startPath))
+					violations = append(violations, fmt.Sprintf("specs/package-hotspots.yaml package %s references missing start_with path %s", pkgPath, startPath))
 					continue
 				}
 				return nil, err
 			}
 		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func FindTaskRoutingCoverageViolations(repoRoot string, entries map[string]taskRoutingEntry) ([]string, error) {
+	var violations []string
+	for taskName, entry := range entries {
+		if len(entry.StartWith) == 0 {
+			violations = append(violations, fmt.Sprintf("specs/task-routing.yaml task %s must declare at least one start_with path", taskName))
+			continue
+		}
+		for _, startPath := range entry.StartWith {
+			target := filepath.Join(repoRoot, filepath.FromSlash(startPath))
+			if _, err := os.Stat(target); err != nil {
+				if os.IsNotExist(err) {
+					violations = append(violations, fmt.Sprintf("specs/task-routing.yaml task %s references missing start_with path %s", taskName, startPath))
+					continue
+				}
+				return nil, err
+			}
+		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func FindExtensionTaxonomyCoverageViolations(repoRoot string, declared map[string]struct{}, doc extensionTaxonomyDoc) ([]string, error) {
+	var violations []string
+
+	for _, root := range doc.CanonicalRoots {
+		target := filepath.Join(repoRoot, filepath.FromSlash(root))
+		if _, err := os.Stat(target); err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, fmt.Sprintf("specs/extension-taxonomy.yaml canonical_root %s does not exist in the repository", root))
+				continue
+			}
+			return nil, err
+		}
+	}
+
+	for root := range doc.CoveredRoots {
+		target := filepath.Join(repoRoot, filepath.FromSlash(root))
+		if _, err := os.Stat(target); err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, fmt.Sprintf("specs/extension-taxonomy.yaml root %s does not exist in the repository", root))
+				continue
+			}
+			return nil, err
+		}
+	}
+
+	for root := range declared {
+		if _, ok := doc.CoveredRoots[root]; ok {
+			continue
+		}
+		violations = append(violations, fmt.Sprintf("extension root %s exists in x/ but is not declared in specs/extension-taxonomy.yaml", root))
 	}
 
 	sort.Strings(violations)
@@ -892,7 +962,7 @@ func isPointerToSelector(expr ast.Expr, pkg, name string) bool {
 	return isSelector(star.X, pkg, name)
 }
 
-func validateModuleManifest(repoRoot, path string) ([]string, error) {
+func validateModuleManifest(repoRoot, path string, schema manifestSchema) ([]string, error) {
 	doc, err := parseManifest(path)
 	if err != nil {
 		return nil, err
@@ -905,16 +975,16 @@ func validateModuleManifest(repoRoot, path string) ([]string, error) {
 	relPath = filepath.ToSlash(relPath)
 
 	var violations []string
-	for _, key := range requiredManifestKeys {
+	for _, key := range schema.Required {
 		if !doc.Seen[key] {
 			violations = append(violations, fmt.Sprintf("%s: missing required key %q", filepath.ToSlash(path), key))
 			continue
 		}
 
-		if _, isEnum := manifestEnums[key]; isEnum {
+		if _, isEnum := schema.Enums[key]; isEnum {
 			continue
 		}
-		if maxCount, isList := manifestListLimits[key]; isList {
+		if maxCount, isList := schema.Limits[key]; isList {
 			if doc.ListCounts[key] == 0 {
 				violations = append(violations, fmt.Sprintf("%s: required list %q must not be empty", filepath.ToSlash(path), key))
 			}
@@ -928,7 +998,7 @@ func validateModuleManifest(repoRoot, path string) ([]string, error) {
 		}
 	}
 
-	for key, allowed := range manifestEnums {
+	for key, allowed := range schema.Enums {
 		value := strings.TrimSpace(doc.Scalars[key])
 		if value == "" {
 			continue
@@ -1046,30 +1116,6 @@ func isStableRoot(path string) bool {
 	return false
 }
 
-// XPrimaryFamilies is the canonical set of x/* primary family packages.
-// Subordinate packages (x/mq, x/ops, etc.) are not listed here.
-var XPrimaryFamilies = map[string]struct{}{
-	"x/tenant":        {},
-	"x/messaging":     {},
-	"x/gateway":       {},
-	"x/rest":          {},
-	"x/websocket":     {},
-	"x/frontend":      {},
-	"x/observability": {},
-	"x/files":         {},
-	"x/data":          {},
-	"x/ai":            {},
-}
-
-// XFamiliesWithSubordinates is the subset of primary families that coordinate
-// subordinate packages and must declare a subordinate_families block.
-var XFamiliesWithSubordinates = map[string]struct{}{
-	"x/messaging":     {},
-	"x/gateway":       {},
-	"x/observability": {},
-	"x/data":          {},
-}
-
 // ValidateStableBoundaryDeclarations checks that every stable root module.yaml
 // declares a non-empty strict_boundary field.
 func ValidateStableBoundaryDeclarations(repoRoot string) ([]string, error) {
@@ -1095,6 +1141,30 @@ func ValidateStableBoundaryDeclarations(repoRoot string) ([]string, error) {
 //   - x/* primary families that coordinate subordinates declare subordinate_families
 //   - x/* packages that declare parent_family reference a recognized primary family
 func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
+	taxonomy, err := ReadExtensionTaxonomy(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	primaryFamilies := map[string]struct{}{}
+	familiesWithSubordinates := map[string]struct{}{}
+	for _, canonicalRoot := range taxonomy.CanonicalRoots {
+		primaryFamilies[canonicalRoot] = struct{}{}
+		for _, roots := range taxonomy.RootsByFamily {
+			if len(roots) <= 1 {
+				continue
+			}
+			if len(roots) > 1 {
+				for _, root := range roots {
+					if root == canonicalRoot {
+						familiesWithSubordinates[canonicalRoot] = struct{}{}
+						break
+					}
+				}
+			}
+		}
+	}
+
 	xDir := filepath.Join(repoRoot, "x")
 	entries, err := os.ReadDir(xDir)
 	if err != nil {
@@ -1120,14 +1190,14 @@ func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
 			return nil, err
 		}
 
-		if _, ok := XFamiliesWithSubordinates[pkg]; ok {
+		if _, ok := familiesWithSubordinates[pkg]; ok {
 			if !doc.Seen["subordinate_families"] {
 				violations = append(violations, pkg+"/module.yaml: primary family must declare subordinate_families")
 			}
 		}
 
 		if parentFamily := strings.TrimSpace(doc.Scalars["parent_family"]); parentFamily != "" {
-			if _, ok := XPrimaryFamilies[parentFamily]; !ok {
+			if _, ok := primaryFamilies[parentFamily]; !ok {
 				violations = append(violations, pkg+"/module.yaml: parent_family "+strconv.Quote(parentFamily)+" is not a recognized primary x/* family")
 			}
 		}

@@ -1,0 +1,61 @@
+version: 1
+
+families:
+  tenant:
+    canonical_root: x/tenant
+    roots:
+      - x/tenant
+
+  file_api:
+    canonical_root: x/fileapi
+    roots:
+      - x/fileapi
+
+  messaging:
+    canonical_root: x/messaging
+    roots:
+      - x/messaging
+      - x/mq
+      - x/pubsub
+      - x/scheduler
+      - x/webhook
+
+  gateway:
+    canonical_root: x/gateway
+    roots:
+      - x/gateway
+      - x/discovery
+      - x/ipc
+
+  resource_api:
+    canonical_root: x/rest
+    roots:
+      - x/rest
+
+  observability:
+    canonical_root: x/observability
+    roots:
+      - x/observability
+      - x/ops
+      - x/devtools
+
+  frontend:
+    canonical_root: x/frontend
+    roots:
+      - x/frontend
+
+  websocket:
+    canonical_root: x/websocket
+    roots:
+      - x/websocket
+
+  data:
+    canonical_root: x/data
+    roots:
+      - x/data
+      - x/cache
+
+  ai:
+    canonical_root: x/ai
+    roots:
+      - x/ai

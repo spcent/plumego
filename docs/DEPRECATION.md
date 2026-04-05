@@ -113,10 +113,10 @@ a deprecation notice:
 ## Governance
 
 - The package-level `module.yaml` for each stable root lists its owner and risk
-  level; see `specs/ownership.yaml`.
+  level.
 - Deprecation decisions for high-risk packages (`core`, `router`, `contract`,
   `security`) require review by the runtime or security owner listed in
-  `specs/ownership.yaml`.
+  the owning `module.yaml`.
 - Deprecation decisions for medium-risk packages can be made by the module
   owner.
 - All deprecations must pass the standard quality gates before release:
@@ -133,6 +133,6 @@ None at v1.0.
 ## See Also
 
 - `docs/ROADMAP.md` — phased development plan
-- `specs/ownership.yaml` — module owners and risk levels
+- `<module>/module.yaml` — module owners, risk levels, and default validation
 - `docs/CANONICAL_STYLE_GUIDE.md` — coding standards
 - `AGENTS.md` — agent workflow and quality gates

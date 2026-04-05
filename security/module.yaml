@@ -3,6 +3,7 @@ path: security
 layer: stable
 status: ga
 owner: security
+risk: critical
 summary: Security helpers for auth, headers, input safety, and abuse protection.
 
 strict_boundary: auth_primitives

@@ -3,6 +3,7 @@ path: x/fileapi
 layer: extension
 status: experimental
 owner: persistence
+risk: medium
 summary: HTTP handler for tenant-aware file operations, composing x/data/file storage and metadata.
 
 responsibilities:

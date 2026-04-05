@@ -38,11 +38,12 @@ Use this default path before making changes:
 1. `docs/CANONICAL_STYLE_GUIDE.md`
 2. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 3. `specs/repo.yaml`
-4. `specs/agent-entrypoints.yaml`
-5. `specs/dependency-rules.yaml`
-6. `specs/ownership.yaml`
-7. target `<module>/module.yaml`
-8. `reference/standard-service`
+4. `specs/task-routing.yaml`
+5. `specs/extension-taxonomy.yaml`
+6. `specs/package-hotspots.yaml`
+7. `specs/dependency-rules.yaml`
+8. target `<module>/module.yaml`
+9. `reference/standard-service`
 
 For staged future work and sequencing, also read:
 
@@ -81,10 +82,10 @@ Five rules determine where to work. Read this before scanning the entrypoints li
 
 **Stable roots (9):** `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
 
-**x/* primary families (10):** `x/tenant`, `x/messaging`, `x/gateway`, `x/rest`, `x/websocket`, `x/frontend`, `x/observability`, `x/files`, `x/data`, `x/ai`
+**x/* primary families (10):** `x/tenant`, `x/fileapi`, `x/messaging`, `x/gateway`, `x/rest`, `x/websocket`, `x/frontend`, `x/observability`, `x/data`, `x/ai`
 
 Always start at a primary family, not a subordinate (`x/mq`, `x/pubsub`, `x/ops`, `x/cache`, `x/devtools`, etc.).
-See `specs/agent-entrypoints.yaml` for the full routing table and detailed entrypoints.
+See `specs/task-routing.yaml` for the full routing table and detailed entrypoints.
 
 ## 6. Module Boundaries
 
@@ -123,7 +124,7 @@ Task entrypoint defaults:
 - Messaging work: start with `x/messaging` (not `x/mq` or `x/pubsub` directly).
 - Tenant work: start with `x/tenant` and `docs/architecture/X_TENANT_BLUEPRINT.md`.
 - WebSocket transport work: start with `x/websocket`.
-- File upload/download/storage work: start with `x/files`.
+- File upload/download/storage work: start with `x/fileapi`.
 - Admin or observability surfaces: start with `x/observability` (includes ops and devtools), not `health`.
 - AI capability work: start with `x/ai`.
 - Data topology work (sharding, rw-split, cache): start with `x/data`.
@@ -173,7 +174,7 @@ them were left behind.
 
 Default order:
 
-1. Run the target module tests from `specs/ownership.yaml` or `<module>/module.yaml`.
+1. Run the target module tests from `<module>/module.yaml`.
 2. Run boundary and manifest checks.
 3. Run repo-wide gates before final handoff.
 

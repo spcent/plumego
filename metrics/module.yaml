@@ -3,6 +3,7 @@ path: metrics
 layer: stable
 status: ga
 owner: observability
+risk: medium
 summary: Metrics interfaces and base collectors.
 
 strict_boundary: metrics_contracts

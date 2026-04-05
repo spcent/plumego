@@ -2,6 +2,8 @@ name: x/gateway
 path: x/gateway
 layer: extension
 status: experimental
+owner: edge
+risk: medium
 summary: The canonical and only app-facing gateway and edge transport entrypoint for proxying, balancing, caching, and rewrite helpers.
 
 subordinate_families:

@@ -3,6 +3,7 @@ path: middleware
 layer: stable
 status: ga
 owner: transport
+risk: high
 summary: Transport-only HTTP middleware, including request/response cross-cutting concerns and transport observability primitives.
 
 strict_boundary: transport_primitives

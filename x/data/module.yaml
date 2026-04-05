@@ -3,6 +3,7 @@ path: x/data
 layer: extension
 status: experimental
 owner: persistence
+risk: medium
 summary: High-level data topology capabilities that should not live in the stable store layer.
 
 subordinate_families:

@@ -9,7 +9,7 @@ metadata:
   read_after:
     - docs/CANONICAL_STYLE_GUIDE.md
     - specs/repo.yaml
-    - specs/agent-entrypoints.yaml
+    - specs/task-routing.yaml
   rules:
     - Add entries only for packages where the wrong package choice causes notable rework.
     - Keep start_with and avoid paths concrete and bounded.
@@ -37,19 +37,6 @@ packages:
       - x/data/file
       - store/file
     summary: App-facing file upload, download, metadata, and temporary URL transport.
-    responsibilities:
-      - HTTP file endpoints
-      - multipart request parsing
-      - tenant context extraction for file APIs
-      - streaming file responses
-    non_goals:
-      - storage backend implementation
-      - pure file interfaces
-      - app bootstrap
-    validations:
-      - go test -race -timeout 60s ./x/fileapi/...
-      - go test -timeout 20s ./x/fileapi/...
-      - go vet ./x/fileapi/...
 
   x/data/file:
     module: x/data
@@ -67,19 +54,6 @@ packages:
       - x/fileapi
       - store/file
     summary: Tenant-aware file storage and metadata implementations.
-    responsibilities:
-      - tenant-aware local and S3 storage
-      - metadata persistence
-      - path isolation
-      - backend-specific behavior
-    non_goals:
-      - HTTP transport behavior
-      - pure file contracts
-      - app bootstrap
-    validations:
-      - go test -race -timeout 60s ./x/data/file/...
-      - go test -timeout 20s ./x/data/file/...
-      - go vet ./x/data/file/...
 
   x/rest:
     module: x/rest
@@ -95,18 +69,6 @@ packages:
       - reference/standard-service
       - x/gateway
     summary: Reusable resource-interface layer for CRUD-standardized APIs.
-    responsibilities:
-      - resource specs
-      - reusable route registration helpers
-      - query and pagination conventions
-    non_goals:
-      - app bootstrap
-      - edge proxy topology
-      - business repositories
-    validations:
-      - go test -race -timeout 60s ./x/rest/...
-      - go test -timeout 20s ./x/rest/...
-      - go vet ./x/rest/...
 
   x/gateway:
     module: x/gateway
@@ -122,18 +84,6 @@ packages:
       - x/rest
       - reference/standard-service
     summary: App-facing gateway and edge transport entrypoint.
-    responsibilities:
-      - reverse proxy behavior
-      - balancing and rewrite helpers
-      - gateway-local cache and circuit behavior
-    non_goals:
-      - app bootstrap
-      - reusable CRUD conventions
-      - business gateway policy
-    validations:
-      - go test -race -timeout 60s ./x/gateway/...
-      - go test -timeout 20s ./x/gateway/...
-      - go vet ./x/gateway/...
 
   x/tenant/core:
     module: x/tenant
@@ -150,19 +100,6 @@ packages:
       - store
       - core
     summary: Tenant resolution, validation, quota, policy, and rate-limit core logic.
-    responsibilities:
-      - tenant ID validation
-      - quota decisions
-      - policy evaluation
-      - tenant context behavior
-    non_goals:
-      - stable middleware expansion
-      - generic DB abstraction
-      - app bootstrap
-    validations:
-      - go test -race -timeout 60s ./x/tenant/core/...
-      - go test -timeout 20s ./x/tenant/core/...
-      - go vet ./x/tenant/core/...
 
   x/tenant/store/db:
     module: x/tenant
@@ -178,18 +115,6 @@ packages:
       - store/db
       - core
     summary: Tenant-aware SQL adapter layer for automatic query scoping.
-    responsibilities:
-      - tenant-scoped SQL rewriting
-      - context-driven tenant extraction for DB access
-      - DB isolation helpers
-    non_goals:
-      - generic SQL store primitives
-      - app bootstrap
-      - business repositories
-    validations:
-      - go test -race -timeout 60s ./x/tenant/store/db/...
-      - go test -timeout 20s ./x/tenant/store/db/...
-      - go vet ./x/tenant/store/db/...
 
   middleware/httpmetrics:
     module: middleware
@@ -205,18 +130,6 @@ packages:
       - x/observability
       - core
     summary: Stable transport-level HTTP metrics middleware primitive.
-    responsibilities:
-      - request metrics collection
-      - response recording
-      - route-aware transport observation
-    non_goals:
-      - exporter wiring
-      - app bootstrap
-      - broad observability catalog behavior
-    validations:
-      - go test -race -timeout 60s ./middleware/httpmetrics/...
-      - go test -timeout 20s ./middleware/httpmetrics/...
-      - go vet ./middleware/httpmetrics/...
 
   middleware/requestid:
     module: middleware
@@ -232,18 +145,6 @@ packages:
       - core
       - x/observability
     summary: Stable request and trace ID propagation middleware primitive.
-    responsibilities:
-      - request ID extraction
-      - request ID generation
-      - trace ID attachment to request context and headers
-    non_goals:
-      - business-specific request policy
-      - app bootstrap
-      - metrics export wiring
-    validations:
-      - go test -race -timeout 60s ./middleware/requestid/...
-      - go test -timeout 20s ./middleware/requestid/...
-      - go vet ./middleware/requestid/...
 
   contract:
     module: contract
@@ -261,16 +162,3 @@ packages:
       - x/gateway
       - core
     summary: Stable transport contracts for responses, errors, and request metadata.
-    responsibilities:
-      - structured error shape
-      - response helpers
-      - request metadata helpers
-      - trace and observability contract helpers
-    non_goals:
-      - protocol-family gateways
-      - app bootstrap
-      - business response envelopes
-    validations:
-      - go test -race -timeout 60s ./contract/...
-      - go test -timeout 20s ./contract/...
-      - go vet ./contract/...

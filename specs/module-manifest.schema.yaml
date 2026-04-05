@@ -3,6 +3,8 @@ required:
   - path
   - layer
   - status
+  - owner
+  - risk
   - summary
   - responsibilities
   - non_goals
@@ -22,6 +24,11 @@ enums:
     - ga
     - beta
     - experimental
+  risk:
+    - low
+    - medium
+    - high
+    - critical
 
 limits:
   responsibilities_max: 7

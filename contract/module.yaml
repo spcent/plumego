@@ -3,6 +3,7 @@ path: contract
 layer: stable
 status: ga
 owner: transport
+risk: high
 summary: Request and response contracts, error model, and context helpers.
 
 strict_boundary: transport_contracts

@@ -3,6 +3,7 @@ path: store
 layer: stable
 status: ga
 owner: persistence
+risk: medium
 summary: Stable storage primitives and base abstractions. Topology-heavy cache implementations have been migrated to x/cache.
 
 strict_boundary: persistence_primitives

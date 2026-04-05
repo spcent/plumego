@@ -20,9 +20,11 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `docs/CANONICAL_STYLE_GUIDE.md`
 - `specs/repo.yaml`
-- `specs/agent-entrypoints.yaml`
-- `specs/ownership.yaml`
+- `specs/task-routing.yaml`
+- `specs/extension-taxonomy.yaml`
+- `specs/package-hotspots.yaml`
 - `specs/dependency-rules.yaml`
+- `specs/checks.yaml`
 - `specs/change-recipes/*`
 - `<模块>/module.yaml`
 
@@ -133,8 +135,8 @@ func main() {
 
 ## Agent 优先工作流
 - canonical 应用启动路径从 `reference/standard-service` 开始。
-- 机器可读的任务入口规则位于 `specs/agent-entrypoints.yaml`。
-- 模块 owner 和默认验证入口位于 `specs/ownership.yaml`。
+- 机器可读的任务入口规则位于 `specs/task-routing.yaml`。
+- 模块 owner、risk 和默认验证入口统一写在各自的 `<模块>/module.yaml` 中。
 - 标准变更 recipe 位于 `specs/change-recipes/*`。
 - 模块 primer 文档位于 `docs/modules/*`，并应与各模块 manifest 的 `doc_paths` 保持一致。
 - 次级任务族入口也已固定：前端静态资源从 `x/frontend` 开始，本地调试能力从 `x/devtools` 开始，服务发现从 `x/discovery` 开始，受保护管理端点从 `x/ops` 开始。

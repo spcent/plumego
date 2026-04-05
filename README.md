@@ -29,9 +29,11 @@ For architecture planning and future refactors, prefer the rules in:
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `docs/CANONICAL_STYLE_GUIDE.md`
 - `specs/repo.yaml`
-- `specs/agent-entrypoints.yaml`
-- `specs/ownership.yaml`
+- `specs/task-routing.yaml`
+- `specs/extension-taxonomy.yaml`
+- `specs/package-hotspots.yaml`
 - `specs/dependency-rules.yaml`
+- `specs/checks.yaml`
 - `specs/change-recipes/*`
 - `<module>/module.yaml`
 
@@ -144,8 +146,8 @@ func main() {
 
 ## Agent-First Workflow
 - Canonical app bootstrap starts from `reference/standard-service`.
-- Machine-readable discovery rules live in `specs/agent-entrypoints.yaml`.
-- Module ownership and default validation live in `specs/ownership.yaml`.
+- Machine-readable discovery rules live in `specs/task-routing.yaml`.
+- Module ownership, risk, and default validation live in each `<module>/module.yaml`.
 - Standard change recipes live in `specs/change-recipes/*`.
 - Module primers live in `docs/modules/*` and should match each manifest's `doc_paths`.
 - Secondary task-family defaults are also explicit: frontend asset work starts in `x/frontend`, local debug work starts in `x/devtools`, service discovery starts in `x/discovery`, and protected admin surfaces start in `x/ops`.

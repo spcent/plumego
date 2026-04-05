@@ -2,6 +2,8 @@ name: x/observability
 path: x/observability
 layer: extension
 status: experimental
+owner: observability
+risk: medium
 summary: The only app-facing entrypoint for broader observability adapters and export wiring; transport observability primitives remain in stable middleware packages.
 
 subordinate_families:

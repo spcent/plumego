@@ -24,7 +24,7 @@
 ## First files to read
 
 - `x/ops/module.yaml`
-- `specs/agent-entrypoints.yaml`
+- `specs/task-routing.yaml`
 - `x/ops/ops.go`
 
 ## Main risks when changing this module

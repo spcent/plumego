@@ -3,6 +3,7 @@ path: x/data/rw
 layer: extension
 status: experimental
 owner: persistence
+risk: high
 summary: Primary-replica read-write cluster orchestration with load balancing, health checking, and routing policies.
 
 responsibilities:
@@ -77,4 +78,3 @@ agent_hints:
   - Compose with x/data/sharding by passing a Cluster as each shard in the Router
   - Use ForcePrimary(ctx) when read-after-write consistency is required
   - Use PreferReplica(ctx) to override write-detecting heuristics for specific read queries
-  - Health checking is opt-in via Config.HealthCheck.Enabled

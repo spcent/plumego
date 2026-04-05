@@ -77,7 +77,7 @@ When a task card applies, read it after:
 1. `docs/CANONICAL_STYLE_GUIDE.md`
 2. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 3. `specs/repo.yaml`
-4. `specs/agent-entrypoints.yaml`
+4. `specs/task-routing.yaml`
 
 Then use the card to drive the concrete change sequence.
 

@@ -2,6 +2,8 @@ name: x/discovery
 path: x/discovery
 layer: extension
 status: experimental
+owner: edge
+risk: medium
 summary: Subordinate service discovery primitives and adapters within the x/gateway family.
 
 parent_family: x/gateway

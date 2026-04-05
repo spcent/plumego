@@ -24,8 +24,8 @@
 ## First files to read
 
 - `x/discovery/module.yaml`
-- `specs/agent-entrypoints.yaml`
-- `specs/extension-entrypoints.yaml`
+- `specs/task-routing.yaml`
+- `specs/extension-taxonomy.yaml`
 
 ## Main risks when changing this module
 

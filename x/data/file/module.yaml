@@ -3,6 +3,7 @@ path: x/data/file
 layer: extension
 status: experimental
 owner: persistence
+risk: medium
 summary: Tenant-aware file storage implementations backed by store/file interfaces.
 
 responsibilities:
@@ -57,3 +58,8 @@ review_checklist:
   - Keep transport concerns out of this module
   - Verify tenant path isolation in storage implementations
   - Keep topology decisions explicit and reviewable
+
+agent_hints:
+  - Use store/file interfaces as the stable contract and keep HTTP concerns in x/fileapi
+  - Keep tenant isolation explicit in path, metadata, and temporary URL generation
+  - Prefer adding storage backends here instead of widening stable store/file

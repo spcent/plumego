@@ -65,6 +65,10 @@ func requiredPathViolations(repoRoot string) []string {
 		"reference/with-websocket",
 		"reference/with-webhook",
 		"specs/repo.yaml",
+		"specs/checks.yaml",
+		"specs/task-routing.yaml",
+		"specs/extension-taxonomy.yaml",
+		"specs/package-hotspots.yaml",
 		"specs/dependency-rules.yaml",
 	}
 

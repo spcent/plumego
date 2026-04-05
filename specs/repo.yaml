@@ -16,24 +16,26 @@ canonical_authority:
     - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
   implementation:
     - reference/standard-service
+  routing:
+    - specs/task-routing.yaml
   taxonomy:
-    - specs/extension-entrypoints.yaml
+    - specs/extension-taxonomy.yaml
+  hotspots:
+    - specs/package-hotspots.yaml
+  dependency_rules:
+    - specs/dependency-rules.yaml
+  schemas:
+    - specs/module-manifest.schema.yaml
+  checks:
+    - specs/checks.yaml
   workflow:
-    - specs/agent-entrypoints.yaml
-    - specs/ownership.yaml
+    - specs/change-recipes
     - specs/change-recipes/add-http-endpoint.yaml
     - specs/change-recipes/add-middleware.yaml
     - specs/change-recipes/new-stable-module.yaml
     - specs/change-recipes/new-extension-module.yaml
   task_queue:
     - tasks/cards
-  notes:
-    - Reference app defines the canonical application structure
-    - reference/standard-service must depend only on stable root packages and stdlib
-    - Extension demonstrations must not define the canonical path
-    - Extension families must expose one canonical discovery entrypoint
-    - Agent workflow metadata must be machine-readable and live under specs/
-    - Repo-native execution cards live under tasks/cards
 
 layers:
   stable:
@@ -69,7 +71,6 @@ layers:
       - x/pubsub
       - x/rest
       - x/scheduler
-      - x/tenant
       - x/webhook
       - x/websocket
 
@@ -80,6 +81,7 @@ layers:
       - internal/checks
       - internal/testkit
       - internal/buildmeta
+      - scripts
 
   reference:
     description: Canonical implementations.
@@ -114,85 +116,27 @@ top_level_rules:
     - Reference apps define the canonical app structure
     - Stable roots should remain grep-friendly and narrow
 
-target_cleanup:
-  stable_layer_moves:
-    - health HTTP handlers move out of health and into reference or extensions
-    - protocol gateway adapters move out of contract and into owning extensions
-    - tenant-aware middleware stays under x/tenant, not middleware
-    - topology-heavy data features move out of stable store and into x/data or x/tenant
-    - store/cache topology migration complete; x/cache/distributed and x/cache/redis are now the canonical homes for those capabilities; do not add new topology-heavy packages under stable store/cache
-  extension_taxonomy:
-    - messaging capabilities should converge under x/messaging
-    - transport adapters should converge under their owning extension instead of broad legacy buckets
-
-x_family_taxonomy:
-  primary_families:
-    - name: x/tenant
-      role: Multi-tenant resolution, policy, quota, and tenant-aware adapters
-    - name: x/messaging
-      role: Canonical messaging entrypoint (coordinates mq, pubsub, scheduler, webhook sub-families)
-    - name: x/gateway
-      role: Reverse proxy, load balancing, service discovery, protocol edge
-    - name: x/rest
-      role: Reusable resource-interface layer, CRUD standardization
-    - name: x/websocket
-      role: WebSocket transport
-    - name: x/frontend
-      role: Frontend asset serving and SPA fallback
-    - name: x/observability
-      role: Observability adapters, export wiring, admin surfaces
-    - name: x/files
-      role: HTTP file upload/download and file storage (canonical home; x/fileapi is a deprecated predecessor)
-    - name: x/data
-      role: Data topology (read-write split, sharding, distributed cache, ML primitives)
-    - name: x/ai
-      role: AI provider abstraction, orchestration, semantic caching, streaming, tool-use
-  subordinate_families:
-    x/messaging:
-      - x/mq        # queue primitive
-      - x/pubsub    # pub-sub primitive
-      - x/scheduler # task scheduling
-      - x/webhook   # webhook receiver
-    x/gateway:
-      - x/discovery # service discovery
-      - x/ipc       # in-process transport
-    x/observability:
-      - x/ops       # protected admin endpoints
-      - x/devtools  # local debug routes
-    x/data:
-      - x/cache     # distributed cache and Redis adapters
-  agent_routing:
-    - intent: "Change kernel, lifecycle, route structure, transport contracts, transport middleware, auth primitives, storage primitives"
-      destination: stable root
-      packages: [core, router, contract, middleware, security, store, health, log, metrics]
-    - intent: "Change product capability, business feature, protocol adaptation, extension behavior"
-      destination: "x/*"
-      start_with_primary_family: true
-    - intent: "Change application wiring, bootstrap, dependency injection, route registration"
-      destination: reference/scaffold
-      paths: [reference/standard-service, internal/scaffold]
-    - intent: "Change architecture rules, boundary definitions, quality gates, machine-readable specs"
-      destination: specs/
-    - intent: "Change execution plan, work items, task sequencing"
-      destination: tasks/cards/
-
 agent_workflow:
   machine_readable_sources:
-    - specs/agent-entrypoints.yaml
-    - specs/ownership.yaml
+    - specs/task-routing.yaml
+    - specs/extension-taxonomy.yaml
+    - specs/package-hotspots.yaml
+    - specs/dependency-rules.yaml
+    - specs/module-manifest.schema.yaml
+    - specs/checks.yaml
     - specs/change-recipes
   execution_queue:
     - tasks/cards
   required_steps:
     - Identify target layer and module
     - Read canonical style and reference app when shaping app structure
-    - Read specs/agent-entrypoints.yaml for discovery defaults
-    - Read tasks/cards when the work should follow a repo-native task card
-    - Read target module manifest
-    - Keep changes within one module when possible
+    - Read specs/task-routing.yaml for discovery defaults
+    - Read specs/package-hotspots.yaml when package choice is ambiguous
+    - Read the target module manifest
+    - Keep changes within one primary module when possible
     - Run module tests first
     - Run boundary checks second
-    - Run reference smoke checks last
+    - Run repo-wide checks last
   defaults:
     max_primary_modules_per_change: 1
     max_files_per_card: 5

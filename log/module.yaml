@@ -3,6 +3,7 @@ path: log
 layer: stable
 status: ga
 owner: runtime
+risk: medium
 summary: Logging interfaces and base implementations.
 
 strict_boundary: logging

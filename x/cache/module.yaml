@@ -3,6 +3,7 @@ path: x/cache
 layer: extension
 status: experimental
 owner: platform
+risk: medium
 summary: Subordinate extension-layer cache adapters and topology-heavy cache implementations within the x/data family.
 
 parent_family: x/data

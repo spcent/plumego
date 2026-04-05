@@ -2,6 +2,8 @@ name: x/pubsub
 path: x/pubsub
 layer: extension
 status: experimental
+owner: messaging
+risk: medium
 summary: Subordinate in-process publish-subscribe primitives used by x/messaging, x/webhook, and local debugging support.
 
 parent_family: x/messaging

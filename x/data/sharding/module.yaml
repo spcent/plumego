@@ -3,6 +3,7 @@ path: x/data/sharding
 layer: extension
 status: experimental
 owner: persistence
+risk: high
 summary: Database sharding router that distributes SQL queries across multiple rw.Cluster shards using configurable strategies and cross-shard policies.
 
 responsibilities:
@@ -78,4 +79,3 @@ agent_hints:
   - Build each shard as an rw.Cluster and pass the slice to NewRouter
   - Use CrossShardDeny (the default) unless you explicitly need fan-out reads
   - Use BeginTxOnShard when the transaction's shard is known at call time
-  - Dynamic config changes are available under x/data/sharding/config

@@ -2,6 +2,8 @@ name: x/ops
 path: x/ops
 layer: extension
 status: experimental
+owner: observability
+risk: medium
 summary: Subordinate protected operations endpoints for queues, receipts, and runtime diagnostics within the x/observability family.
 
 parent_family: x/observability

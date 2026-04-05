@@ -87,9 +87,9 @@ modules:
     allow:
       - stdlib
       - contract
+      - middleware
     deny:
       - core/**
-      - middleware/**
       - security/**
       - store/**
       - x/**
@@ -119,10 +119,14 @@ modules:
       - stdlib
       - contract
       - log
+      - store/kv
     deny:
       - core/**
       - router/**
-      - store/**
+      - store/db/**
+      - store/file/**
+      - store/cache/**
+      - store/idempotency/**
       - x/**
       - reference/**
       - cmd/**

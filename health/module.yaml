@@ -3,6 +3,7 @@ path: health
 layer: stable
 status: ga
 owner: runtime
+risk: medium
 summary: Health models and readiness helpers, not an HTTP endpoint package.
 
 strict_boundary: health_models

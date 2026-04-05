@@ -3,6 +3,7 @@ path: x/ai
 layer: extension
 status: experimental
 owner: ai-gateway
+risk: high
 summary: AI gateway capabilities including providers, sessions, streaming, tools, and resilience helpers.
 
 responsibilities:

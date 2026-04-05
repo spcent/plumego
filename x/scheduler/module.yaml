@@ -2,6 +2,8 @@ name: x/scheduler
 path: x/scheduler
 layer: extension
 status: experimental
+owner: messaging
+risk: medium
 summary: Subordinate in-process scheduling primitives for cron, delayed jobs, and retries within the broader x/messaging capability family.
 
 parent_family: x/messaging

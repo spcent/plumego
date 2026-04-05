@@ -2,6 +2,8 @@ name: x/mq
 path: x/mq
 layer: extension
 status: experimental
+owner: messaging
+risk: medium
 summary: Subordinate durable queue primitives and worker coordination used by the broader x/messaging capability pack.
 
 parent_family: x/messaging

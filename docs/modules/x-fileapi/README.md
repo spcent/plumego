@@ -26,7 +26,7 @@
 
 - `x/fileapi/module.yaml`
 - `x/fileapi/handler.go`
-- `specs/agent-entrypoints.yaml`
+- `specs/task-routing.yaml`
 
 ## Main risks when changing this module
 

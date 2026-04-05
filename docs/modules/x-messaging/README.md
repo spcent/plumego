@@ -25,7 +25,7 @@
 
 - `x/messaging/module.yaml`
 - `x/messaging/entrypoints.go`
-- `specs/extension-entrypoints.yaml`
+- `specs/extension-taxonomy.yaml`
 
 ## Main risks when changing this module
 

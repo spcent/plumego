@@ -2,6 +2,8 @@ name: x/devtools
 path: x/devtools
 layer: extension
 status: experimental
+owner: observability
+risk: medium
 summary: Subordinate debug-only routes, env reload helpers, and local profiling within the x/observability family.
 
 parent_family: x/observability

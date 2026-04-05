@@ -1,0 +1,212 @@
+version: 1
+
+routing_rules:
+  stable_root_work:
+    intent: Change kernel, lifecycle, route structure, transport contracts, transport middleware, auth primitives, or storage primitives.
+    destination: stable
+    packages:
+      - core
+      - router
+      - contract
+      - middleware
+      - security
+      - store
+      - health
+      - log
+      - metrics
+
+  extension_work:
+    intent: Change product capability, business feature, protocol adaptation, or extension behavior.
+    destination: extension
+    primary_families:
+      - x/tenant
+      - x/fileapi
+      - x/messaging
+      - x/gateway
+      - x/rest
+      - x/websocket
+      - x/frontend
+      - x/observability
+      - x/data
+      - x/ai
+
+  app_wiring:
+    intent: Change application wiring, bootstrap shape, dependency injection, or route registration.
+    destination: reference
+    paths:
+      - reference/standard-service
+      - cmd/plumego/internal/scaffold
+
+  repo_rules:
+    intent: Change architecture rules, boundary definitions, quality gates, or machine-readable specs.
+    destination: specs
+
+  task_queue:
+    intent: Change execution plan, work items, or task sequencing.
+    destination: tasks/cards
+
+tasks:
+  package_hotspots:
+    start_with:
+      - specs/package-hotspots.yaml
+      - specs/task-routing.yaml
+
+  file_api:
+    start_with:
+      - x/fileapi/module.yaml
+      - docs/modules/x-fileapi/README.md
+      - x/fileapi/handler.go
+    avoid:
+      - store/file
+      - x/data/file
+
+  app_bootstrap:
+    start_with:
+      - docs/CANONICAL_STYLE_GUIDE.md
+      - specs/repo.yaml
+      - reference/standard-service/main.go
+      - reference/standard-service/internal/app/app.go
+      - reference/standard-service/internal/app/routes.go
+    avoid:
+      - x/rest
+      - x/gateway
+      - x/webhook
+
+  http_endpoint:
+    start_with:
+      - docs/CANONICAL_STYLE_GUIDE.md
+      - reference/standard-service/internal/app/routes.go
+      - contract/module.yaml
+      - router/module.yaml
+    avoid:
+      - middleware
+
+  middleware:
+    start_with:
+      - middleware/module.yaml
+      - docs/modules/middleware/README.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+    avoid:
+      - core
+      - contract
+
+  security:
+    start_with:
+      - security/module.yaml
+      - docs/modules/security/README.md
+      - AGENTS.md
+    avoid:
+      - middleware
+      - x/tenant
+
+  store:
+    start_with:
+      - store/module.yaml
+      - docs/modules/store/README.md
+      - specs/repo.yaml
+    avoid:
+      - x/tenant
+      - x/data
+
+  gateway_edge_transport:
+    start_with:
+      - x/gateway/module.yaml
+      - x/gateway/entrypoints.go
+      - specs/extension-taxonomy.yaml
+    avoid:
+      - x/rest
+      - reference/standard-service
+
+  resource_api_standardization:
+    start_with:
+      - x/rest/module.yaml
+      - x/rest/README.md
+      - x/rest/spec.go
+      - x/rest/entrypoints.go
+    avoid:
+      - core
+      - x/gateway
+
+  messaging:
+    start_with:
+      - x/messaging/module.yaml
+      - x/messaging/entrypoints.go
+      - specs/extension-taxonomy.yaml
+    avoid:
+      - x/mq
+      - x/pubsub
+      - x/webhook
+
+  tenant:
+    start_with:
+      - x/tenant/module.yaml
+      - docs/modules/x-tenant/README.md
+      - docs/architecture/X_TENANT_BLUEPRINT.md
+    avoid:
+      - middleware
+      - store
+      - core
+
+  websocket:
+    start_with:
+      - x/websocket/module.yaml
+      - docs/modules/x-websocket/README.md
+      - x/websocket/websocket.go
+    avoid:
+      - core
+      - router
+
+  frontend_asset_serving:
+    start_with:
+      - x/frontend/module.yaml
+      - docs/modules/x-frontend/README.md
+      - reference/standard-service
+    avoid:
+      - core
+      - router
+
+  devtools_local_debug:
+    start_with:
+      - x/devtools/module.yaml
+      - x/devtools/devtools.go
+      - README.md
+    avoid:
+      - core
+      - reference/standard-service
+
+  service_discovery:
+    start_with:
+      - x/discovery/module.yaml
+      - specs/extension-taxonomy.yaml
+      - specs/repo.yaml
+    avoid:
+      - core
+      - store
+
+  ops_admin_surface:
+    start_with:
+      - x/ops/module.yaml
+      - x/observability/module.yaml
+      - specs/extension-taxonomy.yaml
+    avoid:
+      - health
+      - core
+
+  observability_admin:
+    start_with:
+      - x/observability/module.yaml
+      - x/ops/module.yaml
+    avoid:
+      - core
+      - health
+
+  scaffold:
+    start_with:
+      - cmd/plumego/commands/new.go
+      - cmd/plumego/internal/scaffold/scaffold.go
+      - reference/standard-service
+    avoid:
+      - reference/with-messaging
+      - reference/with-gateway
+      - reference/with-websocket
+      - reference/with-webhook
