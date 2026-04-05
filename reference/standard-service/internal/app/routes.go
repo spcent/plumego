@@ -9,10 +9,20 @@ func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "plumego-reference"}
 
-	a.Core.Get("/", api.Hello)
-	a.Core.Get("/healthz", health.Live)
-	a.Core.Get("/readyz", health.Ready)
-	a.Core.Get("/api/hello", api.Hello)
-	a.Core.Get("/api/status", api.Status)
+	if err := a.Core.Get("/", api.Hello); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/healthz", health.Live); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", health.Ready); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/hello", api.Hello); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/status", api.Status); err != nil {
+		return err
+	}
 	return nil
 }

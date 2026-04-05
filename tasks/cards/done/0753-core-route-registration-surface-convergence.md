@@ -62,3 +62,20 @@ Done Definition:
 - Canonical docs describe a single preferred registration model.
 
 Outcome:
+- Removed the silent log-only registration helpers from `core/routing.go`.
+- Changed `Get` / `Post` / `Put` / `Delete` / `Patch` / `Any` / `Handle` /
+  `HandleFunc` and named variants to return explicit registration errors.
+- Updated `core` tests to treat method helpers as the canonical strict wiring
+  path and added coverage that duplicate and post-start registration failures
+  surface through those helpers.
+- Migrated first-party route wiring in the reference apps, dev dashboard, and
+  scaffold templates to handle registration errors explicitly.
+- Updated `docs/CANONICAL_STYLE_GUIDE.md` so canonical route wiring returns
+  registration errors while keeping one method + path + handler per line.
+- Validation:
+  - `gofmt -w core/routing.go core/test_helpers_test.go core/lifecycle_test.go core/app_test.go core/options_test.go core/routing_test.go cmd/plumego/internal/devserver/dashboard.go cmd/plumego/internal/scaffold/scaffold.go reference/standard-service/internal/app/routes.go reference/with-gateway/internal/app/routes.go reference/with-messaging/internal/app/routes.go reference/with-webhook/internal/app/routes.go reference/with-websocket/internal/app/routes.go`
+  - `go test -race -timeout 60s ./core/...`
+  - `go test -timeout 20s ./reference/...`
+  - `go test -timeout 20s ./internal/scaffold/... ./internal/devserver/...` (run from `cmd/plumego/`)
+  - `go vet ./core/... ./reference/...`
+  - `go vet ./internal/scaffold/... ./internal/devserver/...` (run from `cmd/plumego/`)

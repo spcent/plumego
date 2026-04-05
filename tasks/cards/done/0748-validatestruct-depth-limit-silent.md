@@ -115,3 +115,13 @@ Done Definition:
   when the depth limit is hit, instead of returning nil.
 - The new test passes.
 - All existing validation tests pass unchanged.
+
+Outcome:
+- Completed by converting the silent depth-limit success path into a
+  `validationErrors` return with `Code: "max_depth_exceeded"` and adding a
+  focused regression test for an 11-level nested struct.
+
+Validation Run:
+- `gofmt -w contract/validation.go contract/active_cards_regression_test.go`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

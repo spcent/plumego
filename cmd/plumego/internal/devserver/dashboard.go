@@ -3,6 +3,7 @@ package devserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -124,7 +125,9 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	d.runner.SetOutputPassthrough(cfg.OutputPassthrough)
 
 	// Register routes
-	d.registerRoutes(cfg.UIPath)
+	if err := d.registerRoutes(cfg.UIPath); err != nil {
+		return nil, fmt.Errorf("register dashboard routes: %w", err)
+	}
 
 	// Subscribe to events and broadcast to WebSocket
 	d.subscribeEvents()
@@ -132,10 +135,10 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	return d, nil
 }
 
-// registerRoutes sets up HTTP routes
-func (d *Dashboard) registerRoutes(uiPath string) {
+// registerRoutes sets up HTTP routes.
+func (d *Dashboard) registerRoutes(uiPath string) error {
 	// WebSocket endpoint for real-time events
-	d.app.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
+	if err := d.app.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		// Use ServeWSWithAuth to handle WebSocket upgrade
 		websocket.ServeWSWithAuth(
 			w, r,
@@ -145,29 +148,63 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 			5*time.Second,
 			websocket.SendBlock, // Block on send
 		)
-	})
+	}); err != nil {
+		return fmt.Errorf("register /ws: %w", err)
+	}
 
 	// API endpoints (without Group - register directly)
 	adaptCtx := func(handler contract.CtxHandlerFunc) http.HandlerFunc {
 		return contract.AdaptCtxHandler(handler, d.app.Logger()).ServeHTTP
 	}
 
-	d.app.Get("/api/info", adaptCtx(d.handleInfo))
-	d.app.Get("/api/status", adaptCtx(d.handleStatus))
-	d.app.Get("/api/health", adaptCtx(d.handleHealth))
-	d.app.Get("/api/routes", adaptCtx(d.handleRoutes))
-	d.app.Get("/api/config", adaptCtx(d.handleConfig))
-	d.app.Get("/api/config/edit", adaptCtx(d.handleConfigEditGet))
-	d.app.Post("/api/config/edit", adaptCtx(d.handleConfigEditSave))
-	d.app.Get("/api/metrics", adaptCtx(d.handleMetrics))
-	d.app.Post("/api/metrics/clear", adaptCtx(d.handleMetricsClear))
-	d.app.Get("/api/deps", adaptCtx(d.handleDeps))
-	d.app.Get("/api/pprof/types", adaptCtx(d.handlePprofTypes))
-	d.app.Get("/api/pprof/raw", adaptCtx(d.handlePprofRaw))
-	d.app.Post("/api/test", adaptCtx(d.handleAPITest))
-	d.app.Post("/api/build", adaptCtx(d.handleBuild))
-	d.app.Post("/api/restart", adaptCtx(d.handleRestart))
-	d.app.Post("/api/stop", adaptCtx(d.handleStop))
+	if err := d.app.Get("/api/info", adaptCtx(d.handleInfo)); err != nil {
+		return fmt.Errorf("register /api/info: %w", err)
+	}
+	if err := d.app.Get("/api/status", adaptCtx(d.handleStatus)); err != nil {
+		return fmt.Errorf("register /api/status: %w", err)
+	}
+	if err := d.app.Get("/api/health", adaptCtx(d.handleHealth)); err != nil {
+		return fmt.Errorf("register /api/health: %w", err)
+	}
+	if err := d.app.Get("/api/routes", adaptCtx(d.handleRoutes)); err != nil {
+		return fmt.Errorf("register /api/routes: %w", err)
+	}
+	if err := d.app.Get("/api/config", adaptCtx(d.handleConfig)); err != nil {
+		return fmt.Errorf("register /api/config: %w", err)
+	}
+	if err := d.app.Get("/api/config/edit", adaptCtx(d.handleConfigEditGet)); err != nil {
+		return fmt.Errorf("register /api/config/edit GET: %w", err)
+	}
+	if err := d.app.Post("/api/config/edit", adaptCtx(d.handleConfigEditSave)); err != nil {
+		return fmt.Errorf("register /api/config/edit POST: %w", err)
+	}
+	if err := d.app.Get("/api/metrics", adaptCtx(d.handleMetrics)); err != nil {
+		return fmt.Errorf("register /api/metrics: %w", err)
+	}
+	if err := d.app.Post("/api/metrics/clear", adaptCtx(d.handleMetricsClear)); err != nil {
+		return fmt.Errorf("register /api/metrics/clear: %w", err)
+	}
+	if err := d.app.Get("/api/deps", adaptCtx(d.handleDeps)); err != nil {
+		return fmt.Errorf("register /api/deps: %w", err)
+	}
+	if err := d.app.Get("/api/pprof/types", adaptCtx(d.handlePprofTypes)); err != nil {
+		return fmt.Errorf("register /api/pprof/types: %w", err)
+	}
+	if err := d.app.Get("/api/pprof/raw", adaptCtx(d.handlePprofRaw)); err != nil {
+		return fmt.Errorf("register /api/pprof/raw: %w", err)
+	}
+	if err := d.app.Post("/api/test", adaptCtx(d.handleAPITest)); err != nil {
+		return fmt.Errorf("register /api/test: %w", err)
+	}
+	if err := d.app.Post("/api/build", adaptCtx(d.handleBuild)); err != nil {
+		return fmt.Errorf("register /api/build: %w", err)
+	}
+	if err := d.app.Post("/api/restart", adaptCtx(d.handleRestart)); err != nil {
+		return fmt.Errorf("register /api/restart: %w", err)
+	}
+	if err := d.app.Post("/api/stop", adaptCtx(d.handleStop)); err != nil {
+		return fmt.Errorf("register /api/stop: %w", err)
+	}
 
 	// Static UI files
 	router := d.app.Router()
@@ -187,6 +224,8 @@ func (d *Dashboard) registerRoutes(uiPath string) {
 			frontend.WithIndex("index.html"),
 		)
 	}
+
+	return nil
 }
 
 // subscribeEvents subscribes to all events and broadcasts to WebSocket
@@ -221,9 +260,20 @@ func (d *Dashboard) subscribeEvents() {
 func (d *Dashboard) Start(ctx context.Context) error {
 	// Note: WebSocket hub workers are automatically started in NewHub()
 
+	if err := d.app.Prepare(); err != nil {
+		return fmt.Errorf("prepare dashboard app: %w", err)
+	}
+	if err := d.app.Start(ctx); err != nil {
+		return fmt.Errorf("start dashboard app: %w", err)
+	}
+	srv, err := d.app.Server()
+	if err != nil {
+		return fmt.Errorf("get dashboard server: %w", err)
+	}
+
 	// Start the dashboard server in background
 	go func() {
-		if err := d.app.Boot(); err != nil {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			fmt.Printf("Dashboard server error: %v\n", err)
 		}
 	}()
@@ -270,13 +320,18 @@ func (d *Dashboard) subscribeLifecycleForInfo() {
 func (d *Dashboard) Stop(ctx context.Context) error {
 	// Stop the runner if running
 	if d.runner.IsRunning() {
-		d.runner.Stop()
+		if err := d.runner.Stop(); err != nil {
+			return fmt.Errorf("stop dashboard runner: %w", err)
+		}
 	}
 
 	// Stop WebSocket hub
 	d.hub.Stop()
 
-	// Note: core.App doesn't have Shutdown method, server stops when main exits
+	if err := d.app.Shutdown(ctx); err != nil {
+		return fmt.Errorf("shutdown dashboard app: %w", err)
+	}
+
 	return nil
 }
 
@@ -446,7 +501,7 @@ func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 		return
 	}
 
-	config, err := d.analyzer.GetAppInfo()
+	snapshot, err := d.analyzer.GetAppSnapshot()
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, map[string]any{
 			"error": "Could not fetch config: " + err.Error(),
@@ -454,7 +509,7 @@ func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, config)
+	ctx.JSON(http.StatusOK, snapshot)
 }
 
 func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {

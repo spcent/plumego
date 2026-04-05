@@ -240,8 +240,9 @@ type TransportConfig struct {
 
 ```go
 import (
-    "github.com/spcent/plumego/middleware/proxy"
+    "context"
     "github.com/spcent/plumego/core"
+    "github.com/spcent/plumego/middleware/proxy"
 )
 
 app := core.New()
@@ -255,16 +256,30 @@ app.Use("/api/users/*", proxy.New(proxy.Config{
     LoadBalancer: proxy.RoundRobin(),
 }))
 
-app.Boot()
+if err := app.Prepare(); err != nil {
+    panic(err)
+}
+if err := app.Start(context.Background()); err != nil {
+    panic(err)
+}
+srv, err := app.Server()
+if err != nil {
+    panic(err)
+}
+defer app.Shutdown(context.Background())
+if err := srv.ListenAndServe(); err != nil {
+    panic(err)
+}
 ```
 
 ### With Service Discovery
 
 ```go
 import (
+    "context"
+    "github.com/spcent/plumego/core"
     "github.com/spcent/plumego/middleware/proxy"
     "github.com/spcent/plumego/x/discovery"
-    "github.com/spcent/plumego/core"
 )
 
 // Create Consul discovery client
@@ -280,7 +295,20 @@ app.Use("/api/orders/*", proxy.New(proxy.Config{
     PathRewrite: proxy.StripPrefix("/api/orders"),
 }))
 
-app.Boot()
+if err := app.Prepare(); err != nil {
+    panic(err)
+}
+if err := app.Start(context.Background()); err != nil {
+    panic(err)
+}
+srv, err := app.Server()
+if err != nil {
+    panic(err)
+}
+defer app.Shutdown(context.Background())
+if err := srv.ListenAndServe(); err != nil {
+    panic(err)
+}
 ```
 
 ### With Request/Response Modification

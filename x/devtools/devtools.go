@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/internal/config"
 	"github.com/spcent/plumego/log"
@@ -47,7 +48,7 @@ type DevTools struct {
 }
 
 type Hooks struct {
-	ConfigSnapshot   func() map[string]any
+	Snapshot         func() core.RuntimeSnapshot
 	MiddlewareList   func() []string
 	AttachDevMetrics func(*metrics.DevCollector)
 }
@@ -86,12 +87,12 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 	}))
 
 	r.Get("/_config", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		_ = contract.WriteResponse(w, req, http.StatusOK, c.configSnapshot(), nil)
+		_ = contract.WriteResponse(w, req, http.StatusOK, c.snapshotMap(), nil)
 	}))
 
 	r.Get("/_info", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
-			"config": c.configSnapshot(),
+			"config": c.snapshotMap(),
 			"build":  health.GetBuildInfo(),
 		}
 		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
@@ -117,7 +118,7 @@ func (c *DevTools) RegisterRoutes(r *router.Router) {
 	}))
 
 	r.Get(DevToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		_ = contract.WriteResponse(w, req, http.StatusOK, c.configSnapshot(), nil)
+		_ = contract.WriteResponse(w, req, http.StatusOK, c.snapshotMap(), nil)
 	}))
 
 	r.Get(DevToolsMetricsPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -275,9 +276,37 @@ func (c *DevTools) middlewareList() []string {
 	return c.hooks.MiddlewareList()
 }
 
-func (c *DevTools) configSnapshot() map[string]any {
-	if c.hooks.ConfigSnapshot == nil {
-		return map[string]any{"debug": c.debug}
+func (c *DevTools) snapshot() core.RuntimeSnapshot {
+	if c.hooks.Snapshot != nil {
+		return c.hooks.Snapshot()
 	}
-	return c.hooks.ConfigSnapshot()
+	return core.RuntimeSnapshot{
+		Debug:   c.debug,
+		EnvFile: c.envFile,
+	}
+}
+
+func (c *DevTools) snapshotMap() map[string]any {
+	snapshot := c.snapshot()
+	return map[string]any{
+		"addr":                snapshot.Addr,
+		"debug":               snapshot.Debug,
+		"env_file":            snapshot.EnvFile,
+		"shutdown_timeout":    snapshot.ShutdownTimeout,
+		"read_timeout":        snapshot.ReadTimeout,
+		"read_header_timeout": snapshot.ReadHeaderTimeout,
+		"write_timeout":       snapshot.WriteTimeout,
+		"idle_timeout":        snapshot.IdleTimeout,
+		"max_header_bytes":    snapshot.MaxHeaderBytes,
+		"http2_enabled":       snapshot.HTTP2Enabled,
+		"drain_interval":      snapshot.DrainInterval,
+		"started":             snapshot.Started,
+		"config_frozen":       snapshot.ConfigFrozen,
+		"server_prepared":     snapshot.ServerPrepared,
+		"tls": map[string]any{
+			"enabled":   snapshot.TLS.Enabled,
+			"cert_file": snapshot.TLS.CertFile,
+			"key_file":  snapshot.TLS.KeyFile,
+		},
+	}
 }

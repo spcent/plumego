@@ -20,6 +20,9 @@ type App struct {
 	router          *router.Router       // HTTP router
 	middlewareChain *middleware.Chain    // Middleware pipeline for all routes
 	logger          log.StructuredLogger // Logger instance
+	// Declarative router option state applied to both default and custom routers.
+	hasRouterMethodNotAllowed bool
+	routerMethodNotAllowed    bool
 
 	// Runtime state (protected by mutex)
 	mu             sync.RWMutex
@@ -70,9 +73,7 @@ func New(options ...Option) *App {
 		opt(app)
 	}
 
-	if app.router != nil {
-		app.router.SetLogger(app.logger)
-	}
+	app.syncRouterConfig(app.router, app.logger, app.hasRouterMethodNotAllowed, app.routerMethodNotAllowed)
 
 	return app
 }

@@ -9,7 +9,7 @@ import (
 
 // RegisterRoutes wires all HTTP routes for the with-websocket demo.
 func (a *App) RegisterRoutes() error {
-	a.Core.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	if err := a.Core.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 			"status":    "ok",
 			"service":   "with-websocket",
@@ -17,7 +17,9 @@ func (a *App) RegisterRoutes() error {
 		}, nil); err != nil {
 			http.Error(w, "encoding error", http.StatusInternalServerError)
 		}
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Register WebSocket upgrade and broadcast routes via the ws.Server helper.
 	a.WS.RegisterRoutes(a.Core.Router())

@@ -95,11 +95,9 @@ func (d *Dashboard) resolveConfigEditPath() (string, string, error) {
 	envFile := defaultConfigEditFile
 
 	if d.runner.IsRunning() {
-		if config, err := d.analyzer.GetAppInfo(); err == nil {
-			if raw, ok := config["env_file"]; ok {
-				if path, ok := raw.(string); ok && strings.TrimSpace(path) != "" {
-					envFile = strings.TrimSpace(path)
-				}
+		if snapshot, err := d.analyzer.GetAppSnapshot(); err == nil {
+			if path := strings.TrimSpace(snapshot.EnvFile); path != "" {
+				envFile = path
 			}
 		}
 	}

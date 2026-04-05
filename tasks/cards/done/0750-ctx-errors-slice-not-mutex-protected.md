@@ -122,3 +122,13 @@ Done Definition:
 - `Error` and `CollectedErrors` hold `c.mu` when reading or writing `c.errors`.
 - `go test -race ./contract/...` passes with no data-race warnings.
 - All existing tests pass.
+
+Outcome:
+- Completed by guarding `c.errors` with the existing `c.mu` mutex in both
+  `Error` and `CollectedErrors`, plus a concurrent regression test that passes
+  under the race detector.
+
+Validation Run:
+- `gofmt -w contract/context_core.go contract/context_abort_test.go`
+- `go test -race -timeout 60s ./contract/...`
+- `go vet ./contract/...`

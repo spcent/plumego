@@ -9,7 +9,7 @@ import (
 
 // RegisterRoutes wires all HTTP routes for the with-gateway demo.
 func (a *App) RegisterRoutes() error {
-	a.Core.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	if err := a.Core.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 			"status":    "ok",
 			"service":   "with-gateway",
@@ -17,10 +17,14 @@ func (a *App) RegisterRoutes() error {
 		}, nil); err != nil {
 			http.Error(w, "encoding error", http.StatusInternalServerError)
 		}
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Proxy all /proxy/* requests to the configured backend.
-	a.Core.Any("/proxy/*", a.Proxy.ServeHTTP)
+	if err := a.Core.Any("/proxy/*", a.Proxy.ServeHTTP); err != nil {
+		return err
+	}
 
 	return nil
 }

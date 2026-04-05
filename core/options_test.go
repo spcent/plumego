@@ -158,9 +158,9 @@ func TestNewDefaultsToNoOpLogger(t *testing.T) {
 func TestRequestIDMiddleware(t *testing.T) {
 	app := New()
 	app.Use(requestid.Middleware())
-	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
@@ -173,9 +173,9 @@ func TestRequestIDMiddleware(t *testing.T) {
 
 func TestWithMethodNotAllowed(t *testing.T) {
 	app := New(WithMethodNotAllowed(true))
-	app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/only", nil)
@@ -186,6 +186,57 @@ func TestWithMethodNotAllowed(t *testing.T) {
 	}
 	if rec.Header().Get("Allow") != http.MethodGet {
 		t.Fatalf("expected Allow header to include GET")
+	}
+}
+
+func TestWithMethodNotAllowedOrderIndependentWithCustomRouter(t *testing.T) {
+	makeApp := func(opts ...Option) *App {
+		app := New(opts...)
+		mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		return app
+	}
+
+	testCases := []struct {
+		name string
+		opts []Option
+	}{
+		{
+			name: "before custom router",
+			opts: []Option{
+				WithMethodNotAllowed(true),
+				WithRouter(router.NewRouter()),
+			},
+		},
+		{
+			name: "after custom router",
+			opts: []Option{
+				WithRouter(router.NewRouter()),
+				WithMethodNotAllowed(true),
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			app := makeApp(tt.opts...)
+
+			if !app.Router().MethodNotAllowedEnabled() {
+				t.Fatal("expected custom router to have method-not-allowed enabled")
+			}
+
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/only", nil)
+			app.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Fatalf("expected 405, got %d", rec.Code)
+			}
+			if rec.Header().Get("Allow") != http.MethodGet {
+				t.Fatalf("expected Allow header to include GET")
+			}
+		})
 	}
 }
 

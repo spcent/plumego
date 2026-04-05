@@ -34,6 +34,10 @@
 - `New`
 - `App`
 - `Option`
+- `(*App).Prepare`
+- `(*App).Start`
+- `(*App).Server`
+- `(*App).Shutdown`
 
 ## Main risks when changing this module
 
@@ -45,5 +49,7 @@
 
 - keep bootstrap explicit
 - keep lifecycle behavior reviewable
+- keep one canonical lifecycle path: `Prepare` + `Start` + `Server` + `Shutdown`
+- treat router-affecting options as declarative app construction input, not eager side effects
 - push feature-specific wiring back to app-local code or the owning extension
 - preserve `net/http` compatibility while keeping `core` as a kernel

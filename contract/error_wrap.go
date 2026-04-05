@@ -52,10 +52,12 @@ func NewWrappedError(err error, operation, module string, params map[string]any)
 }
 
 // WrapError wraps an existing error with additional context.
-// If err is already a *WrappedErrorWithContext, the inner operation/module take
-// precedence and outer calls only fill fields that were previously empty.
-// This preserves the original failure location; outer callers can still inspect
-// the wrapped error chain via errors.Is/errors.As.
+// If err is already a *WrappedErrorWithContext, inner fields take precedence:
+//   - Operation and Module: inner value is used if non-empty; outer is the fallback.
+//   - Params: inner keys win; outer keys are added only if not already present.
+//
+// This preserves the original failure-site context. The intermediate wrapper is
+// flattened — the returned error's Unwrap chain is: result -> inner.Err.
 func WrapError(err error, operation, module string, params map[string]any) error {
 	if err == nil {
 		return nil
@@ -69,7 +71,9 @@ func WrapError(err error, operation, module string, params map[string]any) error
 				mergedParams[k] = v
 			}
 			for k, v := range params {
-				mergedParams[k] = v
+				if _, exists := mergedParams[k]; !exists {
+					mergedParams[k] = v
+				}
 			}
 		}
 

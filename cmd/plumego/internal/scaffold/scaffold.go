@@ -183,7 +183,9 @@ func New() *core.App {
 	); err != nil {
 		log.Fatal(err)
 	}
-	registerRoutes(app)
+	if err := registerRoutes(app); err != nil {
+		log.Fatal(err)
+	}
 	return app
 }
 
@@ -203,18 +205,26 @@ import (
 )
 
 // registerRoutes wires all HTTP routes with explicit handler construction.
-func registerRoutes(app *core.App) {
-	app.Get("/healthz", handlers.Health)
+func registerRoutes(app *core.App) error {
+	if err := app.Get("/healthz", handlers.Health); err != nil {
+		return err
+	}
 
 	// Wire user domain: repository → service → handler.
 	userRepo := userdom.NewMemRepository()
 	userSvc := userdom.NewService(userRepo)
 	userH := handlers.UserHandler{Service: userSvc}
 
-	api := app.Router().Group("/api/v1")
-	api.Get("/users", userH.List)
-	api.Get("/users/:id", userH.Get)
-	api.Post("/users", userH.Create)
+	if err := app.Get("/api/v1/users", userH.List); err != nil {
+		return err
+	}
+	if err := app.Get("/api/v1/users/:id", userH.Get); err != nil {
+		return err
+	}
+	if err := app.Post("/api/v1/users", userH.Create); err != nil {
+		return err
+	}
+	return nil
 }
 `, module, module)
 	case "health.go":
@@ -688,10 +698,18 @@ func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "%s"}
 
-	a.Core.Get("/", api.Hello)
-	a.Core.Get("/healthz", health.Live)
-	a.Core.Get("/readyz", health.Ready)
-	a.Core.Get("/api/hello", api.Hello)
+	if err := a.Core.Get("/", api.Hello); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/healthz", health.Live); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", health.Ready); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/hello", api.Hello); err != nil {
+		return err
+	}
 	return nil
 }
 `, module, name)
@@ -909,11 +927,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	app.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	if err := app.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(` + "`" + `{"status":"ok"}` + "`" + `))
-	})
+	}); err != nil {
+		log.Fatal(err)
+	}
 
 	if err := http.ListenAndServe(":8080", app); err != nil {
 		log.Fatal(err)

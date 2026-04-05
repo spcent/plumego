@@ -61,3 +61,19 @@ Done Definition:
 - Lifecycle tests cover the canonical path and pass.
 
 Outcome:
+- Removed `Boot` and `Run` from `core/lifecycle.go`, and deleted the now-dead
+  internal signal-watcher helper tied to that legacy flow.
+- Migrated `cmd/plumego/internal/devserver/dashboard.go` to the explicit
+  `Prepare` + `Start` + `Server` + `Shutdown` lifecycle path.
+- Reworked lifecycle tests to exercise the canonical explicit path instead of
+  `Boot`.
+- Updated startup guidance in `README.md`, `README_CN.md`,
+  `docs/getting-started.md`, and `docs/modules/core/README.md` to show the
+  explicit lifecycle only.
+- Cleared lingering `app.Boot()` examples from `x/gateway` comments/docs.
+- Validation:
+  - `gofmt -w core/lifecycle.go core/lifecycle_test.go cmd/plumego/internal/devserver/dashboard.go`
+  - `go test -race -timeout 60s ./core/...`
+  - `go test -timeout 20s ./internal/devserver/...` (run from `cmd/plumego/`)
+  - `go vet ./core/...`
+  - `go vet ./internal/devserver/...` (run from `cmd/plumego/`)

@@ -64,14 +64,14 @@ func TestOptionsApply(t *testing.T) {
 func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 	app := New()
 
-	app.Get("/router", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/router", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("router"))
-	})
-	app.Get("/mux", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mustRegisterRoute(t, app.Get("/mux", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("mux"))
-	})
+	}))
 
 	app.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -124,10 +124,10 @@ func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 		})
 	})
 
-	app.Get("/hello", func(w http.ResponseWriter, _ *http.Request) {
+	mustRegisterRoute(t, app.Get("/hello", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("hi"))
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 	rr := httptest.NewRecorder()
@@ -145,9 +145,9 @@ func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 func TestUseAfterServeHTTPReturnsError(t *testing.T) {
 	app := New()
 
-	app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	rr := httptest.NewRecorder()
@@ -164,9 +164,9 @@ func TestUseAfterServeHTTPReturnsError(t *testing.T) {
 
 func TestPrepareBuildsHTTPServer(t *testing.T) {
 	app := New(WithAddr(":5555"))
-	app.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("Prepare returned error: %v", err)

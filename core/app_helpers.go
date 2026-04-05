@@ -37,12 +37,24 @@ func (a *App) ensureRouter() *router.Router {
 	}
 	r := a.router
 	logger := a.logger
+	hasMethodNotAllowed := a.hasRouterMethodNotAllowed
+	methodNotAllowed := a.routerMethodNotAllowed
 	a.mu.Unlock()
 
-	if r != nil && logger != nil {
+	a.syncRouterConfig(r, logger, hasMethodNotAllowed, methodNotAllowed)
+	return r
+}
+
+func (a *App) syncRouterConfig(r *router.Router, logger log.StructuredLogger, hasMethodNotAllowed bool, methodNotAllowed bool) {
+	if r == nil {
+		return
+	}
+	if logger != nil {
 		r.SetLogger(logger)
 	}
-	return r
+	if hasMethodNotAllowed {
+		r.SetMethodNotAllowed(methodNotAllowed)
+	}
 }
 
 func (a *App) ensureMiddlewareChain() *middleware.Chain {
@@ -53,17 +65,6 @@ func (a *App) ensureMiddlewareChain() *middleware.Chain {
 	chain := a.middlewareChain
 	a.mu.Unlock()
 	return chain
-}
-
-func (a *App) configSnapshot() AppConfig {
-	a.mu.RLock()
-	if a.config == nil {
-		a.mu.RUnlock()
-		return AppConfig{}
-	}
-	cfg := *a.config
-	a.mu.RUnlock()
-	return cfg
 }
 
 func (a *App) logError(message string, err error, fields log.Fields) {

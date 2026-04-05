@@ -102,6 +102,35 @@ func TestErrorNilIgnored(t *testing.T) {
 	}
 }
 
+func TestErrorCollectedErrorsConcurrent(t *testing.T) {
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
+	defer ctx.Close()
+
+	sentinel := errors.New("concurrent error")
+	done := make(chan struct{})
+	const n = 100
+
+	for i := 0; i < n; i++ {
+		go func() {
+			ctx.Error(sentinel)
+			done <- struct{}{}
+		}()
+	}
+	for i := 0; i < n; i++ {
+		go func() {
+			_ = ctx.CollectedErrors()
+			done <- struct{}{}
+		}()
+	}
+	for i := 0; i < 2*n; i++ {
+		<-done
+	}
+
+	if got := len(ctx.CollectedErrors()); got != n {
+		t.Fatalf("expected %d errors, got %d", n, got)
+	}
+}
+
 func TestAbortStopsMiddlewareChain(t *testing.T) {
 	// Simulate an abort-aware middleware pattern.
 	var order []string

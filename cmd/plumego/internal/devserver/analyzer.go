@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/metrics"
 )
 
@@ -113,8 +114,8 @@ func (a *Analyzer) ProbeEndpoints() []RouteInfo {
 	return discovered
 }
 
-// GetAppInfo fetches application information
-func (a *Analyzer) GetAppInfo() (map[string]any, error) {
+// GetAppSnapshot fetches the application's stable runtime/config snapshot.
+func (a *Analyzer) GetAppSnapshot() (core.RuntimeSnapshot, error) {
 	configURL := a.appURL + "/_debug/config"
 
 	client := &http.Client{
@@ -123,16 +124,18 @@ func (a *Analyzer) GetAppInfo() (map[string]any, error) {
 
 	resp, err := client.Get(configURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch config: %w", err)
+		return core.RuntimeSnapshot{}, fmt.Errorf("failed to fetch config: %w", err)
 	}
 	defer resp.Body.Close()
 
-	var config map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w", err)
+	var payload struct {
+		Data core.RuntimeSnapshot `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return core.RuntimeSnapshot{}, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	return config, nil
+	return payload.Data, nil
 }
 
 // HealthCheck checks if the application is healthy

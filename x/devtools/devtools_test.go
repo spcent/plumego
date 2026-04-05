@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/router"
@@ -170,8 +172,16 @@ func TestConfigEndpointWithHook(t *testing.T) {
 	c := New(Options{
 		Debug: true,
 		Hooks: Hooks{
-			ConfigSnapshot: func() map[string]any {
-				return map[string]any{"custom": "value"}
+			Snapshot: func() core.RuntimeSnapshot {
+				return core.RuntimeSnapshot{
+					Addr:            ":9090",
+					Debug:           true,
+					EnvFile:         ".env.test",
+					ShutdownTimeout: 7 * time.Second,
+					DrainInterval:   250 * time.Millisecond,
+					Started:         true,
+					ServerPrepared:  true,
+				}
 			},
 		},
 	})
@@ -191,8 +201,17 @@ func TestConfigEndpointWithHook(t *testing.T) {
 		t.Fatalf("decode error: %v", err)
 	}
 	data := body["data"].(map[string]any)
-	if data["custom"] != "value" {
-		t.Fatalf("expected custom=value, got %v", data)
+	if data["addr"] != ":9090" {
+		t.Fatalf("expected addr=:9090, got %v", data["addr"])
+	}
+	if data["env_file"] != ".env.test" {
+		t.Fatalf("expected env_file=.env.test, got %v", data["env_file"])
+	}
+	if data["started"] != true {
+		t.Fatalf("expected started=true, got %v", data["started"])
+	}
+	if data["server_prepared"] != true {
+		t.Fatalf("expected server_prepared=true, got %v", data["server_prepared"])
 	}
 }
 
@@ -419,8 +438,12 @@ func TestInfoEndpoint(t *testing.T) {
 	c := New(Options{
 		Debug: true,
 		Hooks: Hooks{
-			ConfigSnapshot: func() map[string]any {
-				return map[string]any{"app": "test"}
+			Snapshot: func() core.RuntimeSnapshot {
+				return core.RuntimeSnapshot{
+					Addr:    ":8088",
+					Debug:   true,
+					EnvFile: ".env.info",
+				}
 			},
 		},
 	})
@@ -440,8 +463,12 @@ func TestInfoEndpoint(t *testing.T) {
 		t.Fatalf("decode error: %v", err)
 	}
 	data := body["data"].(map[string]any)
-	if _, ok := data["config"]; !ok {
+	config, ok := data["config"].(map[string]any)
+	if !ok {
 		t.Fatal("expected config in /_info response")
+	}
+	if config["env_file"] != ".env.info" {
+		t.Fatalf("expected env_file=.env.info, got %v", config["env_file"])
 	}
 	if _, ok := data["build"]; !ok {
 		t.Fatal("expected build in /_info response")

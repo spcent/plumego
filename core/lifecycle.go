@@ -7,47 +7,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/spcent/plumego/log"
 )
-
-// Boot is the legacy convenience entrypoint.
-// Prefer Prepare + Start + Server/Shutdown for explicit lifecycle control.
-func (a *App) Boot() error {
-	return a.Run(context.Background())
-}
-
-// Run prepares the app, starts runtime hooks, then serves until shutdown.
-func (a *App) Run(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	if err := a.Prepare(); err != nil {
-		return err
-	}
-	if err := a.Start(ctx); err != nil {
-		return err
-	}
-
-	stopSignalWatcher := make(chan struct{})
-	go a.handleShutdownSignal(stopSignalWatcher)
-
-	err := a.startServer()
-	close(stopSignalWatcher)
-
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		_ = a.Shutdown(context.Background())
-		return err
-	}
-
-	return nil
-}
 
 // Prepare freezes routing/middleware state and constructs the HTTP server.
 func (a *App) Prepare() error {
@@ -258,31 +222,6 @@ func (a *App) serverStartConfig() serverStartConfig {
 	}
 	a.mu.RUnlock()
 	return cfg
-}
-
-func (a *App) handleShutdownSignal(stop <-chan struct{}) {
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(sig)
-
-	select {
-	case <-stop:
-		return
-	case <-sig:
-	}
-
-	a.logger.Info("SIGTERM received, shutting down")
-
-	cfg := a.serverStartConfig()
-	shutdownTimeout := cfg.shutdownTimeout
-	if shutdownTimeout <= 0 {
-		shutdownTimeout = 5 * time.Second
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
-
-	_ = a.Shutdown(ctx)
 }
 
 func (a *App) stopRuntime(ctx context.Context) {

@@ -70,13 +70,27 @@ This layout should be demonstrated first in `reference/standard-service` and cop
 func main() {
     app := core.New()
 
-    app.Use(RequestID())
-    app.Use(Recovery())
-    app.Use(RequestLogger())
+    if err := app.Use(RequestID(), Recovery(), RequestLogger()); err != nil {
+        log.Fatal(err)
+    }
 
-    registerRoutes(app)
+    if err := registerRoutes(app); err != nil {
+        log.Fatal(err)
+    }
 
-    if err := http.ListenAndServe(":8080", app); err != nil {
+    if err := app.Prepare(); err != nil {
+        log.Fatal(err)
+    }
+    if err := app.Start(context.Background()); err != nil {
+        log.Fatal(err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer app.Shutdown(context.Background())
+
+    if err := srv.ListenAndServe(); err != nil {
         log.Fatal(err)
     }
 }
@@ -93,13 +107,19 @@ Rules:
 ## 5. Route Registration
 
 ```go
-func registerRoutes(app *core.App) {
-    app.Get("/healthz", healthHandler)
-    app.Post("/users", createUserHandler)
+func registerRoutes(app *core.App) error {
+    if err := app.Get("/healthz", healthHandler); err != nil {
+        return err
+    }
+    if err := app.Post("/users", createUserHandler); err != nil {
+        return err
+    }
+    return nil
 }
 ```
 
 - One method + one path + one handler per line
+- Route registration errors must be returned to the caller; do not log and continue
 - Static registration; no reflection or discovery
 - Must remain grep-friendly — path and handler discoverable by search
 - Groups: path prefix and shared middleware only; not for hidden policy or service injection

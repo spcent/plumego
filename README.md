@@ -81,6 +81,8 @@ Smallest runnable example:
 package main
 
 import (
+    "context"
+    "errors"
     "log"
     "net/http"
 
@@ -92,6 +94,7 @@ import (
 )
 
 func main() {
+    ctx := context.Background()
     app := core.New(
         core.WithAddr(":8080"),
         core.WithLogger(plog.NewGLogger()),
@@ -112,8 +115,22 @@ func main() {
         }
     })
 
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare server: %v", err)
+    }
+    if err := app.Start(ctx); err != nil {
+        log.Fatalf("start runtime: %v", err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("get server: %v", err)
+    }
+    defer app.Shutdown(ctx)
+
     log.Println("server started at :8080")
-    log.Fatal(http.ListenAndServe(":8080", app))
+    if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+        log.Fatalf("server stopped: %v", err)
+    }
 }
 ```
 
@@ -125,6 +142,7 @@ func main() {
 - Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
 - Debug mode and devtools are separate. Use `core.WithDebug()` for debug behavior; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
 - Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.
+- When `x/devtools` is wired, `/_debug/config` exposes the stable runtime snapshot used by first-party tooling: address, env file, server timeouts, shutdown/drain settings, TLS config, and lifecycle flags.
 
 ## Agent-First Workflow
 - Canonical app bootstrap starts from `reference/standard-service`.

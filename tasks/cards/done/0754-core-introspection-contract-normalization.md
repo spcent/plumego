@@ -65,3 +65,23 @@ Done Definition:
 - Root documentation matches the actual `core` + `x/devtools` contract.
 
 Outcome:
+- Added a single typed `core.RuntimeSnapshot` contract and replaced the old
+  overlapping getter set with `(*App).RuntimeSnapshot()`.
+- Removed redundant `DebugEnabled`, `EnvPath`, `ConfigSnapshot`, and the
+  private duplicate `configSnapshot()` path from `core`.
+- Updated `x/devtools` to consume the typed snapshot hook and keep the legacy
+  JSON object shape as an explicit adapter at the debug endpoint boundary.
+- Updated the dev dashboard analyzer/config editor to consume the typed
+  snapshot instead of reading undocumented map keys directly.
+- Added snapshot-focused tests in `core`, `x/devtools`, and
+  `cmd/plumego/internal/devserver`.
+- Updated `README.md` and `README_CN.md` to describe the stable `/_debug/config`
+  snapshot contract consistently with `WithDebug`, `WithEnvPath`, and
+  `x/devtools`.
+- Validation:
+  - `gofmt -w core/config.go core/introspection.go core/app_helpers.go core/introspection_test.go x/devtools/devtools.go x/devtools/devtools_test.go cmd/plumego/internal/devserver/analyzer.go cmd/plumego/internal/devserver/analyzer_test.go cmd/plumego/internal/devserver/config_edit.go cmd/plumego/internal/devserver/dashboard.go`
+  - `go test -race -timeout 60s ./core/...`
+  - `go test -timeout 20s ./x/devtools/...`
+  - `go test -timeout 20s ./internal/devserver/...` (run from `cmd/plumego/`)
+  - `go vet ./core/... ./x/devtools/...`
+  - `go vet ./internal/devserver/...` (run from `cmd/plumego/`)

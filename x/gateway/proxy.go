@@ -33,7 +33,7 @@
 //		Targets: []string{"http://backend:8080"},
 //	}))
 //
-//	app.Boot()
+//	// Start with the explicit core lifecycle: Prepare + Start + Server + Shutdown.
 package gateway
 
 import (

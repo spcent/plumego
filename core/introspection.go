@@ -7,55 +7,40 @@ import (
 	"github.com/spcent/plumego/metrics"
 )
 
-// DebugEnabled reports whether debug mode is enabled.
-func (a *App) DebugEnabled() bool {
+// RuntimeSnapshot returns the stable runtime/config snapshot consumed by
+// first-party tooling.
+func (a *App) RuntimeSnapshot() RuntimeSnapshot {
 	if a == nil || a.config == nil {
-		return false
-	}
-
-	a.mu.RLock()
-	debug := a.config.Debug
-	a.mu.RUnlock()
-	return debug
-}
-
-// EnvPath returns the configured env file path.
-func (a *App) EnvPath() string {
-	if a == nil || a.config == nil {
-		return ""
-	}
-
-	a.mu.RLock()
-	path := a.config.EnvFile
-	a.mu.RUnlock()
-	return path
-}
-
-// ConfigSnapshot exposes the current server-facing config values.
-func (a *App) ConfigSnapshot() map[string]any {
-	if a == nil || a.config == nil {
-		return map[string]any{"debug": false}
+		return RuntimeSnapshot{}
 	}
 
 	a.mu.RLock()
 	cfg := *a.config
+	started := a.started
+	configFrozen := a.configFrozen
+	serverPrepared := a.httpServer != nil
 	a.mu.RUnlock()
 
-	return map[string]any{
-		"addr":                cfg.Addr,
-		"debug":               cfg.Debug,
-		"env_file":            cfg.EnvFile,
-		"read_timeout":        cfg.ReadTimeout,
-		"read_header_timeout": cfg.ReadHeaderTimeout,
-		"write_timeout":       cfg.WriteTimeout,
-		"idle_timeout":        cfg.IdleTimeout,
-		"max_header_bytes":    cfg.MaxHeaderBytes,
-		"http2_enabled":       cfg.EnableHTTP2,
-		"tls": map[string]any{
-			"enabled":   cfg.TLS.Enabled,
-			"cert_file": cfg.TLS.CertFile,
-			"key_file":  cfg.TLS.KeyFile,
+	return RuntimeSnapshot{
+		Addr:              cfg.Addr,
+		Debug:             cfg.Debug,
+		EnvFile:           cfg.EnvFile,
+		ShutdownTimeout:   cfg.ShutdownTimeout,
+		ReadTimeout:       cfg.ReadTimeout,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
+		MaxHeaderBytes:    cfg.MaxHeaderBytes,
+		HTTP2Enabled:      cfg.EnableHTTP2,
+		DrainInterval:     cfg.DrainInterval,
+		TLS: RuntimeTLSSnapshot{
+			Enabled:  cfg.TLS.Enabled,
+			CertFile: cfg.TLS.CertFile,
+			KeyFile:  cfg.TLS.KeyFile,
 		},
+		Started:        started,
+		ConfigFrozen:   configFrozen,
+		ServerPrepared: serverPrepared,
 	}
 }
 

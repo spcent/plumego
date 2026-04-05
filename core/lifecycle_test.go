@@ -36,22 +36,31 @@ func requireNetwork(t *testing.T) string {
 	return addr
 }
 
-// TestBoot tests the complete boot process
-func TestBoot(t *testing.T) {
+func TestPrepareStartServeAndShutdown(t *testing.T) {
 	addr := requireNetwork(t)
 
 	app := New(WithAddr(addr))
 
 	// Add a test route
-	app.Get("/boot-test", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/boot-test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("booted"))
-	})
+	}))
 
-	// Start server in background
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("prepare returned unexpected error: %v", err)
+	}
+	if err := app.Start(context.Background()); err != nil {
+		t.Fatalf("start returned unexpected error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		t.Fatalf("server returned unexpected error: %v", err)
+	}
+
 	serverDone := make(chan error)
 	go func() {
-		serverDone <- app.Boot()
+		serverDone <- srv.ListenAndServe()
 	}()
 
 	// Give server time to start
@@ -78,18 +87,18 @@ func TestBoot(t *testing.T) {
 	select {
 	case err := <-serverDone:
 		if err != nil && err != http.ErrServerClosed {
-			t.Errorf("boot returned unexpected error: %v", err)
+			t.Errorf("server returned unexpected error: %v", err)
 		}
 	case <-time.After(2 * time.Second):
-		t.Error("boot did not complete in time")
+		t.Error("server did not complete in time")
 	}
 }
 
 func TestStartMarksAppReadyWithoutLegacyRuntimeHooks(t *testing.T) {
 	app := New()
-	app.Get("/boot-order", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/boot-order", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
@@ -164,9 +173,9 @@ func TestSetupServer(t *testing.T) {
 			app.config.DrainInterval = tt.config.DrainInterval
 
 			// Add a route to ensure handler is created
-			app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+			mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-			})
+			}))
 
 			err := app.setupServer()
 
@@ -210,9 +219,9 @@ func TestStartServer(t *testing.T) {
 		app.config.TLS.KeyFile = ""
 		app.config.ShutdownTimeout = 1 * time.Second
 
-		app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+		mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-		})
+		}))
 
 		if err := app.setupServer(); err != nil {
 			t.Fatalf("setupServer failed: %v", err)
@@ -238,10 +247,10 @@ func TestStartServer(t *testing.T) {
 		app.config.Addr = addr
 		app.config.ShutdownTimeout = 1 * time.Second
 
-		app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+		mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("ok"))
-		})
+		}))
 
 		if err := app.setupServer(); err != nil {
 			t.Fatalf("setupServer failed: %v", err)
@@ -356,7 +365,6 @@ func TestConnectionTracker(t *testing.T) {
 	})
 }
 
-// TestAppBootWithLoggerLifecycle tests boot with logger that implements Lifecycle
 type testLifecycleLogger struct {
 	log.StructuredLogger
 	startCalled atomic.Bool
@@ -377,7 +385,7 @@ func (l *testLifecycleLogger) Info(msg string, fields ...log.Fields)  {}
 func (l *testLifecycleLogger) Error(msg string, fields ...log.Fields) {}
 func (l *testLifecycleLogger) Debug(msg string, fields ...log.Fields) {}
 
-func TestAppBootWithLoggerLifecycle(t *testing.T) {
+func TestPrepareStartServeAndShutdownWithLoggerLifecycle(t *testing.T) {
 	addr := requireNetwork(t)
 	logger := &testLifecycleLogger{}
 	app := New(
@@ -385,15 +393,24 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 		WithAddr(addr),
 	)
 
-	// Don't actually start server, just test Boot up to setup
-	app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
-	// We'll test the Boot method but interrupt it before server start
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("prepare returned unexpected error: %v", err)
+	}
+	if err := app.Start(context.Background()); err != nil {
+		t.Fatalf("start returned unexpected error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		t.Fatalf("server returned unexpected error: %v", err)
+	}
+
 	done := make(chan error)
 	go func() {
-		done <- app.Boot()
+		done <- srv.ListenAndServe()
 	}()
 
 	time.Sleep(50 * time.Millisecond)
@@ -410,11 +427,10 @@ func TestAppBootWithLoggerLifecycle(t *testing.T) {
 
 	select {
 	case <-done:
-		// Check logger was stopped
 		if !logger.stopCalled.Load() {
 			t.Error("logger Stop should have been called")
 		}
 	case <-time.After(1 * time.Second):
-		t.Error("boot did not complete")
+		t.Error("server did not complete")
 	}
 }

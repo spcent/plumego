@@ -64,3 +64,11 @@ Done Definition:
 - Regression tests cover both option orders and pass.
 
 Outcome:
+- Completed by storing method-not-allowed intent on `App` and applying it
+  declaratively to both default and caller-supplied routers, plus an
+  order-independence regression test and a module-primer note.
+
+Validation Run:
+- `gofmt -w core/app.go core/app_helpers.go core/options.go core/options_test.go`
+- `go test -race -timeout 60s ./core/...`
+- `go vet ./core/...`

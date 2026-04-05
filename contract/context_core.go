@@ -328,7 +328,9 @@ func (c *Ctx) IsAborted() bool {
 // returns the same error for convenient inline use.
 func (c *Ctx) Error(err error) error {
 	if err != nil {
+		c.mu.Lock()
 		c.errors = append(c.errors, err)
+		c.mu.Unlock()
 	}
 	return err
 }
@@ -336,7 +338,12 @@ func (c *Ctx) Error(err error) error {
 // CollectedErrors returns a snapshot of the non-fatal errors collected so far.
 // Mutating the returned slice does not affect the context.
 func (c *Ctx) CollectedErrors() []error {
-	if c == nil || len(c.errors) == 0 {
+	if c == nil {
+		return nil
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if len(c.errors) == 0 {
 		return nil
 	}
 	return append([]error(nil), c.errors...)

@@ -261,6 +261,40 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 	}
 }
 
+func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
+	type level11 struct {
+		Value string `validate:"required"`
+	}
+	type level10 struct{ Child level11 }
+	type level9 struct{ Child level10 }
+	type level8 struct{ Child level9 }
+	type level7 struct{ Child level8 }
+	type level6 struct{ Child level7 }
+	type level5 struct{ Child level6 }
+	type level4 struct{ Child level5 }
+	type level3 struct{ Child level4 }
+	type level2 struct{ Child level3 }
+	type level1 struct{ Child level2 }
+	type root struct{ Child level1 }
+
+	err := validateStruct(&root{})
+	if err == nil {
+		t.Fatal("expected depth-limit error, got nil")
+	}
+
+	fields := FieldErrorsFrom(err)
+	var found bool
+	for _, field := range fields {
+		if field.Code == "max_depth_exceeded" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected max_depth_exceeded field error, got %v", fields)
+	}
+}
+
 func TestWriteJSONEncodeFailureWritesNothing(t *testing.T) {
 	rec := httptest.NewRecorder()
 	err := WriteJSON(rec, http.StatusCreated, map[string]any{"bad": func() {}})
@@ -305,6 +339,29 @@ func TestWrapErrorPreservesInnerContextPrecedence(t *testing.T) {
 	params, ok := details["params"].(map[string]any)
 	if !ok || params["inner"] != true || params["outer"] != true {
 		t.Fatalf("expected merged params, got %v", details["params"])
+	}
+}
+
+func TestWrapErrorInnerParamWinsOnConflict(t *testing.T) {
+	inner := WrapError(errors.New("base"), "op", "mod", map[string]any{
+		"entity_id":  "inner-value",
+		"inner_only": true,
+	})
+	outer := WrapError(inner, "op2", "mod2", map[string]any{
+		"entity_id":  "outer-value",
+		"outer_only": true,
+	})
+
+	details := GetErrorDetails(outer)
+	params, ok := details["params"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected params map, got %v", details["params"])
+	}
+	if params["entity_id"] != "inner-value" {
+		t.Fatalf("expected inner param to win, got %v", params["entity_id"])
+	}
+	if params["inner_only"] != true || params["outer_only"] != true {
+		t.Fatalf("expected both unique keys to survive merge, got %v", params)
 	}
 }
 

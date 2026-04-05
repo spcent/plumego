@@ -106,3 +106,13 @@ Done Definition:
 - `WrapError` doc comment accurately describes merge semantics for all three
   fields plus the flattening behaviour.
 - The new test passes; all existing tests pass.
+
+Outcome:
+- Completed by changing `WrapError` param merging to inner-wins semantics and
+  documenting both the field precedence rules and the wrapper-flattening
+  behavior.
+
+Validation Run:
+- `gofmt -w contract/error_wrap.go contract/active_cards_regression_test.go`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

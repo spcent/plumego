@@ -38,7 +38,15 @@ func validateStructAtDepth(dst any, prefix string, depth int) error {
 		return nil
 	}
 	if depth > 10 {
-		return nil
+		fieldName := prefix
+		if fieldName == "" {
+			fieldName = "(root)"
+		}
+		return validationErrors{errors: []FieldError{{
+			Field:   fieldName,
+			Code:    "max_depth_exceeded",
+			Message: "struct nesting exceeds maximum validation depth (10); deeper fields were not validated",
+		}}}
 	}
 
 	rv := reflect.ValueOf(dst)
