@@ -7,9 +7,17 @@ Read by intent instead of scanning everything.
 ## Start Here
 
 - `getting-started.md` — smallest runnable example and the canonical next reads
+- `../reference/standard-service/README.md` — canonical reference app layout and route wiring
 - `CANONICAL_STYLE_GUIDE.md` — the default handler, route, middleware, and response style
 - `architecture/AGENT_FIRST_REPO_BLUEPRINT.md` — repository shape, boundaries, and canonical implementation path
 - `ROADMAP.md` — current priorities and remaining extension work
+
+Canonical onboarding order:
+
+1. `getting-started.md`
+2. `../reference/standard-service/README.md`
+3. this docs index
+4. `specs/*` and `tasks/*` when you need machine-readable routing or execution surfaces
 
 ## Workflow
 

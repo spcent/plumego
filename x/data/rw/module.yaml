@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: persistence
 risk: high
-summary: Primary-replica read-write cluster orchestration with load balancing, health checking, and routing policies.
+summary: Primary-replica read-write cluster orchestration with explicit primary-routing escapes, optional replica health checking, and configurable fallback behavior.
 
 responsibilities:
   - Primary-replica cluster lifecycle management
@@ -12,7 +12,7 @@ responsibilities:
   - Write routing always to primary
   - Transaction-aware routing (transactions always use primary)
   - Replica health checking with configurable thresholds
-  - Automatic fallback to primary when all replicas are down
+  - Optional fallback to primary when all replicas are down
   - Per-cluster query metrics
 
 non_goals:
@@ -76,5 +76,5 @@ review_checklist:
 
 agent_hints:
   - Compose with x/data/sharding by passing a Cluster as each shard in the Router
-  - Use ForcePrimary(ctx) when read-after-write consistency is required
-  - Use PreferReplica(ctx) to override write-detecting heuristics for specific read queries
+  - Use ForcePrimary(ctx) for read-after-write visibility; use PreferReplica(ctx) only for known-safe reads that should bypass SQL write-detection heuristics
+  - DefaultHealthCheckConfig() only applies when HealthCheck.Enabled is true, and FallbackToPrimary should be set explicitly when primary-backed outage reads are acceptable

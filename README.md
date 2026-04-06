@@ -75,6 +75,13 @@ Wire routes, middleware, and background tasks explicitly in your application pac
 
 For the canonical quick-start path, read [`docs/getting-started.md`](./docs/getting-started.md) first, then open [`reference/standard-service`](./reference/standard-service).
 
+Canonical onboarding order:
+
+1. [`docs/getting-started.md`](./docs/getting-started.md) for the smallest runnable example
+2. [`reference/standard-service`](./reference/standard-service) for the canonical app layout and route wiring
+3. [`docs/README.md`](./docs/README.md) for the human-readable docs surface
+4. `specs/*` and `tasks/*` only after the reference path stops being enough
+
 Smallest runnable example:
 
 ```go
@@ -203,6 +210,7 @@ go run ./reference/standard-service
 ## Further Reading
 
 - [`docs/getting-started.md`](./docs/getting-started.md) — smallest runnable example
+- [`reference/standard-service`](./reference/standard-service) — canonical reference application
 - [`docs/README.md`](./docs/README.md) — docs entrypoint
 - [`env.example`](./env.example) — environment variable reference
 - [`cmd/plumego/DEV_SERVER.md`](./cmd/plumego/DEV_SERVER.md) — dev server and dashboard details

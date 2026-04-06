@@ -11,6 +11,13 @@ This package provides configuration management for the database sharding system,
 - **DSN Building**: Automatic DSN construction for MySQL, PostgreSQL, and SQLite
 - **Zero Dependencies**: No external dependencies, uses only Go standard library
 
+## Safe Routing Defaults
+
+- `cross_shard_policy` defaults to `deny`, which keeps unresolved multi-shard reads visible instead of silently fanning out.
+- `default_shard_index` defaults to `-1`, which means transactions must use `BeginTxOnShard` unless you opt into a single-shard fallback.
+- `fallback_to_primary` is per-shard and should be enabled only when primary-backed reads during replica outages are acceptable.
+- `CrossShardAll` is not a result merger. It queries every shard concurrently and returns the first successful result set.
+
 ## Configuration File Format
 
 ### JSON Format
@@ -129,6 +136,8 @@ This package provides configuration management for the database sharding system,
 | `fallback_to_primary` | bool | No | `false` | Use primary when all replicas are down |
 | `health_check` | object | No | - | Health check configuration |
 
+When `default_shard_index` remains `-1`, `BeginTx` without an explicit shard fails. Prefer `BeginTxOnShard` for transactional work so the shard choice is visible at the call site.
+
 ### Database Configuration
 
 | Field | Type | Required | Default | Description |
@@ -170,6 +179,13 @@ This package provides configuration management for the database sharding system,
 
 ### Strategy Configuration
 
+Use these strategy defaults unless your data model forces something else:
+
+- `mod` for stable integer IDs with even distribution requirements
+- `hash` for arbitrary keys such as strings or opaque identifiers
+- `range` for ordered values such as time windows or contiguous ID bands
+- `list` for a small, explicit set of values like regions or tenant classes
+
 For **range** strategy:
 ```json
 {
@@ -209,6 +225,13 @@ Configuration values can be overridden with environment variables:
 | `DB_SHARD_LOG_LEVEL` | string | Log level |
 
 ## Usage Examples
+
+### Routing Guidance
+
+- Keep `cross_shard_policy` at `deny` for OLTP paths unless you can tolerate approximate answers.
+- Use `first` only when shard 0 is a deliberate sampling shard.
+- Use `all` only for first-success or existence-style reads; it does not merge rows across shards.
+- Leave `default_shard_index` at `-1` unless you intentionally want unresolved reads or `BeginTx` calls to pin to one shard.
 
 ### Basic Usage
 

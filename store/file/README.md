@@ -64,10 +64,12 @@ type ImageProcessor interface {
 
 ## Concrete Implementations
 
-Tenant-aware storage backends (local filesystem, S3) and the database-backed
-metadata manager live in **`x/data/file`**.
-
-The HTTP handler lives in **`x/fileapi`**.
+- Tenant-aware storage backends (local filesystem, S3) and the database-backed
+  metadata manager live in **`x/data/file`**.
+- HTTP upload/download handlers and request parsing live in **`x/fileapi`**.
+- `store/file` stays responsible for the stable `Storage` / `MetadataManager`
+  contracts, shared file types, errors, and pure helpers such as path safety
+  checks and image processing.
 
 ## Non-Goals
 

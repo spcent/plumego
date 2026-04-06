@@ -43,3 +43,9 @@ Done Definition:
 - Targeted sharding validation stays green.
 
 Outcome:
+- Tightened `docs/modules/x-data/README.md`, `x/data/sharding/module.yaml`, and `x/data/sharding/config/README.md` around the implemented routing defaults: `CrossShardDeny` is the safe default, `CrossShardAll` returns the first successful result set rather than merging rows, and transactions should use `BeginTxOnShard` unless a deliberate default shard is configured.
+- Updated `x/data/sharding/config/examples/cluster-simple.json` to make the default `default_shard_index: -1` explicit in the simplest example.
+- Validation:
+  - `go test -timeout 20s ./x/data/sharding/...`
+  - `go test -race -timeout 60s ./x/data/sharding/...`
+  - `go vet ./x/data/sharding/...`

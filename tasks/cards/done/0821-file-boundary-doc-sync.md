@@ -45,3 +45,9 @@ Done Definition:
 - Targeted file-layer validation stays green.
 
 Outcome:
+- Aligned `docs/modules/x-fileapi/README.md`, `docs/modules/store/README.md`, `store/file/README.md`, `x/data/file/module.yaml`, and `x/fileapi/module.yaml` on one boundary model: `x/fileapi` owns HTTP transport, `x/data/file` owns tenant-aware storage and metadata implementations, and `store/file` owns the stable transport-agnostic contracts and helpers.
+- Fixed the stale `store/file/file.go` package comment so it no longer implies concrete local/S3 backends live in the stable layer.
+- Validation:
+  - `go test -timeout 20s ./store/file ./x/data/file ./x/fileapi`
+  - `go test -race -timeout 60s ./store/file ./x/data/file ./x/fileapi`
+  - `go vet ./store/file ./x/data/file ./x/fileapi`

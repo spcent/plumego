@@ -44,5 +44,6 @@
     }
   ],
   "cross_shard_policy": "deny",
+  "default_shard_index": -1,
   "log_level": "info"
 }

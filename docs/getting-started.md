@@ -113,14 +113,16 @@ app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 Read these next, in order:
 
 1. `reference/standard-service`
-2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-4. `specs/task-routing.yaml`
-5. the target module's `module.yaml`
+2. `docs/README.md`
+3. `docs/CANONICAL_STYLE_GUIDE.md`
+4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+5. `specs/task-routing.yaml`
+6. the target module's `module.yaml`
 
 ## Notes
 
 - `reference/standard-service` is the canonical application layout.
+- `docs/README.md` is the entrypoint for the human-readable docs surface.
 - `x/*` packages are optional capability families, not the default bootstrap path.
 - Prefer explicit route wiring and explicit middleware registration.
 - Prefer `contract.WriteError` and `contract.WriteResponse` for JSON APIs.

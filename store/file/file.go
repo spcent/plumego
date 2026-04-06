@@ -1,6 +1,6 @@
-// Package file provides a unified interface for file storage operations.
-// It supports both local filesystem storage and S3-compatible cloud storage,
-// with built-in image processing, file deduplication, and metadata management.
+// Package file provides stable, transport-agnostic contracts and helpers for
+// file storage operations. Concrete storage backends and tenant-aware metadata
+// implementations live in x/data/file; HTTP handlers live in x/fileapi.
 package file
 
 import (

@@ -2,6 +2,16 @@
 
 This directory contains a Docker Compose configuration for testing read/write splitting with real MySQL replication.
 
+It is for validating the current `x/data/rw` behavior, not for demonstrating automatic database failover orchestration.
+
+## Operational Expectations
+
+- Ordinary `SELECT` queries may be routed to replicas when they are considered healthy by the cluster.
+- Reads that must observe the primary immediately after a write should use `rw.ForcePrimary(ctx)` in the caller instead of assuming replica catch-up.
+- Replica health checks are background `PingContext` probes and only run when `HealthCheck.Enabled` is set in the cluster config.
+- `FallbackToPrimary` is an explicit opt-in. If it is left false and every replica is marked unhealthy, read routing returns an error instead of silently using the primary.
+- This Docker environment helps you inspect replication lag and replica availability, but it does not change the package's routing semantics.
+
 ## Architecture
 
 ```
@@ -71,6 +81,8 @@ docker exec plumego-mysql-replica2 mysql -utestuser -ptestpass testdb \
   -e "SELECT * FROM users WHERE email='test@example.com'"
 ```
 
+If you are validating read-after-write behavior in an application integration test, issue the follow-up read with `rw.ForcePrimary(ctx)` unless your test is intentionally waiting for replication to catch up.
+
 ## Connection Strings
 
 ### Primary (Read/Write)
@@ -119,6 +131,8 @@ docker exec plumego-mysql-replica2 mysql -uroot -prootpassword \
 
 # Should show: Seconds_Behind_Master: 0
 ```
+
+Replica lag is an operational signal only. The package does not infer "fresh enough" semantics from replication lag; the caller chooses between ordinary replica reads and `ForcePrimary(ctx)`.
 
 ### View Binary Log Position
 
@@ -238,3 +252,4 @@ go test -run=TestConcurrentQueries -v
 - [Read/Write Splitting Design](../SHARDING_DESIGN.md)
 - [Example Application](../../examples/rw/)
 - [Test Suite](../cluster_test.go)
+- [Module Manifest](../module.yaml)

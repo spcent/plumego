@@ -54,7 +54,10 @@
 - `ExecContext` → always primary.
 - `BeginTx` → always primary; marks the context so subsequent queries in that transaction also use primary.
 - `QueryContext` / `QueryRowContext` → primary if `SQLTypePolicy` detects a write keyword or `SELECT … FOR UPDATE`; replica otherwise.
-- If all replicas are unhealthy and `FallbackToPrimary` is `true` (the default), reads fall back to primary.
+- `ForcePrimary(ctx)` is the explicit escape hatch for read-after-write or any other "read from primary now" requirement.
+- `PreferReplica(ctx)` overrides the SQL-type heuristic and should only be used for known-safe reads.
+- If all replicas are unhealthy and `FallbackToPrimary` is explicitly set to `true`, reads fall back to primary; otherwise the query returns a routing error.
+- Background replica health checks run only when `HealthCheck.Enabled` is `true`; they use periodic `PingContext` probes and remove replicas from balancing only after the configured failure threshold.
 
 **Quick start:**
 
@@ -66,6 +69,8 @@ cluster, err := rw.New(rw.Config{
     HealthCheck:       rw.DefaultHealthCheckConfig(),
 })
 ```
+
+Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the primary during replica outages is acceptable for your service. If you need read-after-write visibility on a per-request basis, wrap the read context with `rw.ForcePrimary(ctx)` instead of changing the whole cluster policy.
 
 **See:** `x/data/rw/module.yaml` for full manifest.
 
@@ -99,7 +104,7 @@ cluster, err := rw.New(rw.Config{
 |---|---|
 | `CrossShardDeny` | Reject queries that cannot be resolved to a single shard (safe default) |
 | `CrossShardFirst` | Execute on shard 0 only; use for approximate or sampling queries |
-| `CrossShardAll` | Fan-out to all shards concurrently and return the first successful result |
+| `CrossShardAll` | Fan-out to all shards concurrently and return the first successful result; it does not merge rows across shards |
 
 **Sharding strategies** (all implement `Strategy`):
 
@@ -110,7 +115,18 @@ cluster, err := rw.New(rw.Config{
 | Range | `NewRangeStrategy(defs)` | Key falls within a defined numeric range |
 | List | `NewListStrategy(mapping)` | Key matches a discrete value list |
 
-**Transactions:** Use `BeginTxOnShard(ctx, shardIndex, opts)` when the target shard is known. `BeginTx` without a configured `DefaultShardIndex` returns an error.
+**Strategy selection guidance:**
+
+- `mod` for stable integer IDs and evenly distributed numeric keys.
+- `hash` for arbitrary strings or other non-numeric keys.
+- `range` for ordered domains where operators need predictable shard spans.
+- `list` for a small, explicit set of values such as region codes.
+
+**Routing limits and transactions:**
+
+- Keep `CrossShardDeny` unless a specific read path can tolerate approximate or first-success semantics.
+- Use `BeginTxOnShard(ctx, shardIndex, opts)` when the target shard is known. `BeginTx` without a configured `DefaultShardIndex` returns an error.
+- Keep `DefaultShardIndex` at `-1` by default so unresolved routing stays visible instead of silently pinning traffic to one shard.
 
 **Quick start:**
 

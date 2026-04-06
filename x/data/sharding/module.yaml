@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: persistence
 risk: high
-summary: Database sharding router that distributes SQL queries across multiple rw.Cluster shards using configurable strategies and cross-shard policies.
+summary: Database sharding router that distributes SQL queries across multiple rw.Cluster shards with safe-default cross-shard denial, explicit shard-scoped transactions, and configurable strategy selection.
 
 responsibilities:
   - Shard key resolution from SQL query arguments
@@ -77,5 +77,5 @@ review_checklist:
 
 agent_hints:
   - Build each shard as an rw.Cluster and pass the slice to NewRouter
-  - Use CrossShardDeny (the default) unless you explicitly need fan-out reads
-  - Use BeginTxOnShard when the transaction's shard is known at call time
+  - Use CrossShardDeny (the default) unless you explicitly need first-shard or first-success fan-out reads; CrossShardAll does not merge rows from multiple shards
+  - Use BeginTxOnShard when the transaction's shard is known, keep DefaultShardIndex disabled unless you want a deliberate single-shard fallback, and prefer mod/hash/range/list according to the key shape

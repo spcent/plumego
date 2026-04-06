@@ -34,6 +34,14 @@
 - keep concurrent behavior testable
 - move topology-heavy features to owning extensions
 
+## File Boundary
+
+- `store/file` is the stable contract layer for file storage interfaces, shared file types, errors, and pure helpers.
+- `x/data/file` is the tenant-aware implementation layer for local/S3 storage backends and metadata persistence.
+- `x/fileapi` is the HTTP transport layer for upload, download, info, delete, list, and temporary URL endpoints.
+- Do not move tenant-aware path policy, metadata queries, or backend-specific behavior into stable `store/file`.
+- Do not move HTTP handlers or multipart parsing into stable `store`.
+
 ## Extension-layer cache implementations
 
 Topology-heavy and provider-specific cache implementations have been migrated out of the stable root and now live in `x/cache`:

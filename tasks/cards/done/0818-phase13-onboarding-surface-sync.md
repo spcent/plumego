@@ -45,3 +45,9 @@ Done Definition:
 - The reference-layout and reference-package validation commands stay green.
 
 Outcome:
+- Updated `README.md`, `README_CN.md`, `docs/README.md`, `docs/getting-started.md`, and `reference/standard-service/README.md` so they describe the same canonical onboarding order: getting-started, reference app, docs index, then specs/tasks as deeper control surfaces.
+- Removed stale ambiguity around whether the docs index or specs/tasks come before the canonical reference app in the default learning path.
+- Validation:
+  - `go run ./internal/checks/reference-layout`
+  - `go test -timeout 20s ./reference/standard-service/...`
+  - `go vet ./reference/standard-service/...`
