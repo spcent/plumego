@@ -1,4 +1,4 @@
-package metrics
+package devtools
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/metrics"
 )
 
 // DevCollectorConfig configures the dev metrics collector.
@@ -54,14 +56,14 @@ type DevHTTPStatusCounts struct {
 
 // DevHTTPSeries is the aggregated stats for a route or total series.
 type DevHTTPSeries struct {
-	Method     string              `json:"method"`
-	Path       string              `json:"path"`
-	Count      int64               `json:"count"`
-	ErrorCount int64               `json:"error_count"`
-	Status     DevHTTPStatusCounts `json:"status"`
-	Duration   AggregatorStats     `json:"duration_ms"`
-	Bytes      AggregatorStats     `json:"bytes"`
-	LastSeen   time.Time           `json:"last_seen,omitempty"`
+	Method     string                  `json:"method"`
+	Path       string                  `json:"path"`
+	Count      int64                   `json:"count"`
+	ErrorCount int64                   `json:"error_count"`
+	Status     DevHTTPStatusCounts     `json:"status"`
+	Duration   metrics.AggregatorStats `json:"duration_ms"`
+	Bytes      metrics.AggregatorStats `json:"bytes"`
+	LastSeen   time.Time               `json:"last_seen,omitempty"`
 }
 
 // DevHTTPSnapshot is the JSON payload for dev HTTP metrics.
@@ -88,14 +90,14 @@ type DevDBQuerySample struct {
 
 // DevDBSeries is the aggregated stats for DB operations.
 type DevDBSeries struct {
-	Operation  string          `json:"operation"`
-	Driver     string          `json:"driver"`
-	Table      string          `json:"table,omitempty"`
-	Count      int64           `json:"count"`
-	ErrorCount int64           `json:"error_count"`
-	Duration   AggregatorStats `json:"duration_ms"`
-	Rows       AggregatorStats `json:"rows"`
-	LastSeen   time.Time       `json:"last_seen,omitempty"`
+	Operation  string                  `json:"operation"`
+	Driver     string                  `json:"driver"`
+	Table      string                  `json:"table,omitempty"`
+	Count      int64                   `json:"count"`
+	ErrorCount int64                   `json:"error_count"`
+	Duration   metrics.AggregatorStats `json:"duration_ms"`
+	Rows       metrics.AggregatorStats `json:"rows"`
+	LastSeen   time.Time               `json:"last_seen,omitempty"`
 }
 
 // DevDBSnapshot is the JSON payload for dev DB metrics.
@@ -117,7 +119,7 @@ type DevDBRedactionConfig struct {
 // DevCollector is a lightweight in-memory metrics collector for dev dashboards.
 // It focuses on HTTP request aggregation while still implementing AggregateCollector.
 type DevCollector struct {
-	base *BaseMetricsCollector
+	base *metrics.BaseMetricsCollector
 
 	mu         sync.RWMutex
 	startedAt  time.Time
@@ -166,7 +168,7 @@ func NewDevCollector(cfg DevCollectorConfig) *DevCollector {
 	}
 
 	return &DevCollector{
-		base:          NewBaseMetricsCollector(),
+		base:          metrics.NewBaseMetricsCollector(),
 		startedAt:     time.Now(),
 		window:        cfg.Window,
 		maxSamples:    cfg.MaxSamples,
@@ -268,7 +270,7 @@ func (d *DevCollector) DBSnapshot() DevDBSnapshot {
 }
 
 // Record implements AggregateCollector.
-func (d *DevCollector) Record(ctx context.Context, record MetricRecord) {
+func (d *DevCollector) Record(ctx context.Context, record metrics.MetricRecord) {
 	d.base.Record(ctx, record)
 }
 
@@ -366,7 +368,7 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 }
 
 // GetStats implements AggregateCollector.
-func (d *DevCollector) GetStats() CollectorStats {
+func (d *DevCollector) GetStats() metrics.CollectorStats {
 	stats := d.base.GetStats()
 	if stats.ActiveSeries == 0 && len(stats.TypeBreakdown) > 0 {
 		stats.ActiveSeries = len(stats.TypeBreakdown)
@@ -588,12 +590,12 @@ func (b *statBucket) record(value float64) {
 	}
 }
 
-func (b *statBucket) snapshot() AggregatorStats {
+func (b *statBucket) snapshot() metrics.AggregatorStats {
 	if b.count == 0 {
-		return AggregatorStats{}
+		return metrics.AggregatorStats{}
 	}
 
-	stats := AggregatorStats{
+	stats := metrics.AggregatorStats{
 		Count: b.count,
 		Sum:   b.sum,
 		Min:   b.min,
@@ -623,6 +625,14 @@ func (b *statBucket) sortedValues() []float64 {
 	b.sortedOK = true
 
 	return b.sorted
+}
+
+func percentileSorted(values []float64, p float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	index := int(float64(len(values)-1) * p)
+	return values[index]
 }
 
 func (d *DevCollector) appendDBSlowLocked(operation, driver, table, query string, durationMS float64, err error, now time.Time) {
@@ -763,6 +773,69 @@ func consumeQuoted(s string, idx int, quote byte) int {
 		}
 	}
 	return len(s) - 1
+}
+
+func extractTable(query string) string {
+	fields := strings.Fields(query)
+	if len(fields) == 0 {
+		return ""
+	}
+
+	for i := 0; i < len(fields); i++ {
+		upper := strings.ToUpper(fields[i])
+		switch upper {
+		case "FROM", "INTO":
+			if i+1 < len(fields) {
+				next := fields[i+1]
+				if strings.HasPrefix(next, "(") {
+					continue
+				}
+				return cleanTableName(next)
+			}
+		case "UPDATE":
+			if i+1 < len(fields) {
+				return cleanTableName(fields[i+1])
+			}
+		case "TABLE":
+			next := i + 1
+			if next < len(fields) && strings.EqualFold(fields[next], "IF") {
+				next++
+				if next < len(fields) && strings.EqualFold(fields[next], "NOT") {
+					next++
+				}
+				if next < len(fields) && strings.EqualFold(fields[next], "EXISTS") {
+					next++
+				}
+			}
+			if next < len(fields) {
+				return cleanTableName(fields[next])
+			}
+		}
+	}
+
+	return ""
+}
+
+func cleanTableName(value string) string {
+	value = strings.TrimRight(value, ",;()")
+	if value == "" {
+		return ""
+	}
+	value = unquoteIdent(value)
+	if idx := strings.LastIndexByte(value, '.'); idx >= 0 && idx+1 < len(value) {
+		value = unquoteIdent(value[idx+1:])
+	}
+	return value
+}
+
+func unquoteIdent(value string) string {
+	if len(value) >= 2 {
+		first, last := value[0], value[len(value)-1]
+		if (first == '"' && last == '"') || (first == '`' && last == '`') || (first == '[' && last == ']') {
+			value = value[1 : len(value)-1]
+		}
+	}
+	return value
 }
 
 func isNumericStart(s string, idx int) bool {

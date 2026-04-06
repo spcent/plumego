@@ -7,7 +7,6 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
@@ -56,7 +55,12 @@ func PrepareRequest(w http.ResponseWriter, r *http.Request) PreparedRequest {
 	}
 }
 
-func ExtractSpanContext(ctx context.Context, span metrics.TraceSpan) (string, string) {
+type spanContextCarrier interface {
+	TraceID() string
+	SpanID() string
+}
+
+func ExtractSpanContext(ctx context.Context, span spanContextCarrier) (string, string) {
 	if span != nil {
 		return span.TraceID(), span.SpanID()
 	}

@@ -62,7 +62,7 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 			requestID := prepared.RequestID
 			ctx := r.Context()
 
-			var span metrics.TraceSpan
+			var span mwtracing.TraceSpan
 			if tracer != nil {
 				ctx, span = tracer.Start(ctx, r)
 			}

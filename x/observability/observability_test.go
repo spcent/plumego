@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/spcent/plumego/metrics"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/router"
 )
@@ -117,12 +116,12 @@ func TestConfigureMetricsNilRegisterRoute(t *testing.T) {
 
 func TestConfigureMetricsWithPrometheus(t *testing.T) {
 	r := router.NewRouter()
-	var setCollector *metrics.PrometheusCollector
+	var setCollector *PrometheusCollector
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHook(r),
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { setCollector = c },
+		SetPrometheusCollector: func(c *PrometheusCollector) { setCollector = c },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -138,18 +137,18 @@ func TestConfigureMetricsWithPrometheus(t *testing.T) {
 
 func TestConfigureMetricsWithExplicitCollector(t *testing.T) {
 	r := router.NewRouter()
-	prom := metrics.NewPrometheusCollector("test")
-	var setCollector *metrics.PrometheusCollector
+	prom := NewPrometheusCollector("test")
+	var setCollector *PrometheusCollector
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHook(r),
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { setCollector = c },
+		SetPrometheusCollector: func(c *PrometheusCollector) { setCollector = c },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
 	cfg.Metrics.Collector = prom
-	cfg.Metrics.Exporter = metrics.NewPrometheusExporter(prom)
+	cfg.Metrics.Exporter = NewPrometheusExporter(prom)
 
 	err := Configure(hooks, cfg)
 	if err != nil {
@@ -182,7 +181,7 @@ func TestConfigureMetricsWithExplicitHandler(t *testing.T) {
 
 func TestConfigureMetricsWithExplicitExporter(t *testing.T) {
 	r := router.NewRouter()
-	prom := metrics.NewPrometheusCollector("test")
+	prom := NewPrometheusCollector("test")
 
 	hooks := Hooks{
 		EnsureMutable: func(op, desc string) error { return nil },
@@ -191,7 +190,7 @@ func TestConfigureMetricsWithExplicitExporter(t *testing.T) {
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
 	cfg.Metrics.Collector = prom
-	cfg.Metrics.Exporter = metrics.NewPrometheusExporter(prom)
+	cfg.Metrics.Exporter = NewPrometheusExporter(prom)
 
 	err := Configure(hooks, cfg)
 	if err != nil {
@@ -201,17 +200,17 @@ func TestConfigureMetricsWithExplicitExporter(t *testing.T) {
 
 func TestConfigureMetricsCollectorFromHooks(t *testing.T) {
 	r := router.NewRouter()
-	prom := metrics.NewPrometheusCollector("hookns")
+	prom := NewPrometheusCollector("hookns")
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHook(r),
-		GetPrometheusCollector: func() *metrics.PrometheusCollector { return prom },
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
+		GetPrometheusCollector: func() *PrometheusCollector { return prom },
+		SetPrometheusCollector: func(c *PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
-	cfg.Metrics.Exporter = metrics.NewPrometheusExporter(prom)
+	cfg.Metrics.Exporter = NewPrometheusExporter(prom)
 
 	err := Configure(hooks, cfg)
 	if err != nil {
@@ -306,7 +305,7 @@ func TestConfigureMetricsEmptyPath(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHook(r),
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
+		SetPrometheusCollector: func(c *PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -324,7 +323,7 @@ func TestConfigureMetricsZeroMaxSeries(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHook(r),
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
+		SetPrometheusCollector: func(c *PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/spcent/plumego/metrics"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
@@ -15,8 +14,8 @@ type MetricsConfig struct {
 	Path      string
 	Namespace string
 	MaxSeries int
-	Collector *metrics.PrometheusCollector
-	Exporter  metrics.Exporter
+	Collector *PrometheusCollector
+	Exporter  Exporter
 	Handler   http.Handler
 }
 
@@ -102,16 +101,16 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 	handler := cfg.Handler
 
 	if collector == nil && exporter == nil && handler == nil {
-		prom := metrics.NewPrometheusCollector(cfg.Namespace)
+		prom := NewPrometheusCollector(cfg.Namespace)
 		if cfg.MaxSeries > 0 {
 			prom.WithMaxMemory(cfg.MaxSeries)
 		}
 		collector = prom
-		exporter = metrics.NewPrometheusExporter(prom)
+		exporter = NewPrometheusExporter(prom)
 	}
 
 	if handler == nil && exporter == nil && collector != nil {
-		exporter = metrics.NewPrometheusExporter(collector)
+		exporter = NewPrometheusExporter(collector)
 	}
 
 	if handler == nil && exporter != nil {
@@ -136,7 +135,7 @@ func configureTracing(hooks Hooks, cfg TracingConfig) error {
 		tracer = hooks.GetTracer()
 	}
 	if tracer == nil {
-		tracer = metrics.NewOpenTelemetryTracer(cfg.ServiceName)
+		tracer = NewOpenTelemetryTracer(cfg.ServiceName)
 	}
 
 	if hooks.SetTracer != nil {
@@ -160,8 +159,8 @@ func normalizeObservabilityPath(path string) string {
 type Hooks struct {
 	EnsureMutable          func(op, desc string) error
 	RegisterRoute          func(method, path string, handler http.Handler) error
-	GetPrometheusCollector func() *metrics.PrometheusCollector
-	SetPrometheusCollector func(*metrics.PrometheusCollector)
+	GetPrometheusCollector func() *PrometheusCollector
+	SetPrometheusCollector func(*PrometheusCollector)
 	GetTracer              func() mwtracing.Tracer
 	SetTracer              func(mwtracing.Tracer)
 }

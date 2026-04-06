@@ -1,4 +1,4 @@
-package metrics
+package devtools
 
 import (
 	"context"

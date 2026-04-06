@@ -1,4 +1,4 @@
-package metrics
+package observability
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/metrics"
 )
 
 func TestPrometheusCollectorObserveAndHandler(t *testing.T) {
@@ -113,7 +115,7 @@ func TestPrometheusCollectorStats(t *testing.T) {
 	if stats.TotalRecords != 5 {
 		t.Fatalf("expected 5 total requests, got %d", stats.TotalRecords)
 	}
-	if stats.TypeBreakdown[MetricHTTPRequest] == 0 {
+	if stats.TypeBreakdown[metrics.MetricHTTPRequest] == 0 {
 		t.Fatalf("expected HTTP type breakdown to be populated")
 	}
 	if stats.StartTime.IsZero() {
@@ -196,88 +198,6 @@ func TestPrometheusCollectorMetricsFormat(t *testing.T) {
 	}
 }
 
-func TestPrometheusCollectorSMSGatewayMetrics(t *testing.T) {
-	collector := NewPrometheusCollector("plumego_test")
-
-	ctx := context.Background()
-	collector.Record(ctx, MetricRecord{
-		Type:  MetricSMSGateway,
-		Name:  "queue_depth",
-		Value: 3,
-		Labels: MetricLabels{
-			"queue": "send",
-			"state": "queued",
-		},
-	})
-	collector.Record(ctx, MetricRecord{
-		Type:     MetricSMSGateway,
-		Name:     "send_latency",
-		Value:    0.15,
-		Duration: 150 * time.Millisecond,
-		Labels: MetricLabels{
-			"tenant":   "tenant-1",
-			"provider": "provider-a",
-		},
-	})
-	collector.Record(ctx, MetricRecord{
-		Type:  MetricSMSGateway,
-		Name:  "provider_result",
-		Value: 1,
-		Labels: MetricLabels{
-			"tenant":   "tenant-1",
-			"provider": "provider-a",
-			"result":   "success",
-		},
-	})
-	collector.Record(ctx, MetricRecord{
-		Type:  MetricSMSGateway,
-		Name:  "retry",
-		Value: 1,
-		Labels: MetricLabels{
-			"tenant":   "tenant-1",
-			"provider": "provider-a",
-			"attempt":  "2",
-		},
-	})
-	collector.Record(ctx, MetricRecord{
-		Type:  MetricSMSGateway,
-		Name:  "status",
-		Value: 1,
-		Labels: MetricLabels{
-			"tenant": "tenant-1",
-			"status": "sent",
-		},
-	})
-	collector.Record(ctx, MetricRecord{
-		Type:     MetricSMSGateway,
-		Name:     "receipt_delay",
-		Value:    2,
-		Duration: 2 * time.Second,
-		Labels: MetricLabels{
-			"tenant":   "tenant-1",
-			"provider": "provider-a",
-		},
-	})
-
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
-	collector.Handler().ServeHTTP(rr, req)
-
-	body := rr.Body.String()
-	if !strings.Contains(body, "plumego_test_sms_gateway_queue_depth") {
-		t.Fatalf("expected sms gateway queue depth metric")
-	}
-	if !strings.Contains(body, "plumego_test_sms_gateway_send_latency_seconds_sum") {
-		t.Fatalf("expected send latency metric")
-	}
-	if !strings.Contains(body, "plumego_test_sms_gateway_provider_result_total") {
-		t.Fatalf("expected provider result metric")
-	}
-	if !strings.Contains(body, "plumego_test_sms_gateway_receipt_delay_seconds_sum") {
-		t.Fatalf("expected receipt delay metric")
-	}
-}
-
 func TestPrometheusCollectorLabelEscaping(t *testing.T) {
 	collector := NewPrometheusCollector("test")
 
@@ -340,51 +260,5 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 	// Should be at most 5 (max memory)
 	if stats.ActiveSeries > 5 {
 		t.Fatalf("expected at most 5 series after eviction, got %d", stats.ActiveSeries)
-	}
-}
-
-func TestPrometheusCollectorSMSGatewayLatencyValueUsesSecondsFallback(t *testing.T) {
-	tests := []struct {
-		name        string
-		metricName  string
-		value       float64
-		sumFragment string
-	}{
-		{
-			name:        "send latency",
-			metricName:  "send_latency",
-			value:       0.125,
-			sumFragment: `plumego_test_sms_gateway_send_latency_seconds_sum{tenant="tenant-1",provider="provider-a"} 0.125000000`,
-		},
-		{
-			name:        "receipt delay",
-			metricName:  "receipt_delay",
-			value:       2.5,
-			sumFragment: `plumego_test_sms_gateway_receipt_delay_seconds_sum{tenant="tenant-1",provider="provider-a"} 2.500000000`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			collector := NewPrometheusCollector("plumego_test")
-			collector.Record(context.Background(), MetricRecord{
-				Type:  MetricSMSGateway,
-				Name:  tt.metricName,
-				Value: tt.value,
-				Labels: MetricLabels{
-					"tenant":   "tenant-1",
-					"provider": "provider-a",
-				},
-			})
-
-			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
-			collector.Handler().ServeHTTP(rr, req)
-
-			body := rr.Body.String()
-			if !strings.Contains(body, tt.sumFragment) {
-				t.Fatalf("expected seconds-based sum metric %q, body:\n%s", tt.sumFragment, body)
-			}
-		})
 	}
 }

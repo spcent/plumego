@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/metrics"
 )
 
 type spanContextSpan struct {
@@ -24,7 +23,7 @@ type spanContextTracer struct {
 	span *spanContextSpan
 }
 
-func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, metrics.TraceSpan) {
+func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan) {
 	t.span = &spanContextSpan{traceID: "trace-ctx", spanID: "span-123"}
 	return ctx, t.span
 }

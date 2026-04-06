@@ -1,4 +1,4 @@
-package metrics
+package observability
 
 import (
 	"context"
@@ -30,8 +30,11 @@ func TestOpenTelemetryTracer(t *testing.T) {
 	if spans[0].Name != "http.request" {
 		t.Fatalf("unexpected span name: %s", spans[0].Name)
 	}
-	if spans[0].Attributes["plumego.trace_id"] != "abc123" {
-		t.Fatalf("trace id not recorded: %#v", spans[0].Attributes)
+	if spans[0].Attributes["request_id"] != "abc123" {
+		t.Fatalf("request id not recorded: %#v", spans[0].Attributes)
+	}
+	if spans[0].Attributes["plumego.trace_id"] != spans[0].TraceID {
+		t.Fatalf("trace id attribute mismatch: %#v", spans[0].Attributes)
 	}
 	if spans[0].Status != "OK" {
 		t.Fatalf("expected OK status, got: %s", spans[0].Status)

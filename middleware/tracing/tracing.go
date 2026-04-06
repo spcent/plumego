@@ -5,12 +5,15 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 )
 
-type TraceSpan = metrics.TraceSpan
+type TraceSpan interface {
+	End(status, bytes int, requestID string)
+	TraceID() string
+	SpanID() string
+}
 
 type Tracer interface {
 	Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan)

@@ -17,10 +17,10 @@ import (
 //
 //	import (
 //	    nethttp  "github.com/spcent/plumego/internal/nethttp"
-//	    "github.com/spcent/plumego/metrics"
+//	    "github.com/spcent/plumego/x/observability"
 //	)
 //
-//	col := metrics.NewPrometheusCollector("myapp")
+//	col := observability.NewPrometheusCollector("myapp")
 //
 //	client := nethttp.New(
 //	    nethttp.WithMiddleware(nethttp.MetricsMiddleware(&prometheusAdapter{col})),

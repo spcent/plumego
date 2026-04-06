@@ -14,7 +14,6 @@ import (
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/internal/config"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/router"
 )
 
@@ -45,13 +44,13 @@ type DevTools struct {
 	watchStop context.CancelFunc
 	watchWg   sync.WaitGroup
 
-	devMetrics *metrics.DevCollector
+	devMetrics *DevCollector
 }
 
 type Hooks struct {
 	RuntimeSnapshot  func() core.RuntimeSnapshot
 	MiddlewareList   func() []string
-	AttachDevMetrics func(*metrics.DevCollector)
+	AttachDevMetrics func(*DevCollector)
 }
 
 type Options struct {
@@ -83,7 +82,7 @@ func New(opts Options) *DevTools {
 		logger:     opts.Logger,
 		envFile:    opts.EnvFile,
 		hooks:      opts.Hooks,
-		devMetrics: metrics.NewDevCollector(metrics.DefaultDevCollectorConfig()),
+		devMetrics: NewDevCollector(DefaultDevCollectorConfig()),
 	}
 }
 

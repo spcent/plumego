@@ -16,10 +16,8 @@ func TestCollectorStatsContract(t *testing.T) {
 		collector AggregateCollector
 	}{
 		{name: "base", collector: NewBaseMetricsCollector()},
-		{name: "prometheus", collector: NewPrometheusCollector("test")},
-		{name: "dev", collector: NewDevCollector(DefaultDevCollectorConfig())},
 		{name: "noop", collector: NewNoopCollector()},
-		{name: "multi", collector: NewMultiCollector(NewBaseMetricsCollector(), NewPrometheusCollector("multi"))},
+		{name: "multi", collector: NewMultiCollector(NewBaseMetricsCollector(), NewBaseMetricsCollector())},
 	}
 
 	for _, tt := range tests {

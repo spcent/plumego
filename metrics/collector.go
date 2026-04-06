@@ -50,9 +50,6 @@ const (
 	MetricDBPing        MetricType = "db_ping"
 	MetricDBConnect     MetricType = "db_connect"
 	MetricDBClose       MetricType = "db_close"
-
-	// SMS Gateway metrics
-	MetricSMSGateway MetricType = "sms_gateway"
 )
 
 // MetricLabels represents key-value labels for metrics

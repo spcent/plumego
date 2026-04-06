@@ -12,7 +12,6 @@ import (
 
 	contract "github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
@@ -98,7 +97,7 @@ type stubTracer struct {
 	span     *stubSpan
 }
 
-func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Context, metrics.TraceSpan) {
+func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Context, mwtracing.TraceSpan) {
 	t.started = true
 	t.received = contract.RequestIDFromContext(ctx)
 	t.span = &stubSpan{}
@@ -117,7 +116,7 @@ func (s *spanContextSpan) SpanID() string                        { return s.span
 
 type spanContextTracer struct{ span *spanContextSpan }
 
-func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, metrics.TraceSpan) {
+func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, mwtracing.TraceSpan) {
 	t.span = &spanContextSpan{traceID: "trace-ctx", spanID: "span-123"}
 	return ctx, t.span
 }

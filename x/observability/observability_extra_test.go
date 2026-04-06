@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/spcent/plumego/metrics"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/router"
 )
@@ -19,13 +18,13 @@ func addRouteHookExtra(r *router.Router) func(method, path string, handler http.
 // TestConfigureBothEnabledWiresAll verifies metrics + tracing enabled together.
 func TestConfigureBothEnabledWiresAll(t *testing.T) {
 	r := router.NewRouter()
-	var gotCollector *metrics.PrometheusCollector
+	var gotCollector *PrometheusCollector
 	var gotTracer mwtracing.Tracer
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHookExtra(r),
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { gotCollector = c },
+		SetPrometheusCollector: func(c *PrometheusCollector) { gotCollector = c },
 		SetTracer:              func(tr mwtracing.Tracer) { gotTracer = tr },
 	}
 	cfg := DefaultObservabilityConfig()
@@ -46,12 +45,12 @@ func TestConfigureBothEnabledWiresAll(t *testing.T) {
 // TestConfigureMetricsCustomNamespace verifies a custom namespace is applied.
 func TestConfigureMetricsCustomNamespace(t *testing.T) {
 	r := router.NewRouter()
-	var gotCollector *metrics.PrometheusCollector
+	var gotCollector *PrometheusCollector
 
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHookExtra(r),
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) { gotCollector = c },
+		SetPrometheusCollector: func(c *PrometheusCollector) { gotCollector = c },
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -100,7 +99,7 @@ func TestConfigureConcurrent(t *testing.T) {
 			hooks := Hooks{
 				EnsureMutable:          func(op, desc string) error { return nil },
 				RegisterRoute:          addRouteHookExtra(r),
-				SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
+				SetPrometheusCollector: func(c *PrometheusCollector) {},
 				SetTracer:              func(tr mwtracing.Tracer) {},
 			}
 			cfg := DefaultObservabilityConfig()
@@ -125,7 +124,7 @@ func TestConfigureMetricsMaxSeriesPositive(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHookExtra(r),
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
+		SetPrometheusCollector: func(c *PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
@@ -143,7 +142,7 @@ func TestConfigureMetricsCustomPath(t *testing.T) {
 	hooks := Hooks{
 		EnsureMutable:          func(op, desc string) error { return nil },
 		RegisterRoute:          addRouteHookExtra(r),
-		SetPrometheusCollector: func(c *metrics.PrometheusCollector) {},
+		SetPrometheusCollector: func(c *PrometheusCollector) {},
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true

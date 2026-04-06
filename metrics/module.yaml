@@ -20,7 +20,11 @@ non_goals:
   - Export pipeline wiring and adapters (belong in x/observability)
 
 public_entrypoints:
-  - MetricsCollector
+  - AggregateCollector
+  - Recorder
+  - BaseMetricsCollector
+  - NoopCollector
+  - MultiCollector
 
 allowed_imports:
   - log
@@ -52,4 +56,6 @@ review_checklist:
 agent_hints:
   - Observability capability packs belong outside the stable layer
   - Keep transport-specific logic out
-  - For export pipeline wiring and Prometheus or OTel adapters use x/observability
+  - For Prometheus exposition and tracing implementations use x/observability
+  - For dev-only collectors use x/devtools
+  - For messaging-specific metrics reporters and exporters use x/messaging

@@ -13,7 +13,6 @@ import (
 
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/router"
 )
 
@@ -409,10 +408,10 @@ func TestStopWithoutStart(t *testing.T) {
 }
 
 func TestAttachMetricsAttachesDevMetrics(t *testing.T) {
-	var attached *metrics.DevCollector
+	var attached *DevCollector
 	c := New(Options{
 		Hooks: Hooks{
-			AttachDevMetrics: func(dc *metrics.DevCollector) {
+			AttachDevMetrics: func(dc *DevCollector) {
 				attached = dc
 			},
 		},

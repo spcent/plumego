@@ -1,4 +1,4 @@
-package metrics
+package observability
 
 import (
 	"context"
@@ -7,12 +7,14 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/metrics"
 )
 
 // TestNewOpenTelemetryTracerEmptyName tests the default name behavior
 func TestNewOpenTelemetryTracerEmptyName(t *testing.T) {
 	tracer := NewOpenTelemetryTracer("")
-	if tracer.name != "github.com/spcent/plumego/metrics" {
+	if tracer.name != "github.com/spcent/plumego/x/observability" {
 		t.Fatalf("expected default name, got: %s", tracer.name)
 	}
 }
@@ -115,7 +117,7 @@ func TestPrometheusCollectorMultipleMetricsPerLabel(t *testing.T) {
 	if stats.TotalRecords != 5 {
 		t.Fatalf("expected 5 total requests, got %d", stats.TotalRecords)
 	}
-	if stats.TypeBreakdown[MetricHTTPRequest] == 0 {
+	if stats.TypeBreakdown[metrics.MetricHTTPRequest] == 0 {
 		t.Fatalf("expected HTTP type breakdown to be populated")
 	}
 }
@@ -257,7 +259,8 @@ func TestSpanAttributesCompleteness(t *testing.T) {
 		"parent.trace_id":              "parent-123",
 		"http.status_code":             "200",
 		"http.response_content_length": "512",
-		"plumego.trace_id":             "trace-456",
+		"plumego.trace_id":             "parent-123",
+		"request_id":                   "trace-456",
 		"http.status_text":             "OK",
 		// duration_ms will be approximately 75ms, but we'll check it's reasonable
 	}
