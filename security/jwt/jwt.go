@@ -831,7 +831,7 @@ func writeAuthError(w http.ResponseWriter, r *http.Request, status int, code, me
 		Status(status).
 		Code(code).
 		Message(message).
-		Category(contract.CategoryAuthentication).
+		Category(contract.CategoryAuth).
 		Build())
 }
 

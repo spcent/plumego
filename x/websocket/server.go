@@ -170,7 +170,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		cfg.Hub.securityRejections.Add(1)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusForbidden).
-			Category(contract.CategoryAuthentication).
+			Category(contract.CategoryAuth).
 			Type(contract.ErrTypeForbidden).
 			Code(contract.CodeForbidden).
 			Message("forbidden origin").
@@ -229,7 +229,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		cfg.Hub.securityRejections.Add(1)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusForbidden).
-			Category(contract.CategoryAuthentication).
+			Category(contract.CategoryAuth).
 			Type(contract.ErrTypeForbidden).
 			Code(contract.CodeForbidden).
 			Message("forbidden: bad room password").
@@ -259,7 +259,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			cfg.Hub.securityRejections.Add(1)
 			contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusForbidden).
-				Category(contract.CategoryAuthentication).
+				Category(contract.CategoryAuth).
 				Type(contract.ErrTypeForbidden).
 				Code(contract.CodeForbidden).
 				Message("forbidden: invalid token").

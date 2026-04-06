@@ -191,7 +191,7 @@ func TestWriteError_PolicyDenied(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/api/resource", nil)
 
-	transport.WriteError(w, r, http.StatusForbidden, transport.CodePolicyDenied, "policy denied", contract.CategoryAuthentication)
+	transport.WriteError(w, r, http.StatusForbidden, transport.CodePolicyDenied, "policy denied", contract.CategoryAuth)
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)

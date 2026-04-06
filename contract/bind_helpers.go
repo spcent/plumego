@@ -66,8 +66,13 @@ func BindErrorToAPIError(err error) APIError {
 	default:
 		if len(fields) == 0 {
 			var bindErr *BindError
-			if errors.As(err, &bindErr) && bindErr != nil && bindErr.Message != "" {
-				message = bindErr.Message
+			if errors.As(err, &bindErr) && bindErr != nil {
+				if bindErr.Message != "" {
+					message = bindErr.Message
+				}
+				if bindErr.Status != 0 {
+					status = bindErr.Status
+				}
 				if bindErr.Err != nil {
 					code = CodeRequestBodyReadFailed
 				}

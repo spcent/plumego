@@ -2,6 +2,7 @@ package contract
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -26,8 +27,8 @@ const (
 	CategoryTimeout ErrorCategory = "timeout_error"
 	// CategoryValidation covers input validation errors.
 	CategoryValidation ErrorCategory = "validation_error"
-	// CategoryAuthentication covers authentication and authorization errors.
-	CategoryAuthentication ErrorCategory = "auth_error"
+	// CategoryAuth covers authentication and authorization errors.
+	CategoryAuth ErrorCategory = "auth_error"
 	// CategoryRateLimit covers rate limiting errors.
 	CategoryRateLimit ErrorCategory = "rate_limit_error"
 )
@@ -54,8 +55,8 @@ const (
 	ErrTypeDuplicate     ErrorType = "duplicate_value"
 
 	// Authentication/Authorization errors
-	ErrTypeUnauthorized ErrorType = "unauthorized"
-	ErrTypeForbidden    ErrorType = "forbidden"
+	ErrTypeUnauthorized ErrorType = "unauthorized_request"
+	ErrTypeForbidden    ErrorType = "forbidden_request"
 	ErrTypeInvalidToken ErrorType = "invalid_token"
 	ErrTypeExpiredToken ErrorType = "expired_token"
 
@@ -68,7 +69,7 @@ const (
 	// System errors
 	ErrTypeInternal    ErrorType = "internal_error"
 	ErrTypeUnavailable ErrorType = "service_unavailable"
-	ErrTypeTimeout     ErrorType = "timeout"
+	ErrTypeTimeout     ErrorType = "timeout_error"
 	ErrTypeRateLimited ErrorType = "rate_limited"
 	ErrTypeMaintenance ErrorType = "maintenance_mode"
 
@@ -96,10 +97,10 @@ var errorTypeLookup = map[ErrorType]errorTypeMeta{
 	ErrTypeOutOfRange:    {CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
 	ErrTypeDuplicate:     {CategoryValidation, CodeDuplicate, http.StatusBadRequest},
 	// Auth
-	ErrTypeUnauthorized: {CategoryAuthentication, CodeUnauthorized, http.StatusUnauthorized},
-	ErrTypeForbidden:    {CategoryAuthentication, CodeForbidden, http.StatusForbidden},
-	ErrTypeInvalidToken: {CategoryAuthentication, CodeInvalidToken, http.StatusUnauthorized},
-	ErrTypeExpiredToken: {CategoryAuthentication, CodeExpiredToken, http.StatusUnauthorized},
+	ErrTypeUnauthorized: {CategoryAuth, CodeUnauthorized, http.StatusUnauthorized},
+	ErrTypeForbidden:    {CategoryAuth, CodeForbidden, http.StatusForbidden},
+	ErrTypeInvalidToken: {CategoryAuth, CodeInvalidToken, http.StatusUnauthorized},
+	ErrTypeExpiredToken: {CategoryAuth, CodeExpiredToken, http.StatusUnauthorized},
 	// Resource
 	ErrTypeNotFound:      {CategoryClient, CodeResourceNotFound, http.StatusNotFound},
 	ErrTypeConflict:      {CategoryClient, CodeConflict, http.StatusConflict},
@@ -161,7 +162,7 @@ type ErrorResponse struct {
 // fields are always populated. WriteError keeps fallback defaults for
 // backward compatibility and calls WarnFunc when required fields are missing.
 func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
-	if issues := ValidateError(err); len(issues) > 0 {
+	if issues := validateAPIError(err); len(issues) > 0 {
 		WarnFunc("WriteError received partially-populated APIError: " + strings.Join(issues, "; "))
 	}
 
@@ -209,7 +210,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 func CategoryForStatus(status int) ErrorCategory {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return CategoryAuthentication
+		return CategoryAuth
 	case http.StatusTooManyRequests:
 		return CategoryRateLimit
 	case http.StatusRequestTimeout:
@@ -330,8 +331,8 @@ func (b *ErrorBuilder) Build() APIError {
 	return b.err
 }
 
-// ValidateError validates an APIError and returns validation errors if any.
-func ValidateError(err APIError) []string {
+// validateAPIError validates an APIError and returns validation errors if any.
+func validateAPIError(err APIError) []string {
 	var validationErrors []string
 
 	if err.Status < 100 || err.Status > 599 {
@@ -377,7 +378,7 @@ func HTTPStatusFromCategory(category ErrorCategory) int {
 	switch category {
 	case CategoryClient, CategoryValidation:
 		return http.StatusBadRequest
-	case CategoryAuthentication:
+	case CategoryAuth:
 		return http.StatusUnauthorized
 	case CategoryRateLimit:
 		return http.StatusTooManyRequests
@@ -421,14 +422,33 @@ func ParseErrorFromResponse(resp *http.Response) (APIError, error) {
 	return errorResp.Error, nil
 }
 
-// IsClientError checks if the error is a client error (4xx).
-func IsClientError(err APIError) bool {
-	return err.Status >= 400 && err.Status < 500
+// IsClientError reports whether err is a client error (4xx).
+// It accepts any error and performs a type assertion to APIError internally.
+func IsClientError(err error) bool {
+	var apiErr APIError
+	if !asAPIError(err, &apiErr) {
+		return false
+	}
+	return apiErr.Status >= 400 && apiErr.Status < 500
 }
 
-// IsServerError checks if the error is a server error (5xx).
-func IsServerError(err APIError) bool {
-	return err.Status >= 500
+// IsServerError reports whether err is a server error (5xx).
+// It accepts any error and performs a type assertion to APIError internally.
+func IsServerError(err error) bool {
+	var apiErr APIError
+	if !asAPIError(err, &apiErr) {
+		return false
+	}
+	return apiErr.Status >= 500
+}
+
+// asAPIError attempts to extract an APIError from err via direct assertion or errors.As.
+func asAPIError(err error, out *APIError) bool {
+	if v, ok := err.(APIError); ok {
+		*out = v
+		return true
+	}
+	return errors.As(err, out)
 }
 
 // IsAPIErrorRetryable checks if the API error is retryable based on its status code.

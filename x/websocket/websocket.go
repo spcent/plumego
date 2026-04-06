@@ -126,7 +126,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 				if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
 					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 						Status(http.StatusUnauthorized).
-						Category(contract.CategoryAuthentication).
+						Category(contract.CategoryAuth).
 						Type(contract.ErrTypeUnauthorized).
 						Code(contract.CodeUnauthorized).
 						Message("unauthorized").

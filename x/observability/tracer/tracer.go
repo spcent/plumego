@@ -425,12 +425,9 @@ func (t *Tracer) StartTrace(ctx context.Context, name string, options ...TraceOp
 	spanCtx := contract.TraceContext{
 		TraceID: traceID,
 		SpanID:  spanID,
-		Flags:   0,
-		Sampled: t.sampler.ShouldSample(traceID),
 		Baggage: make(map[string]string),
 	}
-
-	if spanCtx.Sampled {
+	if t.sampler.ShouldSample(traceID) {
 		spanCtx.Flags |= contract.TraceFlagsSampled
 		if t.canAddSpan(trace) {
 			trace.Spans = append(trace.Spans, span)
@@ -474,11 +471,9 @@ func (t *Tracer) StartChildSpan(ctx context.Context, parentSpan *Span, name stri
 		TraceID:      parentSpan.TraceID,
 		SpanID:       spanID,
 		ParentSpanID: &parentSpan.ID,
-		Sampled:      t.sampler.ShouldSample(parentSpan.TraceID),
 		Baggage:      make(map[string]string),
 	}
-
-	if spanCtx.Sampled {
+	if t.sampler.ShouldSample(parentSpan.TraceID) {
 		spanCtx.Flags |= contract.TraceFlagsSampled
 	}
 

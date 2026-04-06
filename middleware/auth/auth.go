@@ -57,7 +57,7 @@ func writeUnauthorized(w http.ResponseWriter, r *http.Request, realm string) {
 		http.StatusUnauthorized,
 		middleware.CodeAuthUnauthenticated,
 		"invalid or missing authentication token",
-		contract.CategoryAuthentication,
+		contract.CategoryAuth,
 		nil,
 	)
 }

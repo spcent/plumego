@@ -37,7 +37,11 @@ type TraceContext struct {
 	// implemented in this package; use x/observability for full propagation support.
 	Baggage map[string]string `json:"baggage,omitempty"`
 	Flags   TraceFlags        `json:"flags"`
-	Sampled bool              `json:"sampled"`
+}
+
+// IsSampled reports whether the W3C sampled flag is set in Flags.
+func (tc TraceContext) IsSampled() bool {
+	return tc.Flags&TraceFlagsSampled != 0
 }
 
 type traceContextKey struct{}

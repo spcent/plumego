@@ -66,7 +66,7 @@ func Middleware(options Options) mw.Middleware {
 				return
 			}
 
-			tenanttransport.WriteError(w, r, status, tenanttransport.CodePolicyDenied, "tenant policy denied request", contract.CategoryAuthentication)
+			tenanttransport.WriteError(w, r, status, tenanttransport.CodePolicyDenied, "tenant policy denied request", contract.CategoryAuth)
 		})
 	}
 }

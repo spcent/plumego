@@ -1,13 +1,14 @@
 package contract
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
 
-// ErrorContext represents contextual information for error wrapping.
-type ErrorContext struct {
+// errorContext represents contextual information for error wrapping.
+type errorContext struct {
 	Operation string         `json:"operation"`
 	Module    string         `json:"module"`
 	Params    map[string]any `json:"params,omitempty"`
@@ -16,8 +17,8 @@ type ErrorContext struct {
 // WrappedErrorWithContext represents an error with attached operation context.
 // Use WrapError to construct values; use errors.Is / errors.As to inspect them.
 type WrappedErrorWithContext struct {
-	Err     error        `json:"error"`
-	Context ErrorContext `json:"context"`
+	Err     error        `json:"-"`
+	Context errorContext `json:"context"`
 	Message string       `json:"message"`
 	When    time.Time    `json:"when"`
 }
@@ -38,11 +39,11 @@ func (w *WrappedErrorWithContext) Unwrap() error {
 	return w.Err
 }
 
-// NewWrappedError creates a new WrappedErrorWithContext with operation context.
-func NewWrappedError(err error, operation, module string, params map[string]any) *WrappedErrorWithContext {
+// newWrappedError creates a new WrappedErrorWithContext with operation context.
+func newWrappedError(err error, operation, module string, params map[string]any) *WrappedErrorWithContext {
 	return &WrappedErrorWithContext{
 		Err: err,
-		Context: ErrorContext{
+		Context: errorContext{
 			Operation: operation,
 			Module:    module,
 			Params:    params,
@@ -90,7 +91,7 @@ func WrapError(err error, operation, module string, params map[string]any) error
 			Err:     wrapped.Err,
 			Message: wrapped.Message,
 			When:    wrapped.When,
-			Context: ErrorContext{
+			Context: errorContext{
 				Operation: op,
 				Module:    mod,
 				Params:    mergedParams,
@@ -98,7 +99,7 @@ func WrapError(err error, operation, module string, params map[string]any) error
 		}
 	}
 
-	return NewWrappedError(err, operation, module, params)
+	return newWrappedError(err, operation, module, params)
 }
 
 // WrapErrorf creates a message-only wrapper with no operation or module context.
@@ -230,8 +231,8 @@ func PanicToError(r any) error {
 	case error:
 		return WrapError(v, "panic_recovery", "recovery", nil)
 	case string:
-		return fmt.Errorf("panic: %s", v)
+		return WrapError(errors.New(v), "panic_recovery", "recovery", nil)
 	default:
-		return fmt.Errorf("panic: %v", v)
+		return WrapError(fmt.Errorf("%v", r), "panic_recovery", "recovery", nil)
 	}
 }

@@ -73,7 +73,6 @@ func TestTraceContextManagement(t *testing.T) {
 		TraceID: "test-trace",
 		SpanID:  "test-span",
 		Flags:   TraceFlagsSampled,
-		Sampled: true,
 		Baggage: map[string]string{
 			"user.id":    "123",
 			"request.id": "abc",
@@ -94,7 +93,7 @@ func TestTraceContextManagement(t *testing.T) {
 	if retrieved.Flags != TraceFlagsSampled {
 		t.Fatalf("expected flags to match")
 	}
-	if !retrieved.Sampled {
+	if !retrieved.IsSampled() {
 		t.Fatalf("expected sampled flag to be true")
 	}
 	if retrieved.Baggage["user.id"] != "123" {

@@ -143,7 +143,7 @@ func authErrorToAPIError(err error) contract.APIError {
 	unauthorized := func(msg string) contract.APIError {
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnauthorized).
-			Category(contract.CategoryAuthentication).
+			Category(contract.CategoryAuth).
 			Type(contract.ErrTypeUnauthorized).
 			Code(contract.CodeUnauthorized).
 			Message(msg).
@@ -153,7 +153,7 @@ func authErrorToAPIError(err error) contract.APIError {
 	case errors.Is(err, contract.ErrUnauthorized):
 		return contract.NewErrorBuilder().
 			Status(http.StatusForbidden).
-			Category(contract.CategoryAuthentication).
+			Category(contract.CategoryAuth).
 			Type(contract.ErrTypeForbidden).
 			Code(contract.CodeForbidden).
 			Message("access forbidden").

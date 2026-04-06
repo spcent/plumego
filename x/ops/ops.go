@@ -462,7 +462,7 @@ func denyAllMiddleware() middleware.Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusUnauthorized).
-				Category(contract.CategoryAuthentication).
+				Category(contract.CategoryAuth).
 				Type(contract.ErrTypeUnauthorized).
 				Code(contract.CodeUnauthorized).
 				Message("ops auth required").

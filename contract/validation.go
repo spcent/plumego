@@ -295,19 +295,3 @@ func stringValue(value reflect.Value) (string, bool) {
 	}
 	return value.String(), true
 }
-
-func parseNumericString(s string) (float64, bool) {
-	if s == "" {
-		return 0, false
-	}
-	if parsed, err := strconv.ParseInt(s, 10, 64); err == nil {
-		return float64(parsed), true
-	}
-	if parsed, err := strconv.ParseUint(s, 10, 64); err == nil {
-		return float64(parsed), true
-	}
-	if parsed, err := strconv.ParseFloat(s, 64); err == nil {
-		return parsed, true
-	}
-	return 0, false
-}
