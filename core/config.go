@@ -25,7 +25,7 @@ type AppConfig struct {
 	WriteTimeout      time.Duration // Maximum duration before timing out writes of the response
 	IdleTimeout       time.Duration // Maximum time to wait for the next request when keep-alives are enabled
 	MaxHeaderBytes    int           // Maximum size of request headers
-	EnableHTTP2       bool          // Whether to keep HTTP/2 support enabled
+	HTTP2Enabled      bool          // Whether to keep HTTP/2 support enabled
 	DrainInterval     time.Duration // How often to log in-flight connection counts while draining
 }
 
@@ -40,7 +40,7 @@ func DefaultConfig() AppConfig {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20, // 1 MiB
-		EnableHTTP2:       true,
+		HTTP2Enabled:      true,
 		DrainInterval:     500 * time.Millisecond,
 	}
 }
@@ -76,46 +76,22 @@ type RuntimeSnapshot struct {
 	PreparationState  PreparationState   `json:"preparation_state"`
 }
 
-type serverSettings struct {
-	Addr              string
-	ReadTimeout       time.Duration
-	ReadHeaderTimeout time.Duration
-	WriteTimeout      time.Duration
-	IdleTimeout       time.Duration
-	MaxHeaderBytes    int
-	HTTP2Enabled      bool
-	DrainInterval     time.Duration
-	TLS               TLSConfig
-}
-
-func projectServerSettings(cfg AppConfig) serverSettings {
-	return serverSettings{
+// runtimeSnapshot projects the AppConfig into a RuntimeSnapshot for introspection.
+func (cfg AppConfig) runtimeSnapshot(state PreparationState) RuntimeSnapshot {
+	return RuntimeSnapshot{
 		Addr:              cfg.Addr,
 		ReadTimeout:       cfg.ReadTimeout,
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
 		IdleTimeout:       cfg.IdleTimeout,
 		MaxHeaderBytes:    cfg.MaxHeaderBytes,
-		HTTP2Enabled:      cfg.EnableHTTP2,
+		HTTP2Enabled:      cfg.HTTP2Enabled,
 		DrainInterval:     cfg.DrainInterval,
-		TLS:               cfg.TLS,
-	}
-}
-
-func (s serverSettings) runtimeSnapshot() RuntimeSnapshot {
-	return RuntimeSnapshot{
-		Addr:              s.Addr,
-		ReadTimeout:       s.ReadTimeout,
-		ReadHeaderTimeout: s.ReadHeaderTimeout,
-		WriteTimeout:      s.WriteTimeout,
-		IdleTimeout:       s.IdleTimeout,
-		MaxHeaderBytes:    s.MaxHeaderBytes,
-		HTTP2Enabled:      s.HTTP2Enabled,
-		DrainInterval:     s.DrainInterval,
 		TLS: RuntimeTLSSnapshot{
-			Enabled:  s.TLS.Enabled,
-			CertFile: s.TLS.CertFile,
-			KeyFile:  s.TLS.KeyFile,
+			Enabled:  cfg.TLS.Enabled,
+			CertFile: cfg.TLS.CertFile,
+			KeyFile:  cfg.TLS.KeyFile,
 		},
+		PreparationState: state,
 	}
 }

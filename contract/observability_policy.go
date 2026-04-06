@@ -19,12 +19,6 @@ type ObservabilityPolicy struct {
 	sensitiveKeys map[string]struct{}
 }
 
-// DefaultObservabilityPolicy returns a fresh ObservabilityPolicy with default settings.
-// Use NewObservabilityPolicy to construct one with custom sensitive keys.
-func DefaultObservabilityPolicy() ObservabilityPolicy {
-	return NewObservabilityPolicy()
-}
-
 // NewObservabilityPolicy creates a policy with safe defaults and optional
 // application-specific sensitive key patterns.
 func NewObservabilityPolicy(extraSensitiveKeys ...string) ObservabilityPolicy {

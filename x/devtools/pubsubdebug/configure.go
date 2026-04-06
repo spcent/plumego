@@ -40,7 +40,7 @@ func Configure(hooks Hooks) {
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 				Status(http.StatusInternalServerError).
 				Category(contract.CategoryServer).
-				Type(contract.ErrTypeInternal).
+				Type(contract.TypeInternal).
 				Code(contract.CodeInternalError).
 				Message("pubsub is not configured").
 				Build())

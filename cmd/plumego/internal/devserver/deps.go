@@ -120,7 +120,7 @@ func (d *Dashboard) handleDeps(ctx *contract.Ctx) {
 	graph, err := d.depsCache.Get(timeoutCtx, d.projectDir, refreshEnabled)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("dependency_graph_failed").
 			Message(err.Error()).
 			Build())

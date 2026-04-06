@@ -430,7 +430,7 @@ func (c *DBResourceController[T]) IndexCtx(ctx *contract.Ctx) {
 	results, total, err := c.repository.FindAll(ctx.R.Context(), params)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("list_failed").
 			Message("failed to fetch records").
 			Build())
@@ -440,7 +440,7 @@ func (c *DBResourceController[T]) IndexCtx(ctx *contract.Ctx) {
 	transformedResults, err := c.Transformer.TransformCollection(ctx.R.Context(), results)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("transform_collection_failed").
 			Message("failed to transform results").
 			Build())
@@ -449,7 +449,7 @@ func (c *DBResourceController[T]) IndexCtx(ctx *contract.Ctx) {
 
 	if err := c.Hooks.AfterList(ctx.R.Context(), params, transformedResults); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("after_list_failed").
 			Message(err.Error()).
 			Build())
@@ -467,7 +467,7 @@ func (c *DBResourceController[T]) ShowCtx(ctx *contract.Ctx) {
 	id := c.ParamExtractor.GetID(ctx.R)
 	if id == "" {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeRequired).
+			Type(contract.TypeRequired).
 			Code("missing_id").
 			Message("id is required").
 			Build())
@@ -478,14 +478,14 @@ func (c *DBResourceController[T]) ShowCtx(ctx *contract.Ctx) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-				Type(contract.ErrTypeNotFound).
+				Type(contract.TypeNotFound).
 				Code("not_found").
 				Message("record not found").
 				Build())
 			return
 		}
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("show_failed").
 			Message("failed to fetch record").
 			Build())
@@ -495,7 +495,7 @@ func (c *DBResourceController[T]) ShowCtx(ctx *contract.Ctx) {
 	transformedResult, err := c.Transformer.Transform(ctx.R.Context(), result)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("transform_failed").
 			Message("failed to transform result").
 			Build())
@@ -509,7 +509,7 @@ func (c *DBResourceController[T]) CreateCtx(ctx *contract.Ctx) {
 	var data T
 	if err := ctx.BindJSON(&data); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("invalid_request").
 			Message("invalid request body").
 			Build())
@@ -540,7 +540,7 @@ func (c *DBResourceController[T]) CreateCtx(ctx *contract.Ctx) {
 
 	if err := c.repository.Create(ctx.R.Context(), &data); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("create_failed").
 			Message("failed to create record").
 			Build())
@@ -549,7 +549,7 @@ func (c *DBResourceController[T]) CreateCtx(ctx *contract.Ctx) {
 
 	if err := c.Hooks.AfterCreate(ctx.R.Context(), &data); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("after_create_failed").
 			Message(err.Error()).
 			Build())
@@ -559,7 +559,7 @@ func (c *DBResourceController[T]) CreateCtx(ctx *contract.Ctx) {
 	transformedResult, err := c.Transformer.Transform(ctx.R.Context(), &data)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("transform_failed").
 			Message("failed to transform result").
 			Build())
@@ -573,7 +573,7 @@ func (c *DBResourceController[T]) UpdateCtx(ctx *contract.Ctx) {
 	id := c.ParamExtractor.GetID(ctx.R)
 	if id == "" {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeRequired).
+			Type(contract.TypeRequired).
 			Code("missing_id").
 			Message("id is required").
 			Build())
@@ -583,7 +583,7 @@ func (c *DBResourceController[T]) UpdateCtx(ctx *contract.Ctx) {
 	var data T
 	if err := ctx.BindJSON(&data); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("invalid_request").
 			Message("invalid request body").
 			Build())
@@ -615,14 +615,14 @@ func (c *DBResourceController[T]) UpdateCtx(ctx *contract.Ctx) {
 	if err := c.repository.Update(ctx.R.Context(), id, &data); err != nil {
 		if err == sql.ErrNoRows {
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-				Type(contract.ErrTypeNotFound).
+				Type(contract.TypeNotFound).
 				Code("not_found").
 				Message("record not found").
 				Build())
 			return
 		}
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("update_failed").
 			Message("failed to update record").
 			Build())
@@ -631,7 +631,7 @@ func (c *DBResourceController[T]) UpdateCtx(ctx *contract.Ctx) {
 
 	if err := c.Hooks.AfterUpdate(ctx.R.Context(), id, &data); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("after_update_failed").
 			Message(err.Error()).
 			Build())
@@ -641,7 +641,7 @@ func (c *DBResourceController[T]) UpdateCtx(ctx *contract.Ctx) {
 	transformedResult, err := c.Transformer.Transform(ctx.R.Context(), &data)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("transform_failed").
 			Message("failed to transform result").
 			Build())
@@ -655,7 +655,7 @@ func (c *DBResourceController[T]) DeleteCtx(ctx *contract.Ctx) {
 	id := c.ParamExtractor.GetID(ctx.R)
 	if id == "" {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeRequired).
+			Type(contract.TypeRequired).
 			Code("missing_id").
 			Message("id is required").
 			Build())
@@ -674,14 +674,14 @@ func (c *DBResourceController[T]) DeleteCtx(ctx *contract.Ctx) {
 	if err := c.repository.Delete(ctx.R.Context(), id); err != nil {
 		if err == sql.ErrNoRows {
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-				Type(contract.ErrTypeNotFound).
+				Type(contract.TypeNotFound).
 				Code("not_found").
 				Message("record not found").
 				Build())
 			return
 		}
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("delete_failed").
 			Message("failed to delete record").
 			Build())
@@ -690,7 +690,7 @@ func (c *DBResourceController[T]) DeleteCtx(ctx *contract.Ctx) {
 
 	if err := c.Hooks.AfterDelete(ctx.R.Context(), id); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("after_delete_failed").
 			Message(err.Error()).
 			Build())

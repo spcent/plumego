@@ -34,7 +34,7 @@ func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("config_edit_path_invalid").
 			Message(err.Error()).
 			Build())
@@ -44,7 +44,7 @@ func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
 	entries, exists, modTime, err := readEnvEntries(path)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("config_edit_read_failed").
 			Message(err.Error()).
 			Build())
@@ -67,7 +67,7 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("config_edit_path_invalid").
 			Message(err.Error()).
 			Build())
@@ -77,7 +77,7 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	var req ConfigEditRequest
 	if err := ctx.BindJSON(&req); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("invalid_request").
 			Message(err.Error()).
 			Build())
@@ -87,7 +87,7 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	entries := normalizeConfigEntries(req.Entries)
 	if err := writeEnvEntries(path, entries); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("config_edit_write_failed").
 			Message(err.Error()).
 			Build())
@@ -103,7 +103,7 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	if req.Restart {
 		if err := d.Rebuild(ctx.R.Context()); err != nil {
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-				Type(contract.ErrTypeInternal).
+				Type(contract.TypeInternal).
 				Code("app_rebuild_failed").
 				Message(err.Error()).
 				Build())

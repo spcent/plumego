@@ -18,7 +18,7 @@ func TestCtxResponseMethodsNilSafe(t *testing.T) {
 		{name: "Text", call: func() error { return c.Text(200, "") }},
 		{name: "Bytes", call: func() error { return c.Bytes(200, nil) }},
 		{name: "Redirect", call: func() error { return c.Redirect(302, "/") }},
-		{name: "SafeRedirect", call: func() error { return c.SafeRedirect(302, "/") }},
+		{name: "UnsafeRedirect", call: func() error { return c.UnsafeRedirect(302, "/") }},
 		{name: "File", call: func() error { return c.File("/tmp/x") }},
 		{name: "Cookie", call: func() error { _, err := c.Cookie("x"); return err }},
 	}

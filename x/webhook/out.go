@@ -216,7 +216,7 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 
 	provided := strings.TrimSpace(ctx.Query.Get("token"))
 	if provided == "" {
-		provided = strings.TrimSpace(ctx.Headers.Get("X-Trigger-Token"))
+		provided = strings.TrimSpace(ctx.RequestHeaders().Get("X-Trigger-Token"))
 	}
 
 	if token == "" && !allowEmpty {

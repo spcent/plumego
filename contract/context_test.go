@@ -112,9 +112,9 @@ func TestBindJSONMaxBodySize(t *testing.T) {
 		t.Fatalf("expected error for body too large")
 	}
 
-	var bindErr *BindError
+	var bindErr *bindError
 	if !errors.As(err, &bindErr) {
-		t.Fatalf("expected BindError, got %T", err)
+		t.Fatalf("expected bindError, got %T", err)
 	}
 
 	if bindErr.Status != http.StatusRequestEntityTooLarge {
@@ -182,9 +182,9 @@ func TestBindJSONErrors(t *testing.T) {
 				t.Fatalf("expected error for %s", tt.name)
 			}
 
-			var bindErr *BindError
+			var bindErr *bindError
 			if !errors.As(err, &bindErr) {
-				t.Fatalf("expected BindError, got %T", err)
+				t.Fatalf("expected bindError, got %T", err)
 			}
 
 			if bindErr.Message != tt.wantMsg {
@@ -276,7 +276,7 @@ func TestParamsAndRequestContextHelpers(t *testing.T) {
 }
 
 func TestBindErrorHelpers(t *testing.T) {
-	err := &BindError{Message: "oops", Err: errors.New("root")}
+	err := &bindError{Message: "oops", Err: errors.New("root")}
 	if err.Error() != "oops" {
 		t.Fatalf("unexpected error message: %s", err.Error())
 	}
@@ -284,7 +284,7 @@ func TestBindErrorHelpers(t *testing.T) {
 		t.Fatalf("expected unwrap to work")
 	}
 
-	var nilErr *BindError
+	var nilErr *bindError
 	if nilErr.Error() != "" {
 		t.Fatalf("nil receiver should return empty string")
 	}

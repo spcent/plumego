@@ -84,7 +84,7 @@ func TestIsRetryable(t *testing.T) {
 	timeoutErr := NewErrorBuilder().
 		Status(http.StatusRequestTimeout).
 		Category(CategoryTimeout).
-		Type(ErrTypeTimeout).
+		Type(TypeTimeout).
 		Code(CodeTimeout).
 		Message("timeout").
 		Build()
@@ -110,7 +110,7 @@ func TestIsRetryable(t *testing.T) {
 	notFoundErr := NewErrorBuilder().
 		Status(http.StatusNotFound).
 		Category(CategoryClient).
-		Type(ErrTypeNotFound).
+		Type(TypeNotFound).
 		Code(CodeResourceNotFound).
 		Message("resource 'resource' not found").
 		Detail("resource", "resource").
@@ -132,7 +132,7 @@ func TestGetErrorDetails(t *testing.T) {
 	apiErr := NewErrorBuilder().
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
-		Type(ErrTypeValidation).
+		Type(TypeValidation).
 		Code(CodeValidationError).
 		Message("validation failed for field 'email': invalid format").
 		Detail("field", "email").

@@ -655,7 +655,7 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code(contract.CodeInternalError).
 			Message(err.Error()).
 			Build())

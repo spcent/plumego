@@ -115,7 +115,7 @@ func TimeoutWithConfig(cfg TimeoutConfig) middleware.Middleware {
 					contract.WriteError(w, r, contract.NewErrorBuilder().
 						Status(http.StatusInternalServerError).
 						Category(contract.CategoryServer).
-						Type(contract.ErrTypeInternal).
+						Type(contract.TypeInternal).
 						Code(contract.CodeInternalError).
 						Message("response exceeded buffer limit").
 						Build())
@@ -212,7 +212,7 @@ func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
 		contract.WriteError(dst, nil, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code(contract.CodeInternalError).
 			Message("response too large for timeout buffering").
 			Build())

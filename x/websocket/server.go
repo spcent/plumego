@@ -156,7 +156,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code(contract.CodeInternalError).
 			Message(err.Error()).
 			Build())
@@ -171,7 +171,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusForbidden).
 			Category(contract.CategoryAuth).
-			Type(contract.ErrTypeForbidden).
+			Type(contract.TypeForbidden).
 			Code(contract.CodeForbidden).
 			Message("forbidden origin").
 			Build())
@@ -187,7 +187,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryClient).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("bad request").
 			Build())
@@ -200,7 +200,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryClient).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("bad request").
 			Build())
@@ -211,7 +211,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryClient).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message(err.Error()).
 			Build())
@@ -230,7 +230,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusForbidden).
 			Category(contract.CategoryAuth).
-			Type(contract.ErrTypeForbidden).
+			Type(contract.TypeForbidden).
 			Code(contract.CodeForbidden).
 			Message("forbidden: bad room password").
 			Build())
@@ -260,7 +260,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusForbidden).
 				Category(contract.CategoryAuth).
-				Type(contract.ErrTypeForbidden).
+				Type(contract.TypeForbidden).
 				Code(contract.CodeForbidden).
 				Message("forbidden: invalid token").
 				Build())
@@ -276,7 +276,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code(contract.CodeInternalError).
 			Message("server does not support hijacking").
 			Build())
@@ -287,7 +287,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code(contract.CodeInternalError).
 			Message("hijack failed").
 			Build())

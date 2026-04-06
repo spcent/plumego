@@ -113,10 +113,10 @@ func TestNamedRouteRegistration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := newTestApp()
 			called := false
-			mustRegisterRoute(t, app.AddRouteWithName(tt.method, tt.path, tt.route, func(w http.ResponseWriter, r *http.Request) {
+			mustRegisterRoute(t, app.AddRouteWithName(tt.method, tt.path, tt.route, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusNoContent)
-			}))
+			})))
 
 			url := app.URL(tt.route, "id", "42")
 			req := httptest.NewRequest(tt.method, url, nil)

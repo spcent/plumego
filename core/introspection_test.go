@@ -14,7 +14,7 @@ func TestRuntimeSnapshotIncludesStableFields(t *testing.T) {
 	cfg.WriteTimeout = 13 * time.Second
 	cfg.IdleTimeout = 17 * time.Second
 	cfg.MaxHeaderBytes = 2048
-	cfg.EnableHTTP2 = false
+	cfg.HTTP2Enabled = false
 	cfg.DrainInterval = 250 * time.Millisecond
 	cfg.TLS = TLSConfig{
 		Enabled:  true,

@@ -48,35 +48,35 @@ type ErrorType string
 
 const (
 	// Validation errors
-	ErrTypeValidation    ErrorType = "validation_error"
-	ErrTypeRequired      ErrorType = "required_field_missing"
-	ErrTypeInvalidFormat ErrorType = "invalid_format"
-	ErrTypeOutOfRange    ErrorType = "value_out_of_range"
-	ErrTypeDuplicate     ErrorType = "duplicate_value"
+	TypeValidation    ErrorType = "validation_error"
+	TypeRequired      ErrorType = "required_field_missing"
+	TypeInvalidFormat ErrorType = "invalid_format"
+	TypeOutOfRange    ErrorType = "value_out_of_range"
+	TypeDuplicate     ErrorType = "duplicate_value"
 
 	// Authentication/Authorization errors
-	ErrTypeUnauthorized ErrorType = "unauthorized_request"
-	ErrTypeForbidden    ErrorType = "forbidden_request"
-	ErrTypeInvalidToken ErrorType = "invalid_token"
-	ErrTypeExpiredToken ErrorType = "expired_token"
+	TypeUnauthorized ErrorType = "unauthorized_request"
+	TypeForbidden    ErrorType = "forbidden_request"
+	TypeInvalidToken ErrorType = "invalid_token"
+	TypeExpiredToken ErrorType = "expired_token"
 
 	// Resource errors
-	ErrTypeNotFound      ErrorType = "resource_not_found"
-	ErrTypeConflict      ErrorType = "resource_conflict"
-	ErrTypeAlreadyExists ErrorType = "resource_already_exists"
-	ErrTypeGone          ErrorType = "resource_gone"
+	TypeNotFound      ErrorType = "resource_not_found"
+	TypeConflict      ErrorType = "resource_conflict"
+	TypeAlreadyExists ErrorType = "resource_already_exists"
+	TypeGone          ErrorType = "resource_gone"
 
 	// System errors
-	ErrTypeInternal    ErrorType = "internal_error"
-	ErrTypeUnavailable ErrorType = "service_unavailable"
-	ErrTypeTimeout     ErrorType = "timeout_error"
-	ErrTypeRateLimited ErrorType = "rate_limited"
-	ErrTypeMaintenance ErrorType = "maintenance_mode"
+	TypeInternal    ErrorType = "internal_error"
+	TypeUnavailable ErrorType = "service_unavailable"
+	TypeTimeout     ErrorType = "timeout_error"
+	TypeRateLimited ErrorType = "rate_limited"
+	TypeMaintenance ErrorType = "maintenance_mode"
 
 	// Business logic errors
-	ErrTypeInvalidState        ErrorType = "invalid_state"
-	ErrTypeInsufficientFunds   ErrorType = "insufficient_funds"
-	ErrTypeOperationNotAllowed ErrorType = "operation_not_allowed"
+	TypeInvalidState        ErrorType = "invalid_state"
+	TypeInsufficientFunds   ErrorType = "insufficient_funds"
+	TypeOperationNotAllowed ErrorType = "operation_not_allowed"
 )
 
 // errorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
@@ -91,31 +91,31 @@ type errorTypeMeta struct {
 // switch statements across the codebase.
 var errorTypeLookup = map[ErrorType]errorTypeMeta{
 	// Validation
-	ErrTypeValidation:    {CategoryValidation, CodeValidationError, http.StatusBadRequest},
-	ErrTypeRequired:      {CategoryValidation, CodeRequired, http.StatusBadRequest},
-	ErrTypeInvalidFormat: {CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
-	ErrTypeOutOfRange:    {CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
-	ErrTypeDuplicate:     {CategoryValidation, CodeDuplicate, http.StatusBadRequest},
+	TypeValidation:    {CategoryValidation, CodeValidationError, http.StatusBadRequest},
+	TypeRequired:      {CategoryValidation, CodeRequired, http.StatusBadRequest},
+	TypeInvalidFormat: {CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
+	TypeOutOfRange:    {CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
+	TypeDuplicate:     {CategoryValidation, CodeDuplicate, http.StatusBadRequest},
 	// Auth
-	ErrTypeUnauthorized: {CategoryAuth, CodeUnauthorized, http.StatusUnauthorized},
-	ErrTypeForbidden:    {CategoryAuth, CodeForbidden, http.StatusForbidden},
-	ErrTypeInvalidToken: {CategoryAuth, CodeInvalidToken, http.StatusUnauthorized},
-	ErrTypeExpiredToken: {CategoryAuth, CodeExpiredToken, http.StatusUnauthorized},
+	TypeUnauthorized: {CategoryAuth, CodeUnauthorized, http.StatusUnauthorized},
+	TypeForbidden:    {CategoryAuth, CodeForbidden, http.StatusForbidden},
+	TypeInvalidToken: {CategoryAuth, CodeInvalidToken, http.StatusUnauthorized},
+	TypeExpiredToken: {CategoryAuth, CodeExpiredToken, http.StatusUnauthorized},
 	// Resource
-	ErrTypeNotFound:      {CategoryClient, CodeResourceNotFound, http.StatusNotFound},
-	ErrTypeConflict:      {CategoryClient, CodeConflict, http.StatusConflict},
-	ErrTypeAlreadyExists: {CategoryClient, CodeAlreadyExists, http.StatusConflict},
-	ErrTypeGone:          {CategoryClient, CodeGone, http.StatusGone},
+	TypeNotFound:      {CategoryClient, CodeResourceNotFound, http.StatusNotFound},
+	TypeConflict:      {CategoryClient, CodeConflict, http.StatusConflict},
+	TypeAlreadyExists: {CategoryClient, CodeAlreadyExists, http.StatusConflict},
+	TypeGone:          {CategoryClient, CodeGone, http.StatusGone},
 	// System
-	ErrTypeInternal:    {CategoryServer, CodeInternalError, http.StatusInternalServerError},
-	ErrTypeUnavailable: {CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
-	ErrTypeTimeout:     {CategoryTimeout, CodeTimeout, http.StatusRequestTimeout},
-	ErrTypeRateLimited: {CategoryRateLimit, CodeRateLimited, http.StatusTooManyRequests},
-	ErrTypeMaintenance: {CategoryServer, CodeMaintenance, http.StatusServiceUnavailable},
+	TypeInternal:    {CategoryServer, CodeInternalError, http.StatusInternalServerError},
+	TypeUnavailable: {CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
+	TypeTimeout:     {CategoryTimeout, CodeTimeout, http.StatusRequestTimeout},
+	TypeRateLimited: {CategoryRateLimit, CodeRateLimited, http.StatusTooManyRequests},
+	TypeMaintenance: {CategoryServer, CodeMaintenance, http.StatusServiceUnavailable},
 	// Business
-	ErrTypeInvalidState:        {CategoryBusiness, CodeInvalidState, http.StatusUnprocessableEntity},
-	ErrTypeInsufficientFunds:   {CategoryBusiness, CodeInsufficientFunds, http.StatusUnprocessableEntity},
-	ErrTypeOperationNotAllowed: {CategoryBusiness, CodeOperationNotAllowed, http.StatusUnprocessableEntity},
+	TypeInvalidState:        {CategoryBusiness, CodeInvalidState, http.StatusUnprocessableEntity},
+	TypeInsufficientFunds:   {CategoryBusiness, CodeInsufficientFunds, http.StatusUnprocessableEntity},
+	TypeOperationNotAllowed: {CategoryBusiness, CodeOperationNotAllowed, http.StatusUnprocessableEntity},
 }
 
 // Meta returns the canonical Category, Code, and HTTP status for the ErrorType.
@@ -162,6 +162,9 @@ type ErrorResponse struct {
 // fields are always populated. WriteError keeps fallback defaults for
 // backward compatibility and calls WarnFunc when required fields are missing.
 func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
+	if w == nil {
+		return ErrResponseWriterNil
+	}
 	if issues := validateAPIError(err); len(issues) > 0 {
 		WarnFunc("WriteError received partially-populated APIError: " + strings.Join(issues, "; "))
 	}
@@ -298,6 +301,17 @@ func (b *ErrorBuilder) TraceID(traceID string) *ErrorBuilder {
 	return b
 }
 
+// TypeOnly sets the Type field without changing Status, Category, or Code.
+// Use this when Status, Category, and Code are already set explicitly and
+// only need to tag the error's type for observability.
+// Contrast with Type(), which also overwrites Status, Category, and Code from type metadata.
+func (b *ErrorBuilder) TypeOnly(errorType ErrorType) *ErrorBuilder {
+	if errorType != "" {
+		b.err.Type = errorType
+	}
+	return b
+}
+
 // Detail adds a detail field to the error.
 func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
 	b.err.Details[key] = value
@@ -408,7 +422,7 @@ func ParseErrorFromResponse(resp *http.Response) (APIError, error) {
 	var errorResp ErrorResponse
 	if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
 		return NewErrorBuilder().
-			Type(ErrTypeInternal).
+			Type(TypeInternal).
 			Status(resp.StatusCode).
 			Code(http.StatusText(resp.StatusCode)).
 			Category(CategoryServer).

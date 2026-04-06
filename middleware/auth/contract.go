@@ -114,7 +114,7 @@ func applyAuthOptions(opts ...AuthOption) authOptions {
 
 func writeAuthInternal(w http.ResponseWriter, r *http.Request, message string) {
 	contract.WriteError(w, r, contract.NewErrorBuilder().
-		Type(contract.ErrTypeInternal).
+		Type(contract.TypeInternal).
 		Message(message).
 		Build())
 }
@@ -144,7 +144,7 @@ func authErrorToAPIError(err error) contract.APIError {
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnauthorized).
 			Category(contract.CategoryAuth).
-			Type(contract.ErrTypeUnauthorized).
+			Type(contract.TypeUnauthorized).
 			Code(contract.CodeUnauthorized).
 			Message(msg).
 			Build()
@@ -154,7 +154,7 @@ func authErrorToAPIError(err error) contract.APIError {
 		return contract.NewErrorBuilder().
 			Status(http.StatusForbidden).
 			Category(contract.CategoryAuth).
-			Type(contract.ErrTypeForbidden).
+			Type(contract.TypeForbidden).
 			Code(contract.CodeForbidden).
 			Message("access forbidden").
 			Build()
