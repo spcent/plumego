@@ -2,7 +2,7 @@
 
 Milestone: contract cleanup
 Priority: P3
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/auth_test.go`
