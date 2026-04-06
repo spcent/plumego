@@ -1,15 +1,10 @@
 // Package cache provides an in-memory caching system with TTL and LRU eviction.
 //
-// This package implements a high-performance cache with features including:
+// This package implements an in-process cache primitive with features including:
 //   - TTL (time-to-live) expiration for entries
-//   - LRU (Least Recently Used) eviction when capacity is reached
-//   - Distributed mode with consistent hashing
-//   - Leaderboard support for ranked data
-//   - Metrics collection and monitoring
-//   - Thread-safe operations
-//
-// The cache can operate in standalone or distributed mode, supporting both
-// simple key-value storage and complex use cases like leaderboards.
+//   - memory-bounded eviction
+//   - metrics collection
+//   - thread-safe operations
 //
 // Example usage:
 //
@@ -39,9 +34,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"sync"
 	"time"
 )
@@ -555,149 +547,6 @@ func (mc *MemoryCache) Close() error {
 	return nil
 }
 
-// isSafeContentType checks if a content type is safe to cache to prevent XSS.
-// Only caches JSON and other structured data formats, not HTML or scripts.
-func isSafeContentType(contentType string) bool {
-	// Extract the media type without parameters
-	mediaType := contentType
-	if idx := strings.Index(contentType, ";"); idx >= 0 {
-		mediaType = strings.TrimSpace(contentType[:idx])
-	}
-
-	// Allow JSON and other safe structured formats
-	safeTypes := []string{
-		"application/json",
-		"application/xml",
-		"text/xml",
-		"application/pdf",
-		"image/",
-		"video/",
-		"audio/",
-	}
-
-	for _, safe := range safeTypes {
-		if strings.HasPrefix(mediaType, safe) || strings.HasSuffix(mediaType, "+json") || strings.HasSuffix(mediaType, "+xml") {
-			return true
-		}
-	}
-
-	return false
-}
-
-// cachedHandler is the core HTTP cache handler implementation.
-// Only caches safe content types (JSON, XML, images, etc.) to prevent stored XSS attacks.
-func cachedHandler(c Cache, ttl time.Duration, keyFn func(*http.Request) string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := keyFn(r)
-
-		// Try to get from cache
-		if data, err := c.Get(r.Context(), key); err == nil {
-			resp, err := decodeCachedResponse(data)
-			if err == nil {
-				writeCachedResponse(w, resp)
-				return
-			}
-			// Cache is corrupted, delete it
-			_ = c.Delete(r.Context(), key)
-		}
-
-		// Cache miss or corrupted, call the handler
-		recorder := httptest.NewRecorder()
-		next.ServeHTTP(recorder, r)
-
-		// Capture body once for writing and optional caching
-		bodyBytes := recorder.Body.Bytes()
-
-		// SECURITY NOTE: bodyBytes contains response data from upstream handlers.
-		// This cache middleware does not inject user input into HTML contexts.
-		// Content type filtering below ensures only safe responses are cached.
-		// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
-		copyHeaders(w.Header(), recorder.Header())
-		w.Header().Set("X-Cache", "MISS")
-		ensureNoSniff(w.Header())
-		w.WriteHeader(recorder.Code)
-		_, _ = safeWrite(w, bodyBytes)
-
-		// Only cache successful responses with safe content types to prevent XSS
-		contentType := recorder.Header().Get("Content-Type")
-		if recorder.Code >= 200 && recorder.Code < 300 && isSafeContentType(contentType) {
-			resp := cachedResponse{
-				Status: recorder.Code,
-				Header: cloneHeader(recorder.Header()),
-				Body:   bodyBytes,
-			}
-			if encoded, err := encodeCachedResponse(resp); err == nil {
-				_ = c.Set(r.Context(), key, encoded, ttl)
-			}
-		}
-	})
-}
-
-// Cached decorates an http.Handler with cache read/write logic.
-// Only caches safe content types (JSON, XML, images, etc.) to prevent stored XSS attacks.
-func Cached(c Cache, ttl time.Duration, keyFn func(*http.Request) string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return cachedHandler(c, ttl, keyFn, next)
-	}
-}
-
-// CachedWithConfig decorates an http.Handler with configurable cache logic.
-// Only caches safe content types (JSON, XML, images, etc.) to prevent stored XSS attacks.
-func CachedWithConfig(c Cache, config Config, keyFn func(*http.Request) string) func(http.Handler) http.Handler {
-	ttl := config.DefaultTTL
-	if ttl == 0 {
-		ttl = 10 * time.Minute
-	}
-	return func(next http.Handler) http.Handler {
-		return cachedHandler(c, ttl, keyFn, next)
-	}
-}
-
-// KeyFromRequest is a helper function to generate cache keys from requests.
-func KeyFromRequest(r *http.Request) string {
-	var builder strings.Builder
-	builder.WriteString(r.Method)
-	builder.WriteString(":")
-	builder.WriteString(r.URL.Path)
-
-	if query := r.URL.RawQuery; query != "" {
-		builder.WriteString("?")
-		builder.WriteString(query)
-	}
-
-	return builder.String()
-}
-
-// KeyFromRequestWithHeaders is a helper function to generate cache keys including specific headers.
-func KeyFromRequestWithHeaders(r *http.Request, headers ...string) string {
-	var builder strings.Builder
-	builder.WriteString(r.Method)
-	builder.WriteString(":")
-	builder.WriteString(r.URL.Path)
-
-	if query := r.URL.RawQuery; query != "" {
-		builder.WriteString("?")
-		builder.WriteString(query)
-	}
-
-	for _, header := range headers {
-		if value := r.Header.Get(header); value != "" {
-			builder.WriteString(":")
-			builder.WriteString(header)
-			builder.WriteString("=")
-			builder.WriteString(value)
-		}
-	}
-
-	return builder.String()
-}
-
-type cachedResponse struct {
-	Status int
-	Header http.Header
-	Body   []byte
-}
-
 func expired(exp time.Time) bool {
 	return !exp.IsZero() && time.Now().After(exp)
 }
@@ -709,44 +558,4 @@ func cloneBytes(in []byte) []byte {
 	out := make([]byte, len(in))
 	copy(out, in)
 	return out
-}
-
-func copyHeaders(dst, src http.Header) {
-	for k, v := range src {
-		dst[k] = append([]string(nil), v...)
-	}
-}
-
-func cloneHeader(h http.Header) http.Header {
-	cloned := make(http.Header, len(h))
-	copyHeaders(cloned, h)
-	return cloned
-}
-
-func encodeCachedResponse(resp cachedResponse) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(resp); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func decodeCachedResponse(data []byte) (cachedResponse, error) {
-	var resp cachedResponse
-	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&resp); err != nil {
-		return cachedResponse{}, err
-	}
-	return resp, nil
-}
-
-func writeCachedResponse(w http.ResponseWriter, resp cachedResponse) {
-	copyHeaders(w.Header(), resp.Header)
-	w.Header().Set("X-Cache", "HIT")
-	status := resp.Status
-	if status == 0 {
-		status = http.StatusOK
-	}
-	ensureNoSniff(w.Header())
-	w.WriteHeader(status)
-	_, _ = safeWrite(w, resp.Body)
 }

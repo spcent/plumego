@@ -4,5 +4,6 @@
 // Sub-packages:
 //
 //   - distributed: consistent-hashing distributed cache with replication and failover
+//   - leaderboard: ranked-data cache built on store/cache primitives
 //   - redis: Redis client adapter implementing store/cache.Cache
 package cache

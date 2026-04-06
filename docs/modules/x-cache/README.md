@@ -12,6 +12,7 @@
 ## Use this module when
 
 - implementing distributed caching with consistent hashing
+- building ranked-data or leaderboard cache features on top of `store/cache`
 - adapting a Redis client to the `store/cache.Cache` interface
 - building topology-heavy or provider-specific cache backends
 
@@ -24,16 +25,19 @@
 ## Sub-packages
 
 - `x/cache/distributed` — consistent-hashing distributed cache with replication modes and failover strategies
+- `x/cache/leaderboard` — in-memory ranked-data cache on top of stable `store/cache` primitives
 - `x/cache/redis` — minimal Redis client adapter implementing `store/cache.Cache`
 
 ## First files to read
 
 - `x/cache/module.yaml`
 - `x/cache/distributed/distributed.go`
+- `x/cache/leaderboard/leaderboard.go`
 - `x/cache/redis/redis.go`
 
 ## Canonical change shape
 
 - implement `store/cache.Cache` interface
 - keep topology decisions in this layer, not in stable store
+- keep feature-specific cache behavior in this layer, not in stable store
 - keep provider-specific logic isolated to sub-packages

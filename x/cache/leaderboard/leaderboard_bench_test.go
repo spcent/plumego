@@ -1,9 +1,11 @@
-package cache
+package leaderboard
 
 import (
 	"context"
 	"fmt"
 	"testing"
+
+	storecache "github.com/spcent/plumego/store/cache"
 )
 
 func BenchmarkSkipListInsert(b *testing.B) {
@@ -87,7 +89,7 @@ func BenchmarkSkipListGetRank(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheZAdd(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -105,7 +107,7 @@ func BenchmarkLeaderboardCacheZAdd(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheZScore(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -128,7 +130,7 @@ func BenchmarkLeaderboardCacheZScore(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheZIncrBy(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -151,7 +153,7 @@ func BenchmarkLeaderboardCacheZIncrBy(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheZRange(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -174,7 +176,7 @@ func BenchmarkLeaderboardCacheZRange(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheZRangeByScore(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -197,7 +199,7 @@ func BenchmarkLeaderboardCacheZRangeByScore(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheZRank(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -220,7 +222,7 @@ func BenchmarkLeaderboardCacheZRank(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheZCard(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -243,7 +245,7 @@ func BenchmarkLeaderboardCacheZCard(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheZCount(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -279,7 +281,7 @@ func BenchmarkLeaderboardCacheZAdd_LargeSet(b *testing.B) {
 }
 
 func benchmarkZAddWithSize(b *testing.B, size int) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 	lbConfig.MaxMembersPerSet = size * 2
 
@@ -307,7 +309,7 @@ func benchmarkZAddWithSize(b *testing.B, size int) {
 
 // Benchmark parallel operations
 func BenchmarkLeaderboardCacheParallelZAdd(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -328,7 +330,7 @@ func BenchmarkLeaderboardCacheParallelZAdd(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheParallelZScore(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -355,7 +357,7 @@ func BenchmarkLeaderboardCacheParallelZScore(b *testing.B) {
 }
 
 func BenchmarkLeaderboardCacheParallelZRank(b *testing.B) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)

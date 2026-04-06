@@ -1,4 +1,4 @@
-package cache
+package leaderboard
 
 import (
 	"context"
@@ -7,11 +7,13 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	storecache "github.com/spcent/plumego/store/cache"
 )
 
-// LeaderboardCache extends Cache with sorted set operations for leaderboards
+// LeaderboardCache extends store/cache with sorted-set operations for ranked data.
 type LeaderboardCache interface {
-	Cache // Embeds existing cache interface
+	storecache.Cache
 
 	// Sorted Set Operations
 	ZAdd(ctx context.Context, key string, members ...*ZMember) error
@@ -62,10 +64,10 @@ func DefaultLeaderboardConfig() *LeaderboardConfig {
 // Validate checks if the configuration is valid
 func (c *LeaderboardConfig) Validate() error {
 	if c.MaxLeaderboards <= 0 {
-		return ErrInvalidConfig
+		return storecache.ErrInvalidConfig
 	}
 	if c.MaxMembersPerSet <= 0 {
-		return ErrInvalidConfig
+		return storecache.ErrInvalidConfig
 	}
 	if c.CleanupInterval <= 0 {
 		c.CleanupInterval = 5 * time.Minute
@@ -117,7 +119,7 @@ func (ss *sortedSet) isExpired() bool {
 
 // MemoryLeaderboardCache is an in-memory implementation of LeaderboardCache
 type MemoryLeaderboardCache struct {
-	*MemoryCache // Embed base cache
+	*storecache.MemoryCache
 
 	leaderboards sync.Map // key -> *sortedSet
 	config       *LeaderboardConfig
@@ -142,7 +144,7 @@ type LeaderboardMetrics struct {
 //
 // Panics if either configuration is invalid. Call config.Validate() beforehand
 // if you need to handle validation errors gracefully.
-func NewMemoryLeaderboardCache(cacheConfig Config, lbConfig *LeaderboardConfig) *MemoryLeaderboardCache {
+func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *LeaderboardConfig) *MemoryLeaderboardCache {
 	if lbConfig == nil {
 		lbConfig = DefaultLeaderboardConfig()
 	}
@@ -151,7 +153,7 @@ func NewMemoryLeaderboardCache(cacheConfig Config, lbConfig *LeaderboardConfig) 
 		panic(fmt.Sprintf("invalid leaderboard config: %v", err))
 	}
 
-	baseCache := NewMemoryCacheWithConfig(cacheConfig)
+	baseCache := storecache.NewMemoryCacheWithConfig(cacheConfig)
 
 	lbc := &MemoryLeaderboardCache{
 		MemoryCache: baseCache,

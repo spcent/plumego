@@ -21,6 +21,7 @@ non_goals:
   - AI-specific caches
   - Read-write splitting and sharding topology defaults
   - HTTP transport behavior
+  - Feature-specific ranked-data cache behavior
   - Business-level idempotency semantics (domain-specific dedup rules, e.g. payment deduplication policies, belong in the application or x/* layer)
 
 public_entrypoints:
@@ -59,9 +60,11 @@ review_checklist:
   - Keep store APIs transport-agnostic
   - No tenant-specific logic in stable store
   - Keep topology-heavy data features out of the stable layer
+  - Keep HTTP response caching and request-derived cache keys out of stable store/cache
   - Prefer stdlib-compatible abstractions
 
 agent_hints:
   - Move tenant-aware adapters to x/tenant/store
   - For distributed or provider-specific cache needs use x/cache (distributed, redis)
+  - For ranked-data cache behavior use x/cache/leaderboard; for HTTP response caching use x/gateway/cache
   - Do not add topology-heavy, provider-heavy, or business-level idempotency logic here; store/idempotency is a transport-agnostic dedup primitive only

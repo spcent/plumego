@@ -1,4 +1,4 @@
-package cache
+package leaderboard
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	storecache "github.com/spcent/plumego/store/cache"
 )
 
 func TestSkipListBasicOperations(t *testing.T) {
@@ -259,7 +261,7 @@ func TestSkipListClear(t *testing.T) {
 }
 
 func TestLeaderboardCacheBasicOperations(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -307,7 +309,7 @@ func TestLeaderboardCacheBasicOperations(t *testing.T) {
 }
 
 func TestLeaderboardCacheZIncrBy(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -344,7 +346,7 @@ func TestLeaderboardCacheZIncrBy(t *testing.T) {
 }
 
 func TestLeaderboardCacheZRange(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -400,7 +402,7 @@ func TestLeaderboardCacheZRange(t *testing.T) {
 }
 
 func TestLeaderboardCacheZRangeByScore(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -440,7 +442,7 @@ func TestLeaderboardCacheZRangeByScore(t *testing.T) {
 }
 
 func TestLeaderboardCacheZRank(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -485,7 +487,7 @@ func TestLeaderboardCacheZRank(t *testing.T) {
 }
 
 func TestLeaderboardCacheZCount(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -527,7 +529,7 @@ func TestLeaderboardCacheZCount(t *testing.T) {
 }
 
 func TestLeaderboardCacheZRemRange(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -579,7 +581,7 @@ func TestLeaderboardCacheZRemRange(t *testing.T) {
 }
 
 func TestLeaderboardCacheZRemRangeByScore(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -631,7 +633,7 @@ func TestLeaderboardCacheZRemRangeByScore(t *testing.T) {
 }
 
 func TestLeaderboardCacheClear(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -650,7 +652,7 @@ func TestLeaderboardCacheClear(t *testing.T) {
 		t.Fatalf("Clear failed: %v", err)
 	}
 
-	if _, err := lbc.Get(ctx, "plain:key"); err != ErrNotFound {
+	if _, err := lbc.Get(ctx, "plain:key"); err != storecache.ErrNotFound {
 		t.Errorf("expected ErrNotFound for plain:key, got %v", err)
 	}
 
@@ -668,7 +670,7 @@ func TestLeaderboardCacheClear(t *testing.T) {
 }
 
 func TestLeaderboardCacheTTL(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 	lbConfig.DefaultTTL = 100 * time.Millisecond
 	lbConfig.CleanupInterval = 50 * time.Millisecond
@@ -695,7 +697,7 @@ func TestLeaderboardCacheTTL(t *testing.T) {
 }
 
 func TestLeaderboardCacheInvalidScore(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -723,7 +725,7 @@ func TestLeaderboardCacheInvalidScore(t *testing.T) {
 }
 
 func TestLeaderboardCacheMemberLimit(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 	lbConfig.MaxMembersPerSet = 5
 
@@ -752,7 +754,7 @@ func TestLeaderboardCacheMemberLimit(t *testing.T) {
 }
 
 func TestLeaderboardCacheConcurrency(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -810,7 +812,7 @@ func TestLeaderboardCacheConcurrency(t *testing.T) {
 }
 
 func TestLeaderboardCacheMetrics(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
@@ -846,7 +848,7 @@ func TestLeaderboardCacheMetrics(t *testing.T) {
 }
 
 func TestLeaderboardCacheUpdateScore(t *testing.T) {
-	config := DefaultConfig()
+	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
 	lbc := NewMemoryLeaderboardCache(config, lbConfig)
