@@ -77,33 +77,6 @@ func TestAdditionalHeadersValidation(t *testing.T) {
 	}
 }
 
-func TestMiddleware(t *testing.T) {
-	policy := DefaultPolicy()
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	middleware := policy.Middleware(handler)
-
-	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
-	w := httptest.NewRecorder()
-
-	middleware.ServeHTTP(w, req)
-
-	resp := w.Result()
-	if got := resp.Header.Get("X-Content-Type-Options"); got != "nosniff" {
-		t.Errorf("expected X-Content-Type-Options nosniff, got %q", got)
-	}
-	if got := resp.Header.Get("X-Frame-Options"); got != "SAMEORIGIN" {
-		t.Errorf("expected X-Frame-Options SAMEORIGIN, got %q", got)
-	}
-	if w.Body.String() != "ok" {
-		t.Errorf("expected body 'ok', got %q", w.Body.String())
-	}
-}
-
 func TestCSPBuilder(t *testing.T) {
 	tests := []struct {
 		name     string

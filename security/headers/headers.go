@@ -1,4 +1,4 @@
-// Package headers provides HTTP security header management and middleware.
+// Package headers provides HTTP security header policy primitives.
 //
 // This package implements a comprehensive security header policy system supporting:
 //   - HSTS (HTTP Strict Transport Security)
@@ -10,13 +10,16 @@
 //
 // Features:
 //   - Declarative policy configuration
-//   - HTTP middleware for automatic header injection
+//   - header application primitives for transport adapters
 //   - CSP nonce generation for inline scripts
 //   - Policy validation and error reporting
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/security/headers"
+//	import (
+//		mwsecurity "github.com/spcent/plumego/middleware/security"
+//		"github.com/spcent/plumego/security/headers"
+//	)
 //
 //	policy := headers.Policy{
 //		StrictTransportSecurity: &headers.HSTSOptions{
@@ -31,9 +34,8 @@
 //		XFrameOptions: "DENY",
 //	}
 //
-//	// Apply as middleware
-//	middleware := policy.Middleware()
-//	app.Use(middleware)
+//	// Apply with the canonical transport adapter
+//	app.Use(mwsecurity.SecurityHeaders(&policy))
 package headers
 
 import (
@@ -283,24 +285,6 @@ func isHTTPSRequest(r *http.Request) bool {
 	}
 
 	return false
-}
-
-// Middleware returns an HTTP middleware that applies the security policy to all responses.
-//
-// Example:
-//
-//	import (
-//		"github.com/spcent/plumego/security/headers"
-//		"net/http"
-//	)
-//
-//	policy := headers.DefaultPolicy()
-//	handler := policy.Middleware(http.HandlerFunc(myHandler))
-func (p Policy) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p.Apply(w, r)
-		next.ServeHTTP(w, r)
-	})
 }
 
 // CSPBuilder helps construct Content-Security-Policy headers.

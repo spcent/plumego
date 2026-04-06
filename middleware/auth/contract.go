@@ -19,6 +19,10 @@ type authOptions struct {
 // AuthOption configures authentication middleware behavior.
 type AuthOption func(*authOptions)
 
+type requestAuthenticator interface {
+	AuthenticateRequest(r *http.Request) (*contract.Principal, *http.Request, error)
+}
+
 // WithAuthErrorHandler overrides the default error handling.
 func WithAuthErrorHandler(handler AuthErrorHandler) AuthOption {
 	return func(o *authOptions) {
@@ -45,7 +49,19 @@ func Authenticate(authenticator contract.Authenticator, opts ...AuthOption) midd
 				return
 			}
 
-			principal, err := authenticator.Authenticate(r)
+			req := r
+			var (
+				principal *contract.Principal
+				err       error
+			)
+			if enriched, ok := authenticator.(requestAuthenticator); ok {
+				principal, req, err = enriched.AuthenticateRequest(r)
+				if req == nil {
+					req = r
+				}
+			} else {
+				principal, err = authenticator.Authenticate(r)
+			}
 			if err != nil {
 				cfg.errorHandler(w, r, err)
 				return
@@ -55,8 +71,8 @@ func Authenticate(authenticator contract.Authenticator, opts ...AuthOption) midd
 				return
 			}
 
-			ctx := contract.WithPrincipal(r.Context(), principal)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			ctx := contract.WithPrincipal(req.Context(), principal)
+			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	}
 }

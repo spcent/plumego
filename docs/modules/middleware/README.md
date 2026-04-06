@@ -34,6 +34,7 @@
 - add ordering and error-path tests
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
+- keep auth and security-header transport adapters here, on top of `security/*` primitives
 
 ## Boundary with observability
 

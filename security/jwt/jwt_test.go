@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	authmw "github.com/spcent/plumego/middleware/auth"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
@@ -501,7 +502,7 @@ func TestCheckPolicy(t *testing.T) {
 
 // ========== Middleware Test ==========
 
-func TestJWTAuthenticatorMiddleware(t *testing.T) {
+func TestAuthenticatorWithMiddlewareAuth(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
@@ -509,9 +510,9 @@ func TestJWTAuthenticatorMiddleware(t *testing.T) {
 	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-mw"}, AuthorizationClaims{Roles: []string{"user"}})
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		claims, err := GetClaimsFromContext(r)
-		if err != nil {
-			t.Errorf("failed to get claims from context: %v", err)
+		claims := TokenClaimsFromContext(r.Context())
+		if claims == nil {
+			t.Errorf("expected claims in context")
 			return
 		}
 		if claims.Identity.Subject != "user-mw" {
@@ -520,7 +521,7 @@ func TestJWTAuthenticatorMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	authenticator := mgr.JWTAuthenticator(TokenTypeAccess)
+	authenticator := authmw.Authenticate(mgr.Authenticator(TokenTypeAccess))
 	wrapped := authenticator(handler)
 
 	// test valid token
@@ -558,7 +559,7 @@ func TestJWTAuthenticatorMiddleware(t *testing.T) {
 
 // ========== Authorization Middleware Test ==========
 
-func TestAuthorizeMiddleware(t *testing.T) {
+func TestPolicyAuthorizerWithMiddlewareAuth(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("success"))
@@ -566,7 +567,7 @@ func TestAuthorizeMiddleware(t *testing.T) {
 	policy := AuthZPolicy{
 		AllRoles: []string{"admin"},
 	}
-	authMiddleware := AuthorizeMiddleware(policy)
+	authMiddleware := authmw.Authorize(PolicyAuthorizer{Policy: policy}, "", "")
 	wrapped := authMiddleware(handler)
 
 	// test valid claims
@@ -578,7 +579,7 @@ func TestAuthorizeMiddleware(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "/admin", nil)
-	ctx := context.WithValue(req.Context(), claimsContextKey, claims)
+	ctx := contract.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -591,7 +592,7 @@ func TestAuthorizeMiddleware(t *testing.T) {
 	// test invalid claims
 	claims.Authorization.Roles = []string{"user"}
 	req = httptest.NewRequest("GET", "/admin", nil)
-	ctx = context.WithValue(req.Context(), claimsContextKey, claims)
+	ctx = contract.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
 	req = req.WithContext(ctx)
 	rec = httptest.NewRecorder()
 
@@ -614,7 +615,7 @@ func TestDebugMode(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	authenticator := mgr.JWTAuthenticator(TokenTypeAccess)
+	authenticator := authmw.Authenticate(mgr.Authenticator(TokenTypeAccess))
 	wrapped := authenticator(handler)
 
 	// test expired token

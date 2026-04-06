@@ -9,9 +9,10 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	authmw "github.com/spcent/plumego/middleware/auth"
 )
 
-func TestJWTAuthenticatorNegativeMatrix(t *testing.T) {
+func TestAuthenticateNegativeMatrix(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()
 	mgr, err := NewJWTManager(store, cfg)
@@ -29,7 +30,7 @@ func TestJWTAuthenticatorNegativeMatrix(t *testing.T) {
 	}
 
 	handlerCalled := false
-	protected := mgr.JWTAuthenticator(TokenTypeAccess)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := authmw.Authenticate(mgr.Authenticator(TokenTypeAccess))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -43,31 +44,31 @@ func TestJWTAuthenticatorNegativeMatrix(t *testing.T) {
 		{
 			name:            "missing authorization header",
 			authzHeader:     "",
-			expectedCode:    "missing_token",
-			expectedMessage: "missing authorization header",
+			expectedCode:    "UNAUTHORIZED",
+			expectedMessage: "authentication required",
 		},
 		{
 			name:            "empty bearer token",
 			authzHeader:     "Bearer   ",
-			expectedCode:    "missing_token",
-			expectedMessage: "missing authorization header",
+			expectedCode:    "UNAUTHORIZED",
+			expectedMessage: "authentication required",
 		},
 		{
 			name:            "malformed token",
 			authzHeader:     "Bearer invalid.token",
-			expectedCode:    "invalid_token",
+			expectedCode:    "UNAUTHORIZED",
 			expectedMessage: "invalid token",
 		},
 		{
 			name:            "tampered signature",
 			authzHeader:     "Bearer " + tamperJWT(accessPair.AccessToken),
-			expectedCode:    "invalid_token",
+			expectedCode:    "UNAUTHORIZED",
 			expectedMessage: "invalid token",
 		},
 		{
 			name:            "wrong token type",
 			authzHeader:     "Bearer " + refreshPair.RefreshToken,
-			expectedCode:    "invalid_token",
+			expectedCode:    "UNAUTHORIZED",
 			expectedMessage: "invalid token",
 		},
 	}
@@ -110,15 +111,21 @@ func tamperJWT(token string) string {
 	if token == "" {
 		return token
 	}
-	last := token[len(token)-1]
-	replacement := "A"
-	if last == 'A' {
-		replacement = "B"
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return token + ".tampered"
 	}
-	return token[:len(token)-1] + replacement
+	if parts[2] == "" {
+		parts[2] = "tampered"
+	} else if parts[2][0] == 'A' {
+		parts[2] = "B" + parts[2][1:]
+	} else {
+		parts[2] = "A" + parts[2][1:]
+	}
+	return strings.Join(parts, ".")
 }
 
-func TestJWTAuthenticatorRejectsNonBearerSchemes(t *testing.T) {
+func TestAuthenticateRejectsNonBearerSchemes(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()
 	mgr, err := NewJWTManager(store, cfg)
@@ -126,7 +133,7 @@ func TestJWTAuthenticatorRejectsNonBearerSchemes(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	protected := mgr.JWTAuthenticator(TokenTypeAccess)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := authmw.Authenticate(mgr.Authenticator(TokenTypeAccess))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
@@ -138,7 +145,7 @@ func TestJWTAuthenticatorRejectsNonBearerSchemes(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "missing authorization header") {
-		t.Fatalf("expected missing authorization header response, got %q", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "authentication required") {
+		t.Fatalf("expected authentication required response, got %q", rec.Body.String())
 	}
 }

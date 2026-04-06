@@ -32,3 +32,5 @@
 - fail closed
 - keep verification explicit
 - add negative tests for invalid input and invalid credentials
+- keep JWT, header, and signature logic in `security/*` as primitives and policies
+- route HTTP adapter wiring through `middleware/auth` and `middleware/security`

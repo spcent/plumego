@@ -10,12 +10,15 @@
 //   - HMAC-SHA256 signing with automatic key rotation
 //   - EdDSA (Ed25519) signing for enhanced security
 //   - Token blacklisting for logout and revocation
-//   - HTTP middleware for automatic token validation
+//   - transport-agnostic token validation with explicit middleware adapters
 //   - Thread-safe operations with minimal lock contention
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/security/jwt"
+//	import (
+//		authmw "github.com/spcent/plumego/middleware/auth"
+//		"github.com/spcent/plumego/security/jwt"
+//	)
 //
 //	// Create a JWT manager with a secret (min 32 bytes)
 //	secret := []byte("your-secret-key-min-32-bytes-long")
@@ -34,8 +37,8 @@
 //		// Handle invalid or expired token
 //	}
 //
-//	// Use as HTTP middleware
-//	app.Use(manager.Middleware())
+//	// Use with the canonical transport adapter
+//	app.Use(authmw.Authenticate(manager.Authenticator(jwt.TokenTypeAccess)))
 package jwt
 
 import (
@@ -55,8 +58,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
@@ -311,8 +312,7 @@ type TokenPair struct {
 //	// Verify token
 //	claims, err := manager.VerifyToken(ctx, pair.AccessToken, jwt.TokenTypeAccess)
 //
-//	// Use as middleware
-//	handler := manager.JWTAuthenticator(jwt.TokenTypeAccess)(myHandler)
+//	// Use with middleware/auth.Authenticate(manager.Authenticator(jwt.TokenTypeAccess))
 type JWTManager struct {
 	config JWTConfig
 	store  *kvstore.KVStore
@@ -772,67 +772,12 @@ func (m *JWTManager) matchIdentityVersion(subject string, version int64) bool {
 	return current == version
 }
 
-// JWTAuthenticator returns a middleware that verifies JWT tokens and stores claims in context.
-func (m *JWTManager) JWTAuthenticator(expectedType TokenType) middleware.Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			token := extractBearerToken(r)
-			if token == "" {
-				writeAuthError(w, r, http.StatusUnauthorized, "missing_token", "missing authorization header")
-				return
-			}
-
-			claims, err := m.VerifyToken(r.Context(), token, expectedType)
-			if err != nil {
-				// Always return generic error message to prevent information leakage.
-				// Detailed errors are logged internally for debugging.
-				writeAuthError(w, r, http.StatusUnauthorized, "invalid_token", "invalid token")
-				return
-			}
-
-			ctx := context.WithValue(r.Context(), claimsContextKey, claims)
-			if principal := PrincipalFromClaims(claims); principal != nil {
-				ctx = contract.WithPrincipal(ctx, principal)
-			}
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
 // AuthZPolicy defines role/permission requirements.
 type AuthZPolicy struct {
 	AnyRole        []string
 	AllRoles       []string
 	AnyPermission  []string
 	AllPermissions []string
-}
-
-// AuthorizeMiddleware enforces authorization based on claims stored by JWTAuthenticator.
-func AuthorizeMiddleware(policy AuthZPolicy) middleware.Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			raw := r.Context().Value(claimsContextKey)
-			claims, ok := raw.(*TokenClaims)
-			if !ok {
-				writeAuthError(w, r, http.StatusForbidden, "auth_context_missing", "missing authentication context")
-				return
-			}
-			if !checkPolicy(policy, claims.Authorization) {
-				writeAuthError(w, r, http.StatusForbidden, "forbidden", "forbidden")
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-func writeAuthError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
-	contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(status).
-		Code(code).
-		Message(message).
-		Category(contract.CategoryAuth).
-		Build())
 }
 
 func checkPolicy(policy AuthZPolicy, auth AuthorizationClaims) bool {
@@ -880,13 +825,21 @@ func contains(list []string, target string) bool {
 	return false
 }
 
-// GetClaimsFromContext extracts JWT claims from the request context.
-func GetClaimsFromContext(r *http.Request) (*TokenClaims, error) {
-	claims, ok := r.Context().Value(claimsContextKey).(*TokenClaims)
-	if !ok {
-		return nil, errors.New("no jwt claims in context")
+// WithTokenClaims stores JWT claims in request context for downstream handlers.
+func WithTokenClaims(ctx context.Context, claims *TokenClaims) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return claims, nil
+	return context.WithValue(ctx, tokenClaimsContextKey{}, claims)
+}
+
+// TokenClaimsFromContext returns JWT claims from request context when present.
+func TokenClaimsFromContext(ctx context.Context) *TokenClaims {
+	if ctx == nil {
+		return nil
+	}
+	claims, _ := ctx.Value(tokenClaimsContextKey{}).(*TokenClaims)
+	return claims
 }
 
 // extractBearerToken extracts Bearer token from the Authorization header.
@@ -900,6 +853,4 @@ func extractBearerToken(r *http.Request) string {
 	return ""
 }
 
-type claimsContext string
-
-const claimsContextKey claimsContext = "jwt_claims"
+type tokenClaimsContextKey struct{}

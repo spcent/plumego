@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,21 @@ type staticAuthenticator struct {
 
 func (s staticAuthenticator) Authenticate(_ *http.Request) (*contract.Principal, error) {
 	return s.principal, s.err
+}
+
+type contextMarkerKey struct{}
+
+type enrichingAuthenticator struct {
+	principal *contract.Principal
+}
+
+func (e enrichingAuthenticator) Authenticate(_ *http.Request) (*contract.Principal, error) {
+	return nil, nil
+}
+
+func (e enrichingAuthenticator) AuthenticateRequest(r *http.Request) (*contract.Principal, *http.Request, error) {
+	ctx := context.WithValue(r.Context(), contextMarkerKey{}, "enriched")
+	return e.principal, r.WithContext(ctx), nil
 }
 
 type staticAuthorizer struct {
@@ -73,7 +89,29 @@ func TestAuthenticateMiddlewareInvalidToken(t *testing.T) {
 	}
 }
 
-func TestAuthorizeMiddleware(t *testing.T) {
+func TestAuthenticateMiddlewareUsesEnrichedRequestContext(t *testing.T) {
+	authenticator := enrichingAuthenticator{
+		principal: &contract.Principal{Subject: "user-2"},
+	}
+
+	handler := Authenticate(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got, _ := r.Context().Value(contextMarkerKey{}).(string); got != "enriched" {
+			t.Fatalf("expected enriched request context")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestAuthorizeAllowsRequest(t *testing.T) {
 	principal := &contract.Principal{Subject: "user-authz"}
 	authorizer := staticAuthorizer{}
 
@@ -92,7 +130,7 @@ func TestAuthorizeMiddleware(t *testing.T) {
 	}
 }
 
-func TestAuthorizeMiddlewareForbidden(t *testing.T) {
+func TestAuthorizeRejectsForbiddenRequest(t *testing.T) {
 	principal := &contract.Principal{Subject: "user-authz"}
 	authorizer := staticAuthorizer{err: contract.ErrUnauthorized}
 

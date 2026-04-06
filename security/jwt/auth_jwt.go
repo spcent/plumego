@@ -15,24 +15,30 @@ type Authenticator struct {
 
 // Authenticate verifies the request token and returns a principal.
 func (a Authenticator) Authenticate(r *http.Request) (*contract.Principal, error) {
+	principal, _, err := a.AuthenticateRequest(r)
+	return principal, err
+}
+
+// AuthenticateRequest verifies the request token and enriches the request context with token claims.
+func (a Authenticator) AuthenticateRequest(r *http.Request) (*contract.Principal, *http.Request, error) {
 	if a.Manager == nil {
-		return nil, contract.ErrUnauthenticated
+		return nil, r, contract.ErrUnauthenticated
 	}
 	if r == nil {
-		return nil, contract.ErrUnauthenticated
+		return nil, r, contract.ErrUnauthenticated
 	}
 
 	token := extractBearerToken(r)
 	if token == "" {
-		return nil, contract.ErrUnauthenticated
+		return nil, r, contract.ErrUnauthenticated
 	}
 
 	claims, err := a.Manager.VerifyToken(r.Context(), token, a.ExpectedType)
 	if err != nil {
-		return nil, mapJWTError(err)
+		return nil, r, mapJWTError(err)
 	}
 
-	return PrincipalFromClaims(claims), nil
+	return PrincipalFromClaims(claims), r.WithContext(WithTokenClaims(r.Context(), claims)), nil
 }
 
 // Authenticator returns a contract.Authenticator for the given token type.
