@@ -14,8 +14,8 @@ func TestURLFromNestedGroupNamedRoute(t *testing.T) {
 	files := v1.Group("/files")
 
 	err := files.AddRouteWithOptions(http.MethodGet, "/:tenant/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		tenant, _ := ParamFromRequest(req, "tenant")
-		path, _ := ParamFromRequest(req, "path")
+		tenant := Param(req, "tenant")
+		path := Param(req, "path")
 		w.Write([]byte(tenant + "|" + path))
 	}), WithRouteName("files.show"))
 	if err != nil {
@@ -142,7 +142,7 @@ func TestNamedMethodHelpersOnGroups(t *testing.T) {
 	v1 := api.Group("/v1")
 
 	v1.GetNamed("users.show", "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		id, _ := ParamFromRequest(req, "id")
+		id := Param(req, "id")
 		_, _ = w.Write([]byte(id))
 	}))
 	v1.PostNamed("users.create", "/users", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

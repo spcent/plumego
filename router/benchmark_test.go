@@ -20,12 +20,12 @@ func createTestRouter() *Router {
 
 	// Parameterized routes
 	r.AddRoute(GET, "/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		name, _ := ParamFromRequest(r, "name")
+		name := Param(r, "name")
 		w.Write([]byte("Hello " + name))
 	}))
 	r.AddRoute(GET, "/users/:id/books/:bookId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
-		bookID, _ := ParamFromRequest(r, "bookId")
+		id := Param(r, "id")
+		bookID := Param(r, "bookId")
 		w.Write([]byte("User " + id + " Book " + bookID))
 	}))
 

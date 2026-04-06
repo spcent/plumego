@@ -20,6 +20,8 @@ non_goals:
   - Authentication
   - Business validation
   - Service construction
+  - Logger carriage or logger lookup
+  - stdlib-shadow handler aliases
   - Tenant routing or feature-flag route factories
 
 public_entrypoints:
@@ -54,6 +56,8 @@ review_checklist:
   - Keep route registration grep-friendly
   - Preserve explicit method-plus-path behavior
   - Keep matching deterministic
+  - Keep logger ownership out of router
+  - Keep one canonical public param helper
 
 agent_hints:
   - No response helpers here

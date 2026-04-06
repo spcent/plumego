@@ -19,6 +19,7 @@
 
 - JSON responses
 - auth policy
+- logger lookup or logger carriage
 - service construction
 
 ## First files to read
@@ -43,4 +44,6 @@
 
 - preserve deterministic dispatch
 - keep explicit method-plus-path registration behavior
+- keep router APIs stdlib-shaped instead of alias-heavy
+- keep one public param helper (`Param`)
 - avoid bleeding response or middleware policy into router internals

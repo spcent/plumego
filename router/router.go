@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -30,12 +29,6 @@ const (
 	DefaultPoolSliceCap  = 4   // Default capacity for pooled slices
 	DefaultPathPartsCap  = 8   // Default capacity for path parts slices
 )
-
-// Handler is an alias to the standard http.Handler for route handlers.
-type Handler = http.Handler
-
-// HandlerFunc is an alias to the standard http.HandlerFunc for convenience.
-type HandlerFunc = http.HandlerFunc
 
 // middlewareManager manages the middleware chain for a router or group.
 // It is an internal type; callers interact with it only through Router.Use().
@@ -85,7 +78,7 @@ type node struct {
 	fullPath    string
 	indices     string
 	children    []*node
-	handler     Handler
+	handler     http.Handler
 	paramKeys   []string
 	middlewares []middleware.Middleware
 	validation  *RouteValidation
@@ -97,8 +90,8 @@ type route struct {
 }
 
 // routerState is the shared mutable state for the root router and all groups.
-// It does not carry application-layer concerns (logger, metrics); those live
-// on the Router struct itself and are not shared across groups.
+// It excludes application-layer concerns so the router stays a pure
+// route-structure primitive.
 type routerState struct {
 	trees            map[string]*node
 	routes           map[string][]route
@@ -129,11 +122,6 @@ type Router struct {
 	parent            *Router
 	middlewareManager *middlewareManager
 	state             *routerState
-
-	// logger is stored directly on the Router (not in shared routerState) so
-	// that groups can carry the same logger reference without coupling the
-	// routing state to application-layer concerns.
-	logger log.StructuredLogger
 }
 
 // RouterOption defines a function type for router configuration options.
@@ -151,15 +139,6 @@ type RouteOption func(*RouteMeta)
 func WithRouteName(name string) RouteOption {
 	return func(meta *RouteMeta) {
 		meta.Name = name
-	}
-}
-
-// WithLogger sets a logger on the router. The logger is not used by routing
-// logic itself; it is available via Logger() so that components registering
-// routes can obtain the application logger without an extra dependency.
-func WithLogger(logger log.StructuredLogger) RouterOption {
-	return func(r *Router) {
-		r.logger = logger
 	}
 }
 
@@ -198,20 +177,6 @@ func NewRouter(opts ...RouterOption) *Router {
 	}
 
 	return r
-}
-
-// SetLogger sets the logger returned by Logger(). The router does not use the
-// logger internally; this is a convenience for component code that receives a
-// *Router and needs to obtain the application logger.
-func (r *Router) SetLogger(logger log.StructuredLogger) {
-	r.logger = logger
-}
-
-// Logger returns the logger associated with this router (or nil if unset).
-// Components that need direct logger access can use this to obtain the one
-// configured via WithLogger or SetLogger.
-func (r *Router) Logger() log.StructuredLogger {
-	return r.logger
 }
 
 // SetMethodNotAllowed toggles 405 responses when another method matches the path.

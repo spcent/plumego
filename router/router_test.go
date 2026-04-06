@@ -48,7 +48,7 @@ func TestParamRoutes(t *testing.T) {
 	r := NewRouter()
 
 	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		name, _ := ParamFromRequest(r, "name")
+		name := Param(r, "name")
 		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams["name"] != name {
 			t.Fatalf("context params mismatch: got %s want %s", ctxParams["name"], name)
@@ -57,8 +57,8 @@ func TestParamRoutes(t *testing.T) {
 	}))
 
 	r.Get("/users/:id/books/:bookId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
-		bookID, _ := ParamFromRequest(r, "bookId")
+		id := Param(r, "id")
+		bookID := Param(r, "bookId")
 		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams["id"] != id || ctxParams["bookId"] != bookID {
 			t.Fatalf("context params mismatch: %v", ctxParams)
@@ -96,10 +96,7 @@ func TestParamsInjectedIntoContext(t *testing.T) {
 			t.Fatalf("expected params in context")
 		}
 
-		paramVal, ok := ParamFromRequest(r, "name")
-		if !ok {
-			t.Fatalf("expected Param helper to find name")
-		}
+		paramVal := Param(r, "name")
 
 		if ctxParams["name"] != paramVal {
 			t.Fatalf("context params mismatch: got %s want %s", ctxParams["name"], paramVal)
@@ -122,16 +119,16 @@ func TestRequestContextHelpers(t *testing.T) {
 
 	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := contract.RequestContextFromContext(r.Context())
-		name, _ := ParamFromRequest(r, "name")
+		name := Param(r, "name")
 		if rc.Params["name"] != name {
 			t.Fatalf("request context params mismatch: got %s want %s", rc.Params["name"], name)
 		}
 
-		if val, ok := ParamFromRequest(r, "name"); !ok || val != name {
-			t.Fatalf("Param helper mismatch: got %s (exists=%t) want %s", val, ok, name)
+		if val := Param(r, "name"); val != name {
+			t.Fatalf("Param helper mismatch: got %s want %s", val, name)
 		}
 
-		if _, ok := ParamFromRequest(r, "missing"); ok {
+		if _, ok := contract.RequestContextFromContext(r.Context()).Params["missing"]; ok {
 			t.Fatalf("expected missing parameter to return ok=false")
 		}
 
@@ -157,10 +154,7 @@ func TestContextHandlerRegistration(t *testing.T) {
 			t.Fatalf("expected RequestContext to be present")
 		}
 
-		paramVal, ok := ParamFromRequest(r, "id")
-		if !ok {
-			t.Fatalf("expected Param helper to find id")
-		}
+		paramVal := Param(r, "id")
 
 		if rc.Params["id"] != paramVal {
 			t.Fatalf("context param mismatch: got %s want %s", rc.Params["id"], paramVal)
@@ -269,7 +263,7 @@ func TestRouteGroup(t *testing.T) {
 	v2 := api.Group("/v2")
 
 	v1.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
+		id := Param(r, "id")
 		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams["id"] != id {
 			t.Fatalf("expected id in context")
@@ -662,8 +656,8 @@ func TestGroupWithPathParams(t *testing.T) {
 	api := r.Group("/api/v1")
 	users := api.Group("/users")
 	users.Get("/:id/posts/:postID", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
-		postID, _ := ParamFromRequest(r, "postID")
+		id := Param(r, "id")
+		postID := Param(r, "postID")
 		w.Write([]byte(id + ":" + postID))
 	}))
 
@@ -756,7 +750,7 @@ func TestGroupFunc(t *testing.T) {
 
 		v1.GroupFunc("/users", func(users *Router) {
 			users.Get("/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				id, _ := ParamFromRequest(r, "id")
+				id := Param(r, "id")
 				w.Write([]byte("user-" + id))
 			}))
 		})

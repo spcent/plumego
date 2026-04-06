@@ -85,16 +85,16 @@ func TestOptimizedMatcher(t *testing.T) {
 		w.Write([]byte("static"))
 	}))
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
+		id := Param(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
 	r.Get("/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
-		postId, _ := ParamFromRequest(r, "postId")
+		id := Param(r, "id")
+		postId := Param(r, "postId")
 		w.Write([]byte(fmt.Sprintf("user-%s-post-%s", id, postId)))
 	}))
 	r.Get("/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		filepath, _ := ParamFromRequest(r, "filepath")
+		filepath := Param(r, "filepath")
 		w.Write([]byte("file-" + filepath))
 	}))
 

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"net/http"
 	"sync/atomic"
 
 	"github.com/spcent/plumego/middleware"
@@ -8,7 +9,7 @@ import (
 
 // MatchResult represents the result of route matching
 type MatchResult struct {
-	Handler          Handler
+	Handler          http.Handler
 	ParamValues      []string
 	ParamKeys        []string
 	RouteMiddlewares []middleware.Middleware // Now using direct type instead of any
@@ -20,10 +21,10 @@ type MatchResult struct {
 
 type cachedHandler struct {
 	version uint64
-	handler Handler
+	handler http.Handler
 }
 
-func (mr *MatchResult) loadCached(version uint64) (Handler, bool) {
+func (mr *MatchResult) loadCached(version uint64) (http.Handler, bool) {
 	if mr == nil {
 		return nil, false
 	}
@@ -41,7 +42,7 @@ func (mr *MatchResult) loadCached(version uint64) (Handler, bool) {
 	return entry.handler, true
 }
 
-func (mr *MatchResult) storeCached(version uint64, handler Handler) {
+func (mr *MatchResult) storeCached(version uint64, handler http.Handler) {
 	if mr == nil || handler == nil {
 		return
 	}

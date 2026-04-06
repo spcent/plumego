@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/spcent/plumego/contract"
@@ -18,7 +19,6 @@ func (r *Router) Group(prefix string) *Router {
 		parent:            r,
 		middlewareManager: newMiddlewareManager(),
 		state:             r.state,
-		logger:            r.logger,
 	}
 }
 
@@ -47,7 +47,7 @@ func normalizeGroupPrefix(parent, child string) string {
 // mustAddRoute calls AddRoute and panics on error.
 // Used by the canonical Get/Post/... convenience methods where errors are
 // programming mistakes (duplicate route, frozen router) that should fail fast.
-func (r *Router) mustAddRoute(method, path string, handler Handler) {
+func (r *Router) mustAddRoute(method, path string, handler http.Handler) {
 	if err := r.AddRoute(method, path, handler); err != nil {
 		panic(fmt.Sprintf("router: %v", err))
 	}
@@ -56,7 +56,7 @@ func (r *Router) mustAddRoute(method, path string, handler Handler) {
 // mustAddNamedRoute calls AddRouteWithName and panics on error.
 // Used by the named convenience methods where registration failures are
 // programming errors (duplicate route, frozen router) and should fail fast.
-func (r *Router) mustAddNamedRoute(method, path, name string, handler Handler) {
+func (r *Router) mustAddNamedRoute(method, path, name string, handler http.Handler) {
 	if err := r.AddRouteWithName(method, path, name, handler); err != nil {
 		panic(fmt.Sprintf("router: %v", err))
 	}
@@ -67,7 +67,7 @@ func (r *Router) mustAddNamedRoute(method, path, name string, handler Handler) {
 // registering routes after Freeze(). Use the method shortcuts (Get, Post, …)
 // for typical route registration; AddRoute is useful when the method string
 // is determined at runtime or when callers need to inspect the error themselves.
-func (r *Router) AddRoute(method, path string, handler Handler) error {
+func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 
@@ -201,7 +201,7 @@ func (r *Router) AddRoute(method, path string, handler Handler) error {
 }
 
 // AddRouteWithName adds a route and records a name for reverse URL generation.
-func (r *Router) AddRouteWithName(method, path, name string, handler Handler) error {
+func (r *Router) AddRouteWithName(method, path, name string, handler http.Handler) error {
 	if err := r.AddRoute(method, path, handler); err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (r *Router) AddRouteWithName(method, path, name string, handler Handler) er
 }
 
 // AddRouteWithOptions adds a route and attaches metadata options.
-func (r *Router) AddRouteWithOptions(method, path string, handler Handler, opts ...RouteOption) error {
+func (r *Router) AddRouteWithOptions(method, path string, handler http.Handler, opts ...RouteOption) error {
 	if err := r.AddRoute(method, path, handler); err != nil {
 		return err
 	}

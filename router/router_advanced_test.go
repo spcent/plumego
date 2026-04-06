@@ -21,23 +21,23 @@ func TestAdvancedRouteMatching(t *testing.T) {
 	}))
 
 	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
+		id := Param(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
 
 	r.Get("/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
-		postId, _ := ParamFromRequest(r, "postId")
+		id := Param(r, "id")
+		postId := Param(r, "postId")
 		w.Write([]byte(fmt.Sprintf("user-%s-post-%s", id, postId)))
 	}))
 
 	r.Get("/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		filepath, _ := ParamFromRequest(r, "filepath")
+		filepath := Param(r, "filepath")
 		w.Write([]byte("file-" + filepath))
 	}))
 
 	r.Post("/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path, _ := ParamFromRequest(r, "path")
+		path := Param(r, "path")
 		w.Write([]byte("any-" + path))
 	}))
 
@@ -137,8 +137,8 @@ func TestContextPropagation(t *testing.T) {
 		}
 
 		// Check Param helper
-		id, ok := ParamFromRequest(r, "id")
-		if !ok || id != "123" {
+		id := Param(r, "id")
+		if id != "123" {
 			t.Errorf("Param helper: expected 123, got %s", id)
 		}
 
@@ -239,7 +239,7 @@ func TestConcurrentRequests(t *testing.T) {
 	r := NewRouter()
 
 	r.Get("/concurrent/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, _ := ParamFromRequest(r, "id")
+		id := Param(r, "id")
 		w.Write([]byte(id))
 	}))
 
@@ -296,14 +296,6 @@ func TestRouterPrint(t *testing.T) {
 	if !strings.Contains(output, "[wildcard]") {
 		t.Error("Print output missing wildcard marker")
 	}
-}
-
-// TestSetLogger tests logger configuration
-func TestSetLogger(t *testing.T) {
-	r := NewRouter()
-
-	// Should not panic
-	r.SetLogger(nil)
 }
 
 // Helper function

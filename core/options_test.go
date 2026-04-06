@@ -17,15 +17,15 @@ func TestAppDependenciesLogger(t *testing.T) {
 	}
 }
 
-func TestAppDependenciesLoggerDoesNotMirrorIntoDefaultRouter(t *testing.T) {
+func TestAppDependenciesLoggerStaysOnApp(t *testing.T) {
 	logger := log.NewGLogger()
 	app := New(DefaultConfig(), AppDependencies{Logger: logger})
 
 	if app.Logger() != logger {
 		t.Fatal("expected App.Logger to return the configured logger")
 	}
-	if app.router.Logger() != nil {
-		t.Fatal("expected default router logger to remain unset")
+	if app.router == nil {
+		t.Fatal("expected app to own a router instance")
 	}
 }
 
