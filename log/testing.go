@@ -189,8 +189,8 @@ func (l *TestLogger) capture(level Level, msg string, fields Fields) {
 }
 
 func (l *TestLogger) withTrace(ctx context.Context, fields Fields) Fields {
-	if traceID := contract.TraceIDFromContext(ctx); traceID != "" {
-		out := mergeFields(fields, Fields{"trace_id": traceID})
+	if requestID := contract.RequestIDFromContext(ctx); requestID != "" {
+		out := mergeFields(fields, Fields{"request_id": requestID})
 		return out
 	}
 	return fields

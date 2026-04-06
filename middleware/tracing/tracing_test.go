@@ -44,8 +44,8 @@ func TestMiddlewareSetsTraceHeadersAndSpanContext(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	if rec.Header().Get(contract.RequestIDHeader) != "trace-ctx" {
-		t.Fatalf("expected request id header to be set from tracer")
+	if rec.Header().Get(contract.RequestIDHeader) == "" {
+		t.Fatalf("expected request id header to be set")
 	}
 	if rec.Header().Get("X-Span-ID") != "span-123" {
 		t.Fatalf("expected span id header to be set")

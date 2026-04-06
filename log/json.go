@@ -186,8 +186,8 @@ func (l *JSONLogger) buildEntry(level Level, msg string, fields Fields, ctx cont
 	entry["time"] = time.Now().UTC().Format(time.RFC3339Nano)
 	entry["level"] = levelName(level)
 	entry["msg"] = msg
-	if traceID := contract.TraceIDFromContext(ctx); traceID != "" {
-		entry["trace_id"] = traceID
+	if requestID := contract.RequestIDFromContext(ctx); requestID != "" {
+		entry["request_id"] = requestID
 	}
 
 	return entry

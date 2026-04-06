@@ -9,8 +9,6 @@ import (
 const (
 	// RequestIDHeader is the canonical request id header.
 	RequestIDHeader = "X-Request-ID"
-	// LegacyTraceIDHeader is the legacy trace id header, checked as a fallback for request id.
-	LegacyTraceIDHeader = "X-Trace-ID"
 )
 
 // ObservabilityPolicy defines canonical middleware observability behavior.
@@ -42,18 +40,15 @@ func NewObservabilityPolicy(extraSensitiveKeys ...string) ObservabilityPolicy {
 	}
 }
 
-// RequestIDFromRequest resolves request id from context, canonical header, or fallback header.
+// RequestIDFromRequest resolves request id from context or the canonical header.
 func (p ObservabilityPolicy) RequestIDFromRequest(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	if id := TraceIDFromContext(r.Context()); id != "" {
+	if id := RequestIDFromContext(r.Context()); id != "" {
 		return id
 	}
 	if id := strings.TrimSpace(r.Header.Get(RequestIDHeader)); id != "" {
-		return id
-	}
-	if id := strings.TrimSpace(r.Header.Get(LegacyTraceIDHeader)); id != "" {
 		return id
 	}
 	return ""
@@ -64,7 +59,7 @@ func (p ObservabilityPolicy) AttachRequestID(w http.ResponseWriter, r *http.Requ
 	if r == nil {
 		return r
 	}
-	ctx := WithTraceIDString(r.Context(), id)
+	ctx := WithRequestID(r.Context(), id)
 	if includeInRequest {
 		r.Header.Set(RequestIDHeader, id)
 	}

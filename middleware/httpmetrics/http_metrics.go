@@ -2,9 +2,7 @@ package httpmetrics
 
 import (
 	"net/http"
-	"time"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	internalobs "github.com/spcent/plumego/middleware/internal/observability"
@@ -19,14 +17,13 @@ func Middleware(collector Observer) middleware.Middleware {
 		}
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			traceID := internalobs.EnsureTraceID(r)
-			w.Header().Set(contract.RequestIDHeader, traceID)
-			recorder := internalobs.NewResponseRecorder(w)
-			start := time.Now()
+			prepared := internalobs.PrepareRequest(w, r)
+			r = prepared.Request
+			recorder := prepared.Recorder
 
 			next.ServeHTTP(recorder, r)
 
-			metricsData := internalobs.BuildRequestMetrics(r, recorder, start, traceID)
+			metricsData := internalobs.BuildRequestMetrics(r, recorder, prepared.StartedAt, prepared.RequestID)
 			path := metricsData.Path
 			if metricsData.Route != "" {
 				path = metricsData.Route

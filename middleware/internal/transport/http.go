@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"bufio"
 	"bytes"
 	"net"
 	"net/http"
@@ -46,10 +47,11 @@ func ClientIP(r *http.Request) string {
 
 type ResponseRecorder struct {
 	http.ResponseWriter
-	statusCode int
-	header     http.Header
-	body       *bytes.Buffer
-	written    bool
+	statusCode   int
+	header       http.Header
+	body         *bytes.Buffer
+	bytesWritten int
+	written      bool
 }
 
 func NewResponseRecorder(w http.ResponseWriter) *ResponseRecorder {
@@ -83,7 +85,9 @@ func (r *ResponseRecorder) Write(b []byte) (int, error) {
 	}
 
 	r.body.Write(b)
-	return SafeWrite(r.ResponseWriter, b)
+	n, err := SafeWrite(r.ResponseWriter, b)
+	r.bytesWritten += n
+	return n, err
 }
 
 func (r *ResponseRecorder) StatusCode() int {
@@ -95,6 +99,24 @@ func (r *ResponseRecorder) StatusCode() int {
 
 func (r *ResponseRecorder) Body() []byte {
 	return r.body.Bytes()
+}
+
+func (r *ResponseRecorder) BytesWritten() int {
+	return r.bytesWritten
+}
+
+func (r *ResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return hj.Hijack()
+}
+
+func (r *ResponseRecorder) Flush() {
+	if fl, ok := r.ResponseWriter.(http.Flusher); ok {
+		fl.Flush()
+	}
 }
 
 func copyHeaders(dst, src http.Header) {

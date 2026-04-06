@@ -2,7 +2,6 @@ package requestid
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
@@ -10,29 +9,11 @@ import (
 )
 
 type config struct {
-	headerName       string
-	fallbackHeader   string
 	generate         func() string
 	includeInRequest bool
 }
 
 type Option func(*config)
-
-func WithHeader(name string) Option {
-	return func(cfg *config) {
-		if name != "" {
-			cfg.headerName = name
-		}
-	}
-}
-
-func WithFallbackHeader(name string) Option {
-	return func(cfg *config) {
-		if name != "" {
-			cfg.fallbackHeader = name
-		}
-	}
-}
 
 func WithGenerator(fn func() string) Option {
 	return func(cfg *config) {
@@ -50,9 +31,7 @@ func WithRequestHeader(enabled bool) Option {
 
 func Middleware(opts ...Option) middleware.Middleware {
 	cfg := config{
-		headerName:       "X-Request-ID",
-		fallbackHeader:   "X-Trace-ID",
-		generate:         log.NewTraceID,
+		generate:         log.NewRequestID,
 		includeInRequest: true,
 	}
 	for _, opt := range opts {
@@ -63,40 +42,14 @@ func Middleware(opts ...Option) middleware.Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			id := traceIDFromRequest(r, cfg.headerName, cfg.fallbackHeader)
+			observePolicy := contract.NewObservabilityPolicy()
+			id := observePolicy.RequestIDFromRequest(r)
 			if id == "" {
 				id = cfg.generate()
 			}
 
-			r = contract.NewObservabilityPolicy().AttachRequestID(w, r, id, cfg.includeInRequest)
-			if cfg.headerName != "" && cfg.headerName != contract.RequestIDHeader {
-				if cfg.includeInRequest {
-					r.Header.Set(cfg.headerName, id)
-				}
-				w.Header().Set(cfg.headerName, id)
-			}
-
+			r = observePolicy.AttachRequestID(w, r, id, cfg.includeInRequest)
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-func traceIDFromRequest(r *http.Request, headerName, fallback string) string {
-	if id := contract.NewObservabilityPolicy().RequestIDFromRequest(r); id != "" {
-		return id
-	}
-	if r == nil {
-		return ""
-	}
-	if headerName != "" && headerName != contract.RequestIDHeader {
-		if id := strings.TrimSpace(r.Header.Get(headerName)); id != "" {
-			return id
-		}
-	}
-	if fallback != "" && fallback != contract.LegacyTraceIDHeader {
-		if id := strings.TrimSpace(r.Header.Get(fallback)); id != "" {
-			return id
-		}
-	}
-	return ""
 }

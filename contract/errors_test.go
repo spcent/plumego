@@ -313,14 +313,10 @@ func TestErrorResponseWriting(t *testing.T) {
 	}
 }
 
-func TestErrorResponseWithTraceID(t *testing.T) {
+func TestErrorResponseWithRequestID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	// Simulate trace ID in context
-	ctx := WithTraceContext(req.Context(), TraceContext{
-		TraceID: "test-trace-id",
-		SpanID:  "test-span-id",
-	})
+	ctx := WithRequestID(req.Context(), "req-123")
 	req = req.WithContext(ctx)
 
 	err := APIError{
@@ -337,18 +333,15 @@ func TestErrorResponseWithTraceID(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if response.TraceID != "test-trace-id" {
-		t.Fatalf("expected trace ID in response")
+	if response.RequestID != "req-123" {
+		t.Fatalf("expected request id in response")
 	}
 }
 
-func TestWriteErrorPreservesTraceID(t *testing.T) {
+func TestWriteErrorPreservesRequestID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := WithTraceContext(req.Context(), TraceContext{
-		TraceID: "context-trace-id",
-		SpanID:  "context-span-id",
-	})
+	ctx := WithRequestID(req.Context(), "context-req-id")
 	req = req.WithContext(ctx)
 
 	err := APIError{
@@ -356,7 +349,7 @@ func TestWriteErrorPreservesTraceID(t *testing.T) {
 		Code:     "VALIDATION_ERROR",
 		Message:  "validation failed",
 		Category: CategoryValidation,
-		TraceID:  "explicit-trace-id",
+		RequestID: "explicit-req-id",
 	}
 
 	WriteError(recorder, req, err)
@@ -366,8 +359,8 @@ func TestWriteErrorPreservesTraceID(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", decodeErr)
 	}
 
-	if response.TraceID != "explicit-trace-id" {
-		t.Fatalf("expected explicit trace ID to be preserved")
+	if response.RequestID != "explicit-req-id" {
+		t.Fatalf("expected explicit request id to be preserved")
 	}
 }
 

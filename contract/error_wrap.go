@@ -182,8 +182,8 @@ func GetErrorDetails(err error) map[string]any {
 		if len(apiErr.Details) > 0 {
 			details["details"] = apiErr.Details
 		}
-		if apiErr.TraceID != "" {
-			details["trace_id"] = apiErr.TraceID
+		if apiErr.RequestID != "" {
+			details["request_id"] = apiErr.RequestID
 		}
 		return details
 	}

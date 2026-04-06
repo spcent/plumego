@@ -439,7 +439,7 @@ func TestRequestContextFromContext(t *testing.T) {
 func TestCtxResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
-	r = r.WithContext(WithTraceContext(r.Context(), TraceContext{TraceID: "trace-xyz"}))
+	r = r.WithContext(WithRequestID(r.Context(), "req-xyz"))
 	ctx := NewCtx(w, r, nil)
 
 	err := ctx.Response(http.StatusOK, map[string]string{"status": "ok"}, map[string]any{"page": 1})
@@ -451,8 +451,8 @@ func TestCtxResponse(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if response.TraceID != "trace-xyz" {
-		t.Fatalf("expected trace id, got %q", response.TraceID)
+	if response.RequestID != "req-xyz" {
+		t.Fatalf("expected request id, got %q", response.RequestID)
 	}
 	if response.Meta == nil || response.Meta["page"] != float64(1) {
 		t.Fatalf("expected meta to be included")

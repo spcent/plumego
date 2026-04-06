@@ -153,8 +153,8 @@ func (l *gLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
 
 func (l *gLogger) logWithLevel(level Level, msg string, fields Fields, ctx context.Context) {
 	combined := mergeFields(l.fields, fields)
-	if traceID := contract.TraceIDFromContext(ctx); traceID != "" {
-		combined["trace_id"] = traceID
+	if requestID := contract.RequestIDFromContext(ctx); requestID != "" {
+		combined["request_id"] = requestID
 	}
 	formatted := l.formatFields(combined)
 	if formatted != "" {

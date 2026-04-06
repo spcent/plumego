@@ -2,13 +2,13 @@ package accesslog
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
 	internalobs "github.com/spcent/plumego/middleware/internal/observability"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
@@ -19,23 +19,22 @@ func Middleware(logger log.StructuredLogger) middleware.Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			traceID := internalobs.EnsureTraceID(r)
-			r = r.WithContext(contract.WithTraceIDString(r.Context(), traceID))
-			w.Header().Set(contract.RequestIDHeader, traceID)
-			recorder := internalobs.NewResponseRecorder(w)
-			start := time.Now()
+			prepared := internalobs.PrepareRequest(w, r)
+			r = prepared.Request
+			recorder := prepared.Recorder
+			requestID := prepared.RequestID
 
 			next.ServeHTTP(recorder, r)
 
-			if headerTraceID := recorder.Header().Get(contract.RequestIDHeader); headerTraceID != "" {
-				traceID = headerTraceID
+			if headerRequestID := recorder.Header().Get(contract.RequestIDHeader); headerRequestID != "" {
+				requestID = headerRequestID
 			}
-			metricsData := internalobs.BuildRequestMetrics(r, recorder, start, traceID)
+			metricsData := internalobs.BuildRequestMetrics(r, recorder, prepared.StartedAt, requestID)
 			rc := contract.RequestContextFromContext(r.Context())
 			fields := contract.NewObservabilityPolicy().MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
 			fields["bytes"] = metricsData.Bytes
 			fields["user_agent"] = metricsData.UserAgent
-			fields["client_ip"] = internalobs.ClientIP(r)
+			fields["client_ip"] = internaltransport.ClientIP(r)
 			if metricsData.Route != "" {
 				fields["route"] = metricsData.Route
 			}
@@ -57,11 +56,11 @@ func Middleware(logger log.StructuredLogger) middleware.Middleware {
 func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			traceID := internalobs.EnsureTraceID(r)
-			ctx := contract.WithTraceIDString(r.Context(), traceID)
-
-			recorder := internalobs.NewResponseRecorder(w)
-			start := time.Now()
+			prepared := internalobs.PrepareRequest(w, r)
+			r = prepared.Request
+			recorder := prepared.Recorder
+			requestID := prepared.RequestID
+			ctx := r.Context()
 
 			var span metrics.TraceSpan
 			if tracer != nil {
@@ -69,24 +68,29 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 			}
 
 			spanTraceID, spanID := internalobs.ExtractSpanContext(ctx, span)
-			if spanTraceID != "" {
-				traceID = spanTraceID
+			if spanTraceID != "" || spanID != "" {
+				traceContext := contract.TraceContext{}
+				if existing := contract.TraceContextFromContext(ctx); existing != nil {
+					traceContext = *existing
+				}
+				if spanTraceID != "" {
+					traceContext.TraceID = contract.TraceID(spanTraceID)
+				}
+				if spanID != "" {
+					traceContext.SpanID = contract.SpanID(spanID)
+				}
+				ctx = contract.WithTraceContext(ctx, traceContext)
 			}
-			ctx = contract.WithTraceIDString(ctx, traceID)
-			if spanID != "" {
-				ctx = contract.WithSpanIDString(ctx, spanID)
-			}
-
-			r = r.WithContext(ctx)
-			w.Header().Set(contract.RequestIDHeader, traceID)
 			if spanID != "" {
 				w.Header().Set("X-Span-ID", spanID)
 			}
 
+			r = r.WithContext(ctx)
+
 			next.ServeHTTP(recorder, r)
 
 			rc := contract.RequestContextFromContext(r.Context())
-			metricsData := internalobs.BuildRequestMetrics(r, recorder, start, traceID)
+			metricsData := internalobs.BuildRequestMetrics(r, recorder, prepared.StartedAt, requestID)
 
 			if observer != nil {
 				path := metricsData.Path
@@ -96,13 +100,13 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 				observer.ObserveHTTP(r.Context(), metricsData.Method, path, metricsData.Status, metricsData.Bytes, metricsData.Duration)
 			}
 			if span != nil {
-				span.End(metricsData.Status, metricsData.Bytes, traceID)
+				span.End(metricsData.Status, metricsData.Bytes, requestID)
 			}
 
 			fields := contract.NewObservabilityPolicy().MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
 			fields["bytes"] = metricsData.Bytes
 			fields["user_agent"] = metricsData.UserAgent
-			fields["client_ip"] = internalobs.ClientIP(r)
+			fields["client_ip"] = internaltransport.ClientIP(r)
 			if metricsData.Route != "" {
 				fields["route"] = metricsData.Route
 			}

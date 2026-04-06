@@ -225,10 +225,10 @@ func TestWrapErrorInnerParamWinsOnConflict(t *testing.T) {
 	}
 }
 
-func TestWriteErrorAndParseErrorUseTopLevelTraceIDAndTypedFields(t *testing.T) {
+func TestWriteErrorAndParseErrorUseTopLevelRequestIDAndTypedFields(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = req.WithContext(WithTraceContext(req.Context(), TraceContext{TraceID: "1234567890abcdef1234567890abcdef"}))
+	req = req.WithContext(WithRequestID(req.Context(), "req-123"))
 
 	writeErr := NewErrorBuilder().
 		Type(TypeValidation).
@@ -243,23 +243,23 @@ func TestWriteErrorAndParseErrorUseTopLevelTraceIDAndTypedFields(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if payload["trace_id"] != "1234567890abcdef1234567890abcdef" {
-		t.Fatalf("expected top-level trace_id, got %v", payload["trace_id"])
+	if payload["request_id"] != "req-123" {
+		t.Fatalf("expected top-level request_id, got %v", payload["request_id"])
 	}
 	errorBody := payload["error"].(map[string]any)
 	if errorBody["type"] != string(TypeValidation) || errorBody["severity"] != string(SeverityWarning) {
 		t.Fatalf("expected type/severity in error body, got %v", errorBody)
 	}
-	if _, ok := errorBody["trace_id"]; ok {
-		t.Fatalf("expected trace_id to be promoted out of nested error body")
+	if _, ok := errorBody["request_id"]; ok {
+		t.Fatalf("expected request_id to be promoted out of nested error body")
 	}
 
 	parsed, err := ParseErrorFromResponse(rec.Result())
 	if err != nil {
 		t.Fatalf("unexpected parse error: %v", err)
 	}
-	if parsed.TraceID != "1234567890abcdef1234567890abcdef" {
-		t.Fatalf("expected parsed trace ID, got %q", parsed.TraceID)
+	if parsed.RequestID != "req-123" {
+		t.Fatalf("expected parsed request id, got %q", parsed.RequestID)
 	}
 }
 

@@ -6,29 +6,27 @@ import (
 	"time"
 )
 
-// TestNewTraceIDGeneration tests basic trace ID generation
-func TestNewTraceIDGeneration(t *testing.T) {
-	// Generate multiple trace IDs
+// TestNewRequestIDGeneration tests basic request ID generation.
+func TestNewRequestIDGeneration(t *testing.T) {
 	ids := make(map[string]bool)
 	for i := 0; i < 100; i++ {
-		id := NewTraceID()
+		id := NewRequestID()
 		if len(id) != idWidth {
-			t.Errorf("Expected trace ID length %d, got %d", idWidth, len(id))
+			t.Errorf("Expected request ID length %d, got %d", idWidth, len(id))
 		}
 		if ids[id] {
-			t.Errorf("Duplicate trace ID generated: %s", id)
+			t.Errorf("Duplicate request ID generated: %s", id)
 		}
 		ids[id] = true
 	}
 }
 
-// TestDecodeTraceID tests trace ID decoding functionality
-func TestDecodeTraceID(t *testing.T) {
-	// Test valid trace ID
-	originalID := NewTraceID()
-	unixMilli, r, seqVal, err := DecodeTraceID(originalID)
+// TestDecodeRequestID tests request ID decoding functionality.
+func TestDecodeRequestID(t *testing.T) {
+	originalID := NewRequestID()
+	unixMilli, r, seqVal, err := DecodeRequestID(originalID)
 	if err != nil {
-		t.Errorf("Failed to decode valid trace ID: %v", err)
+		t.Errorf("Failed to decode valid request ID: %v", err)
 	}
 
 	// Verify decoded values are within expected ranges
@@ -43,28 +41,25 @@ func TestDecodeTraceID(t *testing.T) {
 	}
 }
 
-// TestInvalidTraceID tests error handling for invalid trace IDs
-func TestInvalidTraceID(t *testing.T) {
-	// Test empty string
-	_, _, _, err := DecodeTraceID("")
+// TestInvalidRequestID tests error handling for invalid request IDs.
+func TestInvalidRequestID(t *testing.T) {
+	_, _, _, err := DecodeRequestID("")
 	if err != errInvalidBase62 {
 		t.Errorf("Expected errInvalidBase62 for empty string, got %v", err)
 	}
 
-	// Test wrong length
-	_, _, _, err = DecodeTraceID("short")
+	_, _, _, err = DecodeRequestID("short")
 	if err != errInvalidBase62 {
 		t.Errorf("Expected errInvalidBase62 for wrong length, got %v", err)
 	}
 
-	// Test invalid characters
-	_, _, _, err = DecodeTraceID("!!!@#$%^&*()")
+	_, _, _, err = DecodeRequestID("!!!@#$%^&*()")
 	if err != errInvalidBase62 {
 		t.Errorf("Expected errInvalidBase62 for invalid characters, got %v", err)
 	}
 }
 
-// TestConcurrentGeneration tests concurrent trace ID generation for thread safety
+// TestConcurrentGeneration tests concurrent request ID generation for thread safety.
 func TestConcurrentGeneration(t *testing.T) {
 	const numGoroutines = 100
 	const idsPerGoroutine = 100
@@ -78,7 +73,7 @@ func TestConcurrentGeneration(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < idsPerGoroutine; j++ {
-				id := NewTraceID()
+				id := NewRequestID()
 				mu.Lock()
 				if ids[id] {
 					t.Errorf("Duplicate ID generated in concurrent test: %s", id)
@@ -92,9 +87,9 @@ func TestConcurrentGeneration(t *testing.T) {
 	wg.Wait()
 }
 
-// TestGeneratorStruct tests the TraceIDGenerator struct functionality
+// TestGeneratorStruct tests the RequestIDGenerator struct functionality.
 func TestGeneratorStruct(t *testing.T) {
-	gen := NewTraceIDGenerator()
+	gen := NewRequestIDGenerator()
 
 	// Test that generator produces valid IDs
 	for i := 0; i < 50; i++ {
@@ -104,7 +99,7 @@ func TestGeneratorStruct(t *testing.T) {
 		}
 
 		// Verify decoding works
-		_, _, _, err := DecodeTraceID(id)
+		_, _, _, err := DecodeRequestID(id)
 		if err != nil {
 			t.Errorf("Failed to decode generated ID: %v", err)
 		}
@@ -112,22 +107,22 @@ func TestGeneratorStruct(t *testing.T) {
 }
 
 func TestZeroValueGenerator(t *testing.T) {
-	var gen TraceIDGenerator
+	var gen RequestIDGenerator
 
 	id := gen.Generate()
 	if len(id) != idWidth {
 		t.Fatalf("expected id length %d, got %d", idWidth, len(id))
 	}
 
-	if _, _, _, err := DecodeTraceID(id); err != nil {
+	if _, _, _, err := DecodeRequestID(id); err != nil {
 		t.Fatalf("failed to decode id from zero value generator: %v", err)
 	}
 }
 
-// TestTimestampOrdering tests that newer trace IDs have newer timestamps
+// TestTimestampOrdering tests that newer request IDs have newer timestamps.
 func TestTimestampOrdering(t *testing.T) {
 	time.Sleep(time.Millisecond) // Ensure different millisecond
-	gen := NewTraceIDGenerator()
+	gen := NewRequestIDGenerator()
 
 	// Generate IDs with small delays
 	ids := make([]string, 10)
@@ -138,23 +133,23 @@ func TestTimestampOrdering(t *testing.T) {
 
 	// Verify timestamps are increasing
 	for i := 1; i < len(ids); i++ {
-		ts1, _, _, _ := DecodeTraceID(ids[i-1])
-		ts2, _, _, _ := DecodeTraceID(ids[i])
+		ts1, _, _, _ := DecodeRequestID(ids[i-1])
+		ts2, _, _, _ := DecodeRequestID(ids[i])
 		if ts2 < ts1 {
 			t.Errorf("Timestamp not increasing: %d >= %d", ts1, ts2)
 		}
 	}
 }
 
-// BenchmarkTraceIDGeneration benchmarks the trace ID generation performance
-func BenchmarkTraceIDGeneration(b *testing.B) {
+// BenchmarkRequestIDGeneration benchmarks the request ID generation performance.
+func BenchmarkRequestIDGeneration(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = NewTraceID()
+		_ = NewRequestID()
 	}
 }
 
-// BenchmarkConcurrentGeneration benchmarks concurrent trace ID generation
+// BenchmarkConcurrentGeneration benchmarks concurrent request ID generation.
 func BenchmarkConcurrentGeneration(b *testing.B) {
 	var wg sync.WaitGroup
 	b.ResetTimer()
@@ -163,7 +158,7 @@ func BenchmarkConcurrentGeneration(b *testing.B) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_ = NewTraceID()
+			_ = NewRequestID()
 		}()
 	}
 	wg.Wait()
@@ -174,10 +169,10 @@ func TestRandomness(t *testing.T) {
 	const testCount = 1000
 	randValues := make([]int, testCount)
 
-	// Collect random values from decoded trace IDs
+	// Collect random values from decoded request IDs
 	for i := 0; i < testCount; i++ {
-		id := NewTraceID()
-		_, r, _, err := DecodeTraceID(id)
+		id := NewRequestID()
+		_, r, _, err := DecodeRequestID(id)
 		if err != nil {
 			t.Errorf("Failed to decode ID for randomness test: %v", err)
 			return

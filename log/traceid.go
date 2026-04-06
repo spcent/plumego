@@ -47,12 +47,12 @@ const (
 
 // Error definitions
 var (
-	errInvalidBase62 = errors.New("invalid base62 trace id")
-	errOutOfRange    = errors.New("trace id out of range")
+	errInvalidBase62 = errors.New("invalid base62 request id")
+	errOutOfRange    = errors.New("request id out of range")
 )
 
-// TraceIDGenerator encapsulates the state for trace ID generation
-type TraceIDGenerator struct {
+// RequestIDGenerator encapsulates the state for request ID generation.
+type RequestIDGenerator struct {
 	rng        *mathrand.Rand
 	stateMu    sync.Mutex
 	lastMs     int64
@@ -72,9 +72,9 @@ func cryptoSeed() int64 {
 	return int64(binary.LittleEndian.Uint64(buf[:]))
 }
 
-// NewTraceIDGenerator creates a new trace ID generator with pre-generated random pool
-func NewTraceIDGenerator() *TraceIDGenerator {
-	g := &TraceIDGenerator{
+// NewRequestIDGenerator creates a new request ID generator with pre-generated random pool.
+func NewRequestIDGenerator() *RequestIDGenerator {
+	g := &RequestIDGenerator{
 		rng:        mathrand.New(mathrand.NewSource(cryptoSeed())),
 		randomPool: make([]int32, randomPoolSize), // Pre-generate random numbers
 	}
@@ -87,12 +87,11 @@ func NewTraceIDGenerator() *TraceIDGenerator {
 	return g
 }
 
-// Global generator instance for backward compatibility
-var globalGen = NewTraceIDGenerator()
+var globalGen = NewRequestIDGenerator()
 
-// NewTraceID generates a fixed 12-char Base62 trace id using global generator
-// Reversible: can be decoded back to (unixMilli, rand[0..9999], seq[0..1023])
-func NewTraceID() string {
+// NewRequestID generates a fixed 12-char Base62 request id using the global generator.
+// Reversible: can be decoded back to (unixMilli, rand[0..9999], seq[0..1023]).
+func NewRequestID() string {
 	return globalGen.Generate()
 }
 
@@ -100,7 +99,7 @@ func NewTraceID() string {
 // If the per-millisecond sequence is exhausted, it retries up to maxSeqRetries times
 // (each retry sleeps 100µs). After that it falls back to seq=0 on the next available
 // timestamp to avoid blocking indefinitely under burst load.
-func (g *TraceIDGenerator) Generate() string {
+func (g *RequestIDGenerator) Generate() string {
 	g.ensureInitialized()
 	for attempt := 0; attempt < maxSeqRetries; attempt++ {
 		nowMs := time.Now().UnixMilli()
@@ -144,7 +143,7 @@ func (g *TraceIDGenerator) Generate() string {
 }
 
 // buildID constructs the trace ID from components using optimized random number access
-func (g *TraceIDGenerator) buildID(unixMs int64, seqVal int) string {
+func (g *RequestIDGenerator) buildID(unixMs int64, seqVal int) string {
 	r := g.randomValue()
 
 	// Encode timestamp delta
@@ -160,7 +159,7 @@ func (g *TraceIDGenerator) buildID(unixMs int64, seqVal int) string {
 	return encodeBase62Fixed(v, idWidth)
 }
 
-func (g *TraceIDGenerator) ensureInitialized() {
+func (g *RequestIDGenerator) ensureInitialized() {
 	if g.rng != nil && len(g.randomPool) > 0 {
 		return
 	}
@@ -179,7 +178,7 @@ func (g *TraceIDGenerator) ensureInitialized() {
 	}
 }
 
-func (g *TraceIDGenerator) randomValue() int {
+func (g *RequestIDGenerator) randomValue() int {
 	g.ensureInitialized()
 
 	g.poolMu.RLock()
@@ -202,7 +201,7 @@ func (g *TraceIDGenerator) randomValue() int {
 	return v
 }
 
-func (g *TraceIDGenerator) refreshRandomPool() {
+func (g *RequestIDGenerator) refreshRandomPool() {
 	g.poolMu.Lock()
 	defer g.poolMu.Unlock()
 
@@ -214,7 +213,7 @@ func (g *TraceIDGenerator) refreshRandomPool() {
 	}
 }
 
-func (g *TraceIDGenerator) randomFallback() int {
+func (g *RequestIDGenerator) randomFallback() int {
 	g.poolMu.Lock()
 	defer g.poolMu.Unlock()
 
@@ -224,9 +223,9 @@ func (g *TraceIDGenerator) randomFallback() int {
 	return g.rng.Intn(randMax)
 }
 
-// DecodeTraceID reverses a 12-char Base62 trace id into components
-// Returns: unixMilli, randValue, seqValue, error
-func DecodeTraceID(id string) (unixMilli int64, r int, seqVal int, err error) {
+// DecodeRequestID reverses a 12-char Base62 request id into components.
+// Returns: unixMilli, randValue, seqValue, error.
+func DecodeRequestID(id string) (unixMilli int64, r int, seqVal int, err error) {
 	if len(id) != idWidth {
 		return 0, 0, 0, errInvalidBase62
 	}

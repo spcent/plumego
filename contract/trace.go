@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// TraceID represents a unique identifier for a trace.
+// TraceID represents a unique identifier for tracing context.
 type TraceID string
 
 // SpanID represents a unique identifier for a span.
@@ -65,33 +65,6 @@ func TraceContextFromContext(ctx context.Context) *TraceContext {
 		}
 	}
 	return nil
-}
-
-// TraceIDFromContext extracts the trace id string from the context.
-func TraceIDFromContext(ctx context.Context) string {
-	if tc := TraceContextFromContext(ctx); tc != nil {
-		return string(tc.TraceID)
-	}
-	return ""
-}
-
-// WithTraceIDString stores the given trace ID string in the context.
-// If a TraceContext already exists, only its TraceID field is updated so that
-// span and baggage information are preserved.
-// The id is validated via ParseTraceID; if invalid, WarnFunc is called and
-// the raw string is stored unchanged so callers are not silently misled.
-func WithTraceIDString(ctx context.Context, id string) context.Context {
-	parsed, err := ParseTraceID(id)
-	if err != nil {
-		WarnFunc("WithTraceIDString: " + err.Error() + " (storing raw value: " + id + ")")
-		parsed = TraceID(id)
-	}
-	if existing := TraceContextFromContext(ctx); existing != nil {
-		updated := *existing
-		updated.TraceID = parsed
-		return WithTraceContext(ctx, updated)
-	}
-	return WithTraceContext(ctx, TraceContext{TraceID: parsed})
 }
 
 // WithSpanIDString stores the given span ID string in the context.

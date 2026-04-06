@@ -39,15 +39,15 @@ func TestNewCtxPopulatesFields(t *testing.T) {
 		t.Fatalf("expected deadline to be copied")
 	}
 
-	if ctx.TraceID() != "" {
-		t.Fatalf("expected empty trace id on request without trace context, got %q", ctx.TraceID())
+	if ctx.RequestID() != "" {
+		t.Fatalf("expected empty request id on request without request context, got %q", ctx.RequestID())
 	}
 }
 
 func TestCtxResponseHelpers(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = req.WithContext(WithTraceContext(req.Context(), TraceContext{TraceID: "trace-123"}))
+	req = req.WithContext(WithRequestID(req.Context(), "req-123"))
 	ctx := NewCtx(recorder, req, nil)
 
 	if err := ctx.Response(http.StatusAccepted, map[string]string{"msg": "ok"}, map[string]any{"source": "test"}); err != nil {
@@ -74,8 +74,8 @@ func TestCtxResponseHelpers(t *testing.T) {
 	if data["msg"] != "ok" {
 		t.Fatalf("unexpected payload: %+v", payload)
 	}
-	if payload.TraceID != "trace-123" {
-		t.Fatalf("expected trace id, got %q", payload.TraceID)
+	if payload.RequestID != "req-123" {
+		t.Fatalf("expected request id, got %q", payload.RequestID)
 	}
 	if payload.Meta == nil || payload.Meta["source"] != "test" {
 		t.Fatalf("unexpected meta: %+v", payload.Meta)

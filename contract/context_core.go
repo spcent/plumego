@@ -76,13 +76,12 @@ func (c *Ctx) RequestHeaders() http.Header {
 	return c.R.Header
 }
 
-// TraceID returns the trace ID associated with this request, read live from the
-// request context. Returns an empty string when no trace context is present.
-func (c *Ctx) TraceID() string {
+// RequestID returns the request correlation id associated with this request.
+func (c *Ctx) RequestID() string {
 	if c == nil || c.R == nil {
 		return ""
 	}
-	return TraceIDFromContext(c.R.Context())
+	return RequestIDFromContext(c.R.Context())
 }
 
 // bindError represents an error that occurred while binding a request body.

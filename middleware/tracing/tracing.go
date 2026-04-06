@@ -23,30 +23,37 @@ func Middleware(tracer Tracer) middleware.Middleware {
 		}
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			traceID := internalobs.EnsureTraceID(r)
-			ctx := contract.WithTraceIDString(r.Context(), traceID)
+			prepared := internalobs.PrepareRequest(w, r)
+			r = prepared.Request
+			requestID := prepared.RequestID
+			ctx := r.Context()
 
 			ctx, span := tracer.Start(ctx, r)
 			spanTraceID, spanID := internalobs.ExtractSpanContext(ctx, span)
-			if spanTraceID != "" {
-				traceID = spanTraceID
-				ctx = contract.WithTraceIDString(ctx, traceID)
-			}
-			if spanID != "" {
-				ctx = contract.WithSpanIDString(ctx, spanID)
+			if spanTraceID != "" || spanID != "" {
+				traceContext := contract.TraceContext{}
+				if existing := contract.TraceContextFromContext(ctx); existing != nil {
+					traceContext = *existing
+				}
+				if spanTraceID != "" {
+					traceContext.TraceID = contract.TraceID(spanTraceID)
+				}
+				if spanID != "" {
+					traceContext.SpanID = contract.SpanID(spanID)
+				}
+				ctx = contract.WithTraceContext(ctx, traceContext)
 			}
 
 			r = r.WithContext(ctx)
-			w.Header().Set(contract.RequestIDHeader, traceID)
 			if spanID != "" {
 				w.Header().Set("X-Span-ID", spanID)
 			}
 
-			recorder := internalobs.NewResponseRecorder(w)
+			recorder := prepared.Recorder
 			next.ServeHTTP(recorder, r)
 
 			if span != nil {
-				span.End(recorder.StatusCode(), recorder.BytesWritten(), traceID)
+				span.End(recorder.StatusCode(), recorder.BytesWritten(), requestID)
 			}
 		})
 	}

@@ -255,7 +255,7 @@ func TestLoggingRouter_LogRewrite(t *testing.T) {
 	}
 }
 
-func TestLoggingRouter_WithTraceID(t *testing.T) {
+func TestLoggingRouter_WithRequestID(t *testing.T) {
 	var buf bytes.Buffer
 	logger := log.NewJSONLogger(log.JSONLoggerConfig{
 		Output: &buf,
@@ -272,10 +272,10 @@ func TestLoggingRouter_WithTraceID(t *testing.T) {
 
 	loggingRouter := NewLoggingRouter(router, logger)
 
-	// Create context with trace ID
+	// Create context with request ID
 	ctx := context.Background()
-	traceID := "test-trace-123"
-	ctx = contract.WithTraceContext(ctx, contract.TraceContext{TraceID: contract.TraceID(traceID)})
+	requestID := "test-req-123"
+	ctx = contract.WithRequestID(ctx, requestID)
 
 	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
 
@@ -284,8 +284,8 @@ func TestLoggingRouter_WithTraceID(t *testing.T) {
 		t.Fatalf("failed to parse JSON output: %v", err)
 	}
 
-	if entry["trace_id"] != traceID {
-		t.Errorf("expected trace_id %q, got %v", traceID, entry["trace_id"])
+	if entry["request_id"] != requestID {
+		t.Errorf("expected request_id %q, got %v", requestID, entry["request_id"])
 	}
 }
 

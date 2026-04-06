@@ -100,7 +100,7 @@ type stubTracer struct {
 
 func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Context, metrics.TraceSpan) {
 	t.started = true
-	t.received = contract.TraceIDFromContext(ctx)
+	t.received = contract.RequestIDFromContext(ctx)
 	t.span = &stubSpan{}
 	return ctx, t.span
 }
@@ -128,8 +128,8 @@ func TestLoggingAddsStructuredFields(t *testing.T) {
 
 	mw := Logging(logger, nil, tracer)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if contract.TraceIDFromContext(r.Context()) == "" {
-			t.Fatalf("trace id should be present in context")
+		if contract.RequestIDFromContext(r.Context()) == "" {
+			t.Fatalf("request id should be present in context")
 		}
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte("ok"))
@@ -165,7 +165,7 @@ func TestLoggingUsesUpdatedContextForTracer(t *testing.T) {
 	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("context")) })).ServeHTTP(rec, req)
 
 	if tracer.received != "ctx-trace" {
-		t.Fatalf("tracer should receive trace id from context, got %q", tracer.received)
+		t.Fatalf("tracer should receive request id from context, got %q", tracer.received)
 	}
 }
 

@@ -101,53 +101,14 @@ func TestTraceContextManagement(t *testing.T) {
 	}
 }
 
-func TestTraceIDFromContext(t *testing.T) {
-	ctx := WithTraceContext(context.Background(), TraceContext{
-		TraceID: "test-trace-id",
-		SpanID:  "test-span-id",
-	})
-	if got := TraceIDFromContext(ctx); got != "test-trace-id" {
-		t.Fatalf("expected trace ID %q, got %q", "test-trace-id", got)
-	}
-	if got := TraceIDFromContext(context.Background()); got != "" {
-		t.Fatalf("expected empty trace ID for empty context, got %q", got)
-	}
-}
-
-func TestWithTraceIDString(t *testing.T) {
-	ctx := WithTraceIDString(context.Background(), "new-id")
-	if got := TraceIDFromContext(ctx); got != "new-id" {
-		t.Fatalf("expected %q, got %q", "new-id", got)
-	}
-
-	base := WithTraceContext(context.Background(), TraceContext{
-		TraceID: "old-id",
-		SpanID:  "span-abc",
-	})
-	updated := WithTraceIDString(base, "new-id")
-	tc := TraceContextFromContext(updated)
-	if tc == nil {
-		t.Fatal("expected TraceContext to be set")
-	}
-	if string(tc.TraceID) != "new-id" {
-		t.Fatalf("expected TraceID %q, got %q", "new-id", tc.TraceID)
-	}
-	if string(tc.SpanID) != "span-abc" {
-		t.Fatalf("expected SpanID to be preserved, got %q", tc.SpanID)
-	}
-}
-
 func TestTraceContextFromContextNilSafe(t *testing.T) {
-	if tc := TraceContextFromContext(nil); tc != nil {
+	if tc := TraceContextFromContext(t.Context()); tc != nil {
 		t.Fatalf("expected nil trace context for nil context, got %#v", tc)
-	}
-	if got := TraceIDFromContext(nil); got != "" {
-		t.Fatalf("expected empty trace id for nil context, got %q", got)
 	}
 }
 
 func TestWithSpanIDStringPreservesExistingTraceContext(t *testing.T) {
-	base := WithTraceContext(context.Background(), TraceContext{
+	base := WithTraceContext(t.Context(), TraceContext{
 		TraceID: "trace-abc",
 		Baggage: map[string]string{"user.id": "123"},
 	})

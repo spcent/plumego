@@ -157,7 +157,7 @@ func (b *WebhookBridge) handleMsg(ctx context.Context, msg pubsub.Message, rule 
 			"in_topic":    msg.Topic,
 			"in_id":       msg.ID,
 			"in_time":     msg.Time.Format(time.RFC3339Nano),
-			"trace_id":    msg.Meta["trace_id"],
+			"request_id":  msg.Meta["request_id"],
 			"delivery_id": msg.Meta["delivery_id"], // github delivery / stripe event id
 			"event_type":  msg.Meta["event_type"],
 			"client_ip":   msg.Meta["client_ip"],

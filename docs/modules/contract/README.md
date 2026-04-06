@@ -33,7 +33,8 @@
 - use `Ctx.Response` / `WriteResponse` as the only canonical success path for `Ctx` handlers
 - use one explicit bind step per source: `BindJSON(..., BindOptions{...})` for JSON and `BindQuery(...)` for query
 - perform validation explicitly via `ValidateStruct(...)` after binding, then write failures through `WriteBindError`
-- treat `TraceContext` as the only request-context trace contract; middleware and logging must read from it instead of maintaining package-local trace slots
+- use `WithRequestID(...)` + `RequestIDFromContext(...)` as the only request-correlation contract; middleware and logging must read from it instead of maintaining package-local request id slots
+- keep `TraceContext` for tracing/span state only; do not reuse it as the app-facing request-correlation surface
 - use `Ctx.Stream(StreamConfig{...})` as the only high-level streaming/SSE entrypoint; keep `NewSSEWriter(...)` for low-level stdlib-shaped SSE writing only
 - keep `WriteJSON` as an explicit lower-level writer for raw payloads outside the `Ctx` success contract
 - keep helpers transport-focused

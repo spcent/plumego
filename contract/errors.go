@@ -133,14 +133,14 @@ func (t ErrorType) Meta() errorTypeMeta {
 // NewErrorBuilder(), rather than struct literals, to guarantee that all
 // required fields (Status, Code, Category) are populated consistently.
 type APIError struct {
-	Status   int            `json:"-"`
-	Code     string         `json:"code"`
-	Message  string         `json:"message"`
-	Category ErrorCategory  `json:"category"`
-	Type     ErrorType      `json:"type,omitempty"`
-	Severity ErrorSeverity  `json:"severity,omitempty"`
-	TraceID  string         `json:"-"`
-	Details  map[string]any `json:"details,omitempty"`
+	Status    int            `json:"-"`
+	Code      string         `json:"code"`
+	Message   string         `json:"message"`
+	Category  ErrorCategory  `json:"category"`
+	Type      ErrorType      `json:"type,omitempty"`
+	Severity  ErrorSeverity  `json:"severity,omitempty"`
+	RequestID string         `json:"-"`
+	Details   map[string]any `json:"details,omitempty"`
 }
 
 // Error implements the error interface for APIError
@@ -150,8 +150,8 @@ func (e APIError) Error() string {
 
 // ErrorResponse wraps the error payload for consistent JSON responses.
 type ErrorResponse struct {
-	Error   APIError `json:"error"`
-	TraceID string   `json:"trace_id,omitempty"`
+	Error     APIError `json:"error"`
+	RequestID string   `json:"request_id,omitempty"`
 }
 
 // WriteError writes a structured error response with trace context when available.
@@ -185,15 +185,15 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 		}
 	}
 
-	if err.TraceID == "" && r != nil {
-		if traceID := TraceIDFromContext(r.Context()); traceID != "" {
-			err.TraceID = traceID
+	if err.RequestID == "" && r != nil {
+		if requestID := RequestIDFromContext(r.Context()); requestID != "" {
+			err.RequestID = requestID
 		}
 	}
 
 	resp := ErrorResponse{
-		Error:   err,
-		TraceID: err.TraceID,
+		Error:     err,
+		RequestID: err.RequestID,
 	}
 
 	buf := getJSONBuffer()
@@ -295,9 +295,9 @@ func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
 	return b
 }
 
-// TraceID sets the trace ID for the error.
-func (b *ErrorBuilder) TraceID(traceID string) *ErrorBuilder {
-	b.err.TraceID = traceID
+// RequestID sets the request id for the error.
+func (b *ErrorBuilder) RequestID(requestID string) *ErrorBuilder {
+	b.err.RequestID = requestID
 	return b
 }
 
@@ -430,8 +430,8 @@ func ParseErrorFromResponse(resp *http.Response) (APIError, error) {
 			Build(), nil
 	}
 
-	if errorResp.Error.TraceID == "" {
-		errorResp.Error.TraceID = errorResp.TraceID
+	if errorResp.Error.RequestID == "" {
+		errorResp.Error.RequestID = errorResp.RequestID
 	}
 	return errorResp.Error, nil
 }
