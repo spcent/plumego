@@ -56,8 +56,8 @@ func TestCategoryForStatus(t *testing.T) {
 		expectedCategory ErrorCategory
 	}{
 		{"bad request", http.StatusBadRequest, CategoryClient},
-		{"unauthorized", http.StatusUnauthorized, CategoryAuthentication},
-		{"forbidden", http.StatusForbidden, CategoryAuthentication},
+		{"unauthorized", http.StatusUnauthorized, CategoryAuth},
+		{"forbidden", http.StatusForbidden, CategoryAuth},
 		{"not found", http.StatusNotFound, CategoryClient},
 		{"too many requests", http.StatusTooManyRequests, CategoryRateLimit},
 		{"request timeout", http.StatusRequestTimeout, CategoryTimeout},

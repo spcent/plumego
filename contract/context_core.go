@@ -44,7 +44,6 @@ type Ctx struct {
 	Query    url.Values
 	Headers  http.Header
 	ClientIP string
-	TraceID  string
 	Deadline time.Time
 	Config   *RequestConfig
 
@@ -66,6 +65,15 @@ type Ctx struct {
 	// Middleware data storage
 	mu    sync.RWMutex
 	store map[string]any
+}
+
+// TraceID returns the trace ID associated with this request, read live from the
+// request context. Returns an empty string when no trace context is present.
+func (c *Ctx) TraceID() string {
+	if c == nil || c.R == nil {
+		return ""
+	}
+	return TraceIDFromContext(c.R.Context())
 }
 
 // BindError represents an error that occurred while binding a request body.
@@ -221,8 +229,6 @@ func newCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]
 		deadline, _ = timeoutCtx.Deadline()
 	}
 
-	traceID := TraceIDFromContext(r.Context())
-
 	// Detect compression
 	compressionEnabled := false
 	if cfg.EnableCompression {
@@ -239,7 +245,6 @@ func newCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]
 		Query:    r.URL.Query(),
 		Headers:  r.Header,
 		ClientIP: clientIPFromRequest(r),
-		TraceID:  traceID,
 		Deadline: deadline,
 		Config:   cfg,
 

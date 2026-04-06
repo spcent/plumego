@@ -58,6 +58,9 @@ func (c *Ctx) Redirect(status int, location string) error {
 // same-origin URLs. It returns ErrUnsafeRedirect if the location points to
 // an external host, preventing open redirect vulnerabilities.
 func (c *Ctx) SafeRedirect(status int, location string) error {
+	if c == nil {
+		return ErrContextNil
+	}
 	if err := validateRedirectURL(location, c.R); err != nil {
 		return err
 	}
@@ -98,6 +101,9 @@ func validateRedirectURL(location string, r *http.Request) error {
 
 // File serves a file to the client.
 func (c *Ctx) File(path string) error {
+	if c == nil {
+		return ErrContextNil
+	}
 	http.ServeFile(c.W, c.R, path)
 	return nil
 }
@@ -105,18 +111,26 @@ func (c *Ctx) File(path string) error {
 // SetCookie adds a Set-Cookie header using the provided cookie configuration.
 // Use http.Cookie{} to specify all attributes including SameSite.
 // If cookie.Path is empty it defaults to "/".
+// SetCookie does not modify the caller's cookie struct.
 func (c *Ctx) SetCookie(cookie *http.Cookie) {
-	if cookie.Path == "" {
-		cookie.Path = "/"
+	if c == nil {
+		return
+	}
+	local := *cookie // copy; do not mutate caller's struct
+	if local.Path == "" {
+		local.Path = "/"
 	}
 	// Ensure cookies are only sent over secure HTTPS connections.
-	cookie.Secure = true
-	http.SetCookie(c.W, cookie)
+	local.Secure = true
+	http.SetCookie(c.W, &local)
 }
 
 // Cookie returns the named cookie from the request.
 // If the cookie is not found, it returns http.ErrNoCookie.
 func (c *Ctx) Cookie(name string) (string, error) {
+	if c == nil {
+		return "", ErrContextNil
+	}
 	cookie, err := c.R.Cookie(name)
 	if err != nil {
 		return "", err

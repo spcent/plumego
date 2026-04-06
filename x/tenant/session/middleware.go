@@ -192,7 +192,7 @@ func sessionErrorToAPIError(err error) contract.APIError {
 	unauthorized := func(msg string) contract.APIError {
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnauthorized).
-			Category(contract.CategoryAuthentication).
+			Category(contract.CategoryAuth).
 			Type(contract.ErrTypeUnauthorized).
 			Code(contract.CodeUnauthorized).
 			Message(msg).

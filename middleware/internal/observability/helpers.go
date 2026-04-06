@@ -29,7 +29,7 @@ func EnsureTraceID(r *http.Request) string {
 	if id := contract.TraceIDFromContext(r.Context()); id != "" {
 		return id
 	}
-	if id := contract.DefaultObservabilityPolicy.RequestIDFromRequest(r); id != "" {
+	if id := contract.DefaultObservabilityPolicy().RequestIDFromRequest(r); id != "" {
 		return id
 	}
 	return log.NewTraceID()

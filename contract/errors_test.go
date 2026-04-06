@@ -128,12 +128,12 @@ func TestCommonErrorBuilders(t *testing.T) {
 	// Test unauthorized error via builder
 	authErr := NewErrorBuilder().
 		Status(http.StatusUnauthorized).
-		Category(CategoryAuthentication).
+		Category(CategoryAuth).
 		Type(ErrTypeUnauthorized).
 		Code(CodeUnauthorized).
 		Message("invalid token").
 		Build()
-	if authErr.Category != CategoryAuthentication {
+	if authErr.Category != CategoryAuth {
 		t.Fatalf("expected authentication category")
 	}
 
@@ -171,7 +171,7 @@ func TestErrorValidation(t *testing.T) {
 		Category: CategoryValidation,
 	}
 
-	validationErrors := ValidateError(validErr)
+	validationErrors := validateAPIError(validErr)
 	if len(validationErrors) > 0 {
 		t.Fatalf("expected no validation errors, got %v", validationErrors)
 	}
@@ -205,7 +205,7 @@ func TestErrorValidation(t *testing.T) {
 	}
 
 	for i, invalidErr := range invalidCases {
-		errs := ValidateError(invalidErr)
+		errs := validateAPIError(invalidErr)
 		if len(errs) == 0 {
 			t.Fatalf("case %d: expected validation errors", i)
 		}
@@ -219,7 +219,7 @@ func TestHTTPStatusFromCategory(t *testing.T) {
 	}{
 		{CategoryClient, http.StatusBadRequest},
 		{CategoryValidation, http.StatusBadRequest},
-		{CategoryAuthentication, http.StatusUnauthorized},
+		{CategoryAuth, http.StatusUnauthorized},
 		{CategoryRateLimit, http.StatusTooManyRequests},
 		{CategoryServer, http.StatusInternalServerError},
 		{CategoryTimeout, http.StatusRequestTimeout},

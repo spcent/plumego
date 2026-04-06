@@ -3,6 +3,7 @@ package contract
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -167,12 +168,12 @@ func TestFormatError(t *testing.T) {
 		t.Fatal("expected non-empty formatted error")
 	}
 	// Should contain operation and module
-	if !contains(formatted, "op=op") || !contains(formatted, "module=mod") {
+	if !strings.Contains(formatted, "op=op") || !strings.Contains(formatted, "module=mod") {
 		t.Fatalf("formatted error missing context: %s", formatted)
 	}
 }
 
-// Helper types and functions
+// Helper types
 
 type timeoutError struct {
 	timeout bool
@@ -184,17 +185,4 @@ func (e *timeoutError) Error() string {
 
 func (e *timeoutError) Timeout() bool {
 	return e.timeout
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

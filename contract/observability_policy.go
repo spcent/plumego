@@ -9,8 +9,8 @@ import (
 const (
 	// RequestIDHeader is the canonical request id header.
 	RequestIDHeader = "X-Request-ID"
-	// FallbackRequestIDHeader is the legacy request id header.
-	FallbackRequestIDHeader = "X-Trace-ID"
+	// LegacyTraceIDHeader is the legacy trace id header, checked as a fallback for request id.
+	LegacyTraceIDHeader = "X-Trace-ID"
 )
 
 // ObservabilityPolicy defines canonical middleware observability behavior.
@@ -19,8 +19,11 @@ type ObservabilityPolicy struct {
 	sensitiveKeys map[string]struct{}
 }
 
-// DefaultObservabilityPolicy is the shared observability policy.
-var DefaultObservabilityPolicy = NewObservabilityPolicy()
+// DefaultObservabilityPolicy returns a fresh ObservabilityPolicy with default settings.
+// Use NewObservabilityPolicy to construct one with custom sensitive keys.
+func DefaultObservabilityPolicy() ObservabilityPolicy {
+	return NewObservabilityPolicy()
+}
 
 // NewObservabilityPolicy creates a policy with safe defaults and optional
 // application-specific sensitive key patterns.
@@ -56,7 +59,7 @@ func (p ObservabilityPolicy) RequestIDFromRequest(r *http.Request) string {
 	if id := strings.TrimSpace(r.Header.Get(RequestIDHeader)); id != "" {
 		return id
 	}
-	if id := strings.TrimSpace(r.Header.Get(FallbackRequestIDHeader)); id != "" {
+	if id := strings.TrimSpace(r.Header.Get(LegacyTraceIDHeader)); id != "" {
 		return id
 	}
 	return ""

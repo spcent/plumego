@@ -122,7 +122,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 		Data:  json.RawMessage(raw),
 		Meta: map[string]string{
 			"source":      "github",
-			"trace_id":    ctx.TraceID,
+			"trace_id":    ctx.TraceID(),
 			"delivery_id": delivery,
 			"event_type":  event,
 			"client_ip":   ctx.ClientIP,
@@ -206,7 +206,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 		Data:  json.RawMessage(raw),
 		Meta: map[string]string{
 			"source":      "stripe",
-			"trace_id":    ctx.TraceID,
+			"trace_id":    ctx.TraceID(),
 			"delivery_id": evtID,
 			"event_type":  evtType,
 			"client_ip":   ctx.ClientIP,

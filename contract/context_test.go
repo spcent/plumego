@@ -39,8 +39,8 @@ func TestNewCtxPopulatesFields(t *testing.T) {
 		t.Fatalf("expected deadline to be copied")
 	}
 
-	if ctx.TraceID != "" {
-		t.Fatalf("expected empty trace id on request without trace context, got %q", ctx.TraceID)
+	if ctx.TraceID() != "" {
+		t.Fatalf("expected empty trace id on request without trace context, got %q", ctx.TraceID())
 	}
 }
 
