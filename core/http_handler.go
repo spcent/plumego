@@ -35,7 +35,7 @@ func (a *App) ensureServerPrepared() error {
 		return nil
 	}
 	handler := a.handler
-	settings := projectServerSettings(*a.config)
+	cfg := *a.config
 	a.mu.RUnlock()
 
 	if handler == nil {
@@ -43,11 +43,11 @@ func (a *App) ensureServerPrepared() error {
 	}
 
 	var tlsConfig *tls.Config
-	if settings.TLS.Enabled {
-		if settings.TLS.CertFile == "" || settings.TLS.KeyFile == "" {
+	if cfg.TLS.Enabled {
+		if cfg.TLS.CertFile == "" || cfg.TLS.KeyFile == "" {
 			return wrapCoreError(fmt.Errorf("TLS enabled but certificate or key file not provided"), "prepare_server", nil)
 		}
-		cert, err := tls.LoadX509KeyPair(settings.TLS.CertFile, settings.TLS.KeyFile)
+		cert, err := tls.LoadX509KeyPair(cfg.TLS.CertFile, cfg.TLS.KeyFile)
 		if err != nil {
 			return wrapCoreError(fmt.Errorf("load tls certificate: %w", err), "prepare_server", nil)
 		}
@@ -65,20 +65,20 @@ func (a *App) ensureServerPrepared() error {
 	}
 
 	a.httpServer = &http.Server{
-		Addr:              settings.Addr,
+		Addr:              cfg.Addr,
 		Handler:           handler,
-		ReadTimeout:       settings.ReadTimeout,
-		ReadHeaderTimeout: settings.ReadHeaderTimeout,
-		WriteTimeout:      settings.WriteTimeout,
-		IdleTimeout:       settings.IdleTimeout,
-		MaxHeaderBytes:    settings.MaxHeaderBytes,
+		ReadTimeout:       cfg.ReadTimeout,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
+		MaxHeaderBytes:    cfg.MaxHeaderBytes,
 		TLSConfig:         tlsConfig,
 	}
-	a.connTracker = newConnectionTracker(a.logger, settings.DrainInterval)
+	a.connTracker = newConnectionTracker(a.logger, cfg.DrainInterval)
 	a.httpServer.ConnState = a.connTracker.track
 	a.preparationState = PreparationStateServerPrepared
 
-	if !settings.HTTP2Enabled {
+	if !cfg.HTTP2Enabled {
 		a.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))
 	}
 

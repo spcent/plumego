@@ -127,7 +127,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 						Status(http.StatusUnauthorized).
 						Category(contract.CategoryAuth).
-						Type(contract.ErrTypeUnauthorized).
+						Type(contract.TypeUnauthorized).
 						Code(contract.CodeUnauthorized).
 						Message("unauthorized").
 						Build())

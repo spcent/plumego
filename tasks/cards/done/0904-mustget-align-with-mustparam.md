@@ -69,3 +69,9 @@ Done Definition:
 - All tests pass.
 
 Outcome:
+State: done
+- `MustGet(key string) any` changed to `MustGet(key string) (any, error)`.
+- Returns `fmt.Errorf("%w: %s", ErrMissingKey, key)` on missing key; never panics.
+- `ErrMissingKey` sentinel added alongside `ErrMissingParam` in `context_core.go`.
+- Doc comment updated to remove panic warning.
+- `go test -timeout 20s ./...` passes.

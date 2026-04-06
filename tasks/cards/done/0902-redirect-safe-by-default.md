@@ -60,3 +60,9 @@ Done Definition:
 - All tests pass.
 
 Outcome:
+State: done
+- `SafeRedirect()` renamed to `Redirect()` (safe, same-origin-only behaviour is now the default).
+- `Redirect()` renamed to `UnsafeRedirect()` (explicit opt-in for cross-origin redirects).
+- All callers in `x/webhook` and test files updated.
+- `grep -rn 'SafeRedirect' . --include='*.go'` returns empty.
+- `go test -timeout 20s ./...` passes.

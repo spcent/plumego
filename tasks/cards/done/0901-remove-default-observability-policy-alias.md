@@ -51,3 +51,8 @@ Done Definition:
 - All tests pass.
 
 Outcome:
+State: done
+- `DefaultObservabilityPolicy()` deleted from `contract/observability_policy.go`.
+- All 15 call sites replaced with `NewObservabilityPolicy()` via bulk sed.
+- `grep -rn 'DefaultObservabilityPolicy' . --include='*.go'` returns empty.
+- `go test -timeout 20s ./...` passes.

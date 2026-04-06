@@ -12,7 +12,5 @@ func (a *App) RuntimeSnapshot() RuntimeSnapshot {
 	state := a.preparationState
 	a.mu.RUnlock()
 
-	snapshot := projectServerSettings(cfg).runtimeSnapshot()
-	snapshot.PreparationState = state
-	return snapshot
+	return cfg.runtimeSnapshot(state)
 }

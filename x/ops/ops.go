@@ -197,7 +197,7 @@ func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 			contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 				Status(http.StatusBadRequest).
 				Category(contract.CategoryValidation).
-				Type(contract.ErrTypeValidation).
+				Type(contract.TypeValidation).
 				Code(contract.CodeValidationError).
 				Message("validation failed for field 'queue': queue parameter required").
 				Detail("field", "queue").
@@ -279,7 +279,7 @@ func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryValidation).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeValidationError).
 			Message("validation failed for field 'message_id': message_id parameter required").
 			Detail("field", "message_id").
@@ -317,7 +317,7 @@ func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 			contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 				Status(http.StatusBadRequest).
 				Category(contract.CategoryValidation).
-				Type(contract.ErrTypeValidation).
+				Type(contract.TypeValidation).
 				Code(contract.CodeValidationError).
 				Message("validation failed for field 'provider': provider parameter required").
 				Detail("field", "provider").
@@ -368,7 +368,7 @@ func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryValidation).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeValidationError).
 			Message("validation failed for field 'tenant_id': tenant_id parameter required").
 			Detail("field", "tenant_id").
@@ -463,7 +463,7 @@ func denyAllMiddleware() middleware.Middleware {
 			contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusUnauthorized).
 				Category(contract.CategoryAuth).
-				Type(contract.ErrTypeUnauthorized).
+				Type(contract.TypeUnauthorized).
 				Code(contract.CodeUnauthorized).
 				Message("ops auth required").
 				Build())

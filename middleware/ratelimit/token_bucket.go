@@ -122,7 +122,7 @@ func TokenBucket(config Config) func(http.Handler) http.Handler {
 				contract.WriteError(w, r, contract.NewErrorBuilder().
 					Status(http.StatusInternalServerError).
 					Category(contract.CategoryServer).
-					Type(contract.ErrTypeInternal).
+					Type(contract.TypeInternal).
 					Code(contract.CodeInternalError).
 					Message("Rate limiter internal error").
 					Build())
@@ -163,7 +163,7 @@ func TokenBucket(config Config) func(http.Handler) http.Handler {
 			contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusTooManyRequests).
 				Category(contract.CategoryRateLimit).
-				Type(contract.ErrTypeRateLimited).
+				Type(contract.TypeRateLimited).
 				Code(contract.CodeRateLimited).
 				Message("Rate limit exceeded").
 				Build())

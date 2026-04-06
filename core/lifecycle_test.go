@@ -227,8 +227,8 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 		{
 			name: "with HTTP2 disabled",
 			config: AppConfig{
-				Addr:        ":8083",
-				EnableHTTP2: false,
+				Addr:         ":8083",
+				HTTP2Enabled: false,
 			},
 			expectError: false,
 		},
@@ -251,7 +251,7 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 			cfg.WriteTimeout = tt.config.WriteTimeout
 			cfg.IdleTimeout = tt.config.IdleTimeout
 			cfg.MaxHeaderBytes = tt.config.MaxHeaderBytes
-			cfg.EnableHTTP2 = tt.config.EnableHTTP2
+			cfg.HTTP2Enabled = tt.config.HTTP2Enabled
 			cfg.DrainInterval = tt.config.DrainInterval
 			app := New(cfg, AppDependencies{})
 

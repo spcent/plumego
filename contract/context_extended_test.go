@@ -74,12 +74,12 @@ func TestCategoryForStatus(t *testing.T) {
 	}
 }
 
-func TestRedirect(t *testing.T) {
+func TestUnsafeRedirect(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
 	ctx := NewCtx(w, r, nil)
 
-	err := ctx.Redirect(http.StatusFound, "/redirect")
+	err := ctx.UnsafeRedirect(http.StatusFound, "https://external.example.com/redirect")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,12 +89,12 @@ func TestRedirect(t *testing.T) {
 	}
 
 	location := w.Header().Get("Location")
-	if location != "/redirect" {
-		t.Errorf("expected location '/redirect', got '%s'", location)
+	if location != "https://external.example.com/redirect" {
+		t.Errorf("expected external location, got '%s'", location)
 	}
 }
 
-func TestSafeRedirect(t *testing.T) {
+func TestRedirect(t *testing.T) {
 	tests := []struct {
 		name        string
 		location    string
@@ -118,7 +118,7 @@ func TestSafeRedirect(t *testing.T) {
 			r.Host = tt.host
 			ctx := NewCtx(w, r, nil)
 
-			err := ctx.SafeRedirect(http.StatusFound, tt.location)
+			err := ctx.Redirect(http.StatusFound, tt.location)
 
 			if tt.expectError && err == nil {
 				t.Errorf("expected error for %q, got nil", tt.location)
@@ -253,7 +253,7 @@ func TestBindJSONBodyTooLarge(t *testing.T) {
 		t.Error("expected error for body too large")
 	}
 
-	var bindErr *BindError
+	var bindErr *bindError
 	if errors.As(err, &bindErr) {
 		if bindErr.Status != http.StatusRequestEntityTooLarge {
 			t.Errorf("expected status %d, got %d", http.StatusRequestEntityTooLarge, bindErr.Status)
@@ -491,7 +491,7 @@ func TestParamFromRequest(t *testing.T) {
 
 func TestBindErrorUnwrap(t *testing.T) {
 	innerErr := errors.New("inner error")
-	bindErr := &BindError{
+	bindErr := &bindError{
 		Status:  http.StatusBadRequest,
 		Message: "test error",
 		Err:     innerErr,
@@ -502,13 +502,13 @@ func TestBindErrorUnwrap(t *testing.T) {
 	}
 
 	// Test nil case
-	var nilErr *BindError
+	var nilErr *bindError
 	if nilErr.Unwrap() != nil {
 		t.Error("Unwrap on nil should return nil")
 	}
 
 	// Test with no inner error
-	bindErr2 := &BindError{
+	bindErr2 := &bindError{
 		Status:  http.StatusBadRequest,
 		Message: "test error",
 	}
@@ -592,9 +592,9 @@ func TestBindJSONError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty body")
 	}
-	var bindErr *BindError
+	var bindErr *bindError
 	if !errors.As(err, &bindErr) {
-		t.Fatalf("expected BindError, got %T", err)
+		t.Fatalf("expected bindError, got %T", err)
 	}
 }
 
@@ -671,9 +671,9 @@ func TestBindQueryInvalidType(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid int")
 	}
-	var bindErr *BindError
+	var bindErr *bindError
 	if !errors.As(err, &bindErr) {
-		t.Fatalf("expected BindError, got %T", err)
+		t.Fatalf("expected bindError, got %T", err)
 	}
 	if bindErr.Status != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", bindErr.Status)
@@ -940,27 +940,27 @@ func TestSetGet(t *testing.T) {
 	}
 }
 
-func TestMustGetPanics(t *testing.T) {
+func TestMustGet(t *testing.T) {
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
 
 	// MustGet on existing key
 	ctx.Set("key", "val")
-	if v := ctx.MustGet("key"); v != "val" {
+	v, err := ctx.MustGet("key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != "val" {
 		t.Fatalf("expected val, got %v", v)
 	}
 
-	// MustGet on missing key should panic
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("expected panic for missing key")
-		}
-		msg, ok := r.(string)
-		if !ok || !strings.Contains(msg, "missing key") {
-			t.Fatalf("unexpected panic value: %v", r)
-		}
-	}()
-	ctx.MustGet("nonexistent")
+	// MustGet on missing key returns ErrMissingKey
+	_, err = ctx.MustGet("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for missing key, got nil")
+	}
+	if !errors.Is(err, ErrMissingKey) {
+		t.Fatalf("expected ErrMissingKey, got %v", err)
+	}
 }
 
 func TestSetGetConcurrent(t *testing.T) {

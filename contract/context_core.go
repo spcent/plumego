@@ -42,7 +42,6 @@ type Ctx struct {
 	R        *http.Request
 	Params   map[string]string
 	Query    url.Values
-	Headers  http.Header
 	ClientIP string
 	Deadline time.Time
 	Config   *RequestConfig
@@ -67,6 +66,16 @@ type Ctx struct {
 	store map[string]any
 }
 
+// RequestHeaders returns the request's header map.
+// This is a direct alias for R.Header: writes to the returned map modify the
+// underlying http.Request headers and are visible to all subsequent middleware.
+func (c *Ctx) RequestHeaders() http.Header {
+	if c == nil || c.R == nil {
+		return nil
+	}
+	return c.R.Header
+}
+
 // TraceID returns the trace ID associated with this request, read live from the
 // request context. Returns an empty string when no trace context is present.
 func (c *Ctx) TraceID() string {
@@ -76,8 +85,8 @@ func (c *Ctx) TraceID() string {
 	return TraceIDFromContext(c.R.Context())
 }
 
-// BindError represents an error that occurred while binding a request body.
-type BindError struct {
+// bindError represents an error that occurred while binding a request body.
+type bindError struct {
 	Status  int
 	Message string
 	Err     error
@@ -99,8 +108,11 @@ var (
 	// ErrUnexpectedExtraData is returned when the request body contains unexpected extra data.
 	ErrUnexpectedExtraData = errors.New("unexpected extra data in request body")
 
-	// ErrMissingParam is returned when a required parameter is missing.
+	// ErrMissingParam is returned when a required route parameter is missing.
 	ErrMissingParam = errors.New("missing parameter")
+
+	// ErrMissingKey is returned when a required middleware store key is missing.
+	ErrMissingKey = errors.New("missing key")
 
 	// ErrInvalidParam is returned when a parameter has an invalid value.
 	ErrInvalidParam = errors.New("invalid parameter value")
@@ -131,7 +143,7 @@ var (
 )
 
 // Error implements the error interface.
-func (e *BindError) Error() string {
+func (e *bindError) Error() string {
 	if e == nil {
 		return ""
 	}
@@ -145,7 +157,7 @@ func (e *BindError) Error() string {
 }
 
 // Unwrap exposes the underlying error.
-func (e *BindError) Unwrap() error {
+func (e *bindError) Unwrap() error {
 	if e == nil {
 		return nil
 	}
@@ -205,11 +217,6 @@ func DefaultConfig() RequestConfig {
 	return defaultConfig
 }
 
-func defaultRequestConfig() *RequestConfig {
-	cfg := defaultConfig
-	return &cfg
-}
-
 // newCtxWithConfig is the canonical constructor; nil cfg uses the package default.
 func newCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]string, cfg *RequestConfig) *Ctx {
 	if params == nil {
@@ -217,7 +224,8 @@ func newCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]
 	}
 
 	if cfg == nil {
-		cfg = defaultRequestConfig()
+		c := defaultConfig
+		cfg = &c
 	}
 
 	var cancel context.CancelFunc
@@ -243,7 +251,6 @@ func newCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]
 		R:        r,
 		Params:   params,
 		Query:    r.URL.Query(),
-		Headers:  r.Header,
 		ClientIP: clientIPFromRequest(r),
 		Deadline: deadline,
 		Config:   cfg,
@@ -278,11 +285,15 @@ func (c *Ctx) Abort() {
 	}
 }
 
-// AbortWithStatus is a convenience that writes the HTTP status code and
-// then marks the context as aborted.
+// AbortWithStatus writes the HTTP status code and marks the context as aborted atomically.
+// If Abort has already been called, this is a no-op (WriteHeader is not called again).
 func (c *Ctx) AbortWithStatus(code int) {
-	c.W.WriteHeader(code)
-	c.Abort()
+	if c.aborted.CompareAndSwap(false, true) {
+		c.W.WriteHeader(code)
+		if c.cancel != nil {
+			c.cancel()
+		}
+	}
 }
 
 // IsAborted reports whether Abort has been called on this context.
@@ -351,14 +362,15 @@ func (c *Ctx) Get(key string) (any, bool) {
 	return val, ok
 }
 
-// MustGet retrieves a value from the context store and panics if the key does not exist.
-// Use this only when the key is guaranteed to have been set by prior middleware.
-func (c *Ctx) MustGet(key string) any {
+// MustGet retrieves a value from the context store.
+// It returns ErrMissingKey when the key has not been set, matching MustParam semantics.
+// Use Get when a missing key is not an error condition.
+func (c *Ctx) MustGet(key string) (any, error) {
 	val, ok := c.Get(key)
 	if !ok {
-		panic("contract.Ctx: missing key " + key)
+		return nil, fmt.Errorf("%w: %s", ErrMissingKey, key)
 	}
-	return val
+	return val, nil
 }
 
 // GetRequestDuration returns the time since the request started.

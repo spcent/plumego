@@ -95,7 +95,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryValidation).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeValidationError).
 			Message("validation failed for field 'job_id': job ID too long").
 			Detail("field", "job_id").
@@ -169,7 +169,7 @@ func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, su
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryValidation).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeValidationError).
 			Message("validation failed for field 'job_id': job ID too long").
 			Detail("field", "job_id").

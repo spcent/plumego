@@ -68,7 +68,7 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.AP
 			errors = append(errors, contract.NewErrorBuilder().
 				Status(400).
 				Category(contract.CategoryValidation).
-				Type(contract.ErrTypeRequired).
+				Type(contract.TypeRequired).
 				Code("CONFIG_REQUIRED").
 				Message(fmt.Sprintf("required configuration '%s' is missing", key)).
 				Detail("key", key).
@@ -87,7 +87,7 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.AP
 				apiErr := contract.NewErrorBuilder().
 					Status(400).
 					Category(contract.CategoryValidation).
-					Type(contract.ErrTypeValidation).
+					Type(contract.TypeValidation).
 					Code("CONFIG_VALIDATION_FAILED").
 					Message(err.Error()).
 					Detail("key", key).

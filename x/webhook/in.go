@@ -96,8 +96,8 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 		return
 	}
 
-	event := strings.TrimSpace(ctx.Headers.Get("X-GitHub-Event"))
-	delivery := strings.TrimSpace(ctx.Headers.Get("X-GitHub-Delivery"))
+	event := strings.TrimSpace(ctx.RequestHeaders().Get("X-GitHub-Event"))
+	delivery := strings.TrimSpace(ctx.RequestHeaders().Get("X-GitHub-Delivery"))
 	if event == "" {
 		event = "unknown"
 	}

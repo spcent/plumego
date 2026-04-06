@@ -68,7 +68,7 @@ func Middleware(opts ...Option) middleware.Middleware {
 				id = cfg.generate()
 			}
 
-			r = contract.DefaultObservabilityPolicy().AttachRequestID(w, r, id, cfg.includeInRequest)
+			r = contract.NewObservabilityPolicy().AttachRequestID(w, r, id, cfg.includeInRequest)
 			if cfg.headerName != "" && cfg.headerName != contract.RequestIDHeader {
 				if cfg.includeInRequest {
 					r.Header.Set(cfg.headerName, id)
@@ -82,7 +82,7 @@ func Middleware(opts ...Option) middleware.Middleware {
 }
 
 func traceIDFromRequest(r *http.Request, headerName, fallback string) string {
-	if id := contract.DefaultObservabilityPolicy().RequestIDFromRequest(r); id != "" {
+	if id := contract.NewObservabilityPolicy().RequestIDFromRequest(r); id != "" {
 		return id
 	}
 	if r == nil {

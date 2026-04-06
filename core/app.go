@@ -18,7 +18,7 @@ type App struct {
 	logger          log.StructuredLogger // Logger instance
 
 	// Runtime state (protected by mutex)
-	mu           sync.RWMutex
+	mu               sync.RWMutex
 	preparationState PreparationState // Tracks mutation and preparation phase
 
 	// Server components
@@ -32,10 +32,10 @@ type App struct {
 func New(cfg AppConfig, dependencies AppDependencies) *App {
 	config := cfg
 	app := &App{
-		config:          &config,
-		router:          router.NewRouter(),
-		middlewareChain: middleware.NewChain(),
-		logger:          resolveLogger(dependencies),
+		config:           &config,
+		router:           router.NewRouter(),
+		middlewareChain:  middleware.NewChain(),
+		logger:           resolveLogger(dependencies),
 		preparationState: PreparationStateMutable,
 	}
 

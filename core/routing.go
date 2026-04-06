@@ -8,12 +8,15 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-func (a *App) addRoute(method, path string, handler http.Handler) error {
+// registerRoute is the single implementation for all route registration.
+// An empty name registers the route without a name.
+func (a *App) registerRoute(method, path, name string, handler http.Handler) error {
 	if handler == nil {
-		return contract.WrapError(contract.ErrHandlerNil, "add_route", "core", map[string]any{
-			"method": method,
-			"path":   path,
-		})
+		params := map[string]any{"method": method, "path": path}
+		if name != "" {
+			params["name"] = name
+		}
+		return contract.WrapError(contract.ErrHandlerNil, "add_route", "core", params)
 	}
 
 	if err := a.ensureMutable("add_route", "register route"); err != nil {
@@ -25,28 +28,18 @@ func (a *App) addRoute(method, path string, handler http.Handler) error {
 		return wrapCoreError(fmt.Errorf("router not configured"), "add_route", nil)
 	}
 
+	if name != "" {
+		return r.AddRouteWithName(method, path, name, handler)
+	}
 	return r.AddRoute(method, path, handler)
 }
 
+func (a *App) addRoute(method, path string, handler http.Handler) error {
+	return a.registerRoute(method, path, "", handler)
+}
+
 func (a *App) addNamedRoute(method, name, path string, handler http.Handler) error {
-	if handler == nil {
-		return contract.WrapError(contract.ErrHandlerNil, "add_route", "core", map[string]any{
-			"method": method,
-			"path":   path,
-			"name":   name,
-		})
-	}
-
-	if err := a.ensureMutable("add_route", "register route"); err != nil {
-		return err
-	}
-
-	r := a.ensureRouter()
-	if r == nil {
-		return wrapCoreError(fmt.Errorf("router not configured"), "add_route", nil)
-	}
-
-	return r.AddRouteWithName(method, path, name, handler)
+	return a.registerRoute(method, path, name, handler)
 }
 
 // =========================================================

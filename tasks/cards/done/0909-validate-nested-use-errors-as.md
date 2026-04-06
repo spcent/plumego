@@ -69,3 +69,8 @@ Done Definition:
 - All tests pass.
 
 Outcome:
+State: done
+- Both Ptr and Struct branches in `validateNestedStructField` use `errors.As` instead of bare type assertion.
+- `"errors"` import added to `contract/validation.go`.
+- `grep -rn '\.(validationErrors)' contract/validation.go` returns empty.
+- `go test -timeout 20s ./...` passes.

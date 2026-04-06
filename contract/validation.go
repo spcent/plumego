@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"errors"
 	"fmt"
 	"net/mail"
 	"reflect"
@@ -115,14 +116,16 @@ func validateNestedStructField(value reflect.Value, fieldName string, depth int)
 			return validationErrors{}
 		}
 		if err := validateStructAtDepth(value.Interface(), fieldName, depth); err != nil {
-			if issues, ok := err.(validationErrors); ok {
+			var issues validationErrors
+			if errors.As(err, &issues) {
 				return issues
 			}
 		}
 	case reflect.Struct:
 		if value.CanAddr() {
 			if err := validateStructAtDepth(value.Addr().Interface(), fieldName, depth); err != nil {
-				if issues, ok := err.(validationErrors); ok {
+				var issues validationErrors
+				if errors.As(err, &issues) {
 					return issues
 				}
 			}

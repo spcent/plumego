@@ -43,26 +43,27 @@ func (c *Ctx) Bytes(status int, data []byte) error {
 	return err
 }
 
-// Redirect sends a redirect response to the client.
-// Note: This accepts any URL including external ones. Use SafeRedirect to
-// restrict redirects to same-origin paths only.
-func (c *Ctx) Redirect(status int, location string) error {
-	if c == nil {
-		return ErrContextNil
-	}
-	http.Redirect(c.W, c.R, location, status)
-	return nil
-}
-
-// SafeRedirect sends a redirect response but only allows relative paths and
+// Redirect sends a redirect response but only allows relative paths and
 // same-origin URLs. It returns ErrUnsafeRedirect if the location points to
 // an external host, preventing open redirect vulnerabilities.
-func (c *Ctx) SafeRedirect(status int, location string) error {
+// Use UnsafeRedirect when a cross-origin redirect is explicitly required.
+func (c *Ctx) Redirect(status int, location string) error {
 	if c == nil {
 		return ErrContextNil
 	}
 	if err := validateRedirectURL(location, c.R); err != nil {
 		return err
+	}
+	http.Redirect(c.W, c.R, location, status)
+	return nil
+}
+
+// UnsafeRedirect sends a redirect response to any URL, including external hosts.
+// Prefer Redirect for same-origin redirects. Only use this when you explicitly
+// need to redirect to a different origin and have validated the destination.
+func (c *Ctx) UnsafeRedirect(status int, location string) error {
+	if c == nil {
+		return ErrContextNil
 	}
 	http.Redirect(c.W, c.R, location, status)
 	return nil

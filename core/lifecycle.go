@@ -13,10 +13,7 @@ import (
 
 // Prepare freezes routing/middleware state and constructs the HTTP server.
 func (a *App) Prepare() error {
-	if err := a.ensureServerPrepared(); err != nil {
-		return err
-	}
-	return nil
+	return a.ensureServerPrepared()
 }
 
 // Server returns the prepared HTTP server instance.

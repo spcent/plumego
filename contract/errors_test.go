@@ -13,7 +13,7 @@ func TestErrorBuilder(t *testing.T) {
 	err := builder.
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
-		Type(ErrTypeValidation).
+		Type(TypeValidation).
 		Code("TEST_ERROR").
 		Message("test error message").
 		Detail("field", "email").
@@ -46,7 +46,7 @@ func TestBuilderTypeOverwritesPriorFields(t *testing.T) {
 		Status(999).
 		Code("CUSTOM").
 		Category(CategoryServer).
-		Type(ErrTypeNotFound).
+		Type(TypeNotFound).
 		Build()
 
 	if got.Status != http.StatusNotFound {
@@ -62,7 +62,7 @@ func TestBuilderTypeOverwritesPriorFields(t *testing.T) {
 
 func TestBuilderStatusAfterTypeWins(t *testing.T) {
 	got := NewErrorBuilder().
-		Type(ErrTypeNotFound).
+		Type(TypeNotFound).
 		Status(http.StatusUnprocessableEntity).
 		Build()
 
@@ -75,7 +75,7 @@ func TestErrorBuilderChaining(t *testing.T) {
 	err := NewErrorBuilder().
 		Status(http.StatusNotFound).
 		Category(CategoryClient).
-		Type(ErrTypeNotFound).
+		Type(TypeNotFound).
 		Code("NOT_FOUND").
 		Message("resource not found").
 		Detail("resource", "user").
@@ -96,7 +96,7 @@ func TestCommonErrorBuilders(t *testing.T) {
 	valErr := NewErrorBuilder().
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
-		Type(ErrTypeValidation).
+		Type(TypeValidation).
 		Code(CodeValidationError).
 		Message("validation failed for field 'email': invalid format").
 		Detail("field", "email").
@@ -113,7 +113,7 @@ func TestCommonErrorBuilders(t *testing.T) {
 	notFoundErr := NewErrorBuilder().
 		Status(http.StatusNotFound).
 		Category(CategoryClient).
-		Type(ErrTypeNotFound).
+		Type(TypeNotFound).
 		Code(CodeResourceNotFound).
 		Message("resource 'user' not found").
 		Detail("resource", "user").
@@ -129,7 +129,7 @@ func TestCommonErrorBuilders(t *testing.T) {
 	authErr := NewErrorBuilder().
 		Status(http.StatusUnauthorized).
 		Category(CategoryAuth).
-		Type(ErrTypeUnauthorized).
+		Type(TypeUnauthorized).
 		Code(CodeUnauthorized).
 		Message("invalid token").
 		Build()
@@ -141,7 +141,7 @@ func TestCommonErrorBuilders(t *testing.T) {
 	timeoutErr := NewErrorBuilder().
 		Status(http.StatusRequestTimeout).
 		Category(CategoryTimeout).
-		Type(ErrTypeTimeout).
+		Type(TypeTimeout).
 		Code(CodeTimeout).
 		Message("database timeout").
 		Build()
@@ -153,7 +153,7 @@ func TestCommonErrorBuilders(t *testing.T) {
 	rateLimitErr := NewErrorBuilder().
 		Status(http.StatusTooManyRequests).
 		Category(CategoryRateLimit).
-		Type(ErrTypeRateLimited).
+		Type(TypeRateLimited).
 		Code(CodeRateLimited).
 		Message("too many requests").
 		Build()
@@ -463,7 +463,7 @@ func TestErrorBuilderWithSeverityAndType(t *testing.T) {
 	err := NewErrorBuilder().
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
-		Type(ErrTypeValidation).
+		Type(TypeValidation).
 		Severity(SeverityWarning).
 		Code("VALIDATION_WARNING").
 		Message("validation warning").
@@ -473,7 +473,7 @@ func TestErrorBuilderWithSeverityAndType(t *testing.T) {
 		t.Fatalf("expected severity to be set on APIError")
 	}
 
-	if err.Type != ErrTypeValidation {
+	if err.Type != TypeValidation {
 		t.Fatalf("expected type to be set on APIError")
 	}
 }

@@ -160,3 +160,9 @@ Done Definition:
 - All tests pass, including race detector.
 
 Outcome:
+State: done
+- A) `errors.Is(err, io.EOF)` used in both `streamFromGen` and `streamFromGenWithRetry`.
+- B) `initSSEStream` now returns `(context.Context, *SSEWriter, error)` with internal context cancellation guard; all 4 SSE call sites updated to remove duplicate guards.
+- C) `AbortWithStatus` uses a single CAS block: `CompareAndSwap(false, true)` guards both `WriteHeader` and `cancel()`; double-abort is now a no-op.
+- D) `Prepare()` in `core/lifecycle.go` collapsed to `return a.ensureServerPrepared()`.
+- `go test -timeout 20s ./...` passes.

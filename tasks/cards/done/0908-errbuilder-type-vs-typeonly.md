@@ -85,3 +85,8 @@ Done Definition:
 - All tests pass.
 
 Outcome:
+State: done
+- `ErrorBuilder.TypeOnly(errorType ErrorType) *ErrorBuilder` added to `contract/errors.go`.
+- `BindErrorToAPIError` in `contract/bind_helpers.go` updated to use `TypeOnly` instead of `Type`.
+- `Type()` semantics unchanged; all existing callers unaffected.
+- `go test -timeout 20s ./...` passes.

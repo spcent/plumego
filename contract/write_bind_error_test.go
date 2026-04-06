@@ -92,7 +92,7 @@ func TestWriteBindErrorUnexpectedExtraData(t *testing.T) {
 }
 
 // TestWriteBindErrorValidationWithFields verifies WriteBindError produces
-// structured field errors when a BindError with field-level details is provided.
+// structured field errors when a bindError with field-level details is provided.
 func TestWriteBindErrorValidationWithFields(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/users", nil)
@@ -105,7 +105,7 @@ func TestWriteBindErrorValidationWithFields(t *testing.T) {
 	if validateErr == nil {
 		t.Skip("validator not available")
 	}
-	bindErr := &BindError{
+	bindErr := &bindError{
 		Status:  http.StatusBadRequest,
 		Message: validateErr.Error(),
 		Err:     validateErr,

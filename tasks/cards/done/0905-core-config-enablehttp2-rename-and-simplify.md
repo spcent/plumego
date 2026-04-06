@@ -69,3 +69,11 @@ Done Definition:
 - All tests pass.
 
 Outcome:
+State: done
+- `AppConfig.EnableHTTP2` renamed to `AppConfig.HTTP2Enabled`.
+- `serverSettings` struct and `projectServerSettings()` function deleted.
+- `AppConfig.runtimeSnapshot(PreparationState) RuntimeSnapshot` added, projecting directly.
+- `core/http_handler.go` updated to use `cfg.*` directly instead of `settings.*`.
+- `core/introspection.go` simplified to `return cfg.runtimeSnapshot(state)`.
+- `grep -rn 'serverSettings\|projectServerSettings\|EnableHTTP2' . --include='*.go'` returns empty.
+- `go test -timeout 20s ./...` passes.

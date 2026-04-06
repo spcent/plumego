@@ -43,7 +43,7 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryValidation).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeValidationError).
 			Message("validation failed for field 'workflow_id': workflow_id required").
 			Detail("field", "workflow_id").
@@ -58,7 +58,7 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code(contract.CodeInternalError).
 			Message(fmt.Sprintf("Failed to create SSE stream: %v", err)).
 			Build())
@@ -104,7 +104,7 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryValidation).
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeValidationError).
 			Message("validation failed for field 'workflow_id': workflow_id required").
 			Detail("field", "workflow_id").
@@ -119,7 +119,7 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code(contract.CodeInternalError).
 			Message(fmt.Sprintf("Failed to create SSE stream: %v", err)).
 			Build())
@@ -187,7 +187,7 @@ func HandleWithCallback(
 			contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusInternalServerError).
 				Category(contract.CategoryServer).
-				Type(contract.ErrTypeInternal).
+				Type(contract.TypeInternal).
 				Code(contract.CodeInternalError).
 				Message(fmt.Sprintf("Failed to create workflow: %v", err)).
 				Build())

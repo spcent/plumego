@@ -417,7 +417,7 @@ func (d *Dashboard) handleHealth(ctx *contract.Ctx) {
 func (d *Dashboard) handleBuild(ctx *contract.Ctx) {
 	if err := d.builder.Build(); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("build_failed").
 			Message(err.Error()).
 			Build())
@@ -435,7 +435,7 @@ func (d *Dashboard) handleRestart(ctx *contract.Ctx) {
 
 	if err := d.Rebuild(bgCtx); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("app_restart_failed").
 			Message(err.Error()).
 			Build())
@@ -451,7 +451,7 @@ func (d *Dashboard) handleRestart(ctx *contract.Ctx) {
 func (d *Dashboard) handleStop(ctx *contract.Ctx) {
 	if err := d.runner.Stop(); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("app_stop_failed").
 			Message(err.Error()).
 			Build())
@@ -467,7 +467,7 @@ func (d *Dashboard) handleStop(ctx *contract.Ctx) {
 func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeUnavailable).
+			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
 			Build())
@@ -497,7 +497,7 @@ func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeUnavailable).
+			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
 			Build())
@@ -507,7 +507,7 @@ func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 	snapshot, err := d.analyzer.GetAppSnapshot()
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("config_fetch_failed").
 			Message("could not fetch config: "+err.Error()).
 			Build())
@@ -557,7 +557,7 @@ func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {
 func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeUnavailable).
+			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
 			Build())
@@ -566,7 +566,7 @@ func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
 
 	if err := d.analyzer.ClearDevMetrics(); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("metrics_clear_failed").
 			Message(err.Error()).
 			Build())
@@ -587,7 +587,7 @@ func (d *Dashboard) handlePprofTypes(ctx *contract.Ctx) {
 func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeUnavailable).
+			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
 			Build())
@@ -597,7 +597,7 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 	profileType, seconds, err := parsePprofRequest(ctx)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("invalid_pprof_request").
 			Message(err.Error()).
 			Build())
@@ -607,7 +607,7 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 	payload, contentType, err := d.analyzer.FetchPprof(profileType, seconds)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("pprof_fetch_failed").
 			Message(err.Error()).
 			Build())
@@ -636,7 +636,7 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 	if !d.runner.IsRunning() {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeUnavailable).
+			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
 			Build())
@@ -646,7 +646,7 @@ func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 	var req APITestRequest
 	if err := ctx.BindJSON(&req); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("invalid_request").
 			Message(err.Error()).
 			Build())
@@ -656,7 +656,7 @@ func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 	resp, err := d.analyzer.DoAPITest(req)
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("api_test_failed").
 			Message(err.Error()).
 			Build())

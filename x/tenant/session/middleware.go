@@ -166,7 +166,7 @@ func writeSessionInternal(w http.ResponseWriter, r *http.Request, message string
 	contract.WriteError(w, r, contract.NewErrorBuilder().
 		Status(http.StatusInternalServerError).
 		Category(contract.CategoryServer).
-		Type(contract.ErrTypeInternal).
+		Type(contract.TypeInternal).
 		Code(contract.CodeInternalError).
 		Message(message).
 		Build())
@@ -193,7 +193,7 @@ func sessionErrorToAPIError(err error) contract.APIError {
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnauthorized).
 			Category(contract.CategoryAuth).
-			Type(contract.ErrTypeUnauthorized).
+			Type(contract.TypeUnauthorized).
 			Code(contract.CodeUnauthorized).
 			Message(msg).
 			Build()

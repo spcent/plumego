@@ -17,7 +17,7 @@ import (
 )
 
 // BindJSON binds the request JSON body to the provided destination structure.
-// It performs minimal decoding and returns a BindError on failure.
+// It performs minimal decoding and returns a bindError on failure.
 // An optional BindOptions value can tighten per-call JSON behavior.
 func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
 	bindOpts, err := normalizeJSONBindOptions(opts)
@@ -29,13 +29,13 @@ func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
 	if err != nil {
 		if errors.Is(err, ErrRequestBodyTooLarge) {
 			// err IS ErrRequestBodyTooLarge (set directly by bodyBytes); pass through.
-			return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: err}
+			return &bindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: err}
 		}
-		return &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
+		return &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
 
 	if bindOpts.MaxBodySize > 0 && int64(len(data)) > bindOpts.MaxBodySize {
-		return &BindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
+		return &bindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
 	}
 	// bindOpts.MaxBodySize, if positive, enforces a stricter per-call cap on the
 	// already-read body. RequestConfig.MaxBodySize enforces read-time limits.
@@ -54,7 +54,7 @@ func joinSentinel(sentinel, cause error) error {
 
 func decodeJSONBody(data []byte, dst any, disallowUnknown bool) error {
 	if len(bytes.TrimSpace(data)) == 0 {
-		return &BindError{Status: http.StatusBadRequest, Message: ErrEmptyRequestBody.Error(), Err: ErrEmptyRequestBody}
+		return &bindError{Status: http.StatusBadRequest, Message: ErrEmptyRequestBody.Error(), Err: ErrEmptyRequestBody}
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -63,11 +63,11 @@ func decodeJSONBody(data []byte, dst any, disallowUnknown bool) error {
 	}
 
 	if err := decoder.Decode(dst); err != nil {
-		return &BindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: joinSentinel(ErrInvalidJSON, err)}
+		return &bindError{Status: http.StatusBadRequest, Message: ErrInvalidJSON.Error(), Err: joinSentinel(ErrInvalidJSON, err)}
 	}
 
 	if decoder.Decode(&struct{}{}) != io.EOF {
-		return &BindError{Status: http.StatusBadRequest, Message: ErrUnexpectedExtraData.Error(), Err: ErrUnexpectedExtraData}
+		return &bindError{Status: http.StatusBadRequest, Message: ErrUnexpectedExtraData.Error(), Err: ErrUnexpectedExtraData}
 	}
 
 	return nil
@@ -85,11 +85,11 @@ func (c *Ctx) BindQuery(dst any) error {
 func bindQuery(values url.Values, dst any) error {
 	rv := reflect.ValueOf(dst)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return &BindError{Status: http.StatusBadRequest, Message: "bind destination must be a non-nil pointer to a struct"}
+		return &bindError{Status: http.StatusBadRequest, Message: "bind destination must be a non-nil pointer to a struct"}
 	}
 	rv = rv.Elem()
 	if rv.Kind() != reflect.Struct {
-		return &BindError{Status: http.StatusBadRequest, Message: "bind destination must be a pointer to a struct"}
+		return &bindError{Status: http.StatusBadRequest, Message: "bind destination must be a pointer to a struct"}
 	}
 
 	rt := rv.Type()
@@ -112,7 +112,7 @@ func bindQuery(values url.Values, dst any) error {
 		}
 
 		if err := setFieldFromQuery(fv, queryVal, queryVals); err != nil {
-			return &BindError{
+			return &bindError{
 				Status:  http.StatusBadRequest,
 				Message: fmt.Sprintf("invalid query parameter %q: %v", name, err),
 				Err:     err,
@@ -224,7 +224,7 @@ func normalizeJSONBindOptions(opts []BindOptions) (BindOptions, error) {
 	case 1:
 		return opts[0], nil
 	default:
-		return BindOptions{}, &BindError{
+		return BindOptions{}, &bindError{
 			Status:  http.StatusBadRequest,
 			Message: "BindJSON accepts at most one BindOptions value",
 		}

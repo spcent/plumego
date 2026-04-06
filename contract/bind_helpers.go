@@ -47,7 +47,7 @@ func BindErrorToAPIError(err error) APIError {
 	code := CodeRequestBindError
 	message := "invalid request payload"
 	category := CategoryValidation
-	errorType := ErrTypeInvalidFormat
+	errorType := TypeInvalidFormat
 
 	switch {
 	case errors.Is(err, ErrRequestBodyTooLarge):
@@ -65,7 +65,7 @@ func BindErrorToAPIError(err error) APIError {
 		message = ErrUnexpectedExtraData.Error()
 	default:
 		if len(fields) == 0 {
-			var bindErr *BindError
+			var bindErr *bindError
 			if errors.As(err, &bindErr) && bindErr != nil {
 				if bindErr.Message != "" {
 					message = bindErr.Message
@@ -81,17 +81,17 @@ func BindErrorToAPIError(err error) APIError {
 	}
 
 	if len(fields) > 0 {
-		errorType = ErrTypeValidation
+		errorType = TypeValidation
 		code = CodeValidationError
 		message = "validation failed"
 	}
 
 	builder := NewErrorBuilder().
-		Type(errorType).
 		Status(status).
 		Category(category).
 		Code(code).
-		Message(message)
+		Message(message).
+		TypeOnly(errorType)
 
 	if len(fields) > 0 {
 		builder.Detail("fields", fields)

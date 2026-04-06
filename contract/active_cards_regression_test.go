@@ -38,9 +38,9 @@ func TestBindJSONRejectsMultipleBindOptions(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected bind options error")
 	}
-	var bindErr *BindError
+	var bindErr *bindError
 	if !errors.As(err, &bindErr) {
-		t.Fatalf("expected BindError, got %T", err)
+		t.Fatalf("expected bindError, got %T", err)
 	}
 }
 
@@ -231,7 +231,7 @@ func TestWriteErrorAndParseErrorUseTopLevelTraceIDAndTypedFields(t *testing.T) {
 	req = req.WithContext(WithTraceContext(req.Context(), TraceContext{TraceID: "1234567890abcdef1234567890abcdef"}))
 
 	writeErr := NewErrorBuilder().
-		Type(ErrTypeValidation).
+		Type(TypeValidation).
 		Severity(SeverityWarning).
 		Message("validation failed").
 		Build()
@@ -247,7 +247,7 @@ func TestWriteErrorAndParseErrorUseTopLevelTraceIDAndTypedFields(t *testing.T) {
 		t.Fatalf("expected top-level trace_id, got %v", payload["trace_id"])
 	}
 	errorBody := payload["error"].(map[string]any)
-	if errorBody["type"] != string(ErrTypeValidation) || errorBody["severity"] != string(SeverityWarning) {
+	if errorBody["type"] != string(TypeValidation) || errorBody["severity"] != string(SeverityWarning) {
 		t.Fatalf("expected type/severity in error body, got %v", errorBody)
 	}
 	if _, ok := errorBody["trace_id"]; ok {
@@ -318,16 +318,16 @@ func TestNewObservabilityPolicyAcceptsExtraSensitiveKeys(t *testing.T) {
 	}
 }
 
-func TestSafeRedirectFallsBackToURLHost(t *testing.T) {
+func TestRedirectFallsBackToURLHost(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "https://example.com/start", nil)
 	req.Host = ""
 	ctx := NewCtx(rec, req, nil)
 
-	if err := ctx.SafeRedirect(http.StatusFound, "https://example.com/next"); err != nil {
+	if err := ctx.Redirect(http.StatusFound, "https://example.com/next"); err != nil {
 		t.Fatalf("expected same-origin absolute redirect to succeed, got %v", err)
 	}
-	if err := ctx.SafeRedirect(http.StatusFound, "https://evil.com/next"); !errors.Is(err, ErrUnsafeRedirect) {
+	if err := ctx.Redirect(http.StatusFound, "https://evil.com/next"); !errors.Is(err, ErrUnsafeRedirect) {
 		t.Fatalf("expected cross-origin redirect to fail, got %v", err)
 	}
 }

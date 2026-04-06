@@ -117,11 +117,7 @@ func (c *Ctx) Stream(cfg StreamConfig) error {
 		return streamFromChan(ctx, src, c.textWrite())
 
 	case <-chan SSEEvent:
-		ctx := c.streamContext()
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		sw, err := c.initSSEStream()
+		ctx, sw, err := c.initSSEStream()
 		if err != nil {
 			return err
 		}
@@ -148,11 +144,7 @@ func (c *Ctx) Stream(cfg StreamConfig) error {
 		return streamFromGen(ctx, src, c.textWrite())
 
 	case func() (SSEEvent, error):
-		ctx := c.streamContext()
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		sw, err := c.initSSEStream()
+		ctx, sw, err := c.initSSEStream()
 		if err != nil {
 			return err
 		}
@@ -216,11 +208,7 @@ func (c *Ctx) streamTextSliceChunked(lines []string, chunkSize int) error {
 }
 
 func (c *Ctx) streamSSESlice(events []SSEEvent) error {
-	ctx := c.streamContext()
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	sw, err := c.initSSEStream()
+	ctx, sw, err := c.initSSEStream()
 	if err != nil {
 		return err
 	}
@@ -228,11 +216,7 @@ func (c *Ctx) streamSSESlice(events []SSEEvent) error {
 }
 
 func (c *Ctx) streamSSESliceChunked(events []SSEEvent, chunkSize int) error {
-	ctx := c.streamContext()
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	sw, err := c.initSSEStream()
+	ctx, sw, err := c.initSSEStream()
 	if err != nil {
 		return err
 	}
@@ -373,12 +357,23 @@ func (c *Ctx) initStream(contentType string) (context.Context, error) {
 	return ctx, nil
 }
 
-func (c *Ctx) initSSEStream() (*SSEWriter, error) {
+// initSSEStream checks context cancellation, sets SSE headers, and returns the
+// request context alongside the SSEWriter — matching the (ctx, writer, err) shape
+// of initStream so call sites do not need a separate context guard.
+func (c *Ctx) initSSEStream() (context.Context, *SSEWriter, error) {
+	ctx := c.streamContext()
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	c.W.Header().Set("Content-Type", "text/event-stream")
 	c.W.Header().Set("Cache-Control", "no-cache")
 	c.W.Header().Set("Connection", "keep-alive")
 	c.W.WriteHeader(http.StatusOK)
-	return NewSSEWriter(c.W)
+	sw, err := NewSSEWriter(c.W)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ctx, sw, nil
 }
 
 // streamFromSlice iterates a slice, calling write for each element.
@@ -419,7 +414,7 @@ func streamFromGen[T any](ctx context.Context, gen func() (T, error), write func
 			return err
 		}
 		item, err := gen()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
@@ -457,7 +452,7 @@ func streamFromGenWithRetry[T any](ctx context.Context, gen func() (T, error), m
 			return err
 		}
 		item, err := gen()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {

@@ -15,7 +15,7 @@ func TestBindErrorToAPIErrorFields(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validation error")
 	}
-	bindErr := &BindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
+	bindErr := &bindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
 
 	apiErr := BindErrorToAPIError(bindErr)
 	if apiErr.Code != "VALIDATION_ERROR" {
@@ -29,7 +29,7 @@ func TestBindErrorToAPIErrorFields(t *testing.T) {
 	if !ok || len(fields) == 0 {
 		t.Fatalf("expected field errors, got %T", raw)
 	}
-	if apiErr.Type != ErrTypeValidation {
+	if apiErr.Type != TypeValidation {
 		t.Fatalf("expected validation error type, got %s", apiErr.Type)
 	}
 }
@@ -40,14 +40,14 @@ func TestBindErrorToAPIErrorType(t *testing.T) {
 		err      error
 		wantType ErrorType
 	}{
-		{name: "body too large", err: ErrRequestBodyTooLarge, wantType: ErrTypeInvalidFormat},
-		{name: "empty body", err: ErrEmptyRequestBody, wantType: ErrTypeInvalidFormat},
-		{name: "invalid json", err: ErrInvalidJSON, wantType: ErrTypeInvalidFormat},
-		{name: "unexpected extra data", err: ErrUnexpectedExtraData, wantType: ErrTypeInvalidFormat},
+		{name: "body too large", err: ErrRequestBodyTooLarge, wantType: TypeInvalidFormat},
+		{name: "empty body", err: ErrEmptyRequestBody, wantType: TypeInvalidFormat},
+		{name: "invalid json", err: ErrInvalidJSON, wantType: TypeInvalidFormat},
+		{name: "unexpected extra data", err: ErrUnexpectedExtraData, wantType: TypeInvalidFormat},
 		{
 			name:     "generic bind error fallback",
-			err:      &BindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: errors.New("read failed")},
-			wantType: ErrTypeInvalidFormat,
+			err:      &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: errors.New("read failed")},
+			wantType: TypeInvalidFormat,
 		},
 	}
 

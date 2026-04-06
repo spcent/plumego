@@ -76,3 +76,9 @@ Done Definition:
 - All tests pass.
 
 Outcome:
+State: done
+- All 21 `ErrType*` constants renamed to `Type*` across `contract/errors.go`.
+- `errorTypeLookup` map keys updated.
+- ~140 call sites across `middleware/`, `x/`, and `contract/` updated via bulk sed.
+- `grep -rn 'ErrType' . --include='*.go'` returns empty (outside task cards).
+- `go test -timeout 20s ./...` passes.

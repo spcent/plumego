@@ -19,7 +19,7 @@ func (s *Service) HandleSend(ctx *contract.Ctx) {
 	}
 	if err := contract.ValidateStruct(&req); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("INVALID_REQUEST").
 			Message(err.Error()).
 			Build())
@@ -44,7 +44,7 @@ func (s *Service) HandleBatchSend(ctx *contract.Ctx) {
 	}
 	if err := contract.ValidateStruct(&batch); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("INVALID_REQUEST").
 			Message(err.Error()).
 			Build())
@@ -52,7 +52,7 @@ func (s *Service) HandleBatchSend(ctx *contract.Ctx) {
 	}
 	if len(batch.Requests) == 0 {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeValidation).
+			Type(contract.TypeValidation).
 			Code("EMPTY_BATCH").
 			Message("requests array is empty").
 			Build())
@@ -67,7 +67,7 @@ func (s *Service) HandleStats(ctx *contract.Ctx) {
 	stats, err := s.Stats(ctx.R.Context())
 	if err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("STATS_ERROR").
 			Message(err.Error()).
 			Build())
@@ -81,7 +81,7 @@ func (s *Service) HandleGetReceipt(ctx *contract.Ctx) {
 	id, ok := ctx.Param("id")
 	if !ok || id == "" {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeRequired).
+			Type(contract.TypeRequired).
 			Code("MISSING_ID").
 			Message("message id is required").
 			Build())
@@ -90,7 +90,7 @@ func (s *Service) HandleGetReceipt(ctx *contract.Ctx) {
 	receipt, found := s.receipts.Get(id)
 	if !found {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.ErrTypeNotFound).
+			Type(contract.TypeNotFound).
 			Code("NOT_FOUND").
 			Message("receipt not found").
 			Build())
@@ -147,13 +147,13 @@ func classifyServiceError(err error) contract.APIError {
 			Build()
 	case errors.Is(err, ErrQuotaExceeded):
 		return contract.NewErrorBuilder().
-			Type(contract.ErrTypeRateLimited).
+			Type(contract.TypeRateLimited).
 			Code("QUOTA_EXCEEDED").
 			Message(err.Error()).
 			Build()
 	case errors.Is(err, mq.ErrDuplicateTask):
 		return contract.NewErrorBuilder().
-			Type(contract.ErrTypeConflict).
+			Type(contract.TypeConflict).
 			Code("DUPLICATE_MESSAGE").
 			Message(err.Error()).
 			Build()
@@ -166,13 +166,13 @@ func classifyServiceError(err error) contract.APIError {
 			Build()
 	case errors.Is(err, mq.ErrNotInitialized):
 		return contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("SERVICE_UNAVAILABLE").
 			Message(err.Error()).
 			Build()
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return contract.NewErrorBuilder().
-			Type(contract.ErrTypeTimeout).
+			Type(contract.TypeTimeout).
 			Status(http.StatusGatewayTimeout).
 			Code("REQUEST_TIMEOUT").
 			Message(err.Error()).
@@ -186,7 +186,7 @@ func classifyServiceError(err error) contract.APIError {
 			Build()
 	default:
 		return contract.NewErrorBuilder().
-			Type(contract.ErrTypeInternal).
+			Type(contract.TypeInternal).
 			Code("SEND_ERROR").
 			Message(err.Error()).
 			Build()

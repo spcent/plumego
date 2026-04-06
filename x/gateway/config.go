@@ -185,7 +185,7 @@ func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusRequestTimeout).
 			Category(contract.CategoryTimeout).
-			Type(contract.ErrTypeTimeout).
+			Type(contract.TypeTimeout).
 			Code(contract.CodeTimeout).
 			Message("Gateway Timeout").
 			Build())
