@@ -16,7 +16,7 @@ func TestGetBool(t *testing.T) {
 	os.Unsetenv("test_bool_missing")
 
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
@@ -62,7 +62,7 @@ func TestGetFloat(t *testing.T) {
 	os.Unsetenv("test_float_invalid")
 
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
@@ -101,7 +101,7 @@ func TestGetDurationMs(t *testing.T) {
 	os.Unsetenv("test_duration_invalid")
 
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
@@ -138,7 +138,7 @@ func TestGetDurationMs(t *testing.T) {
 
 func TestSet(t *testing.T) {
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 	SetGlobalConfig(testConfig)
@@ -161,7 +161,7 @@ func TestSet(t *testing.T) {
 
 func TestGetGlobalConfig(t *testing.T) {
 	// Test 1: With existing config
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	SetGlobalConfig(testConfig)
 	defer SetGlobalConfig(nil)
@@ -187,7 +187,7 @@ func TestGetStringSafe(t *testing.T) {
 	os.Unsetenv("test_safe_string_missing")
 
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
@@ -224,7 +224,7 @@ func TestGetIntSafe(t *testing.T) {
 	os.Unsetenv("test_safe_int_missing")
 
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
@@ -261,7 +261,7 @@ func TestGetBoolSafe(t *testing.T) {
 	os.Unsetenv("test_safe_bool_missing")
 
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
@@ -298,7 +298,7 @@ func TestGetFloatSafe(t *testing.T) {
 	os.Unsetenv("test_safe_float_missing")
 
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
@@ -335,7 +335,7 @@ func TestGetDurationMsSafe(t *testing.T) {
 	os.Unsetenv("test_safe_duration_missing")
 
 	// Set up a clean global config for testing
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
@@ -456,7 +456,7 @@ func TestInitDefault(t *testing.T) {
 
 func TestSetGlobalConfig(t *testing.T) {
 	// Create a test config
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 
 	// Set global config

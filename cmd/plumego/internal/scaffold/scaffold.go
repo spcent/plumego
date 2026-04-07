@@ -172,7 +172,7 @@ import (
 func New() *core.App {
 	cfg := core.DefaultConfig()
 	cfg.Addr = ":8080"
-	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewGLogger()})
+	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),
@@ -644,7 +644,7 @@ type App struct {
 
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
-	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewGLogger()})
+	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
 	a.Use(accesslog.Middleware(a.Logger()))
@@ -842,7 +842,7 @@ func Validate(cfg Config) error {
 }
 
 func applyEnv(cfg *Config) error {
-	manager := plumecfg.NewManager(plumelog.NewGLogger())
+	manager := plumecfg.NewManager(plumelog.NewLogger())
 	if err := manager.AddSource(plumecfg.NewEnvSource("")); err != nil {
 		return err
 	}
@@ -916,7 +916,7 @@ import (
 func main() {
 	cfg := core.DefaultConfig()
 	cfg.Addr = ":8080"
-	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewGLogger()})
+	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),

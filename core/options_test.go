@@ -10,7 +10,7 @@ import (
 )
 
 func TestAppDependenciesLogger(t *testing.T) {
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	app := New(DefaultConfig(), AppDependencies{Logger: logger})
 	if app.logger != logger {
 		t.Errorf("expected logger to be set")
@@ -18,7 +18,7 @@ func TestAppDependenciesLogger(t *testing.T) {
 }
 
 func TestAppDependenciesLoggerStaysOnApp(t *testing.T) {
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	app := New(DefaultConfig(), AppDependencies{Logger: logger})
 
 	if app.Logger() != logger {

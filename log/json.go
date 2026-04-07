@@ -15,6 +15,7 @@ import (
 // It's thread-safe and suitable for structured logging in production environments.
 type JSONLogger struct {
 	mu               sync.Mutex
+	writeMu          *sync.Mutex
 	writeErrOnce     sync.Once
 	output           io.Writer
 	errorOutput      io.Writer // optional; Error/Fatal go here when non-nil
@@ -49,6 +50,7 @@ func NewJSONLogger(config JSONLoggerConfig) *JSONLogger {
 		config.Output = os.Stdout
 	}
 	return &JSONLogger{
+		writeMu:          &sync.Mutex{},
 		output:           config.Output,
 		errorOutput:      config.ErrorOutput,
 		level:            config.Level,
@@ -72,6 +74,7 @@ func (l *JSONLogger) WithFields(fields Fields) StructuredLogger {
 	l.mu.Lock()
 	merged := mergeFields(l.fields, fields)
 	child := &JSONLogger{
+		writeMu:          l.writeMu,
 		output:           l.output,
 		errorOutput:      l.errorOutput,
 		level:            l.level,
@@ -163,9 +166,19 @@ func (l *JSONLogger) log(level Level, msg string, fields Fields, ctx context.Con
 		data = []byte(`{"level":"ERROR","msg":"failed to marshal log entry"}`)
 	}
 
-	// Only the actual write to the io.Writer is serialised.
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	writeMu := l.writeMu
+	if writeMu == nil {
+		writeMu = &sync.Mutex{}
+		l.mu.Lock()
+		if l.writeMu == nil {
+			l.writeMu = writeMu
+		} else {
+			writeMu = l.writeMu
+		}
+		l.mu.Unlock()
+	}
+	writeMu.Lock()
+	defer writeMu.Unlock()
 	l.writeRaw(level, data)
 }
 

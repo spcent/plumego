@@ -15,8 +15,11 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// Initialize logging
-	Init()
+	initDefaultFromFlags()
+	code := m.Run()
+	flushDefault()
+	closeDefault()
+	os.Exit(code)
 }
 
 // Test helper functions
@@ -79,6 +82,7 @@ func resetGlobalLogger() {
 	std.logDir = ""
 	std.program = filepath.Base(os.Args[0])
 	std.writeErrOnce = sync.Once{}
+	std.cachedWriters = nil
 }
 
 // TestBasicLogging verifies basic logging functions
@@ -92,47 +96,47 @@ func TestBasicLogging(t *testing.T) {
 	}{
 		{
 			name:     "Info",
-			logFunc:  func() { Info("test info message") },
+			logFunc:  func() { infoDefault("test info message") },
 			expected: "test info message",
 		},
 		{
 			name:     "Infof",
-			logFunc:  func() { Infof("test %s message", "info") },
+			logFunc:  func() { infofDefault("test %s message", "info") },
 			expected: "test info message",
 		},
 		{
 			name:     "Infoln",
-			logFunc:  func() { Infoln("test", "info", "message") },
+			logFunc:  func() { infolnDefault("test", "info", "message") },
 			expected: "test info message",
 		},
 		{
 			name:     "Warning",
-			logFunc:  func() { Warning("test warning message") },
+			logFunc:  func() { warningDefault("test warning message") },
 			expected: "test warning message",
 		},
 		{
 			name:     "Warningf",
-			logFunc:  func() { Warningf("test %s message", "warning") },
+			logFunc:  func() { warningfDefault("test %s message", "warning") },
 			expected: "test warning message",
 		},
 		{
 			name:     "Warningln",
-			logFunc:  func() { Warningln("test", "warning", "message") },
+			logFunc:  func() { warninglnDefault("test", "warning", "message") },
 			expected: "test warning message",
 		},
 		{
 			name:     "Error",
-			logFunc:  func() { Error("test error message") },
+			logFunc:  func() { errorDefault("test error message") },
 			expected: "test error message",
 		},
 		{
 			name:     "Errorf",
-			logFunc:  func() { Errorf("test %s message", "error") },
+			logFunc:  func() { errorfDefault("test %s message", "error") },
 			expected: "test error message",
 		},
 		{
 			name:     "Errorln",
-			logFunc:  func() { Errorln("test", "error", "message") },
+			logFunc:  func() { errorlnDefault("test", "error", "message") },
 			expected: "test error message",
 		},
 	}
@@ -145,7 +149,7 @@ func TestBasicLogging(t *testing.T) {
 			}
 
 			// Verify log format
-			if !regexp.MustCompile(`[IWEF]\d{4} \d{2}:\d{2}:\d{2}\.\d{6} +\d+ \w+:\d+\]`).MatchString(output) {
+			if !regexp.MustCompile(`[IWEF]\d{4} \d{2}:\d{2}:\d{2}\.\d{6} +\d+ \[[^:\]]+:\d+\]`).MatchString(output) {
 				t.Errorf("Log format is incorrect: %q", output)
 			}
 		})
@@ -163,15 +167,15 @@ func TestLogLevels(t *testing.T) {
 		logFunc   func()
 		shouldLog bool
 	}{
-		{"INFO level allows INFO", INFO, INFO, func() { Info("test") }, true},
-		{"INFO level allows WARNING", INFO, WARNING, func() { Warning("test") }, true},
-		{"INFO level allows ERROR", INFO, ERROR, func() { Error("test") }, true},
-		{"WARNING level blocks INFO", WARNING, INFO, func() { Info("test") }, false},
-		{"WARNING level allows WARNING", WARNING, WARNING, func() { Warning("test") }, true},
-		{"WARNING level allows ERROR", WARNING, ERROR, func() { Error("test") }, true},
-		{"ERROR level blocks INFO", ERROR, INFO, func() { Info("test") }, false},
-		{"ERROR level blocks WARNING", ERROR, WARNING, func() { Warning("test") }, false},
-		{"ERROR level allows ERROR", ERROR, ERROR, func() { Error("test") }, true},
+		{"INFO level allows INFO", INFO, INFO, func() { infoDefault("test") }, true},
+		{"INFO level allows WARNING", INFO, WARNING, func() { warningDefault("test") }, true},
+		{"INFO level allows ERROR", INFO, ERROR, func() { errorDefault("test") }, true},
+		{"WARNING level blocks INFO", WARNING, INFO, func() { infoDefault("test") }, false},
+		{"WARNING level allows WARNING", WARNING, WARNING, func() { warningDefault("test") }, true},
+		{"WARNING level allows ERROR", WARNING, ERROR, func() { errorDefault("test") }, true},
+		{"ERROR level blocks INFO", ERROR, INFO, func() { infoDefault("test") }, false},
+		{"ERROR level blocks WARNING", ERROR, WARNING, func() { warningDefault("test") }, false},
+		{"ERROR level allows ERROR", ERROR, ERROR, func() { errorDefault("test") }, true},
 	}
 
 	for _, tt := range tests {
@@ -190,9 +194,10 @@ func TestLogLevels(t *testing.T) {
 func TestDebugLevel(t *testing.T) {
 	resetGlobalLogger()
 	std.SetVerbose(1)
+	std.SetLevel(DEBUG)
 
 	output := captureOutput(func() {
-		NewGLogger().Debug("debug message", nil)
+		NewLogger().Debug("debug message", nil)
 	})
 	if !strings.Contains(output, "debug message") {
 		t.Fatalf("expected debug message to be logged when verbosity allows it")
@@ -204,7 +209,7 @@ func TestDebugLevel(t *testing.T) {
 	std.SetVerbose(1)
 	std.SetLevel(INFO)
 	output = captureOutput(func() {
-		NewGLogger().Debug("filtered debug", nil)
+		NewLogger().Debug("filtered debug", nil)
 	})
 	if strings.TrimSpace(output) != "" {
 		t.Fatalf("expected debug message to be filtered when minimum level is INFO")
@@ -221,30 +226,30 @@ func TestVerboseLogging(t *testing.T) {
 		logLevel  int
 		shouldLog bool
 	}{
-		{"V(0) with verbosity 0", 0, 0, true},
-		{"V(1) with verbosity 0", 0, 1, false},
-		{"V(1) with verbosity 1", 1, 1, true},
-		{"V(2) with verbosity 1", 1, 2, false},
-		{"V(2) with verbosity 2", 2, 2, true},
-		{"V(5) with verbosity 10", 10, 5, true},
+		{"vDefault(0) with verbosity 0", 0, 0, true},
+		{"vDefault(1) with verbosity 0", 0, 1, false},
+		{"vDefault(1) with verbosity 1", 1, 1, true},
+		{"vDefault(2) with verbosity 1", 1, 2, false},
+		{"vDefault(2) with verbosity 2", 2, 2, true},
+		{"vDefault(5) with verbosity 10", 10, 5, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			std.SetVerbose(tt.verbosity)
 
-			if V(tt.logLevel) != tt.shouldLog {
-				t.Errorf("V(%d) with verbosity %d: expected %v", tt.logLevel, tt.verbosity, tt.shouldLog)
+			if vDefault(tt.logLevel) != tt.shouldLog {
+				t.Errorf("vDefault(%d) with verbosity %d: expected %v", tt.logLevel, tt.verbosity, tt.shouldLog)
 			}
 
 			// Test VLog behavior
 			output := captureOutput(func() {
-				VLog(tt.logLevel, "verbose test message")
+				vlogDefault(tt.logLevel, "verbose test message")
 			})
 
 			hasOutput := len(strings.TrimSpace(output)) > 0
 			if hasOutput != tt.shouldLog {
-				t.Errorf("VLog(%d) with verbosity %d: expected shouldLog=%v, got output=%q",
+				t.Errorf("vlogDefault(%d) with verbosity %d: expected shouldLog=%v, got output=%q",
 					tt.logLevel, tt.verbosity, tt.shouldLog, output)
 			}
 		})
@@ -295,12 +300,12 @@ func TestVmoduleWrapperDepth(t *testing.T) {
 	std.SetVerbose(0)
 	std.parseVmodule("glog_test=1")
 
-	if !V(1) {
+	if !vDefault(1) {
 		t.Fatalf("expected top-level V to honor vmodule for caller file")
 	}
 
 	output := captureOutput(func() {
-		VLog(1, "top-level vmodule")
+		vlogDefault(1, "top-level vmodule")
 	})
 	if !strings.Contains(output, "top-level vmodule") {
 		t.Fatalf("expected top-level VLog to emit message when vmodule allows it")
@@ -348,6 +353,7 @@ func TestFileOutput(t *testing.T) {
 	// Configure log directory
 	std.logDir = tempDir
 	std.program = "testapp"
+	std.toStderr = false
 
 	err := std.initLogFiles()
 	if err != nil {
@@ -356,9 +362,9 @@ func TestFileOutput(t *testing.T) {
 	defer std.Close()
 
 	// Write logs at different levels
-	Info("info message")
-	Warning("warning message")
-	Error("error message")
+	infoDefault("info message")
+	warningDefault("warning message")
+	errorDefault("error message")
 
 	std.Flush()
 
@@ -436,7 +442,7 @@ func TestConcurrentLogging(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			for j := 0; j < numLogs; j++ {
-				Infof("goroutine %d log %d", id, j)
+				infofDefault("goroutine %d log %d", id, j)
 			}
 		}(i)
 	}
@@ -493,7 +499,7 @@ func TestCopyStandardLogTo(t *testing.T) {
 	var buf bytes.Buffer
 	std.SetOutput(&buf)
 
-	CopyStandardLogTo(INFO)
+	copyStandardLogTo(INFO)
 
 	// Log using the standard library logger
 
@@ -537,7 +543,7 @@ func TestFlagIntegration(t *testing.T) {
 
 	// Reinitialize
 	resetGlobalLogger()
-	Init()
+	initDefaultFromFlags()
 	defer std.Close()
 
 	// Verify settings are applied
@@ -567,7 +573,7 @@ func TestInitWithConfig(t *testing.T) {
 	tempDir := createTempDir(t)
 	defer cleanupTempDir(t, tempDir)
 
-	err := InitWithConfig(InitConfig{
+	err := initDefaultWithConfig(InitConfig{
 		LogDir:          tempDir,
 		AlsoLogToStderr: true,
 		LogToStderr:     false,
@@ -610,6 +616,7 @@ func TestMultiWriter(t *testing.T) {
 	// Configure output to both files and stderr
 	std.logDir = tempDir
 	std.alsoToStderr = true
+	std.toStderr = false
 	std.program = "testapp"
 
 	err := std.initLogFiles()
@@ -621,18 +628,21 @@ func TestMultiWriter(t *testing.T) {
 	// Capture stderr output
 	var stderrBuf bytes.Buffer
 	oldStderr := os.Stderr
+	oldOutput := std.output
 	r, w, _ := os.Pipe()
 	os.Stderr = w
+	std.SetOutput(os.Stderr)
 
 	go func() {
 		io.Copy(&stderrBuf, r)
 	}()
 
-	Info("test multi writer message")
+	infoDefault("test multi writer message")
 	std.Flush()
 
 	w.Close()
 	os.Stderr = oldStderr
+	std.SetOutput(oldOutput)
 
 	time.Sleep(100 * time.Millisecond) // Wait for the goroutine to finish
 
@@ -675,27 +685,27 @@ func BenchmarkLogging(b *testing.B) {
 
 	b.Run("Info", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			Info("benchmark test message")
+			infoDefault("benchmark test message")
 		}
 	})
 
 	b.Run("Infof", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			Infof("benchmark test message %d", i)
+			infofDefault("benchmark test message %d", i)
 		}
 	})
 
 	b.Run("VLog", func(b *testing.B) {
 		std.SetVerbose(1)
 		for i := 0; i < b.N; i++ {
-			VLog(1, "benchmark verbose message")
+			vlogDefault(1, "benchmark verbose message")
 		}
 	})
 
 	b.Run("VLogFiltered", func(b *testing.B) {
-		std.SetVerbose(0) // This filters out VLog(1)
+		std.SetVerbose(0) // This filters out vlogDefault(1)
 		for i := 0; i < b.N; i++ {
-			VLog(1, "benchmark filtered message")
+			vlogDefault(1, "benchmark filtered message")
 		}
 	})
 }
@@ -709,7 +719,7 @@ func BenchmarkConcurrentLogging(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			Info("concurrent benchmark message")
+			infoDefault("concurrent benchmark message")
 		}
 	})
 }
@@ -724,7 +734,7 @@ func BenchmarkBufferPoolEffectiveness(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		Info("benchmark message for buffer pool effectiveness test")
+		infoDefault("benchmark message for buffer pool effectiveness test")
 	}
 }
 
@@ -739,7 +749,7 @@ func BenchmarkBufferPoolWithLargeMessages(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		Info(largeMessage)
+		infoDefault(largeMessage)
 	}
 }
 
@@ -755,25 +765,25 @@ func TestLnMethodFormatting(t *testing.T) {
 	}{
 		{
 			name:     "Infoln with multiple strings",
-			logFunc:  func() { Infoln("hello", "world", "test") },
+			logFunc:  func() { infolnDefault("hello", "world", "test") },
 			args:     []any{"hello", "world", "test"},
 			expected: "hello world test",
 		},
 		{
 			name:     "Warningln with mixed types",
-			logFunc:  func() { Warningln("count:", 42, "status:", true) },
+			logFunc:  func() { warninglnDefault("count:", 42, "status:", true) },
 			args:     []any{"count:", 42, "status:", true},
 			expected: "count: 42 status: true",
 		},
 		{
 			name:     "Errorln with numbers",
-			logFunc:  func() { Errorln(1, 2, 3, "sum") },
+			logFunc:  func() { errorlnDefault(1, 2, 3, "sum") },
 			args:     []any{1, 2, 3, "sum"},
 			expected: "1 2 3 sum",
 		},
 		{
 			name:     "Infoln with zero arguments",
-			logFunc:  func() { Infoln() },
+			logFunc:  func() { infolnDefault() },
 			args:     []any{},
 			expected: "",
 		},
@@ -804,7 +814,7 @@ func TestEdgeCases(t *testing.T) {
 
 	// Test empty message
 	output := captureOutput(func() {
-		Info("")
+		infoDefault("")
 	})
 	if !strings.Contains(output, "I") { // At minimum the level marker should exist
 		t.Error("Empty message should still produce log header")
@@ -813,7 +823,7 @@ func TestEdgeCases(t *testing.T) {
 	// Test a very long message
 	longMessage := strings.Repeat("a", 10000)
 	output = captureOutput(func() {
-		Info(longMessage)
+		infoDefault(longMessage)
 	})
 	if !strings.Contains(output, longMessage) {
 		t.Error("Long message should be logged completely")
@@ -822,7 +832,7 @@ func TestEdgeCases(t *testing.T) {
 	// Test special characters
 	specialMessage := "Test Chinese characters\n\tSpecial chars"
 	output = captureOutput(func() {
-		Info(specialMessage)
+		infoDefault(specialMessage)
 	})
 	if !strings.Contains(output, specialMessage) {
 		t.Error("Special characters should be logged correctly")
@@ -866,6 +876,7 @@ func TestLogRotation(t *testing.T) {
 	// Configure log directory and rotation settings
 	std.logDir = tempDir
 	std.program = "testapp"
+	std.toStderr = false
 	std.SetRotationConfig(RotationConfig{
 		MaxSize:    1, // 1MB max size
 		MaxAge:     30,
@@ -882,7 +893,7 @@ func TestLogRotation(t *testing.T) {
 	// Write enough data to trigger rotation
 	message := strings.Repeat("x", 500000) // 500KB message
 	for i := 0; i < 5; i++ {               // Write 2.5MB total
-		Info(message)
+		infoDefault(message)
 	}
 	std.Flush()
 
@@ -1042,9 +1053,9 @@ func TestClose(t *testing.T) {
 	}
 
 	// Write some logs to ensure files are active
-	Info("test message before close")
-	Warning("test warning before close")
-	Error("test error before close")
+	infoDefault("test message before close")
+	warningDefault("test warning before close")
+	errorDefault("test error before close")
 
 	// Verify log files are open
 	std.mu.RLock()
@@ -1074,7 +1085,7 @@ func TestClose(t *testing.T) {
 		}
 	}()
 
-	Info("test message after close")
+	infoDefault("test message after close")
 
 	// Reopen and log again to ensure we can still use the logger after close
 	err = std.initLogFiles()
@@ -1082,7 +1093,7 @@ func TestClose(t *testing.T) {
 		t.Fatalf("Failed to reinitialize log files after Close(): %v", err)
 	}
 
-	Info("test message after reopen")
+	infoDefault("test message after reopen")
 	std.Flush()
 	std.Close()
 }

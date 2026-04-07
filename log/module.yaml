@@ -21,7 +21,7 @@ non_goals:
 
 public_entrypoints:
   - StructuredLogger
-  - NewGLogger
+  - NewLogger
 
 allowed_imports:
   - stdlib

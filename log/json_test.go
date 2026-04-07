@@ -187,7 +187,7 @@ func TestJSONLogger_ContextLevels(t *testing.T) {
 			logFunc: func(l *JSONLogger, ctx context.Context) {
 				l.DebugCtx(ctx, "debug msg", nil)
 			},
-			wantLevel: "INFO",
+			wantLevel: "DEBUG",
 		},
 		{
 			name: "info ctx",
@@ -217,7 +217,7 @@ func TestJSONLogger_ContextLevels(t *testing.T) {
 			var buf bytes.Buffer
 			logger := NewJSONLogger(JSONLoggerConfig{
 				Output: &buf,
-				Level:  INFO,
+				Level:  DEBUG,
 			})
 
 			ctx := context.Background()
@@ -326,7 +326,7 @@ func TestJSONLogger_DebugVerbosityGate(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewJSONLogger(JSONLoggerConfig{
 		Output:           &buf,
-		Level:            INFO,
+		Level:            DEBUG,
 		RespectVerbosity: true,
 		Verbosity:        0,
 	})

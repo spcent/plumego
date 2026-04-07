@@ -28,7 +28,7 @@ var errRequestTooLarge = errors.New("request body too large")
 //	handler := limits.BodyLimit(10<<20, nil)(myHandler)
 //
 //	// With logging
-//	logger := log.NewGLogger()
+//	logger := log.NewLogger()
 //	handler := limits.BodyLimit(10<<20, logger)(myHandler)
 //
 // When a request body exceeds the limit, it returns a 413 Request Entity Too Large

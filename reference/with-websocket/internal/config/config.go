@@ -68,7 +68,7 @@ func Validate(cfg Config) error {
 }
 
 func applyEnv(cfg *Config) error {
-	manager := plumecfg.NewManager(plumelog.NewGLogger())
+	manager := plumecfg.NewManager(plumelog.NewLogger())
 	if err := manager.AddSource(plumecfg.NewEnvSource("")); err != nil {
 		return err
 	}

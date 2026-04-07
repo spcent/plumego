@@ -15,7 +15,7 @@ type watchResult struct {
 }
 
 func TestConfigWatchersReceiveUpdates(t *testing.T) {
-	cm := NewConfigManager(log.NewGLogger())
+	cm := NewConfigManager(log.NewLogger())
 	cm.data["foo"] = "old"
 
 	resultCh := make(chan watchResult, 1)
@@ -66,7 +66,7 @@ func TestConfigWatchersReceiveUpdates(t *testing.T) {
 }
 
 func TestConfigWatchersNormalizeKeys(t *testing.T) {
-	cm := NewConfigManager(log.NewGLogger())
+	cm := NewConfigManager(log.NewLogger())
 	cm.data["foo_bar"] = "old"
 
 	resultCh := make(chan watchResult, 1)

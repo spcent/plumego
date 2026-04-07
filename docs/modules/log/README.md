@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`log` defines logging contracts and base implementations.
+`log` defines structured logging contracts and base implementations.
 
 ## v1 Status
 
@@ -20,6 +20,7 @@
 - secret-bearing payload logging
 - business event schema ownership
 - feature-specific transport logic
+- request id generation
 
 ## First files to read
 
@@ -29,5 +30,5 @@
 
 ## Canonical change shape
 
-- preserve structured logging contracts
+- preserve `StructuredLogger` and the canonical `NewLogger` path
 - never log secrets, tokens, signatures, or private keys

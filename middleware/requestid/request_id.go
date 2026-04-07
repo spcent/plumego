@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -31,7 +30,7 @@ func WithRequestHeader(enabled bool) Option {
 
 func Middleware(opts ...Option) middleware.Middleware {
 	cfg := config{
-		generate:         log.NewRequestID,
+		generate:         contract.NewRequestID,
 		includeInRequest: true,
 	}
 	for _, opt := range opts {

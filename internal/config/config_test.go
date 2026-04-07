@@ -137,7 +137,7 @@ func TestConfigWithData(t *testing.T) {
 }
 
 func TestConfigKeyNormalization(t *testing.T) {
-	cfg := NewConfigManager(log.NewGLogger())
+	cfg := NewConfigManager(log.NewLogger())
 	ctx := context.Background()
 
 	src := &stubSource{

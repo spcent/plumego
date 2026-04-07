@@ -11,7 +11,7 @@ import (
 
 // Compile-time checks that all concrete logger types satisfy StructuredLogger.
 var (
-	_ StructuredLogger = (*gLogger)(nil)
+	_ StructuredLogger = (*defaultLogger)(nil)
 	_ StructuredLogger = (*JSONLogger)(nil)
 	_ StructuredLogger = (*TestLogger)(nil)
 	_ StructuredLogger = (*NoOpLogger)(nil)
@@ -68,90 +68,90 @@ func firstFields(extra []Fields) Fields {
 	return nil
 }
 
-// gLogger adapts the existing glog implementation to the StructuredLogger interface.
-type gLogger struct {
+// defaultLogger adapts the default text logger backend to StructuredLogger.
+type defaultLogger struct {
 	fields Fields
 }
 
-// NewGLogger creates a StructuredLogger backed by the package-level glog implementation.
-// It implements Lifecycle to run glog.Init/Flush/Close automatically.
-func NewGLogger() StructuredLogger {
-	return &gLogger{fields: Fields{}}
+// NewLogger creates the canonical structured logger backed by the default text logger.
+// It implements Lifecycle to initialize and flush the default backend automatically.
+func NewLogger() StructuredLogger {
+	return &defaultLogger{fields: Fields{}}
 }
 
-// Start initializes the underlying glog system.
-func (l *gLogger) Start(ctx context.Context) error {
-	Init()
+// Start initializes the underlying default logger backend.
+func (l *defaultLogger) Start(ctx context.Context) error {
+	initDefaultFromFlags()
 	return nil
 }
 
-// Stop flushes and closes glog resources.
-func (l *gLogger) Stop(ctx context.Context) error {
-	Flush()
-	Close()
+// Stop flushes and closes backend resources.
+func (l *defaultLogger) Stop(ctx context.Context) error {
+	flushDefault()
+	closeDefault()
 	return nil
 }
 
-func (l *gLogger) WithFields(fields Fields) StructuredLogger {
-	return &gLogger{fields: mergeFields(l.fields, fields)}
+func (l *defaultLogger) WithFields(fields Fields) StructuredLogger {
+	return &defaultLogger{fields: mergeFields(l.fields, fields)}
 }
 
-func (l *gLogger) With(key string, value any) StructuredLogger {
+func (l *defaultLogger) With(key string, value any) StructuredLogger {
 	return l.WithFields(Fields{key: value})
 }
 
 // Debug logs at DEBUG level.
-// Unlike JSONLogger (which checks its own local verbosity), gLogger gates Debug
-// on the global glog verbosity flag (-v). Both require at least V(1) to emit.
-func (l *gLogger) Debug(msg string, fields ...Fields) {
-	if !std.vAt(1, 3) {
+// Unlike JSONLogger (which checks its own local verbosity), the default logger
+// gates Debug on the backend verbosity flag (-v). Both require at least V(1) to emit.
+func (l *defaultLogger) Debug(msg string, fields ...Fields) {
+	if !std.vAt(1, 2) {
 		return
 	}
 	l.logWithLevel(DEBUG, msg, firstFields(fields), nil)
 }
 
-func (l *gLogger) Info(msg string, fields ...Fields) {
+func (l *defaultLogger) Info(msg string, fields ...Fields) {
 	l.logWithLevel(INFO, msg, firstFields(fields), nil)
 }
 
-func (l *gLogger) Warn(msg string, fields ...Fields) {
+func (l *defaultLogger) Warn(msg string, fields ...Fields) {
 	l.logWithLevel(WARNING, msg, firstFields(fields), nil)
 }
 
-func (l *gLogger) Error(msg string, fields ...Fields) {
+func (l *defaultLogger) Error(msg string, fields ...Fields) {
 	l.logWithLevel(ERROR, msg, firstFields(fields), nil)
 }
 
-func (l *gLogger) Fatal(msg string, fields ...Fields) {
+func (l *defaultLogger) Fatal(msg string, fields ...Fields) {
 	l.logWithLevel(FATAL, msg, firstFields(fields), nil)
 }
 
 // DebugCtx logs at DEBUG level with context.
 // Verbosity is gated on the global glog flag, consistent with Debug.
-func (l *gLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
-	if !std.vAt(1, 3) {
+func (l *defaultLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
+	if !std.vAt(1, 2) {
 		return
 	}
 	l.logWithLevel(DEBUG, msg, firstFields(fields), ctx)
 }
 
-func (l *gLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
+func (l *defaultLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
 	l.logWithLevel(INFO, msg, firstFields(fields), ctx)
 }
 
-func (l *gLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
+func (l *defaultLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
 	l.logWithLevel(WARNING, msg, firstFields(fields), ctx)
 }
 
-func (l *gLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
+func (l *defaultLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
 	l.logWithLevel(ERROR, msg, firstFields(fields), ctx)
 }
 
-func (l *gLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
+func (l *defaultLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
 	l.logWithLevel(FATAL, msg, firstFields(fields), ctx)
 }
 
-func (l *gLogger) logWithLevel(level Level, msg string, fields Fields, ctx context.Context) {
+func (l *defaultLogger) logWithLevel(level Level, msg string, fields Fields, ctx context.Context) {
 	combined := mergeFields(l.fields, fields)
 	if requestID := contract.RequestIDFromContext(ctx); requestID != "" {
 		combined["request_id"] = requestID
@@ -166,7 +166,7 @@ func (l *gLogger) logWithLevel(level Level, msg string, fields Fields, ctx conte
 	std.log(level, 3, msg)
 }
 
-func (l *gLogger) formatFields(fields Fields) string {
+func (l *defaultLogger) formatFields(fields Fields) string {
 	if len(fields) == 0 {
 		return ""
 	}

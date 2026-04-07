@@ -152,7 +152,7 @@ func New(opts ...Option) *Scheduler {
 		stopCh:           make(chan struct{}),
 		workerCount:      4,
 		workCh:           make(chan *runRequest, DefaultWorkChannelBuffer),
-		logger:           log.NewGLogger(),
+		logger:           log.NewLogger(),
 		clock:            realClock{},
 		registry:         make(map[string]TaskFunc),
 		backpressure:     DefaultBackpressureConfig(),

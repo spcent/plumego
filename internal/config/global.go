@@ -68,7 +68,7 @@ func InitDefault() error {
 		return globalInitErr
 	}
 
-	logger := log.NewGLogger()
+	logger := log.NewLogger()
 	globalConfig = NewManager(logger)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -121,7 +121,7 @@ func GetGlobalConfig() *Manager {
 	// InitDefault always sets globalConfig to a non-nil Manager before returning,
 	// regardless of whether Load succeeds, so we only need to read it once after.
 	if err := InitDefault(); err != nil {
-		return NewManager(log.NewGLogger())
+		return NewManager(log.NewLogger())
 	}
 
 	globalConfigMu.RLock()

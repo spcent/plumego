@@ -35,7 +35,7 @@ type ConfigManager = Manager
 
 // New creates a new configuration manager instance.
 func New() *Manager {
-	return NewManager(log.NewGLogger())
+	return NewManager(log.NewLogger())
 }
 
 // NewConfigManager creates a new Manager instance (backward compatibility alias).

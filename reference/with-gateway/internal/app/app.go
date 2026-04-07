@@ -24,7 +24,7 @@ type App struct {
 
 // New constructs the App with a gateway reverse proxy.
 func New(cfg config.Config) (*App, error) {
-	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewGLogger()})
+	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
 	a.Use(accesslog.Middleware(a.Logger()))

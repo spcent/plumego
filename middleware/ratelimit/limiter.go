@@ -29,7 +29,7 @@ import (
 //		MinConcurrent:  50,           // Minimum 50 concurrent requests
 //		MaxConcurrentLimit: 200,      // Maximum 200 concurrent requests (for dynamic adjustment)
 //		WindowSize:     10,           // Pressure sampling window size
-//		Logger:         log.NewGLogger(),
+//		Logger:         log.NewLogger(),
 //	}
 //
 //	limiter := ratelimit.NewRateLimiter(config)

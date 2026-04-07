@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
@@ -38,7 +37,7 @@ func EnsureRequestID(r *http.Request) string {
 	if id := contract.NewObservabilityPolicy().RequestIDFromRequest(r); id != "" {
 		return id
 	}
-	return log.NewRequestID()
+	return contract.NewRequestID()
 }
 
 func PrepareRequest(w http.ResponseWriter, r *http.Request) PreparedRequest {

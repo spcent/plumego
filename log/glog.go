@@ -71,6 +71,7 @@ type RotationConfig struct {
 
 type Logger struct {
 	mu              sync.RWMutex
+	writeMu         sync.Mutex
 	level           Level
 	output          io.Writer
 	toStderr        bool
@@ -108,12 +109,12 @@ func New() *Logger {
 	}
 }
 
-func Init() {
+func initDefaultFromFlags() {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
 
-	if err := InitWithConfig(InitConfig{
+	if err := initDefaultWithConfig(InitConfig{
 		LogDir:          *logDir,
 		AlsoLogToStderr: *alsoLogToStderr,
 		LogToStderr:     *logToStderr,
@@ -125,7 +126,7 @@ func Init() {
 	}
 }
 
-func InitWithConfig(cfg InitConfig) error {
+func initDefaultWithConfig(cfg InitConfig) error {
 	std.mu.Lock()
 	defer std.mu.Unlock()
 
@@ -169,10 +170,7 @@ func (l *Logger) initLogFiles() error {
 
 	for level := INFO; level <= ERROR; level++ {
 		lname := levelName(level)
-		filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
-			l.program, hostname, lname,
-			now.Year(), now.Month(), now.Day(),
-			now.Hour(), now.Minute(), now.Second(), currentPID)
+		filename := logFilename(l.program, hostname, lname, now, currentPID)
 
 		logPath := filepath.Join(l.logDir, filename)
 		file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -190,6 +188,7 @@ func (l *Logger) initLogFiles() error {
 	}
 
 	cleanupOldLogs(l.logDir, l.program, l.rotationConfig, currentLogFiles(l.logFiles))
+	l.rebuildWriterCache()
 	return nil
 }
 
@@ -356,6 +355,7 @@ func (l *Logger) logInternal(level Level, calldepth int, messageBuilder func() s
 	shouldBacktrace := l.shouldLogBacktrace(file, line)
 	l.mu.RUnlock()
 
+	l.writeMu.Lock()
 	if err := writeFull(writer, logLine); err != nil {
 		l.reportWriteError(err)
 	}
@@ -376,6 +376,7 @@ func (l *Logger) logInternal(level Level, calldepth int, messageBuilder func() s
 			l.reportWriteError(err)
 		}
 	}
+	l.writeMu.Unlock()
 
 	// Handle fatal errors
 	if level == FATAL {
@@ -420,7 +421,7 @@ func (l *Logger) vAt(level int, calldepth int) bool {
 }
 
 func (l *Logger) V(level int) bool {
-	return l.vAt(level, 3)
+	return l.vAt(level, 2)
 }
 
 func (l *Logger) Info(args ...any) {
@@ -472,13 +473,13 @@ func (l *Logger) Fatalln(args ...any) {
 }
 
 func (l *Logger) VLog(level int, args ...any) {
-	if l.vAt(level, 3) {
+	if l.vAt(level, 2) {
 		l.log(INFO, 2, args...)
 	}
 }
 
 func (l *Logger) VLogf(level int, format string, args ...any) {
-	if l.vAt(level, 3) {
+	if l.vAt(level, 2) {
 		l.logf(INFO, 2, format, args...)
 	}
 }
@@ -542,10 +543,7 @@ func (l *Logger) rotateLogFile(level Level) error {
 	now := time.Now()
 
 	lname := levelName(level)
-	filename := fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%d.log",
-		l.program, hostname, lname,
-		now.Year(), now.Month(), now.Day(),
-		now.Hour(), now.Minute(), now.Second(), currentPID)
+	filename := logFilename(l.program, hostname, lname, now, currentPID)
 
 	logPath := filepath.Join(l.logDir, filename)
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -577,6 +575,14 @@ type logFileInfo struct {
 	name    string
 	path    string
 	modTime time.Time
+}
+
+func logFilename(program, hostname, lname string, now time.Time, currentPID int) string {
+	return fmt.Sprintf("%s.%s.%s.%04d%02d%02d-%02d%02d%02d.%09d.%d.log",
+		program, hostname, lname,
+		now.Year(), now.Month(), now.Day(),
+		now.Hour(), now.Minute(), now.Second(),
+		now.Nanosecond(), currentPID)
 }
 
 func currentLogFiles(files map[Level]*os.File) map[string]struct{} {
@@ -734,102 +740,103 @@ func (l *Logger) Close() {
 			delete(l.logFiles, level)
 		}
 	}
+	l.rebuildWriterCache()
 }
 
-func V(level int) bool {
-	return std.vAt(level, 3)
+func vDefault(level int) bool {
+	return std.vAt(level, 2)
 }
 
-func Debug(args ...any) {
+func debugDefault(args ...any) {
 	if !std.vAt(1, 2) {
 		return
 	}
 	std.log(DEBUG, 2, args...)
 }
 
-func Debugf(format string, args ...any) {
+func debugfDefault(format string, args ...any) {
 	if !std.vAt(1, 2) {
 		return
 	}
 	std.logf(DEBUG, 2, format, args...)
 }
 
-func Debugln(args ...any) {
+func debuglnDefault(args ...any) {
 	if !std.vAt(1, 2) {
 		return
 	}
 	std.log(DEBUG, 2, fmt.Sprintln(args...))
 }
 
-func Info(args ...any) {
+func infoDefault(args ...any) {
 	std.log(INFO, 2, args...)
 }
 
-func Infof(format string, args ...any) {
+func infofDefault(format string, args ...any) {
 	std.logf(INFO, 2, format, args...)
 }
 
-func Infoln(args ...any) {
+func infolnDefault(args ...any) {
 	std.log(INFO, 2, fmt.Sprintln(args...))
 }
 
-func Warning(args ...any) {
+func warningDefault(args ...any) {
 	std.log(WARNING, 2, args...)
 }
 
-func Warningf(format string, args ...any) {
+func warningfDefault(format string, args ...any) {
 	std.logf(WARNING, 2, format, args...)
 }
 
-func Warningln(args ...any) {
+func warninglnDefault(args ...any) {
 	std.log(WARNING, 2, fmt.Sprintln(args...))
 }
 
-func Error(args ...any) {
+func errorDefault(args ...any) {
 	std.log(ERROR, 2, args...)
 }
 
-func Errorf(format string, args ...any) {
+func errorfDefault(format string, args ...any) {
 	std.logf(ERROR, 2, format, args...)
 }
 
-func Errorln(args ...any) {
+func errorlnDefault(args ...any) {
 	std.log(ERROR, 2, fmt.Sprintln(args...))
 }
 
-func Fatal(args ...any) {
+func fatalDefault(args ...any) {
 	std.log(FATAL, 2, args...)
 }
 
-func Fatalf(format string, args ...any) {
+func fatalfDefault(format string, args ...any) {
 	std.logf(FATAL, 2, format, args...)
 }
 
-func Fatalln(args ...any) {
+func fatallnDefault(args ...any) {
 	std.log(FATAL, 2, fmt.Sprintln(args...))
 }
 
-func VLog(level int, args ...any) {
-	if std.vAt(level, 3) {
+func vlogDefault(level int, args ...any) {
+	if std.vAt(level, 2) {
 		std.log(INFO, 2, args...)
 	}
 }
 
-func VLogf(level int, format string, args ...any) {
-	if std.vAt(level, 3) {
+func vlogfDefault(level int, format string, args ...any) {
+	if std.vAt(level, 2) {
 		std.logf(INFO, 2, format, args...)
 	}
 }
 
-func Flush() {
+func flushDefault() {
 	std.Flush()
 }
 
-func Close() {
+func closeDefault() {
 	std.Close()
 }
 
-func CopyStandardLogTo(level Level) {
+func copyStandardLogTo(level Level) {
 	stdlog.SetOutput(&logWriter{level: level})
 	stdlog.SetFlags(0)
 }
