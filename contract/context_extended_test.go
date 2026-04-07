@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -811,83 +810,6 @@ func TestBindQueryUint(t *testing.T) {
 	}
 	if f.Count != 42 {
 		t.Errorf("expected count=42, got %d", f.Count)
-	}
-}
-
-func TestFormFile(t *testing.T) {
-	// Build a multipart form with a file
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	part, err := writer.CreateFormFile("upload", "test.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	part.Write([]byte("file content here"))
-	writer.Close()
-
-	req := httptest.NewRequest(http.MethodPost, "/upload", &buf)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	ctx := NewCtx(httptest.NewRecorder(), req, nil)
-
-	fh, err := ctx.FormFile("upload")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if fh.Filename != "test.txt" {
-		t.Errorf("expected filename test.txt, got %s", fh.Filename)
-	}
-	if fh.Size != int64(len("file content here")) {
-		t.Errorf("expected size %d, got %d", len("file content here"), fh.Size)
-	}
-}
-
-func TestFormFileMissing(t *testing.T) {
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	writer.Close()
-
-	req := httptest.NewRequest(http.MethodPost, "/upload", &buf)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	ctx := NewCtx(httptest.NewRecorder(), req, nil)
-
-	_, err := ctx.FormFile("missing")
-	if err == nil {
-		t.Fatal("expected error for missing file")
-	}
-}
-
-func TestSaveUploadedFile(t *testing.T) {
-	// Build a multipart form with a file
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	part, err := writer.CreateFormFile("upload", "test.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	content := "saved file content"
-	part.Write([]byte(content))
-	writer.Close()
-
-	req := httptest.NewRequest(http.MethodPost, "/upload", &buf)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	ctx := NewCtx(httptest.NewRecorder(), req, nil)
-
-	fh, err := ctx.FormFile("upload")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dst := t.TempDir() + "/subdir/saved.txt"
-	if err := ctx.SaveUploadedFile(fh, dst); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(dst)
-	if err != nil {
-		t.Fatalf("failed to read saved file: %v", err)
-	}
-	if string(data) != content {
-		t.Errorf("expected %q, got %q", content, string(data))
 	}
 }
 

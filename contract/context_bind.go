@@ -6,11 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -186,38 +183,6 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 		fv.Set(result)
 	}
 	return nil
-}
-
-// FormFile returns the first file for the provided form key.
-// It is a convenience wrapper around http.Request.FormFile.
-func (c *Ctx) FormFile(name string) (*multipart.FileHeader, error) {
-	_, fh, err := c.R.FormFile(name)
-	return fh, err
-}
-
-// SaveUploadedFile copies an uploaded file to a destination path on disk.
-// Parent directories are created automatically if they do not exist.
-func (c *Ctx) SaveUploadedFile(file *multipart.FileHeader, dst string) error {
-	src, err := file.Open()
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-
-	if dir := filepath.Dir(dst); dir != "." {
-		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return err
-		}
-	}
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, src)
-	return err
 }
 
 func normalizeJSONBindOptions(opts []BindOptions) (BindOptions, error) {

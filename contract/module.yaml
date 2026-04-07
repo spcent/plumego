@@ -18,6 +18,7 @@ non_goals:
   - Route matching
   - App bootstrap
   - Persistence logic
+  - Multipart upload convenience helpers
   - Protocol gateway families
   - Business rules
   - Session or token issuance

@@ -37,5 +37,6 @@
 - keep `TraceContext` for tracing/span state only; do not reuse it as the app-facing request-correlation surface
 - use `Ctx.Stream(StreamConfig{...})` as the only high-level streaming/SSE entrypoint; keep `NewSSEWriter(...)` for low-level stdlib-shaped SSE writing only
 - keep `WriteJSON` as an explicit lower-level writer for raw payloads outside the `Ctx` success contract
+- use stdlib multipart parsing directly in owning handlers such as `x/fileapi`; do not add file-upload or disk-save convenience helpers to `contract.Ctx`
 - keep helpers transport-focused
 - avoid framework-style abstraction layers
