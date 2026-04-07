@@ -411,3 +411,30 @@ func TestNonJSONBodyNotTransformed(t *testing.T) {
 	w := httptest.NewRecorder()
 	middleware(handler).ServeHTTP(w, req)
 }
+
+func TestRequestTransformFailureUsesGatewayTransformCode(t *testing.T) {
+	handler := Middleware(Config{
+		RequestTransformers: []RequestTransformer{
+			func(*http.Request) error { return io.EOF },
+		},
+	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	errorObj, _ := payload["error"].(map[string]any)
+	if got, _ := errorObj["code"].(string); got != CodeTransformFailed {
+		t.Fatalf("expected code %q, got %q", CodeTransformFailed, got)
+	}
+}

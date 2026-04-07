@@ -14,7 +14,6 @@ import (
 	"github.com/spcent/plumego/middleware/limits"
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/recovery"
-	"github.com/spcent/plumego/middleware/versioning"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
@@ -63,14 +62,6 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 			expectedCode: middleware.CodeInternalError,
 			handler: recovery.Recovery(recoveryLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("boom")
-			})),
-			request: httptest.NewRequest(http.MethodGet, "/", nil),
-		},
-		{
-			name:         "unsupported version",
-			expectedCode: middleware.CodeUnsupportedVersion,
-			handler: versioning.Middleware(versioning.Config{DefaultVersion: 1, SupportedVersions: []int{2}})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),
 		},
@@ -124,23 +115,19 @@ func assertCanonicalEnvelope(t *testing.T, rec *httptest.ResponseRecorder, expec
 
 func TestMiddlewareCodeRegistryStability(t *testing.T) {
 	expected := map[string]string{
-		"auth":               middleware.CodeAuthUnauthenticated,
-		"rate":               middleware.CodeRateLimited,
-		"tenant_required":    middleware.CodeTenantRequired,
-		"tenant_invalid":     middleware.CodeTenantInvalidID,
-		"tenant_policy":      middleware.CodeTenantPolicyDenied,
-		"tenant_quota":       middleware.CodeTenantQuotaExceeded,
-		"tenant_rate":        middleware.CodeTenantRateLimited,
-		"body_too_large":     middleware.CodeRequestBodyTooLarge,
-		"server_busy":        middleware.CodeServerBusy,
-		"queue_timeout":      middleware.CodeServerQueueTimeout,
-		"request_timeout":    middleware.CodeRequestTimeout,
-		"upstream_failed":    middleware.CodeUpstreamFailed,
-		"unsupported_ver":    middleware.CodeUnsupportedVersion,
-		"transform_failed":   middleware.CodeTransformFailed,
-		"protocol_transform": middleware.CodeProtocolTransformFail,
-		"protocol_exec":      middleware.CodeProtocolExecutionFail,
-		"internal":           middleware.CodeInternalError,
+		"auth":            middleware.CodeAuthUnauthenticated,
+		"rate":            middleware.CodeRateLimited,
+		"tenant_required": middleware.CodeTenantRequired,
+		"tenant_invalid":  middleware.CodeTenantInvalidID,
+		"tenant_policy":   middleware.CodeTenantPolicyDenied,
+		"tenant_quota":    middleware.CodeTenantQuotaExceeded,
+		"tenant_rate":     middleware.CodeTenantRateLimited,
+		"body_too_large":  middleware.CodeRequestBodyTooLarge,
+		"server_busy":     middleware.CodeServerBusy,
+		"queue_timeout":   middleware.CodeServerQueueTimeout,
+		"request_timeout": middleware.CodeRequestTimeout,
+		"upstream_failed": middleware.CodeUpstreamFailed,
+		"internal":        middleware.CodeInternalError,
 	}
 
 	// Keep this test explicit; values are part of wire-level contract.
@@ -156,10 +143,6 @@ func TestMiddlewareCodeRegistryStability(t *testing.T) {
 		expected["queue_timeout"] != "server_queue_timeout" ||
 		expected["request_timeout"] != "request_timeout" ||
 		expected["upstream_failed"] != "upstream_failed" ||
-		expected["unsupported_ver"] != "unsupported_version" ||
-		expected["transform_failed"] != "transform_failed" ||
-		expected["protocol_transform"] != "protocol_transform_failed" ||
-		expected["protocol_exec"] != "protocol_execution_failed" ||
 		expected["internal"] != "internal_error" {
 		t.Fatalf("middleware error code registry changed: %#v", expected)
 	}

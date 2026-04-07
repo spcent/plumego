@@ -10,7 +10,7 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/middleware/transform"
+//		"github.com/spcent/plumego/x/gateway/transform"
 //		"github.com/spcent/plumego/core"
 //	)
 //
@@ -38,8 +38,10 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	mw "github.com/spcent/plumego/middleware"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
+
+// CodeTransformFailed is the canonical x/gateway transform error code.
+const CodeTransformFailed = "transform_failed"
 
 // RequestTransformer modifies an HTTP request
 type RequestTransformer func(*http.Request) error
@@ -69,7 +71,7 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 					if config.OnError != nil {
 						config.OnError(err)
 					}
-					mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeTransformFailed, "request transformation failed", contract.CategoryClient, nil)
+					mw.WriteTransportError(w, r, http.StatusBadRequest, CodeTransformFailed, "request transformation failed", contract.CategoryClient, nil)
 					return
 				}
 			}
@@ -133,10 +135,10 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			} else {
 				w.Header().Del("Content-Length")
 			}
-			internaltransport.EnsureNoSniff(w.Header())
+			ensureNoSniff(w.Header())
 			w.WriteHeader(resp.StatusCode)
 			if len(transformedBody) > 0 {
-				_, _ = internaltransport.SafeWrite(w, transformedBody)
+				_, _ = safeWrite(w, transformedBody)
 			}
 		})
 	}
@@ -167,6 +169,23 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 		r.WriteHeader(http.StatusOK)
 	}
 	return r.body.Write(b)
+}
+
+func ensureNoSniff(header http.Header) {
+	if header == nil {
+		return
+	}
+	if header.Get("X-Content-Type-Options") == "" {
+		header.Set("X-Content-Type-Options", "nosniff")
+	}
+}
+
+func safeWrite(w http.ResponseWriter, body []byte) (int, error) {
+	if w == nil {
+		return 0, nil
+	}
+	ensureNoSniff(w.Header())
+	return w.Write(body)
 }
 
 // ========================================

@@ -17,7 +17,6 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
-	"github.com/spcent/plumego/middleware/versioning"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
@@ -61,14 +60,6 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 			name: "recovery",
 			mw:   recoveryMw,
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
-		},
-		{
-			name: "versioning valid",
-			mw: versioning.Middleware(versioning.Config{
-				DefaultVersion:    1,
-				SupportedVersions: []int{1},
-			}),
-			req: httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
 			name: "tenant resolver valid",
@@ -203,14 +194,6 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 			expectedCode: middleware.CodeInternalError,
 			handler: recovery.Recovery(recoveryLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("boom")
-			})),
-			request: httptest.NewRequest(http.MethodGet, "/", nil),
-		},
-		{
-			name:         "unsupported version",
-			expectedCode: middleware.CodeUnsupportedVersion,
-			handler: versioning.Middleware(versioning.Config{DefaultVersion: 1, SupportedVersions: []int{2}})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),
 		},

@@ -21,6 +21,8 @@
 - tenant policy catalogs
 - tenant resolution or tenant quota enforcement
 - service construction
+- API version negotiation
+- resource or protocol transformation
 
 ## First files to read
 
@@ -35,6 +37,8 @@
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
 - keep auth and security-header transport adapters here, on top of `security/*` primitives
+- keep API version negotiation in `x/rest/versioning`
+- keep protocol or payload adaptation in `x/gateway/*`
 
 ## Boundary with observability
 

@@ -3,6 +3,7 @@ package protocolmw
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -202,5 +203,28 @@ func TestMiddlewareUsesRegisteredAdapter(t *testing.T) {
 	}
 	if rec.Body.String() != "created:POST" {
 		t.Fatalf("expected response body created:POST, got %q", rec.Body.String())
+	}
+}
+
+func TestMiddlewareReadBodyErrorUsesGatewayProtocolTransformCode(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/read-error", nil)
+	req.Body = errReadCloser{}
+
+	rec := httptest.NewRecorder()
+	MiddlewareWithConfig(Config{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	errorObj, _ := payload["error"].(map[string]any)
+	if got, _ := errorObj["code"].(string); got != CodeProtocolTransformFail {
+		t.Fatalf("expected code %q, got %q", CodeProtocolTransformFail, got)
 	}
 }

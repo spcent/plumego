@@ -10,6 +10,13 @@ import (
 	gatewayproto "github.com/spcent/plumego/x/gateway/protocol"
 )
 
+const (
+	// CodeProtocolTransformFail is the canonical x/gateway protocol-adapter transform error code.
+	CodeProtocolTransformFail = "protocol_transform_failed"
+	// CodeProtocolExecutionFail is the canonical x/gateway protocol-adapter execution error code.
+	CodeProtocolExecutionFail = "protocol_execution_failed"
+)
+
 // Middleware creates protocol gateway middleware.
 func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -30,13 +37,13 @@ func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler
 
 			req, err := adapter.Transform(r.Context(), httpReq)
 			if err != nil {
-				mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
 				return
 			}
 
 			resp, err := adapter.Execute(r.Context(), req)
 			if err != nil {
-				mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 
@@ -123,7 +130,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnTransformError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeProtocolTransformFail, "protocol request read failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol request read failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewReader(body))
@@ -152,7 +159,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnTransformError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadRequest, mw.CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
 				return
 			}
 
@@ -162,7 +169,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnExecuteError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 

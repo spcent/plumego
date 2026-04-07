@@ -18,6 +18,8 @@ non_goals:
   - Service injection
   - Tenant policy
   - Tenant resolution and quota orchestration
+  - API version negotiation
+  - Resource or protocol transformation
   - Observability adapter or export catalogs
   - Persistence access
   - Authentication token verification logic (belongs in injected Authenticator implementations)
@@ -61,5 +63,7 @@ review_checklist:
 
 agent_hints:
   - Tenant middleware belongs in x/tenant
+  - Route API version negotiation to x/rest/versioning
+  - Route resource or protocol transformation to x/gateway/*
   - Stateful policy and observability catch-all buckets should move out of middleware
   - Keep behavior visible in tests

@@ -9,7 +9,7 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/middleware/versioning"
+//		"github.com/spcent/plumego/x/rest/versioning"
 //		"github.com/spcent/plumego/core"
 //	)
 //
@@ -49,6 +49,9 @@ import (
 	"github.com/spcent/plumego/contract"
 	mw "github.com/spcent/plumego/middleware"
 )
+
+// CodeUnsupportedVersion is the canonical x/rest version-negotiation error code.
+const CodeUnsupportedVersion = "unsupported_version"
 
 // Strategy defines the version extraction strategy
 type Strategy int
@@ -184,7 +187,7 @@ func Middleware(config Config) mw.Middleware {
 				if cfg.OnVersionMismatch != nil {
 					cfg.OnVersionMismatch(w, r, version)
 				} else {
-					mw.WriteTransportError(w, r, http.StatusNotAcceptable, mw.CodeUnsupportedVersion, fmt.Sprintf("unsupported API version: %d", version), contract.CategoryClient, nil)
+					mw.WriteTransportError(w, r, http.StatusNotAcceptable, CodeUnsupportedVersion, fmt.Sprintf("unsupported API version: %d", version), contract.CategoryClient, nil)
 				}
 				return
 			}
@@ -351,7 +354,7 @@ func CustomExtractor(extractor Extractor, defaultVersion int, supportedVersions 
 			}
 
 			if len(supportedVersions) > 0 && !isVersionSupported(version, supportedVersions) {
-				mw.WriteTransportError(w, r, http.StatusNotAcceptable, mw.CodeUnsupportedVersion, fmt.Sprintf("unsupported API version: %d", version), contract.CategoryClient, nil)
+				mw.WriteTransportError(w, r, http.StatusNotAcceptable, CodeUnsupportedVersion, fmt.Sprintf("unsupported API version: %d", version), contract.CategoryClient, nil)
 				return
 			}
 

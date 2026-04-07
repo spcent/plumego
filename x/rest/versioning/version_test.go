@@ -1,6 +1,7 @@
 package versioning
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -250,6 +251,32 @@ func TestStrategyCustomHeader(t *testing.T) {
 				t.Errorf("Expected version %d, got %s", tt.expectedVersion, body)
 			}
 		})
+	}
+}
+
+func TestUnsupportedVersionUsesVersioningCode(t *testing.T) {
+	handler := Middleware(Config{
+		DefaultVersion:    1,
+		SupportedVersions: []int{2},
+	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotAcceptable {
+		t.Fatalf("expected status %d, got %d", http.StatusNotAcceptable, rec.Code)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	errorObj, _ := payload["error"].(map[string]any)
+	if got, _ := errorObj["code"].(string); got != CodeUnsupportedVersion {
+		t.Fatalf("expected code %q, got %q", CodeUnsupportedVersion, got)
 	}
 }
 
