@@ -49,10 +49,10 @@ func TestAny(t *testing.T) {
 	app := newTestApp()
 
 	called := false
-	mustRegisterRoute(t, app.Any("/any", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Any("/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
 	for _, method := range methods {
@@ -184,9 +184,9 @@ func TestAddRouteWithNameRegistersURLAndReturnsErrors(t *testing.T) {
 func TestMethodHelpersReturnRegistrationErrors(t *testing.T) {
 	app := newTestApp()
 
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}
+	})
 
 	if err := app.Get("/strict-get", handler); err != nil {
 		t.Fatalf("unexpected get registration error: %v", err)

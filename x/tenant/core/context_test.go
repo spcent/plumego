@@ -147,7 +147,7 @@ func TestTenantIDFromContext_WrongType(t *testing.T) {
 	ctx := context.Background()
 
 	// Manually add wrong type to context (simulate corruption)
-	ctx = context.WithValue(ctx, tenantIDContextKeyVar, 12345) // int instead of string
+	ctx = context.WithValue(ctx, tenantIDContextKey{}, 12345) // int instead of string
 
 	// Should handle gracefully and return empty string
 	tenantID := TenantIDFromContext(ctx)

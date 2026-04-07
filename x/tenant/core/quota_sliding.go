@@ -10,9 +10,8 @@ import (
 // SlidingWindowQuotaManager implements quota enforcement with a sliding window algorithm.
 // This is more accurate than fixed windows and prevents burst traffic at window boundaries.
 //
-// SlidingWindowQuotaManager only enforces the per-minute window (RequestsPerMinute /
-// TokensPerMinute, or the QuotaWindowMinute entry from Limits). For hour/day/month
-// enforcement use WindowQuotaManager with InMemoryQuotaStore instead.
+// SlidingWindowQuotaManager only enforces the per-minute window (the QuotaWindowMinute
+// entry from Limits). For hour/day/month enforcement use WindowQuotaManager instead.
 type SlidingWindowQuotaManager struct {
 	provider QuotaConfigProvider
 	windows  sync.Map // map[string]*slidingWindow
@@ -46,6 +45,9 @@ func (m *SlidingWindowQuotaManager) DeleteTenant(tenantID string) {
 
 // Allow checks if the request is within quota using sliding window algorithm.
 func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, req QuotaRequest) (QuotaResult, error) {
+	if m == nil || m.provider == nil {
+		return QuotaResult{Allowed: true}, nil
+	}
 	cfg, err := m.provider.QuotaConfig(ctx, tenantID)
 	if err != nil {
 		return QuotaResult{Allowed: false}, err
@@ -185,18 +187,15 @@ func (w *slidingWindow) calculateTokenRetryAfter(now time.Time, needed int) time
 }
 
 // slidingWindowEffectiveLimits returns the per-minute request and token limits for
-// the sliding window manager. When cfg.Limits is set, only the QuotaWindowMinute
-// entry is used; all other windows require WindowQuotaManager.
+// the sliding window manager. Only the QuotaWindowMinute entry from Limits is used;
+// all other windows require WindowQuotaManager.
 func slidingWindowEffectiveLimits(cfg QuotaConfig) (reqLimit, tokLimit int) {
-	if len(cfg.Limits) > 0 {
-		for _, l := range cfg.Limits {
-			if l.Window == QuotaWindowMinute {
-				return l.Requests, l.Tokens
-			}
+	for _, l := range cfg.Limits {
+		if l.Window == QuotaWindowMinute {
+			return l.Requests, l.Tokens
 		}
-		// Limits defined but no minute window — this manager cannot enforce
-		// hour/day/month limits; callers should use WindowQuotaManager.
-		return 0, 0
 	}
-	return cfg.RequestsPerMinute, cfg.TokensPerMinute
+	// No minute window defined — this manager cannot enforce hour/day/month limits;
+	// callers should use WindowQuotaManager.
+	return 0, 0
 }

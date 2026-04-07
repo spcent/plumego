@@ -7,17 +7,16 @@ import (
 	"time"
 )
 
-func TestInMemoryQuotaManager_Allow(t *testing.T) {
+func TestFixedWindowQuotaManager_Allow(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 10,
-			TokensPerMinute:   100,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 10, Tokens: 100}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 
 	// First request should be allowed
@@ -41,16 +40,16 @@ func TestInMemoryQuotaManager_Allow(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_Exceed_Requests(t *testing.T) {
+func TestFixedWindowQuotaManager_Exceed_Requests(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 2,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 2}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -88,16 +87,16 @@ func TestInMemoryQuotaManager_Exceed_Requests(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_Exceed_Tokens(t *testing.T) {
+func TestFixedWindowQuotaManager_Exceed_Tokens(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			TokensPerMinute: 50,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Tokens: 50}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -126,16 +125,16 @@ func TestInMemoryQuotaManager_Exceed_Tokens(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_WindowReset(t *testing.T) {
+func TestFixedWindowQuotaManager_WindowReset(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 2,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 2}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 
 	// First window
@@ -166,17 +165,14 @@ func TestInMemoryQuotaManager_WindowReset(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_Unlimited(t *testing.T) {
+func TestFixedWindowQuotaManager_Unlimited(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "unlimited-tenant",
-		Quota: QuotaConfig{
-			RequestsPerMinute: 0, // 0 = unlimited
-			TokensPerMinute:   0, // 0 = unlimited
-		},
+		Quota:    QuotaConfig{}, // no limits = unlimited
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -196,17 +192,16 @@ func TestInMemoryQuotaManager_Unlimited(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_TokensOnly(t *testing.T) {
+func TestFixedWindowQuotaManager_TokensOnly(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "tokens-only",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 0,   // unlimited
-			TokensPerMinute:   100, // limited
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Tokens: 100}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -239,17 +234,16 @@ func TestInMemoryQuotaManager_TokensOnly(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_RequestsOnly(t *testing.T) {
+func TestFixedWindowQuotaManager_RequestsOnly(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "requests-only",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 5, // limited
-			TokensPerMinute:   0, // unlimited
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 5}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -282,16 +276,16 @@ func TestInMemoryQuotaManager_RequestsOnly(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_RetryAfter(t *testing.T) {
+func TestFixedWindowQuotaManager_RetryAfter(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "retry-test",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 1,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 1}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 
 	// Use current time for realistic RetryAfter calculation
@@ -318,17 +312,16 @@ func TestInMemoryQuotaManager_RetryAfter(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_DeniedResultReportsCurrentRemainingBudget(t *testing.T) {
+func TestFixedWindowQuotaManager_DeniedResultReportsCurrentRemainingBudget(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "budget-test",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 5,
-			TokensPerMinute:   10,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 5, Tokens: 10}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -363,16 +356,16 @@ func TestInMemoryQuotaManager_DeniedResultReportsCurrentRemainingBudget(t *testi
 	}
 }
 
-func TestInMemoryQuotaManager_Concurrent(t *testing.T) {
+func TestFixedWindowQuotaManager_Concurrent(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "concurrent-test",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 100,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 100}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -410,9 +403,9 @@ func TestInMemoryQuotaManager_Concurrent(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_TenantNotFound(t *testing.T) {
+func TestFixedWindowQuotaManager_TenantNotFound(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 
 	_, err := quotaMgr.Allow(ctx, "non-existent", QuotaRequest{
@@ -425,8 +418,8 @@ func TestInMemoryQuotaManager_TenantNotFound(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_NilProvider(t *testing.T) {
-	quotaMgr := NewInMemoryQuotaManager(nil)
+func TestFixedWindowQuotaManager_NilProvider(t *testing.T) {
+	quotaMgr := NewFixedWindowQuotaManager(nil)
 	ctx := context.Background()
 
 	// Should allow all requests when provider is nil
@@ -443,8 +436,8 @@ func TestInMemoryQuotaManager_NilProvider(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_NilManager(t *testing.T) {
-	var quotaMgr *InMemoryQuotaManager
+func TestFixedWindowQuotaManager_NilManager(t *testing.T) {
+	var quotaMgr *FixedWindowQuotaManager
 	ctx := context.Background()
 
 	// Should allow all requests when manager is nil
@@ -460,16 +453,16 @@ func TestInMemoryQuotaManager_NilManager(t *testing.T) {
 	}
 }
 
-func TestInMemoryQuotaManager_DefaultRequestCount(t *testing.T) {
+func TestFixedWindowQuotaManager_DefaultRequestCount(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	mgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 10,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 10}},
 		},
 	})
 
-	quotaMgr := NewInMemoryQuotaManager(mgr)
+	quotaMgr := NewFixedWindowQuotaManager(mgr)
 	ctx := context.Background()
 
 	// Request without specifying Requests (should default to 1)

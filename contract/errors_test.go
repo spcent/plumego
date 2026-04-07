@@ -345,10 +345,10 @@ func TestWriteErrorPreservesRequestID(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	err := APIError{
-		Status:   http.StatusBadRequest,
-		Code:     "VALIDATION_ERROR",
-		Message:  "validation failed",
-		Category: CategoryValidation,
+		Status:    http.StatusBadRequest,
+		Code:      "VALIDATION_ERROR",
+		Message:   "validation failed",
+		Category:  CategoryValidation,
 		RequestID: "explicit-req-id",
 	}
 

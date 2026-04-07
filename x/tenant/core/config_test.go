@@ -13,8 +13,7 @@ func TestInMemoryConfigManager_SetGet(t *testing.T) {
 	cfg := Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 100,
-			TokensPerMinute:   5000,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 100, Tokens: 5000}},
 		},
 		Policy: PolicyConfig{
 			AllowedModels: []string{"gpt-4", "gpt-3.5"},
@@ -41,11 +40,11 @@ func TestInMemoryConfigManager_SetGet(t *testing.T) {
 	if retrieved.TenantID != cfg.TenantID {
 		t.Errorf("expected tenant ID %s, got %s", cfg.TenantID, retrieved.TenantID)
 	}
-	if retrieved.Quota.RequestsPerMinute != cfg.Quota.RequestsPerMinute {
-		t.Errorf("expected requests %d, got %d", cfg.Quota.RequestsPerMinute, retrieved.Quota.RequestsPerMinute)
+	if len(retrieved.Quota.Limits) == 0 || retrieved.Quota.Limits[0].Requests != 100 {
+		t.Errorf("expected 100 requests/min, got %+v", retrieved.Quota.Limits)
 	}
-	if retrieved.Quota.TokensPerMinute != cfg.Quota.TokensPerMinute {
-		t.Errorf("expected tokens %d, got %d", cfg.Quota.TokensPerMinute, retrieved.Quota.TokensPerMinute)
+	if len(retrieved.Quota.Limits) == 0 || retrieved.Quota.Limits[0].Tokens != 5000 {
+		t.Errorf("expected 5000 tokens/min, got %+v", retrieved.Quota.Limits)
 	}
 	if len(retrieved.Policy.AllowedModels) != len(cfg.Policy.AllowedModels) {
 		t.Errorf("expected %d models, got %d", len(cfg.Policy.AllowedModels), len(retrieved.Policy.AllowedModels))
@@ -112,7 +111,7 @@ func TestInMemoryConfigManager_Concurrent(t *testing.T) {
 			cfg := Config{
 				TenantID: "concurrent-test",
 				Quota: QuotaConfig{
-					RequestsPerMinute: id * 10,
+					Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: id * 10}},
 				},
 			}
 			mgr.SetTenantConfig(cfg)
@@ -150,8 +149,7 @@ func TestInMemoryConfigManager_QuotaProvider(t *testing.T) {
 	cfg := Config{
 		TenantID: "quota-test",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 50,
-			TokensPerMinute:   2500,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 50, Tokens: 2500}},
 		},
 	}
 	mgr.SetTenantConfig(cfg)
@@ -161,11 +159,11 @@ func TestInMemoryConfigManager_QuotaProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("QuotaConfig failed: %v", err)
 	}
-	if quota.RequestsPerMinute != 50 {
-		t.Errorf("expected 50 requests, got %d", quota.RequestsPerMinute)
+	if len(quota.Limits) == 0 || quota.Limits[0].Requests != 50 {
+		t.Errorf("expected 50 requests/min, got %+v", quota.Limits)
 	}
-	if quota.TokensPerMinute != 2500 {
-		t.Errorf("expected 2500 tokens, got %d", quota.TokensPerMinute)
+	if len(quota.Limits) == 0 || quota.Limits[0].Tokens != 2500 {
+		t.Errorf("expected 2500 tokens/min, got %+v", quota.Limits)
 	}
 
 	// Test non-existent tenant
@@ -207,6 +205,66 @@ func TestInMemoryConfigManager_PolicyProvider(t *testing.T) {
 	}
 }
 
+func TestQuotaConfigProviderFromConfig(t *testing.T) {
+	mgr := NewInMemoryConfigManager()
+	ctx := context.Background()
+	mgr.SetTenantConfig(Config{
+		TenantID: "t-1",
+		Quota:    QuotaConfig{Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 10}}},
+	})
+
+	provider := &QuotaConfigProviderFromConfig{Manager: mgr}
+
+	quota, err := provider.QuotaConfig(ctx, "t-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(quota.Limits) == 0 || quota.Limits[0].Requests != 10 {
+		t.Errorf("expected 10 requests/min, got %+v", quota.Limits)
+	}
+
+	_, err = provider.QuotaConfig(ctx, "missing")
+	if err != ErrTenantNotFound {
+		t.Errorf("expected ErrTenantNotFound, got %v", err)
+	}
+
+	var nilProvider *QuotaConfigProviderFromConfig
+	_, err = nilProvider.QuotaConfig(ctx, "t-1")
+	if err != ErrTenantNotFound {
+		t.Errorf("nil receiver: expected ErrTenantNotFound, got %v", err)
+	}
+}
+
+func TestPolicyConfigProviderFromConfig(t *testing.T) {
+	mgr := NewInMemoryConfigManager()
+	ctx := context.Background()
+	mgr.SetTenantConfig(Config{
+		TenantID: "t-1",
+		Policy:   PolicyConfig{AllowedModels: []string{"gpt-4"}},
+	})
+
+	provider := &PolicyConfigProviderFromConfig{Manager: mgr}
+
+	policy, err := provider.PolicyConfig(ctx, "t-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(policy.AllowedModels) != 1 || policy.AllowedModels[0] != "gpt-4" {
+		t.Errorf("unexpected allowed models: %v", policy.AllowedModels)
+	}
+
+	_, err = provider.PolicyConfig(ctx, "missing")
+	if err != ErrTenantNotFound {
+		t.Errorf("expected ErrTenantNotFound, got %v", err)
+	}
+
+	var nilProvider *PolicyConfigProviderFromConfig
+	_, err = nilProvider.PolicyConfig(ctx, "t-1")
+	if err != ErrTenantNotFound {
+		t.Errorf("nil receiver: expected ErrTenantNotFound, got %v", err)
+	}
+}
+
 func TestInMemoryConfigManager_NilSafety(t *testing.T) {
 	var mgr *InMemoryConfigManager
 
@@ -229,7 +287,7 @@ func TestInMemoryConfigManager_MultipleUpdates(t *testing.T) {
 	cfg1 := Config{
 		TenantID: "update-test",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 10,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 10}},
 		},
 		Metadata: map[string]string{"version": "1"},
 	}
@@ -239,8 +297,7 @@ func TestInMemoryConfigManager_MultipleUpdates(t *testing.T) {
 	cfg2 := Config{
 		TenantID: "update-test",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 20,
-			TokensPerMinute:   1000,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 20, Tokens: 1000}},
 		},
 		Metadata: map[string]string{"version": "2"},
 	}
@@ -251,11 +308,11 @@ func TestInMemoryConfigManager_MultipleUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if retrieved.Quota.RequestsPerMinute != 20 {
-		t.Errorf("expected requests 20, got %d", retrieved.Quota.RequestsPerMinute)
+	if len(retrieved.Quota.Limits) == 0 || retrieved.Quota.Limits[0].Requests != 20 {
+		t.Errorf("expected 20 requests/min, got %+v", retrieved.Quota.Limits)
 	}
-	if retrieved.Quota.TokensPerMinute != 1000 {
-		t.Errorf("expected tokens 1000, got %d", retrieved.Quota.TokensPerMinute)
+	if len(retrieved.Quota.Limits) == 0 || retrieved.Quota.Limits[0].Tokens != 1000 {
+		t.Errorf("expected 1000 tokens/min, got %+v", retrieved.Quota.Limits)
 	}
 	if retrieved.Metadata["version"] != "2" {
 		t.Errorf("expected version 2, got %s", retrieved.Metadata["version"])

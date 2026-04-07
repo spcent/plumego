@@ -21,13 +21,20 @@ func TestInMemoryRateLimitProvider(t *testing.T) {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 
-	// Unknown tenant returns zero config (unlimited) with no error.
-	cfg, err = provider.RateLimitConfig(context.Background(), "missing")
-	if err != nil {
-		t.Fatalf("expected nil error for unconfigured tenant, got %v", err)
+	// Unknown tenant returns ErrTenantNotFound.
+	_, err = provider.RateLimitConfig(context.Background(), "missing")
+	if err != ErrTenantNotFound {
+		t.Fatalf("expected ErrTenantNotFound for unconfigured tenant, got %v", err)
 	}
-	if cfg.RequestsPerSecond != 0 || cfg.Burst != 0 {
-		t.Fatalf("expected zero config for unconfigured tenant, got %+v", cfg)
+}
+
+func TestTokenBucketRateLimiter_UnknownTenantAllowed(t *testing.T) {
+	// Unknown tenants (ErrTenantNotFound from provider) are allowed — treated as unlimited.
+	provider := NewInMemoryRateLimitProvider()
+	limiter := NewTokenBucketRateLimiter(provider)
+	res, err := limiter.Allow(context.Background(), "unknown-tenant", RateLimitRequest{})
+	if err != nil || !res.Allowed {
+		t.Fatalf("expected unknown tenant to be allowed, got err=%v res=%+v", err, res)
 	}
 }
 

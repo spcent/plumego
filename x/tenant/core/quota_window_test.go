@@ -11,7 +11,7 @@ func TestWindowQuotaManager_FallbackMinute(t *testing.T) {
 	cfg.SetTenantConfig(Config{
 		TenantID: "t-1",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 1,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 1}},
 		},
 	})
 

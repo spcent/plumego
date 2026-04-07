@@ -131,10 +131,10 @@ func TestPrepareServeAndShutdown(t *testing.T) {
 	app := New(cfg, AppDependencies{})
 
 	// Add a test route
-	mustRegisterRoute(t, app.Get("/boot-test", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/boot-test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("booted"))
-	}))
+	})))
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
@@ -182,9 +182,9 @@ func TestPrepareServeAndShutdown(t *testing.T) {
 
 func TestPrepareMarksAppStarted(t *testing.T) {
 	app := newTestApp()
-	mustRegisterRoute(t, app.Get("/boot-order", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/boot-order", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
@@ -256,9 +256,9 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 			app := New(cfg, AppDependencies{})
 
 			// Add a route to ensure handler is created
-			mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+			mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-			}))
+			})))
 
 			err := app.Prepare()
 
@@ -293,9 +293,9 @@ func TestPrepareRejectsMissingTLSFiles(t *testing.T) {
 	cfg.TLS = TLSConfig{Enabled: true}
 	app := New(cfg, AppDependencies{})
 
-	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	assertWrappedCoreError(t, app.Prepare(), "prepare_server", "TLS enabled but certificate or key file not provided")
 }
@@ -310,9 +310,9 @@ func TestServerReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
 
 func TestPrepareIsIdempotentAfterActivation(t *testing.T) {
 	app := newTestApp()
-	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
@@ -331,10 +331,10 @@ func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 
 	app := New(cfg, AppDependencies{})
 
-	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
-	}))
+	})))
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)
@@ -495,9 +495,9 @@ func TestPrepareAndShutdownDoNotDriveLoggerLifecycle(t *testing.T) {
 	cfg.Addr = addr
 	app := New(cfg, AppDependencies{Logger: logger})
 
-	mustRegisterRoute(t, app.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("prepare returned unexpected error: %v", err)

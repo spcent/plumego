@@ -19,7 +19,7 @@ const maxTenantIDLength = 255
 // underscores, and periods, with a maximum length of 255 bytes.
 func ValidateTenantID(id string) error {
 	if id == "" {
-		return ErrTenantNotFound
+		return ErrInvalidTenantID
 	}
 	if len(id) > maxTenantIDLength {
 		return fmt.Errorf("%w: exceeds maximum length of %d", ErrInvalidTenantID, maxTenantIDLength)

@@ -131,7 +131,7 @@ func TestTenantCache_GetSetDelete(t *testing.T) {
 	cache := newTenantCache(10, 1*time.Minute)
 
 	cfg := tenant.Config{TenantID: "t-123"}
-	cfg.Quota.RequestsPerMinute = 100
+	cfg.Quota.Limits = []tenant.QuotaLimit{{Window: tenant.QuotaWindowMinute, Requests: 100}}
 
 	// Set
 	cache.Set("t-123", cfg)
@@ -144,8 +144,8 @@ func TestTenantCache_GetSetDelete(t *testing.T) {
 	if got.TenantID != "t-123" {
 		t.Errorf("expected tenant ID 't-123', got %q", got.TenantID)
 	}
-	if got.Quota.RequestsPerMinute != 100 {
-		t.Errorf("expected 100 requests/min, got %d", got.Quota.RequestsPerMinute)
+	if len(got.Quota.Limits) == 0 || got.Quota.Limits[0].Requests != 100 {
+		t.Errorf("expected 100 requests/min, got %+v", got.Quota.Limits)
 	}
 
 	// Delete
@@ -325,7 +325,7 @@ func TestDBTenantConfigManager_CacheHit(t *testing.T) {
 
 	// Pre-populate cache
 	cfg := tenant.Config{TenantID: "t-123"}
-	cfg.Quota.RequestsPerMinute = 50
+	cfg.Quota.Limits = []tenant.QuotaLimit{{Window: tenant.QuotaWindowMinute, Requests: 50}}
 	m.cache.Set("t-123", cfg)
 
 	// Should return from cache even though db is nil
@@ -336,7 +336,7 @@ func TestDBTenantConfigManager_CacheHit(t *testing.T) {
 	if got.TenantID != "t-123" {
 		t.Errorf("expected tenant ID 't-123', got %q", got.TenantID)
 	}
-	if got.Quota.RequestsPerMinute != 50 {
-		t.Errorf("expected 50 requests/min, got %d", got.Quota.RequestsPerMinute)
+	if len(got.Quota.Limits) == 0 || got.Quota.Limits[0].Requests != 50 {
+		t.Errorf("expected 50 requests/min, got %+v", got.Quota.Limits)
 	}
 }

@@ -139,6 +139,12 @@ var (
 
 	// ErrConfigNil is returned when a config is nil.
 	ErrConfigNil = errors.New("config cannot be nil")
+
+	// ErrInvalidBindDst is returned when a bind destination is nil or otherwise invalid.
+	ErrInvalidBindDst = errors.New("invalid bind destination")
+
+	// ErrInvalidQueryParam is returned when a query parameter has an invalid value.
+	ErrInvalidQueryParam = errors.New("invalid query parameter")
 )
 
 // Error implements the error interface.
@@ -372,8 +378,8 @@ func (c *Ctx) MustGet(key string) (any, error) {
 	return val, nil
 }
 
-// GetRequestDuration returns the time since the request started.
-func (c *Ctx) GetRequestDuration() time.Duration {
+// RequestDuration returns the time since the request started.
+func (c *Ctx) RequestDuration() time.Duration {
 	return time.Since(c.startedAt)
 }
 
@@ -382,8 +388,8 @@ func (c *Ctx) IsCompressed() bool {
 	return c.compressionEnabled.Load()
 }
 
-// GetBodySize returns the size of the request body.
-func (c *Ctx) GetBodySize() int64 {
+// BodySize returns the size of the request body.
+func (c *Ctx) BodySize() int64 {
 	return c.bodySize.Load()
 }
 

@@ -53,6 +53,9 @@ func joinSentinel(sentinel, cause error) error {
 }
 
 func decodeJSONBody(data []byte, dst any, disallowUnknown bool) error {
+	if dst == nil {
+		return &bindError{Status: http.StatusBadRequest, Message: "bind destination must not be nil", Err: ErrInvalidBindDst}
+	}
 	if len(bytes.TrimSpace(data)) == 0 {
 		return &bindError{Status: http.StatusBadRequest, Message: ErrEmptyRequestBody.Error(), Err: ErrEmptyRequestBody}
 	}
@@ -85,7 +88,7 @@ func (c *Ctx) BindQuery(dst any) error {
 func bindQuery(values url.Values, dst any) error {
 	rv := reflect.ValueOf(dst)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return &bindError{Status: http.StatusBadRequest, Message: "bind destination must be a non-nil pointer to a struct"}
+		return &bindError{Status: http.StatusBadRequest, Message: "bind destination must be a non-nil pointer to a struct", Err: ErrInvalidBindDst}
 	}
 	rv = rv.Elem()
 	if rv.Kind() != reflect.Struct {
@@ -115,7 +118,7 @@ func bindQuery(values url.Values, dst any) error {
 			return &bindError{
 				Status:  http.StatusBadRequest,
 				Message: fmt.Sprintf("invalid query parameter %q: %v", name, err),
-				Err:     err,
+				Err:     fmt.Errorf("%w: %w", ErrInvalidQueryParam, err),
 			}
 		}
 	}

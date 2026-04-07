@@ -19,7 +19,7 @@ func TestValidateTenantID(t *testing.T) {
 		{"valid with dots", "org.team.svc", nil},
 		{"valid with underscores", "my_tenant_1", nil},
 		{"valid uuid-like", "550e8400-e29b-41d4-a716-446655440000", nil},
-		{"empty", "", ErrTenantNotFound},
+		{"empty", "", ErrInvalidTenantID},
 		{"too long", strings.Repeat("a", 256), ErrInvalidTenantID},
 		{"max length", strings.Repeat("a", 255), nil},
 		{"contains space", "tenant 123", ErrInvalidTenantID},
