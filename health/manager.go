@@ -13,12 +13,8 @@ type healthManager struct {
 	mu                sync.RWMutex
 	components        map[string]ComponentChecker
 	health            map[string]*ComponentHealth
-	history           []HealthHistoryEntry
 	config            HealthCheckConfig
-	cleanupTimer      *time.Timer
 	closed            bool
-	metrics           MetricsRecorder
-	lastCheckTime     time.Time
 	lastCheckDuration time.Duration
 
 	readinessMu sync.RWMutex
@@ -39,10 +35,6 @@ func NewHealthManager(config HealthCheckConfig) (HealthManager, error) {
 			Ready:  false,
 			Reason: "starting",
 		},
-	}
-
-	if config.AutoCleanupEnabled {
-		hm.startCleanupTimer()
 	}
 
 	return hm, nil
@@ -74,13 +66,6 @@ func (hm *healthManager) Readiness() ReadinessStatus {
 	hm.readinessMu.RLock()
 	defer hm.readinessMu.RUnlock()
 	return hm.readiness
-}
-
-// SetMetricsRecorder attaches a MetricsRecorder to this manager.
-func (hm *healthManager) SetMetricsRecorder(r MetricsRecorder) {
-	hm.mu.Lock()
-	defer hm.mu.Unlock()
-	hm.metrics = r
 }
 
 // RegisterComponent registers a health check component.
@@ -173,7 +158,6 @@ func (hm *healthManager) CheckComponent(ctx context.Context, name string) error 
 
 	checker, exists := hm.components[name]
 	config := hm.config
-	metrics := hm.metrics
 	hm.mu.RUnlock()
 
 	if !exists {
@@ -199,9 +183,6 @@ func (hm *healthManager) CheckComponent(ctx context.Context, name string) error 
 	health, healthExists := hm.health[name]
 	if !healthExists {
 		hm.mu.Unlock()
-		if metrics != nil {
-			metrics.RecordCheckWithError(name, duration, err == nil, status, err)
-		}
 		return fmt.Errorf("health status for component %s not found", name)
 	}
 
@@ -216,13 +197,8 @@ func (hm *healthManager) CheckComponent(ctx context.Context, name string) error 
 	health.Details["last_check"] = timestamp
 	health.Details["check_duration"] = duration.String()
 	health.Details["check_attempts"] = attempts
-	hm.lastCheckTime = timestamp
 	hm.lastCheckDuration = duration
 	hm.mu.Unlock()
-
-	if metrics != nil {
-		metrics.RecordCheckWithError(name, duration, err == nil, status, err)
-	}
 
 	return err
 }
@@ -324,23 +300,7 @@ func (hm *healthManager) CheckAllComponents(ctx context.Context) HealthStatus {
 	hm.readiness = readiness
 	hm.readinessMu.Unlock()
 
-	// Add to history if enabled
-	if hm.config.EnableHistory {
-		entry := HealthHistoryEntry{
-			Timestamp:  timestamp,
-			State:      getOverallState(hm.health),
-			Message:    readiness.Reason,
-			Components: components,
-			Duration:   duration,
-		}
-
-		hm.history = append(hm.history, entry)
-		hm.applyRetentionPolicy()
-	}
-
 	overallStatus, overallMessage := calculateOverallStatus(hm.health)
-
-	hm.lastCheckTime = timestamp
 	hm.lastCheckDuration = duration
 
 	return HealthStatus{
@@ -411,19 +371,6 @@ func (hm *healthManager) SetConfig(config HealthCheckConfig) error {
 
 	hm.config = config
 
-	// Restart cleanup timer if auto cleanup is enabled
-	if hm.cleanupTimer != nil {
-		hm.cleanupTimer.Stop()
-		hm.cleanupTimer = nil
-	}
-
-	if config.AutoCleanupEnabled {
-		hm.startCleanupTimer()
-	}
-
-	// Immediately run cleanup based on new settings
-	hm.cleanupHistory()
-
 	return nil
 }
 
@@ -432,28 +379,6 @@ func (hm *healthManager) GetConfig() HealthCheckConfig {
 	hm.mu.RLock()
 	defer hm.mu.RUnlock()
 	return hm.config
-}
-
-// startCleanupTimer starts the automatic cleanup timer.
-func (hm *healthManager) startCleanupTimer() {
-	if !hm.config.AutoCleanupEnabled || hm.cleanupTimer != nil || hm.closed {
-		return
-	}
-
-	hm.cleanupTimer = time.AfterFunc(hm.config.CleanupInterval, func() {
-		hm.mu.Lock()
-		hm.cleanupHistory()
-		hm.mu.Unlock()
-
-		// Schedule next cleanup if still enabled
-		hm.mu.RLock()
-		shouldContinue := hm.config.AutoCleanupEnabled && !hm.closed
-		hm.mu.RUnlock()
-
-		if shouldContinue {
-			hm.startCleanupTimer()
-		}
-	})
 }
 
 // Close stops the manager and cleans up resources.
@@ -466,11 +391,6 @@ func (hm *healthManager) Close() error {
 	}
 
 	hm.closed = true
-
-	if hm.cleanupTimer != nil {
-		hm.cleanupTimer.Stop()
-		hm.cleanupTimer = nil
-	}
 
 	return nil
 }

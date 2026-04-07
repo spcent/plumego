@@ -11,15 +11,6 @@ var errManagerClosed = errors.New("manager is closed")
 
 // validateConfig validates the health check configuration.
 func validateConfig(config HealthCheckConfig) error {
-	if config.MaxHistoryEntries < 0 {
-		return errors.New("max history entries cannot be negative")
-	}
-	if config.HistoryRetention < 0 {
-		return errors.New("history retention cannot be negative")
-	}
-	if config.CleanupInterval < 0 {
-		return errors.New("cleanup interval cannot be negative")
-	}
 	if config.Timeout < 0 {
 		return errors.New("timeout cannot be negative")
 	}

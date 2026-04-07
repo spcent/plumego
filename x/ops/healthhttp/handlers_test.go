@@ -44,12 +44,7 @@ func (e mockError) Error() string {
 }
 
 func TestSummaryHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -76,12 +71,7 @@ func TestSummaryHandler(t *testing.T) {
 }
 
 func TestDetailedHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -109,12 +99,7 @@ func TestDetailedHandler(t *testing.T) {
 }
 
 func TestComponentHealthHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -146,12 +131,7 @@ func TestComponentHealthHandler(t *testing.T) {
 }
 
 func TestAllComponentsHealthHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -177,16 +157,11 @@ func TestAllComponentsHealthHandler(t *testing.T) {
 }
 
 func TestHealthHistoryHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-		EnableHistory:      true,
-	}
-	manager, err := health.NewHealthManager(config)
+	coreManager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
+	manager := NewTracker(coreManager)
 	_ = manager.RegisterComponent(&mockChecker{name: "test", healthy: true})
 	manager.CheckAllComponents(context.Background())
 
@@ -198,7 +173,7 @@ func TestHealthHistoryHandler(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 
-	var historyEntries []health.HealthHistoryEntry
+	var historyEntries []HealthHistoryEntry
 	if err := json.Unmarshal(rr.Body.Bytes(), &historyEntries); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
@@ -221,12 +196,7 @@ func TestLiveHandler(t *testing.T) {
 }
 
 func TestComponentsListHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -251,12 +221,7 @@ func TestComponentsListHandler(t *testing.T) {
 }
 
 func TestReadinessHandlerWithManager(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -280,12 +245,7 @@ func TestReadinessHandlerWithManager(t *testing.T) {
 }
 
 func TestReadinessHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -307,12 +267,7 @@ func TestReadinessHandler(t *testing.T) {
 }
 
 func TestHealthHandlerIncludesRuntime(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -348,12 +303,7 @@ func TestHealthHandlerIncludesRuntime(t *testing.T) {
 }
 
 func TestDebugHealthHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}

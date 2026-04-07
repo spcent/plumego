@@ -10,8 +10,8 @@ import (
 // HealthResponse is the JSON body for the main health endpoint.
 type HealthResponse struct {
 	health.HealthStatus
-	BuildInfo health.BuildInfo `json:"build_info,omitempty"`
-	Runtime   *RuntimeInfo     `json:"runtime,omitempty"`
+	BuildInfo BuildInfo    `json:"build_info,omitempty"`
+	Runtime   *RuntimeInfo `json:"runtime,omitempty"`
 }
 
 // ComponentsListResponse is the JSON body for the component list endpoint.
@@ -49,7 +49,7 @@ func DetailedHandler(manager health.HealthManager) http.Handler {
 		status := manager.CheckAllComponents(ctx)
 		resp := HealthResponse{
 			HealthStatus: status,
-			BuildInfo:    health.GetBuildInfo(),
+			BuildInfo:    GetBuildInfo(),
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -75,7 +75,7 @@ func HealthHandler(manager health.HealthManager, debug bool) http.Handler {
 		status := manager.CheckAllComponents(ctx)
 		resp := HealthResponse{
 			HealthStatus: status,
-			BuildInfo:    health.GetBuildInfo(),
+			BuildInfo:    GetBuildInfo(),
 			Runtime:      getRuntimeInfo(),
 		}
 

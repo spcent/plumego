@@ -10,17 +10,14 @@ import (
 )
 
 func TestMetricsHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	tracker := health.NewMetricsTracker(manager)
-	tracker.RecordCheck("test", time.Millisecond, true, health.StatusHealthy)
+	tracker := NewTracker(manager)
+	tracker.recordComponentCheck("test", &health.ComponentHealth{
+		HealthStatus: health.HealthStatus{Status: health.StatusHealthy},
+	}, time.Millisecond, nil)
 
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	rr := httptest.NewRecorder()
@@ -35,20 +32,14 @@ func TestMetricsHandler(t *testing.T) {
 }
 
 func TestHealthReportHandler(t *testing.T) {
-	config := health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-	}
-	manager, err := health.NewHealthManager(config)
+	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
-	tracker := health.NewMetricsTracker(manager)
+	tracker := NewTracker(manager)
 
 	_ = manager.RegisterComponent(&mockChecker{name: "healthy", healthy: true})
-	tracker.RecordCheck("healthy", time.Millisecond, true, health.StatusHealthy)
-	manager.CheckAllComponents(context.Background())
+	tracker.CheckAllComponents(context.Background())
 
 	req := httptest.NewRequest("GET", "/health/report", nil)
 	rr := httptest.NewRecorder()

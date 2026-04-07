@@ -24,11 +24,6 @@ func TestBuildInfoAndReadiness(t *testing.T) {
 	if notReady.Ready || notReady.Reason != "maintenance" {
 		t.Fatalf("unexpected readiness after MarkNotReady: %+v", notReady)
 	}
-
-	info := GetBuildInfo()
-	if info.Version == "" || info.Commit == "" || info.BuildTime == "" {
-		t.Fatalf("expected build info to include defaults, got %+v", info)
-	}
 }
 
 func TestHealthStatusStates(t *testing.T) {

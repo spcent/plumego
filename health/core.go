@@ -43,38 +43,6 @@ type HealthCheckConfig struct {
 	RetryCount          int           `json:"retry_count"`
 	RetryDelay          time.Duration `json:"retry_delay"`
 	HealthCheckInterval time.Duration `json:"health_check_interval"`
-	EnableHistory       bool          `json:"enable_history"`
-	MaxHistoryEntries   int           `json:"max_history_entries"`
-	HistoryRetention    time.Duration `json:"history_retention"`
-	AutoCleanupEnabled  bool          `json:"auto_cleanup_enabled"`
-	CleanupInterval     time.Duration `json:"cleanup_interval"`
-}
-
-// BuildInfo describes the version metadata of the running binary.
-type BuildInfo struct {
-	Version   string `json:"version"`
-	Commit    string `json:"commit"`
-	BuildTime string `json:"buildTime"`
-}
-
-// These variables can be overridden at build time using -ldflags.
-var (
-	// Version reports the application version.
-	Version = "dev"
-	// Commit reports the git commit hash used for the build.
-	Commit = "none"
-	// BuildTime reports when the binary was built.
-	BuildTime = "unknown"
-)
-
-// GetBuildInfo returns the current build metadata.
-func GetBuildInfo() BuildInfo {
-	return BuildInfo{Version: Version, Commit: Commit, BuildTime: BuildTime}
-}
-
-// MetricsRecorder records individual health check executions for metrics collection.
-type MetricsRecorder interface {
-	RecordCheckWithError(name string, duration time.Duration, success bool, status HealthState, err error)
 }
 
 // ComponentRegistry handles component registration and removal.
@@ -93,24 +61,14 @@ type HealthChecker interface {
 	Readiness() ReadinessStatus
 }
 
-// HistoryQuerier provides read access to health check history.
-type HistoryQuerier interface {
-	GetHealthHistory() []HealthHistoryEntry
-	QueryHealthHistory(query HealthHistoryQuery) HealthHistoryQueryResult
-	GetHealthHistoryStats() HistoryStats
-}
-
-// HealthManager is the full management interface combining all sub-interfaces.
+// HealthManager is the in-process management interface for health state and readiness.
 type HealthManager interface {
 	ComponentRegistry
 	HealthChecker
-	HistoryQuerier
 	MarkReady()
 	MarkNotReady(reason string)
-	SetMetricsRecorder(r MetricsRecorder)
 	SetConfig(config HealthCheckConfig) error
 	GetConfig() HealthCheckConfig
-	ForceCleanup()
 	Close() error
 }
 

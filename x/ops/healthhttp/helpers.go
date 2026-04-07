@@ -47,6 +47,18 @@ func requireManager(manager health.HealthManager, w http.ResponseWriter, r *http
 	return true
 }
 
+func requireTracker(tracker *Tracker, w http.ResponseWriter, r *http.Request) bool {
+	if tracker == nil {
+		contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusServiceUnavailable).
+			Code("HEALTH_TRACKER_UNAVAILABLE").
+			Message("health tracker is not configured").
+			Build())
+		return false
+	}
+	return true
+}
+
 func httpStatusForHealth(state health.HealthState) int {
 	switch state {
 	case health.StatusUnhealthy:

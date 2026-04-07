@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/spcent/plumego/health"
 )
@@ -29,7 +28,7 @@ func TestHealthHistoryExportHandler(t *testing.T) {
 		t.Fatalf("expected content type application/json, got %s", contentType)
 	}
 
-	var result health.HealthHistoryQueryResult
+	var result HealthHistoryQueryResult
 	if err := json.Unmarshal(rr.Body.Bytes(), &result); err != nil {
 		t.Fatalf("failed to unmarshal JSON response: %v", err)
 	}
@@ -117,18 +116,14 @@ func (c *mutableChecker) Check(context.Context) error {
 
 var errUnhealthy = errors.New("unhealthy")
 
-func newHistoryManager(t *testing.T) (health.HealthManager, *mutableChecker) {
+func newHistoryManager(t *testing.T) (*Tracker, *mutableChecker) {
 	t.Helper()
 
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{
-		MaxHistoryEntries:  100,
-		HistoryRetention:   24 * time.Hour,
-		AutoCleanupEnabled: false,
-		EnableHistory:      true,
-	})
+	coreManager, err := health.NewHealthManager(health.HealthCheckConfig{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
+	manager := NewTracker(coreManager)
 
 	checker := &mutableChecker{name: "history", healthy: true}
 	if err := manager.RegisterComponent(checker); err != nil {

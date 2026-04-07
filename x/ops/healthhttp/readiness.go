@@ -64,6 +64,6 @@ func ReadinessHandlerWithManager(manager health.HealthManager) http.Handler {
 // BuildInfoHandler exposes build metadata as JSON for diagnostics and release verification.
 func BuildInfoHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_ = contract.WriteJSON(w, http.StatusOK, health.GetBuildInfo())
+		_ = contract.WriteJSON(w, http.StatusOK, GetBuildInfo())
 	})
 }

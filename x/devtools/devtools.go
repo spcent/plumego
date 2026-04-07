@@ -15,6 +15,7 @@ import (
 	"github.com/spcent/plumego/internal/config"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/x/ops/healthhttp"
 )
 
 const (
@@ -110,7 +111,7 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 	if err := r.AddRoute(http.MethodGet, "/_info", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		payload := map[string]any{
 			"config": c.snapshotMap(),
-			"build":  health.GetBuildInfo(),
+			"build":  healthhttp.GetBuildInfo(),
 		}
 		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
 	})); err != nil {

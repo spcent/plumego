@@ -27,7 +27,7 @@ func DebugHealthHandler(manager health.HealthManager, debug bool) http.Handler {
 
 		response := map[string]any{
 			"timestamp":  time.Now(),
-			"build_info": health.GetBuildInfo(),
+			"build_info": GetBuildInfo(),
 			"runtime":    getRuntimeInfo(),
 		}
 

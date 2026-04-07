@@ -11,21 +11,21 @@ import (
 	"github.com/spcent/plumego/health"
 )
 
-// HealthHistoryHandler creates a handler that returns health check history.
-func HealthHistoryHandler(manager health.HealthManager) http.Handler {
+// HealthHistoryHandler creates a handler that returns tracked health history.
+func HealthHistoryHandler(tracker *Tracker) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !requireManager(manager, w, r) {
+		if !requireTracker(tracker, w, r) {
 			return
 		}
 
-		_ = contract.WriteJSON(w, http.StatusOK, manager.GetHealthHistory())
+		_ = contract.WriteJSON(w, http.StatusOK, tracker.GetHealthHistory())
 	})
 }
 
-// HealthHistoryExportHandler creates a handler that exports health check history in various formats.
-func HealthHistoryExportHandler(manager health.HealthManager) http.Handler {
+// HealthHistoryExportHandler creates a handler that exports tracked health history in various formats.
+func HealthHistoryExportHandler(tracker *Tracker) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !requireManager(manager, w, r) {
+		if !requireTracker(tracker, w, r) {
 			return
 		}
 
@@ -44,7 +44,7 @@ func HealthHistoryExportHandler(manager health.HealthManager) http.Handler {
 			format = "json"
 		}
 
-		result := manager.QueryHealthHistory(query)
+		result := tracker.QueryHealthHistory(query)
 
 		switch format {
 		case "csv":
@@ -61,19 +61,19 @@ func HealthHistoryExportHandler(manager health.HealthManager) http.Handler {
 	})
 }
 
-// HealthHistoryStatsHandler returns statistics about health history.
-func HealthHistoryStatsHandler(manager health.HealthManager) http.Handler {
+// HealthHistoryStatsHandler returns statistics about tracked health history.
+func HealthHistoryStatsHandler(tracker *Tracker) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !requireManager(manager, w, r) {
+		if !requireTracker(tracker, w, r) {
 			return
 		}
 
-		_ = contract.WriteJSON(w, http.StatusOK, manager.GetHealthHistoryStats())
+		_ = contract.WriteJSON(w, http.StatusOK, tracker.GetHealthHistoryStats())
 	})
 }
 
-func parseHistoryQuery(r *http.Request) (health.HealthHistoryQuery, error) {
-	q := health.HealthHistoryQuery{}
+func parseHistoryQuery(r *http.Request) (HealthHistoryQuery, error) {
+	q := HealthHistoryQuery{}
 	params := r.URL.Query()
 
 	if s := params.Get("start_time"); s != "" {
@@ -126,7 +126,7 @@ func (e *invalidParamError) Error() string {
 	return e.param + ": " + e.msg
 }
 
-func writeHistoryCSV(w http.ResponseWriter, entries []health.HealthHistoryEntry) {
+func writeHistoryCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
 
