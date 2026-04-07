@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/devtools"
 )
 
@@ -167,8 +166,8 @@ func (a *Analyzer) HealthCheck() (bool, map[string]any, error) {
 
 // DevMetricsSnapshot contains dev HTTP + DB metrics.
 type DevMetricsSnapshot struct {
-	HTTP metrics.DevHTTPSnapshot `json:"http"`
-	DB   metrics.DevDBSnapshot   `json:"db"`
+	HTTP devtools.DevHTTPSnapshot `json:"http"`
+	DB   devtools.DevDBSnapshot   `json:"db"`
 }
 
 // GetDevMetrics fetches dev metrics from the application.
@@ -190,9 +189,9 @@ func (a *Analyzer) GetDevMetrics() (*DevMetricsSnapshot, error) {
 	}
 
 	var payload struct {
-		Enabled bool                    `json:"enabled"`
-		HTTP    metrics.DevHTTPSnapshot `json:"http"`
-		DB      metrics.DevDBSnapshot   `json:"db"`
+		Enabled bool                     `json:"enabled"`
+		HTTP    devtools.DevHTTPSnapshot `json:"http"`
+		DB      devtools.DevDBSnapshot   `json:"db"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {

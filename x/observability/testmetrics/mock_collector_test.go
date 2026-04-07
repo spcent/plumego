@@ -1,10 +1,12 @@
-package metrics
+package testmetrics
 
 import (
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	metrics "github.com/spcent/plumego/metrics"
 )
 
 // TestMockCollector_BasicUsage demonstrates basic MockCollector usage
@@ -258,7 +260,7 @@ func Example_mockCollector_embedding() {
 	}
 
 	mock := &customMock{
-		NoopCollector: NewNoopCollector(),
+		NoopCollector: metrics.NewNoopCollector(),
 	}
 
 	// Override only the method you want to test

@@ -50,15 +50,15 @@ func (m *customMock) ObserveHTTP(ctx context.Context, method, path string, statu
 }
 ```
 
-### 2. MockCollector for Verification (Recommended for Complex Tests)
+### 2. Metrics Test Collector for Verification (Recommended for Complex Tests)
 
-For tests that need to verify metrics calls, use `MockCollector`:
+For tests that need to verify metrics calls, use `x/observability/testmetrics.MockCollector`:
 
 ```go
-import "github.com/spcent/plumego/metrics"
+import testmetrics "github.com/spcent/plumego/x/observability/testmetrics"
 
 func TestDatabaseMetrics(t *testing.T) {
-    mock := metrics.NewMockCollector()
+    mock := testmetrics.NewMockCollector()
 
     // Use your component that records metrics
     db := NewInstrumentedDB(realDB, mock, "postgres")
@@ -89,7 +89,7 @@ For complex verification logic, use custom hooks:
 
 ```go
 func TestWithCustomVerification(t *testing.T) {
-    mock := metrics.NewMockCollector()
+    mock := testmetrics.NewMockCollector()
 
     // Set up custom hook
     var capturedQuery string
@@ -140,10 +140,10 @@ func newMockMetricsCollector() *mockMetricsCollector {
 }
 ```
 
-**Option 2: Use built-in MockCollector**
+**Option 2: Use x/observability/testmetrics.MockCollector**
 ```go
-// Just use the built-in one
-mock := metrics.NewMockCollector()
+// Just use the dedicated metrics test helper package
+mock := testmetrics.NewMockCollector()
 ```
 
 ## Best Practices
@@ -152,7 +152,7 @@ mock := metrics.NewMockCollector()
    - When you just need a valid MetricsCollector instance
    - When you don't care about verifying metrics calls
 
-2. **Use MockCollector for verification**
+2. **Use x/observability/testmetrics.MockCollector for verification**
    - When you need to assert metrics were recorded
    - When you need to check call counts or parameters
 
@@ -189,7 +189,7 @@ func TestMyComponent_Simple(t *testing.T) {
 
 func TestMyComponent_WithVerification(t *testing.T) {
     // Advanced: verify metrics
-    mock := metrics.NewMockCollector()
+    mock := testmetrics.NewMockCollector()
 
     component := NewMyComponent(mock)
     component.RecordData()
@@ -207,7 +207,7 @@ func TestMyComponent_WithVerification(t *testing.T) {
 
 func TestMyComponent_WithHooks(t *testing.T) {
     // Expert: custom validation
-    mock := metrics.NewMockCollector()
+    mock := testmetrics.NewMockCollector()
 
     sawSlowQuery := false
     mock.OnObserveDB = func(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
@@ -232,11 +232,11 @@ type mockCollector struct {
 
 ## Thread Safety
 
-Both `NoopCollector` and `MockCollector` are thread-safe and can be used in concurrent tests.
+Both `NoopCollector` and `x/observability/testmetrics.MockCollector` are thread-safe and can be used in concurrent tests.
 
 ```go
 func TestConcurrent(t *testing.T) {
-    mock := metrics.NewMockCollector()
+    mock := testmetrics.NewMockCollector()
 
     var wg sync.WaitGroup
     for i := 0; i < 100; i++ {
@@ -259,9 +259,9 @@ func TestConcurrent(t *testing.T) {
 | Scenario | Recommended Approach |
 |----------|---------------------|
 | Simple no-op mock | Embed `NoopCollector` |
-| Verify call counts | Use `MockCollector` |
-| Verify call parameters | Use `MockCollector.GetXXXCalls()` |
-| Custom validation logic | Use `MockCollector` with hooks |
+| Verify call counts | Use `testmetrics.MockCollector` |
+| Verify call parameters | Use `testmetrics.MockCollector.GetXXXCalls()` |
+| Custom validation logic | Use `testmetrics.MockCollector` with hooks |
 | Override single method | Embed `NoopCollector`, override one method |
 
 The new approach eliminates boilerplate and makes tests more maintainable. When new methods are added to `MetricsCollector`, your existing test mocks will continue to work without modifications.

@@ -1,6 +1,6 @@
 package devserver
 
-import "github.com/spcent/plumego/metrics"
+import "github.com/spcent/plumego/x/devtools"
 
 // RequestAlertThresholds defines default alert thresholds.
 type RequestAlertThresholds struct {
@@ -37,7 +37,7 @@ func defaultAlertThresholds() RequestAlertThresholds {
 	}
 }
 
-func evaluateRequestAlerts(snapshot *metrics.DevHTTPSnapshot) ([]RequestAlert, RequestAlertThresholds) {
+func evaluateRequestAlerts(snapshot *devtools.DevHTTPSnapshot) ([]RequestAlert, RequestAlertThresholds) {
 	thresholds := defaultAlertThresholds()
 	if snapshot == nil {
 		return nil, thresholds

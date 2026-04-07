@@ -13,7 +13,7 @@ other modules can depend on safely.
 ## Use this module when
 
 - changing collector contracts
-- adding base metrics helpers
+- adding base collectors or aggregate collector composition
 - wiring stable instrumentation against `Recorder` or the focused observer interfaces
 
 ## Do not use this module for
@@ -21,19 +21,24 @@ other modules can depend on safely.
 - Prometheus or tracing implementations
 - dev-only dashboard collectors
 - feature-specific metrics reporters or exporters
+- rolling-window aggregation helpers
+- repo-wide metrics test helpers
 - app bootstrap
 
 ## First files to read
 
 - `metrics/module.yaml`
 - `metrics/collector.go`
-- `metrics/helpers.go`
+- `metrics/multi.go`
 - owning extension docs when the change is implementation-specific
 
 ## Canonical change shape
 
 - keep collector APIs small
 - keep base collectors generic and transport-agnostic
+- keep only aggregate collector composition in stable `metrics`
 - keep Prometheus and tracing adapters in `x/observability`
+- keep rolling-window aggregation in `x/observability/windowmetrics`
+- keep metrics test helpers in `x/observability/testmetrics`
 - keep dev-only collectors in `x/devtools`
 - keep feature-specific metrics ownership in the owning extension

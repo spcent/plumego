@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
+	testmetrics "github.com/spcent/plumego/x/observability/testmetrics"
 )
 
 func TestReporterRecords(t *testing.T) {
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	reporter := NewSMSMetricsReporter(collector)
 
 	ctx := context.Background()

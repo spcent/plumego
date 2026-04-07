@@ -16,6 +16,7 @@ responsibilities:
   - Observability adapters
   - Optional instrumentation helpers
   - Export pipeline wiring
+  - Non-stable observability support helpers such as rolling-window aggregation and metrics testkits
 
 non_goals:
   - Core bootstrap ownership

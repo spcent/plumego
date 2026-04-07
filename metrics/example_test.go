@@ -19,20 +19,6 @@ func ExampleBaseMetricsCollector() {
 	// records=1 errors=0
 }
 
-func ExampleMeasureFunc() {
-	collector := metrics.NewBaseMetricsCollector()
-
-	_ = metrics.MeasureFunc(context.Background(), collector, "cache_fill", func() error {
-		time.Sleep(5 * time.Millisecond)
-		return nil
-	})
-
-	fmt.Println(len(collector.GetRecords()) > 0)
-
-	// Output:
-	// true
-}
-
 func ExampleNewMultiCollector() {
 	left := metrics.NewBaseMetricsCollector()
 	right := metrics.NewBaseMetricsCollector()

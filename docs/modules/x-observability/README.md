@@ -13,6 +13,7 @@
 
 - the task is exporter or adapter integration work
 - the task is broader diagnostics or telemetry pipeline wiring
+- the task is moving non-stable observability helpers or metrics test utilities out of stable roots
 
 ## Do not use this module for
 
@@ -31,3 +32,5 @@
 - keep export wiring explicit
 - keep adapter-local behavior reviewable
 - keep transport observability primitives in stable `middleware/*`
+- keep rolling-window aggregation helpers in `x/observability/windowmetrics`
+- keep metrics test utilities in `x/observability/testmetrics`

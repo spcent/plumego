@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
+	windowmetrics "github.com/spcent/plumego/x/observability/windowmetrics"
 )
 
 // DevCollectorConfig configures the dev metrics collector.
@@ -56,14 +57,14 @@ type DevHTTPStatusCounts struct {
 
 // DevHTTPSeries is the aggregated stats for a route or total series.
 type DevHTTPSeries struct {
-	Method     string                  `json:"method"`
-	Path       string                  `json:"path"`
-	Count      int64                   `json:"count"`
-	ErrorCount int64                   `json:"error_count"`
-	Status     DevHTTPStatusCounts     `json:"status"`
-	Duration   metrics.AggregatorStats `json:"duration_ms"`
-	Bytes      metrics.AggregatorStats `json:"bytes"`
-	LastSeen   time.Time               `json:"last_seen,omitempty"`
+	Method     string                        `json:"method"`
+	Path       string                        `json:"path"`
+	Count      int64                         `json:"count"`
+	ErrorCount int64                         `json:"error_count"`
+	Status     DevHTTPStatusCounts           `json:"status"`
+	Duration   windowmetrics.AggregatorStats `json:"duration_ms"`
+	Bytes      windowmetrics.AggregatorStats `json:"bytes"`
+	LastSeen   time.Time                     `json:"last_seen,omitempty"`
 }
 
 // DevHTTPSnapshot is the JSON payload for dev HTTP metrics.
@@ -90,14 +91,14 @@ type DevDBQuerySample struct {
 
 // DevDBSeries is the aggregated stats for DB operations.
 type DevDBSeries struct {
-	Operation  string                  `json:"operation"`
-	Driver     string                  `json:"driver"`
-	Table      string                  `json:"table,omitempty"`
-	Count      int64                   `json:"count"`
-	ErrorCount int64                   `json:"error_count"`
-	Duration   metrics.AggregatorStats `json:"duration_ms"`
-	Rows       metrics.AggregatorStats `json:"rows"`
-	LastSeen   time.Time               `json:"last_seen,omitempty"`
+	Operation  string                        `json:"operation"`
+	Driver     string                        `json:"driver"`
+	Table      string                        `json:"table,omitempty"`
+	Count      int64                         `json:"count"`
+	ErrorCount int64                         `json:"error_count"`
+	Duration   windowmetrics.AggregatorStats `json:"duration_ms"`
+	Rows       windowmetrics.AggregatorStats `json:"rows"`
+	LastSeen   time.Time                     `json:"last_seen,omitempty"`
 }
 
 // DevDBSnapshot is the JSON payload for dev DB metrics.
@@ -590,12 +591,12 @@ func (b *statBucket) record(value float64) {
 	}
 }
 
-func (b *statBucket) snapshot() metrics.AggregatorStats {
+func (b *statBucket) snapshot() windowmetrics.AggregatorStats {
 	if b.count == 0 {
-		return metrics.AggregatorStats{}
+		return windowmetrics.AggregatorStats{}
 	}
 
-	stats := metrics.AggregatorStats{
+	stats := windowmetrics.AggregatorStats{
 		Count: b.count,
 		Sum:   b.sum,
 		Min:   b.min,

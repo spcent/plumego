@@ -11,12 +11,14 @@ strict_boundary: metrics_contracts
 responsibilities:
   - Metrics collector interfaces
   - Base collectors
-  - Minimal observability support contracts
+  - Minimal aggregate collector composition
 
 non_goals:
   - App bootstrap
   - Feature-specific dashboards
   - Transport policy
+  - Rolling-window aggregation helpers
+  - Repo-wide metrics test utilities
   - Export pipeline wiring and adapters (belong in x/observability)
 
 public_entrypoints:
@@ -54,8 +56,6 @@ review_checklist:
   - Avoid feature coupling
 
 agent_hints:
-  - Observability capability packs belong outside the stable layer
-  - Keep transport-specific logic out
-  - For Prometheus exposition and tracing implementations use x/observability
-  - For dev-only collectors use x/devtools
-  - For messaging-specific metrics reporters and exporters use x/messaging
+  - Observability capability packs and transport-specific logic belong outside the stable layer
+  - Use x/observability for Prometheus, tracing, rolling-window aggregation, and metrics test helpers
+  - Use x/devtools for dev-only collectors and x/messaging for messaging-specific reporters/exporters

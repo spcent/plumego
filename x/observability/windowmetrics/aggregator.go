@@ -1,4 +1,4 @@
-package metrics
+package windowmetrics
 
 import (
 	"sort"
@@ -13,9 +13,9 @@ import (
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/metrics"
+//	import "github.com/spcent/plumego/x/observability/windowmetrics"
 //
-//	agg := metrics.NewAggregator(1 * time.Minute)
+//	agg := windowmetrics.NewAggregator(1 * time.Minute)
 //
 //	// Record values
 //	agg.Record("api_latency", 50.0)
@@ -69,11 +69,11 @@ type AggregatorStats struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/metrics"
+//	import "github.com/spcent/plumego/x/observability/windowmetrics"
 //
 //	// Aggregate metrics over a rolling 5-minute window,
 //	// capped to the newest 10,000 samples per metric.
-//	agg := metrics.NewAggregator(5 * time.Minute)
+//	agg := windowmetrics.NewAggregator(5 * time.Minute)
 func NewAggregator(window time.Duration) *Aggregator {
 	return &Aggregator{
 		mu:      &sync.RWMutex{},
@@ -87,9 +87,9 @@ func NewAggregator(window time.Duration) *Aggregator {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/metrics"
+//	import "github.com/spcent/plumego/x/observability/windowmetrics"
 //
-//	agg := metrics.NewAggregator(1 * time.Minute)
+//	agg := windowmetrics.NewAggregator(1 * time.Minute)
 //	agg.Record("request_duration", 50.5)
 //	agg.Record("request_duration", 75.2)
 func (a *Aggregator) Record(name string, value float64) {
@@ -124,9 +124,9 @@ func (a *Aggregator) Record(name string, value float64) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/metrics"
+//	import "github.com/spcent/plumego/x/observability/windowmetrics"
 //
-//	agg := metrics.NewAggregator(1 * time.Minute)
+//	agg := windowmetrics.NewAggregator(1 * time.Minute)
 //	agg.Record("latency", 50.0)
 //	agg.Record("latency", 75.0)
 //
@@ -213,9 +213,9 @@ func (b *bucket) evictExpired(window time.Duration, now time.Time) {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/metrics"
+//	import "github.com/spcent/plumego/x/observability/windowmetrics"
 //
-//	agg := metrics.NewAggregator(1 * time.Minute)
+//	agg := windowmetrics.NewAggregator(1 * time.Minute)
 //	// ... record metrics ...
 //	agg.Clear()
 func (a *Aggregator) Clear() {
@@ -229,9 +229,9 @@ func (a *Aggregator) Clear() {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/metrics"
+//	import "github.com/spcent/plumego/x/observability/windowmetrics"
 //
-//	agg := metrics.NewAggregator(1 * time.Minute)
+//	agg := windowmetrics.NewAggregator(1 * time.Minute)
 //	agg.Record("latency", 50.0)
 //	agg.Record("throughput", 1000.0)
 //

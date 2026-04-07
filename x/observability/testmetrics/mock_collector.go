@@ -1,9 +1,19 @@
-package metrics
+package testmetrics
 
 import (
 	"context"
 	"sync"
 	"time"
+
+	metrics "github.com/spcent/plumego/metrics"
+)
+
+type (
+	AggregateCollector = metrics.AggregateCollector
+	CollectorStats     = metrics.CollectorStats
+	MetricRecord       = metrics.MetricRecord
+	MetricType         = metrics.MetricType
+	NoopCollector      = metrics.NoopCollector
 )
 
 // MockCollector is a configurable mock implementation of AggregateCollector for testing.
@@ -27,7 +37,7 @@ import (
 //
 // Example - Advanced usage with MockCollector:
 //
-//	mock := metrics.NewMockCollector()
+//	mock := testmetrics.NewMockCollector()
 //	mock.OnObserveHTTP = func(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 //	    // Verify expected values
 //	    if method != "GET" {
@@ -122,7 +132,7 @@ type PubSubCall struct {
 //
 // Example:
 //
-//	mock := metrics.NewMockCollector()
+//	mock := testmetrics.NewMockCollector()
 //	mock.OnObserveHTTP = func(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 //	    // Custom verification logic
 //	}

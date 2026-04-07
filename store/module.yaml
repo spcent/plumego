@@ -65,6 +65,5 @@ review_checklist:
 
 agent_hints:
   - Move tenant-aware adapters to x/tenant/store
-  - For distributed or provider-specific cache needs use x/cache (distributed, redis)
-  - For ranked-data cache behavior use x/cache/leaderboard; for HTTP response caching use x/gateway/cache
-  - Do not add topology-heavy, provider-heavy, or business-level idempotency logic here; store/idempotency is a transport-agnostic dedup primitive only
+  - For distributed or provider-specific cache needs use x/cache; for HTTP response caching use x/gateway/cache
+  - For ranked-data cache behavior use x/cache/leaderboard; do not add topology-heavy, provider-heavy, or business-level idempotency logic here

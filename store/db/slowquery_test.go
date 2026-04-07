@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
+	testmetrics "github.com/spcent/plumego/x/observability/testmetrics"
 )
 
 func TestSlowQueryDetector_Check(t *testing.T) {
@@ -222,7 +222,7 @@ func TestSlowQueryDetector_Concurrency(t *testing.T) {
 
 func TestSlowQueryMetricsObserver(t *testing.T) {
 	callbackCalled := false
-	base := metrics.NewMockCollector()
+	base := testmetrics.NewMockCollector()
 
 	collector := NewSlowQueryMetricsObserver(
 		base,

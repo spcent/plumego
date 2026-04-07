@@ -58,6 +58,5 @@ review_checklist:
 
 agent_hints:
   - Health is a support package, not an app feature catalog
-  - Keep transport concerns elsewhere
+  - Keep transport concerns and health HTTP surfaces in reference or extension packages, not here
   - Keep build info, history export, and metrics/reporting in owning extensions such as x/ops/healthhttp
-  - Prefer reference or extension packages for health HTTP surfaces; do not add HTTP handlers here

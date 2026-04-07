@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
+	testmetrics "github.com/spcent/plumego/x/observability/testmetrics"
 )
 
 // mockDB is a configurable stub connection (driver.Conn + driver.Pinger) for metrics tests.
@@ -101,7 +101,7 @@ func newMockDB(opts ...func(*mockDB)) *sql.DB {
 func TestNewInstrumentedDB(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
@@ -124,7 +124,7 @@ func TestInstrumentedDB_ExecContext(t *testing.T) {
 		m.rowsAffected = 3
 	})
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "mysql")
 
 	ctx := context.Background()
@@ -169,7 +169,7 @@ func TestInstrumentedDB_ExecContext_Error(t *testing.T) {
 		m.execErr = execErr
 	})
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -197,7 +197,7 @@ func TestInstrumentedDB_ExecContext_Error(t *testing.T) {
 func TestInstrumentedDB_QueryContext(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -232,7 +232,7 @@ func TestInstrumentedDB_QueryContext_Error(t *testing.T) {
 		m.queryErr = queryErr
 	})
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -257,7 +257,7 @@ func TestInstrumentedDB_QueryContext_Error(t *testing.T) {
 func TestInstrumentedDB_QueryRowContext(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -285,7 +285,7 @@ func TestInstrumentedDB_QueryRowContext(t *testing.T) {
 func TestInstrumentedDB_BeginTx(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -320,7 +320,7 @@ func TestInstrumentedDB_BeginTx_Error(t *testing.T) {
 		m.beginErr = beginErr
 	})
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -345,7 +345,7 @@ func TestInstrumentedDB_BeginTx_Error(t *testing.T) {
 func TestInstrumentedDB_PingContext(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -379,7 +379,7 @@ func TestInstrumentedDB_PingContext_Error(t *testing.T) {
 		m.pingErr = pingErr
 	})
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -399,7 +399,7 @@ func TestInstrumentedDB_PingContext_Error(t *testing.T) {
 
 func TestInstrumentedDB_Close(t *testing.T) {
 	db := newMockDB()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	err := idb.Close()
@@ -449,7 +449,7 @@ func TestInstrumentedDB_NilCollector(t *testing.T) {
 func TestInstrumentedDB_RecordPoolStats(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -498,7 +498,7 @@ func TestInstrumentedDB_Stats(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
 	db.SetMaxOpenConns(20)
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	stats := idb.Stats()
@@ -510,7 +510,7 @@ func TestInstrumentedDB_Stats(t *testing.T) {
 func TestInstrumentedDB_SetPoolConfig(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	idb.SetMaxOpenConns(15)
@@ -527,7 +527,7 @@ func TestInstrumentedDB_SetPoolConfig(t *testing.T) {
 func TestInstrumentedDB_Unwrap(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	unwrapped := idb.Unwrap()
@@ -539,7 +539,7 @@ func TestInstrumentedDB_Unwrap(t *testing.T) {
 func TestInstrumentedDB_MultipleOperations(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -577,7 +577,7 @@ func TestInstrumentedDB_ErrorTracking(t *testing.T) {
 		m.queryErr = queryErr
 	})
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	ctx := context.Background()
@@ -602,7 +602,7 @@ func TestInstrumentedDB_ErrorTracking(t *testing.T) {
 func TestInstrumentedDB_InterfaceCompliance(t *testing.T) {
 	db := newMockDB()
 	defer db.Close()
-	collector := metrics.NewMockCollector()
+	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
 	// Verify it implements DB interface

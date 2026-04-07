@@ -632,9 +632,11 @@ func TestMultiWriter(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 	std.SetOutput(os.Stderr)
+	done := make(chan struct{})
 
 	go func() {
-		io.Copy(&stderrBuf, r)
+		_, _ = io.Copy(&stderrBuf, r)
+		close(done)
 	}()
 
 	infoDefault("test multi writer message")
@@ -643,8 +645,7 @@ func TestMultiWriter(t *testing.T) {
 	w.Close()
 	os.Stderr = oldStderr
 	std.SetOutput(oldOutput)
-
-	time.Sleep(100 * time.Millisecond) // Wait for the goroutine to finish
+	<-done
 
 	// Verify stderr has output
 	stderrOutput := stderrBuf.String()

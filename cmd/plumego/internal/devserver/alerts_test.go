@@ -3,26 +3,27 @@ package devserver
 import (
 	"testing"
 
-	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/x/devtools"
+	windowmetrics "github.com/spcent/plumego/x/observability/windowmetrics"
 )
 
 func TestEvaluateRequestAlerts(t *testing.T) {
-	snapshot := &metrics.DevHTTPSnapshot{
-		Total: metrics.DevHTTPSeries{
+	snapshot := &devtools.DevHTTPSnapshot{
+		Total: devtools.DevHTTPSeries{
 			Count:      100,
 			ErrorCount: 5,
-			Duration: metrics.AggregatorStats{
+			Duration: windowmetrics.AggregatorStats{
 				P95: 600,
 				P99: 1500,
 			},
 		},
-		Routes: []metrics.DevHTTPSeries{
+		Routes: []devtools.DevHTTPSeries{
 			{
 				Method:     "GET",
 				Path:       "/slow",
 				Count:      20,
 				ErrorCount: 2,
-				Duration: metrics.AggregatorStats{
+				Duration: windowmetrics.AggregatorStats{
 					P95: 800,
 				},
 			},
