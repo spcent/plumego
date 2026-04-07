@@ -33,6 +33,7 @@
 - keep interfaces narrow
 - keep concurrent behavior testable
 - move topology-heavy features to owning extensions
+- keep DB analytics, summaries, and slow-query inspection out of `store/db`; route them to `x/observability/dbinsights`
 - keep HTTP response caching and request-derived cache keys out of `store/cache`
 
 ## File Boundary

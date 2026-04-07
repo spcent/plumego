@@ -34,3 +34,4 @@
 - keep transport observability primitives in stable `middleware/*`
 - keep rolling-window aggregation helpers in `x/observability/windowmetrics`
 - keep metrics test utilities in `x/observability/testmetrics`
+- keep DB analytics and slow-query helpers in `x/observability/dbinsights`

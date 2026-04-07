@@ -1,4 +1,4 @@
-package db
+package dbinsights
 
 import (
 	"context"
@@ -6,18 +6,19 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	storedb "github.com/spcent/plumego/store/db"
 )
 
 const (
-	OP_SELECT = "SELECT"
-	OP_UPDATE = "UPDATE"
-	OP_INSERT = "INSERT"
-	OP_DELETE = "DELETE"
+	opSelect = "SELECT"
+	opUpdate = "UPDATE"
+	opInsert = "INSERT"
+	opDelete = "DELETE"
 )
 
 // QueryStats tracks statistics for database queries.
 type QueryStats struct {
-	// Query metrics
 	TotalQueries   int64         `json:"total_queries"`
 	SuccessQueries int64         `json:"success_queries"`
 	FailedQueries  int64         `json:"failed_queries"`
@@ -26,213 +27,14 @@ type QueryStats struct {
 	MaxDuration    time.Duration `json:"max_duration"`
 	AvgDuration    time.Duration `json:"avg_duration"`
 
-	// Query type breakdown
 	SelectQueries int64 `json:"select_queries"`
 	InsertQueries int64 `json:"insert_queries"`
 	UpdateQueries int64 `json:"update_queries"`
 	DeleteQueries int64 `json:"delete_queries"`
 
-	// Slow query tracking
 	SlowQueries     int64         `json:"slow_queries"`
 	SlowQueryThresh time.Duration `json:"slow_query_threshold"`
-
-	// Last update
-	LastUpdate time.Time `json:"last_update"`
-}
-
-// DBStatsAggregator aggregates database statistics from metrics.
-// It provides a higher-level view of database performance by aggregating
-// metrics across operations, tables, and time windows.
-type DBStatsAggregator struct {
-	mu sync.RWMutex
-
-	// Global stats
-	global QueryStats
-
-	// Per-operation stats
-	byOperation map[string]QueryStats
-
-	// Per-table stats (extracted from queries)
-	byTable map[string]QueryStats
-
-	// Slow query threshold
-	slowQueryThreshold time.Duration
-
-	// Tracking
-	startTime time.Time
-}
-
-// NewDBStatsAggregator creates a new database statistics aggregator.
-func NewDBStatsAggregator(slowQueryThreshold time.Duration) *DBStatsAggregator {
-	if slowQueryThreshold == 0 {
-		slowQueryThreshold = 1 * time.Second // default
-	}
-
-	return &DBStatsAggregator{
-		byOperation:        make(map[string]QueryStats),
-		byTable:            make(map[string]QueryStats),
-		slowQueryThreshold: slowQueryThreshold,
-		startTime:          time.Now(),
-	}
-}
-
-// RecordQuery records a query execution.
-func (a *DBStatsAggregator) RecordQuery(operation, query string, duration time.Duration, err error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	now := time.Now()
-	queryType := detectQueryType(query)
-
-	// Update global stats
-	a.updateStats(&a.global, operation, duration, err, now)
-	a.updateQueryType(&a.global, queryType)
-
-	// Update per-operation stats
-	opStats := a.byOperation[operation]
-	a.updateStats(&opStats, operation, duration, err, now)
-	a.updateQueryType(&opStats, queryType)
-	a.byOperation[operation] = opStats
-
-	// Extract table name and update per-table stats
-	if table := extractTableName(query); table != "" {
-		tableStats := a.byTable[table]
-		a.updateStats(&tableStats, operation, duration, err, now)
-		a.updateQueryType(&tableStats, queryType)
-		a.byTable[table] = tableStats
-	}
-}
-
-func (a *DBStatsAggregator) updateStats(stats *QueryStats, operation string, duration time.Duration, err error, now time.Time) {
-	stats.TotalQueries++
-	stats.LastUpdate = now
-	operation = strings.TrimSpace(strings.ToUpper(operation))
-	switch operation {
-	case OP_SELECT:
-		stats.SelectQueries++
-	case OP_INSERT:
-		stats.InsertQueries++
-	case OP_UPDATE:
-		stats.UpdateQueries++
-	case OP_DELETE:
-		stats.DeleteQueries++
-	}
-
-	if err == nil {
-		stats.SuccessQueries++
-	} else {
-		stats.FailedQueries++
-	}
-
-	stats.TotalDuration += duration
-
-	if stats.MinDuration == 0 || duration < stats.MinDuration {
-		stats.MinDuration = duration
-	}
-	if duration > stats.MaxDuration {
-		stats.MaxDuration = duration
-	}
-
-	if stats.TotalQueries > 0 {
-		stats.AvgDuration = stats.TotalDuration / time.Duration(stats.TotalQueries)
-	}
-
-	// Track slow queries
-	if duration >= a.slowQueryThreshold {
-		stats.SlowQueries++
-	}
-	stats.SlowQueryThresh = a.slowQueryThreshold
-}
-
-func (a *DBStatsAggregator) updateQueryType(stats *QueryStats, queryType string) {
-	switch queryType {
-	case OP_SELECT:
-		stats.SelectQueries++
-	case OP_INSERT:
-		stats.InsertQueries++
-	case OP_UPDATE:
-		stats.UpdateQueries++
-	case OP_DELETE:
-		stats.DeleteQueries++
-	}
-}
-
-func detectQueryType(query string) string {
-	if query == "" {
-		return ""
-	}
-
-	query = strings.TrimSpace(strings.ToUpper(query))
-
-	if strings.HasPrefix(query, OP_SELECT) {
-		return OP_SELECT
-	}
-	if strings.HasPrefix(query, OP_INSERT) {
-		return OP_INSERT
-	}
-	if strings.HasPrefix(query, OP_UPDATE) {
-		return OP_UPDATE
-	}
-	if strings.HasPrefix(query, OP_DELETE) {
-		return OP_DELETE
-	}
-
-	return ""
-}
-
-// GetGlobalStats returns global statistics.
-func (a *DBStatsAggregator) GetGlobalStats() QueryStats {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	return a.global
-}
-
-// GetOperationStats returns statistics for a specific operation.
-func (a *DBStatsAggregator) GetOperationStats(operation string) (QueryStats, bool) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	stats, ok := a.byOperation[operation]
-	return stats, ok
-}
-
-// GetAllOperationStats returns statistics for all operations.
-func (a *DBStatsAggregator) GetAllOperationStats() map[string]QueryStats {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	result := make(map[string]QueryStats, len(a.byOperation))
-	for k, v := range a.byOperation {
-		result[k] = v
-	}
-	return result
-}
-
-// GetTableStats returns statistics for a specific table.
-func (a *DBStatsAggregator) GetTableStats(table string) (QueryStats, bool) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	stats, ok := a.byTable[table]
-	return stats, ok
-}
-
-// GetAllTableStats returns statistics for all tables.
-func (a *DBStatsAggregator) GetAllTableStats() map[string]QueryStats {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	result := make(map[string]QueryStats, len(a.byTable))
-	for k, v := range a.byTable {
-		result[k] = v
-	}
-	return result
-}
-
-// GetTopSlowTables returns the top N tables by slow query count.
-func (a *DBStatsAggregator) GetTopSlowTables(n int) []TableStat {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	return a.getTopSlowTablesLocked(n)
+	LastUpdate      time.Time     `json:"last_update"`
 }
 
 // TableStat represents statistics for a single table.
@@ -243,8 +45,172 @@ type TableStat struct {
 	TotalQueries int64         `json:"total_queries"`
 }
 
+// Aggregator aggregates database statistics from metrics.
+type Aggregator struct {
+	mu sync.RWMutex
+
+	global             QueryStats
+	byOperation        map[string]QueryStats
+	byTable            map[string]QueryStats
+	slowQueryThreshold time.Duration
+	startTime          time.Time
+}
+
+// NewAggregator creates a new database statistics aggregator.
+func NewAggregator(slowQueryThreshold time.Duration) *Aggregator {
+	if slowQueryThreshold == 0 {
+		slowQueryThreshold = time.Second
+	}
+
+	return &Aggregator{
+		byOperation:        make(map[string]QueryStats),
+		byTable:            make(map[string]QueryStats),
+		slowQueryThreshold: slowQueryThreshold,
+		startTime:          time.Now(),
+	}
+}
+
+// RecordQuery records a query execution.
+func (a *Aggregator) RecordQuery(operation, query string, duration time.Duration, err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	now := time.Now()
+	queryType := detectQueryType(query)
+
+	a.updateStats(&a.global, duration, err, now)
+	a.updateQueryType(&a.global, queryType)
+
+	opStats := a.byOperation[operation]
+	a.updateStats(&opStats, duration, err, now)
+	a.updateQueryType(&opStats, queryType)
+	a.byOperation[operation] = opStats
+
+	if table := extractTableName(query); table != "" {
+		tableStats := a.byTable[table]
+		a.updateStats(&tableStats, duration, err, now)
+		a.updateQueryType(&tableStats, queryType)
+		a.byTable[table] = tableStats
+	}
+}
+
+func (a *Aggregator) updateStats(stats *QueryStats, duration time.Duration, err error, now time.Time) {
+	stats.TotalQueries++
+	stats.LastUpdate = now
+
+	if err == nil {
+		stats.SuccessQueries++
+	} else {
+		stats.FailedQueries++
+	}
+
+	stats.TotalDuration += duration
+	if stats.MinDuration == 0 || duration < stats.MinDuration {
+		stats.MinDuration = duration
+	}
+	if duration > stats.MaxDuration {
+		stats.MaxDuration = duration
+	}
+	if stats.TotalQueries > 0 {
+		stats.AvgDuration = stats.TotalDuration / time.Duration(stats.TotalQueries)
+	}
+	if duration >= a.slowQueryThreshold {
+		stats.SlowQueries++
+	}
+	stats.SlowQueryThresh = a.slowQueryThreshold
+}
+
+func (a *Aggregator) updateQueryType(stats *QueryStats, queryType string) {
+	switch queryType {
+	case opSelect:
+		stats.SelectQueries++
+	case opInsert:
+		stats.InsertQueries++
+	case opUpdate:
+		stats.UpdateQueries++
+	case opDelete:
+		stats.DeleteQueries++
+	}
+}
+
+func detectQueryType(query string) string {
+	if query == "" {
+		return ""
+	}
+
+	query = strings.TrimSpace(strings.ToUpper(query))
+	if strings.HasPrefix(query, opSelect) {
+		return opSelect
+	}
+	if strings.HasPrefix(query, opInsert) {
+		return opInsert
+	}
+	if strings.HasPrefix(query, opUpdate) {
+		return opUpdate
+	}
+	if strings.HasPrefix(query, opDelete) {
+		return opDelete
+	}
+	return ""
+}
+
+// GetGlobalStats returns global statistics.
+func (a *Aggregator) GetGlobalStats() QueryStats {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.global
+}
+
+// GetOperationStats returns statistics for a specific operation.
+func (a *Aggregator) GetOperationStats(operation string) (QueryStats, bool) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	stats, ok := a.byOperation[operation]
+	return stats, ok
+}
+
+// GetAllOperationStats returns statistics for all operations.
+func (a *Aggregator) GetAllOperationStats() map[string]QueryStats {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	result := make(map[string]QueryStats, len(a.byOperation))
+	for key, value := range a.byOperation {
+		result[key] = value
+	}
+	return result
+}
+
+// GetTableStats returns statistics for a specific table.
+func (a *Aggregator) GetTableStats(table string) (QueryStats, bool) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	stats, ok := a.byTable[table]
+	return stats, ok
+}
+
+// GetAllTableStats returns statistics for all tables.
+func (a *Aggregator) GetAllTableStats() map[string]QueryStats {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	result := make(map[string]QueryStats, len(a.byTable))
+	for key, value := range a.byTable {
+		result[key] = value
+	}
+	return result
+}
+
+// GetTopSlowTables returns the top N tables by slow query count.
+func (a *Aggregator) GetTopSlowTables(n int) []TableStat {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	return a.getTopSlowTablesLocked(n)
+}
+
 // Reset resets all statistics.
-func (a *DBStatsAggregator) Reset() {
+func (a *Aggregator) Reset() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -255,16 +221,14 @@ func (a *DBStatsAggregator) Reset() {
 }
 
 // Summary returns a formatted summary of all statistics.
-func (a *DBStatsAggregator) Summary() string {
+func (a *Aggregator) Summary() string {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
 	var sb strings.Builder
-
 	sb.WriteString("=== Database Statistics Summary ===\n\n")
 	sb.WriteString(fmt.Sprintf("Uptime: %s\n", time.Since(a.startTime).Round(time.Second)))
 	sb.WriteString(fmt.Sprintf("Slow Query Threshold: %s\n\n", a.slowQueryThreshold))
-
 	sb.WriteString("Global Stats:\n")
 	sb.WriteString(formatQueryStats(a.global))
 	sb.WriteString("\n")
@@ -290,7 +254,7 @@ func (a *DBStatsAggregator) Summary() string {
 	return sb.String()
 }
 
-func (a *DBStatsAggregator) getTopSlowTablesLocked(n int) []TableStat {
+func (a *Aggregator) getTopSlowTablesLocked(n int) []TableStat {
 	tables := make([]TableStat, 0, len(a.byTable))
 	for name, stats := range a.byTable {
 		tables = append(tables, TableStat{
@@ -343,8 +307,6 @@ func indentString(s, indent string) string {
 	return strings.Join(lines, "\n")
 }
 
-// extractTableName attempts to extract the table name from a SQL query.
-// This is a simple heuristic and may not work for all query types.
 func extractTableName(query string) string {
 	if query == "" {
 		return ""
@@ -352,8 +314,7 @@ func extractTableName(query string) string {
 
 	query = strings.TrimSpace(strings.ToUpper(query))
 
-	// Handle SELECT
-	if strings.HasPrefix(query, OP_SELECT) {
+	if strings.HasPrefix(query, opSelect) {
 		if idx := strings.Index(query, "FROM"); idx != -1 {
 			rest := strings.TrimSpace(query[idx+4:])
 			parts := strings.Fields(rest)
@@ -363,7 +324,6 @@ func extractTableName(query string) string {
 		}
 	}
 
-	// Handle INSERT
 	if strings.HasPrefix(query, "INSERT INTO") {
 		rest := strings.TrimSpace(query[11:])
 		parts := strings.Fields(rest)
@@ -372,8 +332,7 @@ func extractTableName(query string) string {
 		}
 	}
 
-	// Handle UPDATE
-	if strings.HasPrefix(query, OP_UPDATE) {
+	if strings.HasPrefix(query, opUpdate) {
 		rest := strings.TrimSpace(query[6:])
 		parts := strings.Fields(rest)
 		if len(parts) > 0 {
@@ -381,7 +340,6 @@ func extractTableName(query string) string {
 		}
 	}
 
-	// Handle DELETE
 	if strings.HasPrefix(query, "DELETE FROM") {
 		rest := strings.TrimSpace(query[11:])
 		parts := strings.Fields(rest)
@@ -394,39 +352,34 @@ func extractTableName(query string) string {
 }
 
 func cleanTableName(name string) string {
-	// Remove common SQL characters
-	name = strings.TrimFunc(name, func(r rune) bool {
+	return strings.TrimFunc(name, func(r rune) bool {
 		return r == '`' || r == '"' || r == '\'' || r == '(' || r == ','
 	})
-	return name
 }
 
 // AggregatingObserver wraps a MetricsObserver and also aggregates statistics.
 type AggregatingObserver struct {
-	base       MetricsObserver
-	aggregator *DBStatsAggregator
+	base       storedb.MetricsObserver
+	aggregator *Aggregator
 }
 
 // NewAggregatingObserver creates an observer that both records metrics and aggregates statistics.
-func NewAggregatingObserver(base MetricsObserver, slowQueryThreshold time.Duration) *AggregatingObserver {
+func NewAggregatingObserver(base storedb.MetricsObserver, slowQueryThreshold time.Duration) *AggregatingObserver {
 	return &AggregatingObserver{
 		base:       base,
-		aggregator: NewDBStatsAggregator(slowQueryThreshold),
+		aggregator: NewAggregator(slowQueryThreshold),
 	}
 }
 
-// ObserveDB implements MetricsObserver and also aggregates statistics.
+// ObserveDB implements store/db.MetricsObserver and also aggregates statistics.
 func (c *AggregatingObserver) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	// Forward to base collector
 	if c.base != nil {
 		c.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
 	}
-
-	// Aggregate statistics
 	c.aggregator.RecordQuery(operation, query, duration, err)
 }
 
 // GetAggregator returns the underlying statistics aggregator.
-func (c *AggregatingObserver) GetAggregator() *DBStatsAggregator {
+func (c *AggregatingObserver) GetAggregator() *Aggregator {
 	return c.aggregator
 }

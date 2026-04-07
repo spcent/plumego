@@ -1,4 +1,4 @@
-package db
+package dbinsights
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	storedb "github.com/spcent/plumego/store/db"
 )
 
 // SlowQuery represents a slow query execution.
@@ -18,61 +20,56 @@ type SlowQuery struct {
 	Driver    string        `json:"driver"`
 }
 
-// SlowQueryDetector detects and logs slow database queries.
-type SlowQueryDetector struct {
+// Detector detects and records slow database queries.
+type Detector struct {
 	mu sync.RWMutex
 
 	threshold     time.Duration
 	maxRecords    int
 	slowQueries   []SlowQuery
 	totalDetected int64
-
-	// Callbacks
-	onSlowQuery func(SlowQuery)
+	onSlowQuery   func(SlowQuery)
 }
 
-// SlowQueryDetectorOption configures the slow query detector.
-type SlowQueryDetectorOption func(*SlowQueryDetector)
+// DetectorOption configures a slow query detector.
+type DetectorOption func(*Detector)
 
-// WithSlowQueryThreshold sets the threshold for slow queries.
-func WithSlowQueryThreshold(threshold time.Duration) SlowQueryDetectorOption {
-	return func(d *SlowQueryDetector) {
+// WithThreshold sets the threshold for slow queries.
+func WithThreshold(threshold time.Duration) DetectorOption {
+	return func(d *Detector) {
 		d.threshold = threshold
 	}
 }
 
-// WithSlowQueryMaxRecords sets the maximum number of slow queries to keep.
-func WithSlowQueryMaxRecords(max int) SlowQueryDetectorOption {
-	return func(d *SlowQueryDetector) {
+// WithMaxRecords sets the maximum number of slow queries to keep.
+func WithMaxRecords(max int) DetectorOption {
+	return func(d *Detector) {
 		d.maxRecords = max
 	}
 }
 
-// WithSlowQueryCallback sets a callback to be called when a slow query is detected.
-func WithSlowQueryCallback(callback func(SlowQuery)) SlowQueryDetectorOption {
-	return func(d *SlowQueryDetector) {
+// WithCallback sets a callback to be called when a slow query is detected.
+func WithCallback(callback func(SlowQuery)) DetectorOption {
+	return func(d *Detector) {
 		d.onSlowQuery = callback
 	}
 }
 
-// NewSlowQueryDetector creates a new slow query detector.
-func NewSlowQueryDetector(opts ...SlowQueryDetectorOption) *SlowQueryDetector {
-	d := &SlowQueryDetector{
-		threshold:   1 * time.Second, // default threshold
-		maxRecords:  100,             // default max records
+// NewDetector creates a new slow query detector.
+func NewDetector(opts ...DetectorOption) *Detector {
+	d := &Detector{
+		threshold:   time.Second,
+		maxRecords:  100,
 		slowQueries: make([]SlowQuery, 0, 100),
 	}
-
 	for _, opt := range opts {
 		opt(d)
 	}
-
 	return d
 }
 
-// Check checks if a query is slow and records it if so.
-// Returns true if the query was slow.
-func (d *SlowQueryDetector) Check(operation, driver, query string, duration time.Duration, err error) bool {
+// Check records a query if it exceeds the configured slow-query threshold.
+func (d *Detector) Check(operation, driver, query string, duration time.Duration, err error) bool {
 	if duration < d.threshold {
 		return false
 	}
@@ -88,25 +85,20 @@ func (d *SlowQueryDetector) Check(operation, driver, query string, duration time
 
 	d.mu.Lock()
 	d.totalDetected++
-
-	// Add to records
 	if len(d.slowQueries) >= d.maxRecords {
-		// Remove oldest entry (FIFO)
 		d.slowQueries = d.slowQueries[1:]
 	}
 	d.slowQueries = append(d.slowQueries, slowQuery)
 	d.mu.Unlock()
 
-	// Call callback if set
 	if d.onSlowQuery != nil {
 		d.onSlowQuery(slowQuery)
 	}
-
 	return true
 }
 
 // GetSlowQueries returns all recorded slow queries.
-func (d *SlowQueryDetector) GetSlowQueries() []SlowQuery {
+func (d *Detector) GetSlowQueries() []SlowQuery {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -116,19 +108,17 @@ func (d *SlowQueryDetector) GetSlowQueries() []SlowQuery {
 }
 
 // GetRecentSlowQueries returns the most recent N slow queries.
-func (d *SlowQueryDetector) GetRecentSlowQueries(n int) []SlowQuery {
+func (d *Detector) GetRecentSlowQueries(n int) []SlowQuery {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
 	if n > len(d.slowQueries) {
 		n = len(d.slowQueries)
 	}
-
 	if n == 0 {
 		return nil
 	}
 
-	// Return last N queries (most recent)
 	result := make([]SlowQuery, n)
 	start := len(d.slowQueries) - n
 	copy(result, d.slowQueries[start:])
@@ -136,14 +126,14 @@ func (d *SlowQueryDetector) GetRecentSlowQueries(n int) []SlowQuery {
 }
 
 // GetTotalDetected returns the total number of slow queries detected.
-func (d *SlowQueryDetector) GetTotalDetected() int64 {
+func (d *Detector) GetTotalDetected() int64 {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.totalDetected
 }
 
 // Clear clears all recorded slow queries.
-func (d *SlowQueryDetector) Clear() {
+func (d *Detector) Clear() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.slowQueries = make([]SlowQuery, 0, d.maxRecords)
@@ -151,7 +141,7 @@ func (d *SlowQueryDetector) Clear() {
 }
 
 // Summary returns a formatted summary of slow queries.
-func (d *SlowQueryDetector) Summary() string {
+func (d *Detector) Summary() string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -165,7 +155,6 @@ func (d *SlowQueryDetector) Summary() string {
 
 	if len(d.slowQueries) > 0 {
 		summary += "Recent slow queries:\n"
-		// Show up to 10 most recent
 		start := 0
 		if len(d.slowQueries) > 10 {
 			start = len(d.slowQueries) - 10
@@ -193,96 +182,80 @@ func truncateQuery(query string, maxLen int) string {
 	return query[:maxLen] + "..."
 }
 
-// InstrumentedDBWithSlowQueryDetection wraps InstrumentedDB with slow query detection.
-type InstrumentedDBWithSlowQueryDetection struct {
-	*InstrumentedDB
-	detector *SlowQueryDetector
+// InstrumentedDB wraps store/db.InstrumentedDB with slow query detection.
+type InstrumentedDB struct {
+	*storedb.InstrumentedDB
+	driver   string
+	detector *Detector
 }
 
-// NewInstrumentedDBWithSlowQueryDetection creates an instrumented DB with slow query detection.
-func NewInstrumentedDBWithSlowQueryDetection(
-	db *InstrumentedDB,
-	opts ...SlowQueryDetectorOption,
-) *InstrumentedDBWithSlowQueryDetection {
-	return &InstrumentedDBWithSlowQueryDetection{
+// NewInstrumentedDB wraps an instrumented DB with slow query detection.
+func NewInstrumentedDB(db *storedb.InstrumentedDB, driver string, opts ...DetectorOption) *InstrumentedDB {
+	return &InstrumentedDB{
 		InstrumentedDB: db,
-		detector:       NewSlowQueryDetector(opts...),
+		driver:         driver,
+		detector:       NewDetector(opts...),
 	}
 }
 
-// GetSlowQueryDetector returns the slow query detector.
-func (idb *InstrumentedDBWithSlowQueryDetection) GetSlowQueryDetector() *SlowQueryDetector {
+// GetDetector returns the slow query detector.
+func (idb *InstrumentedDB) GetDetector() *Detector {
 	return idb.detector
 }
 
 // ExecContext wraps ExecContext with slow query detection.
-func (idb *InstrumentedDBWithSlowQueryDetection) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (idb *InstrumentedDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	start := time.Now()
 	result, err := idb.InstrumentedDB.ExecContext(ctx, query, args...)
 	duration := time.Since(start)
 
 	idb.detector.Check("exec", idb.driver, query, duration, err)
-
 	return result, err
 }
 
 // QueryContext wraps QueryContext with slow query detection.
-func (idb *InstrumentedDBWithSlowQueryDetection) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+func (idb *InstrumentedDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	start := time.Now()
 	rows, err := idb.InstrumentedDB.QueryContext(ctx, query, args...)
 	duration := time.Since(start)
 
 	idb.detector.Check("query", idb.driver, query, duration, err)
-
 	return rows, err
 }
 
 // QueryRowContext wraps QueryRowContext with slow query detection.
-func (idb *InstrumentedDBWithSlowQueryDetection) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+func (idb *InstrumentedDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	start := time.Now()
 	row := idb.InstrumentedDB.QueryRowContext(ctx, query, args...)
 	duration := time.Since(start)
 
 	idb.detector.Check("query", idb.driver, query, duration, nil)
-
 	return row
 }
 
-// SlowQueryMetricsObserver wraps a MetricsObserver with slow query detection.
-type SlowQueryMetricsObserver struct {
-	base     MetricsObserver
-	detector *SlowQueryDetector
+// Observer wraps a MetricsObserver with slow query detection.
+type Observer struct {
+	base     storedb.MetricsObserver
+	detector *Detector
 }
 
-// NewSlowQueryMetricsObserver creates a metrics observer with slow query detection.
-func NewSlowQueryMetricsObserver(
-	base MetricsObserver,
-	opts ...SlowQueryDetectorOption,
-) *SlowQueryMetricsObserver {
-	return &SlowQueryMetricsObserver{
+// NewObserver creates a metrics observer with slow query detection.
+func NewObserver(base storedb.MetricsObserver, opts ...DetectorOption) *Observer {
+	return &Observer{
 		base:     base,
-		detector: NewSlowQueryDetector(opts...),
+		detector: NewDetector(opts...),
 	}
 }
 
-// ObserveDB implements MetricsObserver and also detects slow queries.
-func (c *SlowQueryMetricsObserver) ObserveDB(
-	ctx context.Context,
-	operation, driver, query string,
-	rows int,
-	duration time.Duration,
-	err error,
-) {
-	// Forward to base collector
+// ObserveDB forwards metrics and records slow queries.
+func (c *Observer) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
 	if c.base != nil {
 		c.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
 	}
-
-	// Check for slow query
 	c.detector.Check(operation, driver, query, duration, err)
 }
 
-// GetSlowQueryDetector returns the slow query detector.
-func (c *SlowQueryMetricsObserver) GetSlowQueryDetector() *SlowQueryDetector {
+// GetDetector returns the slow query detector.
+func (c *Observer) GetDetector() *Detector {
 	return c.detector
 }

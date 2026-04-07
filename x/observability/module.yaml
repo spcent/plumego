@@ -16,7 +16,7 @@ responsibilities:
   - Observability adapters
   - Optional instrumentation helpers
   - Export pipeline wiring
-  - Non-stable observability support helpers such as rolling-window aggregation and metrics testkits
+  - Non-stable observability support helpers such as rolling-window aggregation, metrics testkits, and DB analytics helpers
 
 non_goals:
   - Core bootstrap ownership
@@ -29,6 +29,7 @@ allowed_imports:
   - log
   - metrics
   - middleware
+  - store
 
 forbidden_imports:
   - core/components/**

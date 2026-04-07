@@ -1,4 +1,4 @@
-package db
+package dbinsights
 
 import (
 	"errors"
@@ -9,98 +9,71 @@ import (
 	testmetrics "github.com/spcent/plumego/x/observability/testmetrics"
 )
 
-func TestSlowQueryDetector_Check(t *testing.T) {
-	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(100 * time.Millisecond),
-	)
+func TestDetectorCheck(t *testing.T) {
+	detector := NewDetector(WithThreshold(100 * time.Millisecond))
 
-	// Fast query - should not be detected
-	isSlow := detector.Check("query", "postgres", "SELECT * FROM users", 50*time.Millisecond, nil)
-	if isSlow {
+	if detector.Check("query", "postgres", "SELECT * FROM users", 50*time.Millisecond, nil) {
 		t.Error("expected fast query not to be detected as slow")
 	}
-
-	// Slow query - should be detected
-	isSlow = detector.Check("query", "postgres", "SELECT * FROM huge_table", 200*time.Millisecond, nil)
-	if !isSlow {
+	if !detector.Check("query", "postgres", "SELECT * FROM huge_table", 200*time.Millisecond, nil) {
 		t.Error("expected slow query to be detected")
 	}
 
-	// Verify it was recorded
 	slowQueries := detector.GetSlowQueries()
 	if len(slowQueries) != 1 {
 		t.Fatalf("expected 1 slow query, got %d", len(slowQueries))
 	}
-
 	if slowQueries[0].Query != "SELECT * FROM huge_table" {
 		t.Errorf("unexpected query: %s", slowQueries[0].Query)
 	}
 }
 
-func TestSlowQueryDetector_MaxRecords(t *testing.T) {
-	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50*time.Millisecond),
-		WithSlowQueryMaxRecords(5),
-	)
-
-	// Add 10 slow queries
+func TestDetectorMaxRecords(t *testing.T) {
+	detector := NewDetector(WithThreshold(50*time.Millisecond), WithMaxRecords(5))
 	for i := 0; i < 10; i++ {
 		detector.Check("query", "postgres", "SELECT * FROM users", 100*time.Millisecond, nil)
 	}
 
-	// Should only keep the last 5
-	slowQueries := detector.GetSlowQueries()
-	if len(slowQueries) != 5 {
-		t.Errorf("expected 5 slow queries, got %d", len(slowQueries))
+	if len(detector.GetSlowQueries()) != 5 {
+		t.Errorf("expected 5 slow queries, got %d", len(detector.GetSlowQueries()))
 	}
-
-	// But total detected should be 10
 	if detector.GetTotalDetected() != 10 {
 		t.Errorf("expected total detected to be 10, got %d", detector.GetTotalDetected())
 	}
 }
 
-func TestSlowQueryDetector_Callback(t *testing.T) {
+func TestDetectorCallback(t *testing.T) {
 	callbackCalled := false
 	var recordedQuery SlowQuery
 
-	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50*time.Millisecond),
-		WithSlowQueryCallback(func(sq SlowQuery) {
+	detector := NewDetector(
+		WithThreshold(50*time.Millisecond),
+		WithCallback(func(sq SlowQuery) {
 			callbackCalled = true
 			recordedQuery = sq
 		}),
 	)
 
 	detector.Check("query", "postgres", "SELECT * FROM users", 100*time.Millisecond, nil)
-
 	if !callbackCalled {
 		t.Error("expected callback to be called")
 	}
-
 	if recordedQuery.Query != "SELECT * FROM users" {
 		t.Errorf("unexpected query in callback: %s", recordedQuery.Query)
 	}
 }
 
-func TestSlowQueryDetector_GetRecentSlowQueries(t *testing.T) {
-	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50 * time.Millisecond),
-	)
-
-	// Add 10 slow queries
+func TestDetectorGetRecentSlowQueries(t *testing.T) {
+	detector := NewDetector(WithThreshold(50 * time.Millisecond))
 	for i := 0; i < 10; i++ {
 		query := "SELECT * FROM users WHERE id = " + string(rune('0'+i))
 		detector.Check("query", "postgres", query, 100*time.Millisecond, nil)
 	}
 
-	// Get recent 3
 	recent := detector.GetRecentSlowQueries(3)
 	if len(recent) != 3 {
 		t.Fatalf("expected 3 recent queries, got %d", len(recent))
 	}
-
-	// Should be the last 3 (7, 8, 9)
 	for i, sq := range recent {
 		expectedID := '7' + rune(i)
 		if !strings.Contains(sq.Query, string(expectedID)) {
@@ -109,46 +82,30 @@ func TestSlowQueryDetector_GetRecentSlowQueries(t *testing.T) {
 	}
 }
 
-func TestSlowQueryDetector_Clear(t *testing.T) {
-	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50 * time.Millisecond),
-	)
-
-	// Add some slow queries
+func TestDetectorClear(t *testing.T) {
+	detector := NewDetector(WithThreshold(50 * time.Millisecond))
 	detector.Check("query", "postgres", "SELECT * FROM users", 100*time.Millisecond, nil)
 	detector.Check("query", "postgres", "SELECT * FROM posts", 150*time.Millisecond, nil)
 
-	if detector.GetTotalDetected() != 2 {
-		t.Errorf("expected 2 total detected, got %d", detector.GetTotalDetected())
-	}
-
-	// Clear
 	detector.Clear()
 
 	if detector.GetTotalDetected() != 0 {
 		t.Errorf("expected 0 total detected after clear, got %d", detector.GetTotalDetected())
 	}
-
-	slowQueries := detector.GetSlowQueries()
-	if len(slowQueries) != 0 {
-		t.Errorf("expected 0 slow queries after clear, got %d", len(slowQueries))
+	if len(detector.GetSlowQueries()) != 0 {
+		t.Errorf("expected 0 slow queries after clear, got %d", len(detector.GetSlowQueries()))
 	}
 }
 
-func TestSlowQueryDetector_Summary(t *testing.T) {
-	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(100 * time.Millisecond),
-	)
+func TestDetectorSummary(t *testing.T) {
+	detector := NewDetector(WithThreshold(100 * time.Millisecond))
 
-	// No slow queries
 	summary := detector.Summary()
 	if !strings.Contains(summary, "No slow queries detected") {
 		t.Error("expected summary to indicate no slow queries")
 	}
 
-	// Add a slow query
 	detector.Check("query", "postgres", "SELECT * FROM users", 200*time.Millisecond, nil)
-
 	summary = detector.Summary()
 	if !strings.Contains(summary, "Total detected: 1") {
 		t.Error("expected summary to show 1 detected query")
@@ -158,11 +115,8 @@ func TestSlowQueryDetector_Summary(t *testing.T) {
 	}
 }
 
-func TestSlowQueryDetector_WithError(t *testing.T) {
-	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50 * time.Millisecond),
-	)
-
+func TestDetectorWithError(t *testing.T) {
+	detector := NewDetector(WithThreshold(50 * time.Millisecond))
 	testErr := errors.New("query failed")
 	detector.Check("query", "postgres", "SELECT * FROM invalid", 100*time.Millisecond, testErr)
 
@@ -170,7 +124,6 @@ func TestSlowQueryDetector_WithError(t *testing.T) {
 	if len(slowQueries) != 1 {
 		t.Fatalf("expected 1 slow query, got %d", len(slowQueries))
 	}
-
 	if slowQueries[0].Error == nil {
 		t.Error("expected error to be recorded")
 	}
@@ -179,26 +132,18 @@ func TestSlowQueryDetector_WithError(t *testing.T) {
 	}
 }
 
-func TestSlowQueryDetector_DefaultThreshold(t *testing.T) {
-	detector := NewSlowQueryDetector()
-
-	// Default threshold is 1 second
-	isSlow := detector.Check("query", "postgres", "SELECT * FROM users", 500*time.Millisecond, nil)
-	if isSlow {
+func TestDetectorDefaultThreshold(t *testing.T) {
+	detector := NewDetector()
+	if detector.Check("query", "postgres", "SELECT * FROM users", 500*time.Millisecond, nil) {
 		t.Error("expected query under 1s not to be slow with default threshold")
 	}
-
-	isSlow = detector.Check("query", "postgres", "SELECT * FROM huge_table", 1500*time.Millisecond, nil)
-	if !isSlow {
+	if !detector.Check("query", "postgres", "SELECT * FROM huge_table", 1500*time.Millisecond, nil) {
 		t.Error("expected query over 1s to be slow with default threshold")
 	}
 }
 
-func TestSlowQueryDetector_Concurrency(t *testing.T) {
-	detector := NewSlowQueryDetector(
-		WithSlowQueryThreshold(50*time.Millisecond),
-		WithSlowQueryMaxRecords(1000),
-	)
+func TestDetectorConcurrency(t *testing.T) {
+	detector := NewDetector(WithThreshold(50*time.Millisecond), WithMaxRecords(1000))
 
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
@@ -209,8 +154,6 @@ func TestSlowQueryDetector_Concurrency(t *testing.T) {
 			done <- true
 		}()
 	}
-
-	// Wait for all goroutines
 	for i := 0; i < 10; i++ {
 		<-done
 	}
@@ -220,34 +163,28 @@ func TestSlowQueryDetector_Concurrency(t *testing.T) {
 	}
 }
 
-func TestSlowQueryMetricsObserver(t *testing.T) {
+func TestObserver(t *testing.T) {
 	callbackCalled := false
 	base := testmetrics.NewMockCollector()
 
-	collector := NewSlowQueryMetricsObserver(
+	observer := NewObserver(
 		base,
-		WithSlowQueryThreshold(100*time.Millisecond),
-		WithSlowQueryCallback(func(sq SlowQuery) {
+		WithThreshold(100*time.Millisecond),
+		WithCallback(func(SlowQuery) {
 			callbackCalled = true
 		}),
 	)
 
-	// Record a slow query
-	collector.ObserveDB(t.Context(), "query", "postgres", "SELECT * FROM users", 10, 200*time.Millisecond, nil)
+	observer.ObserveDB(t.Context(), "query", "postgres", "SELECT * FROM users", 10, 200*time.Millisecond, nil)
 
-	// Verify it was forwarded to base collector
 	if base.DBCallCount() != 1 {
 		t.Errorf("expected base collector to receive 1 call, got %d", base.DBCallCount())
 	}
-
-	// Verify slow query was detected
 	if !callbackCalled {
 		t.Error("expected slow query callback to be called")
 	}
-
-	detector := collector.GetSlowQueryDetector()
-	if detector.GetTotalDetected() != 1 {
-		t.Errorf("expected 1 slow query detected, got %d", detector.GetTotalDetected())
+	if observer.GetDetector().GetTotalDetected() != 1 {
+		t.Errorf("expected 1 slow query detected, got %d", observer.GetDetector().GetTotalDetected())
 	}
 }
 

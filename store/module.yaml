@@ -19,6 +19,7 @@ non_goals:
   - Tenant-aware adapters
   - Business repositories
   - AI-specific caches
+  - DB analytics and slow-query reporting
   - Read-write splitting and sharding topology defaults
   - HTTP transport behavior
   - Feature-specific ranked-data cache behavior
@@ -60,10 +61,12 @@ review_checklist:
   - Keep store APIs transport-agnostic
   - No tenant-specific logic in stable store
   - Keep topology-heavy data features out of the stable layer
+  - Keep DB analytics and slow-query inspection out of stable store/db
   - Keep HTTP response caching and request-derived cache keys out of stable store/cache
   - Prefer stdlib-compatible abstractions
 
 agent_hints:
   - Move tenant-aware adapters to x/tenant/store
+  - Move DB analytics and slow-query helpers to x/observability/dbinsights
   - For distributed or provider-specific cache needs use x/cache; for HTTP response caching use x/gateway/cache
   - For ranked-data cache behavior use x/cache/leaderboard; do not add topology-heavy, provider-heavy, or business-level idempotency logic here
