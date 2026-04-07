@@ -70,17 +70,20 @@ func (p *InMemoryRateLimitProvider) SetRateLimit(tenantID string, cfg RateLimitC
 }
 
 // RateLimitConfig returns the rate limit config for a tenant.
-// When the tenant has no explicit configuration, a zero-value config is returned
-// (no error), which the TokenBucketRateLimiter treats as unlimited. This is
-// consistent with InMemoryQuotaManager's behaviour for unconfigured tenants.
+// When the tenant has no explicit configuration, ErrTenantNotFound is returned.
+// TokenBucketRateLimiter treats ErrTenantNotFound as "unlimited" so callers
+// do not need to pre-populate every tenant to avoid being rate-limited.
 func (p *InMemoryRateLimitProvider) RateLimitConfig(ctx context.Context, tenantID string) (RateLimitConfig, error) {
 	if p == nil {
 		return RateLimitConfig{}, ErrTenantNotFound
 	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	// Unknown tenant → zero config (unlimited), no error.
-	return p.configs[tenantID], nil
+	cfg, ok := p.configs[tenantID]
+	if !ok {
+		return RateLimitConfig{}, ErrTenantNotFound
+	}
+	return cfg, nil
 }
 
 // TokenBucketRateLimiter implements per-tenant token bucket rate limiting.
@@ -113,6 +116,9 @@ func (l *TokenBucketRateLimiter) Allow(ctx context.Context, tenantID string, req
 
 	cfg, err := l.provider.RateLimitConfig(ctx, tenantID)
 	if err != nil {
+		if errors.Is(err, ErrTenantNotFound) {
+			return RateLimitResult{Allowed: true}, nil
+		}
 		return RateLimitResult{Allowed: false}, err
 	}
 

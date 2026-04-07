@@ -37,14 +37,14 @@ func TestNewAppliesTypedConfigAndOptions(t *testing.T) {
 func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 	app := newTestApp()
 
-	mustRegisterRoute(t, app.Get("/router", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/router", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("router"))
-	}))
-	mustRegisterRoute(t, app.Get("/mux", func(w http.ResponseWriter, r *http.Request) {
+	})))
+	mustRegisterRoute(t, app.Get("/mux", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("mux"))
-	}))
+	})))
 
 	app.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -89,10 +89,10 @@ func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 		})
 	})
 
-	mustRegisterRoute(t, app.Get("/hello", func(w http.ResponseWriter, _ *http.Request) {
+	mustRegisterRoute(t, app.Get("/hello", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("hi"))
-	}))
+	})))
 
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 	rr := httptest.NewRecorder()
@@ -110,9 +110,9 @@ func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 func TestUseAfterServeHTTPReturnsError(t *testing.T) {
 	app := newTestApp()
 
-	mustRegisterRoute(t, app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	rr := httptest.NewRecorder()
@@ -131,9 +131,9 @@ func TestPrepareBuildsHTTPServer(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":5555"
 	app := New(cfg, AppDependencies{})
-	mustRegisterRoute(t, app.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/ready", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	if err := app.Prepare(); err != nil {
 		t.Fatalf("Prepare returned error: %v", err)
@@ -166,9 +166,9 @@ func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 			next.ServeHTTP(w, r)
 		})
 	})
-	mustRegisterRoute(t, app.Get("/prepared", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/prepared", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/prepared", nil)

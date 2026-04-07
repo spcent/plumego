@@ -12,8 +12,7 @@ func TestSlidingWindowQuotaManager_Basic(t *testing.T) {
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 5,
-			TokensPerMinute:   100,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 5, Tokens: 100}},
 		},
 	})
 
@@ -46,8 +45,7 @@ func TestSlidingWindowQuotaManager_RequestLimit(t *testing.T) {
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 3,
-			TokensPerMinute:   1000,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 3, Tokens: 1000}},
 		},
 	})
 
@@ -92,8 +90,7 @@ func TestSlidingWindowQuotaManager_TokenLimit(t *testing.T) {
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 100,
-			TokensPerMinute:   50,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 100, Tokens: 50}},
 		},
 	})
 
@@ -136,8 +133,7 @@ func TestSlidingWindowQuotaManager_SlidingBehavior(t *testing.T) {
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 2,
-			TokensPerMinute:   100,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 2, Tokens: 100}},
 		},
 	})
 
@@ -187,8 +183,7 @@ func TestSlidingWindowQuotaManager_WindowCleanup(t *testing.T) {
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 5,
-			TokensPerMinute:   100,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 5, Tokens: 100}},
 		},
 	})
 
@@ -228,17 +223,14 @@ func TestSlidingWindowQuotaManager_ZeroQuota(t *testing.T) {
 	cfgMgr := NewInMemoryConfigManager()
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
-		Quota: QuotaConfig{
-			RequestsPerMinute: 0, // Unlimited requests
-			TokensPerMinute:   0, // Unlimited tokens
-		},
+		Quota:    QuotaConfig{}, // no limits = unlimited
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
 	ctx := context.Background()
 	now := time.Now()
 
-	// Should allow any number of requests when quota is 0 (unlimited)
+	// Should allow any number of requests when quota is unset (unlimited)
 	for i := 0; i < 100; i++ {
 		result, err := quotaMgr.Allow(ctx, "test-tenant", QuotaRequest{
 			Requests: 1,
@@ -259,8 +251,7 @@ func TestSlidingWindowQuotaManager_MultipleRequests(t *testing.T) {
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 10,
-			TokensPerMinute:   100,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 10, Tokens: 100}},
 		},
 	})
 
@@ -303,8 +294,7 @@ func TestSlidingWindowQuotaManager_ConcurrentAccess(t *testing.T) {
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 100,
-			TokensPerMinute:   1000,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 100, Tokens: 1000}},
 		},
 	})
 
@@ -352,8 +342,7 @@ func TestSlidingWindowQuotaManager_RetryAfterAccuracy(t *testing.T) {
 	cfgMgr.SetTenantConfig(Config{
 		TenantID: "test-tenant",
 		Quota: QuotaConfig{
-			RequestsPerMinute: 2,
-			TokensPerMinute:   100,
+			Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 2, Tokens: 100}},
 		},
 	})
 

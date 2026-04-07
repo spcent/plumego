@@ -63,6 +63,12 @@ func BindErrorToAPIError(err error) APIError {
 	case errors.Is(err, ErrUnexpectedExtraData):
 		code = CodeUnexpectedExtraData
 		message = ErrUnexpectedExtraData.Error()
+	case errors.Is(err, ErrInvalidBindDst):
+		code = CodeInvalidBindDst
+		message = "invalid bind destination"
+	case errors.Is(err, ErrInvalidQueryParam):
+		code = CodeInvalidQuery
+		message = "invalid query parameter"
 	default:
 		if len(fields) == 0 {
 			var bindErr *bindError

@@ -15,10 +15,10 @@ func TestMiddlewareExceeded(t *testing.T) {
 	cfg.SetTenantConfig(tenantcore.Config{
 		TenantID: "t-1",
 		Quota: tenantcore.QuotaConfig{
-			RequestsPerMinute: 1,
+			Limits: []tenantcore.QuotaLimit{{Window: tenantcore.QuotaWindowMinute, Requests: 1}},
 		},
 	})
-	manager := tenantcore.NewInMemoryQuotaManager(cfg)
+	manager := tenantcore.NewFixedWindowQuotaManager(cfg)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -47,11 +47,10 @@ func TestMiddlewareExceededSetsRetryAfterAndQuotaHeaders(t *testing.T) {
 	cfg.SetTenantConfig(tenantcore.Config{
 		TenantID: "t-1",
 		Quota: tenantcore.QuotaConfig{
-			RequestsPerMinute: 2,
-			TokensPerMinute:   10,
+			Limits: []tenantcore.QuotaLimit{{Window: tenantcore.QuotaWindowMinute, Requests: 2, Tokens: 10}},
 		},
 	})
-	manager := tenantcore.NewInMemoryQuotaManager(cfg)
+	manager := tenantcore.NewFixedWindowQuotaManager(cfg)
 
 	handlerCalls := 0
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

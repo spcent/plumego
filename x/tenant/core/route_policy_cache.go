@@ -72,9 +72,21 @@ func (c *InMemoryRoutePolicyCache) Set(ctx context.Context, tenantID string, pol
 	defer c.mu.Unlock()
 
 	if len(c.entries) >= c.maxSize {
-		for key := range c.entries {
-			delete(c.entries, key)
-			break
+		now := time.Now().UTC()
+		evicted := false
+		for key, entry := range c.entries {
+			if now.After(entry.expiresAt) {
+				delete(c.entries, key)
+				evicted = true
+				break
+			}
+		}
+		if !evicted {
+			// No expired entry found; evict an arbitrary entry to stay within maxSize.
+			for key := range c.entries {
+				delete(c.entries, key)
+				break
+			}
 		}
 	}
 

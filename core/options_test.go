@@ -53,9 +53,9 @@ func TestNewDefaultsToNoOpLogger(t *testing.T) {
 func TestRequestIDMiddleware(t *testing.T) {
 	app := newTestApp()
 	app.Use(requestid.Middleware())
-	mustRegisterRoute(t, app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
@@ -70,9 +70,9 @@ func TestMethodNotAllowedConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Router.MethodNotAllowed = true
 	app := New(cfg, AppDependencies{})
-	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/only", nil)
@@ -90,9 +90,9 @@ func TestRouterConfiguresOwnedMethodNotAllowedPolicy(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Router.MethodNotAllowed = true
 	app := New(cfg, AppDependencies{})
-	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	if !app.router.MethodNotAllowedEnabled() {
 		t.Fatal("expected owned router to have method-not-allowed enabled")
@@ -115,9 +115,9 @@ func TestRoutesAndLookupDoNotResyncRouterPolicy(t *testing.T) {
 	cfg.Router.MethodNotAllowed = true
 	app := New(cfg, AppDependencies{})
 
-	mustRegisterRoute(t, app.Get("/only", func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
 	if !app.router.MethodNotAllowedEnabled() {
 		t.Fatal("expected owned router to have method-not-allowed enabled from constructor ownership")

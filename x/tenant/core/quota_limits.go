@@ -21,26 +21,16 @@ type QuotaLimit struct {
 }
 
 func normalizeQuotaLimits(cfg QuotaConfig) []QuotaLimit {
-	if len(cfg.Limits) > 0 {
-		limits := make([]QuotaLimit, 0, len(cfg.Limits))
-		for _, limit := range cfg.Limits {
-			if !isValidQuotaWindow(limit.Window) {
-				continue
-			}
+	limits := make([]QuotaLimit, 0, len(cfg.Limits))
+	for _, limit := range cfg.Limits {
+		if isValidQuotaWindow(limit.Window) {
 			limits = append(limits, limit)
 		}
-		return limits
 	}
-
-	if cfg.RequestsPerMinute > 0 || cfg.TokensPerMinute > 0 {
-		return []QuotaLimit{{
-			Window:   QuotaWindowMinute,
-			Requests: cfg.RequestsPerMinute,
-			Tokens:   cfg.TokensPerMinute,
-		}}
+	if len(limits) == 0 {
+		return nil
 	}
-
-	return nil
+	return limits
 }
 
 func isValidQuotaWindow(window QuotaWindow) bool {

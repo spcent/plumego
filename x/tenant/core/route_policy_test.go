@@ -66,6 +66,64 @@ func TestCachedRoutePolicyProvider(t *testing.T) {
 	}
 }
 
+func TestInMemoryRoutePolicyCache_EvictExpiredFirst(t *testing.T) {
+	ctx := context.Background()
+	maxSize := 3
+	// Use a tiny TTL so the pre-filled entries expire immediately.
+	cache := NewInMemoryRoutePolicyCache(maxSize, 1*time.Millisecond)
+	policy := RoutePolicy{TenantID: "x", Strategy: "weighted"}
+
+	for i := 0; i < maxSize; i++ {
+		id := string(rune('a' + i))
+		_ = cache.Set(ctx, id, RoutePolicy{TenantID: id})
+	}
+
+	// Wait for all entries to expire.
+	time.Sleep(5 * time.Millisecond)
+
+	// Adding a new entry should evict an expired one, not fail.
+	if err := cache.Set(ctx, "new", policy); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	cache.mu.RLock()
+	size := len(cache.entries)
+	_, hasNew := cache.entries["new"]
+	cache.mu.RUnlock()
+
+	if !hasNew {
+		t.Error("new entry should be present after eviction")
+	}
+	if size > maxSize {
+		t.Errorf("cache size %d exceeds maxSize %d", size, maxSize)
+	}
+}
+
+func TestInMemoryRoutePolicyCache_EvictArbitraryWhenNoneExpired(t *testing.T) {
+	ctx := context.Background()
+	maxSize := 3
+	cache := NewInMemoryRoutePolicyCache(maxSize, 1*time.Hour)
+
+	for i := 0; i < maxSize; i++ {
+		id := string(rune('a' + i))
+		_ = cache.Set(ctx, id, RoutePolicy{TenantID: id})
+	}
+
+	if err := cache.Set(ctx, "new", RoutePolicy{TenantID: "new"}); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	cache.mu.RLock()
+	size := len(cache.entries)
+	_, hasNew := cache.entries["new"]
+	cache.mu.RUnlock()
+
+	if !hasNew {
+		t.Error("new entry should be present")
+	}
+	if size > maxSize {
+		t.Errorf("cache size %d exceeds maxSize %d", size, maxSize)
+	}
+}
+
 type testRoutePolicyProvider struct {
 	calls int
 }

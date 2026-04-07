@@ -74,14 +74,15 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 	`
 
 	var cfg tenant.Config
+	var legacyRequestsPerMinute, legacyTokensPerMinute int
 	var quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON sql.NullString
 	var allowedMethodsJSON, allowedPathsJSON, metadataJSON sql.NullString
 	var updatedAt time.Time
 
 	err := m.db.QueryRowContext(ctx, query, tenantID).Scan(
 		&cfg.TenantID,
-		&cfg.Quota.RequestsPerMinute,
-		&cfg.Quota.TokensPerMinute,
+		&legacyRequestsPerMinute,
+		&legacyTokensPerMinute,
 		&quotaLimitsJSON,
 		&allowedModelsJSON,
 		&allowedToolsJSON,
@@ -99,6 +100,15 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 
 	if err := parseTenantConfigJSON(&cfg, quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON, allowedMethodsJSON, allowedPathsJSON, metadataJSON); err != nil {
 		return tenant.Config{}, err
+	}
+
+	// Migrate legacy per-minute columns to Limits when no Limits are stored.
+	if len(cfg.Quota.Limits) == 0 && (legacyRequestsPerMinute > 0 || legacyTokensPerMinute > 0) {
+		cfg.Quota.Limits = []tenant.QuotaLimit{{
+			Window:   tenant.QuotaWindowMinute,
+			Requests: legacyRequestsPerMinute,
+			Tokens:   legacyTokensPerMinute,
+		}}
 	}
 
 	cfg.UpdatedAt = updatedAt
@@ -162,8 +172,8 @@ func (m *DBTenantConfigManager) SetTenantConfig(ctx context.Context, cfg tenant.
 
 	_, err = m.db.ExecContext(ctx, query,
 		cfg.TenantID,
-		cfg.Quota.RequestsPerMinute,
-		cfg.Quota.TokensPerMinute,
+		0, // quota_requests_per_minute — legacy column, always 0 for new writes
+		0, // quota_tokens_per_minute   — legacy column, always 0 for new writes
 		string(quotaLimits),
 		string(allowedModels),
 		string(allowedTools),
@@ -240,14 +250,15 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 	var configs []tenant.Config
 	for rows.Next() {
 		var cfg tenant.Config
+		var legacyRequestsPerMinute, legacyTokensPerMinute int
 		var quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON sql.NullString
 		var allowedMethodsJSON, allowedPathsJSON, metadataJSON sql.NullString
 		var updatedAt time.Time
 
 		err := rows.Scan(
 			&cfg.TenantID,
-			&cfg.Quota.RequestsPerMinute,
-			&cfg.Quota.TokensPerMinute,
+			&legacyRequestsPerMinute,
+			&legacyTokensPerMinute,
 			&quotaLimitsJSON,
 			&allowedModelsJSON,
 			&allowedToolsJSON,
@@ -262,6 +273,14 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 
 		if err := parseTenantConfigJSON(&cfg, quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON, allowedMethodsJSON, allowedPathsJSON, metadataJSON); err != nil {
 			return nil, fmt.Errorf("parsing tenant %s config: %w", cfg.TenantID, err)
+		}
+
+		if len(cfg.Quota.Limits) == 0 && (legacyRequestsPerMinute > 0 || legacyTokensPerMinute > 0) {
+			cfg.Quota.Limits = []tenant.QuotaLimit{{
+				Window:   tenant.QuotaWindowMinute,
+				Requests: legacyRequestsPerMinute,
+				Tokens:   legacyTokensPerMinute,
+			}}
 		}
 
 		cfg.UpdatedAt = updatedAt

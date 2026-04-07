@@ -261,7 +261,7 @@ func TestBindJSONBodyTooLarge(t *testing.T) {
 	}
 }
 
-func TestGetRequestDuration(t *testing.T) {
+func TestRequestDuration(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
 	ctx := NewCtx(w, r, nil)
@@ -269,7 +269,7 @@ func TestGetRequestDuration(t *testing.T) {
 	// Sleep a bit to ensure duration is measurable
 	time.Sleep(10 * time.Millisecond)
 
-	duration := ctx.GetRequestDuration()
+	duration := ctx.RequestDuration()
 	if duration < 10*time.Millisecond {
 		t.Errorf("expected duration >= 10ms, got %v", duration)
 	}
@@ -306,7 +306,7 @@ func TestIsCompressed(t *testing.T) {
 	}
 }
 
-func TestGetBodySize(t *testing.T) {
+func TestBodySize(t *testing.T) {
 	body := "test body content"
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/test", strings.NewReader(body))
@@ -318,7 +318,7 @@ func TestGetBodySize(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	size := ctx.GetBodySize()
+	size := ctx.BodySize()
 	if size != int64(len(body)) {
 		t.Errorf("expected size %d, got %d", len(body), size)
 	}
@@ -1014,8 +1014,8 @@ func TestCtxBodyReadOnce(t *testing.T) {
 		t.Error("body should be cached and return same data")
 	}
 
-	if ctx.GetBodySize() != int64(len(body)) {
-		t.Errorf("expected body size %d, got %d", len(body), ctx.GetBodySize())
+	if ctx.BodySize() != int64(len(body)) {
+		t.Errorf("expected body size %d, got %d", len(body), ctx.BodySize())
 	}
 }
 

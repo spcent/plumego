@@ -1,6 +1,8 @@
 package app
 
 import (
+	"net/http"
+
 	"github.com/spcent/plumego/reference/standard-service/internal/handler"
 )
 
@@ -9,19 +11,19 @@ func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "plumego-reference"}
 
-	if err := a.Core.Get("/", api.Hello); err != nil {
+	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/healthz", health.Live); err != nil {
+	if err := a.Core.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/readyz", health.Ready); err != nil {
+	if err := a.Core.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/api/hello", api.Hello); err != nil {
+	if err := a.Core.Get("/api/hello", http.HandlerFunc(api.Hello)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/api/status", api.Status); err != nil {
+	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
 		return err
 	}
 	return nil

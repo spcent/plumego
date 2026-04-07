@@ -11,13 +11,15 @@ var ErrQuotaExceeded = errors.New("quota exceeded")
 
 // QuotaConfig defines per-tenant quota limits.
 // Zero values mean unlimited.
+//
+// Use Limits to specify quota windows. For a single per-minute quota:
+//
+//	QuotaConfig{Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 100}}}
+//
+// FixedWindowQuotaManager enforces only the first valid limit entry.
+// Use WindowQuotaManager for simultaneous multi-window enforcement.
 type QuotaConfig struct {
-	RequestsPerMinute int
-	TokensPerMinute   int
 	// Limits defines quota windows (minute/hour/day/month).
-	// When non-empty, Limits take precedence over RequestsPerMinute/TokensPerMinute.
-	// InMemoryQuotaManager enforces only the first valid limit window.
-	// Use WindowQuotaManager for full multi-window enforcement.
 	Limits []QuotaLimit
 }
 
@@ -48,23 +50,23 @@ type quotaCounter struct {
 	tokens      int
 }
 
-// evictionInterval controls how often InMemoryQuotaManager scans for stale counters.
+// evictionInterval controls how often FixedWindowQuotaManager scans for stale counters.
 const evictionInterval = time.Minute
 
-// InMemoryQuotaManager is a single-window in-memory quota manager.
+// FixedWindowQuotaManager is a single-window in-memory quota manager.
 // It respects QuotaConfig.Limits by using the first valid limit entry.
 // For multi-window enforcement (hour + day + month simultaneously),
 // use WindowQuotaManager with an InMemoryQuotaStore instead.
-type InMemoryQuotaManager struct {
+type FixedWindowQuotaManager struct {
 	mu           sync.Mutex
 	provider     QuotaConfigProvider
 	counters     map[string]*quotaCounter
 	lastEviction time.Time
 }
 
-// NewInMemoryQuotaManager builds a quota manager from a config provider.
-func NewInMemoryQuotaManager(provider QuotaConfigProvider) *InMemoryQuotaManager {
-	return &InMemoryQuotaManager{
+// NewFixedWindowQuotaManager builds a quota manager from a config provider.
+func NewFixedWindowQuotaManager(provider QuotaConfigProvider) *FixedWindowQuotaManager {
+	return &FixedWindowQuotaManager{
 		provider:     provider,
 		counters:     make(map[string]*quotaCounter),
 		lastEviction: time.Now().UTC(),
@@ -72,9 +74,7 @@ func NewInMemoryQuotaManager(provider QuotaConfigProvider) *InMemoryQuotaManager
 }
 
 // Allow checks quota usage for a tenant.
-// It uses normalizeQuotaLimits to resolve the effective limit, honouring
-// QuotaConfig.Limits when set and falling back to RequestsPerMinute/TokensPerMinute.
-func (m *InMemoryQuotaManager) Allow(ctx context.Context, tenantID string, req QuotaRequest) (QuotaResult, error) {
+func (m *FixedWindowQuotaManager) Allow(ctx context.Context, tenantID string, req QuotaRequest) (QuotaResult, error) {
 	if m == nil || m.provider == nil {
 		return QuotaResult{Allowed: true}, nil
 	}
@@ -153,7 +153,7 @@ func (m *InMemoryQuotaManager) Allow(ctx context.Context, tenantID string, req Q
 // evictStaleLocked removes counters whose window has expired.
 // It runs at most once per evictionInterval to avoid O(n) cost on every request.
 // Must be called with m.mu held.
-func (m *InMemoryQuotaManager) evictStaleLocked(now time.Time) {
+func (m *FixedWindowQuotaManager) evictStaleLocked(now time.Time) {
 	if now.Sub(m.lastEviction) < evictionInterval {
 		return
 	}
