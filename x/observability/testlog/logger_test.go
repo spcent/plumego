@@ -1,0 +1,91 @@
+package testlog
+
+import (
+	"context"
+	"testing"
+
+	"github.com/spcent/plumego/contract"
+)
+
+func TestLoggerCapturesEntries(t *testing.T) {
+	logger := New()
+	logger.Info("hello", Fields{"component": "test"})
+
+	if got := logger.Count(); got != 1 {
+		t.Fatalf("Count() = %d, want 1", got)
+	}
+
+	entry, ok := logger.LastEntry()
+	if !ok {
+		t.Fatal("LastEntry() = none, want entry")
+	}
+	if entry.Level != INFO {
+		t.Fatalf("entry.Level = %v, want %v", entry.Level, INFO)
+	}
+	if entry.Fields["component"] != "test" {
+		t.Fatalf("entry.Fields[component] = %v, want test", entry.Fields["component"])
+	}
+}
+
+func TestLoggerWithFieldsSharesEntries(t *testing.T) {
+	logger := New()
+	child := logger.WithFields(Fields{"scope": "child"})
+	child.Warn("warn")
+
+	if got := logger.CountByLevel(WARNING); got != 1 {
+		t.Fatalf("CountByLevel(WARNING) = %d, want 1", got)
+	}
+
+	entry, ok := logger.LastEntry()
+	if !ok {
+		t.Fatal("LastEntry() = none, want entry")
+	}
+	if entry.Fields["scope"] != "child" {
+		t.Fatalf("entry.Fields[scope] = %v, want child", entry.Fields["scope"])
+	}
+}
+
+func TestLoggerContextAddsRequestID(t *testing.T) {
+	logger := New()
+	ctx := contract.WithRequestID(context.Background(), "req_123")
+
+	logger.InfoCtx(ctx, "request received")
+
+	entry, ok := logger.LastEntry()
+	if !ok {
+		t.Fatal("LastEntry() = none, want entry")
+	}
+	if entry.Fields["request_id"] != "req_123" {
+		t.Fatalf("entry.Fields[request_id] = %v, want req_123", entry.Fields["request_id"])
+	}
+}
+
+func TestLoggerClear(t *testing.T) {
+	logger := New()
+	logger.Info("one")
+	logger.Clear()
+
+	if got := logger.Count(); got != 0 {
+		t.Fatalf("Count() after Clear = %d, want 0", got)
+	}
+	if _, ok := logger.LastEntry(); ok {
+		t.Fatal("LastEntry() after Clear = entry, want none")
+	}
+}
+
+func TestLoggerFatalHook(t *testing.T) {
+	logger := New()
+	var captured string
+	logger.FatalHook = func(msg string) {
+		captured = msg
+	}
+
+	logger.Fatal("boom")
+
+	if captured != "boom" {
+		t.Fatalf("FatalHook captured %q, want boom", captured)
+	}
+	if !logger.HasEntry(FATAL, "boom") {
+		t.Fatal("HasEntry(FATAL, boom) = false, want true")
+	}
+}

@@ -13,7 +13,6 @@ import (
 var (
 	_ StructuredLogger = (*defaultLogger)(nil)
 	_ StructuredLogger = (*JSONLogger)(nil)
-	_ StructuredLogger = (*TestLogger)(nil)
 	_ StructuredLogger = (*NoOpLogger)(nil)
 )
 

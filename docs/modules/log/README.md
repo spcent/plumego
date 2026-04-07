@@ -32,3 +32,4 @@
 
 - preserve `StructuredLogger` and the canonical `NewLogger` path
 - never log secrets, tokens, signatures, or private keys
+- keep reusable test logging helpers out of stable `log`; use `x/observability/testlog`

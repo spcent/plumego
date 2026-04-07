@@ -17,6 +17,7 @@ non_goals:
   - Feature behavior
   - Metrics collection
   - Request policy decisions
+  - Repo-wide testing helpers
   - Structured log aggregation or export backends (belong in x/observability)
 
 public_entrypoints:
