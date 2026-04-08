@@ -9,15 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
-
-type traceContextKey struct{}
-
-type internalTraceContext struct {
-	traceID string
-	spanID  string
-}
 
 // Span captures finalized tracing data for inspection or export.
 type Span struct {
@@ -89,8 +83,8 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 
 	traceID := r.Header.Get("X-Trace-ID")
 	if traceID == "" {
-		if parent := traceContextFromContext(ctx); parent != nil {
-			traceID = parent.traceID
+		if parent := contract.TraceContextFromContext(ctx); parent != nil {
+			traceID = string(parent.TraceID)
 		}
 	}
 	if traceID == "" {
@@ -98,8 +92,8 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 	}
 
 	parentID := ""
-	if parent := traceContextFromContext(ctx); parent != nil && parent.spanID != "" {
-		parentID = parent.spanID
+	if parent := contract.TraceContextFromContext(ctx); parent != nil && parent.SpanID != "" {
+		parentID = string(parent.SpanID)
 	}
 
 	handle := &spanHandle{
@@ -126,17 +120,12 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 		handle.attrs["parent.trace_id"] = inboundTraceID
 	}
 
-	ctx = context.WithValue(ctx, traceContextKey{}, &internalTraceContext{
-		traceID: traceID,
-		spanID:  spanID,
+	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
+		TraceID: contract.TraceID(traceID),
+		SpanID:  contract.SpanID(spanID),
 	})
 
 	return ctx, handle
-}
-
-func traceContextFromContext(ctx context.Context) *internalTraceContext {
-	v, _ := ctx.Value(traceContextKey{}).(*internalTraceContext)
-	return v
 }
 
 func (t *OpenTelemetryTracer) Spans() []Span {

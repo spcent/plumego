@@ -25,6 +25,10 @@ type spanContextTracer struct {
 
 func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan) {
 	t.span = &spanContextSpan{traceID: "trace-ctx", spanID: "span-123"}
+	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
+		TraceID: contract.TraceID(t.span.traceID),
+		SpanID:  contract.SpanID(t.span.spanID),
+	})
 	return ctx, t.span
 }
 

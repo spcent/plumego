@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestOpenTelemetryTracer(t *testing.T) {
@@ -180,12 +182,12 @@ func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
 		t.Fatalf("expected trace id from header, got %s", spanCtx.TraceID())
 	}
 
-	internalCtx := traceContextFromContext(ctx)
-	if internalCtx == nil || internalCtx.traceID != "trace-ctx" {
-		t.Fatalf("expected internal trace context to be set with traceID trace-ctx")
+	traceCtx := contract.TraceContextFromContext(ctx)
+	if traceCtx == nil || traceCtx.TraceID != contract.TraceID("trace-ctx") {
+		t.Fatalf("expected contract trace context to be set with traceID trace-ctx")
 	}
-	if internalCtx.spanID == "" {
-		t.Fatalf("expected non-empty span id in internal trace context")
+	if traceCtx.SpanID == "" {
+		t.Fatalf("expected non-empty span id in contract trace context")
 	}
 }
 

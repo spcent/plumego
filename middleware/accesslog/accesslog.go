@@ -67,20 +67,7 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 				ctx, span = tracer.Start(ctx, r)
 			}
 
-			spanTraceID, spanID := internalobs.ExtractSpanContext(ctx, span)
-			if spanTraceID != "" || spanID != "" {
-				traceContext := contract.TraceContext{}
-				if existing := contract.TraceContextFromContext(ctx); existing != nil {
-					traceContext = *existing
-				}
-				if spanTraceID != "" {
-					traceContext.TraceID = contract.TraceID(spanTraceID)
-				}
-				if spanID != "" {
-					traceContext.SpanID = contract.SpanID(spanID)
-				}
-				ctx = contract.WithTraceContext(ctx, traceContext)
-			}
+			_, spanID := internalobs.ExtractSpanContext(ctx, span)
 			if spanID != "" {
 				w.Header().Set("X-Span-ID", spanID)
 			}
