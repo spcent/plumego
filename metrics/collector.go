@@ -15,41 +15,6 @@ type MetricType string
 const (
 	// HTTP metrics
 	MetricHTTPRequest MetricType = "http_request"
-
-	// PubSub metrics
-	MetricPubSubPublish   MetricType = "pubsub_publish"
-	MetricPubSubSubscribe MetricType = "pubsub_subscribe"
-	MetricPubSubDeliver   MetricType = "pubsub_deliver"
-	MetricPubSubDrop      MetricType = "pubsub_drop"
-
-	// Message Queue metrics
-	MetricMQPublish   MetricType = "mq_publish"
-	MetricMQSubscribe MetricType = "mq_subscribe"
-	MetricMQClose     MetricType = "mq_close"
-	MetricMQMetrics   MetricType = "mq_metrics"
-
-	// Key-Value Store metrics
-	MetricKVSet    MetricType = "kv_set"
-	MetricKVGet    MetricType = "kv_get"
-	MetricKVDelete MetricType = "kv_delete"
-	MetricKVExists MetricType = "kv_exists"
-	MetricKVKeys   MetricType = "kv_keys"
-	MetricKVEvict  MetricType = "kv_evict"
-
-	// IPC metrics
-	MetricIPCAccept MetricType = "ipc_accept"
-	MetricIPCDial   MetricType = "ipc_dial"
-	MetricIPCRead   MetricType = "ipc_read"
-	MetricIPCWrite  MetricType = "ipc_write"
-	MetricIPCClose  MetricType = "ipc_close"
-
-	// Database metrics
-	MetricDBQuery       MetricType = "db_query"
-	MetricDBExec        MetricType = "db_exec"
-	MetricDBTransaction MetricType = "db_transaction"
-	MetricDBPing        MetricType = "db_ping"
-	MetricDBConnect     MetricType = "db_connect"
-	MetricDBClose       MetricType = "db_close"
 )
 
 // MetricLabels represents key-value labels for metrics
@@ -75,6 +40,8 @@ const (
 
 // MetricRecord represents a single metric record
 type MetricRecord struct {
+	// Type is optional. Stable metrics owns only the shared HTTP type; owner-
+	// specific or extension-specific taxonomy should be set by the owning package.
 	Type MetricType
 	Name string
 	// Value uses seconds as the canonical unit for duration/latency metrics.
@@ -248,7 +215,9 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 
 	b.records = append(b.records, record)
 	b.stats.TotalRecords++
-	b.stats.TypeBreakdown[record.Type]++
+	if record.Type != "" {
+		b.stats.TypeBreakdown[record.Type]++
+	}
 
 	if record.Error != nil {
 		b.stats.ErrorRecords++
@@ -273,26 +242,13 @@ func (b *BaseMetricsCollector) ObserveHTTP(ctx context.Context, method, path str
 
 // ObservePubSub implements PubSub metrics recording
 func (b *BaseMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	var metricType MetricType
-	switch operation {
-	case "publish":
-		metricType = MetricPubSubPublish
-	case "subscribe":
-		metricType = MetricPubSubSubscribe
-	case "deliver":
-		metricType = MetricPubSubDeliver
-	case "drop":
-		metricType = MetricPubSubDrop
-	default:
-		metricType = MetricPubSubPublish
-	}
+	normalizedOperation := normalizeMetricOperation(operation)
 
 	record := MetricRecord{
-		Type:  metricType,
-		Name:  "pubsub_" + operation,
+		Name:  "pubsub_" + normalizedOperation,
 		Value: durationValueSeconds(duration),
 		Labels: MetricLabels{
-			labelOperation: operation,
+			labelOperation: normalizedOperation,
 			labelTopic:     topic,
 		},
 		Duration: duration,
@@ -303,26 +259,13 @@ func (b *BaseMetricsCollector) ObservePubSub(ctx context.Context, operation, top
 
 // ObserveMQ implements Message Queue metrics recording
 func (b *BaseMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	var metricType MetricType
-	switch operation {
-	case "publish":
-		metricType = MetricMQPublish
-	case "subscribe":
-		metricType = MetricMQSubscribe
-	case "close":
-		metricType = MetricMQClose
-	case "metrics":
-		metricType = MetricMQMetrics
-	default:
-		metricType = MetricMQPublish
-	}
+	normalizedOperation := normalizeMetricOperation(operation)
 
 	record := MetricRecord{
-		Type:  metricType,
-		Name:  "mq_" + operation,
+		Name:  "mq_" + normalizedOperation,
 		Value: durationValueSeconds(duration),
 		Labels: MetricLabels{
-			labelOperation: operation,
+			labelOperation: normalizedOperation,
 			labelTopic:     topic,
 			labelPanicked:  boolLabel(panicked),
 		},
@@ -334,24 +277,10 @@ func (b *BaseMetricsCollector) ObserveMQ(ctx context.Context, operation, topic s
 
 // ObserveKV implements Key-Value Store metrics recording
 func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	var metricType MetricType
-	switch operation {
-	case "set":
-		metricType = MetricKVSet
-	case "get":
-		metricType = MetricKVGet
-	case "delete":
-		metricType = MetricKVDelete
-	case "exists":
-		metricType = MetricKVExists
-	case "keys":
-		metricType = MetricKVKeys
-	default:
-		metricType = MetricKVGet
-	}
+	normalizedOperation := normalizeMetricOperation(operation)
 
 	labels := MetricLabels{
-		labelOperation: operation,
+		labelOperation: normalizedOperation,
 		labelHit:       boolLabel(hit),
 	}
 	if key != "" {
@@ -359,8 +288,7 @@ func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key str
 	}
 
 	record := MetricRecord{
-		Type:     metricType,
-		Name:     "kv_" + operation,
+		Name:     "kv_" + normalizedOperation,
 		Value:    durationValueSeconds(duration),
 		Labels:   labels,
 		Duration: duration,
@@ -371,24 +299,10 @@ func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key str
 
 // ObserveIPC implements IPC metrics recording
 func (b *BaseMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	var metricType MetricType
-	switch operation {
-	case "accept":
-		metricType = MetricIPCAccept
-	case "dial":
-		metricType = MetricIPCDial
-	case "read":
-		metricType = MetricIPCRead
-	case "write":
-		metricType = MetricIPCWrite
-	case "close":
-		metricType = MetricIPCClose
-	default:
-		metricType = MetricIPCRead
-	}
+	normalizedOperation := normalizeMetricOperation(operation)
 
 	labels := MetricLabels{
-		labelOperation: operation,
+		labelOperation: normalizedOperation,
 		labelTransport: transport,
 	}
 	if addr != "" {
@@ -399,8 +313,7 @@ func (b *BaseMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, 
 	}
 
 	record := MetricRecord{
-		Type:     metricType,
-		Name:     "ipc_" + operation,
+		Name:     "ipc_" + normalizedOperation,
 		Value:    durationValueSeconds(duration),
 		Labels:   labels,
 		Duration: duration,
@@ -411,26 +324,10 @@ func (b *BaseMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, 
 
 // ObserveDB implements database metrics recording
 func (b *BaseMetricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	var metricType MetricType
-	switch operation {
-	case "query":
-		metricType = MetricDBQuery
-	case "exec":
-		metricType = MetricDBExec
-	case "transaction":
-		metricType = MetricDBTransaction
-	case "ping":
-		metricType = MetricDBPing
-	case "connect":
-		metricType = MetricDBConnect
-	case "close":
-		metricType = MetricDBClose
-	default:
-		metricType = MetricDBQuery
-	}
+	normalizedOperation := normalizeMetricOperation(operation)
 
 	labels := MetricLabels{
-		labelOperation: operation,
+		labelOperation: normalizedOperation,
 	}
 	if driver != "" {
 		labels[labelDriver] = driver
@@ -452,8 +349,7 @@ func (b *BaseMetricsCollector) ObserveDB(ctx context.Context, operation, driver,
 	}
 
 	record := MetricRecord{
-		Type:     metricType,
-		Name:     "db_" + operation,
+		Name:     "db_" + normalizedOperation,
 		Value:    durationValueSeconds(duration),
 		Labels:   labels,
 		Duration: duration,
@@ -522,6 +418,14 @@ func boolLabel(value bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func normalizeMetricOperation(operation string) string {
+	normalized := strings.ToLower(strings.TrimSpace(operation))
+	if normalized == "" {
+		return "unknown"
+	}
+	return normalized
 }
 
 func cloneLabels(labels MetricLabels) MetricLabels {

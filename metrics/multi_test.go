@@ -95,6 +95,8 @@ func TestMultiCollectorGetStats(t *testing.T) {
 }
 
 func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
+	customOwnerType := MetricType("owner_metric")
+
 	collector1 := newStubAggregateCollector(func() CollectorStats {
 		return CollectorStats{
 			TotalRecords:  10,
@@ -108,7 +110,7 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 		return CollectorStats{
 			TotalRecords:  5,
 			ErrorRecords:  2,
-			TypeBreakdown: map[MetricType]int64{MetricHTTPRequest: 3, MetricPubSubPublish: 2},
+			TypeBreakdown: map[MetricType]int64{MetricHTTPRequest: 3, customOwnerType: 2},
 			StartTime:     time.Unix(200, 0),
 		}
 	})
@@ -129,8 +131,8 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 	if stats.TypeBreakdown[MetricHTTPRequest] != 13 {
 		t.Fatalf("expected MetricHTTPRequest 13, got %d", stats.TypeBreakdown[MetricHTTPRequest])
 	}
-	if stats.TypeBreakdown[MetricPubSubPublish] != 2 {
-		t.Fatalf("expected MetricPubSubPublish 2, got %d", stats.TypeBreakdown[MetricPubSubPublish])
+	if stats.TypeBreakdown[customOwnerType] != 2 {
+		t.Fatalf("expected custom owner metric 2, got %d", stats.TypeBreakdown[customOwnerType])
 	}
 	// StartTime should be the earliest
 	if !stats.StartTime.Equal(time.Unix(100, 0)) {

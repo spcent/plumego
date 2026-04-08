@@ -59,7 +59,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 		rows      int
 		duration  time.Duration
 		err       error
-		wantType  MetricType
 		wantName  string
 	}{
 		{
@@ -70,7 +69,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 			rows:      10,
 			duration:  50 * time.Millisecond,
 			err:       nil,
-			wantType:  MetricDBQuery,
 			wantName:  "db_query",
 		},
 		{
@@ -81,7 +79,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 			rows:      1,
 			duration:  30 * time.Millisecond,
 			err:       nil,
-			wantType:  MetricDBExec,
 			wantName:  "db_exec",
 		},
 		{
@@ -92,7 +89,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 			rows:      0,
 			duration:  5 * time.Millisecond,
 			err:       nil,
-			wantType:  MetricDBTransaction,
 			wantName:  "db_transaction",
 		},
 		{
@@ -103,7 +99,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 			rows:      0,
 			duration:  2 * time.Millisecond,
 			err:       nil,
-			wantType:  MetricDBPing,
 			wantName:  "db_ping",
 		},
 		{
@@ -114,7 +109,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 			rows:      0,
 			duration:  100 * time.Millisecond,
 			err:       nil,
-			wantType:  MetricDBConnect,
 			wantName:  "db_connect",
 		},
 		{
@@ -125,7 +119,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 			rows:      0,
 			duration:  10 * time.Millisecond,
 			err:       nil,
-			wantType:  MetricDBClose,
 			wantName:  "db_close",
 		},
 		{
@@ -136,7 +129,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 			rows:      0,
 			duration:  20 * time.Millisecond,
 			err:       errors.New("table does not exist"),
-			wantType:  MetricDBQuery,
 			wantName:  "db_query",
 		},
 		{
@@ -147,7 +139,6 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 			rows:      1,
 			duration:  40 * time.Millisecond,
 			err:       nil,
-			wantType:  MetricDBQuery,
 			wantName:  "db_query",
 		},
 	}
@@ -166,9 +157,9 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 
 			record := records[0]
 
-			// Verify record type
-			if record.Type != tt.wantType {
-				t.Errorf("expected type %q, got %q", tt.wantType, record.Type)
+			// DB helpers should not stamp a stable feature type taxonomy.
+			if record.Type != "" {
+				t.Errorf("expected empty type, got %q", record.Type)
 			}
 
 			// Verify record name
@@ -244,8 +235,8 @@ func TestBaseMetricsCollector_ObserveDB(t *testing.T) {
 				t.Errorf("expected 1 error record, got %d", stats.ErrorRecords)
 			}
 
-			if stats.TypeBreakdown[tt.wantType] != 1 {
-				t.Errorf("expected 1 record of type %q, got %d", tt.wantType, stats.TypeBreakdown[tt.wantType])
+			if len(stats.TypeBreakdown) != 0 {
+				t.Errorf("expected no type breakdown entries, got %v", stats.TypeBreakdown)
 			}
 		})
 	}
@@ -374,7 +365,7 @@ func TestBaseMetricsCollector_ObserveDB_DefaultOperation(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	ctx := context.Background()
 
-	// Test with unknown operation - should default to MetricDBQuery
+	// Unknown operations should flow through names/labels without a stable type mapping.
 	collector.ObserveDB(ctx, "unknown_operation", "postgres", "SELECT 1", 0, 10*time.Millisecond, nil)
 
 	records := collector.GetRecords()
@@ -383,8 +374,14 @@ func TestBaseMetricsCollector_ObserveDB_DefaultOperation(t *testing.T) {
 	}
 
 	record := records[0]
-	if record.Type != MetricDBQuery {
-		t.Errorf("expected default type MetricDBQuery, got %q", record.Type)
+	if record.Type != "" {
+		t.Errorf("expected empty type, got %q", record.Type)
+	}
+	if record.Name != "db_unknown_operation" {
+		t.Errorf("expected name %q, got %q", "db_unknown_operation", record.Name)
+	}
+	if record.Labels[labelOperation] != "unknown_operation" {
+		t.Errorf("expected operation label %q, got %q", "unknown_operation", record.Labels[labelOperation])
 	}
 }
 
@@ -407,16 +404,15 @@ func TestBaseMetricsCollector_ObserveDB_Multiple(t *testing.T) {
 		t.Errorf("expected 3 total records, got %d", stats.TotalRecords)
 	}
 
-	if stats.TypeBreakdown[MetricDBQuery] != 1 {
-		t.Errorf("expected 1 query record, got %d", stats.TypeBreakdown[MetricDBQuery])
+	gotNames := []string{records[0].Name, records[1].Name, records[2].Name}
+	wantNames := []string{"db_query", "db_exec", "db_ping"}
+	for i := range wantNames {
+		if gotNames[i] != wantNames[i] {
+			t.Fatalf("expected record %d name %q, got %q", i, wantNames[i], gotNames[i])
+		}
 	}
-
-	if stats.TypeBreakdown[MetricDBExec] != 1 {
-		t.Errorf("expected 1 exec record, got %d", stats.TypeBreakdown[MetricDBExec])
-	}
-
-	if stats.TypeBreakdown[MetricDBPing] != 1 {
-		t.Errorf("expected 1 ping record, got %d", stats.TypeBreakdown[MetricDBPing])
+	if len(stats.TypeBreakdown) != 0 {
+		t.Fatalf("expected no type breakdown entries for DB helpers, got %v", stats.TypeBreakdown)
 	}
 }
 

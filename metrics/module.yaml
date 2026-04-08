@@ -16,6 +16,7 @@ responsibilities:
 non_goals:
   - App bootstrap
   - Feature-specific dashboards
+  - Repo-wide feature metric type catalogs
   - Transport policy
   - Rolling-window aggregation helpers
   - Repo-wide metrics test utilities
@@ -53,7 +54,7 @@ change_risks:
 
 review_checklist:
   - Keep contracts small
-  - Avoid feature coupling
+  - Avoid feature taxonomy coupling
 
 agent_hints:
   - Observability capability packs and transport-specific logic belong outside the stable layer
