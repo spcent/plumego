@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	storedb "github.com/spcent/plumego/store/db"
 )
 
 // SlowQuery represents a slow query execution.
@@ -182,16 +180,16 @@ func truncateQuery(query string, maxLen int) string {
 	return query[:maxLen] + "..."
 }
 
-// InstrumentedDB wraps store/db.InstrumentedDB with slow query detection.
-type InstrumentedDB struct {
-	*storedb.InstrumentedDB
+// SlowQueryDB wraps InstrumentedDB with slow query detection.
+type SlowQueryDB struct {
+	*InstrumentedDB
 	driver   string
 	detector *Detector
 }
 
-// NewInstrumentedDB wraps an instrumented DB with slow query detection.
-func NewInstrumentedDB(db *storedb.InstrumentedDB, driver string, opts ...DetectorOption) *InstrumentedDB {
-	return &InstrumentedDB{
+// NewSlowQueryDB wraps an instrumented DB with slow query detection.
+func NewSlowQueryDB(db *InstrumentedDB, driver string, opts ...DetectorOption) *SlowQueryDB {
+	return &SlowQueryDB{
 		InstrumentedDB: db,
 		driver:         driver,
 		detector:       NewDetector(opts...),
@@ -199,12 +197,12 @@ func NewInstrumentedDB(db *storedb.InstrumentedDB, driver string, opts ...Detect
 }
 
 // GetDetector returns the slow query detector.
-func (idb *InstrumentedDB) GetDetector() *Detector {
+func (idb *SlowQueryDB) GetDetector() *Detector {
 	return idb.detector
 }
 
 // ExecContext wraps ExecContext with slow query detection.
-func (idb *InstrumentedDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (idb *SlowQueryDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	start := time.Now()
 	result, err := idb.InstrumentedDB.ExecContext(ctx, query, args...)
 	duration := time.Since(start)
@@ -214,7 +212,7 @@ func (idb *InstrumentedDB) ExecContext(ctx context.Context, query string, args .
 }
 
 // QueryContext wraps QueryContext with slow query detection.
-func (idb *InstrumentedDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+func (idb *SlowQueryDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	start := time.Now()
 	rows, err := idb.InstrumentedDB.QueryContext(ctx, query, args...)
 	duration := time.Since(start)
@@ -224,7 +222,7 @@ func (idb *InstrumentedDB) QueryContext(ctx context.Context, query string, args 
 }
 
 // QueryRowContext wraps QueryRowContext with slow query detection.
-func (idb *InstrumentedDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+func (idb *SlowQueryDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	start := time.Now()
 	row := idb.InstrumentedDB.QueryRowContext(ctx, query, args...)
 	duration := time.Since(start)
@@ -235,12 +233,12 @@ func (idb *InstrumentedDB) QueryRowContext(ctx context.Context, query string, ar
 
 // Observer wraps a MetricsObserver with slow query detection.
 type Observer struct {
-	base     storedb.MetricsObserver
+	base     MetricsObserver
 	detector *Detector
 }
 
 // NewObserver creates a metrics observer with slow query detection.
-func NewObserver(base storedb.MetricsObserver, opts ...DetectorOption) *Observer {
+func NewObserver(base MetricsObserver, opts ...DetectorOption) *Observer {
 	return &Observer{
 		base:     base,
 		detector: NewDetector(opts...),

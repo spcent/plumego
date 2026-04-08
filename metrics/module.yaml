@@ -25,6 +25,7 @@ non_goals:
 public_entrypoints:
   - AggregateCollector
   - Recorder
+  - HTTPObserver
   - BaseMetricsCollector
   - NoopCollector
   - MultiCollector
@@ -55,6 +56,7 @@ change_risks:
 review_checklist:
   - Keep contracts small
   - Avoid feature taxonomy coupling
+  - Keep feature-owned observer interfaces out of the stable layer
 
 agent_hints:
   - Observability capability packs and transport-specific logic belong outside the stable layer

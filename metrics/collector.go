@@ -101,31 +101,6 @@ type HTTPObserver interface {
 	ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
 }
 
-// PubSubObserver captures only pub/sub activity metrics.
-type PubSubObserver interface {
-	ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error)
-}
-
-// MQObserver captures only message queue activity metrics.
-type MQObserver interface {
-	ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool)
-}
-
-// KVObserver captures only key-value store activity metrics.
-type KVObserver interface {
-	ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool)
-}
-
-// IPCObserver captures only IPC activity metrics.
-type IPCObserver interface {
-	ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error)
-}
-
-// DBObserver captures only database activity metrics.
-type DBObserver interface {
-	ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error)
-}
-
 // StatsReader exposes aggregated collector statistics.
 type StatsReader interface {
 	GetStats() CollectorStats

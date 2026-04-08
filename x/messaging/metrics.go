@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/x/mq"
 )
 
 type messagingMetrics interface {
-	metrics.MQObserver
+	mq.MetricsObserver
 	metrics.Recorder
 }
 

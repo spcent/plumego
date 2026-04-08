@@ -9,8 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/spcent/plumego/metrics"
 )
 
 // subKind distinguishes the type of subscription.
@@ -941,7 +939,7 @@ func (b *InProcBroker) Snapshot() MetricsSnapshot {
 }
 
 // SetMetricsObserver replaces the external metrics sink at runtime.
-func (b *InProcBroker) SetMetricsObserver(observer metrics.PubSubObserver) {
+func (b *InProcBroker) SetMetricsObserver(observer MetricsObserver) {
 	b.config.MetricsObserver = observer
 }
 

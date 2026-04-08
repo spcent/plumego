@@ -552,7 +552,7 @@ func TestPublishWithContext_ContextValuesPropagated(t *testing.T) {
 	}
 }
 
-// testMetricsObserver is a test helper that implements metrics.PubSubObserver
+// testMetricsObserver is a test helper that implements pubsub.MetricsObserver.
 // with callback hooks for verifying context propagation.
 type testMetricsObserver struct {
 	metrics.BaseMetricsCollector

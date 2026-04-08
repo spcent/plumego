@@ -14,7 +14,7 @@ other modules can depend on safely.
 
 - changing collector contracts
 - adding base collectors or aggregate collector composition
-- wiring stable instrumentation against `Recorder` or the focused observer interfaces
+- wiring stable instrumentation against `Recorder` or `HTTPObserver`
 
 ## Do not use this module for
 
@@ -38,6 +38,7 @@ other modules can depend on safely.
 - keep base collectors generic and transport-agnostic
 - keep only aggregate collector composition in stable `metrics`
 - keep the shared stable metric type surface to HTTP; use owner-defined types or `Name` + `Labels` for feature metrics
+- keep feature-specific observer interfaces in their owning package; only the shared HTTP observer stays in stable `metrics`
 - keep Prometheus and tracing adapters in `x/observability`
 - keep rolling-window aggregation in `x/observability/windowmetrics`
 - keep metrics test helpers in `x/observability/testmetrics`

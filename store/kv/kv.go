@@ -47,8 +47,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/spcent/plumego/metrics"
 )
 
 var (
@@ -123,6 +121,12 @@ type Shard struct {
 	prev    map[*Entry]*Entry // LRU prev pointers
 }
 
+// MetricsObserver captures KV-specific observations without depending on the
+// stable metrics root for a feature-owned contract.
+type MetricsObserver interface {
+	ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool)
+}
+
 // KVStore is a simplified, high-performance key-value store
 type KVStore struct {
 	// Configuration
@@ -156,7 +160,7 @@ type KVStore struct {
 	closed int32
 
 	// Unified metrics collector
-	collector metrics.KVObserver
+	collector MetricsObserver
 }
 
 // Stats provides runtime statistics
@@ -1052,12 +1056,12 @@ func Default() (*KVStore, error) {
 }
 
 // SetMetricsCollector sets the unified metrics collector
-func (kv *KVStore) SetMetricsCollector(collector metrics.KVObserver) {
+func (kv *KVStore) SetMetricsCollector(collector MetricsObserver) {
 	kv.collector = collector
 }
 
 // GetMetricsCollector returns the current metrics collector
-func (kv *KVStore) GetMetricsCollector() metrics.KVObserver {
+func (kv *KVStore) GetMetricsCollector() MetricsObserver {
 	return kv.collector
 }
 

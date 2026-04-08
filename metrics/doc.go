@@ -2,7 +2,7 @@
 //
 // The stable surface is intentionally narrow:
 //   - metric record and label contracts
-//   - focused observer interfaces (HTTP, MQ, KV, DB, and so on)
+//   - the shared HTTP observer contract
 //   - BaseMetricsCollector, NoopCollector, and MultiCollector
 //   - helper functions for recording and measuring operations
 //

@@ -6,8 +6,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	storedb "github.com/spcent/plumego/store/db"
 )
 
 const (
@@ -359,19 +357,19 @@ func cleanTableName(name string) string {
 
 // AggregatingObserver wraps a MetricsObserver and also aggregates statistics.
 type AggregatingObserver struct {
-	base       storedb.MetricsObserver
+	base       MetricsObserver
 	aggregator *Aggregator
 }
 
 // NewAggregatingObserver creates an observer that both records metrics and aggregates statistics.
-func NewAggregatingObserver(base storedb.MetricsObserver, slowQueryThreshold time.Duration) *AggregatingObserver {
+func NewAggregatingObserver(base MetricsObserver, slowQueryThreshold time.Duration) *AggregatingObserver {
 	return &AggregatingObserver{
 		base:       base,
 		aggregator: NewAggregator(slowQueryThreshold),
 	}
 }
 
-// ObserveDB implements store/db.MetricsObserver and also aggregates statistics.
+// ObserveDB implements MetricsObserver and also aggregates statistics.
 func (c *AggregatingObserver) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
 	if c.base != nil {
 		c.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
