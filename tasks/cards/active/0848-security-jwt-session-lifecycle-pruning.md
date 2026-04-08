@@ -49,4 +49,7 @@ Done Definition:
 - No residual references remain to removed stable lifecycle APIs.
 
 Outcome:
-- Pending.
+- Completed.
+- Removed token revocation and subject-version invalidation state from stable `security/jwt`; `JWTManager` now only signs, rotates keys, and verifies token semantics.
+- Moved JWT-backed revocation/version state to `x/tenant/session` via `JWTStateStore`, which validates verified claims against revocation markers and subject versions.
+- Updated security and tenant docs/manifests so session lifecycle ownership is explicitly documented under `x/tenant/session`.

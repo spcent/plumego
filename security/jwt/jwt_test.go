@@ -171,9 +171,9 @@ func TestAutomaticRotation(t *testing.T) {
 	}
 }
 
-// ========== blacklist and versioning test ==========
+// ========== caller-owned identity version test ==========
 
-func TestBlacklistAndVersioning(t *testing.T) {
+func TestIdentityVersionIsCallerOwned(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()
 	cfg.AccessExpiration = time.Minute
@@ -183,54 +183,17 @@ func TestBlacklistAndVersioning(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	// generate token pair
-	pair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3"}, AuthorizationClaims{})
+	pair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3", Version: 7}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate pair: %v", err)
 	}
 
-	// token should be valid
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	claims, err := mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
-		t.Fatalf("token should be valid: %v", err)
+		t.Fatalf("verify token: %v", err)
 	}
-
-	// revoke token
-	if err := mgr.RevokeToken(pair.AccessToken); err != nil {
-		t.Fatalf("revoke token: %v", err)
-	}
-
-	// token should be revoked
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
-	if err != ErrTokenRevoked {
-		t.Errorf("expected ErrTokenRevoked, got %v", err)
-	}
-
-	// generate new token pair and increment version
-	pair, err = mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3"}, AuthorizationClaims{})
-	if err != nil {
-		t.Fatalf("generate pair: %v", err)
-	}
-
-	// increment identity version
-	if err := mgr.IncrementIdentityVersion("user-3"); err != nil {
-		t.Fatalf("increment version: %v", err)
-	}
-
-	// old token should be invalidated
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
-	if err != ErrVersionMismatch {
-		t.Errorf("expected ErrVersionMismatch, got %v", err)
-	}
-
-	// new token should have new version
-	newPair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3"}, AuthorizationClaims{})
-	newClaims, err := mgr.VerifyToken(context.Background(), newPair.AccessToken, TokenTypeAccess)
-	if err != nil {
-		t.Fatalf("new token should be valid: %v", err)
-	}
-	if newClaims.Identity.Version != 1 {
-		t.Errorf("expected version=1, got %d", newClaims.Identity.Version)
+	if claims.Identity.Version != 7 {
+		t.Errorf("expected version=7, got %d", claims.Identity.Version)
 	}
 }
 

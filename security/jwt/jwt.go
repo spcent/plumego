@@ -9,9 +9,8 @@
 // Features:
 //   - HMAC-SHA256 signing with automatic key rotation
 //   - EdDSA (Ed25519) signing for enhanced security
-//   - Token blacklisting for logout and revocation
 //   - transport-agnostic token validation with explicit middleware adapters
-//   - Thread-safe operations with minimal lock contention
+//   - thread-safe key management with minimal lock contention
 //
 // Example usage:
 //
@@ -53,7 +52,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -106,8 +104,6 @@ var (
 	ErrInvalidToken     = errors.New("invalid token")
 	ErrTokenExpired     = errors.New("token expired")
 	ErrTokenNotYetValid = errors.New("token not yet valid")
-	ErrTokenRevoked     = errors.New("token revoked")
-	ErrVersionMismatch  = errors.New("token version mismatch")
 	ErrUnknownKey       = errors.New("unknown signing key")
 	ErrMissingSubject   = errors.New("subject is required")
 	ErrInvalidIssuer    = errors.New("invalid issuer")
@@ -115,10 +111,8 @@ var (
 )
 
 const (
-	keyPrefix       = "jwt:keys:"
-	activeKeyKey    = "jwt:active"
-	blacklistPrefix = "jwt:blacklist:"
-	versionPrefix   = "jwt:version:"
+	keyPrefix    = "jwt:keys:"
+	activeKeyKey = "jwt:active"
 )
 
 // IdentityClaims captures authentication (who the subject is).
@@ -285,12 +279,10 @@ type TokenPair struct {
 
 // JWTManager handles JWT token generation and verification.
 //
-// JWTManager provides a complete JWT authentication system with:
+// JWTManager provides a JWT signing and verification primitive with:
 //   - Token generation (access and refresh tokens)
 //   - Token verification and validation
 //   - Key rotation
-//   - Token revocation
-//   - Identity versioning for instant invalidation
 //
 // Example:
 //
@@ -317,10 +309,9 @@ type JWTManager struct {
 	config JWTConfig
 	store  *kvstore.KVStore
 
-	mu           sync.RWMutex
-	keyCache     map[string]JWTSigningKey
-	versionCache map[string]int64 // version cache to reduce lock contention
-	active       string
+	mu       sync.RWMutex
+	keyCache map[string]JWTSigningKey
+	active   string
 }
 
 // NewJWTManager creates a new JWT manager with the given configuration and backing store.
@@ -344,10 +335,9 @@ func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error
 	}
 
 	mgr := &JWTManager{
-		config:       config,
-		store:        store,
-		keyCache:     make(map[string]JWTSigningKey),
-		versionCache: make(map[string]int64), // version cache to reduce lock contention
+		config:   config,
+		store:    store,
+		keyCache: make(map[string]JWTSigningKey),
 	}
 
 	if err := mgr.loadKeys(); err != nil {
@@ -475,7 +465,7 @@ func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityCla
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// ensureRotationUnsafe ensures the key cache and version cache are up-to-date, avoiding deadlocks.
+	// ensureRotationUnsafe ensures the key cache is up-to-date before issuing tokens.
 	if err := m.ensureRotationUnsafe(); err != nil {
 		return TokenPair{}, err
 	}
@@ -488,9 +478,6 @@ func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityCla
 	if identity.Subject == "" {
 		return TokenPair{}, ErrMissingSubject
 	}
-
-	version := m.getIdentityVersionUnsafe(identity.Subject)
-	identity.Version = version
 
 	now := time.Now().UTC()
 	access, err := m.buildToken(activeKey, TokenTypeAccess, identity, authz, now, m.config.AccessExpiration)
@@ -537,7 +524,7 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 		return nil, err
 	}
 
-	// ensureRotationUnsafe ensures the key cache and version cache are up-to-date, avoiding deadlocks.
+	// ensureRotationUnsafe ensures the active signing key state is current.
 	if err = m.ensureRotationUnsafe(); err != nil {
 		return nil, err
 	}
@@ -554,14 +541,6 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 
 	if expectedType != "" && claims.TokenType != expectedType {
 		return nil, ErrInvalidToken
-	}
-
-	if m.isBlacklisted(claims.TokenID) {
-		return nil, ErrTokenRevoked
-	}
-
-	if !m.matchIdentityVersion(claims.Identity.Subject, claims.Identity.Version) {
-		return nil, ErrVersionMismatch
 	}
 
 	return claims, nil
@@ -675,7 +654,7 @@ func signJWT(key JWTSigningKey, claims TokenClaims) (string, error) {
 	return signingInput + "." + sigPart, nil
 }
 
-// ensureRotationUnsafe is the unsafe version of ensureRotationUnsafe, assuming the caller holds the lock.
+// ensureRotationUnsafe rotates the active signing key if the configured interval has elapsed.
 func (m *JWTManager) ensureRotationUnsafe() error {
 	activeKey, ok := m.keyCache[m.active]
 	if !ok {
@@ -689,87 +668,6 @@ func (m *JWTManager) ensureRotationUnsafe() error {
 		return err
 	}
 	return nil
-}
-
-// RevokeToken blacklists the provided token until its expiration.
-func (m *JWTManager) RevokeToken(token string) error {
-	claims, err := m.parseAndVerify(token)
-	if err != nil {
-		return err
-	}
-	ttl := time.Until(time.Unix(claims.ExpiresAt, 0))
-	if ttl < 0 {
-		ttl = 0
-	}
-	key := blacklistPrefix + claims.TokenID
-	return m.store.Set(key, []byte("revoked"), ttl)
-}
-
-func (m *JWTManager) isBlacklisted(jti string) bool {
-	_, err := m.store.Get(blacklistPrefix + jti)
-	if err == nil {
-		// Token is explicitly blacklisted
-		return true
-	}
-	// For "not found" errors, the token is not blacklisted.
-	// For any other errors (storage failure, network issues), we fail-safe
-	// by treating the token as blacklisted to prevent accepting potentially
-	// revoked tokens when the storage is unavailable.
-	if errors.Is(err, kvstore.ErrKeyNotFound) {
-		return false
-	}
-	// Unknown error - fail-safe by assuming blacklisted
-	return true
-}
-
-// IncrementIdentityVersion bumps the subject version, invalidating older tokens.
-func (m *JWTManager) IncrementIdentityVersion(subject string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	version := m.getIdentityVersionUnsafe(subject) + 1
-	payload := []byte(strconv.FormatInt(version, 10)) // use strconv instead of fmt.Sprintf
-	if err := m.store.Set(versionPrefix+subject, payload, 0); err != nil {
-		return err
-	}
-
-	// update cache
-	m.versionCache[subject] = version
-	return nil
-}
-
-// getIdentityVersionUnsafe is the unsafe version of getIdentityVersionUnsafe, assuming the caller holds the lock.
-func (m *JWTManager) getIdentityVersionUnsafe(subject string) int64 {
-	// check cache first
-	if v, ok := m.versionCache[subject]; ok {
-		return v
-	}
-
-	// read from store
-	raw, err := m.store.Get(versionPrefix + subject)
-	if err != nil {
-		return 0
-	}
-
-	// use strconv instead of fmt.Sscanf, and handle errors
-	version, err := strconv.ParseInt(string(raw), 10, 64)
-	if err != nil {
-		// corrupted data, return 0
-		return 0
-	}
-
-	// update cache
-	m.versionCache[subject] = version
-	return version
-}
-
-// matchIdentityVersion checks if the provided version matches the current version for the subject.
-func (m *JWTManager) matchIdentityVersion(subject string, version int64) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	current := m.getIdentityVersionUnsafe(subject)
-	return current == version
 }
 
 // AuthZPolicy defines role/permission requirements.

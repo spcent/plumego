@@ -131,10 +131,6 @@ func mapJWTError(err error) error {
 		return authn.ErrExpiredToken
 	case errors.Is(err, ErrTokenNotYetValid):
 		return authn.ErrInvalidToken
-	case errors.Is(err, ErrTokenRevoked):
-		return authn.ErrSessionRevoked
-	case errors.Is(err, ErrVersionMismatch):
-		return authn.ErrTokenVersionMismatch
 	case errors.Is(err, ErrInvalidIssuer):
 		return authn.ErrInvalidToken
 	case errors.Is(err, ErrInvalidAudience):

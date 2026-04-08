@@ -19,8 +19,6 @@ func TestMapJWTError_AllBranches(t *testing.T) {
 	}{
 		{"ErrTokenExpired", ErrTokenExpired, authn.ErrExpiredToken},
 		{"ErrTokenNotYetValid", ErrTokenNotYetValid, authn.ErrInvalidToken},
-		{"ErrTokenRevoked", ErrTokenRevoked, authn.ErrSessionRevoked},
-		{"ErrVersionMismatch", ErrVersionMismatch, authn.ErrTokenVersionMismatch},
 		{"ErrInvalidIssuer", ErrInvalidIssuer, authn.ErrInvalidToken},
 		{"ErrInvalidAudience", ErrInvalidAudience, authn.ErrInvalidToken},
 		{"ErrUnknownKey", ErrUnknownKey, authn.ErrInvalidToken},

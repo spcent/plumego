@@ -12,6 +12,7 @@ responsibilities:
   - Tenant quota management
   - Tenant rate limiting
   - Tenant-aware store adapters
+  - Session lifecycle and JWT-backed session state
 
 non_goals:
   - Core app bootstrap
@@ -26,6 +27,7 @@ public_entrypoints:
   - ratelimit
   - config
   - store
+  - session
 
 allowed_imports:
   - contract
