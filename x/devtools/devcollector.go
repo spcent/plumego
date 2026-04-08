@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/x/observability/featuremetrics"
 	windowmetrics "github.com/spcent/plumego/x/observability/windowmetrics"
 )
 
@@ -118,7 +119,8 @@ type DevDBRedactionConfig struct {
 }
 
 // DevCollector is a lightweight in-memory metrics collector for dev dashboards.
-// It focuses on HTTP request aggregation while still implementing AggregateCollector.
+// It focuses on HTTP request aggregation while also exposing extension-owned
+// helpers for DB, MQ, KV, IPC, and PubSub observations.
 type DevCollector struct {
 	base *metrics.BaseMetricsCollector
 
@@ -270,12 +272,12 @@ func (d *DevCollector) DBSnapshot() DevDBSnapshot {
 	return snap
 }
 
-// Record implements AggregateCollector.
+// Record records a generic metric.
 func (d *DevCollector) Record(ctx context.Context, record metrics.MetricRecord) {
 	d.base.Record(ctx, record)
 }
 
-// ObserveHTTP implements AggregateCollector.
+// ObserveHTTP records an HTTP metric.
 func (d *DevCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 	d.base.ObserveHTTP(ctx, method, path, status, bytes, duration)
 
@@ -303,34 +305,35 @@ func (d *DevCollector) ObserveHTTP(ctx context.Context, method, path string, sta
 	d.appendSampleLocked(method, path, status, bytes, durationMS, errorHit, now)
 }
 
-// ObservePubSub implements AggregateCollector.
+// ObservePubSub records a PubSub metric via extension-owned helpers.
 func (d *DevCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	d.base.ObservePubSub(ctx, operation, topic, duration, err)
+	featuremetrics.ObservePubSub(d.base, ctx, operation, topic, duration, err)
 }
 
-// ObserveMQ implements AggregateCollector.
+// ObserveMQ records an MQ metric via extension-owned helpers.
 func (d *DevCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	d.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
+	featuremetrics.ObserveMQ(d.base, ctx, operation, topic, duration, err, panicked)
 }
 
-// ObserveKV implements AggregateCollector.
+// ObserveKV records a KV metric via extension-owned helpers.
 func (d *DevCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	d.base.ObserveKV(ctx, operation, key, duration, err, hit)
+	featuremetrics.ObserveKV(d.base, ctx, operation, key, duration, err, hit)
 }
 
-// ObserveIPC implements AggregateCollector.
+// ObserveIPC records an IPC metric via extension-owned helpers.
 func (d *DevCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	d.base.ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
+	featuremetrics.ObserveIPC(d.base, ctx, operation, addr, transport, bytes, duration, err)
 }
 
-// ObserveDB implements AggregateCollector.
+// ObserveDB records a DB metric via extension-owned helpers.
 func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	d.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
+	record := featuremetrics.DBRecord(operation, driver, query, rows, duration, err)
+	d.base.Record(ctx, record)
 
 	durationMS := duration.Seconds() * 1000
 	now := d.now()
 	errorHit := err != nil
-	table := extractTable(query)
+	table := record.Labels["table"]
 
 	key := dbSeriesKey(operation, driver)
 
@@ -368,7 +371,7 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 	d.appendDBSlowLocked(operation, driver, table, query, durationMS, err, now)
 }
 
-// GetStats implements AggregateCollector.
+// GetStats returns aggregate stats from the underlying base collector.
 func (d *DevCollector) GetStats() metrics.CollectorStats {
 	stats := d.base.GetStats()
 	if stats.ActiveSeries == 0 && len(stats.TypeBreakdown) > 0 {
@@ -377,7 +380,7 @@ func (d *DevCollector) GetStats() metrics.CollectorStats {
 	return stats
 }
 
-// Clear implements AggregateCollector.
+// Clear resets the collector state.
 func (d *DevCollector) Clear() {
 	d.base.Clear()
 	d.mu.Lock()
@@ -774,69 +777,6 @@ func consumeQuoted(s string, idx int, quote byte) int {
 		}
 	}
 	return len(s) - 1
-}
-
-func extractTable(query string) string {
-	fields := strings.Fields(query)
-	if len(fields) == 0 {
-		return ""
-	}
-
-	for i := 0; i < len(fields); i++ {
-		upper := strings.ToUpper(fields[i])
-		switch upper {
-		case "FROM", "INTO":
-			if i+1 < len(fields) {
-				next := fields[i+1]
-				if strings.HasPrefix(next, "(") {
-					continue
-				}
-				return cleanTableName(next)
-			}
-		case "UPDATE":
-			if i+1 < len(fields) {
-				return cleanTableName(fields[i+1])
-			}
-		case "TABLE":
-			next := i + 1
-			if next < len(fields) && strings.EqualFold(fields[next], "IF") {
-				next++
-				if next < len(fields) && strings.EqualFold(fields[next], "NOT") {
-					next++
-				}
-				if next < len(fields) && strings.EqualFold(fields[next], "EXISTS") {
-					next++
-				}
-			}
-			if next < len(fields) {
-				return cleanTableName(fields[next])
-			}
-		}
-	}
-
-	return ""
-}
-
-func cleanTableName(value string) string {
-	value = strings.TrimRight(value, ",;()")
-	if value == "" {
-		return ""
-	}
-	value = unquoteIdent(value)
-	if idx := strings.LastIndexByte(value, '.'); idx >= 0 && idx+1 < len(value) {
-		value = unquoteIdent(value[idx+1:])
-	}
-	return value
-}
-
-func unquoteIdent(value string) string {
-	if len(value) >= 2 {
-		first, last := value[0], value[len(value)-1]
-		if (first == '"' && last == '"') || (first == '`' && last == '`') || (first == '[' && last == ']') {
-			value = value[1 : len(value)-1]
-		}
-	}
-	return value
 }
 
 func isNumericStart(s string, idx int) bool {

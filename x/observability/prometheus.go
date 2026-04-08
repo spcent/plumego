@@ -80,26 +80,6 @@ func (p *PrometheusCollector) ObserveHTTP(_ context.Context, method, path string
 	p.recordHTTP(method, path, status, duration)
 }
 
-func (p *PrometheusCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	p.base.ObservePubSub(ctx, operation, topic, duration, err)
-}
-
-func (p *PrometheusCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	p.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
-}
-
-func (p *PrometheusCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	p.base.ObserveKV(ctx, operation, key, duration, err, hit)
-}
-
-func (p *PrometheusCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	p.base.ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
-}
-
-func (p *PrometheusCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	p.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
-}
-
 func (p *PrometheusCollector) GetStats() metrics.CollectorStats {
 	p.mu.RLock()
 	totalRequests := uint64(0)
@@ -237,4 +217,7 @@ func escapeLabelValue(value string) string {
 	return value
 }
 
-var _ metrics.AggregateCollector = (*PrometheusCollector)(nil)
+var _ metrics.Recorder = (*PrometheusCollector)(nil)
+var _ metrics.HTTPObserver = (*PrometheusCollector)(nil)
+var _ metrics.StatsReader = (*PrometheusCollector)(nil)
+var _ metrics.Resetter = (*PrometheusCollector)(nil)

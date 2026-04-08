@@ -57,8 +57,10 @@ review_checklist:
   - Keep contracts small
   - Avoid feature taxonomy coupling
   - Keep feature-owned observer interfaces out of the stable layer
+  - Keep non-HTTP feature helper methods out of stable collectors
 
 agent_hints:
   - Observability capability packs and transport-specific logic belong outside the stable layer
   - Use x/observability for Prometheus, tracing, rolling-window aggregation, and metrics test helpers
+  - Use x/observability helper packages for non-HTTP feature record builders when extension-side reuse is justified
   - Use x/devtools for dev-only collectors and x/messaging for messaging-specific reporters/exporters

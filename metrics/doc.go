@@ -4,11 +4,11 @@
 //   - metric record and label contracts
 //   - the shared HTTP observer contract
 //   - BaseMetricsCollector, NoopCollector, and MultiCollector
-//   - helper functions for recording and measuring operations
+//   - generic record/stat/reset collector composition
 //
 // Prometheus exposition, tracing implementations, and dev-dashboard collectors
 // live in their owning extension packages:
-//   - x/observability for generic Prometheus and tracing adapters
+//   - x/observability for generic Prometheus, tracing adapters, and non-HTTP feature metric helpers
 //   - x/devtools for dev-only collectors
 //   - x/messaging for messaging-specific metrics reporters and exporters
 package metrics

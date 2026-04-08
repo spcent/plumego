@@ -2,9 +2,7 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -21,21 +19,9 @@ const (
 type MetricLabels map[string]string
 
 const (
-	labelMethod    = "method"
-	labelPath      = "path"
-	labelStatus    = "status"
-	labelOperation = "operation"
-	labelTopic     = "topic"
-	labelKVKey     = "key"
-	labelPanicked  = "panicked"
-	labelHit       = "hit"
-	labelAddr      = "addr"
-	labelTransport = "transport"
-	labelBytes     = "bytes"
-	labelDriver    = "driver"
-	labelQuery     = "query"
-	labelTable     = "table"
-	labelRows      = "rows"
+	labelMethod = "method"
+	labelPath   = "path"
+	labelStatus = "status"
 )
 
 // MetricRecord represents a single metric record
@@ -57,30 +43,16 @@ func durationValueSeconds(duration time.Duration) float64 {
 	return duration.Seconds()
 }
 
-// AggregateCollector is the full collector surface.
+// AggregateCollector is the stable collector surface.
 // Prefer narrower interfaces at module boundaries and reserve this contract for
-// collector implementations or fan-out adapters that truly need the whole set.
+// collector implementations or fan-out adapters that need generic recording,
+// shared HTTP observation, stats, and reset semantics.
 type AggregateCollector interface {
 	// Record records a single metric
 	Record(ctx context.Context, record MetricRecord)
 
 	// ObserveHTTP is a convenience method for HTTP request metrics
 	ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
-
-	// ObservePubSub is a convenience method for PubSub metrics
-	ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error)
-
-	// ObserveMQ is a convenience method for Message Queue metrics
-	ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool)
-
-	// ObserveKV is a convenience method for Key-Value Store metrics
-	ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool)
-
-	// ObserveIPC is a convenience method for IPC metrics
-	ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error)
-
-	// ObserveDB is a convenience method for database metrics
-	ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error)
 
 	// GetStats returns current statistics
 	GetStats() CollectorStats
@@ -215,124 +187,6 @@ func (b *BaseMetricsCollector) ObserveHTTP(ctx context.Context, method, path str
 	b.Record(ctx, record)
 }
 
-// ObservePubSub implements PubSub metrics recording
-func (b *BaseMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	normalizedOperation := normalizeMetricOperation(operation)
-
-	record := MetricRecord{
-		Name:  "pubsub_" + normalizedOperation,
-		Value: durationValueSeconds(duration),
-		Labels: MetricLabels{
-			labelOperation: normalizedOperation,
-			labelTopic:     topic,
-		},
-		Duration: duration,
-		Error:    err,
-	}
-	b.Record(ctx, record)
-}
-
-// ObserveMQ implements Message Queue metrics recording
-func (b *BaseMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	normalizedOperation := normalizeMetricOperation(operation)
-
-	record := MetricRecord{
-		Name:  "mq_" + normalizedOperation,
-		Value: durationValueSeconds(duration),
-		Labels: MetricLabels{
-			labelOperation: normalizedOperation,
-			labelTopic:     topic,
-			labelPanicked:  boolLabel(panicked),
-		},
-		Duration: duration,
-		Error:    err,
-	}
-	b.Record(ctx, record)
-}
-
-// ObserveKV implements Key-Value Store metrics recording
-func (b *BaseMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	normalizedOperation := normalizeMetricOperation(operation)
-
-	labels := MetricLabels{
-		labelOperation: normalizedOperation,
-		labelHit:       boolLabel(hit),
-	}
-	if key != "" {
-		labels[labelKVKey] = key
-	}
-
-	record := MetricRecord{
-		Name:     "kv_" + normalizedOperation,
-		Value:    durationValueSeconds(duration),
-		Labels:   labels,
-		Duration: duration,
-		Error:    err,
-	}
-	b.Record(ctx, record)
-}
-
-// ObserveIPC implements IPC metrics recording
-func (b *BaseMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	normalizedOperation := normalizeMetricOperation(operation)
-
-	labels := MetricLabels{
-		labelOperation: normalizedOperation,
-		labelTransport: transport,
-	}
-	if addr != "" {
-		labels[labelAddr] = addr
-	}
-	if bytes > 0 {
-		labels[labelBytes] = fmt.Sprintf("%d", bytes)
-	}
-
-	record := MetricRecord{
-		Name:     "ipc_" + normalizedOperation,
-		Value:    durationValueSeconds(duration),
-		Labels:   labels,
-		Duration: duration,
-		Error:    err,
-	}
-	b.Record(ctx, record)
-}
-
-// ObserveDB implements database metrics recording
-func (b *BaseMetricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	normalizedOperation := normalizeMetricOperation(operation)
-
-	labels := MetricLabels{
-		labelOperation: normalizedOperation,
-	}
-	if driver != "" {
-		labels[labelDriver] = driver
-	}
-	if query != "" {
-		// Truncate long queries to avoid excessive label cardinality
-		maxQueryLen := 100
-		if len(query) > maxQueryLen {
-			labels[labelQuery] = query[:maxQueryLen] + "..."
-		} else {
-			labels[labelQuery] = query
-		}
-	}
-	if rows > 0 {
-		labels[labelRows] = fmt.Sprintf("%d", rows)
-	}
-	if table := extractTable(query); table != "" {
-		labels[labelTable] = table
-	}
-
-	record := MetricRecord{
-		Name:     "db_" + normalizedOperation,
-		Value:    durationValueSeconds(duration),
-		Labels:   labels,
-		Duration: duration,
-		Error:    err,
-	}
-	b.Record(ctx, record)
-}
-
 // GetStats returns current statistics
 func (b *BaseMetricsCollector) GetStats() CollectorStats {
 	b.mu.RLock()
@@ -388,21 +242,6 @@ func (b *BaseMetricsCollector) ensureInitializedLocked() {
 	}
 }
 
-func boolLabel(value bool) string {
-	if value {
-		return "true"
-	}
-	return "false"
-}
-
-func normalizeMetricOperation(operation string) string {
-	normalized := strings.ToLower(strings.TrimSpace(operation))
-	if normalized == "" {
-		return "unknown"
-	}
-	return normalized
-}
-
 func cloneLabels(labels MetricLabels) MetricLabels {
 	if len(labels) == 0 {
 		return nil
@@ -423,143 +262,4 @@ func cloneBreakdown(breakdown map[MetricType]int64) map[MetricType]int64 {
 		result[key] = value
 	}
 	return result
-}
-
-// extractTable attempts to extract the primary table name from a SQL query.
-// It handles common patterns: SELECT ... FROM, INSERT INTO, UPDATE, DELETE FROM,
-// CREATE/ALTER/DROP/TRUNCATE TABLE, REPLACE INTO, and MERGE INTO.
-// Returns an empty string if no table name can be determined.
-func extractTable(query string) string {
-	fields := strings.Fields(query)
-	if len(fields) == 0 {
-		return ""
-	}
-
-	for i := 0; i < len(fields); i++ {
-		upper := strings.ToUpper(fields[i])
-		switch upper {
-		case "FROM", "INTO":
-			// SELECT ... FROM table, INSERT INTO table, DELETE FROM table,
-			// MERGE INTO table, REPLACE INTO table
-			if i+1 < len(fields) {
-				next := fields[i+1]
-				// Skip subqueries
-				if strings.HasPrefix(next, "(") {
-					continue
-				}
-				return cleanTableName(next)
-			}
-		case "UPDATE":
-			// UPDATE table SET ...
-			if i+1 < len(fields) {
-				return cleanTableName(fields[i+1])
-			}
-		case "TABLE":
-			// CREATE TABLE, ALTER TABLE, DROP TABLE, TRUNCATE TABLE
-			next := i + 1
-			// Skip IF [NOT] EXISTS
-			if next < len(fields) && strings.EqualFold(fields[next], "IF") {
-				next++
-				if next < len(fields) && strings.EqualFold(fields[next], "NOT") {
-					next++
-				}
-				if next < len(fields) && strings.EqualFold(fields[next], "EXISTS") {
-					next++
-				}
-			}
-			if next < len(fields) {
-				return cleanTableName(fields[next])
-			}
-		}
-	}
-
-	return ""
-}
-
-// cleanTableName removes surrounding quotes, trailing punctuation, and
-// extracts the table part from schema-qualified identifiers (schema.table).
-func cleanTableName(s string) string {
-	// Remove trailing punctuation (comma, semicolon, parenthesis)
-	s = strings.TrimRight(s, ",;()")
-	if s == "" {
-		return ""
-	}
-
-	s = unquoteIdent(s)
-
-	// Handle schema.table -> take only the table part
-	if idx := strings.LastIndexByte(s, '.'); idx >= 0 && idx+1 < len(s) {
-		s = unquoteIdent(s[idx+1:])
-	}
-
-	return s
-}
-
-// unquoteIdent removes surrounding quote characters from an identifier.
-func unquoteIdent(s string) string {
-	if len(s) >= 2 {
-		first, last := s[0], s[len(s)-1]
-		if (first == '"' && last == '"') ||
-			(first == '`' && last == '`') ||
-			(first == '[' && last == ']') {
-			s = s[1 : len(s)-1]
-		}
-	}
-	return s
-}
-
-// baseForwarder provides lazy-initialized forwarding of aggregate collector methods
-// to an underlying BaseMetricsCollector. Embed this in collectors that delegate
-// common observation methods (PubSub, MQ, KV, IPC, DB) to the base implementation.
-type baseForwarder struct {
-	base     *BaseMetricsCollector
-	baseOnce sync.Once
-}
-
-func (f *baseForwarder) getBase() *BaseMetricsCollector {
-	f.baseOnce.Do(func() {
-		f.base = NewBaseMetricsCollector()
-	})
-	return f.base
-}
-
-func (f *baseForwarder) clearBase() {
-	if f.base != nil {
-		f.base.Clear()
-	}
-}
-
-// Record forwards to the base collector.
-func (f *baseForwarder) Record(ctx context.Context, record MetricRecord) {
-	f.getBase().Record(ctx, record)
-}
-
-// ObserveHTTP forwards to the base collector.
-func (f *baseForwarder) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	f.getBase().ObserveHTTP(ctx, method, path, status, bytes, duration)
-}
-
-// ObservePubSub forwards to the base collector.
-func (f *baseForwarder) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	f.getBase().ObservePubSub(ctx, operation, topic, duration, err)
-}
-
-// ObserveMQ forwards to the base collector.
-func (f *baseForwarder) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	f.getBase().ObserveMQ(ctx, operation, topic, duration, err, panicked)
-}
-
-// ObserveKV forwards to the base collector.
-func (f *baseForwarder) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	f.getBase().ObserveKV(ctx, operation, key, duration, err, hit)
-}
-
-// ObserveIPC forwards to the base collector.
-func (f *baseForwarder) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	f.getBase().ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
-}
-
-// ObserveDB forwards to the base collector.
-func (f *baseForwarder) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	f.getBase().ObserveDB(ctx, operation, driver, query, rows, duration, err)
 }

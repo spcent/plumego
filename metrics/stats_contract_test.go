@@ -25,7 +25,12 @@ func TestCollectorStatsContract(t *testing.T) {
 			tt.collector.Clear()
 			tt.collector.ObserveHTTP(ctx, "GET", "/ok", 200, 123, 10*time.Millisecond)
 			tt.collector.ObserveHTTP(ctx, "GET", "/error", 500, 64, 12*time.Millisecond)
-			tt.collector.ObservePubSub(ctx, "publish", "topic.contract", 5*time.Millisecond, errors.New("boom"))
+			tt.collector.Record(ctx, MetricRecord{
+				Name:      "owner_metric_error",
+				Value:     1,
+				Error:     errors.New("boom"),
+				Timestamp: time.Now(),
+			})
 
 			stats := tt.collector.GetStats()
 

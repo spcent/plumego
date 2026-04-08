@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -866,10 +867,13 @@ func TestMetricsCollector(t *testing.T) {
 }
 
 // mockMetricsCollector embeds NoopCollector for cleaner mock implementation.
-// When new methods are added to MetricsCollector interface, this mock doesn't need updates
-// because NoopCollector implements all interface methods.
+// The local KV observer method is defined below; NoopCollector provides the
+// stable metrics no-op surface used by shared test helpers.
 type mockMetricsCollector struct {
 	*metrics.NoopCollector
+}
+
+func (m *mockMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
 }
 
 // Test validate options with more edge cases

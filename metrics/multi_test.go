@@ -54,23 +54,19 @@ func TestMultiCollectorAllMethods(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Test all observation methods
+	// Test both stable observation paths
 	multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
-	multi.ObservePubSub(ctx, "publish", "topic", 10*time.Millisecond, nil)
-	multi.ObserveMQ(ctx, "subscribe", "queue", 5*time.Millisecond, nil, false)
-	multi.ObserveKV(ctx, "get", "key", 2*time.Millisecond, nil, true)
-	multi.ObserveIPC(ctx, "read", "/socket", "unix", 256, 1*time.Millisecond, nil)
+	multi.Record(ctx, MetricRecord{Name: "owner_metric", Value: 1})
 
-	// Each collector should have received all metrics
-	// Note: KV operations record twice (operation + hit/miss)
+	// Each collector should have received both metrics
 	records1 := collector1.GetRecords()
 	records2 := collector2.GetRecords()
 
-	if len(records1) < 5 {
-		t.Fatalf("expected at least 5 records in collector1, got %d", len(records1))
+	if len(records1) != 2 {
+		t.Fatalf("expected 2 records in collector1, got %d", len(records1))
 	}
-	if len(records2) < 5 {
-		t.Fatalf("expected at least 5 records in collector2, got %d", len(records2))
+	if len(records2) != 2 {
+		t.Fatalf("expected 2 records in collector2, got %d", len(records2))
 	}
 }
 

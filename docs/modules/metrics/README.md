@@ -37,8 +37,10 @@ other modules can depend on safely.
 - keep collector APIs small
 - keep base collectors generic and transport-agnostic
 - keep only aggregate collector composition in stable `metrics`
+- keep `AggregateCollector` limited to `Record`, shared `ObserveHTTP`, stats, and reset semantics
 - keep the shared stable metric type surface to HTTP; use owner-defined types or `Name` + `Labels` for feature metrics
 - keep feature-specific observer interfaces in their owning package; only the shared HTTP observer stays in stable `metrics`
+- keep non-HTTP feature helper record builders in owning extensions or `x/observability` helper packages
 - keep Prometheus and tracing adapters in `x/observability`
 - keep rolling-window aggregation in `x/observability/windowmetrics`
 - keep metrics test helpers in `x/observability/testmetrics`
