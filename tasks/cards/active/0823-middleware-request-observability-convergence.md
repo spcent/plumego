@@ -55,4 +55,6 @@ Done Definition:
 - The removed helper path has zero remaining references after the change.
 
 Outcome:
-- Pending.
+- Completed.
+- Converged stable request observability middleware on shared preparation helpers under `middleware/internal/observability`, including request-id preparation, response recording, and request metric derivation.
+- Removed duplicate request-observability plumbing paths so access logging, tracing, and HTTP metrics use one canonical transport preparation flow.

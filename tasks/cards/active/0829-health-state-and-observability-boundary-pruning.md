@@ -56,4 +56,6 @@ Done Definition:
 - Module docs and manifest describe the same reduced stable boundary the code implements.
 
 Outcome:
-- Pending.
+- Completed.
+- Moved build info, health reporting, history payloads, and metrics tracking out of stable `health` and into `x/ops/healthhttp`.
+- Stable `health` now stays focused on state/readiness models and in-process health management.

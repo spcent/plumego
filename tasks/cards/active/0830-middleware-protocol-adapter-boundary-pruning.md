@@ -56,4 +56,6 @@ Done Definition:
 - No deprecated forwarding surface remains in stable middleware for removed protocol adapters or codes.
 
 Outcome:
-- Pending.
+- Completed.
+- Moved protocol/resource adaptation helpers out of stable `middleware`, including versioning and transform ownership, into their extension owners.
+- Stable middleware now stays transport-only and no longer carries extension-specific error or adaptation surfaces.

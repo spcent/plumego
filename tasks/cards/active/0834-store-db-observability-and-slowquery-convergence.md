@@ -56,4 +56,6 @@ Done Definition:
 - Store docs and manifest describe the same reduced stable boundary the code implements.
 
 Outcome:
-- Pending.
+- Completed.
+- Moved DB analytics, slow-query ownership, and aggregation behavior out of stable `store/db` into `x/observability/dbinsights`.
+- Reduced stable `store/db` to connectivity and SQL helper ownership, while fixing query-type aggregation double-count behavior in the observability layer.

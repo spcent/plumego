@@ -50,4 +50,6 @@ Done Definition:
 - Router and core docs describe the same narrowed public surface that the code implements.
 
 Outcome:
-- Pending.
+- Completed.
+- Removed router logger carriage, duplicate stdlib-shadow helper aliases, and the extra param helper surface outside the canonical router API.
+- Kept stable router ownership centered on route registration, matching, params, and reverse lookup only.

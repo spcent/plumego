@@ -55,4 +55,6 @@ Done Definition:
 - Core docs and manifest describe the same reduced kernel boundary the code implements.
 
 Outcome:
-- Pending.
+- Completed.
+- Removed debug/runtime snapshot payload ownership from stable `core`; the kernel no longer exports runtime snapshot payload types or a debug-facing snapshot accessor.
+- `x/devtools` now owns the runtime snapshot contract it exposes on debug endpoints.

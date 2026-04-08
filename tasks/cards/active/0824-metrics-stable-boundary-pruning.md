@@ -60,4 +60,6 @@ Done Definition:
 - No deprecated forwarding surface remains in `metrics` for relocated capabilities.
 
 Outcome:
-- Pending.
+- Completed.
+- Pruned stable `metrics` back to contracts and base collectors; exporter/tracer/dev-only ownership was pushed to `x/observability` and other owning extensions.
+- Preserved SMS-specific Prometheus capability by moving that formatting and reporter ownership out of stable `metrics` and into the messaging owner layer.

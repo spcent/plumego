@@ -56,4 +56,6 @@ Done Definition:
 - Old non-canonical request/trace ID paths are removed in the same PR; no transitional wrappers or “legacy for compatibility” branches remain.
 
 Outcome:
-- Pending.
+- Completed.
+- Unified the stable request-correlation contract on `request_id`, with `X-Request-ID` as the canonical transport header and `request_id` as the canonical log/response field.
+- Removed the previous trace-id/request-id mismatch between stable contracts, middleware, and logging/request-correlation helpers.

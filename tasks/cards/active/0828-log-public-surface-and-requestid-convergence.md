@@ -57,4 +57,6 @@ Done Definition:
 - Module docs and manifest describe the same reduced stable boundary the code implements.
 
 Outcome:
-- Pending.
+- Completed.
+- Converged stable `log` on one canonical logger constructor path and removed request-id generation ownership from the stable logging root.
+- Request-correlation generation now lives with the request-observability owner path instead of the logger package.

@@ -55,4 +55,6 @@ Done Definition:
 - Contract docs and manifest describe the same narrowed stable boundary the code implements.
 
 Outcome:
-- Pending.
+- Completed.
+- Removed multipart and file-upload convenience helpers from stable `contract.Ctx`, including file-writing helpers that exceeded the transport contract boundary.
+- Upload parsing and file handling now stay in the owning transport/extension layers.

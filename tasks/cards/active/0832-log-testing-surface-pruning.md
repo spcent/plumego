@@ -55,4 +55,6 @@ Done Definition:
 - Module docs and manifest describe the same reduced stable `log` boundary that the code implements.
 
 Outcome:
-- Pending.
+- Completed.
+- Moved stable logging testkit types and helpers out of `log` into `x/observability/testlog`.
+- Stable `log` no longer owns repo-wide test helper surfaces.

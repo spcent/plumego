@@ -54,4 +54,6 @@ Done Definition:
 - No second public adapter path remains for auth or security headers.
 
 Outcome:
-- Pending.
+- Completed.
+- Removed duplicate auth and security-header transport wrappers from stable `security`, keeping the canonical adapters in stable `middleware`.
+- Converged JWT claims context access on explicit `WithTokenClaims` / `TokenClaimsFromContext` accessors.

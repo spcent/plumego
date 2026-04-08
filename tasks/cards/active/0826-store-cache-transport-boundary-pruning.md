@@ -54,4 +54,6 @@ Done Definition:
 - Removed transport and leaderboard APIs have zero residual references under `store/cache`.
 
 Outcome:
-- Pending.
+- Completed.
+- Removed HTTP response caching, request-derived cache helpers, and ranked-data behavior from stable `store/cache`.
+- Moved transport- and feature-owned cache behavior to extension layers so stable store cache ownership stays primitive-only.

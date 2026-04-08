@@ -56,4 +56,6 @@ Done Definition:
 - Metrics docs and manifest describe the same reduced stable surface the code implements.
 
 Outcome:
-- Pending.
+- Completed.
+- Moved rolling-window aggregation helpers to `x/observability/windowmetrics` and repo-wide metrics testing helpers to `x/observability/testmetrics`.
+- Stable `metrics` now keeps only contracts, base collectors, and aggregate composition.

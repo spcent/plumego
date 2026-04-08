@@ -55,4 +55,6 @@ Done Definition:
 - Code comments and manifests describe the same converged tracing-context ownership.
 
 Outcome:
-- Pending.
+- Completed.
+- Converged tracing context carriage on `contract.TraceContext` as the single canonical context carrier across middleware and observability implementations.
+- Removed the duplicate trace-context storage path so middleware reads one carrier directly instead of rehydrating trace/span identity from parallel context state.
