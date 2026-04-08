@@ -307,17 +307,6 @@ func TestStreamRetryBudgetIsTotalNotConsecutive(t *testing.T) {
 	}
 }
 
-func TestNewObservabilityPolicyAcceptsExtraSensitiveKeys(t *testing.T) {
-	policy := NewObservabilityPolicy("api_key")
-	fields := policy.RedactFields(map[string]any{
-		"api_key":  "secret",
-		"password": "p4ss",
-	})
-	if fields["api_key"] != "***" || fields["password"] != "***" {
-		t.Fatalf("expected default and extra sensitive keys to be redacted, got %v", fields)
-	}
-}
-
 func TestRedirectFallsBackToURLHost(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "https://example.com/start", nil)

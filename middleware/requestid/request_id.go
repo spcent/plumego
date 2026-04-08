@@ -5,6 +5,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
+	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 )
 
 type config struct {
@@ -41,13 +42,12 @@ func Middleware(opts ...Option) middleware.Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			observePolicy := contract.NewObservabilityPolicy()
-			id := observePolicy.RequestIDFromRequest(r)
+			id := internalobs.RequestIDFromRequest(r)
 			if id == "" {
 				id = cfg.generate()
 			}
 
-			r = observePolicy.AttachRequestID(w, r, id, cfg.includeInRequest)
+			r = internalobs.AttachRequestID(w, r, id, cfg.includeInRequest)
 			next.ServeHTTP(w, r)
 		})
 	}

@@ -9,6 +9,7 @@ summary: Security helpers for auth, headers, input safety, and abuse protection.
 strict_boundary: auth_primitives
 
 responsibilities:
+  - Auth identity primitives
   - JWT helpers
   - Security headers
   - Input safety
@@ -22,6 +23,7 @@ non_goals:
   - Session lifecycle management and revocation (belongs in application or x/* layer)
 
 public_entrypoints:
+  - authn
   - jwt
   - headers
   - input

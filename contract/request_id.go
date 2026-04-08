@@ -7,6 +7,11 @@ import (
 
 type requestIDKey struct{}
 
+const (
+	// RequestIDHeader is the canonical request id header.
+	RequestIDHeader = "X-Request-ID"
+)
+
 // WithRequestID stores the canonical request correlation id in ctx.
 func WithRequestID(ctx context.Context, id string) context.Context {
 	if ctx == nil {

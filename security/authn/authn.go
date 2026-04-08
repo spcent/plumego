@@ -1,4 +1,4 @@
-package contract
+package authn
 
 import (
 	"context"
@@ -8,11 +8,11 @@ import (
 
 // Principal is the authenticated identity attached to a request context.
 type Principal struct {
-	Subject  string            // user id / service id
-	TenantID string            // optional, SaaS
-	Roles    []string          // small list
-	Scopes   []string          // optional
-	Claims   map[string]string // minimal extra (string-only to avoid abuse)
+	Subject  string
+	TenantID string
+	Roles    []string
+	Scopes   []string
+	Claims   map[string]string
 }
 
 // Authenticator validates a request and returns the authenticated principal.
@@ -25,8 +25,6 @@ type Authorizer interface {
 	Authorize(p *Principal, action string, resource string) error
 }
 
-// Auth sentinel errors. These are defined here so stable packages (security/jwt,
-// middleware/auth) can reference them without importing x/*.
 var (
 	ErrUnauthenticated      = errors.New("unauthenticated")
 	ErrUnauthorized         = errors.New("unauthorized")

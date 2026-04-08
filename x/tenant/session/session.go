@@ -1,13 +1,13 @@
 // Package session defines session lifecycle types and interfaces for x/tenant.
-// Transport-layer auth primitives (Principal, Authenticator, context accessors)
-// remain in the contract package.
+// Authentication primitives (Principal, Authenticator, context accessors)
+// remain in security/authn.
 package session
 
 import (
 	"context"
 	"time"
 
-	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/security/authn"
 )
 
 // SessionStatus is the lifecycle state of a session.
@@ -127,5 +127,5 @@ type SessionManager interface {
 	RefreshManager
 }
 
-// PrincipalFromRequest is a convenience alias for contract.PrincipalFromRequest.
-var PrincipalFromRequest = contract.PrincipalFromRequest
+// PrincipalFromRequest is a convenience alias for authn.PrincipalFromRequest.
+var PrincipalFromRequest = authn.PrincipalFromRequest

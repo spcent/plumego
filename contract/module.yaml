@@ -12,7 +12,7 @@ responsibilities:
   - Structured error model
   - Response helpers
   - Request context helpers
-  - Trace and request metadata helpers
+  - Trace and request metadata carriers
 
 non_goals:
   - Route matching
@@ -22,6 +22,8 @@ non_goals:
   - Protocol gateway families
   - Business rules
   - Session or token issuance
+  - Auth identity primitives
+  - Middleware observability policy or field redaction
 
 public_entrypoints:
   - WriteError

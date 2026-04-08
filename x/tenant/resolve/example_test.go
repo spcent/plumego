@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/security/authn"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	"github.com/spcent/plumego/x/tenant/resolve"
 )
@@ -20,7 +20,7 @@ func ExampleMiddleware_principalFirst() {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("X-Tenant-ID", "header-tenant")
-	req = contract.RequestWithPrincipal(req, &contract.Principal{TenantID: "principal-tenant"})
+	req = authn.RequestWithPrincipal(req, &authn.Principal{TenantID: "principal-tenant"})
 
 	rec := httptest.NewRecorder()
 	mw := resolve.Middleware(resolve.Options{

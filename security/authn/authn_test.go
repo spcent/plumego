@@ -1,4 +1,4 @@
-package contract
+package authn
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestWithPrincipal_RoundTrip(t *testing.T) {
+func TestWithPrincipalRoundTrip(t *testing.T) {
 	p := &Principal{
 		Subject:  "user-1",
 		TenantID: "tenant-a",
@@ -27,16 +27,14 @@ func TestWithPrincipal_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestPrincipalFromContext_Nil(t *testing.T) {
+func TestPrincipalFromContextNil(t *testing.T) {
 	got := PrincipalFromContext(context.Background())
 	if got != nil {
 		t.Fatalf("expected nil principal from empty context, got %+v", got)
 	}
 }
 
-func TestPrincipalFromContext_WrongType(t *testing.T) {
-	// Store a different type under the same context key pattern.
-	// Use a plain background context (no principal) — verifies nil is returned.
+func TestPrincipalFromContextWrongType(t *testing.T) {
 	ctx := context.WithValue(context.Background(), struct{}{}, "not-a-principal")
 	got := PrincipalFromContext(ctx)
 	if got != nil {
@@ -59,14 +57,14 @@ func TestPrincipalFromRequest(t *testing.T) {
 	}
 }
 
-func TestPrincipalFromRequest_Nil(t *testing.T) {
+func TestPrincipalFromRequestNil(t *testing.T) {
 	got := PrincipalFromRequest(nil)
 	if got != nil {
 		t.Fatalf("expected nil for nil request, got %+v", got)
 	}
 }
 
-func TestPrincipalFromRequest_NoAttached(t *testing.T) {
+func TestPrincipalFromRequestNoAttached(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	got := PrincipalFromRequest(req)
 	if got != nil {
@@ -74,14 +72,14 @@ func TestPrincipalFromRequest_NoAttached(t *testing.T) {
 	}
 }
 
-func TestRequestWithPrincipal_Nil(t *testing.T) {
+func TestRequestWithPrincipalNil(t *testing.T) {
 	got := RequestWithPrincipal(nil, &Principal{Subject: "u"})
 	if got != nil {
 		t.Fatalf("expected nil for nil request, got non-nil")
 	}
 }
 
-func TestWithPrincipal_Overwrite(t *testing.T) {
+func TestWithPrincipalOverwrite(t *testing.T) {
 	p1 := &Principal{Subject: "user-1"}
 	p2 := &Principal{Subject: "user-2"}
 
@@ -97,14 +95,13 @@ func TestWithPrincipal_Overwrite(t *testing.T) {
 	}
 }
 
-func TestRequestWithPrincipal_NewRequest(t *testing.T) {
+func TestRequestWithPrincipalNewRequest(t *testing.T) {
 	req := httptest.NewRequest("POST", "/api/data", nil)
 	original := req
 
 	p := &Principal{Subject: "svc-account", Roles: []string{"service"}}
 	newReq := RequestWithPrincipal(req, p)
 
-	// Original should not be mutated.
 	if PrincipalFromRequest(original) != nil {
 		t.Fatal("original request should not have principal attached")
 	}
@@ -118,7 +115,7 @@ func TestRequestWithPrincipal_NewRequest(t *testing.T) {
 	}
 }
 
-func TestPrincipalFromContext_NilPrincipalStored(t *testing.T) {
+func TestPrincipalFromContextNilPrincipalStored(t *testing.T) {
 	ctx := WithPrincipal(context.Background(), nil)
 	got := PrincipalFromContext(ctx)
 	if got != nil {

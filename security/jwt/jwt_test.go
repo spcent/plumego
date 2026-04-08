@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/contract"
 	authmw "github.com/spcent/plumego/middleware/auth"
+	"github.com/spcent/plumego/security/authn"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
@@ -579,7 +579,7 @@ func TestPolicyAuthorizerWithMiddlewareAuth(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "/admin", nil)
-	ctx := contract.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
+	ctx := authn.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -592,7 +592,7 @@ func TestPolicyAuthorizerWithMiddlewareAuth(t *testing.T) {
 	// test invalid claims
 	claims.Authorization.Roles = []string{"user"}
 	req = httptest.NewRequest("GET", "/admin", nil)
-	ctx = contract.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
+	ctx = authn.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
 	req = req.WithContext(ctx)
 	rec = httptest.NewRecorder()
 
@@ -765,21 +765,21 @@ func TestContractAuthenticatorMissingToken(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
 
 	_, err := authenticator.Authenticate(req)
-	if err != contract.ErrUnauthenticated {
+	if err != authn.ErrUnauthenticated {
 		t.Fatalf("expected ErrUnauthenticated, got %v", err)
 	}
 }
 
 func TestPolicyAuthorizer(t *testing.T) {
 	authorizer := PolicyAuthorizer{Policy: AuthZPolicy{AllRoles: []string{"admin"}}}
-	principal := &contract.Principal{Roles: []string{"admin"}}
+	principal := &authn.Principal{Roles: []string{"admin"}}
 
 	if err := authorizer.Authorize(principal, "", ""); err != nil {
 		t.Fatalf("expected authorized, got %v", err)
 	}
 
 	principal.Roles = []string{"user"}
-	if err := authorizer.Authorize(principal, "", ""); err != contract.ErrUnauthorized {
+	if err := authorizer.Authorize(principal, "", ""); err != authn.ErrUnauthorized {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
 	}
 }

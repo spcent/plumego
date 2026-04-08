@@ -31,7 +31,7 @@ func Middleware(logger log.StructuredLogger) middleware.Middleware {
 			}
 			metricsData := internalobs.BuildRequestMetrics(r, recorder, prepared.StartedAt, requestID)
 			rc := contract.RequestContextFromContext(r.Context())
-			fields := contract.NewObservabilityPolicy().MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
+			fields := internalobs.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
 			fields["bytes"] = metricsData.Bytes
 			fields["user_agent"] = metricsData.UserAgent
 			fields["client_ip"] = internaltransport.ClientIP(r)
@@ -90,7 +90,7 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 				span.End(metricsData.Status, metricsData.Bytes, requestID)
 			}
 
-			fields := contract.NewObservabilityPolicy().MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
+			fields := internalobs.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
 			fields["bytes"] = metricsData.Bytes
 			fields["user_agent"] = metricsData.UserAgent
 			fields["client_ip"] = internaltransport.ClientIP(r)

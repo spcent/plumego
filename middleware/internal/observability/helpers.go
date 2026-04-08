@@ -34,7 +34,7 @@ func EnsureRequestID(r *http.Request) string {
 	if id := contract.RequestIDFromContext(r.Context()); id != "" {
 		return id
 	}
-	if id := contract.NewObservabilityPolicy().RequestIDFromRequest(r); id != "" {
+	if id := RequestIDFromRequest(r); id != "" {
 		return id
 	}
 	return contract.NewRequestID()

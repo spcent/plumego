@@ -9,6 +9,7 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
+	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 )
 
 // RateLimiter provides intelligent concurrency control with backpressure, monitoring, and dynamic adjustment.
@@ -281,11 +282,11 @@ func (rl *RateLimiter) rejectRequest(w http.ResponseWriter, r *http.Request, cod
 	})
 
 	if rl.logger != nil {
-		fields := contract.NewObservabilityPolicy().MiddlewareLogFields(r, http.StatusServiceUnavailable, 0)
+		fields := internalobs.MiddlewareLogFields(r, http.StatusServiceUnavailable, 0)
 		fields["code"] = code
 		fields["current_concurrent"] = int64(len(rl.sem))
 		fields["current_queue"] = int64(len(rl.queue))
-		rl.logger.WithFields(log.Fields(contract.NewObservabilityPolicy().RedactFields(fields))).Warn("request rejected due to concurrency limit")
+		rl.logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request rejected due to concurrency limit")
 	}
 }
 
@@ -436,11 +437,11 @@ done:
 // logAdjustment records adjustment log
 func (rl *RateLimiter) logAdjustment(direction string, oldVal, newVal int64) {
 	if rl.logger != nil {
-		fields := contract.NewObservabilityPolicy().MiddlewareLogFields(nil, 0, 0)
+		fields := internalobs.MiddlewareLogFields(nil, 0, 0)
 		fields["direction"] = direction
 		fields["old_value"] = oldVal
 		fields["new_value"] = newVal
-		rl.logger.WithFields(log.Fields(contract.NewObservabilityPolicy().RedactFields(fields))).Info("concurrency limit adjusted")
+		rl.logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Info("concurrency limit adjusted")
 	}
 }
 

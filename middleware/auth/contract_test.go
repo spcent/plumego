@@ -8,28 +8,29 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/security/authn"
 )
 
 type staticAuthenticator struct {
-	principal *contract.Principal
+	principal *authn.Principal
 	err       error
 }
 
-func (s staticAuthenticator) Authenticate(_ *http.Request) (*contract.Principal, error) {
+func (s staticAuthenticator) Authenticate(_ *http.Request) (*authn.Principal, error) {
 	return s.principal, s.err
 }
 
 type contextMarkerKey struct{}
 
 type enrichingAuthenticator struct {
-	principal *contract.Principal
+	principal *authn.Principal
 }
 
-func (e enrichingAuthenticator) Authenticate(_ *http.Request) (*contract.Principal, error) {
+func (e enrichingAuthenticator) Authenticate(_ *http.Request) (*authn.Principal, error) {
 	return nil, nil
 }
 
-func (e enrichingAuthenticator) AuthenticateRequest(r *http.Request) (*contract.Principal, *http.Request, error) {
+func (e enrichingAuthenticator) AuthenticateRequest(r *http.Request) (*authn.Principal, *http.Request, error) {
 	ctx := context.WithValue(r.Context(), contextMarkerKey{}, "enriched")
 	return e.principal, r.WithContext(ctx), nil
 }
@@ -38,16 +39,16 @@ type staticAuthorizer struct {
 	err error
 }
 
-func (s staticAuthorizer) Authorize(_ *contract.Principal, _, _ string) error {
+func (s staticAuthorizer) Authorize(_ *authn.Principal, _, _ string) error {
 	return s.err
 }
 
 func TestAuthenticateMiddlewareSuccess(t *testing.T) {
-	principal := &contract.Principal{Subject: "user-1"}
+	principal := &authn.Principal{Subject: "user-1"}
 	authenticator := staticAuthenticator{principal: principal}
 
 	handler := Authenticate(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got := contract.PrincipalFromRequest(r)
+		got := authn.PrincipalFromRequest(r)
 		if got == nil || got.Subject != "user-1" {
 			t.Fatalf("expected principal in context")
 		}
@@ -65,7 +66,7 @@ func TestAuthenticateMiddlewareSuccess(t *testing.T) {
 }
 
 func TestAuthenticateMiddlewareInvalidToken(t *testing.T) {
-	authenticator := staticAuthenticator{err: contract.ErrInvalidToken}
+	authenticator := staticAuthenticator{err: authn.ErrInvalidToken}
 
 	handler := Authenticate(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -91,7 +92,7 @@ func TestAuthenticateMiddlewareInvalidToken(t *testing.T) {
 
 func TestAuthenticateMiddlewareUsesEnrichedRequestContext(t *testing.T) {
 	authenticator := enrichingAuthenticator{
-		principal: &contract.Principal{Subject: "user-2"},
+		principal: &authn.Principal{Subject: "user-2"},
 	}
 
 	handler := Authenticate(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +113,7 @@ func TestAuthenticateMiddlewareUsesEnrichedRequestContext(t *testing.T) {
 }
 
 func TestAuthorizeAllowsRequest(t *testing.T) {
-	principal := &contract.Principal{Subject: "user-authz"}
+	principal := &authn.Principal{Subject: "user-authz"}
 	authorizer := staticAuthorizer{}
 
 	handler := Authorize(authorizer, "read", "widgets")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +121,7 @@ func TestAuthorizeAllowsRequest(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
+	req = req.WithContext(authn.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -131,15 +132,15 @@ func TestAuthorizeAllowsRequest(t *testing.T) {
 }
 
 func TestAuthorizeRejectsForbiddenRequest(t *testing.T) {
-	principal := &contract.Principal{Subject: "user-authz"}
-	authorizer := staticAuthorizer{err: contract.ErrUnauthorized}
+	principal := &authn.Principal{Subject: "user-authz"}
+	authorizer := staticAuthorizer{err: authn.ErrUnauthorized}
 
 	handler := Authorize(authorizer, "write", "widgets")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
+	req = req.WithContext(authn.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

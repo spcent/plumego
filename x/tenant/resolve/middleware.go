@@ -5,6 +5,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/security/authn"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
@@ -40,7 +41,7 @@ func Middleware(options Options) middleware.Middleware {
 			source := ""
 
 			if allowFromPrincipal {
-				if p := contract.PrincipalFromRequest(r); p != nil && p.TenantID != "" {
+				if p := authn.PrincipalFromRequest(r); p != nil && p.TenantID != "" {
 					tenantID = p.TenantID
 					source = "principal"
 				}

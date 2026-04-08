@@ -10,6 +10,7 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
+	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 	"github.com/spcent/plumego/security/abuse"
 )
@@ -202,9 +203,9 @@ func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Deci
 	})
 
 	if logger != nil {
-		fields := contract.NewObservabilityPolicy().MiddlewareLogFields(r, http.StatusTooManyRequests, 0)
+		fields := internalobs.MiddlewareLogFields(r, http.StatusTooManyRequests, 0)
 		fields["limit"] = decision.Limit
 		fields["remaining"] = decision.Remaining
-		logger.WithFields(log.Fields(contract.NewObservabilityPolicy().RedactFields(fields))).Warn("request rate limited")
+		logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request rate limited")
 	}
 }

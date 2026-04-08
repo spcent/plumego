@@ -6,6 +6,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/security/authn"
 )
 
 // AuthErrorHandler handles authentication/authorization errors.
@@ -20,7 +21,7 @@ type authOptions struct {
 type AuthOption func(*authOptions)
 
 type requestAuthenticator interface {
-	AuthenticateRequest(r *http.Request) (*contract.Principal, *http.Request, error)
+	AuthenticateRequest(r *http.Request) (*authn.Principal, *http.Request, error)
 }
 
 // WithAuthErrorHandler overrides the default error handling.
@@ -40,7 +41,7 @@ func WithAuthRealm(realm string) AuthOption {
 }
 
 // Authenticate validates the request and stores the principal in context.
-func Authenticate(authenticator contract.Authenticator, opts ...AuthOption) middleware.Middleware {
+func Authenticate(authenticator authn.Authenticator, opts ...AuthOption) middleware.Middleware {
 	cfg := applyAuthOptions(opts...)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +52,7 @@ func Authenticate(authenticator contract.Authenticator, opts ...AuthOption) midd
 
 			req := r
 			var (
-				principal *contract.Principal
+				principal *authn.Principal
 				err       error
 			)
 			if enriched, ok := authenticator.(requestAuthenticator); ok {
@@ -67,25 +68,25 @@ func Authenticate(authenticator contract.Authenticator, opts ...AuthOption) midd
 				return
 			}
 			if principal == nil {
-				cfg.errorHandler(w, r, contract.ErrUnauthenticated)
+				cfg.errorHandler(w, r, authn.ErrUnauthenticated)
 				return
 			}
 
-			ctx := contract.WithPrincipal(req.Context(), principal)
+			ctx := authn.WithPrincipal(req.Context(), principal)
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	}
 }
 
 // Authorize enforces access for the provided action/resource pair.
-func Authorize(authorizer contract.Authorizer, action, resource string, opts ...AuthOption) middleware.Middleware {
+func Authorize(authorizer authn.Authorizer, action, resource string, opts ...AuthOption) middleware.Middleware {
 	return AuthorizeFunc(authorizer, func(*http.Request) (string, string) {
 		return action, resource
 	}, opts...)
 }
 
 // AuthorizeFunc enforces access using a resolver for action/resource values.
-func AuthorizeFunc(authorizer contract.Authorizer, resolver func(*http.Request) (string, string), opts ...AuthOption) middleware.Middleware {
+func AuthorizeFunc(authorizer authn.Authorizer, resolver func(*http.Request) (string, string), opts ...AuthOption) middleware.Middleware {
 	cfg := applyAuthOptions(opts...)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -98,9 +99,9 @@ func AuthorizeFunc(authorizer contract.Authorizer, resolver func(*http.Request) 
 				return
 			}
 
-			principal := contract.PrincipalFromRequest(r)
+			principal := authn.PrincipalFromRequest(r)
 			if principal == nil {
-				cfg.errorHandler(w, r, contract.ErrUnauthenticated)
+				cfg.errorHandler(w, r, authn.ErrUnauthenticated)
 				return
 			}
 
@@ -138,7 +139,7 @@ func writeAuthInternal(w http.ResponseWriter, r *http.Request, message string) {
 func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 	return func(w http.ResponseWriter, r *http.Request, err error) {
 		if err == nil {
-			err = contract.ErrUnauthenticated
+			err = authn.ErrUnauthenticated
 		}
 
 		var apiErr contract.APIError
@@ -166,7 +167,7 @@ func authErrorToAPIError(err error) contract.APIError {
 			Build()
 	}
 	switch {
-	case errors.Is(err, contract.ErrUnauthorized):
+	case errors.Is(err, authn.ErrUnauthorized):
 		return contract.NewErrorBuilder().
 			Status(http.StatusForbidden).
 			Category(contract.CategoryAuth).
@@ -174,19 +175,19 @@ func authErrorToAPIError(err error) contract.APIError {
 			Code(contract.CodeForbidden).
 			Message("access forbidden").
 			Build()
-	case errors.Is(err, contract.ErrInvalidToken):
+	case errors.Is(err, authn.ErrInvalidToken):
 		return unauthorized("invalid token")
-	case errors.Is(err, contract.ErrExpiredToken):
+	case errors.Is(err, authn.ErrExpiredToken):
 		return unauthorized("token expired")
-	case errors.Is(err, contract.ErrSessionRevoked):
+	case errors.Is(err, authn.ErrSessionRevoked):
 		return unauthorized("session revoked")
-	case errors.Is(err, contract.ErrSessionExpired):
+	case errors.Is(err, authn.ErrSessionExpired):
 		return unauthorized("session expired")
-	case errors.Is(err, contract.ErrRefreshReused):
+	case errors.Is(err, authn.ErrRefreshReused):
 		return unauthorized("refresh token reuse detected")
-	case errors.Is(err, contract.ErrTokenVersionMismatch):
+	case errors.Is(err, authn.ErrTokenVersionMismatch):
 		return unauthorized("token version mismatch")
-	case errors.Is(err, contract.ErrUnauthenticated):
+	case errors.Is(err, authn.ErrUnauthenticated):
 		fallthrough
 	default:
 		return unauthorized("authentication required")

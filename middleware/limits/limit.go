@@ -9,6 +9,7 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
+	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 )
 
 var errRequestTooLarge = errors.New("request body too large")
@@ -102,10 +103,10 @@ func (l *limitedBodyReader) fail() (int, error) {
 			"at":         l.now().UTC(),
 		})
 		if l.logger != nil {
-			fields := contract.NewObservabilityPolicy().MiddlewareLogFields(nil, http.StatusRequestEntityTooLarge, 0)
+			fields := internalobs.MiddlewareLogFields(nil, http.StatusRequestEntityTooLarge, 0)
 			fields["max_bytes"] = l.maxBytes
 			fields["seen_bytes"] = l.used
-			l.logger.WithFields(log.Fields(contract.NewObservabilityPolicy().RedactFields(fields))).Warn("request body too large")
+			l.logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request body too large")
 		}
 	}
 
