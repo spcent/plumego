@@ -1,4 +1,4 @@
-package contract
+package observability
 
 import (
 	"crypto/rand"

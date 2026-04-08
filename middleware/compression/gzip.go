@@ -21,14 +21,11 @@ import (
 //
 //	import "github.com/spcent/plumego/middleware/compression"
 //
-//	// Use default configuration
-//	handler := compression.Gzip()(myHandler)
-//
-//	// Or with custom configuration
+//	// Use explicit configuration
 //	config := compression.GzipConfig{
 //		MaxBufferBytes: 5 << 20, // 5MB max buffer
 //	}
-//	handler := compression.GzipWithConfig(config)(myHandler)
+//	handler := compression.Gzip(config)(myHandler)
 //
 // The middleware adds the following headers:
 //   - Content-Encoding: gzip (when compression is used)
@@ -36,12 +33,6 @@ import (
 //
 // Note: Compression is skipped for error responses (status >= 400) to avoid
 // compressing small error messages that don't benefit from compression.
-func Gzip() middleware.Middleware {
-	return GzipWithConfig(GzipConfig{
-		MaxBufferBytes: 10 << 20, // 10MB max buffer
-	})
-}
-
 // GzipConfig configures Gzip middleware behavior.
 //
 // Example:
@@ -51,7 +42,7 @@ func Gzip() middleware.Middleware {
 //	config := compression.GzipConfig{
 //		MaxBufferBytes: 5 << 20, // 5MB max buffer
 //	}
-//	handler := compression.GzipWithConfig(config)(myHandler)
+//	handler := compression.Gzip(config)(myHandler)
 type GzipConfig struct {
 	// MaxBufferBytes is the maximum response size to buffer for compression.
 	// Responses larger than this will bypass compression to avoid memory spikes.
@@ -59,8 +50,8 @@ type GzipConfig struct {
 	MaxBufferBytes int
 }
 
-// GzipWithConfig creates a Gzip middleware with custom configuration.
-func GzipWithConfig(cfg GzipConfig) middleware.Middleware {
+// Gzip creates a Gzip middleware with explicit configuration.
+func Gzip(cfg GzipConfig) middleware.Middleware {
 	if cfg.MaxBufferBytes <= 0 {
 		cfg.MaxBufferBytes = 10 << 20
 	}

@@ -20,7 +20,7 @@ non_goals:
   - Persistence logic and multipart upload convenience helpers
   - Protocol gateway families and business rules
   - Session or token issuance and auth identity primitives
-  - Middleware observability policy or field redaction
+  - Middleware observability policy, field redaction, or request-id generation policy
 
 public_entrypoints:
   - WriteError

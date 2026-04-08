@@ -3,7 +3,6 @@ package requestid
 import (
 	"net/http"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 )
@@ -31,7 +30,7 @@ func WithRequestHeader(enabled bool) Option {
 
 func Middleware(opts ...Option) middleware.Middleware {
 	cfg := config{
-		generate:         contract.NewRequestID,
+		generate:         internalobs.NewRequestID,
 		includeInRequest: true,
 	}
 	for _, opt := range opts {

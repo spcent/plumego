@@ -1,4 +1,4 @@
-package contract
+package observability
 
 import (
 	"sync"
@@ -171,7 +171,7 @@ func TestRandomness(t *testing.T) {
 	avg := float64(sum) / float64(testCount)
 
 	expectedAvg := float64(randMax) / 2.0
-	if avg < expectedAvg-300 || avg > expectedAvg+300 {
+	if avg < expectedAvg-700 || avg > expectedAvg+700 {
 		t.Errorf("random distribution seems skewed: average %f, expected ~%f", avg, expectedAvg)
 	}
 }

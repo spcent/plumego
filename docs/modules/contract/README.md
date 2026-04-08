@@ -36,6 +36,7 @@
 - use one explicit bind step per source: `BindJSON(..., BindOptions{...})` for JSON and `BindQuery(...)` for query
 - perform validation explicitly via `ValidateStruct(...)` after binding, then write failures through `WriteBindError`
 - use `WithRequestID(...)` + `RequestIDFromContext(...)` as the only request-correlation contract; middleware and logging must read from it instead of maintaining package-local request id slots
+- keep request-id generation policy in `middleware/requestid` or middleware-owned observability helpers, not in `contract`
 - keep `RequestIDHeader` as the canonical transport header constant only; request-id attach/read policy belongs to middleware
 - keep `TraceContext` for tracing/span state only; do not reuse it as the app-facing request-correlation surface
 - use `Ctx.Stream(StreamConfig{...})` as the only high-level streaming/SSE entrypoint; keep `NewSSEWriter(...)` for low-level stdlib-shaped SSE writing only

@@ -37,7 +37,7 @@ func EnsureRequestID(r *http.Request) string {
 	if id := RequestIDFromRequest(r); id != "" {
 		return id
 	}
-	return contract.NewRequestID()
+	return NewRequestID()
 }
 
 func PrepareRequest(w http.ResponseWriter, r *http.Request) PreparedRequest {

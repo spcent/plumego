@@ -28,16 +28,13 @@ const (
 //
 //	import "github.com/spcent/plumego/middleware/timeout"
 //
-//	// Simple timeout
-//	handler := timeout.Timeout(5 * time.Second)(myHandler)
-//
-//	// With custom configuration
+//	// Explicit configuration
 //	config := timeout.TimeoutConfig{
 //		Timeout:            10 * time.Second,
 //		MaxBufferBytes:     5 << 20,      // 5MB max buffer
 //		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
 //	}
-//	handler := timeout.TimeoutWithConfig(config)(myHandler)
+//	handler := timeout.Timeout(config)(myHandler)
 //
 // The middleware buffers responses to allow timeout enforcement, but switches to
 // bypass mode for large/streaming responses to avoid memory spikes.
@@ -56,24 +53,7 @@ type TimeoutConfig struct {
 	StreamingThreshold int
 }
 
-// Timeout creates a middleware that enforces a maximum duration for a request.
-// If the downstream handler does not complete before the deadline, the request
-// context is canceled and a 504 Gateway Timeout response is returned.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/middleware/timeout"
-//
-//	handler := timeout.Timeout(5 * time.Second)(myHandler)
-func Timeout(d time.Duration) middleware.Middleware {
-	return TimeoutWithConfig(TimeoutConfig{
-		Timeout:            d,
-		MaxBufferBytes:     defaultTimeoutMaxBytes,
-		StreamingThreshold: streamingThresholdBytes,
-	})
-}
-
-// TimeoutWithConfig creates a timeout middleware with explicit configuration.
+// Timeout creates a timeout middleware with explicit configuration.
 //
 // Example:
 //
@@ -84,8 +64,8 @@ func Timeout(d time.Duration) middleware.Middleware {
 //		MaxBufferBytes:     5 << 20,      // 5MB max buffer
 //		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
 //	}
-//	handler := timeout.TimeoutWithConfig(config)(myHandler)
-func TimeoutWithConfig(cfg TimeoutConfig) middleware.Middleware {
+//	handler := timeout.Timeout(config)(myHandler)
+func Timeout(cfg TimeoutConfig) middleware.Middleware {
 	// Ensure reasonable defaults
 	if cfg.MaxBufferBytes <= 0 {
 		cfg.MaxBufferBytes = defaultTimeoutMaxBytes
