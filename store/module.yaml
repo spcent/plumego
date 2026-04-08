@@ -20,6 +20,7 @@ non_goals:
   - Business repositories
   - AI-specific caches
   - DB analytics, slow-query reporting, and HTTP transport behavior
+  - File backend/provider configuration and image-processing pipelines
   - Read-write splitting, sharding topology defaults, and ranked-data cache behavior
   - Business-level idempotency semantics (domain-specific dedup rules belong in the application or x/* layer)
 
@@ -60,6 +61,7 @@ review_checklist:
   - No tenant-specific logic in stable store
   - Keep topology-heavy data features, DB analytics, and slow-query inspection out of the stable layer
   - Keep HTTP response caching and request-derived cache keys out of stable store/cache
+  - Keep file backend config and thumbnail/image-processing ownership out of stable store/file
   - Prefer stdlib-compatible abstractions
 
 agent_hints:

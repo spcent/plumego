@@ -1,17 +1,16 @@
 # store/file — Pure File Storage Interfaces
 
 Stable, transport-agnostic interfaces and primitives for file storage operations.
-No tenant semantics, no HTTP transport, no concrete backend implementations.
+No tenant semantics, no HTTP transport, no concrete backend or image-pipeline implementations.
 
 ## Package Layout
 
 ```
 store/file/
-├── file.go      # Storage, MetadataManager, ImageProcessor interfaces
-├── types.go     # File, PutOptions, FileStat, Query, ImageInfo, StorageConfig
+├── file.go      # Storage and MetadataManager interfaces
+├── types.go     # File, PutOptions, FileStat, Query
 ├── errors.go    # Error definitions (ErrNotFound, ErrInvalidPath, …)
-├── utils.go     # GenerateID, IsPathSafe, MimeToExt, ExtToMime
-└── image.go     # ImageProcessor implementation (pure computation, stdlib only)
+└── utils.go     # GenerateID, IsPathSafe, MimeToExt, ExtToMime
 ```
 
 ## Interfaces
@@ -49,19 +48,6 @@ type MetadataManager interface {
 }
 ```
 
-### ImageProcessor
-
-Pure image computation:
-
-```go
-type ImageProcessor interface {
-    Resize(src io.Reader, width, height int) (io.Reader, error)
-    Thumbnail(src io.Reader, maxWidth, maxHeight int) (io.Reader, error)
-    GetInfo(src io.Reader) (*ImageInfo, error)
-    IsImage(mimeType string) bool
-}
-```
-
 ## Concrete Implementations
 
 - Tenant-aware storage backends (local filesystem, S3) and the database-backed
@@ -69,7 +55,9 @@ type ImageProcessor interface {
 - HTTP upload/download handlers and request parsing live in **`x/fileapi`**.
 - `store/file` stays responsible for the stable `Storage` / `MetadataManager`
   contracts, shared file types, errors, and pure helpers such as path safety
-  checks and image processing.
+  checks.
+- Backend-specific configuration and thumbnail or image-processing helpers live
+  in **`x/data/file`** and **`x/fileapi`**.
 
 ## Non-Goals
 

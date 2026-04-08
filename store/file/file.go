@@ -66,19 +66,3 @@ type MetadataManager interface {
 	// UpdateAccessTime updates the last access timestamp.
 	UpdateAccessTime(ctx context.Context, id string) error
 }
-
-// ImageProcessor handles image processing operations.
-type ImageProcessor interface {
-	// Resize scales an image to the specified dimensions.
-	Resize(src io.Reader, width, height int) (io.Reader, error)
-
-	// Thumbnail generates a thumbnail maintaining aspect ratio.
-	// The thumbnail will fit within maxWidth x maxHeight.
-	Thumbnail(src io.Reader, maxWidth, maxHeight int) (io.Reader, error)
-
-	// GetInfo extracts image metadata (width, height, format).
-	GetInfo(src io.Reader) (*ImageInfo, error)
-
-	// IsImage checks if the MIME type represents an image.
-	IsImage(mimeType string) bool
-}

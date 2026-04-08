@@ -32,15 +32,12 @@ type File struct {
 // Tenant identity is not part of the stable store layer; use x/data/file.PutOptions
 // when tenant-scoped uploads are required.
 type PutOptions struct {
-	Reader        io.Reader      // File content
-	FileName      string         // Original filename
-	ContentType   string         // MIME type
-	Size          int64          // File size (-1 if unknown)
-	UploadedBy    string         // User ID of uploader
-	GenerateThumb bool           // Whether to generate thumbnail
-	ThumbWidth    int            // Thumbnail width (default 200)
-	ThumbHeight   int            // Thumbnail height (default 200)
-	Metadata      map[string]any // Additional metadata
+	Reader      io.Reader      // File content
+	FileName    string         // Original filename
+	ContentType string         // MIME type
+	Size        int64          // File size (-1 if unknown)
+	UploadedBy  string         // User ID of uploader
+	Metadata    map[string]any // Additional metadata
 }
 
 // FileStat contains basic file information.
@@ -63,29 +60,4 @@ type Query struct {
 	Page       int
 	PageSize   int
 	OrderBy    string
-}
-
-// ImageInfo contains image metadata.
-type ImageInfo struct {
-	Width  int    // Image width in pixels
-	Height int    // Image height in pixels
-	Format string // Image format (jpeg, png, gif)
-}
-
-// StorageConfig contains configuration for storage backends.
-type StorageConfig struct {
-	Type string // "local" or "s3"
-
-	// Local storage config
-	LocalBasePath string
-	LocalBaseURL  string
-
-	// S3 storage config
-	S3Endpoint  string
-	S3Region    string
-	S3Bucket    string
-	S3AccessKey string
-	S3SecretKey string
-	S3UseSSL    bool
-	S3PathStyle bool // Path-style (true) or virtual-hosted-style (false)
 }

@@ -35,15 +35,6 @@ func TestError_Unwrap(t *testing.T) {
 	}
 }
 
-// --- StorageConfig and types smoke tests ---
-
-func TestStorageConfig_Zero(t *testing.T) {
-	var cfg StorageConfig
-	// Zero value should not panic when accessed.
-	_ = cfg.LocalBasePath
-	_ = cfg.S3Endpoint
-}
-
 func TestFileStat_Zero(t *testing.T) {
 	var stat FileStat
 	if stat.Size != 0 {
@@ -68,26 +59,14 @@ func TestQuery_Zero(t *testing.T) {
 
 func TestPutOptions_AllFields(t *testing.T) {
 	opts := PutOptions{
-		FileName:      "file.txt",
-		ContentType:   "text/plain",
-		Reader:        strings.NewReader("data"),
-		Metadata:      map[string]any{"key": "val"},
-		UploadedBy:    "user-1",
-		GenerateThumb: false,
-		ThumbWidth:    200,
-		ThumbHeight:   200,
+		FileName:    "file.txt",
+		ContentType: "text/plain",
+		Reader:      strings.NewReader("data"),
+		Metadata:    map[string]any{"key": "val"},
+		UploadedBy:  "user-1",
 	}
 	if opts.FileName != "file.txt" {
 		t.Error("FileName not set")
-	}
-}
-
-// --- ImageInfo tests ---
-
-func TestImageInfo_Zero(t *testing.T) {
-	var info ImageInfo
-	if info.Width != 0 || info.Height != 0 {
-		t.Error("expected zero dimensions")
 	}
 }
 

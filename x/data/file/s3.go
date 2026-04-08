@@ -29,26 +29,24 @@ type S3Storage struct {
 	client    *http.Client
 	signer    *S3Signer
 	metadata  MetadataManager
-	imageProc storefile.ImageProcessor
 }
 
 // NewS3Storage creates a new S3-compatible storage.
-func NewS3Storage(config storefile.StorageConfig, metadata MetadataManager) (*S3Storage, error) {
-	if config.S3Endpoint == "" || config.S3Bucket == "" {
+func NewS3Storage(config S3Config, metadata MetadataManager) (*S3Storage, error) {
+	if config.Endpoint == "" || config.Bucket == "" {
 		return nil, fmt.Errorf("s3: endpoint and bucket are required")
 	}
 
 	s := &S3Storage{
-		endpoint:  config.S3Endpoint,
-		region:    config.S3Region,
-		bucket:    config.S3Bucket,
-		accessKey: config.S3AccessKey,
-		secretKey: config.S3SecretKey,
-		useSSL:    config.S3UseSSL,
-		pathStyle: config.S3PathStyle,
+		endpoint:  config.Endpoint,
+		region:    config.Region,
+		bucket:    config.Bucket,
+		accessKey: config.AccessKey,
+		secretKey: config.SecretKey,
+		useSSL:    config.UseSSL,
+		pathStyle: config.PathStyle,
 		client:    &http.Client{Timeout: 60 * time.Second},
 		metadata:  metadata,
-		imageProc: storefile.NewImageProcessor(),
 	}
 
 	if s.region == "" {

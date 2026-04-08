@@ -2,6 +2,8 @@ package file
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -10,9 +12,6 @@ import (
 	"time"
 
 	storefile "github.com/spcent/plumego/store/file"
-
-	"crypto/sha256"
-	"encoding/hex"
 )
 
 // LocalStorage implements Storage using the local filesystem.
@@ -21,7 +20,7 @@ type LocalStorage struct {
 	basePath  string
 	baseURL   string
 	metadata  MetadataManager
-	imageProc storefile.ImageProcessor
+	imageProc *imageProcessor
 }
 
 // NewLocalStorage creates a new local filesystem storage.
@@ -38,7 +37,7 @@ func NewLocalStorage(basePath, baseURL string, metadata MetadataManager) (*Local
 		basePath:  basePath,
 		baseURL:   baseURL,
 		metadata:  metadata,
-		imageProc: storefile.NewImageProcessor(),
+		imageProc: newImageProcessor(),
 	}, nil
 }
 

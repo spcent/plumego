@@ -9,31 +9,30 @@ import (
 	"image/png"
 	"io"
 	"strings"
+
+	storefile "github.com/spcent/plumego/store/file"
 )
 
-// imageProcessor implements the ImageProcessor interface.
+type imageInfo struct {
+	Width  int
+	Height int
+	Format string
+}
+
 type imageProcessor struct{}
 
-// NewImageProcessor creates a new image processor.
-func NewImageProcessor() ImageProcessor {
+func newImageProcessor() *imageProcessor {
 	return &imageProcessor{}
 }
 
-// Resize scales an image to the specified dimensions.
 func (p *imageProcessor) Resize(src io.Reader, width, height int) (io.Reader, error) {
-	// Decode image
 	img, format, err := image.Decode(src)
 	if err != nil {
-		return nil, &Error{
-			Op:  "Resize",
-			Err: err,
-		}
+		return nil, &storefile.Error{Op: "Resize", Err: err}
 	}
 
-	// Resize using nearest-neighbor algorithm
 	resized := resizeImage(img, width, height)
 
-	// Encode back to image
 	buf := new(bytes.Buffer)
 	switch format {
 	case "jpeg":
@@ -45,7 +44,6 @@ func (p *imageProcessor) Resize(src io.Reader, width, height int) (io.Reader, er
 	default:
 		err = fmt.Errorf("unsupported format: %s", format)
 	}
-
 	if err != nil {
 		return nil, err
 	}
@@ -53,26 +51,18 @@ func (p *imageProcessor) Resize(src io.Reader, width, height int) (io.Reader, er
 	return buf, nil
 }
 
-// Thumbnail generates a thumbnail maintaining aspect ratio.
 func (p *imageProcessor) Thumbnail(src io.Reader, maxWidth, maxHeight int) (io.Reader, error) {
-	// Decode image
 	img, format, err := image.Decode(src)
 	if err != nil {
-		return nil, &Error{
-			Op:  "Thumbnail",
-			Err: err,
-		}
+		return nil, &storefile.Error{Op: "Thumbnail", Err: err}
 	}
 
 	bounds := img.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
 
-	// Don't upscale small images
 	if width <= maxWidth && height <= maxHeight {
-		// Return original image without resizing
 		buf := new(bytes.Buffer)
-		var err error
 		switch format {
 		case "jpeg":
 			err = jpeg.Encode(buf, img, &jpeg.Options{Quality: 85})
@@ -89,7 +79,6 @@ func (p *imageProcessor) Thumbnail(src io.Reader, maxWidth, maxHeight int) (io.R
 		return buf, nil
 	}
 
-	// Calculate new dimensions maintaining aspect ratio
 	var newWidth, newHeight int
 	if width > height {
 		newWidth = maxWidth
@@ -107,10 +96,8 @@ func (p *imageProcessor) Thumbnail(src io.Reader, maxWidth, maxHeight int) (io.R
 		}
 	}
 
-	// Resize
 	resized := resizeImage(img, newWidth, newHeight)
 
-	// Encode
 	buf := new(bytes.Buffer)
 	switch format {
 	case "jpeg":
@@ -122,7 +109,6 @@ func (p *imageProcessor) Thumbnail(src io.Reader, maxWidth, maxHeight int) (io.R
 	default:
 		err = fmt.Errorf("unsupported format: %s", format)
 	}
-
 	if err != nil {
 		return nil, err
 	}
@@ -130,24 +116,19 @@ func (p *imageProcessor) Thumbnail(src io.Reader, maxWidth, maxHeight int) (io.R
 	return buf, nil
 }
 
-// GetInfo extracts image metadata.
-func (p *imageProcessor) GetInfo(src io.Reader) (*ImageInfo, error) {
+func (p *imageProcessor) GetInfo(src io.Reader) (*imageInfo, error) {
 	config, format, err := image.DecodeConfig(src)
 	if err != nil {
-		return nil, &Error{
-			Op:  "GetInfo",
-			Err: err,
-		}
+		return nil, &storefile.Error{Op: "GetInfo", Err: err}
 	}
 
-	return &ImageInfo{
+	return &imageInfo{
 		Width:  config.Width,
 		Height: config.Height,
 		Format: format,
 	}, nil
 }
 
-// IsImage checks if the MIME type represents an image.
 func (p *imageProcessor) IsImage(mimeType string) bool {
 	mimeType = strings.ToLower(mimeType)
 	return mimeType == "image/jpeg" ||
@@ -156,8 +137,6 @@ func (p *imageProcessor) IsImage(mimeType string) bool {
 		mimeType == "image/webp"
 }
 
-// resizeImage resizes an image using nearest-neighbor algorithm.
-// This is a simple implementation suitable for thumbnails.
 func resizeImage(src image.Image, width, height int) image.Image {
 	srcBounds := src.Bounds()
 	srcW := srcBounds.Dx()
