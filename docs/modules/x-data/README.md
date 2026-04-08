@@ -29,6 +29,30 @@
 
 ## Submodules
 
+### x/data/kvengine — Durable Embedded KV Engine
+
+**Purpose:** Owns the topology-heavy and durability-heavy embedded KV engine surface that should not remain in stable `store/kv`.
+
+**When to use:**
+- You need WAL-backed persistence with explicit flush and cleanup intervals.
+- You need snapshot/replay, serializer selection, compression, or shard-count tuning.
+- The stable `store/kv` primitive is too small for the persistence behavior you need.
+
+**Key types:**
+
+| Type / Function | Description |
+|---|---|
+| `KVStore` | Durable embedded KV engine with WAL + snapshot support |
+| `Options` | Engine config including flush cadence, cleanup cadence, compression, serializer format, shard count, and read-only mode |
+| `SerializationFormat` | Binary/JSON engine format selection |
+| `NewKVStore(opts)` | Constructor for the durable engine |
+
+**Boundary rule:**
+- Keep the stable `store/kv` package limited to the small embedded primitive.
+- Route WAL, snapshots, serializer plumbing, compression, and shard tuning to `x/data/kvengine`.
+
+**See:** `x/data/kvengine/module.yaml` for the manifest.
+
 ### x/data/rw — Read-Write Cluster
 
 **Purpose:** Manages a primary-replica database cluster. Routes read queries to healthy replicas and write queries (and all transaction queries) to the primary.

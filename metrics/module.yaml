@@ -61,6 +61,5 @@ review_checklist:
 
 agent_hints:
   - Observability capability packs and transport-specific logic belong outside the stable layer
-  - Use x/observability for Prometheus, tracing, rolling-window aggregation, and metrics test helpers
-  - Use x/observability helper packages for non-HTTP feature record builders when extension-side reuse is justified
+  - Use x/observability for Prometheus, tracing, rolling-window aggregation, metrics test helpers, and non-HTTP feature record builders
   - Use x/devtools for dev-only collectors and x/messaging for messaging-specific reporters/exporters

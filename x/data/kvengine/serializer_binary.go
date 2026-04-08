@@ -1,4 +1,4 @@
-package kvstore
+package kvengine
 
 import (
 	"bufio"

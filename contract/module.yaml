@@ -17,12 +17,9 @@ responsibilities:
 non_goals:
   - Route matching
   - App bootstrap
-  - Persistence logic
-  - Multipart upload convenience helpers
-  - Protocol gateway families
-  - Business rules
-  - Session or token issuance
-  - Auth identity primitives
+  - Persistence logic and multipart upload convenience helpers
+  - Protocol gateway families and business rules
+  - Session or token issuance and auth identity primitives
   - Middleware observability policy or field redaction
 
 public_entrypoints:

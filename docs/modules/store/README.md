@@ -35,6 +35,7 @@
 - move topology-heavy features to owning extensions
 - keep DB analytics, summaries, instrumentation wrappers, pool-stat polling, and slow-query inspection out of `store/db`; route them to `x/observability/dbinsights`
 - keep HTTP response caching and request-derived cache keys out of `store/cache`
+- keep durable KV-engine concerns such as WAL, snapshots, serializer selection, compression, and shard tuning out of `store/kv`; route them to `x/data/kvengine`
 
 ## File Boundary
 
@@ -43,6 +44,12 @@
 - `x/fileapi` is the HTTP transport layer for upload, download, info, delete, list, and temporary URL endpoints.
 - Do not move tenant-aware path policy, metadata queries, backend-specific behavior, or image-processing pipelines into stable `store/file`.
 - Do not move HTTP handlers or multipart parsing into stable `store`.
+
+## KV Boundary
+
+- `store/kv` is the stable small embedded KV primitive for file-backed key/value persistence, TTL-aware CRUD, key scans, and basic stats.
+- `x/data/kvengine` owns durable-engine behavior such as WAL, snapshots, serializer formats, compression, and shard/flush tuning.
+- Do not add engine-format plumbing, snapshot APIs, or durability-tuning knobs back into stable `store/kv`.
 
 ## Extension-layer cache implementations
 

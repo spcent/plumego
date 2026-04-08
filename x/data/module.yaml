@@ -15,6 +15,7 @@ responsibilities:
   - Sharding and routing topology
   - Data access policy composition
   - Tenant-aware topology adapters
+  - Durable KV-engine ownership beyond the stable store/kv primitive
 
 non_goals:
   - App bootstrap
@@ -26,6 +27,7 @@ public_entrypoints:
   - topology
   - routing
   - composition
+  - kvengine
 
 allowed_imports:
   - stdlib

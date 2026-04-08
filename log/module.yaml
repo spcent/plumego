@@ -54,6 +54,5 @@ review_checklist:
 
 agent_hints:
   - Logging contracts should stay decoupled from feature packages
-  - Avoid app-specific semantics here
-  - Keep CLI flag bootstrap and default singleton helpers out of the stable public/runtime path
-  - Never log secrets, tokens, or private keys; this is a non-negotiable security requirement
+  - Avoid app-specific semantics; keep CLI flag bootstrap and default singleton helpers out of the stable public/runtime path
+  - Never log secrets, tokens, or private keys

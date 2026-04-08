@@ -1,0 +1,51 @@
+name: x/data/kvengine
+path: x/data/kvengine
+layer: extension
+status: experimental
+owner: persistence
+risk: medium
+summary: Durable embedded KV engine with WAL, snapshots, serializer selection, and engine tuning.
+
+responsibilities:
+  - Durable embedded KV storage engine
+  - WAL and snapshot ownership
+  - Serializer format and compression ownership
+  - Engine-level tuning for sharding and flush intervals
+
+non_goals:
+  - Stable store primitives
+  - Tenant-aware storage policy
+  - HTTP transport behavior
+
+public_entrypoints:
+  - KVStore
+  - Options
+  - SerializationFormat
+  - NewKVStore
+
+allowed_imports:
+  - stdlib
+  - metrics
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - reference/**
+  - x/tenant/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/data/kvengine
+  - go test -timeout 20s ./x/data/kvengine
+  - go vet ./x/data/kvengine
+
+review_checklist:
+  - Keep durable-engine tuning out of stable store/kv
+  - Keep transport concerns out of x/data/kvengine
+  - Keep engine-level persistence behavior explicit and testable
+
+agent_hints:
+  - Use this package when you need WAL, snapshot/replay, serializer selection, compression, or shard/flush tuning
+  - Keep stable store/kv focused on the small embedded primitive
+  - Do not move transport or tenant policy concerns into this package
