@@ -63,3 +63,4 @@ agent_hints:
   - Tenant middleware belongs in x/tenant
   - Route API version negotiation to x/rest/versioning and resource or protocol transformation to x/gateway/*
   - Stateful policy and observability catch-all buckets should move out of middleware; keep behavior visible in tests
+  - Each middleware subpackage should expose one canonical constructor path only

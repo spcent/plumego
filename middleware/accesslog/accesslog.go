@@ -12,48 +12,12 @@ import (
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
-func Middleware(logger log.StructuredLogger) middleware.Middleware {
+// Logging is the canonical access-log middleware constructor.
+func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) middleware.Middleware {
 	if logger == nil {
 		panic("access logger cannot be nil")
 	}
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			prepared := internalobs.PrepareRequest(w, r)
-			r = prepared.Request
-			recorder := prepared.Recorder
-			requestID := prepared.RequestID
-
-			next.ServeHTTP(recorder, r)
-
-			if headerRequestID := recorder.Header().Get(contract.RequestIDHeader); headerRequestID != "" {
-				requestID = headerRequestID
-			}
-			metricsData := internalobs.BuildRequestMetrics(r, recorder, prepared.StartedAt, requestID)
-			rc := contract.RequestContextFromContext(r.Context())
-			fields := internalobs.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
-			fields["bytes"] = metricsData.Bytes
-			fields["user_agent"] = metricsData.UserAgent
-			fields["client_ip"] = internaltransport.ClientIP(r)
-			if metricsData.Route != "" {
-				fields["route"] = metricsData.Route
-			}
-			if rc.RouteName != "" {
-				fields["route_name"] = rc.RouteName
-			}
-			if spanID := recorder.Header().Get("X-Span-ID"); spanID != "" {
-				fields["span_id"] = spanID
-			} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.SpanID != "" {
-				fields["span_id"] = tc.SpanID
-			}
-
-			logger.WithFields(fields).Info("request completed")
-		})
-	}
-}
-
-// Logging keeps the old combined convenience shape, but lives in a focused package.
-func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			prepared := internalobs.PrepareRequest(w, r)
@@ -76,8 +40,8 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 
 			next.ServeHTTP(recorder, r)
 
-			rc := contract.RequestContextFromContext(r.Context())
 			metricsData := internalobs.BuildRequestMetrics(r, recorder, prepared.StartedAt, requestID)
+			rc := contract.RequestContextFromContext(r.Context())
 
 			if observer != nil {
 				path := metricsData.Path
@@ -102,6 +66,10 @@ func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer 
 			}
 			if spanID != "" {
 				fields["span_id"] = spanID
+			} else if headerSpanID := recorder.Header().Get("X-Span-ID"); headerSpanID != "" {
+				fields["span_id"] = headerSpanID
+			} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.SpanID != "" {
+				fields["span_id"] = tc.SpanID
 			}
 
 			logger.WithFields(fields).Info("request completed")

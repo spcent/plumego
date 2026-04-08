@@ -17,6 +17,7 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
+	"github.com/spcent/plumego/security/authn"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
@@ -53,7 +54,7 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "access log",
-			mw:   accesslog.Middleware(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})),
+			mw:   accesslog.Logging(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}), nil, nil),
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
@@ -70,7 +71,7 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "auth valid token",
-			mw:   auth.SimpleAuth("secret"),
+			mw:   auth.Authenticate(authn.StaticToken("secret")),
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 	}
@@ -157,7 +158,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		{
 			name:         "auth unauthenticated",
 			expectedCode: middleware.CodeAuthUnauthenticated,
-			handler: auth.SimpleAuth("secret")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: auth.Authenticate(authn.StaticToken("secret"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),

@@ -13,6 +13,7 @@ import (
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/security/authn"
 )
 
 const DefaultBasePath = "/ops"
@@ -400,7 +401,7 @@ func (c *Handler) authMiddlewares() []middleware.Middleware {
 		token = strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
 	}
 	if token != "" {
-		middlewares = append(middlewares, auth.SimpleAuth(token))
+		middlewares = append(middlewares, auth.Authenticate(authn.StaticToken(token)))
 	}
 
 	if !c.cfg.Auth.AllowInsecure && len(middlewares) == 0 {

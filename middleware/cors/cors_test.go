@@ -24,7 +24,7 @@ func TestCORSMiddleware(t *testing.T) {
 		MaxAge:           10 * time.Minute,
 	}
 
-	handler := CORSWithOptions(opts, http.HandlerFunc(dummyHandler))
+	handler := Middleware(opts)(http.HandlerFunc(dummyHandler))
 
 	t.Run("No Origin header (non-CORS)", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
@@ -102,7 +102,7 @@ func TestCORSMiddleware(t *testing.T) {
 			AllowedOrigins:   []string{"*"},
 			AllowCredentials: true,
 		}
-		handler2 := CORSWithOptions(opts2, http.HandlerFunc(dummyHandler))
+		handler2 := Middleware(opts2)(http.HandlerFunc(dummyHandler))
 
 		req := httptest.NewRequest("GET", "/test", nil)
 		req.Header.Set("Origin", "http://foo.com")
@@ -119,7 +119,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 func TestCORSMiddleware_ResponseBody(t *testing.T) {
 	opts := CORSOptions{AllowedOrigins: []string{"*"}}
-	handler := CORSWithOptions(opts, http.HandlerFunc(dummyHandler))
+	handler := Middleware(opts)(http.HandlerFunc(dummyHandler))
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Origin", "http://anything.com")

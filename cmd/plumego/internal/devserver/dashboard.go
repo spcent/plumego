@@ -80,7 +80,7 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger()),
+		accesslog.Logging(app.Logger(), nil, nil),
 		recovery.Recovery(app.Logger()),
 		cors.CORS,
 	); err != nil {

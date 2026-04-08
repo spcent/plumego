@@ -171,7 +171,7 @@ func TestLoggingUsesUpdatedContextForTracer(t *testing.T) {
 func TestMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
 	logger := newStubLogger()
 	tracer := &spanContextTracer{}
-	handler := Middleware(logger)(mwtracing.Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := Logging(logger, nil, nil)(mwtracing.Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})))
 
@@ -193,7 +193,7 @@ func TestMiddlewareRejectsNilLogger(t *testing.T) {
 			t.Fatal("expected panic when logger is nil")
 		}
 	}()
-	_ = Middleware(nil)
+	_ = Logging(nil, nil, nil)
 }
 
 type hijackWriter struct {

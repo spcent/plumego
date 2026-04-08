@@ -14,6 +14,7 @@ import (
 	"github.com/spcent/plumego/middleware/limits"
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/security/authn"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
@@ -28,7 +29,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		{
 			name:         "auth unauthenticated",
 			expectedCode: middleware.CodeAuthUnauthenticated,
-			handler: auth.SimpleAuth("secret")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: auth.Authenticate(authn.StaticToken("secret"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),

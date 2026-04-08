@@ -33,6 +33,7 @@
 ## Canonical change shape
 
 - implement `func(http.Handler) http.Handler`
+- keep one constructor path per middleware package; delete parallel wrapper families
 - add ordering and error-path tests
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
