@@ -279,9 +279,8 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 				if app.connTracker == nil {
 					t.Error("connTracker should be created")
 				}
-				snapshot := app.RuntimeSnapshot()
-				if snapshot.PreparationState != PreparationStateServerPrepared {
-					t.Errorf("preparation_state = %q, want %q", snapshot.PreparationState, PreparationStateServerPrepared)
+				if app.preparationState != PreparationStateServerPrepared {
+					t.Errorf("preparation_state = %q, want %q", app.preparationState, PreparationStateServerPrepared)
 				}
 			}
 		})

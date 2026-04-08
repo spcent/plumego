@@ -10,6 +10,7 @@ parent_family: x/observability
 
 responsibilities:
   - Debug route registration
+  - Debug runtime/config snapshot payloads
   - Development metrics surfacing
   - Env reload helpers
   - Local profiling endpoints

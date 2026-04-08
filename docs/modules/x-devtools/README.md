@@ -37,6 +37,7 @@
 
 - keep devtools opt-in
 - keep debug handlers explicit and locally mounted
+- keep debug runtime snapshot payloads in `x/devtools`, not in `core`
 - do not move debug routes into `core`
 
 ## Boundary with bootstrap

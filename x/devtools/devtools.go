@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
@@ -48,8 +49,29 @@ type DevTools struct {
 	devMetrics *DevCollector
 }
 
+// TLSSnapshot is the devtools-owned debug payload for TLS runtime state.
+type TLSSnapshot struct {
+	Enabled  bool   `json:"enabled"`
+	CertFile string `json:"cert_file"`
+	KeyFile  string `json:"key_file"`
+}
+
+// RuntimeSnapshot is the devtools-owned debug payload for core runtime state.
+type RuntimeSnapshot struct {
+	Addr              string                `json:"addr"`
+	ReadTimeout       time.Duration         `json:"read_timeout"`
+	ReadHeaderTimeout time.Duration         `json:"read_header_timeout"`
+	WriteTimeout      time.Duration         `json:"write_timeout"`
+	IdleTimeout       time.Duration         `json:"idle_timeout"`
+	MaxHeaderBytes    int                   `json:"max_header_bytes"`
+	HTTP2Enabled      bool                  `json:"http2_enabled"`
+	DrainInterval     time.Duration         `json:"drain_interval"`
+	TLS               TLSSnapshot           `json:"tls"`
+	PreparationState  core.PreparationState `json:"preparation_state"`
+}
+
 type Hooks struct {
-	RuntimeSnapshot  func() core.RuntimeSnapshot
+	RuntimeSnapshot  func() RuntimeSnapshot
 	MiddlewareList   func() []string
 	AttachDevMetrics func(*DevCollector)
 }
@@ -66,7 +88,7 @@ type Options struct {
 type ConfigSnapshot struct {
 	Debug   bool   `json:"debug"`
 	EnvFile string `json:"env_file"`
-	core.RuntimeSnapshot
+	RuntimeSnapshot
 }
 
 type routeRegistrar interface {

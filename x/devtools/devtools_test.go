@@ -173,8 +173,8 @@ func TestConfigEndpointWithHook(t *testing.T) {
 		Debug:   true,
 		EnvFile: ".env.test",
 		Hooks: Hooks{
-			RuntimeSnapshot: func() core.RuntimeSnapshot {
-				return core.RuntimeSnapshot{
+			RuntimeSnapshot: func() RuntimeSnapshot {
+				return RuntimeSnapshot{
 					Addr:             ":9090",
 					DrainInterval:    250 * time.Millisecond,
 					PreparationState: core.PreparationStateServerPrepared,
@@ -433,8 +433,8 @@ func TestInfoEndpoint(t *testing.T) {
 		Debug:   true,
 		EnvFile: ".env.test",
 		Hooks: Hooks{
-			RuntimeSnapshot: func() core.RuntimeSnapshot {
-				return core.RuntimeSnapshot{
+			RuntimeSnapshot: func() RuntimeSnapshot {
+				return RuntimeSnapshot{
 					Addr: ":8088",
 				}
 			},

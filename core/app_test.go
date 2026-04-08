@@ -149,9 +149,8 @@ func TestPrepareBuildsHTTPServer(t *testing.T) {
 	if server.Handler == nil {
 		t.Fatalf("httpServer handler should not be nil")
 	}
-	snapshot := app.RuntimeSnapshot()
-	if snapshot.PreparationState != PreparationStateServerPrepared {
-		t.Fatalf("preparation_state = %q, want %q", snapshot.PreparationState, PreparationStateServerPrepared)
+	if app.preparationState != PreparationStateServerPrepared {
+		t.Fatalf("preparation_state = %q, want %q", app.preparationState, PreparationStateServerPrepared)
 	}
 }
 
@@ -181,9 +180,8 @@ func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 		t.Fatalf("expected prepared middleware to run")
 	}
 
-	snapshot := app.RuntimeSnapshot()
-	if snapshot.PreparationState != PreparationStateHandlerPrepared {
-		t.Fatalf("preparation_state = %q, want %q", snapshot.PreparationState, PreparationStateHandlerPrepared)
+	if app.preparationState != PreparationStateHandlerPrepared {
+		t.Fatalf("preparation_state = %q, want %q", app.preparationState, PreparationStateHandlerPrepared)
 	}
 	if _, err := app.Server(); err == nil {
 		t.Fatalf("expected Server to fail before Prepare")

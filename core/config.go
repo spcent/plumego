@@ -45,13 +45,6 @@ func DefaultConfig() AppConfig {
 	}
 }
 
-// RuntimeTLSSnapshot exposes the stable TLS subset used by first-party tooling.
-type RuntimeTLSSnapshot struct {
-	Enabled  bool   `json:"enabled"`
-	CertFile string `json:"cert_file"`
-	KeyFile  string `json:"key_file"`
-}
-
 // PreparationState describes the app's canonical kernel preparation phase.
 type PreparationState string
 
@@ -60,38 +53,3 @@ const (
 	PreparationStateHandlerPrepared PreparationState = "handler_prepared"
 	PreparationStateServerPrepared  PreparationState = "server_prepared"
 )
-
-// RuntimeSnapshot exposes the stable runtime/config introspection contract used
-// by first-party tooling and debug surfaces.
-type RuntimeSnapshot struct {
-	Addr              string             `json:"addr"`
-	ReadTimeout       time.Duration      `json:"read_timeout"`
-	ReadHeaderTimeout time.Duration      `json:"read_header_timeout"`
-	WriteTimeout      time.Duration      `json:"write_timeout"`
-	IdleTimeout       time.Duration      `json:"idle_timeout"`
-	MaxHeaderBytes    int                `json:"max_header_bytes"`
-	HTTP2Enabled      bool               `json:"http2_enabled"`
-	DrainInterval     time.Duration      `json:"drain_interval"`
-	TLS               RuntimeTLSSnapshot `json:"tls"`
-	PreparationState  PreparationState   `json:"preparation_state"`
-}
-
-// runtimeSnapshot projects the AppConfig into a RuntimeSnapshot for introspection.
-func (cfg AppConfig) runtimeSnapshot(state PreparationState) RuntimeSnapshot {
-	return RuntimeSnapshot{
-		Addr:              cfg.Addr,
-		ReadTimeout:       cfg.ReadTimeout,
-		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
-		WriteTimeout:      cfg.WriteTimeout,
-		IdleTimeout:       cfg.IdleTimeout,
-		MaxHeaderBytes:    cfg.MaxHeaderBytes,
-		HTTP2Enabled:      cfg.HTTP2Enabled,
-		DrainInterval:     cfg.DrainInterval,
-		TLS: RuntimeTLSSnapshot{
-			Enabled:  cfg.TLS.Enabled,
-			CertFile: cfg.TLS.CertFile,
-			KeyFile:  cfg.TLS.KeyFile,
-		},
-		PreparationState: state,
-	}
-}
