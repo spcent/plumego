@@ -89,7 +89,7 @@ func TestSessionCheckRevokedSession(t *testing.T) {
 		Claims:  map[string]string{"session_id": "sess-1"},
 	}
 	store := &stubSessionStore{session: &Session{SessionID: "sess-1"}}
-	validator := staticSessionValidator{err: authn.ErrSessionRevoked}
+	validator := staticSessionValidator{err: ErrSessionRevoked}
 
 	handler := SessionCheck(store, validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

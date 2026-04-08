@@ -83,7 +83,7 @@ func SessionCheck(store SessionStore, validator SessionValidator, opts ...Sessio
 				return
 			}
 
-			principal := authn.PrincipalFromRequest(r)
+			principal := authn.PrincipalFromContext(r.Context())
 			if principal == nil {
 				cfg.errorHandler(w, r, authn.ErrUnauthenticated)
 				return
@@ -200,13 +200,13 @@ func sessionErrorToAPIError(err error) contract.APIError {
 			Build()
 	}
 	switch {
-	case errors.Is(err, authn.ErrSessionRevoked):
+	case errors.Is(err, ErrSessionRevoked):
 		return unauthorized("session revoked")
-	case errors.Is(err, authn.ErrSessionExpired):
+	case errors.Is(err, ErrSessionExpired):
 		return unauthorized("session expired")
-	case errors.Is(err, authn.ErrRefreshReused):
+	case errors.Is(err, ErrRefreshReused):
 		return unauthorized("refresh token reuse detected")
-	case errors.Is(err, authn.ErrTokenVersionMismatch):
+	case errors.Is(err, ErrTokenVersionMismatch):
 		return unauthorized("token version mismatch")
 	case errors.Is(err, authn.ErrUnauthenticated):
 		fallthrough

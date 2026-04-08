@@ -99,7 +99,7 @@ func AuthorizeFunc(authorizer authn.Authorizer, resolver func(*http.Request) (st
 				return
 			}
 
-			principal := authn.PrincipalFromRequest(r)
+			principal := authn.PrincipalFromContext(r.Context())
 			if principal == nil {
 				cfg.errorHandler(w, r, authn.ErrUnauthenticated)
 				return
@@ -179,14 +179,6 @@ func authErrorToAPIError(err error) contract.APIError {
 		return unauthorized("invalid token")
 	case errors.Is(err, authn.ErrExpiredToken):
 		return unauthorized("token expired")
-	case errors.Is(err, authn.ErrSessionRevoked):
-		return unauthorized("session revoked")
-	case errors.Is(err, authn.ErrSessionExpired):
-		return unauthorized("session expired")
-	case errors.Is(err, authn.ErrRefreshReused):
-		return unauthorized("refresh token reuse detected")
-	case errors.Is(err, authn.ErrTokenVersionMismatch):
-		return unauthorized("token version mismatch")
 	case errors.Is(err, authn.ErrUnauthenticated):
 		fallthrough
 	default:

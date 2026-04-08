@@ -6,8 +6,6 @@ package session
 import (
 	"context"
 	"time"
-
-	"github.com/spcent/plumego/security/authn"
 )
 
 // SessionStatus is the lifecycle state of a session.
@@ -126,6 +124,3 @@ type SessionManager interface {
 	SessionValidator
 	RefreshManager
 }
-
-// PrincipalFromRequest is a convenience alias for authn.PrincipalFromRequest.
-var PrincipalFromRequest = authn.PrincipalFromRequest

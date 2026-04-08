@@ -496,18 +496,10 @@ func TestErrorBuilderDetails(t *testing.T) {
 	}
 }
 
-func TestWriteErrorZeroValueEmitsWarning(t *testing.T) {
-	var warnings []string
-	prev := WarnFunc
-	WarnFunc = func(msg string) { warnings = append(warnings, msg) }
-	defer func() { WarnFunc = prev }()
-
+func TestWriteErrorZeroValueDefaults(t *testing.T) {
 	w := httptest.NewRecorder()
 	_ = WriteError(w, nil, APIError{})
 
-	if len(warnings) == 0 {
-		t.Fatal("expected WarnFunc to be called for zero-value APIError")
-	}
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -552,16 +544,11 @@ func TestErrorBuilderBuildFillsDefaults(t *testing.T) {
 	if got.Category == "" {
 		t.Error("Build() must set a non-empty Category")
 	}
-	// A fully-populated APIError from the builder should not trigger WarnFunc.
-	var warnCalled bool
-	prev := WarnFunc
-	WarnFunc = func(string) { warnCalled = true }
-	defer func() { WarnFunc = prev }()
 
 	w := httptest.NewRecorder()
 	_ = WriteError(w, nil, got)
-	if warnCalled {
-		t.Error("WarnFunc must not be called for a fully-populated APIError from the builder")
+	if w.Code != got.Status {
+		t.Fatalf("expected status %d, got %d", got.Status, w.Code)
 	}
 }
 

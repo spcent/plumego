@@ -2,7 +2,6 @@ package authn
 
 import (
 	"context"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -42,43 +41,6 @@ func TestPrincipalFromContextWrongType(t *testing.T) {
 	}
 }
 
-func TestPrincipalFromRequest(t *testing.T) {
-	p := &Principal{Subject: "req-user"}
-
-	req := httptest.NewRequest("GET", "/", nil)
-	req = RequestWithPrincipal(req, p)
-
-	got := PrincipalFromRequest(req)
-	if got == nil {
-		t.Fatal("expected non-nil principal from request")
-	}
-	if got.Subject != "req-user" {
-		t.Errorf("Subject = %q, want req-user", got.Subject)
-	}
-}
-
-func TestPrincipalFromRequestNil(t *testing.T) {
-	got := PrincipalFromRequest(nil)
-	if got != nil {
-		t.Fatalf("expected nil for nil request, got %+v", got)
-	}
-}
-
-func TestPrincipalFromRequestNoAttached(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", nil)
-	got := PrincipalFromRequest(req)
-	if got != nil {
-		t.Fatalf("expected nil for request without principal, got %+v", got)
-	}
-}
-
-func TestRequestWithPrincipalNil(t *testing.T) {
-	got := RequestWithPrincipal(nil, &Principal{Subject: "u"})
-	if got != nil {
-		t.Fatalf("expected nil for nil request, got non-nil")
-	}
-}
-
 func TestWithPrincipalOverwrite(t *testing.T) {
 	p1 := &Principal{Subject: "user-1"}
 	p2 := &Principal{Subject: "user-2"}
@@ -95,30 +57,16 @@ func TestWithPrincipalOverwrite(t *testing.T) {
 	}
 }
 
-func TestRequestWithPrincipalNewRequest(t *testing.T) {
-	req := httptest.NewRequest("POST", "/api/data", nil)
-	original := req
-
-	p := &Principal{Subject: "svc-account", Roles: []string{"service"}}
-	newReq := RequestWithPrincipal(req, p)
-
-	if PrincipalFromRequest(original) != nil {
-		t.Fatal("original request should not have principal attached")
-	}
-
-	got := PrincipalFromRequest(newReq)
-	if got == nil {
-		t.Fatal("new request should have principal attached")
-	}
-	if got.Subject != "svc-account" {
-		t.Errorf("Subject = %q, want svc-account", got.Subject)
-	}
-}
-
 func TestPrincipalFromContextNilPrincipalStored(t *testing.T) {
 	ctx := WithPrincipal(context.Background(), nil)
 	got := PrincipalFromContext(ctx)
 	if got != nil {
 		t.Fatalf("expected nil for explicitly stored nil principal, got %+v", got)
+	}
+}
+
+func TestPrincipalFromContextNilContext(t *testing.T) {
+	if got := PrincipalFromContext(nil); got != nil {
+		t.Fatalf("expected nil for nil context, got %+v", got)
 	}
 }

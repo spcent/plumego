@@ -20,7 +20,7 @@ func ExampleMiddleware_principalFirst() {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("X-Tenant-ID", "header-tenant")
-	req = authn.RequestWithPrincipal(req, &authn.Principal{TenantID: "principal-tenant"})
+	req = req.WithContext(authn.WithPrincipal(req.Context(), &authn.Principal{TenantID: "principal-tenant"}))
 
 	rec := httptest.NewRecorder()
 	mw := resolve.Middleware(resolve.Options{

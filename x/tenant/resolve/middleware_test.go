@@ -19,7 +19,7 @@ func TestMiddlewareFromPrincipal(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = authn.RequestWithPrincipal(req, &authn.Principal{TenantID: "t-1"})
+	req = req.WithContext(authn.WithPrincipal(req.Context(), &authn.Principal{TenantID: "t-1"}))
 	rec := httptest.NewRecorder()
 
 	mw := Middleware(Options{})
@@ -41,7 +41,7 @@ func TestMiddlewarePrincipalTakesPrecedenceOverHeaderAndExtractor(t *testing.T) 
 
 	req := httptest.NewRequest(http.MethodGet, "/?tenant=query-tenant", nil)
 	req.Header.Set("X-Tenant-ID", "header-tenant")
-	req = authn.RequestWithPrincipal(req, &authn.Principal{TenantID: "principal-tenant"})
+	req = req.WithContext(authn.WithPrincipal(req.Context(), &authn.Principal{TenantID: "principal-tenant"}))
 	rec := httptest.NewRecorder()
 
 	mw := Middleware(Options{

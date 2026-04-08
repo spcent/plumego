@@ -48,7 +48,7 @@
 
 - resolution work starts in `x/tenant/resolve`
 - deny-path, quota, and policy work starts in `x/tenant/core`, `policy`, `quota`, or `ratelimit`
-- session lifecycle and JWT-backed revocation/version work starts in `x/tenant/session`
+- session lifecycle, tenant-session sentinel errors, and JWT-backed revocation/version work start in `x/tenant/session`
 - tenant-aware persistence work starts in `x/tenant/store/*`, not in stable `store/*`
 
 ## Runnable resolution examples

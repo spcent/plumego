@@ -48,7 +48,7 @@ func TestAuthenticateMiddlewareSuccess(t *testing.T) {
 	authenticator := staticAuthenticator{principal: principal}
 
 	handler := Authenticate(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got := authn.PrincipalFromRequest(r)
+		got := authn.PrincipalFromContext(r.Context())
 		if got == nil || got.Subject != "user-1" {
 			t.Fatalf("expected principal in context")
 		}

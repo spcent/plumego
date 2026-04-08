@@ -95,10 +95,10 @@ func (s *JWTStateStore) ValidateClaims(claims *jwt.TokenClaims) error {
 
 	_, err := s.store.Get(revokedTokenPrefix + claims.TokenID)
 	if err == nil {
-		return authn.ErrSessionRevoked
+		return ErrSessionRevoked
 	}
 	if err != nil && !errors.Is(err, kvstore.ErrKeyNotFound) && !errors.Is(err, kvstore.ErrKeyExpired) {
-		return authn.ErrSessionRevoked
+		return ErrSessionRevoked
 	}
 
 	current, err := s.SubjectVersion(claims.Identity.Subject)
@@ -106,7 +106,7 @@ func (s *JWTStateStore) ValidateClaims(claims *jwt.TokenClaims) error {
 		return err
 	}
 	if current != claims.Identity.Version {
-		return authn.ErrTokenVersionMismatch
+		return ErrTokenVersionMismatch
 	}
 	return nil
 }

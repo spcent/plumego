@@ -39,6 +39,7 @@
 - keep request-id generation policy in `middleware/requestid` or middleware-owned observability helpers, not in `contract`
 - keep `RequestIDHeader` as the canonical transport header constant only; request-id attach/read policy belongs to middleware
 - keep `TraceContext` for tracing/span state only; do not reuse it as the app-facing request-correlation surface
+- keep transport helpers deterministic and side-effect-free; do not add package-global warning or diagnostics hooks
 - use `Ctx.Stream(StreamConfig{...})` as the only high-level streaming/SSE entrypoint; keep `NewSSEWriter(...)` for low-level stdlib-shaped SSE writing only
 - keep `WriteJSON` as an explicit lower-level writer for raw payloads outside the `Ctx` success contract
 - use stdlib multipart parsing directly in owning handlers such as `x/fileapi`; do not add file-upload or disk-save convenience helpers to `contract.Ctx`

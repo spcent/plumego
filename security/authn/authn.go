@@ -26,14 +26,10 @@ type Authorizer interface {
 }
 
 var (
-	ErrUnauthenticated      = errors.New("unauthenticated")
-	ErrUnauthorized         = errors.New("unauthorized")
-	ErrInvalidToken         = errors.New("invalid token")
-	ErrExpiredToken         = errors.New("expired token")
-	ErrSessionRevoked       = errors.New("session revoked")
-	ErrSessionExpired       = errors.New("session expired")
-	ErrRefreshReused        = errors.New("refresh token reuse detected")
-	ErrTokenVersionMismatch = errors.New("token version mismatch")
+	ErrUnauthenticated = errors.New("unauthenticated")
+	ErrUnauthorized    = errors.New("unauthorized")
+	ErrInvalidToken    = errors.New("invalid token")
+	ErrExpiredToken    = errors.New("expired token")
 )
 
 type principalContextKey struct{}
@@ -45,26 +41,13 @@ func WithPrincipal(ctx context.Context, p *Principal) context.Context {
 
 // PrincipalFromContext extracts a principal from a context.
 func PrincipalFromContext(ctx context.Context) *Principal {
+	if ctx == nil {
+		return nil
+	}
 	if v := ctx.Value(principalContextKey{}); v != nil {
 		if p, ok := v.(*Principal); ok {
 			return p
 		}
 	}
 	return nil
-}
-
-// PrincipalFromRequest extracts a principal from a request context.
-func PrincipalFromRequest(r *http.Request) *Principal {
-	if r == nil {
-		return nil
-	}
-	return PrincipalFromContext(r.Context())
-}
-
-// RequestWithPrincipal returns a shallow copy of r with the principal attached.
-func RequestWithPrincipal(r *http.Request, p *Principal) *http.Request {
-	if r == nil {
-		return nil
-	}
-	return r.WithContext(WithPrincipal(r.Context(), p))
 }

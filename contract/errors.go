@@ -5,13 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 )
-
-// WarnFunc is invoked when WriteError receives an APIError with missing required
-// fields (Status, Code, or Category). It defaults to a no-op; override in tests
-// or at application startup to surface misconfigured callers.
-var WarnFunc = func(msg string) {}
 
 // ErrorCategory describes the high-level class of an API error for observability.
 type ErrorCategory string
@@ -159,14 +153,11 @@ type ErrorResponse struct {
 // headers have already been sent.
 //
 // Prefer building APIError values through NewErrorBuilder() so that required
-// fields are always populated. WriteError keeps fallback defaults for
-// backward compatibility and calls WarnFunc when required fields are missing.
+// fields are always populated. WriteError still normalizes incomplete APIError
+// values, but it does so deterministically with no package-global side effects.
 func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	if w == nil {
 		return ErrResponseWriterNil
-	}
-	if issues := validateAPIError(err); len(issues) > 0 {
-		WarnFunc("WriteError received partially-populated APIError: " + strings.Join(issues, "; "))
 	}
 
 	if err.Status == 0 {

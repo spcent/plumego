@@ -20,7 +20,7 @@ non_goals:
   - App bootstrap
   - Tenant policy orchestration
   - Persistence logic
-  - Session lifecycle management and revocation (belongs in x/tenant/session or application code)
+  - Session lifecycle management, revocation, and tenant-session sentinel errors (belong in x/tenant/session or application code)
 
 public_entrypoints:
   - authn

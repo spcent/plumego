@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/security/authn"
 	"github.com/spcent/plumego/security/jwt"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
@@ -48,7 +47,7 @@ func TestJWTStateStoreRejectsRevokedClaims(t *testing.T) {
 	if err := state.RevokeClaims(claims); err != nil {
 		t.Fatalf("revoke claims: %v", err)
 	}
-	if err := state.ValidateClaims(claims); !errors.Is(err, authn.ErrSessionRevoked) {
+	if err := state.ValidateClaims(claims); !errors.Is(err, ErrSessionRevoked) {
 		t.Fatalf("expected ErrSessionRevoked, got %v", err)
 	}
 }
@@ -73,7 +72,7 @@ func TestJWTStateStoreRejectsStaleSubjectVersion(t *testing.T) {
 		t.Fatalf("expected version 1, got %d", version)
 	}
 
-	if err := state.ValidateClaims(claims); !errors.Is(err, authn.ErrTokenVersionMismatch) {
+	if err := state.ValidateClaims(claims); !errors.Is(err, ErrTokenVersionMismatch) {
 		t.Fatalf("expected ErrTokenVersionMismatch, got %v", err)
 	}
 

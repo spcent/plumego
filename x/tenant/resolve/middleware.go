@@ -41,7 +41,7 @@ func Middleware(options Options) middleware.Middleware {
 			source := ""
 
 			if allowFromPrincipal {
-				if p := authn.PrincipalFromRequest(r); p != nil && p.TenantID != "" {
+				if p := authn.PrincipalFromContext(r.Context()); p != nil && p.TenantID != "" {
 					tenantID = p.TenantID
 					source = "principal"
 				}
