@@ -50,8 +50,10 @@ change_risks:
 review_checklist:
   - Never log secrets
   - Keep interfaces minimal
+  - Keep backend ownership constructor-local; no package-global singleton in the stable runtime path
 
 agent_hints:
   - Logging contracts should stay decoupled from feature packages
   - Avoid app-specific semantics here
+  - Keep CLI flag bootstrap and default singleton helpers out of the stable public/runtime path
   - Never log secrets, tokens, or private keys; this is a non-negotiable security requirement

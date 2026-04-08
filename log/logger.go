@@ -72,13 +72,6 @@ type StructuredLogger interface {
 	FatalCtx(ctx context.Context, msg string, fields ...Fields)
 }
 
-// Lifecycle allows a logger to participate in application start/stop hooks
-// (e.g. to initialize flags or flush buffers). Methods are optional.
-type Lifecycle interface {
-	Start(ctx context.Context) error
-	Stop(ctx context.Context) error
-}
-
 // firstFields returns the first Fields argument if present, otherwise nil.
 func firstFields(extra []Fields) Fields {
 	if len(extra) > 0 {
@@ -89,7 +82,8 @@ func firstFields(extra []Fields) Fields {
 
 // defaultLogger adapts the default text logger backend to StructuredLogger.
 type defaultLogger struct {
-	fields Fields
+	backend *gLogger
+	fields  Fields
 }
 
 // NewLogger creates the canonical structured logger.
@@ -108,27 +102,17 @@ func NewLogger(configs ...LoggerConfig) StructuredLogger {
 	case LoggerFormatDiscard:
 		return newDiscardLogger()
 	case "", LoggerFormatText:
-		return &defaultLogger{fields: cloneFields(cfg.Fields)}
+		return newDefaultLogger(cfg)
 	default:
-		return &defaultLogger{fields: cloneFields(cfg.Fields)}
+		return newDefaultLogger(cfg)
 	}
 }
 
-// Start initializes the underlying default logger backend.
-func (l *defaultLogger) Start(ctx context.Context) error {
-	initDefaultFromFlags()
-	return nil
-}
-
-// Stop flushes and closes backend resources.
-func (l *defaultLogger) Stop(ctx context.Context) error {
-	flushDefault()
-	closeDefault()
-	return nil
-}
-
 func (l *defaultLogger) WithFields(fields Fields) StructuredLogger {
-	return &defaultLogger{fields: mergeFields(l.fields, fields)}
+	return &defaultLogger{
+		backend: l.getBackend(),
+		fields:  mergeFields(l.fields, fields),
+	}
 }
 
 func (l *defaultLogger) With(key string, value any) StructuredLogger {
@@ -138,7 +122,7 @@ func (l *defaultLogger) With(key string, value any) StructuredLogger {
 // Debug logs at DEBUG level.
 // The canonical logger path gates debug on V(1).
 func (l *defaultLogger) Debug(msg string, fields ...Fields) {
-	if !std.vAt(1, 2) {
+	if !l.getBackend().vAt(1, 2) {
 		return
 	}
 	l.logWithLevel(DEBUG, msg, firstFields(fields))
@@ -164,7 +148,7 @@ func (l *defaultLogger) Fatal(msg string, fields ...Fields) {
 // Verbosity is gated on the global glog flag, consistent with Debug.
 func (l *defaultLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
 	_ = ctx
-	if !std.vAt(1, 2) {
+	if !l.getBackend().vAt(1, 2) {
 		return
 	}
 	l.logWithLevel(DEBUG, msg, firstFields(fields))
@@ -197,9 +181,9 @@ func (l *defaultLogger) logWithLevel(level Level, msg string, fields Fields) {
 		msg += " " + formatted
 	}
 
-	// calldepth=3: std.log adds 1 → logInternal calls runtime.Caller(4)
-	// Frame 0: logInternal, 1: std.log, 2: logWithLevel, 3: public method (Info/Error/…), 4: actual caller
-	std.log(level, 3, msg)
+	// calldepth=3: backend.log adds 1 → logInternal calls runtime.Caller(4)
+	// Frame 0: logInternal, 1: backend.log, 2: logWithLevel, 3: public method (Info/Error/…), 4: actual caller
+	l.getBackend().log(level, 3, msg)
 }
 
 func (l *defaultLogger) formatFields(fields Fields) string {
@@ -219,4 +203,24 @@ func (l *defaultLogger) formatFields(fields Fields) string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+func newDefaultLogger(cfg LoggerConfig) *defaultLogger {
+	backend := newGLogger()
+	if cfg.Output != nil {
+		backend.SetOutput(cfg.Output)
+	}
+	backend.SetLevel(cfg.Level)
+	backend.SetVerbose(cfg.Verbosity)
+	return &defaultLogger{
+		backend: backend,
+		fields:  cloneFields(cfg.Fields),
+	}
+}
+
+func (l *defaultLogger) getBackend() *gLogger {
+	if l.backend == nil {
+		l.backend = newGLogger()
+	}
+	return l.backend
 }

@@ -206,34 +206,6 @@ func (l *jsonLogger) writerFor(level Level) io.Writer {
 	return l.output
 }
 
-// Start implements the Lifecycle interface (no-op for the JSON logger).
-func (l *jsonLogger) Start(ctx context.Context) error {
-	return nil
-}
-
-// Stop implements the Lifecycle interface (flushes both outputs if they support it).
-func (l *jsonLogger) Stop(ctx context.Context) error {
-	l.mu.Lock()
-	out := l.output
-	errOut := l.errorOutput
-	l.mu.Unlock()
-
-	var firstErr error
-	if syncer, ok := out.(interface{ Sync() error }); ok {
-		if err := syncer.Sync(); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	if errOut != nil && errOut != out {
-		if syncer, ok := errOut.(interface{ Sync() error }); ok {
-			if err := syncer.Sync(); err != nil && firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-	return firstErr
-}
-
 // SetLevel changes the minimum log level at runtime.
 // It is safe to call concurrently with logging.
 func (l *jsonLogger) SetLevel(level Level) {

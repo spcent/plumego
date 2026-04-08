@@ -192,13 +192,14 @@ func TestLogLevels(t *testing.T) {
 }
 
 func TestDebugLevel(t *testing.T) {
-	resetGlobalLogger()
-	std.SetVerbose(1)
-	std.SetLevel(DEBUG)
-
-	output := captureOutput(func() {
-		NewLogger().Debug("debug message", nil)
+	var buf bytes.Buffer
+	logger := NewLogger(LoggerConfig{
+		Output:    &buf,
+		Level:     DEBUG,
+		Verbosity: 1,
 	})
+	logger.Debug("debug message", nil)
+	output := buf.String()
 	if !strings.Contains(output, "debug message") {
 		t.Fatalf("expected debug message to be logged when verbosity allows it")
 	}
@@ -206,11 +207,14 @@ func TestDebugLevel(t *testing.T) {
 		t.Fatalf("expected debug level marker D, got %q", output)
 	}
 
-	std.SetVerbose(1)
-	std.SetLevel(INFO)
-	output = captureOutput(func() {
-		NewLogger().Debug("filtered debug", nil)
+	buf.Reset()
+	logger = NewLogger(LoggerConfig{
+		Output:    &buf,
+		Level:     INFO,
+		Verbosity: 1,
 	})
+	logger.Debug("filtered debug", nil)
+	output = buf.String()
 	if strings.TrimSpace(output) != "" {
 		t.Fatalf("expected debug message to be filtered when minimum level is INFO")
 	}
