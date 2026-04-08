@@ -5,16 +5,16 @@ import (
 	"testing"
 )
 
-// --- NewRouteCache edge cases ---
+// --- newMatchCache edge cases ---
 
-func TestNewRouteCache_ZeroCapacity(t *testing.T) {
+func TestNewMatchCacheZeroCapacity(t *testing.T) {
 	// Zero or negative capacity should use the default (100).
-	cache := NewRouteCache(0)
+	cache := newMatchCache(0)
 	if cache.capacity != 100 {
 		t.Errorf("capacity = %d, want 100 for zero input", cache.capacity)
 	}
 
-	cache = NewRouteCache(-5)
+	cache = newMatchCache(-5)
 	if cache.capacity != 100 {
 		t.Errorf("capacity = %d, want 100 for negative input", cache.capacity)
 	}
@@ -22,16 +22,16 @@ func TestNewRouteCache_ZeroCapacity(t *testing.T) {
 
 // --- GetByPattern ---
 
-func TestRouteCache_GetByPattern_Empty(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheGetByPatternEmpty(t *testing.T) {
+	cache := newMatchCache(10)
 	result, params, found := cache.GetByPattern("GET", "/users/123")
 	if found || result != nil || params != nil {
 		t.Error("expected no match on empty cache")
 	}
 }
 
-func TestRouteCache_GetByPattern_Match(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheGetByPatternMatch(t *testing.T) {
+	cache := newMatchCache(10)
 	mr := &MatchResult{RoutePattern: "/users/:id", RouteMethod: "GET"}
 	cache.SetPattern("GET", "/users/:id", mr)
 
@@ -47,8 +47,8 @@ func TestRouteCache_GetByPattern_Match(t *testing.T) {
 	}
 }
 
-func TestRouteCache_GetByPattern_NoMatchWrongMethod(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheGetByPatternNoMatchWrongMethod(t *testing.T) {
+	cache := newMatchCache(10)
 	cache.SetPattern("GET", "/users/:id", &MatchResult{RoutePattern: "/users/:id"})
 
 	_, _, found := cache.GetByPattern("POST", "/users/42")
@@ -57,8 +57,8 @@ func TestRouteCache_GetByPattern_NoMatchWrongMethod(t *testing.T) {
 	}
 }
 
-func TestRouteCache_GetByPattern_UpdatesHits(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheGetByPatternUpdatesHits(t *testing.T) {
+	cache := newMatchCache(10)
 	cache.SetPattern("GET", "/items/:id", &MatchResult{RoutePattern: "/items/:id"})
 
 	before := cache.Stats().Hits
@@ -70,8 +70,8 @@ func TestRouteCache_GetByPattern_UpdatesHits(t *testing.T) {
 	}
 }
 
-func TestRouteCache_GetByPattern_NoMatchNoHit(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheGetByPatternNoMatchNoHit(t *testing.T) {
+	cache := newMatchCache(10)
 	cache.SetPattern("GET", "/items/:id", &MatchResult{RoutePattern: "/items/:id"})
 
 	before := cache.Stats().Misses
@@ -85,8 +85,8 @@ func TestRouteCache_GetByPattern_NoMatchNoHit(t *testing.T) {
 
 // --- Clear ---
 
-func TestRouteCache_Clear(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheClear(t *testing.T) {
+	cache := newMatchCache(10)
 
 	// Populate exact cache.
 	for i := 0; i < 5; i++ {
@@ -125,8 +125,8 @@ func TestRouteCache_Clear(t *testing.T) {
 	}
 }
 
-func TestRouteCache_Clear_EmptyCache(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheClearEmptyCache(t *testing.T) {
+	cache := newMatchCache(10)
 	cache.Clear() // Should not panic on empty cache.
 
 	if size := cache.Size(); size != 0 {
@@ -136,8 +136,8 @@ func TestRouteCache_Clear_EmptyCache(t *testing.T) {
 
 // --- Stats ---
 
-func TestRouteCache_Stats_Initial(t *testing.T) {
-	cache := NewRouteCache(50)
+func TestMatcherStatsInitial(t *testing.T) {
+	cache := newMatchCache(50)
 	stats := cache.Stats()
 
 	if stats.Capacity != 50 {
@@ -157,8 +157,8 @@ func TestRouteCache_Stats_Initial(t *testing.T) {
 	}
 }
 
-func TestRouteCache_Stats_AfterOperations(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherStatsAfterOperations(t *testing.T) {
+	cache := newMatchCache(10)
 	cache.Set("a", &MatchResult{})
 	cache.Set("b", &MatchResult{})
 
@@ -182,8 +182,8 @@ func TestRouteCache_Stats_AfterOperations(t *testing.T) {
 	}
 }
 
-func TestRouteCache_Stats_WithPatterns(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherStatsWithPatterns(t *testing.T) {
+	cache := newMatchCache(10)
 	cache.SetPattern("GET", "/a/:id", &MatchResult{})
 	cache.SetPattern("POST", "/b/:id", &MatchResult{})
 
@@ -195,8 +195,8 @@ func TestRouteCache_Stats_WithPatterns(t *testing.T) {
 
 // --- SetPattern deduplication ---
 
-func TestRouteCache_SetPattern_UpdateExisting(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheSetPatternUpdateExisting(t *testing.T) {
+	cache := newMatchCache(10)
 	mr1 := &MatchResult{RoutePattern: "/a/:id", RouteMethod: "GET"}
 	mr2 := &MatchResult{RoutePattern: "/a/:id", RouteMethod: "GET"}
 
@@ -260,8 +260,8 @@ func TestIsParameterized(t *testing.T) {
 
 // --- Lookup method ---
 
-func TestRouteCache_Lookup_ExactHit(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheLookupExactHit(t *testing.T) {
+	cache := newMatchCache(10)
 	mr := &MatchResult{RoutePattern: "/health", RouteMethod: "GET"}
 	cache.Set("GET:/health", mr)
 
@@ -277,8 +277,8 @@ func TestRouteCache_Lookup_ExactHit(t *testing.T) {
 	}
 }
 
-func TestRouteCache_Lookup_PatternFallback(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheLookupPatternFallback(t *testing.T) {
+	cache := newMatchCache(10)
 	mr := &MatchResult{RoutePattern: "/users/:id", RouteMethod: "GET"}
 	cache.SetPattern("GET", "/users/:id", mr)
 
@@ -293,8 +293,8 @@ func TestRouteCache_Lookup_PatternFallback(t *testing.T) {
 	_ = params
 }
 
-func TestRouteCache_Lookup_Miss(t *testing.T) {
-	cache := NewRouteCache(10)
+func TestMatcherCacheLookupMiss(t *testing.T) {
+	cache := newMatchCache(10)
 	before := cache.Stats().Misses
 
 	cache.Lookup("GET", "/not/found", "GET:/not/found")
@@ -307,9 +307,9 @@ func TestRouteCache_Lookup_Miss(t *testing.T) {
 
 // --- Eviction at capacity ---
 
-func TestRouteCache_Eviction(t *testing.T) {
+func TestMatcherCacheEviction(t *testing.T) {
 	capacity := 5
-	cache := NewRouteCache(capacity)
+	cache := newMatchCache(capacity)
 
 	for i := 0; i < capacity+3; i++ {
 		cache.Set(fmt.Sprintf("key-%d", i), &MatchResult{})

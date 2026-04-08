@@ -147,7 +147,7 @@ func BenchmarkOptDeepPath(b *testing.B) {
 
 // BenchmarkOptPatternCache benchmarks pattern cache lookups specifically.
 func BenchmarkOptPatternCache(b *testing.B) {
-	cache := NewRouteCache(100)
+	cache := newMatchCache(100)
 
 	// Pre-populate pattern cache
 	patterns := []string{

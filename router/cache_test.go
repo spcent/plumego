@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestRouteCacheConcurrentAccess(t *testing.T) {
-	cache := NewRouteCache(64)
+func TestMatcherCacheConcurrentAccess(t *testing.T) {
+	cache := newMatchCache(64)
 	for i := 0; i < 64; i++ {
 		cache.Set(fmt.Sprintf("key-%d", i), &MatchResult{})
 	}

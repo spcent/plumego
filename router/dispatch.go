@@ -30,7 +30,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	cacheKey := fastBuildCacheKey(req.Method, cachePath)
-	if cachedResult, paramValues, exists := r.state.routeCache.Lookup(req.Method, cachePath, cacheKey); exists {
+	if cachedResult, paramValues, exists := r.state.matchCache.Lookup(req.Method, cachePath, cacheKey); exists {
 		// For HEAD requests served by a GET handler, suppress the body.
 		effectiveW := w
 		if req.Method == HEAD && cachedResult.RouteMethod == GET {
@@ -85,9 +85,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if result.RoutePattern != "" && isParameterized(result.RoutePattern) {
-		r.state.routeCache.SetPattern(req.Method, result.RoutePattern, result)
+		r.state.matchCache.SetPattern(req.Method, result.RoutePattern, result)
 	} else {
-		r.state.routeCache.Set(cacheKey, result)
+		r.state.matchCache.Set(cacheKey, result)
 	}
 
 	r.applyMiddlewareAndServe(w, req, params, result)

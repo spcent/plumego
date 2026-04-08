@@ -29,11 +29,11 @@ type patternCacheEntry struct {
 	precompiled precompiledPattern // Pre-split pattern for fast matching
 }
 
-// RouteCache implements a simple LRU cache for route matching results
+// matchCache implements a simple LRU cache for route matching results
 // It supports two caching strategies:
 // 1. Exact path caching for static routes (e.g., /users, /api/health)
 // 2. Pattern-based caching for parameterized routes (e.g., /users/:id)
-type RouteCache struct {
+type matchCache struct {
 	capacity int
 	cache    map[string]*list.Element
 	list     *list.List
@@ -49,12 +49,12 @@ type RouteCache struct {
 	misses uint64
 }
 
-// NewRouteCache creates a new route cache with the given capacity
-func NewRouteCache(capacity int) *RouteCache {
+// newMatchCache creates a new route cache with the given capacity.
+func newMatchCache(capacity int) *matchCache {
 	if capacity <= 0 {
 		capacity = 100 // Default capacity
 	}
-	return &RouteCache{
+	return &matchCache{
 		capacity:     capacity,
 		cache:        make(map[string]*list.Element),
 		list:         list.New(),
@@ -63,7 +63,7 @@ func NewRouteCache(capacity int) *RouteCache {
 }
 
 // Get retrieves a cached route match result
-func (rc *RouteCache) Get(key string) (*MatchResult, bool) {
+func (rc *matchCache) Get(key string) (*MatchResult, bool) {
 	// First try with read lock
 	rc.mu.RLock()
 	element, exists := rc.cache[key]
@@ -94,7 +94,7 @@ func (rc *RouteCache) Get(key string) (*MatchResult, bool) {
 
 // Lookup performs a single cache lookup across exact and parameterized routes.
 // It records one hit or one miss for the entire lookup.
-func (rc *RouteCache) Lookup(method, path, key string) (*MatchResult, []string, bool) {
+func (rc *matchCache) Lookup(method, path, key string) (*MatchResult, []string, bool) {
 	rc.mu.RLock()
 	element, exists := rc.cache[key]
 	if exists {
@@ -126,7 +126,7 @@ func (rc *RouteCache) Lookup(method, path, key string) (*MatchResult, []string, 
 
 // GetByPattern tries to match a path against cached patterns for parameterized routes.
 // Returns the match result and extracted parameter values if found.
-func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string, bool) {
+func (rc *matchCache) GetByPattern(method, path string) (*MatchResult, []string, bool) {
 	result, paramValues, found := rc.matchPatternCache(method, path)
 	if found {
 		atomic.AddUint64(&rc.hits, 1)
@@ -136,7 +136,7 @@ func (rc *RouteCache) GetByPattern(method, path string) (*MatchResult, []string,
 
 // matchPatternCache is the shared implementation for pattern-based cache lookup.
 // It does NOT update hit/miss counters; callers are responsible for that.
-func (rc *RouteCache) matchPatternCache(method, path string) (*MatchResult, []string, bool) {
+func (rc *matchCache) matchPatternCache(method, path string) (*MatchResult, []string, bool) {
 	rc.patternMu.RLock()
 	patterns, exists := rc.patternCache[method]
 	if !exists || len(patterns) == 0 {
@@ -178,7 +178,7 @@ func (rc *RouteCache) matchPatternCache(method, path string) (*MatchResult, []st
 }
 
 // Set adds a route match result to the cache
-func (rc *RouteCache) Set(key string, value *MatchResult) {
+func (rc *matchCache) Set(key string, value *MatchResult) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
@@ -208,7 +208,7 @@ func (rc *RouteCache) Set(key string, value *MatchResult) {
 // SetPattern adds a parameterized route pattern to the cache
 // This is used for routes like /users/:id where we cache the pattern
 // instead of each individual path
-func (rc *RouteCache) SetPattern(method, pattern string, result *MatchResult) {
+func (rc *matchCache) SetPattern(method, pattern string, result *MatchResult) {
 	rc.patternMu.Lock()
 	defer rc.patternMu.Unlock()
 
@@ -272,7 +272,7 @@ func isParameterized(pattern string) bool {
 }
 
 // Clear removes all entries from the cache
-func (rc *RouteCache) Clear() {
+func (rc *matchCache) Clear() {
 	rc.mu.Lock()
 	rc.cache = make(map[string]*list.Element)
 	rc.list = list.New()
@@ -287,7 +287,7 @@ func (rc *RouteCache) Clear() {
 }
 
 // Size returns the current number of cached entries
-func (rc *RouteCache) Size() int {
+func (rc *matchCache) Size() int {
 	rc.mu.RLock()
 	exactSize := len(rc.cache)
 	rc.mu.RUnlock()
@@ -303,7 +303,7 @@ func (rc *RouteCache) Size() int {
 }
 
 // Stats returns cache statistics
-func (rc *RouteCache) Stats() CacheStats {
+func (rc *matchCache) Stats() matchStats {
 	rc.mu.RLock()
 	exactSize := len(rc.cache)
 	rc.mu.RUnlock()
@@ -324,7 +324,7 @@ func (rc *RouteCache) Stats() CacheStats {
 		hitRate = float64(hits) / float64(total)
 	}
 
-	return CacheStats{
+	return matchStats{
 		ExactEntries:   exactSize,
 		PatternEntries: patternSize,
 		Capacity:       rc.capacity,
@@ -334,8 +334,8 @@ func (rc *RouteCache) Stats() CacheStats {
 	}
 }
 
-// CacheStats holds cache statistics
-type CacheStats struct {
+// matchStats holds cache statistics for internal matcher-cache tests.
+type matchStats struct {
 	ExactEntries   int     // Number of exact path cache entries
 	PatternEntries int     // Number of pattern cache entries
 	Capacity       int     // Maximum capacity for exact cache
@@ -344,16 +344,15 @@ type CacheStats struct {
 	HitRate        float64 // Hit rate (hits / total)
 }
 
-// WithCacheCapacity creates a router option that overrides route cache capacity.
-// NewRouter already enables caching with DefaultCacheCapacity.
-func WithCacheCapacity(capacity int) RouterOption {
+// withCacheCapacity overrides route cache capacity for internal tests and benchmarks.
+func withCacheCapacity(capacity int) RouterOption {
 	return func(r *Router) {
-		r.state.routeCache = NewRouteCache(capacity)
+		r.state.matchCache = newMatchCache(capacity)
 	}
 }
 
-// NewRouterWithCacheCapacity creates a new router with an explicit route cache capacity.
-func NewRouterWithCacheCapacity(capacity int, opts ...RouterOption) *Router {
-	allOpts := append([]RouterOption{WithCacheCapacity(capacity)}, opts...)
+// newRouterWithMatchCapacity creates a new router with an explicit matcher-cache capacity.
+func newRouterWithMatchCapacity(capacity int, opts ...RouterOption) *Router {
+	allOpts := append([]RouterOption{withCacheCapacity(capacity)}, opts...)
 	return NewRouter(allOpts...)
 }

@@ -83,9 +83,9 @@ func BenchmarkRouterComparison(b *testing.B) {
 				}
 			})
 
-			// Test with caching enabled
+			// Test with internal caching enabled
 			b.Run("WithCache", func(b *testing.B) {
-				r := NewRouterWithCacheCapacity(100)
+				r := newRouterWithMatchCapacity(100)
 				for _, route := range tt.routes {
 					r.AddRoute(route.method, route.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusOK)
@@ -151,7 +151,7 @@ func BenchmarkRouterTreePerformance(b *testing.B) {
 
 // BenchmarkCachePerformance tests cache performance
 func BenchmarkCachePerformance(b *testing.B) {
-	cache := NewRouteCache(100)
+	cache := newMatchCache(100)
 
 	// Pre-populate cache
 	for i := 0; i < 50; i++ {
@@ -212,7 +212,7 @@ func BenchmarkParameterValidation(b *testing.B) {
 // TestOptimizedRouterFeatures validates all optimization features work together
 func TestOptimizedRouterFeatures(t *testing.T) {
 	// Create router with all features
-	r := NewRouterWithCacheCapacity(50)
+	r := newRouterWithMatchCapacity(50)
 
 	// Add validation
 	validation := NewRouteValidation().
@@ -315,7 +315,7 @@ func TestRouterTreeMatching(t *testing.T) {
 
 // TestCacheEviction validates LRU cache eviction
 func TestCacheEviction(t *testing.T) {
-	cache := NewRouteCache(3) // Small capacity
+	cache := newMatchCache(3) // Small capacity
 
 	// Add 3 entries
 	cache.Set("key1", &MatchResult{Handler: nil})

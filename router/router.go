@@ -97,7 +97,7 @@ type routerState struct {
 	routes           map[string][]route
 	frozen           bool
 	mu               sync.RWMutex
-	routeCache       *RouteCache
+	matchCache       *matchCache
 	routeValidations map[string]map[string]*RouteValidation
 	routeMeta        map[string]map[string]RouteMeta
 	namedRoutes      map[string]*NamedRoute
@@ -168,7 +168,7 @@ func NewRouter(opts ...RouterOption) *Router {
 			routeValidations: make(map[string]map[string]*RouteValidation),
 			routeMeta:        make(map[string]map[string]RouteMeta),
 			namedRoutes:      make(map[string]*NamedRoute),
-			routeCache:       NewRouteCache(DefaultCacheCapacity),
+			matchCache:       newMatchCache(DefaultCacheCapacity),
 		},
 	}
 
@@ -208,29 +208,6 @@ func (r *Router) Use(middlewares ...middleware.Middleware) {
 	for _, m := range middlewares {
 		r.middlewareManager.addMiddleware(m)
 	}
-}
-
-// CacheStats returns statistics about the route cache.
-func (r *Router) CacheStats() CacheStats {
-	if r.state.routeCache == nil {
-		return CacheStats{}
-	}
-	return r.state.routeCache.Stats()
-}
-
-// ClearCache clears all cached route matching results.
-func (r *Router) ClearCache() {
-	if r.state.routeCache != nil {
-		r.state.routeCache.Clear()
-	}
-}
-
-// CacheSize returns the current number of cached entries.
-func (r *Router) CacheSize() int {
-	if r.state.routeCache == nil {
-		return 0
-	}
-	return r.state.routeCache.Size()
 }
 
 // findChild finds a child node with the exact given path segment (static nodes only).
