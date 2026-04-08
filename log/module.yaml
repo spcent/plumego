@@ -10,7 +10,7 @@ strict_boundary: logging
 
 responsibilities:
   - Logging interfaces
-  - Base logger implementations
+  - Canonical base logger construction
   - Logging field helpers
 
 non_goals:

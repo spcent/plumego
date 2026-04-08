@@ -90,7 +90,7 @@ func TestRecoveryCatchesPanicFromDownstreamMiddlewareOrder(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	middleware.Apply(final, outer, recovery.Recovery(log.NewNoOpLogger()), panicMw).ServeHTTP(rec, req)
+	middleware.Apply(final, outer, recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})), panicMw).ServeHTTP(rec, req)
 
 	assertCanonicalErrorEnvelope(t, rec, middleware.CodeInternalError)
 	if handlerCalled {

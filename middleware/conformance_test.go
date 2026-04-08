@@ -18,7 +18,7 @@ import (
 )
 
 func TestMiddlewareErrorConformance(t *testing.T) {
-	recoveryLogger := log.NewNoOpLogger()
+	recoveryLogger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	tests := []struct {
 		name         string
 		expectedCode string

@@ -3,6 +3,7 @@ package core
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/spcent/plumego/log"
@@ -29,24 +30,26 @@ func TestAppDependenciesLoggerStaysOnApp(t *testing.T) {
 	}
 }
 
-func TestNewWithNilLoggerFallsBackToNoOpLogger(t *testing.T) {
+func TestNewWithNilLoggerFallsBackToDiscardLogger(t *testing.T) {
 	var logger log.StructuredLogger
 	app := New(DefaultConfig(), AppDependencies{Logger: logger})
 	if app.logger == nil {
 		t.Fatal("expected logger to be initialized")
 	}
-	if _, ok := app.logger.(*log.NoOpLogger); !ok {
-		t.Fatalf("expected NoOpLogger when nil logger is provided, got %T", app.logger)
+	wantType := reflect.TypeOf(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))
+	if reflect.TypeOf(app.logger) != wantType {
+		t.Fatalf("expected discard logger when nil logger is provided, got %T", app.logger)
 	}
 }
 
-func TestNewDefaultsToNoOpLogger(t *testing.T) {
+func TestNewDefaultsToDiscardLogger(t *testing.T) {
 	app := newTestApp()
 	if app.logger == nil {
 		t.Fatal("expected logger to be initialized")
 	}
-	if _, ok := app.logger.(*log.NoOpLogger); !ok {
-		t.Fatalf("expected NoOpLogger by default, got %T", app.logger)
+	wantType := reflect.TypeOf(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))
+	if reflect.TypeOf(app.logger) != wantType {
+		t.Fatalf("expected discard logger by default, got %T", app.logger)
 	}
 }
 

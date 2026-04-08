@@ -25,7 +25,7 @@ const (
 	FATAL   Level = 3
 )
 
-type InitConfig struct {
+type initConfig struct {
 	LogDir          string
 	AlsoLogToStderr bool
 	LogToStderr     bool
@@ -63,13 +63,13 @@ type vmodulePattern struct {
 	level   int
 }
 
-type RotationConfig struct {
+type rotationConfig struct {
 	MaxSize    int // Maximum size in MB before rotation
 	MaxAge     int // Maximum days to retain old log files
 	MaxBackups int // Maximum number of old log files to retain
 }
 
-type Logger struct {
+type gLogger struct {
 	mu              sync.RWMutex
 	writeMu         sync.Mutex
 	level           Level
@@ -82,7 +82,7 @@ type Logger struct {
 	logFiles        map[Level]*os.File
 	logDir          string
 	program         string
-	rotationConfig  RotationConfig
+	rotationConfig  rotationConfig
 	currentSize     map[Level]int64
 	writeErrOnce    sync.Once
 	// cachedWriters caches the per-level io.Writer (possibly an io.MultiWriter)
@@ -94,10 +94,10 @@ type Logger struct {
 // pid is cached at package init to avoid a getpid syscall on every log line.
 var pid = os.Getpid()
 
-var std = New()
+var std = newGLogger()
 
-func New() *Logger {
-	return &Logger{
+func newGLogger() *gLogger {
+	return &gLogger{
 		level:        INFO,
 		output:       os.Stderr,
 		toStderr:     true,
@@ -114,7 +114,7 @@ func initDefaultFromFlags() {
 		flag.Parse()
 	}
 
-	if err := initDefaultWithConfig(InitConfig{
+	if err := initDefaultWithConfig(initConfig{
 		LogDir:          *logDir,
 		AlsoLogToStderr: *alsoLogToStderr,
 		LogToStderr:     *logToStderr,
@@ -126,7 +126,7 @@ func initDefaultFromFlags() {
 	}
 }
 
-func initDefaultWithConfig(cfg InitConfig) error {
+func initDefaultWithConfig(cfg initConfig) error {
 	std.mu.Lock()
 	defer std.mu.Unlock()
 
@@ -155,7 +155,7 @@ func initDefaultWithConfig(cfg InitConfig) error {
 	return nil
 }
 
-func (l *Logger) initLogFiles() error {
+func (l *gLogger) initLogFiles() error {
 	if err := os.MkdirAll(l.logDir, 0755); err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func (l *Logger) initLogFiles() error {
 	return nil
 }
 
-func (l *Logger) parseVmodule(vmodule string) {
+func (l *gLogger) parseVmodule(vmodule string) {
 	l.vmodulePatterns = nil
 	for _, item := range strings.Split(vmodule, ",") {
 		if item == "" {
@@ -215,7 +215,7 @@ func (l *Logger) parseVmodule(vmodule string) {
 	}
 }
 
-func (l *Logger) getVerbosityForFile(file string) int {
+func (l *gLogger) getVerbosityForFile(file string) int {
 	base := filepath.Base(file)
 	base = strings.TrimSuffix(base, ".go")
 	for _, pattern := range l.vmodulePatterns {
@@ -227,7 +227,7 @@ func (l *Logger) getVerbosityForFile(file string) int {
 	return l.verbosity
 }
 
-func (l *Logger) shouldLogBacktrace(file string, line int) bool {
+func (l *gLogger) shouldLogBacktrace(file string, line int) bool {
 	if l.logBacktraceAt == "" {
 		return false
 	}
@@ -236,7 +236,7 @@ func (l *Logger) shouldLogBacktrace(file string, line int) bool {
 	return target == l.logBacktraceAt
 }
 
-func (l *Logger) formatHeader(level Level, file string, line int) []byte {
+func (l *gLogger) formatHeader(level Level, file string, line int) []byte {
 	buf := logBufferPool.Get().([]byte)
 	buf = buf[:0] // Reset buffer to empty
 
@@ -260,7 +260,7 @@ func (l *Logger) formatHeader(level Level, file string, line int) []byte {
 // rebuildWriterCache pre-computes the effective io.Writer for each log level
 // and stores it in cachedWriters. Must be called under l.mu write lock whenever
 // logFiles, alsoToStderr, toStderr, or output changes.
-func (l *Logger) rebuildWriterCache() {
+func (l *gLogger) rebuildWriterCache() {
 	if l.toStderr {
 		// All levels go to stderr; no need to cache per-level.
 		l.cachedWriters = nil
@@ -294,7 +294,7 @@ func (l *Logger) rebuildWriterCache() {
 
 // getLogWriter returns the effective io.Writer for the given level.
 // Must be called with at least l.mu read lock held.
-func (l *Logger) getLogWriter(level Level) io.Writer {
+func (l *gLogger) getLogWriter(level Level) io.Writer {
 	if l.toStderr {
 		return l.stderrWriter()
 	}
@@ -307,26 +307,26 @@ func (l *Logger) getLogWriter(level Level) io.Writer {
 	return l.stderrWriter()
 }
 
-func (l *Logger) stderrWriter() io.Writer {
+func (l *gLogger) stderrWriter() io.Writer {
 	if l.output != nil {
 		return l.output
 	}
 	return os.Stderr
 }
 
-func (l *Logger) log(level Level, calldepth int, args ...any) {
+func (l *gLogger) log(level Level, calldepth int, args ...any) {
 	l.logInternal(level, calldepth+1, func() string {
 		return fmt.Sprint(args...)
 	})
 }
 
-func (l *Logger) logf(level Level, calldepth int, format string, args ...any) {
+func (l *gLogger) logf(level Level, calldepth int, format string, args ...any) {
 	l.logInternal(level, calldepth+1, func() string {
 		return fmt.Sprintf(format, args...)
 	})
 }
 
-func (l *Logger) logInternal(level Level, calldepth int, messageBuilder func() string) {
+func (l *gLogger) logInternal(level Level, calldepth int, messageBuilder func() string) {
 	// First check if we should log at this level to avoid unnecessary work
 	l.mu.RLock()
 	shouldLog := level >= l.level
@@ -385,13 +385,13 @@ func (l *Logger) logInternal(level Level, calldepth int, messageBuilder func() s
 	}
 }
 
-func (l *Logger) SetLevel(level Level) {
+func (l *gLogger) SetLevel(level Level) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.level = level
 }
 
-func (l *Logger) SetOutput(w io.Writer) {
+func (l *gLogger) SetOutput(w io.Writer) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if w == nil {
@@ -401,13 +401,13 @@ func (l *Logger) SetOutput(w io.Writer) {
 	l.rebuildWriterCache()
 }
 
-func (l *Logger) SetVerbose(v int) {
+func (l *gLogger) SetVerbose(v int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.verbosity = v
 }
 
-func (l *Logger) vAt(level int, calldepth int) bool {
+func (l *gLogger) vAt(level int, calldepth int) bool {
 	_, file, _, ok := runtime.Caller(calldepth)
 	if !ok {
 		return level <= l.verbosity
@@ -420,71 +420,71 @@ func (l *Logger) vAt(level int, calldepth int) bool {
 	return level <= verbosity
 }
 
-func (l *Logger) V(level int) bool {
+func (l *gLogger) V(level int) bool {
 	return l.vAt(level, 2)
 }
 
-func (l *Logger) Info(args ...any) {
+func (l *gLogger) Info(args ...any) {
 	l.log(INFO, 2, args...)
 }
 
-func (l *Logger) Infof(format string, args ...any) {
+func (l *gLogger) Infof(format string, args ...any) {
 	l.logf(INFO, 2, format, args...)
 }
 
-func (l *Logger) Infoln(args ...any) {
+func (l *gLogger) Infoln(args ...any) {
 	l.log(INFO, 2, fmt.Sprintln(args...))
 }
 
-func (l *Logger) Warning(args ...any) {
+func (l *gLogger) Warning(args ...any) {
 	l.log(WARNING, 2, args...)
 }
 
-func (l *Logger) Warningf(format string, args ...any) {
+func (l *gLogger) Warningf(format string, args ...any) {
 	l.logf(WARNING, 2, format, args...)
 }
 
-func (l *Logger) Warningln(args ...any) {
+func (l *gLogger) Warningln(args ...any) {
 	l.log(WARNING, 2, fmt.Sprintln(args...))
 }
 
-func (l *Logger) Error(args ...any) {
+func (l *gLogger) Error(args ...any) {
 	l.log(ERROR, 2, args...)
 }
 
-func (l *Logger) Errorf(format string, args ...any) {
+func (l *gLogger) Errorf(format string, args ...any) {
 	l.logf(ERROR, 2, format, args...)
 }
 
-func (l *Logger) Errorln(args ...any) {
+func (l *gLogger) Errorln(args ...any) {
 	l.log(ERROR, 2, fmt.Sprintln(args...))
 }
 
-func (l *Logger) Fatal(args ...any) {
+func (l *gLogger) Fatal(args ...any) {
 	l.log(FATAL, 2, args...)
 }
 
-func (l *Logger) Fatalf(format string, args ...any) {
+func (l *gLogger) Fatalf(format string, args ...any) {
 	l.logf(FATAL, 2, format, args...)
 }
 
-func (l *Logger) Fatalln(args ...any) {
+func (l *gLogger) Fatalln(args ...any) {
 	l.log(FATAL, 2, fmt.Sprintln(args...))
 }
 
-func (l *Logger) VLog(level int, args ...any) {
+func (l *gLogger) VLog(level int, args ...any) {
 	if l.vAt(level, 2) {
 		l.log(INFO, 2, args...)
 	}
 }
 
-func (l *Logger) VLogf(level int, format string, args ...any) {
+func (l *gLogger) VLogf(level int, format string, args ...any) {
 	if l.vAt(level, 2) {
 		l.logf(INFO, 2, format, args...)
 	}
 }
 
-func (l *Logger) Flush() {
+func (l *gLogger) Flush() {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
@@ -496,7 +496,7 @@ func (l *Logger) Flush() {
 }
 
 // checkLogRotation checks if the log file needs rotation based on size
-func (l *Logger) checkLogRotation(level Level, logSize int64) error {
+func (l *gLogger) checkLogRotation(level Level, logSize int64) error {
 	l.mu.Lock()
 	config := l.rotationConfig
 	if config.MaxSize <= 0 {
@@ -527,7 +527,7 @@ func (l *Logger) checkLogRotation(level Level, logSize int64) error {
 }
 
 // rotateLogFile rotates the log file for the given level
-func (l *Logger) rotateLogFile(level Level) error {
+func (l *gLogger) rotateLogFile(level Level) error {
 	// Close the current log file
 	if file, ok := l.logFiles[level]; ok {
 		file.Close()
@@ -596,7 +596,7 @@ func currentLogFiles(files map[Level]*os.File) map[string]struct{} {
 	return current
 }
 
-func cleanupOldLogs(logDir, program string, config RotationConfig, current map[string]struct{}) {
+func cleanupOldLogs(logDir, program string, config rotationConfig, current map[string]struct{}) {
 	if logDir == "" {
 		return
 	}
@@ -705,7 +705,7 @@ func levelInitial(level Level) byte {
 	}
 }
 
-func (l *Logger) reportWriteError(err error) {
+func (l *gLogger) reportWriteError(err error) {
 	l.writeErrOnce.Do(func() {
 		fmt.Fprintf(os.Stderr, "glog: failed to write log output: %v\n", err)
 	})
@@ -723,14 +723,14 @@ func writeFull(w io.Writer, data []byte) error {
 }
 
 // SetRotationConfig sets the log rotation configuration
-func (l *Logger) SetRotationConfig(config RotationConfig) {
+func (l *gLogger) SetRotationConfig(config rotationConfig) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.rotationConfig = config
 }
 
 // Close closes all log files and releases resources
-func (l *Logger) Close() {
+func (l *gLogger) Close() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

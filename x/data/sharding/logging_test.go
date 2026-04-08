@@ -29,7 +29,7 @@ func TestLoggingRouter_Creation(t *testing.T) {
 	registry := NewShardingRuleRegistry()
 	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
-	t.Run("with nil logger creates default JSONLogger", func(t *testing.T) {
+	t.Run("with nil logger creates default JSON logger", func(t *testing.T) {
 		loggingRouter := NewLoggingRouter(router, nil)
 
 		if loggingRouter.Logger() == nil {
@@ -43,7 +43,8 @@ func TestLoggingRouter_Creation(t *testing.T) {
 
 	t.Run("with custom logger", func(t *testing.T) {
 		var buf bytes.Buffer
-		logger := log.NewJSONLogger(log.JSONLoggerConfig{
+		logger := log.NewLogger(log.LoggerConfig{
+			Format: log.LoggerFormatJSON,
 			Output: &buf,
 			Level:  log.INFO,
 		})
@@ -58,7 +59,8 @@ func TestLoggingRouter_Creation(t *testing.T) {
 
 func TestLoggingRouter_LogQuery(t *testing.T) {
 	var buf bytes.Buffer
-	logger := log.NewJSONLogger(log.JSONLoggerConfig{
+	logger := log.NewLogger(log.LoggerConfig{
+		Format: log.LoggerFormatJSON,
 		Output: &buf,
 		Level:  log.INFO,
 	})
@@ -127,7 +129,8 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 
 func TestLoggingRouter_LogShardResolution(t *testing.T) {
 	var buf bytes.Buffer
-	logger := log.NewJSONLogger(log.JSONLoggerConfig{
+	logger := log.NewLogger(log.LoggerConfig{
+		Format: log.LoggerFormatJSON,
 		Output: &buf,
 		Level:  log.INFO,
 	})
@@ -169,7 +172,8 @@ func TestLoggingRouter_LogShardResolution(t *testing.T) {
 
 func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 	var buf bytes.Buffer
-	logger := log.NewJSONLogger(log.JSONLoggerConfig{
+	logger := log.NewLogger(log.LoggerConfig{
+		Format: log.LoggerFormatJSON,
 		Output: &buf,
 		Level:  log.WARNING,
 	})
@@ -211,7 +215,8 @@ func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 
 func TestLoggingRouter_LogRewrite(t *testing.T) {
 	var buf bytes.Buffer
-	logger := log.NewJSONLogger(log.JSONLoggerConfig{
+	logger := log.NewLogger(log.LoggerConfig{
+		Format: log.LoggerFormatJSON,
 		Output: &buf,
 		Level:  log.INFO,
 	})
@@ -257,7 +262,8 @@ func TestLoggingRouter_LogRewrite(t *testing.T) {
 
 func TestLoggingRouter_WithRequestID(t *testing.T) {
 	var buf bytes.Buffer
-	logger := log.NewJSONLogger(log.JSONLoggerConfig{
+	logger := log.NewLogger(log.LoggerConfig{
+		Format: log.LoggerFormatJSON,
 		Output: &buf,
 		Level:  log.INFO,
 	})
@@ -301,7 +307,8 @@ func TestLoggingRouter_DefaultFields(t *testing.T) {
 	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
 	// Create a custom logger with buffer and default fields
-	customLogger := log.NewJSONLogger(log.JSONLoggerConfig{
+	customLogger := log.NewLogger(log.LoggerConfig{
+		Format: log.LoggerFormatJSON,
 		Output: &buf,
 		Level:  log.INFO,
 		Fields: log.Fields{"component": "sharding"},
@@ -323,7 +330,8 @@ func TestLoggingRouter_DefaultFields(t *testing.T) {
 
 func BenchmarkLoggingRouter_LogQuery(b *testing.B) {
 	var buf bytes.Buffer
-	logger := log.NewJSONLogger(log.JSONLoggerConfig{
+	logger := log.NewLogger(log.LoggerConfig{
+		Format: log.LoggerFormatJSON,
 		Output: &buf,
 		Level:  log.INFO,
 	})

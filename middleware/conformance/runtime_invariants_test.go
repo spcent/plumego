@@ -25,7 +25,7 @@ func TestMiddlewareTypeShape(t *testing.T) {
 }
 
 func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
-	recoveryMw := recovery.Recovery(log.NewNoOpLogger())
+	recoveryMw := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))
 	tests := []struct {
 		name string
 		mw   middleware.Middleware
@@ -53,7 +53,7 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "access log",
-			mw:   accesslog.Middleware(log.NewNoOpLogger()),
+			mw:   accesslog.Middleware(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})),
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
@@ -146,7 +146,7 @@ func TestMiddlewareOrderingDeterministic(t *testing.T) {
 }
 
 func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
-	recoveryLogger := log.NewNoOpLogger()
+	recoveryLogger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	tests := []struct {
 		name         string
 		expectedCode string

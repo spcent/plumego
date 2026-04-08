@@ -311,7 +311,7 @@ func TestVmoduleWrapperDepth(t *testing.T) {
 		t.Fatalf("expected top-level VLog to emit message when vmodule allows it")
 	}
 
-	logger := New()
+	logger := newGLogger()
 	logger.SetVerbose(0)
 	logger.parseVmodule("glog_test=1")
 	var buf bytes.Buffer
@@ -466,9 +466,9 @@ func TestConcurrentLogging(t *testing.T) {
 	}
 }
 
-// TestLoggerInstance validates a custom Logger instance
+// TestLoggerInstance validates a custom logger instance
 func TestLoggerInstance(t *testing.T) {
-	logger := New()
+	logger := newGLogger()
 
 	var buf bytes.Buffer
 	logger.SetOutput(&buf)
@@ -568,12 +568,12 @@ func TestFlagIntegration(t *testing.T) {
 	}
 }
 
-func TestInitWithConfig(t *testing.T) {
+func TestInitWithInternalConfig(t *testing.T) {
 	resetGlobalLogger()
 	tempDir := createTempDir(t)
 	defer cleanupTempDir(t, tempDir)
 
-	err := initDefaultWithConfig(InitConfig{
+	err := initDefaultWithConfig(initConfig{
 		LogDir:          tempDir,
 		AlsoLogToStderr: true,
 		LogToStderr:     false,
@@ -878,7 +878,7 @@ func TestLogRotation(t *testing.T) {
 	std.logDir = tempDir
 	std.program = "testapp"
 	std.toStderr = false
-	std.SetRotationConfig(RotationConfig{
+	std.SetRotationConfig(rotationConfig{
 		MaxSize:    1, // 1MB max size
 		MaxAge:     30,
 		MaxBackups: 5,
@@ -935,7 +935,7 @@ func TestLogRetentionCleanup(t *testing.T) {
 
 	std.logDir = tempDir
 	std.program = "testapp"
-	std.SetRotationConfig(RotationConfig{
+	std.SetRotationConfig(rotationConfig{
 		MaxAge:     1, // days
 		MaxBackups: 1,
 	})
@@ -989,12 +989,12 @@ func TestLogRetentionCleanup(t *testing.T) {
 	}
 }
 
-// TestRotationConfig verifies rotation configuration is applied correctly
-func TestRotationConfig(t *testing.T) {
+// TestInternalRotationConfig verifies rotation configuration is applied correctly.
+func TestInternalRotationConfig(t *testing.T) {
 	resetGlobalLogger()
 
 	// Set initial rotation config
-	std.SetRotationConfig(RotationConfig{
+	std.SetRotationConfig(rotationConfig{
 		MaxSize:    10,
 		MaxAge:     7,
 		MaxBackups: 3,
@@ -1015,7 +1015,7 @@ func TestRotationConfig(t *testing.T) {
 	}
 
 	// Update rotation config
-	std.SetRotationConfig(RotationConfig{
+	std.SetRotationConfig(rotationConfig{
 		MaxSize:    20,
 		MaxAge:     14,
 		MaxBackups: 5,

@@ -29,7 +29,7 @@ type Inbound struct {
 
 func NewInbound(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *Inbound {
 	if logger == nil {
-		logger = log.NewNoOpLogger()
+		logger = log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	}
 	pub := cfg.Pub
 	if pub == nil {

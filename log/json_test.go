@@ -7,13 +7,22 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/spcent/plumego/contract"
 )
 
-func TestNewJSONLogger(t *testing.T) {
+func newTestJSONLogger(t *testing.T, cfg LoggerConfig) *jsonLogger {
+	t.Helper()
+	cfg.Format = LoggerFormatJSON
+	raw := NewLogger(cfg)
+	logger, ok := raw.(*jsonLogger)
+	if !ok {
+		t.Fatalf("expected *jsonLogger, got %T", raw)
+	}
+	return logger
+}
+
+func TestNewLoggerJSONFormat(t *testing.T) {
 	t.Run("with defaults", func(t *testing.T) {
-		logger := NewJSONLogger(JSONLoggerConfig{})
+		logger := newTestJSONLogger(t, LoggerConfig{})
 		if logger == nil {
 			t.Error("expected logger to be created")
 		}
@@ -21,7 +30,7 @@ func TestNewJSONLogger(t *testing.T) {
 
 	t.Run("with custom config", func(t *testing.T) {
 		var buf bytes.Buffer
-		logger := NewJSONLogger(JSONLoggerConfig{
+		logger := newTestJSONLogger(t, LoggerConfig{
 			Output: &buf,
 			Level:  WARNING,
 			Fields: Fields{"app": "test"},
@@ -33,9 +42,9 @@ func TestNewJSONLogger(t *testing.T) {
 	})
 }
 
-func TestJSONLogger_Info(t *testing.T) {
+func TestJSONFormatLoggerInfo(t *testing.T) {
 	var buf bytes.Buffer
-	logger := NewJSONLogger(JSONLoggerConfig{
+	logger := newTestJSONLogger(t, LoggerConfig{
 		Output:           &buf,
 		Level:            INFO,
 		RespectVerbosity: true,
@@ -65,17 +74,17 @@ func TestJSONLogger_Info(t *testing.T) {
 	}
 }
 
-func TestJSONLogger_Levels(t *testing.T) {
+func TestJSONFormatLoggerLevels(t *testing.T) {
 	tests := []struct {
 		name     string
 		logLevel Level
-		logFunc  func(logger *JSONLogger)
+		logFunc  func(logger *jsonLogger)
 		want     string
 	}{
 		{
 			name:     "info level",
 			logLevel: INFO,
-			logFunc: func(l *JSONLogger) {
+			logFunc: func(l *jsonLogger) {
 				l.Info("info msg", nil)
 			},
 			want: "INFO",
@@ -83,7 +92,7 @@ func TestJSONLogger_Levels(t *testing.T) {
 		{
 			name:     "warning level",
 			logLevel: INFO,
-			logFunc: func(l *JSONLogger) {
+			logFunc: func(l *jsonLogger) {
 				l.Warn("warn msg", nil)
 			},
 			want: "WARN",
@@ -91,7 +100,7 @@ func TestJSONLogger_Levels(t *testing.T) {
 		{
 			name:     "error level",
 			logLevel: INFO,
-			logFunc: func(l *JSONLogger) {
+			logFunc: func(l *jsonLogger) {
 				l.Error("error msg", nil)
 			},
 			want: "ERROR",
@@ -101,7 +110,7 @@ func TestJSONLogger_Levels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			logger := NewJSONLogger(JSONLoggerConfig{
+			logger := newTestJSONLogger(t, LoggerConfig{
 				Output: &buf,
 				Level:  tt.logLevel,
 			})
@@ -120,9 +129,9 @@ func TestJSONLogger_Levels(t *testing.T) {
 	}
 }
 
-func TestJSONLogger_WithFields(t *testing.T) {
+func TestJSONFormatLoggerWithFields(t *testing.T) {
 	var buf bytes.Buffer
-	logger := NewJSONLogger(JSONLoggerConfig{
+	logger := newTestJSONLogger(t, LoggerConfig{
 		Output: &buf,
 		Level:  INFO,
 		Fields: Fields{"app": "myapp"},
@@ -136,7 +145,6 @@ func TestJSONLogger_WithFields(t *testing.T) {
 		t.Fatalf("failed to parse JSON output: %v", err)
 	}
 
-	// Should have all fields
 	if entry["app"] != "myapp" {
 		t.Errorf("expected app 'myapp', got %v", entry["app"])
 	}
@@ -148,64 +156,59 @@ func TestJSONLogger_WithFields(t *testing.T) {
 	}
 }
 
-func TestJSONLogger_InfoCtx(t *testing.T) {
+func TestJSONFormatLoggerInfoCtxDoesNotAutoAttachTransportFields(t *testing.T) {
 	var buf bytes.Buffer
-	logger := NewJSONLogger(JSONLoggerConfig{
+	logger := newTestJSONLogger(t, LoggerConfig{
 		Output:           &buf,
 		Level:            INFO,
 		RespectVerbosity: true,
 	})
 
-	ctx := context.Background()
-	requestID := "req-123"
-	ctx = contract.WithRequestID(ctx, requestID)
-
-	logger.InfoCtx(ctx, "test message", Fields{"key": "value"})
+	logger.InfoCtx(context.Background(), "test message", Fields{"key": "value"})
 
 	var entry map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
 		t.Fatalf("failed to parse JSON output: %v", err)
 	}
 
-	if entry["request_id"] != requestID {
-		t.Errorf("expected request_id %q, got %v", requestID, entry["request_id"])
+	if _, ok := entry["request_id"]; ok {
+		t.Fatalf("expected request_id to stay caller-owned, got %v", entry["request_id"])
 	}
-
 	if entry["msg"] != "test message" {
 		t.Errorf("expected msg 'test message', got %v", entry["msg"])
 	}
 }
 
-func TestJSONLogger_ContextLevels(t *testing.T) {
+func TestJSONFormatLoggerContextLevels(t *testing.T) {
 	tests := []struct {
 		name      string
-		logFunc   func(logger *JSONLogger, ctx context.Context)
+		logFunc   func(logger *jsonLogger, ctx context.Context)
 		wantLevel string
 	}{
 		{
 			name: "debug ctx",
-			logFunc: func(l *JSONLogger, ctx context.Context) {
+			logFunc: func(l *jsonLogger, ctx context.Context) {
 				l.DebugCtx(ctx, "debug msg", nil)
 			},
 			wantLevel: "DEBUG",
 		},
 		{
 			name: "info ctx",
-			logFunc: func(l *JSONLogger, ctx context.Context) {
+			logFunc: func(l *jsonLogger, ctx context.Context) {
 				l.InfoCtx(ctx, "info msg", nil)
 			},
 			wantLevel: "INFO",
 		},
 		{
 			name: "warn ctx",
-			logFunc: func(l *JSONLogger, ctx context.Context) {
+			logFunc: func(l *jsonLogger, ctx context.Context) {
 				l.WarnCtx(ctx, "warn msg", nil)
 			},
 			wantLevel: "WARN",
 		},
 		{
 			name: "error ctx",
-			logFunc: func(l *JSONLogger, ctx context.Context) {
+			logFunc: func(l *jsonLogger, ctx context.Context) {
 				l.ErrorCtx(ctx, "error msg", nil)
 			},
 			wantLevel: "ERROR",
@@ -215,15 +218,12 @@ func TestJSONLogger_ContextLevels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			logger := NewJSONLogger(JSONLoggerConfig{
+			logger := newTestJSONLogger(t, LoggerConfig{
 				Output: &buf,
 				Level:  DEBUG,
 			})
 
-			ctx := context.Background()
-			ctx = contract.WithRequestID(ctx, "test-request")
-
-			tt.logFunc(logger, ctx)
+			tt.logFunc(logger, context.Background())
 
 			var entry map[string]any
 			if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -233,19 +233,18 @@ func TestJSONLogger_ContextLevels(t *testing.T) {
 			if entry["level"] != tt.wantLevel {
 				t.Errorf("expected level %s, got %v", tt.wantLevel, entry["level"])
 			}
-
-			if entry["request_id"] != "test-request" {
-				t.Errorf("expected request_id 'test-request', got %v", entry["request_id"])
+			if _, ok := entry["request_id"]; ok {
+				t.Fatalf("expected request_id to remain absent without explicit fields, got %v", entry["request_id"])
 			}
 		})
 	}
 }
 
-func TestJSONLogger_LevelFiltering(t *testing.T) {
+func TestJSONFormatLoggerLevelFiltering(t *testing.T) {
 	var buf bytes.Buffer
-	logger := NewJSONLogger(JSONLoggerConfig{
+	logger := newTestJSONLogger(t, LoggerConfig{
 		Output: &buf,
-		Level:  ERROR, // Only log ERROR and above
+		Level:  ERROR,
 	})
 
 	logger.Info("should not appear", nil)
@@ -254,8 +253,6 @@ func TestJSONLogger_LevelFiltering(t *testing.T) {
 
 	output := buf.String()
 	lines := strings.Split(strings.TrimSpace(output), "\n")
-
-	// Should only have one line (the ERROR)
 	if len(lines) != 1 {
 		t.Errorf("expected 1 log line, got %d", len(lines))
 	}
@@ -270,15 +267,14 @@ func TestJSONLogger_LevelFiltering(t *testing.T) {
 	}
 }
 
-func TestJSONLogger_FieldOverride(t *testing.T) {
+func TestJSONFormatLoggerFieldOverride(t *testing.T) {
 	var buf bytes.Buffer
-	logger := NewJSONLogger(JSONLoggerConfig{
+	logger := newTestJSONLogger(t, LoggerConfig{
 		Output: &buf,
 		Level:  INFO,
 		Fields: Fields{"env": "dev", "version": "1.0"},
 	})
 
-	// Override 'env' field
 	logger.Info("test", Fields{"env": "prod", "request": "123"})
 
 	var entry map[string]any
@@ -286,30 +282,24 @@ func TestJSONLogger_FieldOverride(t *testing.T) {
 		t.Fatalf("failed to parse JSON output: %v", err)
 	}
 
-	// env should be overridden to 'prod'
 	if entry["env"] != "prod" {
 		t.Errorf("expected env 'prod', got %v", entry["env"])
 	}
-
-	// version should still be '1.0'
 	if entry["version"] != "1.0" {
 		t.Errorf("expected version '1.0', got %v", entry["version"])
 	}
-
-	// request should be '123'
 	if entry["request"] != "123" {
 		t.Errorf("expected request '123', got %v", entry["request"])
 	}
 }
 
-func TestJSONLogger_NilFields(t *testing.T) {
+func TestJSONFormatLoggerNilFields(t *testing.T) {
 	var buf bytes.Buffer
-	logger := NewJSONLogger(JSONLoggerConfig{
+	logger := newTestJSONLogger(t, LoggerConfig{
 		Output: &buf,
 		Level:  INFO,
 	})
 
-	// Should not panic with nil fields
 	logger.Info("test message", nil)
 
 	var entry map[string]any
@@ -322,9 +312,9 @@ func TestJSONLogger_NilFields(t *testing.T) {
 	}
 }
 
-func TestJSONLogger_DebugVerbosityGate(t *testing.T) {
+func TestJSONFormatLoggerDebugVerbosityGate(t *testing.T) {
 	var buf bytes.Buffer
-	logger := NewJSONLogger(JSONLoggerConfig{
+	logger := newTestJSONLogger(t, LoggerConfig{
 		Output:           &buf,
 		Level:            DEBUG,
 		RespectVerbosity: true,
@@ -351,9 +341,9 @@ func TestJSONLogger_DebugVerbosityGate(t *testing.T) {
 	}
 }
 
-func TestJSONLogger_ReservedFieldsCannotOverrideCoreKeys(t *testing.T) {
+func TestJSONFormatLoggerReservedFieldsCannotOverrideCoreKeys(t *testing.T) {
 	var buf bytes.Buffer
-	logger := NewJSONLogger(JSONLoggerConfig{
+	logger := newTestJSONLogger(t, LoggerConfig{
 		Output: &buf,
 		Level:  INFO,
 		Fields: Fields{
@@ -363,12 +353,11 @@ func TestJSONLogger_ReservedFieldsCannotOverrideCoreKeys(t *testing.T) {
 		},
 	})
 
-	ctx := contract.WithRequestID(context.Background(), "req-from-ctx")
-	logger.InfoCtx(ctx, "actual message", Fields{
+	logger.InfoCtx(context.Background(), "actual message", Fields{
 		"level":      "SHOULD_NOT_APPLY",
 		"msg":        "SHOULD_NOT_APPLY",
 		"time":       "SHOULD_NOT_APPLY",
-		"request_id": "SHOULD_NOT_APPLY",
+		"request_id": "caller-owned",
 	})
 
 	var entry map[string]any
@@ -385,14 +374,14 @@ func TestJSONLogger_ReservedFieldsCannotOverrideCoreKeys(t *testing.T) {
 	if entry["time"] == "SHOULD_NOT_APPLY" || entry["time"] == "not-time" {
 		t.Fatalf("expected reserved time to be generated by logger, got %v", entry["time"])
 	}
-	if entry["request_id"] != "req-from-ctx" {
-		t.Fatalf("expected request_id from context, got %v", entry["request_id"])
+	if entry["request_id"] != "caller-owned" {
+		t.Fatalf("expected caller-supplied request_id, got %v", entry["request_id"])
 	}
 }
 
-func TestJSONLogger_WithFieldsSharesWriterLock(t *testing.T) {
+func TestJSONFormatLoggerWithFieldsSharesWriterLock(t *testing.T) {
 	var buf bytes.Buffer
-	base := NewJSONLogger(JSONLoggerConfig{
+	base := newTestJSONLogger(t, LoggerConfig{
 		Output: &buf,
 		Level:  INFO,
 	})

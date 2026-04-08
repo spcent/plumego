@@ -3,21 +3,40 @@ package log
 import (
 	"context"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
-
-	"github.com/spcent/plumego/contract"
 )
 
 // Compile-time checks that all concrete logger types satisfy StructuredLogger.
 var (
 	_ StructuredLogger = (*defaultLogger)(nil)
-	_ StructuredLogger = (*JSONLogger)(nil)
-	_ StructuredLogger = (*NoOpLogger)(nil)
+	_ StructuredLogger = (*jsonLogger)(nil)
+	_ StructuredLogger = (*discardLogger)(nil)
 )
 
 // Fields represents structured log fields to attach to a log entry.
 type Fields map[string]any
+
+// LoggerFormat selects the concrete logger implementation behind NewLogger.
+type LoggerFormat string
+
+const (
+	LoggerFormatText    LoggerFormat = "text"
+	LoggerFormatJSON    LoggerFormat = "json"
+	LoggerFormatDiscard LoggerFormat = "discard"
+)
+
+// LoggerConfig configures the canonical NewLogger constructor.
+type LoggerConfig struct {
+	Format           LoggerFormat
+	Output           io.Writer
+	ErrorOutput      io.Writer
+	Level            Level
+	Fields           Fields
+	RespectVerbosity bool
+	Verbosity        int
+}
 
 // StructuredLogger defines the minimal logging interface used by the application.
 //
@@ -44,7 +63,8 @@ type StructuredLogger interface {
 	// Fatal logs a message at FATAL level then calls os.Exit(1).
 	Fatal(msg string, fields ...Fields)
 
-	// Context-aware variants extract trace IDs and other values from ctx.
+	// Context-aware variants preserve the call shape for request-scoped logging.
+	// Logger implementations must not infer transport metadata from ctx.
 	DebugCtx(ctx context.Context, msg string, fields ...Fields)
 	InfoCtx(ctx context.Context, msg string, fields ...Fields)
 	WarnCtx(ctx context.Context, msg string, fields ...Fields)
@@ -72,10 +92,26 @@ type defaultLogger struct {
 	fields Fields
 }
 
-// NewLogger creates the canonical structured logger backed by the default text logger.
-// It implements Lifecycle to initialize and flush the default backend automatically.
-func NewLogger() StructuredLogger {
-	return &defaultLogger{fields: Fields{}}
+// NewLogger creates the canonical structured logger.
+// With no config it returns the default text logger. Alternate formats such as
+// JSON or discard mode are selected through LoggerConfig.Format so there is
+// one constructor path for all stable logger variants.
+func NewLogger(configs ...LoggerConfig) StructuredLogger {
+	cfg := LoggerConfig{}
+	if len(configs) > 0 {
+		cfg = configs[0]
+	}
+
+	switch cfg.Format {
+	case LoggerFormatJSON:
+		return newJSONLogger(cfg)
+	case LoggerFormatDiscard:
+		return newDiscardLogger()
+	case "", LoggerFormatText:
+		return &defaultLogger{fields: cloneFields(cfg.Fields)}
+	default:
+		return &defaultLogger{fields: cloneFields(cfg.Fields)}
+	}
 }
 
 // Start initializes the underlying default logger backend.
@@ -100,61 +136,62 @@ func (l *defaultLogger) With(key string, value any) StructuredLogger {
 }
 
 // Debug logs at DEBUG level.
-// Unlike JSONLogger (which checks its own local verbosity), the default logger
-// gates Debug on the backend verbosity flag (-v). Both require at least V(1) to emit.
+// The canonical logger path gates debug on V(1).
 func (l *defaultLogger) Debug(msg string, fields ...Fields) {
 	if !std.vAt(1, 2) {
 		return
 	}
-	l.logWithLevel(DEBUG, msg, firstFields(fields), nil)
+	l.logWithLevel(DEBUG, msg, firstFields(fields))
 }
 
 func (l *defaultLogger) Info(msg string, fields ...Fields) {
-	l.logWithLevel(INFO, msg, firstFields(fields), nil)
+	l.logWithLevel(INFO, msg, firstFields(fields))
 }
 
 func (l *defaultLogger) Warn(msg string, fields ...Fields) {
-	l.logWithLevel(WARNING, msg, firstFields(fields), nil)
+	l.logWithLevel(WARNING, msg, firstFields(fields))
 }
 
 func (l *defaultLogger) Error(msg string, fields ...Fields) {
-	l.logWithLevel(ERROR, msg, firstFields(fields), nil)
+	l.logWithLevel(ERROR, msg, firstFields(fields))
 }
 
 func (l *defaultLogger) Fatal(msg string, fields ...Fields) {
-	l.logWithLevel(FATAL, msg, firstFields(fields), nil)
+	l.logWithLevel(FATAL, msg, firstFields(fields))
 }
 
 // DebugCtx logs at DEBUG level with context.
 // Verbosity is gated on the global glog flag, consistent with Debug.
 func (l *defaultLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
+	_ = ctx
 	if !std.vAt(1, 2) {
 		return
 	}
-	l.logWithLevel(DEBUG, msg, firstFields(fields), ctx)
+	l.logWithLevel(DEBUG, msg, firstFields(fields))
 }
 
 func (l *defaultLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
-	l.logWithLevel(INFO, msg, firstFields(fields), ctx)
+	_ = ctx
+	l.logWithLevel(INFO, msg, firstFields(fields))
 }
 
 func (l *defaultLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
-	l.logWithLevel(WARNING, msg, firstFields(fields), ctx)
+	_ = ctx
+	l.logWithLevel(WARNING, msg, firstFields(fields))
 }
 
 func (l *defaultLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
-	l.logWithLevel(ERROR, msg, firstFields(fields), ctx)
+	_ = ctx
+	l.logWithLevel(ERROR, msg, firstFields(fields))
 }
 
 func (l *defaultLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
-	l.logWithLevel(FATAL, msg, firstFields(fields), ctx)
+	_ = ctx
+	l.logWithLevel(FATAL, msg, firstFields(fields))
 }
 
-func (l *defaultLogger) logWithLevel(level Level, msg string, fields Fields, ctx context.Context) {
+func (l *defaultLogger) logWithLevel(level Level, msg string, fields Fields) {
 	combined := mergeFields(l.fields, fields)
-	if requestID := contract.RequestIDFromContext(ctx); requestID != "" {
-		combined["request_id"] = requestID
-	}
 	formatted := l.formatFields(combined)
 	if formatted != "" {
 		msg += " " + formatted

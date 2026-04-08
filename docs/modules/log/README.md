@@ -31,5 +31,7 @@
 ## Canonical change shape
 
 - preserve `StructuredLogger` and the canonical `NewLogger` path
+- use `LoggerConfig.Format` to select text/json/discard backends instead of parallel constructors
 - never log secrets, tokens, signatures, or private keys
 - keep reusable test logging helpers out of stable `log`; use `x/observability/testlog`
+- attach `request_id` and other transport metadata explicitly at call sites; stable `log` must not read them from context

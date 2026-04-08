@@ -52,7 +52,7 @@ func (l *recordingLogger) Fatal(msg string, fields ...log.Fields)               
 func (l *recordingLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {}
 
 func TestRecoveryMiddleware(t *testing.T) {
-	logger := log.NewNoOpLogger()
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	tests := []struct {
 		name           string
 		handler        http.Handler
@@ -126,7 +126,7 @@ func TestRecoveryMiddleware(t *testing.T) {
 
 // Test that recovery middleware doesn't interfere with normal responses
 func TestRecoveryMiddleware_NormalFlow(t *testing.T) {
-	logger := log.NewNoOpLogger()
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Custom-Header", "test-value")
 		w.Header().Set("Content-Type", "text/plain")
@@ -158,7 +158,7 @@ func TestRecoveryMiddleware_NormalFlow(t *testing.T) {
 }
 
 func TestRecoveryMiddleware_Concurrent(t *testing.T) {
-	logger := log.NewNoOpLogger()
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("concurrent panic")
 	})
@@ -184,7 +184,7 @@ func TestRecoveryMiddleware_Concurrent(t *testing.T) {
 
 // Test that middleware properly handles different HTTP methods
 func TestRecoveryMiddleware_DifferentMethods(t *testing.T) {
-	logger := log.NewNoOpLogger()
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	methods := []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodHead, http.MethodOptions}
 
 	for _, method := range methods {
@@ -241,7 +241,7 @@ func TestRecovery_UsesInjectedLogger(t *testing.T) {
 
 // Benchmarks remain to ensure middleware overhead stays bounded.
 func BenchmarkRecoveryMiddleware_NoPanic(b *testing.B) {
-	logger := log.NewNoOpLogger()
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -257,7 +257,7 @@ func BenchmarkRecoveryMiddleware_NoPanic(b *testing.B) {
 }
 
 func BenchmarkRecoveryMiddleware_WithPanic(b *testing.B) {
-	logger := log.NewNoOpLogger()
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("benchmark panic")
 	})

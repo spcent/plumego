@@ -127,7 +127,7 @@ type QuotaUsage struct {
 func New(opts Options) *Handler {
 	logger := opts.Logger
 	if logger == nil {
-		logger = log.NewNoOpLogger()
+		logger = log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	}
 	return &Handler{
 		cfg:    opts,
