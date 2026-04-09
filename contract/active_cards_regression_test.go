@@ -169,63 +169,7 @@ func TestWriteJSONEncodeFailureWritesNothing(t *testing.T) {
 	}
 }
 
-func TestCollectedErrorsReturnsCopy(t *testing.T) {
-	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
-	first := errors.New("first")
-	second := errors.New("second")
-	ctx.Error(first)
-	ctx.Error(second)
-
-	copySlice := ctx.CollectedErrors()
-	copySlice[0] = errors.New("mutated")
-
-	got := ctx.CollectedErrors()
-	if got[0] != first || got[1] != second {
-		t.Fatalf("expected collected errors to be immutable from caller writes, got %v", got)
-	}
-}
-
-func TestWrapErrorPreservesInnerContextPrecedence(t *testing.T) {
-	inner := WrapError(errors.New("boom"), "db.query", "db", map[string]any{"inner": true})
-	outer := WrapError(inner, "service.create", "svc", map[string]any{"outer": true})
-
-	details := GetErrorDetails(outer)
-	if details["operation"] != "db.query" {
-		t.Fatalf("expected inner operation to win, got %v", details["operation"])
-	}
-	if details["module"] != "db" {
-		t.Fatalf("expected inner module to win, got %v", details["module"])
-	}
-	params, ok := details["params"].(map[string]any)
-	if !ok || params["inner"] != true || params["outer"] != true {
-		t.Fatalf("expected merged params, got %v", details["params"])
-	}
-}
-
-func TestWrapErrorInnerParamWinsOnConflict(t *testing.T) {
-	inner := WrapError(errors.New("base"), "op", "mod", map[string]any{
-		"entity_id":  "inner-value",
-		"inner_only": true,
-	})
-	outer := WrapError(inner, "op2", "mod2", map[string]any{
-		"entity_id":  "outer-value",
-		"outer_only": true,
-	})
-
-	details := GetErrorDetails(outer)
-	params, ok := details["params"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected params map, got %v", details["params"])
-	}
-	if params["entity_id"] != "inner-value" {
-		t.Fatalf("expected inner param to win, got %v", params["entity_id"])
-	}
-	if params["inner_only"] != true || params["outer_only"] != true {
-		t.Fatalf("expected both unique keys to survive merge, got %v", params)
-	}
-}
-
-func TestWriteErrorAndParseErrorUseTopLevelRequestIDAndTypedFields(t *testing.T) {
+func TestWriteErrorUsesTopLevelRequestIDAndTypedFields(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(WithRequestID(req.Context(), "req-123"))
@@ -252,14 +196,6 @@ func TestWriteErrorAndParseErrorUseTopLevelRequestIDAndTypedFields(t *testing.T)
 	}
 	if _, ok := errorBody["request_id"]; ok {
 		t.Fatalf("expected request_id to be promoted out of nested error body")
-	}
-
-	parsed, err := ParseErrorFromResponse(rec.Result())
-	if err != nil {
-		t.Fatalf("unexpected parse error: %v", err)
-	}
-	if parsed.RequestID != "req-123" {
-		t.Fatalf("expected parsed request id, got %q", parsed.RequestID)
 	}
 }
 

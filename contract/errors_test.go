@@ -234,52 +234,6 @@ func TestHTTPStatusFromCategory(t *testing.T) {
 	}
 }
 
-func TestErrorClassification(t *testing.T) {
-	clientErr := APIError{Status: http.StatusBadRequest}
-	serverErr := APIError{Status: http.StatusInternalServerError}
-
-	if !IsClientError(clientErr) {
-		t.Fatalf("expected client error to be classified as client error")
-	}
-
-	if IsClientError(serverErr) {
-		t.Fatalf("expected server error to not be classified as client error")
-	}
-
-	if !IsServerError(serverErr) {
-		t.Fatalf("expected server error to be classified as server error")
-	}
-
-	if IsServerError(clientErr) {
-		t.Fatalf("expected client error to not be classified as server error")
-	}
-}
-
-func TestRetryableErrorDetection(t *testing.T) {
-	retryableStatuses := []int{408, 429, 500, 502, 503, 504}
-	nonRetryableStatuses := []int{400, 401, 403, 404, 422}
-
-	for _, status := range retryableStatuses {
-		err := APIError{Status: status}
-		if !IsAPIErrorRetryable(err) {
-			t.Fatalf("expected status %d to be retryable", status)
-		}
-	}
-
-	for _, status := range nonRetryableStatuses {
-		err := APIError{Status: status}
-		if IsAPIErrorRetryable(err) {
-			t.Fatalf("expected status %d to not be retryable", status)
-		}
-	}
-
-	// Test timeout error
-	timeoutErr := APIError{Category: CategoryTimeout, Status: http.StatusOK}
-	if !IsAPIErrorRetryable(timeoutErr) {
-		t.Fatalf("expected timeout error to be retryable")
-	}
-}
-
 func TestErrorResponseWriting(t *testing.T) {
 	// Test WriteError function
 	recorder := httptest.NewRecorder()
@@ -361,69 +315,6 @@ func TestWriteErrorPreservesRequestID(t *testing.T) {
 
 	if response.RequestID != "explicit-req-id" {
 		t.Fatalf("expected explicit request id to be preserved")
-	}
-}
-
-func TestParseErrorFromResponse(t *testing.T) {
-	// Create a mock error response
-	errorResp := ErrorResponse{
-		Error: APIError{
-			Status:   http.StatusNotFound,
-			Code:     "RESOURCE_NOT_FOUND",
-			Message:  "resource not found",
-			Category: CategoryClient,
-		},
-	}
-
-	body, _ := json.Marshal(errorResp)
-	resp := httptest.NewRecorder()
-	resp.WriteHeader(http.StatusNotFound)
-	resp.Write(body)
-
-	parsedErr, err := ParseErrorFromResponse(resp.Result())
-
-	if err != nil {
-		t.Fatalf("unexpected error parsing response: %v", err)
-	}
-
-	if parsedErr.Code != "RESOURCE_NOT_FOUND" {
-		t.Fatalf("expected parsed error code to match")
-	}
-
-	if parsedErr.Category != CategoryClient {
-		t.Fatalf("expected parsed error category to match")
-	}
-}
-
-func TestParseErrorFromSuccessfulResponse(t *testing.T) {
-	resp := httptest.NewRecorder()
-	resp.WriteHeader(http.StatusOK)
-	resp.WriteString("{}")
-
-	_, err := ParseErrorFromResponse(resp.Result())
-
-	if err == nil {
-		t.Fatalf("expected error when parsing successful response")
-	}
-}
-
-func TestParseErrorFromMalformedResponse(t *testing.T) {
-	resp := httptest.NewRecorder()
-	resp.WriteHeader(http.StatusInternalServerError)
-	resp.WriteString("{invalid json}")
-
-	parsedErr, err := ParseErrorFromResponse(resp.Result())
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if parsedErr.Status != http.StatusInternalServerError {
-		t.Fatalf("expected status to be preserved")
-	}
-
-	if parsedErr.Code != http.StatusText(http.StatusInternalServerError) {
-		t.Fatalf("expected fallback code")
 	}
 }
 

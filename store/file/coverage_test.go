@@ -51,7 +51,7 @@ func TestFile_Zero(t *testing.T) {
 
 func TestQuery_Zero(t *testing.T) {
 	var q Query
-	_ = q.UploadedBy
+	_ = q.MimeType
 	_ = q.PageSize
 }
 
@@ -63,7 +63,6 @@ func TestPutOptions_AllFields(t *testing.T) {
 		ContentType: "text/plain",
 		Reader:      strings.NewReader("data"),
 		Metadata:    map[string]any{"key": "val"},
-		UploadedBy:  "user-1",
 	}
 	if opts.FileName != "file.txt" {
 		t.Error("FileName not set")

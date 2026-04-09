@@ -20,7 +20,8 @@ non_goals:
   - Persistence logic and multipart upload convenience helpers
   - Protocol gateway families and business rules
   - Session or token issuance and auth identity primitives
-  - Middleware observability policy, field redaction, or request-id generation policy
+  - Middleware observability policy, field redaction, request-id generation policy, or repo-wide error utility helpers
+  - Framework-style request bags, abort state, or request-local service-locator helpers
 
 public_entrypoints:
   - WriteError
@@ -56,8 +57,9 @@ review_checklist:
   - Keep transport helpers explicit
   - Keep protocol-specific wiring out of contract
   - Avoid leaking internals in responses
+  - Do not turn Ctx into a mutable request bag or runtime state container
 
 agent_hints:
   - Prefer stdlib-shaped helpers
   - Do not introduce app wiring here
-  - Do not add business-specific response wrappers or protocol gateway families here
+  - Keep Ctx limited to transport binding/response/streaming helpers, not request-local service location; keep generic internal error wrapping and protocol-specific helpers in the owning module

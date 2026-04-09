@@ -59,11 +59,11 @@ func NewS3Storage(config S3Config, metadata MetadataManager) (*S3Storage, error)
 
 // Put uploads a file to S3 storage under the tenant's key prefix.
 func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
-	fileID := storefile.GenerateID()
+	fileID := generateID()
 
 	ext := path.Ext(opts.FileName)
 	if ext == "" && opts.ContentType != "" {
-		ext = storefile.MimeToExt(opts.ContentType)
+		ext = mimeToExt(opts.ContentType)
 	}
 
 	now := time.Now()

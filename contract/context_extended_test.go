@@ -238,11 +238,10 @@ func TestBindJSONBodyTooLarge(t *testing.T) {
 	// Use custom config with small max body size
 	config := &RequestConfig{MaxBodySize: 1024 * 1024} // 1MB
 	ctx := &Ctx{
-		W:         w,
-		R:         r,
-		Params:    map[string]string{},
-		Config:    config,
-		startedAt: time.Now(),
+		W:      w,
+		R:      r,
+		Params: map[string]string{},
+		Config: config,
 	}
 
 	var dst struct{}
@@ -260,70 +259,7 @@ func TestBindJSONBodyTooLarge(t *testing.T) {
 	}
 }
 
-func TestRequestDuration(t *testing.T) {
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/test", nil)
-	ctx := NewCtx(w, r, nil)
-
-	// Sleep a bit to ensure duration is measurable
-	time.Sleep(10 * time.Millisecond)
-
-	duration := ctx.RequestDuration()
-	if duration < 10*time.Millisecond {
-		t.Errorf("expected duration >= 10ms, got %v", duration)
-	}
-}
-
-func TestIsCompressed(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.EnableCompression = true
-
-	tests := []struct {
-		name            string
-		contentEncoding string
-		expected        bool
-	}{
-		{"gzip", "gzip", true},
-		{"deflate", "deflate", true},
-		{"none", "", false},
-		{"unknown", "br", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			r := httptest.NewRequest("POST", "/test", nil)
-			if tt.contentEncoding != "" {
-				r.Header.Set("Content-Encoding", tt.contentEncoding)
-			}
-			ctx := NewCtxWithConfig(w, r, nil, cfg)
-
-			if ctx.IsCompressed() != tt.expected {
-				t.Errorf("expected %v, got %v", tt.expected, ctx.IsCompressed())
-			}
-		})
-	}
-}
-
-func TestBodySize(t *testing.T) {
-	body := "test body content"
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/test", strings.NewReader(body))
-	ctx := NewCtx(w, r, nil)
-
-	// Trigger body read
-	_, err := ctx.bodyBytes()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	size := ctx.BodySize()
-	if size != int64(len(body)) {
-		t.Errorf("expected size %d, got %d", len(body), size)
-	}
-}
-
-func TestClose(t *testing.T) {
+func TestRelease(t *testing.T) {
 	// Test with cancel function
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
@@ -335,11 +271,11 @@ func TestClose(t *testing.T) {
 	ctx := NewCtx(w, r, nil)
 	ctx.cancel = cancel // Set the cancel function
 
-	// Close should not panic
-	ctx.Close()
+	// release should not panic
+	ctx.release()
 
-	// Second close should not panic
-	ctx.Close()
+	// Second release should not panic
+	ctx.release()
 }
 
 func TestClientIPFromRequest(t *testing.T) {
@@ -516,41 +452,15 @@ func TestBindErrorUnwrap(t *testing.T) {
 	}
 }
 
-func TestCtxCompression(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.EnableCompression = true
-
-	// Test with gzip
-	r := httptest.NewRequest("POST", "/test", nil)
-	r.Header.Set("Content-Encoding", "gzip")
-	w := httptest.NewRecorder()
-	ctx := NewCtxWithConfig(w, r, nil, cfg)
-
-	if !ctx.IsCompressed() {
-		t.Error("expected compression to be enabled")
-	}
-
-	// Test with deflate
-	r = httptest.NewRequest("POST", "/test", nil)
-	r.Header.Set("Content-Encoding", "deflate")
-	w = httptest.NewRecorder()
-	ctx = NewCtxWithConfig(w, r, nil, cfg)
-
-	if !ctx.IsCompressed() {
-		t.Error("expected compression to be enabled")
-	}
-}
-
 func TestCtxConfigDefaults(t *testing.T) {
 	// Test with nil config
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/test", nil)
 	ctx := &Ctx{
-		W:         w,
-		R:         r,
-		Params:    map[string]string{},
-		Config:    nil,
-		startedAt: time.Now(),
+		W:      w,
+		R:      r,
+		Params: map[string]string{},
+		Config: nil,
 	}
 
 	// Should not panic with nil config
@@ -813,111 +723,6 @@ func TestBindQueryUint(t *testing.T) {
 	}
 }
 
-func TestSetGet(t *testing.T) {
-	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
-
-	// Get on empty store returns false
-	val, ok := ctx.Get("missing")
-	if ok || val != nil {
-		t.Fatalf("expected no value for missing key, got %v", val)
-	}
-
-	// Set and Get
-	ctx.Set("user", "alice")
-	val, ok = ctx.Get("user")
-	if !ok || val != "alice" {
-		t.Fatalf("expected alice, got %v (ok=%v)", val, ok)
-	}
-
-	// Overwrite
-	ctx.Set("user", "bob")
-	val, ok = ctx.Get("user")
-	if !ok || val != "bob" {
-		t.Fatalf("expected bob after overwrite, got %v", val)
-	}
-
-	// Different types
-	ctx.Set("count", 42)
-	ctx.Set("active", true)
-	ctx.Set("data", map[string]int{"x": 1})
-
-	if v, _ := ctx.Get("count"); v != 42 {
-		t.Fatalf("expected 42, got %v", v)
-	}
-	if v, _ := ctx.Get("active"); v != true {
-		t.Fatalf("expected true, got %v", v)
-	}
-	if v, _ := ctx.Get("data"); v == nil {
-		t.Fatal("expected non-nil map")
-	}
-
-	// Nil value is a valid stored value
-	ctx.Set("nilval", nil)
-	val, ok = ctx.Get("nilval")
-	if !ok {
-		t.Fatal("expected key to exist even with nil value")
-	}
-	if val != nil {
-		t.Fatalf("expected nil value, got %v", val)
-	}
-}
-
-func TestMustGet(t *testing.T) {
-	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
-
-	// MustGet on existing key
-	ctx.Set("key", "val")
-	v, err := ctx.MustGet("key")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if v != "val" {
-		t.Fatalf("expected val, got %v", v)
-	}
-
-	// MustGet on missing key returns ErrMissingKey
-	_, err = ctx.MustGet("nonexistent")
-	if err == nil {
-		t.Fatal("expected error for missing key, got nil")
-	}
-	if !errors.Is(err, ErrMissingKey) {
-		t.Fatalf("expected ErrMissingKey, got %v", err)
-	}
-}
-
-func TestSetGetConcurrent(t *testing.T) {
-	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
-
-	done := make(chan struct{})
-	const n = 100
-
-	// Concurrent writers
-	for i := 0; i < n; i++ {
-		go func(i int) {
-			ctx.Set("key", i)
-			done <- struct{}{}
-		}(i)
-	}
-
-	// Concurrent readers
-	for i := 0; i < n; i++ {
-		go func() {
-			ctx.Get("key")
-			done <- struct{}{}
-		}()
-	}
-
-	for i := 0; i < 2*n; i++ {
-		<-done
-	}
-
-	// Final value should exist
-	_, ok := ctx.Get("key")
-	if !ok {
-		t.Fatal("expected key to be present after concurrent writes")
-	}
-}
-
 func TestCtxBodyReadOnce(t *testing.T) {
 	body := "test body"
 	w := httptest.NewRecorder()
@@ -934,10 +739,6 @@ func TestCtxBodyReadOnce(t *testing.T) {
 
 	if !bytes.Equal(data1, data2) {
 		t.Error("body should be cached and return same data")
-	}
-
-	if ctx.BodySize() != int64(len(body)) {
-		t.Errorf("expected body size %d, got %d", len(body), ctx.BodySize())
 	}
 }
 

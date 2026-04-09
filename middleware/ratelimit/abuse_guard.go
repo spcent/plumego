@@ -1,3 +1,7 @@
+// Package ratelimit adapts stable abuse primitives to HTTP middleware.
+//
+// The canonical stable entrypoint is AbuseGuard, which wraps security/abuse
+// for per-key transport rate limiting without owning the limiter primitive.
 package ratelimit
 
 import (

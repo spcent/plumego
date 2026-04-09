@@ -39,6 +39,7 @@
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
 - keep auth and security-header transport adapters here, on top of `security/*` primitives
+- keep stable rate limiting here as a thin `middleware/ratelimit.AbuseGuard(...)` adapter over `security/abuse`, not as a catalog of limiter implementations
 - keep API version negotiation in `x/rest/versioning`
 - keep protocol or payload adaptation in `x/gateway/*`
 - keep request-id generation policy in middleware-owned packages; `contract` should only carry request-id context/header contracts

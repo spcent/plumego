@@ -226,7 +226,6 @@ func (c *Ctx) bodyBytes() ([]byte, error) {
 			c.body = nil
 			return
 		}
-		c.bodySize.Store(int64(len(c.body)))
 		if c.Config == nil || c.Config.EnableBodyCache {
 			c.R.Body = io.NopCloser(bytes.NewBuffer(c.body))
 		}

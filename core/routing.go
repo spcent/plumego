@@ -16,7 +16,7 @@ func (a *App) registerRoute(method, path, name string, handler http.Handler) err
 		if name != "" {
 			params["name"] = name
 		}
-		return contract.WrapError(contract.ErrHandlerNil, "add_route", "core", params)
+		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
 	}
 
 	if err := a.ensureMutable("add_route", "register route"); err != nil {

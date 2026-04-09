@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/spcent/plumego/contract"
 )
 
 // Group creates a new router group with the given prefix.
@@ -72,15 +70,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 	defer r.state.mu.Unlock()
 
 	if r.state.frozen {
-		return contract.WrapError(
-			fmt.Errorf("router is frozen, cannot add route after freeze"),
-			"add_route",
-			"router",
-			map[string]any{
-				"method": method,
-				"path":   path,
-			},
-		)
+		return fmt.Errorf("router add_route %s %s: %w", method, path, fmt.Errorf("router is frozen, cannot add route after freeze"))
 	}
 
 	fullPath := r.fullPath(path)
@@ -95,15 +85,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 	current := r.state.trees[method]
 	if fullPath == "/" {
 		if current.handler != nil {
-			return contract.WrapError(
-				fmt.Errorf("duplicate route registration: %s /", method),
-				"add_route",
-				"router",
-				map[string]any{
-					"method": method,
-					"path":   fullPath,
-				},
-			)
+			return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("duplicate route registration: %s /", method))
 		}
 		current.handler = handler
 		current.fullPath = fullPath
@@ -123,15 +105,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 				if child.paramName == "" {
 					child.paramName = seg.paramName
 				} else if child.paramName != seg.paramName {
-					return contract.WrapError(
-						fmt.Errorf("route conflict: parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName),
-						"add_route",
-						"router",
-						map[string]any{
-							"method": method,
-							"path":   fullPath,
-						},
-					)
+					return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("route conflict: parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName))
 				}
 				current = child
 				continue
@@ -150,15 +124,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 				if child.paramName == "" {
 					child.paramName = seg.paramName
 				} else if child.paramName != seg.paramName {
-					return contract.WrapError(
-						fmt.Errorf("route conflict: wildcard parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName),
-						"add_route",
-						"router",
-						map[string]any{
-							"method": method,
-							"path":   fullPath,
-						},
-					)
+					return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("route conflict: wildcard parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName))
 				}
 				current = child
 				continue
@@ -180,15 +146,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 	}
 
 	if current.handler != nil {
-		return contract.WrapError(
-			fmt.Errorf("duplicate route registration: %s %s", method, fullPath),
-			"add_route",
-			"router",
-			map[string]any{
-				"method": method,
-				"path":   fullPath,
-			},
-		)
+		return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("duplicate route registration: %s %s", method, fullPath))
 	}
 	current.handler = handler
 	current.paramKeys = paramKeys
