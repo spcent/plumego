@@ -18,7 +18,7 @@ non_goals:
   - Feature-specific dashboards
   - Repo-wide feature metric type catalogs
   - Transport policy
-  - Rolling-window aggregation helpers
+  - Rolling-window aggregation and record-buffer helpers
   - Repo-wide metrics test utilities
   - Export pipeline wiring and adapters (belong in x/observability)
 
@@ -58,8 +58,9 @@ review_checklist:
   - Avoid feature taxonomy coupling
   - Keep feature-owned observer interfaces out of the stable layer
   - Keep non-HTTP feature helper methods out of stable collectors
+  - Keep record-buffer inspection and retention policy out of stable collectors
 
 agent_hints:
   - Observability capability packs and transport-specific logic belong outside the stable layer
-  - Use x/observability for Prometheus, tracing, rolling-window aggregation, metrics test helpers, and non-HTTP feature record builders
+  - Use x/observability for Prometheus, tracing, rolling-window aggregation, record-buffer collectors, metrics test helpers, and non-HTTP feature record builders
   - Use x/devtools for dev-only collectors and x/messaging for messaging-specific reporters/exporters

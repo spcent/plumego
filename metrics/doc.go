@@ -8,7 +8,7 @@
 //
 // Prometheus exposition, tracing implementations, and dev-dashboard collectors
 // live in their owning extension packages:
-//   - x/observability for generic Prometheus, tracing adapters, and non-HTTP feature metric helpers
+//   - x/observability for generic Prometheus, tracing adapters, buffered record inspection, and non-HTTP feature metric helpers
 //   - x/devtools for dev-only collectors
 //   - x/messaging for messaging-specific metrics reporters and exporters
 package metrics

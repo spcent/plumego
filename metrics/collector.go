@@ -112,7 +112,6 @@ type BaseMetricsCollector struct {
 const defaultMaxRecords = 10000
 
 // NewBaseMetricsCollector creates a new base metrics collector.
-// It retains up to defaultMaxRecords records unless overridden by WithMaxRecords.
 func NewBaseMetricsCollector() *BaseMetricsCollector {
 	return &BaseMetricsCollector{
 		records: make([]MetricRecord, 0, 1000),
@@ -124,9 +123,9 @@ func NewBaseMetricsCollector() *BaseMetricsCollector {
 	}
 }
 
-// WithMaxRecords limits how many records are retained in memory.
+// setMaxRecords limits how many records are retained in memory for package-local tests.
 // A non-positive value disables the limit.
-func (b *BaseMetricsCollector) WithMaxRecords(max int) *BaseMetricsCollector {
+func (b *BaseMetricsCollector) setMaxRecords(max int) *BaseMetricsCollector {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -215,8 +214,8 @@ func (b *BaseMetricsCollector) Clear() {
 	}
 }
 
-// GetRecords returns a copy of all records (for testing or advanced collectors)
-func (b *BaseMetricsCollector) GetRecords() []MetricRecord {
+// recordsSnapshot returns a copy of all records for package-local tests.
+func (b *BaseMetricsCollector) recordsSnapshot() []MetricRecord {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 

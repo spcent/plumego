@@ -1,0 +1,47 @@
+name: x/resilience
+path: x/resilience
+layer: extension
+status: experimental
+owner: runtime
+risk: medium
+summary: Reusable resilience primitives and adapters that do not belong to stable security or a single feature family.
+
+responsibilities:
+  - Circuit breaker primitives
+  - Reusable resilience middleware adapters
+
+non_goals:
+  - Stable root entrypoints
+  - App bootstrap ownership
+  - Feature-specific retry or provider orchestration
+  - Security policy ownership
+
+public_entrypoints:
+  - circuitbreaker
+
+allowed_imports:
+  - contract
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - security/**
+  - store/**
+  - x/tenant/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/resilience/...
+  - go test -timeout 20s ./x/resilience/...
+  - go vet ./x/resilience/...
+
+doc_paths:
+  - docs/modules/x-resilience/README.md
+
+review_checklist:
+  - Keep resilience components reusable across extension families
+  - Avoid hidden globals
+  - Keep transport adapters explicit
+
+agent_hints:
+  - Put reusable circuit breaking here instead of in stable security or feature-specific packages
+  - Keep feature-specific resilience orchestration in the owning extension package

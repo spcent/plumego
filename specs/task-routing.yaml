@@ -27,6 +27,7 @@ routing_rules:
       - x/websocket
       - x/frontend
       - x/observability
+      - x/resilience
       - x/data
       - x/ai
 
@@ -199,6 +200,14 @@ tasks:
     avoid:
       - core
       - health
+
+  resilience:
+    start_with:
+      - x/resilience/module.yaml
+      - specs/extension-taxonomy.yaml
+    avoid:
+      - security
+      - core
 
   scaffold:
     start_with:

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/x/observability/recordbuffer"
 	testmetrics "github.com/spcent/plumego/x/observability/testmetrics"
 )
 
@@ -43,7 +44,7 @@ func TestReporterRecords(t *testing.T) {
 }
 
 func TestSMSPrometheusExporterWritesMetrics(t *testing.T) {
-	collector := metrics.NewBaseMetricsCollector()
+	collector := recordbuffer.NewCollector()
 	reporter := NewSMSMetricsReporter(collector)
 
 	ctx := context.Background()
@@ -75,7 +76,7 @@ func TestSMSPrometheusExporterWritesMetrics(t *testing.T) {
 }
 
 func TestSMSPrometheusExporterUsesValueWhenDurationMissing(t *testing.T) {
-	collector := metrics.NewBaseMetricsCollector()
+	collector := recordbuffer.NewCollector()
 	collector.Record(context.Background(), metrics.MetricRecord{
 		Type:  SMSGatewayMetricType,
 		Name:  MetricSendLatency,

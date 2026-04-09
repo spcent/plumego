@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/x/observability/recordbuffer"
 )
 
 func TestDBRecord(t *testing.T) {
@@ -118,40 +119,40 @@ func TestExtractTableName(t *testing.T) {
 func TestObserveFunctionsRecordDurationSeconds(t *testing.T) {
 	tests := []struct {
 		name    string
-		observe func(*metrics.BaseMetricsCollector, context.Context, time.Duration)
+		observe func(metrics.Recorder, context.Context, time.Duration)
 		want    string
 	}{
 		{
 			name: "pubsub",
-			observe: func(c *metrics.BaseMetricsCollector, ctx context.Context, d time.Duration) {
+			observe: func(c metrics.Recorder, ctx context.Context, d time.Duration) {
 				ObservePubSub(c, ctx, "publish", "topic", d, nil)
 			},
 			want: "pubsub_publish",
 		},
 		{
 			name: "mq",
-			observe: func(c *metrics.BaseMetricsCollector, ctx context.Context, d time.Duration) {
+			observe: func(c metrics.Recorder, ctx context.Context, d time.Duration) {
 				ObserveMQ(c, ctx, "enqueue", "queue", d, nil, false)
 			},
 			want: "mq_enqueue",
 		},
 		{
 			name: "kv",
-			observe: func(c *metrics.BaseMetricsCollector, ctx context.Context, d time.Duration) {
+			observe: func(c metrics.Recorder, ctx context.Context, d time.Duration) {
 				ObserveKV(c, ctx, "get", "key", d, nil, true)
 			},
 			want: "kv_get",
 		},
 		{
 			name: "ipc",
-			observe: func(c *metrics.BaseMetricsCollector, ctx context.Context, d time.Duration) {
+			observe: func(c metrics.Recorder, ctx context.Context, d time.Duration) {
 				ObserveIPC(c, ctx, "read", "/tmp/app.sock", "unix", 256, d, nil)
 			},
 			want: "ipc_read",
 		},
 		{
 			name: "db",
-			observe: func(c *metrics.BaseMetricsCollector, ctx context.Context, d time.Duration) {
+			observe: func(c metrics.Recorder, ctx context.Context, d time.Duration) {
 				ObserveDB(c, ctx, "query", "postgres", "SELECT 1", 1, d, nil)
 			},
 			want: "db_query",
@@ -160,7 +161,7 @@ func TestObserveFunctionsRecordDurationSeconds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			collector := metrics.NewBaseMetricsCollector()
+			collector := recordbuffer.NewCollector()
 			duration := 125 * time.Millisecond
 			tt.observe(collector, context.Background(), duration)
 

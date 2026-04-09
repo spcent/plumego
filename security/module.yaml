@@ -21,6 +21,7 @@ non_goals:
   - Tenant policy orchestration
   - Persistence logic
   - Session lifecycle management, revocation, and tenant-session sentinel errors (belong in x/tenant/session or application code)
+  - Reusable resilience components such as circuit breakers (belong in x/resilience)
 
 public_entrypoints:
   - authn

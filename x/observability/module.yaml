@@ -16,7 +16,7 @@ responsibilities:
   - Observability adapters
   - Optional instrumentation helpers
   - Export pipeline wiring
-  - Non-stable observability support helpers such as rolling-window aggregation, metrics testkits, and DB analytics helpers
+  - Non-stable observability support helpers such as record buffering, rolling-window aggregation, metrics testkits, and DB analytics helpers
 
 non_goals:
   - Core bootstrap ownership
@@ -51,5 +51,5 @@ review_checklist:
 
 agent_hints:
   - Start broader observability adapter and export work here; x/ops and x/devtools are subordinate packages
-  - Start transport observability primitives in middleware/requestid, middleware/tracing, middleware/httpmetrics, or middleware/accesslog
+  - Start transport observability primitives in middleware/requestid, middleware/tracing, middleware/httpmetrics, or middleware/accesslog; keep broader record-buffering and export helpers here
   - Keep adapter-local helpers explicit and do not turn middleware into an observability catalog

@@ -35,4 +35,5 @@
 - keep `Principal`, `Authenticator`, `Authorizer`, and the canonical `WithPrincipal(...)` / `PrincipalFromContext(...)` accessors in `security/authn`
 - keep JWT, header, and signature logic in `security/*` as primitives and policies
 - keep session revocation, token-version invalidation, and tenant-session sentinel errors in `x/tenant/session`, not in stable `security/*`
+- keep reusable resilience primitives such as circuit breakers in `x/resilience`, not in stable `security/*`
 - route HTTP adapter wiring through `middleware/auth` and `middleware/security`

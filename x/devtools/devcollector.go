@@ -9,6 +9,7 @@ import (
 
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/observability/featuremetrics"
+	"github.com/spcent/plumego/x/observability/recordbuffer"
 	windowmetrics "github.com/spcent/plumego/x/observability/windowmetrics"
 )
 
@@ -122,7 +123,7 @@ type DevDBRedactionConfig struct {
 // It focuses on HTTP request aggregation while also exposing extension-owned
 // helpers for DB, MQ, KV, IPC, and PubSub observations.
 type DevCollector struct {
-	base *metrics.BaseMetricsCollector
+	base *recordbuffer.Collector
 
 	mu         sync.RWMutex
 	startedAt  time.Time
@@ -171,7 +172,7 @@ func NewDevCollector(cfg DevCollectorConfig) *DevCollector {
 	}
 
 	return &DevCollector{
-		base:          metrics.NewBaseMetricsCollector(),
+		base:          recordbuffer.NewCollector(),
 		startedAt:     time.Now(),
 		window:        cfg.Window,
 		maxSamples:    cfg.MaxSamples,

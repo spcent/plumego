@@ -47,6 +47,8 @@ go test -race ./...
 - Dependency flow: constructor injection, not context service-locator
 - App shape: follow `reference/standard-service`
 
+**Extension routing note:** reusable resilience primitives belong in `x/resilience`, not stable `security`.
+
 **Documentation sync targets:** `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `docs/ROADMAP.md`, `env.example`
 
 Use the handler pattern from `docs/CANONICAL_STYLE_GUIDE.md` consistently within one flow.

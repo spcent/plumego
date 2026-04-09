@@ -18,7 +18,7 @@ func TestBaseMetricsCollectorMaxRecordsDefault(t *testing.T) {
 		})
 	}
 
-	records := collector.GetRecords()
+	records := collector.recordsSnapshot()
 	if len(records) != defaultMaxRecords {
 		t.Fatalf("expected %d records, got %d", defaultMaxRecords, len(records))
 	}
@@ -31,7 +31,7 @@ func TestBaseMetricsCollectorMaxRecordsDefault(t *testing.T) {
 }
 
 func TestBaseMetricsCollectorMaxRecordsDisabled(t *testing.T) {
-	collector := NewBaseMetricsCollector().WithMaxRecords(0)
+	collector := NewBaseMetricsCollector().setMaxRecords(0)
 	total := 250
 
 	for i := 0; i < total; i++ {
@@ -42,7 +42,7 @@ func TestBaseMetricsCollectorMaxRecordsDisabled(t *testing.T) {
 		})
 	}
 
-	records := collector.GetRecords()
+	records := collector.recordsSnapshot()
 	if len(records) != total {
 		t.Fatalf("expected %d records, got %d", total, len(records))
 	}
@@ -61,7 +61,7 @@ func TestBaseMetricsCollectorRecordClonesLabels(t *testing.T) {
 
 	labels["route"] = "/mutated"
 
-	records := collector.GetRecords()
+	records := collector.recordsSnapshot()
 	if got := records[0].Labels["route"]; got != "/users" {
 		t.Fatalf("expected stored labels to be cloned, got %q", got)
 	}
@@ -73,7 +73,7 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 
 	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, duration)
 
-	records := collector.GetRecords()
+	records := collector.recordsSnapshot()
 	if len(records) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(records))
 	}
@@ -111,13 +111,13 @@ func TestBaseMetricsCollectorClear(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, 50*time.Millisecond)
 
-	if len(collector.GetRecords()) != 1 {
+	if len(collector.recordsSnapshot()) != 1 {
 		t.Fatalf("expected one record before clear")
 	}
 
 	collector.Clear()
 
-	if len(collector.GetRecords()) != 0 {
+	if len(collector.recordsSnapshot()) != 0 {
 		t.Fatalf("expected no records after clear")
 	}
 	stats := collector.GetStats()

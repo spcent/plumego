@@ -82,7 +82,7 @@ Five rules determine where to work. Read this before scanning the entrypoints li
 
 **Stable roots (9):** `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
 
-**x/* primary families (10):** `x/tenant`, `x/fileapi`, `x/messaging`, `x/gateway`, `x/rest`, `x/websocket`, `x/frontend`, `x/observability`, `x/data`, `x/ai`
+**x/* primary families (11):** `x/tenant`, `x/fileapi`, `x/messaging`, `x/gateway`, `x/rest`, `x/websocket`, `x/frontend`, `x/observability`, `x/resilience`, `x/data`, `x/ai`
 
 Always start at a primary family, not a subordinate (`x/mq`, `x/pubsub`, `x/ops`, `x/cache`, `x/devtools`, etc.).
 See `specs/task-routing.yaml` for the full routing table and detailed entrypoints.
@@ -126,6 +126,7 @@ Task entrypoint defaults:
 - WebSocket transport work: start with `x/websocket`.
 - File upload/download/storage work: start with `x/fileapi`.
 - Admin or observability surfaces: start with `x/observability` (includes ops and devtools), not `health`.
+- Reusable resilience primitives: start with `x/resilience`, not `security`.
 - AI capability work: start with `x/ai`.
 - Data topology work (sharding, rw-split, cache): start with `x/data`.
 

@@ -57,3 +57,9 @@ Done Definition:
 - Stable `metrics` no longer exports record-buffer inspection or retention-tuning APIs.
 - Extensions consume an owning `x/observability` record source instead of `metrics.BaseMetricsCollector.GetRecords()`.
 - Metrics docs and manifest describe the same reduced stable surface implemented in code.
+
+Outcome:
+- Completed.
+- Removed `WithMaxRecords(...)` and `GetRecords(...)` from the exported stable `metrics.BaseMetricsCollector` surface, keeping record buffering package-local inside stable tests only.
+- Added `x/observability/recordbuffer` as the owning buffered-record collector for observability, messaging exporters, and devtools collectors that need record inspection.
+- Updated metrics docs/manifests and extension callers so stable `metrics` now owns only recording, shared HTTP observation, stats, and reset semantics.

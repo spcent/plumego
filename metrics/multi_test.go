@@ -36,14 +36,11 @@ func TestMultiCollector(t *testing.T) {
 	multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
 
 	// Verify both collectors received the metric
-	records1 := collector1.GetRecords()
-	records2 := collector2.GetRecords()
-
-	if len(records1) != 1 {
-		t.Fatalf("expected 1 record in collector1, got %d", len(records1))
+	if collector1.GetStats().TotalRecords != 1 {
+		t.Fatalf("expected 1 record in collector1 stats, got %d", collector1.GetStats().TotalRecords)
 	}
-	if len(records2) != 1 {
-		t.Fatalf("expected 1 record in collector2, got %d", len(records2))
+	if collector2.GetStats().TotalRecords != 1 {
+		t.Fatalf("expected 1 record in collector2 stats, got %d", collector2.GetStats().TotalRecords)
 	}
 }
 
@@ -59,14 +56,11 @@ func TestMultiCollectorAllMethods(t *testing.T) {
 	multi.Record(ctx, MetricRecord{Name: "owner_metric", Value: 1})
 
 	// Each collector should have received both metrics
-	records1 := collector1.GetRecords()
-	records2 := collector2.GetRecords()
-
-	if len(records1) != 2 {
-		t.Fatalf("expected 2 records in collector1, got %d", len(records1))
+	if collector1.GetStats().TotalRecords != 2 {
+		t.Fatalf("expected 2 records in collector1 stats, got %d", collector1.GetStats().TotalRecords)
 	}
-	if len(records2) != 2 {
-		t.Fatalf("expected 2 records in collector2, got %d", len(records2))
+	if collector2.GetStats().TotalRecords != 2 {
+		t.Fatalf("expected 2 records in collector2 stats, got %d", collector2.GetStats().TotalRecords)
 	}
 }
 
@@ -175,14 +169,11 @@ func TestMultiCollectorClear(t *testing.T) {
 	multi.Clear()
 
 	// Verify both collectors are cleared
-	records1 := collector1.GetRecords()
-	records2 := collector2.GetRecords()
-
-	if len(records1) != 0 {
-		t.Fatalf("expected 0 records in collector1 after clear, got %d", len(records1))
+	if collector1.GetStats().TotalRecords != 0 {
+		t.Fatalf("expected 0 records in collector1 after clear, got %d", collector1.GetStats().TotalRecords)
 	}
-	if len(records2) != 0 {
-		t.Fatalf("expected 0 records in collector2 after clear, got %d", len(records2))
+	if collector2.GetStats().TotalRecords != 0 {
+		t.Fatalf("expected 0 records in collector2 after clear, got %d", collector2.GetStats().TotalRecords)
 	}
 }
 

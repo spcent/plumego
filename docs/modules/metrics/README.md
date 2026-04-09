@@ -42,6 +42,7 @@ other modules can depend on safely.
 - keep feature-specific observer interfaces in their owning package; only the shared HTTP observer stays in stable `metrics`
 - keep non-HTTP feature helper record builders in owning extensions or `x/observability` helper packages
 - keep Prometheus and tracing adapters in `x/observability`
+- keep record-buffer inspection and retention tuning in `x/observability/recordbuffer`
 - keep rolling-window aggregation in `x/observability/windowmetrics`
 - keep metrics test helpers in `x/observability/testmetrics`
 - keep dev-only collectors in `x/devtools`

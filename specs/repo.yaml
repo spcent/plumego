@@ -69,6 +69,7 @@ layers:
       - x/observability
       - x/ops
       - x/pubsub
+      - x/resilience
       - x/rest
       - x/scheduler
       - x/webhook

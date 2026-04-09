@@ -39,6 +39,11 @@ families:
       - x/ops
       - x/devtools
 
+  resilience:
+    canonical_root: x/resilience
+    roots:
+      - x/resilience
+
   frontend:
     canonical_root: x/frontend
     roots:

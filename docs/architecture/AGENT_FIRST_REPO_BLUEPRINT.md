@@ -35,6 +35,7 @@ Optional or fast-moving capabilities live under `x/`:
 - `x/frontend`
 - `x/ops`
 - `x/devtools`
+- `x/resilience`
 - `x/messaging`
 - `x/discovery`
 - `x/gateway`
@@ -171,6 +172,7 @@ Agents should prefer these entrypoints when multiple related `x/*` packages exis
 - Start gateway and edge transport work in `x/gateway`; treat `x/ipc` as a narrow primitive.
 - Start reusable resource-interface and CRUD-standardization work in `x/rest`; keep bootstrap shape in `reference/standard-service` and edge proxy topology in `x/gateway`.
 - Start broader observability adapter and export work in `x/observability`; use `x/ops` only for protected admin endpoints and auth-gated diagnostics surfaces.
+- Start reusable resilience primitives in `x/resilience`; do not park them under stable `security` or a feature package unless the behavior is truly feature-specific.
 - Start app-facing file upload and download transport work in `x/fileapi`; keep tenant-aware storage implementations in `x/data/file` and pure storage interfaces in `store/file`.
 - Start frontend asset-serving work in `x/frontend`, but do not let frontend helpers define the canonical app path.
 - Start local debug and developer-only route work in `x/devtools`; do not treat debug surfaces as part of `core`.
