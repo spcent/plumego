@@ -202,8 +202,8 @@ func (r *Router) Freeze() {
 // Example:
 //
 //	r := router.NewRouter()
-//	r.Use(middleware.Logging())
-//	r.Use(middleware.Recovery())
+//	r.Use(accesslog.Middleware(logger, nil, nil))
+//	r.Use(recovery.Recovery(logger))
 func (r *Router) Use(middlewares ...middleware.Middleware) {
 	for _, m := range middlewares {
 		r.middlewareManager.addMiddleware(m)

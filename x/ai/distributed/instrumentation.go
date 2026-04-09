@@ -52,7 +52,6 @@ func (ie *InstrumentedDistributedEngine) ExecuteAsync(
 		}
 
 		ie.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "distributed_workflow",
 			Name:     "workflow_execution_started",
 			Value:    1,
 			Labels:   tags,
@@ -90,7 +89,6 @@ func (ie *InstrumentedDistributedEngine) ExecuteSync(
 		}
 
 		ie.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "distributed_workflow",
 			Name:     "workflow_execution_completed",
 			Value:    1,
 			Labels:   tags,
@@ -122,7 +120,6 @@ func (ie *InstrumentedDistributedEngine) Resume(ctx context.Context, executionID
 		}
 
 		ie.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "distributed_workflow",
 			Name:     "workflow_resume",
 			Value:    1,
 			Labels:   tags,
@@ -154,7 +151,6 @@ func (ie *InstrumentedDistributedEngine) Pause(ctx context.Context, executionID 
 		}
 
 		ie.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "distributed_workflow",
 			Name:     "workflow_pause",
 			Value:    1,
 			Labels:   tags,

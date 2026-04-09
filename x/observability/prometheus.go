@@ -63,7 +63,7 @@ func (p *PrometheusCollector) Handler() http.Handler {
 }
 
 func (p *PrometheusCollector) Record(ctx context.Context, record metrics.MetricRecord) {
-	if record.Type == metrics.MetricHTTPRequest {
+	if record.Name == metrics.MetricHTTPRequest {
 		method, _ := record.Labels["method"]
 		path, _ := record.Labels["path"]
 		statusStr, _ := record.Labels["status"]
@@ -100,10 +100,10 @@ func (p *PrometheusCollector) GetStats() metrics.CollectorStats {
 		ErrorRecords:  errorRecords,
 		ActiveSeries:  activeSeries,
 		StartTime:     startTime,
-		TypeBreakdown: make(map[metrics.MetricType]int64),
+		NameBreakdown: make(map[string]int64),
 	}
 	if totalRequests > 0 {
-		stats.TypeBreakdown[metrics.MetricHTTPRequest] = int64(totalRequests)
+		stats.NameBreakdown[metrics.MetricHTTPRequest] = int64(totalRequests)
 	}
 
 	baseStats := p.base.GetStats()
@@ -113,8 +113,8 @@ func (p *PrometheusCollector) GetStats() metrics.CollectorStats {
 	if stats.StartTime.IsZero() || (!baseStats.StartTime.IsZero() && baseStats.StartTime.Before(stats.StartTime)) {
 		stats.StartTime = baseStats.StartTime
 	}
-	for key, value := range baseStats.TypeBreakdown {
-		stats.TypeBreakdown[key] += value
+	for key, value := range baseStats.NameBreakdown {
+		stats.NameBreakdown[key] += value
 	}
 
 	return stats

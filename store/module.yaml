@@ -21,7 +21,7 @@ non_goals:
   - AI-specific caches
   - DB analytics, DB instrumentation wrappers, pool-stat polling, slow-query reporting, and DB health or retry-policy helpers
   - File backend/provider configuration, signed URLs, metadata-manager ownership, and image-processing pipelines
-  - Read-write splitting, sharding topology defaults, durable KV-engine tuning, and ranked-data cache behavior
+  - Read-write splitting, sharding topology defaults, durable KV-engine tuning, ranked-data cache behavior, and cache metrics or introspection ownership
   - Business-level idempotency semantics (domain-specific dedup rules belong in the application or x/* layer)
 
 public_entrypoints:
@@ -59,11 +59,11 @@ change_risks:
 review_checklist:
   - Keep store APIs transport-agnostic and free of tenant-specific logic
   - Keep topology-heavy data features, DB analytics, slow-query inspection, DB instrumentation wrappers, and pool-stat polling out of the stable layer
-  - Keep HTTP response caching, request-derived cache keys, file backend config, signed URLs, metadata-manager ownership, and thumbnail/image-processing ownership out of stable store roots
+  - Keep HTTP response caching, request-derived cache keys, cache metrics or introspection ownership, file backend config, signed URLs, metadata-manager ownership, and thumbnail/image-processing ownership out of stable store roots
   - Keep WAL, snapshots, serializer selection, compression, and shard tuning out of stable store/kv
   - Prefer stdlib-compatible abstractions
 
 agent_hints:
   - Move tenant-aware adapters to x/tenant/store; move DB analytics and slow-query helpers to x/observability/dbinsights
-  - For distributed or provider-specific cache needs use x/cache; for HTTP response caching use x/gateway/cache
+  - For distributed, provider-specific, or metrics/export-oriented cache needs use x/cache; for HTTP response caching use x/gateway/cache
   - For ranked-data cache behavior use x/cache/leaderboard, route durable KV-engine tuning to x/data/kvengine, and keep DB retry or health/reporting policy out of stable store/db

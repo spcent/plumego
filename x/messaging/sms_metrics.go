@@ -12,8 +12,6 @@ import (
 	"github.com/spcent/plumego/metrics"
 )
 
-const SMSGatewayMetricType metrics.MetricType = "messaging_sms_gateway"
-
 const (
 	LabelQueue    = "queue"
 	LabelState    = "state"
@@ -25,12 +23,12 @@ const (
 )
 
 const (
-	MetricQueueDepth     = "queue_depth"
-	MetricSendLatency    = "send_latency"
-	MetricProviderResult = "provider_result"
-	MetricReceiptDelay   = "receipt_delay"
-	MetricRetry          = "retry"
-	MetricStatus         = "status"
+	MetricQueueDepth     = "sms_gateway_queue_depth"
+	MetricSendLatency    = "sms_gateway_send_latency"
+	MetricProviderResult = "sms_gateway_provider_result"
+	MetricReceiptDelay   = "sms_gateway_receipt_delay"
+	MetricRetry          = "sms_gateway_retry"
+	MetricStatus         = "sms_gateway_status"
 )
 
 type SMSQueueStats struct {
@@ -100,7 +98,6 @@ func (r *SMSMetricsReporter) RecordStatus(ctx context.Context, tenantID, status 
 
 func (r *SMSMetricsReporter) record(ctx context.Context, name string, value float64, labels metrics.MetricLabels, duration time.Duration, err error) {
 	r.Recorder.Record(ctx, metrics.MetricRecord{
-		Type:     SMSGatewayMetricType,
 		Name:     name,
 		Value:    value,
 		Labels:   labels,
@@ -230,9 +227,6 @@ func aggregateSMSGatewayRecords(records []metrics.MetricRecord) *smsSnapshot {
 	}
 
 	for _, record := range records {
-		if record.Type != SMSGatewayMetricType {
-			continue
-		}
 		key := smsKey{
 			queue:    record.Labels[LabelQueue],
 			state:    record.Labels[LabelState],

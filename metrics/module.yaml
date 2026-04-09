@@ -16,7 +16,7 @@ responsibilities:
 non_goals:
   - App bootstrap
   - Feature-specific dashboards
-  - Repo-wide feature metric type catalogs
+  - Repo-wide feature metric type catalogs or parallel identity fields
   - Transport policy
   - Rolling-window aggregation and record-buffer helpers
   - Repo-wide metrics test utilities
@@ -55,7 +55,7 @@ change_risks:
 
 review_checklist:
   - Keep contracts small
-  - Avoid feature taxonomy coupling
+  - Avoid feature taxonomy coupling and parallel identity fields
   - Keep feature-owned observer interfaces out of the stable layer
   - Keep non-HTTP feature helper methods out of stable collectors
   - Keep record-buffer inspection and retention policy out of stable collectors

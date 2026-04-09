@@ -12,7 +12,6 @@ func TestBaseMetricsCollectorMaxRecordsDefault(t *testing.T) {
 
 	for i := 0; i < total; i++ {
 		collector.Record(context.Background(), MetricRecord{
-			Type:  MetricHTTPRequest,
 			Name:  "http_request",
 			Value: float64(i),
 		})
@@ -36,7 +35,6 @@ func TestBaseMetricsCollectorMaxRecordsDisabled(t *testing.T) {
 
 	for i := 0; i < total; i++ {
 		collector.Record(context.Background(), MetricRecord{
-			Type:  MetricHTTPRequest,
 			Name:  "http_request",
 			Value: float64(i),
 		})
@@ -53,7 +51,6 @@ func TestBaseMetricsCollectorRecordClonesLabels(t *testing.T) {
 	labels := MetricLabels{"route": "/users"}
 
 	collector.Record(context.Background(), MetricRecord{
-		Type:   MetricHTTPRequest,
 		Name:   "custom_http_metric",
 		Value:  1,
 		Labels: labels,
@@ -79,9 +76,6 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 	}
 
 	record := records[0]
-	if record.Type != MetricHTTPRequest {
-		t.Fatalf("expected type %q, got %q", MetricHTTPRequest, record.Type)
-	}
 	if record.Name != "http_request" {
 		t.Fatalf("expected name http_request, got %q", record.Name)
 	}
@@ -102,8 +96,8 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 	if stats.TotalRecords != 1 {
 		t.Fatalf("expected 1 total record, got %d", stats.TotalRecords)
 	}
-	if stats.TypeBreakdown[MetricHTTPRequest] != 1 {
-		t.Fatalf("expected HTTP type breakdown of 1, got %d", stats.TypeBreakdown[MetricHTTPRequest])
+	if stats.NameBreakdown[MetricHTTPRequest] != 1 {
+		t.Fatalf("expected HTTP name breakdown of 1, got %d", stats.NameBreakdown[MetricHTTPRequest])
 	}
 }
 

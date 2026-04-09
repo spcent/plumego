@@ -375,8 +375,8 @@ func (d *DevCollector) ObserveDB(ctx context.Context, operation, driver, query s
 // GetStats returns aggregate stats from the underlying base collector.
 func (d *DevCollector) GetStats() metrics.CollectorStats {
 	stats := d.base.GetStats()
-	if stats.ActiveSeries == 0 && len(stats.TypeBreakdown) > 0 {
-		stats.ActiveSeries = len(stats.TypeBreakdown)
+	if stats.ActiveSeries == 0 && len(stats.NameBreakdown) > 0 {
+		stats.ActiveSeries = len(stats.NameBreakdown)
 	}
 	return stats
 }

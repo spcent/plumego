@@ -32,11 +32,11 @@ func (m *MultiCollector) ObserveHTTP(ctx context.Context, method, path string, s
 // GetStats returns combined statistics from all collectors.
 func (m *MultiCollector) GetStats() CollectorStats {
 	if len(m.collectors) == 0 {
-		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+		return CollectorStats{NameBreakdown: make(map[string]int64)}
 	}
 
 	combined := CollectorStats{
-		TypeBreakdown: make(map[MetricType]int64),
+		NameBreakdown: make(map[string]int64),
 	}
 
 	for _, c := range m.collectors {
@@ -45,8 +45,8 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		combined.ErrorRecords += stats.ErrorRecords
 		combined.ActiveSeries += stats.ActiveSeries
 
-		for k, v := range stats.TypeBreakdown {
-			combined.TypeBreakdown[k] += v
+		for k, v := range stats.NameBreakdown {
+			combined.NameBreakdown[k] += v
 		}
 
 		if combined.StartTime.IsZero() || (!stats.StartTime.IsZero() && stats.StartTime.Before(combined.StartTime)) {
@@ -54,8 +54,8 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		}
 	}
 
-	if combined.ActiveSeries == 0 && len(combined.TypeBreakdown) > 0 {
-		combined.ActiveSeries = len(combined.TypeBreakdown)
+	if combined.ActiveSeries == 0 && len(combined.NameBreakdown) > 0 {
+		combined.ActiveSeries = len(combined.NameBreakdown)
 	}
 
 	return combined

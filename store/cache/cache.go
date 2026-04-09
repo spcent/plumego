@@ -3,7 +3,6 @@
 // This package implements an in-process cache primitive with features including:
 //   - TTL (time-to-live) expiration for entries
 //   - memory-bounded eviction
-//   - metrics collection
 //   - thread-safe operations
 //
 // Example usage:
@@ -107,9 +106,6 @@ type Config struct {
 	// CleanupInterval is the interval for cleaning up expired items.
 	CleanupInterval time.Duration
 
-	// EnableMetrics enables metrics collection.
-	EnableMetrics bool
-
 	// DefaultTTL is the default time-to-live for items without explicit TTL.
 	DefaultTTL time.Duration
 }
@@ -120,7 +116,6 @@ func DefaultConfig() Config {
 		MaxKeyLength:    DefaultMaxKeyLength,
 		MaxMemoryUsage:  DefaultMaxMemoryUsage,
 		CleanupInterval: DefaultCleanupInterval,
-		EnableMetrics:   true,
 		DefaultTTL:      10 * time.Minute,
 	}
 }
@@ -140,7 +135,9 @@ func (c Config) Validate() error {
 type MemoryCache struct {
 	store    sync.Map
 	config   Config
-	metrics  *MetricsTracker
+	stateMu  sync.RWMutex
+	size     int
+	memory   uint64
 	stopChan chan struct{}
 	wg       sync.WaitGroup
 }
@@ -149,53 +146,6 @@ type cacheItem struct {
 	value      []byte
 	expiration time.Time
 	key        string // Store key for cleanup
-}
-
-// MetricsTracker collects cache metrics.
-type MetricsTracker struct {
-	Hits          uint64
-	Misses        uint64
-	Sets          uint64
-	Deletes       uint64
-	Clears        uint64
-	Expired       uint64
-	CurrentSize   int
-	CurrentMemory uint64
-	mu            sync.RWMutex
-}
-
-// NewMetricsTracker creates a new cache metrics tracker.
-func NewMetricsTracker() *MetricsTracker {
-	return &MetricsTracker{}
-}
-
-// GetStats returns the current metrics snapshot.
-func (mc *MetricsTracker) GetStats() MetricsSnapshot {
-	mc.mu.RLock()
-	defer mc.mu.RUnlock()
-
-	return MetricsSnapshot{
-		Hits:          mc.Hits,
-		Misses:        mc.Misses,
-		Sets:          mc.Sets,
-		Deletes:       mc.Deletes,
-		Clears:        mc.Clears,
-		Expired:       mc.Expired,
-		CurrentSize:   mc.CurrentSize,
-		CurrentMemory: mc.CurrentMemory,
-	}
-}
-
-// MetricsSnapshot represents a snapshot of cache metrics.
-type MetricsSnapshot struct {
-	Hits          uint64 `json:"hits"`
-	Misses        uint64 `json:"misses"`
-	Sets          uint64 `json:"sets"`
-	Deletes       uint64 `json:"deletes"`
-	Clears        uint64 `json:"clears"`
-	Expired       uint64 `json:"expired"`
-	CurrentSize   int    `json:"current_size"`
-	CurrentMemory uint64 `json:"current_memory"`
 }
 
 // NewMemoryCache creates an empty MemoryCache instance.
@@ -214,7 +164,6 @@ func NewMemoryCacheWithConfig(config Config) *MemoryCache {
 
 	cache := &MemoryCache{
 		config:   config,
-		metrics:  NewMetricsTracker(),
 		stopChan: make(chan struct{}),
 	}
 
@@ -245,7 +194,7 @@ func (mc *MemoryCache) startCleanup() {
 	}()
 }
 
-// removeExpiredItem removes an expired item and updates metrics.
+// removeExpiredItem removes an expired item and updates internal state.
 // Returns true if the item was removed.
 func (mc *MemoryCache) removeExpiredItem(key any, item cacheItem) bool {
 	if !expired(item.expiration) {
@@ -253,13 +202,7 @@ func (mc *MemoryCache) removeExpiredItem(key any, item cacheItem) bool {
 	}
 
 	mc.store.Delete(key)
-	mc.updateMetrics(func(m *MetricsTracker) {
-		m.Expired++
-		m.CurrentSize--
-		if m.CurrentMemory >= uint64(len(item.value)) {
-			m.CurrentMemory -= uint64(len(item.value))
-		}
-	})
+	mc.adjustStoredValue(-1, -int64(len(item.value)))
 	return true
 }
 
@@ -306,14 +249,15 @@ func (mc *MemoryCache) validateKey(key string) error {
 }
 
 // checkMemoryLimit checks if adding the value would exceed memory limit.
-func (mc *MemoryCache) checkMemoryLimit(valueSize uint64) error {
+func (mc *MemoryCache) checkMemoryLimit(valueSize, existingSize uint64) error {
 	if mc.config.MaxMemoryUsage == 0 {
 		return nil
 	}
 
-	mc.metrics.mu.RLock()
-	currentMemory := mc.metrics.CurrentMemory
-	mc.metrics.mu.RUnlock()
+	currentMemory := mc.currentMemoryUsage()
+	if currentMemory >= existingSize {
+		currentMemory -= existingSize
+	}
 
 	if currentMemory+valueSize > mc.config.MaxMemoryUsage {
 		return fmt.Errorf("%w: memory limit exceeded (current: %d, adding: %d, limit: %d)",
@@ -321,17 +265,6 @@ func (mc *MemoryCache) checkMemoryLimit(valueSize uint64) error {
 	}
 
 	return nil
-}
-
-// updateMetrics updates metrics with a write lock.
-func (mc *MemoryCache) updateMetrics(fn func(*MetricsTracker)) {
-	if !mc.config.EnableMetrics {
-		return
-	}
-
-	mc.metrics.mu.Lock()
-	defer mc.metrics.mu.Unlock()
-	fn(mc.metrics)
 }
 
 // Get returns the cached value for the provided key if it exists and has not expired.
@@ -342,9 +275,6 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 
 	val, ok := mc.store.Load(key)
 	if !ok {
-		mc.updateMetrics(func(m *MetricsTracker) {
-			m.Misses++
-		})
 		return nil, ErrNotFound
 	}
 
@@ -352,10 +282,6 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 	if mc.removeExpiredItem(key, item) {
 		return nil, ErrNotFound
 	}
-
-	mc.updateMetrics(func(m *MetricsTracker) {
-		m.Hits++
-	})
 
 	return cloneBytes(item.value), nil
 }
@@ -366,8 +292,14 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl ti
 		return err
 	}
 
+	existingSize := uint64(0)
+	if existing, ok := mc.store.Load(key); ok {
+		existingItem := existing.(cacheItem)
+		existingSize = uint64(len(existingItem.value))
+	}
+
 	valueSize := uint64(len(value))
-	if err := mc.checkMemoryLimit(valueSize); err != nil {
+	if err := mc.checkMemoryLimit(valueSize, existingSize); err != nil {
 		return err
 	}
 
@@ -378,31 +310,17 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl ti
 		exp = time.Now().Add(mc.config.DefaultTTL)
 	}
 
-	// Check if key already exists and update memory usage
-	existingSize := uint64(0)
-	if existing, ok := mc.store.Load(key); ok {
-		existingItem := existing.(cacheItem)
-		existingSize = uint64(len(existingItem.value))
-	}
-
 	mc.store.Store(key, cacheItem{
 		value:      cloneBytes(value),
 		expiration: exp,
 		key:        key,
 	})
 
-	mc.updateMetrics(func(m *MetricsTracker) {
-		m.Sets++
-		// Only increment size if this is a new key
-		if existingSize == 0 {
-			m.CurrentSize++
-		}
-		// Update memory: subtract old size, add new size
-		if m.CurrentMemory >= existingSize {
-			m.CurrentMemory -= existingSize
-		}
-		m.CurrentMemory += valueSize
-	})
+	deltaSize := 0
+	if existingSize == 0 {
+		deltaSize = 1
+	}
+	mc.adjustStoredValue(deltaSize, int64(valueSize)-int64(existingSize))
 
 	return nil
 }
@@ -416,13 +334,7 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 	if existing, ok := mc.store.Load(key); ok {
 		item := existing.(cacheItem)
 		mc.store.Delete(key)
-		mc.updateMetrics(func(m *MetricsTracker) {
-			m.Deletes++
-			m.CurrentSize--
-			if m.CurrentMemory >= uint64(len(item.value)) {
-				m.CurrentMemory -= uint64(len(item.value))
-			}
-		})
+		mc.adjustStoredValue(-1, -int64(len(item.value)))
 	}
 
 	return nil
@@ -452,17 +364,8 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 	mc.store.Range(func(key, value any) bool {
 		item := value.(cacheItem)
 		mc.store.Delete(key)
-		mc.updateMetrics(func(m *MetricsTracker) {
-			m.CurrentSize--
-			if m.CurrentMemory >= uint64(len(item.value)) {
-				m.CurrentMemory -= uint64(len(item.value))
-			}
-		})
+		mc.adjustStoredValue(-1, -int64(len(item.value)))
 		return true
-	})
-
-	mc.updateMetrics(func(m *MetricsTracker) {
-		m.Clears++
 	})
 
 	return nil
@@ -535,16 +438,39 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 	return mc.Set(ctx, key, newData, 0)
 }
 
-// GetMetrics returns the current cache metrics.
-func (mc *MemoryCache) GetMetrics() MetricsSnapshot {
-	return mc.metrics.GetStats()
-}
-
 // Close stops the background cleanup goroutine.
 func (mc *MemoryCache) Close() error {
 	close(mc.stopChan)
 	mc.wg.Wait()
 	return nil
+}
+
+func (mc *MemoryCache) currentMemoryUsage() uint64 {
+	mc.stateMu.RLock()
+	defer mc.stateMu.RUnlock()
+	return mc.memory
+}
+
+func (mc *MemoryCache) adjustStoredValue(deltaSize int, deltaMemory int64) {
+	mc.stateMu.Lock()
+	defer mc.stateMu.Unlock()
+
+	mc.size += deltaSize
+	if mc.size < 0 {
+		mc.size = 0
+	}
+
+	if deltaMemory < 0 {
+		reduction := uint64(-deltaMemory)
+		if mc.memory >= reduction {
+			mc.memory -= reduction
+		} else {
+			mc.memory = 0
+		}
+		return
+	}
+
+	mc.memory += uint64(deltaMemory)
 }
 
 func expired(exp time.Time) bool {

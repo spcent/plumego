@@ -12,8 +12,8 @@ import (
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
-// Logging is the canonical access-log middleware constructor.
-func Logging(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) middleware.Middleware {
+// Middleware is the canonical access-log middleware constructor.
+func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) middleware.Middleware {
 	if logger == nil {
 		panic("access logger cannot be nil")
 	}

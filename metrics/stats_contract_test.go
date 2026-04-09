@@ -57,8 +57,8 @@ func TestCollectorStatsContract(t *testing.T) {
 				if !stats.StartTime.IsZero() {
 					t.Fatalf("noop collector start time should be zero, got %v", stats.StartTime)
 				}
-				if stats.TypeBreakdown == nil {
-					t.Fatalf("noop collector must return an initialized type breakdown map")
+				if stats.NameBreakdown == nil {
+					t.Fatalf("noop collector must return an initialized name breakdown map")
 				}
 				return
 			}
@@ -79,16 +79,16 @@ func TestCollectorStatsContract(t *testing.T) {
 				t.Fatalf("collector start time must be recent, got %v", stats.StartTime)
 			}
 
-			if stats.TypeBreakdown != nil {
+			if stats.NameBreakdown != nil {
 				var breakdownTotal int64
-				for _, value := range stats.TypeBreakdown {
+				for _, value := range stats.NameBreakdown {
 					breakdownTotal += value
 				}
 				if breakdownTotal == 0 {
-					t.Fatalf("type breakdown map is present but empty in total")
+					t.Fatalf("name breakdown map is present but empty in total")
 				}
-				if stats.ActiveSeries < len(stats.TypeBreakdown) {
-					t.Fatalf("active series should not be lower than breakdown series count, active=%d breakdown=%d", stats.ActiveSeries, len(stats.TypeBreakdown))
+				if stats.ActiveSeries < len(stats.NameBreakdown) {
+					t.Fatalf("active series should not be lower than breakdown series count, active=%d breakdown=%d", stats.ActiveSeries, len(stats.NameBreakdown))
 				}
 			}
 		})

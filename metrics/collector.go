@@ -7,12 +7,9 @@ import (
 	"time"
 )
 
-// MetricType represents the type of metric being recorded
-type MetricType string
-
 const (
 	// HTTP metrics
-	MetricHTTPRequest MetricType = "http_request"
+	MetricHTTPRequest = "http_request"
 )
 
 // MetricLabels represents key-value labels for metrics
@@ -26,9 +23,7 @@ const (
 
 // MetricRecord represents a single metric record
 type MetricRecord struct {
-	// Type is optional. Stable metrics owns only the shared HTTP type; owner-
-	// specific or extension-specific taxonomy should be set by the owning package.
-	Type MetricType
+	// Name is the canonical metric identity across stable and extension-owned records.
 	Name string
 	// Value uses seconds as the canonical unit for duration/latency metrics.
 	// Non-duration metrics (for example counters or queue depth) may use domain-specific units.
@@ -92,13 +87,13 @@ type Resetter interface {
 //   - StartTime: collector start/reset time (zero only when intentionally unknown).
 //
 // Optional fields:
-//   - TypeBreakdown: per-metric-type counters when the collector can provide them.
+//   - NameBreakdown: per-metric-name counters when the collector can provide them.
 type CollectorStats struct {
-	TotalRecords  int64                `json:"total_records"`
-	ErrorRecords  int64                `json:"error_records"`
-	ActiveSeries  int                  `json:"active_series"`
-	StartTime     time.Time            `json:"start_time"`
-	TypeBreakdown map[MetricType]int64 `json:"type_breakdown"`
+	TotalRecords  int64            `json:"total_records"`
+	ErrorRecords  int64            `json:"error_records"`
+	ActiveSeries  int              `json:"active_series"`
+	StartTime     time.Time        `json:"start_time"`
+	NameBreakdown map[string]int64 `json:"name_breakdown"`
 }
 
 // BaseMetricsCollector provides a base implementation for metrics collectors
@@ -117,7 +112,7 @@ func NewBaseMetricsCollector() *BaseMetricsCollector {
 		records: make([]MetricRecord, 0, 1000),
 		stats: CollectorStats{
 			StartTime:     time.Now(),
-			TypeBreakdown: make(map[MetricType]int64),
+			NameBreakdown: make(map[string]int64),
 		},
 		maxRecords: defaultMaxRecords,
 	}
@@ -161,8 +156,8 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 
 	b.records = append(b.records, record)
 	b.stats.TotalRecords++
-	if record.Type != "" {
-		b.stats.TypeBreakdown[record.Type]++
+	if record.Name != "" {
+		b.stats.NameBreakdown[record.Name]++
 	}
 
 	if record.Error != nil {
@@ -173,7 +168,6 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 // ObserveHTTP implements HTTP metrics recording
 func (b *BaseMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 	record := MetricRecord{
-		Type:  MetricHTTPRequest,
 		Name:  "http_request",
 		Value: durationValueSeconds(duration),
 		Labels: MetricLabels{
@@ -192,11 +186,11 @@ func (b *BaseMetricsCollector) GetStats() CollectorStats {
 	defer b.mu.RUnlock()
 
 	stats := b.stats
-	if stats.ActiveSeries == 0 && len(stats.TypeBreakdown) > 0 {
-		stats.ActiveSeries = len(stats.TypeBreakdown)
+	if stats.ActiveSeries == 0 && len(stats.NameBreakdown) > 0 {
+		stats.ActiveSeries = len(stats.NameBreakdown)
 	}
-	if stats.TypeBreakdown != nil {
-		stats.TypeBreakdown = cloneBreakdown(stats.TypeBreakdown)
+	if stats.NameBreakdown != nil {
+		stats.NameBreakdown = cloneBreakdown(stats.NameBreakdown)
 	}
 	return stats
 }
@@ -210,7 +204,7 @@ func (b *BaseMetricsCollector) Clear() {
 	b.records = b.records[:0]
 	b.stats = CollectorStats{
 		StartTime:     time.Now(),
-		TypeBreakdown: make(map[MetricType]int64),
+		NameBreakdown: make(map[string]int64),
 	}
 }
 
@@ -230,8 +224,8 @@ func (b *BaseMetricsCollector) recordsSnapshot() []MetricRecord {
 }
 
 func (b *BaseMetricsCollector) ensureInitializedLocked() {
-	if b.stats.TypeBreakdown == nil {
-		b.stats.TypeBreakdown = make(map[MetricType]int64)
+	if b.stats.NameBreakdown == nil {
+		b.stats.NameBreakdown = make(map[string]int64)
 	}
 	if b.stats.StartTime.IsZero() {
 		b.stats.StartTime = time.Now()
@@ -252,11 +246,11 @@ func cloneLabels(labels MetricLabels) MetricLabels {
 	return result
 }
 
-func cloneBreakdown(breakdown map[MetricType]int64) map[MetricType]int64 {
+func cloneBreakdown(breakdown map[string]int64) map[string]int64 {
 	if breakdown == nil {
 		return nil
 	}
-	result := make(map[MetricType]int64, len(breakdown))
+	result := make(map[string]int64, len(breakdown))
 	for key, value := range breakdown {
 		result[key] = value
 	}

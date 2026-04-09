@@ -27,7 +27,7 @@ func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
-	a.Use(accesslog.Logging(a.Logger(), nil, nil))
+	a.Use(accesslog.Middleware(a.Logger(), nil, nil))
 
 	proxy := gateway.NewGateway(gateway.GatewayConfig{
 		Targets: []string{cfg.GatewayBackend},

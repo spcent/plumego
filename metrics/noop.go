@@ -63,7 +63,7 @@ func (n *NoopCollector) GetStats() CollectorStats {
 		ErrorRecords:  0,
 		ActiveSeries:  0,
 		StartTime:     time.Time{},
-		TypeBreakdown: make(map[MetricType]int64),
+		NameBreakdown: make(map[string]int64),
 	}
 }
 

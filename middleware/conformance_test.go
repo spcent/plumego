@@ -11,7 +11,7 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
-	"github.com/spcent/plumego/middleware/limits"
+	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/security/authn"
@@ -37,7 +37,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		{
 			name:         "body too large",
 			expectedCode: middleware.CodeRequestBodyTooLarge,
-			handler: limits.BodyLimit(4, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: bodylimit.BodyLimit(4, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = io.ReadAll(r.Body)
 			})),
 			request: httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolarge")),

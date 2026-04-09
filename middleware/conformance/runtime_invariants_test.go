@@ -11,8 +11,8 @@ import (
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/auth"
+	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/httpmetrics"
-	"github.com/spcent/plumego/middleware/limits"
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
@@ -54,7 +54,7 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "access log",
-			mw:   accesslog.Logging(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}), nil, nil),
+			mw:   accesslog.Middleware(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}), nil, nil),
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
@@ -166,7 +166,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		{
 			name:         "body too large",
 			expectedCode: middleware.CodeRequestBodyTooLarge,
-			handler: limits.BodyLimit(4, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: bodylimit.BodyLimit(4, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = io.ReadAll(r.Body)
 			})),
 			request: httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolarge")),

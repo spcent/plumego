@@ -77,7 +77,6 @@ func (c *Collector) ObserveHTTP(ctx context.Context, method, path string, status
 		return
 	}
 	c.Record(ctx, metrics.MetricRecord{
-		Type:  metrics.MetricHTTPRequest,
 		Name:  "http_request",
 		Value: duration.Seconds(),
 		Labels: metrics.MetricLabels{

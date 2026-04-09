@@ -15,7 +15,6 @@ func TestNoopCollectorRecord(t *testing.T) {
 
 	// Should not panic
 	collector.Record(context.Background(), MetricRecord{
-		Type:  MetricHTTPRequest,
 		Name:  "test",
 		Value: 100,
 	})

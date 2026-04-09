@@ -22,7 +22,7 @@ func (s *stubAggregateCollector) GetStats() CollectorStats {
 	if s.onGetStats != nil {
 		return s.onGetStats()
 	}
-	return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+	return CollectorStats{NameBreakdown: make(map[string]int64)}
 }
 
 func TestMultiCollector(t *testing.T) {
@@ -85,13 +85,11 @@ func TestMultiCollectorGetStats(t *testing.T) {
 }
 
 func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
-	customOwnerType := MetricType("owner_metric")
-
 	collector1 := newStubAggregateCollector(func() CollectorStats {
 		return CollectorStats{
 			TotalRecords:  10,
 			ErrorRecords:  1,
-			TypeBreakdown: map[MetricType]int64{MetricHTTPRequest: 10},
+			NameBreakdown: map[string]int64{MetricHTTPRequest: 10},
 			StartTime:     time.Unix(100, 0),
 		}
 	})
@@ -100,7 +98,7 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 		return CollectorStats{
 			TotalRecords:  5,
 			ErrorRecords:  2,
-			TypeBreakdown: map[MetricType]int64{MetricHTTPRequest: 3, customOwnerType: 2},
+			NameBreakdown: map[string]int64{MetricHTTPRequest: 3, "owner_metric": 2},
 			StartTime:     time.Unix(200, 0),
 		}
 	})
@@ -117,12 +115,12 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 	if stats.ErrorRecords != 3 {
 		t.Fatalf("expected ErrorRecords 3, got %d", stats.ErrorRecords)
 	}
-	// TypeBreakdown should be merged
-	if stats.TypeBreakdown[MetricHTTPRequest] != 13 {
-		t.Fatalf("expected MetricHTTPRequest 13, got %d", stats.TypeBreakdown[MetricHTTPRequest])
+	// NameBreakdown should be merged
+	if stats.NameBreakdown[MetricHTTPRequest] != 13 {
+		t.Fatalf("expected MetricHTTPRequest 13, got %d", stats.NameBreakdown[MetricHTTPRequest])
 	}
-	if stats.TypeBreakdown[customOwnerType] != 2 {
-		t.Fatalf("expected custom owner metric 2, got %d", stats.TypeBreakdown[customOwnerType])
+	if stats.NameBreakdown["owner_metric"] != 2 {
+		t.Fatalf("expected custom owner metric 2, got %d", stats.NameBreakdown["owner_metric"])
 	}
 	// StartTime should be the earliest
 	if !stats.StartTime.Equal(time.Unix(100, 0)) {
@@ -136,11 +134,11 @@ func TestMultiCollectorGetStatsCallsEachCollectorOnce(t *testing.T) {
 
 	collectorA := newStubAggregateCollector(func() CollectorStats {
 		callsA++
-		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+		return CollectorStats{NameBreakdown: make(map[string]int64)}
 	})
 	collectorB := newStubAggregateCollector(func() CollectorStats {
 		callsB++
-		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+		return CollectorStats{NameBreakdown: make(map[string]int64)}
 	})
 
 	multi := NewMultiCollector(collectorA, collectorB)

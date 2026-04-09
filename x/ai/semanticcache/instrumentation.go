@@ -43,14 +43,12 @@ func (c *InstrumentedSemanticCache) Get(ctx context.Context, req *provider.Compl
 			tags["similarity"] = formatSimilarity(similarity)
 
 			c.collector.Record(ctx, metrics.MetricRecord{
-				Type:     "semantic_cache",
 				Name:     "semantic_cache_hits",
 				Value:    1,
 				Labels:   tags,
 				Duration: duration,
 			})
 			c.collector.Record(ctx, metrics.MetricRecord{
-				Type:     "semantic_cache",
 				Name:     "semantic_cache_similarity",
 				Value:    similarity,
 				Labels:   tags,
@@ -60,7 +58,6 @@ func (c *InstrumentedSemanticCache) Get(ctx context.Context, req *provider.Compl
 			// Cache miss
 			tags["result"] = "miss"
 			c.collector.Record(ctx, metrics.MetricRecord{
-				Type:     "semantic_cache",
 				Name:     "semantic_cache_misses",
 				Value:    1,
 				Labels:   tags,
@@ -69,7 +66,6 @@ func (c *InstrumentedSemanticCache) Get(ctx context.Context, req *provider.Compl
 		}
 
 		c.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "semantic_cache",
 			Name:     "semantic_cache_get_duration",
 			Value:    float64(duration.Milliseconds()),
 			Labels:   tags,
@@ -98,7 +94,6 @@ func (c *InstrumentedSemanticCache) Set(ctx context.Context, req *provider.Compl
 		if err != nil {
 			tags["result"] = "error"
 			c.collector.Record(ctx, metrics.MetricRecord{
-				Type:     "semantic_cache",
 				Name:     "semantic_cache_set_errors",
 				Value:    1,
 				Labels:   tags,
@@ -108,7 +103,6 @@ func (c *InstrumentedSemanticCache) Set(ctx context.Context, req *provider.Compl
 		} else {
 			tags["result"] = "success"
 			c.collector.Record(ctx, metrics.MetricRecord{
-				Type:     "semantic_cache",
 				Name:     "semantic_cache_stores",
 				Value:    1,
 				Labels:   tags,
@@ -117,7 +111,6 @@ func (c *InstrumentedSemanticCache) Set(ctx context.Context, req *provider.Compl
 		}
 
 		c.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "semantic_cache",
 			Name:     "semantic_cache_set_duration",
 			Value:    float64(duration.Milliseconds()),
 			Labels:   tags,
@@ -173,7 +166,6 @@ func (s *InstrumentedVectorStore) Add(ctx context.Context, entry *VectorEntry) e
 		}
 
 		s.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "vector_store",
 			Name:     "vector_store_add_duration",
 			Value:    float64(duration.Milliseconds()),
 			Labels:   tags,
@@ -181,7 +173,6 @@ func (s *InstrumentedVectorStore) Add(ctx context.Context, entry *VectorEntry) e
 			Error:    err,
 		})
 		s.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "vector_store",
 			Name:     "vector_store_size",
 			Value:    float64(s.store.Size()),
 			Labels:   tags,
@@ -213,7 +204,6 @@ func (s *InstrumentedVectorStore) Search(ctx context.Context, query *Embedding, 
 		}
 
 		s.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "vector_store",
 			Name:     "vector_store_search_duration",
 			Value:    float64(duration.Milliseconds()),
 			Labels:   tags,
@@ -221,7 +211,6 @@ func (s *InstrumentedVectorStore) Search(ctx context.Context, query *Embedding, 
 			Error:    err,
 		})
 		s.collector.Record(ctx, metrics.MetricRecord{
-			Type:     "vector_store",
 			Name:     "vector_store_results_count",
 			Value:    float64(len(results)),
 			Labels:   tags,
@@ -231,7 +220,6 @@ func (s *InstrumentedVectorStore) Search(ctx context.Context, query *Embedding, 
 		// Record best similarity if results found
 		if len(results) > 0 {
 			s.collector.Record(ctx, metrics.MetricRecord{
-				Type:     "vector_store",
 				Name:     "vector_store_best_similarity",
 				Value:    results[0].Similarity,
 				Labels:   tags,

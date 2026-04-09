@@ -65,9 +65,6 @@ func TestDBRecord(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			record := DBRecord(tt.operation, tt.driver, tt.query, tt.rows, tt.duration, tt.err)
-			if record.Type != "" {
-				t.Fatalf("expected empty type, got %q", record.Type)
-			}
 			if record.Name != tt.wantName {
 				t.Fatalf("expected name %q, got %q", tt.wantName, record.Name)
 			}

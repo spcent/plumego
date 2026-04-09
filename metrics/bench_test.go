@@ -26,7 +26,6 @@ func BenchmarkBaseCollectorRecord(b *testing.B) {
 	collector := NewBaseMetricsCollector()
 	ctx := context.Background()
 	record := MetricRecord{
-		Type:  MetricHTTPRequest,
 		Name:  "test",
 		Value: 100,
 		Labels: MetricLabels{

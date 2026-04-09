@@ -80,9 +80,9 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 		requestid.Middleware(),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Logging(app.Logger(), nil, nil),
+		accesslog.Middleware(app.Logger(), nil, nil),
 		recovery.Recovery(app.Logger()),
-		cors.CORS,
+		cors.Middleware(cors.CORSOptions{}),
 	); err != nil {
 		return nil, fmt.Errorf("register dashboard middleware: %w", err)
 	}
@@ -136,7 +136,7 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 // registerRoutes sets up HTTP routes.
 func (d *Dashboard) registerRoutes(uiPath string) error {
 	// WebSocket endpoint for real-time events
-	if err := d.app.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
+	if err := d.app.Get("/ws", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Use ServeWSWithAuth to handle WebSocket upgrade
 		websocket.ServeWSWithAuth(
 			w, r,
@@ -146,7 +146,7 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 			5*time.Second,
 			websocket.SendBlock, // Block on send
 		)
-	}); err != nil {
+	})); err != nil {
 		return fmt.Errorf("register /ws: %w", err)
 	}
 

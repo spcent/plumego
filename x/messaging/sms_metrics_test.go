@@ -31,7 +31,7 @@ func TestReporterRecords(t *testing.T) {
 
 	found := false
 	for _, rec := range records {
-		if rec.Type == SMSGatewayMetricType && rec.Name == MetricSendLatency {
+		if rec.Name == MetricSendLatency {
 			found = true
 			if rec.Labels[LabelProvider] != "provider-a" {
 				t.Fatalf("unexpected provider label: %v", rec.Labels)
@@ -78,7 +78,6 @@ func TestSMSPrometheusExporterWritesMetrics(t *testing.T) {
 func TestSMSPrometheusExporterUsesValueWhenDurationMissing(t *testing.T) {
 	collector := recordbuffer.NewCollector()
 	collector.Record(context.Background(), metrics.MetricRecord{
-		Type:  SMSGatewayMetricType,
 		Name:  MetricSendLatency,
 		Value: 0.125,
 		Labels: metrics.MetricLabels{
