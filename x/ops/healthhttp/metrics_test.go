@@ -10,7 +10,7 @@ import (
 )
 
 func TestMetricsHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestMetricsHandler(t *testing.T) {
 }
 
 func TestHealthReportHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}

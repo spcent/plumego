@@ -1,4 +1,4 @@
-package health
+package healthhttp
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/health"
 )
 
 type flakyChecker struct {
@@ -18,7 +20,7 @@ func (fc *flakyChecker) Name() string {
 	return fc.name
 }
 
-func (fc *flakyChecker) Check(ctx context.Context) error {
+func (fc *flakyChecker) Check(context.Context) error {
 	atomic.AddInt32(&fc.attempts, 1)
 	if atomic.LoadInt32(&fc.attempts) <= fc.failCount {
 		return errors.New("flaky failure")
@@ -47,12 +49,33 @@ func (dc *delayChecker) Check(ctx context.Context) error {
 	}
 }
 
-func TestCheckComponentRetry(t *testing.T) {
-	config := HealthCheckConfig{
+func TestManagerReadiness(t *testing.T) {
+	manager, err := NewManager(Config{})
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	if status := manager.Readiness(); status.Ready {
+		t.Fatalf("expected initial not-ready status, got ready")
+	}
+
+	manager.MarkReady()
+	if ready := manager.Readiness(); !ready.Ready || ready.Reason != "" {
+		t.Fatalf("expected ready without reason, got %+v", ready)
+	}
+
+	manager.MarkNotReady("maintenance")
+	notReady := manager.Readiness()
+	if notReady.Ready || notReady.Reason != "maintenance" {
+		t.Fatalf("unexpected readiness after MarkNotReady: %+v", notReady)
+	}
+}
+
+func TestManagerCheckComponentRetry(t *testing.T) {
+	manager, err := NewManager(Config{
 		RetryCount: 2,
 		RetryDelay: 0,
-	}
-	manager, err := NewHealthManager(config)
+	})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -70,21 +93,20 @@ func TestCheckComponentRetry(t *testing.T) {
 		t.Fatalf("expected 2 attempts, got %d", attempts)
 	}
 
-	health, ok := manager.GetComponentHealth("flaky")
+	component, ok := manager.GetComponentHealth("flaky")
 	if !ok {
 		t.Fatalf("expected component health")
 	}
-	attemptsVal, ok := health.Details["check_attempts"].(int)
+	attemptsVal, ok := component.Details["check_attempts"].(int)
 	if !ok || attemptsVal != 2 {
-		t.Fatalf("expected check_attempts to be 2, got %v", health.Details["check_attempts"])
+		t.Fatalf("expected check_attempts to be 2, got %v", component.Details["check_attempts"])
 	}
 }
 
-func TestCheckComponentTimeout(t *testing.T) {
-	config := HealthCheckConfig{
+func TestManagerCheckComponentTimeout(t *testing.T) {
+	manager, err := NewManager(Config{
 		Timeout: 30 * time.Millisecond,
-	}
-	manager, err := NewHealthManager(config)
+	})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -102,14 +124,14 @@ func TestCheckComponentTimeout(t *testing.T) {
 		t.Fatalf("expected deadline error, got %v", err)
 	}
 
-	health, ok := manager.GetComponentHealth("slow")
+	component, ok := manager.GetComponentHealth("slow")
 	if !ok {
 		t.Fatalf("expected component health")
 	}
-	if health.Status != StatusUnhealthy {
-		t.Fatalf("expected unhealthy status, got %v", health.Status)
+	if component.Status != health.StatusUnhealthy {
+		t.Fatalf("expected unhealthy status, got %v", component.Status)
 	}
-	if attemptsVal, ok := health.Details["check_attempts"].(int); !ok || attemptsVal != 1 {
-		t.Fatalf("expected check_attempts to be 1, got %v", health.Details["check_attempts"])
+	if attemptsVal, ok := component.Details["check_attempts"].(int); !ok || attemptsVal != 1 {
+		t.Fatalf("expected check_attempts to be 1, got %v", component.Details["check_attempts"])
 	}
 }

@@ -106,17 +106,17 @@ type HealthReport struct {
 	Components   []string               `json:"components"`
 }
 
-// Tracker augments a stable health manager with ops-facing history and metrics.
+// Tracker augments an ops health manager with history and metrics.
 type Tracker struct {
-	manager health.HealthManager
+	manager Manager
 
 	mu      sync.RWMutex
 	metrics *HealthMetrics
 	history []HealthHistoryEntry
 }
 
-// NewTracker creates an ops tracker around a stable health manager.
-func NewTracker(manager health.HealthManager) *Tracker {
+// NewTracker creates an ops tracker around a healthhttp manager.
+func NewTracker(manager Manager) *Tracker {
 	return &Tracker{
 		manager: manager,
 		metrics: &HealthMetrics{
@@ -157,7 +157,7 @@ func (t *Tracker) MarkNotReady(reason string) {
 }
 
 // SetConfig forwards configuration updates to the wrapped manager.
-func (t *Tracker) SetConfig(config health.HealthCheckConfig) error {
+func (t *Tracker) SetConfig(config Config) error {
 	if t.manager == nil {
 		return errors.New("health manager is nil")
 	}
@@ -165,9 +165,9 @@ func (t *Tracker) SetConfig(config health.HealthCheckConfig) error {
 }
 
 // GetConfig reads the wrapped manager configuration.
-func (t *Tracker) GetConfig() health.HealthCheckConfig {
+func (t *Tracker) GetConfig() Config {
 	if t.manager == nil {
-		return health.HealthCheckConfig{}
+		return Config{}
 	}
 	return t.manager.GetConfig()
 }

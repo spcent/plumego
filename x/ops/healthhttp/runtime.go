@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/health"
 )
 
 // RuntimeInfoHandler exposes runtime diagnostics only.
@@ -18,7 +17,7 @@ func RuntimeInfoHandler() http.Handler {
 
 // DebugHealthHandler returns comprehensive system diagnostics.
 // It should only be mounted in development or internal environments.
-func DebugHealthHandler(manager health.HealthManager, debug bool) http.Handler {
+func DebugHealthHandler(manager Manager, debug bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !debug {
 			http.NotFound(w, r)

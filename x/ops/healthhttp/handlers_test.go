@@ -44,7 +44,7 @@ func (e mockError) Error() string {
 }
 
 func TestSummaryHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestSummaryHandler(t *testing.T) {
 }
 
 func TestDetailedHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestDetailedHandler(t *testing.T) {
 }
 
 func TestComponentHealthHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestComponentHealthHandler(t *testing.T) {
 }
 
 func TestAllComponentsHealthHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestAllComponentsHealthHandler(t *testing.T) {
 }
 
 func TestHealthHistoryHandler(t *testing.T) {
-	coreManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	coreManager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestLiveHandler(t *testing.T) {
 }
 
 func TestComponentsListHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestComponentsListHandler(t *testing.T) {
 }
 
 func TestReadinessHandlerWithManager(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestReadinessHandlerWithManager(t *testing.T) {
 }
 
 func TestReadinessHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -267,7 +267,7 @@ func TestReadinessHandler(t *testing.T) {
 }
 
 func TestHealthHandlerIncludesRuntime(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -303,7 +303,7 @@ func TestHealthHandlerIncludesRuntime(t *testing.T) {
 }
 
 func TestDebugHealthHandler(t *testing.T) {
-	manager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}

@@ -1,7 +1,7 @@
 # Card 0863: Health Manager Execution Policy Pruning
 
 Priority: P1
-State: active
+State: done
 Primary Module: health
 
 ## Goal
@@ -77,3 +77,12 @@ Then run the required repo-wide gates before committing.
 - Existing health HTTP capability is preserved under `x/ops/healthhttp`.
 - Removed exported health symbols have zero residual references.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Stable `health` now keeps only status/readiness primitives and component health result contracts.
+- Moved manager configuration, retry/timeout/concurrency policy, component registration, aggregation, and mutable manager behavior into `x/ops/healthhttp`.
+- Preserved health HTTP capability through `x/ops/healthhttp.Config`, `x/ops/healthhttp.Manager`, and `x/ops/healthhttp.NewManager`.
+- Removed stable `HealthManager`, `HealthCheckConfig`, `NewHealthManager`, and stable manager tests after migrating all callers.
+- Updated health and x/ops docs plus module manifests to document the ownership split.
+- Validation passed: focused health/x/ops test, race, and vet gates; dependency rules, agent workflow, module manifests, reference layout; repo-wide `go test`, `go vet`, and `go test -race`.

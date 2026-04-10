@@ -4,28 +4,30 @@ layer: stable
 status: ga
 owner: runtime
 risk: medium
-summary: Health state, readiness helpers, and an in-process manager surface, not an HTTP or ops analytics package.
+summary: Health state, readiness helpers, and component health models, not an HTTP or ops analytics package.
 
 strict_boundary: health_models
 
 responsibilities:
   - Health status types
   - Readiness helpers
-  - Health manager abstractions
-  - In-process component registration and check orchestration
+  - Component checker and component health models
 
 non_goals:
   - Feature orchestration
+  - Health manager abstractions or check orchestration
   - HTTP endpoint ownership
   - Transport-specific behavior
   - Build metadata exposure
   - Health history export or retention
   - Metrics, trend, or report generation
-  - App-specific health check implementations (belong in reference apps or x/*)
 
 public_entrypoints:
   - HealthStatus
-  - HealthManager
+  - HealthState
+  - ComponentChecker
+  - ComponentHealth
+  - ReadinessStatus
 
 allowed_imports:
   - stdlib
@@ -52,11 +54,12 @@ change_risks:
 
 review_checklist:
   - Keep types simple and explicit
+  - Keep manager and retry policy outside this module
   - Keep health HTTP handlers outside this module
   - Keep ops reporting and analytics outside this module
   - Avoid feature-specific coupling
 
 agent_hints:
   - Health is a support package, not an app feature catalog
-  - Keep transport concerns and health HTTP surfaces in reference or extension packages, not here
+  - Health manager execution and health HTTP surfaces belong in x/ops/healthhttp or reference apps
   - Keep build info, history export, and metrics/reporting in owning extensions such as x/ops/healthhttp
