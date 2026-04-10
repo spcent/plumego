@@ -1,7 +1,7 @@
 # Card 0923: Router Static Policy Convergence
 
 Priority: P1
-State: active
+State: done
 Primary Module: router
 
 ## Goal
@@ -72,3 +72,10 @@ Then run the required repo-wide gates before committing.
 - Static path traversal and null-byte protections remain covered.
 - Docs/manifests explain the boundary between `router` and `x/frontend`.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Removed `router.StaticConfig` and `Router.StaticWithConfig`; no in-repo callers remained.
+- Kept stable `router.Static` and `router.StaticFS` as explicit static mount primitives.
+- Removed router-owned cache header policy, ETag generation, SPA fallback, index-file policy, and allowed-extension filtering.
+- Documented that frontend asset policy belongs to `x/frontend`.

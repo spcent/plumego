@@ -1,45 +1,15 @@
 package router
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spcent/plumego/contract"
 )
-
-// StaticConfig holds configuration for static file serving
-type StaticConfig struct {
-	// Prefix is the URL prefix for serving static files
-	Prefix string
-
-	// Root is the directory path or filesystem to serve from
-	Root any // Can be string (directory) or http.FileSystem
-
-	// CacheControl sets the Cache-Control header value
-	// Example: "public, max-age=31536000" for 1 year
-	CacheControl string
-
-	// EnableETag enables ETag header generation for cache validation
-	EnableETag bool
-
-	// IndexFile is the default file to serve for directory requests
-	// Default: "index.html"
-	IndexFile string
-
-	// SPAFallback enables SPA mode where missing files fall back to IndexFile
-	SPAFallback bool
-
-	// AllowedExtensions limits which file extensions can be served
-	// If empty, all extensions are allowed
-	AllowedExtensions []string
-}
 
 // normalizeStaticPrefix ensures the prefix always starts with "/"
 func normalizeStaticPrefix(prefix string) string {
@@ -110,36 +80,9 @@ func handleStaticFileError(w http.ResponseWriter, req *http.Request, err error) 
 //	err := r.Static("/static", "./public")
 //	GET /static/js/app.js → ./public/js/app.js
 func (r *Router) Static(prefix, dir string) error {
-	config := StaticConfig{
-		Prefix:    normalizeStaticPrefix(prefix),
-		Root:      dir,
-		IndexFile: "index.html",
-	}
-
-	return r.registerStaticRoute(config, serveFromDirectory)
-}
-
-// StaticWithConfig registers a route that serves files with custom configuration.
-//
-// Example:
-//
-//	r.StaticWithConfig(router.StaticConfig{
-//	    Prefix:       "/static",
-//	    Root:         "./public",
-//	    CacheControl: "public, max-age=86400",
-//	    EnableETag:   true,
-//	})
-func (r *Router) StaticWithConfig(config StaticConfig) error {
-	config.Prefix = normalizeStaticPrefix(config.Prefix)
-	if config.IndexFile == "" {
-		config.IndexFile = "index.html"
-	}
-
-	if _, ok := config.Root.(http.FileSystem); ok {
-		return r.registerStaticRouteWithConfig(config, serveFromFileSystemWithConfig)
-	} else {
-		return r.registerStaticRouteWithConfig(config, serveFromDirectoryWithConfig)
-	}
+	return r.registerStaticRoute(normalizeStaticPrefix(prefix), http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		serveFromDirectory(w, req, dir)
+	}))
 }
 
 // StaticFS registers a route that serves files from a custom http.FileSystem.
@@ -154,26 +97,17 @@ func (r *Router) StaticWithConfig(config StaticConfig) error {
 //	err := r.StaticFS("/assets", http.FS(public))
 //	GET /assets/index.html → served from embedded FS
 func (r *Router) StaticFS(prefix string, fs http.FileSystem) error {
-	config := StaticConfig{
-		Prefix:    normalizeStaticPrefix(prefix),
-		Root:      fs,
-		IndexFile: "index.html",
-	}
-
-	return r.registerStaticRoute(config, serveFromFileSystem)
+	return r.registerStaticRoute(normalizeStaticPrefix(prefix), http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		serveFromFileSystem(w, req, fs)
+	}))
 }
 
 // serveFromDirectory serves files from a local directory
-func serveFromDirectory(w http.ResponseWriter, req *http.Request, root any) bool {
-	dir, ok := root.(string)
-	if !ok {
-		return false
-	}
-
+func serveFromDirectory(w http.ResponseWriter, req *http.Request, dir string) {
 	cleanPath, ok := getFilePathFromRequest(req)
 	if !ok {
 		http.NotFound(w, req)
-		return true
+		return
 	}
 
 	// Construct the full path inside the given directory
@@ -182,52 +116,39 @@ func serveFromDirectory(w http.ResponseWriter, req *http.Request, root any) bool
 	// Security: verify the resolved path is within the root directory (prevents symlink escape)
 	if !isPathWithinRoot(dir, fullPath) {
 		http.NotFound(w, req)
-		return true
+		return
 	}
 
 	// Check if the file exists
 	if handleStaticFileError(w, req, checkFileExists(fullPath)) {
-		return true
+		return
 	}
 
 	// Serve the file
 	http.ServeFile(w, req, fullPath)
-	return true
 }
 
 // serveFromFileSystem serves files from a custom http.FileSystem
-func serveFromFileSystem(w http.ResponseWriter, req *http.Request, root any) bool {
-	fs, ok := root.(http.FileSystem)
-	if !ok {
-		return false
-	}
-
+func serveFromFileSystem(w http.ResponseWriter, req *http.Request, fs http.FileSystem) {
 	cleanPath, ok := getFilePathFromRequest(req)
 	if !ok {
 		http.NotFound(w, req)
-		return true
+		return
 	}
 
 	// Open the file
 	f, err := fs.Open(cleanPath)
 	if handleStaticFileError(w, req, err) {
-		return true
+		return
 	}
 	defer f.Close()
 
 	info, err := f.Stat()
 	if handleStaticFileError(w, req, err) {
-		return true
+		return
 	}
 
-	// Serve the file content directly instead of re-opening via FileServer
-	if seeker, ok := f.(io.ReadSeeker); ok {
-		http.ServeContent(w, req, info.Name(), info.ModTime(), seeker)
-	} else {
-		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
-		io.Copy(w, f)
-	}
-	return true
+	serveFileContent(w, req, f, info)
 }
 
 // checkFileExists checks if a file exists and returns an error if it doesn't
@@ -266,54 +187,10 @@ func isPathWithinRoot(rootDir, resolvedPath string) bool {
 	return strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) || realPath == realRoot
 }
 
-// registerStaticRoute is a generic function that registers static file routes
-func (r *Router) registerStaticRoute(config StaticConfig, handler func(http.ResponseWriter, *http.Request, any) bool) error {
-	routePath := config.Prefix + "/*filepath"
-
-	return r.AddRoute(http.MethodGet, routePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		handler(w, req, config.Root)
-	}))
-}
-
-// registerStaticRouteWithConfig registers static file routes with full configuration
-func (r *Router) registerStaticRouteWithConfig(config StaticConfig, handler func(http.ResponseWriter, *http.Request, StaticConfig) bool) error {
-	routePath := config.Prefix + "/*filepath"
-
-	return r.AddRoute(http.MethodGet, routePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		handler(w, req, config)
-	}))
-}
-
-// isExtensionAllowed checks if a file path's extension is in the allowed list.
-// Returns true if the extension is allowed or if the allowed list is empty.
-func isExtensionAllowed(path string, allowedExtensions []string) bool {
-	if len(allowedExtensions) == 0 {
-		return true
-	}
-	ext := strings.ToLower(filepath.Ext(path))
-	for _, allowed := range allowedExtensions {
-		if ext == strings.ToLower(allowed) {
-			return true
-		}
-	}
-	return false
-}
-
-// setCacheHeaders sets Cache-Control and ETag headers on the response.
-// Returns true if a 304 Not Modified was sent (caller should return).
-func setCacheHeaders(w http.ResponseWriter, req *http.Request, info os.FileInfo, config StaticConfig) bool {
-	if config.CacheControl != "" {
-		w.Header().Set("Cache-Control", config.CacheControl)
-	}
-	if config.EnableETag {
-		etag := generateETag(info)
-		w.Header().Set("ETag", etag)
-		if match := req.Header.Get("If-None-Match"); match == etag {
-			w.WriteHeader(http.StatusNotModified)
-			return true
-		}
-	}
-	return false
+// registerStaticRoute registers a GET route for static file primitives.
+func (r *Router) registerStaticRoute(prefix string, handler http.Handler) error {
+	routePath := prefix + "/*filepath"
+	return r.AddRoute(http.MethodGet, routePath, handler)
 }
 
 // serveFileContent serves file content with seeking support, using ServeContent
@@ -325,174 +202,4 @@ func serveFileContent(w http.ResponseWriter, req *http.Request, f http.File, inf
 		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
 		io.Copy(w, f)
 	}
-}
-
-// serveFromDirectoryWithConfig serves files from a local directory with configuration
-func serveFromDirectoryWithConfig(w http.ResponseWriter, req *http.Request, config StaticConfig) bool {
-	dir, ok := config.Root.(string)
-	if !ok {
-		return false
-	}
-
-	cleanPath, ok := getFilePathFromRequest(req)
-	if !ok {
-		if config.SPAFallback {
-			serveStaticFile(w, req, filepath.Join(dir, config.IndexFile), config)
-			return true
-		}
-		http.NotFound(w, req)
-		return true
-	}
-
-	if !isExtensionAllowed(cleanPath, config.AllowedExtensions) {
-		http.NotFound(w, req)
-		return true
-	}
-
-	fullPath := filepath.Join(dir, cleanPath)
-
-	// Security: verify the resolved path is within the root directory (prevents symlink escape)
-	if !isPathWithinRoot(dir, fullPath) {
-		http.NotFound(w, req)
-		return true
-	}
-
-	// Check if file exists
-	info, err := os.Stat(fullPath)
-	if err != nil {
-		if config.SPAFallback {
-			serveStaticFile(w, req, filepath.Join(dir, config.IndexFile), config)
-			return true
-		}
-		http.NotFound(w, req)
-		return true
-	}
-
-	// If it's a directory, try to serve index file
-	if info.IsDir() {
-		indexPath := filepath.Join(fullPath, config.IndexFile)
-		if _, err := os.Stat(indexPath); err == nil {
-			fullPath = indexPath
-		} else if config.SPAFallback {
-			serveStaticFile(w, req, filepath.Join(dir, config.IndexFile), config)
-			return true
-		} else {
-			http.NotFound(w, req)
-			return true
-		}
-	}
-
-	serveStaticFile(w, req, fullPath, config)
-	return true
-}
-
-// serveStaticFile serves a single static file with cache headers
-func serveStaticFile(w http.ResponseWriter, req *http.Request, path string, config StaticConfig) {
-	f, err := os.Open(path)
-	if err != nil {
-		http.NotFound(w, req)
-		return
-	}
-	defer f.Close()
-
-	info, err := f.Stat()
-	if err != nil {
-		http.NotFound(w, req)
-		return
-	}
-
-	if setCacheHeaders(w, req, info, config) {
-		return
-	}
-
-	http.ServeContent(w, req, info.Name(), info.ModTime(), f)
-}
-
-// serveFromFileSystemWithConfig serves files from http.FileSystem with configuration
-func serveFromFileSystemWithConfig(w http.ResponseWriter, req *http.Request, config StaticConfig) bool {
-	fs, ok := config.Root.(http.FileSystem)
-	if !ok {
-		return false
-	}
-
-	cleanPath, ok := getFilePathFromRequest(req)
-	if !ok {
-		if config.SPAFallback {
-			serveFromFS(w, req, fs, config.IndexFile, config)
-			return true
-		}
-		http.NotFound(w, req)
-		return true
-	}
-
-	if !isExtensionAllowed(cleanPath, config.AllowedExtensions) {
-		http.NotFound(w, req)
-		return true
-	}
-
-	// Try to open the file
-	f, err := fs.Open(cleanPath)
-	if err != nil {
-		if config.SPAFallback {
-			serveFromFS(w, req, fs, config.IndexFile, config)
-			return true
-		}
-		http.NotFound(w, req)
-		return true
-	}
-	defer f.Close()
-
-	info, err := f.Stat()
-	if err != nil {
-		http.NotFound(w, req)
-		return true
-	}
-
-	// If it's a directory, try index file
-	if info.IsDir() {
-		indexPath := cleanPath + "/" + config.IndexFile
-		if indexF, err := fs.Open(indexPath); err == nil {
-			indexF.Close()
-			serveFromFS(w, req, fs, indexPath, config)
-			return true
-		} else if config.SPAFallback {
-			serveFromFS(w, req, fs, config.IndexFile, config)
-			return true
-		}
-		http.NotFound(w, req)
-		return true
-	}
-
-	serveFromFS(w, req, fs, cleanPath, config)
-	return true
-}
-
-// serveFromFS serves a file from http.FileSystem with cache headers
-func serveFromFS(w http.ResponseWriter, req *http.Request, fs http.FileSystem, path string, config StaticConfig) {
-	f, err := fs.Open(path)
-	if err != nil {
-		http.NotFound(w, req)
-		return
-	}
-	defer f.Close()
-
-	info, err := f.Stat()
-	if err != nil {
-		http.NotFound(w, req)
-		return
-	}
-
-	if setCacheHeaders(w, req, info, config) {
-		return
-	}
-
-	serveFileContent(w, req, f, info)
-}
-
-// generateETag generates an ETag based on file info
-func generateETag(info os.FileInfo) string {
-	// Use file size and modification time for ETag
-	data := info.Name() + strconv.FormatInt(info.Size(), 10) + info.ModTime().Format(time.RFC3339Nano)
-	hash := md5.Sum([]byte(data))
-	return `"` + hex.EncodeToString(hash[:]) + `"`
 }

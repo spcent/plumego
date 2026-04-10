@@ -158,6 +158,7 @@ tasks:
       - router
 
   frontend_asset_serving:
+    intent: Static asset policy, embedded frontend mounting, SPA fallback, cache/header policy, precompressed assets, and frontend MIME overrides.
     start_with:
       - x/frontend/module.yaml
       - docs/modules/x-frontend/README.md

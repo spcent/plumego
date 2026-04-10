@@ -13,16 +13,16 @@ responsibilities:
   - Path parameters
   - Route groups
   - Reverse routing
-  - Static mount primitives
+  - Small static mount primitives
 
 non_goals:
   - JSON responses
-  - Authentication
-  - Business validation
+  - Authentication or business validation
   - Service construction
   - Logger carriage or logger lookup
   - stdlib-shadow handler aliases
   - Tenant routing or feature-flag route factories
+  - Frontend asset policy, cache headers, SPA fallback, or ETag generation
 
 public_entrypoints:
   - NewRouter
@@ -33,6 +33,7 @@ public_entrypoints:
   - WithRouteName
   - WithMethodNotAllowed
   - Static
+  - StaticFS
 
 allowed_imports:
   - contract

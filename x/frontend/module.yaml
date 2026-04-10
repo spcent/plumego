@@ -10,11 +10,14 @@ responsibilities:
   - Static asset mounting
   - Embedded asset serving
   - Frontend fallback helpers
+  - Frontend asset cache and header policy
+  - Precompressed asset serving policy
 
 non_goals:
   - Core bootstrap ownership
   - Stable root entrypoints
   - Business-specific UI flows
+  - Router matching primitives
 
 allowed_imports:
   - contract
