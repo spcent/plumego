@@ -6,12 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/spcent/plumego/contract"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	"github.com/spcent/plumego/x/tenant/resolve"
 )
 
-func ExampleMiddleware_principalFirst() {
+func ExampleMiddleware_headerExtraction() {
 	var source string
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -20,7 +19,6 @@ func ExampleMiddleware_principalFirst() {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("X-Tenant-ID", "header-tenant")
-	req = contract.RequestWithPrincipal(req, &contract.Principal{TenantID: "principal-tenant"})
 
 	rec := httptest.NewRecorder()
 	mw := resolve.Middleware(resolve.Options{
@@ -38,8 +36,8 @@ func ExampleMiddleware_principalFirst() {
 
 	// Output:
 	// 200
-	// principal-tenant
-	// principal
+	// header-tenant
+	// header
 }
 
 func ExampleMiddleware_customExtractor() {
@@ -53,8 +51,7 @@ func ExampleMiddleware_customExtractor() {
 	rec := httptest.NewRecorder()
 
 	mw := resolve.Middleware(resolve.Options{
-		DisablePrincipal: true,
-		Extractor:        tenantcore.FromQuery("tenant"),
+		Extractor: tenantcore.FromQuery("tenant"),
 		Hooks: tenantcore.Hooks{
 			OnResolve: func(_ context.Context, info tenantcore.ResolveInfo) {
 				source = info.Source

@@ -10,8 +10,10 @@ import (
 // SlidingWindowQuotaManager implements quota enforcement with a sliding window algorithm.
 // This is more accurate than fixed windows and prevents burst traffic at window boundaries.
 //
-// SlidingWindowQuotaManager only enforces the per-minute window (the QuotaWindowMinute
-// entry from Limits). For hour/day/month enforcement use WindowQuotaManager instead.
+// SlidingWindowQuotaManager only enforces the per-minute window (QuotaWindowMinute).
+// If the tenant configuration contains limits for any other window type
+// (QuotaWindowHour, QuotaWindowDay, QuotaWindowMonth), Allow returns
+// ErrUnsupportedQuotaWindow. Use WindowQuotaManager for hour/day/month enforcement.
 type SlidingWindowQuotaManager struct {
 	provider QuotaConfigProvider
 	windows  sync.Map // map[string]*slidingWindow
@@ -27,7 +29,7 @@ type slidingWindow struct {
 // tokenUsage tracks token consumption with timestamp.
 type tokenUsage struct {
 	time   time.Time
-	tokens int
+	tokens int64
 }
 
 // NewSlidingWindowQuotaManager creates a new sliding window quota manager.
@@ -44,6 +46,8 @@ func (m *SlidingWindowQuotaManager) DeleteTenant(tenantID string) {
 }
 
 // Allow checks if the request is within quota using sliding window algorithm.
+// It returns ErrUnsupportedQuotaWindow if the tenant config includes any window
+// other than QuotaWindowMinute; use WindowQuotaManager for those cases.
 func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, req QuotaRequest) (QuotaResult, error) {
 	if m == nil || m.provider == nil {
 		return QuotaResult{Allowed: true}, nil
@@ -51,6 +55,13 @@ func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, 
 	cfg, err := m.provider.QuotaConfig(ctx, tenantID)
 	if err != nil {
 		return QuotaResult{Allowed: false}, err
+	}
+
+	// Reject configurations that include unsupported window types.
+	for _, l := range cfg.Limits {
+		if isValidQuotaWindow(l.Window) && l.Window != QuotaWindowMinute {
+			return QuotaResult{Allowed: false}, ErrUnsupportedQuotaWindow
+		}
 	}
 
 	reqLimit, tokLimit := slidingWindowEffectiveLimits(cfg)
@@ -64,29 +75,23 @@ func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, 
 	})
 	window := windowInterface.(*slidingWindow)
 
-	now := req.Now
-	if now.IsZero() {
-		now = time.Now()
-	}
-	if req.Requests <= 0 {
-		req.Requests = 1
-	}
+	normalizeQuotaRequest(&req)
 
 	window.mu.Lock()
 	defer window.mu.Unlock()
 
-	cutoff := now.Add(-time.Minute)
+	cutoff := req.Now.Add(-time.Minute)
 	window.cleanup(cutoff)
 
-	currentRequests := len(window.requestTimes)
-	currentTokens := 0
+	currentRequests := int64(len(window.requestTimes))
+	var currentTokens int64
 	for _, u := range window.tokenUsage {
 		currentTokens += u.tokens
 	}
 
 	if reqLimit > 0 && currentRequests+req.Requests > reqLimit {
-		needed := currentRequests + req.Requests - reqLimit
-		retryAfter := window.calculateRequestRetryAfter(now, needed)
+		needed := int(currentRequests + req.Requests - reqLimit)
+		retryAfter := window.calculateRequestRetryAfter(req.Now, needed)
 		return QuotaResult{
 			Allowed:           false,
 			RemainingRequests: remaining(reqLimit, currentRequests),
@@ -96,8 +101,8 @@ func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, 
 	}
 
 	if tokLimit > 0 && currentTokens+req.Tokens > tokLimit {
-		needed := currentTokens + req.Tokens - tokLimit
-		retryAfter := window.calculateTokenRetryAfter(now, needed)
+		needed := int(currentTokens + req.Tokens - tokLimit)
+		retryAfter := window.calculateTokenRetryAfter(req.Now, needed)
 		return QuotaResult{
 			Allowed:           false,
 			RemainingRequests: remaining(reqLimit, currentRequests),
@@ -106,12 +111,12 @@ func (m *SlidingWindowQuotaManager) Allow(ctx context.Context, tenantID string, 
 		}, ErrQuotaExceeded
 	}
 
-	for i := 0; i < req.Requests; i++ {
-		window.requestTimes = append(window.requestTimes, now)
+	for i := int64(0); i < req.Requests; i++ {
+		window.requestTimes = append(window.requestTimes, req.Now)
 	}
 	if req.Tokens > 0 {
 		window.tokenUsage = append(window.tokenUsage, tokenUsage{
-			time:   now,
+			time:   req.Now,
 			tokens: req.Tokens,
 		})
 	}
@@ -171,7 +176,7 @@ func (w *slidingWindow) calculateTokenRetryAfter(now time.Time, needed int) time
 	accumulated := 0
 	var expireEntry time.Time
 	for _, u := range w.tokenUsage {
-		accumulated += u.tokens
+		accumulated += int(u.tokens)
 		expireEntry = u.time
 		if accumulated >= needed {
 			break
@@ -189,7 +194,7 @@ func (w *slidingWindow) calculateTokenRetryAfter(now time.Time, needed int) time
 // slidingWindowEffectiveLimits returns the per-minute request and token limits for
 // the sliding window manager. Only the QuotaWindowMinute entry from Limits is used;
 // all other windows require WindowQuotaManager.
-func slidingWindowEffectiveLimits(cfg QuotaConfig) (reqLimit, tokLimit int) {
+func slidingWindowEffectiveLimits(cfg QuotaConfig) (reqLimit, tokLimit int64) {
 	for _, l := range cfg.Limits {
 		if l.Window == QuotaWindowMinute {
 			return l.Requests, l.Tokens

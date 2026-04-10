@@ -39,10 +39,10 @@ type PolicyDecision struct {
 type QuotaDecision struct {
 	TenantID          string
 	Allowed           bool
-	Tokens            int
-	Requests          int
-	RemainingTokens   int
-	RemainingRequests int
+	Tokens            int64
+	Requests          int64
+	RemainingTokens   int64
+	RemainingRequests int64
 	RetryAfter        time.Duration
 	Status            int
 	// Err is non-nil when the decision was caused by a backend error rather than

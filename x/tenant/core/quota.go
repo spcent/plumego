@@ -2,12 +2,9 @@ package tenant
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 )
-
-var ErrQuotaExceeded = errors.New("quota exceeded")
 
 // QuotaConfig defines per-tenant quota limits.
 // Zero values mean unlimited.
@@ -25,16 +22,16 @@ type QuotaConfig struct {
 
 // QuotaRequest is the input to quota checks.
 type QuotaRequest struct {
-	Requests int
-	Tokens   int
+	Requests int64
+	Tokens   int64
 	Now      time.Time
 }
 
 // QuotaResult describes a quota decision.
 type QuotaResult struct {
 	Allowed           bool
-	RemainingRequests int
-	RemainingTokens   int
+	RemainingRequests int64
+	RemainingTokens   int64
 	RetryAfter        time.Duration
 }
 
@@ -46,8 +43,8 @@ type QuotaManager interface {
 type quotaCounter struct {
 	windowStart time.Time
 	windowEnd   time.Time
-	requests    int
-	tokens      int
+	requests    int64
+	tokens      int64
 }
 
 // evictionInterval controls how often FixedWindowQuotaManager scans for stale counters.
@@ -84,12 +81,7 @@ func (m *FixedWindowQuotaManager) Allow(ctx context.Context, tenantID string, re
 		return QuotaResult{Allowed: false}, err
 	}
 
-	if req.Now.IsZero() {
-		req.Now = time.Now().UTC()
-	}
-	if req.Requests <= 0 {
-		req.Requests = 1
-	}
+	normalizeQuotaRequest(&req)
 
 	// Resolve effective limits: Limits array takes precedence.
 	limits := normalizeQuotaLimits(cfg)
@@ -165,7 +157,7 @@ func (m *FixedWindowQuotaManager) evictStaleLocked(now time.Time) {
 	m.lastEviction = now
 }
 
-func remaining(limit, used int) int {
+func remaining(limit, used int64) int64 {
 	if limit <= 0 {
 		return -1
 	}

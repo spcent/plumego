@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-var ErrRateLimitExceeded = errors.New("rate limit exceeded")
-
 // RateLimitConfig defines per-tenant rate limiting configuration.
 // Zero values mean unlimited.
 type RateLimitConfig struct {
@@ -17,6 +15,15 @@ type RateLimitConfig struct {
 	// Burst controls the maximum burst capacity.
 	// If zero, defaults to RequestsPerSecond.
 	Burst int64
+}
+
+// effectiveBurst returns the burst capacity to use for token bucket enforcement.
+// If Burst is set, it is used as-is. Otherwise it falls back to RequestsPerSecond.
+func (c RateLimitConfig) effectiveBurst() int64 {
+	if c.Burst > 0 {
+		return c.Burst
+	}
+	return c.RequestsPerSecond
 }
 
 // RateLimitRequest is the input to rate limit checks.
@@ -46,21 +53,21 @@ type RateLimiter interface {
 	Allow(ctx context.Context, tenantID string, req RateLimitRequest) (RateLimitResult, error)
 }
 
-// InMemoryRateLimitProvider stores per-tenant rate limit configs in memory.
-type InMemoryRateLimitProvider struct {
+// InMemoryRateLimitManager stores per-tenant rate limit configs in memory.
+type InMemoryRateLimitManager struct {
 	mu      sync.RWMutex
 	configs map[string]RateLimitConfig
 }
 
-// NewInMemoryRateLimitProvider creates an in-memory rate limit config provider.
-func NewInMemoryRateLimitProvider() *InMemoryRateLimitProvider {
-	return &InMemoryRateLimitProvider{
+// NewInMemoryRateLimitManager creates an in-memory rate limit config manager.
+func NewInMemoryRateLimitManager() *InMemoryRateLimitManager {
+	return &InMemoryRateLimitManager{
 		configs: make(map[string]RateLimitConfig),
 	}
 }
 
 // SetRateLimit sets rate limit config for a tenant.
-func (p *InMemoryRateLimitProvider) SetRateLimit(tenantID string, cfg RateLimitConfig) {
+func (p *InMemoryRateLimitManager) SetRateLimit(tenantID string, cfg RateLimitConfig) {
 	if p == nil {
 		return
 	}
@@ -73,7 +80,7 @@ func (p *InMemoryRateLimitProvider) SetRateLimit(tenantID string, cfg RateLimitC
 // When the tenant has no explicit configuration, ErrTenantNotFound is returned.
 // TokenBucketRateLimiter treats ErrTenantNotFound as "unlimited" so callers
 // do not need to pre-populate every tenant to avoid being rate-limited.
-func (p *InMemoryRateLimitProvider) RateLimitConfig(ctx context.Context, tenantID string) (RateLimitConfig, error) {
+func (p *InMemoryRateLimitManager) RateLimitConfig(ctx context.Context, tenantID string) (RateLimitConfig, error) {
 	if p == nil {
 		return RateLimitConfig{}, ErrTenantNotFound
 	}
@@ -128,9 +135,8 @@ func (l *TokenBucketRateLimiter) Allow(ctx context.Context, tenantID string, req
 	if cfg.RequestsPerSecond <= 0 {
 		return RateLimitResult{Allowed: true}, nil
 	}
-	if cfg.Burst <= 0 {
-		cfg.Burst = cfg.RequestsPerSecond
-	}
+
+	effectiveBurst := cfg.effectiveBurst()
 
 	if req.Tokens <= 0 {
 		req.Tokens = 1
@@ -145,11 +151,11 @@ func (l *TokenBucketRateLimiter) Allow(ctx context.Context, tenantID string, req
 
 	if bucket.last.IsZero() {
 		bucket.last = req.Now
-		bucket.tokens = float64(cfg.Burst)
+		bucket.tokens = float64(effectiveBurst)
 	}
 
-	if bucket.capacity != cfg.Burst || bucket.refillRate != cfg.RequestsPerSecond {
-		bucket.capacity = cfg.Burst
+	if bucket.capacity != effectiveBurst || bucket.refillRate != cfg.RequestsPerSecond {
+		bucket.capacity = effectiveBurst
 		bucket.refillRate = cfg.RequestsPerSecond
 		if bucket.tokens > float64(bucket.capacity) {
 			bucket.tokens = float64(bucket.capacity)
@@ -187,7 +193,7 @@ func (l *TokenBucketRateLimiter) Allow(ctx context.Context, tenantID string, req
 		Remaining:  int64(bucket.tokens),
 		RetryAfter: retryAfter,
 		Limit:      cfg.RequestsPerSecond,
-		Burst:      cfg.Burst,
+		Burst:      effectiveBurst,
 	}
 
 	if !allowed {

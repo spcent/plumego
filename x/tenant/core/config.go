@@ -25,12 +25,9 @@ package tenant
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 )
-
-var ErrTenantNotFound = errors.New("tenant not found")
 
 // Config defines tenant-level policies, quotas, and rate limits.
 type Config struct {
@@ -40,11 +37,6 @@ type Config struct {
 	RateLimit RateLimitConfig
 	Metadata  map[string]string
 	UpdatedAt time.Time
-}
-
-// ConfigManager loads tenant configuration snapshots.
-type ConfigManager interface {
-	GetTenantConfig(ctx context.Context, tenantID string) (Config, error)
 }
 
 // QuotaConfigProvider loads quota configuration for a tenant.
@@ -57,57 +49,15 @@ type PolicyConfigProvider interface {
 	PolicyConfig(ctx context.Context, tenantID string) (PolicyConfig, error)
 }
 
-// QuotaConfigProviderFromConfig wraps a ConfigManager as a QuotaConfigProvider.
-type QuotaConfigProviderFromConfig struct {
-	Manager ConfigManager
-}
-
-// QuotaConfig implements QuotaConfigProvider by reading from the unified Config.
-func (p *QuotaConfigProviderFromConfig) QuotaConfig(ctx context.Context, tenantID string) (QuotaConfig, error) {
-	if p == nil || p.Manager == nil {
-		return QuotaConfig{}, ErrTenantNotFound
-	}
-	cfg, err := p.Manager.GetTenantConfig(ctx, tenantID)
-	if err != nil {
-		return QuotaConfig{}, err
-	}
-	return cfg.Quota, nil
-}
-
-// PolicyConfigProviderFromConfig wraps a ConfigManager as a PolicyConfigProvider.
-type PolicyConfigProviderFromConfig struct {
-	Manager ConfigManager
-}
-
-// PolicyConfig implements PolicyConfigProvider by reading from the unified Config.
-func (p *PolicyConfigProviderFromConfig) PolicyConfig(ctx context.Context, tenantID string) (PolicyConfig, error) {
-	if p == nil || p.Manager == nil {
-		return PolicyConfig{}, ErrTenantNotFound
-	}
-	cfg, err := p.Manager.GetTenantConfig(ctx, tenantID)
-	if err != nil {
-		return PolicyConfig{}, err
-	}
-	return cfg.Policy, nil
-}
-
-// RateLimitConfigProviderFromConfig wraps a ConfigManager as a RateLimitConfigProvider.
-// This allows InMemoryConfigManager (and DBTenantConfigManager) to serve as the
-// provider for TokenBucketRateLimiter without a separate InMemoryRateLimitProvider.
-type RateLimitConfigProviderFromConfig struct {
-	Manager ConfigManager
-}
-
-// RateLimitConfig implements RateLimitConfigProvider by reading from the unified Config.
-func (p *RateLimitConfigProviderFromConfig) RateLimitConfig(ctx context.Context, tenantID string) (RateLimitConfig, error) {
-	if p == nil || p.Manager == nil {
-		return RateLimitConfig{}, ErrTenantNotFound
-	}
-	cfg, err := p.Manager.GetTenantConfig(ctx, tenantID)
-	if err != nil {
-		return RateLimitConfig{}, err
-	}
-	return cfg.RateLimit, nil
+// ConfigManager loads tenant configuration snapshots.
+// It also satisfies QuotaConfigProvider, PolicyConfigProvider, and
+// RateLimitConfigProvider so a single implementation can be passed
+// directly to quota, policy, and rate limit subsystems.
+type ConfigManager interface {
+	QuotaConfigProvider
+	PolicyConfigProvider
+	RateLimitConfigProvider
+	GetTenantConfig(ctx context.Context, tenantID string) (Config, error)
 }
 
 // InMemoryConfigManager stores tenant configs in memory.

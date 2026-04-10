@@ -97,3 +97,33 @@ func (a *App) Patch(path string, handler http.Handler) error {
 func (a *App) Any(path string, handler http.Handler) error {
 	return a.addRoute(router.ANY, path, handler)
 }
+
+// GetWithName registers a named GET route with the given handler.
+func (a *App) GetWithName(path, name string, handler http.Handler) error {
+	return a.registerRoute(router.GET, path, name, handler)
+}
+
+// PostWithName registers a named POST route with the given handler.
+func (a *App) PostWithName(path, name string, handler http.Handler) error {
+	return a.registerRoute(router.POST, path, name, handler)
+}
+
+// PutWithName registers a named PUT route with the given handler.
+func (a *App) PutWithName(path, name string, handler http.Handler) error {
+	return a.registerRoute(router.PUT, path, name, handler)
+}
+
+// DeleteWithName registers a named DELETE route with the given handler.
+func (a *App) DeleteWithName(path, name string, handler http.Handler) error {
+	return a.registerRoute(router.DELETE, path, name, handler)
+}
+
+// PatchWithName registers a named PATCH route with the given handler.
+func (a *App) PatchWithName(path, name string, handler http.Handler) error {
+	return a.registerRoute(router.PATCH, path, name, handler)
+}
+
+// AnyWithName registers a named route for any HTTP method with the given handler.
+func (a *App) AnyWithName(path, name string, handler http.Handler) error {
+	return a.registerRoute(router.ANY, path, name, handler)
+}

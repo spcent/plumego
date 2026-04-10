@@ -10,11 +10,18 @@ import (
 	"unicode/utf8"
 )
 
-type validationErrors struct {
+// ValidationErrors is the error type returned by ValidateStruct when one or more
+// field-level validation rules fail. Callers can inspect it with errors.As:
+//
+//	var verr contract.ValidationErrors
+//	if errors.As(err, &verr) {
+//	    for _, fe := range verr.Errors() { ... }
+//	}
+type ValidationErrors struct {
 	errors []FieldError
 }
 
-func (ve validationErrors) Error() string {
+func (ve ValidationErrors) Error() string {
 	if len(ve.errors) == 0 {
 		return ""
 	}
@@ -26,7 +33,7 @@ func (ve validationErrors) Error() string {
 	return strings.Join(parts, "; ")
 }
 
-func (ve validationErrors) Errors() []FieldError {
+func (ve ValidationErrors) Errors() []FieldError {
 	return append([]FieldError(nil), ve.errors...)
 }
 
@@ -45,7 +52,7 @@ func validateStructAtDepth(dst any, prefix string, depth int) error {
 		if fieldName == "" {
 			fieldName = "(root)"
 		}
-		return validationErrors{errors: []FieldError{{
+		return ValidationErrors{errors: []FieldError{{
 			Field:   fieldName,
 			Code:    "max_depth_exceeded",
 			Message: "struct nesting exceeds maximum validation depth (10); deeper fields were not validated",
@@ -88,7 +95,14 @@ func validateStructAtDepth(dst any, prefix string, depth int) error {
 					continue
 				}
 
-				if issue := applyValidationRule(fieldName, fieldValue, rule); issue != nil {
+				issue, tagErr := applyValidationRule(fieldName, fieldValue, rule)
+				if tagErr != nil {
+					// Programmer error: unknown or mis-configured rule.
+					// Propagate directly so callers can distinguish it from
+					// data validation failures.
+					return tagErr
+				}
+				if issue != nil {
 					issues = append(issues, *issue)
 				}
 			}
@@ -102,21 +116,21 @@ func validateStructAtDepth(dst any, prefix string, depth int) error {
 	if len(issues) == 0 {
 		return nil
 	}
-	return validationErrors{errors: issues}
+	return ValidationErrors{errors: issues}
 }
 
-func validateNestedStructField(value reflect.Value, fieldName string, depth int) validationErrors {
+func validateNestedStructField(value reflect.Value, fieldName string, depth int) ValidationErrors {
 	if !value.IsValid() {
-		return validationErrors{}
+		return ValidationErrors{}
 	}
 
 	switch value.Kind() {
 	case reflect.Ptr:
 		if value.IsNil() || value.Elem().Kind() != reflect.Struct {
-			return validationErrors{}
+			return ValidationErrors{}
 		}
 		if err := validateStructAtDepth(value.Interface(), fieldName, depth); err != nil {
-			var issues validationErrors
+			var issues ValidationErrors
 			if errors.As(err, &issues) {
 				return issues
 			}
@@ -124,7 +138,7 @@ func validateNestedStructField(value reflect.Value, fieldName string, depth int)
 	case reflect.Struct:
 		if value.CanAddr() {
 			if err := validateStructAtDepth(value.Addr().Interface(), fieldName, depth); err != nil {
-				var issues validationErrors
+				var issues ValidationErrors
 				if errors.As(err, &issues) {
 					return issues
 				}
@@ -132,10 +146,14 @@ func validateNestedStructField(value reflect.Value, fieldName string, depth int)
 		}
 	}
 
-	return validationErrors{}
+	return ValidationErrors{}
 }
 
-func applyValidationRule(fieldName string, value reflect.Value, rule string) *FieldError {
+// applyValidationRule applies a single validation rule to a field value.
+// It returns a *FieldError for data validation failures, nil when the value
+// passes, or a non-nil error (not *FieldError) when the rule name is unknown —
+// signalling a programmer configuration mistake, not a user input problem.
+func applyValidationRule(fieldName string, value reflect.Value, rule string) (*FieldError, error) {
 	name := rule
 	arg := ""
 	if idx := strings.Index(rule, "="); idx >= 0 {
@@ -145,23 +163,23 @@ func applyValidationRule(fieldName string, value reflect.Value, rule string) *Fi
 
 	switch name {
 	case "required":
-		return validateRequired(fieldName, value)
+		return validateRequired(fieldName, value), nil
 	case "email":
-		return validateEmail(fieldName, value)
+		return validateEmail(fieldName, value), nil
 	case "min":
 		limit, err := strconv.ParseInt(arg, 10, 64)
 		if err != nil {
-			return &FieldError{Field: fieldName, Code: "min", Message: "invalid min validator configuration"}
+			return &FieldError{Field: fieldName, Code: "min", Message: "invalid min validator configuration"}, nil
 		}
-		return validateMin(fieldName, value, limit)
+		return validateMin(fieldName, value, limit), nil
 	case "max":
 		limit, err := strconv.ParseInt(arg, 10, 64)
 		if err != nil {
-			return &FieldError{Field: fieldName, Code: "max", Message: "invalid max validator configuration"}
+			return &FieldError{Field: fieldName, Code: "max", Message: "invalid max validator configuration"}, nil
 		}
-		return validateMax(fieldName, value, limit)
+		return validateMax(fieldName, value, limit), nil
 	default:
-		return &FieldError{Field: fieldName, Code: "unknown_rule", Message: fmt.Sprintf("unknown validation rule: %q", name)}
+		return nil, fmt.Errorf("unknown validation rule %q on field %s", name, fieldName)
 	}
 }
 

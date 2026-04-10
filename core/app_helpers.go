@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
@@ -67,23 +66,4 @@ func (a *App) ensureMiddlewareChain() *middleware.Chain {
 	chain := a.middlewareChain
 	a.mu.RUnlock()
 	return chain
-}
-
-func (a *App) logError(message string, err error, fields log.Fields) {
-	if err == nil {
-		return
-	}
-	a.mu.RLock()
-	logger := a.logger
-	a.mu.RUnlock()
-	if logger == nil {
-		return
-	}
-	if fields == nil {
-		fields = log.Fields{}
-	}
-	if _, ok := fields["error"]; !ok {
-		fields["error"] = err
-	}
-	logger.Error(message, fields)
 }

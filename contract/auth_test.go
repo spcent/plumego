@@ -8,10 +8,9 @@ import (
 
 func TestWithPrincipal_RoundTrip(t *testing.T) {
 	p := &Principal{
-		Subject:  "user-1",
-		TenantID: "tenant-a",
-		Roles:    []string{"admin"},
-		Scopes:   []string{"read", "write"},
+		Subject: "user-1",
+		Roles:   []string{"admin"},
+		Scopes:  []string{"read", "write"},
 	}
 
 	ctx := WithPrincipal(context.Background(), p)
@@ -21,9 +20,6 @@ func TestWithPrincipal_RoundTrip(t *testing.T) {
 	}
 	if got.Subject != "user-1" {
 		t.Errorf("Subject = %q, want user-1", got.Subject)
-	}
-	if got.TenantID != "tenant-a" {
-		t.Errorf("TenantID = %q, want tenant-a", got.TenantID)
 	}
 }
 

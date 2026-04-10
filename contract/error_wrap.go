@@ -102,19 +102,6 @@ func WrapError(err error, operation, module string, params map[string]any) error
 	return newWrappedError(err, operation, module, params)
 }
 
-// WrapErrorf creates a message-only wrapper with no operation or module context.
-// Use WrapError when structured context is required for logging or diagnostics.
-func WrapErrorf(err error, format string, args ...any) error {
-	if err == nil {
-		return nil
-	}
-	return &WrappedErrorWithContext{
-		Err:     err,
-		Message: fmt.Sprintf(format, args...),
-		When:    time.Now(),
-	}
-}
-
 // IsRetryable reports whether err represents a transient condition that a caller
 // may safely retry. It unwraps WrappedErrorWithContext chains and delegates to
 // IsAPIErrorRetryable for APIError values.

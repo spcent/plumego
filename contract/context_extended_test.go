@@ -246,7 +246,7 @@ func TestBindJSONBodyTooLarge(t *testing.T) {
 	}
 
 	var dst struct{}
-	err := ctx.BindJSON(&dst)
+	err := ctx.BindJSON(&dst, nil)
 
 	if err == nil {
 		t.Error("expected error for body too large")
@@ -575,7 +575,7 @@ func TestBindJSONAliasRemoval(t *testing.T) {
 		Name string `json:"name"`
 		Age  int    `json:"age"`
 	}
-	if err := ctx.BindJSON(&payload); err != nil {
+	if err := ctx.BindJSON(&payload, nil); err != nil {
 		t.Fatalf("expected successful bind, got %v", err)
 	}
 	if payload.Name != "demo" || payload.Age != 30 {
@@ -587,7 +587,7 @@ func TestBindJSONError(t *testing.T) {
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("")), nil)
 
 	var payload struct{ Name string }
-	err := ctx.BindJSON(&payload)
+	err := ctx.BindJSON(&payload, nil)
 	if err == nil {
 		t.Fatal("expected error for empty body")
 	}

@@ -32,11 +32,11 @@ func Middleware(options Options) mw.Middleware {
 			}
 
 			tenantID := tenantcore.TenantIDFromContext(r.Context())
-			tokens := 0
+			var tokens int64
 			if options.Estimator != nil {
-				tokens = options.Estimator(r)
+				tokens = int64(options.Estimator(r))
 			} else if header := r.Header.Get(tokensHeader); header != "" {
-				if value, err := strconv.Atoi(header); err == nil {
+				if value, err := strconv.ParseInt(header, 10, 64); err == nil {
 					tokens = value
 				}
 			}

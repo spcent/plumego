@@ -9,7 +9,7 @@ import (
 )
 
 func TestMiddleware(t *testing.T) {
-	provider := tenantcore.NewInMemoryRateLimitProvider()
+	provider := tenantcore.NewInMemoryRateLimitManager()
 	provider.SetRateLimit("t-1", tenantcore.RateLimitConfig{
 		RequestsPerSecond: 1,
 		Burst:             1,
@@ -39,7 +39,7 @@ func TestMiddleware(t *testing.T) {
 }
 
 func TestMiddlewareTenantIsolation(t *testing.T) {
-	provider := tenantcore.NewInMemoryRateLimitProvider()
+	provider := tenantcore.NewInMemoryRateLimitManager()
 	provider.SetRateLimit("t-1", tenantcore.RateLimitConfig{
 		RequestsPerSecond: 1,
 		Burst:             1,

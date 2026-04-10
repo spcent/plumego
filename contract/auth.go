@@ -7,12 +7,13 @@ import (
 )
 
 // Principal is the authenticated identity attached to a request context.
+// Tenant identity is carried separately via x/tenant/core.TenantIDFromContext
+// and x/tenant/core.ContextWithTenantID — not via Principal fields.
 type Principal struct {
-	Subject  string            // user id / service id
-	TenantID string            // optional, SaaS
-	Roles    []string          // small list
-	Scopes   []string          // optional
-	Claims   map[string]string // minimal extra (string-only to avoid abuse)
+	Subject string            // user id / service id
+	Roles   []string          // small list
+	Scopes  []string          // optional
+	Claims  map[string]string // minimal extra (string-only to avoid abuse)
 }
 
 // Authenticator validates a request and returns the authenticated principal.

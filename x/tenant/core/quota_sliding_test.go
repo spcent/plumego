@@ -7,6 +7,32 @@ import (
 	"time"
 )
 
+func TestSlidingWindowQuotaManager_UnsupportedWindow(t *testing.T) {
+	cfgMgr := NewInMemoryConfigManager()
+	cfgMgr.SetTenantConfig(Config{
+		TenantID: "test-tenant",
+		Quota: QuotaConfig{
+			Limits: []QuotaLimit{
+				{Window: QuotaWindowHour, Requests: 1000},
+			},
+		},
+	})
+
+	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
+	ctx := context.Background()
+
+	result, err := quotaMgr.Allow(ctx, "test-tenant", QuotaRequest{
+		Requests: 1,
+		Now:      time.Now().UTC(),
+	})
+	if !errors.Is(err, ErrUnsupportedQuotaWindow) {
+		t.Fatalf("expected ErrUnsupportedQuotaWindow for hour window, got %v", err)
+	}
+	if result.Allowed {
+		t.Error("expected request to be denied when window is unsupported")
+	}
+}
+
 func TestSlidingWindowQuotaManager_Basic(t *testing.T) {
 	cfgMgr := NewInMemoryConfigManager()
 	cfgMgr.SetTenantConfig(Config{

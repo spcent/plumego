@@ -111,7 +111,7 @@ func TestInMemoryConfigManager_Concurrent(t *testing.T) {
 			cfg := Config{
 				TenantID: "concurrent-test",
 				Quota: QuotaConfig{
-					Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: id * 10}},
+					Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: int64(id) * 10}},
 				},
 			}
 			mgr.SetTenantConfig(cfg)
@@ -202,66 +202,6 @@ func TestInMemoryConfigManager_PolicyProvider(t *testing.T) {
 	_, err = mgr.PolicyConfig(ctx, "non-existent")
 	if err != ErrTenantNotFound {
 		t.Errorf("expected ErrTenantNotFound, got %v", err)
-	}
-}
-
-func TestQuotaConfigProviderFromConfig(t *testing.T) {
-	mgr := NewInMemoryConfigManager()
-	ctx := context.Background()
-	mgr.SetTenantConfig(Config{
-		TenantID: "t-1",
-		Quota:    QuotaConfig{Limits: []QuotaLimit{{Window: QuotaWindowMinute, Requests: 10}}},
-	})
-
-	provider := &QuotaConfigProviderFromConfig{Manager: mgr}
-
-	quota, err := provider.QuotaConfig(ctx, "t-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(quota.Limits) == 0 || quota.Limits[0].Requests != 10 {
-		t.Errorf("expected 10 requests/min, got %+v", quota.Limits)
-	}
-
-	_, err = provider.QuotaConfig(ctx, "missing")
-	if err != ErrTenantNotFound {
-		t.Errorf("expected ErrTenantNotFound, got %v", err)
-	}
-
-	var nilProvider *QuotaConfigProviderFromConfig
-	_, err = nilProvider.QuotaConfig(ctx, "t-1")
-	if err != ErrTenantNotFound {
-		t.Errorf("nil receiver: expected ErrTenantNotFound, got %v", err)
-	}
-}
-
-func TestPolicyConfigProviderFromConfig(t *testing.T) {
-	mgr := NewInMemoryConfigManager()
-	ctx := context.Background()
-	mgr.SetTenantConfig(Config{
-		TenantID: "t-1",
-		Policy:   PolicyConfig{AllowedModels: []string{"gpt-4"}},
-	})
-
-	provider := &PolicyConfigProviderFromConfig{Manager: mgr}
-
-	policy, err := provider.PolicyConfig(ctx, "t-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(policy.AllowedModels) != 1 || policy.AllowedModels[0] != "gpt-4" {
-		t.Errorf("unexpected allowed models: %v", policy.AllowedModels)
-	}
-
-	_, err = provider.PolicyConfig(ctx, "missing")
-	if err != ErrTenantNotFound {
-		t.Errorf("expected ErrTenantNotFound, got %v", err)
-	}
-
-	var nilProvider *PolicyConfigProviderFromConfig
-	_, err = nilProvider.PolicyConfig(ctx, "t-1")
-	if err != ErrTenantNotFound {
-		t.Errorf("nil receiver: expected ErrTenantNotFound, got %v", err)
 	}
 }
 

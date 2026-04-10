@@ -18,29 +18,12 @@ func TestBindJSONAndValidateStructExplicitFlow(t *testing.T) {
 	ctx := NewCtx(httptest.NewRecorder(), req, nil)
 
 	var dst payload
-	if err := ctx.BindJSON(&dst); err != nil {
+	if err := ctx.BindJSON(&dst, nil); err != nil {
 		t.Fatalf("expected bind to succeed, got %v", err)
 	}
 
 	if err := ValidateStruct(&dst); err == nil {
 		t.Fatal("expected validation error")
-	}
-}
-
-func TestBindJSONRejectsMultipleBindOptions(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":"alice"}`))
-	ctx := NewCtx(httptest.NewRecorder(), req, nil)
-
-	var dst struct {
-		Name string `json:"name"`
-	}
-	err := ctx.BindJSON(&dst, BindOptions{}, BindOptions{})
-	if err == nil {
-		t.Fatal("expected bind options error")
-	}
-	var bindErr *bindError
-	if !errors.As(err, &bindErr) {
-		t.Fatalf("expected bindError, got %T", err)
 	}
 }
 
@@ -105,9 +88,15 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		Name string `validate:"requried"`
 	}
 	err = ValidateStruct(&badRules{})
-	fields = FieldErrorsFrom(err)
-	if len(fields) == 0 || fields[0].Code != "unknown_rule" {
-		t.Fatalf("expected unknown_rule failure, got %v", fields)
+	if err == nil {
+		t.Fatal("expected error for unknown rule, got nil")
+	}
+	// Unknown rules are programmer errors: not wrapped in ValidationErrors.
+	if FieldErrorsFrom(err) != nil {
+		t.Fatalf("expected unknown rule error to not be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
+	}
+	if !strings.Contains(err.Error(), "unknown validation rule") {
+		t.Fatalf("expected error to mention unknown rule, got: %v", err)
 	}
 
 	type stringLengths struct {

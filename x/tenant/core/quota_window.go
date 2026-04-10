@@ -36,12 +36,7 @@ func (m *WindowQuotaManager) Allow(ctx context.Context, tenantID string, req Quo
 		return QuotaResult{Allowed: true}, nil
 	}
 
-	if req.Now.IsZero() {
-		req.Now = time.Now().UTC()
-	}
-	if req.Requests <= 0 {
-		req.Requests = 1
-	}
+	normalizeQuotaRequest(&req)
 
 	type reservation struct {
 		window      QuotaWindow
@@ -50,8 +45,8 @@ func (m *WindowQuotaManager) Allow(ctx context.Context, tenantID string, req Quo
 
 	var (
 		reserved []reservation
-		minReq   = -1
-		minTok   = -1
+		minReq   int64 = -1
+		minTok   int64 = -1
 	)
 
 	for _, limit := range limits {
@@ -60,19 +55,24 @@ func (m *WindowQuotaManager) Allow(ctx context.Context, tenantID string, req Quo
 		}
 
 		windowStart := quotaWindowStart(req.Now, limit.Window)
-		usage, allowed, err := m.store.Reserve(
-			ctx,
-			tenantID,
-			limit.Window,
-			windowStart,
-			req.Requests,
-			req.Tokens,
-			limit.Requests,
-			limit.Tokens,
-		)
+		usage, allowed, err := m.store.Reserve(ctx, QuotaReserveRequest{
+			TenantID:      tenantID,
+			Window:        limit.Window,
+			WindowStart:   windowStart,
+			DeltaRequests: req.Requests,
+			DeltaTokens:   req.Tokens,
+			LimitRequests: limit.Requests,
+			LimitTokens:   limit.Tokens,
+		})
 		if err != nil || !allowed {
 			for _, item := range reserved {
-				_ = m.store.Release(ctx, tenantID, item.window, item.windowStart, req.Requests, req.Tokens)
+				_ = m.store.Release(ctx, QuotaReleaseRequest{
+					TenantID:      tenantID,
+					Window:        item.window,
+					WindowStart:   item.windowStart,
+					DeltaRequests: req.Requests,
+					DeltaTokens:   req.Tokens,
+				})
 			}
 
 			retryAfter := time.Until(quotaWindowEnd(windowStart, limit.Window))
@@ -104,7 +104,7 @@ func (m *WindowQuotaManager) Allow(ctx context.Context, tenantID string, req Quo
 	}, nil
 }
 
-func minRemaining(current, candidate int) int {
+func minRemaining(current, candidate int64) int64 {
 	if candidate < 0 {
 		return current
 	}

@@ -14,10 +14,8 @@ type Options struct {
 	// HeaderName is the HTTP header to extract tenant ID from (default: "X-Tenant-ID").
 	HeaderName string
 	// Extractor is a custom function to extract tenant ID from the request.
-	// When set, takes precedence over HeaderName. Principal extraction still runs first.
+	// When set, takes precedence over HeaderName.
 	Extractor tenantcore.TenantExtractor
-	// DisablePrincipal disables extracting tenant ID from the authenticated Principal.
-	DisablePrincipal bool
 	// AllowMissing allows requests to proceed when no tenant ID is found.
 	AllowMissing bool
 	// Hooks provides callbacks for tenant resolution events.
@@ -28,34 +26,24 @@ type Options struct {
 }
 
 // Middleware resolves tenant id from request and stores it in context.
-// Resolution order: Principal -> custom Extractor or Header.
+// Resolution order: custom Extractor, then HeaderName header.
 func Middleware(options Options) middleware.Middleware {
 	header := tenanttransport.HeaderOrDefault(options.HeaderName, tenanttransport.DefaultTenantHeader)
 	requireTenant := !options.AllowMissing
-	allowFromPrincipal := !options.DisablePrincipal
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var tenantID string
 			source := ""
 
-			if allowFromPrincipal {
-				if p := contract.PrincipalFromRequest(r); p != nil && p.TenantID != "" {
-					tenantID = p.TenantID
-					source = "principal"
+			if options.Extractor != nil {
+				if id, err := options.Extractor(r); err == nil && id != "" {
+					tenantID = id
+					source = "extractor"
 				}
-			}
-
-			if tenantID == "" {
-				if options.Extractor != nil {
-					if id, err := options.Extractor(r); err == nil && id != "" {
-						tenantID = id
-						source = "extractor"
-					}
-				} else if headerValue := r.Header.Get(header); headerValue != "" {
-					tenantID = headerValue
-					source = "header"
-				}
+			} else if headerValue := r.Header.Get(header); headerValue != "" {
+				tenantID = headerValue
+				source = "header"
 			}
 
 			if tenantID == "" {

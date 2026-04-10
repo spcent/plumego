@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type requestIDKey struct{}
+type requestIDContextKey struct{}
 
 // WithRequestID stores the canonical request correlation id in ctx.
 func WithRequestID(ctx context.Context, id string) context.Context {
@@ -16,7 +16,7 @@ func WithRequestID(ctx context.Context, id string) context.Context {
 	if id == "" {
 		return ctx
 	}
-	return context.WithValue(ctx, requestIDKey{}, id)
+	return context.WithValue(ctx, requestIDContextKey{}, id)
 }
 
 // RequestIDFromContext returns the canonical request correlation id from ctx.
@@ -24,7 +24,7 @@ func RequestIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	if id, ok := ctx.Value(requestIDKey{}).(string); ok {
+	if id, ok := ctx.Value(requestIDContextKey{}).(string); ok {
 		return strings.TrimSpace(id)
 	}
 	return ""

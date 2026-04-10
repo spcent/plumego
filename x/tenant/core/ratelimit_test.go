@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-func TestInMemoryRateLimitProvider(t *testing.T) {
-	provider := NewInMemoryRateLimitProvider()
+func TestInMemoryRateLimitManager(t *testing.T) {
+	provider := NewInMemoryRateLimitManager()
 	provider.SetRateLimit("t-1", RateLimitConfig{
 		RequestsPerSecond: 10,
 		Burst:             20,
@@ -30,7 +30,7 @@ func TestInMemoryRateLimitProvider(t *testing.T) {
 
 func TestTokenBucketRateLimiter_UnknownTenantAllowed(t *testing.T) {
 	// Unknown tenants (ErrTenantNotFound from provider) are allowed — treated as unlimited.
-	provider := NewInMemoryRateLimitProvider()
+	provider := NewInMemoryRateLimitManager()
 	limiter := NewTokenBucketRateLimiter(provider)
 	res, err := limiter.Allow(context.Background(), "unknown-tenant", RateLimitRequest{})
 	if err != nil || !res.Allowed {
@@ -39,7 +39,7 @@ func TestTokenBucketRateLimiter_UnknownTenantAllowed(t *testing.T) {
 }
 
 func TestTokenBucketRateLimiter_AllowAndRefill(t *testing.T) {
-	provider := NewInMemoryRateLimitProvider()
+	provider := NewInMemoryRateLimitManager()
 	provider.SetRateLimit("t-1", RateLimitConfig{
 		RequestsPerSecond: 2,
 		Burst:             2,
@@ -89,7 +89,7 @@ func TestTokenBucketRateLimiter_AllowAndRefill(t *testing.T) {
 }
 
 func TestTokenBucketRateLimiter_Unlimited(t *testing.T) {
-	provider := NewInMemoryRateLimitProvider()
+	provider := NewInMemoryRateLimitManager()
 	provider.SetRateLimit("t-1", RateLimitConfig{})
 
 	limiter := NewTokenBucketRateLimiter(provider)

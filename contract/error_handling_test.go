@@ -45,17 +45,6 @@ func TestWrappedErrorWithContext(t *testing.T) {
 	}
 }
 
-// TestWrapErrorf tests formatted error wrapping
-func TestWrapErrorf(t *testing.T) {
-	originalErr := errors.New("timeout")
-	wrappedErr := WrapErrorf(originalErr, "operation failed after %d retries", 3)
-
-	details := GetErrorDetails(wrappedErr)
-	if details["message"] != "operation failed after 3 retries" {
-		t.Fatalf("expected formatted message, got %v", details["message"])
-	}
-}
-
 // TestPanicToError tests panic recovery
 func TestPanicToError(t *testing.T) {
 	// Test string panic

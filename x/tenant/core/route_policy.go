@@ -2,12 +2,9 @@ package tenant
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 )
-
-var ErrRoutePolicyNotFound = errors.New("route policy not found")
 
 // RoutePolicy describes tenant-specific routing policy.
 // Payload is application-defined JSON to keep the framework unopinionated.

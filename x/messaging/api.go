@@ -13,7 +13,7 @@ import (
 // HandleSend is the HTTP handler for POST /messages/send.
 func (s *Service) HandleSend(ctx *contract.Ctx) {
 	var req SendRequest
-	if err := ctx.BindJSON(&req); err != nil {
+	if err := ctx.BindJSON(&req, nil); err != nil {
 		_ = contract.WriteBindError(ctx.W, ctx.R, err)
 		return
 	}
@@ -38,7 +38,7 @@ func (s *Service) HandleSend(ctx *contract.Ctx) {
 // HandleBatchSend is the HTTP handler for POST /messages/batch.
 func (s *Service) HandleBatchSend(ctx *contract.Ctx) {
 	var batch BatchRequest
-	if err := ctx.BindJSON(&batch); err != nil {
+	if err := ctx.BindJSON(&batch, nil); err != nil {
 		_ = contract.WriteBindError(ctx.W, ctx.R, err)
 		return
 	}

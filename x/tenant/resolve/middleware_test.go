@@ -5,11 +5,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spcent/plumego/contract"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
 
-func TestMiddlewareFromPrincipal(t *testing.T) {
+func TestMiddlewareFromHeader(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if tenantcore.TenantIDFromContext(r.Context()) != "t-1" {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -19,7 +18,7 @@ func TestMiddlewareFromPrincipal(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = contract.RequestWithPrincipal(req, &contract.Principal{TenantID: "t-1"})
+	req.Header.Set("X-Tenant-ID", "t-1")
 	rec := httptest.NewRecorder()
 
 	mw := Middleware(Options{})
@@ -30,9 +29,9 @@ func TestMiddlewareFromPrincipal(t *testing.T) {
 	}
 }
 
-func TestMiddlewarePrincipalTakesPrecedenceOverHeaderAndExtractor(t *testing.T) {
+func TestMiddlewareExtractorTakesPrecedenceOverHeader(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if tenantcore.TenantIDFromContext(r.Context()) != "principal-tenant" {
+		if tenantcore.TenantIDFromContext(r.Context()) != "query-tenant" {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -41,7 +40,6 @@ func TestMiddlewarePrincipalTakesPrecedenceOverHeaderAndExtractor(t *testing.T) 
 
 	req := httptest.NewRequest(http.MethodGet, "/?tenant=query-tenant", nil)
 	req.Header.Set("X-Tenant-ID", "header-tenant")
-	req = contract.RequestWithPrincipal(req, &contract.Principal{TenantID: "principal-tenant"})
 	rec := httptest.NewRecorder()
 
 	mw := Middleware(Options{

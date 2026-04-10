@@ -4,37 +4,37 @@ import "context"
 
 // CachedRoutePolicyProvider wraps a provider with a cache.
 type CachedRoutePolicyProvider struct {
-	Provider RoutePolicyProvider
-	Cache    RoutePolicyCache
+	provider RoutePolicyProvider
+	cache    RoutePolicyCache
 }
 
 // NewCachedRoutePolicyProvider creates a cached provider.
 func NewCachedRoutePolicyProvider(provider RoutePolicyProvider, cache RoutePolicyCache) *CachedRoutePolicyProvider {
 	return &CachedRoutePolicyProvider{
-		Provider: provider,
-		Cache:    cache,
+		provider: provider,
+		cache:    cache,
 	}
 }
 
 // RoutePolicy resolves policy using cache before hitting provider.
 func (c *CachedRoutePolicyProvider) RoutePolicy(ctx context.Context, tenantID string) (RoutePolicy, error) {
-	if c == nil || c.Provider == nil {
+	if c == nil || c.provider == nil {
 		return RoutePolicy{}, ErrRoutePolicyNotFound
 	}
 
-	if c.Cache != nil {
-		if policy, ok := c.Cache.Get(ctx, tenantID); ok {
+	if c.cache != nil {
+		if policy, ok := c.cache.Get(ctx, tenantID); ok {
 			return policy, nil
 		}
 	}
 
-	policy, err := c.Provider.RoutePolicy(ctx, tenantID)
+	policy, err := c.provider.RoutePolicy(ctx, tenantID)
 	if err != nil {
 		return RoutePolicy{}, err
 	}
 
-	if c.Cache != nil {
-		_ = c.Cache.Set(ctx, tenantID, policy)
+	if c.cache != nil {
+		_ = c.cache.Set(ctx, tenantID, policy)
 	}
 
 	return policy, nil
@@ -42,8 +42,8 @@ func (c *CachedRoutePolicyProvider) RoutePolicy(ctx context.Context, tenantID st
 
 // Invalidate removes a cached policy.
 func (c *CachedRoutePolicyProvider) Invalidate(ctx context.Context, tenantID string) error {
-	if c == nil || c.Cache == nil {
+	if c == nil || c.cache == nil {
 		return nil
 	}
-	return c.Cache.Delete(ctx, tenantID)
+	return c.cache.Delete(ctx, tenantID)
 }
