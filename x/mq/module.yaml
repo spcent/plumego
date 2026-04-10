@@ -13,6 +13,7 @@ responsibilities:
   - Task persistence
   - Worker coordination
   - Dead-letter handling
+  - Queue task dedupe adapters
 
 non_goals:
   - Core bootstrap ownership
@@ -24,6 +25,7 @@ allowed_imports:
   - log
   - metrics
   - store
+  - x/data/idempotency
   - x/pubsub
 
 forbidden_imports:

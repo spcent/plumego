@@ -1,0 +1,58 @@
+name: x/data/idempotency
+path: x/data/idempotency
+layer: extension
+status: experimental
+owner: persistence
+risk: medium
+summary: Durable idempotency provider implementations behind the stable store/idempotency contract.
+
+responsibilities:
+  - SQL-backed idempotency provider
+  - KV-backed idempotency provider
+  - SQL dialect and table policy
+  - Duplicate-key handling for durable providers
+
+non_goals:
+  - Stable idempotency primitive ownership
+  - Business-specific dedupe rules
+  - HTTP transport behavior
+  - Tenant policy
+
+public_entrypoints:
+  - SQLStore
+  - SQLConfig
+  - KVStore
+  - KVConfig
+
+allowed_imports:
+  - stdlib
+  - store/idempotency
+  - store/kv
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - reference/**
+  - x/tenant/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/data/idempotency
+  - go test -timeout 20s ./x/data/idempotency
+  - go vet ./x/data/idempotency
+
+change_risks:
+  - idempotency correctness regression
+  - duplicate detection regression
+  - expiry regression
+
+review_checklist:
+  - Keep stable contracts in store/idempotency
+  - Keep provider policy explicit
+  - Keep business dedupe semantics outside this package
+
+agent_hints:
+  - Use this package for durable idempotency storage behind store/idempotency.Store
+  - Keep MQ-specific dedupe behavior in x/mq
+  - Do not add HTTP, tenant, or app workflow policy here

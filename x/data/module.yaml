@@ -16,6 +16,7 @@ responsibilities:
   - Data access policy composition
   - Tenant-aware topology adapters
   - Durable KV-engine ownership beyond the stable store/kv primitive
+  - Durable idempotency provider ownership beyond stable store/idempotency primitives
 
 non_goals:
   - App bootstrap
@@ -28,6 +29,7 @@ public_entrypoints:
   - routing
   - composition
   - kvengine
+  - idempotency
 
 allowed_imports:
   - stdlib
@@ -67,5 +69,5 @@ review_checklist:
 
 agent_hints:
   - Move sharding and rw orchestration here instead of widening store
-  - Keep business repositories in app code, not in x/data
+  - Keep business repositories and domain-specific dedupe rules in app code, not in x/data
   - x/cache is a subordinate package for distributed/Redis cache topology; start cache work here before opening x/cache directly

@@ -38,6 +38,7 @@
 - keep HTTP response caching, request-derived cache keys, and cache metrics/introspection ownership out of `store/cache`
 - keep signed URLs, metadata-manager ownership, uploader/image metadata, and file path/id helper policy out of `store/file`; route them to `x/data/file` and `x/fileapi`
 - keep durable KV-engine concerns such as WAL, snapshots, serializer selection, compression, and shard tuning out of `store/kv`; route them to `x/data/kvengine`
+- keep durable idempotency providers, SQL dialect policy, and table schema policy out of `store/idempotency`; route them to `x/data/idempotency`
 
 ## File Boundary
 
@@ -52,6 +53,12 @@
 - `store/kv` is the stable small embedded KV primitive for file-backed key/value persistence, TTL-aware CRUD, key scans, and basic stats.
 - `x/data/kvengine` owns durable-engine behavior such as WAL, snapshots, serializer formats, compression, and shard/flush tuning.
 - Do not add engine-format plumbing, snapshot APIs, or durability-tuning knobs back into stable `store/kv`.
+
+## Idempotency Boundary
+
+- `store/idempotency` is the stable primitive contract for idempotency records, statuses, errors, and the minimal `Store` interface.
+- `x/data/idempotency` owns durable KV/SQL provider implementations, SQL dialect policy, table naming, and duplicate-key handling.
+- Do not add provider-specific adapters, table schema policy, or feature-specific dedupe rules back into stable `store/idempotency`.
 
 ## Extension-layer cache implementations
 

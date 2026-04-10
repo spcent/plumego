@@ -1,7 +1,7 @@
 # Card 0864: Store Idempotency Provider Boundary Pruning
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 
 ## Goal
@@ -74,3 +74,12 @@ Then run the required repo-wide gates before committing.
 - `x/mq` SQL dedupe capability still works.
 - Removed exported provider symbols have zero residual references.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Stable `store/idempotency` now contains only the reusable idempotency primitive contract: errors, `Status`, `Record`, and `Store`.
+- Moved SQL and KV provider implementations, SQL dialects, table policy, duplicate detection, and provider tests into `x/data/idempotency`.
+- Added `x/data/idempotency/module.yaml` and documented the provider ownership split in store and x/data docs.
+- Updated `x/mq` SQL dedupe to depend on `x/data/idempotency` while preserving MQ dedupe capability.
+- Removed stable provider exports (`SQLStore`, `NewSQLStore`, `SQLConfig`, `DefaultSQLConfig`, `Dialect`, `KVStore`, `NewKVStore`, `KVConfig`, `DefaultKVConfig`) from `store/idempotency`.
+- Validation passed: focused store/x-data/x-mq test, race, and vet gates; dependency rules, agent workflow, module manifests, reference layout; repo-wide `go test`, `go vet`, and `go test -race`.
