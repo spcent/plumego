@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/spcent/plumego/router"
 )
 
 func TestGetPostPutDeletePatch(t *testing.T) {
@@ -113,10 +115,10 @@ func TestNamedRouteRegistration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := newTestApp()
 			called := false
-			mustRegisterRoute(t, app.AddRouteWithName(tt.method, tt.path, tt.route, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mustRegisterRoute(t, app.AddRoute(tt.method, tt.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusNoContent)
-			})))
+			}), router.WithRouteName(tt.route)))
 
 			url := app.URL(tt.route, "id", "42")
 			req := httptest.NewRequest(tt.method, url, nil)
@@ -161,14 +163,14 @@ func TestAddRouteReturnsRegistrationErrors(t *testing.T) {
 	}
 }
 
-func TestAddRouteWithNameRegistersURLAndReturnsErrors(t *testing.T) {
+func TestAddRouteWithRouteNameRegistersURLAndReturnsErrors(t *testing.T) {
 	app := newTestApp()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	if err := app.AddRouteWithName(http.MethodGet, "/users/:id", "users.show", handler); err != nil {
+	if err := app.AddRoute(http.MethodGet, "/users/:id", handler, router.WithRouteName("users.show")); err != nil {
 		t.Fatalf("unexpected add named route error: %v", err)
 	}
 
@@ -176,7 +178,7 @@ func TestAddRouteWithNameRegistersURLAndReturnsErrors(t *testing.T) {
 		t.Fatalf("named route URL = %q, want %q", got, "/users/42")
 	}
 
-	if err := app.AddRouteWithName(http.MethodGet, "/users/:id", "users.show", handler); err == nil {
+	if err := app.AddRoute(http.MethodGet, "/users/:id", handler, router.WithRouteName("users.show")); err == nil {
 		t.Fatalf("expected duplicate named route error")
 	}
 }

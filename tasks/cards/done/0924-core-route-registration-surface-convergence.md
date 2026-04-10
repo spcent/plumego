@@ -1,7 +1,7 @@
 # Card 0924: Core Route Registration Surface Convergence
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 
 ## Goal
@@ -66,3 +66,10 @@ Then run the required repo-wide gates before committing.
 - Core route registration tests cover named route registration through the canonical path.
 - Docs no longer advertise the removed duplicate entrypoint.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Removed `core.App.AddRouteWithName`.
+- Kept named route registration on the canonical `App.AddRoute(..., router.WithRouteName(...))` path.
+- Simplified the internal route registration implementation by removing the duplicate name parameter.
+- Updated current core/style documentation and tests to use `router.WithRouteName`.

@@ -119,7 +119,7 @@ func registerRoutes(app *core.App) error {
 - One method + one path + one handler per line
 - Route registration errors must be returned to the caller; do not log and continue
 - Use `app.Any(...)` for catch-all method registration; do not introduce overlapping helper aliases for the same ANY-route behavior
-- Use `app.AddRouteWithName(...)` for named routes; keep one canonical path instead of per-method named aliases
+- Use `app.AddRoute(..., router.WithRouteName(...))` for named routes; keep one canonical metadata path instead of named-route helper aliases
 - Static registration; no reflection or discovery
 - Must remain grep-friendly — path and handler discoverable by search
 - Groups: path prefix and shared middleware only; not for hidden policy or service injection

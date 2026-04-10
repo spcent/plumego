@@ -11,13 +11,9 @@ import (
 const methodAny = "ANY"
 
 // registerRoute is the single implementation for all route registration.
-// An empty name registers the route without a name.
-func (a *App) registerRoute(method, path, name string, handler http.Handler, opts ...router.RouteOption) error {
+func (a *App) registerRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
 	if handler == nil {
 		params := map[string]any{"method": method, "path": path}
-		if name != "" {
-			params["name"] = name
-		}
 		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
 	}
 
@@ -30,14 +26,11 @@ func (a *App) registerRoute(method, path, name string, handler http.Handler, opt
 		return wrapCoreError(fmt.Errorf("router not configured"), "add_route", nil)
 	}
 
-	if name != "" {
-		opts = append(opts, router.WithRouteName(name))
-	}
 	return r.AddRoute(method, path, handler, opts...)
 }
 
 func (a *App) addRoute(method, path string, handler http.Handler) error {
-	return a.registerRoute(method, path, "", handler)
+	return a.registerRoute(method, path, handler)
 }
 
 // =========================================================
@@ -53,12 +46,7 @@ func (a *App) addRoute(method, path string, handler http.Handler) error {
 // AddRoute registers a route and returns explicit errors for invalid registration.
 // This is useful in strict boot wiring where route registration failures must be surfaced.
 func (a *App) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
-	return a.registerRoute(method, path, "", handler, opts...)
-}
-
-// AddRouteWithName registers a named route and returns explicit registration errors.
-func (a *App) AddRouteWithName(method, path, name string, handler http.Handler) error {
-	return a.registerRoute(method, path, name, handler)
+	return a.registerRoute(method, path, handler, opts...)
 }
 
 // URL resolves a named route against the owned app router.
