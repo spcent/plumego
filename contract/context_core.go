@@ -4,12 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
-	"time"
 )
 
 // RequestContext contains request-scoped data that should be shared across middleware and handlers.
@@ -28,27 +24,21 @@ type requestContextKey struct{}
 
 // RequestConfig holds configuration for request processing.
 type RequestConfig struct {
-	MaxBodySize       int64
-	EnableBodyCache   bool
-	EnableCompression bool
-	RequestTimeout    time.Duration
+	MaxBodySize     int64
+	EnableBodyCache bool
 }
 
-// Ctx is a unified context object shared by handlers.
-// It exposes common request-scoped attributes and helper methods for writing responses.
+// Ctx carries explicit net/http primitives plus route params for legacy context handlers.
+// Prefer func(http.ResponseWriter, *http.Request) for new handlers.
 type Ctx struct {
-	W        http.ResponseWriter
-	R        *http.Request
-	Params   map[string]string
-	Query    url.Values
-	ClientIP string
-	Deadline time.Time
-	Config   *RequestConfig
+	W      http.ResponseWriter
+	R      *http.Request
+	Params map[string]string
 
 	body         []byte
 	bodyErr      error
 	bodyReadOnce sync.Once
-	cancel       context.CancelFunc
+	config       *RequestConfig
 }
 
 // RequestHeaders returns the request's header map.
@@ -98,14 +88,8 @@ var (
 	// ErrValidationFailed is returned when request validation fails.
 	ErrValidationFailed = errors.New("validation failed")
 
-	// ErrCompressionNotSupported is returned when compression is not supported.
-	ErrCompressionNotSupported = errors.New("compression not supported")
-
 	// ErrHandlerNil is returned when a handler is nil.
 	ErrHandlerNil = errors.New("handler cannot be nil")
-
-	// ErrInvalidChunkSize is returned when a streaming chunk size is invalid.
-	ErrInvalidChunkSize = errors.New("invalid chunk size")
 
 	// ErrContextNil is returned when a context is nil.
 	ErrContextNil = errors.New("context cannot be nil")
@@ -115,9 +99,6 @@ var (
 
 	// ErrResponseWriterNil is returned when a response writer is nil.
 	ErrResponseWriterNil = errors.New("response writer cannot be nil")
-
-	// ErrConfigNil is returned when a config is nil.
-	ErrConfigNil = errors.New("config cannot be nil")
 
 	// ErrInvalidBindDst is returned when a bind destination is nil or otherwise invalid.
 	ErrInvalidBindDst = errors.New("invalid bind destination")
@@ -189,16 +170,8 @@ func NewCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]
 }
 
 var defaultConfig = RequestConfig{
-	MaxBodySize:       10 * 1024 * 1024, // 10MB
-	EnableBodyCache:   true,
-	EnableCompression: false,
-	RequestTimeout:    30 * time.Second,
-}
-
-// DefaultConfig returns a copy of the default request processing configuration.
-// Modify the returned value freely; it does not affect the package default.
-func DefaultConfig() RequestConfig {
-	return defaultConfig
+	MaxBodySize:     10 * 1024 * 1024, // 10MB
+	EnableBodyCache: true,
 }
 
 // newCtxWithConfig is the canonical constructor; nil cfg uses the package default.
@@ -212,35 +185,13 @@ func newCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]
 		cfg = &c
 	}
 
-	var cancel context.CancelFunc
-	deadline, hasDeadline := r.Context().Deadline()
-	if !hasDeadline && cfg.RequestTimeout > 0 {
-		timeoutCtx, cancelFunc := context.WithTimeout(r.Context(), cfg.RequestTimeout)
-		cancel = cancelFunc
-		r = r.WithContext(timeoutCtx)
-		deadline, _ = timeoutCtx.Deadline()
-	}
-
 	ctx := &Ctx{
-		W:        w,
-		R:        r,
-		Params:   params,
-		Query:    r.URL.Query(),
-		ClientIP: clientIPFromRequest(r),
-		Deadline: deadline,
-		Config:   cfg,
-		cancel:   cancel,
+		W:      w,
+		R:      r,
+		Params: params,
+		config: cfg,
 	}
 	return ctx
-}
-
-// release cancels request-scoped resources owned by the context.
-func (c *Ctx) release() {
-	if c == nil || c.cancel == nil {
-		return
-	}
-	c.cancel()
-	c.cancel = nil
 }
 
 func (c *Ctx) Param(key string) (string, bool) {
@@ -259,29 +210,6 @@ func (c *Ctx) MustParam(key string) (string, error) {
 	return val, nil
 }
 
-func clientIPFromRequest(r *http.Request) string {
-	// X-Forwarded-For is only trustworthy when appended by infrastructure you control.
-	// Use the last non-empty value rather than the first client-supplied value.
-	if r == nil {
-		return ""
-	}
-	parts := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
-	for i := len(parts) - 1; i >= 0; i-- {
-		if ip := strings.TrimSpace(parts[i]); ip != "" {
-			return ip
-		}
-	}
-	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
-		return ip
-	}
-
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil {
-		return host
-	}
-	return r.RemoteAddr
-}
-
 // CtxHandlerFunc is the handler signature that receives a unified Ctx.
 type CtxHandlerFunc func(*Ctx)
 
@@ -290,15 +218,6 @@ func AdaptCtxHandler(h CtxHandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := RequestContextFromContext(r.Context())
 		ctx := newCtxWithConfig(w, r, rc.Params, nil)
-		defer ctx.release()
 		h(ctx)
 	})
-}
-
-// ValidateCtxHandler returns an error when the handler is nil to give clearer feedback to callers.
-func ValidateCtxHandler(h CtxHandlerFunc) error {
-	if h == nil {
-		return ErrHandlerNil
-	}
-	return nil
 }

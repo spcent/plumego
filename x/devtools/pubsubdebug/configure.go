@@ -50,7 +50,7 @@ func Configure(hooks Hooks) {
 		type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
 
 		if ps, ok := pub.(snapshoter); ok {
-			_ = ctx.Response(http.StatusOK, ps.Snapshot(), nil)
+			_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, ps.Snapshot(), nil)
 			return
 		}
 

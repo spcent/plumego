@@ -10,6 +10,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/internal/httpx"
 	"github.com/spcent/plumego/internal/jsonx"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
@@ -108,7 +109,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if delivery != "unknown" && d.SeenBefore("github:"+delivery) {
-		_ = ctx.Response(http.StatusOK, map[string]any{
+		_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 			"ok":          true,
 			"provider":    "github",
 			"event_type":  event,
@@ -135,7 +136,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 			"request_id":  ctx.RequestID(),
 			"delivery_id": delivery,
 			"event_type":  event,
-			"client_ip":   ctx.ClientIP,
+			"client_ip":   httpx.ClientIP(ctx.R),
 		},
 	}
 
@@ -145,7 +146,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"ok":          true,
 		"provider":    "github",
 		"topic":       topic,
@@ -192,7 +193,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if evtID != "unknown" && d.SeenBefore("stripe:"+evtID) {
-		_ = ctx.Response(http.StatusOK, map[string]any{
+		_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 			"ok":         true,
 			"provider":   "stripe",
 			"event_type": evtType,
@@ -219,7 +220,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 			"request_id":  ctx.RequestID(),
 			"delivery_id": evtID,
 			"event_type":  evtType,
-			"client_ip":   ctx.ClientIP,
+			"client_ip":   httpx.ClientIP(ctx.R),
 		},
 	}
 
@@ -229,7 +230,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"ok":         true,
 		"provider":   "stripe",
 		"topic":      topic,

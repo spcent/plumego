@@ -373,7 +373,7 @@ func (d *Dashboard) Rebuild(ctx context.Context) error {
 // HTTP Handlers
 
 func (d *Dashboard) handleInfo(ctx *contract.Ctx) {
-	_ = ctx.Response(http.StatusOK, d.getDashboardInfo(), nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, d.getDashboardInfo(), nil)
 }
 
 func (d *Dashboard) handleStatus(ctx *contract.Ctx) {
@@ -395,13 +395,13 @@ func (d *Dashboard) handleStatus(ctx *contract.Ctx) {
 		},
 	}
 
-	_ = ctx.Response(http.StatusOK, status, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, status, nil)
 }
 
 func (d *Dashboard) handleHealth(ctx *contract.Ctx) {
 	healthy := d.runner.IsRunning()
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"healthy": healthy,
 		"checks": map[string]string{
 			"app": func() string {
@@ -424,7 +424,7 @@ func (d *Dashboard) handleBuild(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Build completed successfully",
 	}, nil)
@@ -442,7 +442,7 @@ func (d *Dashboard) handleRestart(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application restarted successfully",
 	}, nil)
@@ -458,7 +458,7 @@ func (d *Dashboard) handleStop(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application stopped successfully",
 	}, nil)
@@ -480,7 +480,7 @@ func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 		// Fallback to probing if debug endpoint is not available
 		routes = d.analyzer.ProbeEndpoints()
 		if len(routes) == 0 {
-			_ = ctx.Response(http.StatusOK, map[string]any{
+			_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 				"routes": []RouteInfo{},
 				"error":  "Could not fetch routes: " + err.Error(),
 			}, nil)
@@ -488,7 +488,7 @@ func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 		}
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"routes": routes,
 		"count":  len(routes),
 	}, nil)
@@ -514,7 +514,7 @@ func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, snapshot, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, snapshot, nil)
 }
 
 func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {
@@ -551,7 +551,7 @@ func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {
 	metrics["alerts"] = alerts
 	metrics["thresholds"] = thresholds
 
-	_ = ctx.Response(http.StatusOK, metrics, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, metrics, nil)
 }
 
 func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
@@ -573,13 +573,13 @@ func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"success": true,
 	}, nil)
 }
 
 func (d *Dashboard) handlePprofTypes(ctx *contract.Ctx) {
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"types": pprofProfiles(),
 	}, nil)
 }
@@ -614,8 +614,8 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 		return
 	}
 
-	if download := strings.TrimSpace(ctx.Query.Get("download")); download == "0" || strings.EqualFold(download, "false") {
-		_ = ctx.Response(http.StatusOK, map[string]any{
+	if download := strings.TrimSpace(ctx.R.URL.Query().Get("download")); download == "0" || strings.EqualFold(download, "false") {
+		_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 			"type":         profileType,
 			"seconds":      seconds,
 			"content_type": contentType,
@@ -663,7 +663,7 @@ func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, resp, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, resp, nil)
 }
 
 // Helper methods

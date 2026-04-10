@@ -190,7 +190,7 @@ func (c *Handler) handleSummary(ctx *contract.Ctx) {
 		},
 	}
 
-	_ = ctx.Response(http.StatusOK, data, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, data, nil)
 }
 
 func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
@@ -203,7 +203,7 @@ func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 		return
 	}
 
-	queue := strings.TrimSpace(ctx.Query.Get("queue"))
+	queue := strings.TrimSpace(ctx.R.URL.Query().Get("queue"))
 	var stats []QueueStats
 
 	if queue == "" {
@@ -242,7 +242,7 @@ func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 		stats = []QueueStats{snapshot}
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"queues": stats,
 	}, nil)
 }
@@ -273,7 +273,7 @@ func (c *Handler) handleQueueReplay(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"replay": result,
 	}, nil)
 }
@@ -288,7 +288,7 @@ func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 		return
 	}
 
-	messageID := strings.TrimSpace(ctx.Query.Get("message_id"))
+	messageID := strings.TrimSpace(ctx.R.URL.Query().Get("message_id"))
 	if messageID == "" {
 		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
@@ -308,7 +308,7 @@ func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"receipt": receipt,
 	}, nil)
 }
@@ -323,7 +323,7 @@ func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 		return
 	}
 
-	provider := strings.TrimSpace(ctx.Query.Get("provider"))
+	provider := strings.TrimSpace(ctx.R.URL.Query().Get("provider"))
 	var channels []ChannelHealth
 
 	if provider == "" {
@@ -362,7 +362,7 @@ func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 		channels = []ChannelHealth{status}
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"channels": channels,
 	}, nil)
 }
@@ -377,7 +377,7 @@ func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 		return
 	}
 
-	tenantID := strings.TrimSpace(ctx.Query.Get("tenant_id"))
+	tenantID := strings.TrimSpace(ctx.R.URL.Query().Get("tenant_id"))
 	if tenantID == "" {
 		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
@@ -397,7 +397,7 @@ func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"quota": snapshot,
 	}, nil)
 }

@@ -29,7 +29,7 @@ func (s *Service) HandleSend(ctx *contract.Ctx) {
 		writeServiceError(ctx, err)
 		return
 	}
-	_ = ctx.Response(http.StatusAccepted, map[string]string{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusAccepted, map[string]string{
 		"id":     req.ID,
 		"status": "queued",
 	}, nil)
@@ -59,7 +59,7 @@ func (s *Service) HandleBatchSend(ctx *contract.Ctx) {
 		return
 	}
 	result := s.SendBatch(ctx.R.Context(), batch)
-	_ = ctx.Response(http.StatusOK, result, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, result, nil)
 }
 
 // HandleStats is the HTTP handler for GET /messages/stats.
@@ -73,7 +73,7 @@ func (s *Service) HandleStats(ctx *contract.Ctx) {
 			Build())
 		return
 	}
-	_ = ctx.Response(http.StatusOK, stats, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, stats, nil)
 }
 
 // HandleGetReceipt is the HTTP handler for GET /messages/:id/receipt.
@@ -96,7 +96,7 @@ func (s *Service) HandleGetReceipt(ctx *contract.Ctx) {
 			Build())
 		return
 	}
-	_ = ctx.Response(http.StatusOK, receipt, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, receipt, nil)
 }
 
 // HandleListReceipts is the HTTP handler for GET /messages/receipts.
@@ -118,7 +118,7 @@ func (s *Service) HandleListReceipts(ctx *contract.Ctx) {
 		}
 	}
 	receipts := s.receipts.List(filter)
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"receipts": receipts,
 		"count":    len(receipts),
 	}, nil)
@@ -127,7 +127,7 @@ func (s *Service) HandleListReceipts(ctx *contract.Ctx) {
 // HandleChannelHealth is the HTTP handler for GET /messages/channels.
 func (s *Service) HandleChannelHealth(ctx *contract.Ctx) {
 	statuses := s.monitor.Status()
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"channels": statuses,
 	}, nil)
 }

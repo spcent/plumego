@@ -456,7 +456,7 @@ func (c *DBResourceController[T]) IndexCtx(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, PaginatedResponse{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, PaginatedResponse{
 		Data:       transformedResults,
 		Pagination: NewPaginationMeta(params.Page, params.PageSize, total),
 	}, nil)
@@ -501,7 +501,7 @@ func (c *DBResourceController[T]) ShowCtx(ctx *contract.Ctx) {
 			Build())
 		return
 	}
-	_ = ctx.Response(http.StatusOK, transformedResult, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, transformedResult, nil)
 }
 
 // CreateCtx handles POST /resource.
@@ -565,7 +565,7 @@ func (c *DBResourceController[T]) CreateCtx(ctx *contract.Ctx) {
 			Build())
 		return
 	}
-	_ = ctx.Response(http.StatusCreated, transformedResult, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusCreated, transformedResult, nil)
 }
 
 // UpdateCtx handles PUT /resource/:id.
@@ -647,7 +647,7 @@ func (c *DBResourceController[T]) UpdateCtx(ctx *contract.Ctx) {
 			Build())
 		return
 	}
-	_ = ctx.Response(http.StatusOK, transformedResult, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, transformedResult, nil)
 }
 
 // DeleteCtx handles DELETE /resource/:id.
@@ -697,7 +697,7 @@ func (c *DBResourceController[T]) DeleteCtx(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusNoContent, nil, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusNoContent, nil, nil)
 }
 
 // ================================================

@@ -119,11 +119,11 @@ func webhookCreateTarget(ctx *contract.Ctx, svc *Service) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusCreated, targetToDTO(t), nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusCreated, targetToDTO(t), nil)
 }
 
 func webhookListTargets(ctx *contract.Ctx, svc *Service) {
-	q := ctx.Query
+	q := ctx.R.URL.Query()
 
 	var enabled *bool
 	if v := strings.TrimSpace(q.Get("enabled")); v != "" {
@@ -146,7 +146,7 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 		out = append(out, targetToDTO(t))
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{"items": out}, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{"items": out}, nil)
 }
 
 func webhookGetTarget(ctx *contract.Ctx, svc *Service) {
@@ -162,7 +162,7 @@ func webhookGetTarget(ctx *contract.Ctx, svc *Service) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, targetToDTO(t), nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, targetToDTO(t), nil)
 }
 
 func webhookPatchTarget(ctx *contract.Ctx, svc *Service) {
@@ -184,7 +184,7 @@ func webhookPatchTarget(ctx *contract.Ctx, svc *Service) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, targetToDTO(t), nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, targetToDTO(t), nil)
 }
 
 func webhookSetTargetEnabled(ctx *contract.Ctx, svc *Service, enable bool) {
@@ -204,7 +204,7 @@ func webhookSetTargetEnabled(ctx *contract.Ctx, svc *Service, enable bool) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, targetToDTO(t), nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, targetToDTO(t), nil)
 }
 
 func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmpty bool) {
@@ -214,7 +214,7 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 		return
 	}
 
-	provided := strings.TrimSpace(ctx.Query.Get("token"))
+	provided := strings.TrimSpace(ctx.R.URL.Query().Get("token"))
 	if provided == "" {
 		provided = strings.TrimSpace(ctx.RequestHeaders().Get("X-Trigger-Token"))
 	}
@@ -243,14 +243,14 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 		return
 	}
 
-	_ = ctx.Response(http.StatusAccepted, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusAccepted, map[string]any{
 		"enqueued": enqueued,
 		"event":    event,
 	}, nil)
 }
 
 func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
-	q := ctx.Query
+	q := ctx.R.URL.Query()
 
 	limit := defaultLimit
 	if v := strings.TrimSpace(q.Get("limit")); v != "" {
@@ -324,7 +324,7 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 	}
 
 	resp := map[string]any{"items": out}
-	_ = ctx.Response(http.StatusOK, resp, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, resp, nil)
 }
 
 func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
@@ -342,7 +342,7 @@ func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
 
 	payload := json.RawMessage(d.PayloadJSON)
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"id":                d.ID,
 		"target_id":         d.TargetID,
 		"event_id":          d.EventID,
@@ -377,7 +377,7 @@ func webhookReplayDelivery(ctx *contract.Ctx, svc *Service) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID}, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID}, nil)
 }
 
 // --- package-local error helpers (use ErrorBuilder to guarantee fully populated APIError) ---

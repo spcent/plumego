@@ -1,7 +1,7 @@
 # Card 0925: Contract Ctx Request-Bag Pruning
 
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 
 ## Goal
@@ -75,3 +75,12 @@ Then run the required repo-wide gates before committing.
 - Success and error response paths remain canonical and documented.
 - Removed exported symbols have zero residual references.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Removed `Ctx` response shortcut methods (`Response`, `Text`, `Bytes`, `Redirect`, `UnsafeRedirect`, `File`, `SetCookie`, `Cookie`) and migrated in-repo callers to `WriteResponse` or direct `net/http`.
+- Removed stable `contract` streaming/SSE symbols (`StreamConfig`, `StreamFormat`, `SSEEvent`, `SSEWriter`, `NewSSEWriter`, and associated stream errors).
+- Removed hidden request timeout/cancel ownership from `NewCtx` and pruned `RequestConfig` to body binding policy only.
+- Removed exported request-bag fields `Query`, `Deadline`, `ClientIP`, and `Config`; callers now read query values from `ctx.R.URL.Query()` and request metadata from the request.
+- Removed unused `contract.DefaultConfig`, `ErrCompressionNotSupported`, and `ErrConfigNil`.
+- Kept `CtxHandlerFunc` and `AdaptCtxHandler` temporarily because full migration spans multiple extension families; split the remaining adapter removal into Card 0928.

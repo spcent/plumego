@@ -39,7 +39,8 @@ func pprofProfiles() []pprofProfile {
 }
 
 func parsePprofRequest(ctx *contract.Ctx) (string, int, error) {
-	profileType := strings.ToLower(strings.TrimSpace(ctx.Query.Get("type")))
+	query := ctx.R.URL.Query()
+	profileType := strings.ToLower(strings.TrimSpace(query.Get("type")))
 	if profileType == "" {
 		profileType = "cpu"
 	}
@@ -49,7 +50,7 @@ func parsePprofRequest(ctx *contract.Ctx) (string, int, error) {
 	}
 
 	seconds := 0
-	if secondsRaw := strings.TrimSpace(ctx.Query.Get("seconds")); secondsRaw != "" {
+	if secondsRaw := strings.TrimSpace(query.Get("seconds")); secondsRaw != "" {
 		parsed, err := strconv.Atoi(secondsRaw)
 		if err != nil {
 			return "", 0, fmt.Errorf("invalid seconds")

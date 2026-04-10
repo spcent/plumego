@@ -26,7 +26,9 @@ non_goals:
 public_entrypoints:
   - WriteError
   - WriteResponse
-  - Ctx
+  - WriteJSON
+  - WithRequestContext
+  - RequestContextFromContext
 
 allowed_imports:
   - stdlib
@@ -62,4 +64,4 @@ review_checklist:
 agent_hints:
   - Prefer stdlib-shaped helpers
   - Do not introduce app wiring here
-  - Keep Ctx limited to transport binding/response/streaming helpers, not request-local service location; keep generic internal error wrapping and protocol-specific helpers in the owning module
+  - Keep Ctx limited to legacy transport binding and route-param access; keep response writing and protocol-specific helpers on explicit stdlib paths

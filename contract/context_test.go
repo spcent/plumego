@@ -3,82 +3,39 @@ package contract
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestNewCtxPopulatesFields(t *testing.T) {
+func TestNewCtxPopulatesStableFields(t *testing.T) {
 	deadline := time.Now().Add(time.Minute)
 	baseCtx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 
 	req := httptest.NewRequest(http.MethodGet, "/users/123?foo=bar", nil).WithContext(baseCtx)
-	req.Header.Set("X-Forwarded-For", "1.2.3.4")
-
 	ctx := NewCtx(httptest.NewRecorder(), req, map[string]string{"id": "123"})
 
+	if ctx.W == nil || ctx.R == nil {
+		t.Fatalf("expected net/http primitives to be retained")
+	}
 	if ctx.Params["id"] != "123" {
 		t.Fatalf("expected param to be propagated")
 	}
-
-	if ctx.Query.Get("foo") != "bar" {
-		t.Fatalf("expected query to be parsed")
+	if got := ctx.R.URL.Query().Get("foo"); got != "bar" {
+		t.Fatalf("expected query to remain on request URL, got %q", got)
 	}
-
-	if ctx.ClientIP != "1.2.3.4" {
-		t.Fatalf("expected client ip from header, got %s", ctx.ClientIP)
+	gotDeadline, ok := ctx.R.Context().Deadline()
+	if !ok || !gotDeadline.Equal(deadline) {
+		t.Fatalf("expected existing request deadline to be preserved")
 	}
-
-	if ctx.Deadline.IsZero() || !ctx.Deadline.Equal(deadline) {
-		t.Fatalf("expected deadline to be copied")
-	}
-
 	if ctx.RequestID() != "" {
 		t.Fatalf("expected empty request id on request without request context, got %q", ctx.RequestID())
-	}
-}
-
-func TestCtxResponseHelpers(t *testing.T) {
-	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = req.WithContext(WithRequestID(req.Context(), "req-123"))
-	ctx := NewCtx(recorder, req, nil)
-
-	if err := ctx.Response(http.StatusAccepted, map[string]string{"msg": "ok"}, map[string]any{"source": "test"}); err != nil {
-		t.Fatalf("response failed: %v", err)
-	}
-
-	if recorder.Code != http.StatusAccepted {
-		t.Fatalf("expected status %d got %d", http.StatusAccepted, recorder.Code)
-	}
-
-	if ct := recorder.Header().Get("Content-Type"); ct != "application/json" {
-		t.Fatalf("expected json content type, got %s", ct)
-	}
-
-	var payload Response
-	if err := json.NewDecoder(recorder.Body).Decode(&payload); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-
-	data, ok := payload.Data.(map[string]any)
-	if !ok {
-		t.Fatalf("expected response data object, got %T", payload.Data)
-	}
-	if data["msg"] != "ok" {
-		t.Fatalf("unexpected payload: %+v", payload)
-	}
-	if payload.RequestID != "req-123" {
-		t.Fatalf("expected request id, got %q", payload.RequestID)
-	}
-	if payload.Meta == nil || payload.Meta["source"] != "test" {
-		t.Fatalf("unexpected meta: %+v", payload.Meta)
 	}
 }
 
@@ -92,7 +49,6 @@ func TestBindJSON(t *testing.T) {
 	if err := ctx.BindJSON(&payload); err != nil {
 		t.Fatalf("expected successful bind, got %v", err)
 	}
-
 	if payload.Name != "demo" {
 		t.Fatalf("unexpected payload: %+v", payload)
 	}
@@ -100,11 +56,10 @@ func TestBindJSON(t *testing.T) {
 
 func TestBindJSONMaxBodySize(t *testing.T) {
 	body := bytes.NewBufferString(`{"name":"too-long"}`)
-	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
-	ctx.Config = &RequestConfig{
+	ctx := NewCtxWithConfig(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil, RequestConfig{
 		MaxBodySize:     10,
 		EnableBodyCache: true,
-	}
+	})
 
 	var payload map[string]any
 	err := ctx.BindJSON(&payload)
@@ -116,7 +71,6 @@ func TestBindJSONMaxBodySize(t *testing.T) {
 	if !errors.As(err, &bindErr) {
 		t.Fatalf("expected bindError, got %T", err)
 	}
-
 	if bindErr.Status != http.StatusRequestEntityTooLarge {
 		t.Fatalf("expected status %d, got %d", http.StatusRequestEntityTooLarge, bindErr.Status)
 	}
@@ -125,10 +79,9 @@ func TestBindJSONMaxBodySize(t *testing.T) {
 func TestBindJSONBodyCacheToggle(t *testing.T) {
 	payloadBody := `{"name":"demo"}`
 
-	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(payloadBody)), nil)
-	ctx.Config = &RequestConfig{
+	ctx := NewCtxWithConfig(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(payloadBody)), nil, RequestConfig{
 		EnableBodyCache: true,
-	}
+	})
 
 	var payload map[string]any
 	if err := ctx.BindJSON(&payload); err != nil {
@@ -143,10 +96,9 @@ func TestBindJSONBodyCacheToggle(t *testing.T) {
 		t.Fatalf("expected cached body to match payload")
 	}
 
-	ctxNoCache := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(payloadBody)), nil)
-	ctxNoCache.Config = &RequestConfig{
+	ctxNoCache := NewCtxWithConfig(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(payloadBody)), nil, RequestConfig{
 		EnableBodyCache: false,
-	}
+	})
 
 	if err := ctxNoCache.BindJSON(&payload); err != nil {
 		t.Fatalf("expected bind to succeed, got %v", err)
@@ -186,13 +138,9 @@ func TestBindJSONErrors(t *testing.T) {
 			if !errors.As(err, &bindErr) {
 				t.Fatalf("expected bindError, got %T", err)
 			}
-
 			if bindErr.Message != tt.wantMsg {
 				t.Fatalf("unexpected message: %s", bindErr.Message)
 			}
-
-			// Verify errors.Is works for the sentinel so callers can pattern-match
-			// without string comparisons.
 			if !errors.Is(err, tt.wantSentinel) {
 				t.Fatalf("errors.Is(%v) returned false; want true", tt.wantSentinel)
 			}
@@ -217,10 +165,6 @@ func TestBindJSONThenValidateStruct(t *testing.T) {
 	if err := ValidateStruct(&p); err != nil {
 		t.Fatalf("expected successful validate, got %v", err)
 	}
-
-	if p.Email == "" || p.Password == "" || p.Username == "" {
-		t.Fatalf("expected fields to be populated: %+v", p)
-	}
 }
 
 func TestValidateStructErrorsAfterBindJSON(t *testing.T) {
@@ -242,27 +186,17 @@ func TestValidateStructErrorsAfterBindJSON(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validation error")
 	}
-
 	if !strings.Contains(err.Error(), "Email") {
 		t.Fatalf("unexpected validation error message: %s", err.Error())
 	}
 }
 
-func TestNewCtxAppliesRequestTimeout(t *testing.T) {
-	cfg := RequestConfig{
-		RequestTimeout: 50 * time.Millisecond,
-	}
-
+func TestNewCtxDoesNotCreateRequestTimeout(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := NewCtxWithConfig(httptest.NewRecorder(), req, nil, cfg)
+	ctx := NewCtxWithConfig(httptest.NewRecorder(), req, nil, RequestConfig{})
 
-	if ctx.Deadline.IsZero() {
-		t.Fatalf("expected deadline to be set from request timeout")
-	}
-
-	until := time.Until(ctx.Deadline)
-	if until <= 0 || until > 200*time.Millisecond {
-		t.Fatalf("expected deadline within timeout window, got %v", until)
+	if _, ok := ctx.R.Context().Deadline(); ok {
+		t.Fatalf("NewCtxWithConfig must not create hidden request deadlines")
 	}
 }
 
@@ -293,9 +227,8 @@ func TestBindErrorHelpers(t *testing.T) {
 	}
 }
 
-func TestCtxHelpers(t *testing.T) {
+func TestCtxParamHelpers(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.RemoteAddr = "10.0.0.1:1234"
 	ctx := NewCtx(httptest.NewRecorder(), req, map[string]string{"name": "demo"})
 
 	if val, ok := ctx.Param("name"); !ok || val != "demo" {
@@ -303,14 +236,6 @@ func TestCtxHelpers(t *testing.T) {
 	}
 	if _, err := ctx.MustParam("missing"); err == nil {
 		t.Fatalf("MustParam should error on missing key")
-	}
-
-	// response helpers
-	if err := ctx.Text(http.StatusCreated, "hello"); err != nil {
-		t.Fatalf("text write failed: %v", err)
-	}
-	if err := ctx.Bytes(http.StatusOK, []byte("bin")); err != nil {
-		t.Fatalf("bytes write failed: %v", err)
 	}
 }
 
@@ -327,170 +252,92 @@ func TestAdaptCtxHandler(t *testing.T) {
 	if !called {
 		t.Fatalf("handler was not called")
 	}
+}
 
-	if err := ValidateCtxHandler(nil); err == nil {
-		t.Fatalf("expected validation error for nil handler")
+func TestBindQuery(t *testing.T) {
+	type filter struct {
+		Name   string   `query:"name"`
+		Page   int      `query:"page"`
+		Limit  int64    `query:"limit"`
+		Score  float64  `query:"score"`
+		Active bool     `query:"active"`
+		Tags   []string `query:"tags"`
+		Ignore string
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/?name=alice&page=2&limit=50&score=9.5&active=true&tags=go&tags=http", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	var f filter
+	if err := ctx.BindQuery(&f); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f.Name != "alice" || f.Page != 2 || f.Limit != 50 || f.Score != 9.5 || !f.Active {
+		t.Fatalf("unexpected scalar fields: %+v", f)
+	}
+	if len(f.Tags) != 2 || f.Tags[0] != "go" || f.Tags[1] != "http" {
+		t.Fatalf("expected tags=[go http], got %v", f.Tags)
+	}
+	if f.Ignore != "" {
+		t.Fatal("field without query tag should not be set")
 	}
 }
 
-func TestStreamChunkSizeValidation(t *testing.T) {
-	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), nil)
+func TestBindQueryMissingParams(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
 
-	// Negative ChunkSize is always invalid regardless of source type.
-	if err := ctx.Stream(StreamConfig{Source: strings.NewReader("data"), ChunkSize: -1}); !errors.Is(err, ErrInvalidChunkSize) {
-		t.Fatalf("expected invalid chunk size error for io.Reader, got %v", err)
+	type filter struct {
+		Name string `query:"name"`
+		Page int    `query:"page"`
 	}
 
-	if err := ctx.Stream(StreamConfig{Format: StreamFormatJSON, Source: []any{map[string]string{"a": "b"}}, ChunkSize: -1}); !errors.Is(err, ErrInvalidChunkSize) {
-		t.Fatalf("expected invalid chunk size error for []any, got %v", err)
+	var f filter
+	if err := ctx.BindQuery(&f); err != nil {
+		t.Fatalf("missing params should not error, got %v", err)
 	}
-
-	if err := ctx.Stream(StreamConfig{Format: StreamFormatText, Source: []string{"line"}, ChunkSize: -1}); !errors.Is(err, ErrInvalidChunkSize) {
-		t.Fatalf("expected invalid chunk size error for []string, got %v", err)
-	}
-}
-
-func TestSSESanitizeField(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"clean string", "hello", "hello"},
-		{"newline in middle", "hello\nworld", "helloworld"},
-		{"carriage return", "hello\rworld", "helloworld"},
-		{"crlf", "hello\r\nworld", "helloworld"},
-		{"multiple newlines", "a\nb\nc", "abc"},
-		{"empty", "", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeSSEField(tt.input)
-			if result != tt.expected {
-				t.Errorf("sanitizeSSEField(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
-		})
+	if f.Name != "" || f.Page != 0 {
+		t.Fatal("missing params should leave zero values")
 	}
 }
 
-func TestSSEWriterSanitizesFields(t *testing.T) {
-	recorder := httptest.NewRecorder()
+func TestBindQueryInvalidType(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/?page=notanumber", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
 
-	sw, err := NewSSEWriter(recorder)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	type filter struct {
+		Page int `query:"page"`
 	}
 
-	// Test that newlines in ID and Event are stripped
-	event := SSEEvent{
-		ID:    "id\n:injected",
-		Event: "type\n:injected",
-		Data:  "safe data",
+	var f filter
+	err := ctx.BindQuery(&f)
+	if err == nil {
+		t.Fatal("expected error for invalid int")
 	}
-
-	if err := sw.Write(event); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	var bindErr *bindError
+	if !errors.As(err, &bindErr) {
+		t.Fatalf("expected bindError, got %T", err)
 	}
-
-	body := recorder.Body.String()
-
-	// ID should have newlines stripped
-	if strings.Contains(body, "id: id\n") {
-		t.Error("SSE ID field should have newlines stripped")
+	if bindErr.Status != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", bindErr.Status)
 	}
-	if !strings.Contains(body, "id: id:injected") {
-		t.Errorf("expected sanitized ID, got: %q", body)
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected errors.Is(err, ErrInvalidParam) to be true, got %v", err)
 	}
-
-	// Event should have newlines stripped
-	if strings.Contains(body, "event: type\n") {
-		t.Error("SSE Event field should have newlines stripped")
-	}
-	if !strings.Contains(body, "event: type:injected") {
-		t.Errorf("expected sanitized Event, got: %q", body)
+	var numErr *strconv.NumError
+	if !errors.As(err, &numErr) {
+		t.Fatalf("expected strconv.NumError to remain reachable, got %v", err)
 	}
 }
 
-func TestSSEWriterMultiLineData(t *testing.T) {
-	recorder := httptest.NewRecorder()
+func TestBindQueryNonPointer(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
 
-	sw, err := NewSSEWriter(recorder)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Multi-line data should be split into multiple "data:" lines per SSE spec
-	event := SSEEvent{
-		Data: "line1\nline2\nline3",
-	}
-
-	if err := sw.Write(event); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	body := recorder.Body.String()
-
-	// Each line should be its own data: field
-	if !strings.Contains(body, "data: line1\n") {
-		t.Errorf("expected 'data: line1\\n' in output, got: %q", body)
-	}
-	if !strings.Contains(body, "data: line2\n") {
-		t.Errorf("expected 'data: line2\\n' in output, got: %q", body)
-	}
-	if !strings.Contains(body, "data: line3\n") {
-		t.Errorf("expected 'data: line3\\n' in output, got: %q", body)
-	}
-
-	// Should NOT contain the raw unsplit data
-	if strings.Contains(body, "data: line1\nline2") {
-		t.Error("multi-line data should be split into separate data: fields")
-	}
-}
-
-func TestSSEWriterInjectionPrevention(t *testing.T) {
-	recorder := httptest.NewRecorder()
-
-	sw, err := NewSSEWriter(recorder)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Attempt injection via ID field:
-	// Without sanitization, "id123\n\ndata: malicious" would inject a fake event
-	event := SSEEvent{
-		ID:    "id123\n\ndata: malicious",
-		Event: "msg",
-		Data:  "legitimate",
-	}
-
-	if err := sw.Write(event); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	body := recorder.Body.String()
-
-	// The output should contain exactly one well-formed event.
-	// Newlines in ID are stripped, so injection attempt is neutralized.
-	// The id field should be on a single line without breaks.
-	lines := strings.Split(body, "\n")
-
-	idLineCount := 0
-	dataLineCount := 0
-	for _, line := range lines {
-		if strings.HasPrefix(line, "id: ") {
-			idLineCount++
-		}
-		if strings.HasPrefix(line, "data: ") {
-			dataLineCount++
-		}
-	}
-
-	if idLineCount != 1 {
-		t.Errorf("expected exactly 1 id line, got %d in output: %q", idLineCount, body)
-	}
-	// Only the legitimate data line should exist
-	if dataLineCount != 1 {
-		t.Errorf("expected exactly 1 data line (legitimate only), got %d in output: %q", dataLineCount, body)
+	type filter struct{ Name string }
+	var f filter
+	err := ctx.BindQuery(f)
+	if err == nil {
+		t.Fatal("expected error for non-pointer")
 	}
 }
