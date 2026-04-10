@@ -1,4 +1,4 @@
-# Card 0851
+# Card 0934
 
 Priority: P1
 State: active
@@ -6,7 +6,7 @@ Primary Module: contract
 Owned Files:
 - `contract/validation.go`
 - `contract/bind_helpers.go`
-Depends On: 0850
+Depends On: 0933
 
 Goal:
 - Export `validationErrors` as `ValidationErrors` so callers can use standard Go error inspection (`errors.As`) against the type, instead of being forced to use the bespoke `FieldErrorsFrom` accessor.

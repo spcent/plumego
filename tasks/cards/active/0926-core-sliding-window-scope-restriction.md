@@ -1,4 +1,4 @@
-# Card 0843
+# Card 0926
 
 Priority: P1
 State: active
@@ -19,7 +19,7 @@ Problem:
 
 Scope:
 - In `SlidingWindowQuotaManager.Allow()`, if the provider config contains limits for windows other than `QuotaWindowMinute`, return an error (e.g., `ErrUnsupportedQuotaWindow`) rather than silently allowing.
-- Add `ErrUnsupportedQuotaWindow` to the package sentinel errors (see card 0839).
+- Add `ErrUnsupportedQuotaWindow` to the package sentinel errors (see card 0922).
 - Document in the `SlidingWindowQuotaManager` type comment that it only enforces `QuotaWindowMinute` and that `WindowQuotaManager` should be used for hour/day/month limits.
 - The type-level doc block already mentions the minute-only scope (`quota_sliding.go:14`); strengthen it to be explicit about the error behavior when other windows are configured.
 
@@ -30,7 +30,7 @@ Non-goals:
 
 Files:
 - `x/tenant/core/quota_sliding.go`
-- `x/tenant/core/errors.go` (add `ErrUnsupportedQuotaWindow` — coordinate with card 0839)
+- `x/tenant/core/errors.go` (add `ErrUnsupportedQuotaWindow` — coordinate with card 0922)
 - `x/tenant/core/quota_sliding_test.go`
 
 Tests:
