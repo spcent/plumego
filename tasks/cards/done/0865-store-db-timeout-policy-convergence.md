@@ -1,7 +1,7 @@
 # Card 0865: Store DB Timeout Policy Convergence
 
 Priority: P2
-State: active
+State: done
 Primary Module: store
 
 ## Goal
@@ -64,3 +64,13 @@ Then run the required repo-wide gates before committing.
 - The duplicate unreachable return is removed.
 - Focused tests cover explicit context timeout behavior.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Removed implicit query and transaction timeout probing from `store/db` helpers.
+- Removed `QueryTimeout` and `TransactionTimeout` from stable `db.Config`; `Config` now remains focused on connection opening, pool tuning, and ping timeout.
+- Removed `GetConfig`, `getConfig`, `withQueryTimeout`, and `withTransactionTimeout`.
+- Query and transaction helpers now pass the caller-provided `context.Context` directly to `database/sql`.
+- Added focused tests proving `ExecContext`, `QueryContext`, `QueryRowContext`, `QueryRow`, and `WithTransaction` use the caller context.
+- Updated store docs and manifest to document caller-owned operation deadlines.
+- Validation passed: focused store/db and x/data test, race, and vet gates; dependency rules, agent workflow, module manifests, reference layout; repo-wide `go test`, `go vet`, and `go test -race`.

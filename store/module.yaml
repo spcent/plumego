@@ -19,7 +19,7 @@ non_goals:
   - Tenant-aware adapters
   - Business repositories
   - AI-specific caches
-  - DB analytics, DB instrumentation wrappers, pool-stat polling, slow-query reporting, and DB health or retry-policy helpers
+  - DB analytics, DB instrumentation wrappers, pool-stat polling, slow-query reporting, timeout policy, and DB health or retry-policy helpers
   - File backend/provider configuration, signed URLs, metadata-manager ownership, and image-processing pipelines
   - Read-write splitting, sharding topology defaults, durable KV-engine tuning, ranked-data cache behavior, and cache metrics or introspection ownership
   - Durable idempotency providers, SQL schema policy, and business-level idempotency semantics
