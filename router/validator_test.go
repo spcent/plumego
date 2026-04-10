@@ -15,7 +15,7 @@ func TestRouteValidationGroupPrefix(t *testing.T) {
 	validation := NewRouteValidation().AddParam("id", validator.RouteParamPositiveInt)
 	api.AddValidation(http.MethodGet, "/users/:id", validation)
 
-	api.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -42,7 +42,7 @@ func TestRouteValidationWildcard(t *testing.T) {
 	validation := NewRouteValidation().AddParam("path", validator.RouteParamNewLength(5, 100))
 	r.AddValidation(http.MethodGet, "/files/*path", validation)
 
-	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -69,7 +69,7 @@ func TestRouteValidationCache(t *testing.T) {
 	validation := NewRouteValidation().AddParam("id", validator.RouteParamPositiveInt)
 	r.AddValidation(http.MethodGet, "/users/:id", validation)
 
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -94,9 +94,9 @@ func TestRouteValidationAnyRoute(t *testing.T) {
 	r := NewRouter()
 
 	validation := NewRouteValidation().AddParam("id", validator.RouteParamPositiveInt)
-	r.AddValidation(ANY, "/users/:id", validation)
+	r.AddValidation(methodAny, "/users/:id", validation)
 
-	r.Any("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, methodAny, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -113,7 +113,7 @@ func TestGroupCanServeHTTPDirectly(t *testing.T) {
 	r := NewRouter()
 	api := r.Group("/api")
 
-	api.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

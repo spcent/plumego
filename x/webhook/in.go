@@ -12,11 +12,12 @@ import (
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/internal/jsonx"
 	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
 type routeRegistrar interface {
-	AddRoute(method, path string, handler http.Handler) error
+	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
 type Inbound struct {

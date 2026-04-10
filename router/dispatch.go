@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
 )
 
 // noBodyWriter wraps http.ResponseWriter and discards all body writes.
@@ -33,7 +32,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if cachedResult, paramValues, exists := r.state.matchCache.Lookup(req.Method, cachePath, cacheKey); exists {
 		// For HEAD requests served by a GET handler, suppress the body.
 		effectiveW := w
-		if req.Method == HEAD && cachedResult.RouteMethod == GET {
+		if req.Method == http.MethodHead && cachedResult.RouteMethod == http.MethodGet {
 			effectiveW = noBodyWriter{w}
 		}
 		r.serveCachedMatch(effectiveW, req, cachedResult, paramValues)
@@ -60,13 +59,13 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// For HEAD requests auto-served via the GET handler, suppress the body.
-	if req.Method == HEAD && result.RouteMethod == GET {
+	if req.Method == http.MethodHead && result.RouteMethod == http.MethodGet {
 		w = noBodyWriter{w}
 	}
 
 	if result.RouteMethod == "" {
 		if matchedAny {
-			result.RouteMethod = ANY
+			result.RouteMethod = methodAny
 		} else {
 			result.RouteMethod = req.Method
 		}
@@ -101,33 +100,30 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 		tree := r.state.trees[method]
 		if tree != nil && tree.handler != nil {
 			return &MatchResult{
-				Handler:          tree.handler,
-				RouteMiddlewares: tree.middlewares,
-				RoutePattern:     "/",
-				RouteMethod:      method,
-				Validation:       tree.validation,
+				Handler:      tree.handler,
+				RoutePattern: "/",
+				RouteMethod:  method,
+				Validation:   tree.validation,
 			}, false
 		}
 		// RFC 7231 §4.3.2: HEAD is identical to GET except no body.
-		if method == HEAD {
-			if getTree := r.state.trees[GET]; getTree != nil && getTree.handler != nil {
+		if method == http.MethodHead {
+			if getTree := r.state.trees[http.MethodGet]; getTree != nil && getTree.handler != nil {
 				return &MatchResult{
-					Handler:          getTree.handler,
-					RouteMiddlewares: getTree.middlewares,
-					RoutePattern:     "/",
-					RouteMethod:      GET,
-					Validation:       getTree.validation,
+					Handler:      getTree.handler,
+					RoutePattern: "/",
+					RouteMethod:  http.MethodGet,
+					Validation:   getTree.validation,
 				}, false
 			}
 		}
-		if method != ANY {
-			if anyTree := r.state.trees[ANY]; anyTree != nil && anyTree.handler != nil {
+		if method != methodAny {
+			if anyTree := r.state.trees[methodAny]; anyTree != nil && anyTree.handler != nil {
 				return &MatchResult{
-					Handler:          anyTree.handler,
-					RouteMiddlewares: anyTree.middlewares,
-					RoutePattern:     "/",
-					RouteMethod:      ANY,
-					Validation:       anyTree.validation,
+					Handler:      anyTree.handler,
+					RoutePattern: "/",
+					RouteMethod:  methodAny,
+					Validation:   anyTree.validation,
 				}, true
 			}
 		}
@@ -149,8 +145,8 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 	}
 
 	// RFC 7231 §4.3.2: fall back to GET handler for HEAD requests.
-	if method == HEAD {
-		if getTree := r.state.trees[GET]; getTree != nil {
+	if method == http.MethodHead {
+		if getTree := r.state.trees[http.MethodGet]; getTree != nil {
 			getMatcher := getRouteMatcher(getTree)
 			result := getMatcher.Match(parts)
 			putRouteMatcher(getMatcher)
@@ -161,8 +157,8 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 	}
 
 	// Fall back to ANY handler.
-	if method != ANY {
-		if anyTree := r.state.trees[ANY]; anyTree != nil {
+	if method != methodAny {
+		if anyTree := r.state.trees[methodAny]; anyTree != nil {
 			anyMatcher := getRouteMatcher(anyTree)
 			result := anyMatcher.Match(parts)
 			putRouteMatcher(anyMatcher)
@@ -235,27 +231,7 @@ func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Reques
 	ctx = contract.WithRequestContext(ctx, existingRC)
 	reqWithParams := req.WithContext(ctx)
 
-	// Obtain the handler (possibly from middleware-chain cache).
-	version := r.middlewareManager.getVersion()
-	var handler http.Handler
-	if cached, ok := result.loadCached(version); ok {
-		handler = cached
-	} else {
-		allMiddlewares := r.middlewareManager.getMiddlewares()
-		combined := make([]middleware.Middleware, 0, len(allMiddlewares)+len(result.RouteMiddlewares))
-		combined = append(combined, allMiddlewares...)
-		combined = append(combined, result.RouteMiddlewares...)
-
-		if len(combined) == 0 {
-			handler = result.Handler
-		} else {
-			chain := middleware.NewChain(combined...)
-			handler = chain.Build(result.Handler)
-			result.storeCached(version, handler)
-		}
-	}
-
-	handler.ServeHTTP(w, reqWithParams)
+	result.Handler.ServeHTTP(w, reqWithParams)
 }
 
 func (r *Router) allowedMethods(path string) []string {
@@ -270,7 +246,7 @@ func (r *Router) allowedMethods(path string) []string {
 	allowed := make([]string, 0, len(r.state.trees))
 	if normalized == "/" {
 		for method, tree := range r.state.trees {
-			if method == ANY || tree == nil {
+			if method == methodAny || tree == nil {
 				continue
 			}
 			if tree.handler != nil {
@@ -282,7 +258,7 @@ func (r *Router) allowedMethods(path string) []string {
 		parts := *partsPtr
 
 		for method, tree := range r.state.trees {
-			if method == ANY || tree == nil {
+			if method == methodAny || tree == nil {
 				continue
 			}
 			matcher := getRouteMatcher(tree)

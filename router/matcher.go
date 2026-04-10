@@ -110,14 +110,12 @@ func (rm *routeMatcher) Match(parts []string) *MatchResult {
 	*pvPtr = paramValues
 	putParamValues(pvPtr)
 
-	// Return match result with direct middleware slice
 	return &MatchResult{
-		Handler:          current.handler,
-		ParamValues:      resultParams,
-		ParamKeys:        current.paramKeys,
-		RouteMiddlewares: current.middlewares,
-		RoutePattern:     current.fullPath,
-		Validation:       current.validation,
+		Handler:      current.handler,
+		ParamValues:  resultParams,
+		ParamKeys:    current.paramKeys,
+		RoutePattern: current.fullPath,
+		Validation:   current.validation,
 	}
 }
 

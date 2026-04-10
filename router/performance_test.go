@@ -184,7 +184,7 @@ func BenchmarkParameterValidation(b *testing.B) {
 
 	r.AddValidation("GET", "/users/:id", validation)
 
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -220,12 +220,12 @@ func TestOptimizedRouterFeatures(t *testing.T) {
 	r.AddValidation("GET", "/users/:id", validation)
 
 	// Register routes
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
 
-	r.Get("/posts/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/posts/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte("post-" + id))
 	}))

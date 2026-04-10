@@ -1,7 +1,7 @@
 # Card 0862: Router Middleware And Registration Surface Pruning
 
 Priority: P1
-State: active
+State: done
 Primary Module: router
 
 ## Goal
@@ -85,3 +85,28 @@ Then run the required repo-wide gates before committing.
 - The router public API has one canonical route-registration path.
 - All old removed exported symbols have zero residual references.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Removed router-owned middleware state, middleware imports, route middleware metadata, and middleware-chain caching.
+- Collapsed router registration to `AddRoute(method, path, handler, opts...)`; route names are attached with `WithRouteName`.
+- Removed panic route shortcuts, named shortcut wrappers, exported HTTP method constants, `GroupFunc`, and `SetRouteMeta`.
+- Migrated core and x call sites to explicit `net/http` methods or local ANY sentinels.
+- Kept app-level middleware ownership in `core.App.Use(...)` and extension-owned explicit handler wrapping where needed.
+- Updated router docs and module manifest.
+
+Validation:
+
+```bash
+go test -timeout 20s ./router ./core ./x/devtools ./x/frontend ./x/websocket ./x/webhook ./x/rest ./x/messaging ./x/gateway ./x/ops
+go test -race -timeout 60s ./router ./core
+go vet ./router ./core ./x/devtools ./x/frontend ./x/websocket ./x/webhook ./x/rest ./x/messaging ./x/gateway ./x/ops
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/agent-workflow
+go run ./internal/checks/module-manifests
+go run ./internal/checks/reference-layout
+go test -timeout 20s ./...
+go vet ./...
+go test -race -timeout 60s ./...
+gofmt -w .
+```

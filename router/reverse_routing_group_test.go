@@ -13,7 +13,7 @@ func TestURLFromNestedGroupNamedRoute(t *testing.T) {
 	v1 := api.Group("v1")
 	files := v1.Group("/files")
 
-	err := files.AddRouteWithOptions(http.MethodGet, "/:tenant/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	err := files.AddRoute(http.MethodGet, "/:tenant/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		tenant := Param(req, "tenant")
 		path := Param(req, "path")
 		w.Write([]byte(tenant + "|" + path))
@@ -45,7 +45,7 @@ func TestURLMissingParamsInNestedGroupRoute(t *testing.T) {
 
 	api := r.Group("/api")
 	v1 := api.Group("/v1")
-	err := v1.AddRouteWithOptions(http.MethodGet, "/users/:id/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	err := v1.AddRoute(http.MethodGet, "/users/:id/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}), WithRouteName("users.file"))
 	if err != nil {
@@ -69,7 +69,7 @@ func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
 	r := NewRouter()
 
 	v1 := r.Group("/api/v1")
-	err := v1.AddRouteWithOptions(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	err := v1.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}), WithRouteName("users.show"))
 	if err != nil {
@@ -77,7 +77,7 @@ func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
 	}
 
 	v2 := r.Group("/api/v2")
-	err = v2.AddRouteWithOptions(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	err = v2.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}), WithRouteName("users.show"))
 	if err != nil {
@@ -117,7 +117,7 @@ func TestGroupRootNamedRouteUsesNormalizedPrefix(t *testing.T) {
 	api := r.Group("/api/")
 	v1 := api.Group("/v1/")
 
-	err := v1.AddRouteWithOptions(http.MethodGet, "", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	err := v1.AddRoute(http.MethodGet, "", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}), WithRouteName("api.v1.root"))
 	if err != nil {
@@ -141,13 +141,17 @@ func TestNamedMethodHelpersOnGroups(t *testing.T) {
 	api := r.Group("/api")
 	v1 := api.Group("/v1")
 
-	v1.GetNamed("users.show", "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := v1.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		id := Param(req, "id")
 		_, _ = w.Write([]byte(id))
-	}))
-	v1.PostNamed("users.create", "/users", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	}), WithRouteName("users.show")); err != nil {
+		t.Fatal(err)
+	}
+	if err := v1.AddRoute(http.MethodPost, "/users", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-	}))
+	}), WithRouteName("users.create")); err != nil {
+		t.Fatal(err)
+	}
 
 	showURL := r.URL("users.show", "id", "42")
 	if showURL != "/api/v1/users/42" {

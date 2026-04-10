@@ -136,25 +136,38 @@ func New(opts Options) *Handler {
 	}
 }
 
-func (c *Handler) RegisterRoutes(r *router.Router) {
+func (c *Handler) RegisterRoutes(r *router.Router) error {
 	if !c.cfg.Enabled {
-		return
+		return nil
 	}
 
+	var regErr error
 	c.routesOnce.Do(func() {
 		base := normalizeBasePath(c.cfg.BasePath)
 		group := r.Group(base)
-		for _, mw := range c.authMiddlewares() {
-			group.Use(mw)
+		register := func(method, path string, handler http.Handler) {
+			if regErr != nil {
+				return
+			}
+			regErr = group.AddRoute(method, path, c.withAuth(handler))
 		}
 
-		group.Get("", contract.AdaptCtxHandler(c.handleSummary))
-		group.Get("/queue", contract.AdaptCtxHandler(c.handleQueueStats))
-		group.Post("/queue/replay", contract.AdaptCtxHandler(c.handleQueueReplay))
-		group.Get("/receipts", contract.AdaptCtxHandler(c.handleReceiptLookup))
-		group.Get("/channels", contract.AdaptCtxHandler(c.handleChannelHealth))
-		group.Get("/tenants/quota", contract.AdaptCtxHandler(c.handleTenantQuota))
+		register(http.MethodGet, "", contract.AdaptCtxHandler(c.handleSummary))
+		register(http.MethodGet, "/queue", contract.AdaptCtxHandler(c.handleQueueStats))
+		register(http.MethodPost, "/queue/replay", contract.AdaptCtxHandler(c.handleQueueReplay))
+		register(http.MethodGet, "/receipts", contract.AdaptCtxHandler(c.handleReceiptLookup))
+		register(http.MethodGet, "/channels", contract.AdaptCtxHandler(c.handleChannelHealth))
+		register(http.MethodGet, "/tenants/quota", contract.AdaptCtxHandler(c.handleTenantQuota))
 	})
+	return regErr
+}
+
+func (c *Handler) withAuth(handler http.Handler) http.Handler {
+	middlewares := c.authMiddlewares()
+	if len(middlewares) == 0 {
+		return handler
+	}
+	return middleware.NewChain(middlewares...).Build(handler)
 }
 
 func (c *Handler) handleSummary(ctx *contract.Ctx) {

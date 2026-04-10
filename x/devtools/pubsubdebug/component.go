@@ -7,6 +7,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
@@ -21,7 +22,7 @@ func New(cfg PubSubConfig, fallbackPub pubsub.Broker) *Handler {
 }
 
 type routeRegistrar interface {
-	AddRoute(method, path string, handler http.Handler) error
+	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
 func (h *Handler) RegisterRoutes(r routeRegistrar) error {

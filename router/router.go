@@ -7,20 +7,9 @@ import (
 	"sync/atomic"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
 )
 
-// HTTP method constants define standard HTTP methods for route registration.
-const (
-	GET     = "GET"     // HTTP GET method - retrieve resources
-	POST    = "POST"    // HTTP POST method - create resources
-	PUT     = "PUT"     // HTTP PUT method - update/replace resources
-	DELETE  = "DELETE"  // HTTP DELETE method - remove resources
-	PATCH   = "PATCH"   // HTTP PATCH method - partial updates
-	OPTIONS = "OPTIONS" // HTTP OPTIONS method - describe communication options
-	HEAD    = "HEAD"    // HTTP HEAD method - same as GET but without response body
-	ANY     = "ANY"     // Any HTTP method - catch-all route
-)
+const methodAny = "ANY"
 
 // Configuration defaults
 const (
@@ -29,39 +18,6 @@ const (
 	DefaultPoolSliceCap  = 4   // Default capacity for pooled slices
 	DefaultPathPartsCap  = 8   // Default capacity for path parts slices
 )
-
-// middlewareManager manages the middleware chain for a router or group.
-// It is an internal type; callers interact with it only through Router.Use().
-type middlewareManager struct {
-	middlewares []middleware.Middleware
-	mu          sync.RWMutex
-	version     atomic.Uint64
-}
-
-func newMiddlewareManager() *middlewareManager {
-	return &middlewareManager{
-		middlewares: make([]middleware.Middleware, 0),
-	}
-}
-
-func (mm *middlewareManager) addMiddleware(m middleware.Middleware) {
-	mm.mu.Lock()
-	defer mm.mu.Unlock()
-	mm.middlewares = append(mm.middlewares, m)
-	mm.version.Add(1)
-}
-
-func (mm *middlewareManager) getMiddlewares() []middleware.Middleware {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
-	result := make([]middleware.Middleware, len(mm.middlewares))
-	copy(result, mm.middlewares)
-	return result
-}
-
-func (mm *middlewareManager) getVersion() uint64 {
-	return mm.version.Load()
-}
 
 // segment represents a path segment with type information.
 type segment struct {
@@ -73,15 +29,14 @@ type segment struct {
 
 // node represents a node in the prefix trie.
 type node struct {
-	path        string
-	paramName   string
-	fullPath    string
-	indices     string
-	children    []*node
-	handler     http.Handler
-	paramKeys   []string
-	middlewares []middleware.Middleware
-	validation  *RouteValidation
+	path       string
+	paramName  string
+	fullPath   string
+	indices    string
+	children   []*node
+	handler    http.Handler
+	paramKeys  []string
+	validation *RouteValidation
 }
 
 type route struct {
@@ -104,24 +59,29 @@ type routerState struct {
 	methodNotAllowed atomic.Bool
 }
 
-// Router represents an HTTP router with path-based routing and middleware support.
+// Router represents an HTTP router with path-based routing.
 // It implements http.Handler, making it compatible with any Go HTTP server.
 //
 // Example:
 //
 //	r := router.NewRouter()
-//	r.Get("/users", listUsersHandler)
-//	r.Post("/users", createUserHandler)
+//	if err := r.AddRoute(http.MethodGet, "/users", listUsersHandler); err != nil {
+//	    return err
+//	}
+//	if err := r.AddRoute(http.MethodPost, "/users", createUserHandler); err != nil {
+//	    return err
+//	}
 //
 //	api := r.Group("/api/v1")
-//	api.Get("/users/:id", getUserHandler)
+//	if err := api.AddRoute(http.MethodGet, "/users/:id", getUserHandler); err != nil {
+//	    return err
+//	}
 //
 //	http.ListenAndServe(":8080", r)
 type Router struct {
-	prefix            string
-	parent            *Router
-	middlewareManager *middlewareManager
-	state             *routerState
+	prefix string
+	parent *Router
+	state  *routerState
 }
 
 // RouterOption defines a function type for router configuration options.
@@ -134,7 +94,7 @@ type RouteOption func(*RouteMeta)
 //
 // Example:
 //
-//	r.AddRouteWithOptions("GET", "/users/:id", handler, router.WithRouteName("user.show"))
+//	r.AddRoute(http.MethodGet, "/users/:id", handler, router.WithRouteName("user.show"))
 //	url := r.URL("user.show", "id", "123") // → "/users/123"
 func WithRouteName(name string) RouteOption {
 	return func(meta *RouteMeta) {
@@ -154,14 +114,13 @@ func WithMethodNotAllowed(enabled bool) RouterOption {
 // Example:
 //
 //	r := router.NewRouter()
-//	r.Get("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//	err := r.AddRoute(http.MethodGet, "/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 //	    w.Write([]byte("Hello, World!"))
 //	}))
 func NewRouter(opts ...RouterOption) *Router {
 	r := &Router{
-		prefix:            "",
-		parent:            nil,
-		middlewareManager: newMiddlewareManager(),
+		prefix: "",
+		parent: nil,
 		state: &routerState{
 			trees:            make(map[string]*node),
 			routes:           make(map[string][]route),
@@ -194,20 +153,6 @@ func (r *Router) Freeze() {
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 	r.state.frozen = true
-}
-
-// Use adds middlewares to the router or group.
-// Middlewares execute in the order they are added, for all routes in this group and its children.
-//
-// Example:
-//
-//	r := router.NewRouter()
-//	r.Use(accesslog.Middleware(logger, nil, nil))
-//	r.Use(recovery.Recovery(logger))
-func (r *Router) Use(middlewares ...middleware.Middleware) {
-	for _, m := range middlewares {
-		r.middlewareManager.addMiddleware(m)
-	}
 }
 
 // findChild finds a child node with the exact given path segment (static nodes only).
@@ -256,36 +201,6 @@ func (r *Router) insertChild(parent *node, child *node) {
 	parent.children = append(parent.children, nil)
 	copy(parent.children[i+1:], parent.children[i:])
 	parent.children[i] = child
-}
-
-func (r *Router) routeMiddlewares() []middleware.Middleware {
-	if r.parent == nil {
-		return nil
-	}
-
-	var layers [][]middleware.Middleware
-	for current := r; current != nil && current.parent != nil; current = current.parent {
-		mws := current.middlewareManager.getMiddlewares()
-		if len(mws) > 0 {
-			layers = append(layers, mws)
-		}
-	}
-
-	if len(layers) == 0 {
-		return nil
-	}
-
-	total := 0
-	for i := len(layers) - 1; i >= 0; i-- {
-		total += len(layers[i])
-	}
-
-	combined := make([]middleware.Middleware, 0, total)
-	for i := len(layers) - 1; i >= 0; i-- {
-		combined = append(combined, layers[i]...)
-	}
-
-	return combined
 }
 
 func (r *Router) fullPath(path string) string {
@@ -347,7 +262,7 @@ func normalizeStoredPattern(pattern string) string {
 //
 // Example:
 //
-//	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//	r.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 //	    id := router.Param(r, "id")
 //	    fmt.Fprintf(w, "User: %s", id)
 //	}))

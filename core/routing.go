@@ -8,9 +8,11 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
+const methodAny = "ANY"
+
 // registerRoute is the single implementation for all route registration.
 // An empty name registers the route without a name.
-func (a *App) registerRoute(method, path, name string, handler http.Handler) error {
+func (a *App) registerRoute(method, path, name string, handler http.Handler, opts ...router.RouteOption) error {
 	if handler == nil {
 		params := map[string]any{"method": method, "path": path}
 		if name != "" {
@@ -29,9 +31,9 @@ func (a *App) registerRoute(method, path, name string, handler http.Handler) err
 	}
 
 	if name != "" {
-		return r.AddRouteWithName(method, path, name, handler)
+		opts = append(opts, router.WithRouteName(name))
 	}
-	return r.AddRoute(method, path, handler)
+	return r.AddRoute(method, path, handler, opts...)
 }
 
 func (a *App) addRoute(method, path string, handler http.Handler) error {
@@ -50,8 +52,8 @@ func (a *App) addRoute(method, path string, handler http.Handler) error {
 
 // AddRoute registers a route and returns explicit errors for invalid registration.
 // This is useful in strict boot wiring where route registration failures must be surfaced.
-func (a *App) AddRoute(method, path string, handler http.Handler) error {
-	return a.addRoute(method, path, handler)
+func (a *App) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
+	return a.registerRoute(method, path, "", handler, opts...)
 }
 
 // AddRouteWithName registers a named route and returns explicit registration errors.
@@ -70,30 +72,30 @@ func (a *App) URL(name string, params ...string) string {
 
 // Get registers a GET route with the given handler.
 func (a *App) Get(path string, handler http.Handler) error {
-	return a.addRoute(router.GET, path, handler)
+	return a.addRoute(http.MethodGet, path, handler)
 }
 
 // Post registers a POST route with the given handler.
 func (a *App) Post(path string, handler http.Handler) error {
-	return a.addRoute(router.POST, path, handler)
+	return a.addRoute(http.MethodPost, path, handler)
 }
 
 // Put registers a PUT route with the given handler.
 func (a *App) Put(path string, handler http.Handler) error {
-	return a.addRoute(router.PUT, path, handler)
+	return a.addRoute(http.MethodPut, path, handler)
 }
 
 // Delete registers a DELETE route with the given handler.
 func (a *App) Delete(path string, handler http.Handler) error {
-	return a.addRoute(router.DELETE, path, handler)
+	return a.addRoute(http.MethodDelete, path, handler)
 }
 
 // Patch registers a PATCH route with the given handler.
 func (a *App) Patch(path string, handler http.Handler) error {
-	return a.addRoute(router.PATCH, path, handler)
+	return a.addRoute(http.MethodPatch, path, handler)
 }
 
 // Any registers a route for any HTTP method with the given handler.
 func (a *App) Any(path string, handler http.Handler) error {
-	return a.addRoute(router.ANY, path, handler)
+	return a.addRoute(methodAny, path, handler)
 }

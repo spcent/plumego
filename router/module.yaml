@@ -25,9 +25,14 @@ non_goals:
   - Tenant routing or feature-flag route factories
 
 public_entrypoints:
+  - NewRouter
   - Router
+  - AddRoute
   - Group
   - Param
+  - WithRouteName
+  - WithMethodNotAllowed
+  - Static
 
 allowed_imports:
   - contract

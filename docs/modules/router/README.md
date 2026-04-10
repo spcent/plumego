@@ -14,6 +14,7 @@
 - adding matching or grouping behavior
 - changing path parameter extraction
 - working on reverse routing or mount primitives
+- registering routes directly with `Router.AddRoute(method, path, handler, opts...)`
 
 ## Do not use this module for
 
@@ -21,17 +22,19 @@
 - auth policy
 - logger lookup or logger carriage
 - service construction
+- middleware ownership or middleware execution policy
 
 ## First files to read
 
 - `router/module.yaml`
 - `router/router.go`
-- `router/group.go`
+- `router/registration.go`
 
 ## Public entrypoints
 
 - `Router`
 - `Group`
+- `AddRoute`
 - `Param`
 
 ## Main risks when changing this module
@@ -45,5 +48,13 @@
 - preserve deterministic dispatch
 - keep explicit method-plus-path registration behavior
 - keep router APIs stdlib-shaped instead of alias-heavy
+- use `net/http` method constants for standard HTTP methods
 - keep one public param helper (`Param`)
+- keep route metadata attached through `AddRoute(..., WithRouteName(...))`
 - avoid bleeding response or middleware policy into router internals
+
+## Boundary notes
+
+- `router` does not own middleware registration or middleware chains.
+- App-wide middleware belongs to `core.App.Use(...)` and the stable `middleware` package.
+- `router` keeps an internal ANY sentinel for wildcard method dispatch; callers should prefer `core.App.Any(...)` for app-level catch-all routes.

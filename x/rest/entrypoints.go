@@ -25,48 +25,87 @@ func DefaultRouteOptions() RouteOptions {
 }
 
 // RegisterResourceRoutes binds the canonical REST routes for a resource controller.
-func RegisterResourceRoutes(r *router.Router, prefix string, controller ResourceController, opts RouteOptions) {
+func RegisterResourceRoutes(r *router.Router, prefix string, controller ResourceController, opts RouteOptions) error {
 	if r == nil || controller == nil {
-		return
+		return nil
 	}
 	prefix = normalizePrefix(prefix)
 
-	r.Get(prefix, http.HandlerFunc(controller.Index))
-	r.Get(prefix+"/:id", http.HandlerFunc(controller.Show))
-	r.Post(prefix, http.HandlerFunc(controller.Create))
-	r.Put(prefix+"/:id", http.HandlerFunc(controller.Update))
-	r.Delete(prefix+"/:id", http.HandlerFunc(controller.Delete))
-	r.Patch(prefix+"/:id", http.HandlerFunc(controller.Patch))
+	if err := r.AddRoute(http.MethodGet, prefix, http.HandlerFunc(controller.Index)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodGet, prefix+"/:id", http.HandlerFunc(controller.Show)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodPost, prefix, http.HandlerFunc(controller.Create)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodPut, prefix+"/:id", http.HandlerFunc(controller.Update)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodDelete, prefix+"/:id", http.HandlerFunc(controller.Delete)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodPatch, prefix+"/:id", http.HandlerFunc(controller.Patch)); err != nil {
+		return err
+	}
 
 	if opts.EnableOptions {
-		r.Options(prefix, http.HandlerFunc(controller.Options))
-		r.Options(prefix+"/:id", http.HandlerFunc(controller.Options))
+		if err := r.AddRoute(http.MethodOptions, prefix, http.HandlerFunc(controller.Options)); err != nil {
+			return err
+		}
+		if err := r.AddRoute(http.MethodOptions, prefix+"/:id", http.HandlerFunc(controller.Options)); err != nil {
+			return err
+		}
 	}
 	if opts.EnableHead {
-		r.Head(prefix, http.HandlerFunc(controller.Head))
-		r.Head(prefix+"/:id", http.HandlerFunc(controller.Head))
+		if err := r.AddRoute(http.MethodHead, prefix, http.HandlerFunc(controller.Head)); err != nil {
+			return err
+		}
+		if err := r.AddRoute(http.MethodHead, prefix+"/:id", http.HandlerFunc(controller.Head)); err != nil {
+			return err
+		}
 	}
 	if opts.EnableBatch {
-		r.Post(prefix+"/batch", http.HandlerFunc(controller.BatchCreate))
-		r.Delete(prefix+"/batch", http.HandlerFunc(controller.BatchDelete))
+		if err := r.AddRoute(http.MethodPost, prefix+"/batch", http.HandlerFunc(controller.BatchCreate)); err != nil {
+			return err
+		}
+		if err := r.AddRoute(http.MethodDelete, prefix+"/batch", http.HandlerFunc(controller.BatchDelete)); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // RegisterContextResourceRoutes binds the canonical REST routes for a context-aware resource controller.
-func RegisterContextResourceRoutes(r *router.Router, prefix string, controller ContextResourceController) {
+func RegisterContextResourceRoutes(r *router.Router, prefix string, controller ContextResourceController) error {
 	if r == nil || controller == nil {
-		return
+		return nil
 	}
 	prefix = normalizePrefix(prefix)
 
-	r.Get(prefix, contract.AdaptCtxHandler(controller.IndexCtx))
-	r.Get(prefix+"/:id", contract.AdaptCtxHandler(controller.ShowCtx))
-	r.Post(prefix, contract.AdaptCtxHandler(controller.CreateCtx))
-	r.Put(prefix+"/:id", contract.AdaptCtxHandler(controller.UpdateCtx))
-	r.Delete(prefix+"/:id", contract.AdaptCtxHandler(controller.DeleteCtx))
-	r.Patch(prefix+"/:id", contract.AdaptCtxHandler(controller.PatchCtx))
-	r.Post(prefix+"/batch", contract.AdaptCtxHandler(controller.BatchCreateCtx))
-	r.Delete(prefix+"/batch", contract.AdaptCtxHandler(controller.BatchDeleteCtx))
+	if err := r.AddRoute(http.MethodGet, prefix, contract.AdaptCtxHandler(controller.IndexCtx)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodGet, prefix+"/:id", contract.AdaptCtxHandler(controller.ShowCtx)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodPost, prefix, contract.AdaptCtxHandler(controller.CreateCtx)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodPut, prefix+"/:id", contract.AdaptCtxHandler(controller.UpdateCtx)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodDelete, prefix+"/:id", contract.AdaptCtxHandler(controller.DeleteCtx)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodPatch, prefix+"/:id", contract.AdaptCtxHandler(controller.PatchCtx)); err != nil {
+		return err
+	}
+	if err := r.AddRoute(http.MethodPost, prefix+"/batch", contract.AdaptCtxHandler(controller.BatchCreateCtx)); err != nil {
+		return err
+	}
+	return r.AddRoute(http.MethodDelete, prefix+"/batch", contract.AdaptCtxHandler(controller.BatchDeleteCtx))
 }
 
 func normalizePrefix(prefix string) string {

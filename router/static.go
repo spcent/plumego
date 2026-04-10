@@ -107,16 +107,16 @@ func handleStaticFileError(w http.ResponseWriter, req *http.Request, err error) 
 //
 // Example:
 //
-//	r.Static("/static", "./public")
+//	err := r.Static("/static", "./public")
 //	GET /static/js/app.js → ./public/js/app.js
-func (r *Router) Static(prefix, dir string) {
+func (r *Router) Static(prefix, dir string) error {
 	config := StaticConfig{
 		Prefix:    normalizeStaticPrefix(prefix),
 		Root:      dir,
 		IndexFile: "index.html",
 	}
 
-	r.registerStaticRoute(config, serveFromDirectory)
+	return r.registerStaticRoute(config, serveFromDirectory)
 }
 
 // StaticWithConfig registers a route that serves files with custom configuration.
@@ -129,16 +129,16 @@ func (r *Router) Static(prefix, dir string) {
 //	    CacheControl: "public, max-age=86400",
 //	    EnableETag:   true,
 //	})
-func (r *Router) StaticWithConfig(config StaticConfig) {
+func (r *Router) StaticWithConfig(config StaticConfig) error {
 	config.Prefix = normalizeStaticPrefix(config.Prefix)
 	if config.IndexFile == "" {
 		config.IndexFile = "index.html"
 	}
 
 	if _, ok := config.Root.(http.FileSystem); ok {
-		r.registerStaticRouteWithConfig(config, serveFromFileSystemWithConfig)
+		return r.registerStaticRouteWithConfig(config, serveFromFileSystemWithConfig)
 	} else {
-		r.registerStaticRouteWithConfig(config, serveFromDirectoryWithConfig)
+		return r.registerStaticRouteWithConfig(config, serveFromDirectoryWithConfig)
 	}
 }
 
@@ -151,16 +151,16 @@ func (r *Router) StaticWithConfig(config StaticConfig) {
 //	//go:embed public/*
 //	var public embed.FS
 //
-//	r.StaticFS("/assets", http.FS(public))
+//	err := r.StaticFS("/assets", http.FS(public))
 //	GET /assets/index.html → served from embedded FS
-func (r *Router) StaticFS(prefix string, fs http.FileSystem) {
+func (r *Router) StaticFS(prefix string, fs http.FileSystem) error {
 	config := StaticConfig{
 		Prefix:    normalizeStaticPrefix(prefix),
 		Root:      fs,
 		IndexFile: "index.html",
 	}
 
-	r.registerStaticRoute(config, serveFromFileSystem)
+	return r.registerStaticRoute(config, serveFromFileSystem)
 }
 
 // serveFromDirectory serves files from a local directory
@@ -267,19 +267,19 @@ func isPathWithinRoot(rootDir, resolvedPath string) bool {
 }
 
 // registerStaticRoute is a generic function that registers static file routes
-func (r *Router) registerStaticRoute(config StaticConfig, handler func(http.ResponseWriter, *http.Request, any) bool) {
+func (r *Router) registerStaticRoute(config StaticConfig, handler func(http.ResponseWriter, *http.Request, any) bool) error {
 	routePath := config.Prefix + "/*filepath"
 
-	r.Get(routePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	return r.AddRoute(http.MethodGet, routePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		handler(w, req, config.Root)
 	}))
 }
 
 // registerStaticRouteWithConfig registers static file routes with full configuration
-func (r *Router) registerStaticRouteWithConfig(config StaticConfig, handler func(http.ResponseWriter, *http.Request, StaticConfig) bool) {
+func (r *Router) registerStaticRouteWithConfig(config StaticConfig, handler func(http.ResponseWriter, *http.Request, StaticConfig) bool) error {
 	routePath := config.Prefix + "/*filepath"
 
-	r.Get(routePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	return r.AddRoute(http.MethodGet, routePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		handler(w, req, config)
 	}))
 }

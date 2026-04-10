@@ -14,10 +14,11 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/router"
 )
 
 type routeRegistrar interface {
-	AddRoute(method, path string, handler http.Handler) error
+	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
 // WebSocketConfig defines the configuration for WebSocket.

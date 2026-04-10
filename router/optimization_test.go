@@ -81,19 +81,19 @@ func TestOptimizedMatcher(t *testing.T) {
 	r := NewRouter()
 
 	// Register various types of routes
-	r.Get("/static/path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/static/path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("static"))
 	}))
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
-	r.Get("/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		postId := Param(r, "postId")
 		w.Write([]byte(fmt.Sprintf("user-%s-post-%s", id, postId)))
 	}))
-	r.Get("/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filepath := Param(r, "filepath")
 		w.Write([]byte("file-" + filepath))
 	}))
@@ -165,7 +165,7 @@ func TestConcurrentSafety(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(id int) {
 			path := fmt.Sprintf("/concurrent/%d", id)
-			r.Get(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mustAddRoute(r, http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(fmt.Sprintf("handler-%d", id)))
 			}))
 			done <- true
