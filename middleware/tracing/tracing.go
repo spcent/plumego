@@ -33,9 +33,7 @@ func Middleware(tracer Tracer) middleware.Middleware {
 			ctx, span := tracer.Start(ctx, r)
 			_, spanID := internalobs.ExtractSpanContext(ctx, span)
 			r = r.WithContext(ctx)
-			if spanID != "" {
-				w.Header().Set("X-Span-ID", spanID)
-			}
+			r = internalobs.AttachSpanID(w, r, spanID)
 
 			recorder := prepared.Recorder
 			next.ServeHTTP(recorder, r)

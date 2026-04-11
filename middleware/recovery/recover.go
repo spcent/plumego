@@ -46,7 +46,7 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 				fields := internalobs.MiddlewareLogFields(r, http.StatusInternalServerError, 0)
 				fields["panic"] = rec
 				logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Error("panic recovered")
-				middleware.WriteTransportError(w, r, http.StatusInternalServerError, middleware.CodeInternalError, "internal server error", contract.CategoryServer, nil)
+				middleware.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "internal server error", contract.CategoryServer, nil)
 			}
 		}()
 		next.ServeHTTP(w, r)

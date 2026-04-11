@@ -158,7 +158,7 @@ func authErrorToAPIError(err error) contract.APIError {
 			Status(http.StatusUnauthorized).
 			Category(contract.CategoryAuth).
 			Type(contract.TypeUnauthorized).
-			Code(middleware.CodeAuthUnauthenticated).
+			Code(contract.CodeUnauthorized).
 			Message(msg).
 			Build()
 	}

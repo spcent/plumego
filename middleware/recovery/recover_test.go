@@ -111,8 +111,8 @@ func TestRecoveryMiddleware(t *testing.T) {
 				if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 					t.Fatalf("failed to unmarshal response: %v", err)
 				}
-				if response.Error.Code != "internal_error" {
-					t.Errorf("expected error code internal_error, got %s", response.Error.Code)
+				if response.Error.Code != contract.CodeInternalError {
+					t.Errorf("expected error code %s, got %s", contract.CodeInternalError, response.Error.Code)
 				}
 				if response.Error.Category != contract.CategoryServer {
 					t.Errorf("expected server error category, got %s", response.Error.Category)

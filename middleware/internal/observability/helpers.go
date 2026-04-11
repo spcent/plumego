@@ -42,10 +42,7 @@ func EnsureRequestID(r *http.Request) string {
 
 func PrepareRequest(w http.ResponseWriter, r *http.Request) PreparedRequest {
 	requestID := EnsureRequestID(r)
-	r = r.WithContext(contract.WithRequestID(r.Context(), requestID))
-	if w != nil {
-		w.Header().Set(contract.RequestIDHeader, requestID)
-	}
+	r = AttachRequestID(w, r, requestID, false)
 	return PreparedRequest{
 		Request:   r,
 		Recorder:  NewResponseRecorder(w),

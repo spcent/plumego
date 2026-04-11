@@ -24,7 +24,9 @@ func (a staticTokenAuthenticator) Authenticate(r *http.Request) (*Principal, err
 	return &Principal{Subject: staticTokenSubject}, nil
 }
 
-func extractToken(r *http.Request) string {
+// ExtractBearerToken returns the bearer token from the Authorization header.
+// Query-string tokens are intentionally ignored for security.
+func ExtractBearerToken(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
@@ -36,5 +38,12 @@ func extractToken(r *http.Request) string {
 		}
 	}
 
+	return ""
+}
+
+func extractToken(r *http.Request) string {
+	if token := ExtractBearerToken(r); token != "" {
+		return token
+	}
 	return strings.TrimSpace(r.Header.Get("X-Token"))
 }

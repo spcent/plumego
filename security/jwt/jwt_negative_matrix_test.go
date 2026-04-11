@@ -44,31 +44,31 @@ func TestAuthenticateNegativeMatrix(t *testing.T) {
 		{
 			name:            "missing authorization header",
 			authzHeader:     "",
-			expectedCode:    "auth_unauthenticated",
+			expectedCode:    contract.CodeUnauthorized,
 			expectedMessage: "authentication required",
 		},
 		{
 			name:            "empty bearer token",
 			authzHeader:     "Bearer   ",
-			expectedCode:    "auth_unauthenticated",
+			expectedCode:    contract.CodeUnauthorized,
 			expectedMessage: "authentication required",
 		},
 		{
 			name:            "malformed token",
 			authzHeader:     "Bearer invalid.token",
-			expectedCode:    "auth_unauthenticated",
+			expectedCode:    contract.CodeUnauthorized,
 			expectedMessage: "invalid token",
 		},
 		{
 			name:            "tampered signature",
 			authzHeader:     "Bearer " + tamperJWT(accessPair.AccessToken),
-			expectedCode:    "auth_unauthenticated",
+			expectedCode:    contract.CodeUnauthorized,
 			expectedMessage: "invalid token",
 		},
 		{
 			name:            "wrong token type",
 			authzHeader:     "Bearer " + refreshPair.RefreshToken,
-			expectedCode:    "auth_unauthenticated",
+			expectedCode:    contract.CodeUnauthorized,
 			expectedMessage: "invalid token",
 		},
 	}

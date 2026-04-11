@@ -10,6 +10,9 @@ import (
 
 const sensitiveFieldMask = "***"
 
+// SpanIDHeader is the canonical response header for span correlation.
+const SpanIDHeader = "X-Span-ID"
+
 func RequestIDFromRequest(r *http.Request) string {
 	if r == nil {
 		return ""
@@ -35,6 +38,20 @@ func AttachRequestID(w http.ResponseWriter, r *http.Request, id string, includeI
 		w.Header().Set(contract.RequestIDHeader, id)
 	}
 	return r.WithContext(ctx)
+}
+
+// AttachSpanID writes the span header for downstream response instrumentation.
+func AttachSpanID(w http.ResponseWriter, r *http.Request, id string) *http.Request {
+	if r == nil {
+		return r
+	}
+	if id == "" {
+		return r
+	}
+	if w != nil {
+		w.Header().Set(SpanIDHeader, id)
+	}
+	return r
 }
 
 func MiddlewareLogFields(r *http.Request, status int, duration time.Duration) map[string]any {

@@ -104,7 +104,7 @@ func Timeout(cfg TimeoutConfig) middleware.Middleware {
 				}
 				tw.WriteTo(w)
 			case <-ctx.Done():
-				mw.WriteTransportError(w, r, http.StatusGatewayTimeout, mw.CodeRequestTimeout, "request timed out", contract.CategoryTimeout, nil)
+				mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "request timed out", contract.CategoryTimeout, nil)
 			}
 		})
 	}

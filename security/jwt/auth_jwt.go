@@ -28,7 +28,7 @@ func (a Authenticator) AuthenticateRequest(r *http.Request) (*authn.Principal, *
 		return nil, r, authn.ErrUnauthenticated
 	}
 
-	token := extractBearerToken(r)
+	token := authn.ExtractBearerToken(r)
 	if token == "" {
 		return nil, r, authn.ErrUnauthenticated
 	}

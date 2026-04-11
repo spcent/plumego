@@ -85,8 +85,8 @@ func TestAuthenticateMiddlewareInvalidToken(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unexpected response body: %v", err)
 	}
-	if payload.Error.Code != "auth_unauthenticated" {
-		t.Fatalf("expected code auth_unauthenticated, got %s", payload.Error.Code)
+	if payload.Error.Code != contract.CodeUnauthorized {
+		t.Fatalf("expected code %s, got %s", contract.CodeUnauthorized, payload.Error.Code)
 	}
 }
 

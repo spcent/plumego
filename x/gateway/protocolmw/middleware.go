@@ -53,7 +53,7 @@ func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler
 			}
 
 			if err := adapter.Encode(r.Context(), resp, respWriter); err != nil {
-				mw.WriteTransportError(w, r, http.StatusInternalServerError, mw.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 		})
@@ -183,7 +183,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnEncodeError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusInternalServerError, mw.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
 				return
 			}
 		})

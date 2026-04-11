@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/accesslog"
@@ -157,7 +158,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 	}{
 		{
 			name:         "auth unauthenticated",
-			expectedCode: middleware.CodeAuthUnauthenticated,
+			expectedCode: contract.CodeUnauthorized,
 			handler: auth.Authenticate(authn.StaticToken("secret"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
@@ -165,7 +166,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		},
 		{
 			name:         "body too large",
-			expectedCode: middleware.CodeRequestBodyTooLarge,
+			expectedCode: contract.CodeRequestBodyTooLarge,
 			handler: bodylimit.BodyLimit(4, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = io.ReadAll(r.Body)
 			})),
@@ -181,7 +182,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		},
 		{
 			name:         "abuse guard rate limited",
-			expectedCode: middleware.CodeRateLimited,
+			expectedCode: contract.CodeRateLimited,
 			handler: ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{Rate: 1, Capacity: 1, KeyFunc: func(*http.Request) string { return "k" }})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
@@ -192,7 +193,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		},
 		{
 			name:         "recovery internal",
-			expectedCode: middleware.CodeInternalError,
+			expectedCode: contract.CodeInternalError,
 			handler: recovery.Recovery(recoveryLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("boom")
 			})),
@@ -200,8 +201,8 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		},
 		{
 			name:         "fixture canonical error",
-			expectedCode: middleware.CodeInternalError,
-			handler: fixtureCanonicalErrorMiddleware(middleware.CodeInternalError)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			expectedCode: contract.CodeInternalError,
+			handler: fixtureCanonicalErrorMiddleware(contract.CodeInternalError)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),

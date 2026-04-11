@@ -32,9 +32,7 @@ func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, trac
 			}
 
 			_, spanID := internalobs.ExtractSpanContext(ctx, span)
-			if spanID != "" {
-				w.Header().Set("X-Span-ID", spanID)
-			}
+			r = internalobs.AttachSpanID(w, r, spanID)
 
 			r = r.WithContext(ctx)
 
@@ -66,7 +64,7 @@ func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, trac
 			}
 			if spanID != "" {
 				fields["span_id"] = spanID
-			} else if headerSpanID := recorder.Header().Get("X-Span-ID"); headerSpanID != "" {
+			} else if headerSpanID := recorder.Header().Get(internalobs.SpanIDHeader); headerSpanID != "" {
 				fields["span_id"] = headerSpanID
 			} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.SpanID != "" {
 				fields["span_id"] = tc.SpanID

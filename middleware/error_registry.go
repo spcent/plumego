@@ -7,20 +7,16 @@ import (
 )
 
 // Middleware transport error codes. Keep values stable for client integrations.
+// Shared error codes live in contract; only middleware-specific codes remain here.
 const (
-	CodeAuthUnauthenticated = "auth_unauthenticated"
-	CodeRateLimited         = "rate_limited"
 	CodeTenantRequired      = "tenant_required"
 	CodeTenantInvalidID     = "tenant_invalid_id"
 	CodeTenantPolicyDenied  = "tenant_policy_denied"
 	CodeTenantQuotaExceeded = "tenant_quota_exceeded"
 	CodeTenantRateLimited   = "tenant_rate_limited"
-	CodeRequestBodyTooLarge = "request_body_too_large"
 	CodeServerBusy          = "server_busy"
 	CodeServerQueueTimeout  = "server_queue_timeout"
-	CodeRequestTimeout      = "request_timeout"
 	CodeUpstreamFailed      = "upstream_failed"
-	CodeInternalError       = "internal_error"
 )
 
 // WriteTransportError writes middleware transport errors using the canonical contract helper.

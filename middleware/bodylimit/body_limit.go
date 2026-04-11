@@ -80,7 +80,7 @@ func (l *limitedBodyReader) Close() error {
 func (l *limitedBodyReader) fail() (int, error) {
 	if !l.exceeded {
 		l.exceeded = true
-		mw.WriteTransportError(l.w, nil, http.StatusRequestEntityTooLarge, mw.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
+		mw.WriteTransportError(l.w, nil, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
 			"max_bytes":  l.maxBytes,
 			"seen_bytes": l.used,
 			"at":         l.now().UTC(),

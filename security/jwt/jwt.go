@@ -51,11 +51,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/spcent/plumego/security/authn"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
@@ -101,8 +101,8 @@ const (
 
 // Errors returned by JWT operations.
 var (
-	ErrInvalidToken     = errors.New("invalid token")
-	ErrTokenExpired     = errors.New("token expired")
+	ErrInvalidToken     = authn.ErrInvalidToken
+	ErrTokenExpired     = authn.ErrExpiredToken
 	ErrTokenNotYetValid = errors.New("token not yet valid")
 	ErrUnknownKey       = errors.New("unknown signing key")
 	ErrMissingSubject   = errors.New("subject is required")
@@ -738,17 +738,6 @@ func TokenClaimsFromContext(ctx context.Context) *TokenClaims {
 	}
 	claims, _ := ctx.Value(tokenClaimsContextKey{}).(*TokenClaims)
 	return claims
-}
-
-// extractBearerToken extracts Bearer token from the Authorization header.
-// For security reasons, tokens in URL query parameters are not supported
-// as they can be leaked via server logs, browser history, and Referer headers.
-func extractBearerToken(r *http.Request) string {
-	authHeader := r.Header.Get("Authorization")
-	if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-		return strings.TrimSpace(authHeader[7:])
-	}
-	return ""
 }
 
 type tokenClaimsContextKey struct{}

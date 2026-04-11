@@ -39,7 +39,7 @@ func TestTimeoutMiddleware_TimesOut(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
 	}
 
-	if resp.Error.Code != "request_timeout" || resp.Error.Category != contract.CategoryTimeout {
+	if resp.Error.Code != contract.CodeTimeout || resp.Error.Category != contract.CategoryTimeout {
 		t.Fatalf("unexpected response payload: %+v", resp)
 	}
 
