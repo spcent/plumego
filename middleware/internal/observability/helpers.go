@@ -7,6 +7,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
+	"github.com/spcent/plumego/middleware/requestid"
 )
 
 // RequestMetrics captures common observability attributes for a request.
@@ -30,19 +31,9 @@ type PreparedRequest struct {
 	StartedAt time.Time
 }
 
-func EnsureRequestID(r *http.Request) string {
-	if id := contract.RequestIDFromContext(r.Context()); id != "" {
-		return id
-	}
-	if id := RequestIDFromRequest(r); id != "" {
-		return id
-	}
-	return NewRequestID()
-}
-
 func PrepareRequest(w http.ResponseWriter, r *http.Request) PreparedRequest {
-	requestID := EnsureRequestID(r)
-	r = AttachRequestID(w, r, requestID, false)
+	requestID := requestid.EnsureRequestID(r, nil)
+	r = requestid.AttachRequestID(w, r, requestID, false)
 	return PreparedRequest{
 		Request:   r,
 		Recorder:  NewResponseRecorder(w),

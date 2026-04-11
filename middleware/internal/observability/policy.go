@@ -5,40 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware/requestid"
 )
 
 const sensitiveFieldMask = "***"
 
 // SpanIDHeader is the canonical response header for span correlation.
 const SpanIDHeader = "X-Span-ID"
-
-func RequestIDFromRequest(r *http.Request) string {
-	if r == nil {
-		return ""
-	}
-	if id := contract.RequestIDFromContext(r.Context()); id != "" {
-		return id
-	}
-	if id := strings.TrimSpace(r.Header.Get(contract.RequestIDHeader)); id != "" {
-		return id
-	}
-	return ""
-}
-
-func AttachRequestID(w http.ResponseWriter, r *http.Request, id string, includeInRequest bool) *http.Request {
-	if r == nil {
-		return r
-	}
-	ctx := contract.WithRequestID(r.Context(), id)
-	if includeInRequest {
-		r.Header.Set(contract.RequestIDHeader, id)
-	}
-	if w != nil {
-		w.Header().Set(contract.RequestIDHeader, id)
-	}
-	return r.WithContext(ctx)
-}
 
 // AttachSpanID writes the span header for downstream response instrumentation.
 func AttachSpanID(w http.ResponseWriter, r *http.Request, id string) *http.Request {
@@ -69,7 +42,7 @@ func MiddlewareLogFields(r *http.Request, status int, duration time.Duration) ma
 	if r.URL != nil {
 		fields["path"] = r.URL.Path
 	}
-	fields["request_id"] = RequestIDFromRequest(r)
+	fields["request_id"] = requestid.RequestIDFromRequest(r)
 	return fields
 }
 

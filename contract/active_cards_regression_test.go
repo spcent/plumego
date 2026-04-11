@@ -106,8 +106,8 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 	}
 	err = ValidateStruct(&badRules{})
 	fields = FieldErrorsFrom(err)
-	if len(fields) == 0 || fields[0].Code != "unknown_rule" {
-		t.Fatalf("expected unknown_rule failure, got %v", fields)
+	if len(fields) == 0 || fields[0].Code != CodeInvalidFormat {
+		t.Fatalf("expected invalid format failure, got %v", fields)
 	}
 
 	type stringLengths struct {
@@ -118,6 +118,11 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 	fields = FieldErrorsFrom(err)
 	if len(fields) != 2 {
 		t.Fatalf("expected string min/max failures, got %v", fields)
+	}
+	for _, field := range fields {
+		if field.Code != CodeOutOfRange {
+			t.Fatalf("expected out of range validation codes, got %v", fields)
+		}
 	}
 }
 
@@ -145,13 +150,13 @@ func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
 	fields := FieldErrorsFrom(err)
 	var found bool
 	for _, field := range fields {
-		if field.Code == "max_depth_exceeded" {
+		if field.Code == CodeOutOfRange {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected max_depth_exceeded field error, got %v", fields)
+		t.Fatalf("expected out of range field error, got %v", fields)
 	}
 }
 

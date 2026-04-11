@@ -1,4 +1,4 @@
-package observability
+package requestid
 
 import (
 	"crypto/rand"
@@ -68,11 +68,12 @@ func NewRequestIDGenerator() *RequestIDGenerator {
 	return g
 }
 
-var globalRequestIDGenerator = NewRequestIDGenerator()
+// DefaultGenerator is the canonical generator used when no generator is supplied.
+var DefaultGenerator = NewRequestIDGenerator()
 
-// NewRequestID generates a fixed-width base62 request ID using the canonical global generator.
+// NewRequestID generates a fixed-width base62 request ID using DefaultGenerator.
 func NewRequestID() string {
-	return globalRequestIDGenerator.Generate()
+	return DefaultGenerator.Generate()
 }
 
 // Generate creates a new request ID with monotonic timestamp/sequence coordination.
@@ -205,35 +206,34 @@ func DecodeRequestID(id string) (unixMilli int64, r int, seqVal int, err error) 
 }
 
 func encodeBase62Fixed(v uint64, width int) string {
+	if width <= 0 {
+		width = 1
+	}
+
 	buf := make([]byte, width)
 	for i := width - 1; i >= 0; i-- {
-		buf[i] = base62Alphabet[v%62]
+		buf[i] = base62Alphabet[int(v%62)]
 		v /= 62
 	}
 	return string(buf)
 }
 
-func decodeBase62(s string) (uint64, error) {
+func decodeBase62(id string) (uint64, error) {
 	var v uint64
-	for i := 0; i < len(s); i++ {
-		d, ok := base62Value(s[i])
-		if !ok {
+	for i := 0; i < len(id); i++ {
+		ch := id[i]
+		var digit int
+		switch {
+		case ch >= '0' && ch <= '9':
+			digit = int(ch - '0')
+		case ch >= 'A' && ch <= 'Z':
+			digit = int(ch-'A') + 10
+		case ch >= 'a' && ch <= 'z':
+			digit = int(ch-'a') + 36
+		default:
 			return 0, errInvalidBase62
 		}
-		v = v*62 + uint64(d)
+		v = v*62 + uint64(digit)
 	}
 	return v, nil
-}
-
-func base62Value(c byte) (int, bool) {
-	switch {
-	case c >= '0' && c <= '9':
-		return int(c - '0'), true
-	case c >= 'A' && c <= 'Z':
-		return int(c-'A') + 10, true
-	case c >= 'a' && c <= 'z':
-		return int(c-'a') + 36, true
-	default:
-		return 0, false
-	}
 }
