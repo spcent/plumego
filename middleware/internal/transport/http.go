@@ -8,19 +8,21 @@ import (
 	"strings"
 )
 
+const (
+	HeaderForwardedFor       = "X-Forwarded-For"
+	HeaderRealIP             = "X-Real-IP"
+	HeaderContentTypeNoSniff = "X-Content-Type-Options"
+	ContentTypeNoSniffValue  = "nosniff"
+)
+
 func EnsureNoSniff(header http.Header) {
 	if header == nil {
 		return
 	}
-	if header.Get("X-Content-Type-Options") == "" {
-		header.Set("X-Content-Type-Options", "nosniff")
+	if header.Get(HeaderContentTypeNoSniff) == "" {
+		header.Set(HeaderContentTypeNoSniff, ContentTypeNoSniffValue)
 	}
 }
-
-const (
-	HeaderForwardedFor = "X-Forwarded-For"
-	HeaderRealIP       = "X-Real-IP"
-)
 
 func SafeWrite(w http.ResponseWriter, body []byte) (int, error) {
 	if w == nil {
