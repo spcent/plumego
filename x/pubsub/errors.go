@@ -84,3 +84,86 @@ func newErr(code ErrorCode, op, topic, message string, cause error) *Error {
 		Cause:   cause,
 	}
 }
+
+// Extension sentinel errors. Each group corresponds to an optional subsystem.
+
+// Audit
+var (
+	ErrAuditClosed       = errors.New("audit log is closed")
+	ErrAuditCorrupted    = errors.New("audit log corrupted - hash mismatch")
+	ErrInvalidAuditQuery = errors.New("invalid audit query parameters")
+)
+
+// Backpressure
+var (
+	ErrBackpressureActive = errors.New("backpressure active - slow down")
+	ErrBackpressureClosed = errors.New("backpressure controller is closed")
+)
+
+// Consumer groups
+var (
+	ErrGroupClosed       = errors.New("consumer group is closed")
+	ErrGroupNotFound     = errors.New("consumer group not found")
+	ErrConsumerNotFound  = errors.New("consumer not found")
+	ErrRebalanceRequired = errors.New("rebalance required")
+	ErrInvalidAssignment = errors.New("invalid assignment strategy")
+)
+
+// Distributed / cluster
+var (
+	ErrClusterNotJoined  = errors.New("not joined to cluster")
+	ErrNodeNotFound      = errors.New("node not found")
+	ErrNodeUnhealthy     = errors.New("node is unhealthy")
+	ErrBroadcastFailed   = errors.New("broadcast failed")
+	ErrConsensusTimeout  = errors.New("consensus timeout")
+	ErrInvalidNodeConfig = errors.New("invalid node configuration")
+)
+
+// Dead-letter queue
+var (
+	ErrDLQClosed    = errors.New("dead letter queue is closed")
+	ErrDLQNotFound  = errors.New("dead letter message not found")
+	ErrInvalidQuery = errors.New("invalid query parameters")
+)
+
+// Multi-tenant
+var (
+	ErrQuotaExceeded       = errors.New("quota exceeded")
+	ErrTenantNotFound      = errors.New("tenant not found")
+	ErrTenantAlreadyExists = errors.New("tenant already exists")
+	ErrInvalidTenant       = errors.New("invalid tenant ID")
+)
+
+// Ordering
+var (
+	ErrOrderingClosed    = errors.New("ordering system is closed")
+	ErrInvalidOrderLevel = errors.New("invalid order level")
+	ErrSequenceGap       = errors.New("sequence number gap detected")
+	ErrOutOfOrderMessage = errors.New("out of order message")
+)
+
+// Persistence
+var (
+	ErrPersistenceClosed   = errors.New("persistence layer is closed")
+	ErrInvalidWALEntry     = errors.New("invalid WAL entry")
+	ErrCorruptedWAL        = errors.New("corrupted WAL file")
+	ErrSnapshotFailed      = errors.New("snapshot operation failed")
+	ErrRestoreFailed       = errors.New("restore operation failed")
+	ErrInvalidDurability   = errors.New("invalid durability level")
+	ErrReplicationFailed   = errors.New("replication failed")
+	ErrPersistenceDisabled = errors.New("persistence is not enabled")
+)
+
+// Rate limiting
+var (
+	ErrRateLimitExceeded = errors.New("rate limit exceeded")
+	ErrInvalidRateLimit  = errors.New("invalid rate limit configuration")
+)
+
+// Replay
+var (
+	ErrReplayClosed      = errors.New("replay store is closed")
+	ErrMessageNotFound   = errors.New("message not found in replay store")
+	ErrInvalidTimeRange  = errors.New("invalid time range")
+	ErrArchiveNotEnabled = errors.New("archiving is not enabled")
+)

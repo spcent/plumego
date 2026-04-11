@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,12 +10,6 @@ import (
 )
 
 // Quota errors
-var (
-	ErrQuotaExceeded       = errors.New("quota exceeded")
-	ErrTenantNotFound      = errors.New("tenant not found")
-	ErrTenantAlreadyExists = errors.New("tenant already exists")
-	ErrInvalidTenant       = errors.New("invalid tenant ID")
-)
 
 // TenantQuota defines resource limits for a tenant
 type TenantQuota struct {

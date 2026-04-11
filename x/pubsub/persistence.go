@@ -17,16 +17,6 @@ import (
 )
 
 // Persistent errors
-var (
-	ErrPersistenceClosed   = errors.New("persistence layer is closed")
-	ErrInvalidWALEntry     = errors.New("invalid WAL entry")
-	ErrCorruptedWAL        = errors.New("corrupted WAL file")
-	ErrSnapshotFailed      = errors.New("snapshot operation failed")
-	ErrRestoreFailed       = errors.New("restore operation failed")
-	ErrInvalidDurability   = errors.New("invalid durability level")
-	ErrReplicationFailed   = errors.New("replication failed")
-	ErrPersistenceDisabled = errors.New("persistence is not enabled")
-)
 
 // DurabilityLevel defines how messages are persisted
 type DurabilityLevel int

@@ -2,17 +2,12 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 // Backpressure errors
-var (
-	ErrBackpressureActive = errors.New("backpressure active - slow down")
-	ErrBackpressureClosed = errors.New("backpressure controller is closed")
-)
 
 // BackpressurePropagationPolicy defines how to handle backpressure feedback
 type BackpressurePropagationPolicy int

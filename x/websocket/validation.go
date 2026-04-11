@@ -2,24 +2,9 @@ package websocket
 
 import (
 	"bytes"
-	"errors"
 	"strings"
 	"sync"
 	"unicode/utf8"
-)
-
-var (
-	// ErrInvalidUTF8 is returned when message contains invalid UTF-8 sequences.
-	ErrInvalidUTF8 = errors.New("websocket: invalid utf-8 in message")
-
-	// ErrControlCharacters is returned when message contains dangerous control characters.
-	ErrControlCharacters = errors.New("websocket: message contains control characters")
-
-	// ErrMessageTooLong is returned when message exceeds maximum length.
-	ErrMessageTooLong = errors.New("websocket: message too long")
-
-	// ErrEmptyMessage is returned when message is empty but shouldn't be.
-	ErrEmptyMessage = errors.New("websocket: empty message")
 )
 
 // sqlInjectionPatterns is a pre-allocated slice of lowercase SQL injection indicator

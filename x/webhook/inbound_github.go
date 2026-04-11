@@ -1,15 +1,8 @@
 package webhook
 
 import (
-	"errors"
 	"net/http"
 	"time"
-)
-
-var (
-	ErrGitHubSignature       = errors.New("invalid github signature")
-	ErrGitHubMissingHeader   = errors.New("missing github signature header")
-	ErrGitHubInvalidEncoding = errors.New("invalid hex encoding")
 )
 
 // GitHubVerifyOptions configures GitHub webhook verification.
@@ -104,7 +97,7 @@ func VerifyGitHubWithOptions(r *http.Request, secret string, opts GitHubVerifyOp
 			case CodeInvalidSignature:
 				return nil, ErrGitHubSignature
 			case CodeInvalidEncoding:
-				return nil, ErrGitHubInvalidEncoding
+				return nil, ErrInvalidHexEncoding
 			}
 		}
 		return nil, err

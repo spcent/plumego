@@ -196,7 +196,7 @@ func webhookSetTargetEnabled(ctx *contract.Ctx, svc *Service, enable bool) {
 
 	t, err := svc.UpdateTarget(ctx.R.Context(), id, TargetPatch{Enabled: &enable})
 	if err != nil {
-		if err == ErrNotFound {
+		if err == ErrTargetNotFound {
 			_ = contract.WriteError(ctx.W, ctx.R, errNotFound("target not found"))
 			return
 		}
@@ -368,7 +368,7 @@ func webhookReplayDelivery(ctx *contract.Ctx, svc *Service) {
 	}
 
 	d, err := svc.ReplayDelivery(ctx.R.Context(), id)
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, ErrTargetNotFound) {
 		_ = contract.WriteError(ctx.W, ctx.R, errNotFound("delivery not found"))
 		return
 	}

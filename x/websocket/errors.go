@@ -30,6 +30,25 @@ var (
 	// Auth errors
 	ErrInvalidToken = errors.New("websocket: invalid token")
 	ErrTokenExpired = errors.New("websocket: token expired")
+
+	// Security configuration errors
+	ErrWeakJWTSecret       = errors.New("jwt secret too weak: minimum 32 bytes required")
+	ErrWeakRoomPassword    = errors.New("room password does not meet strength requirements")
+	ErrInvalidWebSocketKey = errors.New("invalid websocket key format")
+	ErrInvalidConfig       = errors.New("invalid security configuration")
+
+	// Validation errors
+	ErrInvalidUTF8       = errors.New("websocket: invalid utf-8 in message")
+	ErrControlCharacters = errors.New("websocket: message contains control characters")
+	ErrMessageTooLong    = errors.New("websocket: message too long")
+	ErrEmptyMessage      = errors.New("websocket: empty message")
+
+	// Server configuration errors
+	ErrNilHub              = errors.New("websocket: hub is nil")
+	ErrNilAuthenticator    = errors.New("websocket: authenticator is nil")
+	ErrNegativeQueueSize   = errors.New("websocket: queue size cannot be negative")
+	ErrInvalidSendBehavior = errors.New("websocket: invalid send behavior")
+	ErrNegativeReadLimit   = errors.New("websocket: read limit cannot be negative")
 )
 
 // Error types for more detailed error information

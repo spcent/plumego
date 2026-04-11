@@ -12,13 +12,6 @@ import (
 )
 
 // Consumer Group errors
-var (
-	ErrGroupClosed       = errors.New("consumer group is closed")
-	ErrGroupNotFound     = errors.New("consumer group not found")
-	ErrConsumerNotFound  = errors.New("consumer not found")
-	ErrRebalanceRequired = errors.New("rebalance required")
-	ErrInvalidAssignment = errors.New("invalid assignment strategy")
-)
 
 // AssignmentStrategy defines how messages are distributed among consumers
 type AssignmentStrategy int

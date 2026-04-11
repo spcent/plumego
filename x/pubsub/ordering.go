@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -10,12 +9,6 @@ import (
 )
 
 // Ordering errors
-var (
-	ErrOrderingClosed    = errors.New("ordering system is closed")
-	ErrInvalidOrderLevel = errors.New("invalid order level")
-	ErrSequenceGap       = errors.New("sequence number gap detected")
-	ErrOutOfOrderMessage = errors.New("out of order message")
-)
 
 // maxMissingSequences caps the number of sequence gaps tracked per queue to
 // prevent unbounded memory growth when messages are permanently lost.

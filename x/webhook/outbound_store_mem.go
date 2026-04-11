@@ -2,15 +2,10 @@ package webhook
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-)
-
-var (
-	ErrNotFound = errors.New("not found")
 )
 
 type MemStore struct {
@@ -41,7 +36,7 @@ func (s *MemStore) UpdateTarget(ctx context.Context, id string, patch TargetPatc
 	defer s.mu.Unlock()
 	t, ok := s.targets[id]
 	if !ok {
-		return Target{}, ErrNotFound
+		return Target{}, ErrTargetNotFound
 	}
 	if patch.Name != nil {
 		t.Name = *patch.Name
@@ -130,7 +125,7 @@ func (s *MemStore) UpdateDelivery(ctx context.Context, id string, patch Delivery
 	defer s.mu.Unlock()
 	d, ok := s.deliveries[id]
 	if !ok {
-		return Delivery{}, ErrNotFound
+		return Delivery{}, ErrTargetNotFound
 	}
 
 	if patch.Attempt != nil {

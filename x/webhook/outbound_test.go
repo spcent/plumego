@@ -513,7 +513,7 @@ func TestReplayDeliveryErrors(t *testing.T) {
 	ctx := context.Background()
 	service := NewService(NewMemStore(), Config{})
 
-	if _, err := service.ReplayDelivery(ctx, "missing"); !errors.Is(err, ErrNotFound) {
+	if _, err := service.ReplayDelivery(ctx, "missing"); !errors.Is(err, ErrTargetNotFound) {
 		t.Fatalf("expected not found error")
 	}
 
@@ -603,7 +603,7 @@ func TestStoreAndFilters(t *testing.T) {
 		t.Fatalf("delivery filter unexpected: %+v", deliveries)
 	}
 
-	if _, err := store.UpdateTarget(ctx, "missing", TargetPatch{}); !errors.Is(err, ErrNotFound) {
+	if _, err := store.UpdateTarget(ctx, "missing", TargetPatch{}); !errors.Is(err, ErrTargetNotFound) {
 		t.Fatalf("expected not found on update target")
 	}
 

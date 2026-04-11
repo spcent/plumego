@@ -1,19 +1,10 @@
 package webhook
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-)
-
-var (
-	ErrStripeSignature        = errors.New("invalid stripe signature")
-	ErrStripeMissingHeader    = errors.New("missing stripe signature header")
-	ErrStripeInvalidTimestamp = errors.New("invalid timestamp in signature")
-	ErrStripeExpired          = errors.New("signature expired")
-	ErrStripeInvalidEncoding  = errors.New("invalid hex encoding")
 )
 
 // StripeVerifyOptions configures Stripe webhook verification.
@@ -130,7 +121,7 @@ func VerifyStripe(r *http.Request, endpointSecret string, opt StripeVerifyOption
 			case CodeInvalidSignature:
 				return nil, ErrStripeSignature
 			case CodeInvalidEncoding:
-				return nil, ErrStripeInvalidEncoding
+				return nil, ErrInvalidHexEncoding
 			case CodeTimestampExpired:
 				return nil, ErrStripeExpired
 			case CodeInvalidTimestamp:

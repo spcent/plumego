@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -70,20 +69,6 @@ type SecurityMetrics struct {
 	// SuccessfulAuthentications counts successful JWT verifications.
 	SuccessfulAuthentications uint64 `json:"successful_authentications"`
 }
-
-var (
-	// ErrWeakJWTSecret is returned when JWT secret is too short
-	ErrWeakJWTSecret = errors.New("jwt secret too weak: minimum 32 bytes required")
-
-	// ErrWeakRoomPassword is returned when room password doesn't meet strength requirements
-	ErrWeakRoomPassword = errors.New("room password does not meet strength requirements")
-
-	// ErrInvalidWebSocketKey is returned when Sec-WebSocket-Key is malformed
-	ErrInvalidWebSocketKey = errors.New("invalid websocket key format")
-
-	// ErrInvalidConfig is returned when configuration is invalid
-	ErrInvalidConfig = errors.New("invalid security configuration")
-)
 
 // ValidateSecurityConfig validates the security configuration
 func ValidateSecurityConfig(cfg SecurityConfig) error {
