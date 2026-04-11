@@ -59,7 +59,6 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 		}
 		current.handler = handler
 		current.fullPath = fullPath
-		current.validation = r.validationFor(method, fullPath)
 		r.storeRouteMetaLocked(method, fullPath, meta)
 		r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})
 		return nil
@@ -122,7 +121,6 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	current.handler = handler
 	current.paramKeys = paramKeys
 	current.fullPath = fullPath
-	current.validation = r.validationFor(method, fullPath)
 	r.storeRouteMetaLocked(method, fullPath, meta)
 
 	r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})

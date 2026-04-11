@@ -79,9 +79,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
-	if params != nil && r.writeValidationError(w, req, result.Validation, params) {
-		return
-	}
 
 	if result.RoutePattern != "" && isParameterized(result.RoutePattern) {
 		r.state.matchCache.SetPattern(req.Method, result.RoutePattern, result)
@@ -103,7 +100,6 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 				Handler:      tree.handler,
 				RoutePattern: "/",
 				RouteMethod:  method,
-				Validation:   tree.validation,
 			}, false
 		}
 		// RFC 7231 §4.3.2: HEAD is identical to GET except no body.
@@ -113,7 +109,6 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 					Handler:      getTree.handler,
 					RoutePattern: "/",
 					RouteMethod:  http.MethodGet,
-					Validation:   getTree.validation,
 				}, false
 			}
 		}
@@ -123,7 +118,6 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 					Handler:      anyTree.handler,
 					RoutePattern: "/",
 					RouteMethod:  methodAny,
-					Validation:   anyTree.validation,
 				}, true
 			}
 		}
@@ -181,27 +175,8 @@ func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, resu
 	}
 
 	params := r.buildParamMap(paramValues, result.ParamKeys)
-	if params != nil && r.writeValidationError(w, req, result.Validation, params) {
-		return
-	}
 
 	r.applyMiddlewareAndServe(w, req, params, result)
-}
-
-func (r *Router) writeValidationError(w http.ResponseWriter, req *http.Request, validation *RouteValidation, params map[string]string) bool {
-	if validation == nil {
-		return false
-	}
-	if err := validation.Validate(params); err != nil {
-		contract.WriteError(w, req, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Code("VALIDATION_ERROR").
-			Message(err.Error()).
-			Category(contract.CategoryValidation).
-			Build())
-		return true
-	}
-	return false
 }
 
 func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[string]string {

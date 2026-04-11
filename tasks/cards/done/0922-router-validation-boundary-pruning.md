@@ -1,7 +1,7 @@
 # Card 0922: Router Validation Boundary Pruning
 
 Priority: P1
-State: active
+State: done
 Primary Module: router
 
 ## Goal
@@ -76,3 +76,9 @@ Then run the required repo-wide gates before committing.
 - Route matching, params, groups, reverse routing, and method-not-allowed tests still pass.
 - Router docs/manifests describe validation as outside router ownership.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Removed router validation types and registration paths (`RouteValidation`, `ParamValidator`, `AddValidation`, and related options).
+- Dropped validation checks from dispatch/matcher paths and deleted validation tests/benchmarks.
+- Updated router docs and module manifest to keep validation policy outside router ownership.

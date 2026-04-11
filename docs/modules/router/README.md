@@ -21,6 +21,7 @@
 
 - JSON responses
 - auth policy
+- route parameter validation policy
 - logger lookup or logger carriage
 - service construction
 - middleware ownership or middleware execution policy

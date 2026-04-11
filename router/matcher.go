@@ -115,7 +115,6 @@ func (rm *routeMatcher) Match(parts []string) *MatchResult {
 		ParamValues:  resultParams,
 		ParamKeys:    current.paramKeys,
 		RoutePattern: current.fullPath,
-		Validation:   current.validation,
 	}
 }
 

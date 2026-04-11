@@ -29,14 +29,13 @@ type segment struct {
 
 // node represents a node in the prefix trie.
 type node struct {
-	path       string
-	paramName  string
-	fullPath   string
-	indices    string
-	children   []*node
-	handler    http.Handler
-	paramKeys  []string
-	validation *RouteValidation
+	path      string
+	paramName string
+	fullPath  string
+	indices   string
+	children  []*node
+	handler   http.Handler
+	paramKeys []string
 }
 
 type route struct {
@@ -53,7 +52,6 @@ type routerState struct {
 	frozen           bool
 	mu               sync.RWMutex
 	matchCache       *matchCache
-	routeValidations map[string]map[string]*RouteValidation
 	routeMeta        map[string]map[string]RouteMeta
 	namedRoutes      map[string]*NamedRoute
 	methodNotAllowed atomic.Bool
@@ -122,12 +120,11 @@ func NewRouter(opts ...RouterOption) *Router {
 		prefix: "",
 		parent: nil,
 		state: &routerState{
-			trees:            make(map[string]*node),
-			routes:           make(map[string][]route),
-			routeValidations: make(map[string]map[string]*RouteValidation),
-			routeMeta:        make(map[string]map[string]RouteMeta),
-			namedRoutes:      make(map[string]*NamedRoute),
-			matchCache:       newMatchCache(DefaultCacheCapacity),
+			trees:       make(map[string]*node),
+			routes:      make(map[string][]route),
+			routeMeta:   make(map[string]map[string]RouteMeta),
+			namedRoutes: make(map[string]*NamedRoute),
+			matchCache:  newMatchCache(DefaultCacheCapacity),
 		},
 	}
 
@@ -228,25 +225,6 @@ func (r *Router) setMeta(method, pattern string, meta RouteMeta) {
 		r.state.routeMeta[method] = make(map[string]RouteMeta)
 	}
 	r.state.routeMeta[method][pattern] = meta
-}
-
-func (r *Router) validationFor(method, pattern string) *RouteValidation {
-	pattern = normalizeStoredPattern(pattern)
-	if byMethod, ok := r.state.routeValidations[method]; ok {
-		return byMethod[pattern]
-	}
-	return nil
-}
-
-func (r *Router) setValidation(method, pattern string, validation *RouteValidation) {
-	pattern = normalizeStoredPattern(pattern)
-	if r.state.routeValidations == nil {
-		r.state.routeValidations = make(map[string]map[string]*RouteValidation)
-	}
-	if r.state.routeValidations[method] == nil {
-		r.state.routeValidations[method] = make(map[string]*RouteValidation)
-	}
-	r.state.routeValidations[method][pattern] = validation
 }
 
 func normalizeStoredPattern(pattern string) string {
