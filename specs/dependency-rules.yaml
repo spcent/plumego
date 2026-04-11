@@ -35,7 +35,7 @@ modules:
     #   canonical: NewErrorBuilder() or ErrorType.Meta()
     #   forbidden: adding New{Specific}Error() constructors beyond existing 7
     # response_write:
-    #   canonical: WriteResponse(w, r, status, data, meta) / ctx.Response(...)
+    #   canonical: WriteResponse(w, r, status, data, meta)
     #   forbidden: per-handler response envelope shapes
     # deprecation:
     #   policy: remove deprecated symbols in the same PR as the last caller migration;

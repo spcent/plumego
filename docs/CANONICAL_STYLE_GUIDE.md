@@ -384,13 +384,10 @@ One canonical path:
 ```go
 // preferred
 contract.WriteResponse(w, r, http.StatusOK, data, meta)
-// or via Ctx
-ctx.Response(http.StatusOK, data, meta)
 ```
 
-`WriteJSON` is a low-level raw-payload writer. It is not the `Ctx`-level success
-path. If you are writing a `Ctx` handler, use `ctx.Response`. If you are
-writing a plain `http.Handler`, use `WriteResponse`.
+`WriteJSON` is a low-level raw-payload writer. It is not the success path.
+Use `WriteResponse` from stdlib-shaped handlers.
 
 Do not invent per-feature envelope shapes.
 

@@ -40,7 +40,7 @@
 - keep `RequestIDHeader` as the canonical transport header constant only; request-id attach/read policy belongs to middleware
 - keep `TraceContext` for tracing/span state only; do not reuse it as the app-facing request-correlation surface
 - keep transport helpers deterministic and side-effect-free; do not add package-global warning or diagnostics hooks
-- keep `Ctx` as a legacy compatibility carrier for `http.ResponseWriter`, `*http.Request`, route params, and narrow binding helpers only; do not add string-key request bags, abort state, hidden deadlines, or request-local service-locator helpers
+- keep `Ctx` as a legacy compatibility carrier for `http.ResponseWriter`, `*http.Request`, route params, and narrow binding helpers only; do not add response-writing helpers, string-key request bags, abort state, hidden deadlines, or request-local service-locator helpers
 - keep protocol-specific streaming/SSE helpers out of stable `contract`; owning modules should implement those on explicit `net/http` handlers
 - keep `WriteJSON` as an explicit lower-level writer for raw payloads outside the `Ctx` success contract
 - use stdlib multipart parsing directly in owning handlers such as `x/fileapi`; do not add file-upload or disk-save convenience helpers to `contract.Ctx`
