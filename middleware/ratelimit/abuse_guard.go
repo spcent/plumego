@@ -19,6 +19,13 @@ import (
 	"github.com/spcent/plumego/security/abuse"
 )
 
+const (
+	headerRateLimitLimit     = "X-RateLimit-Limit"
+	headerRateLimitRemaining = "X-RateLimit-Remaining"
+	headerRateLimitReset     = "X-RateLimit-Reset"
+	headerRetryAfter         = "Retry-After"
+)
+
 // AbuseGuardConfig configures the abuse guard middleware.
 //
 // AbuseGuard provides per-key rate limiting to defend against abuse attacks.
@@ -184,17 +191,17 @@ func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
 }
 
 func applyRateLimitHeaders(w http.ResponseWriter, decision abuse.Decision) {
-	w.Header().Set("X-RateLimit-Limit", strconv.Itoa(decision.Limit))
-	w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(decision.Remaining))
+	w.Header().Set(headerRateLimitLimit, strconv.Itoa(decision.Limit))
+	w.Header().Set(headerRateLimitRemaining, strconv.Itoa(decision.Remaining))
 	if !decision.Reset.IsZero() {
-		w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(decision.Reset.Unix(), 10))
+		w.Header().Set(headerRateLimitReset, strconv.FormatInt(decision.Reset.Unix(), 10))
 	}
 	if !decision.Allowed && decision.RetryAfter > 0 {
 		seconds := int(math.Ceil(decision.RetryAfter.Seconds()))
 		if seconds < 1 {
 			seconds = 1
 		}
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		w.Header().Set(headerRetryAfter, strconv.Itoa(seconds))
 	}
 }
 

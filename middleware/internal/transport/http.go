@@ -17,6 +17,11 @@ func EnsureNoSniff(header http.Header) {
 	}
 }
 
+const (
+	HeaderForwardedFor = "X-Forwarded-For"
+	HeaderRealIP       = "X-Real-IP"
+)
+
 func SafeWrite(w http.ResponseWriter, body []byte) (int, error) {
 	if w == nil {
 		return 0, nil
@@ -30,10 +35,10 @@ func ClientIP(r *http.Request) string {
 		return ""
 	}
 
-	if ip := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]); ip != "" {
+	if ip := strings.TrimSpace(strings.Split(r.Header.Get(HeaderForwardedFor), ",")[0]); ip != "" {
 		return ip
 	}
-	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+	if ip := strings.TrimSpace(r.Header.Get(HeaderRealIP)); ip != "" {
 		return ip
 	}
 
