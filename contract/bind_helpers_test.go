@@ -18,7 +18,7 @@ func TestBindErrorToAPIErrorFields(t *testing.T) {
 	bindErr := &bindError{Status: http.StatusBadRequest, Message: err.Error(), Err: err}
 
 	apiErr := BindErrorToAPIError(bindErr)
-	if apiErr.Code != "VALIDATION_ERROR" {
+	if apiErr.Code != CodeValidationError {
 		t.Fatalf("expected validation error code, got %s", apiErr.Code)
 	}
 	raw, ok := apiErr.Details["fields"]

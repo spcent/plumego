@@ -14,7 +14,7 @@ func TestErrorBuilder(t *testing.T) {
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
 		Type(TypeValidation).
-		Code("TEST_ERROR").
+		Code(CodeValidationError).
 		Message("test error message").
 		Detail("field", "email").
 		Detail("value", "invalid").
@@ -28,8 +28,8 @@ func TestErrorBuilder(t *testing.T) {
 		t.Fatalf("expected category %s, got %s", CategoryValidation, err.Category)
 	}
 
-	if err.Code != "TEST_ERROR" {
-		t.Fatalf("expected code %s, got %s", "TEST_ERROR", err.Code)
+	if err.Code != CodeValidationError {
+		t.Fatalf("expected code %s, got %s", CodeValidationError, err.Code)
 	}
 
 	if err.Message != "test error message" {
@@ -44,7 +44,7 @@ func TestErrorBuilder(t *testing.T) {
 func TestBuilderTypeOverwritesPriorFields(t *testing.T) {
 	got := NewErrorBuilder().
 		Status(999).
-		Code("CUSTOM").
+		Code(CodeInternalError).
 		Category(CategoryServer).
 		Type(TypeNotFound).
 		Build()
@@ -76,7 +76,7 @@ func TestErrorBuilderChaining(t *testing.T) {
 		Status(http.StatusNotFound).
 		Category(CategoryClient).
 		Type(TypeNotFound).
-		Code("NOT_FOUND").
+		Code(CodeResourceNotFound).
 		Message("resource not found").
 		Detail("resource", "user").
 		Detail("id", "123").
@@ -166,7 +166,7 @@ func TestErrorValidation(t *testing.T) {
 	// Valid error
 	validErr := APIError{
 		Status:   http.StatusBadRequest,
-		Code:     "VALIDATION_ERROR",
+		Code:     CodeValidationError,
 		Message:  "validation failed",
 		Category: CategoryValidation,
 	}
@@ -180,7 +180,7 @@ func TestErrorValidation(t *testing.T) {
 	invalidCases := []APIError{
 		{
 			Status:   999, // Invalid status
-			Code:     "ERROR",
+			Code:     CodeInternalError,
 			Message:  "message",
 			Category: CategoryClient,
 		},
@@ -192,13 +192,13 @@ func TestErrorValidation(t *testing.T) {
 		},
 		{
 			Status:   http.StatusBadRequest,
-			Code:     "ERROR",
+			Code:     CodeInternalError,
 			Message:  "", // Empty message
 			Category: CategoryClient,
 		},
 		{
 			Status:   http.StatusBadRequest,
-			Code:     "ERROR",
+			Code:     CodeInternalError,
 			Message:  "message",
 			Category: "", // Empty category
 		},
@@ -241,7 +241,7 @@ func TestErrorResponseWriting(t *testing.T) {
 
 	err := APIError{
 		Status:   http.StatusBadRequest,
-		Code:     "VALIDATION_ERROR",
+		Code:     CodeValidationError,
 		Message:  "validation failed",
 		Category: CategoryValidation,
 		Details:  map[string]any{"field": "email"},
@@ -262,7 +262,7 @@ func TestErrorResponseWriting(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if response.Error.Code != "VALIDATION_ERROR" {
+	if response.Error.Code != CodeValidationError {
 		t.Fatalf("expected code in response")
 	}
 }
@@ -275,7 +275,7 @@ func TestErrorResponseWithRequestID(t *testing.T) {
 
 	err := APIError{
 		Status:   http.StatusInternalServerError,
-		Code:     "INTERNAL_ERROR",
+		Code:     CodeInternalError,
 		Message:  "internal server error",
 		Category: CategoryServer,
 	}
@@ -300,7 +300,7 @@ func TestWriteErrorPreservesRequestID(t *testing.T) {
 
 	err := APIError{
 		Status:    http.StatusBadRequest,
-		Code:      "VALIDATION_ERROR",
+		Code:      CodeValidationError,
 		Message:   "validation failed",
 		Category:  CategoryValidation,
 		RequestID: "explicit-req-id",
@@ -349,7 +349,7 @@ func TestErrorBuilderWithSeverityAndType(t *testing.T) {
 		Category(CategoryValidation).
 		Type(TypeValidation).
 		Severity(SeverityWarning).
-		Code("VALIDATION_WARNING").
+		Code(CodeValidationError).
 		Message("validation warning").
 		Build()
 
@@ -373,7 +373,7 @@ func TestErrorBuilderDetails(t *testing.T) {
 	err := builder.
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
-		Code("VALIDATION_ERROR").
+		Code(CodeValidationError).
 		Message("validation failed").
 		Details(details).
 		Build()
@@ -402,7 +402,7 @@ func TestWriteErrorEncodingFailureDoesNotCommitHeaders(t *testing.T) {
 	err := WriteError(recorder, nil, NewErrorBuilder().
 		Status(http.StatusBadRequest).
 		Category(CategoryClient).
-		Code("BAD_DETAIL").
+		Code(CodeInternalError).
 		Message("bad detail").
 		Detail("bad", make(chan int)).
 		Build())

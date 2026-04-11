@@ -12,7 +12,7 @@ func TestBaseMetricsCollectorMaxRecordsDefault(t *testing.T) {
 
 	for i := 0; i < total; i++ {
 		collector.Record(context.Background(), MetricRecord{
-			Name:  "http_request",
+			Name:  MetricHTTPRequest,
 			Value: float64(i),
 		})
 	}
@@ -35,7 +35,7 @@ func TestBaseMetricsCollectorMaxRecordsDisabled(t *testing.T) {
 
 	for i := 0; i < total; i++ {
 		collector.Record(context.Background(), MetricRecord{
-			Name:  "http_request",
+			Name:  MetricHTTPRequest,
 			Value: float64(i),
 		})
 	}
@@ -76,8 +76,8 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 	}
 
 	record := records[0]
-	if record.Name != "http_request" {
-		t.Fatalf("expected name http_request, got %q", record.Name)
+	if record.Name != MetricHTTPRequest {
+		t.Fatalf("expected name %s, got %q", MetricHTTPRequest, record.Name)
 	}
 	if record.Value != duration.Seconds() {
 		t.Fatalf("expected value %f, got %f", duration.Seconds(), record.Value)

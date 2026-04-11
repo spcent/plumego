@@ -168,7 +168,7 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 // ObserveHTTP implements HTTP metrics recording
 func (b *BaseMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 	record := MetricRecord{
-		Name:  "http_request",
+		Name:  MetricHTTPRequest,
 		Value: durationValueSeconds(duration),
 		Labels: MetricLabels{
 			labelMethod: method,

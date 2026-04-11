@@ -207,7 +207,7 @@ func TestWriteErrorUsesTopLevelRequestIDAndTypedFields(t *testing.T) {
 func TestErrorBuilderStatusOnlyDerivesCategoryRegression(t *testing.T) {
 	got := NewErrorBuilder().
 		Status(http.StatusBadRequest).
-		Code("BAD_REQUEST").
+		Code(CodeBadRequest).
 		Message("bad request").
 		Build()
 	if got.Category != CategoryClient {
