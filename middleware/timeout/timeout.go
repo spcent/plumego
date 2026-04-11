@@ -8,6 +8,7 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 	mw "github.com/spcent/plumego/middleware"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 const (
@@ -111,32 +112,28 @@ func Timeout(cfg TimeoutConfig) middleware.Middleware {
 
 func newTimeoutResponseWriter(ctx context.Context, cfg TimeoutConfig) *timeoutResponseWriter {
 	return &timeoutResponseWriter{
-		header:    http.Header{},
 		ctx:       ctx,
 		cfg:       cfg,
+		buffer:    internaltransport.NewBufferedResponse(cfg.MaxBufferBytes),
 		buffering: true,
 	}
 }
 
 type timeoutResponseWriter struct {
-	header     http.Header
-	body       []byte
-	status     int
 	ctx        context.Context
 	cfg        TimeoutConfig
+	buffer     *internaltransport.BufferedResponse
 	overflow   bool
 	buffering  bool // Whether currently buffering
 	bypassUsed bool // Whether bypass mode was triggered
 }
 
 func (w *timeoutResponseWriter) Header() http.Header {
-	return w.header
+	return w.buffer.Header()
 }
 
 func (w *timeoutResponseWriter) WriteHeader(statusCode int) {
-	if w.status == 0 {
-		w.status = statusCode
-	}
+	w.buffer.WriteHeader(statusCode)
 }
 
 func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
@@ -150,10 +147,6 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 		return 0, http.ErrBodyNotAllowed
 	}
 
-	if w.status == 0 {
-		w.status = http.StatusOK
-	}
-
 	// If bypass was triggered, discard data but don't error
 	if w.bypassUsed {
 		return len(p), nil
@@ -161,25 +154,22 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 
 	// Check if we should switch to bypass mode
 	if w.buffering {
-		currentSize := len(w.body) + len(p)
+		currentSize := w.buffer.Len() + len(p)
 
 		// If exceeds streaming threshold, switch to bypass mode
 		if currentSize > w.cfg.StreamingThreshold {
 			w.buffering = false
 			w.bypassUsed = true
-			w.body = nil // Free memory
+			w.buffer.ClearBody() // Free memory
 			return len(p), nil
 		}
 
-		// If exceeds max buffer limit, mark overflow
-		if w.cfg.MaxBufferBytes > 0 && currentSize > w.cfg.MaxBufferBytes {
-			w.overflow = true
-			return 0, http.ErrBodyNotAllowed
-		}
-
 		// Continue buffering
-		w.body = append(w.body, p...)
-		return len(p), nil
+		n, err := w.buffer.Write(p)
+		if err != nil {
+			w.overflow = true
+		}
+		return n, err
 	}
 
 	// Bypass mode (shouldn't reach here due to bypassUsed check)
@@ -200,19 +190,7 @@ func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
 	}
 
 	// Normal buffered response
-	for k, values := range w.header {
-		for _, v := range values {
-			dst.Header().Add(k, v)
-		}
-	}
-
-	status := w.status
-	if status == 0 {
-		status = http.StatusOK
-	}
-
-	dst.WriteHeader(status)
-	_, _ = dst.Write(w.body)
+	_, _ = w.buffer.WriteTo(dst)
 }
 
 func (w *timeoutResponseWriter) Overflowed() bool {

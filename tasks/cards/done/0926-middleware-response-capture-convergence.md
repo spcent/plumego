@@ -1,7 +1,7 @@
 # Card 0926: Middleware Response Capture Convergence
 
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 
 ## Goal
@@ -72,3 +72,9 @@ Then run the required repo-wide gates before committing.
 - No middleware emits non-canonical JSON error shapes.
 - Middleware conformance tests pass.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Added `middleware/internal/transport.BufferedResponse` for shared header/status/body capture.
+- Timeout and compression middleware now share the internal capture primitive for buffered responses.
+- Preserved existing compression and timeout behavior with explicit buffer/bypass handling.
