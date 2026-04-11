@@ -16,11 +16,11 @@ func TestMiddlewareUsesHeader(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	req.Header.Set("X-Request-ID", "abc-123")
+	req.Header.Set(contract.RequestIDHeader, "abc-123")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("X-Request-ID"); got != "abc-123" {
+	if got := rec.Header().Get(contract.RequestIDHeader); got != "abc-123" {
 		t.Fatalf("expected response header to match, got %q", got)
 	}
 }
@@ -36,7 +36,7 @@ func TestMiddlewareGeneratesWhenMissing(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("X-Request-ID"); got != "gen-1" {
+	if got := rec.Header().Get(contract.RequestIDHeader); got != "gen-1" {
 		t.Fatalf("expected generated header, got %q", got)
 	}
 }

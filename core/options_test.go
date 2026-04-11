@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/requestid"
 )
@@ -64,8 +65,8 @@ func TestRequestIDMiddleware(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	app.ServeHTTP(rec, req)
 
-	if rec.Header().Get("X-Request-ID") == "" {
-		t.Fatalf("expected X-Request-ID to be set")
+	if rec.Header().Get(contract.RequestIDHeader) == "" {
+		t.Fatalf("expected %s to be set", contract.RequestIDHeader)
 	}
 }
 

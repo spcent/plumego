@@ -135,7 +135,7 @@ func TestMiddlewareAddsStructuredFields(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/structured", nil)
-	req.Header.Set("X-Request-ID", "trace-123")
+	req.Header.Set(contract.RequestIDHeader, "trace-123")
 	rc := contract.RequestContext{RoutePattern: "/structured/:id", RouteName: "structured"}
 	req = req.WithContext(contract.WithRequestContext(req.Context(), rc))
 	rec := httptest.NewRecorder()
@@ -159,7 +159,7 @@ func TestMiddlewareUsesUpdatedContextForTracer(t *testing.T) {
 	mw := Middleware(logger, nil, tracer)
 
 	req := httptest.NewRequest(http.MethodGet, "/context", nil)
-	req.Header.Set("X-Request-ID", "ctx-trace")
+	req.Header.Set(contract.RequestIDHeader, "ctx-trace")
 	rec := httptest.NewRecorder()
 	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("context")) })).ServeHTTP(rec, req)
 
