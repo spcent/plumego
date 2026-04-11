@@ -35,7 +35,7 @@ func Configure(hooks Hooks) {
 		path = "/_debug/pubsub"
 	}
 
-	_ = hooks.RegisterRoute(http.MethodGet, path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
+	_ = hooks.RegisterRoute(http.MethodGet, path, adaptCtx(func(ctx *contract.Ctx) {
 		if pub == nil {
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 				Status(http.StatusInternalServerError).

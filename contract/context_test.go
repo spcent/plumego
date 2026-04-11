@@ -239,21 +239,6 @@ func TestCtxParamHelpers(t *testing.T) {
 	}
 }
 
-func TestAdaptCtxHandler(t *testing.T) {
-	called := false
-	h := AdaptCtxHandler(func(c *Ctx) {
-		called = true
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-
-	if !called {
-		t.Fatalf("handler was not called")
-	}
-}
-
 func TestBindQuery(t *testing.T) {
 	type filter struct {
 		Name   string   `query:"name"`

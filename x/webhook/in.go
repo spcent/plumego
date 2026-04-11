@@ -52,7 +52,7 @@ func (c *Inbound) RegisterRoutes(r routeRegistrar) error {
 		if gitHubPath == "" {
 			gitHubPath = "/webhooks/github"
 		}
-		regErr = r.AddRoute(http.MethodPost, gitHubPath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }))
+		regErr = r.AddRoute(http.MethodPost, gitHubPath, adaptCtx(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }))
 		if regErr != nil {
 			return
 		}
@@ -61,7 +61,7 @@ func (c *Inbound) RegisterRoutes(r routeRegistrar) error {
 		if stripePath == "" {
 			stripePath = "/webhooks/stripe"
 		}
-		regErr = r.AddRoute(http.MethodPost, stripePath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
+		regErr = r.AddRoute(http.MethodPost, stripePath, adaptCtx(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
 	})
 
 	return regErr

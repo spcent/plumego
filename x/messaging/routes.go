@@ -18,20 +18,28 @@ func RegisterRoutes(r *router.Router, svc *Service, prefix string) error {
 	}
 	prefix = strings.TrimRight(prefix, "/")
 
-	if err := r.AddRoute(http.MethodPost, prefix+"/send", contract.AdaptCtxHandler(svc.HandleSend)); err != nil {
+	if err := r.AddRoute(http.MethodPost, prefix+"/send", adaptCtx(svc.HandleSend)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPost, prefix+"/batch", contract.AdaptCtxHandler(svc.HandleBatchSend)); err != nil {
+	if err := r.AddRoute(http.MethodPost, prefix+"/batch", adaptCtx(svc.HandleBatchSend)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodGet, prefix+"/stats", contract.AdaptCtxHandler(svc.HandleStats)); err != nil {
+	if err := r.AddRoute(http.MethodGet, prefix+"/stats", adaptCtx(svc.HandleStats)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodGet, prefix+"/receipts", contract.AdaptCtxHandler(svc.HandleListReceipts)); err != nil {
+	if err := r.AddRoute(http.MethodGet, prefix+"/receipts", adaptCtx(svc.HandleListReceipts)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodGet, prefix+"/:id/receipt", contract.AdaptCtxHandler(svc.HandleGetReceipt)); err != nil {
+	if err := r.AddRoute(http.MethodGet, prefix+"/:id/receipt", adaptCtx(svc.HandleGetReceipt)); err != nil {
 		return err
 	}
-	return r.AddRoute(http.MethodGet, prefix+"/channels", contract.AdaptCtxHandler(svc.HandleChannelHealth))
+	return r.AddRoute(http.MethodGet, prefix+"/channels", adaptCtx(svc.HandleChannelHealth))
+}
+
+func adaptCtx(handler func(*contract.Ctx)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := contract.RequestContextFromContext(r.Context())
+		ctx := contract.NewCtx(w, r, rc.Params)
+		handler(ctx)
+	})
 }

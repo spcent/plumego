@@ -152,12 +152,12 @@ func (c *Handler) RegisterRoutes(r *router.Router) error {
 			regErr = group.AddRoute(method, path, c.withAuth(handler))
 		}
 
-		register(http.MethodGet, "", contract.AdaptCtxHandler(c.handleSummary))
-		register(http.MethodGet, "/queue", contract.AdaptCtxHandler(c.handleQueueStats))
-		register(http.MethodPost, "/queue/replay", contract.AdaptCtxHandler(c.handleQueueReplay))
-		register(http.MethodGet, "/receipts", contract.AdaptCtxHandler(c.handleReceiptLookup))
-		register(http.MethodGet, "/channels", contract.AdaptCtxHandler(c.handleChannelHealth))
-		register(http.MethodGet, "/tenants/quota", contract.AdaptCtxHandler(c.handleTenantQuota))
+		register(http.MethodGet, "", adaptCtx(c.handleSummary))
+		register(http.MethodGet, "/queue", adaptCtx(c.handleQueueStats))
+		register(http.MethodPost, "/queue/replay", adaptCtx(c.handleQueueReplay))
+		register(http.MethodGet, "/receipts", adaptCtx(c.handleReceiptLookup))
+		register(http.MethodGet, "/channels", adaptCtx(c.handleChannelHealth))
+		register(http.MethodGet, "/tenants/quota", adaptCtx(c.handleTenantQuota))
 	})
 	return regErr
 }
@@ -469,6 +469,14 @@ func writeNotImplemented(ctx *contract.Ctx, code, message string) {
 		Message(message).
 		Category(contract.CategoryServer).
 		Build())
+}
+
+func adaptCtx(handler func(*contract.Ctx)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := contract.RequestContextFromContext(r.Context())
+		ctx := contract.NewCtx(w, r, rc.Params)
+		handler(ctx)
+	})
 }
 
 func denyAllMiddleware() middleware.Middleware {

@@ -1,7 +1,7 @@
 # Card 0928: Contract Ctx Adapter Migration
 
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 
 ## Goal
@@ -72,3 +72,9 @@ Then run the required repo-wide gates before committing.
 - Stable `contract` no longer advertises a non-canonical handler shape.
 - Affected extension handlers remain explicit and pass package tests.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Removed `CtxHandlerFunc` and `AdaptCtxHandler` from `contract`.
+- Added package-local adapters in `x/rest`, `x/messaging`, `x/ops`, `x/webhook`, and `x/devtools/pubsubdebug`.
+- Updated devserver routes to build `contract.Ctx` locally without stable adapters.

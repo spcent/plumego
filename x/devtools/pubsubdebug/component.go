@@ -41,7 +41,7 @@ func (h *Handler) RegisterRoutes(r routeRegistrar) error {
 			path = "/_debug/pubsub"
 		}
 
-		regErr = r.AddRoute(http.MethodGet, path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
+		regErr = r.AddRoute(http.MethodGet, path, adaptCtx(func(ctx *contract.Ctx) {
 			if pub == nil {
 				_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 					Status(http.StatusInternalServerError).

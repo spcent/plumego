@@ -151,8 +151,12 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 	}
 
 	// API endpoints (without Group - register directly)
-	adaptCtx := func(handler contract.CtxHandlerFunc) http.HandlerFunc {
-		return contract.AdaptCtxHandler(handler).ServeHTTP
+	adaptCtx := func(handler func(*contract.Ctx)) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			rc := contract.RequestContextFromContext(r.Context())
+			ctx := contract.NewCtx(w, r, rc.Params)
+			handler(ctx)
+		}
 	}
 
 	if err := d.app.Get("/api/info", adaptCtx(d.handleInfo)); err != nil {

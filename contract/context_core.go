@@ -209,15 +209,3 @@ func (c *Ctx) MustParam(key string) (string, error) {
 	}
 	return val, nil
 }
-
-// CtxHandlerFunc is the handler signature that receives a unified Ctx.
-type CtxHandlerFunc func(*Ctx)
-
-// AdaptCtxHandler converts a CtxHandlerFunc to a standard http.Handler to keep net/http compatibility.
-func AdaptCtxHandler(h CtxHandlerFunc) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rc := RequestContextFromContext(r.Context())
-		ctx := newCtxWithConfig(w, r, rc.Params, nil)
-		h(ctx)
-	})
-}

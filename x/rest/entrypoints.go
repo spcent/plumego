@@ -84,28 +84,28 @@ func RegisterContextResourceRoutes(r *router.Router, prefix string, controller C
 	}
 	prefix = normalizePrefix(prefix)
 
-	if err := r.AddRoute(http.MethodGet, prefix, contract.AdaptCtxHandler(controller.IndexCtx)); err != nil {
+	if err := r.AddRoute(http.MethodGet, prefix, adaptCtx(controller.IndexCtx)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodGet, prefix+"/:id", contract.AdaptCtxHandler(controller.ShowCtx)); err != nil {
+	if err := r.AddRoute(http.MethodGet, prefix+"/:id", adaptCtx(controller.ShowCtx)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPost, prefix, contract.AdaptCtxHandler(controller.CreateCtx)); err != nil {
+	if err := r.AddRoute(http.MethodPost, prefix, adaptCtx(controller.CreateCtx)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPut, prefix+"/:id", contract.AdaptCtxHandler(controller.UpdateCtx)); err != nil {
+	if err := r.AddRoute(http.MethodPut, prefix+"/:id", adaptCtx(controller.UpdateCtx)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodDelete, prefix+"/:id", contract.AdaptCtxHandler(controller.DeleteCtx)); err != nil {
+	if err := r.AddRoute(http.MethodDelete, prefix+"/:id", adaptCtx(controller.DeleteCtx)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPatch, prefix+"/:id", contract.AdaptCtxHandler(controller.PatchCtx)); err != nil {
+	if err := r.AddRoute(http.MethodPatch, prefix+"/:id", adaptCtx(controller.PatchCtx)); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPost, prefix+"/batch", contract.AdaptCtxHandler(controller.BatchCreateCtx)); err != nil {
+	if err := r.AddRoute(http.MethodPost, prefix+"/batch", adaptCtx(controller.BatchCreateCtx)); err != nil {
 		return err
 	}
-	return r.AddRoute(http.MethodDelete, prefix+"/batch", contract.AdaptCtxHandler(controller.BatchDeleteCtx))
+	return r.AddRoute(http.MethodDelete, prefix+"/batch", adaptCtx(controller.BatchDeleteCtx))
 }
 
 func normalizePrefix(prefix string) string {
@@ -117,4 +117,12 @@ func normalizePrefix(prefix string) string {
 		prefix = "/" + prefix
 	}
 	return strings.TrimRight(prefix, "/")
+}
+
+func adaptCtx(handler func(*contract.Ctx)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := contract.RequestContextFromContext(r.Context())
+		ctx := contract.NewCtx(w, r, rc.Params)
+		handler(ctx)
+	})
 }
