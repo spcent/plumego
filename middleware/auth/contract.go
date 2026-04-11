@@ -20,10 +20,6 @@ type authOptions struct {
 // AuthOption configures authentication middleware behavior.
 type AuthOption func(*authOptions)
 
-type requestAuthenticator interface {
-	AuthenticateRequest(r *http.Request) (*authn.Principal, *http.Request, error)
-}
-
 // WithAuthErrorHandler overrides the default error handling.
 func WithAuthErrorHandler(handler AuthErrorHandler) AuthOption {
 	return func(o *authOptions) {
@@ -55,7 +51,7 @@ func Authenticate(authenticator authn.Authenticator, opts ...AuthOption) middlew
 				principal *authn.Principal
 				err       error
 			)
-			if enriched, ok := authenticator.(requestAuthenticator); ok {
+			if enriched, ok := authenticator.(authn.RequestAuthenticator); ok {
 				principal, req, err = enriched.AuthenticateRequest(r)
 				if req == nil {
 					req = r

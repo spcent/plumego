@@ -20,6 +20,13 @@ type Authenticator interface {
 	Authenticate(r *http.Request) (*Principal, error)
 }
 
+// RequestAuthenticator authenticates requests that may be enriched before
+// reaching downstream handlers.
+type RequestAuthenticator interface {
+	Authenticator
+	AuthenticateRequest(r *http.Request) (*Principal, *http.Request, error)
+}
+
 // Authorizer checks whether a principal may perform action on resource.
 type Authorizer interface {
 	Authorize(p *Principal, action string, resource string) error

@@ -1,7 +1,7 @@
 # Card 0931: Security Auth Request Enrichment Contract
 
 Priority: P1
-State: active
+State: done
 Primary Module: security
 
 ## Goal
@@ -62,3 +62,9 @@ Then run the required repo-wide gates before committing.
 - `security/jwt` exposes its request-enrichment capability through the canonical auth contract.
 - No private cross-package shadow contract remains in `middleware/auth`.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Added `authn.RequestAuthenticator` to make request enrichment an explicit security contract.
+- `middleware/auth` now type-asserts against `authn.RequestAuthenticator` instead of a private interface.
+- `JWTManager.Authenticator` returns `authn.RequestAuthenticator` and the JWT authenticator doc comment reflects the contract.

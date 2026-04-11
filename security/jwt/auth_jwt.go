@@ -7,7 +7,7 @@ import (
 	"github.com/spcent/plumego/security/authn"
 )
 
-// Authenticator adapts JWT verification to the authn.Authenticator interface.
+// Authenticator adapts JWT verification to the authn.RequestAuthenticator interface.
 type Authenticator struct {
 	Manager      *JWTManager
 	ExpectedType TokenType
@@ -41,8 +41,8 @@ func (a Authenticator) AuthenticateRequest(r *http.Request) (*authn.Principal, *
 	return PrincipalFromClaims(claims), r.WithContext(WithTokenClaims(r.Context(), claims)), nil
 }
 
-// Authenticator returns an authn.Authenticator for the given token type.
-func (m *JWTManager) Authenticator(tokenType TokenType) authn.Authenticator {
+// Authenticator returns an authn.RequestAuthenticator for the given token type.
+func (m *JWTManager) Authenticator(tokenType TokenType) authn.RequestAuthenticator {
 	return Authenticator{
 		Manager:      m,
 		ExpectedType: tokenType,
