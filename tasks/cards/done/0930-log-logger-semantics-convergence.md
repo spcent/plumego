@@ -1,7 +1,7 @@
 # Card 0930: Log Logger Semantics Convergence
 
 Priority: P1
-State: active
+State: done
 Primary Module: log
 
 ## Goal
@@ -63,3 +63,9 @@ Then run the required repo-wide gates before committing.
 - Shared `LoggerConfig` fields have the same meaning across supported formats, or a format-specific exception is explicitly documented.
 - Tests cover fatal calls and config behavior for text, JSON, and discard formats.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- Text logger now honors `LoggerConfig.ErrorOutput` for error/fatal levels.
+- Text logger debug gating respects `LoggerConfig.RespectVerbosity`.
+- Added fatal-exit and config behavior tests across formats.

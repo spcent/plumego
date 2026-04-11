@@ -82,8 +82,9 @@ func firstFields(extra []Fields) Fields {
 
 // defaultLogger adapts the default text logger backend to StructuredLogger.
 type defaultLogger struct {
-	backend *gLogger
-	fields  Fields
+	backend          *gLogger
+	fields           Fields
+	respectVerbosity bool
 }
 
 // NewLogger creates the canonical structured logger.
@@ -120,9 +121,9 @@ func (l *defaultLogger) With(key string, value any) StructuredLogger {
 }
 
 // Debug logs at DEBUG level.
-// The canonical logger path gates debug on V(1).
+// When RespectVerbosity is enabled, debug logging is gated on V(1).
 func (l *defaultLogger) Debug(msg string, fields ...Fields) {
-	if !l.getBackend().vAt(1, 2) {
+	if l.respectVerbosity && !l.getBackend().vAt(1, 2) {
 		return
 	}
 	l.logWithLevel(DEBUG, msg, firstFields(fields))
@@ -145,10 +146,10 @@ func (l *defaultLogger) Fatal(msg string, fields ...Fields) {
 }
 
 // DebugCtx logs at DEBUG level with context.
-// Verbosity is gated on the global glog flag, consistent with Debug.
+// When RespectVerbosity is enabled, debug logging is gated on V(1).
 func (l *defaultLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
 	_ = ctx
-	if !l.getBackend().vAt(1, 2) {
+	if l.respectVerbosity && !l.getBackend().vAt(1, 2) {
 		return
 	}
 	l.logWithLevel(DEBUG, msg, firstFields(fields))
@@ -210,11 +211,15 @@ func newDefaultLogger(cfg LoggerConfig) *defaultLogger {
 	if cfg.Output != nil {
 		backend.SetOutput(cfg.Output)
 	}
+	if cfg.ErrorOutput != nil {
+		backend.SetErrorOutput(cfg.ErrorOutput)
+	}
 	backend.SetLevel(cfg.Level)
 	backend.SetVerbose(cfg.Verbosity)
 	return &defaultLogger{
-		backend: backend,
-		fields:  cloneFields(cfg.Fields),
+		backend:          backend,
+		fields:           cloneFields(cfg.Fields),
+		respectVerbosity: cfg.RespectVerbosity,
 	}
 }
 

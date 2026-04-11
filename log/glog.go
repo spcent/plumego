@@ -54,6 +54,7 @@ type gLogger struct {
 	writeMu         sync.Mutex
 	level           Level
 	output          io.Writer
+	errorOutput     io.Writer
 	toStderr        bool
 	alsoToStderr    bool
 	verbosity       int
@@ -227,6 +228,9 @@ func (l *gLogger) rebuildWriterCache() {
 // getLogWriter returns the effective io.Writer for the given level.
 // Must be called with at least l.mu read lock held.
 func (l *gLogger) getLogWriter(level Level) io.Writer {
+	if level >= ERROR && l.errorOutput != nil {
+		return l.errorOutput
+	}
 	if l.toStderr {
 		return l.stderrWriter()
 	}
@@ -331,6 +335,12 @@ func (l *gLogger) SetOutput(w io.Writer) {
 	}
 	l.output = w
 	l.rebuildWriterCache()
+}
+
+func (l *gLogger) SetErrorOutput(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.errorOutput = w
 }
 
 func (l *gLogger) SetVerbose(v int) {
