@@ -1,7 +1,7 @@
 # Card 0927: Store And Metrics Primitive Surface Convergence
 
 Priority: P2
-State: active
+State: done
 Primary Module: store
 
 ## Goal
@@ -76,3 +76,9 @@ Then run the required repo-wide gates before committing.
 - Metrics fan-out helpers handle nil collectors consistently.
 - Removed exported symbols have zero residual references.
 - Focused gates and repo-wide gates pass.
+
+## Outcome
+
+- `store/cache` constructors now return validation errors instead of panicking.
+- `store/kv.Stats` drops stale durable-engine fields and `Close` is idempotent.
+- `metrics.NewMultiCollector` now filters nil collectors and returns nil when no collectors are supplied.

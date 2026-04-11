@@ -37,6 +37,7 @@ other modules can depend on safely.
 - keep collector APIs small
 - keep base collectors generic and transport-agnostic
 - keep only aggregate collector composition in stable `metrics`
+- keep fan-out helpers nil-safe (filter nil inputs and return nil when no collectors/observers are provided)
 - keep `AggregateCollector` limited to `Record`, shared `ObserveHTTP`, stats, and reset semantics
 - keep metric identity canonical as `MetricRecord.Name`; use `Labels` for dimensions instead of parallel type catalogs
 - keep feature-specific observer interfaces in their owning package; only the shared HTTP observer stays in stable `metrics`

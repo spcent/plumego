@@ -3,7 +3,6 @@ package leaderboard
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -141,19 +140,19 @@ type LeaderboardMetrics struct {
 }
 
 // NewMemoryLeaderboardCache creates a new in-memory leaderboard cache.
-//
-// Panics if either configuration is invalid. Call config.Validate() beforehand
-// if you need to handle validation errors gracefully.
-func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *LeaderboardConfig) *MemoryLeaderboardCache {
+func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *LeaderboardConfig) (*MemoryLeaderboardCache, error) {
 	if lbConfig == nil {
 		lbConfig = DefaultLeaderboardConfig()
 	}
 
 	if err := lbConfig.Validate(); err != nil {
-		panic(fmt.Sprintf("invalid leaderboard config: %v", err))
+		return nil, err
 	}
 
-	baseCache := storecache.NewMemoryCacheWithConfig(cacheConfig)
+	baseCache, err := storecache.NewMemoryCacheWithConfig(cacheConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	lbc := &MemoryLeaderboardCache{
 		MemoryCache: baseCache,
@@ -166,7 +165,7 @@ func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *Leaderbo
 	lbc.wg.Add(1)
 	go lbc.cleanupLoop()
 
-	return lbc
+	return lbc, nil
 }
 
 // Close stops the leaderboard cache and cleanup goroutine

@@ -124,3 +124,16 @@ func TestKVStoreClose(t *testing.T) {
 		t.Fatalf("expected ErrStoreClosed, got %v", err)
 	}
 }
+
+func TestKVStoreCloseIdempotent(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("expected Close to be idempotent, got %v", err)
+	}
+}

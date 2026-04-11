@@ -150,16 +150,17 @@ type cacheItem struct {
 
 // NewMemoryCache creates an empty MemoryCache instance.
 func NewMemoryCache() *MemoryCache {
-	return NewMemoryCacheWithConfig(DefaultConfig())
+	cache, err := NewMemoryCacheWithConfig(DefaultConfig())
+	if err != nil {
+		return nil
+	}
+	return cache
 }
 
 // NewMemoryCacheWithConfig creates a MemoryCache with custom configuration.
-//
-// Panics if the configuration is invalid. Call config.Validate() beforehand
-// if you need to handle validation errors gracefully.
-func NewMemoryCacheWithConfig(config Config) *MemoryCache {
+func NewMemoryCacheWithConfig(config Config) (*MemoryCache, error) {
 	if err := config.Validate(); err != nil {
-		panic(fmt.Sprintf("invalid cache config: %v", err))
+		return nil, err
 	}
 
 	cache := &MemoryCache{
@@ -171,7 +172,7 @@ func NewMemoryCacheWithConfig(config Config) *MemoryCache {
 		cache.startCleanup()
 	}
 
-	return cache
+	return cache, nil
 }
 
 // startCleanup starts the background cleanup goroutine.

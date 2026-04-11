@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+func mustNewMemoryCacheWithConfig(t *testing.T, config Config) *MemoryCache {
+	t.Helper()
+	cache, err := NewMemoryCacheWithConfig(config)
+	if err != nil {
+		t.Fatalf("NewMemoryCacheWithConfig: %v", err)
+	}
+	return cache
+}
+
 func TestMemoryCacheSetAndGet(t *testing.T) {
 	cache := NewMemoryCache()
 
@@ -132,7 +141,7 @@ func TestMemoryCacheWithConfig(t *testing.T) {
 		DefaultTTL:      5 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// Test Set with default TTL
@@ -181,7 +190,7 @@ func TestMemoryCacheMemoryLimit(t *testing.T) {
 		DefaultTTL:      1 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// First set should succeed
@@ -208,7 +217,7 @@ func TestMemoryCacheKeyValidation(t *testing.T) {
 		DefaultTTL:      1 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// Test empty key
@@ -235,7 +244,7 @@ func TestMemoryCacheDefaultTTL(t *testing.T) {
 	config := DefaultConfig()
 	config.DefaultTTL = 50 * time.Millisecond
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// Set with zero TTL should use default TTL
@@ -271,7 +280,7 @@ func TestMemoryCacheCleanup(t *testing.T) {
 		DefaultTTL:      1 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// Set some items with short TTL
@@ -304,7 +313,7 @@ func TestMemoryCacheClose(t *testing.T) {
 		DefaultTTL:      1 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 
 	// Set some data
 	cache.Set(context.Background(), "test", []byte("value"), 1*time.Minute)

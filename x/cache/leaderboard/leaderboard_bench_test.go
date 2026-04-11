@@ -92,7 +92,7 @@ func BenchmarkLeaderboardCacheZAdd(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -110,7 +110,7 @@ func BenchmarkLeaderboardCacheZScore(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -133,7 +133,7 @@ func BenchmarkLeaderboardCacheZIncrBy(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -156,7 +156,7 @@ func BenchmarkLeaderboardCacheZRange(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -179,7 +179,7 @@ func BenchmarkLeaderboardCacheZRangeByScore(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -202,7 +202,7 @@ func BenchmarkLeaderboardCacheZRank(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -225,7 +225,7 @@ func BenchmarkLeaderboardCacheZCard(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -248,7 +248,7 @@ func BenchmarkLeaderboardCacheZCount(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -285,7 +285,7 @@ func benchmarkZAddWithSize(b *testing.B, size int) {
 	lbConfig := DefaultLeaderboardConfig()
 	lbConfig.MaxMembersPerSet = size * 2
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -312,7 +312,7 @@ func BenchmarkLeaderboardCacheParallelZAdd(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -333,7 +333,7 @@ func BenchmarkLeaderboardCacheParallelZScore(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -360,7 +360,7 @@ func BenchmarkLeaderboardCacheParallelZRank(b *testing.B) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()

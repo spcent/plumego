@@ -67,9 +67,7 @@ type Stats struct {
 	Entries     int64   `json:"entries"`
 	Hits        int64   `json:"hits"`
 	Misses      int64   `json:"misses"`
-	Evictions   int64   `json:"evictions"`
 	MemoryUsage int64   `json:"memory_usage"`
-	WALSize     int64   `json:"wal_size"`
 	HitRatio    float64 `json:"hit_ratio"`
 }
 
@@ -264,7 +262,7 @@ func (kv *KVStore) Close() error {
 	defer kv.mu.Unlock()
 
 	if kv.closed {
-		return ErrStoreClosed
+		return nil
 	}
 	kv.closed = true
 	return nil

@@ -33,6 +33,7 @@
 - keep interfaces narrow
 - keep concurrent behavior testable
 - move topology-heavy features to owning extensions
+- keep cache and KV constructors explicit about validation errors; do not panic on invalid config
 - keep DB analytics, summaries, instrumentation wrappers, pool-stat polling, and slow-query inspection out of `store/db`; route them to `x/observability/dbinsights`
 - keep DB health payloads, open-retry loops, and generic timeout policy helpers out of `store/db`; callers own operation deadlines through `context.Context`
 - keep HTTP response caching, request-derived cache keys, and cache metrics/introspection ownership out of `store/cache`

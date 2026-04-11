@@ -29,6 +29,9 @@ func TestMultiCollector(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	ctx := context.Background()
 
@@ -48,6 +51,9 @@ func TestMultiCollectorAllMethods(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	ctx := context.Background()
 
@@ -68,6 +74,9 @@ func TestMultiCollectorGetStats(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	ctx := context.Background()
 
@@ -104,6 +113,9 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 	})
 
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	stats := multi.GetStats()
 
@@ -142,6 +154,9 @@ func TestMultiCollectorGetStatsCallsEachCollectorOnce(t *testing.T) {
 	})
 
 	multi := NewMultiCollector(collectorA, collectorB)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	_ = multi.GetStats()
 
@@ -157,6 +172,9 @@ func TestMultiCollectorClear(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	ctx := context.Background()
 
@@ -177,12 +195,8 @@ func TestMultiCollectorClear(t *testing.T) {
 
 func TestMultiCollectorEmpty(t *testing.T) {
 	multi := NewMultiCollector()
-
-	stats := multi.GetStats()
-
-	// Empty multi collector should return zero stats
-	if stats.TotalRecords != 0 {
-		t.Fatalf("expected 0 total records, got %d", stats.TotalRecords)
+	if multi != nil {
+		t.Fatalf("expected nil multi collector for empty input")
 	}
 }
 
