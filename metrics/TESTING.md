@@ -1,268 +1,114 @@
-# Testing with AggregateCollector
+# Testing `metrics`
 
-This document explains how to write tests against the stable metrics collector surface in a maintainable way.
+This guide covers tests for the stable `metrics` root only.
 
-## Problem
+## Stable Surface
 
-The stable aggregate collector surface has many methods. When writing tests, creating mock implementations can be tedious and fragile. Every time a new method is added to that surface, all mock implementations must be updated.
+The stable aggregate collector contract is intentionally small:
 
-## Solutions
+- `Record(ctx, MetricRecord)`
+- `ObserveHTTP(ctx, method, path, status, bytes, duration)`
+- `GetStats() CollectorStats`
+- `Clear()`
 
-We provide two approaches for creating test mocks, depending on your needs:
+Feature-specific helper methods such as DB, MQ, KV, IPC, or PubSub observation
+do not belong to stable `metrics`. Use the owning extension packages for those
+surfaces.
 
-### 1. Simple Mocks with NoopCollector (Recommended for Simple Tests)
+## Recommended Patterns
 
-For tests that don't need to verify metrics calls, embed `NoopCollector`:
+### 1. Use `NoopCollector` for no-op dependencies
 
-```go
-import "github.com/spcent/plumego/metrics"
-
-// Simple mock that does nothing
-type myMock struct {
-    *metrics.NoopCollector
-}
-
-func TestMyFeature(t *testing.T) {
-    mock := &myMock{
-        NoopCollector: metrics.NewNoopCollector(),
-    }
-
-    // Use the mock
-    // All aggregate collector methods are available and do nothing
-}
-```
-
-**Benefits:**
-- Minimal boilerplate
-- Future-proof: when new methods are added to the interface, no changes needed
-- No methods to implement manually
-
-**Override specific methods if needed:**
+When a test only needs a valid collector instance, embed `NoopCollector`.
 
 ```go
-type customMock struct {
-    *metrics.NoopCollector
-    httpCallCount int
-}
-
-func (m *customMock) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-    m.httpCallCount++
-}
-```
-
-### 2. Metrics Test Collector for Verification (Recommended for Complex Tests)
-
-For tests that need to verify metrics calls, use `x/observability/testmetrics.MockCollector`:
-
-```go
-import testmetrics "github.com/spcent/plumego/x/observability/testmetrics"
-import "github.com/spcent/plumego/x/observability/dbinsights"
-
-func TestDatabaseMetrics(t *testing.T) {
-    mock := testmetrics.NewMockCollector()
-
-    // Use your component that records metrics
-    db := dbinsights.NewInstrumentedDB(realDB, mock, "postgres")
-    _, _ = db.QueryContext(context.Background(), "SELECT 1")
-
-    // Verify metrics were recorded
-    if mock.DBCallCount() != 1 {
-        t.Errorf("expected 1 DB call, got %d", mock.DBCallCount())
-    }
-
-    // Check specific call details
-    lastCall := mock.GetLastDBCall()
-    if lastCall.Operation != "query" {
-        t.Errorf("expected query operation, got %s", lastCall.Operation)
-    }
-}
-```
-
-**Features:**
-- Automatic call recording for all metric types
-- Convenient methods: `HTTPCallCount()`, `DBCallCount()`, `GetLastDBCall()`, etc.
-- Thread-safe concurrent access
-- Optional custom hooks for advanced scenarios
-
-### 3. Custom Hooks for Advanced Testing
-
-For complex verification logic, use custom hooks:
-
-```go
-func TestWithCustomVerification(t *testing.T) {
-    mock := testmetrics.NewMockCollector()
-
-    // Set up custom hook
-    var capturedQuery string
-    mock.OnObserveDB = func(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-        capturedQuery = query
-
-        // Custom assertions
-        if duration > 100*time.Millisecond {
-            t.Error("query too slow")
-        }
-    }
-
-    // Test your code
-    // The hook will be called automatically
-}
-```
-
-## Migration Guide
-
-### Before (Old Pattern)
-
-```go
-type mockMetricsCollector struct{}
-
-func (m *mockMetricsCollector) Record(ctx context.Context, record metrics.MetricRecord) {}
-func (m *mockMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {}
-func (m *mockMetricsCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {}
-func (m *mockMetricsCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {}
-func (m *mockMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {}
-func (m *mockMetricsCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {}
-func (m *mockMetricsCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {}
-func (m *mockMetricsCollector) GetStats() metrics.CollectorStats { return metrics.CollectorStats{} }
-func (m *mockMetricsCollector) Clear() {}
-```
-
-### After (New Pattern)
-
-**Option 1: Simple embedding**
-```go
-type mockMetricsCollector struct {
-    *metrics.NoopCollector
-}
-
-func newMockMetricsCollector() *mockMetricsCollector {
-    return &mockMetricsCollector{
-        NoopCollector: metrics.NewNoopCollector(),
-    }
-}
-```
-
-**Option 2: Use x/observability/testmetrics.MockCollector**
-```go
-// Just use the dedicated metrics test helper package
-mock := testmetrics.NewMockCollector()
-```
-
-## Best Practices
-
-1. **Use NoopCollector embedding for simple no-op mocks**
-   - When you just need a valid aggregate collector instance
-   - When you don't care about verifying metrics calls
-
-2. **Use x/observability/testmetrics.MockCollector for verification**
-   - When you need to assert metrics were recorded
-   - When you need to check call counts or parameters
-
-3. **Override specific methods only when needed**
-   - Don't override methods you don't test
-   - Keep overrides minimal and focused
-
-4. **Use custom hooks for complex logic**
-   - When you need custom validation per call
-   - When you need to track state across calls
-
-## Complete Example
-
-```go
-package mypackage
-
-import (
-    "testing"
-    "time"
-    "github.com/spcent/plumego/metrics"
-)
-
-func TestMyComponent_Simple(t *testing.T) {
-    // Simple: just need a valid collector
-    mock := &mockCollector{
-        NoopCollector: metrics.NewNoopCollector(),
-    }
-
-    component := NewMyComponent(mock)
-    component.DoSomething()
-
-    // No verification needed
-}
-
-func TestMyComponent_WithVerification(t *testing.T) {
-    // Advanced: verify metrics
-    mock := testmetrics.NewMockCollector()
-
-    component := NewMyComponent(mock)
-    component.RecordData()
-
-    // Verify calls
-    if mock.HTTPCallCount() != 1 {
-        t.Error("expected HTTP call")
-    }
-
-    calls := mock.GetHTTPCalls()
-    if calls[0].Method != "POST" {
-        t.Errorf("expected POST, got %s", calls[0].Method)
-    }
-}
-
-func TestMyComponent_WithHooks(t *testing.T) {
-    // Expert: custom validation
-    mock := testmetrics.NewMockCollector()
-
-    sawSlowQuery := false
-    mock.OnObserveDB = func(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-        if duration > 100*time.Millisecond {
-            sawSlowQuery = true
-        }
-    }
-
-    component := NewMyComponent(mock)
-    component.ExecuteQuery()
-
-    if !sawSlowQuery {
-        t.Error("expected to see slow query")
-    }
-}
-
-// Simple mock type
 type mockCollector struct {
-    *metrics.NoopCollector
+	*metrics.NoopCollector
+}
+
+func TestComponent(t *testing.T) {
+	collector := &mockCollector{
+		NoopCollector: metrics.NewNoopCollector(),
+	}
+
+	component := NewComponent(collector)
+	component.Run()
 }
 ```
 
-## Thread Safety
+### 2. Use a small spy for stable-call verification
 
-Both `NoopCollector` and `x/observability/testmetrics.MockCollector` are thread-safe and can be used in concurrent tests.
+When a test needs to verify stable collector calls, embed `NoopCollector` and
+override only the method you care about.
 
 ```go
-func TestConcurrent(t *testing.T) {
-    mock := testmetrics.NewMockCollector()
+type spyCollector struct {
+	*metrics.NoopCollector
 
-    var wg sync.WaitGroup
-    for i := 0; i < 100; i++ {
-        wg.Add(1)
-        go func() {
-            defer wg.Done()
-            mock.ObserveHTTP(ctx, "GET", "/", 200, 100, 10*time.Millisecond)
-        }()
-    }
-    wg.Wait()
+	mu         sync.Mutex
+	httpCalls  int
+	lastMethod string
+}
 
-    if mock.HTTPCallCount() != 100 {
-        t.Errorf("expected 100 calls, got %d", mock.HTTPCallCount())
-    }
+func (s *spyCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.httpCalls++
+	s.lastMethod = method
+}
+
+func TestHandlerMetrics(t *testing.T) {
+	collector := &spyCollector{NoopCollector: metrics.NewNoopCollector()}
+
+	handler := NewHandler(collector)
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if collector.httpCalls != 1 {
+		t.Fatalf("httpCalls = %d, want 1", collector.httpCalls)
+	}
 }
 ```
 
-## Summary
+### 3. Assert stable behavior through `GetStats()`
 
-| Scenario | Recommended Approach |
-|----------|---------------------|
-| Simple no-op mock | Embed `NoopCollector` |
-| Verify call counts | Use `testmetrics.MockCollector` |
-| Verify call parameters | Use `testmetrics.MockCollector.GetXXXCalls()` |
-| Custom validation logic | Use `testmetrics.MockCollector` with hooks |
-| Override single method | Embed `NoopCollector`, override one method |
+`BaseMetricsCollector` tests should assert on `CollectorStats`, not on hidden
+internal buffers.
 
-The new approach eliminates boilerplate and makes tests more maintainable. When new methods are added to the aggregate collector surface, your existing test mocks will continue to work without modifications.
+```go
+func TestBaseCollectorStats(t *testing.T) {
+	collector := metrics.NewBaseMetricsCollector()
+
+	collector.Record(context.Background(), metrics.MetricRecord{Name: "jobs_total"})
+	collector.ObserveHTTP(context.Background(), http.MethodGet, "/health", 200, 0, 5*time.Millisecond)
+
+	stats := collector.GetStats()
+	if stats.TotalRecords != 2 {
+		t.Fatalf("TotalRecords = %d, want 2", stats.TotalRecords)
+	}
+	if stats.NameBreakdown["jobs_total"] != 1 {
+		t.Fatalf("jobs_total breakdown = %d, want 1", stats.NameBreakdown["jobs_total"])
+	}
+}
+```
+
+## Extension-Owned Helpers
+
+If the code under test uses extension-owned metrics helpers:
+
+- use `x/observability/featuremetrics` for generic record builders outside the
+  stable root
+- use `x/observability/testmetrics` for richer feature-specific mocks and call
+  inspection
+- read the owning extension's README or testing guide instead of widening stable
+  `metrics/TESTING.md`
+
+Stable `metrics` documentation should not teach extension-only observer methods
+as if they were part of `AggregateCollector`.
+
+## Validation
+
+```bash
+go test -timeout 20s ./metrics/...
+go test -race -timeout 60s ./metrics/...
+go vet ./metrics/...
+```

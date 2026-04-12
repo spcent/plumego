@@ -98,42 +98,18 @@ type CollectorStats struct {
 
 // BaseMetricsCollector provides a base implementation for metrics collectors
 type BaseMetricsCollector struct {
-	mu         sync.RWMutex
-	records    []MetricRecord
-	stats      CollectorStats
-	maxRecords int
+	mu    sync.RWMutex
+	stats CollectorStats
 }
-
-const defaultMaxRecords = 10000
 
 // NewBaseMetricsCollector creates a new base metrics collector.
 func NewBaseMetricsCollector() *BaseMetricsCollector {
 	return &BaseMetricsCollector{
-		records: make([]MetricRecord, 0, 1000),
 		stats: CollectorStats{
 			StartTime:     time.Now(),
 			NameBreakdown: make(map[string]int64),
 		},
-		maxRecords: defaultMaxRecords,
 	}
-}
-
-// setMaxRecords limits how many records are retained in memory for package-local tests.
-// A non-positive value disables the limit.
-func (b *BaseMetricsCollector) setMaxRecords(max int) *BaseMetricsCollector {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if max <= 0 {
-		b.maxRecords = 0
-		return b
-	}
-
-	b.maxRecords = max
-	if len(b.records) > max {
-		b.records = b.records[len(b.records)-max:]
-	}
-	return b
 }
 
 // Record implements the aggregate collector contract.
@@ -150,11 +126,6 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 		record.Labels = cloneLabels(record.Labels)
 	}
 
-	if b.maxRecords > 0 && len(b.records) >= b.maxRecords {
-		b.records = b.records[1:]
-	}
-
-	b.records = append(b.records, record)
 	b.stats.TotalRecords++
 	if record.Name != "" {
 		b.stats.NameBreakdown[record.Name]++
@@ -201,26 +172,10 @@ func (b *BaseMetricsCollector) Clear() {
 	defer b.mu.Unlock()
 	b.ensureInitializedLocked()
 
-	b.records = b.records[:0]
 	b.stats = CollectorStats{
 		StartTime:     time.Now(),
 		NameBreakdown: make(map[string]int64),
 	}
-}
-
-// recordsSnapshot returns a copy of all records for package-local tests.
-func (b *BaseMetricsCollector) recordsSnapshot() []MetricRecord {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
-	result := make([]MetricRecord, len(b.records))
-	for i, record := range b.records {
-		if len(record.Labels) > 0 {
-			record.Labels = cloneLabels(record.Labels)
-		}
-		result[i] = record
-	}
-	return result
 }
 
 func (b *BaseMetricsCollector) ensureInitializedLocked() {
@@ -229,9 +184,6 @@ func (b *BaseMetricsCollector) ensureInitializedLocked() {
 	}
 	if b.stats.StartTime.IsZero() {
 		b.stats.StartTime = time.Now()
-	}
-	if b.records == nil {
-		b.records = make([]MetricRecord, 0, 1000)
 	}
 }
 

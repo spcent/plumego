@@ -47,3 +47,8 @@ type Storage interface {
 - HTTP transport — use `x/fileapi`
 - Business repositories
 - Read-write splitting or sharding topology
+
+## Testing
+
+- Stable package tests live in `store/file/coverage_test.go`.
+- Backend-specific, metadata-manager, image-processing, and HTTP transport tests belong in `x/data/file` or `x/fileapi`, not in the stable root.

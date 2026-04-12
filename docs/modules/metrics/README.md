@@ -39,6 +39,7 @@ other modules can depend on safely.
 - keep only aggregate collector composition in stable `metrics`
 - keep fan-out helpers nil-safe (filter nil inputs and return nil when no collectors/observers are provided)
 - keep `AggregateCollector` limited to `Record`, shared `ObserveHTTP`, stats, and reset semantics
+- do not retain per-record buffers inside stable collectors; record inspection belongs in `x/observability/recordbuffer`
 - keep metric identity canonical as `MetricRecord.Name`; use `Labels` for dimensions instead of parallel type catalogs
 - keep feature-specific observer interfaces in their owning package; only the shared HTTP observer stays in stable `metrics`
 - keep non-HTTP feature helper record builders in owning extensions or `x/observability` helper packages

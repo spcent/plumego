@@ -6,47 +6,7 @@ import (
 	"time"
 )
 
-func TestBaseMetricsCollectorMaxRecordsDefault(t *testing.T) {
-	collector := NewBaseMetricsCollector()
-	total := defaultMaxRecords + 5
-
-	for i := 0; i < total; i++ {
-		collector.Record(context.Background(), MetricRecord{
-			Name:  MetricHTTPRequest,
-			Value: float64(i),
-		})
-	}
-
-	records := collector.recordsSnapshot()
-	if len(records) != defaultMaxRecords {
-		t.Fatalf("expected %d records, got %d", defaultMaxRecords, len(records))
-	}
-	if records[0].Value != 5 {
-		t.Fatalf("expected oldest record to be 5, got %v", records[0].Value)
-	}
-	if records[len(records)-1].Value != float64(total-1) {
-		t.Fatalf("expected newest record to be %d, got %v", total-1, records[len(records)-1].Value)
-	}
-}
-
-func TestBaseMetricsCollectorMaxRecordsDisabled(t *testing.T) {
-	collector := NewBaseMetricsCollector().setMaxRecords(0)
-	total := 250
-
-	for i := 0; i < total; i++ {
-		collector.Record(context.Background(), MetricRecord{
-			Name:  MetricHTTPRequest,
-			Value: float64(i),
-		})
-	}
-
-	records := collector.recordsSnapshot()
-	if len(records) != total {
-		t.Fatalf("expected %d records, got %d", total, len(records))
-	}
-}
-
-func TestBaseMetricsCollectorRecordClonesLabels(t *testing.T) {
+func TestBaseMetricsCollectorRecordTracksTotalsAndBreakdown(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	labels := MetricLabels{"route": "/users"}
 
@@ -58,9 +18,26 @@ func TestBaseMetricsCollectorRecordClonesLabels(t *testing.T) {
 
 	labels["route"] = "/mutated"
 
-	records := collector.recordsSnapshot()
-	if got := records[0].Labels["route"]; got != "/users" {
-		t.Fatalf("expected stored labels to be cloned, got %q", got)
+	stats := collector.GetStats()
+	if stats.TotalRecords != 1 {
+		t.Fatalf("expected one total record, got %d", stats.TotalRecords)
+	}
+	if stats.NameBreakdown["custom_http_metric"] != 1 {
+		t.Fatalf("expected name breakdown to track custom metric")
+	}
+
+	collector.Record(context.Background(), MetricRecord{
+		Name:   "custom_http_metric",
+		Value:  1,
+		Labels: labels,
+	})
+
+	stats = collector.GetStats()
+	if stats.TotalRecords != 2 {
+		t.Fatalf("expected two total records, got %d", stats.TotalRecords)
+	}
+	if stats.NameBreakdown["custom_http_metric"] != 2 {
+		t.Fatalf("expected custom metric count 2, got %d", stats.NameBreakdown["custom_http_metric"])
 	}
 }
 
@@ -69,28 +46,6 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 	duration := 125 * time.Millisecond
 
 	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, duration)
-
-	records := collector.recordsSnapshot()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
-	}
-
-	record := records[0]
-	if record.Name != MetricHTTPRequest {
-		t.Fatalf("expected name %s, got %q", MetricHTTPRequest, record.Name)
-	}
-	if record.Value != duration.Seconds() {
-		t.Fatalf("expected value %f, got %f", duration.Seconds(), record.Value)
-	}
-	if record.Labels[labelMethod] != "GET" {
-		t.Fatalf("expected method label GET, got %q", record.Labels[labelMethod])
-	}
-	if record.Labels[labelPath] != "/test" {
-		t.Fatalf("expected path label /test, got %q", record.Labels[labelPath])
-	}
-	if record.Labels[labelStatus] != "200" {
-		t.Fatalf("expected status label 200, got %q", record.Labels[labelStatus])
-	}
 
 	stats := collector.GetStats()
 	if stats.TotalRecords != 1 {
@@ -105,17 +60,26 @@ func TestBaseMetricsCollectorClear(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, 50*time.Millisecond)
 
-	if len(collector.recordsSnapshot()) != 1 {
-		t.Fatalf("expected one record before clear")
-	}
-
 	collector.Clear()
 
-	if len(collector.recordsSnapshot()) != 0 {
-		t.Fatalf("expected no records after clear")
-	}
 	stats := collector.GetStats()
 	if stats.TotalRecords != 0 {
 		t.Fatalf("expected zero total records after clear, got %d", stats.TotalRecords)
+	}
+	if len(stats.NameBreakdown) != 0 {
+		t.Fatalf("expected empty name breakdown after clear, got %#v", stats.NameBreakdown)
+	}
+}
+
+func TestBaseMetricsCollectorStatsCloneNameBreakdown(t *testing.T) {
+	collector := NewBaseMetricsCollector()
+	collector.Record(context.Background(), MetricRecord{Name: "custom_metric"})
+
+	stats := collector.GetStats()
+	stats.NameBreakdown["custom_metric"] = 999
+
+	stats = collector.GetStats()
+	if stats.NameBreakdown["custom_metric"] != 1 {
+		t.Fatalf("expected collector stats clone to protect internal breakdown, got %d", stats.NameBreakdown["custom_metric"])
 	}
 }
