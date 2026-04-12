@@ -27,6 +27,7 @@
 - `x/tenant/quota` — usage budgeting and quota enforcement
 - `x/tenant/ratelimit` — tenant-scoped rate limiting
 - `x/tenant/config` — tenant configuration and management helpers
+- `x/tenant/session` — session lifecycle and JWT-backed revocation/version state
 - `x/tenant/store/*` — tenant-aware cache and database adapters
 
 ## First files to read
@@ -47,6 +48,7 @@
 
 - resolution work starts in `x/tenant/resolve`
 - deny-path, quota, and policy work starts in `x/tenant/core`, `policy`, `quota`, or `ratelimit`
+- session lifecycle, tenant-session sentinel errors, and JWT-backed revocation/version work start in `x/tenant/session`
 - tenant-aware persistence work starts in `x/tenant/store/*`, not in stable `store/*`
 
 ## Runnable resolution examples

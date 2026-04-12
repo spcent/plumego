@@ -264,7 +264,7 @@ func TestLeaderboardCacheBasicOperations(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -312,7 +312,7 @@ func TestLeaderboardCacheZIncrBy(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -349,7 +349,7 @@ func TestLeaderboardCacheZRange(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -405,7 +405,7 @@ func TestLeaderboardCacheZRangeByScore(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -445,7 +445,7 @@ func TestLeaderboardCacheZRank(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -490,7 +490,7 @@ func TestLeaderboardCacheZCount(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -532,7 +532,7 @@ func TestLeaderboardCacheZRemRange(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -584,7 +584,7 @@ func TestLeaderboardCacheZRemRangeByScore(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -636,7 +636,7 @@ func TestLeaderboardCacheClear(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -675,7 +675,7 @@ func TestLeaderboardCacheTTL(t *testing.T) {
 	lbConfig.DefaultTTL = 100 * time.Millisecond
 	lbConfig.CleanupInterval = 50 * time.Millisecond
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -700,7 +700,7 @@ func TestLeaderboardCacheInvalidScore(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -729,7 +729,7 @@ func TestLeaderboardCacheMemberLimit(t *testing.T) {
 	lbConfig := DefaultLeaderboardConfig()
 	lbConfig.MaxMembersPerSet = 5
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -757,7 +757,7 @@ func TestLeaderboardCacheConcurrency(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -815,7 +815,7 @@ func TestLeaderboardCacheMetrics(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()
@@ -851,7 +851,7 @@ func TestLeaderboardCacheUpdateScore(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
 
-	lbc := NewMemoryLeaderboardCache(config, lbConfig)
+	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
 	ctx := context.Background()

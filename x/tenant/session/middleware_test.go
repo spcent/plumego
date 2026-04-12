@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/security/authn"
 )
 
 type stubSessionStore struct {
@@ -41,7 +41,7 @@ func (s staticSessionValidator) ValidateRefresh(context.Context, *Session, Refre
 }
 
 func TestSessionCheckMiddlewareSuccess(t *testing.T) {
-	principal := &contract.Principal{
+	principal := &authn.Principal{
 		Subject: "user-1",
 		Claims:  map[string]string{"session_id": "sess-1"},
 	}
@@ -53,7 +53,7 @@ func TestSessionCheckMiddlewareSuccess(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
+	req = req.WithContext(authn.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -64,7 +64,7 @@ func TestSessionCheckMiddlewareSuccess(t *testing.T) {
 }
 
 func TestSessionCheckMissingSessionID(t *testing.T) {
-	principal := &contract.Principal{Subject: "user-1"}
+	principal := &authn.Principal{Subject: "user-1"}
 	store := &stubSessionStore{}
 	validator := staticSessionValidator{}
 
@@ -73,7 +73,7 @@ func TestSessionCheckMissingSessionID(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
+	req = req.WithContext(authn.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -84,19 +84,19 @@ func TestSessionCheckMissingSessionID(t *testing.T) {
 }
 
 func TestSessionCheckRevokedSession(t *testing.T) {
-	principal := &contract.Principal{
+	principal := &authn.Principal{
 		Subject: "user-1",
 		Claims:  map[string]string{"session_id": "sess-1"},
 	}
 	store := &stubSessionStore{session: &Session{SessionID: "sess-1"}}
-	validator := staticSessionValidator{err: contract.ErrSessionRevoked}
+	validator := staticSessionValidator{err: ErrSessionRevoked}
 
 	handler := SessionCheck(store, validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
-	req = req.WithContext(contract.WithPrincipal(req.Context(), principal))
+	req = req.WithContext(authn.WithPrincipal(req.Context(), principal))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

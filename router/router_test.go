@@ -14,11 +14,11 @@ func TestBasicRoutes(t *testing.T) {
 	// Reset global router
 	r := NewRouter()
 
-	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
 	}))
 
-	r.Post("/echo", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodPost, "/echo", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("echo"))
 	}))
 
@@ -47,7 +47,7 @@ func TestBasicRoutes(t *testing.T) {
 func TestParamRoutes(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name := Param(r, "name")
 		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams["name"] != name {
@@ -56,7 +56,7 @@ func TestParamRoutes(t *testing.T) {
 		w.Write([]byte("Hello " + name))
 	}))
 
-	r.Get("/users/:id/books/:bookId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id/books/:bookId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		bookID := Param(r, "bookId")
 		ctxParams := contract.RequestContextFromContext(r.Context()).Params
@@ -90,7 +90,7 @@ func TestParamRoutes(t *testing.T) {
 func TestParamsInjectedIntoContext(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams == nil {
 			t.Fatalf("expected params in context")
@@ -117,7 +117,7 @@ func TestParamsInjectedIntoContext(t *testing.T) {
 func TestRequestContextHelpers(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := contract.RequestContextFromContext(r.Context())
 		name := Param(r, "name")
 		if rc.Params["name"] != name {
@@ -148,7 +148,7 @@ func TestRequestContextHelpers(t *testing.T) {
 func TestContextHandlerRegistration(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/ctx/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/ctx/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := contract.RequestContextFromContext(r.Context())
 		if rc.Params == nil {
 			t.Fatalf("expected RequestContext to be present")
@@ -176,7 +176,7 @@ func TestContextHandlerRegistration(t *testing.T) {
 func TestAnyRoute(t *testing.T) {
 	r := NewRouter()
 
-	r.Any("/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, methodAny, "/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
 
@@ -195,11 +195,11 @@ func TestAnyRoute(t *testing.T) {
 func TestAnyRootFallback(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/docs", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/docs", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("docs"))
 	}))
 
-	r.Any("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, methodAny, "/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("home"))
 	}))
 
@@ -216,9 +216,9 @@ func TestPrintRoutes(t *testing.T) {
 	// Reset global r
 	r := NewRouter()
 
-	r.Get("/print1", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	r.Post("/print2", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	r.Any("/print3", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	mustAddRoute(r, http.MethodGet, "/print1", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	mustAddRoute(r, http.MethodPost, "/print2", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	mustAddRoute(r, methodAny, "/print3", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 
 	// Read captured output
 	var outBuf bytes.Buffer
@@ -239,7 +239,7 @@ func TestPrintRoutes(t *testing.T) {
 func TestMethodNotAllowed(t *testing.T) {
 	r := NewRouter()
 
-	r.Any("/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, methodAny, "/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
 
@@ -262,7 +262,7 @@ func TestRouteGroup(t *testing.T) {
 	v1 := api.Group("/v1")
 	v2 := api.Group("/v2")
 
-	v1.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(v1, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		ctxParams := contract.RequestContextFromContext(r.Context()).Params
 		if ctxParams["id"] != id {
@@ -270,10 +270,10 @@ func TestRouteGroup(t *testing.T) {
 		}
 		w.Write([]byte("User " + id))
 	}))
-	v1.Post("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(v1, http.MethodPost, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Create User"))
 	}))
-	v2.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(v2, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Users v2"))
 	}))
 
@@ -300,117 +300,10 @@ func TestRouteGroup(t *testing.T) {
 	}
 }
 
-func TestRouteGroupMiddlewares(t *testing.T) {
-	r := NewRouter()
-
-	api := r.Group("/api")
-	api.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Group", "api")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	api.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("pong"))
-	}))
-
-	req := httptest.NewRequest("GET", "/api/ping", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Header().Get("X-Group") != "api" {
-		t.Errorf("expected middleware to set X-Group header")
-	}
-	if w.Body.String() != "pong" {
-		t.Errorf("expected response body 'pong', got %q", w.Body.String())
-	}
-}
-
-func TestRouteGroupMiddlewareIsolation(t *testing.T) {
-	r := NewRouter()
-
-	api := r.Group("/api")
-	api.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Group", "api")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	api.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("pong"))
-	}))
-
-	r.Get("/status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ok"))
-	}))
-
-	req := httptest.NewRequest("GET", "/api/ping", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Header().Get("X-Group") != "api" {
-		t.Errorf("expected group middleware on /api/ping")
-	}
-
-	req = httptest.NewRequest("GET", "/status", nil)
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Header().Get("X-Group") != "" {
-		t.Errorf("expected group middleware not to run on /status")
-	}
-}
-
-func TestNestedGroupMiddlewareOrder(t *testing.T) {
-	r := NewRouter()
-
-	var order []string
-
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "global")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	api := r.Group("/api")
-	api.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "api")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	v1 := api.Group("/v1")
-	v1.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "v1")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	v1.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-		w.Write([]byte("pong"))
-	}))
-
-	req := httptest.NewRequest("GET", "/api/v1/ping", nil)
-	w := httptest.NewRecorder()
-	order = []string{}
-	r.ServeHTTP(w, req)
-
-	expected := []string{"global", "api", "v1", "handler"}
-	if !slicesEqual(order, expected) {
-		t.Fatalf("expected middleware order %v, got %v", expected, order)
-	}
-}
-
 func TestRouterFreeze(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/ping", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	mustAddRoute(r, http.MethodGet, "/ping", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	r.Freeze()
 
 	err := r.AddRoute("GET", "/panic", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
@@ -422,7 +315,7 @@ func TestRouterFreeze(t *testing.T) {
 func TestRouteMetadata(t *testing.T) {
 	r := NewRouter()
 
-	err := r.AddRouteWithOptions("GET", "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	err := r.AddRoute("GET", "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}), WithRouteName("ping"))
 	if err != nil {
@@ -479,7 +372,7 @@ func TestGroupNoPrefixDoubleSlash(t *testing.T) {
 	api := r.Group("/api/")
 	v1 := api.Group("/v1/")
 
-	v1.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(v1, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 
@@ -496,7 +389,7 @@ func TestGroupMissingLeadingSlash(t *testing.T) {
 	r := NewRouter()
 
 	api := r.Group("api") // no leading slash
-	api.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
 	}))
 
@@ -514,7 +407,7 @@ func TestGroupEmptyPrefix(t *testing.T) {
 
 	// Empty prefix group should behave like root
 	g := r.Group("")
-	g.Get("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(g, http.MethodGet, "/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 
@@ -536,7 +429,7 @@ func TestDeepNestedGroups(t *testing.T) {
 	users := v1.Group("/users")
 	settings := users.Group("/settings")
 
-	settings.Get("/theme", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(settings, http.MethodGet, "/theme", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("dark"))
 	}))
 
@@ -549,113 +442,12 @@ func TestDeepNestedGroups(t *testing.T) {
 	}
 }
 
-func TestDeepNestedGroupMiddlewareOrder(t *testing.T) {
-	r := NewRouter()
-	var order []string
-
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "root")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	api := r.Group("/api")
-	api.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "api")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	v1 := api.Group("/v1")
-	v1.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "v1")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	users := v1.Group("/users")
-	users.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "users")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	users.Get("/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-		w.Write([]byte("ok"))
-	}))
-
-	order = []string{}
-	req := httptest.NewRequest("GET", "/api/v1/users/42", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	expected := []string{"root", "api", "v1", "users", "handler"}
-	if !slicesEqual(order, expected) {
-		t.Fatalf("expected middleware order %v, got %v", expected, order)
-	}
-}
-
-func TestSiblingGroupMiddlewareIsolation(t *testing.T) {
-	r := NewRouter()
-
-	admin := r.Group("/admin")
-	admin.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Admin", "true")
-			next.ServeHTTP(w, r)
-		})
-	})
-	admin.Get("/dashboard", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("admin"))
-	}))
-
-	public := r.Group("/public")
-	public.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Public", "true")
-			next.ServeHTTP(w, r)
-		})
-	})
-	public.Get("/page", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("public"))
-	}))
-
-	// Admin group should have X-Admin but not X-Public
-	req := httptest.NewRequest("GET", "/admin/dashboard", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Header().Get("X-Admin") != "true" {
-		t.Error("expected X-Admin header on admin route")
-	}
-	if w.Header().Get("X-Public") != "" {
-		t.Error("admin route should not have X-Public header")
-	}
-
-	// Public group should have X-Public but not X-Admin
-	req = httptest.NewRequest("GET", "/public/page", nil)
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Header().Get("X-Public") != "true" {
-		t.Error("expected X-Public header on public route")
-	}
-	if w.Header().Get("X-Admin") != "" {
-		t.Error("public route should not have X-Admin header")
-	}
-}
-
 func TestGroupWithPathParams(t *testing.T) {
 	r := NewRouter()
 
 	api := r.Group("/api/v1")
 	users := api.Group("/users")
-	users.Get("/:id/posts/:postID", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(users, http.MethodGet, "/:id/posts/:postID", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		postID := Param(r, "postID")
 		w.Write([]byte(id + ":" + postID))
@@ -675,10 +467,10 @@ func TestGroupRootHandler(t *testing.T) {
 
 	api := r.Group("/api")
 	// Register handler at the group root (empty path)
-	api.Get("", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodGet, "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("api-root"))
 	}))
-	api.Get("/info", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodGet, "/info", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("api-info"))
 	}))
 
@@ -705,16 +497,16 @@ func TestGroupMultipleMethods(t *testing.T) {
 	r := NewRouter()
 
 	api := r.Group("/api")
-	api.Get("/items", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodGet, "/items", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("list"))
 	}))
-	api.Post("/items", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodPost, "/items", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("create"))
 	}))
-	api.Put("/items/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodPut, "/items/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("update"))
 	}))
-	api.Delete("/items/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(api, http.MethodDelete, "/items/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("delete"))
 	}))
 
@@ -740,21 +532,19 @@ func TestGroupMultipleMethods(t *testing.T) {
 	}
 }
 
-func TestGroupFunc(t *testing.T) {
+func TestNestedGroups(t *testing.T) {
 	r := NewRouter()
 
-	r.GroupFunc("/api/v1", func(v1 *Router) {
-		v1.Get("/status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("ok"))
-		}))
+	v1 := r.Group("/api/v1")
+	mustAddRoute(v1, http.MethodGet, "/status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	}))
 
-		v1.GroupFunc("/users", func(users *Router) {
-			users.Get("/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				id := Param(r, "id")
-				w.Write([]byte("user-" + id))
-			}))
-		})
-	})
+	users := v1.Group("/users")
+	mustAddRoute(users, http.MethodGet, "/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := Param(r, "id")
+		w.Write([]byte("user-" + id))
+	}))
 
 	tests := []struct {
 		path     string
@@ -776,55 +566,15 @@ func TestGroupFunc(t *testing.T) {
 	}
 }
 
-func TestGroupFuncWithMiddleware(t *testing.T) {
-	r := NewRouter()
-	var order []string
-
-	r.GroupFunc("/api", func(api *Router) {
-		api.Use(func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				order = append(order, "api-mw")
-				next.ServeHTTP(w, r)
-			})
-		})
-
-		api.GroupFunc("/v1", func(v1 *Router) {
-			v1.Use(func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					order = append(order, "v1-mw")
-					next.ServeHTTP(w, r)
-				})
-			})
-
-			v1.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				order = append(order, "handler")
-				w.Write([]byte("pong"))
-			}))
-		})
-	})
-
-	order = []string{}
-	req := httptest.NewRequest("GET", "/api/v1/ping", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	expected := []string{"api-mw", "v1-mw", "handler"}
-	if !slicesEqual(order, expected) {
-		t.Fatalf("expected middleware order %v, got %v", expected, order)
-	}
-}
-
-func TestGroupFuncReturnsGroup(t *testing.T) {
+func TestGroupReturnsReusableRouter(t *testing.T) {
 	r := NewRouter()
 
-	v1 := r.GroupFunc("/api/v1", func(v1 *Router) {
-		v1.Get("/inside", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("inside"))
-		}))
-	})
+	v1 := r.Group("/api/v1")
+	mustAddRoute(v1, http.MethodGet, "/inside", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("inside"))
+	}))
 
-	// Can still add routes after GroupFunc returns
-	v1.Get("/outside", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(v1, http.MethodGet, "/outside", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("outside"))
 	}))
 

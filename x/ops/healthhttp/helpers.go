@@ -35,7 +35,7 @@ func withCheckTimeout(ctx context.Context, timeout time.Duration) (context.Conte
 	return context.WithTimeout(ctx, timeout)
 }
 
-func requireManager(manager health.HealthManager, w http.ResponseWriter, r *http.Request) bool {
+func requireManager(manager Manager, w http.ResponseWriter, r *http.Request) bool {
 	if manager == nil {
 		contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusServiceUnavailable).

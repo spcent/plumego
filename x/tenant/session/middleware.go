@@ -8,6 +8,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/security/authn"
 )
 
 // SessionErrorHandler handles session-related errors.
@@ -17,7 +18,7 @@ type sessionOptions struct {
 	errorHandler       SessionErrorHandler
 	requireSessionID   bool
 	now                func() time.Time
-	sessionIDExtractor func(*contract.Principal) (string, bool)
+	sessionIDExtractor func(*authn.Principal) (string, bool)
 	sessionLookup      SessionLookup
 }
 
@@ -25,7 +26,7 @@ type sessionOptions struct {
 type SessionOption func(*sessionOptions)
 
 // SessionLookup resolves a session for validation.
-type SessionLookup func(ctx context.Context, r *http.Request, p *contract.Principal) (*Session, error)
+type SessionLookup func(ctx context.Context, r *http.Request, p *authn.Principal) (*Session, error)
 
 // WithSessionErrorHandler overrides the default error handling.
 func WithSessionErrorHandler(handler SessionErrorHandler) SessionOption {
@@ -53,7 +54,7 @@ func WithSessionNow(now func() time.Time) SessionOption {
 }
 
 // WithSessionIDExtractor overrides how session ids are extracted from principals.
-func WithSessionIDExtractor(extractor func(*contract.Principal) (string, bool)) SessionOption {
+func WithSessionIDExtractor(extractor func(*authn.Principal) (string, bool)) SessionOption {
 	return func(o *sessionOptions) {
 		if extractor != nil {
 			o.sessionIDExtractor = extractor
@@ -82,9 +83,9 @@ func SessionCheck(store SessionStore, validator SessionValidator, opts ...Sessio
 				return
 			}
 
-			principal := contract.PrincipalFromRequest(r)
+			principal := authn.PrincipalFromContext(r.Context())
 			if principal == nil {
-				cfg.errorHandler(w, r, contract.ErrUnauthenticated)
+				cfg.errorHandler(w, r, authn.ErrUnauthenticated)
 				return
 			}
 
@@ -94,11 +95,11 @@ func SessionCheck(store SessionStore, validator SessionValidator, opts ...Sessio
 					writeSessionInternal(w, r, "session store is nil")
 					return
 				}
-				lookup = func(ctx context.Context, _ *http.Request, p *contract.Principal) (*Session, error) {
+				lookup = func(ctx context.Context, _ *http.Request, p *authn.Principal) (*Session, error) {
 					sessionID, ok := cfg.sessionIDExtractor(p)
 					if !ok || sessionID == "" {
 						if cfg.requireSessionID {
-							return nil, contract.ErrUnauthenticated
+							return nil, authn.ErrUnauthenticated
 						}
 						return nil, nil
 					}
@@ -113,7 +114,7 @@ func SessionCheck(store SessionStore, validator SessionValidator, opts ...Sessio
 			}
 			if session == nil {
 				if cfg.requireSessionID {
-					cfg.errorHandler(w, r, contract.ErrUnauthenticated)
+					cfg.errorHandler(w, r, authn.ErrUnauthenticated)
 					return
 				}
 				next.ServeHTTP(w, r)
@@ -154,7 +155,7 @@ func applySessionOptions(opts ...SessionOption) sessionOptions {
 	return cfg
 }
 
-func sessionIDFromPrincipal(p *contract.Principal) (string, bool) {
+func sessionIDFromPrincipal(p *authn.Principal) (string, bool) {
 	if p == nil || p.Claims == nil {
 		return "", false
 	}
@@ -175,7 +176,7 @@ func writeSessionInternal(w http.ResponseWriter, r *http.Request, message string
 func defaultSessionErrorHandler() SessionErrorHandler {
 	return func(w http.ResponseWriter, r *http.Request, err error) {
 		if err == nil {
-			err = contract.ErrUnauthenticated
+			err = authn.ErrUnauthenticated
 		}
 
 		var apiErr contract.APIError
@@ -199,15 +200,15 @@ func sessionErrorToAPIError(err error) contract.APIError {
 			Build()
 	}
 	switch {
-	case errors.Is(err, contract.ErrSessionRevoked):
+	case errors.Is(err, ErrSessionRevoked):
 		return unauthorized("session revoked")
-	case errors.Is(err, contract.ErrSessionExpired):
+	case errors.Is(err, ErrSessionExpired):
 		return unauthorized("session expired")
-	case errors.Is(err, contract.ErrRefreshReused):
+	case errors.Is(err, ErrRefreshReused):
 		return unauthorized("refresh token reuse detected")
-	case errors.Is(err, contract.ErrTokenVersionMismatch):
+	case errors.Is(err, ErrTokenVersionMismatch):
 		return unauthorized("token version mismatch")
-	case errors.Is(err, contract.ErrUnauthenticated):
+	case errors.Is(err, authn.ErrUnauthenticated):
 		fallthrough
 	default:
 		return unauthorized("authentication required")

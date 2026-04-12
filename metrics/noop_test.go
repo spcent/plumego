@@ -15,7 +15,6 @@ func TestNoopCollectorRecord(t *testing.T) {
 
 	// Should not panic
 	collector.Record(context.Background(), MetricRecord{
-		Type:  MetricHTTPRequest,
 		Name:  "test",
 		Value: 100,
 	})
@@ -28,40 +27,11 @@ func TestNoopCollectorObserveHTTP(t *testing.T) {
 	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, 50*time.Millisecond)
 }
 
-func TestNoopCollectorObservePubSub(t *testing.T) {
-	collector := NewNoopCollector()
-
-	// Should not panic
-	collector.ObservePubSub(context.Background(), "publish", "topic", 10*time.Millisecond, nil)
-}
-
-func TestNoopCollectorObserveMQ(t *testing.T) {
-	collector := NewNoopCollector()
-
-	// Should not panic
-	collector.ObserveMQ(context.Background(), "subscribe", "queue", 5*time.Millisecond, nil, false)
-}
-
-func TestNoopCollectorObserveKV(t *testing.T) {
-	collector := NewNoopCollector()
-
-	// Should not panic
-	collector.ObserveKV(context.Background(), "get", "key123", 2*time.Millisecond, nil, true)
-}
-
-func TestNoopCollectorObserveIPC(t *testing.T) {
-	collector := NewNoopCollector()
-
-	// Should not panic
-	collector.ObserveIPC(context.Background(), "read", "/tmp/test.sock", "unix", 256, 1*time.Millisecond, nil)
-}
-
 func TestNoopCollectorGetStats(t *testing.T) {
 	collector := NewNoopCollector()
 
 	// Record some metrics
 	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, 50*time.Millisecond)
-	collector.ObservePubSub(context.Background(), "publish", "topic", 10*time.Millisecond, nil)
 
 	stats := collector.GetStats()
 

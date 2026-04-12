@@ -14,7 +14,7 @@ func TestErrorBuilder(t *testing.T) {
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
 		Type(TypeValidation).
-		Code("TEST_ERROR").
+		Code(CodeValidationError).
 		Message("test error message").
 		Detail("field", "email").
 		Detail("value", "invalid").
@@ -28,8 +28,8 @@ func TestErrorBuilder(t *testing.T) {
 		t.Fatalf("expected category %s, got %s", CategoryValidation, err.Category)
 	}
 
-	if err.Code != "TEST_ERROR" {
-		t.Fatalf("expected code %s, got %s", "TEST_ERROR", err.Code)
+	if err.Code != CodeValidationError {
+		t.Fatalf("expected code %s, got %s", CodeValidationError, err.Code)
 	}
 
 	if err.Message != "test error message" {
@@ -44,7 +44,7 @@ func TestErrorBuilder(t *testing.T) {
 func TestBuilderTypeOverwritesPriorFields(t *testing.T) {
 	got := NewErrorBuilder().
 		Status(999).
-		Code("CUSTOM").
+		Code(CodeInternalError).
 		Category(CategoryServer).
 		Type(TypeNotFound).
 		Build()
@@ -76,7 +76,7 @@ func TestErrorBuilderChaining(t *testing.T) {
 		Status(http.StatusNotFound).
 		Category(CategoryClient).
 		Type(TypeNotFound).
-		Code("NOT_FOUND").
+		Code(CodeResourceNotFound).
 		Message("resource not found").
 		Detail("resource", "user").
 		Detail("id", "123").
@@ -166,7 +166,7 @@ func TestErrorValidation(t *testing.T) {
 	// Valid error
 	validErr := APIError{
 		Status:   http.StatusBadRequest,
-		Code:     "VALIDATION_ERROR",
+		Code:     CodeValidationError,
 		Message:  "validation failed",
 		Category: CategoryValidation,
 	}
@@ -180,7 +180,7 @@ func TestErrorValidation(t *testing.T) {
 	invalidCases := []APIError{
 		{
 			Status:   999, // Invalid status
-			Code:     "ERROR",
+			Code:     CodeInternalError,
 			Message:  "message",
 			Category: CategoryClient,
 		},
@@ -192,13 +192,13 @@ func TestErrorValidation(t *testing.T) {
 		},
 		{
 			Status:   http.StatusBadRequest,
-			Code:     "ERROR",
+			Code:     CodeInternalError,
 			Message:  "", // Empty message
 			Category: CategoryClient,
 		},
 		{
 			Status:   http.StatusBadRequest,
-			Code:     "ERROR",
+			Code:     CodeInternalError,
 			Message:  "message",
 			Category: "", // Empty category
 		},
@@ -234,52 +234,6 @@ func TestHTTPStatusFromCategory(t *testing.T) {
 	}
 }
 
-func TestErrorClassification(t *testing.T) {
-	clientErr := APIError{Status: http.StatusBadRequest}
-	serverErr := APIError{Status: http.StatusInternalServerError}
-
-	if !IsClientError(clientErr) {
-		t.Fatalf("expected client error to be classified as client error")
-	}
-
-	if IsClientError(serverErr) {
-		t.Fatalf("expected server error to not be classified as client error")
-	}
-
-	if !IsServerError(serverErr) {
-		t.Fatalf("expected server error to be classified as server error")
-	}
-
-	if IsServerError(clientErr) {
-		t.Fatalf("expected client error to not be classified as server error")
-	}
-}
-
-func TestRetryableErrorDetection(t *testing.T) {
-	retryableStatuses := []int{408, 429, 500, 502, 503, 504}
-	nonRetryableStatuses := []int{400, 401, 403, 404, 422}
-
-	for _, status := range retryableStatuses {
-		err := APIError{Status: status}
-		if !IsAPIErrorRetryable(err) {
-			t.Fatalf("expected status %d to be retryable", status)
-		}
-	}
-
-	for _, status := range nonRetryableStatuses {
-		err := APIError{Status: status}
-		if IsAPIErrorRetryable(err) {
-			t.Fatalf("expected status %d to not be retryable", status)
-		}
-	}
-
-	// Test timeout error
-	timeoutErr := APIError{Category: CategoryTimeout, Status: http.StatusOK}
-	if !IsAPIErrorRetryable(timeoutErr) {
-		t.Fatalf("expected timeout error to be retryable")
-	}
-}
-
 func TestErrorResponseWriting(t *testing.T) {
 	// Test WriteError function
 	recorder := httptest.NewRecorder()
@@ -287,7 +241,7 @@ func TestErrorResponseWriting(t *testing.T) {
 
 	err := APIError{
 		Status:   http.StatusBadRequest,
-		Code:     "VALIDATION_ERROR",
+		Code:     CodeValidationError,
 		Message:  "validation failed",
 		Category: CategoryValidation,
 		Details:  map[string]any{"field": "email"},
@@ -308,7 +262,7 @@ func TestErrorResponseWriting(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if response.Error.Code != "VALIDATION_ERROR" {
+	if response.Error.Code != CodeValidationError {
 		t.Fatalf("expected code in response")
 	}
 }
@@ -321,7 +275,7 @@ func TestErrorResponseWithRequestID(t *testing.T) {
 
 	err := APIError{
 		Status:   http.StatusInternalServerError,
-		Code:     "INTERNAL_ERROR",
+		Code:     CodeInternalError,
 		Message:  "internal server error",
 		Category: CategoryServer,
 	}
@@ -346,7 +300,7 @@ func TestWriteErrorPreservesRequestID(t *testing.T) {
 
 	err := APIError{
 		Status:    http.StatusBadRequest,
-		Code:      "VALIDATION_ERROR",
+		Code:      CodeValidationError,
 		Message:   "validation failed",
 		Category:  CategoryValidation,
 		RequestID: "explicit-req-id",
@@ -361,69 +315,6 @@ func TestWriteErrorPreservesRequestID(t *testing.T) {
 
 	if response.RequestID != "explicit-req-id" {
 		t.Fatalf("expected explicit request id to be preserved")
-	}
-}
-
-func TestParseErrorFromResponse(t *testing.T) {
-	// Create a mock error response
-	errorResp := ErrorResponse{
-		Error: APIError{
-			Status:   http.StatusNotFound,
-			Code:     "RESOURCE_NOT_FOUND",
-			Message:  "resource not found",
-			Category: CategoryClient,
-		},
-	}
-
-	body, _ := json.Marshal(errorResp)
-	resp := httptest.NewRecorder()
-	resp.WriteHeader(http.StatusNotFound)
-	resp.Write(body)
-
-	parsedErr, err := ParseErrorFromResponse(resp.Result())
-
-	if err != nil {
-		t.Fatalf("unexpected error parsing response: %v", err)
-	}
-
-	if parsedErr.Code != "RESOURCE_NOT_FOUND" {
-		t.Fatalf("expected parsed error code to match")
-	}
-
-	if parsedErr.Category != CategoryClient {
-		t.Fatalf("expected parsed error category to match")
-	}
-}
-
-func TestParseErrorFromSuccessfulResponse(t *testing.T) {
-	resp := httptest.NewRecorder()
-	resp.WriteHeader(http.StatusOK)
-	resp.WriteString("{}")
-
-	_, err := ParseErrorFromResponse(resp.Result())
-
-	if err == nil {
-		t.Fatalf("expected error when parsing successful response")
-	}
-}
-
-func TestParseErrorFromMalformedResponse(t *testing.T) {
-	resp := httptest.NewRecorder()
-	resp.WriteHeader(http.StatusInternalServerError)
-	resp.WriteString("{invalid json}")
-
-	parsedErr, err := ParseErrorFromResponse(resp.Result())
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if parsedErr.Status != http.StatusInternalServerError {
-		t.Fatalf("expected status to be preserved")
-	}
-
-	if parsedErr.Code != http.StatusText(http.StatusInternalServerError) {
-		t.Fatalf("expected fallback code")
 	}
 }
 
@@ -458,7 +349,7 @@ func TestErrorBuilderWithSeverityAndType(t *testing.T) {
 		Category(CategoryValidation).
 		Type(TypeValidation).
 		Severity(SeverityWarning).
-		Code("VALIDATION_WARNING").
+		Code(CodeValidationError).
 		Message("validation warning").
 		Build()
 
@@ -482,7 +373,7 @@ func TestErrorBuilderDetails(t *testing.T) {
 	err := builder.
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
-		Code("VALIDATION_ERROR").
+		Code(CodeValidationError).
 		Message("validation failed").
 		Details(details).
 		Build()
@@ -496,18 +387,10 @@ func TestErrorBuilderDetails(t *testing.T) {
 	}
 }
 
-func TestWriteErrorZeroValueEmitsWarning(t *testing.T) {
-	var warnings []string
-	prev := WarnFunc
-	WarnFunc = func(msg string) { warnings = append(warnings, msg) }
-	defer func() { WarnFunc = prev }()
-
+func TestWriteErrorZeroValueDefaults(t *testing.T) {
 	w := httptest.NewRecorder()
 	_ = WriteError(w, nil, APIError{})
 
-	if len(warnings) == 0 {
-		t.Fatal("expected WarnFunc to be called for zero-value APIError")
-	}
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -519,7 +402,7 @@ func TestWriteErrorEncodingFailureDoesNotCommitHeaders(t *testing.T) {
 	err := WriteError(recorder, nil, NewErrorBuilder().
 		Status(http.StatusBadRequest).
 		Category(CategoryClient).
-		Code("BAD_DETAIL").
+		Code(CodeInternalError).
 		Message("bad detail").
 		Detail("bad", make(chan int)).
 		Build())
@@ -552,16 +435,11 @@ func TestErrorBuilderBuildFillsDefaults(t *testing.T) {
 	if got.Category == "" {
 		t.Error("Build() must set a non-empty Category")
 	}
-	// A fully-populated APIError from the builder should not trigger WarnFunc.
-	var warnCalled bool
-	prev := WarnFunc
-	WarnFunc = func(string) { warnCalled = true }
-	defer func() { WarnFunc = prev }()
 
 	w := httptest.NewRecorder()
 	_ = WriteError(w, nil, got)
-	if warnCalled {
-		t.Error("WarnFunc must not be called for a fully-populated APIError from the builder")
+	if w.Code != got.Status {
+		t.Fatalf("expected status %d, got %d", got.Status, w.Code)
 	}
 }
 

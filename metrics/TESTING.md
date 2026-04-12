@@ -1,10 +1,10 @@
-# Testing with MetricsCollector
+# Testing with AggregateCollector
 
-This document explains how to write tests with the `MetricsCollector` interface in a maintainable way.
+This document explains how to write tests against the stable metrics collector surface in a maintainable way.
 
 ## Problem
 
-The `MetricsCollector` interface has many methods. When writing tests, creating mock implementations can be tedious and fragile. Every time a new method is added to the interface, all mock implementations must be updated.
+The stable aggregate collector surface has many methods. When writing tests, creating mock implementations can be tedious and fragile. Every time a new method is added to that surface, all mock implementations must be updated.
 
 ## Solutions
 
@@ -28,7 +28,7 @@ func TestMyFeature(t *testing.T) {
     }
 
     // Use the mock
-    // All MetricsCollector methods are available and do nothing
+    // All aggregate collector methods are available and do nothing
 }
 ```
 
@@ -56,13 +56,14 @@ For tests that need to verify metrics calls, use `x/observability/testmetrics.Mo
 
 ```go
 import testmetrics "github.com/spcent/plumego/x/observability/testmetrics"
+import "github.com/spcent/plumego/x/observability/dbinsights"
 
 func TestDatabaseMetrics(t *testing.T) {
     mock := testmetrics.NewMockCollector()
 
     // Use your component that records metrics
-    db := NewInstrumentedDB(realDB, mock, "postgres")
-    db.Query("SELECT 1")
+    db := dbinsights.NewInstrumentedDB(realDB, mock, "postgres")
+    _, _ = db.QueryContext(context.Background(), "SELECT 1")
 
     // Verify metrics were recorded
     if mock.DBCallCount() != 1 {
@@ -149,7 +150,7 @@ mock := testmetrics.NewMockCollector()
 ## Best Practices
 
 1. **Use NoopCollector embedding for simple no-op mocks**
-   - When you just need a valid MetricsCollector instance
+   - When you just need a valid aggregate collector instance
    - When you don't care about verifying metrics calls
 
 2. **Use x/observability/testmetrics.MockCollector for verification**
@@ -264,4 +265,4 @@ func TestConcurrent(t *testing.T) {
 | Custom validation logic | Use `testmetrics.MockCollector` with hooks |
 | Override single method | Embed `NoopCollector`, override one method |
 
-The new approach eliminates boilerplate and makes tests more maintainable. When new methods are added to `MetricsCollector`, your existing test mocks will continue to work without modifications.
+The new approach eliminates boilerplate and makes tests more maintainable. When new methods are added to the aggregate collector surface, your existing test mocks will continue to work without modifications.

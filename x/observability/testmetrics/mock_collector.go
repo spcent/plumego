@@ -12,7 +12,6 @@ type (
 	AggregateCollector = metrics.AggregateCollector
 	CollectorStats     = metrics.CollectorStats
 	MetricRecord       = metrics.MetricRecord
-	MetricType         = metrics.MetricType
 	NoopCollector      = metrics.NoopCollector
 )
 
@@ -282,7 +281,7 @@ func (m *MockCollector) GetStats() CollectorStats {
 
 	return CollectorStats{
 		TotalRecords:  int64(recordCount),
-		TypeBreakdown: make(map[MetricType]int64),
+		NameBreakdown: make(map[string]int64),
 	}
 }
 

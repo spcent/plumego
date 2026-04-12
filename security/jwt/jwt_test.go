@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/contract"
 	authmw "github.com/spcent/plumego/middleware/auth"
+	"github.com/spcent/plumego/security/authn"
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
@@ -171,9 +171,9 @@ func TestAutomaticRotation(t *testing.T) {
 	}
 }
 
-// ========== blacklist and versioning test ==========
+// ========== caller-owned identity version test ==========
 
-func TestBlacklistAndVersioning(t *testing.T) {
+func TestIdentityVersionIsCallerOwned(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()
 	cfg.AccessExpiration = time.Minute
@@ -183,54 +183,17 @@ func TestBlacklistAndVersioning(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	// generate token pair
-	pair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3"}, AuthorizationClaims{})
+	pair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3", Version: 7}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate pair: %v", err)
 	}
 
-	// token should be valid
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	claims, err := mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
-		t.Fatalf("token should be valid: %v", err)
+		t.Fatalf("verify token: %v", err)
 	}
-
-	// revoke token
-	if err := mgr.RevokeToken(pair.AccessToken); err != nil {
-		t.Fatalf("revoke token: %v", err)
-	}
-
-	// token should be revoked
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
-	if err != ErrTokenRevoked {
-		t.Errorf("expected ErrTokenRevoked, got %v", err)
-	}
-
-	// generate new token pair and increment version
-	pair, err = mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3"}, AuthorizationClaims{})
-	if err != nil {
-		t.Fatalf("generate pair: %v", err)
-	}
-
-	// increment identity version
-	if err := mgr.IncrementIdentityVersion("user-3"); err != nil {
-		t.Fatalf("increment version: %v", err)
-	}
-
-	// old token should be invalidated
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
-	if err != ErrVersionMismatch {
-		t.Errorf("expected ErrVersionMismatch, got %v", err)
-	}
-
-	// new token should have new version
-	newPair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3"}, AuthorizationClaims{})
-	newClaims, err := mgr.VerifyToken(context.Background(), newPair.AccessToken, TokenTypeAccess)
-	if err != nil {
-		t.Fatalf("new token should be valid: %v", err)
-	}
-	if newClaims.Identity.Version != 1 {
-		t.Errorf("expected version=1, got %d", newClaims.Identity.Version)
+	if claims.Identity.Version != 7 {
+		t.Errorf("expected version=7, got %d", claims.Identity.Version)
 	}
 }
 
@@ -579,7 +542,7 @@ func TestPolicyAuthorizerWithMiddlewareAuth(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "/admin", nil)
-	ctx := contract.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
+	ctx := authn.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -592,7 +555,7 @@ func TestPolicyAuthorizerWithMiddlewareAuth(t *testing.T) {
 	// test invalid claims
 	claims.Authorization.Roles = []string{"user"}
 	req = httptest.NewRequest("GET", "/admin", nil)
-	ctx = contract.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
+	ctx = authn.WithPrincipal(req.Context(), PrincipalFromClaims(claims))
 	req = req.WithContext(ctx)
 	rec = httptest.NewRecorder()
 
@@ -675,9 +638,9 @@ func TestExtractBearerToken(t *testing.T) {
 				req.Header.Set("Authorization", tt.header)
 			}
 
-			got := extractBearerToken(req)
+			got := authn.ExtractBearerToken(req)
 			if got != tt.want {
-				t.Errorf("extractBearerToken() = %q, want %q", got, tt.want)
+				t.Errorf("ExtractBearerToken() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -765,21 +728,21 @@ func TestContractAuthenticatorMissingToken(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
 
 	_, err := authenticator.Authenticate(req)
-	if err != contract.ErrUnauthenticated {
+	if err != authn.ErrUnauthenticated {
 		t.Fatalf("expected ErrUnauthenticated, got %v", err)
 	}
 }
 
 func TestPolicyAuthorizer(t *testing.T) {
 	authorizer := PolicyAuthorizer{Policy: AuthZPolicy{AllRoles: []string{"admin"}}}
-	principal := &contract.Principal{Roles: []string{"admin"}}
+	principal := &authn.Principal{Roles: []string{"admin"}}
 
 	if err := authorizer.Authorize(principal, "", ""); err != nil {
 		t.Fatalf("expected authorized, got %v", err)
 	}
 
 	principal.Roles = []string{"user"}
-	if err := authorizer.Authorize(principal, "", ""); err != contract.ErrUnauthorized {
+	if err := authorizer.Authorize(principal, "", ""); err != authn.ErrUnauthorized {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
 	}
 }

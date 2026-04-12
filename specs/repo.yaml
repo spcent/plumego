@@ -10,6 +10,9 @@ repo:
     - Single canonical implementation path for new work
 
 canonical_authority:
+  operations:
+    - AGENTS.md
+    - docs/CODEX_WORKFLOW.md
   style:
     - docs/CANONICAL_STYLE_GUIDE.md
   architecture:
@@ -30,10 +33,17 @@ canonical_authority:
     - specs/checks.yaml
   workflow:
     - specs/change-recipes
+    - specs/change-recipes/analysis-only.yaml
     - specs/change-recipes/add-http-endpoint.yaml
     - specs/change-recipes/add-middleware.yaml
+    - specs/change-recipes/fix-bug.yaml
+    - specs/change-recipes/http-endpoint-bugfix.yaml
     - specs/change-recipes/new-stable-module.yaml
     - specs/change-recipes/new-extension-module.yaml
+    - specs/change-recipes/review-only.yaml
+    - specs/change-recipes/stable-root-boundary-review.yaml
+    - specs/change-recipes/symbol-change.yaml
+    - specs/change-recipes/tenant-policy-change.yaml
   task_queue:
     - tasks/cards
 
@@ -69,6 +79,7 @@ layers:
       - x/observability
       - x/ops
       - x/pubsub
+      - x/resilience
       - x/rest
       - x/scheduler
       - x/webhook
@@ -129,16 +140,41 @@ agent_workflow:
     - tasks/cards
   required_steps:
     - Identify target layer and module
+    - Establish goal, in-scope paths, and out-of-scope paths before editing
     - Read canonical style and reference app when shaping app structure
     - Read specs/task-routing.yaml for discovery defaults
     - Read specs/package-hotspots.yaml when package choice is ambiguous
     - Read the target module manifest
+    - State public API and dependency assumptions before broad changes
+    - Split broad or ambiguous work into analysis and implementation passes
     - Keep changes within one primary module when possible
     - Run module tests first
     - Run boundary checks second
     - Run repo-wide checks last
+    - Report residual risks and doc-sync impacts at handoff
   defaults:
     max_primary_modules_per_change: 1
     max_files_per_card: 5
     require_manifest_for_new_module: true
     prefer_extension_family_entrypoint: true
+    require_explicit_scope: true
+    default_no_public_api_change: true
+    default_no_dependency_change: true
+    require_tests_for_behavior_change: true
+    findings_first_review_output: true
+  task_contract:
+    required_fields:
+      - goal
+      - in_scope
+      - out_of_scope
+      - target_module
+      - api_and_dependency_policy
+      - tests
+      - validation
+      - done_definition
+    default_assumptions:
+      - one primary module per change
+      - no stable public API changes
+      - no new dependencies
+      - focused tests required for behavior changes
+      - docs sync only for implemented behavior changes

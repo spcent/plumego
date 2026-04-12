@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
@@ -20,7 +19,13 @@ func (a *App) ensureMutable(operation, action string) error {
 }
 
 func wrapCoreError(err error, operation string, params map[string]any) error {
-	return contract.WrapError(err, operation, "core", params)
+	if err == nil {
+		return nil
+	}
+	if len(params) == 0 {
+		return fmt.Errorf("core %s: %w", operation, err)
+	}
+	return fmt.Errorf("core %s %v: %w", operation, params, err)
 }
 
 func (a *App) freezeConfig() {

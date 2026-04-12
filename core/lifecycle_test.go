@@ -8,7 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
+	"github.com/spcent/plumego/log"
 	"math/big"
 	"net"
 	"net/http"
@@ -18,9 +18,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 )
 
 func writeTestTLSCertFiles(t *testing.T) (string, string) {
@@ -107,19 +104,9 @@ func assertWrappedCoreError(t *testing.T, err error, operation string, message s
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if err.Error() != message {
-		t.Fatalf("error message = %q, want %q", err.Error(), message)
-	}
-
-	var wrapped *contract.WrappedErrorWithContext
-	if !errors.As(err, &wrapped) {
-		t.Fatalf("expected wrapped core error, got %T", err)
-	}
-	if wrapped.Context.Operation != operation {
-		t.Fatalf("operation = %q, want %q", wrapped.Context.Operation, operation)
-	}
-	if wrapped.Context.Module != "core" {
-		t.Fatalf("module = %q, want %q", wrapped.Context.Module, "core")
+	want := "core " + operation + ": " + message
+	if err.Error() != want {
+		t.Fatalf("error message = %q, want %q", err.Error(), want)
 	}
 }
 

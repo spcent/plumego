@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/security/authn"
 )
 
 // --- mapJWTError tests (covers all branches at 0%) ---
@@ -17,16 +17,14 @@ func TestMapJWTError_AllBranches(t *testing.T) {
 		input error
 		want  error
 	}{
-		{"ErrTokenExpired", ErrTokenExpired, contract.ErrExpiredToken},
-		{"ErrTokenNotYetValid", ErrTokenNotYetValid, contract.ErrInvalidToken},
-		{"ErrTokenRevoked", ErrTokenRevoked, contract.ErrSessionRevoked},
-		{"ErrVersionMismatch", ErrVersionMismatch, contract.ErrTokenVersionMismatch},
-		{"ErrInvalidIssuer", ErrInvalidIssuer, contract.ErrInvalidToken},
-		{"ErrInvalidAudience", ErrInvalidAudience, contract.ErrInvalidToken},
-		{"ErrUnknownKey", ErrUnknownKey, contract.ErrInvalidToken},
-		{"ErrMissingSubject", ErrMissingSubject, contract.ErrInvalidToken},
-		{"ErrInvalidToken", ErrInvalidToken, contract.ErrInvalidToken},
-		{"unknown error", errors.New("unexpected"), contract.ErrInvalidToken},
+		{"ErrTokenExpired", ErrTokenExpired, authn.ErrExpiredToken},
+		{"ErrTokenNotYetValid", ErrTokenNotYetValid, authn.ErrInvalidToken},
+		{"ErrInvalidIssuer", ErrInvalidIssuer, authn.ErrInvalidToken},
+		{"ErrInvalidAudience", ErrInvalidAudience, authn.ErrInvalidToken},
+		{"ErrUnknownKey", ErrUnknownKey, authn.ErrInvalidToken},
+		{"ErrMissingSubject", ErrMissingSubject, authn.ErrInvalidToken},
+		{"ErrInvalidToken", ErrInvalidToken, authn.ErrInvalidToken},
+		{"unknown error", errors.New("unexpected"), authn.ErrInvalidToken},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -38,7 +36,7 @@ func TestMapJWTError_AllBranches(t *testing.T) {
 	}
 }
 
-// --- Authenticator struct (contract.Authenticator) ---
+// --- Authenticator struct (authn.Authenticator) ---
 
 func TestAuthenticator_NilManager(t *testing.T) {
 	a := Authenticator{Manager: nil, ExpectedType: TokenTypeAccess}
@@ -46,7 +44,7 @@ func TestAuthenticator_NilManager(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer sometoken")
 
 	_, err := a.Authenticate(req)
-	if !errors.Is(err, contract.ErrUnauthenticated) {
+	if !errors.Is(err, authn.ErrUnauthenticated) {
 		t.Errorf("nil Manager: expected ErrUnauthenticated, got %v", err)
 	}
 }
@@ -60,7 +58,7 @@ func TestAuthenticator_NilRequest_Direct(t *testing.T) {
 	a := Authenticator{Manager: mgr, ExpectedType: TokenTypeAccess}
 
 	_, err = a.Authenticate(nil)
-	if !errors.Is(err, contract.ErrUnauthenticated) {
+	if !errors.Is(err, authn.ErrUnauthenticated) {
 		t.Errorf("nil request: expected ErrUnauthenticated, got %v", err)
 	}
 }
@@ -78,7 +76,7 @@ func TestAuthenticator_ExpiredToken_MapsToExpiredToken(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer notavalidtoken.x.y")
 
 	_, err = a.Authenticate(req)
-	if !errors.Is(err, contract.ErrInvalidToken) {
+	if !errors.Is(err, authn.ErrInvalidToken) {
 		t.Errorf("expected ErrInvalidToken for garbage token, got %v", err)
 	}
 }
@@ -188,7 +186,7 @@ func TestRotateKey_EdDSA(t *testing.T) {
 func TestPolicyAuthorizer_NilPrincipal(t *testing.T) {
 	pa := PolicyAuthorizer{Policy: AuthZPolicy{AllRoles: []string{"admin"}}}
 	err := pa.Authorize(nil, "", "")
-	if !errors.Is(err, contract.ErrUnauthenticated) {
+	if !errors.Is(err, authn.ErrUnauthenticated) {
 		t.Errorf("nil principal: expected ErrUnauthenticated, got %v", err)
 	}
 }
@@ -198,14 +196,14 @@ func TestPolicyAuthorizer_NilPrincipal(t *testing.T) {
 func TestPermissionAuthorizer_NilPrincipal(t *testing.T) {
 	pa := PermissionAuthorizer{}
 	err := pa.Authorize(nil, "read", "resource")
-	if !errors.Is(err, contract.ErrUnauthenticated) {
+	if !errors.Is(err, authn.ErrUnauthenticated) {
 		t.Errorf("nil principal: expected ErrUnauthenticated, got %v", err)
 	}
 }
 
 func TestPermissionAuthorizer_EmptyActionResource(t *testing.T) {
 	pa := PermissionAuthorizer{}
-	p := &contract.Principal{Scopes: []string{"read:docs"}}
+	p := &authn.Principal{Scopes: []string{"read:docs"}}
 	err := pa.Authorize(p, "", "")
 	if err != nil {
 		t.Errorf("empty action+resource should pass: %v", err)
@@ -214,7 +212,7 @@ func TestPermissionAuthorizer_EmptyActionResource(t *testing.T) {
 
 func TestPermissionAuthorizer_ActionOnly(t *testing.T) {
 	pa := PermissionAuthorizer{Separator: ":"}
-	p := &contract.Principal{Scopes: []string{"write"}}
+	p := &authn.Principal{Scopes: []string{"write"}}
 	err := pa.Authorize(p, "write", "")
 	if err != nil {
 		t.Errorf("action only: expected nil, got %v", err)
@@ -223,7 +221,7 @@ func TestPermissionAuthorizer_ActionOnly(t *testing.T) {
 
 func TestPermissionAuthorizer_CustomSeparator(t *testing.T) {
 	pa := PermissionAuthorizer{Separator: "/"}
-	p := &contract.Principal{Scopes: []string{"read/docs"}}
+	p := &authn.Principal{Scopes: []string{"read/docs"}}
 	err := pa.Authorize(p, "read", "docs")
 	if err != nil {
 		t.Errorf("custom separator: expected nil, got %v", err)

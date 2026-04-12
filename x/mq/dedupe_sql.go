@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/store/idempotency"
+	"github.com/spcent/plumego/x/data/idempotency"
 )
 
 // SQLDeduperConfig configures the SQL-backed task deduper.

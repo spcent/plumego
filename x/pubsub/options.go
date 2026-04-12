@@ -1,10 +1,15 @@
 package pubsub
 
 import (
+	"context"
 	"time"
-
-	"github.com/spcent/plumego/metrics"
 )
+
+// MetricsObserver captures pubsub activity metrics without routing the
+// feature-owned observer contract through stable metrics.
+type MetricsObserver interface {
+	ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error)
+}
 
 // Config holds the runtime configuration for InProcBroker.
 // It contains only operational parameters — capability features are provided
@@ -31,7 +36,7 @@ type Config struct {
 	WorkerPoolSize int
 
 	// MetricsObserver is the external metrics sink.
-	MetricsObserver metrics.PubSubObserver
+	MetricsObserver MetricsObserver
 
 	// EnablePanicRecovery wraps the delivery goroutine in a recover() guard
 	// (default: true).
@@ -102,7 +107,7 @@ func WithWorkerPoolSize(size int) Option {
 }
 
 // WithMetricsObserver sets the external metrics sink.
-func WithMetricsObserver(observer metrics.PubSubObserver) Option {
+func WithMetricsObserver(observer MetricsObserver) Option {
 	return func(c *Config) {
 		c.MetricsObserver = observer
 	}

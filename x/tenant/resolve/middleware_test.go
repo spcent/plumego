@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/spcent/plumego/security/authn"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
 
@@ -18,7 +19,7 @@ func TestMiddlewareFromHeader(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Tenant-ID", "t-1")
+	req = req.WithContext(authn.WithPrincipal(req.Context(), &authn.Principal{TenantID: "t-1"}))
 	rec := httptest.NewRecorder()
 
 	mw := Middleware(Options{})
@@ -43,7 +44,8 @@ func TestMiddlewareExtractorTakesPrecedenceOverHeader(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	mw := Middleware(Options{
-		Extractor: tenantcore.FromQuery("tenant"),
+		Extractor:        tenantcore.FromQuery("tenant"),
+		DisablePrincipal: true,
 	})
 	mw(handler).ServeHTTP(rec, req)
 

@@ -1,3 +1,7 @@
+// Package ratelimit adapts stable abuse primitives to HTTP middleware.
+//
+// The canonical stable entrypoint is AbuseGuard, which wraps security/abuse
+// for per-key transport rate limiting without owning the limiter primitive.
 package ratelimit
 
 import (
@@ -10,8 +14,16 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
+	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 	"github.com/spcent/plumego/security/abuse"
+)
+
+const (
+	headerRateLimitLimit     = "X-RateLimit-Limit"
+	headerRateLimitRemaining = "X-RateLimit-Remaining"
+	headerRateLimitReset     = "X-RateLimit-Reset"
+	headerRetryAfter         = "Retry-After"
 )
 
 // AbuseGuardConfig configures the abuse guard middleware.
@@ -179,22 +191,22 @@ func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
 }
 
 func applyRateLimitHeaders(w http.ResponseWriter, decision abuse.Decision) {
-	w.Header().Set("X-RateLimit-Limit", strconv.Itoa(decision.Limit))
-	w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(decision.Remaining))
+	w.Header().Set(headerRateLimitLimit, strconv.Itoa(decision.Limit))
+	w.Header().Set(headerRateLimitRemaining, strconv.Itoa(decision.Remaining))
 	if !decision.Reset.IsZero() {
-		w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(decision.Reset.Unix(), 10))
+		w.Header().Set(headerRateLimitReset, strconv.FormatInt(decision.Reset.Unix(), 10))
 	}
 	if !decision.Allowed && decision.RetryAfter > 0 {
 		seconds := int(math.Ceil(decision.RetryAfter.Seconds()))
 		if seconds < 1 {
 			seconds = 1
 		}
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		w.Header().Set(headerRetryAfter, strconv.Itoa(seconds))
 	}
 }
 
 func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Decision, logger log.StructuredLogger) {
-	mw.WriteTransportError(w, r, http.StatusTooManyRequests, mw.CodeRateLimited, "too many requests", contract.CategoryRateLimit, map[string]any{
+	mw.WriteTransportError(w, r, http.StatusTooManyRequests, contract.CodeRateLimited, "too many requests", contract.CategoryRateLimit, map[string]any{
 		"limit":       decision.Limit,
 		"remaining":   decision.Remaining,
 		"retry_after": decision.RetryAfter.Seconds(),
@@ -202,9 +214,9 @@ func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Deci
 	})
 
 	if logger != nil {
-		fields := contract.NewObservabilityPolicy().MiddlewareLogFields(r, http.StatusTooManyRequests, 0)
+		fields := internalobs.MiddlewareLogFields(r, http.StatusTooManyRequests, 0)
 		fields["limit"] = decision.Limit
 		fields["remaining"] = decision.Remaining
-		logger.WithFields(log.Fields(contract.NewObservabilityPolicy().RedactFields(fields))).Warn("request rate limited")
+		logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request rate limited")
 	}
 }

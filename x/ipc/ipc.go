@@ -122,7 +122,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 )
 
 // Error represents an IPC error with context
@@ -156,8 +155,14 @@ type Config struct {
 	KeepAlive           bool                 // Enable TCP keepalive for TCP connections. Default: true.
 	KeepAlivePeriod     time.Duration        // TCP keepalive period. Default: 30s. Only applies to TCP connections.
 	WindowsSecuritySDDL string               // Windows security descriptor (SDDL string). Windows only. Empty = default security.
-	Metrics             metrics.IPCObserver  // Optional metrics collector
+	Metrics             MetricsObserver      // Optional metrics collector
 	Logger              log.StructuredLogger // Optional structured logger
+}
+
+// MetricsObserver captures IPC-specific observations without routing the
+// feature-owned observer contract through stable metrics.
+type MetricsObserver interface {
+	ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error)
 }
 
 // DefaultConfig returns default configuration
@@ -243,7 +248,7 @@ func WithKeepAlivePeriod(period time.Duration) Option {
 }
 
 // WithMetrics sets the metrics collector
-func WithMetrics(m metrics.IPCObserver) Option {
+func WithMetrics(m MetricsObserver) Option {
 	return func(c *Config) {
 		c.Metrics = m
 	}

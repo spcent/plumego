@@ -1,0 +1,12 @@
+name: symbol-change
+scope: exported symbol removal, rename, or behavior change
+steps:
+  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, specs/repo.yaml, and the target module manifest.
+  - Enumerate every caller first with rg before editing.
+  - Decide how each caller will be handled: migrate, update assertion, or explicit discard with TODO.
+  - Apply the symbol change and update every caller in the same change.
+  - Re-run the same search and confirm no stale references remain when required.
+  - Update affected tests in the same change and run build plus test validation.
+stop_conditions:
+  - Do not leave deprecated wrappers, dead compatibility layers, or silent discard sites behind.
+  - Do not change stable public APIs without an explicit request and migration plan.

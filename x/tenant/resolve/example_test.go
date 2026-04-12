@@ -22,6 +22,7 @@ func ExampleMiddleware_headerExtraction() {
 
 	rec := httptest.NewRecorder()
 	mw := resolve.Middleware(resolve.Options{
+		DisablePrincipal: true,
 		Hooks: tenantcore.Hooks{
 			OnResolve: func(_ context.Context, info tenantcore.ResolveInfo) {
 				source = info.Source

@@ -7,6 +7,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
@@ -21,7 +22,7 @@ func New(cfg PubSubConfig, fallbackPub pubsub.Broker) *Handler {
 }
 
 type routeRegistrar interface {
-	AddRoute(method, path string, handler http.Handler) error
+	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
 func (h *Handler) RegisterRoutes(r routeRegistrar) error {
@@ -40,7 +41,7 @@ func (h *Handler) RegisterRoutes(r routeRegistrar) error {
 			path = "/_debug/pubsub"
 		}
 
-		regErr = r.AddRoute(http.MethodGet, path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
+		regErr = r.AddRoute(http.MethodGet, path, adaptCtx(func(ctx *contract.Ctx) {
 			if pub == nil {
 				_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 					Status(http.StatusInternalServerError).
@@ -55,7 +56,7 @@ func (h *Handler) RegisterRoutes(r routeRegistrar) error {
 			type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
 
 			if ps, ok := pub.(snapshoter); ok {
-				_ = ctx.Response(http.StatusOK, ps.Snapshot(), nil)
+				_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, ps.Snapshot(), nil)
 				return
 			}
 

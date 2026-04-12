@@ -8,8 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/spcent/plumego/health"
 )
 
 func TestHealthHistoryExportHandler(t *testing.T) {
@@ -119,7 +117,7 @@ var errUnhealthy = errors.New("unhealthy")
 func newHistoryManager(t *testing.T) (*Tracker, *mutableChecker) {
 	t.Helper()
 
-	coreManager, err := health.NewHealthManager(health.HealthCheckConfig{})
+	coreManager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}

@@ -97,7 +97,7 @@ worker := mq.NewWorker(queue, mq.WorkerConfig{
 })
 ```
 
-Or use the SQL-backed deduper (requires `idempotency_keys` migration):
+Or use the SQL-backed deduper (requires an `idempotency_keys` migration and `github.com/spcent/plumego/x/data/idempotency` for dialect constants):
 
 ```go
 db, _ := sql.Open("postgres", os.Getenv("DATABASE_URL"))

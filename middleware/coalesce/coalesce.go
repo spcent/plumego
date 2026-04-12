@@ -199,7 +199,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		inflight.waiters--
 		c.mu.Unlock()
 
-		mw.WriteTransportError(w, r, http.StatusGatewayTimeout, mw.CodeRequestTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
+		mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
 	}
 }
 

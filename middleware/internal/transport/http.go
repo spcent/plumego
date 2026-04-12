@@ -8,12 +8,19 @@ import (
 	"strings"
 )
 
+const (
+	HeaderForwardedFor       = "X-Forwarded-For"
+	HeaderRealIP             = "X-Real-IP"
+	HeaderContentTypeNoSniff = "X-Content-Type-Options"
+	ContentTypeNoSniffValue  = "nosniff"
+)
+
 func EnsureNoSniff(header http.Header) {
 	if header == nil {
 		return
 	}
-	if header.Get("X-Content-Type-Options") == "" {
-		header.Set("X-Content-Type-Options", "nosniff")
+	if header.Get(HeaderContentTypeNoSniff) == "" {
+		header.Set(HeaderContentTypeNoSniff, ContentTypeNoSniffValue)
 	}
 }
 
@@ -30,10 +37,10 @@ func ClientIP(r *http.Request) string {
 		return ""
 	}
 
-	if ip := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]); ip != "" {
+	if ip := strings.TrimSpace(strings.Split(r.Header.Get(HeaderForwardedFor), ",")[0]); ip != "" {
 		return ip
 	}
-	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+	if ip := strings.TrimSpace(r.Header.Get(HeaderRealIP)); ip != "" {
 		return ip
 	}
 

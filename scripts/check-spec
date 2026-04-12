@@ -77,6 +77,20 @@ ok_message() {
   echo -e "  ${GREEN}OK${RESET}    $msg"
 }
 
+trim_value() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+extract_field_value() {
+  local field_name="$1"
+  local raw
+  raw="$(sed -nE "s/^${field_name}:[[:space:]]*(.*)\$/\\1/p" "$TARGET" | awk 'NF { value=$0 } END { print value }' | tr -d '\r')"
+  trim_value "$raw"
+}
+
 extract_milestone_id() {
   local id
   id="$(sed -nE 's/^# (M-[0-9][0-9][0-9]): .*/\1/p' "$TARGET" | head -n1)"
@@ -297,6 +311,9 @@ validate_verify() {
 
 validate_card() {
   local milestone_id milestone_spec
+  local recipe_path recipe_value recipe_name
+  local primary_module primary_module_path
+  local expected_modules expected_desc
 
   echo "Required card fields:"
   check "Title (# Card)"               "^# Card "
@@ -309,6 +326,7 @@ validate_card() {
   echo "Workflow metadata:"
   if grep -Eq "^Milestone:" "$TARGET" 2>/dev/null; then
     check "Milestone field"            "^Milestone:"
+    check "Recipe field"               "^Recipe:"
     check "Priority field"             "^Priority:"
     check "State field"                "^State:"
     check "Primary Module field"       "^Primary Module:"
@@ -328,6 +346,71 @@ validate_card() {
         warn_message "Milestone reference has no matching spec in active/ or done/"
       fi
     fi
+
+    recipe_value="$(extract_field_value "Recipe")"
+    if [ -z "$recipe_value" ]; then
+      warn_message "Recipe field is empty — set it to a matching specs/change-recipes/*.yaml path"
+    else
+      recipe_path="$recipe_value"
+      if [ ! -f "$recipe_path" ]; then
+        echo -e "  ${RED}MISS${RESET}  Recipe path exists"
+        FAILED=1
+      else
+        ok_message "Recipe exists: $recipe_path"
+        recipe_name="${recipe_path##*/}"
+        recipe_name="${recipe_name%.yaml}"
+      fi
+    fi
+
+    primary_module="$(extract_field_value "Primary Module")"
+    if [ -n "$primary_module" ]; then
+      primary_module_path="$primary_module/module.yaml"
+      if [ ! -f "$primary_module_path" ]; then
+        warn_message "Primary Module path has no module.yaml: $primary_module"
+      fi
+    fi
+
+    if [ -n "${recipe_name:-}" ] && [ -n "$primary_module" ]; then
+      expected_modules=""
+      expected_desc=""
+      case "$recipe_name" in
+        tenant-policy-change)
+          expected_modules='^x/tenant$'
+          expected_desc='x/tenant'
+          ;;
+        stable-root-boundary-review)
+          expected_modules='^(core|router|contract|middleware|security|store|health|log|metrics)$'
+          expected_desc='one stable root'
+          ;;
+        add-middleware)
+          expected_modules='^middleware$'
+          expected_desc='middleware'
+          ;;
+        new-stable-module)
+          expected_modules='^(core|router|contract|middleware|security|store|health|log|metrics)$'
+          expected_desc='the target stable root'
+          ;;
+        new-extension-module)
+          expected_modules='^x/'
+          expected_desc='an x/* family'
+          ;;
+        symbol-change)
+          expected_modules='.'
+          expected_desc='the owning module of the symbol'
+          ;;
+        http-endpoint-bugfix|add-http-endpoint)
+          expected_modules='^(core|router|contract|x/rest|x/fileapi|x/frontend|x/gateway|x/websocket)$'
+          expected_desc='core, router, contract, or an app-facing HTTP family'
+          ;;
+        fix-bug|analysis-only|review-only)
+          expected_modules='.'
+          expected_desc='the owning module'
+          ;;
+      esac
+      if [ -n "$expected_modules" ] && ! printf '%s\n' "$primary_module" | grep -Eq "$expected_modules"; then
+        warn_message "Recipe and Primary Module look inconsistent — recipe $recipe_name usually maps to $expected_desc, got $primary_module"
+      fi
+    fi
   else
     warn_message "Legacy card shape detected — milestone linkage and ownership fields are not declared"
   fi
@@ -336,6 +419,7 @@ validate_card() {
   echo "Template placeholder check:"
   warn "C-XXX placeholder still present"  "C-XXX"      "replace with real card ID"
   warn "M-XXX placeholder still present"  "M-XXX"      "replace with real milestone ID"
+  warn "Recipe placeholder still present" "^Recipe:[[:space:]]*<" "replace with a real recipe path"
 }
 
 KIND="$(detect_kind)"

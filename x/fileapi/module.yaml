@@ -6,6 +6,15 @@ owner: persistence
 risk: medium
 summary: HTTP transport layer for tenant-aware file operations, composing x/data/file implementations behind stable store/file contracts.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-fileapi/README.md
+
 responsibilities:
   - HTTP transport layer for file upload, download, info, URL, delete, list
   - Tenant extraction from request context
@@ -46,10 +55,23 @@ test_commands:
 doc_paths:
   - docs/modules/x-fileapi/README.md
 
+change_risks:
+  - upload validation regression
+  - streaming delivery regression
+  - tenant extraction regression
+
+stop_conditions:
+  - The change introduces storage interface ownership, tenant-aware storage implementations, or business repositories into x/fileapi
+  - The change weakens tenant extraction, request validation, or contract.WriteError usage in handlers
+  - The change hides route registration or backend selection policy inside library code
+  - The change requires stable roots to absorb tenant-aware file transport behavior
+
 review_checklist:
   - Tenant extraction must come from context, never from request body or path
   - All handler methods must use contract.WriteError for error responses
   - No business logic in handlers; delegate to Storage and MetadataManager
+  - Keep multipart parsing, streaming, and backend selection reviewable
+  - Keep route registration explicit in app wiring
 
 agent_hints:
   - Wire this handler in your application's routes.go; do not call RegisterRoutes from library code

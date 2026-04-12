@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/spcent/plumego/metrics"
 )
 
 type TaskQueue struct {
 	store   TaskStore
 	now     func() time.Time
-	metrics metrics.MQObserver
+	metrics MetricsObserver
 }
 
 type TaskQueueOption func(*TaskQueue)
@@ -23,7 +21,7 @@ func WithQueueNowFunc(now func() time.Time) TaskQueueOption {
 	}
 }
 
-func WithQueueMetricsObserver(observer metrics.MQObserver) TaskQueueOption {
+func WithQueueMetricsObserver(observer MetricsObserver) TaskQueueOption {
 	return func(q *TaskQueue) {
 		q.metrics = observer
 	}
@@ -195,6 +193,6 @@ func (q *TaskQueue) observe(ctx context.Context, op, topic string, start time.Ti
 	q.metrics.ObserveMQ(ctx, op, topic, time.Since(start), err, false)
 }
 
-func (q *TaskQueue) collector() metrics.MQObserver {
+func (q *TaskQueue) collector() MetricsObserver {
 	return q.metrics
 }

@@ -25,7 +25,7 @@ func New(cfg config.Config) (*App, error) {
 	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 	app.Use(requestid.Middleware())
 	app.Use(recovery.Recovery(app.Logger()))
-	app.Use(accesslog.Middleware(app.Logger()))
+	app.Use(accesslog.Middleware(app.Logger(), nil, nil))
 
 	return &App{
 		Core: app,

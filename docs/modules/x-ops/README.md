@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`x/ops` provides protected operations endpoints for queues, receipts, and runtime diagnostics.
+`x/ops` provides protected operations endpoints for queues, receipts, health HTTP orchestration, and runtime diagnostics.
 
 ## v1 Status
 
@@ -13,6 +13,7 @@
 
 - the task is an auth-gated admin endpoint
 - the task is queue or receipt diagnostics
+- the task is health HTTP manager orchestration, history, metrics, or protected health diagnostics
 - the task is a protected runtime operations surface
 
 ## Do not use this module for
@@ -26,6 +27,7 @@
 - `x/ops/module.yaml`
 - `specs/task-routing.yaml`
 - `x/ops/ops.go`
+- `x/ops/healthhttp`
 
 ## Main risks when changing this module
 
@@ -36,11 +38,12 @@
 ## Canonical change shape
 
 - keep admin routing explicit and auth-gated
+- keep health manager execution policy in `x/ops/healthhttp`, not stable `health`
 - use `x/ops` only for protected admin surfaces
 - keep broader observability adapter work in `x/observability`
 
 ## Boundary with x/observability
 
-- `x/ops`: protected admin endpoints, auth-gated diagnostics, and runtime control surfaces
+- `x/ops`: protected admin endpoints, health HTTP manager orchestration, auth-gated diagnostics, and runtime control surfaces
 - `x/observability`: broader adapter, export, and diagnostics integration work
 - stable `middleware/*`: transport-only observability primitives

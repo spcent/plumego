@@ -6,15 +6,27 @@ owner: frontend
 risk: medium
 summary: Static and embedded frontend serving helpers for explicit mounting.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-frontend/README.md
+
 responsibilities:
   - Static asset mounting
   - Embedded asset serving
   - Frontend fallback helpers
+  - Frontend asset cache and header policy
+  - Precompressed asset serving policy
 
 non_goals:
   - Core bootstrap ownership
   - Stable root entrypoints
   - Business-specific UI flows
+  - Router matching primitives
 
 allowed_imports:
   - contract
@@ -34,10 +46,23 @@ test_commands:
 doc_paths:
   - docs/modules/x-frontend/README.md
 
+change_risks:
+  - asset fallback regression
+  - cache header regression
+  - embedded asset regression
+
+stop_conditions:
+  - The change introduces core bootstrap ownership, business UI flows, or router matching primitives into x/frontend
+  - The change hides filesystem behavior, fallback policy, or cache policy behind implicit side effects
+  - The change requires stable roots to absorb frontend asset serving behavior
+  - The change mixes app-specific frontend composition into reusable transport helpers
+
 review_checklist:
   - Keep mounting explicit
   - Avoid hidden filesystem side effects
   - Preserve net/http compatibility
+  - Keep cache and fallback policy explicit
+  - Keep frontend helpers transport-only
 
 agent_hints:
   - Keep frontend setup outside core

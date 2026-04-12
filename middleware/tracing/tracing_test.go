@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 )
 
 type spanContextSpan struct {
@@ -50,7 +51,7 @@ func TestMiddlewareSetsTraceHeadersAndSpanContext(t *testing.T) {
 	if rec.Header().Get(contract.RequestIDHeader) == "" {
 		t.Fatalf("expected request id header to be set")
 	}
-	if rec.Header().Get("X-Span-ID") != "span-123" {
+	if rec.Header().Get(internalobs.SpanIDHeader) != "span-123" {
 		t.Fatalf("expected span id header to be set")
 	}
 	if tracer.span == nil || !tracer.span.ended {

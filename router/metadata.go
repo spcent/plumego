@@ -8,12 +8,10 @@ import (
 	"strings"
 )
 
-// SetRouteMeta sets metadata for a route.
-func (r *Router) SetRouteMeta(method, path string, meta RouteMeta) {
-	r.state.mu.Lock()
-	defer r.state.mu.Unlock()
-
-	pattern := r.fullPath(path)
+func (r *Router) storeRouteMetaLocked(method, pattern string, meta RouteMeta) {
+	if meta == (RouteMeta{}) {
+		return
+	}
 	r.setMeta(method, pattern, meta)
 	if meta.Name != "" {
 		r.registerNamedRoute(meta.Name, method, pattern)

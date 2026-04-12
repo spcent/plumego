@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	kvstore "github.com/spcent/plumego/store/kv"
+	"github.com/spcent/plumego/x/data/kvengine"
 )
 
 // PersistenceBackend defines the interface for message persistence.
@@ -43,14 +43,14 @@ type PersistenceBackend interface {
 
 // KVPersistence implements PersistenceBackend using store/kv.
 type KVPersistence struct {
-	store  *kvstore.KVStore
+	store  *kvengine.KVStore
 	mu     sync.RWMutex
 	closed bool
 }
 
 // NewKVPersistence creates a new KV-based persistence backend.
 func NewKVPersistence(dataDir string) (*KVPersistence, error) {
-	opts := kvstore.Options{
+	opts := kvengine.Options{
 		DataDir:           dataDir,
 		MaxEntries:        100000,
 		MaxMemoryMB:       500,
@@ -58,11 +58,11 @@ func NewKVPersistence(dataDir string) (*KVPersistence, error) {
 		CleanInterval:     30 * time.Second,
 		ShardCount:        16,
 		EnableCompression: true,
-		SerializerFormat:  kvstore.FormatBinary,
+		SerializerFormat:  kvengine.FormatBinary,
 		AutoDetectFormat:  true,
 	}
 
-	store, err := kvstore.NewKVStore(opts)
+	store, err := kvengine.NewKVStore(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create KV store: %w", err)
 	}
@@ -126,7 +126,7 @@ func (p *KVPersistence) GetMessages(ctx context.Context, topic string, limit int
 	for _, key := range matchingKeys {
 		data, err := p.store.Get(key)
 		if err != nil {
-			if err == kvstore.ErrKeyNotFound || err == kvstore.ErrKeyExpired {
+			if err == kvengine.ErrKeyNotFound || err == kvengine.ErrKeyExpired {
 				continue
 			}
 			return nil, fmt.Errorf("failed to get message %s: %w", key, err)
@@ -212,7 +212,7 @@ func (p *KVPersistence) GetSubscriptions(ctx context.Context, topic string) (map
 
 		data, err := p.store.Get(key)
 		if err != nil {
-			if err == kvstore.ErrKeyNotFound || err == kvstore.ErrKeyExpired {
+			if err == kvengine.ErrKeyNotFound || err == kvengine.ErrKeyExpired {
 				continue
 			}
 			return nil, fmt.Errorf("failed to get subscription %s: %w", key, err)
@@ -268,7 +268,7 @@ func (p *KVPersistence) GetAckState(ctx context.Context, topic string, messageID
 	key := fmt.Sprintf("ack:%s:%s", topic, messageID)
 	_, err := p.store.Get(key)
 	if err != nil {
-		if err == kvstore.ErrKeyNotFound || err == kvstore.ErrKeyExpired {
+		if err == kvengine.ErrKeyNotFound || err == kvengine.ErrKeyExpired {
 			return false, nil
 		}
 		return false, err

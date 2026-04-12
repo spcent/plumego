@@ -30,7 +30,7 @@ func TestMiddlewareAdaptersRespectLayerBoundaries(t *testing.T) {
 		{
 			name:      "circuit adapter imports only resilience circuit",
 			dir:       "circuitbreaker",
-			allowList: []string{"github.com/spcent/plumego/security/resilience/circuitbreaker"},
+			allowList: []string{"github.com/spcent/plumego/x/resilience/circuitbreaker"},
 		},
 		{
 			name: "tenant adapter imports only transport and tenant modules",

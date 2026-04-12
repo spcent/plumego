@@ -13,13 +13,13 @@ import (
 // BenchmarkOptStaticRoute benchmarks static route matching (no params).
 func BenchmarkOptStaticRoute(b *testing.B) {
 	r := NewRouter()
-	r.AddRoute(GET, "/about", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/about", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	r.AddRoute(GET, "/contact", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/contact", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	r.AddRoute(GET, "/api/v1/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/api/v1/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -37,7 +37,7 @@ func BenchmarkOptStaticRoute(b *testing.B) {
 // BenchmarkOptSingleParam benchmarks single-parameter route matching.
 func BenchmarkOptSingleParam(b *testing.B) {
 	r := NewRouter()
-	r.AddRoute(GET, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -55,7 +55,7 @@ func BenchmarkOptSingleParam(b *testing.B) {
 // BenchmarkOptMultiParam benchmarks multi-parameter route matching.
 func BenchmarkOptMultiParam(b *testing.B) {
 	r := NewRouter()
-	r.AddRoute(GET, "/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -73,7 +73,7 @@ func BenchmarkOptMultiParam(b *testing.B) {
 // BenchmarkOptWildcard benchmarks wildcard route matching.
 func BenchmarkOptWildcard(b *testing.B) {
 	r := NewRouter()
-	r.AddRoute(GET, "/static/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/static/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -95,14 +95,14 @@ func BenchmarkOptManyRoutes(b *testing.B) {
 	// Register 50 static routes
 	for i := 0; i < 50; i++ {
 		path := fmt.Sprintf("/api/v1/resource%d", i)
-		r.AddRoute(GET, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mustAddRoute(r, http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
 	}
 	// Register 20 parameterized routes
 	for i := 0; i < 20; i++ {
 		path := fmt.Sprintf("/api/v1/entity%d/:id", i)
-		r.AddRoute(GET, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mustAddRoute(r, http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
 	}
@@ -129,7 +129,7 @@ func BenchmarkOptManyRoutes(b *testing.B) {
 // BenchmarkOptDeepPath benchmarks deeply nested path matching.
 func BenchmarkOptDeepPath(b *testing.B) {
 	r := NewRouter()
-	r.AddRoute(GET, "/api/v1/users/:userId/orgs/:orgId/teams/:teamId/members/:memberId",
+	mustAddRoute(r, http.MethodGet, "/api/v1/users/:userId/orgs/:orgId/teams/:teamId/members/:memberId",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -157,7 +157,7 @@ func BenchmarkOptPatternCache(b *testing.B) {
 		"/teams/:teamId/members/:memberId",
 	}
 	for _, p := range patterns {
-		cache.SetPattern(GET, p, &MatchResult{
+		cache.SetPattern(http.MethodGet, p, &MatchResult{
 			Handler:   http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 			ParamKeys: []string{"id"},
 		})
@@ -174,7 +174,7 @@ func BenchmarkOptPatternCache(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		path := lookupPaths[i%len(lookupPaths)]
-		cache.GetByPattern(GET, path)
+		cache.GetByPattern(http.MethodGet, path)
 	}
 }
 
@@ -233,7 +233,7 @@ func BenchmarkOptSplitPath(b *testing.B) {
 // BenchmarkOptParallelStatic benchmarks static route matching under contention.
 func BenchmarkOptParallelStatic(b *testing.B) {
 	r := NewRouter()
-	r.AddRoute(GET, "/about", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/about", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -252,7 +252,7 @@ func BenchmarkOptParallelStatic(b *testing.B) {
 // BenchmarkOptParallelParam benchmarks parameterized route matching under contention.
 func BenchmarkOptParallelParam(b *testing.B) {
 	r := NewRouter()
-	r.AddRoute(GET, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

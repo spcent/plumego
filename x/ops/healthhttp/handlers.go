@@ -21,7 +21,7 @@ type ComponentsListResponse struct {
 }
 
 // SummaryHandler returns aggregate component health only.
-func SummaryHandler(manager health.HealthManager) http.Handler {
+func SummaryHandler(manager Manager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -37,7 +37,7 @@ func SummaryHandler(manager health.HealthManager) http.Handler {
 }
 
 // DetailedHandler returns aggregate health plus build metadata.
-func DetailedHandler(manager health.HealthManager) http.Handler {
+func DetailedHandler(manager Manager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -59,7 +59,7 @@ func DetailedHandler(manager health.HealthManager) http.Handler {
 
 // HealthHandler creates a comprehensive health check handler.
 // Pass debug=true to include runtime diagnostics in the response.
-func HealthHandler(manager health.HealthManager, debug bool) http.Handler {
+func HealthHandler(manager Manager, debug bool) http.Handler {
 	if !debug {
 		return DetailedHandler(manager)
 	}
@@ -85,7 +85,7 @@ func HealthHandler(manager health.HealthManager, debug bool) http.Handler {
 }
 
 // ComponentHealthHandler creates a handler for checking a specific component's health.
-func ComponentHealthHandler(manager health.HealthManager, componentName string) http.Handler {
+func ComponentHealthHandler(manager Manager, componentName string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -111,7 +111,7 @@ func ComponentHealthHandler(manager health.HealthManager, componentName string) 
 }
 
 // AllComponentsHealthHandler creates a handler for checking all components' health.
-func AllComponentsHealthHandler(manager health.HealthManager) http.Handler {
+func AllComponentsHealthHandler(manager Manager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -134,7 +134,7 @@ func LiveHandler() http.Handler {
 }
 
 // ComponentsListHandler creates a handler that lists all registered components.
-func ComponentsListHandler(manager health.HealthManager) http.Handler {
+func ComponentsListHandler(manager Manager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return

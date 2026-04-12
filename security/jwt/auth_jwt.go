@@ -4,33 +4,33 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/security/authn"
 )
 
-// Authenticator adapts JWT verification to the contract.Authenticator interface.
+// Authenticator adapts JWT verification to the authn.RequestAuthenticator interface.
 type Authenticator struct {
 	Manager      *JWTManager
 	ExpectedType TokenType
 }
 
 // Authenticate verifies the request token and returns a principal.
-func (a Authenticator) Authenticate(r *http.Request) (*contract.Principal, error) {
+func (a Authenticator) Authenticate(r *http.Request) (*authn.Principal, error) {
 	principal, _, err := a.AuthenticateRequest(r)
 	return principal, err
 }
 
 // AuthenticateRequest verifies the request token and enriches the request context with token claims.
-func (a Authenticator) AuthenticateRequest(r *http.Request) (*contract.Principal, *http.Request, error) {
+func (a Authenticator) AuthenticateRequest(r *http.Request) (*authn.Principal, *http.Request, error) {
 	if a.Manager == nil {
-		return nil, r, contract.ErrUnauthenticated
+		return nil, r, authn.ErrUnauthenticated
 	}
 	if r == nil {
-		return nil, r, contract.ErrUnauthenticated
+		return nil, r, authn.ErrUnauthenticated
 	}
 
-	token := extractBearerToken(r)
+	token := authn.ExtractBearerToken(r)
 	if token == "" {
-		return nil, r, contract.ErrUnauthenticated
+		return nil, r, authn.ErrUnauthenticated
 	}
 
 	claims, err := a.Manager.VerifyToken(r.Context(), token, a.ExpectedType)
@@ -41,8 +41,8 @@ func (a Authenticator) AuthenticateRequest(r *http.Request) (*contract.Principal
 	return PrincipalFromClaims(claims), r.WithContext(WithTokenClaims(r.Context(), claims)), nil
 }
 
-// Authenticator returns a contract.Authenticator for the given token type.
-func (m *JWTManager) Authenticator(tokenType TokenType) contract.Authenticator {
+// Authenticator returns an authn.RequestAuthenticator for the given token type.
+func (m *JWTManager) Authenticator(tokenType TokenType) authn.RequestAuthenticator {
 	return Authenticator{
 		Manager:      m,
 		ExpectedType: tokenType,
@@ -55,9 +55,9 @@ type PolicyAuthorizer struct {
 }
 
 // Authorize checks the principal against the configured policy.
-func (p PolicyAuthorizer) Authorize(principal *contract.Principal, _, _ string) error {
+func (p PolicyAuthorizer) Authorize(principal *authn.Principal, _, _ string) error {
 	if principal == nil {
-		return contract.ErrUnauthenticated
+		return authn.ErrUnauthenticated
 	}
 
 	authz := AuthorizationClaims{
@@ -65,7 +65,7 @@ func (p PolicyAuthorizer) Authorize(principal *contract.Principal, _, _ string) 
 		Permissions: principal.Scopes,
 	}
 	if !checkPolicy(p.Policy, authz) {
-		return contract.ErrUnauthorized
+		return authn.ErrUnauthorized
 	}
 	return nil
 }
@@ -76,9 +76,9 @@ type PermissionAuthorizer struct {
 }
 
 // Authorize checks the action/resource permission in principal scopes.
-func (p PermissionAuthorizer) Authorize(principal *contract.Principal, action string, resource string) error {
+func (p PermissionAuthorizer) Authorize(principal *authn.Principal, action string, resource string) error {
 	if principal == nil {
-		return contract.ErrUnauthenticated
+		return authn.ErrUnauthenticated
 	}
 	if action == "" && resource == "" {
 		return nil
@@ -96,15 +96,15 @@ func (p PermissionAuthorizer) Authorize(principal *contract.Principal, action st
 	if contains(principal.Scopes, perm) {
 		return nil
 	}
-	return contract.ErrUnauthorized
+	return authn.ErrUnauthorized
 }
 
-// PrincipalFromClaims converts JWT claims to a contract.Principal.
-func PrincipalFromClaims(claims *TokenClaims) *contract.Principal {
+// PrincipalFromClaims converts JWT claims to an authn.Principal.
+func PrincipalFromClaims(claims *TokenClaims) *authn.Principal {
 	if claims == nil {
 		return nil
 	}
-	principal := &contract.Principal{
+	principal := &authn.Principal{
 		Subject: claims.Identity.Subject,
 		Roles:   claims.Authorization.Roles,
 		Scopes:  claims.Authorization.Permissions,
@@ -128,24 +128,20 @@ func PrincipalFromClaims(claims *TokenClaims) *contract.Principal {
 func mapJWTError(err error) error {
 	switch {
 	case errors.Is(err, ErrTokenExpired):
-		return contract.ErrExpiredToken
+		return authn.ErrExpiredToken
 	case errors.Is(err, ErrTokenNotYetValid):
-		return contract.ErrInvalidToken
-	case errors.Is(err, ErrTokenRevoked):
-		return contract.ErrSessionRevoked
-	case errors.Is(err, ErrVersionMismatch):
-		return contract.ErrTokenVersionMismatch
+		return authn.ErrInvalidToken
 	case errors.Is(err, ErrInvalidIssuer):
-		return contract.ErrInvalidToken
+		return authn.ErrInvalidToken
 	case errors.Is(err, ErrInvalidAudience):
-		return contract.ErrInvalidToken
+		return authn.ErrInvalidToken
 	case errors.Is(err, ErrUnknownKey):
-		return contract.ErrInvalidToken
+		return authn.ErrInvalidToken
 	case errors.Is(err, ErrMissingSubject):
-		return contract.ErrInvalidToken
+		return authn.ErrInvalidToken
 	case errors.Is(err, ErrInvalidToken):
-		return contract.ErrInvalidToken
+		return authn.ErrInvalidToken
 	default:
-		return contract.ErrInvalidToken
+		return authn.ErrInvalidToken
 	}
 }

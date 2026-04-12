@@ -1,0 +1,12 @@
+name: tenant-policy-change
+scope: tenant resolution, tenant policy, quota, rate-limit, or tenant-session behavior
+steps:
+  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, x/tenant/module.yaml, and docs/architecture/X_TENANT_BLUEPRINT.md.
+  - Confirm the change belongs in x/tenant rather than stable middleware, stable store, or core.
+  - Keep resolution, policy, quota, and session flow explicit and fail closed on errors.
+  - Preserve transport-only behavior in tenant middleware and keep stable roots free of tenant internals.
+  - Add or update focused tests for deny paths, isolation, quota feedback, and middleware ordering as relevant.
+  - Run x/tenant tests first, then boundary and repo-wide checks if stable interfaces or shared behavior changed.
+stop_conditions:
+  - Do not move tenant-aware logic into stable middleware or stable store.
+  - Do not weaken deny-path behavior, Retry-After semantics, or tenant isolation guarantees.

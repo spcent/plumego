@@ -30,7 +30,7 @@ func TestMiddlewareShortCircuitErrorPathOrder(t *testing.T) {
 				w,
 				r,
 				http.StatusTooManyRequests,
-				middleware.CodeRateLimited,
+				contract.CodeRateLimited,
 				"rate limited",
 				contract.CategoryRateLimit,
 				nil,
@@ -48,7 +48,7 @@ func TestMiddlewareShortCircuitErrorPathOrder(t *testing.T) {
 	rec := httptest.NewRecorder()
 	middleware.Apply(final, outer, blocker).ServeHTTP(rec, req)
 
-	assertCanonicalErrorEnvelope(t, rec, middleware.CodeRateLimited)
+	assertCanonicalErrorEnvelope(t, rec, contract.CodeRateLimited)
 	if handlerCalled {
 		t.Fatalf("final handler should not be called on short-circuit error path")
 	}
@@ -90,9 +90,9 @@ func TestRecoveryCatchesPanicFromDownstreamMiddlewareOrder(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	middleware.Apply(final, outer, recovery.Recovery(log.NewNoOpLogger()), panicMw).ServeHTTP(rec, req)
+	middleware.Apply(final, outer, recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})), panicMw).ServeHTTP(rec, req)
 
-	assertCanonicalErrorEnvelope(t, rec, middleware.CodeInternalError)
+	assertCanonicalErrorEnvelope(t, rec, contract.CodeInternalError)
 	if handlerCalled {
 		t.Fatalf("final handler should not be called when downstream middleware panics")
 	}

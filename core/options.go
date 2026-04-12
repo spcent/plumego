@@ -12,7 +12,7 @@ type AppDependencies struct {
 
 func resolveLogger(dependencies AppDependencies) log.StructuredLogger {
 	if dependencies.Logger == nil {
-		return log.NewNoOpLogger()
+		return log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	}
 	return dependencies.Logger
 }

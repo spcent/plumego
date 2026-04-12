@@ -2,16 +2,8 @@ package contract
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
-	"strings"
 )
-
-// WarnFunc is invoked when WriteError receives an APIError with missing required
-// fields (Status, Code, or Category). It defaults to a no-op; override in tests
-// or at application startup to surface misconfigured callers.
-var WarnFunc = func(msg string) {}
 
 // ErrorCategory describes the high-level class of an API error for observability.
 type ErrorCategory string
@@ -159,14 +151,11 @@ type ErrorResponse struct {
 // headers have already been sent.
 //
 // Prefer building APIError values through NewErrorBuilder() so that required
-// fields are always populated. WriteError keeps fallback defaults for
-// backward compatibility and calls WarnFunc when required fields are missing.
+// fields are always populated. WriteError still normalizes incomplete APIError
+// values, but it does so deterministically with no package-global side effects.
 func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	if w == nil {
 		return ErrResponseWriterNil
-	}
-	if issues := validateAPIError(err); len(issues) > 0 {
-		WarnFunc("WriteError received partially-populated APIError: " + strings.Join(issues, "; "))
 	}
 
 	if err.Status == 0 {
@@ -405,77 +394,4 @@ func HTTPStatusFromCategory(category ErrorCategory) int {
 	default:
 		return http.StatusInternalServerError
 	}
-}
-
-// ParseErrorFromResponse attempts to parse an APIError from an HTTP response.
-// Note: this closes resp.Body.
-func ParseErrorFromResponse(resp *http.Response) (APIError, error) {
-	if resp == nil || resp.Body == nil {
-		return APIError{}, fmt.Errorf("response is nil")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 400 {
-		return APIError{}, fmt.Errorf("no error in successful response")
-	}
-
-	var errorResp ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
-		return NewErrorBuilder().
-			Type(TypeInternal).
-			Status(resp.StatusCode).
-			Code(http.StatusText(resp.StatusCode)).
-			Category(CategoryServer).
-			Message(fmt.Sprintf("failed to parse error response: %v", err)).
-			Build(), nil
-	}
-
-	if errorResp.Error.RequestID == "" {
-		errorResp.Error.RequestID = errorResp.RequestID
-	}
-	return errorResp.Error, nil
-}
-
-// IsClientError reports whether err is a client error (4xx).
-// It accepts any error and performs a type assertion to APIError internally.
-func IsClientError(err error) bool {
-	var apiErr APIError
-	if !asAPIError(err, &apiErr) {
-		return false
-	}
-	return apiErr.Status >= 400 && apiErr.Status < 500
-}
-
-// IsServerError reports whether err is a server error (5xx).
-// It accepts any error and performs a type assertion to APIError internally.
-func IsServerError(err error) bool {
-	var apiErr APIError
-	if !asAPIError(err, &apiErr) {
-		return false
-	}
-	return apiErr.Status >= 500
-}
-
-// asAPIError attempts to extract an APIError from err via direct assertion or errors.As.
-func asAPIError(err error, out *APIError) bool {
-	if v, ok := err.(APIError); ok {
-		*out = v
-		return true
-	}
-	return errors.As(err, out)
-}
-
-// IsAPIErrorRetryable checks if the API error is retryable based on its status code.
-func IsAPIErrorRetryable(err APIError) bool {
-	switch err.Status {
-	case http.StatusRequestTimeout,
-		http.StatusTooManyRequests,
-		http.StatusInternalServerError,
-		http.StatusBadGateway,
-		http.StatusServiceUnavailable,
-		http.StatusGatewayTimeout:
-		return true
-	}
-
-	return err.Category == CategoryTimeout
 }

@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+func mustNewMemoryCacheWithConfig(t *testing.T, config Config) *MemoryCache {
+	t.Helper()
+	cache, err := NewMemoryCacheWithConfig(config)
+	if err != nil {
+		t.Fatalf("NewMemoryCacheWithConfig: %v", err)
+	}
+	return cache
+}
+
 func TestMemoryCacheSetAndGet(t *testing.T) {
 	cache := NewMemoryCache()
 
@@ -119,9 +128,6 @@ func TestDefaultConfig(t *testing.T) {
 	if config.CleanupInterval != DefaultCleanupInterval {
 		t.Fatalf("expected CleanupInterval %v, got %v", DefaultCleanupInterval, config.CleanupInterval)
 	}
-	if !config.EnableMetrics {
-		t.Fatal("expected EnableMetrics to be true")
-	}
 	if config.DefaultTTL != 10*time.Minute {
 		t.Fatalf("expected DefaultTTL 10m, got %v", config.DefaultTTL)
 	}
@@ -132,11 +138,10 @@ func TestMemoryCacheWithConfig(t *testing.T) {
 		MaxKeyLength:    100,
 		MaxMemoryUsage:  1024,
 		CleanupInterval: 1 * time.Second,
-		EnableMetrics:   true,
 		DefaultTTL:      5 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// Test Set with default TTL
@@ -155,7 +160,7 @@ func TestMemoryCacheWithConfig(t *testing.T) {
 	}
 }
 
-func TestMemoryCacheMetrics(t *testing.T) {
+func TestMemoryCacheDeleteAndMiss(t *testing.T) {
 	cache := NewMemoryCache()
 	defer cache.Close()
 
@@ -172,23 +177,8 @@ func TestMemoryCacheMetrics(t *testing.T) {
 	// Delete a key
 	_ = cache.Delete(context.Background(), "key2")
 
-	// Get metrics
-	metrics := cache.GetMetrics()
-
-	if metrics.Sets != 2 {
-		t.Fatalf("expected 2 sets, got %d", metrics.Sets)
-	}
-	if metrics.Hits != 1 {
-		t.Fatalf("expected 1 hit, got %d", metrics.Hits)
-	}
-	if metrics.Misses != 1 {
-		t.Fatalf("expected 1 miss, got %d", metrics.Misses)
-	}
-	if metrics.Deletes != 1 {
-		t.Fatalf("expected 1 delete, got %d", metrics.Deletes)
-	}
-	if metrics.CurrentSize != 1 {
-		t.Fatalf("expected 1 current size, got %d", metrics.CurrentSize)
+	if _, err := cache.Get(context.Background(), "key2"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected deleted key to be missing, got %v", err)
 	}
 }
 
@@ -197,11 +187,10 @@ func TestMemoryCacheMemoryLimit(t *testing.T) {
 		MaxKeyLength:    100,
 		MaxMemoryUsage:  10, // Very small limit
 		CleanupInterval: 0,
-		EnableMetrics:   false,
 		DefaultTTL:      1 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// First set should succeed
@@ -225,11 +214,10 @@ func TestMemoryCacheKeyValidation(t *testing.T) {
 		MaxKeyLength:    10,
 		MaxMemoryUsage:  0,
 		CleanupInterval: 0,
-		EnableMetrics:   false,
 		DefaultTTL:      1 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// Test empty key
@@ -256,7 +244,7 @@ func TestMemoryCacheDefaultTTL(t *testing.T) {
 	config := DefaultConfig()
 	config.DefaultTTL = 50 * time.Millisecond
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// Set with zero TTL should use default TTL
@@ -289,11 +277,10 @@ func TestMemoryCacheCleanup(t *testing.T) {
 		MaxKeyLength:    100,
 		MaxMemoryUsage:  0,
 		CleanupInterval: 50 * time.Millisecond,
-		EnableMetrics:   true,
 		DefaultTTL:      1 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
 	// Set some items with short TTL
@@ -307,13 +294,14 @@ func TestMemoryCacheCleanup(t *testing.T) {
 	// Wait for cleanup to run
 	time.Sleep(100 * time.Millisecond)
 
-	// Check metrics
-	metrics := cache.GetMetrics()
-	if metrics.Expired != 2 {
-		t.Fatalf("expected 2 expired items, got %d", metrics.Expired)
+	if _, err := cache.Get(context.Background(), "exp1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected exp1 to be cleaned up, got %v", err)
 	}
-	if metrics.CurrentSize != 1 {
-		t.Fatalf("expected 1 remaining item, got %d", metrics.CurrentSize)
+	if _, err := cache.Get(context.Background(), "exp2"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected exp2 to be cleaned up, got %v", err)
+	}
+	if value, err := cache.Get(context.Background(), "keep"); err != nil || string(value) != "value3" {
+		t.Fatalf("expected keep to remain available, got value=%q err=%v", value, err)
 	}
 }
 
@@ -322,11 +310,10 @@ func TestMemoryCacheClose(t *testing.T) {
 		MaxKeyLength:    100,
 		MaxMemoryUsage:  0,
 		CleanupInterval: 50 * time.Millisecond,
-		EnableMetrics:   false,
 		DefaultTTL:      1 * time.Minute,
 	}
 
-	cache := NewMemoryCacheWithConfig(config)
+	cache := mustNewMemoryCacheWithConfig(t, config)
 
 	// Set some data
 	cache.Set(context.Background(), "test", []byte("value"), 1*time.Minute)
@@ -389,13 +376,8 @@ func TestMemoryCacheUpdateExistingKey(t *testing.T) {
 		t.Fatalf("expected 'new', got %q", val)
 	}
 
-	// Check metrics
-	metrics := cache.GetMetrics()
-	if metrics.Sets != 2 {
-		t.Fatalf("expected 2 sets, got %d", metrics.Sets)
-	}
-	if metrics.CurrentSize != 1 {
-		t.Fatalf("expected 1 current size, got %d", metrics.CurrentSize)
+	if exists, err := cache.Exists(context.Background(), "key"); err != nil || !exists {
+		t.Fatalf("expected updated key to exist, exists=%v err=%v", exists, err)
 	}
 }
 
@@ -424,10 +406,11 @@ func TestMemoryCacheConcurrentAccess(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	// Verify metrics
-	metrics := cache.GetMetrics()
-	if metrics.Sets != 100 {
-		t.Fatalf("expected 100 sets, got %d", metrics.Sets)
+	for i := 0; i < 100; i++ {
+		key := fmt.Sprintf("key%d", i)
+		if _, err := cache.Get(context.Background(), key); err != nil {
+			t.Fatalf("expected key %q to be readable after concurrent access, got %v", key, err)
+		}
 	}
 }
 

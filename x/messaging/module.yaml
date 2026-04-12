@@ -6,6 +6,15 @@ owner: messaging
 risk: medium
 summary: The canonical and only app-facing messaging family entrypoint, built on explicit queue, pubsub, scheduler, and webhook adapters.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-messaging/README.md
+
 subordinate_families:
   - package: x/mq
     role: durable queue primitive and worker coordination
@@ -27,6 +36,14 @@ non_goals:
   - Core bootstrap ownership
   - Stable root entrypoints
   - Tenant bootstrap policy
+
+public_entrypoints:
+  - send
+  - delivery
+  - schedule
+  - webhook
+  - broker
+  - routes
 
 allowed_imports:
   - contract
@@ -51,10 +68,23 @@ test_commands:
 doc_paths:
   - docs/modules/x-messaging/README.md
 
+change_risks:
+  - delivery regression
+  - scheduling regression
+  - webhook flow regression
+
+stop_conditions:
+  - The change introduces hidden provider globals, tenant bootstrap ownership, or stable-root entrypoints into x/messaging
+  - The change mixes business workflow policy into family-level messaging primitives
+  - The change requires core or stable roots to learn mq, pubsub, scheduler, or webhook internals
+  - The change makes subordinate families compete with x/messaging as app-facing discovery entrypoints
+
 review_checklist:
   - Keep message flow explicit
   - Avoid hidden provider globals
   - Preserve error-path visibility
+  - Keep route wiring and delivery orchestration explicit
+  - Keep mq, pubsub, scheduler, and webhook ownership clear at the family boundary
 
 agent_hints:
   - Start all new app-facing messaging discovery here before opening sibling x/* packages

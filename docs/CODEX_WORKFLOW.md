@@ -1,280 +1,408 @@
-# Codex Workflow — Milestone-Driven Agent Delegation
+# Codex Workflow — Plumego
 
-Companion lightweight pipeline spec:
-[`docs/MILESTONE_PIPELINE.md`](./MILESTONE_PIPELINE.md)
+This document defines the recommended way to use Codex in `plumego`.
 
-Live repository CI runs through `.github/workflows/quality-gates.yml`.
-`docs/github-workflows/milestone-gates.yml` is an example milestone-only workflow asset, not the repository's primary CI definition.
+It is a companion to:
 
-## The Model
+- `AGENTS.md` for hard rules and validation order
+- `docs/CANONICAL_STYLE_GUIDE.md` for code shape
+- `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` for repository layout
+- `specs/*` and `<module>/module.yaml` for machine-readable ownership and boundaries
 
+Use this document when you want a repeatable prompting and execution pattern,
+not just a one-off instruction.
+
+Repo-native recipe assets live under `specs/change-recipes/` and should be used
+when a task matches one of the standard shapes.
+
+## 1. Default Operating Model
+
+Codex should work in one of three modes:
+
+### Analysis Mode
+
+Use when scope, ownership, or architecture is unclear.
+
+Expected output:
+
+- owning module or `x/*` family
+- in-scope paths
+- out-of-scope paths
+- likely touched files
+- main risks
+- validation plan
+
+Do not edit code in this mode.
+
+### Implementation Mode
+
+Use when the task contract is already clear.
+
+Expected behavior:
+
+- confirm the owning module first
+- make the smallest coherent change
+- keep the diff inside one primary module when possible
+- add or update focused tests
+- run validation before handoff
+
+### Review Mode
+
+Use when the user asks for review, audit, or risk assessment.
+
+Expected output:
+
+- findings first
+- severity-ordered issues
+- file-level references
+- missing tests and regression risks
+
+Do not patch code unless the user explicitly asks for fixes.
+
+## 2. Task Contract
+
+For stable and predictable runs, every task should define:
+
+- Goal
+- In Scope
+- Out of Scope
+- Target Module
+- API and Dependency Policy
+- Tests
+- Validation
+- Done Definition
+
+When humans omit these details, Codex should assume:
+
+- one primary module per change
+- no stable public API changes
+- no new dependencies
+- focused tests are required for behavior changes
+- docs sync is required only for implemented behavior changes
+
+## 3. Stop Conditions
+
+Codex should stop and surface the issue before coding when:
+
+- the owning module is unclear
+- the task would force a stable root to import `x/*`
+- the task needs a stable public API change that was not requested
+- the task needs a new dependency that was not approved
+- the task is broad but lacks acceptance criteria or validation commands
+- a repo spec, module manifest, and local pattern conflict in a behavior-changing way
+
+## 4. Daily Workflow
+
+Use this loop for normal feature work, bug fixes, and refactors:
+
+1. Read the control plane in canonical order.
+2. Identify the owning module or family.
+3. State in-scope and out-of-scope paths.
+4. State public API and dependency assumptions.
+5. Implement the smallest coherent change.
+6. Add or update focused tests.
+7. Run module validation first.
+8. Run boundary and repo-wide checks second.
+9. Report residual risks and doc-sync impacts.
+
+Default read order:
+
+1. `AGENTS.md`
+2. `docs/CANONICAL_STYLE_GUIDE.md`
+3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+4. `specs/repo.yaml`
+5. `specs/task-routing.yaml`
+6. `specs/extension-taxonomy.yaml`
+7. `specs/package-hotspots.yaml`
+8. `specs/dependency-rules.yaml`
+9. target `<module>/module.yaml`
+10. `reference/standard-service`
+
+## 5. Prompt Templates
+
+Before writing a bespoke prompt, check whether one of these repo-native recipes
+already matches the task:
+
+- `specs/change-recipes/analysis-only.yaml`
+- `specs/change-recipes/fix-bug.yaml`
+- `specs/change-recipes/http-endpoint-bugfix.yaml`
+- `specs/change-recipes/review-only.yaml`
+- `specs/change-recipes/add-http-endpoint.yaml`
+- `specs/change-recipes/add-middleware.yaml`
+- `specs/change-recipes/new-stable-module.yaml`
+- `specs/change-recipes/new-extension-module.yaml`
+- `specs/change-recipes/stable-root-boundary-review.yaml`
+- `specs/change-recipes/symbol-change.yaml`
+- `specs/change-recipes/tenant-policy-change.yaml`
+
+### Analysis Prompt
+
+```text
+Do not edit code.
+
+Read the relevant control-plane files and determine the best landing zone for:
+[task]
+
+Return:
+- owning module or x/* family
+- in-scope paths
+- out-of-scope paths
+- likely touched files
+- risks
+- validation plan
+- smallest reversible task split
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  You (Architect)                                             │
-│  ─────────────────────────────────────────────────────────  │
-│  Decide: goal, scope, architectural constraints,            │
-│          task phases, acceptance criteria, hard stops.      │
-│  Tool: make new-milestone N=NNN TITLE="..."                 │
-│        → fill TEMPLATE → make check-spec → commit          │
-└────────────────────────┬─────────────────────────────────────┘
-                         │  make milestone M=active/M-NNN
-                         ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Codex --yolo (Autonomous Execution)                        │
-│  ─────────────────────────────────────────────────────────  │
-│  Reads AGENTS.md (behavior boundary, auto-loaded)           │
-│  Reads spec Context files                                   │
-│  Executes phases:                                           │
-│    Phase 1 (sequential) → Phase 2 (parallel) → ...         │
-│  Runs quality gates → commits → pushes → opens PR          │
-└────────────────────────┬─────────────────────────────────────┘
-                         │  git push milestone/M-NNN-slug
-                         ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Local pre-push hook (scripts/pre-push)                     │
-│  Full gate suite runs before push leaves the machine        │
-│  Blocks push on any failure                                 │
-└────────────────────────┬─────────────────────────────────────┘
-                         │  PR opened
-                         ▼
-┌──────────────────────────────────────────────────────────────┐
-│  CI (.github/workflows/quality-gates.yml or copied         │
-│      docs/github-workflows/milestone-gates.yml)            │
-│  Reruns all gates, posts result table to PR comment         │
-└────────────────────────┬─────────────────────────────────────┘
-                         │  CI green
-                         ▼
-┌──────────────────────────────────────────────────────────────┐
-│  You (Reviewer) — the only manual checkpoint                │
-│  ─────────────────────────────────────────────────────────  │
-│  1. Goal matches intent?                                    │
-│  2. Approach section confirms method?                       │
-│  3. Architecture Decisions table: all ✅?                   │
-│  4. Diff within declared scope?                             │
-│  5. go.mod unchanged?                                       │
-│  → Merge + archive spec + next milestone                    │
-└──────────────────────────────────────────────────────────────┘
+
+### Implementation Prompt
+
+```text
+Implement this change in plumego:
+[task]
+
+Constraints:
+- In scope: [paths]
+- Out of scope: [paths]
+- Target module: [module]
+- No new dependencies
+- Do not change stable public APIs unless explicitly requested
+- Follow AGENTS.md and the canonical style guide
+
+Requirements:
+- state which files you will touch before broad edits
+- make the smallest coherent change
+- add or update focused tests
+- run the required validation commands
+- report residual risks at the end
 ```
 
----
+### Review Prompt
 
-## One-Time Setup
+```text
+Review this change only. Do not modify code.
+
+Priorities:
+1. boundary violations
+2. stable-root to x/* drift
+3. net/http compatibility risks
+4. hidden globals or context service-location
+5. fail-open behavior
+6. missing tests
+
+Output findings first, ordered by severity, with file references.
+```
+
+### Exported Symbol Change Prompt
+
+```text
+Change this exported symbol:
+[symbol and requested change]
+
+You must:
+- enumerate every caller first with rg
+- update every caller in the same change
+- re-run the same search and verify no stale references remain
+- update tests in the same change
+- run go build ./... and go test ./...
+```
+
+### Milestone Prompt
+
+```text
+Execute this milestone:
+[tasks/milestones/active/M-NNN.md]
+
+Follow AGENTS.md milestone rules exactly:
+- read every Context file first
+- follow Tasks in order
+- stay inside Affected Modules
+- stop and record blockers in the spec if discovered
+- run the full validation sequence before push
+```
+
+## 6. Symbol Change Protocol
+
+When removing, renaming, or changing the behavior of an exported symbol:
+
+1. enumerate callers first with `rg -n --glob '*.go' 'SymbolName' .`
+2. decide how every site will be handled
+3. edit all callers in the same change
+4. re-run the same search
+5. update tests in the same change
+6. finish only after build, tests, and residual-reference checks pass
+
+Do not leave dead wrappers, deprecated compatibility layers, or silent discard
+sites behind.
+
+## 7. Validation
+
+Default validation order:
+
+1. run the target module tests from `<module>/module.yaml`
+2. run boundary and manifest checks
+3. run repo-wide gates
+
+Required repo-wide gates:
 
 ```bash
-# Install local pre-push quality gate hook
-make setup-hooks
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/agent-workflow
+go run ./internal/checks/module-manifests
+go run ./internal/checks/reference-layout
+go test -race -timeout 60s ./...
+go test -timeout 20s ./...
+go vet ./...
+gofmt -w .
 ```
 
-After this, quality gates run automatically on every `git push`:
+## 8. Milestone Workflow
 
-| Branch | Gate triggered |
-|--------|---------------|
-| `milestone/*` | Full 8-gate suite (blocks push on failure) |
-| `main`, `claude/*`, `feature/*` | Quick check (vet + fmt + tests) |
+Use the milestone path for multi-step, single-PR scopes with explicit human
+authorship and autonomous Codex execution.
 
-To skip once: `git push --no-verify`
+Companion workflow assets:
 
----
+- `docs/MILESTONE_PIPELINE.md`
+- `docs/github-workflows/milestone-pr-template.md`
+- `tasks/milestones/ROADMAP.md`
 
-## Complete Workflow
+High-level loop:
 
-### Step 1 — Scaffold the Spec
+1. scaffold the spec with `make new-milestone`
+2. fill Goal, Architecture Decisions, Context, Tasks, Acceptance Criteria, and Out of Scope
+3. validate with `make check-spec`
+4. launch with `make milestone M=active/M-NNN`
+5. let Codex execute autonomously on the milestone branch
+6. review the PR as the only manual checkpoint
+7. archive the spec and update the roadmap
 
-```bash
-make new-milestone N=001 TITLE="Add ResourceHandler to x/rest"
-# → creates tasks/milestones/active/M-001.md from TEMPLATE
-```
+Use milestones when:
 
-Fill the spec. Concentrate effort on:
+- the work spans multiple stable intermediate steps
+- there are non-obvious architecture decisions to lock down
+- the task needs explicit sequencing or parallel phases
+- the reviewer wants one PR with a spec-backed contract
 
-| Section | What to write | Time investment |
-|---------|--------------|----------------|
-| **Goal** | One sentence — observable end state | Medium |
-| **Architecture Decisions** | Non-obvious constraints Codex must not override | High |
-| **Context** | Exact file paths, not module names | Medium |
-| **Tasks / Phases** | Atomic steps; mark parallel groups explicitly | High |
-| **Acceptance Criteria** | Exact commands, verbatim | Low (copy template) |
-| **Out of Scope** | Hard stops; be explicit | Medium |
+Do not use milestones for every small fix. Daily implementation prompts are the
+default.
 
-### Step 2 — Validate the Spec
+## 9. Worked Examples
 
-```bash
-make check-spec M=active/M-001
-```
+These examples show how real Plumego work maps onto the control plane.
 
-Checks all required sections and gate commands are present.  
-Fix any `MISS` lines. Warnings about placeholders mean the spec is incomplete.
+### Example A: Exported Symbol Cleanup
 
-If you are using the full pipeline artifacts, scaffold and validate them too:
+Task shape:
 
-```bash
-make new-plan M=active/M-001
-make check-plan M=active/M-001
-make new-card ID=001 SLUG=slice-router-work M=M-001
-make check-card C=active/C-001-slice-router-work
-make new-verify M=active/M-001
-make check-verify M=active/M-001
-```
+- rename or remove an exported `contract` or `core` symbol
+- migrate every caller in one change
+- update tests and verify zero stale references
 
-`make milestone` now requires the companion plan file to exist and pass `make check-plan`.
+Use:
 
-Update `tasks/milestones/ROADMAP.md`: add a row for M-001, declare dependencies.
+- recipe: `specs/change-recipes/symbol-change.yaml`
+- routing entry: `symbol_change`
 
-### Step 3 — Launch Codex
+Representative cards:
 
-```bash
-make milestone M=active/M-001
-```
+- `tasks/cards/done/0907-rename-errtype-constants-to-type.md`
+- `tasks/cards/done/0918-contract-ctx-getter-rename.md`
 
-Codex reads AGENTS.md (auto-loaded) + the spec, then executes autonomously.  
-Walk away. Expected timeline depends on milestone size; check back at PR.
+### Example B: HTTP Handler or Route Bug
 
-If Codex surfaces a **Draft PR** with `## Open Questions` filled in, it hit a
-decision point that needs your input. Answer in the spec, re-run.
+Task shape:
 
-### Step 4 — Review the PR
+- broken request decode
+- inconsistent error response
+- route registration or transport regression
 
-The PR body is filled from `docs/github-workflows/milestone-pr-template.md`.
-Review in order:
+Use:
 
-1. **CI gate table** (posted by bot) — must be all green.
-2. **Goal** — does it match what you intended?
-3. **Approach** — is the method what you had in mind?
-4. **Architecture Decisions table** — any ⚠️ rows require your explicit approval.
-5. **Scope boundary table** — no unexpected modules in the diff.
-6. **`go.mod`** — must be unchanged.
+- recipe: `specs/change-recipes/http-endpoint-bugfix.yaml`
+- routing entry: `http_endpoint_bugfix`
 
-Merge when satisfied.
+Representative cards:
 
-### Step 5 — Archive
+- `tasks/cards/done/0743-writeerror-buffer-before-headers.md`
+- `tasks/cards/done/0902-redirect-safe-by-default.md`
 
-```bash
-mv tasks/milestones/active/M-001.md tasks/milestones/done/M-001.md
-# Add ## Outcome section with PR number and date
-```
+### Example C: Tenant Policy or Quota Change
 
-Update `tasks/milestones/ROADMAP.md`: set status to `[✓]`.  
-Any milestone that listed `Depends on: M-001` is now unblocked.
+Task shape:
 
----
+- tenant resolution behavior
+- quota feedback headers
+- deny-path, isolation, or tenant-session changes
 
-## Writing High-Signal Specs
+Use:
 
-### Architecture Decisions — the Highest-Value Section
+- recipe: `specs/change-recipes/tenant-policy-change.yaml`
+- routing entry: `tenant_policy_change`
 
-This section is what separates a good spec from an ambiguous one.  
-Without it, Codex makes reasonable but possibly wrong choices.  
-With it, Codex implements exactly what you intended.
+Representative cards:
 
-Write decisions that are:
-- **Non-obvious** — Codex would not infer them from context alone.
-- **Specific** — "use interface embedding, not wrapping" beats "keep http.Handler compatible".
-- **Falsifiable** — a reviewer can check whether the decision was followed.
+- `tasks/cards/done/0796-x-tenant-quota-retry-after-coverage.md`
+- `tasks/cards/done/0797-x-tenant-policy-and-isolation-coverage.md`
+- `tasks/cards/done/0914-tenant-core-ratelimit-provider-unknown-tenant.md`
 
-Do NOT write:
-- "Follow best practices" — not actionable.
-- "Keep it simple" — not falsifiable.
-- Decisions that are already enforced by AGENTS.md or `specs/` — redundant.
+### Example D: Stable Root Boundary Audit
 
-### Context — Exact Paths Beat Module Names
+Task shape:
 
-```markdown
-# Good
-4. `x/rest/module.yaml`
-5. `specs/change-recipes/add-http-endpoint.yaml`
-6. `reference/standard-service/internal/app/routes.go`
+- review-only request
+- stable-root ownership drift
+- hidden coupling or x/* leakage concerns
 
-# Bad
-4. x/rest docs and specs
-```
+Use:
 
-### Parallel Task Phases — When to Use Them
+- recipe: `specs/change-recipes/stable-root-boundary-review.yaml`
+- routing entry: `stable_root_boundary_review`
 
-Mark a phase as parallel when its tasks:
-- Touch different files with no shared state.
-- Could be implemented in any order without conflicts.
-- Would produce independent, reviewable diffs.
+Representative cards:
 
-Do NOT mark as parallel when:
-- Task B imports or extends what Task A creates.
-- Both tasks modify the same file.
+- `tasks/cards/done/0303-block-tenant-leakage-into-stable-roots.md`
+- `tasks/cards/done/0848-security-jwt-session-lifecycle-pruning.md`
+- `tasks/cards/done/0850-security-resilience-boundary-pruning.md`
 
-### Out of Scope — Be Explicit
+## 10. Review Checklist for Humans
 
-Add milestone-specific stops beyond the standard ones.  
-If you know a tempting-but-wrong path exists, name it:
+When reviewing Codex output, check:
 
-```markdown
-- Do not extract a generic `HandlerRegistry`; ResourceHandler is the only abstraction needed.
-- Do not modify `reference/with-gateway`; only `reference/standard-service` is in scope.
-```
+1. the owning module was correct
+2. the diff stayed inside scope
+3. stable roots did not learn extension-family internals
+4. control flow stayed explicit and `net/http` compatible
+5. tests cover failure paths and regressions
+6. docs changed only where implemented behavior changed
+7. `go.mod` did not change unless explicitly approved
 
----
+## 11. Anti-Patterns
 
-## Delegation Contract Summary
+Do not ask Codex to:
 
-| Concern | Who Decides | Where |
-|---------|-------------|-------|
-| Goal, scope, hard stops | You | Spec |
-| Architectural constraints | You | `## Architecture Decisions` |
-| Internal implementation details | Codex | Autonomously |
-| Type/func naming (non-public) | Codex | Per existing patterns |
-| Test structure | Codex | Per CANONICAL_STYLE_GUIDE |
-| Commit granularity | Codex | Per AGENTS.md §11 |
-| Quality gate failures | Codex | Must fix before push |
-| Deviations from Architecture Decisions | Codex surfaces, You approve | PR `⚠️` row |
-| New external dependencies | Neither | Forbidden |
-| Touching out-of-scope modules | Neither | Forbidden |
+- "optimize this" without a target module or success bar
+- "refactor broadly" across multiple primary modules in one pass
+- "just make it cleaner" without boundaries
+- preserve deprecated wrappers indefinitely
+- infer whether public APIs or dependencies may change
 
-Full contract: `AGENTS.md §12`.
+Do not let Codex:
 
----
+- widen stable roots into feature catalogs
+- hide dependency flow in context or globals
+- add one-off response helpers or route-registration idioms
+- treat subordinate `x/*` packages as competing family entrypoints
 
-## Parallel Milestone Execution
+## 12. Recommended Usage
 
-Multiple milestones can run concurrently when:
-- Their `Parallel OK:` field is `yes`.
-- Their `Depends on:` fields are both satisfied.
-- Their `## Affected Modules` do not overlap.
+For best stability, use this sequence:
 
-Check `tasks/milestones/ROADMAP.md` before launching a second milestone.  
-If two milestones accidentally touch the same file, run them sequentially.
+1. analysis prompt
+2. implementation prompt
+3. review prompt
 
----
+For larger work:
 
-## Troubleshooting
-
-| Symptom | Cause | Action |
-|---------|-------|--------|
-| `make check-spec` shows MISS | Required section missing | Fill section, re-run |
-| `make milestone` refuses to launch | Companion plan file missing | Run `make new-plan`, fill it, then `make check-plan` |
-| `make check-plan` fails | Plan missing or malformed | Run `make new-plan`, fill fields, re-run |
-| `make check-card` warns about legacy shape | Card predates milestone pipeline metadata | Add milestone ownership fields or keep as legacy queue item |
-| `make check-verify` fails | Verify report missing required gate sections | Scaffold with `make new-verify`, then fill evidence |
-| Codex opens Draft PR with Open Questions | Hit unresolvable decision point | Answer in spec, re-run Codex on branch |
-| Pre-push hook blocks push | Gate failure | Fix failure, `git push` again |
-| CI gate `dependency-rules` fails | Stable root imports `x/*` | Check new import paths in diff |
-| CI gate `module-manifests` fails | New file not in `doc_paths` | Update `<module>/module.yaml` |
-| PR diff outside Affected Modules | Out of Scope too vague | Revert, tighten spec, re-run |
-| `go.mod` has new entry | Extension added non-stdlib import to main module | Move to `x/*` sub-module |
-| Two parallel milestones conflict | Overlapping files | Serialize them in ROADMAP.md |
-
----
-
-## Reference
-
-| File | Purpose |
-|------|---------|
-| `tasks/milestones/TEMPLATE.md` | Spec template |
-| `tasks/milestones/PLAN_TEMPLATE.md` | Planner handoff template |
-| `tasks/milestones/VERIFY_TEMPLATE.md` | Verifier evidence template |
-| `tasks/milestones/ROADMAP.md` | Pipeline view, dependency DAG |
-| `tasks/cards/TEMPLATE.md` | Worker card template |
-| `docs/github-workflows/milestone-pr-template.md` | PR body template (Codex fills) |
-| `docs/github-workflows/milestone-gates.yml` | Optional milestone-only workflow example |
-| `.github/workflows/quality-gates.yml` | Live repository CI workflow |
-| `scripts/check-spec` | Spec validator |
-| `scripts/pre-push` | Local pre-push gate hook |
-| `AGENTS.md §11` | Milestone execution protocol |
-| `AGENTS.md §12` | Delegation contract |
-| `Makefile` | `make help` for all targets |
+1. analysis prompt
+2. split into cards or a milestone
+3. execute one card or milestone at a time
+4. review before merge

@@ -1,16 +1,9 @@
-// Package db provides database connectivity and operations with advanced features.
+// Package db provides small stdlib-shaped SQL helpers.
 //
-// This package wraps database/sql with additional functionality including:
-//   - Connection pool management
-//   - Read/write splitting for high availability
-//   - Horizontal sharding for scalability
-//   - Automatic query retry with backoff
-//   - Metrics collection (query timing, error rates)
-//   - Health checking and monitoring
-//   - Transaction management with context support
-//
-// The package supports multiple database drivers (MySQL, PostgreSQL, SQLite)
-// and provides both simple single-database and complex multi-database topologies.
+// This package wraps database/sql with connection setup, context-driven query
+// and transaction helpers, and scan utilities. Topology, retry policy, timeout
+// policy, and health or observability ownership belong outside the stable store
+// root.
 //
 // Example usage:
 //
@@ -89,12 +82,6 @@ type Config struct {
 
 	// PingTimeout is the timeout for the initial ping test
 	PingTimeout time.Duration
-
-	// QueryTimeout is the default timeout for queries (0 = no timeout)
-	QueryTimeout time.Duration
-
-	// TransactionTimeout is the default timeout for transactions (0 = no timeout)
-	TransactionTimeout time.Duration
 }
 
 // DB defines the minimal behavior required by SQL consumers.
@@ -133,27 +120,19 @@ func (c Config) Validate() error {
 	if c.PingTimeout < 0 {
 		return fmt.Errorf("%w: PingTimeout must be non-negative", ErrInvalidConfig)
 	}
-	if c.QueryTimeout < 0 {
-		return fmt.Errorf("%w: QueryTimeout must be non-negative", ErrInvalidConfig)
-	}
-	if c.TransactionTimeout < 0 {
-		return fmt.Errorf("%w: TransactionTimeout must be non-negative", ErrInvalidConfig)
-	}
 	return nil
 }
 
 // DefaultConfig returns a default configuration for common use cases.
 func DefaultConfig(driver, dsn string) Config {
 	return Config{
-		Driver:             driver,
-		DSN:                dsn,
-		MaxOpenConns:       10,
-		MaxIdleConns:       5,
-		ConnMaxLifetime:    30 * time.Minute,
-		ConnMaxIdleTime:    5 * time.Minute,
-		PingTimeout:        5 * time.Second,
-		QueryTimeout:       30 * time.Second,
-		TransactionTimeout: 60 * time.Second,
+		Driver:          driver,
+		DSN:             dsn,
+		MaxOpenConns:    10,
+		MaxIdleConns:    5,
+		ConnMaxLifetime: 30 * time.Minute,
+		ConnMaxIdleTime: 5 * time.Minute,
+		PingTimeout:     5 * time.Second,
 	}
 }
 
@@ -190,29 +169,6 @@ func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 	return db, nil
 }
 
-// OpenWithRetry opens a database connection with retry logic.
-func OpenWithRetry(config Config, open OpenFunc, maxRetries int, retryDelay time.Duration) (*sql.DB, error) {
-	var lastErr error
-
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			time.Sleep(retryDelay)
-		}
-
-		db, err := OpenWith(config, open)
-		if err == nil {
-			return db, nil
-		}
-		if errors.Is(err, ErrInvalidConfig) {
-			return nil, err
-		}
-
-		lastErr = err
-	}
-
-	return nil, fmt.Errorf("%w: failed after %d attempts: %v", ErrConnectionFailed, maxRetries+1, lastErr)
-}
-
 // ApplyConfig updates pooling and lifetime settings on an existing sql.DB.
 func ApplyConfig(db *sql.DB, config Config) {
 	if db == nil {
@@ -239,48 +195,31 @@ func ApplyConfig(db *sql.DB, config Config) {
 	}
 }
 
-// ExecContext executes a query with timeout support.
+// ExecContext executes a query using the caller-provided context.
 func ExecContext(ctx context.Context, db DB, query string, args ...any) (sql.Result, error) {
 	if db == nil {
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
 
-	ctx, cancel := withQueryTimeout(ctx, db)
-	defer cancel()
-
 	return db.ExecContext(ctx, query, args...)
 }
 
-// QueryContext executes a query with timeout support.
+// QueryContext executes a query using the caller-provided context.
 func QueryContext(ctx context.Context, db DB, query string, args ...any) (*sql.Rows, error) {
 	if db == nil {
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
 
-	ctx, cancel := withQueryTimeout(ctx, db)
-	defer cancel()
-
 	return db.QueryContext(ctx, query, args...)
 }
 
-// QueryRowContext executes a query with timeout support.
+// QueryRowContext executes a query using the caller-provided context.
 func QueryRowContext(ctx context.Context, db DB, query string, args ...any) *sql.Row {
 	if db == nil {
 		return nil
 	}
 
-	ctx, cancel := withQueryTimeout(ctx, db)
-	defer cancel()
-
 	return db.QueryRowContext(ctx, query, args...)
-}
-
-// WithTimeout creates a context with timeout for database operations.
-func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	if timeout > 0 {
-		return context.WithTimeout(ctx, timeout)
-	}
-	return ctx, func() {}
 }
 
 // WithTransaction executes a function within a transaction.
@@ -290,9 +229,6 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 	if db == nil {
 		return fmt.Errorf("%w: database is nil", ErrTransactionFailed)
 	}
-
-	ctx, cancel := withTransactionTimeout(ctx, db)
-	defer cancel()
 
 	tx, err := db.BeginTx(ctx, txOpts)
 	if err != nil {
@@ -326,9 +262,6 @@ func QueryRow(ctx context.Context, db DB, query string, args ...any) (*sql.Row, 
 	if db == nil {
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
-
-	ctx, cancel := withQueryTimeout(ctx, db)
-	defer cancel()
 
 	return db.QueryRowContext(ctx, query, args...), nil
 }
@@ -429,85 +362,4 @@ func Ping(ctx context.Context, db DB, timeout time.Duration) error {
 	}
 
 	return nil
-}
-
-// HealthCheck performs a comprehensive health check of the database.
-func HealthCheck(ctx context.Context, db DB, timeout time.Duration) (HealthStatus, error) {
-	if db == nil {
-		return HealthStatus{Status: "unhealthy"}, fmt.Errorf("%w: database is nil", ErrPingFailed)
-	}
-
-	start := time.Now()
-
-	// Ping the database
-	pingErr := Ping(ctx, db, timeout)
-
-	health := HealthStatus{
-		Status:    "healthy",
-		Timestamp: time.Now(),
-		Latency:   time.Since(start),
-	}
-
-	if pingErr != nil {
-		health.Status = "unhealthy"
-		health.Error = pingErr.Error()
-		return health, pingErr
-	}
-
-	// Get connection stats if available
-	if sqlDB, ok := db.(*sql.DB); ok {
-		stats := sqlDB.Stats()
-		health.OpenConnections = stats.OpenConnections
-		health.InUse = stats.InUse
-		health.Idle = stats.Idle
-		health.WaitCount = stats.WaitCount
-		health.WaitDuration = stats.WaitDuration
-	}
-
-	return health, nil
-}
-
-// HealthStatus represents the health status of the database.
-type HealthStatus struct {
-	Status          string        `json:"status"`
-	Timestamp       time.Time     `json:"timestamp"`
-	Latency         time.Duration `json:"latency"`
-	Error           string        `json:"error,omitempty"`
-	OpenConnections int           `json:"open_connections,omitempty"`
-	InUse           int           `json:"in_use,omitempty"`
-	Idle            int           `json:"idle,omitempty"`
-	WaitCount       int64         `json:"wait_count,omitempty"`
-	WaitDuration    time.Duration `json:"wait_duration,omitempty"`
-}
-
-// GetConfig is a helper interface for databases that can expose their configuration.
-type GetConfig interface {
-	GetConfig() Config
-}
-
-func withQueryTimeout(ctx context.Context, db DB) (context.Context, context.CancelFunc) {
-	config, ok := getConfig(db)
-	if !ok || config.QueryTimeout <= 0 {
-		return ctx, func() {}
-	}
-	return WithTimeout(ctx, config.QueryTimeout)
-}
-
-func withTransactionTimeout(ctx context.Context, db DB) (context.Context, context.CancelFunc) {
-	config, ok := getConfig(db)
-	if !ok || config.TransactionTimeout <= 0 {
-		return ctx, func() {}
-	}
-	return WithTimeout(ctx, config.TransactionTimeout)
-}
-
-func getConfig(db DB) (Config, bool) {
-	if db == nil {
-		return Config{}, false
-	}
-	cfg, ok := db.(GetConfig)
-	if !ok {
-		return Config{}, false
-	}
-	return cfg.GetConfig(), true
 }

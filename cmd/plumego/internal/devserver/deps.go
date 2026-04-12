@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -101,17 +102,18 @@ type pkgInfo struct {
 }
 
 func (d *Dashboard) handleDeps(ctx *contract.Ctx) {
-	includeStd := strings.TrimSpace(ctx.Query.Get("include_std"))
+	query := ctx.R.URL.Query()
+	includeStd := strings.TrimSpace(query.Get("include_std"))
 	includeStdlib := includeStd == "" || includeStd == "1" || strings.EqualFold(includeStd, "true")
 
 	maxNodes := 0
-	if maxRaw := strings.TrimSpace(ctx.Query.Get("max_nodes")); maxRaw != "" {
+	if maxRaw := strings.TrimSpace(query.Get("max_nodes")); maxRaw != "" {
 		if parsed, err := strconv.Atoi(maxRaw); err == nil && parsed > 0 {
 			maxNodes = parsed
 		}
 	}
 
-	refresh := strings.TrimSpace(ctx.Query.Get("refresh"))
+	refresh := strings.TrimSpace(query.Get("refresh"))
 	refreshEnabled := refresh == "1" || strings.EqualFold(refresh, "true")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx.R.Context(), 15*time.Second)
@@ -128,7 +130,7 @@ func (d *Dashboard) handleDeps(ctx *contract.Ctx) {
 	}
 
 	filtered := filterDependencyGraph(graph, includeStdlib, maxNodes)
-	_ = ctx.Response(200, filtered, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, filtered, nil)
 }
 
 func buildDependencyGraph(ctx context.Context, dir string) (*DependencyGraph, error) {

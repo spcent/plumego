@@ -98,11 +98,11 @@ func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 func newTestS3Storage(t *testing.T, srv *httptest.Server) *S3Storage {
 	t.Helper()
 	host := strings.TrimPrefix(srv.URL, "http://")
-	s, err := NewS3Storage(storefile.StorageConfig{
-		S3Endpoint:  host,
-		S3Bucket:    "testbucket",
-		S3UseSSL:    false,
-		S3PathStyle: true,
+	s, err := NewS3Storage(S3Config{
+		Endpoint:  host,
+		Bucket:    "testbucket",
+		UseSSL:    false,
+		PathStyle: true,
 	}, nil)
 	if err != nil {
 		t.Fatalf("NewS3Storage: %v", err)
@@ -259,10 +259,10 @@ func TestS3Storage_Copy(t *testing.T) {
 func TestS3Storage_Put_Deduplication(t *testing.T) {
 	srv, _ := newS3Server(t)
 	host := strings.TrimPrefix(srv.URL, "http://")
-	s, _ := NewS3Storage(storefile.StorageConfig{
-		S3Endpoint:  host,
-		S3Bucket:    "testbucket",
-		S3PathStyle: true,
+	s, _ := NewS3Storage(S3Config{
+		Endpoint:  host,
+		Bucket:    "testbucket",
+		PathStyle: true,
 	}, &mockMetadata{})
 	s.client = &http.Client{}
 
@@ -314,16 +314,16 @@ func TestS3Storage_buildURL_PathTraversalEncoded(t *testing.T) {
 }
 
 func TestNewS3Storage_MissingConfig(t *testing.T) {
-	_, err := NewS3Storage(storefile.StorageConfig{}, nil)
+	_, err := NewS3Storage(S3Config{}, nil)
 	if err == nil {
 		t.Fatal("expected error for missing S3 config")
 	}
 }
 
 func TestNewS3Storage_DefaultRegion(t *testing.T) {
-	s, err := NewS3Storage(storefile.StorageConfig{
-		S3Endpoint: "s3.amazonaws.com",
-		S3Bucket:   "my-bucket",
+	s, err := NewS3Storage(S3Config{
+		Endpoint: "s3.amazonaws.com",
+		Bucket:   "my-bucket",
 	}, nil)
 	if err != nil {
 		t.Fatalf("NewS3Storage: %v", err)

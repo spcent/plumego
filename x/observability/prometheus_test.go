@@ -115,8 +115,8 @@ func TestPrometheusCollectorStats(t *testing.T) {
 	if stats.TotalRecords != 5 {
 		t.Fatalf("expected 5 total requests, got %d", stats.TotalRecords)
 	}
-	if stats.TypeBreakdown[metrics.MetricHTTPRequest] == 0 {
-		t.Fatalf("expected HTTP type breakdown to be populated")
+	if stats.NameBreakdown[metrics.MetricHTTPRequest] == 0 {
+		t.Fatalf("expected HTTP name breakdown to be populated")
 	}
 	if stats.StartTime.IsZero() {
 		t.Fatalf("expected non-zero start time")

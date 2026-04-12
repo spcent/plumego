@@ -33,12 +33,18 @@
 ## Canonical change shape
 
 - implement `func(http.Handler) http.Handler`
+- keep one constructor path per middleware package; delete parallel wrapper families
+- keep stable middleware packages single-purpose; split unrelated transport behaviors into separate packages instead of umbrella buckets
+- prefer explicit config constructors for configurable middleware such as `compression.Gzip(GzipConfig)` and `timeout.Timeout(TimeoutConfig)`
+- use `accesslog.Middleware(...)` as the canonical access-log constructor
 - add ordering and error-path tests
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
 - keep auth and security-header transport adapters here, on top of `security/*` primitives
+- keep stable rate limiting here as a thin `middleware/ratelimit.AbuseGuard(...)` adapter over `security/abuse`, not as a catalog of limiter implementations
 - keep API version negotiation in `x/rest/versioning`
 - keep protocol or payload adaptation in `x/gateway/*`
+- keep request-id generation policy in middleware-owned packages; `contract` should only carry request-id context/header contracts
 
 ## Boundary with observability
 

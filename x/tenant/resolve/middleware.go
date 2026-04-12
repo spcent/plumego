@@ -5,6 +5,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/security/authn"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
@@ -18,6 +19,8 @@ type Options struct {
 	Extractor tenantcore.TenantExtractor
 	// AllowMissing allows requests to proceed when no tenant ID is found.
 	AllowMissing bool
+	// DisablePrincipal disables tenant resolution from the authn.Principal in the request context.
+	DisablePrincipal bool
 	// Hooks provides callbacks for tenant resolution events.
 	Hooks tenantcore.Hooks
 	// OnMissing is called when tenant ID is missing and AllowMissing is false.
@@ -26,24 +29,34 @@ type Options struct {
 }
 
 // Middleware resolves tenant id from request and stores it in context.
-// Resolution order: custom Extractor, then HeaderName header.
+// Resolution order: authn.Principal from context, then custom Extractor, then HeaderName header.
 func Middleware(options Options) middleware.Middleware {
 	header := tenanttransport.HeaderOrDefault(options.HeaderName, tenanttransport.DefaultTenantHeader)
 	requireTenant := !options.AllowMissing
+	allowFromPrincipal := !options.DisablePrincipal
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var tenantID string
 			source := ""
 
-			if options.Extractor != nil {
-				if id, err := options.Extractor(r); err == nil && id != "" {
-					tenantID = id
-					source = "extractor"
+			if allowFromPrincipal {
+				if p := authn.PrincipalFromContext(r.Context()); p != nil && p.TenantID != "" {
+					tenantID = p.TenantID
+					source = "principal"
 				}
-			} else if headerValue := r.Header.Get(header); headerValue != "" {
-				tenantID = headerValue
-				source = "header"
+			}
+
+			if tenantID == "" {
+				if options.Extractor != nil {
+					if id, err := options.Extractor(r); err == nil && id != "" {
+						tenantID = id
+						source = "extractor"
+					}
+				} else if headerValue := r.Header.Get(header); headerValue != "" {
+					tenantID = headerValue
+					source = "header"
+				}
 			}
 
 			if tenantID == "" {

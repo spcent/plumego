@@ -35,7 +35,7 @@ func Configure(hooks Hooks) {
 		path = "/_debug/pubsub"
 	}
 
-	_ = hooks.RegisterRoute(http.MethodGet, path, contract.AdaptCtxHandler(func(ctx *contract.Ctx) {
+	_ = hooks.RegisterRoute(http.MethodGet, path, adaptCtx(func(ctx *contract.Ctx) {
 		if pub == nil {
 			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 				Status(http.StatusInternalServerError).
@@ -50,7 +50,7 @@ func Configure(hooks Hooks) {
 		type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
 
 		if ps, ok := pub.(snapshoter); ok {
-			_ = ctx.Response(http.StatusOK, ps.Snapshot(), nil)
+			_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, ps.Snapshot(), nil)
 			return
 		}
 

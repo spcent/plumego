@@ -18,7 +18,7 @@ type ReadinessResponse struct {
 
 // ReadinessHandler exposes the current readiness state as JSON.
 // It returns HTTP 200 when ready and 503 otherwise.
-func ReadinessHandler(manager health.HealthManager) http.Handler {
+func ReadinessHandler(manager Manager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return
@@ -36,7 +36,7 @@ func ReadinessHandler(manager health.HealthManager) http.Handler {
 
 // ReadinessHandlerWithManager checks component health and exposes the derived readiness state.
 // It returns HTTP 200 when ready and 503 otherwise.
-func ReadinessHandlerWithManager(manager health.HealthManager) http.Handler {
+func ReadinessHandlerWithManager(manager Manager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requireManager(manager, w, r) {
 			return

@@ -16,27 +16,27 @@ func TestAdvancedRouteMatching(t *testing.T) {
 	r := NewRouter()
 
 	// Register various route types
-	r.Get("/static/path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/static/path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("static"))
 	}))
 
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
 
-	r.Get("/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id/posts/:postId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		postId := Param(r, "postId")
 		w.Write([]byte(fmt.Sprintf("user-%s-post-%s", id, postId)))
 	}))
 
-	r.Get("/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/files/*filepath", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filepath := Param(r, "filepath")
 		w.Write([]byte("file-" + filepath))
 	}))
 
-	r.Post("/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodPost, "/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := Param(r, "path")
 		w.Write([]byte("any-" + path))
 	}))
@@ -72,58 +72,11 @@ func TestAdvancedRouteMatching(t *testing.T) {
 	}
 }
 
-// TestMiddlewareChain tests middleware application and ordering
-func TestMiddlewareChain(t *testing.T) {
-	r := NewRouter()
-
-	var order []string
-
-	// Global middleware
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "global-1")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "global-2")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	// Group middleware
-	api := r.Group("/api")
-	api.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "api")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	api.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-		w.Write([]byte("ok"))
-	}))
-
-	// Test API route
-	order = []string{}
-	req := httptest.NewRequest("GET", "/api/test", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	expected := []string{"global-1", "global-2", "api", "handler"}
-	if !slicesEqual(order, expected) {
-		t.Errorf("middleware order mismatch: expected %v, got %v", expected, order)
-	}
-}
-
 // TestContextPropagation tests that context is properly propagated
 func TestContextPropagation(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/test/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/test/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check params in context
 		params := contract.RequestContextFromContext(r.Context()).Params
 		if params["id"] != "123" {
@@ -157,7 +110,7 @@ func TestContextPropagation(t *testing.T) {
 // TestRouteConflict tests duplicate route detection
 func TestRouteConflict(t *testing.T) {
 	r := NewRouter()
-	r.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	mustAddRoute(r, http.MethodGet, "/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	// Should return error on duplicate
 	err := r.AddRoute("GET", "/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
@@ -173,17 +126,17 @@ func TestRouterGroupNesting(t *testing.T) {
 	v1 := r.Group("/api/v1")
 	v2 := r.Group("/api/v2")
 
-	v1.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(v1, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("v1-users"))
 	}))
 
-	v2.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(v2, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("v2-users"))
 	}))
 
 	// Nested group
 	v1Admin := v1.Group("/admin")
-	v1Admin.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(v1Admin, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("v1-admin-users"))
 	}))
 
@@ -238,7 +191,7 @@ func TestStaticFileSecurity(t *testing.T) {
 func TestConcurrentRequests(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/concurrent/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/concurrent/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte(id))
 	}))
@@ -274,10 +227,10 @@ func TestConcurrentRequests(t *testing.T) {
 func TestRouterPrint(t *testing.T) {
 	r := NewRouter()
 
-	r.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	r.Post("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	r.Any("/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	mustAddRoute(r, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	mustAddRoute(r, http.MethodPost, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	mustAddRoute(r, methodAny, "/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	var buf bytes.Buffer
 	r.Print(&buf)

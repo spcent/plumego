@@ -11,7 +11,7 @@ import (
 
 func TestMethodMismatchReturnsNotFound(t *testing.T) {
 	r := NewRouter()
-	r.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 
@@ -32,7 +32,7 @@ func TestMethodMismatchReturnsNotFound(t *testing.T) {
 
 func TestMethodNotAllowedWhenEnabled(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
-	r.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 
@@ -50,7 +50,7 @@ func TestMethodNotAllowedWhenEnabled(t *testing.T) {
 
 func TestMethodNotAllowedRoot(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
-	r.Get("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("root"))
 	}))
 
@@ -68,7 +68,7 @@ func TestMethodNotAllowedRoot(t *testing.T) {
 
 func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true), withCacheCapacity(10))
-	r.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 
@@ -97,9 +97,9 @@ func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
 
 func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
-	r.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
-	r.Post("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
-	r.Put("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
+	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
+	mustAddRoute(r, http.MethodPost, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
+	mustAddRoute(r, http.MethodPut, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 
 	req := httptest.NewRequest(http.MethodDelete, "/only", nil)
 	rec := httptest.NewRecorder()
@@ -115,10 +115,10 @@ func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
 
 func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
 	r := NewRouter()
-	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
 	}))
-	r.Any("/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, methodAny, "/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
 
@@ -136,7 +136,7 @@ func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
 
 func TestAnyFallbackWithCache(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
-	r.Any("/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, methodAny, "/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
 
@@ -164,7 +164,7 @@ func TestAnyFallbackWithCache(t *testing.T) {
 
 func TestTrailingSlashNormalization(t *testing.T) {
 	r := NewRouter()
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte(id))
 	}))
@@ -183,7 +183,7 @@ func TestTrailingSlashNormalization(t *testing.T) {
 
 func TestInternalDoubleSlashNotNormalized(t *testing.T) {
 	r := NewRouter()
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 
@@ -198,7 +198,7 @@ func TestInternalDoubleSlashNotNormalized(t *testing.T) {
 
 func TestWildcardParamCapturesRemainder(t *testing.T) {
 	r := NewRouter()
-	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := Param(r, "path")
 		w.Write([]byte(path))
 	}))
@@ -217,7 +217,7 @@ func TestWildcardParamCapturesRemainder(t *testing.T) {
 
 func TestEncodedSpaceParamIsDecoded(t *testing.T) {
 	r := NewRouter()
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte(id))
 	}))
@@ -236,7 +236,7 @@ func TestEncodedSpaceParamIsDecoded(t *testing.T) {
 
 func TestEncodedSlashDoesNotMatchSingleSegmentParam(t *testing.T) {
 	r := NewRouter()
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 
@@ -251,7 +251,7 @@ func TestEncodedSlashDoesNotMatchSingleSegmentParam(t *testing.T) {
 
 func TestEncodedSlashMatchesWildcardParam(t *testing.T) {
 	r := NewRouter()
-	r.Get("/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := Param(r, "path")
 		w.Write([]byte(path))
 	}))
@@ -270,7 +270,7 @@ func TestEncodedSlashMatchesWildcardParam(t *testing.T) {
 
 func TestDuplicateParamKeysLastWins(t *testing.T) {
 	r := NewRouter()
-	r.Get("/teams/:id/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/teams/:id/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte(id))
 	}))
@@ -290,7 +290,7 @@ func TestDuplicateParamKeysLastWins(t *testing.T) {
 func TestGroupParamKeysLastWins(t *testing.T) {
 	r := NewRouter()
 	group := r.Group("/orgs/:id")
-	group.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(group, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte(id))
 	}))
@@ -310,7 +310,7 @@ func TestGroupParamKeysLastWins(t *testing.T) {
 func TestGroupParamDoesNotMatchEncodedSlash(t *testing.T) {
 	r := NewRouter()
 	group := r.Group("/orgs/:id")
-	group.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(group, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -325,7 +325,7 @@ func TestGroupParamDoesNotMatchEncodedSlash(t *testing.T) {
 
 func TestCachedRouteDoesNotLeakParams(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte(id))
 	}))
@@ -351,132 +351,9 @@ func TestCachedRouteDoesNotLeakParams(t *testing.T) {
 	}
 }
 
-func TestMiddlewareShortCircuitStopsHandler(t *testing.T) {
-	r := NewRouter()
-
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Stop", "true")
-			w.WriteHeader(http.StatusUnauthorized)
-		})
-	})
-
-	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("handler should not be called")
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", rec.Code)
-	}
-	if rec.Header().Get("X-Stop") != "true" {
-		t.Fatalf("expected short-circuit header to be set")
-	}
-}
-
-func TestCachedMatchPreservesMiddlewareOrder(t *testing.T) {
-	r := NewRouter(withCacheCapacity(10))
-	var order []string
-
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "mw1")
-			next.ServeHTTP(w, r)
-		})
-	})
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "mw2")
-			next.ServeHTTP(w, r)
-		})
-	})
-	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-	rec := httptest.NewRecorder()
-	order = []string{}
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if !slicesEqual(order, []string{"mw1", "mw2", "handler"}) {
-		t.Fatalf("expected order [mw1 mw2 handler], got %v", order)
-	}
-
-	order = []string{}
-	rec = httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if !slicesEqual(order, []string{"mw1", "mw2", "handler"}) {
-		t.Fatalf("expected cached order [mw1 mw2 handler], got %v", order)
-	}
-}
-
-func TestCachedMatchPreservesNestedGroupOrder(t *testing.T) {
-	r := NewRouter(withCacheCapacity(10))
-	var order []string
-
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "global")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	api := r.Group("/api")
-	api.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "api")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	v1 := api.Group("/v1")
-	v1.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "v1")
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	v1.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/ping", nil)
-	rec := httptest.NewRecorder()
-	order = []string{}
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if !slicesEqual(order, []string{"global", "api", "v1", "handler"}) {
-		t.Fatalf("expected order [global api v1 handler], got %v", order)
-	}
-
-	order = []string{}
-	rec = httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if !slicesEqual(order, []string{"global", "api", "v1", "handler"}) {
-		t.Fatalf("expected cached order [global api v1 handler], got %v", order)
-	}
-}
-
 func TestRouteParamsOverrideExistingContext(t *testing.T) {
 	r := NewRouter()
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		rc := contract.RequestContextFromContext(r.Context())
 
@@ -505,7 +382,7 @@ func TestRouteParamsOverrideExistingContext(t *testing.T) {
 
 func TestRequestContextIncludesRoutePatternAndName(t *testing.T) {
 	r := NewRouter()
-	err := r.AddRouteWithOptions(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	err := r.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := contract.RequestContextFromContext(r.Context())
 		if rc.RoutePattern != "/users/:id" {
 			t.Fatalf("expected route pattern %q, got %q", "/users/:id", rc.RoutePattern)
@@ -528,36 +405,9 @@ func TestRequestContextIncludesRoutePatternAndName(t *testing.T) {
 	}
 }
 
-func TestRouteContextVisibleToOuterMiddleware(t *testing.T) {
-	r := NewRouter()
-	var gotPattern string
-
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			next.ServeHTTP(w, r)
-			gotPattern = contract.RequestContextFromContext(r.Context()).RoutePattern
-		})
-	})
-
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/users/123", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if gotPattern != "/users/:id" {
-		t.Fatalf("expected outer middleware to see route pattern %q, got %q", "/users/:id", gotPattern)
-	}
-}
-
 func TestCachedRouteNormalizesTrailingSlash(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -580,58 +430,12 @@ func TestCachedRouteNormalizesTrailingSlash(t *testing.T) {
 	}
 }
 
-func TestCachedRouteInvalidatesOnMiddlewareChange(t *testing.T) {
-	r := NewRouter(withCacheCapacity(10))
-	var order []string
-
-	mw1 := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "mw1")
-			next.ServeHTTP(w, r)
-		})
-	}
-	mw2 := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			order = append(order, "mw2")
-			next.ServeHTTP(w, r)
-		})
-	}
-
-	r.Use(mw1)
-	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		order = append(order, "handler")
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-	rec := httptest.NewRecorder()
-	order = []string{}
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if !slicesEqual(order, []string{"mw1", "handler"}) {
-		t.Fatalf("expected order [mw1 handler], got %v", order)
-	}
-
-	r.Use(mw2)
-	order = []string{}
-	rec = httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if !slicesEqual(order, []string{"mw1", "mw2", "handler"}) {
-		t.Fatalf("expected order [mw1 mw2 handler], got %v", order)
-	}
-}
-
 func TestCachedRouteSeparatesByHostAndMethod(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
-	r.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	r.Post("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodPost, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

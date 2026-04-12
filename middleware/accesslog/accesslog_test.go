@@ -121,11 +121,11 @@ func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context
 	return ctx, t.span
 }
 
-func TestLoggingAddsStructuredFields(t *testing.T) {
+func TestMiddlewareAddsStructuredFields(t *testing.T) {
 	logger := newStubLogger()
 	tracer := &stubTracer{}
 
-	mw := Logging(logger, nil, tracer)
+	mw := Middleware(logger, nil, tracer)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if contract.RequestIDFromContext(r.Context()) == "" {
 			t.Fatalf("request id should be present in context")
@@ -135,7 +135,7 @@ func TestLoggingAddsStructuredFields(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/structured", nil)
-	req.Header.Set("X-Request-ID", "trace-123")
+	req.Header.Set(contract.RequestIDHeader, "trace-123")
 	rc := contract.RequestContext{RoutePattern: "/structured/:id", RouteName: "structured"}
 	req = req.WithContext(contract.WithRequestContext(req.Context(), rc))
 	rec := httptest.NewRecorder()
@@ -153,13 +153,13 @@ func TestLoggingAddsStructuredFields(t *testing.T) {
 	}
 }
 
-func TestLoggingUsesUpdatedContextForTracer(t *testing.T) {
+func TestMiddlewareUsesUpdatedContextForTracer(t *testing.T) {
 	logger := newStubLogger()
 	tracer := &stubTracer{}
-	mw := Logging(logger, nil, tracer)
+	mw := Middleware(logger, nil, tracer)
 
 	req := httptest.NewRequest(http.MethodGet, "/context", nil)
-	req.Header.Set("X-Request-ID", "ctx-trace")
+	req.Header.Set(contract.RequestIDHeader, "ctx-trace")
 	rec := httptest.NewRecorder()
 	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("context")) })).ServeHTTP(rec, req)
 
@@ -171,7 +171,7 @@ func TestLoggingUsesUpdatedContextForTracer(t *testing.T) {
 func TestMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
 	logger := newStubLogger()
 	tracer := &spanContextTracer{}
-	handler := Middleware(logger)(mwtracing.Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := Middleware(logger, nil, nil)(mwtracing.Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})))
 
@@ -193,7 +193,7 @@ func TestMiddlewareRejectsNilLogger(t *testing.T) {
 			t.Fatal("expected panic when logger is nil")
 		}
 	}()
-	_ = Middleware(nil)
+	_ = Middleware(nil, nil, nil)
 }
 
 type hijackWriter struct {
@@ -214,9 +214,9 @@ func (w *hijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, errors.New("hijack")
 }
 
-func TestLoggingPreservesHijacker(t *testing.T) {
+func TestMiddlewarePreservesHijacker(t *testing.T) {
 	logger := newStubLogger()
-	mw := Logging(logger, nil, nil)
+	mw := Middleware(logger, nil, nil)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hj, ok := w.(http.Hijacker)
 		if !ok {

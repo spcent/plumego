@@ -1,0 +1,12 @@
+name: http-endpoint-bugfix
+scope: defect repair in HTTP handlers, route wiring, or transport contracts
+steps:
+  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, docs/CANONICAL_STYLE_GUIDE.md, and the owning module manifest.
+  - Localize whether the defect belongs to route wiring, handler transport logic, contract helpers, or the owning extension family.
+  - Fix the root cause while preserving the canonical handler shape and explicit route registration style.
+  - Keep JSON decode, request input reads, and error writing on canonical transport paths.
+  - Add or update focused regression tests for success, invalid input, and error-path behavior.
+  - Run target module tests and wider gates when the transport contract or route behavior changed.
+stop_conditions:
+  - Do not hide dependencies in request context or middleware.
+  - Do not invent one-off response envelopes, handler signatures, or route-registration idioms.

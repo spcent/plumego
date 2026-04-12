@@ -12,6 +12,7 @@ responsibilities:
   - Ops route registration
   - Queue and receipt admin hooks
   - Explicit auth-gated diagnostics
+  - Health HTTP manager orchestration through x/ops/healthhttp
 
 non_goals:
   - Core bootstrap ownership

@@ -11,8 +11,21 @@ type MultiCollector struct {
 }
 
 // NewMultiCollector creates a new multi-collector that forwards to all provided collectors.
-func NewMultiCollector(collectors ...AggregateCollector) *MultiCollector {
-	return &MultiCollector{collectors: collectors}
+// It returns nil if no non-nil collectors are provided.
+func NewMultiCollector(collectors ...AggregateCollector) AggregateCollector {
+	filtered := make([]AggregateCollector, 0, len(collectors))
+	for _, collector := range collectors {
+		if collector != nil {
+			filtered = append(filtered, collector)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	if len(filtered) == 1 {
+		return filtered[0]
+	}
+	return &MultiCollector{collectors: filtered}
 }
 
 // Record forwards the record to all collectors.
@@ -29,49 +42,14 @@ func (m *MultiCollector) ObserveHTTP(ctx context.Context, method, path string, s
 	}
 }
 
-// ObservePubSub forwards the PubSub observation to all collectors.
-func (m *MultiCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	for _, c := range m.collectors {
-		c.ObservePubSub(ctx, operation, topic, duration, err)
-	}
-}
-
-// ObserveMQ forwards the MQ observation to all collectors.
-func (m *MultiCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	for _, c := range m.collectors {
-		c.ObserveMQ(ctx, operation, topic, duration, err, panicked)
-	}
-}
-
-// ObserveKV forwards the KV observation to all collectors.
-func (m *MultiCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	for _, c := range m.collectors {
-		c.ObserveKV(ctx, operation, key, duration, err, hit)
-	}
-}
-
-// ObserveIPC forwards the IPC observation to all collectors.
-func (m *MultiCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	for _, c := range m.collectors {
-		c.ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
-	}
-}
-
-// ObserveDB forwards the database observation to all collectors.
-func (m *MultiCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	for _, c := range m.collectors {
-		c.ObserveDB(ctx, operation, driver, query, rows, duration, err)
-	}
-}
-
 // GetStats returns combined statistics from all collectors.
 func (m *MultiCollector) GetStats() CollectorStats {
 	if len(m.collectors) == 0 {
-		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+		return CollectorStats{NameBreakdown: make(map[string]int64)}
 	}
 
 	combined := CollectorStats{
-		TypeBreakdown: make(map[MetricType]int64),
+		NameBreakdown: make(map[string]int64),
 	}
 
 	for _, c := range m.collectors {
@@ -80,8 +58,8 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		combined.ErrorRecords += stats.ErrorRecords
 		combined.ActiveSeries += stats.ActiveSeries
 
-		for k, v := range stats.TypeBreakdown {
-			combined.TypeBreakdown[k] += v
+		for k, v := range stats.NameBreakdown {
+			combined.NameBreakdown[k] += v
 		}
 
 		if combined.StartTime.IsZero() || (!stats.StartTime.IsZero() && stats.StartTime.Before(combined.StartTime)) {
@@ -89,8 +67,8 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		}
 	}
 
-	if combined.ActiveSeries == 0 && len(combined.TypeBreakdown) > 0 {
-		combined.ActiveSeries = len(combined.TypeBreakdown)
+	if combined.ActiveSeries == 0 && len(combined.NameBreakdown) > 0 {
+		combined.ActiveSeries = len(combined.NameBreakdown)
 	}
 
 	return combined

@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
@@ -66,7 +65,9 @@ type Metrics struct {
 }
 
 // MetricsObserver can be plugged into the broker to observe activity.
-type MetricsObserver = metrics.MQObserver
+type MetricsObserver interface {
+	ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool)
+}
 
 // PanicHandler is invoked when a broker operation panics.
 type PanicHandler func(ctx context.Context, op Operation, recovered any)

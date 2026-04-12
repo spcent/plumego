@@ -13,6 +13,7 @@ import (
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/security/authn"
 )
 
 const DefaultBasePath = "/ops"
@@ -127,7 +128,7 @@ type QuotaUsage struct {
 func New(opts Options) *Handler {
 	logger := opts.Logger
 	if logger == nil {
-		logger = log.NewNoOpLogger()
+		logger = log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	}
 	return &Handler{
 		cfg:    opts,
@@ -135,25 +136,38 @@ func New(opts Options) *Handler {
 	}
 }
 
-func (c *Handler) RegisterRoutes(r *router.Router) {
+func (c *Handler) RegisterRoutes(r *router.Router) error {
 	if !c.cfg.Enabled {
-		return
+		return nil
 	}
 
+	var regErr error
 	c.routesOnce.Do(func() {
 		base := normalizeBasePath(c.cfg.BasePath)
 		group := r.Group(base)
-		for _, mw := range c.authMiddlewares() {
-			group.Use(mw)
+		register := func(method, path string, handler http.Handler) {
+			if regErr != nil {
+				return
+			}
+			regErr = group.AddRoute(method, path, c.withAuth(handler))
 		}
 
-		group.Get("", contract.AdaptCtxHandler(c.handleSummary))
-		group.Get("/queue", contract.AdaptCtxHandler(c.handleQueueStats))
-		group.Post("/queue/replay", contract.AdaptCtxHandler(c.handleQueueReplay))
-		group.Get("/receipts", contract.AdaptCtxHandler(c.handleReceiptLookup))
-		group.Get("/channels", contract.AdaptCtxHandler(c.handleChannelHealth))
-		group.Get("/tenants/quota", contract.AdaptCtxHandler(c.handleTenantQuota))
+		register(http.MethodGet, "", adaptCtx(c.handleSummary))
+		register(http.MethodGet, "/queue", adaptCtx(c.handleQueueStats))
+		register(http.MethodPost, "/queue/replay", adaptCtx(c.handleQueueReplay))
+		register(http.MethodGet, "/receipts", adaptCtx(c.handleReceiptLookup))
+		register(http.MethodGet, "/channels", adaptCtx(c.handleChannelHealth))
+		register(http.MethodGet, "/tenants/quota", adaptCtx(c.handleTenantQuota))
 	})
+	return regErr
+}
+
+func (c *Handler) withAuth(handler http.Handler) http.Handler {
+	middlewares := c.authMiddlewares()
+	if len(middlewares) == 0 {
+		return handler
+	}
+	return middleware.NewChain(middlewares...).Build(handler)
 }
 
 func (c *Handler) handleSummary(ctx *contract.Ctx) {
@@ -176,7 +190,7 @@ func (c *Handler) handleSummary(ctx *contract.Ctx) {
 		},
 	}
 
-	_ = ctx.Response(http.StatusOK, data, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, data, nil)
 }
 
 func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
@@ -189,7 +203,7 @@ func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 		return
 	}
 
-	queue := strings.TrimSpace(ctx.Query.Get("queue"))
+	queue := strings.TrimSpace(ctx.R.URL.Query().Get("queue"))
 	var stats []QueueStats
 
 	if queue == "" {
@@ -228,7 +242,7 @@ func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 		stats = []QueueStats{snapshot}
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"queues": stats,
 	}, nil)
 }
@@ -259,7 +273,7 @@ func (c *Handler) handleQueueReplay(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"replay": result,
 	}, nil)
 }
@@ -274,7 +288,7 @@ func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 		return
 	}
 
-	messageID := strings.TrimSpace(ctx.Query.Get("message_id"))
+	messageID := strings.TrimSpace(ctx.R.URL.Query().Get("message_id"))
 	if messageID == "" {
 		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
@@ -294,7 +308,7 @@ func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"receipt": receipt,
 	}, nil)
 }
@@ -309,7 +323,7 @@ func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 		return
 	}
 
-	provider := strings.TrimSpace(ctx.Query.Get("provider"))
+	provider := strings.TrimSpace(ctx.R.URL.Query().Get("provider"))
 	var channels []ChannelHealth
 
 	if provider == "" {
@@ -348,7 +362,7 @@ func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 		channels = []ChannelHealth{status}
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"channels": channels,
 	}, nil)
 }
@@ -363,7 +377,7 @@ func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 		return
 	}
 
-	tenantID := strings.TrimSpace(ctx.Query.Get("tenant_id"))
+	tenantID := strings.TrimSpace(ctx.R.URL.Query().Get("tenant_id"))
 	if tenantID == "" {
 		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
@@ -383,7 +397,7 @@ func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"quota": snapshot,
 	}, nil)
 }
@@ -400,7 +414,7 @@ func (c *Handler) authMiddlewares() []middleware.Middleware {
 		token = strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
 	}
 	if token != "" {
-		middlewares = append(middlewares, auth.SimpleAuth(token))
+		middlewares = append(middlewares, auth.Authenticate(authn.StaticToken(token)))
 	}
 
 	if !c.cfg.Auth.AllowInsecure && len(middlewares) == 0 {
@@ -455,6 +469,14 @@ func writeNotImplemented(ctx *contract.Ctx, code, message string) {
 		Message(message).
 		Category(contract.CategoryServer).
 		Build())
+}
+
+func adaptCtx(handler func(*contract.Ctx)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := contract.RequestContextFromContext(r.Context())
+		ctx := contract.NewCtx(w, r, rc.Params)
+		handler(ctx)
+	})
 }
 
 func denyAllMiddleware() middleware.Middleware {

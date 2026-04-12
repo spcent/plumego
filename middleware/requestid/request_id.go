@@ -3,7 +3,6 @@ package requestid
 import (
 	"net/http"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 )
 
@@ -30,7 +29,7 @@ func WithRequestHeader(enabled bool) Option {
 
 func Middleware(opts ...Option) middleware.Middleware {
 	cfg := config{
-		generate:         contract.NewRequestID,
+		generate:         NewRequestID,
 		includeInRequest: true,
 	}
 	for _, opt := range opts {
@@ -41,13 +40,12 @@ func Middleware(opts ...Option) middleware.Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			observePolicy := contract.NewObservabilityPolicy()
-			id := observePolicy.RequestIDFromRequest(r)
+			id := RequestIDFromRequest(r)
 			if id == "" {
 				id = cfg.generate()
 			}
 
-			r = observePolicy.AttachRequestID(w, r, id, cfg.includeInRequest)
+			r = AttachRequestID(w, r, id, cfg.includeInRequest)
 			next.ServeHTTP(w, r)
 		})
 	}

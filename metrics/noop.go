@@ -48,31 +48,6 @@ func (n *NoopCollector) ObserveHTTP(ctx context.Context, method, path string, st
 	// No-op
 }
 
-// ObservePubSub does nothing and returns immediately.
-func (n *NoopCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	// No-op
-}
-
-// ObserveMQ does nothing and returns immediately.
-func (n *NoopCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	// No-op
-}
-
-// ObserveKV does nothing and returns immediately.
-func (n *NoopCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	// No-op
-}
-
-// ObserveIPC does nothing and returns immediately.
-func (n *NoopCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	// No-op
-}
-
-// ObserveDB does nothing and returns immediately.
-func (n *NoopCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	// No-op
-}
-
 // GetStats returns an empty statistics structure.
 //
 // Example:
@@ -88,7 +63,7 @@ func (n *NoopCollector) GetStats() CollectorStats {
 		ErrorRecords:  0,
 		ActiveSeries:  0,
 		StartTime:     time.Time{},
-		TypeBreakdown: make(map[MetricType]int64),
+		NameBreakdown: make(map[string]int64),
 	}
 }
 

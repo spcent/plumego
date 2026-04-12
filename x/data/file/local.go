@@ -2,6 +2,8 @@ package file
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -10,9 +12,6 @@ import (
 	"time"
 
 	storefile "github.com/spcent/plumego/store/file"
-
-	"crypto/sha256"
-	"encoding/hex"
 )
 
 // LocalStorage implements Storage using the local filesystem.
@@ -21,7 +20,7 @@ type LocalStorage struct {
 	basePath  string
 	baseURL   string
 	metadata  MetadataManager
-	imageProc storefile.ImageProcessor
+	imageProc *imageProcessor
 }
 
 // NewLocalStorage creates a new local filesystem storage.
@@ -38,17 +37,17 @@ func NewLocalStorage(basePath, baseURL string, metadata MetadataManager) (*Local
 		basePath:  basePath,
 		baseURL:   baseURL,
 		metadata:  metadata,
-		imageProc: storefile.NewImageProcessor(),
+		imageProc: newImageProcessor(),
 	}, nil
 }
 
 // Put uploads a file to local storage under the tenant's directory tree.
 func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) {
-	fileID := storefile.GenerateID()
+	fileID := generateID()
 
 	ext := filepath.Ext(opts.FileName)
 	if ext == "" && opts.ContentType != "" {
-		ext = storefile.MimeToExt(opts.ContentType)
+		ext = mimeToExt(opts.ContentType)
 	}
 
 	// Path: {tenantID}/{YYYY}/{MM}/{DD}/{id}{ext}
@@ -145,7 +144,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 // Get retrieves a file from local storage.
 func (s *LocalStorage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
-	if !storefile.IsPathSafe(path) {
+	if !isPathSafe(path) {
 		return nil, &storefile.Error{Op: "Get", Path: path, Err: storefile.ErrInvalidPath}
 	}
 
@@ -164,7 +163,7 @@ func (s *LocalStorage) Get(ctx context.Context, path string) (io.ReadCloser, err
 
 // Delete removes a file from local storage.
 func (s *LocalStorage) Delete(ctx context.Context, path string) error {
-	if !storefile.IsPathSafe(path) {
+	if !isPathSafe(path) {
 		return &storefile.Error{Op: "Delete", Path: path, Err: storefile.ErrInvalidPath}
 	}
 
@@ -182,7 +181,7 @@ func (s *LocalStorage) Delete(ctx context.Context, path string) error {
 
 // Exists checks if a file exists in local storage.
 func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
-	if !storefile.IsPathSafe(path) {
+	if !isPathSafe(path) {
 		return false, storefile.ErrInvalidPath
 	}
 
@@ -198,7 +197,7 @@ func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
 
 // Stat returns file information from local storage.
 func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileStat, error) {
-	if !storefile.IsPathSafe(path) {
+	if !isPathSafe(path) {
 		return nil, storefile.ErrInvalidPath
 	}
 
@@ -220,7 +219,7 @@ func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileSt
 
 // List returns files in local storage matching the prefix.
 func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
-	if !storefile.IsPathSafe(prefix) {
+	if !isPathSafe(prefix) {
 		return nil, storefile.ErrInvalidPath
 	}
 
@@ -262,7 +261,7 @@ func (s *LocalStorage) GetURL(ctx context.Context, path string, expiry time.Dura
 
 // Copy copies a file within local storage.
 func (s *LocalStorage) Copy(ctx context.Context, srcPath, dstPath string) error {
-	if !storefile.IsPathSafe(srcPath) || !storefile.IsPathSafe(dstPath) {
+	if !isPathSafe(srcPath) || !isPathSafe(dstPath) {
 		return storefile.ErrInvalidPath
 	}
 

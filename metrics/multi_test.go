@@ -22,13 +22,16 @@ func (s *stubAggregateCollector) GetStats() CollectorStats {
 	if s.onGetStats != nil {
 		return s.onGetStats()
 	}
-	return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+	return CollectorStats{NameBreakdown: make(map[string]int64)}
 }
 
 func TestMultiCollector(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	ctx := context.Background()
 
@@ -36,14 +39,11 @@ func TestMultiCollector(t *testing.T) {
 	multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
 
 	// Verify both collectors received the metric
-	records1 := collector1.GetRecords()
-	records2 := collector2.GetRecords()
-
-	if len(records1) != 1 {
-		t.Fatalf("expected 1 record in collector1, got %d", len(records1))
+	if collector1.GetStats().TotalRecords != 1 {
+		t.Fatalf("expected 1 record in collector1 stats, got %d", collector1.GetStats().TotalRecords)
 	}
-	if len(records2) != 1 {
-		t.Fatalf("expected 1 record in collector2, got %d", len(records2))
+	if collector2.GetStats().TotalRecords != 1 {
+		t.Fatalf("expected 1 record in collector2 stats, got %d", collector2.GetStats().TotalRecords)
 	}
 }
 
@@ -51,26 +51,22 @@ func TestMultiCollectorAllMethods(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	ctx := context.Background()
 
-	// Test all observation methods
+	// Test both stable observation paths
 	multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
-	multi.ObservePubSub(ctx, "publish", "topic", 10*time.Millisecond, nil)
-	multi.ObserveMQ(ctx, "subscribe", "queue", 5*time.Millisecond, nil, false)
-	multi.ObserveKV(ctx, "get", "key", 2*time.Millisecond, nil, true)
-	multi.ObserveIPC(ctx, "read", "/socket", "unix", 256, 1*time.Millisecond, nil)
+	multi.Record(ctx, MetricRecord{Name: "owner_metric", Value: 1})
 
-	// Each collector should have received all metrics
-	// Note: KV operations record twice (operation + hit/miss)
-	records1 := collector1.GetRecords()
-	records2 := collector2.GetRecords()
-
-	if len(records1) < 5 {
-		t.Fatalf("expected at least 5 records in collector1, got %d", len(records1))
+	// Each collector should have received both metrics
+	if collector1.GetStats().TotalRecords != 2 {
+		t.Fatalf("expected 2 records in collector1 stats, got %d", collector1.GetStats().TotalRecords)
 	}
-	if len(records2) < 5 {
-		t.Fatalf("expected at least 5 records in collector2, got %d", len(records2))
+	if collector2.GetStats().TotalRecords != 2 {
+		t.Fatalf("expected 2 records in collector2 stats, got %d", collector2.GetStats().TotalRecords)
 	}
 }
 
@@ -78,6 +74,9 @@ func TestMultiCollectorGetStats(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	ctx := context.Background()
 
@@ -95,13 +94,11 @@ func TestMultiCollectorGetStats(t *testing.T) {
 }
 
 func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
-	customOwnerType := MetricType("owner_metric")
-
 	collector1 := newStubAggregateCollector(func() CollectorStats {
 		return CollectorStats{
 			TotalRecords:  10,
 			ErrorRecords:  1,
-			TypeBreakdown: map[MetricType]int64{MetricHTTPRequest: 10},
+			NameBreakdown: map[string]int64{MetricHTTPRequest: 10},
 			StartTime:     time.Unix(100, 0),
 		}
 	})
@@ -110,12 +107,15 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 		return CollectorStats{
 			TotalRecords:  5,
 			ErrorRecords:  2,
-			TypeBreakdown: map[MetricType]int64{MetricHTTPRequest: 3, customOwnerType: 2},
+			NameBreakdown: map[string]int64{MetricHTTPRequest: 3, "owner_metric": 2},
 			StartTime:     time.Unix(200, 0),
 		}
 	})
 
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	stats := multi.GetStats()
 
@@ -127,12 +127,12 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 	if stats.ErrorRecords != 3 {
 		t.Fatalf("expected ErrorRecords 3, got %d", stats.ErrorRecords)
 	}
-	// TypeBreakdown should be merged
-	if stats.TypeBreakdown[MetricHTTPRequest] != 13 {
-		t.Fatalf("expected MetricHTTPRequest 13, got %d", stats.TypeBreakdown[MetricHTTPRequest])
+	// NameBreakdown should be merged
+	if stats.NameBreakdown[MetricHTTPRequest] != 13 {
+		t.Fatalf("expected MetricHTTPRequest 13, got %d", stats.NameBreakdown[MetricHTTPRequest])
 	}
-	if stats.TypeBreakdown[customOwnerType] != 2 {
-		t.Fatalf("expected custom owner metric 2, got %d", stats.TypeBreakdown[customOwnerType])
+	if stats.NameBreakdown["owner_metric"] != 2 {
+		t.Fatalf("expected custom owner metric 2, got %d", stats.NameBreakdown["owner_metric"])
 	}
 	// StartTime should be the earliest
 	if !stats.StartTime.Equal(time.Unix(100, 0)) {
@@ -146,14 +146,17 @@ func TestMultiCollectorGetStatsCallsEachCollectorOnce(t *testing.T) {
 
 	collectorA := newStubAggregateCollector(func() CollectorStats {
 		callsA++
-		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+		return CollectorStats{NameBreakdown: make(map[string]int64)}
 	})
 	collectorB := newStubAggregateCollector(func() CollectorStats {
 		callsB++
-		return CollectorStats{TypeBreakdown: make(map[MetricType]int64)}
+		return CollectorStats{NameBreakdown: make(map[string]int64)}
 	})
 
 	multi := NewMultiCollector(collectorA, collectorB)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	_ = multi.GetStats()
 
@@ -169,6 +172,9 @@ func TestMultiCollectorClear(t *testing.T) {
 	collector1 := NewBaseMetricsCollector()
 	collector2 := NewBaseMetricsCollector()
 	multi := NewMultiCollector(collector1, collector2)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
 
 	ctx := context.Background()
 
@@ -179,25 +185,18 @@ func TestMultiCollectorClear(t *testing.T) {
 	multi.Clear()
 
 	// Verify both collectors are cleared
-	records1 := collector1.GetRecords()
-	records2 := collector2.GetRecords()
-
-	if len(records1) != 0 {
-		t.Fatalf("expected 0 records in collector1 after clear, got %d", len(records1))
+	if collector1.GetStats().TotalRecords != 0 {
+		t.Fatalf("expected 0 records in collector1 after clear, got %d", collector1.GetStats().TotalRecords)
 	}
-	if len(records2) != 0 {
-		t.Fatalf("expected 0 records in collector2 after clear, got %d", len(records2))
+	if collector2.GetStats().TotalRecords != 0 {
+		t.Fatalf("expected 0 records in collector2 after clear, got %d", collector2.GetStats().TotalRecords)
 	}
 }
 
 func TestMultiCollectorEmpty(t *testing.T) {
 	multi := NewMultiCollector()
-
-	stats := multi.GetStats()
-
-	// Empty multi collector should return zero stats
-	if stats.TotalRecords != 0 {
-		t.Fatalf("expected 0 total records, got %d", stats.TotalRecords)
+	if multi != nil {
+		t.Fatalf("expected nil multi collector for empty input")
 	}
 }
 

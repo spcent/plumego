@@ -8,17 +8,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
-	"github.com/spcent/plumego/middleware/limits"
+	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/security/authn"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
 func TestMiddlewareErrorConformance(t *testing.T) {
-	recoveryLogger := log.NewNoOpLogger()
+	recoveryLogger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	tests := []struct {
 		name         string
 		expectedCode string
@@ -27,16 +29,16 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 	}{
 		{
 			name:         "auth unauthenticated",
-			expectedCode: middleware.CodeAuthUnauthenticated,
-			handler: auth.SimpleAuth("secret")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			expectedCode: contract.CodeUnauthorized,
+			handler: auth.Authenticate(authn.StaticToken("secret"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
 			name:         "body too large",
-			expectedCode: middleware.CodeRequestBodyTooLarge,
-			handler: limits.BodyLimit(4, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			expectedCode: contract.CodeRequestBodyTooLarge,
+			handler: bodylimit.BodyLimit(4, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = io.ReadAll(r.Body)
 			})),
 			request: httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolarge")),
@@ -51,7 +53,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		},
 		{
 			name:         "abuse guard rate limited",
-			expectedCode: middleware.CodeRateLimited,
+			expectedCode: contract.CodeRateLimited,
 			handler: ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{Rate: 1, Capacity: 1, KeyFunc: func(*http.Request) string { return "k" }})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
@@ -59,7 +61,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		},
 		{
 			name:         "recovery internal",
-			expectedCode: middleware.CodeInternalError,
+			expectedCode: contract.CodeInternalError,
 			handler: recovery.Recovery(recoveryLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("boom")
 			})),
@@ -115,35 +117,25 @@ func assertCanonicalEnvelope(t *testing.T, rec *httptest.ResponseRecorder, expec
 
 func TestMiddlewareCodeRegistryStability(t *testing.T) {
 	expected := map[string]string{
-		"auth":            middleware.CodeAuthUnauthenticated,
-		"rate":            middleware.CodeRateLimited,
 		"tenant_required": middleware.CodeTenantRequired,
 		"tenant_invalid":  middleware.CodeTenantInvalidID,
 		"tenant_policy":   middleware.CodeTenantPolicyDenied,
 		"tenant_quota":    middleware.CodeTenantQuotaExceeded,
 		"tenant_rate":     middleware.CodeTenantRateLimited,
-		"body_too_large":  middleware.CodeRequestBodyTooLarge,
 		"server_busy":     middleware.CodeServerBusy,
 		"queue_timeout":   middleware.CodeServerQueueTimeout,
-		"request_timeout": middleware.CodeRequestTimeout,
 		"upstream_failed": middleware.CodeUpstreamFailed,
-		"internal":        middleware.CodeInternalError,
 	}
 
 	// Keep this test explicit; values are part of wire-level contract.
-	if expected["auth"] != "auth_unauthenticated" ||
-		expected["rate"] != "rate_limited" ||
-		expected["tenant_required"] != "tenant_required" ||
+	if expected["tenant_required"] != "tenant_required" ||
 		expected["tenant_invalid"] != "tenant_invalid_id" ||
 		expected["tenant_policy"] != "tenant_policy_denied" ||
 		expected["tenant_quota"] != "tenant_quota_exceeded" ||
 		expected["tenant_rate"] != "tenant_rate_limited" ||
-		expected["body_too_large"] != "request_body_too_large" ||
 		expected["server_busy"] != "server_busy" ||
 		expected["queue_timeout"] != "server_queue_timeout" ||
-		expected["request_timeout"] != "request_timeout" ||
-		expected["upstream_failed"] != "upstream_failed" ||
-		expected["internal"] != "internal_error" {
+		expected["upstream_failed"] != "upstream_failed" {
 		t.Fatalf("middleware error code registry changed: %#v", expected)
 	}
 

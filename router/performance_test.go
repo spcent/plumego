@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/spcent/plumego/internal/validator"
 )
 
 // BenchmarkRouterComparison compares performance between old and new router implementations
@@ -173,59 +171,18 @@ func BenchmarkCachePerformance(b *testing.B) {
 	}
 }
 
-// BenchmarkParameterValidation tests parameter validation overhead
-func BenchmarkParameterValidation(b *testing.B) {
-	r := NewRouter()
-
-	// Add route with validation
-	validation := NewRouteValidation().
-		AddParam("id", validator.RouteParamPositiveInt).
-		AddParam("email", validator.RouteParamUUID)
-
-	r.AddValidation("GET", "/users/:id", validation)
-
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	// Test requests
-	tests := []struct {
-		name string
-		path string
-	}{
-		{"Valid", "/users/123"},
-		{"Invalid", "/users/abc"},
-	}
-
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				req := httptest.NewRequest("GET", tt.path, nil)
-				w := httptest.NewRecorder()
-				r.ServeHTTP(w, req)
-			}
-		})
-	}
-}
-
 // TestOptimizedRouterFeatures validates all optimization features work together
 func TestOptimizedRouterFeatures(t *testing.T) {
 	// Create router with all features
 	r := newRouterWithMatchCapacity(50)
 
-	// Add validation
-	validation := NewRouteValidation().
-		AddParam("id", validator.RouteParamPositiveInt)
-	r.AddValidation("GET", "/users/:id", validation)
-
 	// Register routes
-	r.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte("user-" + id))
 	}))
 
-	r.Get("/posts/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/posts/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		w.Write([]byte("post-" + id))
 	}))
@@ -242,16 +199,7 @@ func TestOptimizedRouterFeatures(t *testing.T) {
 		t.Errorf("Expected 'user-123', got '%s'", body)
 	}
 
-	// Test 2: Invalid parameter (should fail validation)
-	req = httptest.NewRequest("GET", "/users/abc", nil)
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("Expected status 400 for invalid param, got %d. Body: %s", w.Code, w.Body.String())
-	}
-
-	// Test 3: Cache hit on second request
+	// Test 2: Cache hit on second request
 	req = httptest.NewRequest("GET", "/posts/456", nil)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -342,50 +290,5 @@ func TestCacheEviction(t *testing.T) {
 	// key2 should be evicted
 	if _, found := cache.Get("key2"); found {
 		t.Error("key2 should have been evicted")
-	}
-}
-
-// TestValidationRules validates parameter validation
-func TestValidationRules(t *testing.T) {
-	emailValidator := validator.RouteParamMustRegex(`^[^@]+@[^@]+\.[^@]+$`)
-	validation := NewRouteValidation().
-		AddParam("id", validator.RouteParamPositiveInt).
-		AddParam("email", emailValidator).
-		AddParam("name", validator.RouteParamNewLength(1, 50))
-
-	tests := []struct {
-		name    string
-		params  map[string]string
-		wantErr bool
-	}{
-		{
-			name:    "Valid all",
-			params:  map[string]string{"id": "123", "email": "test@example.com", "name": "John"},
-			wantErr: false,
-		},
-		{
-			name:    "Invalid id",
-			params:  map[string]string{"id": "abc", "email": "test@example.com"},
-			wantErr: true,
-		},
-		{
-			name:    "Invalid email",
-			params:  map[string]string{"id": "123", "email": "invalid-email"},
-			wantErr: true,
-		},
-		{
-			name:    "Name too long",
-			params:  map[string]string{"id": "123", "name": string(make([]byte, 51))},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validation.Validate(tt.params)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
 	}
 }

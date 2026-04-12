@@ -19,7 +19,7 @@ func TestGzip_SmallResponse(t *testing.T) {
 		w.Write([]byte("Hello World"))
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -62,7 +62,7 @@ func TestGzip_LargeResponse(t *testing.T) {
 		w.Write([]byte(largeData))
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -86,7 +86,7 @@ func TestGzip_SkipWebSocket(t *testing.T) {
 		w.Write([]byte("upgrade"))
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -117,7 +117,7 @@ func TestGzip_SkipSSE(t *testing.T) {
 		w.Write([]byte("data: hello\n\n"))
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -159,7 +159,7 @@ func TestGzip_SkipBinaryContent(t *testing.T) {
 				w.Write(tc.data)
 			}
 
-			wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+			wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set("Accept-Encoding", "gzip")
@@ -187,7 +187,7 @@ func TestGzip_SkipAlreadyCompressed(t *testing.T) {
 		w.Write([]byte("already compressed"))
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -216,7 +216,7 @@ func TestGzip_SkipNoAcceptEncoding(t *testing.T) {
 		w.Write([]byte("Hello World"))
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// No Accept-Encoding header
@@ -245,7 +245,7 @@ func TestGzip_SkipErrorResponses(t *testing.T) {
 		w.Write([]byte("Error"))
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -275,7 +275,7 @@ func TestGzip_CustomMaxBuffer(t *testing.T) {
 	}
 
 	cfg := GzipConfig{MaxBufferBytes: 5} // Only compress if <= 5 bytes
-	wrapped := middleware.Apply(http.HandlerFunc(handler), GzipWithConfig(cfg))
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(cfg))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -305,7 +305,7 @@ func TestGzip_VaryHeader(t *testing.T) {
 		w.Write([]byte("Hello World"))
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -324,7 +324,7 @@ func TestGzip_EmptyResponse(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}
 
-	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip())
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -350,7 +350,7 @@ func TestGzip_ChunkedWrite(t *testing.T) {
 
 	// Use a custom config with a small max buffer to trigger chunked writing
 	cfg := GzipConfig{MaxBufferBytes: 1 << 20} // 1MB max buffer
-	wrapped := middleware.Apply(http.HandlerFunc(handler), GzipWithConfig(cfg))
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(cfg))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -389,7 +389,7 @@ func TestGzip_ErrorHandling(t *testing.T) {
 
 	// Use a custom config with a small max buffer
 	cfg := GzipConfig{MaxBufferBytes: 1 << 20} // 1MB max buffer
-	wrapped := middleware.Apply(http.HandlerFunc(handler), GzipWithConfig(cfg))
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(cfg))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")

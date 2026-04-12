@@ -73,7 +73,7 @@ type Config struct {
 	// Metrics for observability; nil disables metrics.
 	// It records queue-level metrics and messaging-specific metric records.
 	Metrics interface {
-		metrics.MQObserver
+		mq.MetricsObserver
 		metrics.Recorder
 	}
 

@@ -3,6 +3,7 @@ package devserver
 import (
 	"bufio"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,7 +61,7 @@ func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
 		payload.Updated = modTime.Format(time.RFC3339)
 	}
 
-	_ = ctx.Response(200, payload, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, payload, nil)
 }
 
 func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
@@ -112,7 +113,7 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 		response["restarted"] = true
 	}
 
-	_ = ctx.Response(200, response, nil)
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, response, nil)
 }
 
 func (d *Dashboard) resolveConfigEditPath() (string, string, error) {

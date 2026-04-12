@@ -1,6 +1,7 @@
 # Card C-XXXX
 
 Milestone:
+Recipe: specs/change-recipes/<recipe>.yaml
 Priority:
 State: active
 Primary Module:

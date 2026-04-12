@@ -4,9 +4,18 @@ layer: stable
 status: ga
 owner: persistence
 risk: medium
-summary: Stable storage primitives and base abstractions. Topology-heavy cache implementations have been migrated to x/cache.
+summary: Stable storage primitives and base abstractions. Topology-heavy cache, durable KV-engine, and durable idempotency providers live in x/*.
 
 strict_boundary: persistence_primitives
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/store/README.md
 
 responsibilities:
   - DB helpers
@@ -19,9 +28,10 @@ non_goals:
   - Tenant-aware adapters
   - Business repositories
   - AI-specific caches
-  - DB analytics, slow-query reporting, and HTTP transport behavior
-  - Read-write splitting, sharding topology defaults, and ranked-data cache behavior
-  - Business-level idempotency semantics (domain-specific dedup rules belong in the application or x/* layer)
+  - DB analytics, DB instrumentation wrappers, pool-stat polling, slow-query reporting, timeout policy, and DB health or retry-policy helpers
+  - File backend/provider configuration, signed URLs, metadata-manager ownership, and image-processing pipelines
+  - Read-write splitting, sharding topology defaults, durable KV-engine tuning, ranked-data cache behavior, and cache metrics or introspection ownership
+  - Durable idempotency providers, SQL schema policy, and business-level idempotency semantics
 
 public_entrypoints:
   - db
@@ -55,14 +65,20 @@ change_risks:
   - concurrent access regression
   - isolation regression
 
+stop_conditions:
+  - The change introduces tenant-aware adapters, HTTP policy, or business repositories into stable store
+  - The change requires store to import x/* or absorb data-topology, provider-export, or observability ownership that belongs elsewhere
+  - The change adds retry, health-reporting, analytics, or signed-URL policy as stable store defaults
+  - The change turns store into a feature-specific persistence catalog instead of transport-agnostic primitives
+
 review_checklist:
-  - Keep store APIs transport-agnostic
-  - No tenant-specific logic in stable store
-  - Keep topology-heavy data features, DB analytics, and slow-query inspection out of the stable layer
-  - Keep HTTP response caching and request-derived cache keys out of stable store/cache
+  - Keep store APIs transport-agnostic and free of tenant-specific logic
+  - Keep topology-heavy data features, DB analytics, slow-query inspection, DB instrumentation wrappers, and pool-stat polling out of the stable layer
+  - Keep HTTP response caching, request-derived cache keys, cache metrics or introspection ownership, file backend config, signed URLs, metadata-manager ownership, and thumbnail/image-processing ownership out of stable store roots
+  - Keep WAL, snapshots, serializer selection, compression, shard tuning, SQL/KV idempotency providers, and table policy out of stable store roots
   - Prefer stdlib-compatible abstractions
 
 agent_hints:
-  - Move tenant-aware adapters to x/tenant/store; move DB analytics and slow-query helpers to x/observability/dbinsights
-  - For distributed or provider-specific cache needs use x/cache; for HTTP response caching use x/gateway/cache
-  - For ranked-data cache behavior use x/cache/leaderboard; do not add topology-heavy or business-level idempotency logic here
+  - Move tenant-aware adapters to x/tenant/store and move DB analytics, slow-query helpers, and DB health/reporting to the owning observability extensions
+  - For distributed, provider-specific, or metrics/export-oriented cache behavior use x/cache; for HTTP response caching use x/gateway/cache
+  - Route durable topology and provider behavior to x/data/* and keep stable store focused on base storage contracts and helpers

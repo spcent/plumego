@@ -8,8 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/spcent/plumego/metrics"
 )
 
 type TaskHandler func(ctx context.Context, task Task) error
@@ -23,7 +21,7 @@ type WorkerConfig struct {
 	RetryPolicy         RetryPolicy
 	LeaseExtendInterval time.Duration
 	ShutdownTimeout     time.Duration
-	MetricsObserver     metrics.MQObserver
+	MetricsObserver     MetricsObserver
 	Deduper             TaskDeduper
 	DedupeKeyFunc       func(Task) string
 	DedupeTTL           time.Duration

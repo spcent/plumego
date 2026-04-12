@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/x/mq"
 )
 
 type messagingMetrics interface {
-	metrics.MQObserver
+	mq.MetricsObserver
 	metrics.Recorder
 }
 
@@ -33,7 +34,6 @@ func (m *metricsWrapper) ObserveSend(ctx context.Context, channel Channel, provi
 	}
 	m.collector.ObserveMQ(ctx, "messaging_send", string(channel), duration, err, false)
 	m.collector.Record(ctx, metrics.MetricRecord{
-		Type:      "messaging_send",
 		Name:      "messaging.send." + string(channel),
 		Value:     duration.Seconds(),
 		Labels:    metrics.MetricLabels{"channel": string(channel), "provider": provider},
@@ -57,7 +57,6 @@ func (m *metricsWrapper) ObserveValidation(ctx context.Context, channel Channel)
 		return
 	}
 	m.collector.Record(ctx, metrics.MetricRecord{
-		Type:      "messaging_validation_error",
 		Name:      "messaging.validation." + string(channel),
 		Value:     1,
 		Labels:    metrics.MetricLabels{"channel": string(channel)},

@@ -70,13 +70,12 @@ func TraceContextFromContext(ctx context.Context) *TraceContext {
 // WithSpanIDString stores the given span ID string in the context.
 // If a TraceContext already exists, only its SpanID field is updated so that
 // trace and baggage information are preserved.
-// The id is validated via ParseSpanID; if invalid, WarnFunc is called and
-// the raw string is stored unchanged so callers are not silently misled.
+// Invalid values are ignored so the transport carrier never stores malformed
+// span ids.
 func WithSpanIDString(ctx context.Context, id string) context.Context {
 	parsed, err := ParseSpanID(id)
 	if err != nil {
-		WarnFunc("WithSpanIDString: " + err.Error() + " (storing raw value: " + id + ")")
-		parsed = SpanID(id)
+		return ctx
 	}
 	if existing := TraceContextFromContext(ctx); existing != nil {
 		updated := *existing

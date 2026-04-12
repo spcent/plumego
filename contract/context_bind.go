@@ -77,7 +77,10 @@ func decodeJSONBody(data []byte, dst any, disallowUnknown bool) error {
 // Fields without a "query" tag are skipped. A tag value of "-" also skips the field.
 // Validation is an explicit second step via ValidateStruct.
 func (c *Ctx) BindQuery(dst any) error {
-	return bindQuery(c.Query, dst)
+	if c == nil || c.R == nil {
+		return ErrContextNil
+	}
+	return bindQuery(c.R.URL.Query(), dst)
 }
 
 // bindQuery maps URL query values to struct fields using the "query" struct tag.
@@ -188,8 +191,8 @@ func (c *Ctx) bodyBytes() ([]byte, error) {
 	c.bodyReadOnce.Do(func() {
 		reader := io.Reader(c.R.Body)
 		maxBodySize := int64(0)
-		if c.Config != nil && c.Config.MaxBodySize > 0 {
-			maxBodySize = c.Config.MaxBodySize
+		if c.config != nil && c.config.MaxBodySize > 0 {
+			maxBodySize = c.config.MaxBodySize
 			if c.W != nil {
 				reader = http.MaxBytesReader(c.W, c.R.Body, maxBodySize)
 			} else {
@@ -211,8 +214,7 @@ func (c *Ctx) bodyBytes() ([]byte, error) {
 			c.body = nil
 			return
 		}
-		c.bodySize.Store(int64(len(c.body)))
-		if c.Config == nil || c.Config.EnableBodyCache {
+		if c.config == nil || c.config.EnableBodyCache {
 			c.R.Body = io.NopCloser(bytes.NewBuffer(c.body))
 		}
 	})

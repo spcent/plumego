@@ -2,30 +2,6 @@ package health
 
 import "testing"
 
-func TestBuildInfoAndReadiness(t *testing.T) {
-	mgr, err := NewHealthManager(HealthCheckConfig{})
-	if err != nil {
-		t.Fatalf("failed to create manager: %v", err)
-	}
-
-	// Initial state: not ready
-	status := mgr.Readiness()
-	if status.Ready {
-		t.Fatalf("expected initial not-ready status, got ready")
-	}
-
-	mgr.MarkReady()
-	if ready := mgr.Readiness(); !ready.Ready || ready.Reason != "" {
-		t.Fatalf("expected ready without reason, got %+v", ready)
-	}
-
-	mgr.MarkNotReady("maintenance")
-	notReady := mgr.Readiness()
-	if notReady.Ready || notReady.Reason != "maintenance" {
-		t.Fatalf("unexpected readiness after MarkNotReady: %+v", notReady)
-	}
-}
-
 func TestHealthStatusStates(t *testing.T) {
 	status := HealthStatus{Status: StatusHealthy}
 

@@ -10,13 +10,15 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/internal/httpx"
 	"github.com/spcent/plumego/internal/jsonx"
 	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
 type routeRegistrar interface {
-	AddRoute(method, path string, handler http.Handler) error
+	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
 type Inbound struct {
@@ -29,7 +31,7 @@ type Inbound struct {
 
 func NewInbound(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *Inbound {
 	if logger == nil {
-		logger = log.NewNoOpLogger()
+		logger = log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	}
 	pub := cfg.Pub
 	if pub == nil {
@@ -50,7 +52,7 @@ func (c *Inbound) RegisterRoutes(r routeRegistrar) error {
 		if gitHubPath == "" {
 			gitHubPath = "/webhooks/github"
 		}
-		regErr = r.AddRoute(http.MethodPost, gitHubPath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }))
+		regErr = r.AddRoute(http.MethodPost, gitHubPath, adaptCtx(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }))
 		if regErr != nil {
 			return
 		}
@@ -59,7 +61,7 @@ func (c *Inbound) RegisterRoutes(r routeRegistrar) error {
 		if stripePath == "" {
 			stripePath = "/webhooks/stripe"
 		}
-		regErr = r.AddRoute(http.MethodPost, stripePath, contract.AdaptCtxHandler(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
+		regErr = r.AddRoute(http.MethodPost, stripePath, adaptCtx(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
 	})
 
 	return regErr
@@ -107,7 +109,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if delivery != "unknown" && d.SeenBefore("github:"+delivery) {
-		_ = ctx.Response(http.StatusOK, map[string]any{
+		_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 			"ok":          true,
 			"provider":    "github",
 			"event_type":  event,
@@ -134,7 +136,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 			"request_id":  ctx.RequestID(),
 			"delivery_id": delivery,
 			"event_type":  event,
-			"client_ip":   ctx.ClientIP,
+			"client_ip":   httpx.ClientIP(ctx.R),
 		},
 	}
 
@@ -144,7 +146,7 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"ok":          true,
 		"provider":    "github",
 		"topic":       topic,
@@ -191,7 +193,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 
 	d := c.ensureWebhookInDeduper()
 	if evtID != "unknown" && d.SeenBefore("stripe:"+evtID) {
-		_ = ctx.Response(http.StatusOK, map[string]any{
+		_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 			"ok":         true,
 			"provider":   "stripe",
 			"event_type": evtType,
@@ -218,7 +220,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 			"request_id":  ctx.RequestID(),
 			"delivery_id": evtID,
 			"event_type":  evtType,
-			"client_ip":   ctx.ClientIP,
+			"client_ip":   httpx.ClientIP(ctx.R),
 		},
 	}
 
@@ -228,7 +230,7 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = ctx.Response(http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
 		"ok":         true,
 		"provider":   "stripe",
 		"topic":      topic,

@@ -2,6 +2,8 @@
 
 The `frontend` package provides static file serving for built frontend applications (React, Vue, Next.js, Vite, etc.) with advanced features for production deployments.
 
+For simple stable file mounts without frontend asset policy, use `router.Static` or `router.StaticFS`. Keep cache headers, SPA fallback, pre-compressed assets, custom headers, custom error pages, and MIME overrides in this package.
+
 ## Features
 
 - ✅ **Dual Source Support**: Serve from disk directories or embedded filesystems

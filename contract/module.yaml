@@ -8,25 +8,38 @@ summary: Request and response contracts, error model, and context helpers.
 
 strict_boundary: transport_contracts
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - contract/errors.go
+  - contract/response.go
+  - contract/context_core.go
+
 responsibilities:
   - Structured error model
   - Response helpers
   - Request context helpers
-  - Trace and request metadata helpers
+  - Trace and request metadata carriers
 
 non_goals:
   - Route matching
   - App bootstrap
-  - Persistence logic
-  - Multipart upload convenience helpers
-  - Protocol gateway families
-  - Business rules
-  - Session or token issuance
+  - Persistence logic and multipart upload convenience helpers
+  - Protocol gateway families and business rules
+  - Session or token issuance and auth identity primitives
+  - Middleware observability policy, field redaction, request-id generation policy, or repo-wide error utility helpers
+  - Framework-style request bags, abort state, or request-local service-locator helpers
 
 public_entrypoints:
   - WriteError
   - WriteResponse
-  - Ctx
+  - WriteJSON
+  - WithRequestContext
+  - RequestContextFromContext
 
 allowed_imports:
   - stdlib
@@ -52,13 +65,20 @@ change_risks:
   - response write regression
   - request context regression
 
+stop_conditions:
+  - The change introduces protocol gateways, session lifecycle management, or tracing infrastructure into contract
+  - The change requires contract to learn app bootstrap, route matching, persistence, or feature policy details
+  - The change adds mutable request bags, abort state, or service-locator behavior to request context helpers
+  - The change creates new per-feature response envelopes or ad hoc error constructor families
+
 review_checklist:
   - Keep one error write path
   - Keep transport helpers explicit
   - Keep protocol-specific wiring out of contract
   - Avoid leaking internals in responses
+  - Do not turn request context helpers into a mutable request bag or runtime state container
 
 agent_hints:
-  - Prefer stdlib-shaped helpers
-  - Do not introduce app wiring here
-  - Do not add business-specific response wrappers or protocol gateway families here
+  - Prefer stdlib-shaped helpers and keep response writing on the canonical WriteError and WriteResponse paths
+  - Do not introduce app wiring, persistence shortcuts, or feature-specific protocol helpers here
+  - Keep request context helpers limited to transport metadata and explicit accessor pairs

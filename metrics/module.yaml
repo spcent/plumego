@@ -8,6 +8,15 @@ summary: Metrics interfaces and base collectors.
 
 strict_boundary: metrics_contracts
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/metrics/README.md
+
 responsibilities:
   - Metrics collector interfaces
   - Base collectors
@@ -16,15 +25,16 @@ responsibilities:
 non_goals:
   - App bootstrap
   - Feature-specific dashboards
-  - Repo-wide feature metric type catalogs
+  - Repo-wide feature metric type catalogs or parallel identity fields
   - Transport policy
-  - Rolling-window aggregation helpers
+  - Rolling-window aggregation and record-buffer helpers
   - Repo-wide metrics test utilities
   - Export pipeline wiring and adapters (belong in x/observability)
 
 public_entrypoints:
   - AggregateCollector
   - Recorder
+  - HTTPObserver
   - BaseMetricsCollector
   - NoopCollector
   - MultiCollector
@@ -52,11 +62,20 @@ change_risks:
   - collector compatibility regression
   - metrics event regression
 
+stop_conditions:
+  - The change introduces app bootstrap, export-pipeline wiring, or feature-specific dashboards into metrics
+  - The change requires metrics to import x/* or absorb rolling-window aggregation, tracing, or transport-specific policy ownership
+  - The change adds feature taxonomies, record-buffer retention policy, or devtools helpers to stable collectors
+  - The change turns metrics into a capability pack instead of small stable contracts and collectors
+
 review_checklist:
   - Keep contracts small
-  - Avoid feature taxonomy coupling
+  - Avoid feature taxonomy coupling and parallel identity fields
+  - Keep feature-owned observer interfaces out of the stable layer
+  - Keep non-HTTP feature helper methods out of stable collectors
+  - Keep record-buffer inspection and retention policy out of stable collectors
 
 agent_hints:
-  - Observability capability packs and transport-specific logic belong outside the stable layer
-  - Use x/observability for Prometheus, tracing, rolling-window aggregation, and metrics test helpers
-  - Use x/devtools for dev-only collectors and x/messaging for messaging-specific reporters/exporters
+  - Observability capability packs and transport-specific policy belong outside the stable layer
+  - Use x/observability for Prometheus, tracing, rolling-window aggregation, record-buffer collectors, metrics test helpers, and non-HTTP feature record builders
+  - Use x/devtools for dev-only collectors and the owning feature extensions for domain-specific reporters or exporters

@@ -4,30 +4,18 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/spcent/plumego/contract"
 )
 
 // Group creates a new router group with the given prefix.
-// Groups allow sharing a common path prefix and middleware across multiple routes.
-// Child groups inherit the parent's prefix and can add their own middleware.
+// Groups allow sharing a common path prefix across multiple routes.
 func (r *Router) Group(prefix string) *Router {
 	fullPrefix := normalizeGroupPrefix(r.prefix, prefix)
 
 	return &Router{
-		prefix:            fullPrefix,
-		parent:            r,
-		middlewareManager: newMiddlewareManager(),
-		state:             r.state,
+		prefix: fullPrefix,
+		parent: r,
+		state:  r.state,
 	}
-}
-
-// GroupFunc creates a new route group with the given prefix and invokes
-// the callback function with the group router.
-func (r *Router) GroupFunc(prefix string, fn func(*Router)) *Router {
-	g := r.Group(prefix)
-	fn(g)
-	return g
 }
 
 func normalizeGroupPrefix(parent, child string) string {
@@ -44,44 +32,16 @@ func normalizeGroupPrefix(parent, child string) string {
 	return combined
 }
 
-// mustAddRoute calls AddRoute and panics on error.
-// Used by the canonical Get/Post/... convenience methods where errors are
-// programming mistakes (duplicate route, frozen router) that should fail fast.
-func (r *Router) mustAddRoute(method, path string, handler http.Handler) {
-	if err := r.AddRoute(method, path, handler); err != nil {
-		panic(fmt.Sprintf("router: %v", err))
-	}
-}
-
-// mustAddNamedRoute calls AddRouteWithName and panics on error.
-// Used by the named convenience methods where registration failures are
-// programming errors (duplicate route, frozen router) and should fail fast.
-func (r *Router) mustAddNamedRoute(method, path, name string, handler http.Handler) {
-	if err := r.AddRouteWithName(method, path, name, handler); err != nil {
-		panic(fmt.Sprintf("router: %v", err))
-	}
-}
-
-// AddRoute adds a route to the router with the given method, path, and handler.
-// Returns an error for programming mistakes such as duplicate routes or
-// registering routes after Freeze(). Use the method shortcuts (Get, Post, …)
-// for typical route registration; AddRoute is useful when the method string
-// is determined at runtime or when callers need to inspect the error themselves.
-func (r *Router) AddRoute(method, path string, handler http.Handler) error {
+// AddRoute adds a route to the router with the given method, path, handler, and
+// optional route metadata.
+func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...RouteOption) error {
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 
 	if r.state.frozen {
-		return contract.WrapError(
-			fmt.Errorf("router is frozen, cannot add route after freeze"),
-			"add_route",
-			"router",
-			map[string]any{
-				"method": method,
-				"path":   path,
-			},
-		)
+		return fmt.Errorf("router add_route %s %s: %w", method, path, fmt.Errorf("router is frozen, cannot add route after freeze"))
 	}
+	meta := routeMetaFromOptions(opts...)
 
 	fullPath := r.fullPath(path)
 	if fullPath == "" {
@@ -95,19 +55,11 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 	current := r.state.trees[method]
 	if fullPath == "/" {
 		if current.handler != nil {
-			return contract.WrapError(
-				fmt.Errorf("duplicate route registration: %s /", method),
-				"add_route",
-				"router",
-				map[string]any{
-					"method": method,
-					"path":   fullPath,
-				},
-			)
+			return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("duplicate route registration: %s /", method))
 		}
 		current.handler = handler
 		current.fullPath = fullPath
-		current.validation = r.validationFor(method, fullPath)
+		r.storeRouteMetaLocked(method, fullPath, meta)
 		r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})
 		return nil
 	}
@@ -123,15 +75,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 				if child.paramName == "" {
 					child.paramName = seg.paramName
 				} else if child.paramName != seg.paramName {
-					return contract.WrapError(
-						fmt.Errorf("route conflict: parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName),
-						"add_route",
-						"router",
-						map[string]any{
-							"method": method,
-							"path":   fullPath,
-						},
-					)
+					return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("route conflict: parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName))
 				}
 				current = child
 				continue
@@ -150,15 +94,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 				if child.paramName == "" {
 					child.paramName = seg.paramName
 				} else if child.paramName != seg.paramName {
-					return contract.WrapError(
-						fmt.Errorf("route conflict: wildcard parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName),
-						"add_route",
-						"router",
-						map[string]any{
-							"method": method,
-							"path":   fullPath,
-						},
-					)
+					return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("route conflict: wildcard parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName))
 				}
 				current = child
 				continue
@@ -180,53 +116,28 @@ func (r *Router) AddRoute(method, path string, handler http.Handler) error {
 	}
 
 	if current.handler != nil {
-		return contract.WrapError(
-			fmt.Errorf("duplicate route registration: %s %s", method, fullPath),
-			"add_route",
-			"router",
-			map[string]any{
-				"method": method,
-				"path":   fullPath,
-			},
-		)
+		return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("duplicate route registration: %s %s", method, fullPath))
 	}
 	current.handler = handler
 	current.paramKeys = paramKeys
 	current.fullPath = fullPath
-	current.middlewares = r.routeMiddlewares()
-	current.validation = r.validationFor(method, fullPath)
+	r.storeRouteMetaLocked(method, fullPath, meta)
 
 	r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})
 	return nil
 }
 
-// AddRouteWithName adds a route and records a name for reverse URL generation.
-func (r *Router) AddRouteWithName(method, path, name string, handler http.Handler) error {
-	if err := r.AddRoute(method, path, handler); err != nil {
-		return err
-	}
-	if name != "" {
-		r.SetRouteMeta(method, path, RouteMeta{Name: name})
-	}
-	return nil
-}
-
-// AddRouteWithOptions adds a route and attaches metadata options.
-func (r *Router) AddRouteWithOptions(method, path string, handler http.Handler, opts ...RouteOption) error {
-	if err := r.AddRoute(method, path, handler); err != nil {
-		return err
-	}
-	if len(opts) == 0 {
-		return nil
-	}
+func routeMetaFromOptions(opts ...RouteOption) RouteMeta {
 	meta := RouteMeta{}
+	if len(opts) == 0 {
+		return meta
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&meta)
 		}
 	}
-	r.SetRouteMeta(method, path, meta)
-	return nil
+	return meta
 }
 
 // compilePathSegments parses a URL path into route segments.

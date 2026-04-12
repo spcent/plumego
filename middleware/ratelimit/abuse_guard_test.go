@@ -51,7 +51,7 @@ func TestAbuseGuardBlocks(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	if got := resp.Header.Get("X-RateLimit-Remaining"); got != "0" {
+	if got := resp.Header.Get(headerRateLimitRemaining); got != "0" {
 		t.Fatalf("expected remaining 0, got %q", got)
 	}
 
@@ -61,7 +61,7 @@ func TestAbuseGuardBlocks(t *testing.T) {
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", resp.StatusCode)
 	}
-	if got := resp.Header.Get("Retry-After"); got == "" {
+	if got := resp.Header.Get(headerRetryAfter); got == "" {
 		t.Fatalf("expected Retry-After header")
 	}
 }
@@ -128,7 +128,7 @@ func TestAbuseGuardHeaderToggle(t *testing.T) {
 	rec := httptest.NewRecorder()
 	wrapped.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("X-RateLimit-Limit"); got != "" {
+	if got := rec.Header().Get(headerRateLimitLimit); got != "" {
 		t.Fatalf("expected rate limit headers to be omitted, got %q", got)
 	}
 }
@@ -139,14 +139,14 @@ func TestClientIP(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
-	req.Header.Set("X-Forwarded-For", " 1.1.1.1 , 2.2.2.2 ")
+	req.Header.Set(internaltransport.HeaderForwardedFor, " 1.1.1.1 , 2.2.2.2 ")
 	req.RemoteAddr = "9.9.9.9:1234"
 	if got := internaltransport.ClientIP(req); got != "1.1.1.1" {
 		t.Fatalf("expected X-Forwarded-For to win, got %q", got)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "http://example.com", nil)
-	req.Header.Set("X-Real-IP", " 3.3.3.3 ")
+	req.Header.Set(internaltransport.HeaderRealIP, " 3.3.3.3 ")
 	req.RemoteAddr = "9.9.9.9:1234"
 	if got := internaltransport.ClientIP(req); got != "3.3.3.3" {
 		t.Fatalf("expected X-Real-IP to win, got %q", got)

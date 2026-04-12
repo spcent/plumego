@@ -112,7 +112,7 @@ func TestWithSpanIDStringPreservesExistingTraceContext(t *testing.T) {
 		TraceID: "trace-abc",
 		Baggage: map[string]string{"user.id": "123"},
 	})
-	updated := WithSpanIDString(base, "span-new")
+	updated := WithSpanIDString(base, "1234567890abcdef")
 	tc := TraceContextFromContext(updated)
 	if tc == nil {
 		t.Fatal("expected TraceContext to be set")
@@ -120,8 +120,28 @@ func TestWithSpanIDStringPreservesExistingTraceContext(t *testing.T) {
 	if string(tc.TraceID) != "trace-abc" {
 		t.Fatalf("expected TraceID %q, got %q", "trace-abc", tc.TraceID)
 	}
-	if string(tc.SpanID) != "span-new" {
-		t.Fatalf("expected SpanID %q, got %q", "span-new", tc.SpanID)
+	if string(tc.SpanID) != "1234567890abcdef" {
+		t.Fatalf("expected SpanID %q, got %q", "1234567890abcdef", tc.SpanID)
+	}
+	if tc.Baggage["user.id"] != "123" {
+		t.Fatalf("expected baggage to be preserved, got %#v", tc.Baggage)
+	}
+}
+
+func TestWithSpanIDStringIgnoresInvalidSpanID(t *testing.T) {
+	base := WithTraceContext(t.Context(), TraceContext{
+		TraceID: "trace-abc",
+		SpanID:  "1111111111111111",
+		Baggage: map[string]string{"user.id": "123"},
+	})
+
+	updated := WithSpanIDString(base, "span-new")
+	tc := TraceContextFromContext(updated)
+	if tc == nil {
+		t.Fatal("expected TraceContext to be set")
+	}
+	if string(tc.SpanID) != "1111111111111111" {
+		t.Fatalf("expected invalid span id to be ignored, got %q", tc.SpanID)
 	}
 	if tc.Baggage["user.id"] != "123" {
 		t.Fatalf("expected baggage to be preserved, got %#v", tc.Baggage)

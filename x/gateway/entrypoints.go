@@ -7,6 +7,8 @@ import (
 	"github.com/spcent/plumego/x/gateway/protocol"
 )
 
+const methodAny = "ANY"
+
 // GatewayConfig is the canonical app-facing proxy configuration type.
 type GatewayConfig = Config
 
@@ -65,16 +67,18 @@ func NewGatewayProtocolRegistry() *GatewayProtocolRegistry {
 }
 
 // RegisterRoute binds a gateway handler to a path using explicit ANY semantics.
-func RegisterRoute(r *router.Router, path string, handler http.Handler) {
+func RegisterRoute(r *router.Router, path string, handler http.Handler) error {
 	if r == nil || handler == nil || path == "" {
-		return
+		return nil
 	}
-	r.Any(path, handler)
+	return r.AddRoute(methodAny, path, handler)
 }
 
 // RegisterProxy constructs a gateway proxy and binds it to a path.
-func RegisterProxy(r *router.Router, path string, cfg GatewayConfig) *GatewayProxy {
+func RegisterProxy(r *router.Router, path string, cfg GatewayConfig) (*GatewayProxy, error) {
 	proxy := NewGateway(cfg)
-	RegisterRoute(r, path, proxy)
-	return proxy
+	if err := RegisterRoute(r, path, proxy); err != nil {
+		return nil, err
+	}
+	return proxy, nil
 }

@@ -14,7 +14,7 @@ other modules can depend on safely.
 
 - changing collector contracts
 - adding base collectors or aggregate collector composition
-- wiring stable instrumentation against `Recorder` or the focused observer interfaces
+- wiring stable instrumentation against `Recorder` or `HTTPObserver`
 
 ## Do not use this module for
 
@@ -37,8 +37,13 @@ other modules can depend on safely.
 - keep collector APIs small
 - keep base collectors generic and transport-agnostic
 - keep only aggregate collector composition in stable `metrics`
-- keep the shared stable metric type surface to HTTP; use owner-defined types or `Name` + `Labels` for feature metrics
+- keep fan-out helpers nil-safe (filter nil inputs and return nil when no collectors/observers are provided)
+- keep `AggregateCollector` limited to `Record`, shared `ObserveHTTP`, stats, and reset semantics
+- keep metric identity canonical as `MetricRecord.Name`; use `Labels` for dimensions instead of parallel type catalogs
+- keep feature-specific observer interfaces in their owning package; only the shared HTTP observer stays in stable `metrics`
+- keep non-HTTP feature helper record builders in owning extensions or `x/observability` helper packages
 - keep Prometheus and tracing adapters in `x/observability`
+- keep record-buffer inspection and retention tuning in `x/observability/recordbuffer`
 - keep rolling-window aggregation in `x/observability/windowmetrics`
 - keep metrics test helpers in `x/observability/testmetrics`
 - keep dev-only collectors in `x/devtools`

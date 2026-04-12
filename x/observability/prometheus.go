@@ -63,7 +63,7 @@ func (p *PrometheusCollector) Handler() http.Handler {
 }
 
 func (p *PrometheusCollector) Record(ctx context.Context, record metrics.MetricRecord) {
-	if record.Type == metrics.MetricHTTPRequest {
+	if record.Name == metrics.MetricHTTPRequest {
 		method, _ := record.Labels["method"]
 		path, _ := record.Labels["path"]
 		statusStr, _ := record.Labels["status"]
@@ -78,26 +78,6 @@ func (p *PrometheusCollector) Record(ctx context.Context, record metrics.MetricR
 
 func (p *PrometheusCollector) ObserveHTTP(_ context.Context, method, path string, status, _ int, duration time.Duration) {
 	p.recordHTTP(method, path, status, duration)
-}
-
-func (p *PrometheusCollector) ObservePubSub(ctx context.Context, operation, topic string, duration time.Duration, err error) {
-	p.base.ObservePubSub(ctx, operation, topic, duration, err)
-}
-
-func (p *PrometheusCollector) ObserveMQ(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) {
-	p.base.ObserveMQ(ctx, operation, topic, duration, err, panicked)
-}
-
-func (p *PrometheusCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
-	p.base.ObserveKV(ctx, operation, key, duration, err, hit)
-}
-
-func (p *PrometheusCollector) ObserveIPC(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) {
-	p.base.ObserveIPC(ctx, operation, addr, transport, bytes, duration, err)
-}
-
-func (p *PrometheusCollector) ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) {
-	p.base.ObserveDB(ctx, operation, driver, query, rows, duration, err)
 }
 
 func (p *PrometheusCollector) GetStats() metrics.CollectorStats {
@@ -120,10 +100,10 @@ func (p *PrometheusCollector) GetStats() metrics.CollectorStats {
 		ErrorRecords:  errorRecords,
 		ActiveSeries:  activeSeries,
 		StartTime:     startTime,
-		TypeBreakdown: make(map[metrics.MetricType]int64),
+		NameBreakdown: make(map[string]int64),
 	}
 	if totalRequests > 0 {
-		stats.TypeBreakdown[metrics.MetricHTTPRequest] = int64(totalRequests)
+		stats.NameBreakdown[metrics.MetricHTTPRequest] = int64(totalRequests)
 	}
 
 	baseStats := p.base.GetStats()
@@ -133,8 +113,8 @@ func (p *PrometheusCollector) GetStats() metrics.CollectorStats {
 	if stats.StartTime.IsZero() || (!baseStats.StartTime.IsZero() && baseStats.StartTime.Before(stats.StartTime)) {
 		stats.StartTime = baseStats.StartTime
 	}
-	for key, value := range baseStats.TypeBreakdown {
-		stats.TypeBreakdown[key] += value
+	for key, value := range baseStats.NameBreakdown {
+		stats.NameBreakdown[key] += value
 	}
 
 	return stats
@@ -237,4 +217,7 @@ func escapeLabelValue(value string) string {
 	return value
 }
 
-var _ metrics.AggregateCollector = (*PrometheusCollector)(nil)
+var _ metrics.Recorder = (*PrometheusCollector)(nil)
+var _ metrics.HTTPObserver = (*PrometheusCollector)(nil)
+var _ metrics.StatsReader = (*PrometheusCollector)(nil)
+var _ metrics.Resetter = (*PrometheusCollector)(nil)

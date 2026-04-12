@@ -11,19 +11,19 @@ func createTestRouter() *Router {
 	r := NewRouter()
 
 	// Static routes
-	r.AddRoute(GET, "/about", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/about", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("about"))
 	}))
-	r.AddRoute(GET, "/contact", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/contact", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("contact"))
 	}))
 
 	// Parameterized routes
-	r.AddRoute(GET, "/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/hello/:name", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name := Param(r, "name")
 		w.Write([]byte("Hello " + name))
 	}))
-	r.AddRoute(GET, "/users/:id/books/:bookId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, http.MethodGet, "/users/:id/books/:bookId", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := Param(r, "id")
 		bookID := Param(r, "bookId")
 		w.Write([]byte("User " + id + " Book " + bookID))

@@ -163,10 +163,10 @@ new-verify: ## Scaffold a milestone verify report: make new-verify M=active/M-00
 	echo "Next: fill the verify report, then:"; \
 	echo "  make check-verify M=$(M)"
 
-new-card: ## Scaffold a task card: make new-card ID=001 SLUG=slice-router-work M=M-001
+new-card: ## Scaffold a task card: make new-card ID=001 SLUG=slice-router-work M=M-001 R=fix-bug
 	@if [ -z "$(ID)" ] || [ -z "$(SLUG)" ] || [ -z "$(M)" ]; then \
 	  echo "Error: ID, SLUG, and M are required."; \
-	  echo "  Example: make new-card ID=001 SLUG=slice-router-work M=M-001"; \
+	  echo "  Example: make new-card ID=001 SLUG=slice-router-work M=M-001 R=fix-bug"; \
 	  exit 1; \
 	fi
 	@DEST=tasks/cards/active/C-$(ID)-$(SLUG).md; \
@@ -176,11 +176,25 @@ new-card: ## Scaffold a task card: make new-card ID=001 SLUG=slice-router-work M
 	fi; \
 	rewrite() { expr="$$1"; file="$$2"; tmp=$$(mktemp); sed "$$expr" "$$file" > "$$tmp" && mv "$$tmp" "$$file"; }; \
 	cp tasks/cards/TEMPLATE.md "$$DEST"; \
-	rewrite "s/^# Card C-XXX/# Card C-$(ID)/" "$$DEST"; \
+	rewrite "s/^# Card C-XXXX/# Card C-$(ID)/" "$$DEST"; \
 	rewrite "s/^Milestone:/Milestone: $(M)/" "$$DEST"; \
+	if [ -n "$(R)" ]; then \
+	  RECIPE_PATH="specs/change-recipes/$(R).yaml"; \
+	  if [ ! -f "$$RECIPE_PATH" ]; then \
+	    echo "Error: $$RECIPE_PATH not found."; \
+	    echo "Available recipes:"; \
+	    ls specs/change-recipes/*.yaml 2>/dev/null | sed 's|specs/change-recipes/||; s|\.yaml$$||'; \
+	    rm -f "$$DEST"; \
+	    exit 1; \
+	  fi; \
+	  rewrite "s|^Recipe: .*|Recipe: $$RECIPE_PATH|" "$$DEST"; \
+	fi; \
 	echo "Created: $$DEST"; \
 	echo "Next: fill the card fields, then:"; \
-	echo "  make check-card C=active/C-$(ID)-$(SLUG)"
+	echo "  make check-card C=active/C-$(ID)-$(SLUG)"; \
+	if [ -z "$(R)" ]; then \
+	  echo "Hint: set Recipe: to one of specs/change-recipes/*.yaml or scaffold with R=<recipe-name> next time."; \
+	fi
 
 # ── Quality Gates (run locally, mirrors CI) ───────────────────────────────────
 

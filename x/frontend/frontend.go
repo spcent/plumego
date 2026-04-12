@@ -13,7 +13,10 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-const defaultIndex = "index.html"
+const (
+	defaultIndex = "index.html"
+	methodAny    = "ANY"
+)
 
 // config defines how a built frontend bundle is served.
 type config struct {
@@ -40,7 +43,7 @@ type Mount struct {
 }
 
 type routeRegistrar interface {
-	AddRoute(method, path string, handler http.Handler) error
+	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
 // WithPrefix sets the mount prefix for the frontend bundle.
@@ -210,16 +213,16 @@ func (m *Mount) Register(r routeRegistrar) error {
 	}
 
 	if m.prefix == "/" {
-		if err := r.AddRoute(router.ANY, "/", m.handler); err != nil {
+		if err := r.AddRoute(methodAny, "/", m.handler); err != nil {
 			return err
 		}
-		return r.AddRoute(router.ANY, "/*filepath", m.handler)
+		return r.AddRoute(methodAny, "/*filepath", m.handler)
 	}
 
-	if err := r.AddRoute(router.ANY, m.prefix+"/*filepath", m.handler); err != nil {
+	if err := r.AddRoute(methodAny, m.prefix+"/*filepath", m.handler); err != nil {
 		return err
 	}
-	return r.AddRoute(router.ANY, m.prefix, m.handler)
+	return r.AddRoute(methodAny, m.prefix, m.handler)
 }
 
 func newConfig(opts ...Option) (*config, error) {

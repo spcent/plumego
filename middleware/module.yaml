@@ -8,6 +8,15 @@ summary: Transport-only HTTP middleware, including request/response cross-cuttin
 
 strict_boundary: transport_primitives
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/middleware/README.md
+
 responsibilities:
   - Middleware chaining
   - Request and response cross-cutting concerns
@@ -52,6 +61,12 @@ change_risks:
   - double-next regression
   - error-path regression
 
+stop_conditions:
+  - The change introduces business DTO assembly, service injection, or persistence access into middleware
+  - The change requires middleware to learn tenant policy, quota, or protocol-family behavior that belongs in x/*
+  - The change adds multi-phase middleware lifecycle abstractions instead of standard http.Handler chaining
+  - The change turns middleware into an observability or policy catch-all bucket instead of narrow transport primitives
+
 review_checklist:
   - next must be called exactly once
   - Keep responsibility transport-only
@@ -60,6 +75,6 @@ review_checklist:
   - No request-scoped service locator
 
 agent_hints:
-  - Tenant middleware belongs in x/tenant
-  - Route API version negotiation to x/rest/versioning and resource or protocol transformation to x/gateway/*
-  - Stateful policy and observability catch-all buckets should move out of middleware; keep behavior visible in tests
+  - Tenant middleware belongs in x/tenant; route API version negotiation to x/rest/versioning and resource or protocol transformation to x/gateway/*
+  - Each subpackage should expose one canonical constructor path and remain a thin http.Handler adapter over explicit dependencies
+  - Move stateful policy and observability catch-all behavior out of middleware; rate limiting should stay a thin HTTP adapter over security or abuse primitives

@@ -6,6 +6,15 @@ owner: ai-gateway
 risk: high
 summary: AI gateway capabilities including providers, sessions, streaming, tools, and resilience helpers.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-ai/README.md
+
 responsibilities:
   - Provider adapters
   - Session and context management
@@ -70,10 +79,18 @@ change_risks:
   - streaming behavior regression
   - cache/session correctness regression
 
+stop_conditions:
+  - The change introduces core bootstrap ownership, stable entrypoints, or business-specific prompt flows into x/ai primitives
+  - The change hides provider selection, session flow, or tool invocation behind globals or implicit registries
+  - The change requires core or stable roots to learn AI provider internals
+  - The change mixes websocket, webhook, or tenant-specific behavior directly into family-level AI primitives
+
 review_checklist:
   - Keep AI wiring explicit outside core
   - Do not add hidden provider globals
   - Keep transport concerns out of AI packages
+  - Keep provider, session, streaming, and tool boundaries explicit
+  - Keep unstable subpackages from leaking into stable-facing contracts
 
 agent_hints:
   - Prefer explicit handler-level composition

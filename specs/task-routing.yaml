@@ -27,6 +27,7 @@ routing_rules:
       - x/websocket
       - x/frontend
       - x/observability
+      - x/resilience
       - x/data
       - x/ai
 
@@ -46,6 +47,104 @@ routing_rules:
     destination: tasks/cards
 
 tasks:
+  control_plane:
+    intent: Change AGENTS, canonical style, architecture blueprint, repo specs, dependency rules, or control-plane guidance.
+    start_with:
+      - AGENTS.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+      - specs/repo.yaml
+      - specs/task-routing.yaml
+      - specs/dependency-rules.yaml
+    avoid:
+      - reference/with-messaging
+      - reference/with-gateway
+
+  module_manifest:
+    intent: Change module ownership, scope, test commands, or review guidance in module manifests.
+    start_with:
+      - AGENTS.md
+      - specs/module-manifest.schema.yaml
+      - specs/dependency-rules.yaml
+      - core/module.yaml
+    avoid:
+      - reference/with-messaging
+      - tasks/cards
+
+  symbol_change:
+    intent: Remove, rename, or change the behavior of an exported symbol.
+    start_with:
+      - AGENTS.md
+      - docs/CODEX_WORKFLOW.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+      - specs/change-recipes/symbol-change.yaml
+      - specs/package-hotspots.yaml
+    avoid:
+      - reference/with-messaging
+      - reference/with-gateway
+
+  bugfix_triage:
+    intent: Localize an implementation bug and identify the owning module before coding.
+    start_with:
+      - AGENTS.md
+      - docs/CODEX_WORKFLOW.md
+      - specs/repo.yaml
+      - specs/task-routing.yaml
+      - specs/change-recipes/fix-bug.yaml
+      - specs/package-hotspots.yaml
+    avoid:
+      - reference/with-messaging
+      - reference/with-gateway
+
+  http_endpoint_bugfix:
+    intent: Fix a defect in HTTP route wiring, handler transport logic, or contract-backed endpoint behavior.
+    start_with:
+      - AGENTS.md
+      - docs/CODEX_WORKFLOW.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+      - specs/change-recipes/http-endpoint-bugfix.yaml
+      - reference/standard-service/internal/app/routes.go
+      - contract/module.yaml
+      - router/module.yaml
+    avoid:
+      - middleware
+      - x/gateway
+
+  tenant_policy_change:
+    intent: Change tenant resolution, tenant policy, quota, rate limiting, or tenant-session behavior.
+    start_with:
+      - AGENTS.md
+      - docs/CODEX_WORKFLOW.md
+      - specs/change-recipes/tenant-policy-change.yaml
+      - x/tenant/module.yaml
+      - docs/architecture/X_TENANT_BLUEPRINT.md
+      - docs/modules/x-tenant/README.md
+    avoid:
+      - middleware
+      - store
+      - core
+
+  stable_root_boundary_review:
+    intent: Review stable-root changes for boundary drift, hidden coupling, and compatibility risk without coding.
+    start_with:
+      - AGENTS.md
+      - docs/CODEX_WORKFLOW.md
+      - specs/change-recipes/stable-root-boundary-review.yaml
+      - specs/repo.yaml
+      - specs/dependency-rules.yaml
+      - core/module.yaml
+      - router/module.yaml
+      - contract/module.yaml
+      - middleware/module.yaml
+      - security/module.yaml
+      - store/module.yaml
+      - health/module.yaml
+      - log/module.yaml
+      - metrics/module.yaml
+    avoid:
+      - reference/with-messaging
+      - reference/with-gateway
+
   package_hotspots:
     start_with:
       - specs/package-hotspots.yaml
@@ -157,6 +256,7 @@ tasks:
       - router
 
   frontend_asset_serving:
+    intent: Static asset policy, embedded frontend mounting, SPA fallback, cache/header policy, precompressed assets, and frontend MIME overrides.
     start_with:
       - x/frontend/module.yaml
       - docs/modules/x-frontend/README.md
@@ -199,6 +299,14 @@ tasks:
     avoid:
       - core
       - health
+
+  resilience:
+    start_with:
+      - x/resilience/module.yaml
+      - specs/extension-taxonomy.yaml
+    avoid:
+      - security
+      - core
 
   scaffold:
     start_with:

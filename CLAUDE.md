@@ -6,6 +6,7 @@ See `AGENTS.md` for the full operational guide (boundaries, rules, quality gates
 
 Repository planning and future restructuring should also follow:
 
+- `docs/CODEX_WORKFLOW.md`
 - `docs/CANONICAL_STYLE_GUIDE.md`
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `specs/repo.yaml`
@@ -46,6 +47,8 @@ go test -race ./...
 - Middleware: `func(http.Handler) http.Handler`, transport-only
 - Dependency flow: constructor injection, not context service-locator
 - App shape: follow `reference/standard-service`
+
+**Extension routing note:** reusable resilience primitives belong in `x/resilience`, not stable `security`.
 
 **Documentation sync targets:** `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`, `docs/ROADMAP.md`, `env.example`
 

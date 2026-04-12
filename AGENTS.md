@@ -13,6 +13,9 @@ Optimize for:
 - minimal search radius
 - one canonical implementation path
 
+Use the repository control plane to constrain Codex output. Do not rely on
+conversational intent alone when the task can be made explicit.
+
 ## 2. Non-Negotiables
 
 - Preserve `net/http` compatibility.
@@ -35,15 +38,16 @@ Optimize for:
 
 Use this default path before making changes:
 
-1. `docs/CANONICAL_STYLE_GUIDE.md`
-2. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-3. `specs/repo.yaml`
-4. `specs/task-routing.yaml`
-5. `specs/extension-taxonomy.yaml`
-6. `specs/package-hotspots.yaml`
-7. `specs/dependency-rules.yaml`
-8. target `<module>/module.yaml`
-9. `reference/standard-service`
+1. `docs/CODEX_WORKFLOW.md`
+2. `docs/CANONICAL_STYLE_GUIDE.md`
+3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+4. `specs/repo.yaml`
+5. `specs/task-routing.yaml`
+6. `specs/extension-taxonomy.yaml`
+7. `specs/package-hotspots.yaml`
+8. `specs/dependency-rules.yaml`
+9. target `<module>/module.yaml`
+10. `reference/standard-service`
 
 For staged future work and sequencing, also read:
 
@@ -68,6 +72,32 @@ When guidance overlaps, follow:
 - Middleware: `func(http.Handler) http.Handler`, transport-only responsibility
 - Reference app: `reference/standard-service` is the only canonical application layout
 
+## 4.1 Task Contract For Reliable Runs
+
+Every implementation request should state:
+
+- Goal: what must be true when done
+- In scope: modules and directories Codex may edit
+- Out of scope: modules and behaviors Codex must not touch
+- Target module: the owning stable root, `x/*` family, or reference app
+- API and dependency policy: whether stable public APIs or `go.mod` may change
+- Tests: which tests must be added or updated
+- Validation: exact commands or the required validation tier
+- Done definition: the acceptance bar for handoff
+
+When those details are omitted, use these defaults:
+
+- one primary module per change
+- no stable public API changes
+- no new dependencies
+- focused tests are required for behavior changes
+- docs sync is required only for implemented behavior changes
+
+For large or ambiguous work, split the execution into two passes:
+
+1. analysis-only: classify module ownership, scope, and risks
+2. implementation: execute one small reversible card at a time
+
 ## 5. Agent Navigation Rules
 
 Five rules determine where to work. Read this before scanning the entrypoints list.
@@ -82,7 +112,7 @@ Five rules determine where to work. Read this before scanning the entrypoints li
 
 **Stable roots (9):** `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
 
-**x/* primary families (10):** `x/tenant`, `x/fileapi`, `x/messaging`, `x/gateway`, `x/rest`, `x/websocket`, `x/frontend`, `x/observability`, `x/data`, `x/ai`
+**x/* primary families (11):** `x/tenant`, `x/fileapi`, `x/messaging`, `x/gateway`, `x/rest`, `x/websocket`, `x/frontend`, `x/observability`, `x/resilience`, `x/data`, `x/ai`
 
 Always start at a primary family, not a subordinate (`x/mq`, `x/pubsub`, `x/ops`, `x/cache`, `x/devtools`, etc.).
 See `specs/task-routing.yaml` for the full routing table and detailed entrypoints.
@@ -126,6 +156,7 @@ Task entrypoint defaults:
 - WebSocket transport work: start with `x/websocket`.
 - File upload/download/storage work: start with `x/fileapi`.
 - Admin or observability surfaces: start with `x/observability` (includes ops and devtools), not `health`.
+- Reusable resilience primitives: start with `x/resilience`, not `security`.
 - AI capability work: start with `x/ai`.
 - Data topology work (sharding, rw-split, cache): start with `x/data`.
 
@@ -144,8 +175,9 @@ When a card removes, renames, or changes the behavior of any exported symbol,
 follow these steps before writing any code:
 
 1. **Enumerate all sites first.**
-   Run `grep -rn 'SymbolName' . --include='*.go'` and collect the full list.
-   Do not start editing until you have the complete picture.
+   Run `rg -n --glob '*.go' 'SymbolName' .` (or `grep -rn` if `rg` is not
+   available) and collect the full list. Do not start editing until you have
+   the complete picture.
 
 2. **Address every site.**
    For each file in the list, decide: migrate, update assertion, or add an
@@ -223,6 +255,45 @@ Update these when behavior, public API, config, security semantics, lifecycle be
 6. Add or update focused tests.
 7. Run validation in the order from Section 8.
 8. Sync docs only for implemented behavior changes.
+
+## 10.1 Working Modes
+
+### Analysis Mode
+
+Use when scope or ownership is unclear.
+
+- Do not edit code.
+- Name the owning module or family.
+- List in-scope and out-of-scope paths.
+- List likely touched files, risks, and validation plan.
+
+### Implementation Mode
+
+Use when the task contract is clear.
+
+- Name the target module before editing.
+- State the intended file set before broad changes.
+- Keep the diff within one primary module when possible.
+- Add tests and run validation before handoff.
+
+### Review Mode
+
+Use when the user asks for review or audit only.
+
+- Do not patch code unless explicitly asked.
+- Findings come first, ordered by severity.
+- Prioritize boundary violations, regressions, hidden coupling, and missing tests.
+
+## 10.2 Stop Conditions Before Coding
+
+Stop and surface the issue before editing when:
+
+- the owning module is unclear
+- the change would require a stable root to import `x/*`
+- the change needs a stable public API change that was not requested
+- the change needs a new dependency that was not approved
+- the requested scope is broad but lacks acceptance criteria or validation commands
+- a repo spec, module manifest, and local pattern disagree in a way that changes behavior
 
 ## 11. Milestone Execution Protocol
 

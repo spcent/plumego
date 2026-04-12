@@ -92,13 +92,13 @@ type ConfigSnapshot struct {
 }
 
 type routeRegistrar interface {
-	AddRoute(method, path string, handler http.Handler) error
+	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 	Routes() []router.RouteInfo
 }
 
 func New(opts Options) *DevTools {
 	if opts.Logger == nil {
-		opts.Logger = log.NewNoOpLogger()
+		opts.Logger = log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	}
 	return &DevTools{
 		debug:      opts.Debug,
