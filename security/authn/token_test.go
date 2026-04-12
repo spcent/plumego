@@ -57,10 +57,10 @@ func TestStaticToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/test?token=secret123", nil)
 			if tt.authorization != "" {
-				req.Header.Set("Authorization", tt.authorization)
+				req.Header.Set(HeaderAuthorization, tt.authorization)
 			}
 			if tt.xToken != "" {
-				req.Header.Set("X-Token", tt.xToken)
+				req.Header.Set(HeaderXToken, tt.xToken)
 			}
 
 			principal, err := StaticToken(tt.configured).Authenticate(req)

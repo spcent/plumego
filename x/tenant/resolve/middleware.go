@@ -15,12 +15,12 @@ type Options struct {
 	// HeaderName is the HTTP header to extract tenant ID from (default: "X-Tenant-ID").
 	HeaderName string
 	// Extractor is a custom function to extract tenant ID from the request.
-	// When set, takes precedence over HeaderName. Principal extraction still runs first.
+	// When set, takes precedence over HeaderName.
 	Extractor tenantcore.TenantExtractor
-	// DisablePrincipal disables extracting tenant ID from the authenticated Principal.
-	DisablePrincipal bool
 	// AllowMissing allows requests to proceed when no tenant ID is found.
 	AllowMissing bool
+	// DisablePrincipal disables tenant resolution from the authn.Principal in the request context.
+	DisablePrincipal bool
 	// Hooks provides callbacks for tenant resolution events.
 	Hooks tenantcore.Hooks
 	// OnMissing is called when tenant ID is missing and AllowMissing is false.
@@ -29,7 +29,7 @@ type Options struct {
 }
 
 // Middleware resolves tenant id from request and stores it in context.
-// Resolution order: Principal -> custom Extractor or Header.
+// Resolution order: authn.Principal from context, then custom Extractor, then HeaderName header.
 func Middleware(options Options) middleware.Middleware {
 	header := tenanttransport.HeaderOrDefault(options.HeaderName, tenanttransport.DefaultTenantHeader)
 	requireTenant := !options.AllowMissing

@@ -2,11 +2,8 @@ package tenant
 
 import (
 	"context"
-	"errors"
 	"strings"
 )
-
-var ErrPolicyDenied = errors.New("policy denied")
 
 // PolicyConfig defines allow lists for tenant access control.
 // Empty lists mean "allow all" for that dimension.
@@ -45,22 +42,22 @@ type PolicyEvaluator interface {
 
 // ConfigPolicyEvaluator checks policy against a tenant configuration provider.
 type ConfigPolicyEvaluator struct {
-	Provider PolicyConfigProvider
+	provider PolicyConfigProvider
 }
 
 // NewConfigPolicyEvaluator creates a policy evaluator from a config provider.
 func NewConfigPolicyEvaluator(provider PolicyConfigProvider) *ConfigPolicyEvaluator {
-	return &ConfigPolicyEvaluator{Provider: provider}
+	return &ConfigPolicyEvaluator{provider: provider}
 }
 
 // Evaluate checks allow lists for models, tools, HTTP methods, and URL paths.
 // Empty allow lists permit all values for that dimension.
 func (e *ConfigPolicyEvaluator) Evaluate(ctx context.Context, tenantID string, req PolicyRequest) (PolicyResult, error) {
-	if e == nil || e.Provider == nil {
+	if e == nil || e.provider == nil {
 		return PolicyResult{Allowed: true}, nil
 	}
 
-	cfg, err := e.Provider.PolicyConfig(ctx, tenantID)
+	cfg, err := e.provider.PolicyConfig(ctx, tenantID)
 	if err != nil {
 		return PolicyResult{Allowed: false, Reason: err.Error()}, err
 	}

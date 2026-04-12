@@ -26,14 +26,6 @@ func newListener(addr string) (net.Listener, error) {
 }
 
 // Distributed errors
-var (
-	ErrClusterNotJoined  = errors.New("not joined to cluster")
-	ErrNodeNotFound      = errors.New("node not found")
-	ErrNodeUnhealthy     = errors.New("node is unhealthy")
-	ErrBroadcastFailed   = errors.New("broadcast failed")
-	ErrConsensusTimeout  = errors.New("consensus timeout")
-	ErrInvalidNodeConfig = errors.New("invalid node configuration")
-)
 
 // ClusterConfig configures the distributed cluster
 type ClusterConfig struct {

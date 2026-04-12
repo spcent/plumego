@@ -40,7 +40,7 @@ type ErrorType string
 
 const (
 	// Validation errors
-	TypeValidation    ErrorType = "validation_error"
+	TypeValidation    ErrorType = "validation_failure"
 	TypeRequired      ErrorType = "required_field_missing"
 	TypeInvalidFormat ErrorType = "invalid_format"
 	TypeOutOfRange    ErrorType = "value_out_of_range"
@@ -61,7 +61,7 @@ const (
 	// System errors
 	TypeInternal    ErrorType = "internal_error"
 	TypeUnavailable ErrorType = "service_unavailable"
-	TypeTimeout     ErrorType = "timeout_error"
+	TypeTimeout     ErrorType = "timeout_failure"
 	TypeRateLimited ErrorType = "rate_limited"
 	TypeMaintenance ErrorType = "maintenance_mode"
 
@@ -192,7 +192,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 		return encErr
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(HeaderContentType, ContentTypeJSON)
 	w.WriteHeader(err.Status)
 	_, writeErr := w.Write(buf.Bytes())
 	return writeErr

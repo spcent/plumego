@@ -15,11 +15,11 @@ import (
 
 // BindJSON binds the request JSON body to the provided destination structure.
 // It performs minimal decoding and returns a bindError on failure.
-// An optional BindOptions value can tighten per-call JSON behavior.
+// The optional opts argument tightens per-call JSON behavior; omit it to use defaults.
 func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
-	bindOpts, err := normalizeJSONBindOptions(opts)
-	if err != nil {
-		return err
+	var opt BindOptions
+	if len(opts) > 0 {
+		opt = opts[0]
 	}
 
 	data, err := c.bodyBytes()
@@ -31,12 +31,12 @@ func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
 		return &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
 
-	if bindOpts.MaxBodySize > 0 && int64(len(data)) > bindOpts.MaxBodySize {
+	if opt.MaxBodySize > 0 && int64(len(data)) > opt.MaxBodySize {
 		return &bindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
 	}
-	// bindOpts.MaxBodySize, if positive, enforces a stricter per-call cap on the
+	// opt.MaxBodySize, if positive, enforces a stricter per-call cap on the
 	// already-read body. RequestConfig.MaxBodySize enforces read-time limits.
-	return decodeJSONBody(data, dst, bindOpts.DisallowUnknownFields)
+	return decodeJSONBody(data, dst, opt.DisallowUnknownFields)
 }
 
 // joinSentinel wraps sentinel and cause together so that errors.Is(e, sentinel)
@@ -92,7 +92,7 @@ func bindQuery(values url.Values, dst any) error {
 	}
 	rv = rv.Elem()
 	if rv.Kind() != reflect.Struct {
-		return &bindError{Status: http.StatusBadRequest, Message: "bind destination must be a pointer to a struct"}
+		return &bindError{Status: http.StatusBadRequest, Message: "bind destination must be a pointer to a struct", Err: ErrInvalidBindDst}
 	}
 
 	rt := rv.Type()
@@ -186,20 +186,6 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 		fv.Set(result)
 	}
 	return nil
-}
-
-func normalizeJSONBindOptions(opts []BindOptions) (BindOptions, error) {
-	switch len(opts) {
-	case 0:
-		return BindOptions{}, nil
-	case 1:
-		return opts[0], nil
-	default:
-		return BindOptions{}, &bindError{
-			Status:  http.StatusBadRequest,
-			Message: "BindJSON accepts at most one BindOptions value",
-		}
-	}
 }
 
 func (c *Ctx) bodyBytes() ([]byte, error) {

@@ -2,17 +2,12 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 // Rate limit errors
-var (
-	ErrRateLimitExceeded = errors.New("rate limit exceeded")
-	ErrInvalidRateLimit  = errors.New("invalid rate limit configuration")
-)
 
 // RateLimitConfig configures rate limiting
 type RateLimitConfig struct {

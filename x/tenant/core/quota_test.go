@@ -251,7 +251,7 @@ func TestFixedWindowQuotaManager_RequestsOnly(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		result, err := quotaMgr.Allow(ctx, "requests-only", QuotaRequest{
 			Requests: 1,
-			Tokens:   i * 1000, // varying tokens
+			Tokens:   int64(i) * 1000, // varying tokens
 			Now:      now,
 		})
 		if err != nil {
@@ -485,9 +485,9 @@ func TestFixedWindowQuotaManager_DefaultRequestCount(t *testing.T) {
 func TestRemainingHelper(t *testing.T) {
 	tests := []struct {
 		name     string
-		limit    int
-		used     int
-		expected int
+		limit    int64
+		used     int64
+		expected int64
 	}{
 		{"unlimited", 0, 10, -1},
 		{"some remaining", 100, 30, 70},

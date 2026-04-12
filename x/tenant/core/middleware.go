@@ -1,15 +1,11 @@
 package tenant
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
 )
-
-// ErrInvalidTenantID indicates a tenant ID failed validation.
-var ErrInvalidTenantID = errors.New("invalid tenant ID")
 
 // maxTenantIDLength is the maximum allowed length for a tenant ID.
 const maxTenantIDLength = 255

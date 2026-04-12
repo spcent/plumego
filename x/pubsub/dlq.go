@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -11,11 +10,6 @@ import (
 )
 
 // Enhanced DLQ errors
-var (
-	ErrDLQClosed    = errors.New("dead letter queue is closed")
-	ErrDLQNotFound  = errors.New("dead letter message not found")
-	ErrInvalidQuery = errors.New("invalid query parameters")
-)
 
 // RetryStrategy defines retry behavior
 type RetryStrategy int

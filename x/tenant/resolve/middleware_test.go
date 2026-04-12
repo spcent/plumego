@@ -9,7 +9,7 @@ import (
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
 
-func TestMiddlewareFromPrincipal(t *testing.T) {
+func TestMiddlewareFromHeader(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if tenantcore.TenantIDFromContext(r.Context()) != "t-1" {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -30,9 +30,9 @@ func TestMiddlewareFromPrincipal(t *testing.T) {
 	}
 }
 
-func TestMiddlewarePrincipalTakesPrecedenceOverHeaderAndExtractor(t *testing.T) {
+func TestMiddlewareExtractorTakesPrecedenceOverHeader(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if tenantcore.TenantIDFromContext(r.Context()) != "principal-tenant" {
+		if tenantcore.TenantIDFromContext(r.Context()) != "query-tenant" {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -41,11 +41,11 @@ func TestMiddlewarePrincipalTakesPrecedenceOverHeaderAndExtractor(t *testing.T) 
 
 	req := httptest.NewRequest(http.MethodGet, "/?tenant=query-tenant", nil)
 	req.Header.Set("X-Tenant-ID", "header-tenant")
-	req = req.WithContext(authn.WithPrincipal(req.Context(), &authn.Principal{TenantID: "principal-tenant"}))
 	rec := httptest.NewRecorder()
 
 	mw := Middleware(Options{
-		Extractor: tenantcore.FromQuery("tenant"),
+		Extractor:        tenantcore.FromQuery("tenant"),
+		DisablePrincipal: true,
 	})
 	mw(handler).ServeHTTP(rec, req)
 

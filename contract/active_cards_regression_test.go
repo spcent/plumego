@@ -2,7 +2,6 @@ package contract
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,23 +23,6 @@ func TestBindJSONAndValidateStructExplicitFlow(t *testing.T) {
 
 	if err := ValidateStruct(&dst); err == nil {
 		t.Fatal("expected validation error")
-	}
-}
-
-func TestBindJSONRejectsMultipleBindOptions(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":"alice"}`))
-	ctx := NewCtx(httptest.NewRecorder(), req, nil)
-
-	var dst struct {
-		Name string `json:"name"`
-	}
-	err := ctx.BindJSON(&dst, BindOptions{}, BindOptions{})
-	if err == nil {
-		t.Fatal("expected bind options error")
-	}
-	var bindErr *bindError
-	if !errors.As(err, &bindErr) {
-		t.Fatalf("expected bindError, got %T", err)
 	}
 }
 
@@ -105,9 +87,15 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		Name string `validate:"requried"`
 	}
 	err = ValidateStruct(&badRules{})
-	fields = FieldErrorsFrom(err)
-	if len(fields) == 0 || fields[0].Code != CodeInvalidFormat {
-		t.Fatalf("expected invalid format failure, got %v", fields)
+	if err == nil {
+		t.Fatal("expected error for unknown rule, got nil")
+	}
+	// Unknown rules are programmer errors: not wrapped in ValidationErrors.
+	if FieldErrorsFrom(err) != nil {
+		t.Fatalf("expected unknown rule error to not be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
+	}
+	if !strings.Contains(err.Error(), "unknown validation rule") {
+		t.Fatalf("expected error to mention unknown validation rule, got: %v", err)
 	}
 
 	type stringLengths struct {

@@ -16,11 +16,6 @@ import (
 )
 
 // Audit errors
-var (
-	ErrAuditClosed       = errors.New("audit log is closed")
-	ErrAuditCorrupted    = errors.New("audit log corrupted - hash mismatch")
-	ErrInvalidAuditQuery = errors.New("invalid audit query parameters")
-)
 
 // AuditOperation represents the type of operation being audited
 type AuditOperation string

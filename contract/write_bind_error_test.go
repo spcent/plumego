@@ -2,6 +2,7 @@ package contract
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -123,6 +124,19 @@ func TestWriteBindErrorValidationWithFields(t *testing.T) {
 	}
 	if resp.Error.Code != CodeValidationError {
 		t.Fatalf("expected code %s, got %s", CodeValidationError, resp.Error.Code)
+	}
+}
+
+// TestBindQueryPointerToNonStructWrapsErrInvalidBindDst verifies that a pointer to
+// a non-struct destination (e.g. *int) produces an error satisfying errors.Is(err, ErrInvalidBindDst).
+func TestBindQueryPointerToNonStructWrapsErrInvalidBindDst(t *testing.T) {
+	var dst int
+	err := bindQuery(nil, &dst)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, ErrInvalidBindDst) {
+		t.Fatalf("errors.Is(err, ErrInvalidBindDst) = false, want true; err = %v", err)
 	}
 }
 

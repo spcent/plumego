@@ -32,10 +32,7 @@ const (
 	randomPoolSize = 4096
 )
 
-var (
-	errInvalidBase62 = errors.New("invalid base62 request id")
-	errOutOfRange    = errors.New("request id out of range")
-)
+var errInvalidBase62 = errors.New("invalid base62 request id")
 
 // RequestIDGenerator encapsulates state for request ID generation.
 type RequestIDGenerator struct {
@@ -196,10 +193,6 @@ func DecodeRequestID(id string) (unixMilli int64, r int, seqVal int, err error) 
 	seqVal = int(v & uint64(seqMax))
 	r = int((v >> shiftRand) & uint64(randMask))
 	ts := (v >> shiftTS) & ((uint64(1) << tsBits) - 1)
-
-	if r < 0 || r > randMask {
-		return 0, 0, 0, errOutOfRange
-	}
 
 	unixMilli = int64(ts) + epochMilli
 	return unixMilli, r, seqVal, nil

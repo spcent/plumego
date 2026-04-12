@@ -106,8 +106,8 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 	if len(cfg.Quota.Limits) == 0 && (legacyRequestsPerMinute > 0 || legacyTokensPerMinute > 0) {
 		cfg.Quota.Limits = []tenant.QuotaLimit{{
 			Window:   tenant.QuotaWindowMinute,
-			Requests: legacyRequestsPerMinute,
-			Tokens:   legacyTokensPerMinute,
+			Requests: int64(legacyRequestsPerMinute),
+			Tokens:   int64(legacyTokensPerMinute),
 		}}
 	}
 
@@ -278,8 +278,8 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 		if len(cfg.Quota.Limits) == 0 && (legacyRequestsPerMinute > 0 || legacyTokensPerMinute > 0) {
 			cfg.Quota.Limits = []tenant.QuotaLimit{{
 				Window:   tenant.QuotaWindowMinute,
-				Requests: legacyRequestsPerMinute,
-				Tokens:   legacyTokensPerMinute,
+				Requests: int64(legacyRequestsPerMinute),
+				Tokens:   int64(legacyTokensPerMinute),
 			}}
 		}
 

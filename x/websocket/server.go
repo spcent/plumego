@@ -91,19 +91,19 @@ func readLimitToInt(limit int64) int {
 
 func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 	if cfg.Hub == nil {
-		return cfg, errors.New("websocket server misconfigured: hub is nil")
+		return cfg, ErrNilHub
 	}
 	if cfg.Auth == nil {
-		return cfg, errors.New("websocket server misconfigured: authenticator is nil")
+		return cfg, ErrNilAuthenticator
 	}
 	if cfg.QueueSize < 0 {
-		return cfg, errors.New("websocket server misconfigured: queue size cannot be negative")
+		return cfg, ErrNegativeQueueSize
 	}
 	if cfg.SendBehavior < SendBlock || cfg.SendBehavior > SendClose {
-		return cfg, errors.New("websocket server misconfigured: invalid send behavior")
+		return cfg, ErrInvalidSendBehavior
 	}
 	if cfg.ReadLimit < 0 {
-		return cfg, errors.New("websocket server misconfigured: read limit cannot be negative")
+		return cfg, ErrNegativeReadLimit
 	}
 	if cfg.ReadLimit == 0 {
 		if p, ok := cfg.Auth.(messageSizeProvider); ok {

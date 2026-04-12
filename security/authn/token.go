@@ -8,6 +8,12 @@ import (
 
 const staticTokenSubject = "static-token"
 
+// HeaderAuthorization is the standard HTTP Authorization header name.
+const HeaderAuthorization = "Authorization"
+
+// HeaderXToken is the X-Token header name used as an alternative bearer credential.
+const HeaderXToken = "X-Token"
+
 type staticTokenAuthenticator struct {
 	token string
 }
@@ -31,7 +37,7 @@ func ExtractBearerToken(r *http.Request) string {
 		return ""
 	}
 
-	authz := strings.TrimSpace(r.Header.Get("Authorization"))
+	authz := strings.TrimSpace(r.Header.Get(HeaderAuthorization))
 	if len(authz) > len("Bearer ") && strings.EqualFold(authz[:len("Bearer")], "Bearer") {
 		if tok := strings.TrimSpace(authz[len("Bearer"):]); tok != "" {
 			return tok
@@ -45,5 +51,5 @@ func extractToken(r *http.Request) string {
 	if token := ExtractBearerToken(r); token != "" {
 		return token
 	}
-	return strings.TrimSpace(r.Header.Get("X-Token"))
+	return strings.TrimSpace(r.Header.Get(HeaderXToken))
 }

@@ -2,11 +2,8 @@ package webhook
 
 import (
 	"context"
-	"errors"
 	"time"
 )
-
-var ErrQueueFull = errors.New("webhook queue full")
 
 type Task struct {
 	DeliveryID string

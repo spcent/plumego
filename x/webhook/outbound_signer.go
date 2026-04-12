@@ -4,10 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 )
-
-var ErrInvalidHex = errors.New("invalid hex encoding")
 
 // SignV1 creates a v1 webhook signature using HMAC-SHA256.
 // Format: hex(hmac_sha256(secret, timestamp + "." + rawBody))
@@ -34,7 +31,7 @@ func ConstantTimeEqualHex(aHex, bHex string) bool {
 func VerifySignature(secret, timestamp, signature string, payload []byte) error {
 	expected := SignV1(secret, timestamp, payload)
 	if !ConstantTimeEqualHex(signature, expected) {
-		return errors.New("signature verification failed")
+		return ErrSignatureMismatch
 	}
 	return nil
 }

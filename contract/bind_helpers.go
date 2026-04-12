@@ -23,18 +23,11 @@ type FieldError struct {
 	Message string `json:"message"`
 }
 
-// fieldErrorProvider is implemented by validationErrors (and any custom validator
-// that produces []FieldError directly).
-type fieldErrorProvider interface {
-	Errors() []FieldError
-}
-
 // FieldErrorsFrom extracts field-level validation errors from an error.
 func FieldErrorsFrom(err error) []FieldError {
-	for current := err; current != nil; current = errors.Unwrap(current) {
-		if p, ok := current.(fieldErrorProvider); ok {
-			return p.Errors()
-		}
+	var ve ValidationErrors
+	if errors.As(err, &ve) {
+		return ve.Errors()
 	}
 	return nil
 }

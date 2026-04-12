@@ -10,8 +10,28 @@ import (
 type QuotaUsage struct {
 	WindowStart time.Time
 	WindowEnd   time.Time
-	Requests    int
-	Tokens      int
+	Requests    int64
+	Tokens      int64
+}
+
+// QuotaReserveRequest carries the parameters for a quota reservation attempt.
+type QuotaReserveRequest struct {
+	TenantID      string
+	Window        QuotaWindow
+	WindowStart   time.Time
+	DeltaRequests int64
+	DeltaTokens   int64
+	LimitRequests int64
+	LimitTokens   int64
+}
+
+// QuotaReleaseRequest carries the parameters for rolling back a reservation.
+type QuotaReleaseRequest struct {
+	TenantID      string
+	Window        QuotaWindow
+	WindowStart   time.Time
+	DeltaRequests int64
+	DeltaTokens   int64
 }
 
 // QuotaStore provides atomic quota reservation for a single window.
@@ -19,9 +39,9 @@ type QuotaStore interface {
 	// Reserve attempts to add usage in a window. It should be atomic and only
 	// update usage when within limits. The returned usage should reflect the
 	// stored values after the call.
-	Reserve(ctx context.Context, tenantID string, window QuotaWindow, windowStart time.Time, deltaRequests, deltaTokens, limitRequests, limitTokens int) (QuotaUsage, bool, error)
+	Reserve(ctx context.Context, req QuotaReserveRequest) (QuotaUsage, bool, error)
 	// Release rolls back a previous reservation.
-	Release(ctx context.Context, tenantID string, window QuotaWindow, windowStart time.Time, deltaRequests, deltaTokens int) error
+	Release(ctx context.Context, req QuotaReleaseRequest) error
 }
 
 // InMemoryQuotaStore is a simple in-memory quota store.
@@ -56,7 +76,7 @@ func NewInMemoryQuotaStore(opts ...InMemoryQuotaStoreConfig) *InMemoryQuotaStore
 }
 
 // Reserve attempts to add usage for a window.
-func (s *InMemoryQuotaStore) Reserve(ctx context.Context, tenantID string, window QuotaWindow, windowStart time.Time, deltaRequests, deltaTokens, limitRequests, limitTokens int) (QuotaUsage, bool, error) {
+func (s *InMemoryQuotaStore) Reserve(ctx context.Context, req QuotaReserveRequest) (QuotaUsage, bool, error) {
 	if s == nil {
 		return QuotaUsage{}, false, ErrQuotaExceeded
 	}
@@ -66,20 +86,20 @@ func (s *InMemoryQuotaStore) Reserve(ctx context.Context, tenantID string, windo
 
 	s.maybeCleanupLocked(time.Now().UTC())
 
-	key := quotaKey{tenantID: tenantID, window: window, windowStart: windowStart}
+	key := quotaKey{tenantID: req.TenantID, window: req.Window, windowStart: req.WindowStart}
 	usage := s.entries[key]
 	if usage == nil {
 		usage = &QuotaUsage{
-			WindowStart: windowStart,
-			WindowEnd:   quotaWindowEnd(windowStart, window),
+			WindowStart: req.WindowStart,
+			WindowEnd:   quotaWindowEnd(req.WindowStart, req.Window),
 		}
 		s.entries[key] = usage
 	}
 
-	nextRequests := usage.Requests + deltaRequests
-	nextTokens := usage.Tokens + deltaTokens
+	nextRequests := usage.Requests + req.DeltaRequests
+	nextTokens := usage.Tokens + req.DeltaTokens
 
-	if (limitRequests > 0 && nextRequests > limitRequests) || (limitTokens > 0 && nextTokens > limitTokens) {
+	if (req.LimitRequests > 0 && nextRequests > req.LimitRequests) || (req.LimitTokens > 0 && nextTokens > req.LimitTokens) {
 		return *usage, false, nil
 	}
 
@@ -90,7 +110,7 @@ func (s *InMemoryQuotaStore) Reserve(ctx context.Context, tenantID string, windo
 }
 
 // Release rolls back a previous reservation.
-func (s *InMemoryQuotaStore) Release(ctx context.Context, tenantID string, window QuotaWindow, windowStart time.Time, deltaRequests, deltaTokens int) error {
+func (s *InMemoryQuotaStore) Release(ctx context.Context, req QuotaReleaseRequest) error {
 	if s == nil {
 		return nil
 	}
@@ -98,17 +118,17 @@ func (s *InMemoryQuotaStore) Release(ctx context.Context, tenantID string, windo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := quotaKey{tenantID: tenantID, window: window, windowStart: windowStart}
+	key := quotaKey{tenantID: req.TenantID, window: req.Window, windowStart: req.WindowStart}
 	usage := s.entries[key]
 	if usage == nil {
 		return nil
 	}
 
-	usage.Requests -= deltaRequests
+	usage.Requests -= req.DeltaRequests
 	if usage.Requests < 0 {
 		usage.Requests = 0
 	}
-	usage.Tokens -= deltaTokens
+	usage.Tokens -= req.DeltaTokens
 	if usage.Tokens < 0 {
 		usage.Tokens = 0
 	}

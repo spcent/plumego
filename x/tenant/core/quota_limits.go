@@ -16,8 +16,20 @@ const (
 // Zero values mean unlimited for the dimension.
 type QuotaLimit struct {
 	Window   QuotaWindow
-	Requests int
-	Tokens   int
+	Requests int64
+	Tokens   int64
+}
+
+// normalizeQuotaRequest applies default values to a QuotaRequest.
+// If Now is zero it is set to the current UTC time.
+// If Requests is non-positive it is set to 1 (one request per call is the minimum).
+func normalizeQuotaRequest(req *QuotaRequest) {
+	if req.Now.IsZero() {
+		req.Now = time.Now().UTC()
+	}
+	if req.Requests <= 0 {
+		req.Requests = 1
+	}
 }
 
 func normalizeQuotaLimits(cfg QuotaConfig) []QuotaLimit {

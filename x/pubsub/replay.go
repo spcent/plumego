@@ -16,12 +16,6 @@ import (
 )
 
 // Replay errors
-var (
-	ErrReplayClosed      = errors.New("replay store is closed")
-	ErrMessageNotFound   = errors.New("message not found in replay store")
-	ErrInvalidTimeRange  = errors.New("invalid time range")
-	ErrArchiveNotEnabled = errors.New("archiving is not enabled")
-)
 
 // ReplayConfig configures the message replay store
 type ReplayConfig struct {

@@ -346,7 +346,7 @@ func (s *Service) ListDeliveries(ctx context.Context, f DeliveryFilter) ([]Deliv
 func (s *Service) ReplayDelivery(ctx context.Context, deliveryID string) (Delivery, error) {
 	d, ok := s.store.GetDelivery(ctx, deliveryID)
 	if !ok {
-		return Delivery{}, ErrNotFound
+		return Delivery{}, ErrTargetNotFound
 	}
 	if len(d.PayloadJSON) == 0 {
 		return Delivery{}, errors.New("delivery has no payload_json")
