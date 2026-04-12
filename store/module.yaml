@@ -81,4 +81,4 @@ review_checklist:
 agent_hints:
   - Move tenant-aware adapters to x/tenant/store and move DB analytics, slow-query helpers, and DB health/reporting to the owning observability extensions
   - For distributed, provider-specific, or metrics/export-oriented cache behavior use x/cache; for HTTP response caching use x/gateway/cache
-  - Route durable topology and provider behavior to x/data/* and keep stable store focused on base storage contracts and helpers
+  - Route durable topology and provider behavior to x/data/* and keep stable store focused on base storage contracts, shared types, and errors

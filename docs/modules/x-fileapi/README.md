@@ -40,14 +40,14 @@
 - keep handler behavior transport-only
 - read tenant identity from request context, not body or path
 - delegate storage and metadata behavior to `x/data/file`
-- keep pure interfaces and helpers in `store/file`
+- keep stable storage contracts, shared types, and errors in `store/file`
 - keep route wiring in the application layer; `x/fileapi` should not become a bootstrap surface
 
 ## Boundary with data and store
 
 - `x/fileapi` is the app-facing file transport entrypoint
 - `x/data/file` owns tenant-aware storage, metadata, and temporary URL implementations
-- `store/file` owns transport-agnostic interfaces, errors, shared types, and pure helpers
+- `store/file` owns transport-agnostic interfaces, errors, and shared types
 - if the change is about multipart parsing, status codes, or response headers, keep it here
 - if the change is about tenant path layout, metadata persistence, or storage backends, move it to `x/data/file`
-- if the change is about stable interfaces or pure utilities, keep it in `store/file`
+- if the change is about stable storage contracts or shared file types, keep it in `store/file`
