@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +20,9 @@ import (
 // Example:
 //
 //	auth := websocket.NewSimpleRoomAuth(secret)
-//	auth.SetRoomPassword("chat", "s3cr3t")
+//	if err := auth.SetRoomPassword("chat", "s3cr3t"); err != nil {
+//		panic(err)
+//	}
 //
 //	cfg := websocket.ServerConfig{
 //	    Hub:  hub,
@@ -42,7 +43,9 @@ type RoomAuthenticator interface {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	auth := websocket.NewSimpleRoomAuth(secret)
-//	auth.SetRoomPassword("chat-room", "my-secret-password")
+//	if err := auth.SetRoomPassword("chat-room", "my-secret-password"); err != nil {
+//		panic(err)
+//	}
 //
 //	// Check if password is correct
 //	if auth.CheckRoomPassword("chat-room", "my-secret-password") {
@@ -77,16 +80,19 @@ func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	auth := websocket.NewSimpleRoomAuth(secret)
-//	auth.SetRoomPassword("chat-room", "my-secret-password")
-func (s *SimpleRoomAuth) SetRoomPassword(room, pwd string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+//	if err := auth.SetRoomPassword("chat-room", "my-secret-password"); err != nil {
+//		panic(err)
+//	}
+func (s *SimpleRoomAuth) SetRoomPassword(room, pwd string) error {
 	hashed, err := password.HashPassword(pwd)
 	if err != nil {
-		log.Printf("Error hashing room password: %v", err)
-		return
+		return err
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.roomPasswords[room] = string(hashed)
+	return nil
 }
 
 func (s *SimpleRoomAuth) CheckRoomPassword(room, provided string) bool {

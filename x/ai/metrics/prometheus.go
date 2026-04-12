@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,13 +28,15 @@ func NewPrometheusExporter(collector *MemoryCollector, namespace string) *Promet
 // Handler returns an HTTP handler that exports metrics in Prometheus format
 func (pe *PrometheusExporter) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-
 		snapshot := pe.collector.Snapshot()
-		if err := pe.writePrometheusFormat(w, snapshot); err != nil {
-			http.Error(w, "Failed to generate metrics", http.StatusInternalServerError)
+		var buf bytes.Buffer
+		if err := pe.writePrometheusFormat(&buf, snapshot); err != nil {
 			return
 		}
+
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(buf.Bytes())
 	}
 }
 

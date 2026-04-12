@@ -2,25 +2,23 @@
 // It composes x/data/file storage and metadata implementations with the
 // contract error model.
 //
-// Tenant identity must be placed in the request context under the key
-// "tenant_id" (string) before reaching any handler method — typically by a
-// middleware in the calling application. User identity is read from the
-// optional "user_id" context key.
+// Tenant identity must be attached via x/tenant/core.WithTenantID before
+// reaching any handler method — typically by middleware in the calling
+// application. User identity is optional and may be attached via WithUserID.
 package fileapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 	storefile "github.com/spcent/plumego/store/file"
 	datafile "github.com/spcent/plumego/x/data/file"
+	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
 
 // Handler provides HTTP endpoints for file operations.
@@ -46,30 +44,20 @@ func (h *Handler) WithMaxSize(size int64) *Handler {
 	return h
 }
 
-// RegisterRoutes registers file handling routes to the given ServeMux.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /files", h.Upload)
-	mux.HandleFunc("GET /files/{id}", h.Download)
-	mux.HandleFunc("GET /files/{id}/info", h.GetInfo)
-	mux.HandleFunc("GET /files/{id}/url", h.GetURL)
-	mux.HandleFunc("DELETE /files/{id}", h.Delete)
-	mux.HandleFunc("GET /files", h.List)
-}
-
 // Upload handles file upload via multipart form.
 // POST /files
 // Form fields: file (required), generate_thumb, thumb_width, thumb_height.
-// Requires "tenant_id" in request context.
+// Requires tenant identity in request context.
 func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	tenantID, ok := ctx.Value("tenant_id").(string)
-	if !ok || tenantID == "" {
-		h.writeError(w, r, http.StatusBadRequest, "missing tenant_id in context")
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if tenantID == "" {
+		h.writeError(w, r, http.StatusBadRequest, "missing tenant id in context")
 		return
 	}
 
-	userID, _ := ctx.Value("user_id").(string)
+	userID := UserIDFromContext(ctx)
 
 	if err := r.ParseMultipartForm(h.maxSize); err != nil {
 		h.writeError(w, r, http.StatusBadRequest, fmt.Sprintf("failed to parse form: %v", err))
@@ -266,38 +254,8 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ServeHTTP implements http.Handler for middleware chaining.
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	method := r.Method
-
-	switch {
-	case method == http.MethodPost && path == "/files":
-		h.Upload(w, r)
-	case method == http.MethodGet && strings.HasPrefix(path, "/files/"):
-		parts := strings.Split(strings.TrimPrefix(path, "/files/"), "/")
-		if len(parts) == 1 {
-			h.Download(w, r)
-		} else if len(parts) == 2 && parts[1] == "info" {
-			h.GetInfo(w, r)
-		} else if len(parts) == 2 && parts[1] == "url" {
-			h.GetURL(w, r)
-		} else {
-			h.writeError(w, r, http.StatusNotFound, "not found")
-		}
-	case method == http.MethodDelete && strings.HasPrefix(path, "/files/"):
-		h.Delete(w, r)
-	case method == http.MethodGet && path == "/files":
-		h.List(w, r)
-	default:
-		h.writeError(w, r, http.StatusNotFound, "not found")
-	}
-}
-
 func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	_ = contract.WriteJSON(w, status, data)
 }
 
 func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, status int, message string) {

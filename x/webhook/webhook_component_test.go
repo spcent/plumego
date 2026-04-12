@@ -2,8 +2,12 @@ package webhook
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
@@ -143,5 +147,109 @@ func TestWebhookOutboundBasic(t *testing.T) {
 	_, disabledHealth := disabledHandler.Health()
 	if disabledHealth.Status != "degraded" {
 		t.Errorf("expected degraded status for disabled component, got %s", disabledHealth.Status)
+	}
+}
+
+func TestInboundRegisterRoutesDuplicateReturnsError(t *testing.T) {
+	ps := pubsub.New()
+	defer ps.Close()
+
+	handler := NewInbound(WebhookInConfig{
+		Enabled:      true,
+		Pub:          ps,
+		GitHubSecret: "secret123",
+		StripeSecret: "secret456",
+	}, ps, nil)
+
+	r := router.NewRouter()
+	if err := handler.RegisterRoutes(r); err != nil {
+		t.Fatalf("first RegisterRoutes failed: %v", err)
+	}
+	if err := handler.RegisterRoutes(r); err == nil {
+		t.Fatal("expected duplicate RegisterRoutes to return an error")
+	}
+}
+
+func TestOutboundRegisterRoutesDuplicateReturnsError(t *testing.T) {
+	handler := NewOutbound(WebhookOutConfig{
+		Enabled: true,
+		Service: &Service{},
+	})
+
+	r := router.NewRouter()
+	if err := handler.RegisterRoutes(r); err != nil {
+		t.Fatalf("first RegisterRoutes failed: %v", err)
+	}
+	if err := handler.RegisterRoutes(r); err == nil {
+		t.Fatal("expected duplicate RegisterRoutes to return an error")
+	}
+}
+
+func TestInboundMissingSecretWritesCanonicalError(t *testing.T) {
+	ps := pubsub.New()
+	defer ps.Close()
+
+	handler := NewInbound(WebhookInConfig{
+		Enabled:    true,
+		Pub:        ps,
+		GitHubPath: "/webhooks/github",
+	}, ps, nil)
+
+	r := router.NewRouter()
+	if err := handler.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/github", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rec.Code)
+	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "missing_secret" {
+		t.Fatalf("error code = %q, want missing_secret", body.Error.Code)
+	}
+}
+
+func TestOutboundTriggerDisabledWritesCanonicalError(t *testing.T) {
+	handler := NewOutbound(WebhookOutConfig{
+		Enabled:         true,
+		Service:         &Service{},
+		AllowEmptyToken: false,
+	})
+
+	r := router.NewRouter()
+	if err := handler.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/events/demo", httptest.NewRequest(http.MethodPost, "/", nil).Body)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", rec.Code)
+	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "forbidden" {
+		t.Fatalf("error code = %q, want forbidden", body.Error.Code)
 	}
 }

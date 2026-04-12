@@ -99,10 +99,8 @@ func TestRegisterRoutesDebugTrue(t *testing.T) {
 		{http.MethodGet, DevToolsRoutesJSONPath},
 		{http.MethodGet, DevToolsMiddlewarePath},
 		{http.MethodGet, DevToolsConfigPath},
+		{http.MethodGet, DevToolsInfoPath},
 		{http.MethodGet, DevToolsMetricsPath},
-		{http.MethodGet, "/_routes"},
-		{http.MethodGet, "/_config"},
-		{http.MethodGet, "/_info"},
 	}
 
 	for _, tt := range tests {
@@ -112,6 +110,25 @@ func TestRegisterRoutesDebugTrue(t *testing.T) {
 
 		if rec.Code == http.StatusNotFound {
 			t.Errorf("expected route %s %s to be registered, got 404", tt.method, tt.path)
+		}
+	}
+}
+
+func TestLegacyTopLevelDebugAliasesRemoved(t *testing.T) {
+	c := New(Options{Debug: true})
+	r := router.NewRouter()
+	c.RegisterRoutes(r)
+
+	for _, path := range []string{
+		"/_" + "routes",
+		"/_" + "config",
+		"/_" + "info",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected legacy alias %s to be removed, got status %d", path, rec.Code)
 		}
 	}
 }
@@ -443,7 +460,7 @@ func TestInfoEndpoint(t *testing.T) {
 	r := router.NewRouter()
 	c.RegisterRoutes(r)
 
-	req := httptest.NewRequest(http.MethodGet, "/_info", nil)
+	req := httptest.NewRequest(http.MethodGet, DevToolsInfoPath, nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -458,13 +475,13 @@ func TestInfoEndpoint(t *testing.T) {
 	data := body["data"].(map[string]any)
 	config, ok := data["config"].(map[string]any)
 	if !ok {
-		t.Fatal("expected config in /_info response")
+		t.Fatal("expected config in info response")
 	}
 	if config["env_file"] != ".env.test" {
 		t.Fatalf("expected env_file=.env.test, got %v", config["env_file"])
 	}
 	if _, ok := data["build"]; !ok {
-		t.Fatal("expected build in /_info response")
+		t.Fatal("expected build in info response")
 	}
 }
 

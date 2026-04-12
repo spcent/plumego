@@ -4,6 +4,7 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -116,8 +117,6 @@ func TestDefaultFileContent_NoTODO(t *testing.T) {
 		{"internal/domain/user/repository.go", "myapp", "example.com/myapp"},
 		{"internal/httpapp/handlers/metrics.go", "myapp", "example.com/myapp"},
 		{"internal/httpapp/handlers/health.go", "myapp", "example.com/myapp"},
-		{"internal/platform/httperr/error.go", "myapp", "example.com/myapp"},
-		{"internal/platform/httpjson/response.go", "myapp", "example.com/myapp"},
 		{"frontend/index.html", "myapp", "example.com/myapp"},
 		{"frontend/app.js", "myapp", "example.com/myapp"},
 		{"frontend/styles.css", "myapp", "example.com/myapp"},
@@ -130,6 +129,47 @@ func TestDefaultFileContent_NoTODO(t *testing.T) {
 		content := getDefaultFileContent(tc.file, tc.name, tc.module)
 		if strings.Contains(content, "// TODO") {
 			t.Errorf("file=%q contains '// TODO':\n%s", tc.file, content)
+		}
+	}
+}
+
+func TestGetTemplateFiles_MicroserviceDoesNotEmitLegacyHTTPHelpers(t *testing.T) {
+	files := GetTemplateFiles("microservice")
+	if slices.Contains(files, "internal/platform/httpjson/response.go") {
+		t.Fatal("microservice template should not emit internal/platform/httpjson/response.go")
+	}
+	if slices.Contains(files, "internal/platform/httperr/error.go") {
+		t.Fatal("microservice template should not emit internal/platform/httperr/error.go")
+	}
+}
+
+func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
+	const (
+		testName   = "myapp"
+		testModule = "example.com/myapp"
+	)
+
+	disallowed := []string{
+		"internal/platform/httpjson",
+		"internal/platform/httperr",
+		"http.Error(",
+		"json.NewEncoder(w).Encode",
+		`w.Header().Set("Content-Type", "application/json")`,
+		`"encoding error"`,
+	}
+
+	for _, tmpl := range allTemplates {
+		files := GetTemplateFiles(tmpl)
+		for _, file := range files {
+			if filepath.Ext(file) != ".go" {
+				continue
+			}
+			content := getTemplateContent(file, testName, testModule, tmpl)
+			for _, pattern := range disallowed {
+				if strings.Contains(content, pattern) {
+					t.Fatalf("template=%q file=%q contains disallowed pattern %q:\n%s", tmpl, file, pattern, content)
+				}
+			}
 		}
 	}
 }

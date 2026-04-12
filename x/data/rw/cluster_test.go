@@ -261,7 +261,7 @@ func TestClusterQueryContextReplica(t *testing.T) {
 	}
 }
 
-func TestClusterForcePrimary(t *testing.T) {
+func TestClusterWithForcePrimary(t *testing.T) {
 	primary := newStubDB()
 	defer primary.Close()
 
@@ -283,7 +283,7 @@ func TestClusterForcePrimary(t *testing.T) {
 	defer cluster.Close()
 
 	// Force primary even for read
-	ctx := ForcePrimary(context.Background())
+	ctx := WithForcePrimary(context.Background())
 	rows, err := cluster.QueryContext(ctx, "SELECT * FROM test")
 	if err != nil {
 		t.Errorf("QueryContext failed: %v", err)
@@ -552,7 +552,7 @@ func TestClusterQueryRowContextPrimary(t *testing.T) {
 	defer cluster.Close()
 
 	// Write query should use primary
-	ctx := ForcePrimary(context.Background())
+	ctx := WithForcePrimary(context.Background())
 	row := cluster.QueryRowContext(ctx, "SELECT * FROM test WHERE id = ?", 1)
 	if row == nil {
 		t.Error("expected row, got nil")

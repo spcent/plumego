@@ -68,12 +68,24 @@ func Middleware(options Options) middleware.Middleware {
 					options.OnMissing(w, r)
 					return
 				}
-				tenanttransport.WriteError(w, r, http.StatusUnauthorized, tenanttransport.CodeRequired, "tenant id is required", contract.CategoryAuth)
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+					Status(http.StatusUnauthorized).
+					Type(contract.TypeUnauthorized).
+					Code(tenanttransport.CodeRequired).
+					Message("tenant id is required").
+					Category(contract.CategoryAuth).
+					Build())
 				return
 			}
 
 			if err := tenantcore.ValidateTenantID(tenantID); err != nil {
-				tenanttransport.WriteError(w, r, http.StatusBadRequest, tenanttransport.CodeInvalidID, "invalid tenant ID format", contract.CategoryAuth)
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+					Status(http.StatusBadRequest).
+					Type(contract.TypeInvalidFormat).
+					Code(tenanttransport.CodeInvalidID).
+					Message("invalid tenant ID format").
+					Category(contract.CategoryValidation).
+					Build())
 				return
 			}
 

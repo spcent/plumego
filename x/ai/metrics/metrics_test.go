@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -432,11 +434,23 @@ func TestPrometheusExporter_Handler(t *testing.T) {
 
 	// Create HTTP test
 	handler := exporter.Handler()
-
-	// Since we can't easily test HTTP handlers without net/http/httptest,
-	// we'll just verify it doesn't panic
 	if handler == nil {
-		t.Error("Handler should not be nil")
+		t.Fatal("Handler should not be nil")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "text/plain; version=0.0.4; charset=utf-8" {
+		t.Fatalf("content type = %q", got)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "# HELP test_requests_total") {
+		t.Fatalf("expected prometheus help output, got %q", body)
 	}
 }
 

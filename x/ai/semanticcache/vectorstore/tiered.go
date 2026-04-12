@@ -13,6 +13,7 @@ type TieredBackend struct {
 	l1         Backend
 	l2         Backend
 	l3         Backend
+	onError    func(TieredBackgroundError)
 	l1MaxSize  int
 	l2MaxSize  int
 	dimensions int
@@ -24,9 +25,17 @@ type TieredConfig struct {
 	L1         Backend // Required: fast cache (e.g., memory)
 	L2         Backend // Optional: medium cache
 	L3         Backend // Optional: persistent storage
+	OnError    func(TieredBackgroundError)
 	L1MaxSize  int
 	L2MaxSize  int
 	Dimensions int
+}
+
+// TieredBackgroundError captures a best-effort tier operation failure.
+type TieredBackgroundError struct {
+	Tier      string
+	Operation string
+	Err       error
 }
 
 // TieredStats holds statistics for tiered cache.
@@ -50,6 +59,7 @@ func NewTieredBackend(config TieredConfig) (*TieredBackend, error) {
 		l1:         config.L1,
 		l2:         config.L2,
 		l3:         config.L3,
+		onError:    config.OnError,
 		l1MaxSize:  config.L1MaxSize,
 		l2MaxSize:  config.L2MaxSize,
 		dimensions: config.Dimensions,
@@ -71,15 +81,13 @@ func (t *TieredBackend) Add(ctx context.Context, entry *Entry) error {
 
 	if t.l2 != nil {
 		if err := t.l2.Add(ctx, entry); err != nil {
-			// Log but don't fail
-			fmt.Printf("L2 add failed: %v\n", err)
+			t.reportBackgroundError("l2", "add", err)
 		}
 	}
 
 	if t.l3 != nil {
 		if err := t.l3.Add(ctx, entry); err != nil {
-			// Log but don't fail
-			fmt.Printf("L3 add failed: %v\n", err)
+			t.reportBackgroundError("l3", "add", err)
 		}
 	}
 
@@ -95,10 +103,14 @@ func (t *TieredBackend) AddBatch(ctx context.Context, entries []*Entry) error {
 
 	// Best-effort add to L2 and L3
 	if t.l2 != nil {
-		t.l2.AddBatch(ctx, entries)
+		if err := t.l2.AddBatch(ctx, entries); err != nil {
+			t.reportBackgroundError("l2", "add_batch", err)
+		}
 	}
 	if t.l3 != nil {
-		t.l3.AddBatch(ctx, entries)
+		if err := t.l3.AddBatch(ctx, entries); err != nil {
+			t.reportBackgroundError("l3", "add_batch", err)
+		}
 	}
 
 	return nil
@@ -317,4 +329,15 @@ func (t *TieredBackend) L1HitRate() float64 {
 // ResetStats resets all statistics.
 func (t *TieredBackend) ResetStats() {
 	t.stats = &TieredStats{}
+}
+
+func (t *TieredBackend) reportBackgroundError(tier, operation string, err error) {
+	if t == nil || err == nil || t.onError == nil {
+		return
+	}
+	t.onError(TieredBackgroundError{
+		Tier:      tier,
+		Operation: operation,
+		Err:       err,
+	})
 }

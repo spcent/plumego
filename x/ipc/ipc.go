@@ -352,24 +352,12 @@ func NewServer(addr string, opts ...Option) (Server, error) {
 	return newPlatformServer(addr, config)
 }
 
-// NewServerWithConfig creates a new IPC server with custom config
-// Deprecated: Use NewServer with functional options instead
-func NewServerWithConfig(addr string, config *Config) (Server, error) {
-	return newPlatformServer(addr, config)
-}
-
 // Dial connects to a server at given address with default config
 func Dial(addr string, opts ...Option) (Client, error) {
 	config := DefaultConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
-	return dialPlatform(addr, config)
-}
-
-// DialWithConfig connects to a server with custom config
-// Deprecated: Use Dial with functional options instead
-func DialWithConfig(addr string, config *Config) (Client, error) {
 	return dialPlatform(addr, config)
 }
 

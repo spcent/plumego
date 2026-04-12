@@ -148,7 +148,9 @@ func TestServeWSWithAuth_BadRoomPassword(t *testing.T) {
 	defer hub.Stop()
 	auth := NewSimpleRoomAuth([]byte("secret"))
 	// Set a room password first
-	auth.SetRoomPassword("test", "correct")
+	if err := auth.SetRoomPassword("test", "correct"); err != nil {
+		t.Fatalf("SetRoomPassword: %v", err)
+	}
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/ws?room=test&room_password=wrong", nil)

@@ -1,13 +1,10 @@
 package transport_test
 
 import (
-	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/x/tenant/transport"
 )
 
@@ -157,57 +154,6 @@ func TestSetQuotaHeaders(t *testing.T) {
 			t.Errorf("X-Quota-Remaining-Tokens should be omitted, got %q", got)
 		}
 	})
-}
-
-func TestWriteError(t *testing.T) {
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/api", nil)
-
-	transport.WriteError(w, r, http.StatusTooManyRequests, transport.CodeRateLimited, "rate limit exceeded", contract.CategoryRateLimit)
-
-	if w.Code != http.StatusTooManyRequests {
-		t.Errorf("status = %d, want %d", w.Code, http.StatusTooManyRequests)
-	}
-
-	// Response is wrapped: {"error": {"code": ..., "message": ...}}
-	var body struct {
-		Error struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.Error.Code != transport.CodeRateLimited {
-		t.Errorf("code = %q, want %q", body.Error.Code, transport.CodeRateLimited)
-	}
-	if body.Error.Message != "rate limit exceeded" {
-		t.Errorf("message = %q, want rate limit exceeded", body.Error.Message)
-	}
-}
-
-func TestWriteError_PolicyDenied(t *testing.T) {
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/resource", nil)
-
-	transport.WriteError(w, r, http.StatusForbidden, transport.CodePolicyDenied, "policy denied", contract.CategoryAuth)
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
-	}
-
-	var body struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
-	}
-	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.Error.Code != transport.CodePolicyDenied {
-		t.Errorf("code = %q, want %q", body.Error.Code, transport.CodePolicyDenied)
-	}
 }
 
 func TestErrorCodes_AreNonEmpty(t *testing.T) {

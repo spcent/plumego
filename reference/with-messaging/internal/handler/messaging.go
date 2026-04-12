@@ -60,11 +60,9 @@ func (h MessagingHandler) Publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := contract.WriteResponse(w, r, http.StatusAccepted, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusAccepted, map[string]any{
 		"ok":        true,
 		"topic":     body.Topic,
 		"timestamp": time.Now().Format(time.RFC3339),
-	}, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	}, nil)
 }

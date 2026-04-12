@@ -88,7 +88,7 @@ func TestTenantDB_ErrAndOperationsFailClosedOnInvalidColumn(t *testing.T) {
 		t.Fatal("Err() should report invalid tenant column configuration")
 	}
 
-	ctx := tenant.ContextWithTenantID(context.Background(), "t-123")
+	ctx := tenant.WithTenantID(context.Background(), "t-123")
 	if _, err := tdb.QueryFromContext(ctx, "SELECT * FROM users"); err == nil {
 		t.Fatal("QueryFromContext() should fail for invalid tenant column configuration")
 	}
@@ -124,7 +124,7 @@ func TestTenantDB_QueryFromContext(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	ctx := tenant.ContextWithTenantID(context.Background(), "t-123")
+	ctx := tenant.WithTenantID(context.Background(), "t-123")
 
 	rows, err := tdb.QueryFromContext(ctx, "SELECT * FROM users WHERE active = ?", true)
 	if err != nil {
@@ -172,7 +172,7 @@ func TestTenantDB_ExecFromContext(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	ctx := tenant.ContextWithTenantID(context.Background(), "t-123")
+	ctx := tenant.WithTenantID(context.Background(), "t-123")
 
 	_, err := tdb.ExecFromContext(ctx, "UPDATE users SET active = ? WHERE name = ?", true, "test")
 	if err != nil {
@@ -693,7 +693,7 @@ func TestTenantDB_QueryRowFromContext_WithTenant(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	ctx := tenant.ContextWithTenantID(context.Background(), "t-123")
+	ctx := tenant.WithTenantID(context.Background(), "t-123")
 
 	row := tdb.QueryRowFromContext(ctx, "SELECT * FROM users WHERE id = ?", 1)
 	if row == nil {

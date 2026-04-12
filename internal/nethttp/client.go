@@ -32,7 +32,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"math"
 	"math/rand"
 	"net"
@@ -100,18 +99,41 @@ type Middleware func(next RoundTripperFunc) RoundTripperFunc
 // RoundTripperFunc is a function that implements the core HTTP transport contract.
 type RoundTripperFunc func(req *http.Request) (*http.Response, error)
 
-// Logging returns a middleware that logs each outbound request's method, URL, status, and duration.
-func Logging(next RoundTripperFunc) RoundTripperFunc {
-	return func(req *http.Request) (*http.Response, error) {
-		start := time.Now()
-		resp, err := next(req)
-		dur := time.Since(start)
-		if err != nil {
-			log.Printf("http client: %s %s error=%v duration=%s", req.Method, req.URL.Host, err, dur)
-		} else {
-			log.Printf("http client: %s %s status=%s duration=%s", req.Method, req.URL.Host, resp.Status, dur)
+// RequestLogEntry captures a request result for caller-defined logging middleware.
+type RequestLogEntry struct {
+	Method   string
+	Host     string
+	Status   string
+	Duration time.Duration
+	Err      error
+}
+
+// Logging returns a middleware that reports outbound request results to the caller-provided callback.
+func Logging(logf func(RequestLogEntry)) Middleware {
+	return func(next RoundTripperFunc) RoundTripperFunc {
+		return func(req *http.Request) (*http.Response, error) {
+			start := time.Now()
+			resp, err := next(req)
+
+			if logf != nil {
+				entry := RequestLogEntry{
+					Duration: time.Since(start),
+					Err:      err,
+				}
+				if req != nil {
+					entry.Method = req.Method
+					if req.URL != nil {
+						entry.Host = req.URL.Host
+					}
+				}
+				if resp != nil {
+					entry.Status = resp.Status
+				}
+				logf(entry)
+			}
+
+			return resp, err
 		}
-		return resp, err
 	}
 }
 

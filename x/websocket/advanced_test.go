@@ -236,7 +236,9 @@ func TestAuthentication(t *testing.T) {
 	auth := NewSimpleRoomAuth(secret)
 
 	// Test room password
-	auth.SetRoomPassword("secure", "secret123")
+	if err := auth.SetRoomPassword("secure", "secret123"); err != nil {
+		t.Fatalf("SetRoomPassword: %v", err)
+	}
 	if !auth.CheckRoomPassword("secure", "secret123") {
 		t.Error("Room password check failed")
 	}

@@ -4,9 +4,6 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
 )
 
 const (
@@ -27,10 +24,6 @@ func HeaderOrDefault(value, fallback string) string {
 		return fallback
 	}
 	return value
-}
-
-func WriteError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory) {
-	middleware.WriteTransportError(w, r, status, code, message, category, nil)
 }
 
 func SetRetryAfterHeader(w http.ResponseWriter, retry time.Duration) {

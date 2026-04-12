@@ -172,13 +172,19 @@ func TestLoggingMiddleware(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
+	logged := false
 	client := New(
-		WithMiddleware(Logging),
+		WithMiddleware(Logging(func(entry RequestLogEntry) {
+			logged = true
+		})),
 		WithTransport(http.DefaultTransport),
 	)
 	_, err := client.Get(context.Background(), server.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !logged {
+		t.Fatal("expected logging callback to run")
 	}
 }
 

@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestAdminHandlerEndpoints(t *testing.T) {
@@ -29,6 +31,7 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("health status: %d", rec.Code)
 	}
+	assertJSONContentType(t, rec)
 
 	req = httptest.NewRequest(http.MethodGet, "/scheduler/jobs/admin-1", nil)
 	rec = httptest.NewRecorder()
@@ -36,6 +39,7 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("job status: %d", rec.Code)
 	}
+	assertJSONContentType(t, rec)
 
 	var status JobStatus
 	if err := json.NewDecoder(rec.Body).Decode(&status); err != nil {
@@ -70,6 +74,7 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("jobs state status: %d", rec.Code)
 	}
+	assertJSONContentType(t, rec)
 	var jobs []JobStatus
 	if err := json.NewDecoder(rec.Body).Decode(&jobs); err != nil {
 		t.Fatalf("decode jobs: %v", err)
@@ -142,6 +147,7 @@ func TestAdminHandlerBulkDLQAndPrefix(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected method not allowed for GET job action, got %d", rec.Code)
 	}
+	assertErrorCode(t, rec, "METHOD_NOT_ALLOWED")
 
 	rec = doAdminReq(h, http.MethodGet, "/admin/sched/dlq/dlq-fail")
 	if rec.Code != http.StatusOK {
@@ -161,6 +167,7 @@ func TestAdminHandlerBulkDLQAndPrefix(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected method not allowed for dlq entry action, got %d", rec.Code)
 	}
+	assertErrorCode(t, rec, "METHOD_NOT_ALLOWED")
 
 	rec = doAdminReq(h, http.MethodDelete, "/admin/sched/dlq/dlq-fail")
 	if rec.Code != http.StatusOK {
@@ -171,6 +178,7 @@ func TestAdminHandlerBulkDLQAndPrefix(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected dlq entry not found after delete, got %d", rec.Code)
 	}
+	assertErrorCode(t, rec, contract.CodeResourceNotFound)
 }
 
 func doAdminReq(h *AdminHandler, method, path string) *httptest.ResponseRecorder {
@@ -189,6 +197,26 @@ func assertAffectedCount(t *testing.T, payload []byte, want int) {
 	got := body["affected"]
 	if got != want {
 		t.Fatalf("expected affected=%d, got %d", want, got)
+	}
+}
+
+func assertJSONContentType(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if got := rec.Header().Get("Content-Type"); got != contract.ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
+	}
+}
+
+func assertErrorCode(t *testing.T, rec *httptest.ResponseRecorder, want string) {
+	t.Helper()
+	assertJSONContentType(t, rec)
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if resp.Error.Code != want {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, want)
 	}
 }
 

@@ -50,8 +50,6 @@ internal/httpapp/handlers/user_create.go
 internal/httpapp/middleware/logging.go
 internal/domain/user/service.go
 internal/domain/user/repository.go
-internal/platform/httpjson/response.go
-internal/platform/httperr/error.go
 ```
 
 This layout should be demonstrated first in `reference/standard-service` and copied by templates and scaffolds, not reinvented per example.
@@ -59,8 +57,9 @@ This layout should be demonstrated first in `reference/standard-service` and cop
 - `cmd/` — startup only
 - `internal/httpapp/` — HTTP wiring only
 - `internal/domain/` — business logic
-- `internal/platform/` — reusable transport/infra helpers
-- Do not mix routing, domain logic, persistence, and response helpers in one package
+- `internal/platform/` — optional app-local infra adapters only when the behavior does not already belong to a stable Plumego package
+- success and error writes should go directly through `contract.WriteResponse` / `contract.WriteError` from handlers instead of app-local JSON/error helper families
+- Do not mix routing, domain logic, persistence, and transport helper policy in one package
 
 ---
 

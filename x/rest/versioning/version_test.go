@@ -18,7 +18,7 @@ func TestStrategyAcceptHeader(t *testing.T) {
 	middleware := Middleware(config)
 
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		version := GetVersion(r.Context())
+		version := VersionFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(string(rune('0' + version))))
 	}))
@@ -85,7 +85,7 @@ func TestStrategyURLPath(t *testing.T) {
 	middleware := Middleware(config)
 
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		version := GetVersion(r.Context())
+		version := VersionFromContext(r.Context())
 		path := r.URL.Path
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(string(rune('0'+version)) + ":" + path))
@@ -147,7 +147,7 @@ func TestStrategyQueryParam(t *testing.T) {
 	middleware := Middleware(config)
 
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		version := GetVersion(r.Context())
+		version := VersionFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(string(rune('0' + version))))
 	}))
@@ -204,7 +204,7 @@ func TestStrategyCustomHeader(t *testing.T) {
 	middleware := Middleware(config)
 
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		version := GetVersion(r.Context())
+		version := VersionFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(string(rune('0' + version))))
 	}))
@@ -321,7 +321,7 @@ func TestCustomExtractor(t *testing.T) {
 	middleware := CustomExtractor(extractor, 1, []int{1, 2, 3})
 
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		version := GetVersion(r.Context())
+		version := VersionFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(string(rune('0' + version))))
 	}))

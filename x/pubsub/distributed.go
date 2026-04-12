@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"sort"
@@ -552,11 +551,11 @@ func (dps *DistributedPubSub) checkNodeHealth() {
 
 func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		contract.WriteError(w, r, errClusterMethodNotAllowed())
+		_ = contract.WriteError(w, r, errClusterMethodNotAllowed())
 		return
 	}
 	if !dps.authenticateClusterRequest(r) {
-		contract.WriteError(w, r, errClusterUnauthorized())
+		_ = contract.WriteError(w, r, errClusterUnauthorized())
 		return
 	}
 
@@ -566,23 +565,22 @@ func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Reques
 		"joined":  dps.joined.Load(),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	_ = contract.WriteJSON(w, http.StatusOK, status)
 }
 
 func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		contract.WriteError(w, r, errClusterMethodNotAllowed())
+		_ = contract.WriteError(w, r, errClusterMethodNotAllowed())
 		return
 	}
 	if !dps.authenticateClusterRequest(r) {
-		contract.WriteError(w, r, errClusterUnauthorized())
+		_ = contract.WriteError(w, r, errClusterUnauthorized())
 		return
 	}
 
 	var payload heartbeatPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Code("INVALID_PAYLOAD").
 			Message("invalid payload").
@@ -617,23 +615,22 @@ func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Req
 		Version:   "1.0",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = contract.WriteJSON(w, http.StatusOK, response)
 }
 
 func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		contract.WriteError(w, r, errClusterMethodNotAllowed())
+		_ = contract.WriteError(w, r, errClusterMethodNotAllowed())
 		return
 	}
 	if !dps.authenticateClusterRequest(r) {
-		contract.WriteError(w, r, errClusterUnauthorized())
+		_ = contract.WriteError(w, r, errClusterUnauthorized())
 		return
 	}
 
 	var cm clusterMessage
 	if err := json.NewDecoder(r.Body).Decode(&cm); err != nil {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Code("INVALID_MESSAGE").
 			Message("invalid message").
@@ -644,7 +641,7 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 
 	// Publish locally
 	if err := dps.InProcBroker.Publish(cm.Topic, cm.Message); err != nil {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
 			Type(contract.TypeInternal).
@@ -657,17 +654,16 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 
 	dps.clusterReceives.Add(1)
 
-	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "OK")
+	_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		contract.WriteError(w, r, errClusterMethodNotAllowed())
+		_ = contract.WriteError(w, r, errClusterMethodNotAllowed())
 		return
 	}
 	if !dps.authenticateClusterRequest(r) {
-		contract.WriteError(w, r, errClusterUnauthorized())
+		_ = contract.WriteError(w, r, errClusterUnauthorized())
 		return
 	}
 
@@ -678,8 +674,7 @@ func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request)
 	}
 	dps.nodesMu.RUnlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = contract.WriteJSON(w, http.StatusOK, map[string]any{
 		"nodes": nodes,
 	})
 }

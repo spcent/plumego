@@ -210,7 +210,7 @@ func (c *Cluster) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, er
 	c.metrics.PrimaryQueries.Add(1)
 
 	// Mark context as being in transaction
-	ctx = MarkInTransaction(ctx)
+	ctx = WithInTransaction(ctx)
 
 	return c.primary.BeginTx(ctx, opts)
 }

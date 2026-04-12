@@ -36,12 +36,12 @@ public_entrypoints:
   - NewTransactionAwarePolicy
   - NewAlwaysPrimaryPolicy
   - NewCompositePolicy
-  - ForcePrimary
-  - PreferReplica
-  - MarkInTransaction
-  - IsForcePrimary
-  - IsPreferReplica
-  - IsInTransaction
+  - WithForcePrimary
+  - WithPreferReplica
+  - WithInTransaction
+  - ForcePrimaryFromContext
+  - PreferReplicaFromContext
+  - InTransactionFromContext
 
 allowed_imports:
   - stdlib
@@ -76,5 +76,5 @@ review_checklist:
 
 agent_hints:
   - Compose with x/data/sharding by passing a Cluster as each shard in the Router
-  - Use ForcePrimary(ctx) for read-after-write visibility; use PreferReplica(ctx) only for known-safe reads that should bypass SQL write-detection heuristics
+  - Use WithForcePrimary(ctx) for read-after-write visibility; use WithPreferReplica(ctx) only for known-safe reads that should bypass SQL write-detection heuristics
   - DefaultHealthCheckConfig() only applies when HealthCheck.Enabled is true, and FallbackToPrimary should be set explicitly when primary-backed outage reads are acceptable

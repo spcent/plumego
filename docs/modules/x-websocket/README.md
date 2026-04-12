@@ -44,4 +44,6 @@
 
 - keep websocket setup explicit and out of `core`
 - keep auth and broadcast gates reviewable
+- handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
+- keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface

@@ -24,90 +24,6 @@ import (
 )
 
 // ================================================
-// Deprecated legacy response types
-// ================================================
-
-// Response represents a standardized JSON response structure.
-//
-// Deprecated: use contract.Response or contract.WriteResponse instead.
-type Response struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    any    `json:"data,omitempty"`
-}
-
-// ErrorResponse represents a standardized error response structure.
-//
-// Deprecated: use contract.APIError or contract.WriteError instead.
-type ErrorResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Details any    `json:"details,omitempty"`
-}
-
-// ================================================
-// JSONWriter — legacy response helper
-// ================================================
-
-// JSONWriter provides consistent JSON response writing.
-//
-// Deprecated: prefer contract.WriteResponse / contract.WriteError for new code.
-type JSONWriter struct {
-	resourceName string
-}
-
-// NewJSONWriter creates a new JSON writer with the given resource name.
-//
-// Deprecated: prefer contract.WriteResponse / contract.WriteError for new code.
-func NewJSONWriter(resourceName string) *JSONWriter {
-	return &JSONWriter{resourceName: resourceName}
-}
-
-// WriteJSON writes a standardized JSON response.
-func (jw *JSONWriter) WriteJSON(w http.ResponseWriter, status int, data any) {
-	if err := contract.WriteResponse(w, nil, status, data, nil); err != nil {
-		if jw != nil && jw.resourceName != "" {
-			fmt.Printf("[rest] JSON encoding failed for %s: %v\n", jw.resourceName, err)
-		} else {
-			fmt.Printf("[rest] JSON encoding failed: %v\n", err)
-		}
-	}
-}
-
-// WriteError writes a standardized error response.
-func (jw *JSONWriter) WriteError(w http.ResponseWriter, status int, message string, details any) {
-	b := contract.NewErrorBuilder().
-		Status(status).
-		Code(http.StatusText(status)).
-		Message(message).
-		Category(contract.CategoryForStatus(status))
-	if details != nil {
-		b = b.Detail("details", details)
-	}
-	contract.WriteError(w, nil, b.Build())
-}
-
-// WriteResponse writes a contract response payload and includes trace id when available.
-func (jw *JSONWriter) WriteResponse(w http.ResponseWriter, r *http.Request, status int, data any, meta map[string]any) error {
-	return contract.WriteResponse(w, r, status, data, meta)
-}
-
-// WriteAPIError writes a contract error payload.
-func (jw *JSONWriter) WriteAPIError(w http.ResponseWriter, r *http.Request, err contract.APIError) {
-	contract.WriteError(w, r, err)
-}
-
-// WriteNotImplemented writes a standardized "Not Implemented" response.
-func (jw *JSONWriter) WriteNotImplemented(w http.ResponseWriter, method string) {
-	resourceName := "resource"
-	if jw != nil && jw.resourceName != "" {
-		resourceName = jw.resourceName
-	}
-	jw.WriteError(w, http.StatusNotImplemented, "Not Implemented",
-		fmt.Sprintf("The %s method is not implemented for the %s resource", method, resourceName))
-}
-
-// ================================================
 // ResourceController — RESTful resource interface
 // ================================================
 
@@ -130,34 +46,32 @@ type ResourceController interface {
 // All methods return "Not Implemented" by default; override the ones you need.
 type BaseResourceController struct {
 	ResourceName string
-	jsonWriter   *JSONWriter
 }
 
 // NewBaseResourceController creates a new base resource controller.
 func NewBaseResourceController(resourceName string) *BaseResourceController {
 	return &BaseResourceController{
 		ResourceName: resourceName,
-		jsonWriter:   NewJSONWriter(resourceName),
 	}
 }
 
 func (c *BaseResourceController) Index(w http.ResponseWriter, r *http.Request) {
-	c.jsonWriter.WriteNotImplemented(w, "Index")
+	writeNotImplementedResourceError(w, r, c.resourceName(), "Index")
 }
 func (c *BaseResourceController) Show(w http.ResponseWriter, r *http.Request) {
-	c.jsonWriter.WriteNotImplemented(w, "Show")
+	writeNotImplementedResourceError(w, r, c.resourceName(), "Show")
 }
 func (c *BaseResourceController) Create(w http.ResponseWriter, r *http.Request) {
-	c.jsonWriter.WriteNotImplemented(w, "Create")
+	writeNotImplementedResourceError(w, r, c.resourceName(), "Create")
 }
 func (c *BaseResourceController) Update(w http.ResponseWriter, r *http.Request) {
-	c.jsonWriter.WriteNotImplemented(w, "Update")
+	writeNotImplementedResourceError(w, r, c.resourceName(), "Update")
 }
 func (c *BaseResourceController) Delete(w http.ResponseWriter, r *http.Request) {
-	c.jsonWriter.WriteNotImplemented(w, "Delete")
+	writeNotImplementedResourceError(w, r, c.resourceName(), "Delete")
 }
 func (c *BaseResourceController) Patch(w http.ResponseWriter, r *http.Request) {
-	c.jsonWriter.WriteNotImplemented(w, "Patch")
+	writeNotImplementedResourceError(w, r, c.resourceName(), "Patch")
 }
 
 // Options handles OPTIONS requests; sets common CORS headers.
@@ -174,30 +88,27 @@ func (c *BaseResourceController) Head(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *BaseResourceController) BatchCreate(w http.ResponseWriter, r *http.Request) {
-	c.jsonWriter.WriteNotImplemented(w, "BatchCreate")
+	writeNotImplementedResourceError(w, r, c.resourceName(), "BatchCreate")
 }
 func (c *BaseResourceController) BatchDelete(w http.ResponseWriter, r *http.Request) {
-	c.jsonWriter.WriteNotImplemented(w, "BatchDelete")
+	writeNotImplementedResourceError(w, r, c.resourceName(), "BatchDelete")
 }
 
-// JSON is a helper method to write JSON responses.
-func (c *BaseResourceController) JSON(w http.ResponseWriter, status int, data any) {
-	c.jsonWriter.WriteJSON(w, status, data)
+func (c *BaseResourceController) resourceName() string {
+	if c == nil || strings.TrimSpace(c.ResourceName) == "" {
+		return "resource"
+	}
+	return c.ResourceName
 }
 
-// Error is a helper method to write standardized error responses.
-func (c *BaseResourceController) Error(w http.ResponseWriter, status int, message string, details any) {
-	c.jsonWriter.WriteError(w, status, message, details)
-}
-
-// Response is a helper method to write contract-based JSON responses.
-func (c *BaseResourceController) Response(w http.ResponseWriter, r *http.Request, status int, data any, meta map[string]any) {
-	_ = c.jsonWriter.WriteResponse(w, r, status, data, meta)
-}
-
-// APIError is a helper method to write contract-based error responses.
-func (c *BaseResourceController) APIError(w http.ResponseWriter, r *http.Request, err contract.APIError) {
-	c.jsonWriter.WriteAPIError(w, r, err)
+func writeNotImplementedResourceError(w http.ResponseWriter, r *http.Request, resourceName, method string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(http.StatusNotImplemented).
+		Code("not_implemented").
+		Message(fmt.Sprintf("The %s method is not implemented for the %s resource", method, resourceName)).
+		Detail("method", method).
+		Detail("resource", resourceName).
+		Build())
 }
 
 // ================================================
@@ -211,9 +122,7 @@ type QueryParams struct {
 	Offset   int
 	Limit    int
 
-	Sort      []SortField
-	SortBy    string // Deprecated: use Sort
-	SortOrder string // Deprecated: use Sort
+	Sort []SortField
 
 	Filters map[string]string
 	Search  string
@@ -361,21 +270,6 @@ func (qb *QueryBuilder) Parse(r *http.Request) *QueryParams {
 		}
 	}
 
-	// Legacy sort_by / sort_order
-	if sortBy := query.Get("sort_by"); sortBy != "" {
-		params.SortBy = sortBy
-		params.SortOrder = "asc"
-		if order := query.Get("sort_order"); order == "desc" {
-			params.SortOrder = "desc"
-		}
-		if len(qb.allowedSorts) == 0 || qb.allowedSorts[sortBy] {
-			params.Sort = append(params.Sort, SortField{
-				Field: sortBy,
-				Desc:  params.SortOrder == "desc",
-			})
-		}
-	}
-
 	params.Search = query.Get("search")
 	if params.Search == "" {
 		params.Search = query.Get("q")
@@ -383,7 +277,7 @@ func (qb *QueryBuilder) Parse(r *http.Request) *QueryParams {
 
 	skip := map[string]bool{
 		"page": true, "page_size": true, "limit": true, "offset": true,
-		"sort": true, "sort_by": true, "sort_order": true,
+		"sort":   true,
 		"search": true, "q": true, "fields": true, "include": true,
 	}
 	for key, values := range query {
@@ -605,13 +499,7 @@ func (c *BaseContextResourceController) ParseQueryParams(r *http.Request) *Query
 }
 
 func (c *BaseContextResourceController) notImplemented(ctx *contract.Ctx, method string) {
-	_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-		Status(http.StatusNotImplemented).
-		Code("not_implemented").
-		Message(fmt.Sprintf("The %s method is not implemented for the %s resource", method, c.ResourceName)).
-		Detail("method", method).
-		Detail("resource", c.ResourceName).
-		Build())
+	writeNotImplementedResourceError(ctx.W, ctx.R, c.ResourceName, method)
 }
 
 func (c *BaseContextResourceController) IndexCtx(ctx *contract.Ctx) {

@@ -1079,11 +1079,11 @@ func (s *Scheduler) execute(j *job, enqueuedAt time.Time) {
 	lastErr := j.lastError
 	s.setJobStateLocked(j, JobStateRunning)
 	s.mu.Unlock()
-	ctx = context.WithValue(ctx, jobIDKey{}, j.id)
-	ctx = context.WithValue(ctx, jobAttemptKey{}, attempt)
-	ctx = context.WithValue(ctx, jobScheduledKey{}, scheduledAt)
+	ctx = WithJobID(ctx, j.id)
+	ctx = WithJobAttempt(ctx, attempt)
+	ctx = WithJobScheduledAt(ctx, scheduledAt)
 	if lastErr != nil {
-		ctx = context.WithValue(ctx, jobLastErrorKey{}, lastErr)
+		ctx = WithJobLastError(ctx, lastErr)
 	}
 	err := func() (err error) {
 		defer func() {

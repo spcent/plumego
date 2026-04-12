@@ -2,8 +2,14 @@ package pubsub
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestDistributedPubSub_Basic(t *testing.T) {
@@ -408,6 +414,141 @@ func TestDistributedPubSub_InvalidConfig(t *testing.T) {
 				t.Error("Expected error for invalid config")
 			}
 		})
+	}
+}
+
+func TestDistributedPubSub_HTTPHandlersUseCanonicalResponses(t *testing.T) {
+	config := DefaultClusterConfig("node-http", "127.0.0.1:18101")
+
+	dps, err := NewDistributed(config)
+	if err != nil {
+		t.Fatalf("NewDistributed: %v", err)
+	}
+	defer dps.Close()
+
+	healthReq := httptest.NewRequest(http.MethodGet, "/health", nil)
+	healthRec := httptest.NewRecorder()
+	dps.handleHealth(healthRec, healthReq)
+	if healthRec.Code != http.StatusOK {
+		t.Fatalf("health status = %d, want %d", healthRec.Code, http.StatusOK)
+	}
+	assertPubSubJSONContentType(t, healthRec)
+
+	var health map[string]any
+	if err := json.NewDecoder(healthRec.Body).Decode(&health); err != nil {
+		t.Fatalf("decode health: %v", err)
+	}
+	if health["node_id"] != "node-http" {
+		t.Fatalf("node_id = %v, want %q", health["node_id"], "node-http")
+	}
+
+	heartbeatBody := `{"node_id":"peer-1","addr":"127.0.0.1:18102","topics":["orders"],"timestamp":"2026-04-12T00:00:00Z","version":"1.0"}`
+	heartbeatReq := httptest.NewRequest(http.MethodPost, "/heartbeat", strings.NewReader(heartbeatBody))
+	heartbeatRec := httptest.NewRecorder()
+	dps.handleHeartbeat(heartbeatRec, heartbeatReq)
+	if heartbeatRec.Code != http.StatusOK {
+		t.Fatalf("heartbeat status = %d, want %d", heartbeatRec.Code, http.StatusOK)
+	}
+	assertPubSubJSONContentType(t, heartbeatRec)
+
+	var heartbeatResp heartbeatPayload
+	if err := json.NewDecoder(heartbeatRec.Body).Decode(&heartbeatResp); err != nil {
+		t.Fatalf("decode heartbeat response: %v", err)
+	}
+	if heartbeatResp.NodeID != "node-http" {
+		t.Fatalf("heartbeat node_id = %q, want %q", heartbeatResp.NodeID, "node-http")
+	}
+
+	syncReq := httptest.NewRequest(http.MethodGet, "/sync", nil)
+	syncRec := httptest.NewRecorder()
+	dps.handleSync(syncRec, syncReq)
+	if syncRec.Code != http.StatusOK {
+		t.Fatalf("sync status = %d, want %d", syncRec.Code, http.StatusOK)
+	}
+	assertPubSubJSONContentType(t, syncRec)
+
+	var syncResp struct {
+		Nodes []*ClusterNode `json:"nodes"`
+	}
+	if err := json.NewDecoder(syncRec.Body).Decode(&syncResp); err != nil {
+		t.Fatalf("decode sync response: %v", err)
+	}
+	if len(syncResp.Nodes) != 1 || syncResp.Nodes[0].ID != "peer-1" {
+		t.Fatalf("unexpected sync nodes: %+v", syncResp.Nodes)
+	}
+}
+
+func TestDistributedPubSub_HTTPHandlersReturnStructuredErrors(t *testing.T) {
+	config := DefaultClusterConfig("node-http", "127.0.0.1:18111")
+	config.AuthToken = "secret-token"
+
+	dps, err := NewDistributed(config)
+	if err != nil {
+		t.Fatalf("NewDistributed: %v", err)
+	}
+	defer dps.Close()
+
+	methodReq := httptest.NewRequest(http.MethodGet, "/heartbeat", nil)
+	methodRec := httptest.NewRecorder()
+	dps.handleHeartbeat(methodRec, methodReq)
+	if methodRec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("heartbeat method status = %d, want %d", methodRec.Code, http.StatusMethodNotAllowed)
+	}
+	assertPubSubErrorCode(t, methodRec, "METHOD_NOT_ALLOWED")
+
+	authReq := httptest.NewRequest(http.MethodGet, "/health", nil)
+	authRec := httptest.NewRecorder()
+	dps.handleHealth(authRec, authReq)
+	if authRec.Code != http.StatusUnauthorized {
+		t.Fatalf("health auth status = %d, want %d", authRec.Code, http.StatusUnauthorized)
+	}
+	assertPubSubErrorCode(t, authRec, "UNAUTHORIZED")
+}
+
+func TestDistributedPubSub_ClusterPublishReturnsJSON(t *testing.T) {
+	config := DefaultClusterConfig("node-http", "127.0.0.1:18121")
+
+	dps, err := NewDistributed(config)
+	if err != nil {
+		t.Fatalf("NewDistributed: %v", err)
+	}
+	defer dps.Close()
+
+	body := `{"type":"publish","node_id":"peer-1","topic":"orders","message":{"data":"ok"},"timestamp":"2026-04-12T00:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPost, "/publish", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	dps.handleClusterPublish(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("publish status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	assertPubSubJSONContentType(t, rec)
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode publish response: %v", err)
+	}
+	if resp["status"] != "ok" {
+		t.Fatalf("publish status payload = %q, want %q", resp["status"], "ok")
+	}
+}
+
+func assertPubSubJSONContentType(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if got := rec.Header().Get("Content-Type"); got != contract.ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
+	}
+}
+
+func assertPubSubErrorCode(t *testing.T, rec *httptest.ResponseRecorder, want string) {
+	t.Helper()
+	assertPubSubJSONContentType(t, rec)
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if resp.Error.Code != want {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, want)
 	}
 }
 

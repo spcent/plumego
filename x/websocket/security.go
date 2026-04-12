@@ -37,6 +37,10 @@ type SecurityConfig struct {
 	// Should be false in production
 	EnableDebugLogging bool
 
+	// Logger is optional and caller-provided. When nil, auth/security helpers do
+	// not emit logs.
+	Logger *log.Logger
+
 	// RejectOnQueueFull determines behavior when broadcast queue is full
 	// true: reject message and log error
 	// false: drop message silently (current behavior)
@@ -87,7 +91,9 @@ func ValidateSecurityConfig(cfg SecurityConfig) error {
 	if strings.Contains(secretStr, "secret") ||
 		strings.Contains(secretStr, "password") ||
 		strings.Contains(secretStr, "123456") {
-		log.Printf("WARNING: JWT secret contains common weak patterns")
+		if cfg.Logger != nil {
+			cfg.Logger.Printf("websocket: JWT secret contains common weak patterns")
+		}
 	}
 
 	return nil
@@ -125,7 +131,6 @@ func ValidateRoomPassword(pwd string, config password.PasswordStrengthConfig, en
 		if enforce {
 			return ErrWeakRoomPassword
 		}
-		log.Printf("WARNING: Weak room password used (enforcement disabled)")
 	}
 
 	return nil
@@ -187,16 +192,19 @@ func (s *SecureRoomAuth) SetRoomPassword(room, pwd string) error {
 		s.weakRoomPasswords.Add(1)
 		return err
 	}
-	s.SimpleRoomAuth.SetRoomPassword(room, pwd)
-	return nil
+	isStrong := password.ValidatePasswordStrength(pwd, s.securityConfig.RoomPasswordConfig)
+	if !isStrong && s.securityConfig.Logger != nil {
+		s.securityConfig.Logger.Printf("websocket: weak room password accepted for room %q", room)
+	}
+	return s.SimpleRoomAuth.SetRoomPassword(room, pwd)
 }
 
 // VerifyJWT overrides with additional logging and per-instance metrics
 func (s *SecureRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 	payload, err := s.SimpleRoomAuth.VerifyJWT(token)
 	if err != nil {
-		if s.securityConfig.EnableDebugLogging {
-			log.Printf("JWT verification failed: %v", err)
+		if s.securityConfig.EnableDebugLogging && s.securityConfig.Logger != nil {
+			s.securityConfig.Logger.Printf("websocket: JWT verification failed: %v", err)
 		}
 		s.invalidJWTSecrets.Add(1)
 		return nil, err
@@ -220,20 +228,6 @@ func (s *SecureRoomAuth) ResetMetrics() {
 	s.weakRoomPasswords.Store(0)
 	s.successfulAuthentications.Store(0)
 }
-
-// GetSecurityMetrics is deprecated. Use (*SecureRoomAuth).GetMetrics() instead.
-//
-// Deprecated: global security metrics were removed. Per-instance metrics are
-// available via (*SecureRoomAuth).GetMetrics(). Hub-level metrics are available
-// via (*Hub).Metrics().
-func GetSecurityMetrics() SecurityMetrics {
-	return SecurityMetrics{}
-}
-
-// ResetSecurityMetrics is deprecated and is now a no-op.
-//
-// Deprecated: global security metrics were removed. Use (*SecureRoomAuth).ResetMetrics().
-func ResetSecurityMetrics() {}
 
 // GenerateSecureSecret generates a cryptographically secure random secret
 func GenerateSecureSecret(length int) ([]byte, error) {

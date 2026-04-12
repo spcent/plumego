@@ -241,3 +241,52 @@ func TestCLI_InspectParsesFlagsAfterSubcommand(t *testing.T) {
 		t.Fatalf("expected endpoint /health, got %v", payload.Data["endpoint"])
 	}
 }
+
+func TestCLI_InspectUsesCanonicalDebugEndpoints(t *testing.T) {
+	tests := []struct {
+		name        string
+		subcommand  string
+		wantPath    string
+		wantMessage string
+	}{
+		{name: "routes", subcommand: "routes", wantPath: "/_debug/routes.json", wantMessage: "Routes retrieved"},
+		{name: "config", subcommand: "config", wantPath: "/_debug/config", wantMessage: "Configuration retrieved"},
+		{name: "info", subcommand: "info", wantPath: "/_debug/info", wantMessage: "Application info retrieved"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := mustNewLocalServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != tt.wantPath {
+					t.Fatalf("unexpected path %q", r.URL.Path)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"data":{"ok":true}}`))
+			}))
+			defer server.Close()
+
+			stdout, _, err := runCLI(t, []string{
+				"--format", "json",
+				"inspect", tt.subcommand, "--url", server.URL,
+			}, "")
+			if err != nil {
+				t.Fatalf("inspect %s failed: %v", tt.subcommand, err)
+			}
+
+			var payload struct {
+				Status  string         `json:"status"`
+				Message string         `json:"message"`
+				Data    map[string]any `json:"data"`
+			}
+			if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+				t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+			}
+			if payload.Status != "success" {
+				t.Fatalf("expected success status, got %q", payload.Status)
+			}
+			if payload.Message != tt.wantMessage {
+				t.Fatalf("expected message %q, got %q", tt.wantMessage, payload.Message)
+			}
+		})
+	}
+}

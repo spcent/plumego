@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 )
 
@@ -95,5 +96,35 @@ func TestParseQueryParamsUsesSpecDrivenNormalization(t *testing.T) {
 	}
 	if len(params.Filters) != 1 || params.Filters["tenant_id"] != "t1" {
 		t.Fatalf("expected filter allowlist to keep only tenant_id, got %#v", params.Filters)
+	}
+}
+
+func TestParseQueryParamsIgnoresLegacySortCompatibilityFields(t *testing.T) {
+	controller := NewBaseContextResourceController("users").ApplySpec(ResourceSpec{
+		Name:   "users",
+		Prefix: "/api/users",
+		Options: &ResourceOptions{
+			AllowedSorts: []string{"created_at"},
+		},
+	})
+
+	legacySortKey := "sort" + "_by"
+	legacyOrderKey := "sort" + "_order"
+	query := url.Values{
+		legacySortKey:  []string{"created_at"},
+		legacyOrderKey: []string{"desc"},
+	}
+
+	req := httptest.NewRequest("GET", "/api/users?"+query.Encode(), nil)
+	params := controller.ParseQueryParams(req)
+
+	if len(params.Sort) != 0 {
+		t.Fatalf("expected legacy sort query compatibility input to be ignored as sort input, got %#v", params.Sort)
+	}
+	if _, ok := params.Filters[legacySortKey]; !ok {
+		t.Fatalf("expected legacy sort key to fall back to a generic filter once compatibility parsing is removed, got %#v", params.Filters)
+	}
+	if got := params.Filters[legacyOrderKey]; got != "desc" {
+		t.Fatalf("expected legacy sort order key to fall back to a generic filter value, got %#v", params.Filters)
 	}
 }
