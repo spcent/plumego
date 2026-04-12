@@ -37,9 +37,9 @@ type Storage interface {
 - HTTP upload/download handlers and request parsing live in **`x/fileapi`**.
 - `store/file` stays responsible for the stable `Storage` contract, shared file
   types, and file operation errors.
-- Backend-specific configuration, metadata persistence, signed URLs, path/id
-  helpers, and thumbnail or image-processing helpers live in **`x/data/file`**
-  and **`x/fileapi`**.
+- Backend-specific configuration, metadata persistence, signed URLs, and any
+  path/id helper policy live in **`x/data/file`** and **`x/fileapi`**.
+- Thumbnail or image-processing helpers also live outside the stable root.
 
 ## Non-Goals
 

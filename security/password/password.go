@@ -6,24 +6,22 @@
 //
 // Features:
 //   - PBKDF2-HMAC-SHA512 key derivation (default: 210,000 iterations)
-//   - Automatic salt generation (32 bytes)
+//   - Automatic salt generation (16 bytes)
 //   - Constant-time comparison to prevent timing attacks
 //   - Password strength validation with customizable rules
-//   - Common password dictionary check (optional)
 //
 // Example usage:
 //
 //	import "github.com/spcent/plumego/security/password"
 //
 //	// Hash a password
-//	hash, err := password.Hash("user-password-123")
+//	hash, err := password.HashPassword("user-password-123")
 //	if err != nil {
 //		// Handle error
 //	}
 //
 //	// Verify a password
-//	ok := password.Verify("user-password-123", hash)
-//	if !ok {
+//	if err := password.CheckPassword(hash, "user-password-123"); err != nil {
 //		// Invalid password
 //	}
 //
@@ -35,8 +33,9 @@
 //		RequireDigit:     true,
 //		RequireSpecial:   true,
 //	}
-//	err = password.ValidateStrength("WeakPass", config)
-//	// Returns error if password doesn't meet requirements
+//	if !password.ValidatePasswordStrength("WeakPass", config) {
+//		// Password doesn't meet requirements
+//	}
 package password
 
 import (

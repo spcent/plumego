@@ -27,11 +27,12 @@
 //			IncludeSubDomains: true,
 //			Preload:           true,
 //		},
-//		ContentSecurityPolicy: &headers.CSPOptions{
-//			DefaultSrc: []string{"'self'"},
-//			ScriptSrc:  []string{"'self'", "'unsafe-inline'"},
-//		},
-//		XFrameOptions: "DENY",
+//		FrameOptions:       "DENY",
+//		ContentTypeOptions: "nosniff",
+//		ContentSecurityPolicy: headers.NewCSPBuilder().
+//			DefaultSrc("'self'").
+//			ScriptSrc("'self'").
+//			Build(),
 //	}
 //
 //	// Apply with the canonical transport adapter

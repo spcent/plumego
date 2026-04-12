@@ -404,7 +404,15 @@ func (c *ClusterDB) HealthCheck(ctx context.Context, timeout time.Duration) ([]S
 		}
 
 		start := time.Now()
-		pingErr := db.Ping(ctx, shard, timeout)
+		pingCtx := ctx
+		var cancel context.CancelFunc
+		if timeout > 0 {
+			pingCtx, cancel = context.WithTimeout(ctx, timeout)
+		}
+		pingErr := db.Ping(pingCtx, shard)
+		if cancel != nil {
+			cancel()
+		}
 		latency := time.Since(start)
 
 		if pingErr != nil {

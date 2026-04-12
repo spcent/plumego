@@ -1,6 +1,7 @@
-// Package file provides stable, transport-agnostic contracts and helpers for
-// file storage operations. Concrete storage backends and tenant-aware metadata
-// implementations live in x/data/file; HTTP handlers live in x/fileapi.
+// Package file provides stable, transport-agnostic contracts, shared types, and
+// errors for file storage operations. Concrete storage backends, metadata
+// implementations, and helper policy live outside the stable root; HTTP
+// handlers live in x/fileapi.
 package file
 
 import (

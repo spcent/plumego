@@ -1,9 +1,9 @@
 // Package db provides small stdlib-shaped SQL helpers.
 //
 // This package wraps database/sql with connection setup, context-driven query
-// and transaction helpers, and scan utilities. Topology, retry policy, timeout
-// policy, schema ownership, and health or observability ownership belong
-// outside the stable store root.
+// and transaction helpers, and scan utilities. Topology, retry policy, schema
+// ownership, and health or observability ownership belong outside the stable
+// store root. Operation deadlines are caller-owned through context.Context.
 //
 // Example usage:
 //
@@ -85,9 +85,6 @@ type Config struct {
 
 	// ConnMaxIdleTime is the maximum amount of time a connection may be idle
 	ConnMaxIdleTime time.Duration
-
-	// PingTimeout is the timeout for the initial ping test
-	PingTimeout time.Duration
 }
 
 // DB defines the minimal behavior required by SQL consumers.
@@ -123,9 +120,6 @@ func (c Config) Validate() error {
 	if c.ConnMaxIdleTime < 0 {
 		return fmt.Errorf("%w: ConnMaxIdleTime must be non-negative", ErrInvalidConfig)
 	}
-	if c.PingTimeout < 0 {
-		return fmt.Errorf("%w: PingTimeout must be non-negative", ErrInvalidConfig)
-	}
 	return nil
 }
 
@@ -138,7 +132,6 @@ func DefaultConfig(driver, dsn string) Config {
 		MaxIdleConns:    5,
 		ConnMaxLifetime: 30 * time.Minute,
 		ConnMaxIdleTime: 5 * time.Minute,
-		PingTimeout:     5 * time.Second,
 	}
 }
 
@@ -162,15 +155,6 @@ func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 	}
 
 	ApplyConfig(db, config)
-
-	if config.PingTimeout > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), config.PingTimeout)
-		defer cancel()
-		if err := db.PingContext(ctx); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("%w: %v", ErrPingFailed, err)
-		}
-	}
 
 	return db, nil
 }
@@ -351,16 +335,10 @@ func ScanRows[T any](rows *sql.Rows, scanFunc func(*sql.Rows) (T, error)) ([]T, 
 	return results, nil
 }
 
-// Ping tests the database connection with timeout.
-func Ping(ctx context.Context, db DB, timeout time.Duration) error {
+// Ping tests the database connection using the caller-provided context.
+func Ping(ctx context.Context, db DB) error {
 	if db == nil {
 		return fmt.Errorf("%w: database is nil", ErrPingFailed)
-	}
-
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
 	}
 
 	if err := db.PingContext(ctx); err != nil {

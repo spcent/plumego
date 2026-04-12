@@ -256,9 +256,8 @@ func createTestClusterDB(t *testing.T, shardCount int) *ClusterDB {
 	for i := 0; i < shardCount; i++ {
 		shards[i] = ShardConfig{
 			Primary: db.Config{
-				Driver:      "stub",
-				DSN:         "test",
-				PingTimeout: 0, // Disable ping for tests
+				Driver: "stub",
+				DSN:    "test",
 			},
 			HealthCheck: rw.HealthCheckConfig{
 				Enabled: false, // Disable health checks for tests

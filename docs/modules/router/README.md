@@ -52,6 +52,8 @@
 
 - preserve deterministic dispatch
 - keep explicit method-plus-path registration behavior
+- treat route registration failures as returned `error` values; do not model
+  duplicate/conflict/frozen registration through panic-oriented helpers
 - keep router APIs stdlib-shaped instead of alias-heavy
 - use `net/http` method constants for standard HTTP methods
 - keep one public param helper (`Param`)

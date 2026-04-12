@@ -6,32 +6,28 @@ import (
 	"testing"
 )
 
-// TestFreezeBlocksNewRoutes verifies that adding a route after Freeze panics.
+// TestFreezeBlocksNewRoutes verifies that adding a route after Freeze returns
+// an error through the public AddRoute contract.
 func TestFreezeBlocksNewRoutes(t *testing.T) {
 	r := NewRouter()
 	mustAddRoute(r, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {}))
 	r.Freeze()
 
-	defer func() {
-		if rec := recover(); rec == nil {
-			t.Fatal("expected panic when adding route to frozen router, got none")
-		}
-	}()
-	mustAddRoute(r, http.MethodGet, "/pong", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {}))
+	if err := r.AddRoute(http.MethodGet, "/pong", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {})); err == nil {
+		t.Fatal("expected error when adding route to frozen router, got nil")
+	}
 }
 
-// TestDuplicateRoutePanics verifies that registering the same method+path twice panics.
-func TestDuplicateRoutePanics(t *testing.T) {
+// TestDuplicateRouteReturnsError verifies that registering the same method+path
+// twice returns an error through the public AddRoute contract.
+func TestDuplicateRouteReturnsError(t *testing.T) {
 	r := NewRouter()
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {})
 	mustAddRoute(r, http.MethodGet, "/dup", handler)
 
-	defer func() {
-		if rec := recover(); rec == nil {
-			t.Fatal("expected panic on duplicate route, got none")
-		}
-	}()
-	mustAddRoute(r, http.MethodGet, "/dup", handler)
+	if err := r.AddRoute(http.MethodGet, "/dup", handler); err == nil {
+		t.Fatal("expected error on duplicate route, got nil")
+	}
 }
 
 // TestUnknownPathReturns404 verifies that a request for an unregistered path

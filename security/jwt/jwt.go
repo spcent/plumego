@@ -15,23 +15,30 @@
 // Example usage:
 //
 //	import (
+//		"context"
+//
 //		authmw "github.com/spcent/plumego/middleware/auth"
 //		"github.com/spcent/plumego/security/jwt"
+//		kvstore "github.com/spcent/plumego/store/kv"
 //	)
 //
-//	// Create a JWT manager with a secret (min 32 bytes)
-//	secret := []byte("your-secret-key-min-32-bytes-long")
-//	manager := jwt.NewManager(secret)
-//
-//	// Generate an access token
-//	claims := jwt.Claims{
-//		"sub":   "user123",
-//		"email": "user@example.com",
+//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
+//	if err != nil {
+//		// Handle store initialization error
 //	}
-//	token, err := manager.Generate(claims, jwt.TokenTypeAccess)
+//
+//	config := jwt.DefaultJWTConfig()
+//	manager, err := jwt.NewJWTManager(store, config)
+//	if err != nil {
+//		// Handle manager initialization error
+//	}
+//
+//	identity := jwt.IdentityClaims{Subject: "user123"}
+//	authz := jwt.AuthorizationClaims{Roles: []string{"user"}}
+//	pair, err := manager.GenerateTokenPair(context.Background(), identity, authz)
 //
 //	// Verify a token
-//	verified, err := manager.Verify(token, jwt.TokenTypeAccess)
+//	verified, err := manager.VerifyToken(context.Background(), pair.AccessToken, jwt.TokenTypeAccess)
 //	if err != nil {
 //		// Handle invalid or expired token
 //	}
@@ -289,7 +296,10 @@ type TokenPair struct {
 //	import "github.com/spcent/plumego/security/jwt"
 //	import "github.com/spcent/plumego/store/kv"
 //
-//	store := kv.New()
+//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
+//	if err != nil {
+//		// handle error
+//	}
 //	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {
@@ -321,8 +331,10 @@ type JWTManager struct {
 //	import "github.com/spcent/plumego/security/jwt"
 //	import "github.com/spcent/plumego/store/kv"
 //
-//	store := kv.New()
-//	secret := []byte("my-secret-key")
+//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
+//	if err != nil {
+//		// handle error
+//	}
 //	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {

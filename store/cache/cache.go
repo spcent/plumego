@@ -1,4 +1,5 @@
-// Package cache provides an in-memory caching system with TTL and LRU eviction.
+// Package cache provides a small in-memory cache primitive with TTL-aware and
+// memory-bounded eviction.
 //
 // This package implements an in-process cache primitive with features including:
 //   - TTL (time-to-live) expiration for entries
@@ -9,22 +10,24 @@
 //
 //	import "github.com/spcent/plumego/store/cache"
 //
-//	// Create a cache with 1000 items max, 5 minute TTL
-//	c := cache.New(cache.Config{
-//		MaxSize: 1000,
-//		TTL:     5 * time.Minute,
+//	c, err := cache.NewMemoryCacheWithConfig(cache.Config{
+//		MaxMemoryUsage: 10 << 20, // 10 MiB
+//		DefaultTTL:     5 * time.Minute,
 //	})
+//	if err != nil {
+//		// Handle invalid config
+//	}
 //
 //	// Set a value
-//	c.Set("user:123", userData)
+//	_ = c.Set(context.Background(), "user:123", userData, 0)
 //
 //	// Get a value
-//	if val, found := c.Get("user:123"); found {
+//	if val, err := c.Get(context.Background(), "user:123"); err == nil {
 //		// Use val
 //	}
 //
 //	// Delete a value
-//	c.Delete("user:123")
+//	_ = c.Delete(context.Background(), "user:123")
 package cache
 
 import (

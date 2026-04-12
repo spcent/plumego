@@ -32,11 +32,6 @@ func TestConfigValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "negative ping timeout",
-			config:  Config{Driver: "driver", DSN: "dsn", PingTimeout: -1},
-			wantErr: true,
-		},
-		{
 			name:    "valid",
 			config:  Config{Driver: "driver", DSN: "dsn", MaxOpenConns: 5},
 			wantErr: false,
@@ -65,9 +60,6 @@ func TestDefaultConfig(t *testing.T) {
 	if config.MaxIdleConns != 5 {
 		t.Fatalf("expected MaxIdleConns 5, got %d", config.MaxIdleConns)
 	}
-	if config.PingTimeout != 5*time.Second {
-		t.Fatalf("expected PingTimeout 5s, got %v", config.PingTimeout)
-	}
 }
 
 func TestApplyConfigMaxOpenConns(t *testing.T) {
@@ -83,20 +75,22 @@ func TestApplyConfigMaxOpenConns(t *testing.T) {
 	}
 }
 
-func TestOpenWithPing(t *testing.T) {
-	pingErr := errors.New("ping failed")
-	conn := &stubConn{pingErr: pingErr}
+func TestOpenWithDoesNotPingDuringOpen(t *testing.T) {
+	conn := &stubConn{}
 	connector := &stubConnector{conn: conn}
 
-	_, err := OpenWith(Config{
-		Driver:      "stub",
-		DSN:         "dsn",
-		PingTimeout: 50 * time.Millisecond,
+	db, err := OpenWith(Config{
+		Driver: "stub",
+		DSN:    "dsn",
 	}, func(driver, dsn string) (*sql.DB, error) {
 		return sql.OpenDB(connector), nil
 	})
-	if err == nil || !errors.Is(err, ErrPingFailed) {
-		t.Fatalf("expected ErrPingFailed, got %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer db.Close()
+	if got := conn.pingCount; got != 0 {
+		t.Fatalf("expected open to avoid implicit ping, got %d ping calls", got)
 	}
 }
 
@@ -327,27 +321,29 @@ func TestPing(t *testing.T) {
 	defer db.Close()
 
 	ctx := context.Background()
-	err := Ping(ctx, db, 10*time.Second)
+	err := Ping(ctx, db)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestPingNilDB(t *testing.T) {
-	err := Ping(context.Background(), nil, 10*time.Second)
+	err := Ping(context.Background(), nil)
 	if err == nil || !errors.Is(err, ErrPingFailed) {
 		t.Fatalf("expected ErrPingFailed, got %v", err)
 	}
 }
 
-func TestPingWithTimeout(t *testing.T) {
+func TestPingUsesCallerTimeout(t *testing.T) {
 	pingErr := errors.New("ping failed")
 	connector := &stubConnector{conn: &stubConn{pingErr: pingErr}}
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
-	err := Ping(ctx, db, 10*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	err := Ping(ctx, db)
 	if err == nil || !errors.Is(err, ErrPingFailed) {
 		t.Fatalf("expected ErrPingFailed, got %v", err)
 	}
@@ -440,7 +436,8 @@ func (d stubDriver) Open(name string) (driver.Conn, error) {
 }
 
 type stubConn struct {
-	pingErr error
+	pingErr   error
+	pingCount int
 }
 
 func (c *stubConn) Prepare(query string) (driver.Stmt, error) {
@@ -456,6 +453,7 @@ func (c *stubConn) Begin() (driver.Tx, error) {
 }
 
 func (c *stubConn) Ping(ctx context.Context) error {
+	c.pingCount++
 	// Add a small delay to ensure measurable latency in tests
 	time.Sleep(1 * time.Millisecond)
 	return c.pingErr
