@@ -109,6 +109,12 @@ func TestNamedRouteRegistration(t *testing.T) {
 			path:   "/named/patch/:id",
 			route:  "named.patch",
 		},
+		{
+			name:   "any",
+			method: methodAny,
+			path:   "/named/any/:id",
+			route:  "named.any",
+		},
 	}
 
 	for _, tt := range tests {
@@ -121,7 +127,12 @@ func TestNamedRouteRegistration(t *testing.T) {
 			}), router.WithRouteName(tt.route)))
 
 			url := app.URL(tt.route, "id", "42")
-			req := httptest.NewRequest(tt.method, url, nil)
+			reqMethod := tt.method
+			if tt.method == methodAny {
+				reqMethod = http.MethodGet
+			}
+
+			req := httptest.NewRequest(reqMethod, url, nil)
 			rr := httptest.NewRecorder()
 			app.ServeHTTP(rr, req)
 

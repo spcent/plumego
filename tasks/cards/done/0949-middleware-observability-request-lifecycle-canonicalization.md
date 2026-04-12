@@ -61,3 +61,19 @@ Establish one canonical request-lifecycle path for stable observability middlewa
 - Request ID generation ownership is documented by the code path and covered by tests.
 - Access log, tracing, and HTTP metrics middleware no longer duplicate span/request completion logic unnecessarily.
 - Middleware tests cover the chosen ordering and fallback behavior.
+
+## Outcome
+
+- Added shared observability lifecycle helpers in `middleware/internal/observability` for request completion, observed-path selection, trace start, and trace completion.
+- Rewired `middleware/accesslog`, `middleware/httpmetrics`, and `middleware/tracing` to use the shared helper path instead of open-coding their own lifecycle fragments.
+- Added helper-focused regression tests covering fallback request-id stamping, span header/context attachment, observed-path precedence, and span completion payloads.
+- Clarified in middleware docs that stable observability middleware may stamp a fallback request id when `requestid.Middleware()` is not installed.
+
+## Validation Run
+
+```bash
+gofmt -w middleware/internal/observability/helpers.go middleware/internal/observability/helpers_test.go middleware/accesslog/accesslog.go middleware/httpmetrics/http_metrics.go middleware/tracing/tracing.go
+go test -timeout 20s ./middleware/internal/observability ./middleware/accesslog ./middleware/httpmetrics ./middleware/tracing ./middleware/...
+go test -race -timeout 60s ./middleware/...
+go vet ./middleware/...
+```

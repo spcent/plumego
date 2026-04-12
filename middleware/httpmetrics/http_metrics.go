@@ -23,12 +23,8 @@ func Middleware(collector Observer) middleware.Middleware {
 
 			next.ServeHTTP(recorder, r)
 
-			metricsData := internalobs.BuildRequestMetrics(r, recorder, prepared.StartedAt, prepared.RequestID)
-			path := metricsData.Path
-			if metricsData.Route != "" {
-				path = metricsData.Route
-			}
-			collector.ObserveHTTP(r.Context(), metricsData.Method, path, metricsData.Status, metricsData.Bytes, metricsData.Duration)
+			metricsData := prepared.Complete(r)
+			collector.ObserveHTTP(r.Context(), metricsData.Method, metricsData.ObservedPath(), metricsData.Status, metricsData.Bytes, metricsData.Duration)
 		})
 	}
 }

@@ -53,3 +53,19 @@ Remove the named-route shorthand helpers from `core` and restore one canonical r
 - The only supported named-route path in stable `core` is `AddRoute(..., router.WithRouteName(...))`.
 - The pre/post removal grep for all six symbols is clean.
 - `core` tests and repo build pass.
+
+## Outcome
+
+- Removed `GetWithName`, `PostWithName`, `PutWithName`, `DeleteWithName`, `PatchWithName`, and `AnyWithName` from `core/routing.go`.
+- Kept named-route coverage on the canonical `App.AddRoute(..., router.WithRouteName(...))` path.
+- Extended the canonical named-route test to cover the `ANY` registration path without reintroducing alias helpers.
+
+## Validation Run
+
+```bash
+gofmt -w core/routing.go core/routing_test.go
+rg -n 'GetWithName|PostWithName|PutWithName|DeleteWithName|PatchWithName|AnyWithName' . --glob '*.go'
+go test -timeout 20s ./core/...
+go test -race -timeout 60s ./core/...
+go build ./...
+```

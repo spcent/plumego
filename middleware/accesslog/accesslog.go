@@ -1,6 +1,7 @@
 package accesslog
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
@@ -23,34 +24,23 @@ func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, trac
 			prepared := internalobs.PrepareRequest(w, r)
 			r = prepared.Request
 			recorder := prepared.Recorder
-			requestID := prepared.RequestID
-			ctx := r.Context()
-
-			var span mwtracing.TraceSpan
+			var startTrace internalobs.TraceStarter
 			if tracer != nil {
-				ctx, span = tracer.Start(ctx, r)
+				startTrace = func(ctx context.Context, r *http.Request) (context.Context, internalobs.TraceSpan) {
+					return tracer.Start(ctx, r)
+				}
 			}
-
-			_, spanID := internalobs.ExtractSpanContext(ctx, span)
-			r = internalobs.AttachSpanID(w, r, spanID)
-
-			r = r.WithContext(ctx)
+			r, span, spanID := internalobs.BeginTrace(w, prepared, startTrace)
 
 			next.ServeHTTP(recorder, r)
 
-			metricsData := internalobs.BuildRequestMetrics(r, recorder, prepared.StartedAt, requestID)
+			metricsData := prepared.Complete(r)
 			rc := contract.RequestContextFromContext(r.Context())
 
 			if observer != nil {
-				path := metricsData.Path
-				if metricsData.Route != "" {
-					path = metricsData.Route
-				}
-				observer.ObserveHTTP(r.Context(), metricsData.Method, path, metricsData.Status, metricsData.Bytes, metricsData.Duration)
+				observer.ObserveHTTP(r.Context(), metricsData.Method, metricsData.ObservedPath(), metricsData.Status, metricsData.Bytes, metricsData.Duration)
 			}
-			if span != nil {
-				span.End(metricsData.Status, metricsData.Bytes, requestID)
-			}
+			internalobs.EndTrace(span, metricsData)
 
 			fields := internalobs.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
 			fields["bytes"] = metricsData.Bytes

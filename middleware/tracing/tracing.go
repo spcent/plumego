@@ -26,21 +26,13 @@ func Middleware(tracer Tracer) middleware.Middleware {
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			prepared := internalobs.PrepareRequest(w, r)
-			r = prepared.Request
-			requestID := prepared.RequestID
-			ctx := r.Context()
-
-			ctx, span := tracer.Start(ctx, r)
-			_, spanID := internalobs.ExtractSpanContext(ctx, span)
-			r = r.WithContext(ctx)
-			r = internalobs.AttachSpanID(w, r, spanID)
-
+			r, span, _ := internalobs.BeginTrace(w, prepared, func(ctx context.Context, r *http.Request) (context.Context, internalobs.TraceSpan) {
+				return tracer.Start(ctx, r)
+			})
 			recorder := prepared.Recorder
 			next.ServeHTTP(recorder, r)
 
-			if span != nil {
-				span.End(recorder.StatusCode(), recorder.BytesWritten(), requestID)
-			}
+			internalobs.EndTrace(span, prepared.Complete(r))
 		})
 	}
 }

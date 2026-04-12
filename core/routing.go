@@ -87,33 +87,3 @@ func (a *App) Patch(path string, handler http.Handler) error {
 func (a *App) Any(path string, handler http.Handler) error {
 	return a.addRoute(methodAny, path, handler)
 }
-
-// GetWithName registers a named GET route with the given handler.
-func (a *App) GetWithName(path, name string, handler http.Handler) error {
-	return a.registerRoute(http.MethodGet, path, handler, router.WithRouteName(name))
-}
-
-// PostWithName registers a named POST route with the given handler.
-func (a *App) PostWithName(path, name string, handler http.Handler) error {
-	return a.registerRoute(http.MethodPost, path, handler, router.WithRouteName(name))
-}
-
-// PutWithName registers a named PUT route with the given handler.
-func (a *App) PutWithName(path, name string, handler http.Handler) error {
-	return a.registerRoute(http.MethodPut, path, handler, router.WithRouteName(name))
-}
-
-// DeleteWithName registers a named DELETE route with the given handler.
-func (a *App) DeleteWithName(path, name string, handler http.Handler) error {
-	return a.registerRoute(http.MethodDelete, path, handler, router.WithRouteName(name))
-}
-
-// PatchWithName registers a named PATCH route with the given handler.
-func (a *App) PatchWithName(path, name string, handler http.Handler) error {
-	return a.registerRoute(http.MethodPatch, path, handler, router.WithRouteName(name))
-}
-
-// AnyWithName registers a named route for any HTTP method with the given handler.
-func (a *App) AnyWithName(path, name string, handler http.Handler) error {
-	return a.registerRoute(methodAny, path, handler, router.WithRouteName(name))
-}
