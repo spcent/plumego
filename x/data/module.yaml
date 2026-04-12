@@ -6,6 +6,15 @@ owner: persistence
 risk: medium
 summary: High-level data topology capabilities that should not live in the stable store layer.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-data/README.md
+
 subordinate_families:
   - package: x/cache
     role: distributed cache with consistent hashing, replication, failover, and Redis adapter
@@ -62,10 +71,18 @@ change_risks:
   - isolation regression
   - persistence correctness regression
 
+stop_conditions:
+  - The change introduces business repositories, HTTP transport behavior, or stable store primitives into x/data
+  - The change hides topology routing, sharding, or rw-split decisions behind implicit registries or globals
+  - The change requires stable store to learn topology ownership that belongs in x/data
+  - The change turns x/cache into a competing family entrypoint instead of a subordinate topology package
+
 review_checklist:
   - Keep stable store primitives out of this module
   - Keep topology decisions explicit and reviewable
   - Keep transport concerns out of this module
+  - Keep tenant-aware topology and provider ownership explicit
+  - Keep durable topology behavior separate from business repository logic
 
 agent_hints:
   - Move sharding and rw orchestration here instead of widening store

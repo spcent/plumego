@@ -155,7 +155,11 @@ type CreateUserRequest struct {
 func createUserHandler(w http.ResponseWriter, r *http.Request) {
     var req CreateUserRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        WriteError(w, BadRequest("invalid_json", "invalid request body"))
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).
+            Code("invalid_json").
+            Message("invalid request body").
+            Build())
         return
     }
     // transport-level validation here
@@ -174,7 +178,11 @@ Not canonical: middleware-first binding into context, mixed-source auto-binding,
 // Route param
 id := Param(r, "id")
 if id == "" {
-    WriteError(w, BadRequest("missing_id", "missing route parameter id"))
+    _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeRequired).
+        Code("missing_id").
+        Message("missing route parameter id").
+        Build())
     return
 }
 
@@ -210,7 +218,11 @@ type ErrorResponse struct {
 }
 
 // One write path:
-WriteError(w, BadRequest("invalid_json", "invalid request body"))
+contract.WriteError(w, r, contract.NewErrorBuilder().
+    Type(contract.TypeValidation).
+    Code("invalid_json").
+    Message("invalid request body").
+    Build())
 ```
 
 Rules:
@@ -225,7 +237,7 @@ Rules:
 ## 11. Success Responses
 
 ```go
-WriteJSON(w, http.StatusCreated, CreateUserResponse{ID: id})
+contract.WriteResponse(w, r, http.StatusCreated, CreateUserResponse{ID: id}, nil)
 ```
 
 - One response helper, used consistently
@@ -282,7 +294,38 @@ Rules:
 
 ---
 
-## 14. Rules for AI Agents
+## 14. Prompt Contracts for AI Agents
+
+High-quality Codex tasks should specify:
+
+- goal
+- in-scope paths
+- out-of-scope paths
+- owning module or entrypoint
+- public API and dependency policy
+- required tests
+- validation commands
+- done definition
+
+When the request is ambiguous or broad:
+
+- first run an analysis-only pass
+- split large work into small reversible cards
+- delay code edits until module ownership and scope are explicit
+
+When the task changes or removes an exported symbol:
+
+- enumerate callers first with `rg`
+- update every caller in the same change
+- verify zero residual references before handoff
+
+Review requests are different from implementation requests:
+
+- findings first
+- no code changes unless explicitly requested
+- prioritize boundaries, regressions, concurrency, and missing tests
+
+## 15. Rules for AI Agents
 
 Default behavior:
 - Prefer stdlib-shaped solutions
@@ -290,7 +333,7 @@ Default behavior:
 - Preserve existing canonical patterns when editing nearby files
 - Treat broad bucket names (`utils`, `validator`, `rest`, `pubsub`, `tenant`) as migration debt, not expansion targets
 
-## 15. Agent-First Repo Rules
+## 16. Agent-First Repo Rules
 
 - Start app-structure work from `reference/standard-service`
 - Keep each change centered on one primary module when possible
@@ -311,12 +354,12 @@ Do not introduce:
 
 ---
 
-## 16. `contract` Package Rules
+## 17. `contract` Package Rules
 
 `contract` owns **transport primitives only**: request/response envelopes, error
 types, HTTP writing helpers, context key accessors, and binding helpers.
 
-### 16.1 Scope boundary
+### 17.1 Scope boundary
 
 The following categories **do not belong** in `contract` and must live in `x/*`:
 
@@ -330,7 +373,7 @@ The following categories **do not belong** in `contract` and must live in `x/*`:
 `contract` may export context keys and ID accessor functions for tracing and
 auth, but must not own the full instrumentation or session management subsystem.
 
-### 16.2 Context accessor naming
+### 17.2 Context accessor naming
 
 All context accessor pairs in `contract` use the **With/From** pattern:
 
@@ -358,7 +401,7 @@ var fooKey fooContextKey            // ← unnecessary variable
 context.WithValue(ctx, fooKey, v)
 ```
 
-### 16.3 Error construction path
+### 17.3 Error construction path
 
 One canonical path:
 
@@ -377,7 +420,7 @@ or `Category` only when the transport contract truly needs a deviation.
 **Do not add** `Ctx.ErrorJSON`, `HandleError`, `SafeExecute`, or new
 `NewXxxError(...)` convenience layers on top of this path.
 
-### 16.4 Success response path
+### 17.4 Success response path
 
 One canonical path:
 
@@ -391,7 +434,7 @@ Use `WriteResponse` from stdlib-shaped handlers.
 
 Do not invent per-feature envelope shapes.
 
-### 16.5 Deprecated API policy
+### 17.5 Deprecated API policy
 
 When replacing an API in `contract`:
 
@@ -413,7 +456,7 @@ Conflict rule: if existing code conflicts with this guide — preserve behavior 
 
 ---
 
-## 15. Compatibility APIs
+## 18. Compatibility APIs
 
 - Must not appear in canonical docs
 - Must be labeled clearly
@@ -422,7 +465,7 @@ Conflict rule: if existing code conflicts with this guide — preserve behavior 
 
 ---
 
-## 16. Review Checklist
+## 19. Review Checklist
 
 - Request flow obvious from route to response?
 - Code stays close to `net/http` semantics?
@@ -435,7 +478,7 @@ Conflict rule: if existing code conflicts with this guide — preserve behavior 
 
 ---
 
-## 17. Canonical Examples
+## 20. Canonical Examples
 
 ### Create endpoint
 
@@ -445,6 +488,8 @@ package handlers
 import (
     "encoding/json"
     "net/http"
+
+    "github.com/spcent/plumego/contract"
 )
 
 type CreateUserRequest struct {
@@ -467,22 +512,34 @@ type UserHandler struct {
 func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
     var req CreateUserRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        WriteError(w, BadRequest("invalid_json", "invalid request body"))
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).
+            Code("invalid_json").
+            Message("invalid request body").
+            Build())
         return
     }
 
     if req.Name == "" {
-        WriteError(w, BadRequest("missing_name", "name is required"))
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Code("missing_name").
+            Message("name is required").
+            Build())
         return
     }
 
     id, err := h.Service.Create(req.Name, req.Email)
     if err != nil {
-        WriteError(w, Internal("create_user_failed", "failed to create user"))
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternal).
+            Code("create_user_failed").
+            Message("failed to create user").
+            Build())
         return
     }
 
-    WriteJSON(w, http.StatusCreated, CreateUserResponse{ID: id})
+    _ = contract.WriteResponse(w, r, http.StatusCreated, CreateUserResponse{ID: id}, nil)
 }
 ```
 

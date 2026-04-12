@@ -6,6 +6,16 @@ owner: multitenancy
 risk: high
 summary: Multi-tenant resolution, policy, quota, rate limit, and tenant-aware adapters.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - docs/architecture/X_TENANT_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-tenant/README.md
+
 responsibilities:
   - Tenant resolution
   - Tenant policy evaluation
@@ -57,6 +67,12 @@ change_risks:
   - deny-path regression
   - middleware ordering regression
   - quota feedback regression
+
+stop_conditions:
+  - The change requires core, stable middleware, or stable store to learn tenant internals
+  - The change introduces business onboarding flows or product-specific tenant policy into x/tenant primitives
+  - The change weakens fail-closed tenant policy, quota, or session behavior
+  - The change hides tenant resolution or policy flow behind implicit globals or bootstrap magic
 
 review_checklist:
   - Fail closed on tenant policy errors

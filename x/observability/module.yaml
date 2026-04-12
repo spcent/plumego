@@ -6,6 +6,15 @@ owner: observability
 risk: medium
 summary: The only app-facing entrypoint for broader observability adapters and export wiring; transport observability primitives remain in stable middleware packages.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-observability/README.md
+
 subordinate_families:
   - package: x/ops
     role: protected auth-gated admin and diagnostics endpoints
@@ -44,10 +53,23 @@ test_commands:
 doc_paths:
   - docs/modules/x-observability/README.md
 
+change_risks:
+  - export wiring regression
+  - metrics buffering regression
+  - diagnostics isolation regression
+
+stop_conditions:
+  - The change introduces core bootstrap ownership, business metrics policy, or stable transport primitives into x/observability
+  - The change hides export behavior, adapter wiring, or record buffering behind package globals
+  - The change requires stable middleware, metrics, or log to absorb observability capability-pack behavior
+  - The change makes x/ops or x/devtools compete with x/observability as the family entrypoint
+
 review_checklist:
   - Keep export behavior explicit
   - Avoid hidden globals
   - Preserve observability isolation
+  - Keep stable middleware focused on transport primitives
+  - Keep x/ops and x/devtools subordinate to this family entrypoint
 
 agent_hints:
   - Start broader observability adapter and export work here; x/ops and x/devtools are subordinate packages

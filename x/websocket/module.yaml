@@ -6,6 +6,15 @@ owner: realtime
 risk: medium
 summary: WebSocket extension surface for hub primitives and explicit route registration.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-websocket/README.md
+
 responsibilities:
   - WebSocket route registration
   - App-facing hub aliases
@@ -50,10 +59,18 @@ change_risks:
   - broadcast behavior regression
   - connection lifecycle regression
 
+stop_conditions:
+  - The change introduces core bootstrap ownership, generic event-bus abstractions, or business channels into x/websocket
+  - The change weakens auth flow, origin checks, or secret handling around websocket setup
+  - The change hides route mounting or hub setup behind implicit globals or package init behavior
+  - The change requires stable roots to absorb websocket-specific lifecycle behavior
+
 review_checklist:
   - Keep auth explicit
   - Do not weaken secret checks
   - Keep app-level mounting explicit
+  - Keep connection lifecycle and broadcast behavior reviewable
+  - Keep websocket setup out of stable roots
 
 agent_hints:
   - Use x/websocket for app-facing imports

@@ -1,0 +1,11 @@
+name: review-only
+scope: code review and risk assessment without implementation
+steps:
+  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, and the relevant module manifests or specs for the touched area.
+  - Inspect the diff or target files with a boundary-first review mindset.
+  - Prioritize findings about module ownership drift, hidden coupling, compatibility risk, fail-open behavior, and missing tests.
+  - Report findings first, ordered by severity, with file-level references.
+  - Note residual risk explicitly if no high-confidence finding is present.
+stop_conditions:
+  - Do not patch code unless the user explicitly requests fixes.
+  - Do not replace findings with a broad summary or changelog-style recap.

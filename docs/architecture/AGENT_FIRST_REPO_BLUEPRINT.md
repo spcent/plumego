@@ -40,7 +40,6 @@ Optional or fast-moving capabilities live under `x/`:
 - `x/discovery`
 - `x/gateway`
 - `x/data`
-- `x/fileapi`
 
 Non-library areas stay out of import-path design:
 
@@ -65,19 +64,37 @@ This split is intentional and should remain stable:
 - keep machine-readable repository contracts at the top level so discovery and checks stay simple
 - keep task cards outside `docs/` when they are meant to drive execution rather than serve as archival prose
 
+## Agent Control Plane
+
+Agents should treat the repository control plane as a layered contract:
+
+1. `AGENTS.md`: operating rules, task contracts, validation order, milestone protocol
+2. `docs/CODEX_WORKFLOW.md`: repeatable prompting and execution patterns
+3. `docs/CANONICAL_STYLE_GUIDE.md`: canonical implementation path and code shape
+4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`: repository shape and ownership model
+5. `specs/*.yaml`: machine-readable routing, dependency, taxonomy, and manifest rules
+6. `<module>/module.yaml`: module-local responsibilities, review checklist, and validation commands
+7. `reference/standard-service`: canonical application wiring
+
+The intent is not just documentation. Each layer should make it harder for an
+agent to guess incorrectly about module ownership, allowed imports, or the
+canonical way to implement a change.
+
 ## Canonical Implementation Path
 
 Agents should treat these as the default read and write path:
 
-1. `docs/CANONICAL_STYLE_GUIDE.md`
-2. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-3. `specs/repo.yaml`
-4. `specs/task-routing.yaml`
-5. `specs/extension-taxonomy.yaml`
-6. `specs/package-hotspots.yaml`
-7. `specs/dependency-rules.yaml`
-8. `<module>/module.yaml`
-9. `reference/standard-service`
+1. `AGENTS.md`
+2. `docs/CODEX_WORKFLOW.md`
+3. `docs/CANONICAL_STYLE_GUIDE.md`
+4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+5. `specs/repo.yaml`
+6. `specs/task-routing.yaml`
+7. `specs/extension-taxonomy.yaml`
+8. `specs/package-hotspots.yaml`
+9. `specs/dependency-rules.yaml`
+10. `<module>/module.yaml`
+11. `reference/standard-service`
 
 Rules:
 
@@ -85,6 +102,20 @@ Rules:
 - `reference/standard-service` must depend only on stable root packages and the standard library
 - extension or feature demos must live outside `reference/standard-service`
 - each extension family must publish one canonical discovery entrypoint
+
+## Task Contract Defaults
+
+When humans do not provide an explicit task contract, agents should default to:
+
+- one primary module per change
+- no stable public API changes
+- no new dependencies
+- focused tests for behavior changes
+- docs sync only for implemented behavior changes
+
+Large work should be split into an analysis pass and an implementation pass.
+Analysis identifies module ownership, in-scope paths, out-of-scope paths,
+likely touched files, and validation commands before coding begins.
 
 ## Hard Rules
 
@@ -127,14 +158,16 @@ Avoid growing broad buckets such as:
 
 ## Canonical Read Path
 
-1. `docs/CANONICAL_STYLE_GUIDE.md`
-2. `specs/repo.yaml`
-3. `specs/task-routing.yaml`
-4. `specs/extension-taxonomy.yaml`
-5. `specs/package-hotspots.yaml`
-6. `specs/dependency-rules.yaml`
-7. `<module>/module.yaml`
-8. module code
+1. `AGENTS.md`
+2. `docs/CODEX_WORKFLOW.md`
+3. `docs/CANONICAL_STYLE_GUIDE.md`
+4. `specs/repo.yaml`
+5. `specs/task-routing.yaml`
+6. `specs/extension-taxonomy.yaml`
+7. `specs/package-hotspots.yaml`
+8. `specs/dependency-rules.yaml`
+9. `<module>/module.yaml`
+10. module code
 
 ## Machine-Readable Agent Workflow
 
@@ -151,6 +184,35 @@ Required metadata lives under `specs/`:
 
 Human-readable module primers live under `docs/modules/` and should mirror
 manifest-declared `doc_paths`.
+
+Module manifests are part of the control plane, not just package notes. Each
+`<module>/module.yaml` should declare:
+
+- summary and strict boundary
+- responsibilities and non-goals
+- allowed and forbidden imports
+- test commands
+- review checklist
+- agent hints
+- doc paths
+
+Stable roots must declare a non-empty `strict_boundary` so agents and checks can
+distinguish kernel, router, contract, middleware, and other stable roles
+without inferring from package names alone.
+
+## Execution Loop
+
+The default agent loop is:
+
+1. classify the owning layer and module
+2. read the control plane in canonical order
+3. declare intended scope and touched files
+4. implement the smallest coherent change
+5. run module validation first, then boundary and repo checks
+6. report residual risks and doc sync needs
+
+If step 1 or 2 leaves the owning module unclear, the agent should stop in
+analysis mode instead of coding through ambiguity.
 
 ## Migration Direction
 

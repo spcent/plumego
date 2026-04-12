@@ -8,6 +8,15 @@ summary: HTTP route matching, params, groups, and reverse routing.
 
 strict_boundary: route_structure
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - reference/standard-service/internal/app/routes.go
+
 responsibilities:
   - Route matching
   - Path parameters
@@ -19,8 +28,7 @@ non_goals:
   - JSON responses
   - Authentication or business validation
   - Route parameter validation policy
-  - Service construction
-  - Logger carriage or logger lookup
+  - Service construction or logger lookup
   - stdlib-shadow handler aliases
   - Tenant routing or feature-flag route factories
   - Frontend asset policy, cache headers, SPA fallback, or ETag generation
@@ -59,14 +67,20 @@ change_risks:
   - param extraction regression
   - reverse routing regression
 
+stop_conditions:
+  - The change introduces response writing, auth policy, or business validation into router
+  - The change requires router to import x/* or learn tenant, protocol-family, or frontend asset policy internals
+  - The change adds hidden route registration, reflection-driven discovery, or service construction to router
+  - The change widens router into a feature catalog instead of a route-structure primitive
+
 review_checklist:
   - Keep route registration grep-friendly
   - Preserve explicit method-plus-path behavior
   - Keep matching deterministic
-  - Keep logger ownership out of router
-  - Keep one canonical public param helper
+  - Keep transport helpers and logger ownership out of router
+  - Keep one canonical public param and route-metadata path
 
 agent_hints:
-  - No response helpers here
-  - No middleware policy here
-  - No config loading here
+  - Start app-facing route work from reference/standard-service wiring and only widen router when the route primitive itself changes
+  - Keep router focused on matching, params, groups, and metadata; move policy and feature behavior to the owning stable root or x/* family
+  - Do not add response helpers, middleware policy, config loading, or service construction here

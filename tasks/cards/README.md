@@ -10,7 +10,7 @@ Directory layout:
 
 Scaffold helpers:
 
-- `make new-card ID=001 SLUG=slice-router-work M=M-001`
+- `make new-card ID=001 SLUG=slice-router-work M=M-001 R=fix-bug`
 - `make check-card C=active/C-001-slice-router-work`
 
 Lifecycle states:
@@ -53,6 +53,7 @@ Each card should define:
 Recommended execution metadata:
 
 - Milestone
+- Recipe
 - Primary Module
 - Owned Files
 - Depends On
@@ -70,11 +71,13 @@ Optional operational fields when useful:
 ## Authoring Rules
 
 - prefer one primary module
+- choose one matching `specs/change-recipes/*.yaml` recipe when possible
 - keep the file set small
 - keep validation short and relevant
 - avoid mixing unrelated runtime, docs, and architecture changes in one card
 - keep the live queue short enough that the next card is obvious
 - archive completed cards promptly so `active/` remains a working queue rather than a history dump
+- expect `make check-card` to warn when `Recipe:` and `Primary Module:` obviously disagree
 
 ## Queue Management
 
@@ -88,12 +91,28 @@ Optional operational fields when useful:
 
 When a task card applies, read it after:
 
-1. `docs/CANONICAL_STYLE_GUIDE.md`
-2. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-3. `specs/repo.yaml`
-4. `specs/task-routing.yaml`
+1. `docs/CODEX_WORKFLOW.md`
+2. `docs/CANONICAL_STYLE_GUIDE.md`
+3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+4. `specs/repo.yaml`
+5. `specs/task-routing.yaml`
 
 Then use the card to drive the concrete change sequence.
+
+## Recipe Selection
+
+Before authoring a new card, pick the closest repo-native recipe:
+
+- `analysis-only.yaml` for scoping and ownership clarification without coding
+- `fix-bug.yaml` for root-cause fixes
+- `http-endpoint-bugfix.yaml` for route, handler, or transport defects
+- `symbol-change.yaml` for exported symbol removal, rename, or behavior change
+- `tenant-policy-change.yaml` for tenant resolution, policy, quota, and session work
+- `stable-root-boundary-review.yaml` for review-only boundary audits
+- `add-http-endpoint.yaml` for new explicit routes and handlers
+- `add-middleware.yaml` for transport-only middleware changes
+
+If no recipe fits, the card should say why instead of silently inventing a new task shape.
 
 ## Relationship to Other Repo Surfaces
 

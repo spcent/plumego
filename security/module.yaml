@@ -8,6 +8,15 @@ summary: Security helpers for auth, headers, input safety, and abuse protection.
 
 strict_boundary: auth_primitives
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/security/README.md
+
 responsibilities:
   - Auth identity primitives
   - JWT helpers
@@ -54,12 +63,20 @@ change_risks:
   - header policy regression
   - deny-path regression
 
+stop_conditions:
+  - The change introduces app bootstrap, tenant orchestration, or session lifecycle management into security
+  - The change requires security to import x/* or absorb resilience, protocol, or application feature behavior
+  - The change weakens fail-closed verification behavior or introduces secret logging
+  - The change hides verification or policy flow behind implicit globals, middleware magic, or context service location
+
 review_checklist:
   - Never log secrets
   - Fail closed on verification errors
   - Keep verification logic explicit
+  - Use timing-safe comparison for secret checks
+  - Keep tenant session and policy orchestration out of security
 
 agent_hints:
-  - Tenant policy stays in x/tenant
-  - Prefer timing-safe comparison for secrets
-  - Negative-path tests are mandatory for auth changes
+  - Tenant policy and session lifecycle stay in x/tenant; reusable resilience stays in x/resilience
+  - Prefer explicit verifiers and timing-safe comparison for secrets instead of convenience wrappers with hidden behavior
+  - Negative-path tests are mandatory for auth, token, signature, and header-policy changes

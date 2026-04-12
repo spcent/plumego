@@ -1,0 +1,11 @@
+name: stable-root-boundary-review
+scope: review-only check for stable-root boundary safety
+steps:
+  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, specs/repo.yaml, specs/dependency-rules.yaml, and the touched stable-root manifests.
+  - Classify changed files by stable root and identify any extension-family leakage or app-wiring drift.
+  - Check for hidden globals, context service-location, net/http compatibility drift, and transport/business responsibility mixing.
+  - Report findings first, ordered by severity, with file-level references and minimal fix guidance.
+  - Call out missing negative-path or regression tests when behavior risk is non-trivial.
+stop_conditions:
+  - Do not patch code unless the review explicitly asks for implementation.
+  - Do not normalize stable-root to x/* coupling as acceptable technical debt without a documented exception.

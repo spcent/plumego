@@ -6,6 +6,15 @@ owner: runtime
 risk: medium
 summary: Reusable resilience primitives and adapters that do not belong to stable security or a single feature family.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-resilience/README.md
+
 responsibilities:
   - Circuit breaker primitives
   - Reusable resilience middleware adapters
@@ -37,11 +46,25 @@ test_commands:
 doc_paths:
   - docs/modules/x-resilience/README.md
 
+change_risks:
+  - breaker threshold regression
+  - adapter behavior regression
+  - failure-path regression
+
+stop_conditions:
+  - The change introduces app bootstrap ownership, security policy ownership, or feature-specific workflow orchestration into x/resilience
+  - The change hides circuit breaker state or adapter behavior behind globals or implicit registration
+  - The change requires stable security or middleware to absorb reusable resilience ownership
+  - The change turns x/resilience into a catch-all runtime policy package
+
 review_checklist:
   - Keep resilience components reusable across extension families
   - Avoid hidden globals
   - Keep transport adapters explicit
+  - Keep circuit-breaker state and thresholds reviewable
+  - Keep feature-specific resilience orchestration in owning extensions
 
 agent_hints:
   - Put reusable circuit breaking here instead of in stable security or feature-specific packages
   - Keep feature-specific resilience orchestration in the owning extension package
+  - Keep adapters explicit rather than wrapping failures behind hidden middleware magic

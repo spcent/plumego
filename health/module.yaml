@@ -8,6 +8,15 @@ summary: Health state, readiness helpers, and component health models, not an HT
 
 strict_boundary: health_models
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/health/README.md
+
 responsibilities:
   - Health status types
   - Readiness helpers
@@ -52,6 +61,12 @@ change_risks:
   - readiness regression
   - health state regression
 
+stop_conditions:
+  - The change introduces HTTP endpoint ownership, manager orchestration, or retry policy into health
+  - The change requires health to import x/* or absorb ops analytics, history, or transport-specific behavior
+  - The change turns health models into feature-specific status catalogs or app bootstrap glue
+  - The change adds build metadata exposure, reporting, or retention policy as stable health defaults
+
 review_checklist:
   - Keep types simple and explicit
   - Keep manager and retry policy outside this module
@@ -60,6 +75,6 @@ review_checklist:
   - Avoid feature-specific coupling
 
 agent_hints:
-  - Health is a support package, not an app feature catalog
-  - Health manager execution and health HTTP surfaces belong in x/ops/healthhttp or reference apps
-  - Keep build info, history export, and metrics/reporting in owning extensions such as x/ops/healthhttp
+  - Health is a support package, not an app feature catalog or ops surface
+  - Health manager execution and health HTTP surfaces belong in reference apps or the owning ops extensions
+  - Keep build info, history export, analytics, and reporting in owning extensions rather than stable health

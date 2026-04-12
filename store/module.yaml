@@ -8,6 +8,15 @@ summary: Stable storage primitives and base abstractions. Topology-heavy cache, 
 
 strict_boundary: persistence_primitives
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/store/README.md
+
 responsibilities:
   - DB helpers
   - Cache primitives
@@ -56,6 +65,12 @@ change_risks:
   - concurrent access regression
   - isolation regression
 
+stop_conditions:
+  - The change introduces tenant-aware adapters, HTTP policy, or business repositories into stable store
+  - The change requires store to import x/* or absorb data-topology, provider-export, or observability ownership that belongs elsewhere
+  - The change adds retry, health-reporting, analytics, or signed-URL policy as stable store defaults
+  - The change turns store into a feature-specific persistence catalog instead of transport-agnostic primitives
+
 review_checklist:
   - Keep store APIs transport-agnostic and free of tenant-specific logic
   - Keep topology-heavy data features, DB analytics, slow-query inspection, DB instrumentation wrappers, and pool-stat polling out of the stable layer
@@ -64,6 +79,6 @@ review_checklist:
   - Prefer stdlib-compatible abstractions
 
 agent_hints:
-  - Move tenant-aware adapters to x/tenant/store; move DB analytics and slow-query helpers to x/observability/dbinsights
-  - For distributed, provider-specific, or metrics/export-oriented cache needs use x/cache; for HTTP response caching use x/gateway/cache
-  - For ranked-data cache behavior use x/cache/leaderboard, route durable KV-engine tuning to x/data/kvengine, route durable idempotency providers to x/data/idempotency, and keep DB retry or health/reporting policy out of stable store/db
+  - Move tenant-aware adapters to x/tenant/store and move DB analytics, slow-query helpers, and DB health/reporting to the owning observability extensions
+  - For distributed, provider-specific, or metrics/export-oriented cache behavior use x/cache; for HTTP response caching use x/gateway/cache
+  - Route durable topology and provider behavior to x/data/* and keep stable store focused on base storage contracts and helpers

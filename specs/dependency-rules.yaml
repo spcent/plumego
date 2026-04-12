@@ -210,9 +210,11 @@ special_rules:
     - Reference app define the canonical application shape
     - Stable packages must never import x/*
     - Core stays a kernel and must not grow feature-catalog dependencies
+    - Control-plane files under docs/, specs/, and tasks/ are guidance surfaces, not library import roots
     - Router stays transport-structure only
     - Middleware must stay transport-only and must not import store
     - Stable middleware must not grow tenant resolution, tenant policy, or tenant quota behavior
+    - If a change would force stable middleware or core to learn tenant, data-topology, or protocol-family details, move the behavior into the owning x/* family instead
     - Tenant-aware storage belongs under x/tenant/store
     - Stable store must not grow tenant-aware adapters or tenant-specific storage policy
     - Protocol gateway families belong in their owning extension package, not in contract

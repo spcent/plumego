@@ -8,6 +8,15 @@ summary: Logging interfaces and base implementations.
 
 strict_boundary: logging
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/log/README.md
+
 responsibilities:
   - Logging interfaces
   - Canonical base logger construction
@@ -47,12 +56,20 @@ change_risks:
   - logger compatibility regression
   - field formatting regression
 
+stop_conditions:
+  - The change introduces feature behavior, request policy, or app bootstrap ownership into log
+  - The change requires log to import x/* or absorb export backends, aggregation, or observability pipeline wiring
+  - The change adds package-global singleton state or hidden logger registration to the stable runtime path
+  - The change widens log into a testing-helper or feature-specific semantics package
+
 review_checklist:
   - Never log secrets
   - Keep interfaces minimal
   - Keep backend ownership constructor-local; no package-global singleton in the stable runtime path
+  - Keep formatting and field helpers generic, not feature-specific
+  - Keep export backends and aggregation outside stable log
 
 agent_hints:
-  - Logging contracts should stay decoupled from feature packages
-  - Avoid app-specific semantics; keep CLI flag bootstrap and default singleton helpers out of the stable public/runtime path
-  - Never log secrets, tokens, or private keys
+  - Logging contracts should stay decoupled from feature packages and transport policy
+  - Keep CLI bootstrap, default singleton helpers, and export backends out of the stable public runtime path
+  - Never log secrets, tokens, signatures, or private keys

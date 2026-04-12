@@ -6,6 +6,15 @@ owner: platform-api
 risk: medium
 summary: The canonical and only app-facing reusable resource-interface layer for REST controllers, query parsing, pagination, and repository-backed resource wiring.
 
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x-rest/README.md
+
 responsibilities:
   - REST resource helpers
   - CRUD route scaffolding
@@ -17,6 +26,13 @@ non_goals:
   - Core bootstrap ownership
   - Gateway and edge proxy ownership
   - Business repository ownership
+
+public_entrypoints:
+  - ResourceSpec
+  - RegisterCollectionRoutes
+  - RegisterResourceRoutes
+  - pagination
+  - query
 
 allowed_imports:
   - contract
@@ -37,11 +53,23 @@ test_commands:
 doc_paths:
   - docs/modules/x-rest/README.md
 
+change_risks:
+  - resource route regression
+  - query parsing regression
+  - pagination contract regression
+
+stop_conditions:
+  - The change introduces bootstrap ownership, proxy topology, or business repositories into x/rest
+  - The change hides repository or service injection behind reflection, context service location, or generic registries
+  - The change requires stable roots to learn resource-family conventions that belong in x/rest
+  - The change makes x/rest compete with reference/standard-service for canonical app bootstrap shape
+
 review_checklist:
   - Keep resource wiring explicit
   - Avoid hidden repository injection
   - Preserve transport-only helpers
   - Keep response and error conventions aligned with contract helpers
+  - Keep reusable interface conventions separate from gateway and business-specific APIs
 
 agent_hints:
   - Use x/rest when standardizing reusable resource APIs and CRUD interface shape

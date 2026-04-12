@@ -1,0 +1,12 @@
+name: fix-bug
+scope: defect repair and regression prevention
+steps:
+  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, specs/repo.yaml, and the target module manifest.
+  - Reproduce or localize the bug at the owning module and identify the root cause before editing.
+  - Apply the smallest coherent fix at the root cause rather than patching symptoms.
+  - Add or update focused regression tests, prioritizing negative paths and boundary conditions.
+  - Run the target module tests, then boundary checks, then wider gates when the fix is cross-cutting.
+  - Report root cause, fix strategy, validation results, and residual risk.
+stop_conditions:
+  - Do not widen scope into unrelated cleanup or broad refactors.
+  - Do not change stable public APIs or add dependencies unless explicitly approved.

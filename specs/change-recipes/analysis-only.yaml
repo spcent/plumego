@@ -1,0 +1,12 @@
+name: analysis-only
+scope: ambiguity reduction before coding
+steps:
+  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, and the relevant control-plane files in canonical order.
+  - Identify the owning stable root, x/* family, or reference app entrypoint.
+  - Declare in-scope paths, out-of-scope paths, and likely touched files.
+  - List primary risks, including boundary drift, compatibility, fail-open behavior, and missing tests.
+  - Propose the smallest reversible task split and the validation plan.
+  - Stop without editing code.
+stop_conditions:
+  - Do not start implementation before module ownership is explicit.
+  - Do not recommend stable-root to x/* dependency drift as an acceptable shortcut.
