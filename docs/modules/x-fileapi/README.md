@@ -39,9 +39,10 @@
 
 - keep handler behavior transport-only
 - read tenant identity from request context, not body or path
+- use `x/tenant/core.WithTenantID(...)` for tenant attachment and `x/fileapi.WithUserID(...)` when uploader identity is needed
 - delegate storage and metadata behavior to `x/data/file`
 - keep stable storage contracts, shared types, and errors in `store/file`
-- keep route wiring in the application layer; `x/fileapi` should not become a bootstrap surface
+- keep route wiring in the application layer; bind `Handler.Upload`, `Download`, `GetInfo`, `GetURL`, `Delete`, and `List` explicitly instead of relying on library-owned route tables
 
 ## Boundary with data and store
 

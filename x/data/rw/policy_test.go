@@ -60,21 +60,21 @@ func TestSQLTypePolicy(t *testing.T) {
 func TestContextHints(t *testing.T) {
 	policy := NewSQLTypePolicy()
 
-	t.Run("ForcePrimary", func(t *testing.T) {
-		ctx := ForcePrimary(context.Background())
+	t.Run("WithForcePrimary", func(t *testing.T) {
+		ctx := WithForcePrimary(context.Background())
 
 		// Even SELECT should go to primary
 		if !policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {
-			t.Error("expected primary for SELECT with ForcePrimary context")
+			t.Error("expected primary for SELECT with WithForcePrimary context")
 		}
 	})
 
-	t.Run("PreferReplica", func(t *testing.T) {
-		ctx := PreferReplica(context.Background())
+	t.Run("WithPreferReplica", func(t *testing.T) {
+		ctx := WithPreferReplica(context.Background())
 
 		// Even write should try replica (though this is unusual)
 		if policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {
-			t.Error("expected replica for SELECT with PreferReplica context")
+			t.Error("expected replica for SELECT with WithPreferReplica context")
 		}
 	})
 
@@ -97,7 +97,7 @@ func TestTransactionAwarePolicy(t *testing.T) {
 	policy := NewTransactionAwarePolicy(base)
 
 	t.Run("In transaction", func(t *testing.T) {
-		ctx := MarkInTransaction(context.Background())
+		ctx := WithInTransaction(context.Background())
 
 		// All queries should go to primary
 		if !policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {

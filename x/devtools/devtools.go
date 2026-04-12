@@ -25,6 +25,7 @@ const (
 	DevToolsRoutesJSONPath = DevToolsBasePath + "/routes.json"
 	DevToolsMiddlewarePath = DevToolsBasePath + "/middleware"
 	DevToolsConfigPath     = DevToolsBasePath + "/config"
+	DevToolsInfoPath       = DevToolsBasePath + "/info"
 	DevToolsMetricsPath    = DevToolsBasePath + "/metrics"
 	DevToolsMetricsClear   = DevToolsMetricsPath + "/clear"
 	DevToolsPprofBasePath  = DevToolsBasePath + "/pprof"
@@ -114,32 +115,6 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 		return nil
 	}
 
-	// Legacy aliases for CLI compatibility.
-	if err := r.AddRoute(http.MethodGet, "/_routes", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		payload := map[string]any{
-			"routes": r.Routes(),
-		}
-		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
-	})); err != nil {
-		return err
-	}
-
-	if err := r.AddRoute(http.MethodGet, "/_config", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		_ = contract.WriteResponse(w, req, http.StatusOK, c.snapshotMap(), nil)
-	})); err != nil {
-		return err
-	}
-
-	if err := r.AddRoute(http.MethodGet, "/_info", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		payload := map[string]any{
-			"config": c.snapshotMap(),
-			"build":  healthhttp.GetBuildInfo(),
-		}
-		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
-	})); err != nil {
-		return err
-	}
-
 	if err := r.AddRoute(http.MethodGet, DevToolsRoutesPath, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte(renderRoutesText(r.Routes())))
@@ -167,6 +142,16 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 
 	if err := r.AddRoute(http.MethodGet, DevToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_ = contract.WriteResponse(w, req, http.StatusOK, c.snapshotMap(), nil)
+	})); err != nil {
+		return err
+	}
+
+	if err := r.AddRoute(http.MethodGet, DevToolsInfoPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		payload := map[string]any{
+			"config": c.snapshotMap(),
+			"build":  healthhttp.GetBuildInfo(),
+		}
+		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
 	})); err != nil {
 		return err
 	}

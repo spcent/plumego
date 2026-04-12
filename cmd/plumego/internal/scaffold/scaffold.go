@@ -62,8 +62,6 @@ func GetTemplateFiles(template string) []string {
 			"internal/httpapp/handlers/metrics.go",
 			"internal/domain/user/service.go",
 			"internal/domain/user/repository.go",
-			"internal/platform/httpjson/response.go",
-			"internal/platform/httperr/error.go",
 			"Dockerfile",
 			"docker-compose.yml",
 		}...)
@@ -159,6 +157,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/accesslog"
@@ -231,13 +230,15 @@ func registerRoutes(app *core.App) error {
 
 import (
 	"net/http"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // Health responds with a simple JSON liveness check.
 func Health(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(` + "`" + `{"status":"ok"}` + "`" + `))
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+		"status": "ok",
+	}, nil)
 }
 `
 	case "api.go":
@@ -259,9 +260,7 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 		"message":   "hello from %s",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
-	if err := contract.WriteResponse(w, r, http.StatusOK, resp, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
 `, name)
 	case "user.go":
@@ -271,6 +270,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/spcent/plumego/contract"
 	userdom %q
 )
 
@@ -288,11 +288,15 @@ type createUserRequest struct {
 func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	users, err := h.Service.List(r.Context())
 	if err != nil {
-		http.Error(w, "failed to list users", http.StatusInternalServerError)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Code("list_users_failed").
+			Message("failed to list users").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(users)
+	_ = contract.WriteResponse(w, r, http.StatusOK, users, nil)
 }
 
 // Get handles GET /api/v1/users/:id
@@ -300,28 +304,40 @@ func (h UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	u, err := h.Service.GetByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, "user not found", http.StatusNotFound)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusNotFound).
+			Code("user_not_found").
+			Message("user not found").
+			Category(contract.CategoryClient).
+			Build())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(u)
+	_ = contract.WriteResponse(w, r, http.StatusOK, u, nil)
 }
 
 // Create handles POST /api/v1/users
 func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("invalid_json").
+			Message("invalid request body").
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 	u, err := h.Service.Create(r.Context(), req.Name, req.Email)
 	if err != nil {
-		http.Error(w, "failed to create user", http.StatusInternalServerError)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Code("create_user_failed").
+			Message("failed to create user").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(u)
+	_ = contract.WriteResponse(w, r, http.StatusCreated, u, nil)
 }
 `, module+"/internal/domain/user")
 	case "service.go":
@@ -435,64 +451,15 @@ type MetricsHandler struct{}
 
 // Summary responds with a basic runtime metrics snapshot.
 func (h MetricsHandler) Summary(w http.ResponseWriter, r *http.Request) {
-	if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"uptime":    time.Since(startTime).String(),
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	}, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	}, nil)
 }
 
 var startTime = time.Now()
 `
-	case "response.go":
-		return `package httpjson
-
-import (
-	"encoding/json"
-	"net/http"
-)
-
-// Write encodes v as JSON and writes it with the given status code.
-func Write(w http.ResponseWriter, status int, v any) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	return json.NewEncoder(w).Encode(v)
-}
-`
 	case "error.go":
-		if filepath.Dir(file) == "internal/platform/httperr" || filepath.Base(filepath.Dir(file)) == "httperr" {
-			return `package httperr
-
-import (
-	"encoding/json"
-	"net/http"
-)
-
-// ErrorResponse is the canonical error shape for this service.
-type ErrorResponse struct {
-	Code    string ` + "`json:\"code\"`" + `
-	Message string ` + "`json:\"message\"`" + `
-}
-
-// Write writes a structured JSON error response.
-func Write(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(ErrorResponse{Code: code, Message: message})
-}
-
-// BadRequest writes a 400 error response.
-func BadRequest(w http.ResponseWriter, code, message string) {
-	Write(w, http.StatusBadRequest, code, message)
-}
-
-// Internal writes a 500 error response.
-func Internal(w http.ResponseWriter, code, message string) {
-	Write(w, http.StatusInternalServerError, code, message)
-}
-`
-		}
 		// Derive package name from directory for other error.go files.
 		pkg := filepath.Base(filepath.Dir(file))
 		if pkg == "." || pkg == "" {
@@ -728,9 +695,7 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 		"message":   "hello from %s",
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
-	if err := contract.WriteResponse(w, r, http.StatusOK, resp, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
 `, name)
 }
@@ -752,26 +717,22 @@ type HealthHandler struct {
 
 // Live reports that the process is serving HTTP traffic.
 func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
-	if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"status":    "ok",
 		"service":   h.ServiceName,
 		"check":     "liveness",
 		"timestamp": time.Now().Format(time.RFC3339),
-	}, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	}, nil)
 }
 
 // Ready reports that the service is ready to accept requests.
 func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"status":    "ready",
 		"service":   h.ServiceName,
 		"check":     "readiness",
 		"timestamp": time.Now().Format(time.RFC3339),
-	}, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	}, nil)
 }
 `
 }
@@ -928,9 +889,9 @@ func main() {
 	}
 
 	if err := app.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(` + "`" + `{"status":"ok"}` + "`" + `))
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+			"status": "ok",
+		}, nil)
 	}); err != nil {
 		log.Fatal(err)
 	}

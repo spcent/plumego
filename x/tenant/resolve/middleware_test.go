@@ -1,12 +1,14 @@
 package resolve
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/spcent/plumego/security/authn"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
+	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
 func TestMiddlewareFromHeader(t *testing.T) {
@@ -68,6 +70,18 @@ func TestMiddlewareInvalidTenantID(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", rec.Code)
 	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != tenanttransport.CodeInvalidID {
+		t.Fatalf("unexpected error code %q", body.Error.Code)
+	}
 }
 
 func TestMiddlewareMissing(t *testing.T) {
@@ -82,5 +96,17 @@ func TestMiddlewareMissing(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != tenanttransport.CodeRequired {
+		t.Fatalf("unexpected error code %q", body.Error.Code)
 	}
 }

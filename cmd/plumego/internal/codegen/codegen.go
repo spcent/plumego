@@ -238,6 +238,7 @@ func Test%s(t *testing.T) {
 // interface whose methods correspond to the requested HTTP methods.
 func generateHandlerCode(name, pkg string, methods []string) string {
 	lower := strings.ToLower(name)
+	needsJSON := false
 
 	// Build service interface methods from requested HTTP methods.
 	svcMethods := ""
@@ -247,20 +248,28 @@ func generateHandlerCode(name, pkg string, methods []string) string {
 		case "GET":
 			svcMethods += fmt.Sprintf("\tGet(ctx context.Context, id string) (*%s, error)\n", name)
 		case "POST":
+			needsJSON = true
 			svcMethods += fmt.Sprintf("\tCreate(ctx context.Context, name string) (*%s, error)\n", name)
 		case "PUT":
+			needsJSON = true
 			svcMethods += fmt.Sprintf("\tUpdate(ctx context.Context, id, name string) (*%s, error)\n", name)
 		case "DELETE":
 			svcMethods += "\tDelete(ctx context.Context, id string) error\n"
 		}
 	}
 
+	jsonImport := ""
+	if needsJSON {
+		jsonImport = "\n\t\"encoding/json\""
+	}
+
 	header := fmt.Sprintf(`package %s
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
+	"net/http"%s
+
+	"github.com/spcent/plumego/contract"
 )
 
 // %s represents a %s entity.
@@ -277,7 +286,7 @@ type %sService interface {
 type %sHandler struct {
 	Service %sService
 }
-`, pkg, name, lower, name, name, name, name, svcMethods, name, lower, name, name)
+`, pkg, jsonImport, name, lower, name, name, name, name, svcMethods, name, lower, name, name)
 
 	handlers := ""
 	for _, m := range methods {
@@ -298,14 +307,17 @@ func (h %sHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	item, err := h.Service.Get(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusNotFound).
+			Code("%s_not_found").
+			Message("%s not found").
+			Category(contract.CategoryClient).
+			Build())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(item)
+	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
 }
-`, lower, name)
+`, lower, name, lower, lower)
 	case "POST":
 		return fmt.Sprintf(`
 // Create%sRequest carries the fields for creating a new %s.
@@ -317,19 +329,27 @@ type Create%sRequest struct {
 func (h %sHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req Create%sRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("invalid_json").
+			Message("invalid request body").
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 	item, err := h.Service.Create(r.Context(), req.Name)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Code("create_%s_failed").
+			Message("failed to create %s").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(item)
+	_ = contract.WriteResponse(w, r, http.StatusCreated, item, nil)
 }
-`, name, lower, name, lower, name, name)
+`, name, lower, name, lower, name, name, lower, lower)
 	case "PUT":
 		return fmt.Sprintf(`
 // Update%sRequest carries the fields for updating a %s.
@@ -342,31 +362,44 @@ func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var req Update%sRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code("invalid_json").
+			Message("invalid request body").
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 	item, err := h.Service.Update(r.Context(), id, req.Name)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Code("update_%s_failed").
+			Message("failed to update %s").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(item)
+	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
 }
-`, name, lower, name, lower, name, name)
+`, name, lower, name, lower, name, name, lower, lower)
 	case "DELETE":
 		return fmt.Sprintf(`
 // Delete handles DELETE /%s/:id
 func (h %sHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.Service.Delete(r.Context(), id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Code("delete_%s_failed").
+			Message("failed to delete %s").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-`, lower, name)
+`, lower, name, lower, lower)
 	default:
 		return ""
 	}

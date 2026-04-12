@@ -16,6 +16,14 @@ type jobAttemptKey struct{}
 type jobScheduledKey struct{}
 type jobLastErrorKey struct{}
 
+// WithJobID stores the job id in context.
+func WithJobID(ctx context.Context, jobID JobID) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, jobIDKey{}, jobID)
+}
+
 // JobIDFromContext returns the job ID stored in the context.
 func JobIDFromContext(ctx context.Context) (JobID, bool) {
 	if ctx == nil {
@@ -23,6 +31,14 @@ func JobIDFromContext(ctx context.Context) (JobID, bool) {
 	}
 	val, ok := ctx.Value(jobIDKey{}).(JobID)
 	return val, ok
+}
+
+// WithJobAttempt stores the attempt number in context.
+func WithJobAttempt(ctx context.Context, attempt int) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, jobAttemptKey{}, attempt)
 }
 
 // JobAttemptFromContext returns the attempt number stored in the context.
@@ -34,6 +50,14 @@ func JobAttemptFromContext(ctx context.Context) (int, bool) {
 	return val, ok
 }
 
+// WithJobScheduledAt stores the scheduled time in context.
+func WithJobScheduledAt(ctx context.Context, scheduledAt time.Time) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, jobScheduledKey{}, scheduledAt)
+}
+
 // JobScheduledAtFromContext returns the scheduled time stored in the context.
 func JobScheduledAtFromContext(ctx context.Context) (time.Time, bool) {
 	if ctx == nil {
@@ -41,6 +65,14 @@ func JobScheduledAtFromContext(ctx context.Context) (time.Time, bool) {
 	}
 	val, ok := ctx.Value(jobScheduledKey{}).(time.Time)
 	return val, ok
+}
+
+// WithJobLastError stores the last error in context.
+func WithJobLastError(ctx context.Context, err error) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, jobLastErrorKey{}, err)
 }
 
 // JobLastErrorFromContext returns the last error stored in the context.

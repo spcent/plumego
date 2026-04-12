@@ -19,14 +19,12 @@ func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 		service = "plumego-reference"
 	}
 
-	if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"status":    "ok",
 		"service":   service,
 		"check":     "liveness",
 		"timestamp": time.Now().Format(time.RFC3339),
-	}, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	}, nil)
 }
 
 // Ready reports that the reference service is ready to accept requests.
@@ -36,12 +34,10 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		service = "plumego-reference"
 	}
 
-	if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"status":    "ready",
 		"service":   service,
 		"check":     "readiness",
 		"timestamp": time.Now().Format(time.RFC3339),
-	}, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	}, nil)
 }

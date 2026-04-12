@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -22,11 +21,10 @@ type routeRegistrar interface {
 }
 
 type Inbound struct {
-	cfg        WebhookInConfig
-	pub        pubsub.Broker
-	logger     log.StructuredLogger
-	deduper    *Deduper
-	routesOnce sync.Once
+	cfg     WebhookInConfig
+	pub     pubsub.Broker
+	logger  log.StructuredLogger
+	deduper *Deduper
 }
 
 func NewInbound(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *Inbound {
@@ -46,25 +44,19 @@ func (c *Inbound) RegisterRoutes(r routeRegistrar) error {
 		return nil
 	}
 
-	var regErr error
-	c.routesOnce.Do(func() {
-		gitHubPath := strings.TrimSpace(c.cfg.GitHubPath)
-		if gitHubPath == "" {
-			gitHubPath = "/webhooks/github"
-		}
-		regErr = r.AddRoute(http.MethodPost, gitHubPath, adaptCtx(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) }))
-		if regErr != nil {
-			return
-		}
+	gitHubPath := strings.TrimSpace(c.cfg.GitHubPath)
+	if gitHubPath == "" {
+		gitHubPath = "/webhooks/github"
+	}
+	if err := r.AddRoute(http.MethodPost, gitHubPath, adaptCtx(func(ctx *contract.Ctx) { c.webhookInGitHub(ctx) })); err != nil {
+		return err
+	}
 
-		stripePath := strings.TrimSpace(c.cfg.StripePath)
-		if stripePath == "" {
-			stripePath = "/webhooks/stripe"
-		}
-		regErr = r.AddRoute(http.MethodPost, stripePath, adaptCtx(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
-	})
-
-	return regErr
+	stripePath := strings.TrimSpace(c.cfg.StripePath)
+	if stripePath == "" {
+		stripePath = "/webhooks/stripe"
+	}
+	return r.AddRoute(http.MethodPost, stripePath, adaptCtx(func(ctx *contract.Ctx) { c.webhookInStripe(ctx) }))
 }
 
 func (c *Inbound) Health() (string, health.HealthStatus) {
@@ -84,7 +76,13 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 		secret = strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, errInMissingSecret("GITHUB_WEBHOOK_SECRET is not configured"))
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Type(contract.TypeInternal).
+			Code("missing_secret").
+			Message("GITHUB_WEBHOOK_SECRET is not configured").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
 
@@ -94,7 +92,13 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 	}
 	raw, err := VerifyGitHub(ctx.R, secret, maxBody)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, errInInvalidSignature("invalid GitHub signature"))
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusUnauthorized).
+			Type(contract.TypeUnauthorized).
+			Code("invalid_signature").
+			Message("invalid GitHub signature").
+			Category(contract.CategoryAuth).
+			Build())
 		return
 	}
 
@@ -142,7 +146,13 @@ func (c *Inbound) webhookInGitHub(ctx *contract.Ctx) {
 
 	if err = c.pub.Publish(topic, msg); err != nil {
 		c.logger.Error("Failed to publish GitHub event", log.Fields{"error": err, "topic": topic, "event_id": delivery})
-		_ = contract.WriteError(ctx.W, ctx.R, errInPublishFailed())
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Type(contract.TypeInternal).
+			Code("publish_failed").
+			Message("failed to forward event to internal bus").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
 
@@ -163,7 +173,13 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 		secret = strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))
 	}
 	if secret == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, errInMissingSecret("STRIPE_WEBHOOK_SECRET is not configured"))
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Type(contract.TypeInternal).
+			Code("missing_secret").
+			Message("STRIPE_WEBHOOK_SECRET is not configured").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
 
@@ -178,7 +194,13 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 
 	raw, err := VerifyStripe(ctx.R, secret, StripeVerifyOptions{MaxBody: maxBody, Tolerance: tol})
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, errInInvalidSignature("invalid Stripe signature"))
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusUnauthorized).
+			Type(contract.TypeUnauthorized).
+			Code("invalid_signature").
+			Message("invalid Stripe signature").
+			Category(contract.CategoryAuth).
+			Build())
 		return
 	}
 
@@ -226,7 +248,13 @@ func (c *Inbound) webhookInStripe(ctx *contract.Ctx) {
 
 	if err = c.pub.Publish(topic, msg); err != nil {
 		c.logger.Error("Failed to publish Stripe event", log.Fields{"error": err, "topic": topic, "event_id": evtID})
-		_ = contract.WriteError(ctx.W, ctx.R, errInPublishFailed())
+		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			Status(http.StatusInternalServerError).
+			Type(contract.TypeInternal).
+			Code("publish_failed").
+			Message("failed to forward event to internal bus").
+			Category(contract.CategoryServer).
+			Build())
 		return
 	}
 
@@ -278,18 +306,4 @@ func sanitizeTopicSuffix(s string) string {
 		}
 	}
 	return strings.ToLower(b.String())
-}
-
-// --- package-local error helpers for inbound webhook handlers ---
-
-func errInMissingSecret(msg string) contract.APIError {
-	return contract.NewErrorBuilder().Status(http.StatusInternalServerError).Code("missing_secret").Message(msg).Build()
-}
-
-func errInInvalidSignature(msg string) contract.APIError {
-	return contract.NewErrorBuilder().Status(http.StatusUnauthorized).Code("invalid_signature").Message(msg).Build()
-}
-
-func errInPublishFailed() contract.APIError {
-	return contract.NewErrorBuilder().Status(http.StatusInternalServerError).Code("publish_failed").Message("failed to forward event to internal bus").Build()
 }

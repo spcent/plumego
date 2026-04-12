@@ -10,13 +10,11 @@ import (
 // RegisterRoutes wires all HTTP routes for the with-websocket demo.
 func (a *App) RegisterRoutes() error {
 	if err := a.Core.Get("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 			"status":    "ok",
 			"service":   "with-websocket",
 			"timestamp": time.Now().Format(time.RFC3339),
-		}, nil); err != nil {
-			http.Error(w, "encoding error", http.StatusInternalServerError)
-		}
+		}, nil)
 	})); err != nil {
 		return err
 	}

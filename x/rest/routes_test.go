@@ -1,8 +1,12 @@
 package rest
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
 )
 
@@ -57,6 +61,35 @@ func TestRegisterContextResourceRoutesUsesCanonicalRouteSurface(t *testing.T) {
 		{"POST", "/users/batch"},
 		{"PUT", "/users/:id"},
 	})
+}
+
+func TestBaseResourceControllerUsesContractNotImplementedError(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/users", nil)
+
+	NewBaseResourceController("users").Index(rec, req)
+
+	if rec.Code != http.StatusNotImplemented {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotImplemented)
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.Error.Code != "not_implemented" {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, "not_implemented")
+	}
+	if resp.Error.Message != "The Index method is not implemented for the users resource" {
+		t.Fatalf("error message = %q", resp.Error.Message)
+	}
+	if got := resp.Error.Details["method"]; got != "Index" {
+		t.Fatalf("method detail = %v, want %q", got, "Index")
+	}
+	if got := resp.Error.Details["resource"]; got != "users" {
+		t.Fatalf("resource detail = %v, want %q", got, "users")
+	}
 }
 
 type routeKey struct {

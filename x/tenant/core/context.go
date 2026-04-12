@@ -7,8 +7,8 @@ import (
 
 type tenantIDContextKey struct{}
 
-// ContextWithTenantID attaches a tenant id to context.
-func ContextWithTenantID(ctx context.Context, tenantID string) context.Context {
+// WithTenantID attaches a tenant id to context.
+func WithTenantID(ctx context.Context, tenantID string) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -33,5 +33,5 @@ func RequestWithTenantID(r *http.Request, tenantID string) *http.Request {
 	if r == nil {
 		return nil
 	}
-	return r.WithContext(ContextWithTenantID(r.Context(), tenantID))
+	return r.WithContext(WithTenantID(r.Context(), tenantID))
 }

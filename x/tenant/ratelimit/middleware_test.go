@@ -1,11 +1,13 @@
 package ratelimit
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
+	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
 func TestMiddleware(t *testing.T) {
@@ -35,6 +37,18 @@ func TestMiddleware(t *testing.T) {
 	mw(handler).ServeHTTP(rec, req)
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected status 429, got %d", rec.Code)
+	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != tenanttransport.CodeRateLimited {
+		t.Fatalf("error code = %q, want %q", body.Error.Code, tenanttransport.CodeRateLimited)
 	}
 }
 

@@ -23,7 +23,9 @@ import (
 func TestJWTAndRoomAuth(t *testing.T) {
 	secret := []byte("s3cr3t")
 	auth := NewSimpleRoomAuth(secret)
-	auth.SetRoomPassword("a", "p")
+	if err := auth.SetRoomPassword("a", "p"); err != nil {
+		t.Fatalf("SetRoomPassword: %v", err)
+	}
 	if !auth.CheckRoomPassword("a", "p") {
 		t.Fatal("password check failed")
 	}
@@ -48,7 +50,9 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	hub := NewHub(workerCount, jobQueueSize)
 	secret := []byte("testsecret")
 	auth := NewSimpleRoomAuth(secret)
-	auth.SetRoomPassword("room1", "pwd1")
+	if err := auth.SetRoomPassword("room1", "pwd1"); err != nil {
+		t.Fatalf("SetRoomPassword: %v", err)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWSWithAuth(w, r, hub, auth, sendQueueSize, sendTimeout, sendBehavior)

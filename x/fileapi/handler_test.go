@@ -15,6 +15,7 @@ import (
 
 	storefile "github.com/spcent/plumego/store/file"
 	datafile "github.com/spcent/plumego/x/data/file"
+	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
 
 // --- mock Storage ---
@@ -158,8 +159,8 @@ func TestHandler_Upload(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/files", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	ctx := context.WithValue(req.Context(), "tenant_id", "tenant-123")
-	ctx = context.WithValue(ctx, "user_id", "user-456")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	ctx = WithUserID(ctx, "user-456")
 	req = req.WithContext(ctx)
 
 	w := httptest.NewRecorder()
@@ -422,7 +423,7 @@ func BenchmarkHandler_Upload(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest(http.MethodPost, "/files", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", contentType)
-		ctx := context.WithValue(req.Context(), "tenant_id", "tenant-123")
+		ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 		h.Upload(w, req)

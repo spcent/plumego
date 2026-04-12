@@ -33,7 +33,7 @@
 //
 //	// Access version in handler
 //	app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
-//		version := versioning.GetVersion(r.Context())
+//		version := versioning.VersionFromContext(r.Context())
 //		// Handle request based on version
 //	})
 package versioning
@@ -200,16 +200,27 @@ func Middleware(config Config) mw.Middleware {
 				cfg.OnVersionExtracted(r, version)
 			}
 
-			ctx := context.WithValue(r.Context(), versionKey{}, version)
+			ctx := WithVersion(r.Context(), version)
 			w.Header().Set("X-API-Version", strconv.Itoa(version))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-// GetVersion returns the API version from context
-// Returns 0 if version not found in context
-func GetVersion(ctx context.Context) int {
+// WithVersion stores the API version in context.
+func WithVersion(ctx context.Context, version int) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, versionKey{}, version)
+}
+
+// VersionFromContext returns the API version from context.
+// Returns 0 if version not found in context.
+func VersionFromContext(ctx context.Context) int {
+	if ctx == nil {
+		return 0
+	}
 	if v, ok := ctx.Value(versionKey{}).(int); ok {
 		return v
 	}
@@ -358,7 +369,7 @@ func CustomExtractor(extractor Extractor, defaultVersion int, supportedVersions 
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), versionKey{}, version)
+			ctx := WithVersion(r.Context(), version)
 			w.Header().Set("X-API-Version", strconv.Itoa(version))
 
 			next.ServeHTTP(w, r.WithContext(ctx))

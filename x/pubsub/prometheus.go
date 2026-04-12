@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 // PrometheusExporter exports pubsub metrics in Prometheus format
@@ -504,7 +506,12 @@ func escapeLabel(s string) string {
 func (pe *PrometheusExporter) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Status(http.StatusMethodNotAllowed).
+				Code("METHOD_NOT_ALLOWED").
+				Message("method not allowed").
+				Category(contract.CategoryClient).
+				Build())
 			return
 		}
 

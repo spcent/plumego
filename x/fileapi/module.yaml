@@ -30,6 +30,8 @@ non_goals:
 public_entrypoints:
   - Handler
   - NewHandler
+  - WithUserID
+  - UserIDFromContext
 
 allowed_imports:
   - stdlib
@@ -74,6 +76,6 @@ review_checklist:
   - Keep route registration explicit in app wiring
 
 agent_hints:
-  - Wire this handler in your application's routes.go; do not call RegisterRoutes from library code
-  - Inject a tenant middleware before file routes to populate "tenant_id" in context
-  - Use x/data/file.NewLocalStorage or x/data/file.NewS3Storage as the Storage implementation, and keep backend selection, tenant path policy, and metadata persistence out of handlers
+  - Wire `Handler.Upload`, `Download`, `GetInfo`, `GetURL`, `Delete`, and `List` explicitly in your application's routes.go
+  - Inject tenant middleware before file routes and attach tenant identity with `x/tenant/core.WithTenantID`
+  - Use `x/fileapi.WithUserID` when upload handlers need uploader identity in context, and keep backend selection, tenant path policy, and metadata persistence in `x/data/file` or app wiring rather than handlers

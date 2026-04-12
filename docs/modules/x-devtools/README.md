@@ -39,6 +39,16 @@
 - keep debug handlers explicit and locally mounted
 - keep debug runtime snapshot payloads in `x/devtools`, not in `core`
 - do not move debug routes into `core`
+- keep one canonical debug endpoint family under `/_debug/*`
+
+## Canonical debug endpoints
+
+- `/_debug/routes` for plain-text route listing
+- `/_debug/routes.json` for machine-readable route discovery
+- `/_debug/config` for runtime/config snapshot payloads
+- `/_debug/info` for config plus build metadata
+- `/_debug/middleware`, `/_debug/metrics`, and `/_debug/reload` for the
+  remaining debug-only surfaces
 
 ## Boundary with bootstrap
 

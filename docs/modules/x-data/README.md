@@ -85,7 +85,7 @@
 **When to use:**
 - Your service has one primary and one or more read replicas.
 - You want automatic replica health checking and failover.
-- You need per-query routing hints (`ForcePrimary`, `PreferReplica`).
+- You need per-query routing hints (`WithForcePrimary`, `WithPreferReplica`).
 
 **Key types:**
 
@@ -96,15 +96,15 @@
 | `Config` | Primary `*sql.DB`, `Replicas []*sql.DB`, load balancer, routing policy, health-check config |
 | `LoadBalancer` | Interface; `NewRoundRobinBalancer()` and `NewWeightedBalancer(weights)` are built-in |
 | `RoutingPolicy` | Interface; `NewSQLTypePolicy()`, `NewTransactionAwarePolicy()`, `NewAlwaysPrimaryPolicy()` |
-| `ForcePrimary(ctx)` | Returns a context that forces the next query to primary |
-| `PreferReplica(ctx)` | Returns a context that overrides write-detection and prefers a replica |
+| `WithForcePrimary(ctx)` | Returns a context that forces the next query to primary |
+| `WithPreferReplica(ctx)` | Returns a context that overrides write-detection and prefers a replica |
 
 **Routing rules:**
 - `ExecContext` → always primary.
 - `BeginTx` → always primary; marks the context so subsequent queries in that transaction also use primary.
 - `QueryContext` / `QueryRowContext` → primary if `SQLTypePolicy` detects a write keyword or `SELECT … FOR UPDATE`; replica otherwise.
-- `ForcePrimary(ctx)` is the explicit escape hatch for read-after-write or any other "read from primary now" requirement.
-- `PreferReplica(ctx)` overrides the SQL-type heuristic and should only be used for known-safe reads.
+- `WithForcePrimary(ctx)` is the explicit escape hatch for read-after-write or any other "read from primary now" requirement.
+- `WithPreferReplica(ctx)` overrides the SQL-type heuristic and should only be used for known-safe reads.
 - If all replicas are unhealthy and `FallbackToPrimary` is explicitly set to `true`, reads fall back to primary; otherwise the query returns a routing error.
 - Background replica health checks run only when `HealthCheck.Enabled` is `true`; they use periodic `PingContext` probes and remove replicas from balancing only after the configured failure threshold.
 
@@ -119,7 +119,7 @@ cluster, err := rw.New(rw.Config{
 })
 ```
 
-Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the primary during replica outages is acceptable for your service. If you need read-after-write visibility on a per-request basis, wrap the read context with `rw.ForcePrimary(ctx)` instead of changing the whole cluster policy.
+Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the primary during replica outages is acceptable for your service. If you need read-after-write visibility on a per-request basis, wrap the read context with `rw.WithForcePrimary(ctx)` instead of changing the whole cluster policy.
 
 **See:** `x/data/rw/module.yaml` for full manifest.
 

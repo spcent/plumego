@@ -14,50 +14,58 @@ type RoutingPolicy interface {
 	Name() string
 }
 
-// ctxKey is the type for context keys
-type ctxKey int
+type forcePrimaryContextKey struct{}
+type preferReplicaContextKey struct{}
+type inTransactionContextKey struct{}
 
-const (
-	// keyUsePrimary forces routing to primary
-	keyUsePrimary ctxKey = iota
-
-	// keyPreferReplica prefers routing to replica even for writes
-	keyPreferReplica
-
-	// keyInTransaction marks context as being in a transaction
-	keyInTransaction
-)
-
-// ForcePrimary returns a context that forces all queries to use the primary database
-func ForcePrimary(ctx context.Context) context.Context {
-	return context.WithValue(ctx, keyUsePrimary, true)
+// WithForcePrimary returns a context that forces all queries to use the primary database.
+func WithForcePrimary(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, forcePrimaryContextKey{}, true)
 }
 
-// PreferReplica returns a context that prefers routing to replicas
-func PreferReplica(ctx context.Context) context.Context {
-	return context.WithValue(ctx, keyPreferReplica, true)
+// WithPreferReplica returns a context that prefers routing to replicas.
+func WithPreferReplica(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, preferReplicaContextKey{}, true)
 }
 
-// IsForcePrimary checks if the context forces primary usage
-func IsForcePrimary(ctx context.Context) bool {
-	v, ok := ctx.Value(keyUsePrimary).(bool)
+// ForcePrimaryFromContext checks if the context forces primary usage.
+func ForcePrimaryFromContext(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	v, ok := ctx.Value(forcePrimaryContextKey{}).(bool)
 	return ok && v
 }
 
-// IsPreferReplica checks if the context prefers replicas
-func IsPreferReplica(ctx context.Context) bool {
-	v, ok := ctx.Value(keyPreferReplica).(bool)
+// PreferReplicaFromContext checks if the context prefers replicas.
+func PreferReplicaFromContext(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	v, ok := ctx.Value(preferReplicaContextKey{}).(bool)
 	return ok && v
 }
 
-// MarkInTransaction marks the context as being in a transaction
-func MarkInTransaction(ctx context.Context) context.Context {
-	return context.WithValue(ctx, keyInTransaction, true)
+// WithInTransaction marks the context as being in a transaction.
+func WithInTransaction(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, inTransactionContextKey{}, true)
 }
 
-// IsInTransaction checks if the context is in a transaction
-func IsInTransaction(ctx context.Context) bool {
-	v, ok := ctx.Value(keyInTransaction).(bool)
+// InTransactionFromContext checks if the context is in a transaction.
+func InTransactionFromContext(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	v, ok := ctx.Value(inTransactionContextKey{}).(bool)
 	return ok && v
 }
 
@@ -72,11 +80,11 @@ func NewSQLTypePolicy() *SQLTypePolicy {
 // ShouldUsePrimary determines routing based on SQL statement type
 func (p *SQLTypePolicy) ShouldUsePrimary(ctx context.Context, query string) bool {
 	// Check context hints first
-	if IsForcePrimary(ctx) {
+	if ForcePrimaryFromContext(ctx) {
 		return true
 	}
 
-	if IsPreferReplica(ctx) {
+	if PreferReplicaFromContext(ctx) {
 		return false
 	}
 
@@ -143,7 +151,7 @@ func NewTransactionAwarePolicy(base RoutingPolicy) *TransactionAwarePolicy {
 // ShouldUsePrimary routes to primary if in transaction
 func (p *TransactionAwarePolicy) ShouldUsePrimary(ctx context.Context, query string) bool {
 	// All queries in a transaction must use primary
-	if IsInTransaction(ctx) {
+	if InTransactionFromContext(ctx) {
 		return true
 	}
 

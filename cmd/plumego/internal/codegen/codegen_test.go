@@ -110,6 +110,33 @@ func TestGenerateHandlerCode_HandlerCallsService(t *testing.T) {
 	}
 }
 
+func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
+	content := generateHandlerCode("Widget", "handlers", []string{"GET", "POST", "PUT", "DELETE"})
+
+	required := []string{
+		`"github.com/spcent/plumego/contract"`,
+		"contract.WriteResponse(",
+		"contract.WriteError(",
+		"json.NewDecoder(r.Body).Decode",
+	}
+	for _, pattern := range required {
+		if !strings.Contains(content, pattern) {
+			t.Fatalf("handler code missing required pattern %q:\n%s", pattern, content)
+		}
+	}
+
+	disallowed := []string{
+		"http.Error(",
+		"json.NewEncoder(w).Encode",
+		`w.Header().Set("Content-Type", "application/json")`,
+	}
+	for _, pattern := range disallowed {
+		if strings.Contains(content, pattern) {
+			t.Fatalf("handler code contains disallowed pattern %q:\n%s", pattern, content)
+		}
+	}
+}
+
 // TestGenerateHandlerTestCode_NoTODO verifies generated test files have no // TODO.
 func TestGenerateHandlerTestCode_NoTODO(t *testing.T) {
 	methods := []string{"GET", "POST", "PUT", "DELETE"}

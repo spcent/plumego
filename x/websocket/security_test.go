@@ -1,11 +1,13 @@
 package websocket
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"testing"
 	"time"
 
@@ -335,6 +337,49 @@ func TestHubBroadcastWithSecurity(t *testing.T) {
 	hubMetrics := hub.Metrics()
 	if hubMetrics.BroadcastDropped > 0 {
 		t.Logf("Broadcast dropped (queue full): %d", hubMetrics.BroadcastDropped)
+	}
+}
+
+func TestSecurityConfigUsesCallerProvidedLogger(t *testing.T) {
+	secret := []byte("secret12345678901234567890123456")
+	var buf bytes.Buffer
+	logger := log.New(&buf, "", 0)
+
+	err := ValidateSecurityConfig(SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+		Logger:             logger,
+	})
+	if err != nil {
+		t.Fatalf("ValidateSecurityConfig() error = %v", err)
+	}
+	if got := buf.String(); got == "" {
+		t.Fatal("expected logger output for weak secret warning")
+	}
+}
+
+func TestSecureRoomAuthVerifyJWTUsesCallerProvidedLogger(t *testing.T) {
+	secret := bytes.Repeat([]byte("s"), 32)
+	var buf bytes.Buffer
+	logger := log.New(&buf, "", 0)
+
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:               secret,
+		MinJWTSecretLength:      32,
+		EnforcePasswordStrength: true,
+		EnableDebugLogging:      true,
+		Logger:                  logger,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth() error = %v", err)
+	}
+
+	_, err = auth.VerifyJWT("invalid.token")
+	if err == nil {
+		t.Fatal("expected invalid token error")
+	}
+	if got := buf.String(); got == "" {
+		t.Fatal("expected debug logger output for JWT verification failure")
 	}
 }
 

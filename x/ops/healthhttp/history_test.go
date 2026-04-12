@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestHealthHistoryExportHandler(t *testing.T) {
@@ -66,6 +68,17 @@ func TestHealthHistoryExportHandler(t *testing.T) {
 
 	if rr.Code != 400 {
 		t.Fatalf("expected status 400 for invalid format, got %d", rr.Code)
+	}
+	if contentType := rr.Header().Get("Content-Type"); contentType != contract.ContentTypeJSON {
+		t.Fatalf("expected content type %s for invalid format, got %s", contract.ContentTypeJSON, contentType)
+	}
+
+	var errResp contract.ErrorResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to unmarshal error response: %v", err)
+	}
+	if errResp.Error.Code != "INVALID_FORMAT" {
+		t.Fatalf("expected INVALID_FORMAT, got %s", errResp.Error.Code)
 	}
 }
 

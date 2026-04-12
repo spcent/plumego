@@ -1,6 +1,7 @@
 package healthhttp
 
 import (
+	"bytes"
 	"encoding/csv"
 	"net/http"
 	"strconv"
@@ -127,10 +128,8 @@ func (e *invalidParamError) Error() string {
 }
 
 func writeHistoryCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
-
-	writer := csv.NewWriter(w)
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
 	_ = writer.Write([]string{"Timestamp", "State", "Message", "Components", "Duration"})
 
 	for _, entry := range entries {
@@ -144,9 +143,14 @@ func writeHistoryCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 	}
 
 	writer.Flush()
-	if err := writer.Error(); err != nil {
-		http.Error(w, "failed to write CSV", http.StatusInternalServerError)
+	if writer.Error() != nil {
+		return
 	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(buf.Bytes())
 }
 
 func isValidHealthState(state health.HealthState) bool {

@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-func TestContextWithTenantID(t *testing.T) {
+func TestWithTenantID(t *testing.T) {
 	ctx := context.Background()
 	tenantID := "test-tenant-123"
 
 	// Add tenant ID to context
-	newCtx := ContextWithTenantID(ctx, tenantID)
+	newCtx := WithTenantID(ctx, tenantID)
 
 	// Verify it was added
 	retrieved := TenantIDFromContext(newCtx)
@@ -25,7 +25,7 @@ func TestTenantIDFromContext_Present(t *testing.T) {
 	ctx := context.Background()
 	expected := "my-tenant"
 
-	ctx = ContextWithTenantID(ctx, expected)
+	ctx = WithTenantID(ctx, expected)
 	actual := TenantIDFromContext(ctx)
 
 	if actual != expected {
@@ -45,16 +45,16 @@ func TestTenantIDFromContext_Missing(t *testing.T) {
 
 func TestTenantIDFromContext_Nil(t *testing.T) {
 	// Nil context should return empty string (not panic)
-	tenantID := TenantIDFromContext(t.Context())
+	tenantID := TenantIDFromContext(nil)
 	if tenantID != "" {
 		t.Errorf("expected empty string for nil context, got %s", tenantID)
 	}
 }
 
-func TestContextWithTenantID_Nil(t *testing.T) {
+func TestWithTenantID_Nil(t *testing.T) {
 	// Nil context should create background context
 	tenantID := "test-tenant"
-	ctx := ContextWithTenantID(t.Context(), tenantID)
+	ctx := WithTenantID(nil, tenantID)
 
 	if ctx == nil {
 		t.Fatal("expected non-nil context")
@@ -66,14 +66,14 @@ func TestContextWithTenantID_Nil(t *testing.T) {
 	}
 }
 
-func TestContextWithTenantID_Override(t *testing.T) {
+func TestWithTenantID_Override(t *testing.T) {
 	ctx := context.Background()
 
 	// Set first tenant
-	ctx = ContextWithTenantID(ctx, "tenant-1")
+	ctx = WithTenantID(ctx, "tenant-1")
 
 	// Override with second tenant
-	ctx = ContextWithTenantID(ctx, "tenant-2")
+	ctx = WithTenantID(ctx, "tenant-2")
 
 	// Should have the second tenant
 	retrieved := TenantIDFromContext(ctx)
@@ -82,11 +82,11 @@ func TestContextWithTenantID_Override(t *testing.T) {
 	}
 }
 
-func TestContextWithTenantID_EmptyString(t *testing.T) {
+func TestWithTenantID_EmptyString(t *testing.T) {
 	ctx := context.Background()
 
 	// Set empty tenant ID
-	ctx = ContextWithTenantID(ctx, "")
+	ctx = WithTenantID(ctx, "")
 
 	// Should be able to retrieve empty string
 	retrieved := TenantIDFromContext(ctx)
@@ -163,7 +163,7 @@ func TestContextPreservation(t *testing.T) {
 	ctx = context.WithValue(ctx, otherKey{}, "other-value")
 
 	// Add tenant ID
-	ctx = ContextWithTenantID(ctx, "my-tenant")
+	ctx = WithTenantID(ctx, "my-tenant")
 
 	// Verify both values are present
 	tenantID := TenantIDFromContext(ctx)
@@ -207,15 +207,15 @@ func TestRequestPreservation(t *testing.T) {
 	}
 }
 
-func BenchmarkContextWithTenantID(b *testing.B) {
+func BenchmarkWithTenantID(b *testing.B) {
 	ctx := context.Background()
 	for i := 0; i < b.N; i++ {
-		_ = ContextWithTenantID(ctx, "tenant-123")
+		_ = WithTenantID(ctx, "tenant-123")
 	}
 }
 
 func BenchmarkTenantIDFromContext(b *testing.B) {
-	ctx := ContextWithTenantID(context.Background(), "tenant-123")
+	ctx := WithTenantID(context.Background(), "tenant-123")
 	for i := 0; i < b.N; i++ {
 		_ = TenantIDFromContext(ctx)
 	}

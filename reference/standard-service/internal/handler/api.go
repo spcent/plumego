@@ -33,9 +33,7 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			"api_status": "/api/status",
 		},
 	}
-	if err := contract.WriteResponse(w, r, http.StatusOK, resp, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
 
 // Status responds with a summary of system health and component state.
@@ -58,7 +56,5 @@ func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
 			"middleware",
 		},
 	}
-	if err := contract.WriteResponse(w, r, http.StatusOK, resp, nil); err != nil {
-		http.Error(w, "encoding error", http.StatusInternalServerError)
-	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }

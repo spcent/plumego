@@ -58,11 +58,11 @@ func (c *InspectCmd) Run(ctx *Context, args []string) error {
 	case "metrics":
 		return inspectMetrics(ctx.Out, client, *url, *auth)
 	case "routes":
-		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_routes", "Routes retrieved")
+		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_debug/routes.json", "Routes retrieved")
 	case "config":
-		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_config", "Configuration retrieved")
+		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_debug/config", "Configuration retrieved")
 	case "info":
-		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_info", "Application info retrieved")
+		return fetchSingleEndpoint(ctx.Out, client, *url, *auth, "/_debug/info", "Application info retrieved")
 	default:
 		return ctx.Out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}

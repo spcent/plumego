@@ -1,11 +1,14 @@
 package pubsub
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestPrometheusExporter_Basic(t *testing.T) {
@@ -413,6 +416,18 @@ func TestPrometheusExporter_HTTPMethodValidation(t *testing.T) {
 
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Errorf("Expected 405, got %d", w.Code)
+	}
+
+	if got := w.Header().Get("Content-Type"); got != contract.ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if resp.Error.Code != "METHOD_NOT_ALLOWED" {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, "METHOD_NOT_ALLOWED")
 	}
 }
 

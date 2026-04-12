@@ -19,6 +19,39 @@ import (
 	"time"
 )
 
+func optionsFromConfig(cfg *Config) []Option {
+	if cfg == nil {
+		return nil
+	}
+
+	opts := []Option{
+		WithConnectTimeout(cfg.ConnectTimeout),
+		WithReadTimeout(cfg.ReadTimeout),
+		WithWriteTimeout(cfg.WriteTimeout),
+		WithBufferSize(cfg.BufferSize),
+		WithKeepAlive(cfg.KeepAlive),
+		WithKeepAlivePeriod(cfg.KeepAlivePeriod),
+	}
+
+	if cfg.UnixSocketPerm != 0 {
+		opts = append(opts, WithUnixSocketPerm(cfg.UnixSocketPerm))
+	}
+	if cfg.UnixSocketDirPerm != 0 {
+		opts = append(opts, WithUnixSocketDirPerm(cfg.UnixSocketDirPerm))
+	}
+	if cfg.Metrics != nil {
+		opts = append(opts, WithMetrics(cfg.Metrics))
+	}
+	if cfg.Logger != nil {
+		opts = append(opts, WithLogger(cfg.Logger))
+	}
+	if cfg.WindowsSecuritySDDL != "" {
+		opts = append(opts, WithWindowsSecuritySDDL(cfg.WindowsSecuritySDDL))
+	}
+
+	return opts
+}
+
 func ExampleServer() {
 	// Create server with custom config
 	config := &Config{
@@ -28,7 +61,7 @@ func ExampleServer() {
 		BufferSize:     8192,
 	}
 
-	server, err := NewServerWithConfig("test_socket", config)
+	server, err := NewServer("test_socket", optionsFromConfig(config)...)
 	if err != nil {
 		stdlog.Fatal(err)
 	}
@@ -51,7 +84,7 @@ func ExampleServer() {
 	}()
 
 	// Client connection example
-	client, err := DialWithConfig(server.Addr(), config)
+	client, err := Dial(server.Addr(), optionsFromConfig(config)...)
 	if err != nil {
 		stdlog.Fatal(err)
 	}
@@ -131,7 +164,7 @@ func TestServerBasic(t *testing.T) {
 			BufferSize:     8192,
 		}
 
-		server, err := NewServerWithConfig(getTestAddr(), config)
+		server, err := NewServer(getTestAddr(), optionsFromConfig(config)...)
 		if err != nil {
 			t.Fatalf("Failed to create server with config: %v", err)
 		}
@@ -382,7 +415,7 @@ func TestWithTimeout(t *testing.T) {
 		}
 
 		// Try to connect to non-existent address
-		_, err := DialWithConfig("127.0.0.1:0", config)
+		_, err := Dial("127.0.0.1:0", optionsFromConfig(config)...)
 		if err == nil {
 			t.Error("Expected connect timeout error")
 		}
