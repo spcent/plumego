@@ -1,7 +1,7 @@
 # Card 0791
 
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - `docs/modules/x-ai/README.md`

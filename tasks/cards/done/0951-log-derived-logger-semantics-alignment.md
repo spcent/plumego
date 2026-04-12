@@ -1,7 +1,7 @@
 # Card 0951: Log Derived Logger Semantics Alignment
 
 Priority: P1
-State: active
+State: done
 Primary Module: log
 
 ## Goal

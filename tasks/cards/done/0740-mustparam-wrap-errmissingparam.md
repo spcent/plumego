@@ -1,7 +1,7 @@
 # Card 0740
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files: contract/context_core.go
 

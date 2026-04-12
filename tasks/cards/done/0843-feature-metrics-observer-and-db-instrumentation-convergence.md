@@ -1,7 +1,7 @@
 # Card 0843
 
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - `metrics/collector.go`

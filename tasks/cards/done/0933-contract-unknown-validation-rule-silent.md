@@ -1,7 +1,7 @@
 # Card 0933
 
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/validation.go`

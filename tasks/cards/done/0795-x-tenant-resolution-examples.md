@@ -1,7 +1,7 @@
 # Card 0795
 
 Priority: P1
-State: active
+State: done
 Primary Module: x/tenant
 Owned Files:
 - `x/tenant/resolve/example_test.go`

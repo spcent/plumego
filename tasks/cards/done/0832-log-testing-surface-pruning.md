@@ -1,7 +1,7 @@
 # Card 0832
 
 Priority: P1
-State: active
+State: done
 Primary Module: log
 Owned Files:
 - `log/testing.go`

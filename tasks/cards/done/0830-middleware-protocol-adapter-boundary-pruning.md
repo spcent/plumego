@@ -1,7 +1,7 @@
 # Card 0830
 
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - `middleware/versioning/version.go`

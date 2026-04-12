@@ -1,7 +1,7 @@
 # Card 0910
 
 Priority: P3
-State: active
+State: done
 Primary Module: contract, core
 Owned Files:
 - `contract/context_stream.go`
@@ -160,7 +160,6 @@ Done Definition:
 - All tests pass, including race detector.
 
 Outcome:
-State: done
 - A) `errors.Is(err, io.EOF)` used in both `streamFromGen` and `streamFromGenWithRetry`.
 - B) `initSSEStream` now returns `(context.Context, *SSEWriter, error)` with internal context cancellation guard; all 4 SSE call sites updated to remove duplicate guards.
 - C) `AbortWithStatus` uses a single CAS block: `CompareAndSwap(false, true)` guards both `WriteHeader` and `cancel()`; double-abort is now a no-op.

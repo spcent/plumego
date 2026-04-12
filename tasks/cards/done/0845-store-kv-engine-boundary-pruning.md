@@ -1,7 +1,7 @@
 # Card 0845
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - `store/kv/kv.go`

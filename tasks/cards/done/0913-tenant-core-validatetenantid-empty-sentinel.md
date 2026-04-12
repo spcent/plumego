@@ -1,7 +1,7 @@
 # Card 0913
 
 Priority: P2
-State: active
+State: done
 Primary Module: x/tenant/core
 Owned Files:
 - `x/tenant/core/middleware.go`

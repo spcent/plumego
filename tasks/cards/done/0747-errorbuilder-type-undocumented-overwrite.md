@@ -1,7 +1,7 @@
 # Card 0747
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files: contract/errors.go, middleware/auth/contract.go
 

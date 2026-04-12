@@ -1,7 +1,7 @@
 # Card 0848
 
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - `security/jwt/jwt.go`

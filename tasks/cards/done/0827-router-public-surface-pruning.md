@@ -1,7 +1,7 @@
 # Card 0827
 
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files:
 - `router/router.go`

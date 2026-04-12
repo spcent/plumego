@@ -1,7 +1,7 @@
 # Card 0852
 
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - `security/authn/authn.go`

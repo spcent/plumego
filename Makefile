@@ -75,9 +75,9 @@ check-verify: ## Validate a milestone verify report: make check-verify M=active/
 	fi; \
 	scripts/check-spec "$$VERIFY"
 
-check-card: ## Validate a task card: make check-card C=active/C-001-slice-router-work
+check-card: ## Validate a task card: make check-card C=active/0001-slice-router-work
 	@if [ -z "$(C)" ]; then \
-	  echo "Error: C is required. Example: make check-card C=active/C-001-slice-router-work"; \
+	  echo "Error: C is required. Example: make check-card C=active/0001-slice-router-work"; \
 	  exit 1; \
 	fi
 	@scripts/check-spec tasks/cards/$(C).md
@@ -163,20 +163,20 @@ new-verify: ## Scaffold a milestone verify report: make new-verify M=active/M-00
 	echo "Next: fill the verify report, then:"; \
 	echo "  make check-verify M=$(M)"
 
-new-card: ## Scaffold a task card: make new-card ID=001 SLUG=slice-router-work M=M-001 R=fix-bug
+new-card: ## Scaffold a task card: make new-card ID=0001 SLUG=slice-router-work M=M-001 R=fix-bug
 	@if [ -z "$(ID)" ] || [ -z "$(SLUG)" ] || [ -z "$(M)" ]; then \
 	  echo "Error: ID, SLUG, and M are required."; \
-	  echo "  Example: make new-card ID=001 SLUG=slice-router-work M=M-001 R=fix-bug"; \
+	  echo "  Example: make new-card ID=0001 SLUG=slice-router-work M=M-001 R=fix-bug"; \
 	  exit 1; \
 	fi
-	@DEST=tasks/cards/active/C-$(ID)-$(SLUG).md; \
+	@DEST=tasks/cards/active/$(ID)-$(SLUG).md; \
 	if [ -f "$$DEST" ]; then \
 	  echo "Error: $$DEST already exists."; \
 	  exit 1; \
 	fi; \
 	rewrite() { expr="$$1"; file="$$2"; tmp=$$(mktemp); sed "$$expr" "$$file" > "$$tmp" && mv "$$tmp" "$$file"; }; \
 	cp tasks/cards/TEMPLATE.md "$$DEST"; \
-	rewrite "s/^# Card C-XXXX/# Card C-$(ID)/" "$$DEST"; \
+	rewrite "s/^# Card XXXX/# Card $(ID)/" "$$DEST"; \
 	rewrite "s/^Milestone:/Milestone: $(M)/" "$$DEST"; \
 	if [ -n "$(R)" ]; then \
 	  RECIPE_PATH="specs/change-recipes/$(R).yaml"; \
@@ -191,7 +191,7 @@ new-card: ## Scaffold a task card: make new-card ID=001 SLUG=slice-router-work M
 	fi; \
 	echo "Created: $$DEST"; \
 	echo "Next: fill the card fields, then:"; \
-	echo "  make check-card C=active/C-$(ID)-$(SLUG)"; \
+	echo "  make check-card C=active/$(ID)-$(SLUG)"; \
 	if [ -z "$(R)" ]; then \
 	  echo "Hint: set Recipe: to one of specs/change-recipes/*.yaml or scaffold with R=<recipe-name> next time."; \
 	fi

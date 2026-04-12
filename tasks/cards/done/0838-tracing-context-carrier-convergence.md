@@ -1,7 +1,7 @@
 # Card 0838
 
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/trace.go`

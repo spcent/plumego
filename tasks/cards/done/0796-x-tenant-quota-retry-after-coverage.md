@@ -1,7 +1,7 @@
 # Card 0796
 
 Priority: P1
-State: active
+State: done
 Primary Module: x/tenant
 Owned Files:
 - `x/tenant/core/quota_test.go`

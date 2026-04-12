@@ -1,7 +1,7 @@
 # Card 0909
 
 Priority: P3
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/validation.go`
@@ -69,7 +69,6 @@ Done Definition:
 - All tests pass.
 
 Outcome:
-State: done
 - Both Ptr and Struct branches in `validateNestedStructField` use `errors.As` instead of bare type assertion.
 - `"errors"` import added to `contract/validation.go`.
 - `grep -rn '\.(validationErrors)' contract/validation.go` returns empty.

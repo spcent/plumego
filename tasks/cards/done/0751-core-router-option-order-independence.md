@@ -1,7 +1,7 @@
 # Card 0751
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/options.go`

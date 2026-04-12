@@ -1,7 +1,7 @@
 # Card 0792
 
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - `x/ai/provider/example_test.go`

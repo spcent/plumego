@@ -1,7 +1,7 @@
 # Card 0858
 
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/errors.go`

@@ -1,7 +1,7 @@
 # Card 0940
 
 Priority: P1
-State: active
+State: done
 Primary Module: x/tenant/core
 Owned Files:
 - `x/tenant/core/quota_limits.go`

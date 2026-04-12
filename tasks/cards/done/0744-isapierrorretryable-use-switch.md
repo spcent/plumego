@@ -1,7 +1,7 @@
 # Card 0744
 
 Priority: P3
-State: active
+State: done
 Primary Module: contract
 Owned Files: contract/errors.go
 

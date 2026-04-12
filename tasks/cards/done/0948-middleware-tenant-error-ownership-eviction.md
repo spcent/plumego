@@ -1,7 +1,7 @@
 # Card 0948: Middleware Tenant Error Ownership Eviction
 
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 
 ## Goal

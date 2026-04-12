@@ -1,7 +1,7 @@
 # Card 0906
 
 Priority: P3
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/routing.go`
@@ -68,7 +68,6 @@ Done Definition:
 - All tests pass.
 
 Outcome:
-State: done
 - `registerRoute(method, path, name string, handler http.Handler) error` added as single implementation.
 - `addRoute` and `addNamedRoute` reduced to one-line delegators to `registerRoute`.
 - Handler nil check, `ensureMutable`, and `ensureRouter` logic no longer duplicated.

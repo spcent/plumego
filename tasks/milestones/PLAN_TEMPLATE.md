@@ -15,11 +15,11 @@ Affected Modules:
 
 | Card | Goal | Primary Module | Owned Files | Depends On | Quick Gates |
 |------|------|----------------|-------------|------------|-------------|
-| C-001 | | | | | |
+| 0001 | | | | | |
 
 ## Dependency Edges
 
-- `C-001 -> C-002`
+- `0001 -> 0002`
 
 ## Parallel Groups
 

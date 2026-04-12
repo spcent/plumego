@@ -1,7 +1,7 @@
 # Card 0943: Contract JSON Content-Type Constants
 
 Priority: P3
-State: active
+State: done
 Primary Module: contract
 
 ## Goal

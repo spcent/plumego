@@ -1,7 +1,7 @@
 # Card 0798
 
 Priority: P2
-State: active
+State: done
 Primary Module: x/tenant
 Owned Files:
 - `docs/modules/x-tenant/README.md`

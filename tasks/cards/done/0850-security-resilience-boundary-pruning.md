@@ -1,7 +1,7 @@
 # Card 0850
 
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - `security/resilience/circuitbreaker`

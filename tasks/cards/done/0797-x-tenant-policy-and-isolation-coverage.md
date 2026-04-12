@@ -1,7 +1,7 @@
 # Card 0797
 
 Priority: P1
-State: active
+State: done
 Primary Module: x/tenant
 Owned Files:
 - `x/tenant/core/policy_test.go`

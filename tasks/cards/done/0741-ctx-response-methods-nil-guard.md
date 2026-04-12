@@ -1,7 +1,7 @@
 # Card 0741
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files: contract/context_response.go
 

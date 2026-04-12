@@ -1,7 +1,7 @@
 # Card 0904
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/context_core.go`
@@ -69,7 +69,6 @@ Done Definition:
 - All tests pass.
 
 Outcome:
-State: done
 - `MustGet(key string) any` changed to `MustGet(key string) (any, error)`.
 - Returns `fmt.Errorf("%w: %s", ErrMissingKey, key)` on missing key; never panics.
 - `ErrMissingKey` sentinel added alongside `ErrMissingParam` in `context_core.go`.

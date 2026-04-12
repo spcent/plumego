@@ -1,7 +1,7 @@
 # Card 0790
 
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `README.md`

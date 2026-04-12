@@ -1,7 +1,7 @@
 # Card 0847
 
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - `middleware/compression/gzip.go`

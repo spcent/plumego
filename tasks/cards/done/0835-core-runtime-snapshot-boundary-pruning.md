@@ -1,7 +1,7 @@
 # Card 0835
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/config.go`

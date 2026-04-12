@@ -10,8 +10,8 @@ Directory layout:
 
 Scaffold helpers:
 
-- `make new-card ID=001 SLUG=slice-router-work M=M-001 R=fix-bug`
-- `make check-card C=active/C-001-slice-router-work`
+- `make new-card ID=0001 SLUG=slice-router-work M=M-001 R=fix-bug`
+- `make check-card C=active/0001-slice-router-work`
 
 Lifecycle states:
 
@@ -84,6 +84,7 @@ Optional operational fields when useful:
 - `active/` is ordered by execution intent, not by historical id alone
 - the first card in the queue should be the best next action, not merely the oldest open card
 - when a card finishes, move it to `done/` and record the actual outcome and validations that ran
+- when a card moves to `done/`, update the top-level header to `State: done` and do not leave or append a second `State:` line under `Outcome`
 - when a card is no longer the best execution unit, replace or retire it explicitly instead of leaving stale work in the queue
 - do not keep roadmap-scale planning items in `active/`; split them before queueing them
 

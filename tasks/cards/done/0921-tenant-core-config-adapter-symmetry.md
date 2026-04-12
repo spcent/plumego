@@ -1,7 +1,7 @@
 # Card 0921
 
 Priority: P3
-State: active
+State: done
 Primary Module: x/tenant/core
 Owned Files:
 - `x/tenant/core/config.go`

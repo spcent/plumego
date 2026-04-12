@@ -1,7 +1,7 @@
 # Card 0905
 
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/config.go`
@@ -69,7 +69,6 @@ Done Definition:
 - All tests pass.
 
 Outcome:
-State: done
 - `AppConfig.EnableHTTP2` renamed to `AppConfig.HTTP2Enabled`.
 - `serverSettings` struct and `projectServerSettings()` function deleted.
 - `AppConfig.runtimeSnapshot(PreparationState) RuntimeSnapshot` added, projecting directly.

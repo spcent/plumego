@@ -1,4 +1,4 @@
-# Card C-XXXX
+# Card XXXX
 
 Milestone:
 Recipe: specs/change-recipes/<recipe>.yaml

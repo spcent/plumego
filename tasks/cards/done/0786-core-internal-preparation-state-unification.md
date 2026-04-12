@@ -1,7 +1,7 @@
 # Card 0786
 
 Priority: P0
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/app.go`

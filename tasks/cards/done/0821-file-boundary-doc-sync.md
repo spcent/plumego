@@ -1,7 +1,7 @@
 # Card 0821
 
 Priority: P1
-State: active
+State: done
 Primary Module: x/fileapi
 Owned Files:
 - `docs/modules/x-fileapi/README.md`

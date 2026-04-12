@@ -1,7 +1,7 @@
 # Card 0937
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/request_id_generation.go`

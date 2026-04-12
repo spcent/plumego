@@ -1,7 +1,7 @@
 # Card 0903
 
 Priority: P3
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/context_core.go`
@@ -66,7 +66,6 @@ Done Definition:
 - All tests pass.
 
 Outcome:
-State: done
 - `defaultRequestConfig()` deleted from `contract/context_core.go`.
 - Nil-cfg branch in `newCtxWithConfig()` inlined to `c := defaultConfig; cfg = &c`.
 - `go test -timeout 20s ./...` passes.

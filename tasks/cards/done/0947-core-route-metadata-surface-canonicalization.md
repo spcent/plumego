@@ -1,7 +1,7 @@
 # Card 0947: Core Route Metadata Surface Canonicalization
 
 Priority: P1
-State: active
+State: done
 Primary Module: core
 
 ## Goal

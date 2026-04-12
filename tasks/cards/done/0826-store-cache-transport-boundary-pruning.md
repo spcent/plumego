@@ -1,7 +1,7 @@
 # Card 0826
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - `store/cache/cache.go`

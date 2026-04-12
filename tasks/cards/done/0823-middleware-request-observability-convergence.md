@@ -1,7 +1,7 @@
 # Card 0823
 
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - `middleware/accesslog/accesslog.go`

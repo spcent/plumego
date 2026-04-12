@@ -1,7 +1,7 @@
 # Card 0929
 
 Priority: P0
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/auth.go`

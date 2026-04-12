@@ -1,7 +1,7 @@
 # Card 0907
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/errors.go`
@@ -76,7 +76,6 @@ Done Definition:
 - All tests pass.
 
 Outcome:
-State: done
 - All 21 `ErrType*` constants renamed to `Type*` across `contract/errors.go`.
 - `errorTypeLookup` map keys updated.
 - ~140 call sites across `middleware/`, `x/`, and `contract/` updated via bulk sed.

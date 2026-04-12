@@ -1,7 +1,7 @@
 # Card 0820
 
 Priority: P1
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - `docs/modules/x-data/README.md`

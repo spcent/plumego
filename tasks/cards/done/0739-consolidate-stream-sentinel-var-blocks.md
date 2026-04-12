@@ -1,7 +1,7 @@
 # Card 0739
 
 Priority: P3
-State: active
+State: done
 Primary Module: contract
 Owned Files: contract/context_stream.go
 

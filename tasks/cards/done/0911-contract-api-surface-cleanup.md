@@ -1,7 +1,7 @@
 # Card 0911
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/errors.go`
@@ -146,7 +146,6 @@ Done Definition:
 - `go build ./...` and all tests pass.
 
 Outcome:
-State: done
 - A) `WriteError` now returns `ErrResponseWriterNil` when `w == nil`, matching `WriteJSON`.
 - B) `Ctx.Headers http.Header` field removed; `RequestHeaders() http.Header` method added. All callers in `x/webhook` migrated to `ctx.RequestHeaders().Get(...)`.
 - C) `BindError` renamed to `bindError` (unexported); updated in `context_bind.go` and `bind_helpers.go`. External tests updated to test through public API.

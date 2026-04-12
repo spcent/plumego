@@ -1,7 +1,7 @@
 # Card 0849
 
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/request_id_generation.go`

@@ -1,7 +1,7 @@
 # Card 0941
 
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/context_bind.go`

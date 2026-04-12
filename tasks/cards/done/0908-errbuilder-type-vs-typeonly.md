@@ -1,7 +1,7 @@
 # Card 0908
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/errors.go`
@@ -85,7 +85,6 @@ Done Definition:
 - All tests pass.
 
 Outcome:
-State: done
 - `ErrorBuilder.TypeOnly(errorType ErrorType) *ErrorBuilder` added to `contract/errors.go`.
 - `BindErrorToAPIError` in `contract/bind_helpers.go` updated to use `TypeOnly` instead of `Type`.
 - `Type()` semantics unchanged; all existing callers unaffected.

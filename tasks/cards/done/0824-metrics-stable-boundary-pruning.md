@@ -1,7 +1,7 @@
 # Card 0824
 
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - `metrics/otel.go`

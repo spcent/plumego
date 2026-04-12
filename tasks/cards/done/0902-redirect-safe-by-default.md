@@ -1,7 +1,7 @@
 # Card 0902
 
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/context_response.go`
@@ -60,7 +60,6 @@ Done Definition:
 - All tests pass.
 
 Outcome:
-State: done
 - `SafeRedirect()` renamed to `Redirect()` (safe, same-origin-only behaviour is now the default).
 - `Redirect()` renamed to `UnsafeRedirect()` (explicit opt-in for cross-origin redirects).
 - All callers in `x/webhook` and test files updated.

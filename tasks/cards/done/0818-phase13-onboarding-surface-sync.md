@@ -1,7 +1,7 @@
 # Card 0818
 
 Priority: P1
-State: active
+State: done
 Primary Module: reference/standard-service
 Owned Files:
 - `README.md`

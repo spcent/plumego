@@ -1,7 +1,7 @@
 # Card 0749
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files: contract/error_wrap.go
 

@@ -1,7 +1,7 @@
 # Card 0746
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files: contract/observability_policy.go, middleware/requestid/request_id.go
 

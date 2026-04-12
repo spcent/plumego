@@ -1,7 +1,7 @@
 # Card 0916
 
 Priority: P2
-State: active
+State: done
 Primary Module: x/tenant/core
 Owned Files:
 - `x/tenant/core/route_policy_cache.go`

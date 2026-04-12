@@ -1,7 +1,7 @@
 # Card 0912
 
 Priority: P3
-State: active
+State: done
 Primary Module: x/tenant/core
 Owned Files:
 - `x/tenant/core/context.go`

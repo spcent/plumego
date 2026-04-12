@@ -1,7 +1,7 @@
 # Card 0834
 
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - `store/db/stats.go`

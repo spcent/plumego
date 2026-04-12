@@ -1,7 +1,7 @@
 # Card 0949: Middleware Observability Request Lifecycle Canonicalization
 
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 
 ## Goal

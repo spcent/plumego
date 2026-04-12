@@ -1,7 +1,7 @@
 # Card 0944: Authn Header Constant Adoption
 
 Priority: P3
-State: active
+State: done
 Primary Module: security
 
 ## Goal

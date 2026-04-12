@@ -1,7 +1,7 @@
 # Card 0857
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - `store/db/sql.go`

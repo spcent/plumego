@@ -1,7 +1,7 @@
 # Card 0950: Store Stable Tenant Artifact Eviction
 
 Priority: P0
-State: active
+State: done
 Primary Module: store
 
 ## Goal

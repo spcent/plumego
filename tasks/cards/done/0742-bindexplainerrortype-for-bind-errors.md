@@ -1,7 +1,7 @@
 # Card 0742
 
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files: contract/bind_helpers.go
 
