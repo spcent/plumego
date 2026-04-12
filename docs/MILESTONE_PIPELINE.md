@@ -109,6 +109,7 @@ Required fields:
 
 - `Card`
 - `Milestone`
+- `Recipe`
 - `Priority`
 - `State`
 - `Primary Module`
@@ -232,9 +233,10 @@ Affected Modules:
 ### Card Template Fields
 
 ```md
-# Card C-XXX
+# Card XXXX
 
 Milestone:
+Recipe: specs/change-recipes/<recipe>.yaml
 Priority:
 State:
 Primary Module:
