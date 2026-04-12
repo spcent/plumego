@@ -26,6 +26,19 @@ func TestWithPrincipalRoundTrip(t *testing.T) {
 	}
 }
 
+func TestWithPrincipalNilContext(t *testing.T) {
+	p := &Principal{Subject: "user-1"}
+
+	ctx := WithPrincipal(nil, p)
+	got := PrincipalFromContext(ctx)
+	if got == nil {
+		t.Fatal("expected non-nil principal from nil parent context")
+	}
+	if got.Subject != "user-1" {
+		t.Errorf("Subject = %q, want user-1", got.Subject)
+	}
+}
+
 func TestPrincipalFromContextNil(t *testing.T) {
 	got := PrincipalFromContext(context.Background())
 	if got != nil {

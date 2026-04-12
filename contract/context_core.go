@@ -132,6 +132,9 @@ func (e *bindError) Unwrap() error {
 // WithRequestContext stores rc in ctx using the package-internal requestContextKey.
 // Use this instead of context.WithValue with the old exported key.
 func WithRequestContext(ctx context.Context, rc RequestContext) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return context.WithValue(ctx, requestContextKey{}, rc)
 }
 

@@ -147,6 +147,23 @@ func TestRequestContextFromContext(t *testing.T) {
 	}
 }
 
+func TestWithRequestContextNilContext(t *testing.T) {
+	rc := RequestContext{
+		Params:       map[string]string{"id": "123"},
+		RoutePattern: "/users/:id",
+		RouteName:    "user_show",
+	}
+
+	ctx := WithRequestContext(nil, rc)
+	result := RequestContextFromContext(ctx)
+	if result.Params == nil || result.Params["id"] != "123" {
+		t.Fatal("expected RequestContext to survive nil parent context")
+	}
+	if result.RoutePattern != "/users/:id" || result.RouteName != "user_show" {
+		t.Fatal("expected route fields from nil-parent RequestContext")
+	}
+}
+
 func TestCtxConfigDefaults(t *testing.T) {
 	ctx := &Ctx{
 		W:      httptest.NewRecorder(),

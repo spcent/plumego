@@ -43,6 +43,9 @@ type principalContextKey struct{}
 
 // WithPrincipal attaches a principal to a context.
 func WithPrincipal(ctx context.Context, p *Principal) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return context.WithValue(ctx, principalContextKey{}, p)
 }
 
