@@ -5,6 +5,12 @@ import (
 	"net/http"
 )
 
+// HeaderContentType is the HTTP Content-Type header name.
+const HeaderContentType = "Content-Type"
+
+// ContentTypeJSON is the MIME type for JSON responses.
+const ContentTypeJSON = "application/json"
+
 // Response represents a standardized success response payload.
 // It can be used together with WriteResponse for consistent JSON output.
 type Response struct {
@@ -26,7 +32,7 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) error {
 		return err
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(HeaderContentType, ContentTypeJSON)
 	w.WriteHeader(status)
 	_, err := w.Write(buf.Bytes())
 	return err

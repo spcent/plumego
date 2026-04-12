@@ -108,8 +108,12 @@ func validateStructAtDepth(dst any, prefix string, depth int) error {
 			}
 		}
 
-		if nestedErr := validateNestedStructField(fieldValue, fieldName, depth+1); len(nestedErr.errors) > 0 {
-			issues = append(issues, nestedErr.Errors()...)
+		nested, tagErr := validateNestedStructField(fieldValue, fieldName, depth+1)
+		if tagErr != nil {
+			return tagErr
+		}
+		if len(nested.errors) > 0 {
+			issues = append(issues, nested.Errors()...)
 		}
 	}
 
@@ -119,34 +123,36 @@ func validateStructAtDepth(dst any, prefix string, depth int) error {
 	return ValidationErrors{errors: issues}
 }
 
-func validateNestedStructField(value reflect.Value, fieldName string, depth int) ValidationErrors {
+func validateNestedStructField(value reflect.Value, fieldName string, depth int) (ValidationErrors, error) {
 	if !value.IsValid() {
-		return ValidationErrors{}
+		return ValidationErrors{}, nil
 	}
 
 	switch value.Kind() {
 	case reflect.Ptr:
 		if value.IsNil() || value.Elem().Kind() != reflect.Struct {
-			return ValidationErrors{}
+			return ValidationErrors{}, nil
 		}
 		if err := validateStructAtDepth(value.Interface(), fieldName, depth); err != nil {
 			var issues ValidationErrors
 			if errors.As(err, &issues) {
-				return issues
+				return issues, nil
 			}
+			return ValidationErrors{}, err
 		}
 	case reflect.Struct:
 		if value.CanAddr() {
 			if err := validateStructAtDepth(value.Addr().Interface(), fieldName, depth); err != nil {
 				var issues ValidationErrors
 				if errors.As(err, &issues) {
-					return issues
+					return issues, nil
 				}
+				return ValidationErrors{}, err
 			}
 		}
 	}
 
-	return ValidationErrors{}
+	return ValidationErrors{}, nil
 }
 
 // applyValidationRule applies a single validation rule to a field value.
@@ -179,7 +185,7 @@ func applyValidationRule(fieldName string, value reflect.Value, rule string) (*F
 		}
 		return validateMax(fieldName, value, limit), nil
 	default:
-		return &FieldError{Field: fieldName, Code: CodeInvalidFormat, Message: fmt.Sprintf("unknown validation rule: %q", name)}, nil
+		return nil, fmt.Errorf("unknown validation rule %q on field %s", name, fieldName)
 	}
 }
 

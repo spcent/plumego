@@ -87,9 +87,15 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		Name string `validate:"requried"`
 	}
 	err = ValidateStruct(&badRules{})
-	fields = FieldErrorsFrom(err)
-	if len(fields) == 0 || fields[0].Code != CodeInvalidFormat {
-		t.Fatalf("expected invalid format failure, got %v", fields)
+	if err == nil {
+		t.Fatal("expected error for unknown rule, got nil")
+	}
+	// Unknown rules are programmer errors: not wrapped in ValidationErrors.
+	if FieldErrorsFrom(err) != nil {
+		t.Fatalf("expected unknown rule error to not be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
+	}
+	if !strings.Contains(err.Error(), "unknown validation rule") {
+		t.Fatalf("expected error to mention unknown validation rule, got: %v", err)
 	}
 
 	type stringLengths struct {

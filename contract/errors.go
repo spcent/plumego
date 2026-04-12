@@ -192,7 +192,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 		return encErr
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(HeaderContentType, ContentTypeJSON)
 	w.WriteHeader(err.Status)
 	_, writeErr := w.Write(buf.Bytes())
 	return writeErr
