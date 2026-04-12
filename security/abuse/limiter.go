@@ -15,14 +15,15 @@
 //	import "github.com/spcent/plumego/security/abuse"
 //
 //	// Create limiter: 100 requests/sec with burst of 200
-//	limiter := abuse.NewGuard(abuse.Config{
+//	limiter := abuse.NewLimiter(abuse.Config{
 //		Rate:     100,  // tokens per second
 //		Capacity: 200,  // burst capacity
 //	})
 //
 //	// Check if request is allowed
 //	clientIP := "192.168.1.1"
-//	if !limiter.Allow(clientIP) {
+//	decision := limiter.Allow(clientIP)
+//	if !decision.Allowed {
 //		// Rate limit exceeded
 //		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 //		return
