@@ -648,7 +648,7 @@ func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 	}
 
 	var req APITestRequest
-	if err := ctx.BindJSON(&req, nil); err != nil {
+	if err := ctx.BindJSON(&req); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code("invalid_request").

@@ -17,7 +17,7 @@ func TestBindJSONAndValidateStructExplicitFlow(t *testing.T) {
 	ctx := NewCtx(httptest.NewRecorder(), req, nil)
 
 	var dst payload
-	if err := ctx.BindJSON(&dst, nil); err != nil {
+	if err := ctx.BindJSON(&dst); err != nil {
 		t.Fatalf("expected bind to succeed, got %v", err)
 	}
 

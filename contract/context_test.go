@@ -46,7 +46,7 @@ func TestBindJSON(t *testing.T) {
 	var payload struct {
 		Name string `json:"name"`
 	}
-	if err := ctx.BindJSON(&payload, nil); err != nil {
+	if err := ctx.BindJSON(&payload); err != nil {
 		t.Fatalf("expected successful bind, got %v", err)
 	}
 	if payload.Name != "demo" {
@@ -62,7 +62,7 @@ func TestBindJSONMaxBodySize(t *testing.T) {
 	})
 
 	var payload map[string]any
-	err := ctx.BindJSON(&payload, nil)
+	err := ctx.BindJSON(&payload)
 	if err == nil {
 		t.Fatalf("expected error for body too large")
 	}
@@ -84,7 +84,7 @@ func TestBindJSONBodyCacheToggle(t *testing.T) {
 	})
 
 	var payload map[string]any
-	if err := ctx.BindJSON(&payload, nil); err != nil {
+	if err := ctx.BindJSON(&payload); err != nil {
 		t.Fatalf("expected bind to succeed, got %v", err)
 	}
 
@@ -100,7 +100,7 @@ func TestBindJSONBodyCacheToggle(t *testing.T) {
 		EnableBodyCache: false,
 	})
 
-	if err := ctxNoCache.BindJSON(&payload, nil); err != nil {
+	if err := ctxNoCache.BindJSON(&payload); err != nil {
 		t.Fatalf("expected bind to succeed, got %v", err)
 	}
 
@@ -129,7 +129,7 @@ func TestBindJSONErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(tt.body)), nil)
 			var payload map[string]any
-			err := ctx.BindJSON(&payload, nil)
+			err := ctx.BindJSON(&payload)
 			if err == nil {
 				t.Fatalf("expected error for %s", tt.name)
 			}
@@ -159,7 +159,7 @@ func TestBindJSONThenValidateStruct(t *testing.T) {
 	}
 
 	var p payload
-	if err := ctx.BindJSON(&p, nil); err != nil {
+	if err := ctx.BindJSON(&p); err != nil {
 		t.Fatalf("expected successful bind, got %v", err)
 	}
 	if err := ValidateStruct(&p); err != nil {
@@ -178,7 +178,7 @@ func TestValidateStructErrorsAfterBindJSON(t *testing.T) {
 	}
 
 	var p payload
-	if err := ctx.BindJSON(&p, nil); err != nil {
+	if err := ctx.BindJSON(&p); err != nil {
 		t.Fatalf("expected bind to succeed, got %v", err)
 	}
 

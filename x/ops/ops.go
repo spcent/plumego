@@ -258,7 +258,7 @@ func (c *Handler) handleQueueReplay(ctx *contract.Ctx) {
 	}
 
 	var req QueueReplayRequest
-	if err := ctx.BindJSON(&req, nil); err != nil {
+	if err := ctx.BindJSON(&req); err != nil {
 		_ = contract.WriteBindError(ctx.W, ctx.R, err)
 		return
 	}

@@ -507,7 +507,7 @@ func (c *DBResourceController[T]) ShowCtx(ctx *contract.Ctx) {
 // CreateCtx handles POST /resource.
 func (c *DBResourceController[T]) CreateCtx(ctx *contract.Ctx) {
 	var data T
-	if err := ctx.BindJSON(&data, nil); err != nil {
+	if err := ctx.BindJSON(&data); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code("invalid_request").
@@ -581,7 +581,7 @@ func (c *DBResourceController[T]) UpdateCtx(ctx *contract.Ctx) {
 	}
 
 	var data T
-	if err := ctx.BindJSON(&data, nil); err != nil {
+	if err := ctx.BindJSON(&data); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code("invalid_request").

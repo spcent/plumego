@@ -15,10 +15,11 @@ import (
 
 // BindJSON binds the request JSON body to the provided destination structure.
 // It performs minimal decoding and returns a bindError on failure.
-// Pass a non-nil opts to tighten per-call JSON behavior; nil uses defaults.
-func (c *Ctx) BindJSON(dst any, opts *BindOptions) error {
-	if opts == nil {
-		opts = &BindOptions{}
+// The optional opts argument tightens per-call JSON behavior; omit it to use defaults.
+func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
+	var opt BindOptions
+	if len(opts) > 0 {
+		opt = opts[0]
 	}
 
 	data, err := c.bodyBytes()
@@ -30,12 +31,12 @@ func (c *Ctx) BindJSON(dst any, opts *BindOptions) error {
 		return &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: err}
 	}
 
-	if opts.MaxBodySize > 0 && int64(len(data)) > opts.MaxBodySize {
+	if opt.MaxBodySize > 0 && int64(len(data)) > opt.MaxBodySize {
 		return &bindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: ErrRequestBodyTooLarge}
 	}
-	// opts.MaxBodySize, if positive, enforces a stricter per-call cap on the
+	// opt.MaxBodySize, if positive, enforces a stricter per-call cap on the
 	// already-read body. RequestConfig.MaxBodySize enforces read-time limits.
-	return decodeJSONBody(data, dst, opts.DisallowUnknownFields)
+	return decodeJSONBody(data, dst, opt.DisallowUnknownFields)
 }
 
 // joinSentinel wraps sentinel and cause together so that errors.Is(e, sentinel)

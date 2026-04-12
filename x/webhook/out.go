@@ -108,7 +108,7 @@ type targetDTO struct {
 
 func webhookCreateTarget(ctx *contract.Ctx, svc *Service) {
 	var req Target
-	if err := ctx.BindJSON(&req, nil); err != nil {
+	if err := ctx.BindJSON(&req); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}
@@ -173,7 +173,7 @@ func webhookPatchTarget(ctx *contract.Ctx, svc *Service) {
 	}
 
 	var req TargetPatch
-	if err := ctx.BindJSON(&req, nil); err != nil {
+	if err := ctx.BindJSON(&req); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}
@@ -232,7 +232,7 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 		Data map[string]any `json:"data"`
 		Meta map[string]any `json:"meta"`
 	}
-	if err := ctx.BindJSON(&payload, nil); err != nil {
+	if err := ctx.BindJSON(&payload); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, errInvalidJSON())
 		return
 	}

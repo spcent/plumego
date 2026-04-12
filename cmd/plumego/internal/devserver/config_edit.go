@@ -76,7 +76,7 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	}
 
 	var req ConfigEditRequest
-	if err := ctx.BindJSON(&req, nil); err != nil {
+	if err := ctx.BindJSON(&req); err != nil {
 		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code("invalid_request").
