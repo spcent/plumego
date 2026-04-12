@@ -66,6 +66,7 @@
 - `store/db` helpers execute with the exact `context.Context` supplied by the caller.
 - Query and transaction helpers must not infer deadlines from optional config interfaces.
 - Use `context.WithTimeout` or `context.WithDeadline` at the application or owning extension boundary when an operation deadline is required.
+- tenant configuration schema and migrations belong in `x/tenant/config`, not stable `store/db`
 
 ## Extension-layer cache implementations
 

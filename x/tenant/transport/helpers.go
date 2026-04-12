@@ -15,11 +15,11 @@ const (
 	DefaultToolHeader   = "X-Tool"
 	DefaultTokensHeader = "X-Token-Count"
 
-	CodeRequired      = middleware.CodeTenantRequired
-	CodeInvalidID     = middleware.CodeTenantInvalidID
-	CodeRateLimited   = middleware.CodeTenantRateLimited
-	CodePolicyDenied  = middleware.CodeTenantPolicyDenied
-	CodeQuotaExceeded = middleware.CodeTenantQuotaExceeded
+	CodeRequired      = "tenant_required"
+	CodeInvalidID     = "tenant_invalid_id"
+	CodeRateLimited   = "tenant_rate_limited"
+	CodePolicyDenied  = "tenant_policy_denied"
+	CodeQuotaExceeded = "tenant_quota_exceeded"
 )
 
 func HeaderOrDefault(value, fallback string) string {

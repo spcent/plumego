@@ -20,6 +20,7 @@ import (
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/security/authn"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
+	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
 func TestMiddlewareTypeShape(t *testing.T) {
@@ -174,7 +175,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		},
 		{
 			name:         "tenant required",
-			expectedCode: middleware.CodeTenantRequired,
+			expectedCode: tenanttransport.CodeRequired,
 			handler: tenantresolve.Middleware(tenantresolve.Options{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),

@@ -2,30 +2,36 @@
 //
 // This package wraps database/sql with connection setup, context-driven query
 // and transaction helpers, and scan utilities. Topology, retry policy, timeout
-// policy, and health or observability ownership belong outside the stable store
-// root.
+// policy, schema ownership, and health or observability ownership belong
+// outside the stable store root.
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/store/db"
+//	import (
+//		"context"
 //
-//	// Connect to a database
-//	database, err := db.Connect(db.Config{
-//		Driver:   "mysql",
-//		Host:     "localhost",
-//		Port:     3306,
-//		Database: "myapp",
-//		Username: "user",
-//		Password: "pass",
-//		MaxOpenConns: 25,
-//		MaxIdleConns: 10,
-//	})
+//		"github.com/spcent/plumego/store/db"
+//	)
 //
-//	// Execute a query
-//	rows, err := database.Query(ctx, "SELECT * FROM users WHERE id = ?", 123)
+//	func example(ctx context.Context) error {
+//		cfg := db.DefaultConfig("postgres", "postgres://user:pass@localhost:5432/myapp?sslmode=disable")
+//		database, err := db.Open(cfg)
+//		if err != nil {
+//			return err
+//		}
+//		defer database.Close()
 //
-//	// Begin a transaction
-//	tx, err := database.BeginTx(ctx)
+//		rows, err := db.QueryContext(ctx, database, "SELECT id FROM users WHERE active = ?", true)
+//		if err != nil {
+//			return err
+//		}
+//		defer rows.Close()
+//
+//		return db.WithTransaction(ctx, database, nil, func(tx *sql.Tx) error {
+//			_, err := tx.ExecContext(ctx, "UPDATE users SET last_seen_at = CURRENT_TIMESTAMP")
+//			return err
+//		})
+//	}
 package db
 
 import (

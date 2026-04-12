@@ -41,6 +41,37 @@ func TestDefaultLoggerRespectVerbosity(t *testing.T) {
 	})
 }
 
+func TestDerivedLoggerPreservesRespectVerbosityAcrossFormats(t *testing.T) {
+	formats := []LoggerFormat{LoggerFormatText, LoggerFormatJSON}
+	for _, format := range formats {
+		t.Run(string(format), func(t *testing.T) {
+			var buf bytes.Buffer
+			logger := NewLogger(LoggerConfig{
+				Format:           format,
+				Output:           &buf,
+				Level:            DEBUG,
+				Verbosity:        0,
+				RespectVerbosity: true,
+			})
+
+			child := logger.WithFields(Fields{"scope": "child"})
+			child.Debug("debug-suppressed")
+			if got := buf.String(); got != "" {
+				t.Fatalf("expected derived logger to preserve verbosity gating, got %q", got)
+			}
+
+			child.Info("info-ok")
+			got := buf.String()
+			if !strings.Contains(got, "info-ok") {
+				t.Fatalf("expected derived logger info to log, got %q", got)
+			}
+			if !strings.Contains(got, "child") {
+				t.Fatalf("expected derived logger fields to be preserved, got %q", got)
+			}
+		})
+	}
+}
+
 func TestDefaultLoggerErrorOutput(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer

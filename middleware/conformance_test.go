@@ -17,6 +17,7 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/security/authn"
 	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
+	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
 func TestMiddlewareErrorConformance(t *testing.T) {
@@ -45,7 +46,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		},
 		{
 			name:         "tenant required",
-			expectedCode: middleware.CodeTenantRequired,
+			expectedCode: tenanttransport.CodeRequired,
 			handler: tenantresolve.Middleware(tenantresolve.Options{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
@@ -117,11 +118,11 @@ func assertCanonicalEnvelope(t *testing.T, rec *httptest.ResponseRecorder, expec
 
 func TestMiddlewareCodeRegistryStability(t *testing.T) {
 	expected := map[string]string{
-		"tenant_required": middleware.CodeTenantRequired,
-		"tenant_invalid":  middleware.CodeTenantInvalidID,
-		"tenant_policy":   middleware.CodeTenantPolicyDenied,
-		"tenant_quota":    middleware.CodeTenantQuotaExceeded,
-		"tenant_rate":     middleware.CodeTenantRateLimited,
+		"tenant_required": tenanttransport.CodeRequired,
+		"tenant_invalid":  tenanttransport.CodeInvalidID,
+		"tenant_policy":   tenanttransport.CodePolicyDenied,
+		"tenant_quota":    tenanttransport.CodeQuotaExceeded,
+		"tenant_rate":     tenanttransport.CodeRateLimited,
 		"server_busy":     middleware.CodeServerBusy,
 		"queue_timeout":   middleware.CodeServerQueueTimeout,
 		"upstream_failed": middleware.CodeUpstreamFailed,

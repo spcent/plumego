@@ -111,8 +111,9 @@ func NewLogger(configs ...LoggerConfig) StructuredLogger {
 
 func (l *defaultLogger) WithFields(fields Fields) StructuredLogger {
 	return &defaultLogger{
-		backend: l.getBackend(),
-		fields:  mergeFields(l.fields, fields),
+		backend:          l.getBackend(),
+		fields:           mergeFields(l.fields, fields),
+		respectVerbosity: l.respectVerbosity,
 	}
 }
 
