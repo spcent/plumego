@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"strconv"
@@ -261,7 +262,7 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, map[string]string{
-		"url":        fileURL,
+		"url":        html.EscapeString(fileURL),
 		"expires_in": strconv.Itoa(int(expiry.Seconds())),
 	})
 }
