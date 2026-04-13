@@ -249,7 +249,7 @@ func TestOutboundTriggerDisabledWritesCanonicalError(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Error.Code != "forbidden" {
-		t.Fatalf("error code = %q, want forbidden", body.Error.Code)
+	if body.Error.Code != "FORBIDDEN" {
+		t.Fatalf("error code = %q, want FORBIDDEN", body.Error.Code)
 	}
 }
