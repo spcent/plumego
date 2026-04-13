@@ -151,60 +151,52 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 	}
 
 	// API endpoints (without Group - register directly)
-	adaptCtx := func(handler func(*contract.Ctx)) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			rc := contract.RequestContextFromContext(r.Context())
-			ctx := contract.NewCtx(w, r, rc.Params)
-			handler(ctx)
-		}
-	}
-
-	if err := d.app.Get("/api/info", adaptCtx(d.handleInfo)); err != nil {
+	if err := d.app.Get("/api/info", http.HandlerFunc(d.handleInfo)); err != nil {
 		return fmt.Errorf("register /api/info: %w", err)
 	}
-	if err := d.app.Get("/api/status", adaptCtx(d.handleStatus)); err != nil {
+	if err := d.app.Get("/api/status", http.HandlerFunc(d.handleStatus)); err != nil {
 		return fmt.Errorf("register /api/status: %w", err)
 	}
-	if err := d.app.Get("/api/health", adaptCtx(d.handleHealth)); err != nil {
+	if err := d.app.Get("/api/health", http.HandlerFunc(d.handleHealth)); err != nil {
 		return fmt.Errorf("register /api/health: %w", err)
 	}
-	if err := d.app.Get("/api/routes", adaptCtx(d.handleRoutes)); err != nil {
+	if err := d.app.Get("/api/routes", http.HandlerFunc(d.handleRoutes)); err != nil {
 		return fmt.Errorf("register /api/routes: %w", err)
 	}
-	if err := d.app.Get("/api/config", adaptCtx(d.handleConfig)); err != nil {
+	if err := d.app.Get("/api/config", http.HandlerFunc(d.handleConfig)); err != nil {
 		return fmt.Errorf("register /api/config: %w", err)
 	}
-	if err := d.app.Get("/api/config/edit", adaptCtx(d.handleConfigEditGet)); err != nil {
+	if err := d.app.Get("/api/config/edit", http.HandlerFunc(d.handleConfigEditGet)); err != nil {
 		return fmt.Errorf("register /api/config/edit GET: %w", err)
 	}
-	if err := d.app.Post("/api/config/edit", adaptCtx(d.handleConfigEditSave)); err != nil {
+	if err := d.app.Post("/api/config/edit", http.HandlerFunc(d.handleConfigEditSave)); err != nil {
 		return fmt.Errorf("register /api/config/edit POST: %w", err)
 	}
-	if err := d.app.Get("/api/metrics", adaptCtx(d.handleMetrics)); err != nil {
+	if err := d.app.Get("/api/metrics", http.HandlerFunc(d.handleMetrics)); err != nil {
 		return fmt.Errorf("register /api/metrics: %w", err)
 	}
-	if err := d.app.Post("/api/metrics/clear", adaptCtx(d.handleMetricsClear)); err != nil {
+	if err := d.app.Post("/api/metrics/clear", http.HandlerFunc(d.handleMetricsClear)); err != nil {
 		return fmt.Errorf("register /api/metrics/clear: %w", err)
 	}
-	if err := d.app.Get("/api/deps", adaptCtx(d.handleDeps)); err != nil {
+	if err := d.app.Get("/api/deps", http.HandlerFunc(d.handleDeps)); err != nil {
 		return fmt.Errorf("register /api/deps: %w", err)
 	}
-	if err := d.app.Get("/api/pprof/types", adaptCtx(d.handlePprofTypes)); err != nil {
+	if err := d.app.Get("/api/pprof/types", http.HandlerFunc(d.handlePprofTypes)); err != nil {
 		return fmt.Errorf("register /api/pprof/types: %w", err)
 	}
-	if err := d.app.Get("/api/pprof/raw", adaptCtx(d.handlePprofRaw)); err != nil {
+	if err := d.app.Get("/api/pprof/raw", http.HandlerFunc(d.handlePprofRaw)); err != nil {
 		return fmt.Errorf("register /api/pprof/raw: %w", err)
 	}
-	if err := d.app.Post("/api/test", adaptCtx(d.handleAPITest)); err != nil {
+	if err := d.app.Post("/api/test", http.HandlerFunc(d.handleAPITest)); err != nil {
 		return fmt.Errorf("register /api/test: %w", err)
 	}
-	if err := d.app.Post("/api/build", adaptCtx(d.handleBuild)); err != nil {
+	if err := d.app.Post("/api/build", http.HandlerFunc(d.handleBuild)); err != nil {
 		return fmt.Errorf("register /api/build: %w", err)
 	}
-	if err := d.app.Post("/api/restart", adaptCtx(d.handleRestart)); err != nil {
+	if err := d.app.Post("/api/restart", http.HandlerFunc(d.handleRestart)); err != nil {
 		return fmt.Errorf("register /api/restart: %w", err)
 	}
-	if err := d.app.Post("/api/stop", adaptCtx(d.handleStop)); err != nil {
+	if err := d.app.Post("/api/stop", http.HandlerFunc(d.handleStop)); err != nil {
 		return fmt.Errorf("register /api/stop: %w", err)
 	}
 
@@ -376,11 +368,11 @@ func (d *Dashboard) Rebuild(ctx context.Context) error {
 
 // HTTP Handlers
 
-func (d *Dashboard) handleInfo(ctx *contract.Ctx) {
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, d.getDashboardInfo(), nil)
+func (d *Dashboard) handleInfo(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteResponse(w, r, http.StatusOK, d.getDashboardInfo(), nil)
 }
 
-func (d *Dashboard) handleStatus(ctx *contract.Ctx) {
+func (d *Dashboard) handleStatus(w http.ResponseWriter, r *http.Request) {
 	info := d.getDashboardInfo()
 	status := map[string]any{
 		"dashboard": map[string]any{
@@ -399,13 +391,13 @@ func (d *Dashboard) handleStatus(ctx *contract.Ctx) {
 		},
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, status, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, status, nil)
 }
 
-func (d *Dashboard) handleHealth(ctx *contract.Ctx) {
+func (d *Dashboard) handleHealth(w http.ResponseWriter, r *http.Request) {
 	healthy := d.runner.IsRunning()
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"healthy": healthy,
 		"checks": map[string]string{
 			"app": func() string {
@@ -418,9 +410,9 @@ func (d *Dashboard) handleHealth(ctx *contract.Ctx) {
 	}, nil)
 }
 
-func (d *Dashboard) handleBuild(ctx *contract.Ctx) {
+func (d *Dashboard) handleBuild(w http.ResponseWriter, r *http.Request) {
 	if err := d.builder.Build(); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("build_failed").
 			Message(err.Error()).
@@ -428,17 +420,17 @@ func (d *Dashboard) handleBuild(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Build completed successfully",
 	}, nil)
 }
 
-func (d *Dashboard) handleRestart(ctx *contract.Ctx) {
+func (d *Dashboard) handleRestart(w http.ResponseWriter, r *http.Request) {
 	bgCtx := context.Background()
 
 	if err := d.Rebuild(bgCtx); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("app_restart_failed").
 			Message(err.Error()).
@@ -446,15 +438,15 @@ func (d *Dashboard) handleRestart(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application restarted successfully",
 	}, nil)
 }
 
-func (d *Dashboard) handleStop(ctx *contract.Ctx) {
+func (d *Dashboard) handleStop(w http.ResponseWriter, r *http.Request) {
 	if err := d.runner.Stop(); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("app_stop_failed").
 			Message(err.Error()).
@@ -462,15 +454,15 @@ func (d *Dashboard) handleStop(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application stopped successfully",
 	}, nil)
 }
 
-func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
+func (d *Dashboard) handleRoutes(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
@@ -484,7 +476,7 @@ func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 		// Fallback to probing if debug endpoint is not available
 		routes = d.analyzer.ProbeEndpoints()
 		if len(routes) == 0 {
-			_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+			_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 				"routes": []RouteInfo{},
 				"error":  "Could not fetch routes: " + err.Error(),
 			}, nil)
@@ -492,15 +484,15 @@ func (d *Dashboard) handleRoutes(ctx *contract.Ctx) {
 		}
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"routes": routes,
 		"count":  len(routes),
 	}, nil)
 }
 
-func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
+func (d *Dashboard) handleConfig(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
@@ -510,7 +502,7 @@ func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 
 	snapshot, err := d.analyzer.GetAppSnapshot()
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("config_fetch_failed").
 			Message("could not fetch config: "+err.Error()).
@@ -518,10 +510,10 @@ func (d *Dashboard) handleConfig(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, snapshot, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, snapshot, nil)
 }
 
-func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {
+func (d *Dashboard) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	metrics := map[string]any{
 		"dashboard": map[string]any{
 			"uptime":    time.Since(d.startTime).Seconds(),
@@ -555,12 +547,12 @@ func (d *Dashboard) handleMetrics(ctx *contract.Ctx) {
 	metrics["alerts"] = alerts
 	metrics["thresholds"] = thresholds
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, metrics, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, metrics, nil)
 }
 
-func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
+func (d *Dashboard) handleMetricsClear(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
@@ -569,7 +561,7 @@ func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
 	}
 
 	if err := d.analyzer.ClearDevMetrics(); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("metrics_clear_failed").
 			Message(err.Error()).
@@ -577,20 +569,20 @@ func (d *Dashboard) handleMetricsClear(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"success": true,
 	}, nil)
 }
 
-func (d *Dashboard) handlePprofTypes(ctx *contract.Ctx) {
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+func (d *Dashboard) handlePprofTypes(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"types": pprofProfiles(),
 	}, nil)
 }
 
-func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
+func (d *Dashboard) handlePprofRaw(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
@@ -598,9 +590,9 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 		return
 	}
 
-	profileType, seconds, err := parsePprofRequest(ctx)
+	profileType, seconds, err := parsePprofRequest(r)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code("invalid_pprof_request").
 			Message(err.Error()).
@@ -610,7 +602,7 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 
 	payload, contentType, err := d.analyzer.FetchPprof(profileType, seconds)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("pprof_fetch_failed").
 			Message(err.Error()).
@@ -618,8 +610,8 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 		return
 	}
 
-	if download := strings.TrimSpace(ctx.R.URL.Query().Get("download")); download == "0" || strings.EqualFold(download, "false") {
-		_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	if download := strings.TrimSpace(r.URL.Query().Get("download")); download == "0" || strings.EqualFold(download, "false") {
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 			"type":         profileType,
 			"seconds":      seconds,
 			"content_type": contentType,
@@ -630,16 +622,16 @@ func (d *Dashboard) handlePprofRaw(ctx *contract.Ctx) {
 		return
 	}
 
-	ctx.W.Header().Set("Content-Type", contentType)
-	ctx.W.Header().Set("Access-Control-Allow-Origin", "*")
-	ctx.W.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pprof", profileType))
-	ctx.W.WriteHeader(http.StatusOK)
-	_, _ = ctx.W.Write(payload)
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pprof", profileType))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(payload)
 }
 
-func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
+func (d *Dashboard) handleAPITest(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeUnavailable).
 			Code("app_not_running").
 			Message("application is not running").
@@ -648,18 +640,19 @@ func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 	}
 
 	var req APITestRequest
-	if err := ctx.BindJSON(&req); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.TypeValidation).
-			Code("invalid_request").
-			Message(err.Error()).
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryValidation).
+			Code(contract.CodeInvalidJSON).
+			Message("invalid request body").
 			Build())
 		return
 	}
 
 	resp, err := d.analyzer.DoAPITest(req)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code("api_test_failed").
 			Message(err.Error()).
@@ -667,7 +660,7 @@ func (d *Dashboard) handleAPITest(ctx *contract.Ctx) {
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, resp, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
 
 // Helper methods

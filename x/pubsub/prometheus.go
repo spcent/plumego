@@ -508,7 +508,7 @@ func (pe *PrometheusExporter) Handler() http.HandlerFunc {
 		if r.Method != http.MethodGet {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusMethodNotAllowed).
-				Code("METHOD_NOT_ALLOWED").
+				Code(contract.CodeMethodNotAllowed).
 				Message("method not allowed").
 				Category(contract.CategoryClient).
 				Build())

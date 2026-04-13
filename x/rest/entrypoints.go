@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
 )
 
@@ -77,37 +76,6 @@ func RegisterResourceRoutes(r *router.Router, prefix string, controller Resource
 	return nil
 }
 
-// RegisterContextResourceRoutes binds the canonical REST routes for a context-aware resource controller.
-func RegisterContextResourceRoutes(r *router.Router, prefix string, controller ContextResourceController) error {
-	if r == nil || controller == nil {
-		return nil
-	}
-	prefix = normalizePrefix(prefix)
-
-	if err := r.AddRoute(http.MethodGet, prefix, adaptCtx(controller.IndexCtx)); err != nil {
-		return err
-	}
-	if err := r.AddRoute(http.MethodGet, prefix+"/:id", adaptCtx(controller.ShowCtx)); err != nil {
-		return err
-	}
-	if err := r.AddRoute(http.MethodPost, prefix, adaptCtx(controller.CreateCtx)); err != nil {
-		return err
-	}
-	if err := r.AddRoute(http.MethodPut, prefix+"/:id", adaptCtx(controller.UpdateCtx)); err != nil {
-		return err
-	}
-	if err := r.AddRoute(http.MethodDelete, prefix+"/:id", adaptCtx(controller.DeleteCtx)); err != nil {
-		return err
-	}
-	if err := r.AddRoute(http.MethodPatch, prefix+"/:id", adaptCtx(controller.PatchCtx)); err != nil {
-		return err
-	}
-	if err := r.AddRoute(http.MethodPost, prefix+"/batch", adaptCtx(controller.BatchCreateCtx)); err != nil {
-		return err
-	}
-	return r.AddRoute(http.MethodDelete, prefix+"/batch", adaptCtx(controller.BatchDeleteCtx))
-}
-
 func normalizePrefix(prefix string) string {
 	prefix = strings.TrimSpace(prefix)
 	if prefix == "" {
@@ -117,12 +85,4 @@ func normalizePrefix(prefix string) string {
 		prefix = "/" + prefix
 	}
 	return strings.TrimRight(prefix, "/")
-}
-
-func adaptCtx(handler func(*contract.Ctx)) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rc := contract.RequestContextFromContext(r.Context())
-		ctx := contract.NewCtx(w, r, rc.Params)
-		handler(ctx)
-	})
 }

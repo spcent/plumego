@@ -442,19 +442,6 @@ func (pe *ParamExtractor) GetQueryBool(r *http.Request, name string, defaultValu
 // Context-aware resource controller
 // ================================================
 
-// ContextResourceController is a context-aware version of ResourceController
-// that uses contract.Ctx for enhanced request handling.
-type ContextResourceController interface {
-	IndexCtx(ctx *contract.Ctx)
-	ShowCtx(ctx *contract.Ctx)
-	CreateCtx(ctx *contract.Ctx)
-	UpdateCtx(ctx *contract.Ctx)
-	DeleteCtx(ctx *contract.Ctx)
-	PatchCtx(ctx *contract.Ctx)
-	BatchCreateCtx(ctx *contract.Ctx)
-	BatchDeleteCtx(ctx *contract.Ctx)
-}
-
 // BaseContextResourceController provides a default implementation with context support.
 // Embed it in your controller struct and override the methods you need.
 type BaseContextResourceController struct {
@@ -498,33 +485,43 @@ func (c *BaseContextResourceController) ParseQueryParams(r *http.Request) *Query
 	return NormalizeQueryParams(params, c.Spec.Options)
 }
 
-func (c *BaseContextResourceController) notImplemented(ctx *contract.Ctx, method string) {
-	writeNotImplementedResourceError(ctx.W, ctx.R, c.ResourceName, method)
+func (c *BaseContextResourceController) Index(w http.ResponseWriter, r *http.Request) {
+	writeNotImplementedResourceError(w, r, c.ResourceName, "Index")
+}
+func (c *BaseContextResourceController) Show(w http.ResponseWriter, r *http.Request) {
+	writeNotImplementedResourceError(w, r, c.ResourceName, "Show")
+}
+func (c *BaseContextResourceController) Create(w http.ResponseWriter, r *http.Request) {
+	writeNotImplementedResourceError(w, r, c.ResourceName, "Create")
+}
+func (c *BaseContextResourceController) Update(w http.ResponseWriter, r *http.Request) {
+	writeNotImplementedResourceError(w, r, c.ResourceName, "Update")
+}
+func (c *BaseContextResourceController) Delete(w http.ResponseWriter, r *http.Request) {
+	writeNotImplementedResourceError(w, r, c.ResourceName, "Delete")
+}
+func (c *BaseContextResourceController) Patch(w http.ResponseWriter, r *http.Request) {
+	writeNotImplementedResourceError(w, r, c.ResourceName, "Patch")
 }
 
-func (c *BaseContextResourceController) IndexCtx(ctx *contract.Ctx) {
-	c.notImplemented(ctx, "Index")
+// Options handles OPTIONS requests; sets common CORS headers.
+func (c *BaseContextResourceController) Options(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+	w.Header().Set("Access-Control-Max-Age", "86400")
+	w.WriteHeader(http.StatusNoContent)
 }
-func (c *BaseContextResourceController) ShowCtx(ctx *contract.Ctx) {
-	c.notImplemented(ctx, "Show")
+
+// Head handles HEAD requests; returns 200 OK with no body.
+func (c *BaseContextResourceController) Head(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
-func (c *BaseContextResourceController) CreateCtx(ctx *contract.Ctx) {
-	c.notImplemented(ctx, "Create")
+
+func (c *BaseContextResourceController) BatchCreate(w http.ResponseWriter, r *http.Request) {
+	writeNotImplementedResourceError(w, r, c.ResourceName, "BatchCreate")
 }
-func (c *BaseContextResourceController) UpdateCtx(ctx *contract.Ctx) {
-	c.notImplemented(ctx, "Update")
-}
-func (c *BaseContextResourceController) DeleteCtx(ctx *contract.Ctx) {
-	c.notImplemented(ctx, "Delete")
-}
-func (c *BaseContextResourceController) PatchCtx(ctx *contract.Ctx) {
-	c.notImplemented(ctx, "Patch")
-}
-func (c *BaseContextResourceController) BatchCreateCtx(ctx *contract.Ctx) {
-	c.notImplemented(ctx, "BatchCreate")
-}
-func (c *BaseContextResourceController) BatchDeleteCtx(ctx *contract.Ctx) {
-	c.notImplemented(ctx, "BatchDelete")
+func (c *BaseContextResourceController) BatchDelete(w http.ResponseWriter, r *http.Request) {
+	writeNotImplementedResourceError(w, r, c.ResourceName, "BatchDelete")
 }
 
 // ================================================

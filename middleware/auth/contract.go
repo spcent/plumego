@@ -126,7 +126,7 @@ func applyAuthOptions(opts ...AuthOption) authOptions {
 }
 
 func writeAuthInternal(w http.ResponseWriter, r *http.Request, message string) {
-	contract.WriteError(w, r, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeInternal).
 		Message(message).
 		Build())
@@ -140,7 +140,7 @@ func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 
 		var apiErr contract.APIError
 		if errors.As(err, &apiErr) {
-			contract.WriteError(w, r, apiErr)
+			_ = contract.WriteError(w, r, apiErr)
 			return
 		}
 
@@ -148,7 +148,7 @@ func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 		if apiErr.Status == http.StatusUnauthorized && realm != "" {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="`+realm+`"`)
 		}
-		contract.WriteError(w, r, apiErr)
+		_ = contract.WriteError(w, r, apiErr)
 	}
 }
 

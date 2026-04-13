@@ -93,19 +93,7 @@ func DefaultDebugErrorConfig() DebugErrorConfig {
 //	  }
 //	}
 func DebugErrors(config DebugErrorConfig) middleware.Middleware {
-	cfg := DefaultDebugErrorConfig()
-	if config.NotFoundHint != "" {
-		cfg.NotFoundHint = config.NotFoundHint
-	}
-	if config.IncludeBody {
-		cfg.IncludeBody = true
-	}
-	if !config.IncludeRequest {
-		cfg.IncludeRequest = false
-	}
-	if !config.IncludeQuery {
-		cfg.IncludeQuery = false
-	}
+	cfg := config
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +114,7 @@ func DebugErrors(config DebugErrorConfig) middleware.Middleware {
 			}
 
 			copyHeader(w.Header(), rec.header)
-			contract.WriteError(w, r, debugErrorPayload(status, r, cfg, body))
+			_ = contract.WriteError(w, r, debugErrorPayload(status, r, cfg, body))
 		})
 	}
 }

@@ -164,7 +164,7 @@ func sessionIDFromPrincipal(p *authn.Principal) (string, bool) {
 }
 
 func writeSessionInternal(w http.ResponseWriter, r *http.Request, message string) {
-	contract.WriteError(w, r, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Status(http.StatusInternalServerError).
 		Category(contract.CategoryServer).
 		Type(contract.TypeInternal).
@@ -181,11 +181,11 @@ func defaultSessionErrorHandler() SessionErrorHandler {
 
 		var apiErr contract.APIError
 		if errors.As(err, &apiErr) {
-			contract.WriteError(w, r, apiErr)
+			_ = contract.WriteError(w, r, apiErr)
 			return
 		}
 
-		contract.WriteError(w, r, sessionErrorToAPIError(err))
+		_ = contract.WriteError(w, r, sessionErrorToAPIError(err))
 	}
 }
 

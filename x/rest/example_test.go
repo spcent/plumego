@@ -42,12 +42,12 @@ func (exampleUserRepo) Exists(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 
-func ExampleRegisterContextResourceRoutes() {
+func ExampleRegisterResourceRoutes() {
 	r := router.NewRouter()
 	spec := rest.DefaultResourceSpec("users").WithPrefix("/api/users")
 	controller := rest.NewDBResource[exampleUser](spec, exampleUserRepo{})
 
-	rest.RegisterContextResourceRoutes(r, spec.Prefix, controller)
+	rest.RegisterResourceRoutes(r, spec.Prefix, controller, rest.DefaultRouteOptions())
 
 	for _, route := range r.Routes() {
 		fmt.Printf("%s %s\n", route.Method, route.Path)
@@ -58,6 +58,10 @@ func ExampleRegisterContextResourceRoutes() {
 	// DELETE /api/users/batch
 	// GET /api/users
 	// GET /api/users/:id
+	// HEAD /api/users
+	// HEAD /api/users/:id
+	// OPTIONS /api/users
+	// OPTIONS /api/users/:id
 	// PATCH /api/users/:id
 	// POST /api/users
 	// POST /api/users/batch

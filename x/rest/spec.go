@@ -127,6 +127,6 @@ func RegisterDBResource[T any](r *router.Router, spec ResourceSpec, repository R
 	spec = spec.Normalized()
 
 	controller := NewDBResource[T](spec, repository)
-	RegisterContextResourceRoutes(r, spec.Prefix, controller)
+	_ = RegisterResourceRoutes(r, spec.Prefix, controller, spec.Routes)
 	return controller
 }

@@ -27,8 +27,11 @@ const (
 	CodeGone          = "RESOURCE_GONE"
 
 	// System sub-codes
-	CodeUnavailable = "SERVICE_UNAVAILABLE"
-	CodeMaintenance = "MAINTENANCE_MODE"
+	CodeUnavailable      = "SERVICE_UNAVAILABLE"
+	CodeMaintenance      = "MAINTENANCE_MODE"
+	CodeMethodNotAllowed = "METHOD_NOT_ALLOWED"
+	CodeBadGateway       = "BAD_GATEWAY"
+	CodeInvalidRequest   = "INVALID_REQUEST"
 
 	// Business sub-codes
 	CodeInvalidState        = "INVALID_STATE"

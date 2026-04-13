@@ -2,10 +2,10 @@ package ops
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -20,9 +20,8 @@ const DefaultBasePath = "/ops"
 
 // Handler exposes protected operations endpoints for queue/receipt/tenant management.
 type Handler struct {
-	cfg        Options
-	logger     log.StructuredLogger
-	routesOnce sync.Once
+	cfg    Options
+	logger log.StructuredLogger
 }
 
 // Options configures the ops component.
@@ -141,25 +140,28 @@ func (c *Handler) RegisterRoutes(r *router.Router) error {
 		return nil
 	}
 
-	var regErr error
-	c.routesOnce.Do(func() {
-		base := normalizeBasePath(c.cfg.BasePath)
-		group := r.Group(base)
-		register := func(method, path string, handler http.Handler) {
-			if regErr != nil {
-				return
-			}
-			regErr = group.AddRoute(method, path, c.withAuth(handler))
-		}
+	base := normalizeBasePath(c.cfg.BasePath)
+	group := r.Group(base)
+	register := func(method, path string, handler http.Handler) error {
+		return group.AddRoute(method, path, c.withAuth(handler))
+	}
 
-		register(http.MethodGet, "", adaptCtx(c.handleSummary))
-		register(http.MethodGet, "/queue", adaptCtx(c.handleQueueStats))
-		register(http.MethodPost, "/queue/replay", adaptCtx(c.handleQueueReplay))
-		register(http.MethodGet, "/receipts", adaptCtx(c.handleReceiptLookup))
-		register(http.MethodGet, "/channels", adaptCtx(c.handleChannelHealth))
-		register(http.MethodGet, "/tenants/quota", adaptCtx(c.handleTenantQuota))
-	})
-	return regErr
+	if err := register(http.MethodGet, "", http.HandlerFunc(c.handleSummary)); err != nil {
+		return err
+	}
+	if err := register(http.MethodGet, "/queue", http.HandlerFunc(c.handleQueueStats)); err != nil {
+		return err
+	}
+	if err := register(http.MethodPost, "/queue/replay", http.HandlerFunc(c.handleQueueReplay)); err != nil {
+		return err
+	}
+	if err := register(http.MethodGet, "/receipts", http.HandlerFunc(c.handleReceiptLookup)); err != nil {
+		return err
+	}
+	if err := register(http.MethodGet, "/channels", http.HandlerFunc(c.handleChannelHealth)); err != nil {
+		return err
+	}
+	return register(http.MethodGet, "/tenants/quota", http.HandlerFunc(c.handleTenantQuota))
 }
 
 func (c *Handler) withAuth(handler http.Handler) http.Handler {
@@ -170,11 +172,7 @@ func (c *Handler) withAuth(handler http.Handler) http.Handler {
 	return middleware.NewChain(middlewares...).Build(handler)
 }
 
-func (c *Handler) handleSummary(ctx *contract.Ctx) {
-	if ctx == nil {
-		return
-	}
-
+func (c *Handler) handleSummary(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"base_path": normalizeBasePath(c.cfg.BasePath),
 		"auth": map[string]any{
@@ -190,25 +188,21 @@ func (c *Handler) handleSummary(ctx *contract.Ctx) {
 		},
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, data, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, data, nil)
 }
 
-func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
-	if ctx == nil {
-		return
-	}
-
+func (c *Handler) handleQueueStats(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.QueueStats == nil {
-		writeNotImplemented(ctx, "queue_stats_not_configured", "queue stats hook not configured")
+		writeNotImplemented(w, r, "queue_stats_not_configured", "queue stats hook not configured")
 		return
 	}
 
-	queue := strings.TrimSpace(ctx.R.URL.Query().Get("queue"))
+	queue := strings.TrimSpace(r.URL.Query().Get("queue"))
 	var stats []QueueStats
 
 	if queue == "" {
 		if c.cfg.Hooks.QueueList == nil {
-			contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusBadRequest).
 				Category(contract.CategoryValidation).
 				Type(contract.TypeValidation).
@@ -219,78 +213,75 @@ func (c *Handler) handleQueueStats(ctx *contract.Ctx) {
 				Build())
 			return
 		}
-		queues, err := c.cfg.Hooks.QueueList(ctx.R.Context())
+		queues, err := c.cfg.Hooks.QueueList(r.Context())
 		if err != nil {
-			c.writeHookError(ctx, "queue_list_failed", err)
+			c.writeHookError(w, r, "queue_list_failed", err)
 			return
 		}
 		stats = make([]QueueStats, 0, len(queues))
 		for _, q := range queues {
-			snapshot, err := c.cfg.Hooks.QueueStats(ctx.R.Context(), q)
+			snapshot, err := c.cfg.Hooks.QueueStats(r.Context(), q)
 			if err != nil {
-				c.writeHookError(ctx, "queue_stats_failed", err)
+				c.writeHookError(w, r, "queue_stats_failed", err)
 				return
 			}
 			stats = append(stats, snapshot)
 		}
 	} else {
-		snapshot, err := c.cfg.Hooks.QueueStats(ctx.R.Context(), queue)
+		snapshot, err := c.cfg.Hooks.QueueStats(r.Context(), queue)
 		if err != nil {
-			c.writeHookError(ctx, "queue_stats_failed", err)
+			c.writeHookError(w, r, "queue_stats_failed", err)
 			return
 		}
 		stats = []QueueStats{snapshot}
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"queues": stats,
 	}, nil)
 }
 
-func (c *Handler) handleQueueReplay(ctx *contract.Ctx) {
-	if ctx == nil {
-		return
-	}
-
+func (c *Handler) handleQueueReplay(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.QueueReplay == nil {
-		writeNotImplemented(ctx, "queue_replay_not_configured", "queue replay hook not configured")
+		writeNotImplemented(w, r, "queue_replay_not_configured", "queue replay hook not configured")
 		return
 	}
 
 	var req QueueReplayRequest
-	if err := ctx.BindJSON(&req); err != nil {
-		_ = contract.WriteBindError(ctx.W, ctx.R, err)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryValidation).
+			Code(contract.CodeInvalidJSON).
+			Message("invalid request body").
+			Build())
 		return
 	}
 	if err := contract.ValidateStruct(&req); err != nil {
-		_ = contract.WriteBindError(ctx.W, ctx.R, err)
+		_ = contract.WriteBindError(w, r, err)
 		return
 	}
 
-	result, err := c.cfg.Hooks.QueueReplay(ctx.R.Context(), req)
+	result, err := c.cfg.Hooks.QueueReplay(r.Context(), req)
 	if err != nil {
-		c.writeHookError(ctx, "queue_replay_failed", err)
+		c.writeHookError(w, r, "queue_replay_failed", err)
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"replay": result,
 	}, nil)
 }
 
-func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
-	if ctx == nil {
-		return
-	}
-
+func (c *Handler) handleReceiptLookup(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.ReceiptLookup == nil {
-		writeNotImplemented(ctx, "receipt_lookup_not_configured", "receipt lookup hook not configured")
+		writeNotImplemented(w, r, "receipt_lookup_not_configured", "receipt lookup hook not configured")
 		return
 	}
 
-	messageID := strings.TrimSpace(ctx.R.URL.Query().Get("message_id"))
+	messageID := strings.TrimSpace(r.URL.Query().Get("message_id"))
 	if messageID == "" {
-		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryValidation).
 			Type(contract.TypeValidation).
@@ -302,33 +293,29 @@ func (c *Handler) handleReceiptLookup(ctx *contract.Ctx) {
 		return
 	}
 
-	receipt, err := c.cfg.Hooks.ReceiptLookup(ctx.R.Context(), messageID)
+	receipt, err := c.cfg.Hooks.ReceiptLookup(r.Context(), messageID)
 	if err != nil {
-		c.writeHookError(ctx, "receipt_lookup_failed", err)
+		c.writeHookError(w, r, "receipt_lookup_failed", err)
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"receipt": receipt,
 	}, nil)
 }
 
-func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
-	if ctx == nil {
-		return
-	}
-
+func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.ChannelHealth == nil {
-		writeNotImplemented(ctx, "channel_health_not_configured", "channel health hook not configured")
+		writeNotImplemented(w, r, "channel_health_not_configured", "channel health hook not configured")
 		return
 	}
 
-	provider := strings.TrimSpace(ctx.R.URL.Query().Get("provider"))
+	provider := strings.TrimSpace(r.URL.Query().Get("provider"))
 	var channels []ChannelHealth
 
 	if provider == "" {
 		if c.cfg.Hooks.ChannelList == nil {
-			contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusBadRequest).
 				Category(contract.CategoryValidation).
 				Type(contract.TypeValidation).
@@ -339,47 +326,43 @@ func (c *Handler) handleChannelHealth(ctx *contract.Ctx) {
 				Build())
 			return
 		}
-		list, err := c.cfg.Hooks.ChannelList(ctx.R.Context())
+		list, err := c.cfg.Hooks.ChannelList(r.Context())
 		if err != nil {
-			c.writeHookError(ctx, "channel_list_failed", err)
+			c.writeHookError(w, r, "channel_list_failed", err)
 			return
 		}
 		channels = make([]ChannelHealth, 0, len(list))
 		for _, name := range list {
-			status, err := c.cfg.Hooks.ChannelHealth(ctx.R.Context(), name)
+			status, err := c.cfg.Hooks.ChannelHealth(r.Context(), name)
 			if err != nil {
-				c.writeHookError(ctx, "channel_health_failed", err)
+				c.writeHookError(w, r, "channel_health_failed", err)
 				return
 			}
 			channels = append(channels, status)
 		}
 	} else {
-		status, err := c.cfg.Hooks.ChannelHealth(ctx.R.Context(), provider)
+		status, err := c.cfg.Hooks.ChannelHealth(r.Context(), provider)
 		if err != nil {
-			c.writeHookError(ctx, "channel_health_failed", err)
+			c.writeHookError(w, r, "channel_health_failed", err)
 			return
 		}
 		channels = []ChannelHealth{status}
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"channels": channels,
 	}, nil)
 }
 
-func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
-	if ctx == nil {
-		return
-	}
-
+func (c *Handler) handleTenantQuota(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.TenantQuota == nil {
-		writeNotImplemented(ctx, "tenant_quota_not_configured", "tenant quota hook not configured")
+		writeNotImplemented(w, r, "tenant_quota_not_configured", "tenant quota hook not configured")
 		return
 	}
 
-	tenantID := strings.TrimSpace(ctx.R.URL.Query().Get("tenant_id"))
+	tenantID := strings.TrimSpace(r.URL.Query().Get("tenant_id"))
 	if tenantID == "" {
-		contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryValidation).
 			Type(contract.TypeValidation).
@@ -391,13 +374,13 @@ func (c *Handler) handleTenantQuota(ctx *contract.Ctx) {
 		return
 	}
 
-	snapshot, err := c.cfg.Hooks.TenantQuota(ctx.R.Context(), tenantID)
+	snapshot, err := c.cfg.Hooks.TenantQuota(r.Context(), tenantID)
 	if err != nil {
-		c.writeHookError(ctx, "tenant_quota_failed", err)
+		c.writeHookError(w, r, "tenant_quota_failed", err)
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"quota": snapshot,
 	}, nil)
 }
@@ -440,18 +423,15 @@ func (c *Handler) hasAuthConfigured() bool {
 	return false
 }
 
-func (c *Handler) writeHookError(ctx *contract.Ctx, code string, err error) {
-	if ctx == nil {
-		return
-	}
+func (c *Handler) writeHookError(w http.ResponseWriter, r *http.Request, code string, err error) {
 	if c.logger != nil && err != nil {
-		c.logger.ErrorCtx(ctx.R.Context(), "ops hook failed", log.Fields{
+		c.logger.ErrorCtx(r.Context(), "ops hook failed", log.Fields{
 			"code":  code,
 			"error": err.Error(),
-			"path":  ctx.R.URL.Path,
+			"path":  r.URL.Path,
 		})
 	}
-	contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Status(http.StatusInternalServerError).
 		Code(code).
 		Message("internal error").
@@ -459,11 +439,8 @@ func (c *Handler) writeHookError(ctx *contract.Ctx, code string, err error) {
 		Build())
 }
 
-func writeNotImplemented(ctx *contract.Ctx, code, message string) {
-	if ctx == nil {
-		return
-	}
-	contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+func writeNotImplemented(w http.ResponseWriter, r *http.Request, code, message string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Status(http.StatusNotImplemented).
 		Code(code).
 		Message(message).
@@ -471,18 +448,10 @@ func writeNotImplemented(ctx *contract.Ctx, code, message string) {
 		Build())
 }
 
-func adaptCtx(handler func(*contract.Ctx)) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rc := contract.RequestContextFromContext(r.Context())
-		ctx := contract.NewCtx(w, r, rc.Params)
-		handler(ctx)
-	})
-}
-
 func denyAllMiddleware() middleware.Middleware {
 	return func(_ http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contract.WriteError(w, r, contract.NewErrorBuilder().
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusUnauthorized).
 				Category(contract.CategoryAuth).
 				Type(contract.TypeUnauthorized).

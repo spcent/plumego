@@ -46,16 +46,20 @@ func TestRegisterResourceRoutesRespectsRouteOptions(t *testing.T) {
 	})
 }
 
-func TestRegisterContextResourceRoutesUsesCanonicalRouteSurface(t *testing.T) {
+func TestRegisterResourceRoutesWorksWithBaseContextResourceController(t *testing.T) {
 	r := router.NewRouter()
 
-	RegisterContextResourceRoutes(r, "users/", NewBaseContextResourceController("users"))
+	RegisterResourceRoutes(r, "users/", NewBaseContextResourceController("users"), DefaultRouteOptions())
 
 	assertRouteSet(t, r.Routes(), []routeKey{
 		{"DELETE", "/users/:id"},
 		{"DELETE", "/users/batch"},
 		{"GET", "/users"},
 		{"GET", "/users/:id"},
+		{"HEAD", "/users"},
+		{"HEAD", "/users/:id"},
+		{"OPTIONS", "/users"},
+		{"OPTIONS", "/users/:id"},
 		{"PATCH", "/users/:id"},
 		{"POST", "/users"},
 		{"POST", "/users/batch"},

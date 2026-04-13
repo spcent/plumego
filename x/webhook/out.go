@@ -34,36 +34,38 @@ func (c *Outbound) RegisterRoutes(r routeRegistrar) error {
 
 	svc := c.cfg.Service
 
-	if err := r.AddRoute(http.MethodPost, base+"/targets", adaptCtx(func(ctx *contract.Ctx) { webhookCreateTarget(ctx, svc) })); err != nil {
+	if err := r.AddRoute(http.MethodPost, base+"/targets", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookCreateTarget(w, r, svc) })); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodGet, base+"/targets", adaptCtx(func(ctx *contract.Ctx) { webhookListTargets(ctx, svc) })); err != nil {
+	if err := r.AddRoute(http.MethodGet, base+"/targets", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookListTargets(w, r, svc) })); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodGet, base+"/targets/:id", adaptCtx(func(ctx *contract.Ctx) { webhookGetTarget(ctx, svc) })); err != nil {
+	if err := r.AddRoute(http.MethodGet, base+"/targets/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookGetTarget(w, r, svc) })); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPatch, base+"/targets/:id", adaptCtx(func(ctx *contract.Ctx) { webhookPatchTarget(ctx, svc) })); err != nil {
+	if err := r.AddRoute(http.MethodPatch, base+"/targets/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookPatchTarget(w, r, svc) })); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPost, base+"/targets/:id/enable", adaptCtx(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, true) })); err != nil {
+	if err := r.AddRoute(http.MethodPost, base+"/targets/:id/enable", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookSetTargetEnabled(w, r, svc, true) })); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPost, base+"/targets/:id/disable", adaptCtx(func(ctx *contract.Ctx) { webhookSetTargetEnabled(ctx, svc, false) })); err != nil {
+	if err := r.AddRoute(http.MethodPost, base+"/targets/:id/disable", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookSetTargetEnabled(w, r, svc, false) })); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodPost, base+"/events/:event", adaptCtx(func(ctx *contract.Ctx) {
-		webhookTriggerEvent(ctx, svc, c.cfg.TriggerToken, c.cfg.AllowEmptyToken)
+	token, allowEmpty := c.cfg.TriggerToken, c.cfg.AllowEmptyToken
+	if err := r.AddRoute(http.MethodPost, base+"/events/:event", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		webhookTriggerEvent(w, r, svc, token, allowEmpty)
 	})); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodGet, base+"/deliveries", adaptCtx(func(ctx *contract.Ctx) { webhookListDeliveries(ctx, svc, c.cfg.DefaultPageLimit) })); err != nil {
+	pageLimit := c.cfg.DefaultPageLimit
+	if err := r.AddRoute(http.MethodGet, base+"/deliveries", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookListDeliveries(w, r, svc, pageLimit) })); err != nil {
 		return err
 	}
-	if err := r.AddRoute(http.MethodGet, base+"/deliveries/:id", adaptCtx(func(ctx *contract.Ctx) { webhookGetDelivery(ctx, svc) })); err != nil {
+	if err := r.AddRoute(http.MethodGet, base+"/deliveries/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookGetDelivery(w, r, svc) })); err != nil {
 		return err
 	}
-	return r.AddRoute(http.MethodPost, base+"/deliveries/:id/replay", adaptCtx(func(ctx *contract.Ctx) { webhookReplayDelivery(ctx, svc) }))
+	return r.AddRoute(http.MethodPost, base+"/deliveries/:id/replay", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { webhookReplayDelivery(w, r, svc) }))
 }
 
 func (c *Outbound) Health() (string, health.HealthStatus) {
@@ -97,24 +99,24 @@ type targetDTO struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-func webhookCreateTarget(ctx *contract.Ctx, svc *Service) {
+func webhookCreateTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 	var req Target
-	if err := ctx.BindJSON(&req); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("invalid_json").Message("invalid JSON payload").Category(contract.CategoryValidation).Build())
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("invalid_json").Message("invalid JSON payload").Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	t, err := svc.CreateTarget(ctx.R.Context(), req)
+	t, err := svc.CreateTarget(r.Context(), req)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusCreated, targetToDTO(t), nil)
+	_ = contract.WriteResponse(w, r, http.StatusCreated, targetToDTO(t), nil)
 }
 
-func webhookListTargets(ctx *contract.Ctx, svc *Service) {
-	q := ctx.R.URL.Query()
+func webhookListTargets(w http.ResponseWriter, r *http.Request, svc *Service) {
+	q := r.URL.Query()
 
 	var enabled *bool
 	if v := strings.TrimSpace(q.Get("enabled")); v != "" {
@@ -123,12 +125,12 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 	}
 	event := strings.TrimSpace(q.Get("event"))
 
-	items, err := svc.ListTargets(ctx.R.Context(), TargetFilter{
+	items, err := svc.ListTargets(r.Context(), TargetFilter{
 		Enabled: enabled,
 		Event:   event,
 	})
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusInternalServerError).Type(contract.TypeInternal).Code("store_error").Message(err.Error()).Category(contract.CategoryServer).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusInternalServerError).Type(contract.TypeInternal).Code("store_error").Message(err.Error()).Category(contract.CategoryServer).Build())
 		return
 	}
 
@@ -137,85 +139,85 @@ func webhookListTargets(ctx *contract.Ctx, svc *Service) {
 		out = append(out, targetToDTO(t))
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{"items": out}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{"items": out}, nil)
 }
 
-func webhookGetTarget(ctx *contract.Ctx, svc *Service) {
-	id, ok := ctx.Param("id")
-	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
+func webhookGetTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
+	if strings.TrimSpace(id) == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	t, ok := svc.GetTarget(ctx.R.Context(), id)
+	t, ok := svc.GetTarget(r.Context(), id)
 	if !ok {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotFound).Type(contract.TypeNotFound).Code("not_found").Message("target not found").Category(contract.CategoryClient).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusNotFound).Type(contract.TypeNotFound).Code("not_found").Message("target not found").Category(contract.CategoryClient).Build())
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, targetToDTO(t), nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, targetToDTO(t), nil)
 }
 
-func webhookPatchTarget(ctx *contract.Ctx, svc *Service) {
-	id, ok := ctx.Param("id")
-	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
+func webhookPatchTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
+	if strings.TrimSpace(id) == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
 		return
 	}
 
 	var req TargetPatch
-	if err := ctx.BindJSON(&req); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("invalid_json").Message("invalid JSON payload").Category(contract.CategoryValidation).Build())
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("invalid_json").Message("invalid JSON payload").Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	t, err := svc.UpdateTarget(ctx.R.Context(), id, req)
+	t, err := svc.UpdateTarget(r.Context(), id, req)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, targetToDTO(t), nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, targetToDTO(t), nil)
 }
 
-func webhookSetTargetEnabled(ctx *contract.Ctx, svc *Service, enable bool) {
-	id, ok := ctx.Param("id")
-	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
+func webhookSetTargetEnabled(w http.ResponseWriter, r *http.Request, svc *Service, enable bool) {
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
+	if strings.TrimSpace(id) == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	t, err := svc.UpdateTarget(ctx.R.Context(), id, TargetPatch{Enabled: &enable})
+	t, err := svc.UpdateTarget(r.Context(), id, TargetPatch{Enabled: &enable})
 	if err != nil {
 		if err == ErrTargetNotFound {
-			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotFound).Type(contract.TypeNotFound).Code("not_found").Message("target not found").Category(contract.CategoryClient).Build())
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusNotFound).Type(contract.TypeNotFound).Code("not_found").Message("target not found").Category(contract.CategoryClient).Build())
 			return
 		}
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, targetToDTO(t), nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, targetToDTO(t), nil)
 }
 
-func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmpty bool) {
-	event, ok := ctx.Param("event")
-	if !ok || strings.TrimSpace(event) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("event is required").Category(contract.CategoryValidation).Build())
+func webhookTriggerEvent(w http.ResponseWriter, r *http.Request, svc *Service, token string, allowEmpty bool) {
+	event := contract.RequestContextFromContext(r.Context()).Params["event"]
+	if strings.TrimSpace(event) == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("event is required").Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	provided := strings.TrimSpace(ctx.R.URL.Query().Get("token"))
+	provided := strings.TrimSpace(r.URL.Query().Get("token"))
 	if provided == "" {
-		provided = strings.TrimSpace(ctx.RequestHeaders().Get("X-Trigger-Token"))
+		provided = strings.TrimSpace(r.Header.Get("X-Trigger-Token"))
 	}
 
 	if token == "" && !allowEmpty {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusForbidden).Type(contract.TypeForbidden).Code("forbidden").Message("triggering is disabled").Category(contract.CategoryAuth).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusForbidden).Type(contract.TypeForbidden).Code("forbidden").Message("triggering is disabled").Category(contract.CategoryAuth).Build())
 		return
 	}
 	if token != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusUnauthorized).Type(contract.TypeUnauthorized).Code("unauthorized").Message("invalid trigger token").Category(contract.CategoryAuth).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusUnauthorized).Type(contract.TypeUnauthorized).Code("unauthorized").Message("invalid trigger token").Category(contract.CategoryAuth).Build())
 		return
 	}
 
@@ -223,25 +225,25 @@ func webhookTriggerEvent(ctx *contract.Ctx, svc *Service, token string, allowEmp
 		Data map[string]any `json:"data"`
 		Meta map[string]any `json:"meta"`
 	}
-	if err := ctx.BindJSON(&payload); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("invalid_json").Message("invalid JSON payload").Category(contract.CategoryValidation).Build())
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("invalid_json").Message("invalid JSON payload").Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	enqueued, err := svc.TriggerEvent(ctx.R.Context(), Event{Type: event, Data: payload.Data, Meta: payload.Meta})
+	enqueued, err := svc.TriggerEvent(r.Context(), Event{Type: event, Data: payload.Data, Meta: payload.Meta})
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusAccepted, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusAccepted, map[string]any{
 		"enqueued": enqueued,
 		"event":    event,
 	}, nil)
 }
 
-func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
-	q := ctx.R.URL.Query()
+func webhookListDeliveries(w http.ResponseWriter, r *http.Request, svc *Service, defaultLimit int) {
+	q := r.URL.Query()
 
 	limit := defaultLimit
 	if v := strings.TrimSpace(q.Get("limit")); v != "" {
@@ -273,9 +275,9 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 		}
 	}
 
-	deliveries, err := svc.ListDeliveries(ctx.R.Context(), filter)
+	deliveries, err := svc.ListDeliveries(r.Context(), filter)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusInternalServerError).Type(contract.TypeInternal).Code("store_error").Message(err.Error()).Category(contract.CategoryServer).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusInternalServerError).Type(contract.TypeInternal).Code("store_error").Message(err.Error()).Category(contract.CategoryServer).Build())
 		return
 	}
 
@@ -315,25 +317,25 @@ func webhookListDeliveries(ctx *contract.Ctx, svc *Service, defaultLimit int) {
 	}
 
 	resp := map[string]any{"items": out}
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, resp, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
 
-func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
-	id, ok := ctx.Param("id")
-	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
+func webhookGetDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
+	if strings.TrimSpace(id) == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	d, ok := svc.GetDelivery(ctx.R.Context(), id)
+	d, ok := svc.GetDelivery(r.Context(), id)
 	if !ok {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotFound).Type(contract.TypeNotFound).Code("not_found").Message("delivery not found").Category(contract.CategoryClient).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusNotFound).Type(contract.TypeNotFound).Code("not_found").Message("delivery not found").Category(contract.CategoryClient).Build())
 		return
 	}
 
 	payload := json.RawMessage(d.PayloadJSON)
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"id":                d.ID,
 		"target_id":         d.TargetID,
 		"event_id":          d.EventID,
@@ -351,24 +353,24 @@ func webhookGetDelivery(ctx *contract.Ctx, svc *Service) {
 	}, nil)
 }
 
-func webhookReplayDelivery(ctx *contract.Ctx, svc *Service) {
-	id, ok := ctx.Param("id")
-	if !ok || strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
+func webhookReplayDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
+	if strings.TrimSpace(id) == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeRequired).Code("bad_request").Message("id is required").Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	d, err := svc.ReplayDelivery(ctx.R.Context(), id)
+	d, err := svc.ReplayDelivery(r.Context(), id)
 	if errors.Is(err, ErrTargetNotFound) {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotFound).Type(contract.TypeNotFound).Code("not_found").Message("delivery not found").Category(contract.CategoryClient).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusNotFound).Type(contract.TypeNotFound).Code("not_found").Message("delivery not found").Category(contract.CategoryClient).Build())
 		return
 	}
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Type(contract.TypeValidation).Code("bad_request").Message(err.Error()).Category(contract.CategoryValidation).Build())
 		return
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID}, nil)
 }
 
 func targetToDTO(t Target) targetDTO {

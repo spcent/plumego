@@ -104,7 +104,7 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	ensureNoSniff(w.Header())
-	contract.WriteError(w, nil, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, nil, contract.NewErrorBuilder().
 		Status(http.StatusServiceUnavailable).
 		Code("CIRCUIT_OPEN").
 		Message("Circuit breaker is open. The service is temporarily unavailable.").
@@ -118,7 +118,7 @@ func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	ensureNoSniff(w.Header())
-	contract.WriteError(w, nil, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, nil, contract.NewErrorBuilder().
 		Status(http.StatusTooManyRequests).
 		Code("RATE_LIMITED").
 		Message("Circuit breaker is in half-open state. Too many concurrent requests.").
