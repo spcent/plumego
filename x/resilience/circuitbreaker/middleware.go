@@ -121,7 +121,7 @@ func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 	ensureNoSniff(w.Header())
 	_ = contract.WriteError(w, nil, contract.NewErrorBuilder().
 		Status(http.StatusTooManyRequests).
-		Code("RATE_LIMITED").
+		Code(contract.CodeRateLimited).
 		Message("Circuit breaker is in half-open state. Too many concurrent requests.").
 		Category(contract.CategoryRateLimit).
 		Detail("circuit", cb.Name()).

@@ -192,7 +192,7 @@ func classifyServiceError(err error) contract.APIError {
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnprocessableEntity).
 			Category(contract.CategoryValidation).
-			Code("VALIDATION_ERROR").
+			Code(contract.CodeValidationError).
 			Message(err.Error()).
 			Build()
 	default:
