@@ -180,7 +180,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 
 	// Basic HTTP validation first
 	if r.Method != http.MethodGet {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code(contract.CodeMethodNotAllowed).Message("method not allowed").Category(contract.CategoryClient).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeMethodNotAllowed).Message("method not allowed").Build())
 		return
 	}
 	if !headerContains(r.Header, "Connection", "Upgrade") || !headerContains(r.Header, "Upgrade", "websocket") {

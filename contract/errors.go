@@ -59,11 +59,14 @@ const (
 	TypeGone          ErrorType = "resource_gone"
 
 	// System errors
-	TypeInternal    ErrorType = "internal_error"
-	TypeUnavailable ErrorType = "service_unavailable"
-	TypeTimeout     ErrorType = "timeout_failure"
-	TypeRateLimited ErrorType = "rate_limited"
-	TypeMaintenance ErrorType = "maintenance_mode"
+	TypeInternal        ErrorType = "internal_error"
+	TypeUnavailable     ErrorType = "service_unavailable"
+	TypeTimeout         ErrorType = "timeout_failure"
+	TypeRateLimited     ErrorType = "rate_limited"
+	TypeMaintenance     ErrorType = "maintenance_mode"
+	TypeMethodNotAllowed ErrorType = "method_not_allowed"
+	TypeNotImplemented  ErrorType = "not_implemented"
+	TypeBadGateway      ErrorType = "bad_gateway"
 
 	// Business logic errors
 	TypeInvalidState        ErrorType = "invalid_state"
@@ -103,7 +106,10 @@ var errorTypeLookup = map[ErrorType]errorTypeMeta{
 	TypeUnavailable: {CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
 	TypeTimeout:     {CategoryTimeout, CodeTimeout, http.StatusRequestTimeout},
 	TypeRateLimited: {CategoryRateLimit, CodeRateLimited, http.StatusTooManyRequests},
-	TypeMaintenance: {CategoryServer, CodeMaintenance, http.StatusServiceUnavailable},
+	TypeMaintenance:      {CategoryServer, CodeMaintenance, http.StatusServiceUnavailable},
+	TypeMethodNotAllowed: {CategoryClient, CodeMethodNotAllowed, http.StatusMethodNotAllowed},
+	TypeNotImplemented:   {CategoryServer, CodeNotImplemented, http.StatusNotImplemented},
+	TypeBadGateway:       {CategoryServer, CodeBadGateway, http.StatusBadGateway},
 	// Business
 	TypeInvalidState:        {CategoryBusiness, CodeInvalidState, http.StatusUnprocessableEntity},
 	TypeInsufficientFunds:   {CategoryBusiness, CodeInsufficientFunds, http.StatusUnprocessableEntity},

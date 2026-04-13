@@ -89,7 +89,7 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 // HandleExecute handles HTTP POST requests to execute workflows with streaming.
 func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code(contract.CodeMethodNotAllowed).Message("Method not allowed").Category(contract.CategoryClient).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeMethodNotAllowed).Message("Method not allowed").Build())
 		return
 	}
 

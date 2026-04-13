@@ -103,8 +103,7 @@ func (c *BaseResourceController) resourceName() string {
 
 func writeNotImplementedResourceError(w http.ResponseWriter, r *http.Request, resourceName, method string) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusNotImplemented).
-		Code(contract.CodeNotImplemented).
+		Type(contract.TypeNotImplemented).
 		Message(fmt.Sprintf("The %s method is not implemented for the %s resource", method, resourceName)).
 		Detail("method", method).
 		Detail("resource", resourceName).

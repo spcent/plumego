@@ -348,10 +348,8 @@ func parseJobState(value string) JobState {
 
 func writeMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusMethodNotAllowed).
-		Code(contract.CodeMethodNotAllowed).
+		Type(contract.TypeMethodNotAllowed).
 		Message("method not allowed").
-		Category(contract.CategoryClient).
 		Build())
 }
 

@@ -746,7 +746,7 @@ type ClusterStats struct {
 // --- package-local error helpers for cluster HTTP handlers ---
 
 func errClusterMethodNotAllowed() contract.APIError {
-	return contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code(contract.CodeMethodNotAllowed).Message("method not allowed").Category(contract.CategoryClient).Build()
+	return contract.NewErrorBuilder().Type(contract.TypeMethodNotAllowed).Message("method not allowed").Build()
 }
 
 func errClusterUnauthorized() contract.APIError {
