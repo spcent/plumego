@@ -189,7 +189,7 @@ func webhookSetTargetEnabled(w http.ResponseWriter, r *http.Request, svc *Servic
 
 	t, err := svc.UpdateTarget(r.Context(), id, TargetPatch{Enabled: &enable})
 	if err != nil {
-		if err == ErrTargetNotFound {
+		if errors.Is(err, ErrTargetNotFound) {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Code(contract.CodeResourceNotFound).Message("target not found").Build())
 			return
 		}

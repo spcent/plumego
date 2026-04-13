@@ -290,7 +290,7 @@ func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
-			Code("list_users_failed").
+			Code(contract.CodeInternalError).
 			Message("failed to list users").
 			Category(contract.CategoryServer).
 			Build())
@@ -306,7 +306,7 @@ func (h UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusNotFound).
-			Code("user_not_found").
+			Code(contract.CodeResourceNotFound).
 			Message("user not found").
 			Category(contract.CategoryClient).
 			Build())
@@ -321,7 +321,7 @@ func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
-			Code("invalid_json").
+			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
 			Category(contract.CategoryValidation).
 			Build())
@@ -331,7 +331,7 @@ func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusInternalServerError).
-			Code("create_user_failed").
+			Code(contract.CodeInternalError).
 			Message("failed to create user").
 			Category(contract.CategoryServer).
 			Build())

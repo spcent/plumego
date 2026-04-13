@@ -9,6 +9,7 @@ package fileapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -311,7 +312,7 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeFileMetadataError(w http.ResponseWriter, r *http.Request, err error) {
-	if err == storefile.ErrNotFound {
+	if errors.Is(err, storefile.ErrNotFound) {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusNotFound).
 			Code(contract.CodeResourceNotFound).

@@ -346,7 +346,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusMethodNotAllowed).
-			Code("method_not_allowed").
+			Code(contract.CodeMethodNotAllowed).
 			Message("method not allowed").
 			Category(contract.CategoryClient).
 			Build())
@@ -528,7 +528,7 @@ func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message str
 	}
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Status(code).
-		Code("internal_error").
+		Code(contract.CodeInternalError).
 		Message(message).
 		Category(contract.CategoryServer).
 		Build())

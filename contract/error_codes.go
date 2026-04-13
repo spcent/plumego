@@ -30,6 +30,7 @@ const (
 	CodeUnavailable      = "SERVICE_UNAVAILABLE"
 	CodeMaintenance      = "MAINTENANCE_MODE"
 	CodeMethodNotAllowed = "METHOD_NOT_ALLOWED"
+	CodeNotImplemented   = "NOT_IMPLEMENTED"
 	CodeBadGateway       = "BAD_GATEWAY"
 	CodeInvalidRequest   = "INVALID_REQUEST"
 

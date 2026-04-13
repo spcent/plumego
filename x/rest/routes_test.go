@@ -82,8 +82,8 @@ func TestBaseResourceControllerUsesContractNotImplementedError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if resp.Error.Code != "not_implemented" {
-		t.Fatalf("error code = %q, want %q", resp.Error.Code, "not_implemented")
+	if resp.Error.Code != contract.CodeNotImplemented {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, contract.CodeNotImplemented)
 	}
 	if resp.Error.Message != "The Index method is not implemented for the users resource" {
 		t.Fatalf("error message = %q", resp.Error.Message)

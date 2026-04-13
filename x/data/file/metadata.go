@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -70,7 +71,7 @@ func (m *DBMetadataManager) Get(ctx context.Context, id string) (*File, error) {
 		&file.LastAccessAt, &file.DeletedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, storefile.ErrNotFound
 	}
 	if err != nil {
@@ -107,7 +108,7 @@ func (m *DBMetadataManager) GetByPath(ctx context.Context, p string) (*File, err
 		&file.LastAccessAt, &file.DeletedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, storefile.ErrNotFound
 	}
 	if err != nil {
@@ -145,7 +146,7 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 		&file.LastAccessAt, &file.DeletedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // not found, not an error
 	}
 	if err != nil {

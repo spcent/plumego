@@ -1,6 +1,7 @@
 package circuitbreaker
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
@@ -37,12 +38,12 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			})
 
 			// If circuit breaker rejected the request
-			if err == ErrCircuitOpen {
+			if errors.Is(err, ErrCircuitOpen) {
 				writeCircuitOpenResponse(w, cb)
 				return
 			}
 
-			if err == ErrTooManyRequests {
+			if errors.Is(err, ErrTooManyRequests) {
 				writeTooManyRequestsResponse(w, cb)
 				return
 			}
