@@ -33,7 +33,7 @@ func (h *AdminHandler) WithPrefix(prefix string) *AdminHandler {
 // ServeHTTP implements http.Handler.
 func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.scheduler == nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusServiceUnavailable).Code(contract.CodeUnavailable).Message("scheduler not configured").Category(contract.CategoryServer).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("scheduler not configured").Build())
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, h.prefix)

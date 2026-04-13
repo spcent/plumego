@@ -750,5 +750,5 @@ func errClusterMethodNotAllowed() contract.APIError {
 }
 
 func errClusterUnauthorized() contract.APIError {
-	return contract.NewErrorBuilder().Status(http.StatusUnauthorized).Code(contract.CodeUnauthorized).Message("invalid cluster auth token").Category(contract.CategoryAuth).Build()
+	return contract.NewErrorBuilder().Type(contract.TypeUnauthorized).Message("invalid cluster auth token").Build()
 }
