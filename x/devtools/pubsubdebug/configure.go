@@ -38,10 +38,7 @@ func Configure(hooks Hooks) {
 	_ = hooks.RegisterRoute(http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if pub == nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusInternalServerError).
-				Category(contract.CategoryServer).
 				Type(contract.TypeInternal).
-				Code(contract.CodeInternalError).
 				Message("pubsub is not configured").
 				Build())
 			return

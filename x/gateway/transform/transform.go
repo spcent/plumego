@@ -107,10 +107,7 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 						config.OnError(err)
 					}
 					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Status(http.StatusInternalServerError).
-						Category(contract.CategoryServer).
 						Type(contract.TypeInternal).
-						Code(contract.CodeInternalError).
 						Message("Response transformation failed").
 						Build())
 					return

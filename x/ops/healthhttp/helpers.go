@@ -38,7 +38,7 @@ func withCheckTimeout(ctx context.Context, timeout time.Duration) (context.Conte
 func requireManager(manager Manager, w http.ResponseWriter, r *http.Request) bool {
 	if manager == nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusServiceUnavailable).
+			Type(contract.TypeUnavailable).
 			Code("HEALTH_MANAGER_UNAVAILABLE").
 			Message("health manager is not configured").
 			Build())
@@ -50,7 +50,7 @@ func requireManager(manager Manager, w http.ResponseWriter, r *http.Request) boo
 func requireTracker(tracker *Tracker, w http.ResponseWriter, r *http.Request) bool {
 	if tracker == nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusServiceUnavailable).
+			Type(contract.TypeUnavailable).
 			Code("HEALTH_TRACKER_UNAVAILABLE").
 			Message("health tracker is not configured").
 			Build())

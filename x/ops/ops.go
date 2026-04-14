@@ -203,10 +203,7 @@ func (c *Handler) handleQueueStats(w http.ResponseWriter, r *http.Request) {
 	if queue == "" {
 		if c.cfg.Hooks.QueueList == nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusBadRequest).
-				Category(contract.CategoryValidation).
 				Type(contract.TypeValidation).
-				Code(contract.CodeValidationError).
 				Message("validation failed for field 'queue': queue parameter required").
 				Detail("field", "queue").
 				Detail("validation_message", "queue parameter required").
@@ -316,10 +313,7 @@ func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
 	if provider == "" {
 		if c.cfg.Hooks.ChannelList == nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusBadRequest).
-				Category(contract.CategoryValidation).
 				Type(contract.TypeValidation).
-				Code(contract.CodeValidationError).
 				Message("validation failed for field 'provider': provider parameter required").
 				Detail("field", "provider").
 				Detail("validation_message", "provider parameter required").
@@ -432,19 +426,17 @@ func (c *Handler) writeHookError(w http.ResponseWriter, r *http.Request, code st
 		})
 	}
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusInternalServerError).
+		Type(contract.TypeInternal).
 		Code(code).
 		Message("internal error").
-		Category(contract.CategoryServer).
 		Build())
 }
 
 func writeNotImplemented(w http.ResponseWriter, r *http.Request, code, message string) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusNotImplemented).
+		Type(contract.TypeNotImplemented).
 		Code(code).
 		Message(message).
-		Category(contract.CategoryServer).
 		Build())
 }
 
@@ -452,10 +444,7 @@ func denyAllMiddleware() middleware.Middleware {
 	return func(_ http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusUnauthorized).
-				Category(contract.CategoryAuth).
 				Type(contract.TypeUnauthorized).
-				Code(contract.CodeUnauthorized).
 				Message("ops auth required").
 				Build())
 		})

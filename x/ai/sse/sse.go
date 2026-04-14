@@ -254,10 +254,7 @@ func Handle(handler Handler) http.HandlerFunc {
 		stream, err := NewStream(r.Context(), w)
 		if err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusInternalServerError).
-				Category(contract.CategoryServer).
 				Type(contract.TypeInternal).
-				Code(contract.CodeInternalError).
 				Message(err.Error()).
 				Build())
 			return
