@@ -107,10 +107,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	result, err := h.storage.Put(ctx, opts)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message(fmt.Sprintf("upload failed: %v", err)).
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
@@ -145,10 +143,8 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	reader, err := h.storage.Get(ctx, fileMeta.Path)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message(fmt.Sprintf("failed to read file: %v", err)).
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
@@ -248,10 +244,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	files, total, err := h.metadata.List(ctx, query)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message(fmt.Sprintf("list failed: %v", err)).
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
@@ -297,10 +291,8 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	fileURL, err := h.storage.GetURL(ctx, fileMeta.Path, expiry)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message(fmt.Sprintf("failed to generate url: %v", err)).
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
@@ -321,10 +313,8 @@ func writeFileMetadataError(w http.ResponseWriter, r *http.Request, err error) {
 			Build())
 	} else {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message(fmt.Sprintf("metadata error: %v", err)).
-			Category(contract.CategoryServer).
 			Build())
 	}
 }

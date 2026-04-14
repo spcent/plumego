@@ -154,8 +154,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	normalized, err := normalizeServerConfig(cfg)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Category(contract.CategoryServer).
 			Type(contract.TypeInternal).
 			Message(err.Error()).
 			Build())
@@ -181,8 +179,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	}
 	if !headerContains(r.Header, "Connection", "Upgrade") || !headerContains(r.Header, "Upgrade", "websocket") {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
 			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("bad request").
@@ -194,8 +190,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	key := r.Header.Get("Sec-WebSocket-Key")
 	if key == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
 			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("bad request").
@@ -205,8 +199,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	if err := ValidateWebSocketKey(key); err != nil {
 		cfg.Hub.invalidWSKeys.Add(1)
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
 			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message(err.Error()).
@@ -264,8 +256,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Category(contract.CategoryServer).
 			Type(contract.TypeInternal).
 			Message("server does not support hijacking").
 			Build())
@@ -274,8 +264,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	conn, buf, err := hj.Hijack()
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Category(contract.CategoryServer).
 			Type(contract.TypeInternal).
 			Message("hijack failed").
 			Build())
