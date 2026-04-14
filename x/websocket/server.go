@@ -157,7 +157,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message(err.Error()).
 			Build())
 		return
@@ -268,7 +267,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("server does not support hijacking").
 			Build())
 		return
@@ -279,7 +277,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			Status(http.StatusInternalServerError).
 			Category(contract.CategoryServer).
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("hijack failed").
 			Build())
 		return
