@@ -269,7 +269,7 @@ func (p *KVPersistence) GetAckState(ctx context.Context, topic string, messageID
 	key := fmt.Sprintf("ack:%s:%s", topic, messageID)
 	_, err := p.store.Get(key)
 	if err != nil {
-		if err == kvengine.ErrKeyNotFound || err == kvengine.ErrKeyExpired {
+		if errors.Is(err, kvengine.ErrKeyNotFound) || errors.Is(err, kvengine.ErrKeyExpired) {
 			return false, nil
 		}
 		return false, err
