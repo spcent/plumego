@@ -279,10 +279,7 @@ func (c *Handler) handleReceiptLookup(w http.ResponseWriter, r *http.Request) {
 	messageID := strings.TrimSpace(r.URL.Query().Get("message_id"))
 	if messageID == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
 			Type(contract.TypeValidation).
-			Code(contract.CodeValidationError).
 			Message("validation failed for field 'message_id': message_id parameter required").
 			Detail("field", "message_id").
 			Detail("validation_message", "message_id parameter required").
@@ -357,10 +354,7 @@ func (c *Handler) handleTenantQuota(w http.ResponseWriter, r *http.Request) {
 	tenantID := strings.TrimSpace(r.URL.Query().Get("tenant_id"))
 	if tenantID == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
 			Type(contract.TypeValidation).
-			Code(contract.CodeValidationError).
 			Message("validation failed for field 'tenant_id': tenant_id parameter required").
 			Detail("field", "tenant_id").
 			Detail("validation_message", "tenant_id parameter required").

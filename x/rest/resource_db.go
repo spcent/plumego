@@ -433,7 +433,6 @@ func (c *DBResourceController[T]) Index(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to fetch records").
 			Build())
 		return
@@ -443,7 +442,6 @@ func (c *DBResourceController[T]) Index(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to transform results").
 			Build())
 		return
@@ -452,7 +450,6 @@ func (c *DBResourceController[T]) Index(w http.ResponseWriter, r *http.Request) 
 	if err := c.Hooks.AfterList(r.Context(), params, transformedResults); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message(err.Error()).
 			Build())
 		return
@@ -470,7 +467,6 @@ func (c *DBResourceController[T]) Show(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
-			Code(contract.CodeRequired).
 			Message("id is required").
 			Build())
 		return
@@ -481,14 +477,12 @@ func (c *DBResourceController[T]) Show(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeNotFound).
-				Code(contract.CodeResourceNotFound).
 				Message("record not found").
 				Build())
 			return
 		}
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to fetch record").
 			Build())
 		return
@@ -498,7 +492,6 @@ func (c *DBResourceController[T]) Show(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to transform result").
 			Build())
 		return
@@ -543,7 +536,6 @@ func (c *DBResourceController[T]) Create(w http.ResponseWriter, r *http.Request)
 	if err := c.repository.Create(r.Context(), &data); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to create record").
 			Build())
 		return
@@ -552,7 +544,6 @@ func (c *DBResourceController[T]) Create(w http.ResponseWriter, r *http.Request)
 	if err := c.Hooks.AfterCreate(r.Context(), &data); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message(err.Error()).
 			Build())
 		return
@@ -562,7 +553,6 @@ func (c *DBResourceController[T]) Create(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to transform result").
 			Build())
 		return
@@ -576,7 +566,6 @@ func (c *DBResourceController[T]) Update(w http.ResponseWriter, r *http.Request)
 	if id == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
-			Code(contract.CodeRequired).
 			Message("id is required").
 			Build())
 		return
@@ -618,14 +607,12 @@ func (c *DBResourceController[T]) Update(w http.ResponseWriter, r *http.Request)
 		if errors.Is(err, sql.ErrNoRows) {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeNotFound).
-				Code(contract.CodeResourceNotFound).
 				Message("record not found").
 				Build())
 			return
 		}
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to update record").
 			Build())
 		return
@@ -634,7 +621,6 @@ func (c *DBResourceController[T]) Update(w http.ResponseWriter, r *http.Request)
 	if err := c.Hooks.AfterUpdate(r.Context(), id, &data); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message(err.Error()).
 			Build())
 		return
@@ -644,7 +630,6 @@ func (c *DBResourceController[T]) Update(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to transform result").
 			Build())
 		return
@@ -658,7 +643,6 @@ func (c *DBResourceController[T]) Delete(w http.ResponseWriter, r *http.Request)
 	if id == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
-			Code(contract.CodeRequired).
 			Message("id is required").
 			Build())
 		return
@@ -677,14 +661,12 @@ func (c *DBResourceController[T]) Delete(w http.ResponseWriter, r *http.Request)
 		if errors.Is(err, sql.ErrNoRows) {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeNotFound).
-				Code(contract.CodeResourceNotFound).
 				Message("record not found").
 				Build())
 			return
 		}
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("failed to delete record").
 			Build())
 		return
@@ -693,7 +675,6 @@ func (c *DBResourceController[T]) Delete(w http.ResponseWriter, r *http.Request)
 	if err := c.Hooks.AfterDelete(r.Context(), id); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message(err.Error()).
 			Build())
 		return

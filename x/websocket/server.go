@@ -169,10 +169,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	if origin != "" && !isOriginAllowed(origin, cfg.AllowedOrigins) {
 		cfg.Hub.securityRejections.Add(1)
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusForbidden).
-			Category(contract.CategoryAuth).
 			Type(contract.TypeForbidden).
-			Code(contract.CodeForbidden).
 			Message("forbidden origin").
 			Build())
 		return
@@ -228,10 +225,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	if !cfg.Auth.CheckRoomPassword(room, roomPwd) {
 		cfg.Hub.securityRejections.Add(1)
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusForbidden).
-			Category(contract.CategoryAuth).
 			Type(contract.TypeForbidden).
-			Code(contract.CodeForbidden).
 			Message("forbidden: bad room password").
 			Build())
 		return

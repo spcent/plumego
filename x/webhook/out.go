@@ -130,7 +130,7 @@ func webhookListTargets(w http.ResponseWriter, r *http.Request, svc *Service) {
 		Event:   event,
 	})
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Code(contract.CodeInternalError).Message(err.Error()).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Message(err.Error()).Build())
 		return
 	}
 
@@ -151,7 +151,7 @@ func webhookGetTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 
 	t, ok := svc.GetTarget(r.Context(), id)
 	if !ok {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Code(contract.CodeResourceNotFound).Message("target not found").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Message("target not found").Build())
 		return
 	}
 
@@ -190,7 +190,7 @@ func webhookSetTargetEnabled(w http.ResponseWriter, r *http.Request, svc *Servic
 	t, err := svc.UpdateTarget(r.Context(), id, TargetPatch{Enabled: &enable})
 	if err != nil {
 		if errors.Is(err, ErrTargetNotFound) {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Code(contract.CodeResourceNotFound).Message("target not found").Build())
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Message("target not found").Build())
 			return
 		}
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeValidation).Code(contract.CodeBadRequest).Message(err.Error()).Build())
@@ -213,11 +213,11 @@ func webhookTriggerEvent(w http.ResponseWriter, r *http.Request, svc *Service, t
 	}
 
 	if token == "" && !allowEmpty {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeForbidden).Code(contract.CodeForbidden).Message("triggering is disabled").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeForbidden).Message("triggering is disabled").Build())
 		return
 	}
 	if token != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnauthorized).Code(contract.CodeUnauthorized).Message("invalid trigger token").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnauthorized).Message("invalid trigger token").Build())
 		return
 	}
 
@@ -277,7 +277,7 @@ func webhookListDeliveries(w http.ResponseWriter, r *http.Request, svc *Service,
 
 	deliveries, err := svc.ListDeliveries(r.Context(), filter)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Code(contract.CodeInternalError).Message(err.Error()).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Message(err.Error()).Build())
 		return
 	}
 
@@ -329,7 +329,7 @@ func webhookGetDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
 
 	d, ok := svc.GetDelivery(r.Context(), id)
 	if !ok {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Code(contract.CodeResourceNotFound).Message("delivery not found").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Message("delivery not found").Build())
 		return
 	}
 
@@ -362,7 +362,7 @@ func webhookReplayDelivery(w http.ResponseWriter, r *http.Request, svc *Service)
 
 	d, err := svc.ReplayDelivery(r.Context(), id)
 	if errors.Is(err, ErrTargetNotFound) {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Code(contract.CodeResourceNotFound).Message("delivery not found").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Message("delivery not found").Build())
 		return
 	}
 	if err != nil {

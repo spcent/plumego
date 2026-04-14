@@ -116,10 +116,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 
 			if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-					Status(http.StatusUnauthorized).
-					Category(contract.CategoryAuth).
 					Type(contract.TypeUnauthorized).
-					Code(contract.CodeUnauthorized).
 					Message("unauthorized").
 					Build())
 				return
@@ -127,7 +124,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Code(contract.CodeInternalError).Message("Error reading request body").Build())
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Message("Error reading request body").Build())
 				return
 			}
 
