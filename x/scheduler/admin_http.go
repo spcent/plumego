@@ -92,10 +92,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 	// Validate job ID length to prevent abuse via extremely long path segments.
 	if len(parts[0]) > maxAdminJobIDLen {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
 			Type(contract.TypeValidation).
-			Code(contract.CodeValidationError).
 			Message("validation failed for field 'job_id': job ID too long").
 			Detail("field", "job_id").
 			Detail("validation_message", "job ID too long").
@@ -166,10 +163,7 @@ func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, su
 	}
 	if len(id) > maxAdminJobIDLen {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
 			Type(contract.TypeValidation).
-			Code(contract.CodeValidationError).
 			Message("validation failed for field 'job_id': job ID too long").
 			Detail("field", "job_id").
 			Detail("validation_message", "job ID too long").

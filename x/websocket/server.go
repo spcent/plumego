@@ -258,10 +258,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		if err != nil {
 			cfg.Hub.securityRejections.Add(1)
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusForbidden).
-				Category(contract.CategoryAuth).
 				Type(contract.TypeForbidden).
-				Code(contract.CodeForbidden).
 				Message("forbidden: invalid token").
 				Build())
 			return

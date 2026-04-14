@@ -94,7 +94,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.mu.RUnlock()
 
 	if handler == nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusServiceUnavailable).Code(contract.CodeUnavailable).Message("handler not configured").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("handler not configured").Build())
 		return
 	}
 
