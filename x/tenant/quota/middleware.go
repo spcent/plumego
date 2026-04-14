@@ -80,11 +80,9 @@ func Middleware(options Options) mw.Middleware {
 			}
 
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(status).
 				Type(contract.TypeRateLimited).
 				Code(tenanttransport.CodeQuotaExceeded).
 				Message("tenant quota exceeded").
-				Category(contract.CategoryRateLimit).
 				Build())
 		})
 	}

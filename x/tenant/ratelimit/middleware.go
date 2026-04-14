@@ -77,11 +77,9 @@ func Middleware(options Options) middleware.Middleware {
 			}
 
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(status).
 				Type(contract.TypeRateLimited).
 				Code(tenanttransport.CodeRateLimited).
 				Message("tenant rate limit exceeded").
-				Category(contract.CategoryRateLimit).
 				Build())
 		})
 	}

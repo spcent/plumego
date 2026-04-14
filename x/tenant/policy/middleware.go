@@ -67,11 +67,9 @@ func Middleware(options Options) mw.Middleware {
 			}
 
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(status).
 				Type(contract.TypeForbidden).
 				Code(tenanttransport.CodePolicyDenied).
 				Message("tenant policy denied request").
-				Category(contract.CategoryAuth).
 				Build())
 		})
 	}
