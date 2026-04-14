@@ -151,8 +151,7 @@ func classifyServiceError(err error) contract.APIError {
 	switch {
 	case errors.Is(err, ErrProviderFailure):
 		return contract.NewErrorBuilder().
-			Status(http.StatusBadGateway).
-			Category(contract.CategoryServer).
+			Type(contract.TypeBadGateway).
 			Code("PROVIDER_ERROR").
 			Message(err.Error()).
 			Build()

@@ -52,10 +52,9 @@ func Configure(hooks Hooks) {
 		}
 
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusNotImplemented).
+			Type(contract.TypeNotImplemented).
 			Code("not_supported").
 			Message("pubsub snapshot not supported by this implementation").
-			Category(contract.CategoryServer).
 			Build())
 	}))
 }
