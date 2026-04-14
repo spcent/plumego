@@ -173,10 +173,7 @@ func HandleWithCallback(
 		workflow, err := callback(r.Context())
 		if err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusInternalServerError).
-				Category(contract.CategoryServer).
 				Type(contract.TypeInternal).
-				Code(contract.CodeInternalError).
 				Message(fmt.Sprintf("Failed to create workflow: %v", err)).
 				Build())
 			return
