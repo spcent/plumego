@@ -155,20 +155,14 @@ func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 func authErrorToAPIError(err error) contract.APIError {
 	unauthorized := func(msg string) contract.APIError {
 		return contract.NewErrorBuilder().
-			Status(http.StatusUnauthorized).
-			Category(contract.CategoryAuth).
 			Type(contract.TypeUnauthorized).
-			Code(contract.CodeUnauthorized).
 			Message(msg).
 			Build()
 	}
 	switch {
 	case errors.Is(err, authn.ErrUnauthorized):
 		return contract.NewErrorBuilder().
-			Status(http.StatusForbidden).
-			Category(contract.CategoryAuth).
 			Type(contract.TypeForbidden).
-			Code(contract.CodeForbidden).
 			Message("access forbidden").
 			Build()
 	case errors.Is(err, authn.ErrInvalidToken):

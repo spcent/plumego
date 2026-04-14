@@ -66,8 +66,6 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.AP
 		// Check required fields
 		if schema.Required && !exists {
 			errors = append(errors, contract.NewErrorBuilder().
-				Status(400).
-				Category(contract.CategoryValidation).
 				Type(contract.TypeRequired).
 				Code("CONFIG_REQUIRED").
 				Message(fmt.Sprintf("required configuration '%s' is missing", key)).
@@ -85,8 +83,6 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.AP
 		for _, validator := range schema.Validators {
 			if err := validator.Validate(value, key); err != nil {
 				apiErr := contract.NewErrorBuilder().
-					Status(400).
-					Category(contract.CategoryValidation).
 					Type(contract.TypeValidation).
 					Code("CONFIG_VALIDATION_FAILED").
 					Message(err.Error()).
