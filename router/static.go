@@ -200,6 +200,6 @@ func serveFileContent(w http.ResponseWriter, req *http.Request, f http.File, inf
 		http.ServeContent(w, req, info.Name(), info.ModTime(), seeker)
 	} else {
 		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
-		io.Copy(w, f)
+		_, _ = io.Copy(w, f)
 	}
 }

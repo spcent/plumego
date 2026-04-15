@@ -113,20 +113,17 @@ func VerifyStripe(r *http.Request, endpointSecret string, opt StripeVerifyOption
 
 	// Map generic errors to Stripe-specific errors for backwards compatibility
 	if lastErr != nil {
-		ve, ok := lastErr.(*VerifyError)
-		if ok {
-			switch ve.Code {
-			case CodeMissingSignature:
-				return nil, ErrStripeMissingHeader
-			case CodeInvalidSignature:
-				return nil, ErrStripeSignature
-			case CodeInvalidEncoding:
-				return nil, ErrInvalidHexEncoding
-			case CodeTimestampExpired:
-				return nil, ErrStripeExpired
-			case CodeInvalidTimestamp:
-				return nil, ErrStripeInvalidTimestamp
-			}
+		switch ErrorCodeOf(lastErr) {
+		case CodeMissingSignature:
+			return nil, ErrStripeMissingHeader
+		case CodeInvalidSignature:
+			return nil, ErrStripeSignature
+		case CodeInvalidEncoding:
+			return nil, ErrInvalidHexEncoding
+		case CodeTimestampExpired:
+			return nil, ErrStripeExpired
+		case CodeInvalidTimestamp:
+			return nil, ErrStripeInvalidTimestamp
 		}
 	}
 

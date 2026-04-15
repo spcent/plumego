@@ -89,16 +89,13 @@ func VerifyGitHubWithOptions(r *http.Request, secret string, opts GitHubVerifyOp
 	result, err := VerifyHMAC(r, cfg)
 	if err != nil {
 		// Map generic errors to GitHub-specific errors for backwards compatibility
-		ve, ok := err.(*VerifyError)
-		if ok {
-			switch ve.Code {
-			case CodeMissingSignature:
-				return nil, ErrGitHubMissingHeader
-			case CodeInvalidSignature:
-				return nil, ErrGitHubSignature
-			case CodeInvalidEncoding:
-				return nil, ErrInvalidHexEncoding
-			}
+		switch ErrorCodeOf(err) {
+		case CodeMissingSignature:
+			return nil, ErrGitHubMissingHeader
+		case CodeInvalidSignature:
+			return nil, ErrGitHubSignature
+		case CodeInvalidEncoding:
+			return nil, ErrInvalidHexEncoding
 		}
 		return nil, err
 	}
