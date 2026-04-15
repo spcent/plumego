@@ -289,10 +289,8 @@ func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	users, err := h.Service.List(r.Context())
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message("failed to list users").
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
@@ -305,10 +303,8 @@ func (h UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	u, err := h.Service.GetByID(r.Context(), id)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusNotFound).
-			Code(contract.CodeResourceNotFound).
+			Type(contract.TypeNotFound).
 			Message("user not found").
-			Category(contract.CategoryClient).
 			Build())
 		return
 	}
@@ -330,10 +326,8 @@ func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	u, err := h.Service.Create(r.Context(), req.Name, req.Email)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message("failed to create user").
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}

@@ -308,10 +308,8 @@ func (h %sHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Service.Get(r.Context(), id)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusNotFound).
-			Code(contract.CodeResourceNotFound).
+			Type(contract.TypeNotFound).
 			Message("%s not found").
-			Category(contract.CategoryClient).
 			Build())
 		return
 	}
@@ -340,10 +338,8 @@ func (h %sHandler) Create(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Service.Create(r.Context(), req.Name)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message("failed to create %s").
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
@@ -373,10 +369,8 @@ func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Service.Update(r.Context(), id, req.Name)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message("failed to update %s").
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
@@ -390,10 +384,8 @@ func (h %sHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.Service.Delete(r.Context(), id); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code(contract.CodeInternalError).
+			Type(contract.TypeInternal).
 			Message("failed to delete %s").
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}

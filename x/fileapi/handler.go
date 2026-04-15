@@ -306,10 +306,8 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 func writeFileMetadataError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, storefile.ErrNotFound) {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusNotFound).
-			Code(contract.CodeResourceNotFound).
+			Type(contract.TypeNotFound).
 			Message("file not found").
-			Category(contract.CategoryClient).
 			Build())
 	} else {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
