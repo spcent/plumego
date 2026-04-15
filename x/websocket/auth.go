@@ -182,7 +182,7 @@ func ExtractUserInfo(payload map[string]any) *UserInfo {
 	// json.Unmarshal into map[string]any always produces []interface{} for JSON
 	// arrays, never []string. Handle both representations for forward compat.
 	switch v := payload["roles"].(type) {
-	case []interface{}:
+	case []any:
 		for _, r := range v {
 			if s, ok := r.(string); ok {
 				userInfo.Roles = append(userInfo.Roles, s)
