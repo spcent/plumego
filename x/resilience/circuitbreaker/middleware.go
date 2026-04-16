@@ -39,12 +39,12 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 
 			// If circuit breaker rejected the request
 			if errors.Is(err, ErrCircuitOpen) {
-				writeCircuitOpenResponse(w, cb)
+				writeCircuitOpenResponse(w, r, cb)
 				return
 			}
 
 			if errors.Is(err, ErrTooManyRequests) {
-				writeTooManyRequestsResponse(w, cb)
+				writeTooManyRequestsResponse(w, r, cb)
 				return
 			}
 		})
@@ -102,10 +102,10 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 }
 
 // writeCircuitOpenResponse writes a 503 response when circuit is open
-func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
+func writeCircuitOpenResponse(w http.ResponseWriter, r *http.Request, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	ensureNoSniff(w.Header())
-	_ = contract.WriteError(w, nil, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeUnavailable).
 		Code("CIRCUIT_OPEN").
 		Message("circuit breaker is open; service temporarily unavailable").
@@ -115,10 +115,10 @@ func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
 }
 
 // writeTooManyRequestsResponse writes a 429 response for rate limiting
-func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
+func writeTooManyRequestsResponse(w http.ResponseWriter, r *http.Request, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	ensureNoSniff(w.Header())
-	_ = contract.WriteError(w, nil, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeRateLimited).
 		Message("circuit breaker is half-open; too many concurrent requests").
 		Detail("circuit", cb.Name()).

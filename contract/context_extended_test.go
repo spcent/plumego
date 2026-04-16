@@ -19,7 +19,7 @@ func TestWriteErrorWithBuilder(t *testing.T) {
 	err := WriteError(w, r, NewErrorBuilder().
 		Status(http.StatusBadRequest).
 		Code("invalid_request").
-		Message("Bad request").
+		Message("bad request").
 		Detail("field", "name").
 		Build())
 	if err != nil {
