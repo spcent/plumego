@@ -24,7 +24,7 @@ func WriteTransportError(
 	category contract.ErrorCategory,
 	details map[string]any,
 ) {
-	contract.WriteError(w, r, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Status(status).
 		Code(code).
 		Message(message).

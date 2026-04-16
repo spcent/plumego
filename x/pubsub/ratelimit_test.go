@@ -25,7 +25,7 @@ func TestRateLimitedPubSub_Basic(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		msg := Message{Data: i}
-		if err := rlps.Publish("test.topic", msg); err == ErrRateLimitExceeded {
+		if err := rlps.Publish("test.topic", msg); errors.Is(err, ErrRateLimitExceeded) {
 			denied++
 		} else if err == nil {
 			allowed++
@@ -241,7 +241,7 @@ func TestRateLimitedPubSub_ConcurrentPublish(t *testing.T) {
 
 			for j := 0; j < messagesPerGoroutine; j++ {
 				msg := Message{Data: j}
-				if err := rlps.Publish("concurrent", msg); err == ErrRateLimitExceeded {
+				if err := rlps.Publish("concurrent", msg); errors.Is(err, ErrRateLimitExceeded) {
 					denied.Add(1)
 				} else if err == nil {
 					allowed.Add(1)

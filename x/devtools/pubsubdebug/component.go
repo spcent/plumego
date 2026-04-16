@@ -3,7 +3,6 @@ package pubsubdebug
 import (
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
@@ -14,7 +13,6 @@ import (
 type Handler struct {
 	cfg        PubSubConfig
 	defaultPub pubsub.Broker
-	routesOnce sync.Once
 }
 
 func New(cfg PubSubConfig, fallbackPub pubsub.Broker) *Handler {
@@ -30,40 +28,37 @@ func (h *Handler) RegisterRoutes(r routeRegistrar) error {
 		return nil
 	}
 
-	var regErr error
-	h.routesOnce.Do(func() {
-		pub := h.cfg.Pub
+	pub := h.cfg.Pub
+	if pub == nil {
+		pub = h.defaultPub
+	}
+	path := strings.TrimSpace(h.cfg.Path)
+	if path == "" {
+		path = "/_debug/pubsub"
+	}
+
+	return r.AddRoute(http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if pub == nil {
-			pub = h.defaultPub
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInternal).
+				Message("pubsub is not configured").
+				Build())
+			return
 		}
-		path := strings.TrimSpace(h.cfg.Path)
-		if path == "" {
-			path = "/_debug/pubsub"
+
+		type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
+
+		if ps, ok := pub.(snapshoter); ok {
+			_ = contract.WriteResponse(w, r, http.StatusOK, ps.Snapshot(), nil)
+			return
 		}
 
-		regErr = r.AddRoute(http.MethodGet, path, adaptCtx(func(ctx *contract.Ctx) {
-			if pub == nil {
-				_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-					Status(http.StatusInternalServerError).
-					Category(contract.CategoryServer).
-					Type(contract.TypeInternal).
-					Code(contract.CodeInternalError).
-					Message("pubsub is not configured").
-					Build())
-				return
-			}
-
-			type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
-
-			if ps, ok := pub.(snapshoter); ok {
-				_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, ps.Snapshot(), nil)
-				return
-			}
-
-			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotImplemented).Code("not_supported").Message("pubsub snapshot not supported by this implementation").Category(contract.CategoryServer).Build())
-		}))
-	})
-	return regErr
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotImplemented).
+			Code("not_supported").
+			Message("pubsub snapshot not supported by this implementation").
+			Build())
+	}))
 }
 
 func (h *Handler) Health() (string, health.HealthStatus) {

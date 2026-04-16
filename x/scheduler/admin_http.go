@@ -33,7 +33,7 @@ func (h *AdminHandler) WithPrefix(prefix string) *AdminHandler {
 // ServeHTTP implements http.Handler.
 func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.scheduler == nil {
-		contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusServiceUnavailable).Code("SERVICE_UNAVAILABLE").Message("scheduler not configured").Category(contract.CategoryServer).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("scheduler not configured").Build())
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, h.prefix)
@@ -91,11 +91,8 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 	}
 	// Validate job ID length to prevent abuse via extremely long path segments.
 	if len(parts[0]) > maxAdminJobIDLen {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
-			Code(contract.CodeValidationError).
 			Message("validation failed for field 'job_id': job ID too long").
 			Detail("field", "job_id").
 			Detail("validation_message", "job ID too long").
@@ -165,11 +162,8 @@ func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, su
 		return
 	}
 	if len(id) > maxAdminJobIDLen {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
-			Code(contract.CodeValidationError).
 			Message("validation failed for field 'job_id': job ID too long").
 			Detail("field", "job_id").
 			Detail("validation_message", "job ID too long").
@@ -348,10 +342,8 @@ func parseJobState(value string) JobState {
 
 func writeMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusMethodNotAllowed).
-		Code("METHOD_NOT_ALLOWED").
+		Type(contract.TypeMethodNotAllowed).
 		Message("method not allowed").
-		Category(contract.CategoryClient).
 		Build())
 }
 

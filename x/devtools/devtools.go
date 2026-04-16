@@ -213,7 +213,7 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 
 	if err := r.AddRoute(http.MethodPost, DevToolsReloadPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if err := c.reloadEnv(req.Context()); err != nil {
-			contract.WriteError(w, req, contract.NewErrorBuilder().
+			_ = contract.WriteError(w, req, contract.NewErrorBuilder().
 				Status(http.StatusBadRequest).
 				Code("env_reload_failed").
 				Message(err.Error()).

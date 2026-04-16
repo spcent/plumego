@@ -153,11 +153,8 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth Room
 func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig) {
 	normalized, err := normalizeServerConfig(cfg)
 	if err != nil {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Category(contract.CategoryServer).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message(err.Error()).
 			Build())
 		return
@@ -168,11 +165,8 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	origin := r.Header.Get("Origin")
 	if origin != "" && !isOriginAllowed(origin, cfg.AllowedOrigins) {
 		cfg.Hub.securityRejections.Add(1)
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusForbidden).
-			Category(contract.CategoryAuth).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeForbidden).
-			Code(contract.CodeForbidden).
 			Message("forbidden origin").
 			Build())
 		return
@@ -180,13 +174,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 
 	// Basic HTTP validation first
 	if r.Method != http.MethodGet {
-		contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code("METHOD_NOT_ALLOWED").Message("method not allowed").Category(contract.CategoryClient).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeMethodNotAllowed).Message("method not allowed").Build())
 		return
 	}
 	if !headerContains(r.Header, "Connection", "Upgrade") || !headerContains(r.Header, "Upgrade", "websocket") {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("bad request").
@@ -197,9 +189,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	// Validate WebSocket key
 	key := r.Header.Get("Sec-WebSocket-Key")
 	if key == "" {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("bad request").
@@ -208,9 +198,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	}
 	if err := ValidateWebSocketKey(key); err != nil {
 		cfg.Hub.invalidWSKeys.Add(1)
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message(err.Error()).
@@ -227,11 +215,8 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	roomPwd := r.URL.Query().Get("room_password")
 	if !cfg.Auth.CheckRoomPassword(room, roomPwd) {
 		cfg.Hub.securityRejections.Add(1)
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusForbidden).
-			Category(contract.CategoryAuth).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeForbidden).
-			Code(contract.CodeForbidden).
 			Message("forbidden: bad room password").
 			Build())
 		return
@@ -241,7 +226,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		if errors.Is(err, ErrRoomFull) {
 			status = http.StatusTooManyRequests
 		}
-		contract.WriteError(w, r, contract.NewErrorBuilder().Status(status).Code("JOIN_DENIED").Message(err.Error()).Category(contract.CategoryClient).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(status).Code("JOIN_DENIED").Message(err.Error()).Category(contract.CategoryClient).Build())
 		return
 	}
 
@@ -257,11 +242,8 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		payload, err := cfg.Auth.VerifyJWT(token)
 		if err != nil {
 			cfg.Hub.securityRejections.Add(1)
-			contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusForbidden).
-				Category(contract.CategoryAuth).
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeForbidden).
-				Code(contract.CodeForbidden).
 				Message("forbidden: invalid token").
 				Build())
 			return
@@ -273,22 +255,16 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	accept := computeAcceptKey(key)
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Category(contract.CategoryServer).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("server does not support hijacking").
 			Build())
 		return
 	}
 	conn, buf, err := hj.Hijack()
 	if err != nil {
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Category(contract.CategoryServer).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeInternalError).
 			Message("hijack failed").
 			Build())
 		return

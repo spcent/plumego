@@ -35,13 +35,10 @@ func Configure(hooks Hooks) {
 		path = "/_debug/pubsub"
 	}
 
-	_ = hooks.RegisterRoute(http.MethodGet, path, adaptCtx(func(ctx *contract.Ctx) {
+	_ = hooks.RegisterRoute(http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if pub == nil {
-			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-				Status(http.StatusInternalServerError).
-				Category(contract.CategoryServer).
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).
-				Code(contract.CodeInternalError).
 				Message("pubsub is not configured").
 				Build())
 			return
@@ -50,11 +47,15 @@ func Configure(hooks Hooks) {
 		type snapshoter interface{ Snapshot() pubsub.MetricsSnapshot }
 
 		if ps, ok := pub.(snapshoter); ok {
-			_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, ps.Snapshot(), nil)
+			_ = contract.WriteResponse(w, r, http.StatusOK, ps.Snapshot(), nil)
 			return
 		}
 
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().Status(http.StatusNotImplemented).Code("not_supported").Message("pubsub snapshot not supported by this implementation").Category(contract.CategoryServer).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotImplemented).
+			Code("not_supported").
+			Message("pubsub snapshot not supported by this implementation").
+			Build())
 	}))
 }
 

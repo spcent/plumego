@@ -9,6 +9,7 @@ package fileapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -54,20 +55,35 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	tenantID := tenantcore.TenantIDFromContext(ctx)
 	if tenantID == "" {
-		h.writeError(w, r, http.StatusBadRequest, "missing tenant id in context")
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code(contract.CodeBadRequest).
+			Message("missing tenant id in context").
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 
 	userID := UserIDFromContext(ctx)
 
 	if err := r.ParseMultipartForm(h.maxSize); err != nil {
-		h.writeError(w, r, http.StatusBadRequest, fmt.Sprintf("failed to parse form: %v", err))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code(contract.CodeBadRequest).
+			Message(fmt.Sprintf("failed to parse form: %v", err)).
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 
 	f, header, err := r.FormFile("file")
 	if err != nil {
-		h.writeError(w, r, http.StatusBadRequest, fmt.Sprintf("missing file: %v", err))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code(contract.CodeBadRequest).
+			Message(fmt.Sprintf("missing file: %v", err)).
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 	defer f.Close()
@@ -90,11 +106,14 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.storage.Put(ctx, opts)
 	if err != nil {
-		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("upload failed: %v", err))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Message(fmt.Sprintf("upload failed: %v", err)).
+			Build())
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, result)
+	_ = contract.WriteJSON(w, http.StatusOK, result)
 }
 
 // Download streams file content.
@@ -104,13 +123,18 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
-		h.writeError(w, r, http.StatusBadRequest, "missing file id")
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code(contract.CodeBadRequest).
+			Message("missing file id").
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 
 	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
-		h.writeMetadataError(w, r, err)
+		writeFileMetadataError(w, r, err)
 		return
 	}
 
@@ -118,7 +142,10 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 
 	reader, err := h.storage.Get(ctx, fileMeta.Path)
 	if err != nil {
-		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to read file: %v", err))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Message(fmt.Sprintf("failed to read file: %v", err)).
+			Build())
 		return
 	}
 	defer reader.Close()
@@ -128,7 +155,7 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileMeta.Name))
 	w.Header().Set("Cache-Control", "public, max-age=31536000")
 	w.WriteHeader(http.StatusOK)
-	io.Copy(w, reader)
+	_, _ = io.Copy(w, reader)
 }
 
 // GetInfo returns file metadata.
@@ -137,17 +164,22 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
-		h.writeError(w, r, http.StatusBadRequest, "missing file id")
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code(contract.CodeBadRequest).
+			Message("missing file id").
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 
 	fileMeta, err := h.metadata.Get(r.Context(), fileID)
 	if err != nil {
-		h.writeMetadataError(w, r, err)
+		writeFileMetadataError(w, r, err)
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, fileMeta)
+	_ = contract.WriteJSON(w, http.StatusOK, fileMeta)
 }
 
 // Delete soft-deletes a file.
@@ -156,16 +188,21 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
-		h.writeError(w, r, http.StatusBadRequest, "missing file id")
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code(contract.CodeBadRequest).
+			Message("missing file id").
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 
 	if err := h.metadata.Delete(r.Context(), fileID); err != nil {
-		h.writeMetadataError(w, r, err)
+		writeFileMetadataError(w, r, err)
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, map[string]string{"message": "file deleted"})
+	_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"message": "file deleted"})
 }
 
 // List returns a paginated list of files.
@@ -206,11 +243,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	files, total, err := h.metadata.List(ctx, query)
 	if err != nil {
-		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("list failed: %v", err))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Message(fmt.Sprintf("list failed: %v", err)).
+			Build())
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, map[string]any{
+	_ = contract.WriteJSON(w, http.StatusOK, map[string]any{
 		"items":      files,
 		"total":      total,
 		"page":       query.Page,
@@ -226,7 +266,12 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
-		h.writeError(w, r, http.StatusBadRequest, "missing file id")
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code(contract.CodeBadRequest).
+			Message("missing file id").
+			Category(contract.CategoryValidation).
+			Build())
 		return
 	}
 
@@ -239,39 +284,35 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 
 	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
-		h.writeMetadataError(w, r, err)
+		writeFileMetadataError(w, r, err)
 		return
 	}
 
 	fileURL, err := h.storage.GetURL(ctx, fileMeta.Path, expiry)
 	if err != nil {
-		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("failed to generate url: %v", err))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Message(fmt.Sprintf("failed to generate url: %v", err)).
+			Build())
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, map[string]string{
+	_ = contract.WriteJSON(w, http.StatusOK, map[string]string{
 		"url":        html.EscapeString(fileURL),
 		"expires_in": strconv.Itoa(int(expiry.Seconds())),
 	})
 }
 
-func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
-	_ = contract.WriteJSON(w, status, data)
-}
-
-func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, status int, message string) {
-	contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(status).
-		Code(http.StatusText(status)).
-		Message(message).
-		Category(contract.CategoryForStatus(status)).
-		Build())
-}
-
-func (h *Handler) writeMetadataError(w http.ResponseWriter, r *http.Request, err error) {
-	if err == storefile.ErrNotFound {
-		h.writeError(w, r, http.StatusNotFound, "file not found")
+func writeFileMetadataError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, storefile.ErrNotFound) {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotFound).
+			Message("file not found").
+			Build())
 	} else {
-		h.writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("metadata error: %v", err))
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Message(fmt.Sprintf("metadata error: %v", err)).
+			Build())
 	}
 }

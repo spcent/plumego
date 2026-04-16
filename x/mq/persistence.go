@@ -3,6 +3,7 @@ package mq
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -126,7 +127,7 @@ func (p *KVPersistence) GetMessages(ctx context.Context, topic string, limit int
 	for _, key := range matchingKeys {
 		data, err := p.store.Get(key)
 		if err != nil {
-			if err == kvengine.ErrKeyNotFound || err == kvengine.ErrKeyExpired {
+			if errors.Is(err, kvengine.ErrKeyNotFound) || errors.Is(err, kvengine.ErrKeyExpired) {
 				continue
 			}
 			return nil, fmt.Errorf("failed to get message %s: %w", key, err)
@@ -212,7 +213,7 @@ func (p *KVPersistence) GetSubscriptions(ctx context.Context, topic string) (map
 
 		data, err := p.store.Get(key)
 		if err != nil {
-			if err == kvengine.ErrKeyNotFound || err == kvengine.ErrKeyExpired {
+			if errors.Is(err, kvengine.ErrKeyNotFound) || errors.Is(err, kvengine.ErrKeyExpired) {
 				continue
 			}
 			return nil, fmt.Errorf("failed to get subscription %s: %w", key, err)
@@ -268,7 +269,7 @@ func (p *KVPersistence) GetAckState(ctx context.Context, topic string, messageID
 	key := fmt.Sprintf("ack:%s:%s", topic, messageID)
 	_, err := p.store.Get(key)
 	if err != nil {
-		if err == kvengine.ErrKeyNotFound || err == kvengine.ErrKeyExpired {
+		if errors.Is(err, kvengine.ErrKeyNotFound) || errors.Is(err, kvengine.ErrKeyExpired) {
 			return false, nil
 		}
 		return false, err

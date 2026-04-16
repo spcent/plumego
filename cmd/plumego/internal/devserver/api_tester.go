@@ -145,7 +145,9 @@ func buildAppURL(base, path, rawQuery string) (string, error) {
 		trimmed = "/"
 	}
 
-	if strings.Contains(trimmed, "://") {
+	// Reject absolute and protocol-relative URLs before parsing.
+	// "://" catches http://evil.com; "//" catches //evil.com (protocol-relative).
+	if strings.Contains(trimmed, "://") || strings.HasPrefix(trimmed, "//") {
 		return "", fmt.Errorf("absolute URLs are not allowed")
 	}
 
@@ -156,6 +158,13 @@ func buildAppURL(base, path, rawQuery string) (string, error) {
 	parsedPath, err := url.Parse(trimmed)
 	if err != nil {
 		return "", fmt.Errorf("invalid path")
+	}
+
+	// Defense-in-depth: reject any path that parsed into a URL with a host
+	// component. url.Parse("//evil.com/x") sets Host="evil.com", so a
+	// ResolveReference call would silently redirect to that host.
+	if parsedPath.Host != "" {
+		return "", fmt.Errorf("host component not allowed in path")
 	}
 
 	query := parsedPath.Query()
@@ -171,9 +180,16 @@ func buildAppURL(base, path, rawQuery string) (string, error) {
 		}
 	}
 
-	parsedPath.RawQuery = query.Encode()
+	// Build the final URL by copying the base and overwriting only the path
+	// and query. ResolveReference would allow a crafted path to redirect to a
+	// different host/scheme; direct construction prevents that entirely.
+	finalURL := *baseURL
+	finalURL.Path = parsedPath.Path
+	finalURL.RawPath = parsedPath.RawPath
+	finalURL.RawQuery = query.Encode()
+	finalURL.Fragment = ""
+	finalURL.RawFragment = ""
 
-	finalURL := baseURL.ResolveReference(parsedPath)
 	return finalURL.String(), nil
 }
 

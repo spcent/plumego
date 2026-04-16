@@ -46,16 +46,20 @@ func TestRegisterResourceRoutesRespectsRouteOptions(t *testing.T) {
 	})
 }
 
-func TestRegisterContextResourceRoutesUsesCanonicalRouteSurface(t *testing.T) {
+func TestRegisterResourceRoutesWorksWithBaseContextResourceController(t *testing.T) {
 	r := router.NewRouter()
 
-	RegisterContextResourceRoutes(r, "users/", NewBaseContextResourceController("users"))
+	RegisterResourceRoutes(r, "users/", NewBaseContextResourceController("users"), DefaultRouteOptions())
 
 	assertRouteSet(t, r.Routes(), []routeKey{
 		{"DELETE", "/users/:id"},
 		{"DELETE", "/users/batch"},
 		{"GET", "/users"},
 		{"GET", "/users/:id"},
+		{"HEAD", "/users"},
+		{"HEAD", "/users/:id"},
+		{"OPTIONS", "/users"},
+		{"OPTIONS", "/users/:id"},
 		{"PATCH", "/users/:id"},
 		{"POST", "/users"},
 		{"POST", "/users/batch"},
@@ -78,10 +82,10 @@ func TestBaseResourceControllerUsesContractNotImplementedError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if resp.Error.Code != "not_implemented" {
-		t.Fatalf("error code = %q, want %q", resp.Error.Code, "not_implemented")
+	if resp.Error.Code != contract.CodeNotImplemented {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, contract.CodeNotImplemented)
 	}
-	if resp.Error.Message != "The Index method is not implemented for the users resource" {
+	if resp.Error.Message != "the Index method is not implemented for the users resource" {
 		t.Fatalf("error message = %q", resp.Error.Message)
 	}
 	if got := resp.Error.Details["method"]; got != "Index" {

@@ -308,16 +308,14 @@ func (h %sHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Service.Get(r.Context(), id)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusNotFound).
-			Code("%s_not_found").
+			Type(contract.TypeNotFound).
 			Message("%s not found").
-			Category(contract.CategoryClient).
 			Build())
 		return
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
 }
-`, lower, name, lower, lower)
+`, lower, name, lower)
 	case "POST":
 		return fmt.Sprintf(`
 // Create%sRequest carries the fields for creating a new %s.
@@ -331,7 +329,7 @@ func (h %sHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
-			Code("invalid_json").
+			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
 			Category(contract.CategoryValidation).
 			Build())
@@ -340,16 +338,14 @@ func (h %sHandler) Create(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Service.Create(r.Context(), req.Name)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code("create_%s_failed").
+			Type(contract.TypeInternal).
 			Message("failed to create %s").
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
 	_ = contract.WriteResponse(w, r, http.StatusCreated, item, nil)
 }
-`, name, lower, name, lower, name, name, lower, lower)
+`, name, lower, name, lower, name, name, lower)
 	case "PUT":
 		return fmt.Sprintf(`
 // Update%sRequest carries the fields for updating a %s.
@@ -364,7 +360,7 @@ func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
-			Code("invalid_json").
+			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
 			Category(contract.CategoryValidation).
 			Build())
@@ -373,16 +369,14 @@ func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 	item, err := h.Service.Update(r.Context(), id, req.Name)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code("update_%s_failed").
+			Type(contract.TypeInternal).
 			Message("failed to update %s").
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
 }
-`, name, lower, name, lower, name, name, lower, lower)
+`, name, lower, name, lower, name, name, lower)
 	case "DELETE":
 		return fmt.Sprintf(`
 // Delete handles DELETE /%s/:id
@@ -390,16 +384,14 @@ func (h %sHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.Service.Delete(r.Context(), id); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusInternalServerError).
-			Code("delete_%s_failed").
+			Type(contract.TypeInternal).
 			Message("failed to delete %s").
-			Category(contract.CategoryServer).
 			Build())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-`, lower, name, lower, lower)
+`, lower, name, lower)
 	default:
 		return ""
 	}

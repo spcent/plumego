@@ -101,8 +101,8 @@ type pkgInfo struct {
 	imports []string
 }
 
-func (d *Dashboard) handleDeps(ctx *contract.Ctx) {
-	query := ctx.R.URL.Query()
+func (d *Dashboard) handleDeps(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
 	includeStd := strings.TrimSpace(query.Get("include_std"))
 	includeStdlib := includeStd == "" || includeStd == "1" || strings.EqualFold(includeStd, "true")
 
@@ -116,12 +116,12 @@ func (d *Dashboard) handleDeps(ctx *contract.Ctx) {
 	refresh := strings.TrimSpace(query.Get("refresh"))
 	refreshEnabled := refresh == "1" || strings.EqualFold(refresh, "true")
 
-	timeoutCtx, cancel := context.WithTimeout(ctx.R.Context(), 15*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
 	graph, err := d.depsCache.Get(timeoutCtx, d.projectDir, refreshEnabled)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("dependency_graph_failed").
 			Message(err.Error()).
@@ -130,7 +130,7 @@ func (d *Dashboard) handleDeps(ctx *contract.Ctx) {
 	}
 
 	filtered := filterDependencyGraph(graph, includeStdlib, maxNodes)
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, filtered, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, filtered, nil)
 }
 
 func buildDependencyGraph(ctx context.Context, dir string) (*DependencyGraph, error) {

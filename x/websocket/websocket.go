@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -65,8 +64,6 @@ type Server struct {
 	debug  bool
 	logger log.StructuredLogger
 	hub    *Hub
-
-	routesOnce sync.Once
 }
 
 const minWebSocketSecretLen = 32
@@ -95,63 +92,55 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 }
 
 func (c *Server) RegisterRoutes(r routeRegistrar) error {
-	var regErr error
-	c.routesOnce.Do(func() {
-		wsAuth := NewSimpleRoomAuth(c.config.Secret)
+	wsAuth := NewSimpleRoomAuth(c.config.Secret)
 
-		regErr = r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ServeWSWithAuth(w, r, c.hub, wsAuth, c.config.SendQueueSize,
-				c.config.SendTimeout, c.config.SendBehavior)
-		}))
-		if regErr != nil {
-			return
+	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithAuth(w, r, c.hub, wsAuth, c.config.SendQueueSize,
+			c.config.SendTimeout, c.config.SendBehavior)
+	})); err != nil {
+		return err
+	}
+
+	if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
+		if err := r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Always require authentication for broadcast endpoint.
+			// Debug mode should only affect logging verbosity, never security checks.
+			const bearerPrefix = "bearer "
+			rawAuth := r.Header.Get("Authorization")
+			var provided []byte
+			if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
+				provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
+			}
+			// Note: Query parameter secrets are no longer supported for security reasons.
+			// Secrets in URLs can be leaked via server logs and Referer headers.
+
+			if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeUnauthorized).
+					Message("unauthorized").
+					Build())
+				return
+			}
+
+			b, err := io.ReadAll(r.Body)
+			if err != nil {
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Message("error reading request body").Build())
+				return
+			}
+
+			// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
+			if room := r.URL.Query().Get("room"); room != "" {
+				c.hub.BroadcastRoom(room, OpcodeText, b)
+			} else {
+				c.hub.BroadcastAll(OpcodeText, b)
+			}
+			w.WriteHeader(http.StatusNoContent)
+		})); err != nil {
+			return err
 		}
+	}
 
-		if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
-			regErr = r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != http.MethodPost {
-					_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusMethodNotAllowed).Code("method_not_allowed").Message("POST only").Category(contract.CategoryClient).Build())
-					return
-				}
-				// Always require authentication for broadcast endpoint.
-				// Debug mode should only affect logging verbosity, never security checks.
-				const bearerPrefix = "bearer "
-				rawAuth := r.Header.Get("Authorization")
-				var provided []byte
-				if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
-					provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
-				}
-				// Note: Query parameter secrets are no longer supported for security reasons.
-				// Secrets in URLs can be leaked via server logs and Referer headers.
-
-				if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
-					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Status(http.StatusUnauthorized).
-						Category(contract.CategoryAuth).
-						Type(contract.TypeUnauthorized).
-						Code(contract.CodeUnauthorized).
-						Message("unauthorized").
-						Build())
-					return
-				}
-
-				b, err := io.ReadAll(r.Body)
-				if err != nil {
-					_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusInternalServerError).Code("read_body_failed").Message("Error reading request body").Build())
-					return
-				}
-
-				// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
-				if room := r.URL.Query().Get("room"); room != "" {
-					c.hub.BroadcastRoom(room, OpcodeText, b)
-				} else {
-					c.hub.BroadcastAll(OpcodeText, b)
-				}
-				w.WriteHeader(http.StatusNoContent)
-			}))
-		}
-	})
-	return regErr
+	return nil
 }
 
 func (c *Server) Shutdown(ctx context.Context) error {

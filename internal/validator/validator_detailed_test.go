@@ -236,7 +236,7 @@ func TestRuleRegistryConcurrency(t *testing.T) {
 			defer wg.Done()
 			_, exists := registry.Get("min" + string(rune('0'+idx)))
 			if !exists {
-				errors <- fmt.Errorf("Expected rule %d to exist", idx)
+				errors <- fmt.Errorf("expected rule %d to exist", idx)
 			}
 		}(i)
 	}

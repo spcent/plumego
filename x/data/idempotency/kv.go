@@ -3,6 +3,7 @@ package idempotency
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -52,7 +53,7 @@ func (s *KVStore) Get(_ context.Context, key string) (Record, bool, error) {
 
 	data, err := s.store.Get(s.key(key))
 	if err != nil {
-		if err == kvstore.ErrKeyNotFound || err == kvstore.ErrKeyExpired {
+		if errors.Is(err, kvstore.ErrKeyNotFound) || errors.Is(err, kvstore.ErrKeyExpired) {
 			return Record{}, false, nil
 		}
 		return Record{}, false, err

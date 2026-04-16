@@ -126,7 +126,7 @@ func applyAuthOptions(opts ...AuthOption) authOptions {
 }
 
 func writeAuthInternal(w http.ResponseWriter, r *http.Request, message string) {
-	contract.WriteError(w, r, contract.NewErrorBuilder().
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeInternal).
 		Message(message).
 		Build())
@@ -140,7 +140,7 @@ func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 
 		var apiErr contract.APIError
 		if errors.As(err, &apiErr) {
-			contract.WriteError(w, r, apiErr)
+			_ = contract.WriteError(w, r, apiErr)
 			return
 		}
 
@@ -148,27 +148,21 @@ func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 		if apiErr.Status == http.StatusUnauthorized && realm != "" {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="`+realm+`"`)
 		}
-		contract.WriteError(w, r, apiErr)
+		_ = contract.WriteError(w, r, apiErr)
 	}
 }
 
 func authErrorToAPIError(err error) contract.APIError {
 	unauthorized := func(msg string) contract.APIError {
 		return contract.NewErrorBuilder().
-			Status(http.StatusUnauthorized).
-			Category(contract.CategoryAuth).
 			Type(contract.TypeUnauthorized).
-			Code(contract.CodeUnauthorized).
 			Message(msg).
 			Build()
 	}
 	switch {
 	case errors.Is(err, authn.ErrUnauthorized):
 		return contract.NewErrorBuilder().
-			Status(http.StatusForbidden).
-			Category(contract.CategoryAuth).
 			Type(contract.TypeForbidden).
-			Code(contract.CodeForbidden).
 			Message("access forbidden").
 			Build()
 	case errors.Is(err, authn.ErrInvalidToken):

@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -31,10 +32,10 @@ type ConfigEditRequest struct {
 	Restart bool              `json:"restart"`
 }
 
-func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
+func (d *Dashboard) handleConfigEditGet(w http.ResponseWriter, r *http.Request) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code("config_edit_path_invalid").
 			Message(err.Error()).
@@ -44,7 +45,7 @@ func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
 
 	entries, exists, modTime, err := readEnvEntries(path)
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("config_edit_read_failed").
 			Message(err.Error()).
@@ -61,13 +62,13 @@ func (d *Dashboard) handleConfigEditGet(ctx *contract.Ctx) {
 		payload.Updated = modTime.Format(time.RFC3339)
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, payload, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, payload, nil)
 }
 
-func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
+func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code("config_edit_path_invalid").
 			Message(err.Error()).
@@ -76,18 +77,19 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	}
 
 	var req ConfigEditRequest
-	if err := ctx.BindJSON(&req); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
-			Type(contract.TypeValidation).
-			Code("invalid_request").
-			Message(err.Error()).
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Category(contract.CategoryValidation).
+			Code(contract.CodeInvalidJSON).
+			Message("invalid request body").
 			Build())
 		return
 	}
 
 	entries := normalizeConfigEntries(req.Entries)
 	if err := writeEnvEntries(path, entries); err != nil {
-		_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code("config_edit_write_failed").
 			Message(err.Error()).
@@ -102,8 +104,8 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 	}
 
 	if req.Restart {
-		if err := d.Rebuild(ctx.R.Context()); err != nil {
-			_ = contract.WriteError(ctx.W, ctx.R, contract.NewErrorBuilder().
+		if err := d.Rebuild(r.Context()); err != nil {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).
 				Code("app_rebuild_failed").
 				Message(err.Error()).
@@ -113,7 +115,7 @@ func (d *Dashboard) handleConfigEditSave(ctx *contract.Ctx) {
 		response["restarted"] = true
 	}
 
-	_ = contract.WriteResponse(ctx.W, ctx.R, http.StatusOK, response, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
 }
 
 func (d *Dashboard) resolveConfigEditPath() (string, string, error) {

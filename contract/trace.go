@@ -91,7 +91,7 @@ func ParseTraceID(id string) (TraceID, error) {
 		return "", fmt.Errorf("invalid trace ID length: expected %d, got %d", TraceIDLength, len(id))
 	}
 	if _, err := hex.DecodeString(id); err != nil {
-		return "", fmt.Errorf("invalid trace ID format: %v", err)
+		return "", fmt.Errorf("invalid trace ID format: %w", err)
 	}
 	return TraceID(id), nil
 }
@@ -102,7 +102,7 @@ func ParseSpanID(id string) (SpanID, error) {
 		return "", fmt.Errorf("invalid span ID length: expected %d, got %d", SpanIDLength, len(id))
 	}
 	if _, err := hex.DecodeString(id); err != nil {
-		return "", fmt.Errorf("invalid span ID format: %v", err)
+		return "", fmt.Errorf("invalid span ID format: %w", err)
 	}
 	return SpanID(id), nil
 }

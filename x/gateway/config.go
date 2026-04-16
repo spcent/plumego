@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -174,27 +175,20 @@ type ErrorHandlerFunc func(w http.ResponseWriter, r *http.Request, err error)
 // defaultErrorHandler is the default error handler
 func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
-	case err == ErrNoBackends || err == ErrNoHealthyBackends:
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusServiceUnavailable).
-			Code("SERVICE_UNAVAILABLE").
-			Message("Service Unavailable").
-			Category(contract.CategoryServer).
+	case errors.Is(err, ErrNoBackends) || errors.Is(err, ErrNoHealthyBackends):
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeUnavailable).
+			Message("service unavailable").
 			Build())
-	case err == ErrBackendTimeout:
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusRequestTimeout).
-			Category(contract.CategoryTimeout).
+	case errors.Is(err, ErrBackendTimeout):
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeTimeout).
-			Code(contract.CodeTimeout).
-			Message("Gateway Timeout").
+			Message("gateway timeout").
 			Build())
 	default:
-		contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadGateway).
-			Code("BAD_GATEWAY").
-			Message("Bad Gateway").
-			Category(contract.CategoryServer).
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadGateway).
+			Message("bad gateway").
 			Build())
 	}
 }

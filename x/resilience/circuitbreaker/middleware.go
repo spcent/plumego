@@ -1,6 +1,7 @@
 package circuitbreaker
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
@@ -37,13 +38,13 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			})
 
 			// If circuit breaker rejected the request
-			if err == ErrCircuitOpen {
-				writeCircuitOpenResponse(w, cb)
+			if errors.Is(err, ErrCircuitOpen) {
+				writeCircuitOpenResponse(w, r, cb)
 				return
 			}
 
-			if err == ErrTooManyRequests {
-				writeTooManyRequestsResponse(w, cb)
+			if errors.Is(err, ErrTooManyRequests) {
+				writeTooManyRequestsResponse(w, r, cb)
 				return
 			}
 		})
@@ -101,28 +102,25 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 }
 
 // writeCircuitOpenResponse writes a 503 response when circuit is open
-func writeCircuitOpenResponse(w http.ResponseWriter, cb *CircuitBreaker) {
+func writeCircuitOpenResponse(w http.ResponseWriter, r *http.Request, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	ensureNoSniff(w.Header())
-	contract.WriteError(w, nil, contract.NewErrorBuilder().
-		Status(http.StatusServiceUnavailable).
-		Code("CIRCUIT_OPEN").
-		Message("Circuit breaker is open. The service is temporarily unavailable.").
-		Category(contract.CategoryServer).
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeUnavailable).
+		Code(contract.CodeCircuitOpen).
+		Message("circuit breaker is open; service temporarily unavailable").
 		Detail("circuit", cb.Name()).
 		Detail("state", cb.State().String()).
 		Build())
 }
 
 // writeTooManyRequestsResponse writes a 429 response for rate limiting
-func writeTooManyRequestsResponse(w http.ResponseWriter, cb *CircuitBreaker) {
+func writeTooManyRequestsResponse(w http.ResponseWriter, r *http.Request, cb *CircuitBreaker) {
 	w.Header().Set("X-Circuit-Breaker-State", cb.State().String())
 	ensureNoSniff(w.Header())
-	contract.WriteError(w, nil, contract.NewErrorBuilder().
-		Status(http.StatusTooManyRequests).
-		Code("RATE_LIMITED").
-		Message("Circuit breaker is in half-open state. Too many concurrent requests.").
-		Category(contract.CategoryRateLimit).
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeRateLimited).
+		Message("circuit breaker is half-open; too many concurrent requests").
 		Detail("circuit", cb.Name()).
 		Detail("state", cb.State().String()).
 		Build())
