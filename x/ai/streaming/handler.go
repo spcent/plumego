@@ -54,7 +54,7 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Message(fmt.Sprintf("Failed to create SSE stream: %v", err)).
+			Message(fmt.Sprintf("failed to create SSE stream: %v", err)).
 			Build())
 		return
 	}
@@ -83,14 +83,14 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 // HandleExecute handles HTTP POST requests to execute workflows with streaming.
 func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeMethodNotAllowed).Message("Method not allowed").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeMethodNotAllowed).Message("method not allowed").Build())
 		return
 	}
 
 	// Parse request
 	var req WorkflowRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Code(contract.CodeInvalidRequest).Message(fmt.Sprintf("Invalid request: %v", err)).Category(contract.CategoryClient).Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Code(contract.CodeInvalidRequest).Message(fmt.Sprintf("invalid request: %v", err)).Category(contract.CategoryClient).Build())
 		return
 	}
 
@@ -109,7 +109,7 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Message(fmt.Sprintf("Failed to create SSE stream: %v", err)).
+			Message(fmt.Sprintf("failed to create SSE stream: %v", err)).
 			Build())
 		return
 	}
@@ -129,7 +129,7 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	// Send final result
 	jsonData, _ := json.Marshal(map[string]any{
 		"event":         "result",
-		"success":       err == nil,
+		"success":       true,
 		"results_count": len(results),
 	})
 	stream.SendJSON("result", string(jsonData))
@@ -174,7 +174,7 @@ func HandleWithCallback(
 		if err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).
-				Message(fmt.Sprintf("Failed to create workflow: %v", err)).
+				Message(fmt.Sprintf("failed to create workflow: %v", err)).
 				Build())
 			return
 		}

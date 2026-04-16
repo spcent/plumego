@@ -124,7 +124,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Message("Error reading request body").Build())
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Message("error reading request body").Build())
 				return
 			}
 

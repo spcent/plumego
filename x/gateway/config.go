@@ -178,17 +178,17 @@ func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, ErrNoBackends) || errors.Is(err, ErrNoHealthyBackends):
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeUnavailable).
-			Message("Service Unavailable").
+			Message("service unavailable").
 			Build())
 	case errors.Is(err, ErrBackendTimeout):
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeTimeout).
-			Message("Gateway Timeout").
+			Message("gateway timeout").
 			Build())
 	default:
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadGateway).
-			Message("Bad Gateway").
+			Message("bad gateway").
 			Build())
 	}
 }
