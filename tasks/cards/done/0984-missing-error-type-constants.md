@@ -79,3 +79,4 @@ go vet ./contract/... ./x/...
 
 ## Outcome
 
+Completed. Added `TypeMethodNotAllowed`, `TypeNotImplemented`, and `TypeBadGateway` to `contract/errors.go` with correct metadata entries. All 6 MethodNotAllowed call sites simplified to `.Type(contract.TypeMethodNotAllowed)`. `x/rest/resource.go` simplified to `.Type(contract.TypeNotImplemented)`. All tests pass; `go vet` clean.

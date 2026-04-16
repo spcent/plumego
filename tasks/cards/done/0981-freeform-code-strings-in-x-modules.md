@@ -95,3 +95,10 @@ go vet ./x/rest/... ./x/websocket/... ./x/frontend/...
 
 ## Outcome
 
+Completed. All freeform lowercase code strings in listed files replaced with canonical `contract.Code*` constants:
+- `x/websocket/websocket.go`: `"read_body_failed"` → `CodeInternalError`
+- `x/rest/resource_db.go`: all 20 sites replaced with canonical constants
+- `x/rest/resource.go`: `"not_implemented"` → `CodeMethodNotAllowed` (now uses `TypeNotImplemented` via card 0984)
+- `x/frontend/frontend.go`: `"method_not_allowed"` → `TypeMethodNotAllowed`, `"internal_error"` → `CodeInternalError`
+- `cmd/plumego/internal/scaffold/scaffold.go`: 4 sites replaced
+All tests pass; `go vet` clean.

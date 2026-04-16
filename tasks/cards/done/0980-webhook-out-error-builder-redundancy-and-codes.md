@@ -104,3 +104,9 @@ go vet ./x/webhook/...
 
 ## Outcome
 
+Completed. All 22 call sites in `x/webhook/out.go` cleaned up:
+- Redundant `.Status()` before `.Type()` removed
+- Redundant `.Category()` after `.Type()` removed
+- Freeform lowercase code strings replaced with canonical `contract.Code*` constants
+- `TypeRequired.Code(CodeBadRequest)` overrides removed (6 sites); now use `TypeRequired` alone, which correctly sets `REQUIRED_FIELD_MISSING`
+All tests pass; `go vet` clean.

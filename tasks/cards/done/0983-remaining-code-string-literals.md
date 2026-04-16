@@ -67,3 +67,8 @@ go vet ./x/messaging/... ./x/pubsub/... ./x/resilience/...
 
 ## Outcome
 
+Completed. Added 11 new constants to `contract/error_codes.go` and replaced all freeform literals:
+- Category A (value-changing): "MISSING_ID" → CodeRequired, "NOT_FOUND" → CodeResourceNotFound, "REQUEST_TIMEOUT" → CodeTimeout
+- Category B (new constants): CodeProviderError, CodeQuotaExceeded, CodeDuplicateMessage, CodeTaskExpired, CodeSendError, CodeEmptyBatch, CodeStatsError, CodeInvalidPayload, CodeInvalidMessage, CodeCircuitOpen
+- Updated `x/messaging/api_test.go` to expect canonical "TIMEOUT" code for context timeout case
+All tests pass; `go vet` clean.

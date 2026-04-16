@@ -80,3 +80,11 @@ go vet ./x/fileapi/... ./x/webhook/... ./x/rest/... ./x/data/... ./x/mq/... ./x/
 
 ## Outcome
 
+Completed. All `err == sentinel` comparisons in listed production files replaced with `errors.Is()`:
+- `x/fileapi/handler.go`: ErrNotFound
+- `x/webhook/out.go`: ErrTargetNotFound
+- `x/rest/resource_db.go`: sql.ErrNoRows (3 sites)
+- `x/data/file/metadata.go`: sql.ErrNoRows (3 sites)
+- `x/mq/persistence.go`: kvengine.ErrKeyNotFound/ErrKeyExpired (3 sites)
+- `x/resilience/circuitbreaker/middleware.go`: ErrCircuitOpen, ErrTooManyRequests
+All tests pass; `go vet` clean.
