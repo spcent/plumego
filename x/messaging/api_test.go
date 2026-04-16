@@ -62,7 +62,7 @@ func TestClassifyServiceError(t *testing.T) {
 			name:       "context timeout",
 			err:        context.DeadlineExceeded,
 			wantStatus: http.StatusGatewayTimeout,
-			wantCode:   "REQUEST_TIMEOUT",
+			wantCode:   "TIMEOUT",
 		},
 		{
 			name:       "unknown",

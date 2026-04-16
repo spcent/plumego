@@ -107,7 +107,7 @@ func writeCircuitOpenResponse(w http.ResponseWriter, r *http.Request, cb *Circui
 	ensureNoSniff(w.Header())
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeUnavailable).
-		Code("CIRCUIT_OPEN").
+		Code(contract.CodeCircuitOpen).
 		Message("circuit breaker is open; service temporarily unavailable").
 		Detail("circuit", cb.Name()).
 		Detail("state", cb.State().String()).

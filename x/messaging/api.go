@@ -64,7 +64,7 @@ func (s *Service) HandleBatchSend(w http.ResponseWriter, r *http.Request) {
 	if len(batch.Requests) == 0 {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
-			Code("EMPTY_BATCH").
+			Code(contract.CodeEmptyBatch).
 			Message("requests array is empty").
 			Build())
 		return
@@ -79,7 +79,7 @@ func (s *Service) HandleStats(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code("STATS_ERROR").
+			Code(contract.CodeStatsError).
 			Message(err.Error()).
 			Build())
 		return
@@ -93,7 +93,7 @@ func (s *Service) HandleGetReceipt(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
-			Code("MISSING_ID").
+			Code(contract.CodeRequired).
 			Message("message id is required").
 			Build())
 		return
@@ -102,7 +102,7 @@ func (s *Service) HandleGetReceipt(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
-			Code("NOT_FOUND").
+			Code(contract.CodeResourceNotFound).
 			Message("receipt not found").
 			Build())
 		return
@@ -152,26 +152,26 @@ func classifyServiceError(err error) contract.APIError {
 	case errors.Is(err, ErrProviderFailure):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeBadGateway).
-			Code("PROVIDER_ERROR").
+			Code(contract.CodeProviderError).
 			Message(err.Error()).
 			Build()
 	case errors.Is(err, ErrQuotaExceeded):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeRateLimited).
-			Code("QUOTA_EXCEEDED").
+			Code(contract.CodeQuotaExceeded).
 			Message(err.Error()).
 			Build()
 	case errors.Is(err, mq.ErrDuplicateTask):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeConflict).
-			Code("DUPLICATE_MESSAGE").
+			Code(contract.CodeDuplicateMessage).
 			Message(err.Error()).
 			Build()
 	case errors.Is(err, mq.ErrTaskExpired):
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnprocessableEntity).
 			Category(contract.CategoryValidation).
-			Code("TASK_EXPIRED").
+			Code(contract.CodeTaskExpired).
 			Message(err.Error()).
 			Build()
 	case errors.Is(err, mq.ErrNotInitialized):
@@ -184,7 +184,7 @@ func classifyServiceError(err error) contract.APIError {
 		return contract.NewErrorBuilder().
 			Type(contract.TypeTimeout).
 			Status(http.StatusGatewayTimeout).
-			Code("REQUEST_TIMEOUT").
+			Code(contract.CodeTimeout).
 			Message(err.Error()).
 			Build()
 	case isValidationError(err), errors.Is(err, mq.ErrInvalidConfig):
@@ -197,7 +197,7 @@ func classifyServiceError(err error) contract.APIError {
 	default:
 		return contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code("SEND_ERROR").
+			Code(contract.CodeSendError).
 			Message(err.Error()).
 			Build()
 	}
