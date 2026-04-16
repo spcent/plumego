@@ -7,6 +7,18 @@ const { copy } = Astro.props;
     <h2>{copy.canonicalTitle}</h2>
     <p>{copy.canonicalBody}</p>
     <a class="text-link" href={copy.canonicalCta.href}>{copy.canonicalCta.label}</a>
+  </div>
+  <div class="canonical-layout">
+    <div class="canonical-blueprint">
+      <p class="signal-list__kicker">canonical shape</p>
+      <h3>reference/standard-service</h3>
+      <ul>
+        <li>main.go</li>
+        <li>internal/app/app.go</li>
+        <li>internal/app/routes.go</li>
+        <li>internal/handler/health.go</li>
+      </ul>
+    </div>
     <div class="step-list">
       {copy.canonicalSteps.map((step: { label: string; title: string; body: string }) => (
         <article class="step-list__item">
@@ -17,9 +29,4 @@ const { copy } = Astro.props;
       ))}
     </div>
   </div>
-  <pre class="code-panel"><code>reference/standard-service/
-  main.go
-  internal/app/app.go
-  internal/app/routes.go
-  internal/handler/health.go</code></pre>
 </section>

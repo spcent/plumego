@@ -1,0 +1,28 @@
+---
+interface LinkItem {
+  label: string;
+  href: string;
+}
+
+interface Props {
+  eyebrow: string;
+  title: string;
+  description: string;
+  links?: LinkItem[];
+}
+
+const { eyebrow, title, description, links = [] } = Astro.props as Props;
+---
+
+<section class="page-hero">
+  <p class="hero__eyebrow">{eyebrow}</p>
+  <h1>{title}</h1>
+  <p>{description}</p>
+  {links.length > 0 && (
+    <div class="page-hero__links">
+      {links.map((item) => (
+        <a class="text-link" href={item.href}>{item.label}</a>
+      ))}
+    </div>
+  )}
+</section>

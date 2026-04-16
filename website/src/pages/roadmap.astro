@@ -1,5 +1,6 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
 import { ROADMAP_COPY } from '../data/site';
 import { ROADMAP_FACTS } from '../generated/roadmap';
 
@@ -7,11 +8,15 @@ const copy = ROADMAP_COPY.en;
 ---
 
 <MarketingLayout locale="en" title={copy.title} description={copy.description} currentPath="/roadmap">
-  <section class="page-hero">
-    <p class="hero__eyebrow">{copy.eyebrow}</p>
-    <h1>{copy.title}</h1>
-    <p>{copy.description}</p>
-  </section>
+  <PageHero
+    eyebrow={copy.eyebrow}
+    title={copy.title}
+    description={copy.description}
+    links={[
+      { label: 'Docs', href: '/docs' },
+      { label: 'Releases', href: '/releases' },
+    ]}
+  />
 
   <section class="section">
     <div class="section__intro">
@@ -62,6 +67,18 @@ const copy = ROADMAP_COPY.en;
           {ROADMAP_FACTS.suggestedExecutionOrder.map((item) => <li>{item}</li>)}
         </ul>
       </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>Use roadmap with release posture</h2>
+      <p>Roadmap shows direction. Release posture tells you what can actually be adopted today.</p>
+    </div>
+    <div class="page-links">
+      <a class="text-link" href="/releases">Inspect releases</a>
+      <a class="text-link" href="/docs/release-posture">Read release posture</a>
+      <a class="text-link" href="/docs/reference-app">Open the reference app</a>
     </div>
   </section>
 </MarketingLayout>

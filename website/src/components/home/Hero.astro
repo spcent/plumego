@@ -9,18 +9,6 @@ const { copy } = Astro.props;
     <p class="hero__eyebrow">{copy.eyebrow}</p>
     <h1>{copy.headline}</h1>
     <p class="hero__summary">{copy.summary}</p>
-    <div class="hero__context">
-      <article class="hero__context-item">
-        <p class="signal-list__kicker">{copy.heroAudience.label}</p>
-        <h3>{copy.heroAudience.title}</h3>
-        <p>{copy.heroAudience.body}</p>
-      </article>
-      <article class="hero__context-item">
-        <p class="signal-list__kicker">{copy.heroStatus.label}</p>
-        <h3>{copy.heroStatus.title}</h3>
-        <p>{copy.heroStatus.body}</p>
-      </article>
-    </div>
     <div class="hero__actions">
       <a class="button button--primary" href={copy.primaryCta.href}>{copy.primaryCta.label}</a>
       <a class="button button--ghost" href={copy.secondaryCta.href}>{copy.secondaryCta.label}</a>
@@ -28,6 +16,18 @@ const { copy } = Astro.props;
     <ul class="hero__notes">
       {copy.notes.map((note: string) => <li>{note}</li>)}
     </ul>
+    <div class="hero__signals">
+      <article class="hero__signal">
+        <p class="signal-list__kicker">{copy.heroAudience.label}</p>
+        <h3>{copy.heroAudience.title}</h3>
+        <p>{copy.heroAudience.body}</p>
+      </article>
+      <article class="hero__signal">
+        <p class="signal-list__kicker">{copy.heroStatus.label}</p>
+        <h3>{copy.heroStatus.title}</h3>
+        <p>{copy.heroStatus.body}</p>
+      </article>
+    </div>
   </div>
 
   <div class="hero__visual">

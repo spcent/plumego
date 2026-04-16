@@ -8,7 +8,7 @@ sidebar:
 
 import DocsPortalSummary from '../../../components/docs/DocsPortalSummary.astro';
 import DocsReadingPath from '../../../components/docs/DocsReadingPath.astro';
-import DocsStartHereCards from '../../../components/docs/DocsStartHereCards.astro';
+import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
 
 # Documentation
 
@@ -33,20 +33,20 @@ import DocsStartHereCards from '../../../components/docs/DocsStartHereCards.astr
 
   <section class="docs-home-section">
     <div class="docs-home-section__head">
+      <p class="signal-list__kicker">read by topic</p>
+      <h2>Choose a reading track</h2>
+      <p>Once you understand the canonical path, continue by topic instead of scanning pages at random.</p>
+    </div>
+    <DocsTopicGroups />
+  </section>
+
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
       <p class="signal-list__kicker">synced facts</p>
       <h2>Repository summary</h2>
       <p>These numbers and summaries are pulled from repository sources during the prebuild sync step instead of being maintained as a docs-only duplicate.</p>
     </div>
     <DocsPortalSummary />
-  </section>
-
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">entry points</p>
-      <h2>Start here</h2>
-      <p>Use these entry cards when you already know the kind of question you need answered and want the shortest path to the right page.</p>
-    </div>
-    <DocsStartHereCards />
   </section>
 </div>
 

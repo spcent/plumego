@@ -8,7 +8,7 @@ sidebar:
 
 import DocsPortalSummary from '../../../../components/docs/DocsPortalSummary.astro';
 import DocsReadingPath from '../../../../components/docs/DocsReadingPath.astro';
-import DocsStartHereCards from '../../../../components/docs/DocsStartHereCards.astro';
+import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 
 # 文档
 
@@ -33,20 +33,20 @@ import DocsStartHereCards from '../../../../components/docs/DocsStartHereCards.a
 
   <section class="docs-home-section">
     <div class="docs-home-section__head">
+      <p class="signal-list__kicker">read by topic</p>
+      <h2>按主题继续阅读</h2>
+      <p>当你已经理解 canonical path 之后，接下来应该按主题继续，而不是随机扫页面。</p>
+    </div>
+    <DocsTopicGroups locale="zh" />
+  </section>
+
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
       <p class="signal-list__kicker">synced facts</p>
       <h2>同步仓库摘要</h2>
       <p>这些摘要和数字都来自构建前的仓库同步步骤，而不是维护在站点里的另一份手写副本。</p>
     </div>
     <DocsPortalSummary locale="zh" />
-  </section>
-
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">entry points</p>
-      <h2>从这里开始</h2>
-      <p>当你已经知道自己要解决哪类问题时，可以直接从这些入口卡片跳到合适的页面。</p>
-    </div>
-    <DocsStartHereCards locale="zh" />
   </section>
 </div>
 

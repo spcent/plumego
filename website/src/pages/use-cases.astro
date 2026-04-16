@@ -1,5 +1,6 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
 import { USE_CASES_COPY } from '../data/site';
 
 const copy = USE_CASES_COPY.en;
@@ -12,11 +13,15 @@ const copy = USE_CASES_COPY.en;
   currentPath="/use-cases"
   keywords={['plumego use cases', 'go service toolkit', 'stdlib-first go', 'explicit http services']}
 >
-  <section class="page-hero">
-    <p class="hero__eyebrow">{copy.eyebrow}</p>
-    <h1>{copy.title}</h1>
-    <p>{copy.description}</p>
-  </section>
+  <PageHero
+    eyebrow={copy.eyebrow}
+    title={copy.title}
+    description={copy.description}
+    links={[
+      { label: 'Examples', href: '/examples' },
+      { label: 'Docs', href: '/docs' },
+    ]}
+  />
 
   <section class="section">
     <div class="section__intro">
@@ -55,5 +60,17 @@ const copy = USE_CASES_COPY.en;
         <a class="text-link" href={item.startHref}>{item.startLabel}</a>
       </article>
     ))}
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>Continue with the default path</h2>
+      <p>Once the fit is clear, move to the canonical example and the docs entry path.</p>
+    </div>
+    <div class="page-links">
+      <a class="text-link" href="/examples">Open examples</a>
+      <a class="text-link" href="/docs/getting-started">Open getting started</a>
+      <a class="text-link" href="/docs/reference-app">Read the reference app</a>
+    </div>
   </section>
 </MarketingLayout>

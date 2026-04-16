@@ -1,5 +1,6 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
 import { EXAMPLES_COPY } from '../data/site';
 
 const copy = EXAMPLES_COPY.en;
@@ -12,11 +13,15 @@ const copy = EXAMPLES_COPY.en;
   currentPath="/examples"
   keywords={['plumego examples', 'go http example', 'reference standard service', 'plumego reference app']}
 >
-  <section class="page-hero">
-    <p class="hero__eyebrow">{copy.eyebrow}</p>
-    <h1>{copy.title}</h1>
-    <p>{copy.description}</p>
-  </section>
+  <PageHero
+    eyebrow={copy.eyebrow}
+    title={copy.title}
+    description={copy.description}
+    links={[
+      { label: 'Use Cases', href: '/use-cases' },
+      { label: 'Docs', href: '/docs' },
+    ]}
+  />
 
   <section class="section">
     <div class="section__intro">
@@ -70,6 +75,18 @@ const copy = EXAMPLES_COPY.en;
           <a class="text-link" href={item.href}>{item.label}</a>
         </article>
       ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>Continue with documentation</h2>
+      <p>Examples are meant to push you toward the reference path, not replace it.</p>
+    </div>
+    <div class="page-links">
+      <a class="text-link" href="/docs/getting-started">Open getting started</a>
+      <a class="text-link" href="/docs/reference-app">Read the reference app</a>
+      <a class="text-link" href="/docs/modules/overview">Open modules overview</a>
     </div>
   </section>
 </MarketingLayout>

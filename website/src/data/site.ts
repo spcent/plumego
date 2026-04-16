@@ -13,73 +13,107 @@ export const SITE = {
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
     { label: 'Docs', href: '/docs' },
+    { label: 'Use Cases', href: '/use-cases' },
+    { label: 'Examples', href: '/examples' },
     { label: 'Roadmap', href: '/roadmap' },
-    { label: 'Releases', href: '/releases' },
     { label: 'GitHub', href: SITE.githubUrl },
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
+    { label: '适用场景', href: '/zh/use-cases' },
+    { label: '示例', href: '/zh/examples' },
     { label: '路线图', href: '/zh/roadmap' },
-    { label: '发布', href: '/zh/releases' },
     { label: 'GitHub', href: SITE.githubUrl },
   ],
 };
 
-export const FOOTER_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
+export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{ label: string; href: string }> }>> = {
   en: [
-    { label: 'Docs', href: '/docs' },
-    { label: 'Getting Started', href: '/docs/getting-started' },
-    { label: 'Reference App', href: '/docs/reference-app' },
-    { label: 'Use Cases', href: '/use-cases' },
-    { label: 'Examples', href: '/examples' },
-    { label: 'Roadmap', href: '/roadmap' },
-    { label: 'Releases', href: '/releases' },
-    { label: 'GitHub', href: SITE.githubUrl },
+    {
+      title: 'Product',
+      links: [
+        { label: 'Docs', href: '/docs' },
+        { label: 'Use Cases', href: '/use-cases' },
+        { label: 'Examples', href: '/examples' },
+      ],
+    },
+    {
+      title: 'Start',
+      links: [
+        { label: 'Getting Started', href: '/docs/getting-started' },
+        { label: 'Reference App', href: '/docs/reference-app' },
+        { label: 'FAQ', href: '/docs/faq' },
+      ],
+    },
+    {
+      title: 'Status',
+      links: [
+        { label: 'Roadmap', href: '/roadmap' },
+        { label: 'Releases', href: '/releases' },
+        { label: 'GitHub', href: SITE.githubUrl },
+      ],
+    },
   ],
   zh: [
-    { label: '文档', href: '/zh/docs' },
-    { label: '开始使用', href: '/zh/docs/getting-started' },
-    { label: '参考应用', href: '/zh/docs/reference-app' },
-    { label: '适用场景', href: '/zh/use-cases' },
-    { label: '示例', href: '/zh/examples' },
-    { label: '路线图', href: '/zh/roadmap' },
-    { label: '发布', href: '/zh/releases' },
-    { label: 'GitHub', href: SITE.githubUrl },
+    {
+      title: '产品',
+      links: [
+        { label: '文档', href: '/zh/docs' },
+        { label: '适用场景', href: '/zh/use-cases' },
+        { label: '示例', href: '/zh/examples' },
+      ],
+    },
+    {
+      title: '起步',
+      links: [
+        { label: '开始使用', href: '/zh/docs/getting-started' },
+        { label: '参考应用', href: '/zh/docs/reference-app' },
+        { label: '常见问题', href: '/zh/docs/faq' },
+      ],
+    },
+    {
+      title: '状态',
+      links: [
+        { label: '路线图', href: '/zh/roadmap' },
+        { label: '发布', href: '/zh/releases' },
+        { label: 'GitHub', href: SITE.githubUrl },
+      ],
+    },
   ],
 };
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'Go Services, Explicit By Default',
-    headline: 'Build Go HTTP services without hiding the HTTP model.',
+    eyebrow: 'Plumego',
+    headline: 'A Go toolkit for explicit HTTP services.',
     summary:
-      'Plumego is a stdlib-first web toolkit for teams that want explicit routing, middleware, transport contracts, and application wiring. It stays close to net/http, keeps stable roots narrow, and pushes optional capability work into x/* families instead of growing a hidden framework core.',
+      'Plumego stays close to net/http, keeps the stable surface intentionally narrow, and gives teams one canonical path for building reviewable Go services.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
-    secondaryCta: { label: 'View Reference App', href: '/docs/reference-app' },
-    notes: ['Go 1.24+', 'reference/standard-service', 'stable roots + x/*'],
+    secondaryCta: { label: 'See Use Cases', href: '/use-cases' },
+    notes: ['Go 1.24+', 'stdlib-first', 'reference/standard-service'],
     heroAudience: {
-      label: 'Best for',
-      title: 'Teams that prefer reviewable service code',
-      body: 'A good fit for internal APIs, boundary-sensitive services, and repositories that want explicit wiring instead of framework magic.',
+      label: 'Built for',
+      title: 'Teams that want service code to stay reviewable',
+      body: 'Best for internal APIs, platform services, and boundary-sensitive repositories that prefer explicit wiring over hidden framework conventions.',
     },
     heroStatus: {
       label: 'Current status',
-      title: `${RELEASE_FACTS.currentVersion} with visible stability boundaries`,
-      body: 'The canonical path is ready to use now. Compatibility promises still vary by area, so release posture remains explicit instead of implied.',
+      title: `${RELEASE_FACTS.currentVersion} with a published release posture`,
+      body: 'The canonical path is ready to adopt now. Stability promises still vary by surface, so compatibility boundaries stay published instead of implied.',
     },
     heroVisual: {
-      stableLabel: 'stable roots',
-      stableTitle: 'small public surface',
-      stableBody: 'core, router, contract, and the rest of the long-lived API stay narrow on purpose.',
-      extensionLabel: 'extensions',
-      extensionTitle: 'optional capability families',
-      extensionBody: 'x/* keeps fast-moving features out of the kernel and out of the default learning path.',
-      footerLabel: 'reading path',
-      footerBody: 'reference app → module boundary → extension family',
+      stableLabel: 'one stable model',
+      stableTitle: 'explicit request path',
+      stableBody: 'Routes, middleware, handlers, and application wiring remain visible in code instead of disappearing into framework-owned registration.',
+      extensionLabel: 'one expansion rule',
+      extensionTitle: 'capabilities branch outward',
+      extensionBody: 'Stable roots stay narrow while optional capability work starts in x/* families instead of stretching the kernel.',
+      footerLabel: 'default path',
+      footerBody: 'docs → reference app → boundaries → extensions',
     },
     valueTitle: 'Why Plumego exists.',
     valueLead:
-      'Plumego does not try to out-abstract Go’s HTTP model. The value is in keeping the familiar parts visible while making repository ownership, extension boundaries, and current maturity easier to judge.',
+      'Plumego does not try to out-abstract the Go HTTP model. It exists to keep the important parts visible as the repository and the team get larger.',
     values: [
       {
         kicker: 'explicitness',
@@ -98,24 +132,29 @@ export const HOME_COPY = {
       },
     ],
     valueFootnote:
-      'The point is not “more abstraction.” The point is a service toolkit that stays readable when your repository and team get larger.',
-    mapTitle: 'One default path, one boundary model.',
-    mapLead:
-      'You do not start from a feature catalog. You start from the stable path, then branch into x/* only when the owning capability is clear.',
-    mapPanels: {
-      stable: {
-        title: 'Stable Roots',
-        caption: 'Long-lived public packages with explicit responsibilities.',
+      'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small.',
+    adoptionTitle: 'Two clear ways to continue.',
+    adoptionBody:
+      'The first real question after the landing page is not “which package should I open?” It is “does this fit my service?” and “which example path should I trust?”',
+    adoptionCards: [
+      {
+        kicker: 'fit',
+        title: 'Use Cases',
+        body: 'See where Plumego is strongest today, what kind of teams benefit most, and how to decide whether explicit structure is actually a requirement.',
+        href: '/use-cases',
+        label: 'Explore use cases',
       },
-      extension: {
-        title: 'x/* Extensions',
-        caption: 'Optional or faster-moving families that should not redefine the core path.',
+      {
+        kicker: 'paths',
+        title: 'Examples',
+        body: 'Start from the one canonical runnable example, then move into guided examples that explain request flow, boundaries, and adoption posture.',
+        href: '/examples',
+        label: 'Explore examples',
       },
-      footer: 'Default routing rule: kernel and transport changes stay in stable roots; capability work starts in the owning x/* family.',
-    },
+    ],
     stableRoots: MODULE_FACTS.stableRoots,
     extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: 'Adopt Plumego through one canonical path.',
+    canonicalTitle: 'Start from one canonical service shape.',
     canonicalBody:
       'Begin with reference/standard-service. It gives you the directory shape, bootstrap flow, and route wiring Plumego treats as the default application path.',
     canonicalCta: { label: 'Read the Reference App Guide', href: '/docs/reference-app' },
@@ -136,79 +175,43 @@ export const HOME_COPY = {
         body: 'Check route registration before touching handlers or deeper modules.',
       },
     ],
-    controlTitle: 'What you can rely on today.',
-    controlBody:
-      'The site should not ask you to infer maturity. The current usable surface is explicit: one canonical app path, narrow stable roots, and a visible release posture.',
-    exploreTitle: 'Go beyond the landing page without guessing.',
-    exploreBody:
-      'If you are evaluating adoption, move directly into use cases and examples instead of treating them as footer-only side links. These two pages explain where Plumego fits and which example paths it can honestly stand behind today.',
-    exploreCards: [
-      {
-        kicker: 'fit',
-        title: 'Use Cases',
-        body: 'See where Plumego is strongest today, which teams benefit most, and how to decide whether explicit structure is actually a requirement.',
-        href: '/use-cases',
-        label: 'Open use cases',
-      },
-      {
-        kicker: 'paths',
-        title: 'Examples',
-        body: 'Start from the one canonical runnable example, then move into guided examples that explain request flow, boundaries, and adoption posture.',
-        href: '/examples',
-        label: 'Open examples',
-      },
-    ],
-    controlItems: [
-      {
-        title: 'Canonical app path',
-        body: 'reference/standard-service is the documented starting point for new services and examples.',
-      },
-      {
-        title: 'Narrow stable roots',
-        body: 'Long-lived API remains concentrated in stable roots instead of expanding through hidden compatibility wrappers.',
-      },
-      {
-        title: 'Visible release posture',
-        body: 'Compatibility expectations are published and kept separate from roadmap ambition.',
-      },
-    ],
-    finalTitle: 'Start with one successful path, then expand only when needed.',
+    finalTitle: 'Read the docs, run the reference app, then expand only when needed.',
     finalBody:
-      'Read Getting Started, inspect the Reference App, and only then move into module boundaries or extension families when your change actually needs them.',
+      'Plumego works best when you start from the default path and branch into deeper boundaries only after the owning capability is clear.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
     finalSecondary: { label: 'Open GitHub', href: SITE.githubUrl },
   },
   zh: {
-    eyebrow: 'Go Services, Explicit By Default',
-    headline: '构建 Go HTTP 服务，但不要把 HTTP 模型藏起来。',
+    eyebrow: 'Plumego',
+    headline: '一个面向显式 HTTP 服务的 Go 工具包。',
     summary:
-      'Plumego 是一个面向显式 HTTP 服务的 stdlib-first Web 工具包。它尽量贴近 net/http，把路由、中间件、transport contract 和应用 wiring 保持可见，同时把可选能力留在 x/* 家族，而不是长成隐藏的框架内核。',
+      'Plumego 尽量贴近 net/http，把稳定表面保持收敛，并为团队提供一条构建可评审 Go 服务的 canonical 路径。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
-    secondaryCta: { label: '查看参考应用', href: '/zh/docs/reference-app' },
-    notes: ['Go 1.24+', 'reference/standard-service', '稳定根 + x/*'],
+    secondaryCta: { label: '查看适用场景', href: '/zh/use-cases' },
+    notes: ['Go 1.24+', 'stdlib-first', 'reference/standard-service'],
     heroAudience: {
-      label: '适合谁',
-      title: '适合希望服务代码可审查的团队',
-      body: '适合内部 API、边界敏感型服务，以及希望把 wiring 保持显式而不是依赖框架魔法的仓库。',
+      label: '适合',
+      title: '希望服务代码持续可评审的团队',
+      body: '尤其适合内部 API、平台服务，以及那些更看重显式 wiring 而不是隐藏框架约定的仓库。',
     },
     heroStatus: {
       label: '当前状态',
-      title: `${RELEASE_FACTS.currentVersion}，并且稳定边界是可见的`,
-      body: 'canonical path 现在就可以使用，但不同区域的兼容性承诺并不相同，所以 release posture 会被明确写出来，而不是默认你自己猜。',
+      title: `${RELEASE_FACTS.currentVersion}，并且发布姿态是公开的`,
+      body: 'canonical path 现在就可以采用，但不同区域的稳定承诺并不相同，所以兼容性边界会被明确发布，而不是默认你自己猜。',
     },
     heroVisual: {
-      stableLabel: 'stable roots',
-      stableTitle: '收敛的公开表面',
-      stableBody: 'core、router、contract 等长期 API 有意保持窄边界，而不是一路长成框架能力目录。',
-      extensionLabel: 'extensions',
-      extensionTitle: '可选能力家族',
-      extensionBody: 'x/* 承接快速演进功能，让内核与默认学习路径保持克制。',
-      footerLabel: 'reading path',
-      footerBody: 'reference app → 模块边界 → 扩展家族',
+      stableLabel: '一套稳定模型',
+      stableTitle: '显式请求路径',
+      stableBody: 'Routes、middleware、handlers 和应用 wiring 都继续留在代码里，而不是消失在框架注册机制后面。',
+      extensionLabel: '一条扩展规则',
+      extensionTitle: '能力向外分叉',
+      extensionBody: '稳定根保持收敛，可选能力从 x/* 家族开始，而不是继续拉长内核。',
+      footerLabel: '默认路径',
+      footerBody: 'docs → reference app → 边界 → 扩展',
     },
     valueTitle: 'Plumego 为什么存在。',
     valueLead:
-      'Plumego 不是要重新发明 Go 的 HTTP 模型。它的价值在于：把熟悉的部分继续保持熟悉，同时让模块 ownership、扩展边界和当前成熟度更容易判断。',
+      'Plumego 不是要重新发明 Go 的 HTTP 模型。它的目标，是在仓库和团队变大以后，继续把关键结构保持可见。',
     values: [
       {
         kicker: '显式性',
@@ -227,23 +230,29 @@ export const HOME_COPY = {
       },
     ],
     valueFootnote:
-      '重点不是“多一层抽象”，而是当团队和仓库变大以后，服务工具包依然能保持可读。',
-    mapTitle: '一条默认路径，一套边界模型。',
-    mapLead: '你不是从功能目录起步，而是先从稳定路径起步，只有在 capability ownership 明确时才进入 x/*。',
-    mapPanels: {
-      stable: {
-        title: '稳定根',
-        caption: '长期公开包，职责显式且边界窄。',
+      '重点不是更多框架抽象，而是让服务工具包在仓库不再小的时候依然保持可读。',
+    adoptionTitle: '继续往前时，先回答两个问题。',
+    adoptionBody:
+      '离开首页之后，真正重要的不是“先看哪个包”，而是“它适不适合我的服务”和“我该相信哪条示例路径”。',
+    adoptionCards: [
+      {
+        kicker: 'fit',
+        title: '适用场景',
+        body: '看清 Plumego 当前在哪些场景最强、哪类团队真正受益，以及如何判断“显式结构”是不是你的真实需求。',
+        href: '/zh/use-cases',
+        label: '查看适用场景',
       },
-      extension: {
-        title: 'x/* 扩展',
-        caption: '可选能力与快速演进家族，不重定义核心学习路径。',
+      {
+        kicker: 'paths',
+        title: '示例',
+        body: '从唯一的 canonical 可运行示例起步，再进入解释请求路径、边界和采用姿态的引导式示例。',
+        href: '/zh/examples',
+        label: '查看示例',
       },
-      footer: '默认路由规则：内核与 transport 变化归稳定根；能力工作从对应的 x/* 家族开始。',
-    },
+    ],
     stableRoots: MODULE_FACTS.stableRoots,
     extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: '通过唯一的 canonical 路径采用 Plumego。',
+    canonicalTitle: '从唯一的 canonical 服务形态起步。',
     canonicalBody:
       '先看 reference/standard-service。它给出 Plumego 认可的默认目录结构、bootstrap 流程和 route wiring 方式。',
     canonicalCta: { label: '阅读参考应用说明', href: '/zh/docs/reference-app' },
@@ -264,43 +273,8 @@ export const HOME_COPY = {
         body: '在继续深入 handler 或模块之前，先看清 route 注册。',
       },
     ],
-    controlTitle: '今天你可以依赖什么。',
-    controlBody: '这个站点不应该逼你自己猜成熟度。当前可用表面是明确的：一条 canonical app path、收敛的稳定根，以及可见的 release posture。',
-    exploreTitle: '不要只停留在首页，再往前走两步。',
-    exploreBody:
-      '如果你正在评估是否采用 Plumego，应该直接进入适用场景和示例页面，而不是把它们当成 footer 里的附属链接。这两页分别回答“哪里适合用”和“当前有哪些诚实可用的示例路径”。',
-    exploreCards: [
-      {
-        kicker: 'fit',
-        title: '适用场景',
-        body: '看清 Plumego 当前在哪些场景最强、哪类团队真正受益，以及如何判断“显式结构”是不是你的真实需求。',
-        href: '/zh/use-cases',
-        label: '打开适用场景',
-      },
-      {
-        kicker: 'paths',
-        title: '示例',
-        body: '从唯一的 canonical 可运行示例起步，再进入解释请求路径、边界和采用姿态的引导式示例。',
-        href: '/zh/examples',
-        label: '打开示例',
-      },
-    ],
-    controlItems: [
-      {
-        title: 'Canonical app path',
-        body: 'reference/standard-service 是新服务和示例的默认起点。',
-      },
-      {
-        title: '收敛的稳定根',
-        body: '长期 API 仍然集中在稳定根里，而不是继续通过隐藏兼容包装层扩张。',
-      },
-      {
-        title: '可见的发布姿态',
-        body: '兼容性预期被明确发布出来，并且与 roadmap 里的目标区分开。',
-      },
-    ],
-    finalTitle: '先走通一条成功路径，再按需要扩展。',
-    finalBody: '先读开始使用，再看参考应用，只有当你的改动真的需要时，才继续深入模块边界和扩展家族。',
+    finalTitle: '先读文档，跑通 reference app，再按需要向外扩展。',
+    finalBody: 'Plumego 最适合从默认路径进入，只有在 capability ownership 明确之后，再进入更深的模块边界。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
     finalSecondary: { label: '打开 GitHub', href: SITE.githubUrl },
   },

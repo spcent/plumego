@@ -1,5 +1,6 @@
 ---
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
 import { USE_CASES_COPY } from '../../data/site';
 
 const copy = USE_CASES_COPY.zh;
@@ -13,11 +14,15 @@ const copy = USE_CASES_COPY.zh;
   imagePath="/brand/og-zh.svg"
   keywords={['plumego 适用场景', 'go 服务工具包', 'stdlib-first', '显式 http 服务']}
 >
-  <section class="page-hero">
-    <p class="hero__eyebrow">{copy.eyebrow}</p>
-    <h1>{copy.title}</h1>
-    <p>{copy.description}</p>
-  </section>
+  <PageHero
+    eyebrow={copy.eyebrow}
+    title={copy.title}
+    description={copy.description}
+    links={[
+      { label: '示例', href: '/zh/examples' },
+      { label: '文档', href: '/zh/docs' },
+    ]}
+  />
 
   <section class="section">
     <div class="section__intro">
@@ -56,5 +61,17 @@ const copy = USE_CASES_COPY.zh;
         <a class="text-link" href={item.startHref}>{item.startLabel}</a>
       </article>
     ))}
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>顺着默认路径继续</h2>
+      <p>当适用性判断清楚之后，下一步应该回到 canonical 示例和 docs 主入口。</p>
+    </div>
+    <div class="page-links">
+      <a class="text-link" href="/zh/examples">查看示例</a>
+      <a class="text-link" href="/zh/docs/getting-started">打开开始使用</a>
+      <a class="text-link" href="/zh/docs/reference-app">阅读参考应用</a>
+    </div>
   </section>
 </MarketingLayout>

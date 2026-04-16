@@ -1,0 +1,82 @@
+---
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props as Props;
+
+const groups =
+  locale === 'zh'
+    ? [
+        {
+          title: 'Start',
+          body: '先走通一条成功路径，再继续细分边界。',
+          links: [
+            { label: '开始使用', href: '/zh/docs/getting-started' },
+            { label: '参考应用', href: '/zh/docs/reference-app' },
+          ],
+        },
+        {
+          title: 'Concepts',
+          body: '先建立请求流与仓库控制面的心智模型。',
+          links: [
+            { label: 'Request Flow', href: '/zh/docs/concepts/request-flow' },
+            { label: 'Repository Control Plane', href: '/zh/docs/concepts/repo-control-plane' },
+            { label: '常见问题', href: '/zh/docs/faq' },
+          ],
+        },
+        {
+          title: 'Boundaries',
+          body: '当你需要判断改动归属时，再进入模块与发布姿态。',
+          links: [
+            { label: '模块总览', href: '/zh/docs/modules/overview' },
+            { label: '稳定根', href: '/zh/docs/stable-roots' },
+            { label: 'x/* 家族', href: '/zh/docs/x-family' },
+            { label: '发布姿态', href: '/zh/docs/release-posture' },
+          ],
+        },
+      ]
+    : [
+        {
+          title: 'Start',
+          body: 'Run one successful path before classifying deeper repository work.',
+          links: [
+            { label: 'Getting Started', href: '/docs/getting-started' },
+            { label: 'Reference App', href: '/docs/reference-app' },
+          ],
+        },
+        {
+          title: 'Concepts',
+          body: 'Build the request-flow and control-plane model before you open packages at random.',
+          links: [
+            { label: 'Request Flow', href: '/docs/concepts/request-flow' },
+            { label: 'Repository Control Plane', href: '/docs/concepts/repo-control-plane' },
+            { label: 'FAQ', href: '/docs/faq' },
+          ],
+        },
+        {
+          title: 'Boundaries',
+          body: 'Move into modules and release posture when you need to decide where work belongs.',
+          links: [
+            { label: 'Modules Overview', href: '/docs/modules/overview' },
+            { label: 'Stable Roots', href: '/docs/stable-roots' },
+            { label: 'x/* Family', href: '/docs/x-family' },
+            { label: 'Release Posture', href: '/docs/release-posture' },
+          ],
+        },
+      ];
+---
+
+<div class="docs-topic-groups">
+  {groups.map((group) => (
+    <article class="topic-group">
+      <h3>{group.title}</h3>
+      <p>{group.body}</p>
+      <ul>
+        {group.links.map((item) => (
+          <li><a class="text-link" href={item.href}>{item.label}</a></li>
+        ))}
+      </ul>
+    </article>
+  ))}
+</div>

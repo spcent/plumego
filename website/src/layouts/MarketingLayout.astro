@@ -4,7 +4,7 @@ import '../styles/global.css';
 import '../styles/prose.css';
 import '../styles/theme.css';
 import SiteHeader from '../components/shared/SiteHeader.astro';
-import { FOOTER_LINKS, SITE, type Locale } from '../data/site';
+import { FOOTER_GROUPS, SITE, type Locale } from '../data/site';
 import { buildMarketingSeo } from '../lib/seo';
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
 
 const { locale, title, description, currentPath, imagePath, noindex, type, keywords, includeAlternates } = Astro.props;
 const pageTitle = `${title} · ${SITE.name}`;
-const footerLinks = FOOTER_LINKS[locale];
+const footerGroups = FOOTER_GROUPS[locale];
 const seo = buildMarketingSeo({
   title: pageTitle,
   description,
@@ -85,12 +85,22 @@ const lang = locale === 'zh' ? 'zh-CN' : 'en';
       <slot />
     </main>
     <footer class="site-footer">
-      <p>{SITE.name} · {SITE.currentVersion}</p>
-      <div class="site-footer__links">
-        {footerLinks.map((link) => (
-          <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel={link.href.startsWith('http') ? 'noreferrer' : undefined}>
-            {link.label}
-          </a>
+      <div class="site-footer__meta">
+        <p class="site-footer__brand">{SITE.name}</p>
+        <p>{SITE.currentVersion} · stdlib-first · static site on Cloudflare Pages</p>
+      </div>
+      <div class="site-footer__grid">
+        {footerGroups.map((group) => (
+          <div class="site-footer__group">
+            <p class="site-footer__group-title">{group.title}</p>
+            <div class="site-footer__links">
+              {group.links.map((link) => (
+                <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel={link.href.startsWith('http') ? 'noreferrer' : undefined}>
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </footer>

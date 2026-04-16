@@ -1,5 +1,6 @@
 ---
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
 import { ROADMAP_COPY } from '../../data/site';
 import { ROADMAP_FACTS } from '../../generated/roadmap';
 
@@ -7,11 +8,15 @@ const copy = ROADMAP_COPY.zh;
 ---
 
 <MarketingLayout locale="zh" title={copy.title} description={copy.description} currentPath="/zh/roadmap">
-  <section class="page-hero">
-    <p class="hero__eyebrow">{copy.eyebrow}</p>
-    <h1>{copy.title}</h1>
-    <p>{copy.description}</p>
-  </section>
+  <PageHero
+    eyebrow={copy.eyebrow}
+    title={copy.title}
+    description={copy.description}
+    links={[
+      { label: '文档', href: '/zh/docs' },
+      { label: '发布', href: '/zh/releases' },
+    ]}
+  />
 
   <section class="section">
     <div class="section__intro">
@@ -62,6 +67,18 @@ const copy = ROADMAP_COPY.zh;
           {ROADMAP_FACTS.suggestedExecutionOrder.map((item) => <li>{item}</li>)}
         </ul>
       </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>把路线图和发布姿态一起看</h2>
+      <p>路线图说明方向，发布姿态才说明今天哪些部分可以被采用。</p>
+    </div>
+    <div class="page-links">
+      <a class="text-link" href="/zh/releases">查看发布页</a>
+      <a class="text-link" href="/zh/docs/release-posture">阅读发布姿态</a>
+      <a class="text-link" href="/zh/docs/reference-app">打开参考应用</a>
     </div>
   </section>
 </MarketingLayout>

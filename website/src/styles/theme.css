@@ -168,3 +168,68 @@
     inset: auto 1rem 1rem auto;
   }
 }
+
+/* Website redesign overrides */
+
+.hero__visual {
+  min-height: 36rem;
+  border-color: rgba(143, 207, 255, 0.12);
+  background:
+    radial-gradient(circle at top left, rgba(143, 207, 255, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(14, 24, 37, 0.84), rgba(8, 15, 25, 0.92)),
+    rgba(10, 18, 28, 0.76);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.24);
+}
+
+.hero__grid {
+  background-size: 3.4rem 3.4rem;
+  opacity: 0.8;
+}
+
+.topology-diagram {
+  inset: 2.2rem 2.2rem 3rem 2.2rem;
+  width: calc(100% - 4.4rem);
+  height: calc(100% - 5.2rem);
+}
+
+.hero__plane {
+  width: min(22rem, calc(100% - 4.4rem));
+  background: rgba(8, 17, 28, 0.78);
+  border-color: rgba(143, 207, 255, 0.12);
+}
+
+.hero__plane--ext {
+  inset: 2.1rem 1.9rem auto auto;
+}
+
+.hero__legend {
+  width: min(17rem, calc(100% - 4rem));
+  border-top-color: rgba(143, 207, 255, 0.12);
+}
+
+.hero__plane span,
+.hero__legend span {
+  color: #8fcfff;
+}
+
+.hero__plane strong,
+.hero__legend strong {
+  color: #f5f9fc;
+}
+
+.hero__plane p,
+.hero__legend p {
+  color: rgba(232, 240, 247, 0.72);
+}
+
+@media (max-width: 960px) {
+  .hero__visual {
+    min-height: 29rem;
+  }
+
+  .topology-diagram {
+    inset: 1rem 1rem 1.8rem 1rem;
+    width: calc(100% - 2rem);
+    height: calc(100% - 2.8rem);
+  }
+}

@@ -92,32 +92,31 @@ The website is split into two page families:
 Header navigation for the release-ready site is intentionally narrow:
 
 - Docs
-- Roadmap
-- Releases
-- GitHub
-
-Footer navigation is slightly broader and is used for task-oriented entry points:
-
-- Docs
-- Getting Started
-- Reference App
 - Use Cases
 - Examples
 - Roadmap
-- Releases
 - GitHub
+
+Footer navigation is grouped by job instead of presented as one flat link row:
+
+- Product: Docs, Use Cases, Examples
+- Start: Getting Started, Reference App, FAQ
+- Status: Roadmap, Releases, GitHub
 
 ### Page responsibilities
 
 - `/` and `/zh`
-  - marketing landing pages
-  - explain positioning, value, canonical path, and primary CTA
+  - product landing pages
+  - explain positioning, value, adoption paths, and the canonical start
 - `/docs` and `/zh/docs`
-  - documentation entry portals
-  - route readers into the recommended learning path and synced repo facts
+  - reading-first documentation entry pages
+  - route readers through recommended path, topic groups, and synced repo facts
 - `/docs/getting-started`
   - first-run path only
   - should answer “how do I successfully start?”
+- `/docs/concepts/request-flow`, `/docs/concepts/repo-control-plane`, `/docs/faq`
+  - concept-layer docs
+  - should answer “how should I think about the request path and repository before changing code?”
 - `/docs/reference-app`
   - canonical application layout
   - should answer “where do I copy the default service shape from?”
@@ -127,6 +126,12 @@ Footer navigation is slightly broader and is used for task-oriented entry points
 - `/docs/release-posture`
   - compatibility and maturity framing
   - should answer “how stable is this surface?”
+- `/use-cases`
+  - adoption-fit page
+  - should answer “is Plumego a fit for my team and service shape?”
+- `/examples`
+  - example-path page
+  - should answer “which example path should I trust first?”
 - `/roadmap`
   - repository direction and explicit non-goals
 - `/releases`
@@ -171,7 +176,7 @@ Current published routes:
 Release-completion support pages:
 
 - `/404`
-- locale-aware canonical and Open Graph metadata on marketing pages
+- locale-aware canonical and Open Graph metadata on marketing and docs pages
 - shared OG assets under `public/brand/**`
 
 ### Pages deployment shape
