@@ -27,6 +27,7 @@ func BodyLimit(maxBytes int64, logger log.StructuredLogger) mw.Middleware {
 
 			limited := &limitedBodyReader{
 				w:        w,
+				req:      r,
 				r:        r.Body,
 				maxBytes: maxBytes,
 				logger:   logger,
@@ -41,6 +42,7 @@ func BodyLimit(maxBytes int64, logger log.StructuredLogger) mw.Middleware {
 
 type limitedBodyReader struct {
 	w        http.ResponseWriter
+	req      *http.Request
 	r        io.ReadCloser
 	maxBytes int64
 	used     int64
@@ -80,7 +82,7 @@ func (l *limitedBodyReader) Close() error {
 func (l *limitedBodyReader) fail() (int, error) {
 	if !l.exceeded {
 		l.exceeded = true
-		mw.WriteTransportError(l.w, nil, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
+		mw.WriteTransportError(l.w, l.req, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
 			"max_bytes":  l.maxBytes,
 			"seen_bytes": l.used,
 			"at":         l.now().UTC(),
