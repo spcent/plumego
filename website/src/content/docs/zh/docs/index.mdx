@@ -12,22 +12,52 @@ import DocsStartHereCards from '../../../../components/docs/DocsStartHereCards.a
 
 # 文档
 
-Plumego 是一个 stdlib-first 的 Go Web 工具包，面向显式的 HTTP 服务。推荐的阅读方式是先从 canonical 参考路径进入，再逐步理解模块边界与扩展家族。
+<div class="docs-home-intro">
+  <p class="docs-home-intro__lead">
+    Plumego 是一个面向显式 HTTP 服务的 stdlib-first Go Web 工具包。进入这套仓库的最短路径，是先从 canonical 参考路径起步，再在需要时向外扩展到模块边界和能力家族。
+  </p>
+  <p class="docs-home-intro__support">
+    这个首页更像文档入口页，而不是营销页。先顺着推荐路径建立概念层，再借助同步摘要和入口卡片去判断下一步该读哪里。
+  </p>
+</div>
 
-## 建议阅读路径
+<div class="docs-home-stack not-content">
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
+      <p class="signal-list__kicker">canonical path</p>
+      <h2>建议阅读路径</h2>
+      <p>先用最短路径建立可工作的心智模型，再进入更细的模块边界和扩展家族。</p>
+    </div>
+    <DocsReadingPath locale="zh" />
+  </section>
 
-<DocsReadingPath locale="zh" />
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
+      <p class="signal-list__kicker">synced facts</p>
+      <h2>同步仓库摘要</h2>
+      <p>这些摘要和数字都来自构建前的仓库同步步骤，而不是维护在站点里的另一份手写副本。</p>
+    </div>
+    <DocsPortalSummary locale="zh" />
+  </section>
 
-## 同步仓库摘要
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
+      <p class="signal-list__kicker">entry points</p>
+      <h2>从这里开始</h2>
+      <p>当你已经知道自己要解决哪类问题时，可以直接从这些入口卡片跳到合适的页面。</p>
+    </div>
+    <DocsStartHereCards locale="zh" />
+  </section>
+</div>
 
-<DocsPortalSummary locale="zh" />
-
-## 从这里开始
-
-<DocsStartHereCards locale="zh" />
-
-## 这套文档覆盖什么
-
-- canonical 应用路径
-- 模块边界与仓库结构
-- 发布姿态与当前兼容性说明
+<div class="docs-home-coverage not-content">
+  <p class="signal-list__kicker">coverage</p>
+  <h2>这套文档覆盖什么</h2>
+  <ul>
+    <li>请求路径与仓库控制平面</li>
+    <li>canonical 应用路径</li>
+    <li>模块边界与仓库结构</li>
+    <li>发布姿态与当前兼容性说明</li>
+    <li>关于适用范围、稳定性和使用方式的高频问题</li>
+  </ul>
+</div>

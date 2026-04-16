@@ -1,22 +1,39 @@
 ---
-import LocaleSwitch from '../components/shared/LocaleSwitch.astro';
-import ThemeToggle from '../components/shared/ThemeToggle.astro';
-import { NAV_LINKS, SITE, type Locale } from '../data/site';
-import { toLocalePath } from '../lib/i18n';
+import '../styles/starlight-bridge.css';
+import '../styles/global.css';
+import '../styles/prose.css';
+import '../styles/theme.css';
+import SiteHeader from '../components/shared/SiteHeader.astro';
+import { FOOTER_LINKS, SITE, type Locale } from '../data/site';
+import { buildMarketingSeo } from '../lib/seo';
 
 interface Props {
   locale: Locale;
   title: string;
   description: string;
   currentPath: string;
+  imagePath?: string;
+  noindex?: boolean;
+  type?: 'website' | 'article';
+  keywords?: string[];
+  includeAlternates?: boolean;
 }
 
-const { locale, title, description, currentPath } = Astro.props;
-const nav = NAV_LINKS[locale];
-const lang = locale === 'zh' ? 'zh-CN' : 'en';
-const canonicalPath = toLocalePath(currentPath, 'en');
-const zhPath = toLocalePath(currentPath, 'zh');
+const { locale, title, description, currentPath, imagePath, noindex, type, keywords, includeAlternates } = Astro.props;
 const pageTitle = `${title} · ${SITE.name}`;
+const footerLinks = FOOTER_LINKS[locale];
+const seo = buildMarketingSeo({
+  title: pageTitle,
+  description,
+  currentPath,
+  locale,
+  imagePath,
+  noindex,
+  type,
+  keywords,
+  includeAlternates,
+});
+const lang = locale === 'zh' ? 'zh-CN' : 'en';
 ---
 
 <!doctype html>
@@ -26,12 +43,28 @@ const pageTitle = `${title} · ${SITE.name}`;
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
+    {seo.keywords && <meta name="keywords" content={seo.keywords} />}
+    <meta name="robots" content={seo.robots} />
     <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#08111c" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="canonical" href={`https://plumego.dev${canonicalPath}`} />
-    <link rel="alternate" href="https://plumego.dev/" hreflang="x-default" />
-    <link rel="alternate" href={`https://plumego.dev${canonicalPath}`} hreflang="en" />
-    <link rel="alternate" href={`https://plumego.dev${zhPath}`} hreflang="zh" />
+    <link rel="canonical" href={seo.canonicalUrl} />
+    {seo.includeAlternates && <link rel="alternate" href="https://plumego.dev/" hreflang="x-default" />}
+    {seo.includeAlternates && <link rel="alternate" href={`${seo.siteOrigin}${seo.canonicalPath}`} hreflang="en" />}
+    {seo.includeAlternates && <link rel="alternate" href={`${seo.siteOrigin}${seo.zhPath}`} hreflang="zh" />}
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:type" content={seo.type} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={seo.canonicalUrl} />
+    <meta property="og:image" content={seo.imageUrl} />
+    <meta property="og:image:alt" content={description} />
+    <meta property="og:locale" content={seo.ogLocale} />
+    {seo.includeAlternates && <meta property="og:locale:alternate" content={seo.alternateLocale} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={seo.imageUrl} />
     <script is:inline>
       (() => {
         const storageKey = 'starlight-theme';
@@ -47,34 +80,18 @@ const pageTitle = `${title} · ${SITE.name}`;
     </script>
   </head>
   <body class="marketing-shell">
-    <header class="site-header">
-      <a class="site-header__brand" href={locale === 'zh' ? '/zh' : '/'}>
-        <img src="/brand/logo-light.svg" alt="Plumego" class="brand brand--light" />
-        <img src="/brand/logo-dark.svg" alt="Plumego" class="brand brand--dark" />
-      </a>
-      <nav class="site-header__nav" aria-label="Primary">
-        {nav.map((link) => (
-          <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel={link.href.startsWith('http') ? 'noreferrer' : undefined}>
-            {link.label}
-          </a>
-        ))}
-      </nav>
-      <div class="site-header__tools">
-        <ThemeToggle />
-        <LocaleSwitch currentPath={currentPath} />
-      </div>
-    </header>
+    <SiteHeader locale={locale} currentPath={currentPath} />
     <main>
       <slot />
     </main>
     <footer class="site-footer">
       <p>{SITE.name} · {SITE.currentVersion}</p>
       <div class="site-footer__links">
-        <a href={locale === 'zh' ? '/zh/docs' : '/docs'}>{locale === 'zh' ? '文档' : 'Docs'}</a>
-        <a href={locale === 'zh' ? '/zh/docs/reference-app' : '/docs/reference-app'}>
-          {locale === 'zh' ? '参考应用' : 'Reference App'}
-        </a>
-        <a href={SITE.githubUrl} target="_blank" rel="noreferrer">GitHub</a>
+        {footerLinks.map((link) => (
+          <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel={link.href.startsWith('http') ? 'noreferrer' : undefined}>
+            {link.label}
+          </a>
+        ))}
       </div>
     </footer>
   </body>

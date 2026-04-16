@@ -1,0 +1,51 @@
+---
+title: Request Flow
+description: The canonical HTTP request path in Plumego stays explicit from route registration to response write.
+translationKey: request-flow
+sidebar:
+  order: 4
+---
+
+# Request Flow
+
+Plumego keeps the HTTP request path visible on purpose. A request should remain easy to trace from route registration to handler logic to the final write path, without hidden registries or framework-owned control flow.
+
+## The canonical path
+
+1. A route is registered explicitly in `reference/standard-service/internal/app/routes.go`.
+2. The router matches method and path, then forwards the request to a standard-library handler.
+3. Transport-only middleware may wrap the handler, but it should not hide business wiring.
+4. The handler decodes input, calls explicit application code, and writes a success or error response through the canonical transport path.
+
+## What stays visible
+
+- route ownership
+- handler shape
+- request decode
+- dependency injection through application wiring
+- success and error write paths
+
+## What Plumego avoids
+
+- hidden handler registration through `init()`
+- framework-owned service lookup from request context
+- feature-specific response helper families
+- middleware that silently assembles business DTOs or injects services
+
+## Why this matters
+
+When the request path is visible, a maintainer or agent can answer basic review questions quickly:
+
+- where did this endpoint get registered
+- which middleware layers run before it
+- where are dependencies wired
+- which package owns the response shape
+
+That is the baseline Plumego optimizes for.
+
+## Read this page with
+
+- [Getting Started](/docs/getting-started)
+- [Reference App](/docs/reference-app)
+- [Repository Control Plane](/docs/concepts/repo-control-plane)
+

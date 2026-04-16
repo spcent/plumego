@@ -1,0 +1,48 @@
+---
+title: FAQ
+description: Common questions about Plumego’s scope, stability, boundaries, and intended use.
+translationKey: faq
+sidebar:
+  order: 8
+---
+
+# FAQ
+
+## What is Plumego trying to optimize for?
+
+Plumego optimizes for explicit HTTP services built on the standard-library model. It prefers visible route wiring, visible bootstrap code, narrow stable roots, and a repository structure that agents can classify reliably.
+
+## Is Plumego a full-stack web framework?
+
+No. Plumego is a Go HTTP toolkit with a strong opinion about explicit service structure. It does not try to hide application wiring behind framework magic.
+
+## Why keep saying “stdlib-first”?
+
+Because the request and handler shape should stay close to `net/http`. Plumego wants services to remain legible to people who already understand the Go standard library.
+
+## Where should I start?
+
+Start with:
+
+1. [Getting Started](/docs/getting-started)
+2. [Request Flow](/docs/concepts/request-flow)
+3. [Reference App](/docs/reference-app)
+
+That path is shorter and safer than scanning packages at random.
+
+## How do I decide between a stable root and `x/*`?
+
+Use stable roots for long-lived transport and kernel primitives. Use `x/*` when the work is capability-specific, faster-moving, tenant-aware, protocol-specific, or likely to expand beyond the default learning path.
+
+## Does every package already carry a v1 stability promise?
+
+No. Read [Release Posture](/docs/release-posture) and the public [Releases](/releases) page before assuming long-term compatibility.
+
+## Why is there a reference app?
+
+`reference/standard-service` provides one canonical application path. It shows how Plumego expects bootstrap, wiring, routing, and handlers to stay visible in code.
+
+## Is the repository control plane part of the product?
+
+It is part of how Plumego is meant to be used and maintained. Docs, specs, and task cards help contributors and agents classify work consistently, which is especially important for a repository with stable roots and multiple extension families.
+

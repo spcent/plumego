@@ -1,0 +1,12 @@
+---
+interface Props {
+  href: string;
+}
+
+const { href } = Astro.props;
+---
+
+<a class="site-brand" href={href} aria-label="Plumego">
+  <img src="/brand/logo-light.svg" alt="Plumego" class="brand brand--light" />
+  <img src="/brand/logo-dark.svg" alt="Plumego" class="brand brand--dark" />
+</a>

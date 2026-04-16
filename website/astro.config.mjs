@@ -11,6 +11,7 @@ export default defineConfig({
       title: 'Plumego',
       description: 'A stdlib-first Go web toolkit with clear module boundaries.',
       favicon: '/favicon.svg',
+      disable404Route: true,
       social: [
         {
           icon: 'github',
@@ -30,10 +31,17 @@ export default defineConfig({
       },
       customCss: [
         './src/styles/tokens.css',
+        './src/styles/starlight-bridge.css',
         './src/styles/global.css',
         './src/styles/prose.css',
         './src/styles/theme.css',
       ],
+      components: {
+        Head: './src/components/starlight/Head.astro',
+        Header: './src/components/starlight/Header.astro',
+        ThemeSelect: './src/components/shared/ThemeSelect.astro',
+        LanguageSelect: './src/components/shared/LanguageSelect.astro',
+      },
       sidebar: [
         {
           label: 'Documentation',

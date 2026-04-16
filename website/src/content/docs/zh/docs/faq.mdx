@@ -1,0 +1,48 @@
+---
+title: FAQ
+description: 关于 Plumego 的范围、稳定性、边界和适用方式的常见问题。
+translationKey: faq
+sidebar:
+  order: 8
+---
+
+# FAQ
+
+## Plumego 主要想优化什么？
+
+Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好可见的 route wiring、可见的 bootstrap 代码、收窄的 stable roots，以及让 agent 也能稳定分类的仓库结构。
+
+## Plumego 是一个全栈 Web 框架吗？
+
+不是。Plumego 是一个 Go HTTP 工具包，并且对显式服务结构有很强的偏好。它不试图把应用 wiring 隐藏在框架魔法后面。
+
+## 为什么一直强调 stdlib-first？
+
+因为请求和 handler 的形态应该尽量贴近 `net/http`。Plumego 希望服务对于已经理解 Go 标准库的人来说仍然是直接可读的。
+
+## 我应该从哪里开始？
+
+建议按这个顺序：
+
+1. [开始使用](/zh/docs/getting-started)
+2. [Request Flow](/zh/docs/concepts/request-flow)
+3. [参考应用](/zh/docs/reference-app)
+
+这条路径比随机扫包更短，也更稳。
+
+## 怎么判断该放到 stable root 还是 `x/*`？
+
+长期存在的 transport 和 kernel 基础能力放 stable roots。能力型、变化更快、tenant-aware、协议特定、或者会偏离默认学习路径的内容，放到 `x/*`。
+
+## 现在是不是所有包都已经具备 v1 稳定承诺？
+
+不是。先看 [发布姿态](/zh/docs/release-posture) 和公开的 [发布页](/zh/releases)，再假设长期兼容性。
+
+## 为什么需要 reference app？
+
+`reference/standard-service` 提供了一条 canonical 应用路径。它把 Plumego 期望保留可见的 bootstrap、wiring、routing 和 handler 形态落实成可检查的代码。
+
+## 仓库控制平面算产品的一部分吗？
+
+它至少是 Plumego 被使用和维护方式的一部分。Docs、specs 和 task cards 帮助贡献者与 agent 以同一套方式完成工作分类，这对一个同时拥有 stable roots 和多个扩展家族的仓库尤其重要。
+

@@ -1,5 +1,52 @@
+.sl-markdown-content {
+  font-variant-numeric: oldstyle-nums proportional-nums;
+}
+
 .sl-markdown-content :is(h1, h2, h3, h4) {
   font-family: var(--font-display);
+}
+
+.sl-markdown-content h1 {
+  margin-bottom: 0.9rem;
+  font-size: clamp(2.8rem, 5vw, 4.6rem);
+  line-height: 0.98;
+}
+
+.sl-markdown-content h2 {
+  margin-top: 2.6rem;
+  margin-bottom: 0.85rem;
+  font-size: clamp(1.9rem, 3vw, 2.75rem);
+  line-height: 1.02;
+}
+
+.sl-markdown-content h3 {
+  margin-top: 1.9rem;
+  margin-bottom: 0.6rem;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  line-height: 1.08;
+}
+
+.sl-markdown-content :is(p, li, dt, dd) {
+  font-size: 1.03rem;
+  line-height: 1.82;
+}
+
+.sl-markdown-content p {
+  max-width: 66ch;
+  text-wrap: pretty;
+}
+
+.sl-markdown-content ul,
+.sl-markdown-content ol {
+  padding-inline-start: 1.2rem;
+}
+
+.sl-markdown-content li::marker {
+  color: var(--accent-strong);
+}
+
+.sl-markdown-content li + li {
+  margin-top: 0.45rem;
 }
 
 .sl-markdown-content a {
@@ -9,4 +56,78 @@
 .sl-markdown-content code,
 .sl-markdown-content pre {
   font-family: var(--font-mono);
+}
+
+.sl-markdown-content code:not(pre code) {
+  padding: 0.18rem 0.42rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-elevated));
+  font-size: 0.92em;
+}
+
+.sl-markdown-content pre {
+  padding: 1rem 1.1rem;
+}
+
+.sl-markdown-content .expressive-code {
+  margin: 1.35rem 0 1.55rem;
+}
+
+.sl-markdown-content .expressive-code .frame {
+  border-radius: 1.15rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.sl-markdown-content .expressive-code .frame .header {
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent),
+    color-mix(in srgb, var(--bg-elevated) 95%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.sl-markdown-content .expressive-code .frame .title {
+  color: var(--fg);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sl-markdown-content .expressive-code .copy {
+  border-inline-start: 1px solid var(--line);
+}
+
+.sl-markdown-content blockquote {
+  padding: 1rem 1.2rem;
+}
+
+.sl-markdown-content table {
+  font-size: 0.96rem;
+}
+
+.sl-markdown-content th {
+  color: var(--fg);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.sl-markdown-content hr {
+  margin: 2.6rem 0;
+}
+
+@media (max-width: 720px) {
+  .sl-markdown-content :is(p, li, dt, dd) {
+    font-size: 1rem;
+  }
+
+  .sl-markdown-content h1 {
+    font-size: clamp(2.3rem, 9vw, 3.5rem);
+  }
+
+  .sl-markdown-content h2 {
+    margin-top: 2.2rem;
+  }
 }

@@ -1,0 +1,46 @@
+---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import { NOT_FOUND_COPY } from '../data/site';
+
+const copy = NOT_FOUND_COPY.en;
+const secondary = NOT_FOUND_COPY.zh;
+---
+
+<MarketingLayout
+  locale="en"
+  title={copy.title}
+  description={copy.description}
+  currentPath="/404"
+  noindex={true}
+  includeAlternates={false}
+  keywords={['plumego 404', 'page not found']}
+>
+  <section class="page-hero page-hero--error">
+    <p class="hero__eyebrow">{copy.eyebrow}</p>
+    <h1>{copy.title}</h1>
+    <p>{copy.body}</p>
+  </section>
+
+  <section class="section section--split">
+    <article class="page-panel">
+      <p class="signal-list__kicker">English</p>
+      <h2>{copy.title}</h2>
+      <p>{copy.description}</p>
+      <div class="not-found-actions">
+        {copy.actions.map((action) => (
+          <a class="button button--ghost" href={action.href}>{action.label}</a>
+        ))}
+      </div>
+    </article>
+    <article class="page-panel">
+      <p class="signal-list__kicker">简体中文</p>
+      <h2>{secondary.title}</h2>
+      <p>{secondary.description}</p>
+      <div class="not-found-actions">
+        {secondary.actions.map((action) => (
+          <a class="button button--ghost" href={action.href}>{action.label}</a>
+        ))}
+      </div>
+    </article>
+  </section>
+</MarketingLayout>

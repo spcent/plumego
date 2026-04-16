@@ -1,0 +1,31 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" rx="36" fill="#08111C"/>
+  <rect width="1200" height="630" rx="36" fill="url(#paint0_radial)"/>
+  <rect x="58" y="58" width="1084" height="514" rx="30" fill="rgba(9,18,30,0.78)" stroke="#243244"/>
+  <rect x="104" y="92" width="198" height="44" rx="22" fill="#11375A"/>
+  <path d="M151.857 106C159.665 106 166 112.335 166 120.143V120.143C166 127.951 159.665 134.286 151.857 134.286H140V117.857C140 111.308 145.308 106 151.857 106V106Z" fill="#0D8BD7"/>
+  <path d="M150.6 111.714H157.714V118.829C157.714 124.723 152.937 129.5 147.043 129.5H145.714V116.6C145.714 113.897 147.897 111.714 150.6 111.714Z" fill="#F3F7FB"/>
+  <text x="182" y="128" fill="#F3F7FB" font-family="ui-sans-serif, system-ui, sans-serif" font-size="30" font-weight="700">Plumego</text>
+  <text x="104" y="236" fill="#8FCFFF" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24" letter-spacing="0.18em">面向显式 HTTP 服务的 Go 工具包</text>
+  <text x="104" y="332" fill="#F8FBFD" font-family="Georgia, 'Times New Roman', serif" font-size="82" font-weight="700">把 HTTP 模型</text>
+  <text x="104" y="420" fill="#F8FBFD" font-family="Georgia, 'Times New Roman', serif" font-size="82" font-weight="700">保持可见。</text>
+  <text x="104" y="492" fill="#B7C3D1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="34">稳定根保持收敛，可选能力从 x/* 进入，而不是长成隐藏框架内核。</text>
+  <g opacity="0.92">
+    <rect x="792" y="162" width="250" height="88" rx="24" fill="rgba(9,18,30,0.8)" stroke="#233548"/>
+    <text x="822" y="198" fill="#8FCFFF" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" letter-spacing="0.16em">CANONICAL PATH</text>
+    <text x="822" y="234" fill="#F8FBFD" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">reference/standard-service</text>
+  </g>
+  <g opacity="0.92">
+    <rect x="824" y="284" width="218" height="144" rx="24" fill="rgba(9,18,30,0.8)" stroke="#233548"/>
+    <text x="854" y="320" fill="#8FCFFF" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" letter-spacing="0.16em">默认阅读顺序</text>
+    <text x="854" y="360" fill="#F8FBFD" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">docs → specs</text>
+    <text x="854" y="396" fill="#F8FBFD" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">→ tasks → code</text>
+  </g>
+  <defs>
+    <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1084 560) rotate(-146.62) scale(745.368 814.562)">
+      <stop stop-color="#0D8BD7" stop-opacity="0.17"/>
+      <stop offset="0.48" stop-color="#0A1725" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0A1725" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

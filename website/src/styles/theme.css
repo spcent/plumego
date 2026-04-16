@@ -23,9 +23,9 @@
 
 .topology-diagram {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: 1.75rem 1.75rem 2.5rem 1.75rem;
+  width: calc(100% - 3.5rem);
+  height: calc(100% - 4.25rem);
 }
 
 .topology-diagram__halo circle {
@@ -66,7 +66,7 @@
 
 .hero__plane {
   position: absolute;
-  inset: auto auto 2rem 2rem;
+  inset: auto auto 1.4rem 1.6rem;
   width: min(24rem, calc(100% - 4rem));
   border: 1px solid var(--line);
   border-radius: 1.4rem;
@@ -77,13 +77,13 @@
 }
 
 .hero__plane--ext {
-  inset: 3rem 2rem auto auto;
+  inset: 2.6rem 1.6rem auto auto;
   animation-delay: 140ms;
 }
 
 .hero__legend {
   position: absolute;
-  inset: auto 2rem 2rem auto;
+  inset: auto 1.75rem 1.2rem auto;
   width: min(18rem, calc(100% - 4rem));
   border-top: 1px solid var(--line);
   padding-top: 0.9rem;
@@ -146,5 +146,25 @@
   .page-hero,
   .page-grid {
     animation: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .topology-diagram {
+    inset: 1rem;
+    width: calc(100% - 2rem);
+    height: calc(100% - 2rem);
+  }
+
+  .hero__plane {
+    inset: auto auto 1rem 1rem;
+  }
+
+  .hero__plane--ext {
+    inset: 1rem 1rem auto auto;
+  }
+
+  .hero__legend {
+    inset: auto 1rem 1rem auto;
   }
 }

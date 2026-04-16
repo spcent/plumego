@@ -1,0 +1,86 @@
+---
+import { SITE } from '../../data/site';
+import { localeFromPath } from '../../lib/i18n';
+import { buildMarketingSeo } from '../../lib/seo';
+
+const { starlightRoute } = Astro.locals;
+const locale = localeFromPath(Astro.url.pathname);
+const pageTitle = `${starlightRoute.entry.data.title} · ${SITE.name}`;
+const description = starlightRoute.entry.data.description || 'Plumego documentation.';
+const seo = buildMarketingSeo({
+  title: pageTitle,
+  description,
+  currentPath: Astro.url.pathname,
+  locale,
+  type: 'article',
+});
+
+const filteredHead = starlightRoute.head.filter((entry) => {
+  if (entry.tag === 'title') return false;
+
+  if (entry.tag === 'meta') {
+    const name = typeof entry.attrs?.name === 'string' ? entry.attrs.name : '';
+    const property = typeof entry.attrs?.property === 'string' ? entry.attrs.property : '';
+    if (
+      name === 'viewport' ||
+      name === 'description' ||
+      name === 'generator' ||
+      name === 'twitter:card' ||
+      name === 'twitter:title' ||
+      name === 'twitter:description' ||
+      name === 'twitter:image' ||
+      property === 'og:title' ||
+      property === 'og:type' ||
+      property === 'og:url' ||
+      property === 'og:locale' ||
+      property === 'og:locale:alternate' ||
+      property === 'og:description' ||
+      property === 'og:site_name' ||
+      property === 'og:image' ||
+      property === 'og:image:alt'
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  if (entry.tag === 'link') {
+    const rel = typeof entry.attrs?.rel === 'string' ? entry.attrs.rel : '';
+    if (rel === 'canonical' || rel === 'alternate' || rel === 'shortcut icon' || rel === 'sitemap') {
+      return false;
+    }
+  }
+
+  return true;
+});
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{pageTitle}</title>
+<meta name="description" content={description} />
+<meta name="robots" content={seo.robots} />
+<meta name="generator" content={Astro.generator} />
+<meta name="generator" content="Starlight" />
+<meta name="theme-color" content="#08111c" />
+<link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="canonical" href={seo.canonicalUrl} />
+<link rel="alternate" href="https://plumego.dev/" hreflang="x-default" />
+<link rel="alternate" href={`${seo.siteOrigin}${seo.canonicalPath}`} hreflang="en" />
+<link rel="alternate" href={`${seo.siteOrigin}${seo.zhPath}`} hreflang="zh" />
+<link rel="sitemap" href="/sitemap-index.xml" />
+<meta property="og:site_name" content={SITE.name} />
+<meta property="og:type" content={seo.type} />
+<meta property="og:title" content={pageTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={seo.canonicalUrl} />
+<meta property="og:image" content={seo.imageUrl} />
+<meta property="og:image:alt" content={description} />
+<meta property="og:locale" content={seo.ogLocale} />
+<meta property="og:locale:alternate" content={seo.alternateLocale} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={pageTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={seo.imageUrl} />
+
+{filteredHead.map(({ tag: Tag, attrs, content }) => <Tag {...attrs} set:html={content} />)}

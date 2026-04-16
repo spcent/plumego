@@ -1,0 +1,64 @@
+---
+title: Repository Control Plane
+description: Plumego 把 docs、specs 和 task cards 分开维护，让人和 agent 都能稳定地分类工作。
+translationKey: repo-control-plane
+sidebar:
+  order: 7
+---
+
+# Repository Control Plane
+
+Plumego 不只是一些 Go 包。它还维护了一层仓库控制平面，用来告诉人和 agent 在改代码前应该如何先完成工作分类。
+
+## 三个表面
+
+### Docs
+
+Docs 面向人解释意图。它负责说明 canonical path、模块边界、发布姿态，以及进入仓库的默认方式。
+
+### Specs
+
+Specs 提供机器可读的路由和边界定义。它回答这类问题：
+
+- 某类改动应该由哪个模块负责
+- 允许哪些依赖关系
+- 哪些包家族是主入口
+
+### Tasks
+
+Task cards 和 milestones 把工作变成显式执行单元。它们定义 scope、validation、done definition 和顺序。
+
+## 为什么要分开
+
+单独一层通常都不够：
+
+- 只有 docs，对自动化来说太松
+- 只有 specs，对 onboarding 和 review 来说太硬
+- 只有 tasks，又解释不了它依赖的架构意图
+
+正因为这三层彼此补位又不混成一层，Plumego 的仓库才更容易理解。
+
+## 这对贡献者意味着什么
+
+在改代码前，先分类：
+
+1. 这个改动由哪个 stable root 或 `x/*` 家族负责？
+2. 哪些 canonical docs 描述了预期路径？
+3. 哪个 spec 或 task card 约束这次改动？
+
+这套顺序可以减少搜索半径，也让改动保持小而可逆。
+
+## 这页不是什么
+
+- 不是 package 级文档的替代品
+- 不是跳过 module manifest 的理由
+- 也不是说所有仓库规则都已经永远稳定
+
+它只是让 Plumego 保持 agent-friendly 和可评审的工作模型。
+
+## 建议和这些页面一起读
+
+- [Request Flow](/zh/docs/concepts/request-flow)
+- [模块总览](/zh/docs/modules/overview)
+- [发布姿态](/zh/docs/release-posture)
+

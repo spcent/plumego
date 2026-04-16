@@ -12,22 +12,52 @@ import DocsStartHereCards from '../../../components/docs/DocsStartHereCards.astr
 
 # Documentation
 
-Plumego is a stdlib-first Go web toolkit for explicit HTTP services. The recommended way to approach the repository is to start with the canonical reference path, then move outward into module boundaries and extension families.
+<div class="docs-home-intro">
+  <p class="docs-home-intro__lead">
+    Plumego is a stdlib-first Go web toolkit for explicit HTTP services. The shortest way into the repository is to start with the canonical reference path, then move outward into boundaries and extension families only when you need them.
+  </p>
+  <p class="docs-home-intro__support">
+    This docs home is meant to feel like an entry portal, not a marketing splash. Start with the recommended path, build the concept layer first, inspect the synced repository facts, and only then branch into the module surface.
+  </p>
+</div>
 
-## Recommended reading path
+<div class="docs-home-stack not-content">
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
+      <p class="signal-list__kicker">canonical path</p>
+      <h2>Recommended reading path</h2>
+      <p>Follow the smallest path that builds a usable mental model before you classify deeper repository work.</p>
+    </div>
+    <DocsReadingPath />
+  </section>
 
-<DocsReadingPath />
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
+      <p class="signal-list__kicker">synced facts</p>
+      <h2>Repository summary</h2>
+      <p>These numbers and summaries are pulled from repository sources during the prebuild sync step instead of being maintained as a docs-only duplicate.</p>
+    </div>
+    <DocsPortalSummary />
+  </section>
 
-## Synced repository summary
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
+      <p class="signal-list__kicker">entry points</p>
+      <h2>Start here</h2>
+      <p>Use these entry cards when you already know the kind of question you need answered and want the shortest path to the right page.</p>
+    </div>
+    <DocsStartHereCards />
+  </section>
+</div>
 
-<DocsPortalSummary />
-
-## Start here
-
-<DocsStartHereCards />
-
-## What this docs site covers
-
-- the canonical application path
-- module boundaries and repository shape
-- release posture and current compatibility expectations
+<div class="docs-home-coverage not-content">
+  <p class="signal-list__kicker">coverage</p>
+  <h2>What this docs site covers</h2>
+  <ul>
+    <li>the request path and repository control plane</li>
+    <li>the canonical application path</li>
+    <li>module boundaries and repository shape</li>
+    <li>release posture and current compatibility expectations</li>
+    <li>high-frequency questions about scope, stability, and intended use</li>
+  </ul>
+</div>

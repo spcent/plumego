@@ -1,0 +1,64 @@
+---
+title: Repository Control Plane
+description: Plumego keeps docs, specs, and task cards separate so humans and agents can classify work consistently.
+translationKey: repo-control-plane
+sidebar:
+  order: 7
+---
+
+# Repository Control Plane
+
+Plumego is not only a set of Go packages. It also maintains a repository control plane that tells humans and agents how to classify work before they start editing code.
+
+## The three surfaces
+
+### Docs
+
+Docs explain intent for humans. They describe the canonical path, module boundaries, release posture, and the default way to navigate the repository.
+
+### Specs
+
+Specs provide machine-readable routing and boundary definitions. They answer questions like:
+
+- which module owns a kind of change
+- which dependencies are allowed
+- which package families are primary entrypoints
+
+### Tasks
+
+Task cards and milestones turn work into explicit execution units. They define scope, validation, done definition, and sequencing.
+
+## Why Plumego separates them
+
+One layer is rarely enough:
+
+- docs alone are too loose for reliable automation
+- specs alone are too dry for onboarding and review
+- tasks alone do not explain the architecture they rely on
+
+The repository stays understandable because these three surfaces reinforce each other without collapsing into one file or one workflow.
+
+## What this means for contributors
+
+Before changing code, classify the work:
+
+1. Which stable root or `x/*` family owns it?
+2. Which canonical docs describe the intended path?
+3. Which spec or task card constrains the change?
+
+That sequence reduces search radius and keeps changes small and reversible.
+
+## What this page is not
+
+- not a replacement for package-level docs
+- not a license to skip module manifests
+- not a promise that every repo rule is already stable forever
+
+It is the working model that keeps Plumego agent-friendly and reviewable.
+
+## Read this page with
+
+- [Request Flow](/docs/concepts/request-flow)
+- [Modules Overview](/docs/modules/overview)
+- [Release Posture](/docs/release-posture)
+

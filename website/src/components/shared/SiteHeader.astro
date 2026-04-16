@@ -1,0 +1,46 @@
+---
+import { NAV_LINKS, type Locale } from '../../data/site';
+import { localeFromPath } from '../../lib/i18n';
+import LanguageSelect from './LanguageSelect.astro';
+import SiteBrand from './SiteBrand.astro';
+import ThemeSelect from './ThemeSelect.astro';
+
+interface Props {
+  currentPath?: string;
+  locale?: Locale;
+  variant?: 'marketing' | 'docs';
+}
+
+const currentPath = Astro.props.currentPath ?? Astro.url.pathname;
+const locale = Astro.props.locale ?? localeFromPath(currentPath);
+const variant = Astro.props.variant ?? 'marketing';
+const nav = NAV_LINKS[locale];
+
+const isCurrent = (href: string) => {
+  if (href.startsWith('http')) return false;
+  if (href === '/' || href === '/zh') return currentPath === href;
+  return currentPath === href || currentPath.startsWith(`${href}/`);
+};
+---
+
+<header class:list={['site-header', variant === 'docs' && 'site-header--docs']}>
+  <div class="site-header__leading">
+    <SiteBrand href={locale === 'zh' ? '/zh' : '/'} />
+  </div>
+  <nav class="site-header__nav" aria-label={locale === 'zh' ? '主导航' : 'Primary'}>
+    {nav.map((link) => (
+      <a
+        href={link.href}
+        aria-current={isCurrent(link.href) ? 'page' : undefined}
+        target={link.href.startsWith('http') ? '_blank' : undefined}
+        rel={link.href.startsWith('http') ? 'noreferrer' : undefined}
+      >
+        {link.label}
+      </a>
+    ))}
+  </nav>
+  <div class="site-header__tools" data-tools-root={variant}>
+    <ThemeSelect />
+    <LanguageSelect />
+  </div>
+</header>

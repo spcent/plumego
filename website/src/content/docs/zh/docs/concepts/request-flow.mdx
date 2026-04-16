@@ -1,0 +1,51 @@
+---
+title: Request Flow
+description: Plumego 的 canonical HTTP 请求路径会从路由注册到响应写出保持显式可见。
+translationKey: request-flow
+sidebar:
+  order: 4
+---
+
+# Request Flow
+
+Plumego 有意让 HTTP 请求路径保持可见。一个请求应该可以从路由注册、到 handler 逻辑、再到最终写回路径被清楚追踪，而不是被隐藏注册表或框架内部控制流吞掉。
+
+## Canonical 路径
+
+1. 在 `reference/standard-service/internal/app/routes.go` 里显式注册路由。
+2. router 按 method 和 path 完成匹配，再把请求交给标准库形态的 handler。
+3. 可以有 transport-only middleware 包裹 handler，但不应该把业务 wiring 藏起来。
+4. handler 负责解码输入、调用显式的应用代码，并通过 canonical 的 transport 路径写出成功或错误响应。
+
+## 哪些东西应该保持可见
+
+- 路由归属
+- handler 形态
+- 请求解码
+- 通过应用 wiring 完成的依赖注入
+- 成功与错误的写回路径
+
+## Plumego 刻意避免什么
+
+- 通过 `init()` 做隐藏 handler 注册
+- 从请求上下文里做框架式 service lookup
+- 只为单个功能准备的响应 helper 家族
+- 在 middleware 里偷偷拼业务 DTO 或注入服务
+
+## 为什么这件事重要
+
+当请求路径是可见的，维护者或 agent 能更快回答最基础的评审问题：
+
+- 这个 endpoint 在哪里注册
+- 它前面经过了哪些 middleware
+- 依赖在哪里 wiring
+- 响应形态由哪个包负责
+
+这就是 Plumego 优先优化的基线。
+
+## 建议和这些页面一起读
+
+- [开始使用](/zh/docs/getting-started)
+- [参考应用](/zh/docs/reference-app)
+- [仓库控制平面](/zh/docs/concepts/repo-control-plane)
+

@@ -5,7 +5,7 @@ This directory contains the official Plumego website.
 ## Goals
 
 - fully static output
-- deployable to Cloudflare Workers Static Assets
+- deployable to Cloudflare Pages
 - Markdown/MDX-first publishing workflow
 - bilingual support for English and Chinese
 - shared light/dark theme across marketing pages and docs
@@ -15,7 +15,7 @@ This directory contains the official Plumego website.
 - Astro
 - Starlight
 - MDX
-- Cloudflare Workers Static Assets
+- Cloudflare Pages
 
 ## URL Strategy
 
@@ -79,6 +79,100 @@ Build output is emitted to `dist/`.
 Deploy target:
 
 - Cloudflare Pages
+
+## Release Architecture
+
+The website is split into two page families:
+
+- marketing pages under `src/pages/**`
+- documentation pages under `src/content/docs/**`
+
+### Published navigation
+
+Header navigation for the release-ready site is intentionally narrow:
+
+- Docs
+- Roadmap
+- Releases
+- GitHub
+
+Footer navigation is slightly broader and is used for task-oriented entry points:
+
+- Docs
+- Getting Started
+- Reference App
+- Use Cases
+- Examples
+- Roadmap
+- Releases
+- GitHub
+
+### Page responsibilities
+
+- `/` and `/zh`
+  - marketing landing pages
+  - explain positioning, value, canonical path, and primary CTA
+- `/docs` and `/zh/docs`
+  - documentation entry portals
+  - route readers into the recommended learning path and synced repo facts
+- `/docs/getting-started`
+  - first-run path only
+  - should answer “how do I successfully start?”
+- `/docs/reference-app`
+  - canonical application layout
+  - should answer “where do I copy the default service shape from?”
+- `/docs/modules/overview`, `/docs/stable-roots`, `/docs/x-family`
+  - ownership and boundary pages
+  - should answer “where does a change belong?”
+- `/docs/release-posture`
+  - compatibility and maturity framing
+  - should answer “how stable is this surface?”
+- `/roadmap`
+  - repository direction and explicit non-goals
+- `/releases`
+  - current version and support posture
+
+### Release sitemap
+
+Current published routes:
+
+- `/`
+- `/docs`
+- `/docs/getting-started`
+- `/docs/reference-app`
+- `/docs/modules/overview`
+- `/docs/stable-roots`
+- `/docs/x-family`
+- `/docs/release-posture`
+- `/roadmap`
+- `/releases`
+- `/use-cases`
+- `/examples`
+- `/404`
+- `/zh`
+- `/zh/docs`
+- `/zh/docs/getting-started`
+- `/zh/docs/reference-app`
+- `/zh/docs/modules/overview`
+- `/zh/docs/stable-roots`
+- `/zh/docs/x-family`
+- `/zh/docs/release-posture`
+- `/zh/roadmap`
+- `/zh/releases`
+- `/zh/use-cases`
+- `/zh/examples`
+- `/docs/concepts/request-flow`
+- `/docs/concepts/repo-control-plane`
+- `/docs/faq`
+- `/zh/docs/concepts/request-flow`
+- `/zh/docs/concepts/repo-control-plane`
+- `/zh/docs/faq`
+
+Release-completion support pages:
+
+- `/404`
+- locale-aware canonical and Open Graph metadata on marketing pages
+- shared OG assets under `public/brand/**`
 
 ### Pages deployment shape
 
@@ -189,22 +283,24 @@ After the project is live, review these settings in the dashboard:
 
 If preview URLs should not be public, protect them with Cloudflare Access from the Pages project settings.
 
-## Initial Scope
+## Release Readiness Scope
 
-Phase 1 includes:
+Currently shipped:
 
 - home page
 - docs landing page
 - getting started
 - reference app
 - modules overview
+- stable roots
+- x/* family
+- release posture
 - roadmap
 - releases
 
-Out of scope for Phase 1:
+Required before release-ready status:
 
-- blog
-- SSR search
-- playground
-- account features
-- API explorer
+- concept-layer docs pages
+- FAQ / use-case / examples pages
+- final 404 and share-preview polish
+- one full content pass for both English and Chinese

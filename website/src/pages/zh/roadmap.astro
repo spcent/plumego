@@ -8,23 +8,60 @@ const copy = ROADMAP_COPY.zh;
 
 <MarketingLayout locale="zh" title={copy.title} description={copy.description} currentPath="/zh/roadmap">
   <section class="page-hero">
-    <p class="hero__eyebrow">Repository Direction</p>
+    <p class="hero__eyebrow">{copy.eyebrow}</p>
     <h1>{copy.title}</h1>
     <p>{copy.description}</p>
   </section>
-  <section class="page-grid">
-    {[
-      { title: '当前基线', items: ROADMAP_FACTS.currentBaseline },
-      { title: '进行中', items: ROADMAP_FACTS.inProgress },
-      { title: '计划中', items: ROADMAP_FACTS.planned },
-      { title: '建议执行顺序', items: ROADMAP_FACTS.suggestedExecutionOrder },
-    ].map((section) => (
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>{copy.introTitle}</h2>
+      <p>{copy.introBody}</p>
+    </div>
+    <div class="signal-list">
+      {copy.guideCards.map((item) => (
+        <article class="signal-list__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>{copy.timelineTitle}</h2>
+      <p>{copy.timelineBody}</p>
+    </div>
+    <div class="page-grid">
+      {[
+        { title: copy.sections[0].title, items: ROADMAP_FACTS.currentBaseline },
+        { title: copy.sections[1].title, items: ROADMAP_FACTS.inProgress },
+        { title: copy.sections[2].title, items: ROADMAP_FACTS.planned },
+        { title: copy.sections[3].title, items: copy.sections[3].items },
+      ].map((section) => (
+        <article class="page-panel">
+          <h2>{section.title}</h2>
+          <ul>
+            {section.items.map((item) => <li>{item}</li>)}
+          </ul>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>{copy.orderTitle}</h2>
+      <p>{copy.orderBody}</p>
+    </div>
+    <div class="fact-stack">
       <article class="page-panel">
-        <h2>{section.title}</h2>
         <ul>
-          {section.items.map((item) => <li>{item}</li>)}
+          {ROADMAP_FACTS.suggestedExecutionOrder.map((item) => <li>{item}</li>)}
         </ul>
       </article>
-    ))}
+    </div>
   </section>
 </MarketingLayout>
