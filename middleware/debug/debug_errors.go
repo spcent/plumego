@@ -195,8 +195,8 @@ func shouldReplaceError(header http.Header, body []byte) bool {
 }
 
 func debugErrorPayload(status int, r *http.Request, cfg DebugErrorConfig, body []byte) contract.APIError {
-	message := http.StatusText(status)
-	code := strings.ToLower(strings.ReplaceAll(message, " ", "_"))
+	message := strings.ToLower(http.StatusText(status))
+	code := strings.ReplaceAll(message, " ", "_")
 	category := contract.CategoryClient
 	if status >= http.StatusInternalServerError {
 		category = contract.CategoryServer

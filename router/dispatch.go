@@ -47,7 +47,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Allow", strings.Join(allowed, ", "))
 				_ = contract.WriteError(w, req, contract.NewErrorBuilder().
 					Type(contract.TypeMethodNotAllowed).
-					Message(http.StatusText(http.StatusMethodNotAllowed)).
+					Message("method not allowed").
 					Build())
 				return
 			}

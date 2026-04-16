@@ -145,7 +145,7 @@ func webhookListTargets(w http.ResponseWriter, r *http.Request, svc *Service) {
 func webhookGetTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	if strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Code(contract.CodeBadRequest).Message("id is required").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Message("id is required").Build())
 		return
 	}
 
@@ -161,7 +161,7 @@ func webhookGetTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 func webhookPatchTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	if strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Code(contract.CodeBadRequest).Message("id is required").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Message("id is required").Build())
 		return
 	}
 
@@ -183,7 +183,7 @@ func webhookPatchTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 func webhookSetTargetEnabled(w http.ResponseWriter, r *http.Request, svc *Service, enable bool) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	if strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Code(contract.CodeBadRequest).Message("id is required").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Message("id is required").Build())
 		return
 	}
 
@@ -203,7 +203,7 @@ func webhookSetTargetEnabled(w http.ResponseWriter, r *http.Request, svc *Servic
 func webhookTriggerEvent(w http.ResponseWriter, r *http.Request, svc *Service, token string, allowEmpty bool) {
 	event := contract.RequestContextFromContext(r.Context()).Params["event"]
 	if strings.TrimSpace(event) == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Code(contract.CodeBadRequest).Message("event is required").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Message("event is required").Build())
 		return
 	}
 
@@ -323,7 +323,7 @@ func webhookListDeliveries(w http.ResponseWriter, r *http.Request, svc *Service,
 func webhookGetDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	if strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Code(contract.CodeBadRequest).Message("id is required").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Message("id is required").Build())
 		return
 	}
 
@@ -356,7 +356,7 @@ func webhookGetDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
 func webhookReplayDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	if strings.TrimSpace(id) == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Code(contract.CodeBadRequest).Message("id is required").Build())
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeRequired).Message("id is required").Build())
 		return
 	}
 
