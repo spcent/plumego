@@ -65,7 +65,7 @@ All are wrapped at route registration time with `adaptCtx(func(ctx *contract.Ctx
 ## Tests
 
 ```bash
-rg -n 'adaptCtx\|contract\.Ctx' x/webhook -g '*.go'
+rg -n 'adaptCtx|contract\.Ctx' x/webhook -g '*.go'
 go test -timeout 20s ./x/webhook/...
 go vet ./x/webhook/...
 ```
@@ -77,7 +77,7 @@ go vet ./x/webhook/...
 
 ## Done Definition
 
-- `rg 'adaptCtx\|contract\.Ctx' x/webhook -g '*.go'` returns no results.
+- `rg 'adaptCtx|contract\.Ctx' x/webhook -g '*.go'` returns no results.
 - `x/webhook/ctx_adapter.go` no longer exists.
 - All webhook handler functions accept `(w http.ResponseWriter, r *http.Request)`.
 - All `contract.WriteError` calls in in.go and out.go use `_ =` prefix.

@@ -82,7 +82,7 @@ teaching surface of the old pattern.
 ## Tests
 
 ```bash
-rg -n 'adaptCtx\|contract\.Ctx' x/devtools/pubsubdebug cmd/plumego/internal/devserver -g '*.go'
+rg -n 'adaptCtx|contract\.Ctx' x/devtools/pubsubdebug cmd/plumego/internal/devserver -g '*.go'
 go test -timeout 20s ./x/devtools/... ./cmd/plumego/...
 go vet ./x/devtools/... ./cmd/plumego/...
 ```
@@ -91,7 +91,7 @@ After all adaptCtx migration cards (0974–0976) are complete, run the full
 codebase check:
 
 ```bash
-rg -rn 'adaptCtx\|func.*ctx \*contract\.Ctx' --include='*.go' .
+rg -rn 'adaptCtx|func.*ctx \*contract\.Ctx' --include='*.go' .
 go test -timeout 30s ./...
 go vet ./...
 ```
@@ -103,7 +103,7 @@ go vet ./...
 
 ## Done Definition
 
-- `rg 'adaptCtx\|contract\.Ctx' x/devtools/pubsubdebug cmd/plumego/internal/devserver -g '*.go'`
+- `rg 'adaptCtx|contract\.Ctx' x/devtools/pubsubdebug cmd/plumego/internal/devserver -g '*.go'`
   returns no results.
 - `x/devtools/pubsubdebug/ctx_adapter.go` no longer exists.
 - All devtools and devserver tests pass; `go vet` is clean.

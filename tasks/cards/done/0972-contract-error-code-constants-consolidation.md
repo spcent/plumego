@@ -74,7 +74,7 @@ place but the string is scattered and can drift independently.
 ## Tests
 
 ```bash
-rg -n '"METHOD_NOT_ALLOWED"\|"BAD_GATEWAY"\|"INVALID_REQUEST"\|"SERVICE_UNAVAILABLE"' \
+rg -n '"METHOD_NOT_ALLOWED"|"BAD_GATEWAY"|"INVALID_REQUEST"|"SERVICE_UNAVAILABLE"' \
   router x/ai x/pubsub x/websocket x/scheduler x/gateway x/messaging -g '*.go' \
   --glob '!*_test.go'
 go test -timeout 20s ./contract/... ./router/... ./x/ai/... ./x/pubsub/... ./x/websocket/... ./x/scheduler/... ./x/gateway/... ./x/messaging/...

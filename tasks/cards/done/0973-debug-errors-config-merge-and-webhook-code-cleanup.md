@@ -94,7 +94,7 @@ const (
 ## Tests
 
 ```bash
-rg -n '"missing_secret"\|"invalid_signature"\|"publish_failed"' x/webhook/in.go
+rg -n '"missing_secret"|"invalid_signature"|"publish_failed"' x/webhook/in.go
 go test -timeout 20s ./middleware/debug/... ./x/webhook/...
 go vet ./middleware/debug/... ./x/webhook/...
 ```

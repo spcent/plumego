@@ -63,7 +63,7 @@ from the stable layer; keeping it in `x/ops` means:
 ## Tests
 
 ```bash
-rg -n 'adaptCtx\|contract\.Ctx' x/ops -g '*.go'
+rg -n 'adaptCtx|contract\.Ctx' x/ops -g '*.go'
 go test -timeout 20s ./x/ops/...
 go vet ./x/ops/...
 ```
@@ -75,7 +75,7 @@ go vet ./x/ops/...
 
 ## Done Definition
 
-- `rg 'adaptCtx\|contract\.Ctx' x/ops -g '*.go'` returns no results.
+- `rg 'adaptCtx|contract\.Ctx' x/ops -g '*.go'` returns no results.
 - All six handlers accept `(w http.ResponseWriter, r *http.Request)`.
 - All `contract.WriteError` calls in ops.go use `_ =` prefix.
 - `x/ops` tests pass; `go vet` is clean.

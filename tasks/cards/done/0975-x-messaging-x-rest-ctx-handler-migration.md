@@ -82,7 +82,7 @@ unnecessary parallel surface.
 ## Tests
 
 ```bash
-rg -n 'adaptCtx\|contract\.Ctx\|ContextResourceController\|RegisterContextRoutes\|\.IndexCtx\|\.ShowCtx\|\.CreateCtx\|\.UpdateCtx\|\.DeleteCtx\|\.PatchCtx\|\.BatchCreateCtx\|\.BatchDeleteCtx' x/messaging x/rest -g '*.go'
+rg -n 'adaptCtx|contract\.Ctx|ContextResourceController|RegisterContextRoutes|\.IndexCtx|\.ShowCtx|\.CreateCtx|\.UpdateCtx|\.DeleteCtx|\.PatchCtx|\.BatchCreateCtx|\.BatchDeleteCtx' x/messaging x/rest -g '*.go'
 go test -timeout 20s ./x/messaging/... ./x/rest/...
 go vet ./x/messaging/... ./x/rest/...
 ```
@@ -96,7 +96,7 @@ go vet ./x/messaging/... ./x/rest/...
 
 ## Done Definition
 
-- `rg 'adaptCtx\|contract\.Ctx' x/messaging x/rest -g '*.go'` returns no
+- `rg 'adaptCtx|contract\.Ctx' x/messaging x/rest -g '*.go'` returns no
   results.
 - `ContextResourceController`, `BaseContextResourceController`, and all `*Ctx`
   method names are absent from x/rest source.

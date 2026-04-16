@@ -107,8 +107,8 @@ exists as an exact match.
 ## Tests
 
 ```bash
-rg -n 'writeJSON\|writeError\|writeMetadataError\|http\.StatusText' x/fileapi -g '*.go'
-rg -n '"invalid_json"\|"%s_not_found"\|"create_%s_failed"\|"update_%s_failed"\|"delete_%s_failed"' cmd/plumego/internal/codegen -g '*.go'
+rg -n 'writeJSON|writeError|writeMetadataError|http\.StatusText' x/fileapi -g '*.go'
+rg -n '"invalid_json"|"%s_not_found"|"create_%s_failed"|"update_%s_failed"|"delete_%s_failed"' cmd/plumego/internal/codegen -g '*.go'
 go test -timeout 20s ./x/fileapi/... ./cmd/plumego/internal/codegen/...
 go vet ./x/fileapi/... ./cmd/plumego/internal/codegen/...
 ```
