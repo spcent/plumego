@@ -1,0 +1,36 @@
+---
+title: 稳定根
+description: 构成 Plumego 默认学习路径的长期公开包。
+translationKey: stable-roots
+sidebar:
+  order: 5
+---
+
+import GeneratedStableRootFacts from '../../../../components/docs/GeneratedStableRootFacts.astro';
+
+# 稳定根
+
+稳定根是仓库根部那些长期公开的包。它们定义了 Plumego 的默认学习路径，也承接 v1 兼容性承诺中最核心的部分。
+
+## 同步稳定根事实
+
+<GeneratedStableRootFacts locale="zh" />
+
+## 这里应该放什么
+
+- 应用内核与生命周期
+- 路由结构与匹配原语
+- transport contract 与响应辅助
+- transport-only 中间件
+- 安全原语与基础存储抽象
+
+## 这里不该放什么
+
+- 产品特定功能逻辑
+- tenant-aware 策略分支
+- 协议家族目录
+- 前端、AI、数据拓扑或网关等可选能力
+
+## 工作规则
+
+如果某个改动会迫使稳定根学习扩展层语义，就应该把行为移动到对应的 `x/*` 家族。

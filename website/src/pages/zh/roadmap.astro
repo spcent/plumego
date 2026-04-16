@@ -1,0 +1,30 @@
+---
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import { ROADMAP_COPY } from '../../data/site';
+import { ROADMAP_FACTS } from '../../generated/roadmap';
+
+const copy = ROADMAP_COPY.zh;
+---
+
+<MarketingLayout locale="zh" title={copy.title} description={copy.description} currentPath="/zh/roadmap">
+  <section class="page-hero">
+    <p class="hero__eyebrow">Repository Direction</p>
+    <h1>{copy.title}</h1>
+    <p>{copy.description}</p>
+  </section>
+  <section class="page-grid">
+    {[
+      { title: '当前基线', items: ROADMAP_FACTS.currentBaseline },
+      { title: '进行中', items: ROADMAP_FACTS.inProgress },
+      { title: '计划中', items: ROADMAP_FACTS.planned },
+      { title: '建议执行顺序', items: ROADMAP_FACTS.suggestedExecutionOrder },
+    ].map((section) => (
+      <article class="page-panel">
+        <h2>{section.title}</h2>
+        <ul>
+          {section.items.map((item) => <li>{item}</li>)}
+        </ul>
+      </article>
+    ))}
+  </section>
+</MarketingLayout>

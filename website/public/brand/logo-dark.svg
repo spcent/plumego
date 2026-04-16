@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 84" role="img" aria-labelledby="title">
+  <title>Plumego</title>
+  <rect width="56" height="56" rx="14" fill="#46b7ff"/>
+  <path d="M14 37c0-14 9-23 19-23 10 0 19 8 19 19 0 12-9 20-21 20H23V37h8c6 0 10-5 10-10s-4-9-9-9c-5 0-8 3-8 8v27H14V37Z" fill="#0c1116" transform="translate(7 7)"/>
+  <text x="78" y="53" fill="#eef2f6" font-size="36" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="700">Plumego</text>
+</svg>

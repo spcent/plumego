@@ -1,0 +1,65 @@
+---
+interface Props {
+  stableRoots: readonly string[];
+  extensions: readonly string[];
+}
+
+const { stableRoots, extensions } = Astro.props as Props;
+
+const stableNodes: string[] = [...stableRoots].slice(0, 6);
+const extensionNodes: string[] = [...extensions].slice(0, 6);
+---
+
+<svg class="topology-diagram" viewBox="0 0 760 560" aria-hidden="true">
+  <defs>
+    <linearGradient id="plumegoPulse" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="var(--accent-strong)" stop-opacity="0.25" />
+    </linearGradient>
+  </defs>
+
+  <g class="topology-diagram__halo">
+    <circle cx="380" cy="218" r="106" />
+    <circle cx="380" cy="218" r="172" />
+  </g>
+
+  <g class="topology-diagram__links">
+    {stableNodes.map((_, index) => (
+      <line x1="310" y1="218" x2="150" y2={108 + index * 58} />
+    ))}
+    {extensionNodes.map((_, index) => (
+      <line x1="450" y1="218" x2="610" y2={108 + index * 58} />
+    ))}
+    <line x1="380" y1="290" x2="380" y2="398" />
+  </g>
+
+  <g class="topology-diagram__kernel">
+    <circle cx="380" cy="218" r="78" />
+    <text x="380" y="204">stdlib first</text>
+    <text x="380" y="238">net/http</text>
+  </g>
+
+  <g class="topology-diagram__lane">
+    <rect x="290" y="398" width="180" height="96" rx="20" />
+    <text x="380" y="430">control plane</text>
+    <text x="380" y="456">docs → specs → tasks</text>
+  </g>
+
+  <g class="topology-diagram__labels topology-diagram__labels--stable">
+    {stableNodes.map((node, index) => (
+      <>
+        <rect x="42" y={86 + index * 58} width="166" height="34" rx="17" />
+        <text x="125" y={107 + index * 58}>{node}</text>
+      </>
+    ))}
+  </g>
+
+  <g class="topology-diagram__labels topology-diagram__labels--extension">
+    {extensionNodes.map((node, index) => (
+      <>
+        <rect x="552" y={86 + index * 58} width="166" height="34" rx="17" />
+        <text x="635" y={107 + index * 58}>{node}</text>
+      </>
+    ))}
+  </g>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title>Plumego</title>
+  <rect width="128" height="128" rx="28" fill="#0d8bd7"/>
+  <path d="M32 82c0-23 14-38 32-38 17 0 32 13 32 32 0 20-15 34-35 34H46V82h15c10 0 17-8 17-18 0-9-7-16-16-16-8 0-14 6-14 15v47H32V82Z" fill="#f6f0e7"/>
+</svg>

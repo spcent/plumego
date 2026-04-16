@@ -1,0 +1,27 @@
+---
+const { copy } = Astro.props;
+---
+
+<section class="section section--map">
+  <div class="section__intro">
+    <h2>{copy.mapTitle}</h2>
+    <p>{copy.mapLead}</p>
+  </div>
+  <div class="module-map">
+    <div>
+      <h3>{copy.mapPanels.stable.title}</h3>
+      <p>{copy.mapPanels.stable.caption}</p>
+      <ul>
+        {copy.stableRoots.map((item: string) => <li>{item}</li>)}
+      </ul>
+    </div>
+    <div>
+      <h3>{copy.mapPanels.extension.title}</h3>
+      <p>{copy.mapPanels.extension.caption}</p>
+      <ul>
+        {copy.extensions.map((item: string) => <li>{item}</li>)}
+      </ul>
+    </div>
+  </div>
+  <p class="section__footnote">{copy.mapPanels.footer}</p>
+</section>

@@ -1,0 +1,28 @@
+:root {
+  --bg: #f6f0e7;
+  --bg-elevated: rgba(255, 255, 255, 0.72);
+  --bg-strong: #e7dcc9;
+  --fg: #151515;
+  --fg-soft: #4a4a46;
+  --line: rgba(21, 21, 21, 0.12);
+  --accent: #0d8bd7;
+  --accent-strong: #0a5a8d;
+  --accent-soft: rgba(13, 139, 215, 0.16);
+  --shadow: 0 24px 80px rgba(14, 18, 24, 0.08);
+  --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --font-mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0c1116;
+  --bg-elevated: rgba(15, 23, 32, 0.72);
+  --bg-strong: #111a23;
+  --fg: #eef2f6;
+  --fg-soft: #98a6b4;
+  --line: rgba(238, 242, 246, 0.12);
+  --accent: #46b7ff;
+  --accent-strong: #8fd4ff;
+  --accent-soft: rgba(70, 183, 255, 0.16);
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}

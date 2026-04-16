@@ -1,0 +1,12 @@
+---
+import { localeFromPath, switchLocalePath } from '../../lib/i18n';
+
+const { currentPath } = Astro.props;
+const currentLocale = localeFromPath(currentPath);
+const nextLocale = currentLocale === 'zh' ? 'en' : 'zh';
+const nextLabel = currentLocale === 'zh' ? 'English' : '中文';
+---
+
+<a class="locale-switch" href={switchLocalePath(currentPath)} lang={nextLocale}>
+  {nextLabel}
+</a>

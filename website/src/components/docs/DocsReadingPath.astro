@@ -1,0 +1,81 @@
+---
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props as Props;
+
+const steps =
+  locale === 'zh'
+    ? [
+        {
+          eyebrow: 'step 1',
+          title: '先跑通 Getting Started',
+          body: '先确认最小参考路径可运行，再进入更细的模块边界和扩展家族。',
+          href: '/zh/docs/getting-started',
+          label: '打开开始使用',
+        },
+        {
+          eyebrow: 'step 2',
+          title: '顺着 Reference App 往下读',
+          body: '从 bootstrap、app wiring 和 route 注册开始理解 canonical 应用路径。',
+          href: '/zh/docs/reference-app',
+          label: '打开参考应用',
+        },
+        {
+          eyebrow: 'step 3',
+          title: '再判断模块与边界',
+          body: '当你需要决定改动应该落在哪个模块时，再看 stable roots 与 x/* 家族。',
+          href: '/zh/docs/modules/overview',
+          label: '打开模块总览',
+        },
+        {
+          eyebrow: 'step 4',
+          title: '最后确认发布姿态',
+          body: '在假设某个包已经稳定之前，先查看 release posture 和 roadmap 摘要。',
+          href: '/zh/docs/release-posture',
+          label: '打开发布姿态',
+        },
+      ]
+    : [
+        {
+          eyebrow: 'step 1',
+          title: 'Start with Getting Started',
+          body: 'Confirm the smallest reference path works before moving deeper into boundaries and extension families.',
+          href: '/docs/getting-started',
+          label: 'Open getting started',
+        },
+        {
+          eyebrow: 'step 2',
+          title: 'Follow the Reference App',
+          body: 'Read the canonical application path from bootstrap to app wiring to route registration.',
+          href: '/docs/reference-app',
+          label: 'Open reference app',
+        },
+        {
+          eyebrow: 'step 3',
+          title: 'Then classify modules and boundaries',
+          body: 'Move to stable roots and x/* families when you need to decide where a change belongs.',
+          href: '/docs/modules/overview',
+          label: 'Open modules overview',
+        },
+        {
+          eyebrow: 'step 4',
+          title: 'Finish with release posture',
+          body: 'Check release posture and roadmap summary before assuming a package is already stable.',
+          href: '/docs/release-posture',
+          label: 'Open release posture',
+        },
+      ];
+---
+
+<div class="portal-grid">
+  {steps.map((step) => (
+    <article class="fact-card">
+      <p class="signal-list__kicker">{step.eyebrow}</p>
+      <h3>{step.title}</h3>
+      <p>{step.body}</p>
+      <a class="text-link" href={step.href}>{step.label}</a>
+    </article>
+  ))}
+</div>

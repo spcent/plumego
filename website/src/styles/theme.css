@@ -1,0 +1,150 @@
+.hero__visual {
+  position: relative;
+  min-height: 34rem;
+  border: 1px solid var(--line);
+  border-radius: 2rem;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(13, 139, 215, 0.12), transparent 40%),
+    linear-gradient(180deg, transparent, rgba(13, 139, 215, 0.05)),
+    var(--bg-elevated);
+  box-shadow: var(--shadow);
+}
+
+.hero__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 3rem 3rem;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 92%);
+}
+
+.topology-diagram {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.topology-diagram__halo circle {
+  fill: none;
+  stroke: var(--accent-soft);
+  stroke-width: 1.5;
+}
+
+.topology-diagram__links line {
+  stroke: url(#plumegoPulse);
+  stroke-width: 1.5;
+}
+
+.topology-diagram__kernel circle,
+.topology-diagram__lane rect,
+.topology-diagram__labels rect {
+  fill: var(--bg-elevated);
+  stroke: var(--line);
+  stroke-width: 1.25;
+}
+
+.topology-diagram__kernel text,
+.topology-diagram__lane text,
+.topology-diagram__labels text {
+  fill: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  text-anchor: middle;
+}
+
+.topology-diagram__kernel text:first-of-type,
+.topology-diagram__lane text:first-of-type {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  fill: var(--accent-strong);
+}
+
+.hero__plane {
+  position: absolute;
+  inset: auto auto 2rem 2rem;
+  width: min(24rem, calc(100% - 4rem));
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  background: var(--bg-elevated);
+  padding: 1.15rem;
+  backdrop-filter: blur(10px);
+  animation: rise 700ms ease both;
+}
+
+.hero__plane--ext {
+  inset: 3rem 2rem auto auto;
+  animation-delay: 140ms;
+}
+
+.hero__legend {
+  position: absolute;
+  inset: auto 2rem 2rem auto;
+  width: min(18rem, calc(100% - 4rem));
+  border-top: 1px solid var(--line);
+  padding-top: 0.9rem;
+  backdrop-filter: blur(10px);
+}
+
+.hero__plane span,
+.hero__legend span {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--fg-soft);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.hero__plane strong,
+.hero__legend strong {
+  font-size: 1.08rem;
+}
+
+.hero__plane p,
+.hero__legend p {
+  margin: 0.55rem 0 0;
+}
+
+.hero__copy,
+.section,
+.page-hero,
+.page-grid {
+  animation: fade-up 520ms ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__plane,
+  .hero__copy,
+  .section,
+  .page-hero,
+  .page-grid {
+    animation: none;
+  }
+}

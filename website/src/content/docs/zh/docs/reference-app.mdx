@@ -1,0 +1,36 @@
+---
+title: 参考应用
+description: 为什么 reference/standard-service 是 Plumego 服务的 canonical 起点。
+translationKey: reference-app
+sidebar:
+  order: 3
+---
+
+# 参考应用
+
+`reference/standard-service` 是 Plumego 的 canonical 应用形态。
+
+## 它展示了什么
+
+- `main.go` 中的显式 bootstrap
+- `internal/app/app.go` 中的 app-local wiring
+- `internal/app/routes.go` 中的显式 route 注册
+- `internal/handler` 下的 transport-only handler
+
+## 为什么重要
+
+Plumego 有意坚持“只有一条明显路径”的工程风格，而参考应用就是这条路径被具体化、可审查化的地方。
+
+## 什么时候应该紧跟它
+
+适用于：
+
+- 新建服务
+- 校验 handler 与 route 形态
+- 判断应用本地代码应放在哪里
+
+## 不应从它推导什么
+
+- 它是 canonical 参考，不是功能目录
+- 它不意味着每个 `x/*` 包都属于默认学习路径
+- 它不应被当作模糊稳定根边界的理由

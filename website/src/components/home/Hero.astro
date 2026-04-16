@@ -1,0 +1,39 @@
+---
+import HeroTopology from './HeroTopology.astro';
+
+const { copy } = Astro.props;
+---
+
+<section class="hero">
+  <div class="hero__copy">
+    <p class="hero__eyebrow">{copy.eyebrow}</p>
+    <h1>{copy.headline}</h1>
+    <p class="hero__summary">{copy.summary}</p>
+    <div class="hero__actions">
+      <a class="button button--primary" href={copy.primaryCta.href}>{copy.primaryCta.label}</a>
+      <a class="button button--ghost" href={copy.secondaryCta.href}>{copy.secondaryCta.label}</a>
+    </div>
+    <ul class="hero__notes">
+      {copy.notes.map((note: string) => <li>{note}</li>)}
+    </ul>
+  </div>
+
+  <div class="hero__visual">
+    <HeroTopology stableRoots={copy.stableRoots} extensions={copy.extensions} />
+    <div class="hero__plane hero__plane--root">
+      <span>{copy.heroVisual.stableLabel}</span>
+      <strong>{copy.heroVisual.stableTitle}</strong>
+      <p>{copy.heroVisual.stableBody}</p>
+    </div>
+    <div class="hero__plane hero__plane--ext">
+      <span>{copy.heroVisual.extensionLabel}</span>
+      <strong>{copy.heroVisual.extensionTitle}</strong>
+      <p>{copy.heroVisual.extensionBody}</p>
+    </div>
+    <div class="hero__legend">
+      <span>{copy.heroVisual.footerLabel}</span>
+      <strong>{copy.heroVisual.footerBody}</strong>
+    </div>
+    <div class="hero__grid"></div>
+  </div>
+</section>

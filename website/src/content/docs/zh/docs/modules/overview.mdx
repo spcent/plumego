@@ -1,0 +1,35 @@
+---
+title: 模块总览
+description: 稳定根保持窄边界，扩展家族统一放在 x/*。
+translationKey: modules-overview
+sidebar:
+  order: 4
+---
+
+import GeneratedModuleFacts from '../../../../../components/docs/GeneratedModuleFacts.astro';
+
+# 模块总览
+
+Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速演进功能放在 `x/*`。这个拆分是有意的：它让稳定表面保持收敛，也让 ownership 更容易判断。
+
+## 同步模块清单
+
+<GeneratedModuleFacts locale="zh" />
+
+## 默认分类规则
+
+- 内核、生命周期、transport contract 或稳定中间件变化，归稳定根
+- 能力或协议家族工作，归各自的 `x/*`
+- 应用 wiring，归 `reference/standard-service`
+
+## 为什么这很重要
+
+- 稳定根更容易学习、评审和长期维护
+- 扩展能力可以更快演进，而不重定义默认学习路径
+- 仓库工具可以用更小的搜索半径做任务归类
+
+## 下一步阅读
+
+- [稳定根](/zh/docs/stable-roots)
+- [x/* 家族](/zh/docs/x-family)
+- [发布姿态](/zh/docs/release-posture)

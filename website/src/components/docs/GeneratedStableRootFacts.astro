@@ -1,0 +1,51 @@
+---
+import { MODULE_FACTS } from '../../generated/modules';
+
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props as Props;
+
+const copy =
+  locale === 'zh'
+    ? {
+        source: '从 `specs/repo.yaml` 与 `specs/task-routing.yaml` 同步',
+        title: '稳定根清单',
+        countLabel: '稳定根',
+        intentTitle: '默认归类意图',
+        discouragedTitle: '不鼓励的新根目录',
+        footnote: '这些事实块来自仓库 machine-readable specs，而不是 docs 中手工复制的列表。',
+      }
+    : {
+        source: 'Synced from `specs/repo.yaml` and `specs/task-routing.yaml`',
+        title: 'Stable root inventory',
+        countLabel: 'stable roots',
+        intentTitle: 'Default routing intent',
+        discouragedTitle: 'Discouraged new top-level roots',
+        footnote: 'These fact blocks come from the machine-readable repository specs instead of a copied docs-only list.',
+      };
+---
+
+<div class="fact-grid">
+  <article class="fact-card">
+    <p class="fact-card__eyebrow">{copy.source}</p>
+    <h3>{copy.title}</h3>
+    <p class="fact-card__count">{MODULE_FACTS.stableRoots.length} {copy.countLabel}</p>
+    <ul>
+      {MODULE_FACTS.stableRoots.map((item) => <li><code>{item}</code></li>)}
+    </ul>
+  </article>
+
+  <article class="fact-card">
+    <p class="fact-card__eyebrow">{copy.source}</p>
+    <h3>{copy.intentTitle}</h3>
+    <p>{MODULE_FACTS.stableRootWorkIntent}</p>
+    <h3>{copy.discouragedTitle}</h3>
+    <ul>
+      {MODULE_FACTS.discouragedRoots.map((item) => <li><code>{item}</code></li>)}
+    </ul>
+  </article>
+</div>
+
+<p class="fact-footnote">{copy.footnote}</p>

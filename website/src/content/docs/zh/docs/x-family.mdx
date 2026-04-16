@@ -1,0 +1,32 @@
+---
+title: x/* 家族
+description: Plumego 如何组织可选能力与快速演进能力。
+translationKey: x-family
+sidebar:
+  order: 6
+---
+
+import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtensionFacts.astro';
+
+# x/* 家族
+
+`x/*` 这一层的存在，是为了让可选能力和快速演进功能继续前进，而不重定义稳定根的默认学习路径。
+
+## 同步扩展事实
+
+<GeneratedExtensionFacts locale="zh" />
+
+## 什么时候从这里开始
+
+当工作主要围绕以下内容时，从 `x/*` 家族开始：
+
+- 能力特定行为
+- 协议适配
+- tenant、gateway 或 observability 策略
+- 不应扩大稳定根的可选应用能力
+
+## 不该怎么做
+
+- 不要让稳定根依赖 `x/*`
+- 不要借 `x/*` 重写 canonical 参考路径
+- 既然已有主家族入口，就不要从从属包开始读起

@@ -1,0 +1,40 @@
+---
+title: 开始使用
+description: 先跑通 Plumego 的 canonical 参考路径，并保持 HTTP 流程显式。
+translationKey: getting-started
+sidebar:
+  order: 2
+---
+
+# 开始使用
+
+理解 Plumego 的最快方式，是先跑通 canonical 参考应用。这条路径会直接展示 Plumego 希望保持显式的 bootstrap、route wiring 与 handler 形态。
+
+## 环境要求
+
+- Go 1.24+
+- 已经 checkout `github.com/spcent/plumego`
+
+## 首次运行
+
+```bash
+go run ./reference/standard-service
+```
+
+## 启动后应该读哪里
+
+- `reference/standard-service/main.go`：bootstrap 路径
+- `reference/standard-service/internal/app/app.go`：应用本地 wiring
+- `reference/standard-service/internal/app/routes.go`：显式 route 注册
+- `reference/standard-service/internal/handler`：transport-only handler
+
+## 这次首次运行说明了什么
+
+- 参考服务可以在不增加外部依赖的情况下启动
+- route wiring 保持显式，而不是藏进注册魔法里
+- handler 形态依旧贴近标准库 HTTP 模型
+
+## 下一步阅读
+
+- [参考应用](/zh/docs/reference-app)
+- [模块总览](/zh/docs/modules/overview)

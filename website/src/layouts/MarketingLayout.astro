@@ -1,0 +1,81 @@
+---
+import LocaleSwitch from '../components/shared/LocaleSwitch.astro';
+import ThemeToggle from '../components/shared/ThemeToggle.astro';
+import { NAV_LINKS, SITE, type Locale } from '../data/site';
+import { toLocalePath } from '../lib/i18n';
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  currentPath: string;
+}
+
+const { locale, title, description, currentPath } = Astro.props;
+const nav = NAV_LINKS[locale];
+const lang = locale === 'zh' ? 'zh-CN' : 'en';
+const canonicalPath = toLocalePath(currentPath, 'en');
+const zhPath = toLocalePath(currentPath, 'zh');
+const pageTitle = `${title} · ${SITE.name}`;
+---
+
+<!doctype html>
+<html lang={lang} data-theme="">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={`https://plumego.dev${canonicalPath}`} />
+    <link rel="alternate" href="https://plumego.dev/" hreflang="x-default" />
+    <link rel="alternate" href={`https://plumego.dev${canonicalPath}`} hreflang="en" />
+    <link rel="alternate" href={`https://plumego.dev${zhPath}`} hreflang="zh" />
+    <script is:inline>
+      (() => {
+        const storageKey = 'starlight-theme';
+        const stored = window.localStorage.getItem(storageKey);
+        const theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+  </head>
+  <body class="marketing-shell">
+    <header class="site-header">
+      <a class="site-header__brand" href={locale === 'zh' ? '/zh' : '/'}>
+        <img src="/brand/logo-light.svg" alt="Plumego" class="brand brand--light" />
+        <img src="/brand/logo-dark.svg" alt="Plumego" class="brand brand--dark" />
+      </a>
+      <nav class="site-header__nav" aria-label="Primary">
+        {nav.map((link) => (
+          <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel={link.href.startsWith('http') ? 'noreferrer' : undefined}>
+            {link.label}
+          </a>
+        ))}
+      </nav>
+      <div class="site-header__tools">
+        <ThemeToggle />
+        <LocaleSwitch currentPath={currentPath} />
+      </div>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <p>{SITE.name} · {SITE.currentVersion}</p>
+      <div class="site-footer__links">
+        <a href={locale === 'zh' ? '/zh/docs' : '/docs'}>{locale === 'zh' ? '文档' : 'Docs'}</a>
+        <a href={locale === 'zh' ? '/zh/docs/reference-app' : '/docs/reference-app'}>
+          {locale === 'zh' ? '参考应用' : 'Reference App'}
+        </a>
+        <a href={SITE.githubUrl} target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </footer>
+  </body>
+</html>

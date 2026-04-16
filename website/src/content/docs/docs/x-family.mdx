@@ -1,0 +1,32 @@
+---
+title: x/* Family
+description: How optional and fast-moving Plumego capabilities are organized.
+translationKey: x-family
+sidebar:
+  order: 6
+---
+
+import GeneratedExtensionFacts from '../../../components/docs/GeneratedExtensionFacts.astro';
+
+# x/* Family
+
+The `x/*` layer exists so optional or faster-moving capabilities can evolve without redefining the stable-root learning path.
+
+## Synced extension facts
+
+<GeneratedExtensionFacts />
+
+## When to start here
+
+Start with an `x/*` family when the work is primarily about:
+
+- capability-specific behavior
+- protocol adaptation
+- tenant, gateway, or observability policy
+- optional app-facing functionality that should not expand stable roots
+
+## What not to do
+
+- do not make stable roots depend on `x/*`
+- do not use `x/*` as a pretext to redefine the canonical reference path
+- do not start in a subordinate package when a primary family already exists

@@ -1,0 +1,50 @@
+---
+import { MODULE_FACTS } from '../../generated/modules';
+
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props as Props;
+
+const copy =
+  locale === 'zh'
+    ? {
+        primaryTitle: '主入口家族',
+        primarySource: '从 `specs/task-routing.yaml` 同步',
+        allTitle: '全部扩展路径',
+        allSource: '从 `specs/repo.yaml` 同步',
+        intentTitle: '默认归类意图',
+        footnote: '主入口家族和全部扩展路径被分开展示，避免把辅助路径误认成默认入口。',
+      }
+    : {
+        primaryTitle: 'Primary entry families',
+        primarySource: 'Synced from `specs/task-routing.yaml`',
+        allTitle: 'All extension paths',
+        allSource: 'Synced from `specs/repo.yaml`',
+        intentTitle: 'Default routing intent',
+        footnote: 'Primary entry families and all extension paths are shown separately so subordinate paths do not get mistaken for default entrypoints.',
+      };
+---
+
+<div class="fact-grid">
+  <article class="fact-card">
+    <p class="fact-card__eyebrow">{copy.primarySource}</p>
+    <h3>{copy.primaryTitle}</h3>
+    <p class="fact-card__count">{MODULE_FACTS.primaryExtensionFamilies.length}</p>
+    <ul>
+      {MODULE_FACTS.primaryExtensionFamilies.map((item) => <li><code>{item}</code></li>)}
+    </ul>
+  </article>
+
+  <article class="fact-card">
+    <p class="fact-card__eyebrow">{copy.allSource}</p>
+    <h3>{copy.allTitle}</h3>
+    <p>{copy.intentTitle}: {MODULE_FACTS.extensionWorkIntent}</p>
+    <ul>
+      {MODULE_FACTS.allExtensionPaths.map((item) => <li><code>{item}</code></li>)}
+    </ul>
+  </article>
+</div>
+
+<p class="fact-footnote">{copy.footnote}</p>

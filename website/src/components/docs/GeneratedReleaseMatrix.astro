@@ -1,0 +1,36 @@
+---
+import { RELEASE_FACTS } from '../../generated/releases';
+
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props as Props;
+
+const copy =
+  locale === 'zh'
+    ? {
+        source: '从 `README.md` 的 v1 支持矩阵同步',
+        modules: '模块',
+        countLabel: '同步条目',
+      }
+    : {
+        source: 'Synced from the v1 support matrix in `README.md`',
+        modules: 'Modules',
+        countLabel: 'Synced entries',
+      };
+---
+
+<p class="fact-footnote">{copy.source}</p>
+<p class="fact-card__count">{RELEASE_FACTS.supportMatrix.length} {copy.countLabel}</p>
+
+<div class="fact-stack">
+  {RELEASE_FACTS.supportMatrix.map((entry) => (
+    <article class="fact-card">
+      <p class="status-pill">{entry.status}</p>
+      <h3>{entry.area}</h3>
+      <p>{entry.promise}.</p>
+      <p><strong>{copy.modules}:</strong> {entry.modules}</p>
+    </article>
+  ))}
+</div>

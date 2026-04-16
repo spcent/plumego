@@ -1,0 +1,35 @@
+---
+title: Modules Overview
+description: Stable roots stay narrow, and extension families live under x/*.
+translationKey: modules-overview
+sidebar:
+  order: 4
+---
+
+import GeneratedModuleFacts from '../../../../components/docs/GeneratedModuleFacts.astro';
+
+# Modules Overview
+
+Plumego keeps long-lived public packages at the repository root and places optional or fast-moving capabilities under `x/*`. This split is intentional: it keeps the stable surface small and makes ownership easier to classify.
+
+## Synced module inventory
+
+<GeneratedModuleFacts />
+
+## Default classification rule
+
+- kernel, lifecycle, transport contracts, or stable middleware changes belong in stable roots
+- capability or protocol work belongs in the owning `x/*` family
+- application wiring belongs in `reference/standard-service`
+
+## Why this matters
+
+- stable roots remain easier to learn, review, and preserve
+- extension work can evolve faster without redefining the default learning path
+- repository tooling can classify changes with a smaller search radius
+
+## Read next
+
+- [Stable Roots](/docs/stable-roots)
+- [x/* Family](/docs/x-family)
+- [Release Posture](/docs/release-posture)

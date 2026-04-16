@@ -1,0 +1,12 @@
+.sl-markdown-content :is(h1, h2, h3, h4) {
+  font-family: var(--font-display);
+}
+
+.sl-markdown-content a {
+  color: var(--accent);
+}
+
+.sl-markdown-content code,
+.sl-markdown-content pre {
+  font-family: var(--font-mono);
+}

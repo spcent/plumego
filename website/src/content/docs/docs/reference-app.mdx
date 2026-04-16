@@ -1,0 +1,36 @@
+---
+title: Reference App
+description: Why reference/standard-service is the canonical starting point for Plumego services.
+translationKey: reference-app
+sidebar:
+  order: 3
+---
+
+# Reference App
+
+`reference/standard-service` is the canonical application shape in Plumego.
+
+## What it demonstrates
+
+- explicit bootstrap in `main.go`
+- app-local wiring in `internal/app/app.go`
+- explicit route registration in `internal/app/routes.go`
+- transport-only handlers under `internal/handler`
+
+## Why it matters
+
+Plumego is intentionally opinionated about one obvious way to structure a service. The reference app is the place where that path is made concrete and reviewable.
+
+## When to follow it closely
+
+Use it when you are:
+
+- starting a new service
+- validating handler and route shape
+- deciding where application-local code should live
+
+## What not to infer from it
+
+- it is a canonical reference, not a feature catalog
+- it does not make every `x/*` package part of the default path
+- it should not be treated as a license to blur stable-root boundaries

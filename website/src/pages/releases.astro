@@ -1,0 +1,54 @@
+---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import { RELEASE_COPY, SITE } from '../data/site';
+import { RELEASE_FACTS } from '../generated/releases';
+
+const copy = RELEASE_COPY.en;
+const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => entry.status.includes('GA')).length;
+const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
+  entry.status.toLowerCase().includes('experimental'),
+).length;
+---
+
+<MarketingLayout locale="en" title={copy.title} description={copy.description} currentPath="/releases">
+  <section class="page-hero">
+    <p class="hero__eyebrow">Release Posture</p>
+    <h1>{copy.title}</h1>
+    <p>{copy.description}</p>
+  </section>
+
+  <section class="release-banner">
+    <p>Current version</p>
+    <strong>{SITE.currentVersion}</strong>
+    <a class="text-link" href={SITE.githubUrl + '/releases'} target="_blank" rel="noreferrer">GitHub Releases</a>
+  </section>
+
+  <section class="release-stats">
+    <article class="page-panel">
+      <p class="signal-list__kicker">source</p>
+      <h2>README.md</h2>
+      <p>The release page consumes the synced v1 support matrix instead of a hand-copied website-only list.</p>
+    </article>
+    <article class="page-panel">
+      <p class="signal-list__kicker">stable groups</p>
+      <h2>{stableGroups}</h2>
+      <p>Groups currently carrying a GA-level compatibility promise.</p>
+    </article>
+    <article class="page-panel">
+      <p class="signal-list__kicker">experimental groups</p>
+      <h2>{experimentalGroups}</h2>
+      <p>Groups still included in release scope but not yet frozen for compatibility.</p>
+    </article>
+  </section>
+
+  <section class="page-grid">
+    {RELEASE_FACTS.supportMatrix.map((entry) => (
+      <article class="page-panel">
+        <p class="status-pill">{entry.status}</p>
+        <h2>{entry.area}</h2>
+        <p>{entry.promise}</p>
+        <p><strong>Modules:</strong> {entry.modules}</p>
+      </article>
+    ))}
+  </section>
+</MarketingLayout>

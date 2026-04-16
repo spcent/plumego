@@ -1,0 +1,40 @@
+---
+title: Getting Started
+description: Run the canonical Plumego reference path first and keep the HTTP flow explicit.
+translationKey: getting-started
+sidebar:
+  order: 2
+---
+
+# Getting Started
+
+The fastest way to understand Plumego is to run the canonical reference application first. That path shows how Plumego expects bootstrap, route wiring, and handler shape to stay visible in code.
+
+## Requirements
+
+- Go 1.24+
+- a local checkout of `github.com/spcent/plumego`
+
+## First run
+
+```bash
+go run ./reference/standard-service
+```
+
+## What to inspect after it starts
+
+- `reference/standard-service/main.go` for the bootstrap path
+- `reference/standard-service/internal/app/app.go` for application-local wiring
+- `reference/standard-service/internal/app/routes.go` for explicit route registration
+- `reference/standard-service/internal/handler` for transport-only handlers
+
+## What this first run demonstrates
+
+- the reference service boots without additional dependencies
+- route wiring remains explicit instead of being hidden behind registration magic
+- the handler shape stays close to the standard-library HTTP model
+
+## What to read next
+
+- [Reference App](/docs/reference-app)
+- [Modules Overview](/docs/modules/overview)

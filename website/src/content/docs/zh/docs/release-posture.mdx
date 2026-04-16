@@ -1,0 +1,25 @@
+---
+title: 发布姿态
+description: 在假设某个模块属于长期稳定表面之前，先看支持矩阵。
+translationKey: release-posture
+sidebar:
+  order: 7
+---
+
+import GeneratedReleaseMatrix from '../../../../components/docs/GeneratedReleaseMatrix.astro';
+
+# 发布姿态
+
+Plumego v1 覆盖当前仓库中的已检入模块，但不同区域承载的兼容性承诺并不相同。
+
+## 同步支持矩阵
+
+<GeneratedReleaseMatrix locale="zh" />
+
+## 实际判断规则
+
+在把某个包视为长期可靠依赖之前，先判断它属于稳定根，还是属于仍在演进的扩展家族。
+
+## 为什么要单独写这一页
+
+Plumego 把发布姿态写清楚，是为了避免文档、脚手架和扩展工作无意中夸大兼容性承诺。

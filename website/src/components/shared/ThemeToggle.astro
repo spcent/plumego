@@ -1,0 +1,33 @@
+<button class="theme-toggle" type="button" aria-label="Toggle color theme" data-theme-toggle>
+  <span aria-hidden="true" class="theme-toggle__sun">Light</span>
+  <span aria-hidden="true" class="theme-toggle__moon">Dark</span>
+</button>
+
+<script>
+  const storageKey = 'starlight-theme';
+
+  const getTheme = () => {
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  };
+
+  const syncButtons = () => {
+    const theme = getTheme();
+    for (const button of document.querySelectorAll('[data-theme-toggle]')) {
+      button.setAttribute('aria-pressed', String(theme === 'dark'));
+    }
+  };
+
+  document.addEventListener('astro:page-load', syncButtons);
+  syncButtons();
+
+  for (const button of document.querySelectorAll('[data-theme-toggle]')) {
+    button.addEventListener('click', () => {
+      const next = getTheme() === 'dark' ? 'light' : 'dark';
+      window.localStorage.setItem(storageKey, next);
+      document.documentElement.dataset.theme = next;
+      syncButtons();
+    });
+  }
+</script>

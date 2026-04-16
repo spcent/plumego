@@ -1,0 +1,36 @@
+---
+title: Stable Roots
+description: The long-lived public packages that define the default Plumego learning path.
+translationKey: stable-roots
+sidebar:
+  order: 5
+---
+
+import GeneratedStableRootFacts from '../../../components/docs/GeneratedStableRootFacts.astro';
+
+# Stable Roots
+
+Stable roots are the long-lived public packages at the repository root. They define the default learning path and the v1 compatibility promise Plumego intends to preserve.
+
+## Synced stable-root facts
+
+<GeneratedStableRootFacts />
+
+## What belongs here
+
+- application kernel and lifecycle
+- route structure and matching primitives
+- transport contracts and response helpers
+- transport-only middleware
+- security primitives and base storage abstractions
+
+## What does not belong here
+
+- product-specific feature logic
+- tenant-aware policy branching
+- protocol family catalogs
+- optional frontend, AI, data-topology, or gateway behavior
+
+## Working rule
+
+If the change would force a stable root to learn an extension concern, move the behavior to the owning `x/*` family instead.

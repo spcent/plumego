@@ -1,0 +1,27 @@
+{
+  "name": "plumego-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "sync:modules": "node ./scripts/sync-modules.mjs",
+    "sync:release": "node ./scripts/sync-release-meta.mjs",
+    "sync:roadmap": "node ./scripts/sync-roadmap.mjs",
+    "sync": "node ./scripts/sync-all.mjs",
+    "predev": "pnpm sync",
+    "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
+    "prebuild": "pnpm sync",
+    "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
+    "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
+    "precheck": "pnpm sync",
+    "check": "ASTRO_TELEMETRY_DISABLED=1 astro check"
+  },
+  "devDependencies": {
+    "@astrojs/check": "latest",
+    "@astrojs/mdx": "latest",
+    "@astrojs/starlight": "latest",
+    "astro": "latest",
+    "typescript": "^5.9.0"
+  }
+}

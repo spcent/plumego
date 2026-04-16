@@ -1,0 +1,26 @@
+---
+const { copy } = Astro.props;
+---
+
+<section class="section section--cta">
+  <div class="section__intro">
+    <h2>{copy.controlTitle}</h2>
+    <p>{copy.controlBody}</p>
+    <div class="control-grid">
+      {copy.controlItems.map((item: { title: string; body: string }) => (
+        <article class="control-grid__item">
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </div>
+  <div class="section__intro">
+    <h2>{copy.finalTitle}</h2>
+    <p>{copy.finalBody}</p>
+    <div class="hero__actions">
+      <a class="button button--primary" href={copy.finalPrimary.href}>{copy.finalPrimary.label}</a>
+      <a class="button button--ghost" href={copy.finalSecondary.href}>{copy.finalSecondary.label}</a>
+    </div>
+  </div>
+</section>
