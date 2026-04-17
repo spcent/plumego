@@ -21,7 +21,7 @@ func (r *recordingPubSub) Publish(topic string, msg pubsub.Message) error {
 	return nil
 }
 
-func (r *recordingPubSub) Subscribe(topic string, opts pubsub.SubOptions) (pubsub.Subscription, error) {
+func (r *recordingPubSub) Subscribe(ctx context.Context, topic string, opts pubsub.SubOptions) (pubsub.Subscription, error) {
 	return nil, errors.New("not implemented")
 }
 

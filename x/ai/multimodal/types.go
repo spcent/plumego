@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"time"
+
+	"github.com/spcent/plumego/x/ai/provider"
 )
 
 // ContentType represents the type of content.
@@ -193,14 +195,15 @@ type Message struct {
 	Timestamp  time.Time      `json:"timestamp,omitempty"`
 }
 
-// MessageRole represents the role of a message sender.
-type MessageRole string
+// MessageRole is an alias for provider.Role.
+// Use provider.Role directly when possible.
+type MessageRole = provider.Role
 
 const (
-	RoleSystem    MessageRole = "system"
-	RoleUser      MessageRole = "user"
-	RoleAssistant MessageRole = "assistant"
-	RoleTool      MessageRole = "tool"
+	RoleSystem    = provider.RoleSystem
+	RoleUser      = provider.RoleUser
+	RoleAssistant = provider.RoleAssistant
+	RoleTool      = provider.RoleTool
 )
 
 // NewTextMessage creates a new text-only message.

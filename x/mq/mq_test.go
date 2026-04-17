@@ -1036,7 +1036,7 @@ func (p panicPubSub) Publish(topic string, msg pubsub.Message) error {
 	panic("boom")
 }
 
-func (p panicPubSub) Subscribe(topic string, opts pubsub.SubOptions) (pubsub.Subscription, error) {
+func (p panicPubSub) Subscribe(ctx context.Context, topic string, opts pubsub.SubOptions) (pubsub.Subscription, error) {
 	return nil, errors.New("not implemented")
 }
 

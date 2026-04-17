@@ -79,7 +79,7 @@ func (b *WebhookBridge) Start(ctx context.Context) (stop func() error, err error
 		if in == "" || out == "" {
 			continue
 		}
-		sub, e := b.Pub.Subscribe(in, opts)
+		sub, e := b.Pub.Subscribe(context.Background(), in, opts)
 		if e != nil {
 			// best effort: stop already started subs
 			b.stopAll()
