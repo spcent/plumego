@@ -13,15 +13,17 @@ export const SITE = {
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
     { label: 'Docs', href: '/docs' },
-    { label: 'Use Cases', href: '/use-cases' },
+    { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
+    { label: 'Releases', href: '/releases' },
     { label: 'Roadmap', href: '/roadmap' },
     { label: 'GitHub', href: SITE.githubUrl },
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
-    { label: '适用场景', href: '/zh/use-cases' },
+    { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
+    { label: '发布', href: '/zh/releases' },
     { label: '路线图', href: '/zh/roadmap' },
     { label: 'GitHub', href: SITE.githubUrl },
   ],
@@ -33,7 +35,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       title: 'Product',
       links: [
         { label: 'Docs', href: '/docs' },
-        { label: 'Use Cases', href: '/use-cases' },
+        { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
     },
@@ -59,7 +61,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       title: '产品',
       links: [
         { label: '文档', href: '/zh/docs' },
-        { label: '适用场景', href: '/zh/use-cases' },
+        { label: '架构', href: '/zh/architecture' },
         { label: '示例', href: '/zh/examples' },
       ],
     },
@@ -89,7 +91,7 @@ export const HOME_COPY = {
     summary:
       'Plumego stays close to net/http, keeps the stable surface intentionally narrow, and gives teams one canonical path for building reviewable Go services.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
-    secondaryCta: { label: 'See Use Cases', href: '/use-cases' },
+    secondaryCta: { label: 'See Architecture', href: '/architecture' },
     notes: ['Go 1.24+', 'stdlib-first', 'reference/standard-service'],
     heroAudience: {
       label: 'Built for',
@@ -138,11 +140,11 @@ export const HOME_COPY = {
       'The first real question after the landing page is not “which package should I open?” It is “does this fit my service?” and “which example path should I trust?”',
     adoptionCards: [
       {
-        kicker: 'fit',
-        title: 'Use Cases',
-        body: 'See where Plumego is strongest today, what kind of teams benefit most, and how to decide whether explicit structure is actually a requirement.',
-        href: '/use-cases',
-        label: 'Explore use cases',
+        kicker: 'topology',
+        title: 'Architecture',
+        body: 'See how stable roots, extension families, and the canonical request path fit together before deciding where a change belongs.',
+        href: '/architecture',
+        label: 'Explore architecture',
       },
       {
         kicker: 'paths',
@@ -187,7 +189,7 @@ export const HOME_COPY = {
     summary:
       'Plumego 尽量贴近 net/http，把稳定表面保持收敛，并为团队提供一条构建可评审 Go 服务的 canonical 路径。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
-    secondaryCta: { label: '查看适用场景', href: '/zh/use-cases' },
+    secondaryCta: { label: '查看架构', href: '/zh/architecture' },
     notes: ['Go 1.24+', 'stdlib-first', 'reference/standard-service'],
     heroAudience: {
       label: '适合',
@@ -236,11 +238,11 @@ export const HOME_COPY = {
       '离开首页之后，真正重要的不是“先看哪个包”，而是“它适不适合我的服务”和“我该相信哪条示例路径”。',
     adoptionCards: [
       {
-        kicker: 'fit',
-        title: '适用场景',
-        body: '看清 Plumego 当前在哪些场景最强、哪类团队真正受益，以及如何判断“显式结构”是不是你的真实需求。',
-        href: '/zh/use-cases',
-        label: '查看适用场景',
+        kicker: 'topology',
+        title: '架构',
+        body: '先看稳定根、扩展家族与 canonical 请求路径如何组合，再判断某个改动究竟该落在哪一层。',
+        href: '/zh/architecture',
+        label: '查看架构',
       },
       {
         kicker: 'paths',
@@ -408,6 +410,145 @@ export const ROADMAP_COPY = {
           '把租户或数据拓扑逻辑塞回稳定根',
           '在缺少策略、测试和文档时把 x/* 标成 GA',
         ],
+      },
+    ],
+  },
+} as const;
+
+export const ARCHITECTURE_COPY = {
+  en: {
+    title: 'Architecture',
+    description: 'Stable roots, extension families, and the canonical request path that define the Plumego mental model.',
+    eyebrow: 'System Topology',
+    introTitle: 'Read the architecture as a boundary map.',
+    introBody:
+      'Plumego is easiest to evaluate when you can see which responsibilities stay in the kernel, which ones branch outward into extensions, and where the default request path begins and ends.',
+    guideCards: [
+      {
+        kicker: 'stable roots',
+        title: 'Keep long-lived responsibilities narrow',
+        body: 'Routing, contracts, transport middleware, and storage-facing primitives should stay legible enough to defend compatibility over time.',
+      },
+      {
+        kicker: 'extension rule',
+        title: 'Push optional capability work outward',
+        body: 'Product or protocol-specific expansion should begin in x/* families so the kernel does not absorb every fast-moving concern.',
+      },
+      {
+        kicker: 'canonical path',
+        title: 'Teach one request path first',
+        body: 'The website, docs, and reference app all point toward one readable route from bootstrap to write path before asking readers to branch into deeper packages.',
+      },
+    ],
+    sectionTitle: 'Three layers you should be able to classify immediately',
+    sectionBody:
+      'If a new reader cannot tell whether a change belongs to stable roots, a capability family, or the canonical app path, the site is not doing enough explanatory work.',
+    layers: [
+      {
+        kicker: 'kernel',
+        title: 'Stable roots',
+        body: 'Core modules carry the strongest compatibility burden. They should stay narrow, boring, and easy to reason about in code review.',
+        items: MODULE_FACTS.stableRoots,
+      },
+      {
+        kicker: 'extensions',
+        title: 'Primary capability families',
+        body: 'These families are useful, but they do not pretend to share the same stability profile as the smallest kernel surface.',
+        items: MODULE_FACTS.primaryExtensionFamilies,
+      },
+      {
+        kicker: 'workflow',
+        title: 'Canonical request path',
+        body: 'The default app path gives teams one bootstrap model, one routing flow, and one shared place to begin before extension work starts.',
+        items: ['docs/getting-started', 'docs/reference-app', 'internal/app/app.go', 'internal/app/routes.go'],
+      },
+    ],
+    flowTitle: 'How to inspect one request without guessing',
+    flowBody:
+      'The quickest architecture read starts at the reference app, confirms the app-local wiring, and only then expands outward into packages that obviously belong to the feature or protocol being added.',
+    flowSteps: [
+      {
+        label: '01',
+        title: 'Start in the reference app',
+        body: 'Read the default service shape first so bootstrap and route ownership stay visible.',
+      },
+      {
+        label: '02',
+        title: 'Confirm the app-local constructor',
+        body: 'Check where dependencies are assembled before treating helpers or packages as architectural entry points.',
+      },
+      {
+        label: '03',
+        title: 'Trace routes before handlers',
+        body: 'Route registration should tell you which request path is public, what middleware runs, and where transport control ends.',
+      },
+    ],
+  },
+  zh: {
+    title: '架构',
+    description: '帮助读者看清 Plumego 的稳定根、扩展家族与 canonical 请求路径如何构成统一心智模型。',
+    eyebrow: 'System Topology',
+    introTitle: '把架构页当作边界地图来读。',
+    introBody:
+      '判断 Plumego 最容易的方式，是先看清哪些职责留在内核、哪些能力向 x/* 扩展家族外分，以及默认请求路径从哪里开始、在什么地方结束。',
+    guideCards: [
+      {
+        kicker: 'stable roots',
+        title: '让长期职责保持收敛',
+        body: '路由、契约、传输中间件以及面向存储的基础原语，应当保持足够清晰，才能长期守住兼容性。',
+      },
+      {
+        kicker: 'extension rule',
+        title: '把可选能力向外扩展',
+        body: '产品能力或协议适配应该从 x/* 家族开始，而不是不断吸入内核，最终让默认路径失去边界。',
+      },
+      {
+        kicker: 'canonical path',
+        title: '先教会读者一条默认请求路径',
+        body: '网站、文档和 reference app 都应该先把从 bootstrap 到 write path 的默认路径讲清楚，再让读者进入更深的扩展区域。',
+      },
+    ],
+    sectionTitle: '读者应该能立刻分清的三层结构',
+    sectionBody:
+      '如果一个新读者分不清某个改动属于稳定根、能力家族还是 canonical 应用路径，说明站点还没有把架构解释到位。',
+    layers: [
+      {
+        kicker: 'kernel',
+        title: '稳定根',
+        body: '核心模块承担最强的兼容性负担，因此应保持收敛、克制，并且在代码评审时容易理解。',
+        items: MODULE_FACTS.stableRoots,
+      },
+      {
+        kicker: 'extensions',
+        title: '主要能力家族',
+        body: '这些扩展很重要，但不应该假装与最小内核表面享受同一等级的稳定性承诺。',
+        items: MODULE_FACTS.primaryExtensionFamilies,
+      },
+      {
+        kicker: 'workflow',
+        title: 'canonical 请求路径',
+        body: '默认应用路径给团队提供统一 bootstrap 模型、统一路由流向，以及开始理解仓库的共同入口。',
+        items: ['docs/getting-started', 'docs/reference-app', 'internal/app/app.go', 'internal/app/routes.go'],
+      },
+    ],
+    flowTitle: '不靠猜测地检查一条请求路径',
+    flowBody:
+      '最快的架构阅读方式，是先从 reference app 入手，确认 app-local wiring，然后再向外展开到那些显然属于具体功能或协议的包。',
+    flowSteps: [
+      {
+        label: '01',
+        title: '先从 reference app 开始',
+        body: '先看默认服务形态，把 bootstrap 和 route ownership 读清楚。',
+      },
+      {
+        label: '02',
+        title: '确认应用本地构造器',
+        body: '先检查依赖是如何被组装的，再判断辅助包是不是架构入口。',
+      },
+      {
+        label: '03',
+        title: '先追 routes，再进 handlers',
+        body: 'route 注册应该先告诉你公开请求路径、middleware 顺序以及 transport 控制在哪里停止。',
       },
     ],
   },
