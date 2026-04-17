@@ -624,7 +624,10 @@ li {
   .portal-grid--dense,
   .module-map,
   .site-footer,
-  .release-banner {
+  .release-banner,
+  .topology-board,
+  .example-hierarchy,
+  .recipe-grid {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: flex-start;
@@ -667,13 +670,18 @@ li {
   .page-hero p {
     max-width: 40rem;
   }
-
   .hero__actions,
   .hero__notes {
     justify-content: center;
   }
+  .comparison-table__head,
+  .comparison-table__row {
+    grid-template-columns: 1fr;
+  }
+  .request-flow-step::before {
+    left: 1.2rem;
+  }
 }
-
 @media (max-width: 640px) {
   .site-header {
     gap: 0.7rem;
@@ -708,9 +716,29 @@ li {
   .theme-icon-button {
     width: 2.7rem;
   }
+  .topology-node,
+  .example-hierarchy__primary,
+  .example-hierarchy__secondary,
+  .recipe-card,
+  .request-flow-step,
+  .page-panel,
+  .signal-list__item,
+  .control-grid__item,
+  .release-banner {
+    padding: 1.2rem;
+    border-radius: 1.35rem;
+  }
+  .comparison-table__head,
+  .comparison-table__row {
+    padding: 1rem 1.05rem;
+  }
+  .page-links,
+  .page-hero__links {
+    gap: 0.75rem 1rem;
+  }
 }
-
 /* Website redesign overrides */
+
 
 main {
   gap: 5.5rem;
@@ -962,8 +990,109 @@ main {
 .control-grid--tight {
   gap: 1rem;
 }
-
+.topology-board,
+.example-hierarchy,
+.recipe-grid {
+  display: grid;
+  gap: 1.2rem;
+}
+.topology-board {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.topology-node,
+.example-hierarchy__primary,
+.example-hierarchy__secondary,
+.recipe-card,
+.request-flow-step {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1.7rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+}
+.topology-node ul,
+.example-hierarchy__primary ul,
+.example-hierarchy__secondary ol {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--fg-soft);
+}
+.topology-node li + li,
+.example-hierarchy__primary li + li,
+.example-hierarchy__secondary li + li {
+  margin-top: 0.45rem;
+}
+.request-flow-rail {
+  display: grid;
+  gap: 0.9rem;
+}
+.request-flow-step {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+}
+.request-flow-step::before {
+  content: '';
+  position: absolute;
+  left: 1.5rem;
+  top: -0.95rem;
+  width: 1px;
+  height: 0.95rem;
+  background: color-mix(in srgb, var(--accent) 22%, var(--line));
+}
+.request-flow-step:first-child::before {
+  display: none;
+}
+.request-flow-step__note {
+  color: var(--fg-muted);
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+}
+.comparison-table {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 1.7rem;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+}
+.comparison-table__head,
+.comparison-table__row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1.2rem 1.4rem;
+}
+.comparison-table__head {
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
+  color: var(--fg);
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.comparison-table__row + .comparison-table__row {
+  border-top: 1px solid var(--line);
+}
+.page-grid--single-emphasis {
+  grid-template-columns: minmax(0, 1fr);
+}
+.page-panel--feature {
+  gap: 0.8rem;
+  background: linear-gradient(180deg, rgba(143, 207, 255, 0.08), transparent 48%), var(--bg-elevated);
+}
+.example-hierarchy {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+}
+.recipe-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.section--architecture-flow,
+.section--examples-hierarchy {
+  align-items: start;
+}
 .page-hero {
+
   gap: 1rem;
   padding-top: 2.6rem;
 }

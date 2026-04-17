@@ -4,6 +4,36 @@ import PageHero from '../../components/marketing/PageHero.astro';
 import { EXAMPLES_COPY } from '../../data/site';
 
 const copy = EXAMPLES_COPY.zh;
+
+const recipeTracks = [
+  {
+    label: 'recipe 01',
+    title: '请求路径 recipe',
+    body: '当你需要不靠猜测地追一条 HTTP 请求，从 route 注册一直看到写回路径在哪里结束时，用这条路径。',
+    href: '/zh/docs/concepts/request-flow',
+    cta: '追踪一条请求',
+  },
+  {
+    label: 'recipe 02',
+    title: '模块归属 recipe',
+    body: '当真正的问题是这项工作应该落在稳定根、应用本地 wiring 还是 x/* 家族时，用这条路径。',
+    href: '/zh/docs/modules/overview',
+    cta: '判断改动归属',
+  },
+  {
+    label: 'recipe 03',
+    title: '发布姿态 recipe',
+    body: '当采用决策取决于兼容性信号，而不是“仓库里有这个包所以默认可用”时，用这条路径。',
+    href: '/zh/docs/release-posture',
+    cta: '检查发布姿态',
+  },
+] as const;
+
+const adoptionChecks = [
+  '在打开无关包家族之前，先跑通 reference app。',
+  '用 recipe 回答一个明确问题，而不是把它们当成并行的产品 demo。',
+  '一旦知道是哪条边界或能力拥有这项改动，就回到文档主路径继续。',
+] as const;
 ---
 
 <MarketingLayout
@@ -40,14 +70,44 @@ const copy = EXAMPLES_COPY.zh;
     </div>
   </section>
 
+  <section class="section section--split section--examples-hierarchy">
+    <div class="section__intro">
+      <h2>先理解层级，再决定看哪一页</h2>
+      <p>Plumego 的示例是刻意分层的：只有一个 canonical 可运行服务，其余是围绕它展开的引导式 recipes，用来解释如何读仓库。</p>
+    </div>
+    <div class="example-hierarchy">
+      <article class="example-hierarchy__primary">
+        <p class="signal-list__kicker">canonical example</p>
+        <h3>reference/standard-service</h3>
+        <p>主示例是那个你可以 clone、运行、与自己服务对照，并在采用过程中不断回来的服务骨架。</p>
+        <ul>
+          <li>bootstrap 和 server 构造保持可见</li>
+          <li>internal/app 拥有应用本地 wiring</li>
+          <li>在进入更深的 handler 或包之前，route 注册仍然清晰可读</li>
+        </ul>
+        <a class="text-link" href="/zh/docs/reference-app">打开参考应用说明</a>
+      </article>
+      <article class="example-hierarchy__secondary">
+        <p class="signal-list__kicker">guided recipes</p>
+        <h3>Recipes 一次只回答一个仓库问题</h3>
+        <p>它们不是并行迷你产品，而是帮助你理解请求路径、ownership 与成熟度边界的可复用阅读模式。</p>
+        <ol>
+          {adoptionChecks.map((item) => (
+            <li>{item}</li>
+          ))}
+        </ol>
+      </article>
+    </div>
+  </section>
+
   <section class="section">
     <div class="section__intro">
       <h2>{copy.runnableTitle}</h2>
       <p>{copy.runnableBody}</p>
     </div>
-    <div class="page-grid">
+    <div class="page-grid page-grid--single-emphasis">
       {copy.runnableExamples.map((item) => (
-        <article class="page-panel">
+        <article class="page-panel page-panel--feature">
           <p class="signal-list__kicker">{item.kicker}</p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>
@@ -57,6 +117,23 @@ const copy = EXAMPLES_COPY.zh;
             ))}
           </ul>
           <a class="text-link" href={item.href}>{item.label}</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>引导式 recipes</h2>
+      <p>Recipes 比 canonical example 更小，也比 docs overview 更具体。它们的目标，是帮读者回答一个明确的采用问题，然后回到 canonical path。</p>
+    </div>
+    <div class="recipe-grid">
+      {recipeTracks.map((item) => (
+        <article class="recipe-card">
+          <p class="signal-list__kicker">{item.label}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <a class="text-link" href={item.href}>{item.cta}</a>
         </article>
       ))}
     </div>

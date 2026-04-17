@@ -4,6 +4,72 @@ import PageHero from '../../components/marketing/PageHero.astro';
 import { ARCHITECTURE_COPY } from '../../data/site';
 
 const copy = ARCHITECTURE_COPY.zh;
+
+const requestFlow = [
+  {
+    label: '01',
+    title: '边界请求先进入 net/http',
+    body: '请求从标准库表面进入，transport 起点在 Plumego 介入之前就已经可见。',
+    note: '先把入口保持克制，ownership 才会从显式代码开始。',
+  },
+  {
+    label: '02',
+    title: '应用本地 wiring 负责组装依赖',
+    body: 'internal/app/app.go 应该说明服务本地拥有的能力、注入方式，以及哪些协作者本来就是可选的。',
+    note: 'bootstrap 是否自律，直接决定后续代码是否还容易读。',
+  },
+  {
+    label: '03',
+    title: 'routes 负责划定公开请求路径',
+    body: 'internal/app/routes.go 应该告诉你哪些 handler 对外开放、middleware 顺序是什么，以及 transport 控制应该在何处停止。',
+    note: 'route 注册是第一张架构地图，而不是可以跳过的细节。',
+  },
+  {
+    label: '04',
+    title: '路径读清以后，能力再向外分层',
+    body: '只有 canonical path 已经清楚时，更深的能力工作才应该进入稳定根或 x/* 家族，而不是全部吸回内核。',
+    note: '扩展应当建立在分类之后，而不是为了省事。',
+  },
+] as const;
+
+const topologyColumns = [
+  {
+    label: 'stable roots',
+    title: '优先守兼容性的内核',
+    body: '这些模块承担长期负担，因此应该更小、更慢、更容易在评审时讲清楚。',
+    items: ['contract', 'core', 'router', 'middleware', 'security'],
+  },
+  {
+    label: 'canonical path',
+    title: '每个新读者都该先学会的默认阅读路径',
+    body: '网站、文档与 reference app 都在强化同一条路线：bootstrap → route 注册 → 请求处理。',
+    items: ['docs/getting-started', 'docs/reference-app', 'internal/app/app.go', 'internal/app/routes.go'],
+  },
+  {
+    label: 'x/* families',
+    title: '向外分叉的能力家族',
+    body: '可选的产品能力或协议工作应该留在这里，它们可以更快演进，但不应该要求内核一起膨胀。',
+    items: ['x/ai', 'x/data', 'x/gateway', 'x/messaging', 'x/rest', 'x/websocket'],
+  },
+] as const;
+
+const comparisonRows = [
+  {
+    aspect: '归属判断',
+    stable: '它是否属于几乎所有服务都会依赖、并且需要更强兼容性承诺的职责？',
+    extension: '它是否属于可选、协议相关或产品形态很强的能力，不应该重写默认路径？',
+  },
+  {
+    aspect: '演进速度',
+    stable: '更慢、更收敛、更容易在评审中为兼容性负责。',
+    extension: '可以更快演进，只要和 canonical path 的边界仍然足够清楚。',
+  },
+  {
+    aspect: '读者预期',
+    stable: '新读者应该只看文档和 reference app 就能理解为什么它存在。',
+    extension: '新读者应该先理解自己为什么需要它，再决定是否打开具体家族。',
+  },
+] as const;
 ---
 
 <MarketingLayout
@@ -41,6 +107,46 @@ const copy = ARCHITECTURE_COPY.zh;
 
   <section class="section">
     <div class="section__intro">
+      <h2>先把架构看成三块互相配合的区域</h2>
+      <p>当内核、canonical 阅读路径，以及向外分叉的能力家族都能同时出现在一个视图里，Plumego 才会更容易判断和信任。</p>
+    </div>
+    <div class="topology-board">
+      {topologyColumns.map((column) => (
+        <article class="topology-node">
+          <p class="signal-list__kicker">{column.label}</p>
+          <h3>{column.title}</h3>
+          <p>{column.body}</p>
+          <ul>
+            {column.items.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section section--split section--architecture-flow">
+    <div class="section__intro">
+      <h2>{copy.flowTitle}</h2>
+      <p>{copy.flowBody}</p>
+    </div>
+    <div class="request-flow-rail">
+      {requestFlow.map((step) => (
+        <article class="request-flow-step">
+          <div>
+            <p class="signal-list__kicker">{step.label}</p>
+            <h3>{step.title}</h3>
+          </div>
+          <p>{step.body}</p>
+          <p class="request-flow-step__note">{step.note}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
       <h2>{copy.sectionTitle}</h2>
       <p>{copy.sectionBody}</p>
     </div>
@@ -62,16 +168,21 @@ const copy = ARCHITECTURE_COPY.zh;
 
   <section class="section">
     <div class="section__intro">
-      <h2>{copy.flowTitle}</h2>
-      <p>{copy.flowBody}</p>
+      <h2>stable roots 与 x/* 的区别，本质上是 ownership 区别</h2>
+      <p>这两层都重要。差别在于，一层负责保护几乎所有服务都会依赖的默认路径，另一层负责防止可选能力继续向内渗透。</p>
     </div>
-    <div class="control-grid">
-      {copy.flowSteps.map((item) => (
-        <article class="control-grid__item">
-          <p class="signal-list__kicker">{item.label}</p>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-        </article>
+    <div class="comparison-table" role="table" aria-label="稳定根与 x 家族对比">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">信号</span>
+        <span role="columnheader">稳定根</span>
+        <span role="columnheader">x/* 家族</span>
+      </div>
+      {comparisonRows.map((row) => (
+        <div class="comparison-table__row" role="row">
+          <strong role="cell">{row.aspect}</strong>
+          <span role="cell">{row.stable}</span>
+          <span role="cell">{row.extension}</span>
+        </div>
       ))}
     </div>
   </section>
@@ -79,7 +190,7 @@ const copy = ARCHITECTURE_COPY.zh;
   <section class="section">
     <div class="section__intro">
       <h2>回到 reference path 继续</h2>
-      <p>先用架构页判断工作应该落在哪一层，再回到文档和可运行示例推进真正的采用工作。</p>
+      <p>先用架构页判断工作应该落在哪一层，再回到文档与可运行示例推进真正的采用。</p>
     </div>
     <div class="page-links">
       <a class="text-link" href="/zh/docs/getting-started">打开开始使用</a>
