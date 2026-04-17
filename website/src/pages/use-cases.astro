@@ -1,9 +1,44 @@
 ---
-import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
+import MarketingLayout from '../layouts/MarketingLayout.astro';
 import { USE_CASES_COPY } from '../data/site';
 
 const copy = USE_CASES_COPY.en;
+const fitChecks = [
+  {
+    kicker: 'review path',
+    title: 'Do you want request flow to stay visible in code review?',
+    body: 'Plumego is strongest when reviewers should be able to inspect route registration, middleware order, and app-local wiring directly in code.',
+  },
+  {
+    kicker: 'service shape',
+    title: 'Do you want one canonical service shape?',
+    body: 'The framework works best when new services can begin from one reference app instead of growing repository-specific bootstrap patterns.',
+  },
+  {
+    kicker: 'boundary map',
+    title: 'Do you need explicit maturity and ownership signals?',
+    body: 'Plumego favors published boundaries: stable roots stay narrow, capability families move outward, and release posture is explained instead of implied.',
+  },
+];
+
+const cautionCards = [
+  {
+    kicker: 'not ideal',
+    title: 'Framework conventions should stay invisible',
+    body: 'If the team wants batteries-included abstractions to disappear behind framework-owned magic, Plumego can feel slower and more deliberate than expected.',
+  },
+  {
+    kicker: 'not ideal',
+    title: 'Every service is intentionally snowflake-shaped',
+    body: 'The value here comes from narrowing the accepted path. If each service needs a different bootstrap or routing style, the canonical path becomes less useful.',
+  },
+  {
+    kicker: 'not ideal',
+    title: 'You want architecture answers without adoption decisions',
+    body: 'Use Architecture to learn the boundary model. Use this page only when you need to decide whether Plumego fits the service in front of you.',
+  },
+];
 ---
 
 <MarketingLayout
@@ -11,15 +46,15 @@ const copy = USE_CASES_COPY.en;
   title={copy.title}
   description={copy.description}
   currentPath="/use-cases"
-  keywords={['plumego use cases', 'go service toolkit', 'stdlib-first go', 'explicit http services']}
+  keywords={['plumego adoption fit', 'go service toolkit', 'stdlib-first go', 'explicit http services']}
 >
   <PageHero
     eyebrow={copy.eyebrow}
     title={copy.title}
     description={copy.description}
     links={[
+      { label: 'Architecture', href: '/architecture' },
       { label: 'Examples', href: '/examples' },
-      { label: 'Docs', href: '/docs' },
     ]}
   />
 
@@ -44,6 +79,15 @@ const copy = USE_CASES_COPY.en;
       <h2>{copy.decisionTitle}</h2>
       <p>{copy.decisionBody}</p>
     </div>
+    <div class="control-grid">
+      {fitChecks.map((item) => (
+        <article class="page-panel page-panel--dense">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
   </section>
 
   <section class="page-grid">
@@ -62,15 +106,36 @@ const copy = USE_CASES_COPY.en;
     ))}
   </section>
 
+  <section class="section section--split">
+    <div class="section__intro">
+      <h2>When to slow down before adopting</h2>
+      <p>
+        This page should help you make a fit decision, not force one. If the service posture below sounds more like your team,
+        keep Architecture as a mental model and hold adoption until the repository goals are clearer.
+      </p>
+    </div>
+    <div class="control-grid">
+      {cautionCards.map((item) => (
+        <article class="page-panel page-panel--dense">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
   <section class="section">
     <div class="section__intro">
-      <h2>Continue with the default path</h2>
-      <p>Once the fit is clear, move to the canonical example and the docs entry path.</p>
+      <h2>Pick the next page deliberately</h2>
+      <p>
+        Once the fit is clearer, move to the page that answers the next question: boundary model, runnable path, or direct docs entry.
+      </p>
     </div>
     <div class="page-links">
+      <a class="text-link" href="/architecture">Read architecture first</a>
       <a class="text-link" href="/examples">Open examples</a>
       <a class="text-link" href="/docs/getting-started">Open getting started</a>
-      <a class="text-link" href="/docs/reference-app">Read the reference app</a>
     </div>
   </section>
 </MarketingLayout>

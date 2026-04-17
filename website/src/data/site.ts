@@ -89,10 +89,10 @@ export const HOME_COPY = {
     eyebrow: 'Plumego',
     headline: 'A Go toolkit for explicit HTTP services.',
     summary:
-      'Plumego stays close to net/http, keeps the stable surface intentionally narrow, and gives teams one canonical path for building reviewable Go services.',
+      'Plumego stays close to net/http, keeps the stable surface intentionally narrow, and gives teams one canonical request path for building reviewable Go services.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'See Architecture', href: '/architecture' },
-    notes: ['Go 1.24+', 'stdlib-first', 'reference/standard-service'],
+    notes: ['Go 1.24+', 'request-flow first', 'reference/standard-service'],
     heroAudience: {
       label: 'Built for',
       title: 'Teams that want service code to stay reviewable',
@@ -111,8 +111,30 @@ export const HOME_COPY = {
       extensionTitle: 'capabilities branch outward',
       extensionBody: 'Stable roots stay narrow while optional capability work starts in x/* families instead of stretching the kernel.',
       footerLabel: 'default path',
-      footerBody: 'docs → reference app → boundaries → extensions',
+      footerBody: 'docs → reference app → request flow → module fit',
     },
+    heroPath: [
+      {
+        label: '01',
+        title: 'Start in docs',
+        body: 'Use getting-started to understand the default path before browsing deeper packages.',
+      },
+      {
+        label: '02',
+        title: 'Run the reference app',
+        body: 'Treat reference/standard-service as the canonical service shape instead of a disposable demo.',
+      },
+      {
+        label: '03',
+        title: 'Trace one request',
+        body: 'Read the request flow before deciding where transport responsibility ends.',
+      },
+      {
+        label: '04',
+        title: 'Classify module ownership',
+        body: 'Only then decide whether the work belongs in stable roots, app-local wiring, or x/* families.',
+      },
+    ],
     valueTitle: 'Why Plumego exists.',
     valueLead:
       'Plumego does not try to out-abstract the Go HTTP model. It exists to keep the important parts visible as the repository and the team get larger.',
@@ -135,9 +157,9 @@ export const HOME_COPY = {
     ],
     valueFootnote:
       'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small.',
-    adoptionTitle: 'Two clear ways to continue.',
+    adoptionTitle: 'Choose the next page by question, not by package.',
     adoptionBody:
-      'The first real question after the landing page is not “which package should I open?” It is “does this fit my service?” and “which example path should I trust?”',
+      'Architecture explains how the repository is shaped. Examples show the canonical runnable path and the guided recipes around it. Pick the page that answers your next question.',
     adoptionCards: [
       {
         kicker: 'topology',
@@ -156,9 +178,9 @@ export const HOME_COPY = {
     ],
     stableRoots: MODULE_FACTS.stableRoots,
     extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: 'Start from one canonical service shape.',
+    canonicalTitle: 'Start from one canonical request path.',
     canonicalBody:
-      'Begin with reference/standard-service. It gives you the directory shape, bootstrap flow, and route wiring Plumego treats as the default application path.',
+      'Begin with reference/standard-service. The point is not just one service skeleton—it is one readable path from bootstrap to route registration before deeper boundary work begins.',
     canonicalCta: { label: 'Read the Reference App Guide', href: '/docs/reference-app' },
     canonicalSteps: [
       {
@@ -176,7 +198,26 @@ export const HOME_COPY = {
         title: 'Finish in internal/app/routes.go',
         body: 'Check route registration before touching handlers or deeper modules.',
       },
+      {
+        label: 'boundaries',
+        title: 'Only then compare module ownership',
+        body: 'Use architecture and modules overview to decide whether the next change belongs in stable roots or x/* families.',
+      },
     ],
+    mapTitle: 'Use the module map after the canonical path is clear.',
+    mapLead:
+      'The module map is not a second starting point. It is the next layer of orientation once you understand the default request path and need to classify where deeper work belongs.',
+    mapPanels: {
+      stable: {
+        title: 'Stable roots protect the default path',
+        caption: 'Narrow modules with stronger compatibility burden and clearer review expectations.',
+      },
+      extension: {
+        title: 'x/* families protect optional capability work',
+        caption: 'Product or protocol-specific work moves outward instead of stretching the kernel.',
+      },
+      footer: 'Read the path first; use the module map when the next question is ownership.',
+    },
     finalTitle: 'Read the docs, run the reference app, then expand only when needed.',
     finalBody:
       'Plumego works best when you start from the default path and branch into deeper boundaries only after the owning capability is clear.',
@@ -187,10 +228,10 @@ export const HOME_COPY = {
     eyebrow: 'Plumego',
     headline: '一个面向显式 HTTP 服务的 Go 工具包。',
     summary:
-      'Plumego 尽量贴近 net/http，把稳定表面保持收敛，并为团队提供一条构建可评审 Go 服务的 canonical 路径。',
+      'Plumego 尽量贴近 net/http，把稳定表面保持收敛，并为团队提供一条构建可评审 Go 服务的 canonical 请求路径。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '查看架构', href: '/zh/architecture' },
-    notes: ['Go 1.24+', 'stdlib-first', 'reference/standard-service'],
+    notes: ['Go 1.24+', 'request-flow first', 'reference/standard-service'],
     heroAudience: {
       label: '适合',
       title: '希望服务代码持续可评审的团队',
@@ -209,8 +250,30 @@ export const HOME_COPY = {
       extensionTitle: '能力向外分叉',
       extensionBody: '稳定根保持收敛，可选能力从 x/* 家族开始，而不是继续拉长内核。',
       footerLabel: '默认路径',
-      footerBody: 'docs → reference app → 边界 → 扩展',
+      footerBody: 'docs → reference app → request flow → 模块归属',
     },
+    heroPath: [
+      {
+        label: '01',
+        title: '先从文档进入',
+        body: '先用开始使用理解默认路径，再决定要不要看更深的包。',
+      },
+      {
+        label: '02',
+        title: '运行 reference app',
+        body: '把 reference/standard-service 当成 canonical 服务形态，而不是一次性 demo。',
+      },
+      {
+        label: '03',
+        title: '沿 request flow 读一遍',
+        body: '先追清一条请求，判断 transport 责任到底在哪一层结束。',
+      },
+      {
+        label: '04',
+        title: '最后判断模块归属',
+        body: '再决定这项工作属于稳定根、应用本地 wiring，还是 x/* 能力家族。',
+      },
+    ],
     valueTitle: 'Plumego 为什么存在。',
     valueLead:
       'Plumego 不是要重新发明 Go 的 HTTP 模型。它的目标，是在仓库和团队变大以后，继续把关键结构保持可见。',
@@ -233,9 +296,9 @@ export const HOME_COPY = {
     ],
     valueFootnote:
       '重点不是更多框架抽象，而是让服务工具包在仓库不再小的时候依然保持可读。',
-    adoptionTitle: '继续往前时，先回答两个问题。',
+    adoptionTitle: '根据问题选下一页，而不是先选包。',
     adoptionBody:
-      '离开首页之后，真正重要的不是“先看哪个包”，而是“它适不适合我的服务”和“我该相信哪条示例路径”。',
+      'Architecture 负责解释仓库如何分层；Examples 负责解释 canonical 可运行路径和围绕它的 guided recipes。先选能回答你下一个问题的页面。',
     adoptionCards: [
       {
         kicker: 'topology',
@@ -254,9 +317,9 @@ export const HOME_COPY = {
     ],
     stableRoots: MODULE_FACTS.stableRoots,
     extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: '从唯一的 canonical 服务形态起步。',
+    canonicalTitle: '先从 canonical 请求路径起步。',
     canonicalBody:
-      '先看 reference/standard-service。它给出 Plumego 认可的默认目录结构、bootstrap 流程和 route wiring 方式。',
+      '先看 reference/standard-service。重点不只是服务骨架本身，而是一条从 bootstrap 到 route 注册都保持可读的默认请求路径。',
     canonicalCta: { label: '阅读参考应用说明', href: '/zh/docs/reference-app' },
     canonicalSteps: [
       {
@@ -274,7 +337,26 @@ export const HOME_COPY = {
         title: '最后看 internal/app/routes.go',
         body: '在继续深入 handler 或模块之前，先看清 route 注册。',
       },
+      {
+        label: 'boundaries',
+        title: '再判断模块归属',
+        body: '用 architecture 与 modules overview 判断下一项工作属于稳定根还是 x/* 家族。',
+      },
     ],
+    mapTitle: '只有 canonical path 清楚以后，再看 module map。',
+    mapLead:
+      'module map 不是第二个起点，而是在默认请求路径已经读清之后，帮助你继续判断更深工作归属的下一层视图。',
+    mapPanels: {
+      stable: {
+        title: '稳定根负责保护默认路径',
+        caption: '这些模块更收敛、兼容性负担更重，也更应该在评审时容易讲清楚。',
+      },
+      extension: {
+        title: 'x/* 家族负责承接可选能力工作',
+        caption: '产品能力或协议工作向外分叉，而不是继续把内核拉长。',
+      },
+      footer: '先读路径，再用 module map 判断 ownership。',
+    },
     finalTitle: '先读文档，跑通 reference app，再按需要向外扩展。',
     finalBody: 'Plumego 最适合从默认路径进入，只有在 capability ownership 明确之后，再进入更深的模块边界。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
@@ -657,12 +739,12 @@ export const SUPPORT_MATRIX = RELEASE_FACTS.supportMatrix;
 
 export const USE_CASES_COPY = {
   en: {
-    title: 'Use Cases',
-    description: 'Where Plumego fits well today, where the canonical path is strongest, and what kind of teams benefit most.',
-    eyebrow: 'Adoption Fit',
-    introTitle: 'Use Plumego when explicit structure is part of the requirement.',
+    title: 'Adoption Fit',
+    description: 'Use this page to decide whether Plumego matches the service in front of you and which reading path should come next.',
+    eyebrow: 'Fit Check',
+    introTitle: 'Use this page to decide whether Plumego matches the service in front of you.',
     introBody:
-      'Plumego is strongest when service boundaries, reviewability, and repository ownership matter. It is less about shipping a feature bundle quickly and more about keeping the HTTP service model visible as the repository grows.',
+      'Architecture explains how the repository is structured. This page is narrower: it helps you decide whether Plumego is a good fit for the service you are evaluating and which entry path to open next.',
     guideCards: [
       {
         kicker: 'good fit',
@@ -680,9 +762,9 @@ export const USE_CASES_COPY = {
         body: 'Plumego’s docs/specs/tasks split helps both humans and agents decide where a change belongs before the diff starts to sprawl.',
       },
     ],
-    decisionTitle: 'How to judge fit quickly',
+    decisionTitle: 'Three quick fit checks',
     decisionBody:
-      'If your team wants the framework to disappear into conventions, Plumego may feel too explicit. If you want narrow stable roots and visible routing decisions, it becomes much more compelling.',
+      'If your team wants the framework to disappear into conventions, Plumego may feel too explicit. If you want visible route decisions, one canonical service shape, and explicit maturity signals, it becomes much more compelling.',
     cases: [
       {
         kicker: 'internal api',
@@ -735,12 +817,12 @@ export const USE_CASES_COPY = {
     ],
   },
   zh: {
-    title: '适用场景',
-    description: 'Plumego 当前更适合哪些场景、canonical path 在哪里最强，以及哪类团队会真正受益。',
-    eyebrow: 'Adoption Fit',
-    introTitle: '当“显式结构”本身就是需求时，再用 Plumego。',
+    title: '采用判断',
+    description: '用这个页面判断当前服务是否适合 Plumego，以及下一步应该沿哪条阅读路径进入。',
+    eyebrow: 'Fit Check',
+    introTitle: '用这一页判断 Plumego 是否匹配你眼前的服务。',
     introBody:
-      'Plumego 最强的地方，是边界、可评审性和仓库 ownership 都很重要的时候。它不是为了更快堆功能目录，而是为了在仓库变大以后，仍然把 HTTP 服务模型保持可见。',
+      'Architecture 负责解释仓库如何分层；这一页更收敛，只负责帮你判断 Plumego 是否适合当前服务，以及下一步该打开哪条入口路径。',
     guideCards: [
       {
         kicker: 'good fit',
@@ -758,9 +840,9 @@ export const USE_CASES_COPY = {
         body: 'docs/specs/tasks 的分层让人和 agent 都能在 diff 失控之前先判断改动归属。',
       },
     ],
-    decisionTitle: '如何快速判断是否适合',
+    decisionTitle: '三个快速判断问题',
     decisionBody:
-      '如果你的团队更希望框架藏进约定里，Plumego 可能会显得过于显式。相反，如果你想要收敛的稳定根和可见的路由决策，它会更有吸引力。',
+      '如果你的团队更希望框架藏进约定里，Plumego 可能会显得过于显式。相反，如果你想要可见的路由决策、统一服务形态与显式成熟度信号，它会更有吸引力。',
     cases: [
       {
         kicker: 'internal api',

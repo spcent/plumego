@@ -16,6 +16,17 @@ const { copy } = Astro.props;
     <ul class="hero__notes">
       {copy.notes.map((note: string) => <li>{note}</li>)}
     </ul>
+    <div class="hero__path" aria-label="Canonical reading path">
+      {copy.heroPath.map((step: { label: string; title: string; body: string }) => (
+        <article class="hero__path-step">
+          <span>{step.label}</span>
+          <div>
+            <strong>{step.title}</strong>
+            <p>{step.body}</p>
+          </div>
+        </article>
+      ))}
+    </div>
     <div class="hero__signals">
       <article class="hero__signal">
         <p class="signal-list__kicker">{copy.heroAudience.label}</p>

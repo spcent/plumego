@@ -454,6 +454,48 @@ li {
   gap: 1.1rem;
 }
 
+.hero__path {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.2rem;
+}
+
+.hero__path-step {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 0.9rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(120, 160, 255, 0.16);
+  border-radius: 1rem;
+  background: rgba(10, 18, 34, 0.56);
+}
+
+.hero__path-step span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: rgba(120, 160, 255, 0.12);
+  border: 1px solid rgba(120, 160, 255, 0.18);
+  color: var(--fg);
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+}
+
+.hero__path-step strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--fg);
+}
+
+.hero__path-step p {
+  margin: 0;
+  color: var(--fg-soft);
+  font-size: 0.95rem;
+}
+
 .hero__notes li {
   border-bottom: 0;
   border-top: 1px solid var(--line);
@@ -471,6 +513,20 @@ li {
 .control-grid__item {
   border-top: 1px solid var(--line);
   padding-top: 0.9rem;
+}
+
+.page-panel--dense {
+  gap: 0.85rem;
+}
+
+.page-panel--dense h3 {
+  margin: 0;
+  color: var(--fg);
+  font-size: 1.1rem;
+}
+
+.page-panel--dense p {
+  margin: 0;
 }
 
 .fact-card__eyebrow,
@@ -657,8 +713,17 @@ li {
     padding-left: 0;
   }
 
-  .hero__context {
+  .hero__signals {
     grid-template-columns: 1fr;
+  }
+
+  .hero__path-step {
+    grid-template-columns: 1fr;
+  }
+
+  .hero__path-step span {
+    width: fit-content;
+    min-width: 3rem;
   }
 
   h1 {
