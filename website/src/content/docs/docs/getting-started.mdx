@@ -8,7 +8,9 @@ sidebar:
 
 # Getting Started
 
-The fastest way to understand Plumego is to run the canonical reference application first. That path shows how Plumego expects bootstrap, route wiring, and handler shape to stay visible in code.
+Getting Started is the shortest path from docs home into a running Plumego service. Choose this page when the next question is execution: you want one successful run, one small inspection checklist, and one clear confirmation that Plumego keeps bootstrap and route wiring visible.
+
+If the better question is "what does the canonical service shape imply and where should I copy from?", pause here and open [Reference App](/docs/reference-app). If the real question is about stable roots, `x/*`, and repository ownership, jump to [Architecture](/architecture) instead of stretching this page into a boundary guide.
 
 ## Requirements
 
@@ -34,7 +36,16 @@ go run ./reference/standard-service
 - route wiring remains explicit instead of being hidden behind registration magic
 - the handler shape stays close to the standard-library HTTP model
 
+## What this page does not try to answer
+
+- it does not explain the full repository boundary model
+- it does not replace the canonical service tour in Reference App
+- it does not imply that every package you see during exploration belongs on the default learning path
+
 ## What to read next
 
-- [Reference App](/docs/reference-app)
-- [Modules Overview](/docs/modules/overview)
+Choose the next page by question, not by page order:
+
+- open [Reference App](/docs/reference-app) when you want a file-by-file reading of the canonical service shape
+- open [Request Flow](/docs/concepts/request-flow) when you want to understand how a request moves through the explicit HTTP path
+- open [Architecture](/architecture) when you need to classify ownership, stable roots, and extension families instead of only running the default path

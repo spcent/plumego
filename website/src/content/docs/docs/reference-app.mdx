@@ -8,7 +8,9 @@ sidebar:
 
 # Reference App
 
-`reference/standard-service` is the canonical application shape in Plumego.
+`reference/standard-service` is the canonical application shape in Plumego. Choose this page when the next question is shape rather than execution: you want to see how the reference service is assembled, what its layout demonstrates, and which conclusions are safe to carry into a real service.
+
+If you have not run anything yet and simply want the shortest working path, start with [Getting Started](/docs/getting-started). If your question has already moved beyond canonical service shape and into repository boundaries, open [Architecture](/architecture) so the ownership conversation stays there instead of leaking into this page.
 
 ## What it demonstrates
 
@@ -28,9 +30,17 @@ Use it when you are:
 - starting a new service
 - validating handler and route shape
 - deciding where application-local code should live
+- comparing your service skeleton against Plumego’s canonical layout
 
 ## What not to infer from it
 
 - it is a canonical reference, not a feature catalog
 - it does not make every `x/*` package part of the default path
 - it should not be treated as a license to blur stable-root boundaries
+- it is not the page that decides repository ownership or release maturity
+
+## What to read next
+
+- open [Architecture](/architecture) when you need to classify stable roots, `x/*`, or repository ownership
+- open [Modules Overview](/docs/modules/overview) when you want a broader map after understanding the canonical app shape
+- open [FAQ](/docs/faq) when your next questions are about scope, maturity, or what Plumego is intentionally not trying to be

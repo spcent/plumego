@@ -8,7 +8,9 @@ sidebar:
 
 # 开始使用
 
-理解 Plumego 的最快方式，是先跑通 canonical 参考应用。这条路径会直接展示 Plumego 希望保持显式的 bootstrap、route wiring 与 handler 形态。
+“开始使用”是从 docs 首页进入一个可运行 Plumego 服务的最短路径。当你接下来的问题是执行层问题时，应该先看这里：你要的是一次成功运行、一份很短的检查清单，以及一个足够明确的确认信号——Plumego 确实把 bootstrap 与 route wiring 保持在可见范围内。
+
+如果你真正想问的是“canonical 服务形态意味着什么、我应该从哪里抄结构”，那就先去看[参考应用](/zh/docs/reference-app)。如果你真正关心的是 stable roots、`x/*` 与仓库归属，那就直接跳到 [Architecture](/zh/architecture)，不要把这个页面当作边界说明页来使用。
 
 ## 环境要求
 
@@ -34,7 +36,16 @@ go run ./reference/standard-service
 - route wiring 保持显式，而不是藏进注册魔法里
 - handler 形态依旧贴近标准库 HTTP 模型
 
+## 这个页面不打算回答什么
+
+- 它不负责解释完整的仓库边界模型
+- 它不能替代参考应用对 canonical 服务形态的文件级讲解
+- 它也不意味着你在探索时看到的每个包都属于默认学习路径
+
 ## 下一步阅读
 
-- [参考应用](/zh/docs/reference-app)
-- [模块总览](/zh/docs/modules/overview)
+按问题选择下一页，而不是按页面顺序机械阅读：
+
+- 打开 [参考应用](/zh/docs/reference-app)，当你想按文件理解 canonical 服务形态时
+- 打开 [Request Flow](/zh/docs/concepts/request-flow)，当你想知道一个请求如何沿显式 HTTP 路径向前流动时
+- 打开 [Architecture](/zh/architecture)，当你需要判断 stable roots、扩展家族和工作归属，而不仅仅是把默认路径跑起来时

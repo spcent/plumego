@@ -8,7 +8,9 @@ sidebar:
 
 # 参考应用
 
-`reference/standard-service` 是 Plumego 的 canonical 应用形态。
+`reference/standard-service` 是 Plumego 的 canonical 应用形态。当你接下来的问题是“canonical 服务长什么样”，而不是“先怎么跑起来”时，应该看这个页面。它的职责，是让你理解参考服务如何被组装起来、这种布局到底说明了什么，以及哪些结论可以安全地带入真实服务。
+
+如果你还没有跑任何东西，只想先走最短成功路径，请先看[开始使用](/zh/docs/getting-started)。如果你的问题已经从服务形态转向仓库边界与模块归属，请直接打开 [Architecture](/zh/architecture)，把归属判断留在那个页面里，而不是让它继续渗到这里。
 
 ## 它展示了什么
 
@@ -28,9 +30,17 @@ Plumego 有意坚持“只有一条明显路径”的工程风格，而参考应
 - 新建服务
 - 校验 handler 与 route 形态
 - 判断应用本地代码应放在哪里
+- 把你自己的服务骨架和 Plumego 的 canonical 布局做对照
 
 ## 不应从它推导什么
 
 - 它是 canonical 参考，不是功能目录
 - 它不意味着每个 `x/*` 包都属于默认学习路径
-- 它不应被当作模糊稳定根边界的理由
+- 它不应被当作模糊 stable-root 边界的理由
+- 它也不是用来判断仓库归属或发布成熟度的页面
+
+## 下一步阅读
+
+- 打开 [Architecture](/zh/architecture)，当你需要分类 stable roots、`x/*` 与仓库归属时
+- 打开 [模块总览](/zh/docs/modules/overview)，当你在理解 canonical 形态之后，想看更大的模块地图时
+- 打开 [FAQ](/zh/docs/faq)，当你下一步的问题是范围、成熟度或 Plumego 明确不打算做什么时
