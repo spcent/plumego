@@ -21,12 +21,26 @@ import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
   </p>
 </div>
 
+<div class="docs-home-coverage not-content">
+  <p class="signal-list__kicker">handoff</p>
+  <h2>If you came from Why Plumego</h2>
+  <p>
+    Treat this page as the handoff from adoption evaluation into implementation. If Plumego already looks like the right fit, continue into Getting Started and the
+    Reference App. If the fit question is still open, go back to Why Plumego before you spend time classifying modules.
+  </p>
+  <ul>
+    <li><a href="/why-plumego">Return to Why Plumego</a> if the team or service fit still needs a longer decision path.</li>
+    <li><a href="/docs/getting-started">Open Getting Started</a> when the next question is how to stand up the smallest canonical path.</li>
+    <li><a href="/docs/reference-app">Open Reference App</a> when you want to inspect the runnable shape directly.</li>
+  </ul>
+</div>
+
 <div class="docs-home-stack not-content">
   <section class="docs-home-section">
     <div class="docs-home-section__head">
       <p class="signal-list__kicker">canonical path</p>
       <h2>Recommended reading path</h2>
-      <p>Follow the smallest path that builds a usable mental model before you classify deeper repository work.</p>
+      <p>Follow the smallest path that turns adoption confidence into implementation steps before you classify deeper repository work.</p>
     </div>
     <DocsReadingPath />
   </section>
@@ -35,7 +49,7 @@ import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
     <div class="docs-home-section__head">
       <p class="signal-list__kicker">read by topic</p>
       <h2>Choose a reading track</h2>
-      <p>Once you understand the canonical path, continue by topic instead of scanning pages at random.</p>
+      <p>Once the fit decision is behind you, continue by topic instead of scanning pages at random.</p>
     </div>
     <DocsTopicGroups />
   </section>

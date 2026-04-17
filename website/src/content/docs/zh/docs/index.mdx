@@ -21,12 +21,25 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
   </p>
 </div>
 
+<div class="docs-home-coverage not-content">
+  <p class="signal-list__kicker">handoff</p>
+  <h2>如果你刚从 Why Plumego 过来</h2>
+  <p>
+    把这一页当作从 adoption 判断进入实现阶段的交接页。如果你已经确认 Plumego 适合当前服务，就继续进入 Getting Started 与 Reference App；如果适配问题还没有想清楚，就先回到 Why Plumego，再决定是否继续划分模块边界。
+  </p>
+  <ul>
+    <li><a href="/zh/why-plumego">回到 Why Plumego</a>，当团队姿态或服务适配度还需要更完整的判断路径时。</li>
+    <li><a href="/zh/docs/getting-started">打开开始使用</a>，当下一个问题是如何跑通最小 canonical path。</li>
+    <li><a href="/zh/docs/reference-app">打开参考应用</a>，当你想直接检查 runnable shape 时。</li>
+  </ul>
+</div>
+
 <div class="docs-home-stack not-content">
   <section class="docs-home-section">
     <div class="docs-home-section__head">
       <p class="signal-list__kicker">canonical path</p>
       <h2>建议阅读路径</h2>
-      <p>先用最短路径建立可工作的心智模型，再进入更细的模块边界和扩展家族。</p>
+      <p>先把 adoption 判断转成实现步骤，再进入更细的模块边界和扩展家族。</p>
     </div>
     <DocsReadingPath locale="zh" />
   </section>
@@ -35,7 +48,7 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
     <div class="docs-home-section__head">
       <p class="signal-list__kicker">read by topic</p>
       <h2>按主题继续阅读</h2>
-      <p>当你已经理解 canonical path 之后，接下来应该按主题继续，而不是随机扫页面。</p>
+      <p>当适配判断已经结束之后，接下来应该按主题继续，而不是随机扫页面。</p>
     </div>
     <DocsTopicGroups locale="zh" />
   </section>
