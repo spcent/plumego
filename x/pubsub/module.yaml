@@ -21,6 +21,7 @@ non_goals:
 allowed_imports:
   - log
   - metrics
+  - x/resilience
 
 forbidden_imports:
   - core/components/**

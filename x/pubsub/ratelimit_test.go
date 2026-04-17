@@ -287,16 +287,20 @@ func TestRateLimitedPubSub_TokenBucket(t *testing.T) {
 func TestRateLimitedPubSub_DynamicRateAdjustment(t *testing.T) {
 	tb := newTokenBucket(10.0, 5)
 
-	// Initial rate
-	if tb.rate != 10.0 {
-		t.Errorf("Expected initial rate 10.0, got %.1f", tb.rate)
+	// Drain bucket
+	for tb.allow() {
 	}
 
-	// Update rate
-	tb.updateRate(20.0)
+	// With low rate, bucket should stay empty.
+	if tb.allow() {
+		t.Error("expected no token immediately after draining")
+	}
 
-	if tb.rate != 20.0 {
-		t.Errorf("Expected updated rate 20.0, got %.1f", tb.rate)
+	// After cranking rate way up, wait a bit and tokens should refill fast.
+	tb.updateRate(10000.0)
+	time.Sleep(5 * time.Millisecond)
+	if !tb.allow() {
+		t.Error("expected token to be available after updating to high rate")
 	}
 }
 

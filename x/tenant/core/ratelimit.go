@@ -202,6 +202,10 @@ func (l *TokenBucketRateLimiter) Allow(ctx context.Context, tenantID string, req
 	return result, nil
 }
 
+// tokenBucket is a local token bucket used by TokenBucketRateLimiter.
+// It is intentionally kept separate from x/resilience/ratelimit.TokenBucket because
+// it supports a caller-supplied "now" time for deterministic testing and
+// in-place rate/capacity reconfiguration without losing accumulated tokens.
 type tokenBucket struct {
 	mu         sync.Mutex
 	tokens     float64
