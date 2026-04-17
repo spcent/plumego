@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -10,7 +11,7 @@ func TestPubSub_ConcurrentPublish_NoPanic(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 64, Policy: DropOldest})
+	sub, err := ps.Subscribe(context.Background(), "t", SubOptions{BufferSize: 64, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}

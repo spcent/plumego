@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/spcent/plumego/security/authn"
@@ -130,18 +131,20 @@ func mapJWTError(err error) error {
 	case errors.Is(err, ErrTokenExpired):
 		return authn.ErrExpiredToken
 	case errors.Is(err, ErrTokenNotYetValid):
-		return authn.ErrInvalidToken
+		return fmt.Errorf("token not yet valid: %w", authn.ErrInvalidToken)
 	case errors.Is(err, ErrInvalidIssuer):
-		return authn.ErrInvalidToken
+		return fmt.Errorf("invalid issuer: %w", authn.ErrInvalidToken)
 	case errors.Is(err, ErrInvalidAudience):
-		return authn.ErrInvalidToken
+		return fmt.Errorf("invalid audience: %w", authn.ErrInvalidToken)
 	case errors.Is(err, ErrUnknownKey):
-		return authn.ErrInvalidToken
+		return fmt.Errorf("unknown signing key: %w", authn.ErrInvalidToken)
 	case errors.Is(err, ErrMissingSubject):
-		return authn.ErrInvalidToken
+		return fmt.Errorf("missing subject: %w", authn.ErrInvalidToken)
 	case errors.Is(err, ErrInvalidToken):
 		return authn.ErrInvalidToken
 	default:
-		return authn.ErrInvalidToken
+		// Internal errors (e.g. storage failures) are returned as-is so callers
+		// can distinguish infrastructure failures from auth failures.
+		return err
 	}
 }

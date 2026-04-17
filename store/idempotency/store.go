@@ -1,3 +1,14 @@
+// Package idempotency defines stable, storage-agnostic contracts for
+// idempotent request processing.
+//
+// This package contains only interface definitions, sentinel errors, and shared
+// types. Concrete implementations (SQL-backed, KV-backed) live in x/data/idempotency.
+//
+// Typical wiring:
+//
+//	import "github.com/spcent/plumego/x/data/idempotency"
+//	store := idempotency.NewSQLStore(db)          // concrete implementation
+//	_ idempotencycontract.Store = store            // satisfies this interface
 package idempotency
 
 import (

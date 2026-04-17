@@ -92,8 +92,9 @@ func DefaultAckOptions() AckOptions {
 }
 
 // SubscribeAckable creates an ackable subscription.
-func (ps *InProcBroker) SubscribeAckable(topic string, subOpts SubOptions, ackOpts AckOptions) (AckableSubscription, error) {
-	sub, err := ps.Subscribe(topic, subOpts)
+// When ctx is cancelled the underlying subscription is automatically closed.
+func (ps *InProcBroker) SubscribeAckable(ctx context.Context, topic string, subOpts SubOptions, ackOpts AckOptions) (AckableSubscription, error) {
+	sub, err := ps.Subscribe(ctx, topic, subOpts)
 	if err != nil {
 		return nil, err
 	}

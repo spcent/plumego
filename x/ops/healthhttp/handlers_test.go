@@ -302,7 +302,7 @@ func TestHealthHandlerIncludesRuntime(t *testing.T) {
 	}
 }
 
-func TestDebugHealthHandler(t *testing.T) {
+func TestDiagnosticsHandler(t *testing.T) {
 	manager, err := NewManager(Config{})
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
@@ -312,13 +312,13 @@ func TestDebugHealthHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/health/debug", nil)
 
 	rr := httptest.NewRecorder()
-	DebugHealthHandler(manager, false).ServeHTTP(rr, req)
+	DiagnosticsHandler(manager, false).ServeHTTP(rr, req)
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 when debug disabled, got %d", rr.Code)
 	}
 
 	rr = httptest.NewRecorder()
-	DebugHealthHandler(manager, true).ServeHTTP(rr, req)
+	DiagnosticsHandler(manager, true).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 when debug enabled, got %d", rr.Code)
 	}
@@ -335,7 +335,7 @@ func TestDebugHealthHandler(t *testing.T) {
 	}
 
 	rr = httptest.NewRecorder()
-	DebugHealthHandler(nil, true).ServeHTTP(rr, req)
+	DiagnosticsHandler(nil, true).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 with nil manager, got %d", rr.Code)
 	}

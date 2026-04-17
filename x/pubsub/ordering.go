@@ -585,7 +585,7 @@ type OrderedSubscription struct {
 // Each ordered subscription gets its own sequence tracker so that
 // subscriber-side verification is independent of publisher-side checks.
 func (ops *OrderedPubSub) SubscribeOrdered(topic string, opts SubOptions) (*OrderedSubscription, error) {
-	sub, err := ops.Subscribe(topic, opts)
+	sub, err := ops.Subscribe(context.Background(), topic, opts)
 	if err != nil {
 		return nil, err
 	}

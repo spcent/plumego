@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"net/http"
 
-	"github.com/spcent/plumego/internal/httputil"
+	httputil "github.com/spcent/plumego/internal/httputil"
 )
 
 // ResponseRecorder captures response data while still writing to the underlying writer.
@@ -40,7 +40,7 @@ func (r *ResponseRecorder) WriteHeader(code int) {
 	r.written = true
 
 	copyHeaders(r.ResponseWriter.Header(), r.header)
-	utils.EnsureNoSniff(r.ResponseWriter.Header())
+	httputil.EnsureNoSniff(r.ResponseWriter.Header())
 	r.ResponseWriter.WriteHeader(code)
 }
 
@@ -55,7 +55,7 @@ func (r *ResponseRecorder) Write(b []byte) (int, error) {
 	}
 
 	r.body.Write(b)
-	return utils.SafeWrite(r.ResponseWriter, b)
+	return httputil.SafeWrite(r.ResponseWriter, b)
 }
 
 // StatusCode returns the recorded status code.

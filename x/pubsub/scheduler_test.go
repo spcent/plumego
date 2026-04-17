@@ -30,7 +30,7 @@ func TestPublishDelayed_Basic(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe("delayed.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "delayed.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestPublishAt_Basic(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe("at.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "at.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestCancelScheduled(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe("cancel.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "cancel.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestPublishDelayed_MultipleMessages(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe("multi.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "multi.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestPublishAt_PastTime(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe("past.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "past.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func TestPublishWithTTL_Basic(t *testing.T) {
 	tm := newTTLManager(ps, time.Minute)
 	defer tm.Close()
 
-	sub, err := ps.Subscribe("ttl.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "ttl.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestPublishWithTTL_AutoGeneratesID(t *testing.T) {
 	tm := newTTLManager(ps, time.Minute)
 	defer tm.Close()
 
-	sub, err := ps.Subscribe("autoid.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "autoid.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +291,7 @@ func TestMessageScheduler_Schedule(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe("sched.unit", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "sched.unit", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}

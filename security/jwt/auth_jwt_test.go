@@ -24,7 +24,6 @@ func TestMapJWTError_AllBranches(t *testing.T) {
 		{"ErrUnknownKey", ErrUnknownKey, authn.ErrInvalidToken},
 		{"ErrMissingSubject", ErrMissingSubject, authn.ErrInvalidToken},
 		{"ErrInvalidToken", ErrInvalidToken, authn.ErrInvalidToken},
-		{"unknown error", errors.New("unexpected"), authn.ErrInvalidToken},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -33,6 +32,18 @@ func TestMapJWTError_AllBranches(t *testing.T) {
 				t.Errorf("mapJWTError(%v) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestMapJWTError_UnknownErrorReturnedAsIs(t *testing.T) {
+	sentinel := errors.New("internal storage failure")
+	got := mapJWTError(sentinel)
+	// Internal/unknown errors must NOT be remapped to authn.ErrInvalidToken.
+	if errors.Is(got, authn.ErrInvalidToken) {
+		t.Error("unexpected internal error should not be mapped to authn.ErrInvalidToken")
+	}
+	if !errors.Is(got, sentinel) {
+		t.Errorf("mapJWTError returned %v, want original sentinel", got)
 	}
 }
 

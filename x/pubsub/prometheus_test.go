@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -41,13 +42,13 @@ func TestPrometheusExporter_WithSubscribers(t *testing.T) {
 	defer ps.Close()
 
 	// Create subscribers
-	sub1, _ := ps.Subscribe("test.a", SubOptions{BufferSize: 10})
+	sub1, _ := ps.Subscribe(context.Background(), "test.a", SubOptions{BufferSize: 10})
 	defer sub1.Cancel()
 
-	sub2, _ := ps.Subscribe("test.a", SubOptions{BufferSize: 10})
+	sub2, _ := ps.Subscribe(context.Background(), "test.a", SubOptions{BufferSize: 10})
 	defer sub2.Cancel()
 
-	sub3, _ := ps.Subscribe("test.b", SubOptions{BufferSize: 10})
+	sub3, _ := ps.Subscribe(context.Background(), "test.b", SubOptions{BufferSize: 10})
 	defer sub3.Cancel()
 
 	exporter := NewPrometheusExporter(ps)
@@ -322,7 +323,7 @@ func TestPrometheusExporter_MultipleMetricTypes(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, _ := ps.Subscribe("test", SubOptions{BufferSize: 10})
+	sub, _ := ps.Subscribe(context.Background(), "test", SubOptions{BufferSize: 10})
 	defer sub.Cancel()
 
 	for i := 0; i < 3; i++ {

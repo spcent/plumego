@@ -26,7 +26,7 @@ func TestOrderedPubSub_Basic(t *testing.T) {
 	defer ops.Close()
 
 	// Subscribe
-	sub, err := ops.Subscribe("test.order", SubOptions{BufferSize: 10})
+	sub, err := ops.Subscribe(context.Background(), "test.order", SubOptions{BufferSize: 10})
 	if err != nil {
 		t.Fatalf("Failed to subscribe: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestOrderedPubSub_OrderLevels(t *testing.T) {
 			ops := NewOrdered(config)
 			defer ops.Close()
 
-			sub, _ := ops.Subscribe("test", SubOptions{BufferSize: 10})
+			sub, _ := ops.Subscribe(context.Background(), "test", SubOptions{BufferSize: 10})
 			defer sub.Cancel()
 
 			// Publish
@@ -118,7 +118,7 @@ func TestOrderedPubSub_WithKey(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub, _ := ops.Subscribe("test.key", SubOptions{BufferSize: 20})
+	sub, _ := ops.Subscribe(context.Background(), "test.key", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
 	// Publish messages with different keys
@@ -193,7 +193,7 @@ func TestOrderedPubSub_Batching(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub, _ := ops.Subscribe("test.batch", SubOptions{BufferSize: 20})
+	sub, _ := ops.Subscribe(context.Background(), "test.batch", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
 	// Publish messages
@@ -231,7 +231,7 @@ func TestOrderedPubSub_SequenceCheck(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub, _ := ops.Subscribe("test.seq", SubOptions{BufferSize: 10})
+	sub, _ := ops.Subscribe(context.Background(), "test.seq", SubOptions{BufferSize: 10})
 	defer sub.Cancel()
 
 	// Publish sequential messages
@@ -274,10 +274,10 @@ func TestOrderedPubSub_GlobalOrder(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub, _ := ops.Subscribe("topic1", SubOptions{BufferSize: 10})
+	sub, _ := ops.Subscribe(context.Background(), "topic1", SubOptions{BufferSize: 10})
 	defer sub.Cancel()
 
-	sub2, _ := ops.Subscribe("topic2", SubOptions{BufferSize: 10})
+	sub2, _ := ops.Subscribe(context.Background(), "topic2", SubOptions{BufferSize: 10})
 	defer sub2.Cancel()
 
 	// Publish to different topics
@@ -456,7 +456,7 @@ func TestOrderedPubSub_QueueStatsPerTopic(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub, _ := ops.Subscribe("stats.topic", SubOptions{BufferSize: 20})
+	sub, _ := ops.Subscribe(context.Background(), "stats.topic", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
 	// Publish messages
@@ -495,7 +495,7 @@ func TestOrderedPubSub_QueueStatsPerKey(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub, _ := ops.Subscribe("key.topic", SubOptions{BufferSize: 20})
+	sub, _ := ops.Subscribe(context.Background(), "key.topic", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
 	keys := []string{"keyA", "keyB"}
@@ -533,9 +533,9 @@ func TestOrderedPubSub_QueueStatsGlobal(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub1, _ := ops.Subscribe("g.topic1", SubOptions{BufferSize: 10})
+	sub1, _ := ops.Subscribe(context.Background(), "g.topic1", SubOptions{BufferSize: 10})
 	defer sub1.Cancel()
-	sub2, _ := ops.Subscribe("g.topic2", SubOptions{BufferSize: 10})
+	sub2, _ := ops.Subscribe(context.Background(), "g.topic2", SubOptions{BufferSize: 10})
 	defer sub2.Cancel()
 
 	// Publish to multiple topics through the global queue
@@ -571,9 +571,9 @@ func TestOrderedPubSub_GlobalSequenceCheck(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub1, _ := ops.Subscribe("seq.topic1", SubOptions{BufferSize: 10})
+	sub1, _ := ops.Subscribe(context.Background(), "seq.topic1", SubOptions{BufferSize: 10})
 	defer sub1.Cancel()
-	sub2, _ := ops.Subscribe("seq.topic2", SubOptions{BufferSize: 10})
+	sub2, _ := ops.Subscribe(context.Background(), "seq.topic2", SubOptions{BufferSize: 10})
 	defer sub2.Cancel()
 
 	// Publish to different topics through the global queue
@@ -604,7 +604,7 @@ func TestOrderedPubSub_MultipleTopicQueueStats(t *testing.T) {
 
 	topics := []string{"multi.a", "multi.b", "multi.c"}
 	for _, topic := range topics {
-		sub, _ := ops.Subscribe(topic, SubOptions{BufferSize: 20})
+		sub, _ := ops.Subscribe(context.Background(), topic, SubOptions{BufferSize: 20})
 		defer sub.Cancel()
 
 		for i := 0; i < 4; i++ {
@@ -641,7 +641,7 @@ func TestOrderedPubSub_SequenceCheckPerKey(t *testing.T) {
 	ops := NewOrdered(config)
 	defer ops.Close()
 
-	sub, _ := ops.Subscribe("seqkey.topic", SubOptions{BufferSize: 20})
+	sub, _ := ops.Subscribe(context.Background(), "seqkey.topic", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
 	// Publish messages with different keys

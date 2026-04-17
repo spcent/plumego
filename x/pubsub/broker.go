@@ -11,7 +11,7 @@ import "context"
 //	var b pubsub.Broker = pubsub.New()
 //	defer b.Close()
 //
-//	sub, err := b.Subscribe("user.created", pubsub.DefaultSubOptions())
+//	sub, err := b.Subscribe(ctx, "user.created", pubsub.DefaultSubOptions())
 //	if err != nil {
 //		// handle error
 //	}
@@ -23,7 +23,8 @@ type Broker interface {
 	Publish(topic string, msg Message) error
 
 	// Subscribe creates a new subscription to an exact topic.
-	Subscribe(topic string, opts SubOptions) (Subscription, error)
+	// When ctx is cancelled the subscription is automatically closed.
+	Subscribe(ctx context.Context, topic string, opts SubOptions) (Subscription, error)
 
 	// Close shuts down the broker and cancels all subscriptions.
 	Close() error

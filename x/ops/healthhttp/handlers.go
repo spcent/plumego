@@ -58,9 +58,9 @@ func DetailedHandler(manager Manager) http.Handler {
 }
 
 // HealthHandler creates a comprehensive health check handler.
-// Pass debug=true to include runtime diagnostics in the response.
-func HealthHandler(manager Manager, debug bool) http.Handler {
-	if !debug {
+// Pass includeRuntime=true to include runtime diagnostics in the response.
+func HealthHandler(manager Manager, includeRuntime bool) http.Handler {
+	if !includeRuntime {
 		return DetailedHandler(manager)
 	}
 

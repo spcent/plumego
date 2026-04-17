@@ -87,14 +87,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.applyMiddlewareAndServe(w, req, params, result)
 }
 
-func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
+func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()
 
 	if path == "/" {
 		tree := r.state.trees[method]
 		if tree != nil && tree.handler != nil {
-			return &MatchResult{
+			return &matchResult{
 				Handler:      tree.handler,
 				RoutePattern: "/",
 				RouteMethod:  method,
@@ -103,7 +103,7 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 		// RFC 7231 §4.3.2: HEAD is identical to GET except no body.
 		if method == http.MethodHead {
 			if getTree := r.state.trees[http.MethodGet]; getTree != nil && getTree.handler != nil {
-				return &MatchResult{
+				return &matchResult{
 					Handler:      getTree.handler,
 					RoutePattern: "/",
 					RouteMethod:  http.MethodGet,
@@ -112,7 +112,7 @@ func (r *Router) matchRoute(method, path string) (*MatchResult, bool) {
 		}
 		if method != methodAny {
 			if anyTree := r.state.trees[methodAny]; anyTree != nil && anyTree.handler != nil {
-				return &MatchResult{
+				return &matchResult{
 					Handler:      anyTree.handler,
 					RoutePattern: "/",
 					RouteMethod:  methodAny,
@@ -167,7 +167,7 @@ func (r *Router) normalizePath(path string) string {
 	return fastNormalizePath(path)
 }
 
-func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *MatchResult, paramValues []string) {
+func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *matchResult, paramValues []string) {
 	if paramValues == nil {
 		paramValues = result.ParamValues
 	}
@@ -181,7 +181,7 @@ func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[str
 	return buildParamMapPooled(paramValues, paramKeys)
 }
 
-func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *MatchResult) {
+func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *matchResult) {
 	if result == nil {
 		return
 	}

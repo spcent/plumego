@@ -17,7 +17,7 @@ func TestAckableSubscription_AckRemovesPending(t *testing.T) {
 		DeadLetterTopic: "dlq.test",
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestAckableSubscription_NackNoRequeue_SendsToDLQ(t *testing.T) {
 		DeadLetterTopic: "dlq.test",
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestAckableSubscription_NackRequeue_ExceedsMaxRetries(t *testing.T) {
 		DeadLetterTopic: "dlq.test",
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestAckableSubscription_DLQ_WithCallback(t *testing.T) {
 		},
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestAckableSubscription_DLQ_MaxSize(t *testing.T) {
 		},
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestAckableSubscription_ClearDeadLetters(t *testing.T) {
 		DeadLetterTopic: "dlq.test",
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,14 +303,14 @@ func TestAckableSubscription_ReprocessDeadLetters(t *testing.T) {
 		DeadLetterTopic: "dlq.test",
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer sub.Cancel()
 
 	// Subscribe to the original topic to catch reprocessed messages
-	reprocessSub, err := ps.Subscribe("test.topic", DefaultSubOptions())
+	reprocessSub, err := ps.Subscribe(context.Background(), "test.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestAckableSubscription_ReprocessDeadLetters_WithFilter(t *testing.T) {
 		DeadLetterTopic: "dlq.test",
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,7 +433,7 @@ func TestAckableSubscription_DLQ_Metadata(t *testing.T) {
 		DeadLetterTopic: "dlq.test",
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +486,7 @@ func TestAckableSubscription_NoDLQ_WhenNotConfigured(t *testing.T) {
 		MaxRetries: 3,
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -518,7 +518,7 @@ func TestAckableSubscription_DLQConfig_OnlyLocalStorage(t *testing.T) {
 		},
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -557,7 +557,7 @@ func TestAckableSubscription_Timeout_SendsToDLQ(t *testing.T) {
 		DeadLetterTopic: "dlq.test",
 	}
 
-	sub, err := ps.SubscribeAckable("test.topic", DefaultSubOptions(), ackOpts)
+	sub, err := ps.SubscribeAckable(context.Background(), "test.topic", DefaultSubOptions(), ackOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -662,7 +662,7 @@ func TestDeadLetterQueue_Reprocess(t *testing.T) {
 	dlq := newDeadLetterQueue(DeadLetterConfig{Topic: "test-dlq"})
 
 	// Subscribe to original topic
-	sub, err := ps.Subscribe("original.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(context.Background(), "original.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}

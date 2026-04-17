@@ -29,7 +29,7 @@ func newRouteMatcher(root *node) *routeMatcher {
 //   - parts: URL path segments (e.g., ["users", "123"])
 //
 // Returns:
-//   - *MatchResult: Match result with handler and parameters, or nil if no match
+//   - *matchResult: Match result with handler and parameters, or nil if no match
 //
 // Example:
 //
@@ -39,7 +39,7 @@ func newRouteMatcher(root *node) *routeMatcher {
 //	    handler := result.Handler
 //	    params := result.ParamValues // ["123"]
 //	}
-func (rm *routeMatcher) Match(parts []string) *MatchResult {
+func (rm *routeMatcher) Match(parts []string) *matchResult {
 	if rm.root == nil {
 		return nil
 	}
@@ -110,7 +110,7 @@ func (rm *routeMatcher) Match(parts []string) *MatchResult {
 	*pvPtr = paramValues
 	putParamValues(pvPtr)
 
-	return &MatchResult{
+	return &matchResult{
 		Handler:      current.handler,
 		ParamValues:  resultParams,
 		ParamKeys:    current.paramKeys,

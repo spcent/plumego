@@ -124,7 +124,7 @@ type SubscriptionStats struct {
 //
 // Example:
 //
-//	sub, err := broker.Subscribe("user.created", pubsub.DefaultSubOptions())
+//	sub, err := broker.Subscribe(ctx, "user.created", pubsub.DefaultSubOptions())
 //	if err != nil {
 //		// handle
 //	}

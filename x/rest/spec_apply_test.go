@@ -4,7 +4,7 @@ import "testing"
 
 func TestApplyResourceSpecPreservesControllerDefaults(t *testing.T) {
 	controller := &BaseContextResourceController{
-		ResourceName: "users",
+		BaseResourceController: BaseResourceController{ResourceName: "users"},
 	}
 
 	ApplyResourceSpec(controller, ResourceSpec{})

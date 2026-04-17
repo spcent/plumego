@@ -20,7 +20,7 @@ func TestRequestReplyBasic(t *testing.T) {
 	}
 	defer rm.Close()
 
-	sub, err := ps.Subscribe("math.add", SubOptions{BufferSize: 16})
+	sub, err := ps.Subscribe(context.Background(), "math.add", SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestRequestReplyMultipleConcurrent(t *testing.T) {
 	}
 	defer rm.Close()
 
-	sub, err := ps.Subscribe("echo", SubOptions{BufferSize: 64})
+	sub, err := ps.Subscribe(context.Background(), "echo", SubOptions{BufferSize: 64})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestRequestReplyCorrelationID(t *testing.T) {
 	}
 	defer rm.Close()
 
-	sub, err := ps.Subscribe("service.ping", SubOptions{BufferSize: 16})
+	sub, err := ps.Subscribe(context.Background(), "service.ping", SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestRequestReplyManagerMultipleRequests(t *testing.T) {
 	}
 	defer rm.Close()
 
-	sub, err := ps.Subscribe("counter", SubOptions{BufferSize: 16})
+	sub, err := ps.Subscribe(context.Background(), "counter", SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -37,6 +37,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/internal/httputil"
 	mw "github.com/spcent/plumego/middleware"
 )
 
@@ -132,7 +133,7 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			} else {
 				w.Header().Del("Content-Length")
 			}
-			ensureNoSniff(w.Header())
+			httputil.EnsureNoSniff(w.Header())
 			w.WriteHeader(resp.StatusCode)
 			if len(transformedBody) > 0 {
 				_, _ = safeWrite(w, transformedBody)
@@ -168,20 +169,12 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 	return r.body.Write(b)
 }
 
-func ensureNoSniff(header http.Header) {
-	if header == nil {
-		return
-	}
-	if header.Get("X-Content-Type-Options") == "" {
-		header.Set("X-Content-Type-Options", "nosniff")
-	}
-}
 
 func safeWrite(w http.ResponseWriter, body []byte) (int, error) {
 	if w == nil {
 		return 0, nil
 	}
-	ensureNoSniff(w.Header())
+	httputil.EnsureNoSniff(w.Header())
 	return w.Write(body)
 }
 

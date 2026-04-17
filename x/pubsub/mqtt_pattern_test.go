@@ -444,7 +444,7 @@ func TestSubscribeMQTT_CoexistsWithGlobPatterns(t *testing.T) {
 	defer globSub.Cancel()
 
 	// Exact topic subscriber
-	exactSub, err := ps.Subscribe("events/user/created", SubOptions{
+	exactSub, err := ps.Subscribe(context.Background(), "events/user/created", SubOptions{
 		BufferSize: 8,
 		Policy:     DropOldest,
 	})

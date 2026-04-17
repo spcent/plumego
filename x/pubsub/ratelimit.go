@@ -426,8 +426,8 @@ func (rlps *RateLimitedPubSub) adjustAdaptiveRates() {
 }
 
 // Subscribe creates a rate-limited subscription
-func (rlps *RateLimitedPubSub) Subscribe(topic string, opts SubOptions) (Subscription, error) {
-	sub, err := rlps.InProcBroker.Subscribe(topic, opts)
+func (rlps *RateLimitedPubSub) Subscribe(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
+	sub, err := rlps.InProcBroker.Subscribe(ctx, topic, opts)
 	if err != nil {
 		return nil, err
 	}

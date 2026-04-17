@@ -32,7 +32,7 @@ func TestMatcherCacheGetByPatternEmpty(t *testing.T) {
 
 func TestMatcherCacheGetByPatternMatch(t *testing.T) {
 	cache := newMatchCache(10)
-	mr := &MatchResult{RoutePattern: "/users/:id", RouteMethod: "GET"}
+	mr := &matchResult{RoutePattern: "/users/:id", RouteMethod: "GET"}
 	cache.SetPattern("GET", "/users/:id", mr)
 
 	result, params, found := cache.GetByPattern("GET", "/users/42")
@@ -49,7 +49,7 @@ func TestMatcherCacheGetByPatternMatch(t *testing.T) {
 
 func TestMatcherCacheGetByPatternNoMatchWrongMethod(t *testing.T) {
 	cache := newMatchCache(10)
-	cache.SetPattern("GET", "/users/:id", &MatchResult{RoutePattern: "/users/:id"})
+	cache.SetPattern("GET", "/users/:id", &matchResult{RoutePattern: "/users/:id"})
 
 	_, _, found := cache.GetByPattern("POST", "/users/42")
 	if found {
@@ -59,7 +59,7 @@ func TestMatcherCacheGetByPatternNoMatchWrongMethod(t *testing.T) {
 
 func TestMatcherCacheGetByPatternUpdatesHits(t *testing.T) {
 	cache := newMatchCache(10)
-	cache.SetPattern("GET", "/items/:id", &MatchResult{RoutePattern: "/items/:id"})
+	cache.SetPattern("GET", "/items/:id", &matchResult{RoutePattern: "/items/:id"})
 
 	before := cache.Stats().Hits
 	cache.GetByPattern("GET", "/items/99")
@@ -72,7 +72,7 @@ func TestMatcherCacheGetByPatternUpdatesHits(t *testing.T) {
 
 func TestMatcherCacheGetByPatternNoMatchNoHit(t *testing.T) {
 	cache := newMatchCache(10)
-	cache.SetPattern("GET", "/items/:id", &MatchResult{RoutePattern: "/items/:id"})
+	cache.SetPattern("GET", "/items/:id", &matchResult{RoutePattern: "/items/:id"})
 
 	before := cache.Stats().Misses
 	cache.GetByPattern("GET", "/other/path/no/match")
@@ -90,11 +90,11 @@ func TestMatcherCacheClear(t *testing.T) {
 
 	// Populate exact cache.
 	for i := 0; i < 5; i++ {
-		cache.Set(fmt.Sprintf("key-%d", i), &MatchResult{})
+		cache.Set(fmt.Sprintf("key-%d", i), &matchResult{})
 	}
 	// Populate pattern cache.
-	cache.SetPattern("GET", "/users/:id", &MatchResult{})
-	cache.SetPattern("POST", "/items/:id", &MatchResult{})
+	cache.SetPattern("GET", "/users/:id", &matchResult{})
+	cache.SetPattern("POST", "/items/:id", &matchResult{})
 
 	// Trigger some hits/misses.
 	cache.Get("key-0")
@@ -159,8 +159,8 @@ func TestMatcherStatsInitial(t *testing.T) {
 
 func TestMatcherStatsAfterOperations(t *testing.T) {
 	cache := newMatchCache(10)
-	cache.Set("a", &MatchResult{})
-	cache.Set("b", &MatchResult{})
+	cache.Set("a", &matchResult{})
+	cache.Set("b", &matchResult{})
 
 	cache.Get("a")    // hit
 	cache.Get("a")    // hit
@@ -184,8 +184,8 @@ func TestMatcherStatsAfterOperations(t *testing.T) {
 
 func TestMatcherStatsWithPatterns(t *testing.T) {
 	cache := newMatchCache(10)
-	cache.SetPattern("GET", "/a/:id", &MatchResult{})
-	cache.SetPattern("POST", "/b/:id", &MatchResult{})
+	cache.SetPattern("GET", "/a/:id", &matchResult{})
+	cache.SetPattern("POST", "/b/:id", &matchResult{})
 
 	stats := cache.Stats()
 	if stats.PatternEntries != 2 {
@@ -197,8 +197,8 @@ func TestMatcherStatsWithPatterns(t *testing.T) {
 
 func TestMatcherCacheSetPatternUpdateExisting(t *testing.T) {
 	cache := newMatchCache(10)
-	mr1 := &MatchResult{RoutePattern: "/a/:id", RouteMethod: "GET"}
-	mr2 := &MatchResult{RoutePattern: "/a/:id", RouteMethod: "GET"}
+	mr1 := &matchResult{RoutePattern: "/a/:id", RouteMethod: "GET"}
+	mr2 := &matchResult{RoutePattern: "/a/:id", RouteMethod: "GET"}
 
 	cache.SetPattern("GET", "/a/:id", mr1)
 	cache.SetPattern("GET", "/a/:id", mr2) // Should update, not duplicate.
@@ -262,7 +262,7 @@ func TestIsParameterized(t *testing.T) {
 
 func TestMatcherCacheLookupExactHit(t *testing.T) {
 	cache := newMatchCache(10)
-	mr := &MatchResult{RoutePattern: "/health", RouteMethod: "GET"}
+	mr := &matchResult{RoutePattern: "/health", RouteMethod: "GET"}
 	cache.Set("GET:/health", mr)
 
 	result, params, found := cache.Lookup("GET", "/health", "GET:/health")
@@ -279,7 +279,7 @@ func TestMatcherCacheLookupExactHit(t *testing.T) {
 
 func TestMatcherCacheLookupPatternFallback(t *testing.T) {
 	cache := newMatchCache(10)
-	mr := &MatchResult{RoutePattern: "/users/:id", RouteMethod: "GET"}
+	mr := &matchResult{RoutePattern: "/users/:id", RouteMethod: "GET"}
 	cache.SetPattern("GET", "/users/:id", mr)
 
 	// No exact key, falls through to pattern matching.
@@ -312,7 +312,7 @@ func TestMatcherCacheEviction(t *testing.T) {
 	cache := newMatchCache(capacity)
 
 	for i := 0; i < capacity+3; i++ {
-		cache.Set(fmt.Sprintf("key-%d", i), &MatchResult{})
+		cache.Set(fmt.Sprintf("key-%d", i), &matchResult{})
 	}
 
 	stats := cache.Stats()

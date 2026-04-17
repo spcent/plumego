@@ -87,7 +87,7 @@ func TestDistributedPubSub_GlobalPublish(t *testing.T) {
 	time.Sleep(300 * time.Millisecond) // Wait for cluster formation
 
 	// Subscribe on node2
-	sub, err := dps2.Subscribe("test.global", SubOptions{BufferSize: 10})
+	sub, err := dps2.Subscribe(context.Background(), "test.global", SubOptions{BufferSize: 10})
 	if err != nil {
 		t.Fatalf("Failed to subscribe: %v", err)
 	}
@@ -232,13 +232,13 @@ func TestDistributedPubSub_LocalTopics(t *testing.T) {
 	defer dps.Close()
 
 	// Subscribe to topics
-	sub1, _ := dps.Subscribe("topic.a", SubOptions{BufferSize: 1})
+	sub1, _ := dps.Subscribe(context.Background(), "topic.a", SubOptions{BufferSize: 1})
 	defer sub1.Cancel()
 
-	sub2, _ := dps.Subscribe("topic.b", SubOptions{BufferSize: 1})
+	sub2, _ := dps.Subscribe(context.Background(), "topic.b", SubOptions{BufferSize: 1})
 	defer sub2.Cancel()
 
-	sub3, _ := dps.Subscribe("topic.a", SubOptions{BufferSize: 1}) // duplicate
+	sub3, _ := dps.Subscribe(context.Background(), "topic.a", SubOptions{BufferSize: 1}) // duplicate
 	defer sub3.Cancel()
 
 	time.Sleep(50 * time.Millisecond)
@@ -351,13 +351,13 @@ func TestDistributedPubSub_MultipleSubscribers(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 
 	// Multiple subscribers on node2
-	sub1, _ := dps2.Subscribe("fanout.topic", SubOptions{BufferSize: 5})
+	sub1, _ := dps2.Subscribe(context.Background(), "fanout.topic", SubOptions{BufferSize: 5})
 	defer sub1.Cancel()
 
-	sub2, _ := dps2.Subscribe("fanout.topic", SubOptions{BufferSize: 5})
+	sub2, _ := dps2.Subscribe(context.Background(), "fanout.topic", SubOptions{BufferSize: 5})
 	defer sub2.Cancel()
 
-	sub3, _ := dps2.Subscribe("fanout.topic", SubOptions{BufferSize: 5})
+	sub3, _ := dps2.Subscribe(context.Background(), "fanout.topic", SubOptions{BufferSize: 5})
 	defer sub3.Cancel()
 
 	// Publish from node1

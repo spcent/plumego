@@ -5,14 +5,12 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
 )
 
 // Middleware restricts how many requests can be processed concurrently and
 // optionally bounds how many can wait in a queue.
-func Middleware(maxConcurrent, queueDepth int, queueTimeout time.Duration, logger log.StructuredLogger) mw.Middleware {
-	_ = logger
+func Middleware(maxConcurrent, queueDepth int, queueTimeout time.Duration) mw.Middleware {
 	if maxConcurrent <= 0 {
 		return func(next http.Handler) http.Handler { return next }
 	}

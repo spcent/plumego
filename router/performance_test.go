@@ -154,7 +154,7 @@ func BenchmarkCachePerformance(b *testing.B) {
 	// Pre-populate cache
 	for i := 0; i < 50; i++ {
 		key := fmt.Sprintf("GET /users/%d", i)
-		result := &MatchResult{
+		result := &matchResult{
 			Handler:     http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 			ParamValues: []string{fmt.Sprintf("%d", i)},
 			ParamKeys:   []string{"id"},
@@ -266,15 +266,15 @@ func TestCacheEviction(t *testing.T) {
 	cache := newMatchCache(3) // Small capacity
 
 	// Add 3 entries
-	cache.Set("key1", &MatchResult{Handler: nil})
-	cache.Set("key2", &MatchResult{Handler: nil})
-	cache.Set("key3", &MatchResult{Handler: nil})
+	cache.Set("key1", &matchResult{Handler: nil})
+	cache.Set("key2", &matchResult{Handler: nil})
+	cache.Set("key3", &matchResult{Handler: nil})
 
 	// Access key1 to make it most recently used
 	cache.Get("key1")
 
 	// Add 4th entry, should evict key2 (least recently used)
-	cache.Set("key4", &MatchResult{Handler: nil})
+	cache.Set("key4", &matchResult{Handler: nil})
 
 	// Verify key1 and key3 still exist
 	if _, found := cache.Get("key1"); !found {

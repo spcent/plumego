@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -480,7 +481,7 @@ func TestBackpressure_PublishWithBackpressure(t *testing.T) {
 	defer bpc.Close()
 
 	// Create subscriber
-	sub, _ := ps.Subscribe("test", SubOptions{BufferSize: 10})
+	sub, _ := ps.Subscribe(context.Background(), "test", SubOptions{BufferSize: 10})
 	defer sub.Cancel()
 
 	// Low pressure - should succeed

@@ -444,7 +444,7 @@ func (pe *ParamExtractor) GetQueryBool(r *http.Request, name string, defaultValu
 // BaseContextResourceController provides a default implementation with context support.
 // Embed it in your controller struct and override the methods you need.
 type BaseContextResourceController struct {
-	ResourceName   string
+	BaseResourceController
 	QueryBuilder   *QueryBuilder
 	ParamExtractor *ParamExtractor
 	Hooks          ResourceHooks
@@ -455,7 +455,7 @@ type BaseContextResourceController struct {
 // NewBaseContextResourceController creates a context-aware resource controller with defaults.
 func NewBaseContextResourceController(resourceName string) *BaseContextResourceController {
 	controller := &BaseContextResourceController{
-		ResourceName: resourceName,
+		BaseResourceController: BaseResourceController{ResourceName: resourceName},
 	}
 	ApplyResourceSpec(controller, DefaultResourceSpec(resourceName))
 	return controller
@@ -482,45 +482,6 @@ func (c *BaseContextResourceController) ParseQueryParams(r *http.Request) *Query
 
 	params := builder.Parse(r)
 	return NormalizeQueryParams(params, c.Spec.Options)
-}
-
-func (c *BaseContextResourceController) Index(w http.ResponseWriter, r *http.Request) {
-	writeNotImplementedResourceError(w, r, c.ResourceName, "Index")
-}
-func (c *BaseContextResourceController) Show(w http.ResponseWriter, r *http.Request) {
-	writeNotImplementedResourceError(w, r, c.ResourceName, "Show")
-}
-func (c *BaseContextResourceController) Create(w http.ResponseWriter, r *http.Request) {
-	writeNotImplementedResourceError(w, r, c.ResourceName, "Create")
-}
-func (c *BaseContextResourceController) Update(w http.ResponseWriter, r *http.Request) {
-	writeNotImplementedResourceError(w, r, c.ResourceName, "Update")
-}
-func (c *BaseContextResourceController) Delete(w http.ResponseWriter, r *http.Request) {
-	writeNotImplementedResourceError(w, r, c.ResourceName, "Delete")
-}
-func (c *BaseContextResourceController) Patch(w http.ResponseWriter, r *http.Request) {
-	writeNotImplementedResourceError(w, r, c.ResourceName, "Patch")
-}
-
-// Options handles OPTIONS requests; sets common CORS headers.
-func (c *BaseContextResourceController) Options(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-	w.Header().Set("Access-Control-Max-Age", "86400")
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// Head handles HEAD requests; returns 200 OK with no body.
-func (c *BaseContextResourceController) Head(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-}
-
-func (c *BaseContextResourceController) BatchCreate(w http.ResponseWriter, r *http.Request) {
-	writeNotImplementedResourceError(w, r, c.ResourceName, "BatchCreate")
-}
-func (c *BaseContextResourceController) BatchDelete(w http.ResponseWriter, r *http.Request) {
-	writeNotImplementedResourceError(w, r, c.ResourceName, "BatchDelete")
 }
 
 // ================================================

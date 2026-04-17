@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -298,7 +299,7 @@ func TestReplayStore_Replay(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Create subscriber to count replayed messages
-	sub, _ := ps.Subscribe("replay.topic", SubOptions{BufferSize: 100})
+	sub, _ := ps.Subscribe(context.Background(), "replay.topic", SubOptions{BufferSize: 100})
 	defer sub.Cancel()
 
 	// Publish original messages
