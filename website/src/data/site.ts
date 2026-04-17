@@ -35,6 +35,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       title: 'Product',
       links: [
         { label: 'Docs', href: '/docs' },
+        { label: 'Why Plumego', href: '/why-plumego' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
@@ -61,6 +62,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       title: '产品',
       links: [
         { label: '文档', href: '/zh/docs' },
+        { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
         { label: '架构', href: '/zh/architecture' },
         { label: '示例', href: '/zh/examples' },
       ],
@@ -171,6 +173,13 @@ export const HOME_COPY = {
     adoptionBody:
       'Architecture explains how the repository is shaped. Examples show the canonical runnable path. Releases tells you what can be adopted now versus what should stay deliberate. Pick the page that answers your next decision.',
     adoptionCards: [
+      {
+        kicker: 'fit',
+        title: 'Why Plumego',
+        body: 'Use the dedicated adoption page when the question is not package topology but whether Plumego actually matches the service, team posture, and repository shape in front of you.',
+        href: '/why-plumego',
+        label: 'Evaluate fit',
+      },
       {
         kicker: 'topology',
         title: 'Architecture',
@@ -332,6 +341,13 @@ export const HOME_COPY = {
     adoptionBody:
       'Architecture 负责解释仓库如何分层；Examples 负责展示 canonical 可运行路径；Releases 负责解释哪些区域现在就适合采用。先选真正能回答你下一个决策的问题的页面。',
     adoptionCards: [
+      {
+        kicker: 'fit',
+        title: '为什么选择 Plumego',
+        body: '如果你关心的不再是包拓扑，而是 Plumego 是否真的匹配眼前这个服务、团队姿态与仓库目标，就先走专门的 adoption 判断页。',
+        href: '/zh/why-plumego',
+        label: '判断是否适合',
+      },
       {
         kicker: 'topology',
         title: '架构',

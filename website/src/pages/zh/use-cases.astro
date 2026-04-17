@@ -1,102 +1,84 @@
 ---
 import PageHero from '../../components/marketing/PageHero.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
-import { USE_CASES_COPY } from '../../data/site';
 
-const copy = USE_CASES_COPY.zh;
-
-const fitChecks = [
+const quickChecks = [
   {
-    kicker: 'review path',
-    title: '你是否希望请求路径在代码评审里保持可见？',
-    body: 'Plumego 最适合的场景，是 reviewer 需要直接在代码里看清 route 注册、middleware 顺序与 app-local wiring。',
+    kicker: 'request flow',
+    title: '你希望请求路径在代码里保持可评审',
+    body: '当 route 注册、中间件顺序与 app-local wiring 应该继续保持可见，而不是被框架默认值吞没时，Plumego 会更有价值。',
   },
   {
     kicker: 'service shape',
-    title: '你是否希望有一条 canonical 服务形态？',
-    body: '当新服务可以从同一个 reference app 起步，而不是不断长出仓库私有的 bootstrap 变体时，这套框架会更有价值。',
+    title: '你希望新服务有一条统一起步路径',
+    body: '如果新服务应该从同一条可读的参考布局起步，而不是继续长出仓库私有的 bootstrap 变体，这套模型会更有吸引力。',
   },
   {
-    kicker: 'boundary map',
-    title: '你是否需要显式的成熟度与 ownership 信号？',
-    body: 'Plumego 倾向于把边界公开出来：稳定根保持收敛，能力家族继续向外分层，发布姿态由页面明确解释而不是默认脑补。',
-  },
-] as const;
-
-const cautionCards = [
-  {
-    kicker: 'not ideal',
-    title: '你希望框架约定尽量不可见',
-    body: '如果团队更喜欢 batteries-included 的抽象藏在框架魔法后面，Plumego 可能会显得更慢、更克制，也更需要显式决策。',
-  },
-  {
-    kicker: 'not ideal',
-    title: '每个服务都刻意保持雪花状结构',
-    body: '这套模型的价值来自收窄默认路径。如果每个服务都必须使用不同 bootstrap 或 routing 风格，canonical path 的价值就会下降。',
-  },
-  {
-    kicker: 'not ideal',
-    title: '你只想知道架构，不想做采用决策',
-    body: '如果当前只是想理解边界模型，请先去 Architecture 页面；只有在需要判断“适不适合眼前这个服务”时，再回到这一页。',
+    kicker: 'maturity posture',
+    title: '你需要显式的支持与 ownership 信号',
+    body: 'stable roots、x/* families、release posture 与 roadmap direction 被拆开，是为了公开说明哪些区域是 baseline，哪些仍然需要谨慎采用。',
   },
 ] as const;
 
-const decisionRows = [
+const nextQuestions = [
   {
-    signal: '首要关注点',
-    fit: '你关心请求路径是否可读、wiring 是否显式、bootstrap 是否统一，以及成熟度边界是否公开。',
-    caution: '你更关心约定优先的人体工学、可互换的服务骨架，或能隐藏结构选择的便捷包装。',
+    kicker: 'go deeper',
+    title: '为什么选择 Plumego',
+    body: '如果你需要更长的判断答案——团队画像、反适配信号，以及按确定度选择下一步路径——就进入完整的 adoption 落地页。',
+    href: '/zh/why-plumego',
+    cta: '打开 Why Plumego',
   },
   {
-    signal: '团队姿态',
-    fit: 'reviewer 希望在仓库继续长大之前，就能从代码与文档直接判断 ownership。',
-    caution: '团队更看重框架内建默认值，而不是仓库清晰度，并且乐于接受 magic registration。',
-  },
-  {
-    signal: '仓库预期',
-    fit: '你希望 docs、generated facts、examples 与 release posture 共同强化一套心智模型。',
-    caution: '你更倾向于让每个项目自己发明形态，不希望有一条 canonical 服务路径持续指导新工作。',
-  },
-] as const;
-
-const decisionPaths = [
-  {
-    kicker: 'good fit',
-    title: '你已经想要一条 canonical path',
-    body: '先从 docs 与 reference app 开始，再用 examples 与 architecture 保持这条路径在服务扩展时仍然显式。',
-    href: '/zh/docs/getting-started',
-    cta: '从开始使用进入',
-  },
-  {
-    kicker: 'still evaluating',
-    title: '你需要先审查边界再决定',
-    body: '当问题更接近兼容性、ownership 与仓库结构，而不是语法细节时，先去 architecture 与 release posture。',
+    kicker: 'topology first',
+    title: '架构',
+    body: '如果你的下一个决策取决于 stable roots、extension families 与改动真正该落在哪一层，就先去看 Architecture。',
     href: '/zh/architecture',
-    cta: '先看架构',
+    cta: '阅读架构页',
   },
   {
-    kicker: 'cautious fit',
-    title: '你认可这套模型，但还需要 runnable proof',
-    body: '如果最快的判断方式，是把自己的服务与 canonical 布局直接对照，就先去 reference app 与 example paths。',
+    kicker: 'runnable proof',
+    title: '示例',
+    body: '如果 canonical runnable path 与 guided recipes 比继续看概念页更快回答适配问题，就直接进入 Examples。',
     href: '/zh/examples',
     cta: '打开示例页',
+  },
+  {
+    kicker: 'support posture',
+    title: '发布',
+    body: '如果真正的问题不是某个模块存不存在，而是它现在是否足够成熟到可以采用，就去看 Releases。',
+    href: '/zh/releases',
+    cta: '查看发布页',
+  },
+] as const;
+
+const cautionSignals = [
+  {
+    kicker: 'slow down',
+    title: '你更重视框架魔法，而不是显式评审路径',
+    body: '如果目标是让结构尽量隐藏在框架约定后面，Plumego 可能会显得过于克制。',
+  },
+  {
+    kicker: 'slow down',
+    title: '每个服务都应该继续发明自己的形态',
+    body: '这套模型更适合仓库想收敛出一条 canonical path，而不是允许多个本地 bootstrap 风格同时扩散。',
   },
 ] as const;
 ---
 
 <MarketingLayout
   locale="zh"
-  title={copy.title}
-  description={copy.description}
+  title="采用判断"
+  description="把这一页当作快速判断入口：先快速筛选，再决定是否继续进入 Why Plumego、Architecture、Examples 或 Releases。"
   currentPath="/zh/use-cases"
   imagePath="/brand/og-zh.svg"
-  keywords={['plumego 采用判断', 'go 服务工具包', 'stdlib-first go', '显式 http 服务']}
+  keywords={['plumego 采用判断', '为什么选择 plumego', 'go 服务工具包', '显式 http 服务']}
 >
   <PageHero
-    eyebrow={copy.eyebrow}
-    title={copy.title}
-    description={copy.description}
+    eyebrow="Quick Fit Check"
+    title="采用判断"
+    description="把这一页当作 adoption 问题的短版本。如果信号基本对齐，再继续进入 Why Plumego 查看更完整的判断路径。"
     links={[
+      { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
       { label: '架构', href: '/zh/architecture' },
       { label: '示例', href: '/zh/examples' },
     ]}
@@ -104,82 +86,13 @@ const decisionPaths = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>{copy.introTitle}</h2>
-      <p>{copy.introBody}</p>
-    </div>
-    <div class="signal-list">
-      {copy.guideCards.map((item) => (
-        <article class="signal-list__item">
-          <p class="signal-list__kicker">{item.kicker}</p>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-        </article>
-      ))}
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section__intro">
-      <h2>{copy.decisionTitle}</h2>
-      <p>{copy.decisionBody}</p>
-    </div>
-    <div class="control-grid">
-      {fitChecks.map((item) => (
-        <article class="page-panel page-panel--dense">
-          <p class="signal-list__kicker">{item.kicker}</p>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-        </article>
-      ))}
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section__intro">
-      <h2>适配信号与谨慎信号</h2>
+      <h2>当你只需要一个快速答案时，从这里开始。</h2>
       <p>
-        这页的作用不是让你欣赏架构，而是帮助你做判断。当你需要知道“眼前这个服务究竟会不会真正受益于 Plumego 的显式模型”时，先看下面这张对照表。
+        这一页现在是更短的 adoption gateway。它的作用，是先帮助你判断 Plumego 是否值得继续深入，再把你送往真正回答下一个问题的页面。
       </p>
     </div>
-    <div class="comparison-table" role="table" aria-label="适配信号与谨慎信号对照">
-      <div class="comparison-table__head" role="row">
-        <span role="columnheader">信号</span>
-        <span role="columnheader">适合</span>
-        <span role="columnheader">先放慢</span>
-      </div>
-      {decisionRows.map((row) => (
-        <div class="comparison-table__row" role="row">
-          <strong role="cell">{row.signal}</strong>
-          <span role="cell">{row.fit}</span>
-          <span role="cell">{row.caution}</span>
-        </div>
-      ))}
-    </div>
-  </section>
-
-  <section class="page-grid">
-    {copy.cases.map((item) => (
-      <article class="page-panel">
-        <p class="signal-list__kicker">{item.kicker}</p>
-        <h2>{item.title}</h2>
-        <p>{item.body}</p>
-        <ul>
-          {item.fitPoints.map((point) => (
-            <li>{point}</li>
-          ))}
-        </ul>
-        <a class="text-link" href={item.startHref}>{item.startLabel}</a>
-      </article>
-    ))}
-  </section>
-
-  <section class="section section--split">
-    <div class="section__intro">
-      <h2>在采用之前应该放慢的情况</h2>
-      <p>这页应该帮助你做判断，而不是强推结论。如果下面这些姿态更像你的团队，就把 Architecture 当成心智模型先保存下来，等仓库目标更清楚后再决定是否采用。</p>
-    </div>
     <div class="control-grid">
-      {cautionCards.map((item) => (
+      {quickChecks.map((item) => (
         <article class="page-panel page-panel--dense">
           <p class="signal-list__kicker">{item.kicker}</p>
           <h3>{item.title}</h3>
@@ -191,11 +104,31 @@ const decisionPaths = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>按你的确定度选择下一页</h2>
-      <p>当适配判断更清楚以后，再去打开下一页：现在马上开始、先看边界模型，还是先拿 canonical 可运行路径和自己的服务做对照。</p>
+      <h2>两个通常意味着“先放慢”的信号。</h2>
+      <p>
+        Plumego 并不是为了覆盖所有场景。如果下面这些谨慎信号更接近你的团队，就先保留架构模型的理解，不必过早强行采用。
+      </p>
     </div>
     <div class="control-grid control-grid--tight">
-      {decisionPaths.map((item) => (
+      {cautionSignals.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>有意识地选择下一页。</h2>
+      <p>
+        一旦快速判断已经更清楚，就去打开真正匹配你当前确定度的页面：继续深入 adoption、先看仓库边界、先做 runnable 对照，或者先核对成熟度姿态。
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {nextQuestions.map((item) => (
         <article class="control-grid__item">
           <p class="signal-list__kicker">{item.kicker}</p>
           <h3>{item.title}</h3>
@@ -203,19 +136,6 @@ const decisionPaths = [
           <a class="text-link" href={item.href}>{item.cta}</a>
         </article>
       ))}
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section__intro">
-      <h2>有意识地选择下一页</h2>
-      <p>一旦适配度更清楚，就去打开真正回答下一个问题的页面：边界模型、可运行路径，或直接进入 docs。</p>
-    </div>
-    <div class="page-links">
-      <a class="text-link" href="/zh/architecture">先看架构</a>
-      <a class="text-link" href="/zh/examples">打开示例页</a>
-      <a class="text-link" href="/zh/docs/getting-started">打开开始使用</a>
-      <a class="text-link" href="/zh/releases">查看发布页</a>
     </div>
   </section>
 </MarketingLayout>
