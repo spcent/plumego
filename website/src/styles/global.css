@@ -895,10 +895,15 @@ li {
   .release-banner,
   .topology-board,
   .example-hierarchy,
-  .recipe-grid {
+  .recipe-grid,
+  .recipe-grid--expanded {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .topology-node--fact-rich ul {
+    columns: 1;
   }
 
   .site-header {
@@ -1213,7 +1218,7 @@ main {
 
 .why-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2rem;
 }
 
@@ -1226,7 +1231,7 @@ main {
 
 .adoption-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.2rem;
 }
 
@@ -1314,8 +1319,39 @@ main {
 }
 .topology-node li + li,
 .example-hierarchy__primary li + li,
-.example-hierarchy__secondary li + li {
+.example-hierarchy__secondary li + li,
+.recipe-card__checks li + li {
   margin-top: 0.45rem;
+}
+
+.topology-node--fact-rich ul {
+  columns: 2;
+  column-gap: 1rem;
+}
+
+.topology-node--fact-rich li {
+  break-inside: avoid;
+}
+
+.recipe-card__checks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recipe-card__checks li {
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+  color: var(--fg-soft);
+}
+
+.recipe-card__checks li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.recipe-card__checks li:last-child {
+  padding-bottom: 0;
 }
 .request-flow-rail {
   display: grid;
@@ -1379,6 +1415,10 @@ main {
 }
 .recipe-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.recipe-grid--expanded {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .section--architecture-flow,
 .section--examples-hierarchy {
@@ -1495,6 +1535,28 @@ main {
     gap: 1rem;
   }
 
+  .hero__actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero__actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hero__notes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.7rem 1rem;
+  }
+
+  .hero__path {
+    gap: 0.75rem;
+  }
+
   .hero__signals,
   .canonical-layout {
     grid-template-columns: 1fr;
@@ -1529,6 +1591,25 @@ main {
 
   .hero__summary {
     font-size: 1rem;
+  }
+
+  .hero__notes {
+    grid-template-columns: 1fr;
+  }
+
+  .signal-list__item,
+  .page-panel,
+  .release-banner,
+  .fact-card,
+  .request-flow-step,
+  .topology-node,
+  .example-hierarchy__primary,
+  .example-hierarchy__secondary,
+  .recipe-card,
+  .adoption-card,
+  .canonical-blueprint {
+    padding: 1.2rem;
+    border-radius: 1.35rem;
   }
 
   .adoption-card {

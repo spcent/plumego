@@ -9,6 +9,68 @@ const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => entry.status.
 const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
   entry.status.toLowerCase().includes('experimental'),
 ).length;
+
+const adoptionGuidance = [
+  {
+    kicker: 'adopt now',
+    title: 'Start with the stable roots and the canonical reference path',
+    body: 'If you are evaluating Plumego for production use, begin with stable library roots, the reference app, and the documented request path before expanding into optional surfaces.',
+  },
+  {
+    kicker: 'evaluate deliberately',
+    title: 'Treat extension families as useful but not frozen',
+    body: 'App-facing extension families can be valuable today, but they should be adopted only after you understand where compatibility guarantees stop and where product-specific evolution is still expected.',
+  },
+  {
+    kicker: 'wait for more evidence',
+    title: 'Hold off when your decision depends on experimental subordinate primitives',
+    body: 'If your service depends directly on subordinate extension primitives rather than on the owning family entrypoint, you should slow down until the discovery path and compatibility expectations are clearer.',
+  },
+] as const;
+
+const releaseChannels = [
+  {
+    kicker: 'ga',
+    title: 'Stable roots',
+    body: 'These are the compatibility-carrying library surfaces for v1 users. They set the bar for what Plumego expects most services to rely on over time.',
+    details: ['public package surface is intended to remain stable', 'best first stop for production evaluation', 'documentation and examples assume this path first'],
+  },
+  {
+    kicker: 'supported reference',
+    title: 'Canonical reference app and CLI',
+    body: 'These surfaces are part of the official adoption path, but they should be read as guides for bootstrap and operational flow rather than as broad extension catalogs.',
+    details: ['reference app teaches the default service shape', 'CLI is supported as a tool, not as a Go import surface', 'both stay aligned with canonical docs'],
+  },
+  {
+    kicker: 'experimental',
+    title: 'Extension families and subordinate primitives',
+    body: 'These areas remain inside release scope and quality gates, but API and config compatibility are not frozen. They should be adopted for clear reasons rather than by default.',
+    details: ['choose the owning family before subordinate paths', 'expect faster iteration than in stable roots', 'keep product capability concerns outside the kernel'],
+  },
+] as const;
+
+const upgradePath = [
+  {
+    label: '01',
+    title: 'Confirm the default path still fits your service',
+    body: 'Before upgrading, re-check whether your service still follows the canonical bootstrap, routing, and app-local wiring path.',
+  },
+  {
+    label: '02',
+    title: 'Read the support matrix as a boundary check',
+    body: 'Identify which surfaces your service imports directly and map them to stable, supported-reference, or experimental status.',
+  },
+  {
+    label: '03',
+    title: 'Upgrade stable roots first, then optional families',
+    body: 'When both surfaces are present, verify the stable roots and canonical path before evaluating experimental family changes.',
+  },
+  {
+    label: '04',
+    title: 'Return to docs and examples after the upgrade',
+    body: 'Use the reference app, request-flow docs, and architecture page to verify that your local repository shape still matches the intended path.',
+  },
+] as const;
 ---
 
 <MarketingLayout locale="en" title={copy.title} description={copy.description} currentPath="/releases">
@@ -44,6 +106,25 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
     </div>
   </section>
 
+  <section class="section">
+    <div class="section__intro">
+      <h2>Adoption guidance before you read the matrix line by line</h2>
+      <p>
+        Most readers do not need every line of the support matrix first. They need a default decision posture: adopt the canonical path now, read
+        supported reference surfaces as teaching tools, and treat experimental capability work as deliberate opt-in territory.
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {adoptionGuidance.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
   <section class="release-stats">
     <article class="page-panel">
       <p class="signal-list__kicker">source</p>
@@ -64,6 +145,30 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
 
   <section class="section">
     <div class="section__intro">
+      <h2>Release channels in plain language</h2>
+      <p>
+        The repository contains several release postures at once. The point of this page is not to flatten them into one optimistic story, but to
+        help you understand which surfaces should lead adoption and which ones should follow later with more caution.
+      </p>
+    </div>
+    <div class="page-grid">
+      {releaseChannels.map((item) => (
+        <article class="page-panel">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h2>{item.title}</h2>
+          <p>{item.body}</p>
+          <ul>
+            {item.details.map((detail) => (
+              <li>{detail}</li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
       <h2>{copy.principlesTitle}</h2>
       <p>{copy.principlesBody}</p>
     </div>
@@ -72,6 +177,27 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
         <article class="control-grid__item">
           <p class="signal-list__kicker">{item.kicker}</p>
           <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section section--split">
+    <div class="section__intro">
+      <h2>Suggested upgrade path</h2>
+      <p>
+        Upgrades are easiest when the release conversation stays attached to repository shape. Use the steps below as a practical order of
+        operations whenever compatibility matters more than package curiosity.
+      </p>
+    </div>
+    <div class="request-flow-rail">
+      {upgradePath.map((item) => (
+        <article class="request-flow-step">
+          <div>
+            <p class="signal-list__kicker">{item.label}</p>
+            <h3>{item.title}</h3>
+          </div>
           <p>{item.body}</p>
         </article>
       ))}
@@ -105,6 +231,7 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
       <a class="text-link" href="/architecture">Open architecture</a>
       <a class="text-link" href="/docs/reference-app">Read the reference app</a>
       <a class="text-link" href="/roadmap">Open roadmap</a>
+      <a class="text-link" href="/examples">Open examples</a>
     </div>
   </section>
 </MarketingLayout>

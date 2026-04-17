@@ -10,6 +10,7 @@ const recipeTracks = [
     label: 'recipe 01',
     title: 'Request-flow recipe',
     body: 'Use this when you need to trace one HTTP request from route registration to write path without guessing where transport responsibility ends.',
+    checks: ['follow route registration before handlers', 'confirm middleware order on the public path', 'stop once transport ownership ends'],
     href: '/docs/concepts/request-flow',
     cta: 'Trace one request',
   },
@@ -17,15 +18,33 @@ const recipeTracks = [
     label: 'recipe 02',
     title: 'Module-fit recipe',
     body: 'Use this when the real question is whether your work belongs in stable roots, app-local wiring, or an x/* family.',
+    checks: ['classify the change before opening packages', 'protect stable-root compatibility promises', 'push optional capability work outward'],
     href: '/docs/modules/overview',
     cta: 'Classify the change',
   },
   {
     label: 'recipe 03',
+    title: 'Reference-app recipe',
+    body: 'Use this when you want to inspect the canonical service shape and compare your own bootstrap and route layout against it.',
+    checks: ['start from internal/app ownership', 'compare directory shape before adding abstractions', 'treat the reference app as the reusable baseline'],
+    href: '/docs/reference-app',
+    cta: 'Read the reference app',
+  },
+  {
+    label: 'recipe 04',
     title: 'Release-posture recipe',
     body: 'Use this when adoption depends on compatibility signals rather than on whether a package simply exists in the repository.',
+    checks: ['read stability promises before expanding scope', 'separate release posture from roadmap ambition', 'keep evidence ahead of assumptions'],
     href: '/docs/release-posture',
     cta: 'Check release posture',
+  },
+  {
+    label: 'recipe 05',
+    title: 'Repository-shape recipe',
+    body: 'Use this when a change spans docs, generated facts, and implementation work and you need to know which layer owns what.',
+    checks: ['use docs for learning paths', 'use specs and generated facts for source-of-truth signals', 'keep app-local code and extensions clearly separated'],
+    href: '/architecture',
+    cta: 'Open architecture',
   },
 ] as const;
 
@@ -33,6 +52,37 @@ const adoptionChecks = [
   'Run the reference app before opening unrelated package families.',
   'Use recipes to answer a specific question, not as parallel product demos.',
   'Return to the docs path once you know which boundary or capability owns the change.',
+] as const;
+
+const readingOrder = [
+  {
+    label: '01',
+    title: 'Run the canonical service first',
+    body: 'Start with reference/standard-service so the bootstrap model, route ownership, and handler shape all have one default baseline.',
+    href: '/docs/reference-app',
+    cta: 'Start with the runnable path',
+  },
+  {
+    label: '02',
+    title: 'Use recipes to answer one concrete question',
+    body: 'Pick a recipe only after you know what you are trying to inspect: request flow, module fit, release posture, or repository shape.',
+    href: '/docs/concepts/request-flow',
+    cta: 'Open a focused recipe',
+  },
+  {
+    label: '03',
+    title: 'Return to docs for durable guidance',
+    body: 'Recipes point back into docs so the canonical path stays central and the site does not turn examples into a disconnected showcase.',
+    href: '/docs/getting-started',
+    cta: 'Continue in docs',
+  },
+  {
+    label: '04',
+    title: 'Check release posture before expanding scope',
+    body: 'Once you understand the default path, use releases to decide whether the specific surface you care about is mature enough to adopt.',
+    href: '/releases',
+    cta: 'Inspect release posture',
+  },
 ] as const;
 ---
 
@@ -74,25 +124,31 @@ const adoptionChecks = [
       <h2>Learn the hierarchy before you choose a page</h2>
       <p>
         Plumego examples are intentionally layered. There is one canonical runnable service, and there are guided recipes that explain how to
-        read the repository around it.
+        read the repository around it without pretending every problem needs a separate demo app.
       </p>
     </div>
     <div class="example-hierarchy">
       <article class="example-hierarchy__primary">
         <p class="signal-list__kicker">canonical example</p>
         <h3>reference/standard-service</h3>
-        <p>The primary example is the one you can clone, run, compare against your own service, and keep returning to during adoption.</p>
+        <p>
+          The primary example is the service you can clone, run, compare against your own repository, and keep returning to while adoption
+          decisions are still forming.
+        </p>
         <ul>
           <li>bootstrap and server construction stay visible</li>
           <li>internal/app owns application-local wiring</li>
-          <li>route registration stays readable before deeper handlers or packages</li>
+          <li>route registration stays readable before deeper handlers or package families</li>
         </ul>
         <a class="text-link" href="/docs/reference-app">Open the reference app guide</a>
       </article>
       <article class="example-hierarchy__secondary">
         <p class="signal-list__kicker">guided recipes</p>
         <h3>Recipes answer one repository question at a time</h3>
-        <p>These are not parallel mini-products. They are reusable reading patterns for request flow, ownership, and release maturity.</p>
+        <p>
+          These are not parallel mini-products. They are reusable reading patterns for request flow, ownership, maturity signals, and repository
+          shape.
+        </p>
         <ol>
           {adoptionChecks.map((item) => (
             <li>{item}</li>
@@ -126,15 +182,40 @@ const adoptionChecks = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>Guided recipes</h2>
+      <h2>Recipe tracks for focused adoption questions</h2>
       <p>
-        Recipes are smaller than the canonical example and more specific than docs overviews. They exist to help a reader answer one concrete
-        adoption question and then return to the canonical path.
+        Recipes are smaller than the canonical example and more specific than a docs overview. Each one should help a reader answer a concrete
+        question quickly, then return to the default path with better classification.
       </p>
     </div>
-    <div class="recipe-grid">
+    <div class="recipe-grid recipe-grid--expanded">
       {recipeTracks.map((item) => (
         <article class="recipe-card">
+          <p class="signal-list__kicker">{item.label}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <ul class="recipe-card__checks">
+            {item.checks.map((check) => (
+              <li>{check}</li>
+            ))}
+          </ul>
+          <a class="text-link" href={item.href}>{item.cta}</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>Suggested reading order</h2>
+      <p>
+        Treat this page as a decision layer. The right reading order starts with one runnable baseline, branches into one focused question, and
+        then returns to docs and release posture once the repository boundary is clear.
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {readingOrder.map((item) => (
+        <article class="control-grid__item">
           <p class="signal-list__kicker">{item.label}</p>
           <h3>{item.title}</h3>
           <p>{item.body}</p>
@@ -170,6 +251,7 @@ const adoptionChecks = [
       <a class="text-link" href="/architecture">Open architecture</a>
       <a class="text-link" href="/docs/reference-app">Read the reference app</a>
       <a class="text-link" href="/docs/modules/overview">Open modules overview</a>
+      <a class="text-link" href="/releases">Inspect releases</a>
     </div>
   </section>
 </MarketingLayout>

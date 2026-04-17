@@ -4,41 +4,84 @@ import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import { USE_CASES_COPY } from '../../data/site';
 
 const copy = USE_CASES_COPY.zh;
+
 const fitChecks = [
   {
     kicker: 'review path',
-    title: '你是否希望 request flow 在代码评审里保持可见？',
-    body: '当 reviewer 需要直接看清 route 注册、中间件顺序和 app-local wiring 时，Plumego 的价值会更明显。',
+    title: '你是否希望请求路径在代码评审里保持可见？',
+    body: 'Plumego 最适合的场景，是 reviewer 需要直接在代码里看清 route 注册、middleware 顺序与 app-local wiring。',
   },
   {
     kicker: 'service shape',
-    title: '你是否希望新服务从同一 canonical 形态起步？',
-    body: '如果新服务应当共享同一 reference app，而不是各自长出不同 bootstrap 模式，Plumego 会更顺手。',
+    title: '你是否希望有一条 canonical 服务形态？',
+    body: '当新服务可以从同一个 reference app 起步，而不是不断长出仓库私有的 bootstrap 变体时，这套框架会更有价值。',
   },
   {
     kicker: 'boundary map',
-    title: '你是否需要显式成熟度与 ownership 信号？',
-    body: 'Plumego 倾向于公开边界：稳定根保持收敛，能力家族向外分叉，release posture 也会明确说明，而不是靠存在感暗示。',
+    title: '你是否需要显式的成熟度与 ownership 信号？',
+    body: 'Plumego 倾向于把边界公开出来：稳定根保持收敛，能力家族继续向外分层，发布姿态由页面明确解释而不是默认脑补。',
   },
-];
+] as const;
 
 const cautionCards = [
   {
-    kicker: '不太适合',
-    title: '更希望框架约定彻底隐身',
-    body: '如果团队更期待 batteries-included 式抽象完全藏进框架魔法里，Plumego 可能会显得更慢、更克制。',
+    kicker: 'not ideal',
+    title: '你希望框架约定尽量不可见',
+    body: '如果团队更喜欢 batteries-included 的抽象藏在框架魔法后面，Plumego 可能会显得更慢、更克制，也更需要显式决策。',
   },
   {
-    kicker: '不太适合',
-    title: '每个服务都故意保持雪花结构',
-    body: '这里的价值来自收敛 accepted path。如果每个服务都必须拥有不同 bootstrap 或 routing 形态，canonical path 的价值就会下降。',
+    kicker: 'not ideal',
+    title: '每个服务都刻意保持雪花状结构',
+    body: '这套模型的价值来自收窄默认路径。如果每个服务都必须使用不同 bootstrap 或 routing 风格，canonical path 的价值就会下降。',
   },
   {
-    kicker: '不太适合',
-    title: '只想看架构，不需要判断是否采用',
-    body: '想了解边界模型时请直接看 Architecture；只有当你要判断当前服务是否适合采用 Plumego 时，再使用这一页。',
+    kicker: 'not ideal',
+    title: '你只想知道架构，不想做采用决策',
+    body: '如果当前只是想理解边界模型，请先去 Architecture 页面；只有在需要判断“适不适合眼前这个服务”时，再回到这一页。',
   },
-];
+] as const;
+
+const decisionRows = [
+  {
+    signal: '首要关注点',
+    fit: '你关心请求路径是否可读、wiring 是否显式、bootstrap 是否统一，以及成熟度边界是否公开。',
+    caution: '你更关心约定优先的人体工学、可互换的服务骨架，或能隐藏结构选择的便捷包装。',
+  },
+  {
+    signal: '团队姿态',
+    fit: 'reviewer 希望在仓库继续长大之前，就能从代码与文档直接判断 ownership。',
+    caution: '团队更看重框架内建默认值，而不是仓库清晰度，并且乐于接受 magic registration。',
+  },
+  {
+    signal: '仓库预期',
+    fit: '你希望 docs、generated facts、examples 与 release posture 共同强化一套心智模型。',
+    caution: '你更倾向于让每个项目自己发明形态，不希望有一条 canonical 服务路径持续指导新工作。',
+  },
+] as const;
+
+const decisionPaths = [
+  {
+    kicker: 'good fit',
+    title: '你已经想要一条 canonical path',
+    body: '先从 docs 与 reference app 开始，再用 examples 与 architecture 保持这条路径在服务扩展时仍然显式。',
+    href: '/zh/docs/getting-started',
+    cta: '从开始使用进入',
+  },
+  {
+    kicker: 'still evaluating',
+    title: '你需要先审查边界再决定',
+    body: '当问题更接近兼容性、ownership 与仓库结构，而不是语法细节时，先去 architecture 与 release posture。',
+    href: '/zh/architecture',
+    cta: '先看架构',
+  },
+  {
+    kicker: 'cautious fit',
+    title: '你认可这套模型，但还需要 runnable proof',
+    body: '如果最快的判断方式，是把自己的服务与 canonical 布局直接对照，就先去 reference app 与 example paths。',
+    href: '/zh/examples',
+    cta: '打开示例页',
+  },
+] as const;
 ---
 
 <MarketingLayout
@@ -47,7 +90,7 @@ const cautionCards = [
   description={copy.description}
   currentPath="/zh/use-cases"
   imagePath="/brand/og-zh.svg"
-  keywords={['plumego 采用判断', 'go 服务工具包', 'stdlib-first', '显式 http 服务']}
+  keywords={['plumego 采用判断', 'go 服务工具包', 'stdlib-first go', '显式 http 服务']}
 >
   <PageHero
     eyebrow={copy.eyebrow}
@@ -91,6 +134,29 @@ const cautionCards = [
     </div>
   </section>
 
+  <section class="section">
+    <div class="section__intro">
+      <h2>适配信号与谨慎信号</h2>
+      <p>
+        这页的作用不是让你欣赏架构，而是帮助你做判断。当你需要知道“眼前这个服务究竟会不会真正受益于 Plumego 的显式模型”时，先看下面这张对照表。
+      </p>
+    </div>
+    <div class="comparison-table" role="table" aria-label="适配信号与谨慎信号对照">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">信号</span>
+        <span role="columnheader">适合</span>
+        <span role="columnheader">先放慢</span>
+      </div>
+      {decisionRows.map((row) => (
+        <div class="comparison-table__row" role="row">
+          <strong role="cell">{row.signal}</strong>
+          <span role="cell">{row.fit}</span>
+          <span role="cell">{row.caution}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+
   <section class="page-grid">
     {copy.cases.map((item) => (
       <article class="page-panel">
@@ -109,10 +175,8 @@ const cautionCards = [
 
   <section class="section section--split">
     <div class="section__intro">
-      <h2>哪些情况下应该先放慢采用节奏</h2>
-      <p>
-        这页应该帮你做出采用判断，而不是逼你立刻采用。如果下面这些姿态更像你当前团队，就先把 Architecture 当成边界地图，等仓库目标更清楚之后再决定是否采用。
-      </p>
+      <h2>在采用之前应该放慢的情况</h2>
+      <p>这页应该帮助你做判断，而不是强推结论。如果下面这些姿态更像你的团队，就把 Architecture 当成心智模型先保存下来，等仓库目标更清楚后再决定是否采用。</p>
     </div>
     <div class="control-grid">
       {cautionCards.map((item) => (
@@ -127,13 +191,31 @@ const cautionCards = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>有了判断之后，再选下一页</h2>
-      <p>一旦适配度更清楚，就根据下一个问题选择页面：边界模型、可运行路径，或者直接回到文档入口。</p>
+      <h2>按你的确定度选择下一页</h2>
+      <p>当适配判断更清楚以后，再去打开下一页：现在马上开始、先看边界模型，还是先拿 canonical 可运行路径和自己的服务做对照。</p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {decisionPaths.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <a class="text-link" href={item.href}>{item.cta}</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>有意识地选择下一页</h2>
+      <p>一旦适配度更清楚，就去打开真正回答下一个问题的页面：边界模型、可运行路径，或直接进入 docs。</p>
     </div>
     <div class="page-links">
       <a class="text-link" href="/zh/architecture">先看架构</a>
-      <a class="text-link" href="/zh/examples">查看示例</a>
+      <a class="text-link" href="/zh/examples">打开示例页</a>
       <a class="text-link" href="/zh/docs/getting-started">打开开始使用</a>
+      <a class="text-link" href="/zh/releases">查看发布页</a>
     </div>
   </section>
 </MarketingLayout>

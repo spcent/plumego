@@ -5,6 +5,57 @@ import { ROADMAP_COPY } from '../data/site';
 import { ROADMAP_FACTS } from '../generated/roadmap';
 
 const copy = ROADMAP_COPY.en;
+
+const roadmapSections = [
+  {
+    kicker: 'baseline',
+    title: copy.sections[0].title,
+    body: 'This is the default Plumego path that readers should assume first. It is already part of the repository baseline rather than future aspiration.',
+    items: ROADMAP_FACTS.currentBaseline,
+  },
+  {
+    kicker: 'in progress',
+    title: copy.sections[1].title,
+    body: 'These areas are receiving active attention now. They are the clearest near-term signal, but they should still be read together with release posture before adoption decisions widen.',
+    items: ROADMAP_FACTS.inProgress,
+  },
+  {
+    kicker: 'planned',
+    title: copy.sections[2].title,
+    body: 'Planned work describes direction and sequencing pressure. It is not yet a compatibility promise, and it should not be mistaken for baseline support.',
+    items: ROADMAP_FACTS.planned,
+  },
+  {
+    kicker: 'non-goals',
+    title: copy.sections[3].title,
+    body: 'These boundaries are deliberate. They protect the repository from drifting back toward hidden compatibility layers and overloaded stable roots.',
+    items: copy.sections[3].items,
+  },
+] as const;
+
+const adoptionNotes = [
+  {
+    kicker: 'adopt today',
+    title: 'Use the roadmap to understand direction, not to replace release posture',
+    body: 'If your question is about what can be trusted now, the release page should lead. The roadmap tells you what is tightening next and which areas remain intentionally gated.',
+    href: '/releases',
+    cta: 'Inspect releases',
+  },
+  {
+    kicker: 'read next',
+    title: 'Return to the reference path after understanding direction',
+    body: 'Once the roadmap explains where the repository is heading, go back to docs and the reference app so the default path stays primary.',
+    href: '/docs/reference-app',
+    cta: 'Open the reference app',
+  },
+  {
+    kicker: 'for contributors',
+    title: 'Use the execution order when multiple lines are open at once',
+    body: 'The suggested sequence is the tightening order for open work. It is not a release calendar, but it is the best clue for what should stabilize first.',
+    href: '/docs/release-posture',
+    cta: 'Read release posture',
+  },
+] as const;
 ---
 
 <MarketingLayout locale="en" title={copy.title} description={copy.description} currentPath="/roadmap">
@@ -40,14 +91,11 @@ const copy = ROADMAP_COPY.en;
       <p>{copy.timelineBody}</p>
     </div>
     <div class="page-grid">
-      {[
-        { title: copy.sections[0].title, items: ROADMAP_FACTS.currentBaseline },
-        { title: copy.sections[1].title, items: ROADMAP_FACTS.inProgress },
-        { title: copy.sections[2].title, items: ROADMAP_FACTS.planned },
-        { title: copy.sections[3].title, items: copy.sections[3].items },
-      ].map((section) => (
-        <article class="page-panel">
+      {roadmapSections.map((section) => (
+        <article class="page-panel page-panel--dense">
+          <p class="signal-list__kicker">{section.kicker}</p>
           <h2>{section.title}</h2>
+          <p>{section.body}</p>
           <ul>
             {section.items.map((item) => <li>{item}</li>)}
           </ul>
@@ -56,29 +104,41 @@ const copy = ROADMAP_COPY.en;
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--split">
     <div class="section__intro">
       <h2>{copy.orderTitle}</h2>
       <p>{copy.orderBody}</p>
     </div>
-    <div class="fact-stack">
-      <article class="page-panel">
-        <ul>
-          {ROADMAP_FACTS.suggestedExecutionOrder.map((item) => <li>{item}</li>)}
-        </ul>
-      </article>
+    <div class="request-flow-rail">
+      {ROADMAP_FACTS.suggestedExecutionOrder.map((item, index) => (
+        <article class="request-flow-step">
+          <div>
+            <p class="signal-list__kicker">{String(index + 1).padStart(2, '0')}</p>
+            <h3>Execution checkpoint</h3>
+          </div>
+          <p>{item}</p>
+        </article>
+      ))}
     </div>
   </section>
 
   <section class="section">
     <div class="section__intro">
-      <h2>Use roadmap with release posture</h2>
-      <p>Roadmap shows direction. Release posture tells you what can actually be adopted today.</p>
+      <h2>How to use roadmap in an adoption decision</h2>
+      <p>
+        Roadmap shows direction. Release posture tells you what can actually be adopted today. Docs and the reference app keep the canonical path
+        primary even while the repository grows outward.
+      </p>
     </div>
-    <div class="page-links">
-      <a class="text-link" href="/releases">Inspect releases</a>
-      <a class="text-link" href="/docs/release-posture">Read release posture</a>
-      <a class="text-link" href="/docs/reference-app">Open the reference app</a>
+    <div class="control-grid control-grid--tight">
+      {adoptionNotes.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <a class="text-link" href={item.href}>{item.cta}</a>
+        </article>
+      ))}
     </div>
   </section>
 </MarketingLayout>

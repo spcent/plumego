@@ -2,6 +2,7 @@
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
 import { ARCHITECTURE_COPY } from '../data/site';
+import { MODULE_FACTS } from '../generated/modules';
 
 const copy = ARCHITECTURE_COPY.en;
 
@@ -35,9 +36,9 @@ const requestFlow = [
 const topologyColumns = [
   {
     label: 'stable roots',
-    title: 'Compatibility-first kernel',
+    title: `${MODULE_FACTS.stableRoots.length} compatibility-carrying modules`,
     body: 'These modules carry the long-lived burden. They should stay smaller, slower-moving, and explainable without repository archaeology.',
-    items: ['contract', 'core', 'router', 'middleware', 'security'],
+    items: MODULE_FACTS.stableRoots,
   },
   {
     label: 'canonical path',
@@ -47,9 +48,9 @@ const topologyColumns = [
   },
   {
     label: 'x/* families',
-    title: 'Capability families that expand outward',
+    title: `${MODULE_FACTS.primaryExtensionFamilies.length} primary outward families`,
     body: 'Optional product or protocol work belongs here. Useful surfaces are allowed to move faster without pretending the kernel must absorb them.',
-    items: ['x/ai', 'x/data', 'x/gateway', 'x/messaging', 'x/rest', 'x/websocket'],
+    items: MODULE_FACTS.primaryExtensionFamilies,
   },
 ] as const;
 
@@ -68,6 +69,37 @@ const comparisonRows = [
     aspect: 'Reader expectation',
     stable: 'A newcomer should be able to understand why the module exists from the docs and the reference app alone.',
     extension: 'A newcomer should first understand why they need it before opening the package family.',
+  },
+] as const;
+
+const repositorySignals = [
+  {
+    label: 'docs',
+    title: 'Learning path and boundary explanation',
+    body: 'Docs teach the canonical path, request flow, and public mental model before readers start inferring structure from package names alone.',
+    href: '/docs',
+    cta: 'Open docs',
+  },
+  {
+    label: 'reference',
+    title: 'Runnable service shape',
+    body: 'reference/standard-service keeps the default bootstrap and route ownership visible so newcomers have one repository baseline to compare against.',
+    href: '/docs/reference-app',
+    cta: 'Read the reference app',
+  },
+  {
+    label: 'generated facts',
+    title: 'Published inventory and maturity signals',
+    body: 'Synced facts turn stable roots, extension families, and release posture into machine-readable signals instead of duplicated marketing claims.',
+    href: '/releases',
+    cta: 'Inspect release posture',
+  },
+  {
+    label: 'app-local code',
+    title: 'The place where ownership stays visible',
+    body: 'internal/app is where service-specific wiring stays obvious. It should remain the first stop before deeper capability packages enter the conversation.',
+    href: '/examples',
+    cta: 'See example paths',
   },
 ] as const;
 ---
@@ -109,19 +141,40 @@ const comparisonRows = [
     <div class="section__intro">
       <h2>See the architecture as three cooperating zones</h2>
       <p>
-        Plumego becomes easier to trust when the kernel, the canonical reading path, and the outward expansion families are all visible on
-        one screen.
+        Plumego becomes easier to trust when the kernel, the canonical reading path, and the outward expansion families are all visible on one
+        screen with actual repository facts behind them.
       </p>
     </div>
     <div class="topology-board">
       {topologyColumns.map((column) => (
-        <article class="topology-node">
+        <article class="topology-node topology-node--fact-rich">
           <p class="signal-list__kicker">{column.label}</p>
           <h3>{column.title}</h3>
           <p>{column.body}</p>
           <ul>
             {column.items.map((item) => (
               <li>{item}</li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>{copy.sectionTitle}</h2>
+      <p>{copy.sectionBody}</p>
+    </div>
+    <div class="page-grid">
+      {copy.layers.map((item) => (
+        <article class="page-panel">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h2>{item.title}</h2>
+          <p>{item.body}</p>
+          <ul>
+            {item.items.map((entry) => (
+              <li>{entry}</li>
             ))}
           </ul>
         </article>
@@ -150,20 +203,64 @@ const comparisonRows = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>{copy.sectionTitle}</h2>
-      <p>{copy.sectionBody}</p>
+      <h2>Stable-root signals should stay explicit</h2>
+      <p>
+        The architecture page should not just name the kernel. It should also explain what kind of work belongs there and which root names are a
+        warning sign that capability concerns are drifting inward.
+      </p>
     </div>
     <div class="page-grid">
-      {copy.layers.map((item) => (
-        <article class="page-panel">
-          <p class="signal-list__kicker">{item.kicker}</p>
-          <h2>{item.title}</h2>
+      <article class="page-panel page-panel--dense">
+        <p class="signal-list__kicker">stable-root work intent</p>
+        <h3>Use the kernel for long-lived transport and lifecycle concerns</h3>
+        <p>{MODULE_FACTS.stableRootWorkIntent}</p>
+        <ul>
+          {MODULE_FACTS.stableRoots.map((item) => (
+            <li>{item}</li>
+          ))}
+        </ul>
+      </article>
+      <article class="page-panel page-panel--dense">
+        <p class="signal-list__kicker">discouraged roots</p>
+        <h3>Capability-shaped names are usually a signal to branch outward</h3>
+        <p>
+          These names are useful as product or protocol concerns, but they are poor default roots because they blur the ownership boundary of the
+          kernel.
+        </p>
+        <ul>
+          {MODULE_FACTS.discouragedRoots.map((item) => (
+            <li>{item}</li>
+          ))}
+        </ul>
+      </article>
+      <article class="page-panel page-panel--dense">
+        <p class="signal-list__kicker">extension work intent</p>
+        <h3>Let outward families move faster without redefining the default path</h3>
+        <p>{MODULE_FACTS.extensionWorkIntent}</p>
+        <ul>
+          {MODULE_FACTS.allExtensionPaths.map((item) => (
+            <li>{item}</li>
+          ))}
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>Repository shape should reinforce the same mental model</h2>
+      <p>
+        The architecture is not only a package story. It is also a repository story: docs teach the path, the reference app proves it, synced
+        facts publish the boundaries, and app-local code keeps service ownership readable.
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {repositorySignals.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.label}</p>
+          <h3>{item.title}</h3>
           <p>{item.body}</p>
-          <ul>
-            {item.items.map((entry) => (
-              <li>{entry}</li>
-            ))}
-          </ul>
+          <a class="text-link" href={item.href}>{item.cta}</a>
         </article>
       ))}
     </div>
@@ -202,6 +299,7 @@ const comparisonRows = [
       <a class="text-link" href="/docs/getting-started">Open getting started</a>
       <a class="text-link" href="/docs/reference-app">Read the reference app</a>
       <a class="text-link" href="/examples">Open examples</a>
+      <a class="text-link" href="/releases">Inspect releases</a>
     </div>
   </section>
 </MarketingLayout>

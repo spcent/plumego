@@ -87,21 +87,21 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 export const HOME_COPY = {
   en: {
     eyebrow: 'Plumego',
-    headline: 'A Go toolkit for explicit HTTP services.',
+    headline: 'A stdlib-first Go toolkit for explicit HTTP services.',
     summary:
-      'Plumego stays close to net/http, keeps the stable surface intentionally narrow, and gives teams one canonical request path for building reviewable Go services.',
+      'Plumego stays close to net/http, keeps the stable surface intentionally narrow, and gives teams one canonical request path for building reviewable services without hidden framework-owned conventions.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'See Architecture', href: '/architecture' },
-    notes: ['Go 1.24+', 'request-flow first', 'reference/standard-service'],
+    notes: ['Go 1.24+', 'request-flow first', 'published release posture', 'reference/standard-service'],
     heroAudience: {
       label: 'Built for',
-      title: 'Teams that want service code to stay reviewable',
-      body: 'Best for internal APIs, platform services, and boundary-sensitive repositories that prefer explicit wiring over hidden framework conventions.',
+      title: 'Teams that want service code to stay reviewable as the repository grows',
+      body: 'Best for internal APIs, platform services, and boundary-sensitive repositories that prefer explicit wiring, visible route ownership, and one shared reference path over hidden registration.',
     },
     heroStatus: {
       label: 'Current status',
-      title: `${RELEASE_FACTS.currentVersion} with a published release posture`,
-      body: 'The canonical path is ready to adopt now. Stability promises still vary by surface, so compatibility boundaries stay published instead of implied.',
+      title: `${RELEASE_FACTS.currentVersion} with a published compatibility boundary`,
+      body: 'The canonical path is ready to adopt now. Release posture, examples, and architecture all reinforce where stability promises hold and where optional capability work is still expected to move faster.',
     },
     heroVisual: {
       stableLabel: 'one stable model',
@@ -111,7 +111,7 @@ export const HOME_COPY = {
       extensionTitle: 'capabilities branch outward',
       extensionBody: 'Stable roots stay narrow while optional capability work starts in x/* families instead of stretching the kernel.',
       footerLabel: 'default path',
-      footerBody: 'docs → reference app → request flow → module fit',
+      footerBody: 'docs → reference app → request flow → release posture → module fit',
     },
     heroPath: [
       {
@@ -131,13 +131,18 @@ export const HOME_COPY = {
       },
       {
         label: '04',
-        title: 'Classify module ownership',
-        body: 'Only then decide whether the work belongs in stable roots, app-local wiring, or x/* families.',
+        title: 'Read release posture deliberately',
+        body: 'Check which surfaces are stable, supported reference, or still experimental before widening adoption scope.',
+      },
+      {
+        label: '05',
+        title: 'Only then classify module ownership',
+        body: 'Decide whether the next change belongs in stable roots, app-local wiring, or x/* families.',
       },
     ],
     valueTitle: 'Why Plumego exists.',
     valueLead:
-      'Plumego does not try to out-abstract the Go HTTP model. It exists to keep the important parts visible as the repository and the team get larger.',
+      'Plumego does not try to out-abstract the Go HTTP model. It exists to keep the important parts visible as the repository and the team get larger, and to make adoption decisions easier to defend in review.',
     values: [
       {
         kicker: 'explicitness',
@@ -150,16 +155,21 @@ export const HOME_COPY = {
         body: 'Stable roots carry long-lived responsibilities. Optional or fast-moving capability work starts in x/* families instead of leaking into the kernel.',
       },
       {
+        kicker: 'release posture',
+        title: 'Publish what is safe to adopt today',
+        body: 'Compatibility is explained in public instead of being inferred from package existence alone, so teams can distinguish baseline from experimentation.',
+      },
+      {
         kicker: 'repo control',
         title: 'Make repository intent easier to classify',
         body: 'Docs, specs, generated facts, and task cards make change ownership easier to reason about for both humans and coding agents.',
       },
     ],
     valueFootnote:
-      'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small.',
+      'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small and when multiple teams need one defensible default path.',
     adoptionTitle: 'Choose the next page by question, not by package.',
     adoptionBody:
-      'Architecture explains how the repository is shaped. Examples show the canonical runnable path and the guided recipes around it. Pick the page that answers your next question.',
+      'Architecture explains how the repository is shaped. Examples show the canonical runnable path. Releases tells you what can be adopted now versus what should stay deliberate. Pick the page that answers your next decision.',
     adoptionCards: [
       {
         kicker: 'topology',
@@ -171,16 +181,23 @@ export const HOME_COPY = {
       {
         kicker: 'paths',
         title: 'Examples',
-        body: 'Start from the one canonical runnable example, then move into guided examples that explain request flow, boundaries, and adoption posture.',
+        body: 'Start from the one canonical runnable example, then move into guided recipes that explain request flow, boundaries, and adoption posture.',
         href: '/examples',
         label: 'Explore examples',
+      },
+      {
+        kicker: 'adoption',
+        title: 'Releases',
+        body: 'Use release posture when the question is not “does this package exist?” but “which surfaces are mature enough to trust today?”',
+        href: '/releases',
+        label: 'Inspect releases',
       },
     ],
     stableRoots: MODULE_FACTS.stableRoots,
     extensions: MODULE_FACTS.primaryExtensionFamilies,
     canonicalTitle: 'Start from one canonical request path.',
     canonicalBody:
-      'Begin with reference/standard-service. The point is not just one service skeleton—it is one readable path from bootstrap to route registration before deeper boundary work begins.',
+      'Begin with reference/standard-service. The point is not just one service skeleton—it is one readable path from bootstrap to route registration, release posture, and module classification before deeper boundary work begins.',
     canonicalCta: { label: 'Read the Reference App Guide', href: '/docs/reference-app' },
     canonicalSteps: [
       {
@@ -199,6 +216,11 @@ export const HOME_COPY = {
         body: 'Check route registration before touching handlers or deeper modules.',
       },
       {
+        label: 'release posture',
+        title: 'Verify maturity before widening scope',
+        body: 'Use the release page to separate stable roots, supported reference surfaces, and experimental families.',
+      },
+      {
         label: 'boundaries',
         title: 'Only then compare module ownership',
         body: 'Use architecture and modules overview to decide whether the next change belongs in stable roots or x/* families.',
@@ -206,41 +228,41 @@ export const HOME_COPY = {
     ],
     mapTitle: 'Use the module map after the canonical path is clear.',
     mapLead:
-      'The module map is not a second starting point. It is the next layer of orientation once you understand the default request path and need to classify where deeper work belongs.',
+      'The module map is not a second starting point. It is the next layer of orientation once you understand the default request path, release posture, and need to classify where deeper work belongs.',
     mapPanels: {
       stable: {
         title: 'Stable roots protect the default path',
-        caption: 'Narrow modules with stronger compatibility burden and clearer review expectations.',
+        caption: 'Narrow modules with stronger compatibility burden, clearer review expectations, and a published baseline role.',
       },
       extension: {
         title: 'x/* families protect optional capability work',
-        caption: 'Product or protocol-specific work moves outward instead of stretching the kernel.',
+        caption: 'Product or protocol-specific work moves outward instead of stretching the kernel, and stays easier to evaluate deliberately.',
       },
-      footer: 'Read the path first; use the module map when the next question is ownership.',
+      footer: 'Read the path first; use the module map when the next question is ownership or release posture.',
     },
-    finalTitle: 'Read the docs, run the reference app, then expand only when needed.',
+    finalTitle: 'Read the docs, run the reference app, then expand only when the boundary is clear.',
     finalBody:
-      'Plumego works best when you start from the default path and branch into deeper boundaries only after the owning capability is clear.',
+      'Plumego works best when you start from the default path, check release posture early, and branch into deeper boundaries only after the owning capability is obvious.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
     finalSecondary: { label: 'Open GitHub', href: SITE.githubUrl },
   },
   zh: {
     eyebrow: 'Plumego',
-    headline: '一个面向显式 HTTP 服务的 Go 工具包。',
+    headline: '一个 stdlib-first 的显式 HTTP 服务 Go 工具包。',
     summary:
-      'Plumego 尽量贴近 net/http，把稳定表面保持收敛，并为团队提供一条构建可评审 Go 服务的 canonical 请求路径。',
+      'Plumego 尽量贴近 net/http，把稳定表面保持收敛，并为团队提供一条构建可评审服务的 canonical 请求路径，而不是把关键结构藏进框架约定里。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '查看架构', href: '/zh/architecture' },
-    notes: ['Go 1.24+', 'request-flow first', 'reference/standard-service'],
+    notes: ['Go 1.24+', 'request-flow first', '公开的发布姿态', 'reference/standard-service'],
     heroAudience: {
       label: '适合',
-      title: '希望服务代码持续可评审的团队',
-      body: '尤其适合内部 API、平台服务，以及那些更看重显式 wiring 而不是隐藏框架约定的仓库。',
+      title: '希望仓库变大后服务代码仍然可评审的团队',
+      body: '尤其适合内部 API、平台服务，以及那些更看重显式 wiring、可见 route ownership 和统一 reference path，而不是隐藏式注册机制的仓库。',
     },
     heroStatus: {
       label: '当前状态',
-      title: `${RELEASE_FACTS.currentVersion}，并且发布姿态是公开的`,
-      body: 'canonical path 现在就可以采用，但不同区域的稳定承诺并不相同，所以兼容性边界会被明确发布，而不是默认你自己猜。',
+      title: `${RELEASE_FACTS.currentVersion}，并且兼容性边界是公开的`,
+      body: 'canonical path 现在就可以采用。发布姿态、示例页与架构页会共同说明哪些区域已经稳定，哪些能力表面仍应保持审慎扩展。',
     },
     heroVisual: {
       stableLabel: '一套稳定模型',
@@ -250,7 +272,7 @@ export const HOME_COPY = {
       extensionTitle: '能力向外分叉',
       extensionBody: '稳定根保持收敛，可选能力从 x/* 家族开始，而不是继续拉长内核。',
       footerLabel: '默认路径',
-      footerBody: 'docs → reference app → request flow → 模块归属',
+      footerBody: 'docs → reference app → request flow → 发布姿态 → 模块归属',
     },
     heroPath: [
       {
@@ -270,13 +292,18 @@ export const HOME_COPY = {
       },
       {
         label: '04',
+        title: '先检查发布姿态',
+        body: '在扩大采用范围之前，先确认哪些表面属于稳定根，哪些仍然只是支持参考或实验性能力。',
+      },
+      {
+        label: '05',
         title: '最后判断模块归属',
         body: '再决定这项工作属于稳定根、应用本地 wiring，还是 x/* 能力家族。',
       },
     ],
     valueTitle: 'Plumego 为什么存在。',
     valueLead:
-      'Plumego 不是要重新发明 Go 的 HTTP 模型。它的目标，是在仓库和团队变大以后，继续把关键结构保持可见。',
+      'Plumego 不是要重新发明 Go 的 HTTP 模型。它的目标，是在仓库和团队变大以后，继续把关键结构保持可见，并让采用决策在评审中更容易被解释。',
     values: [
       {
         kicker: '显式性',
@@ -289,16 +316,21 @@ export const HOME_COPY = {
         body: '稳定根承接长期职责，可选或快速演进能力从 x/* 家族进入，而不是一路渗进内核。',
       },
       {
+        kicker: '发布姿态',
+        title: '把今天真正能安全采用的范围公开出来',
+        body: '兼容性不是靠“仓库里有这个包”来暗示，而是由页面明确解释，让团队能区分基线与实验区。',
+      },
+      {
         kicker: '仓库控制面',
         title: '让仓库意图更容易判断',
         body: 'docs、specs、同步事实与 task card 分层明确，让人和 agent 都更容易判断改动该落在哪。',
       },
     ],
     valueFootnote:
-      '重点不是更多框架抽象，而是让服务工具包在仓库不再小的时候依然保持可读。',
+      '重点不是更多框架抽象，而是让服务工具包在仓库不再小、团队开始协作分工之后，依然有一条可辩护的默认路径。',
     adoptionTitle: '根据问题选下一页，而不是先选包。',
     adoptionBody:
-      'Architecture 负责解释仓库如何分层；Examples 负责解释 canonical 可运行路径和围绕它的 guided recipes。先选能回答你下一个问题的页面。',
+      'Architecture 负责解释仓库如何分层；Examples 负责展示 canonical 可运行路径；Releases 负责解释哪些区域现在就适合采用。先选真正能回答你下一个决策的问题的页面。',
     adoptionCards: [
       {
         kicker: 'topology',
@@ -314,12 +346,19 @@ export const HOME_COPY = {
         href: '/zh/examples',
         label: '查看示例',
       },
+      {
+        kicker: 'adoption',
+        title: '发布',
+        body: '当问题不再是“仓库里有没有这个包”，而是“今天哪些表面真正值得信任”时，就去看发布姿态。',
+        href: '/zh/releases',
+        label: '查看发布页',
+      },
     ],
     stableRoots: MODULE_FACTS.stableRoots,
     extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: '先从 canonical 请求路径起步。',
+    canonicalTitle: '先从一条 canonical 请求路径起步。',
     canonicalBody:
-      '先看 reference/standard-service。重点不只是服务骨架本身，而是一条从 bootstrap 到 route 注册都保持可读的默认请求路径。',
+      '先看 reference/standard-service。重点不只是服务骨架本身，而是一条从 bootstrap 到 route 注册、再到发布姿态与模块归属都保持可读的默认路径。',
     canonicalCta: { label: '阅读参考应用说明', href: '/zh/docs/reference-app' },
     canonicalSteps: [
       {
@@ -334,31 +373,36 @@ export const HOME_COPY = {
       },
       {
         label: 'routes',
-        title: '最后看 internal/app/routes.go',
+        title: '然后看 internal/app/routes.go',
         body: '在继续深入 handler 或模块之前，先看清 route 注册。',
       },
       {
+        label: 'release posture',
+        title: '确认成熟度再扩大范围',
+        body: '用发布页分清哪些是稳定根，哪些属于支持参考表面，哪些仍然是实验性家族。',
+      },
+      {
         label: 'boundaries',
-        title: '再判断模块归属',
+        title: '最后再判断模块归属',
         body: '用 architecture 与 modules overview 判断下一项工作属于稳定根还是 x/* 家族。',
       },
     ],
     mapTitle: '只有 canonical path 清楚以后，再看 module map。',
     mapLead:
-      'module map 不是第二个起点，而是在默认请求路径已经读清之后，帮助你继续判断更深工作归属的下一层视图。',
+      'module map 不是第二个起点，而是在默认请求路径与发布姿态已经读清之后，帮助你继续判断更深工作归属的下一层视图。',
     mapPanels: {
       stable: {
         title: '稳定根负责保护默认路径',
-        caption: '这些模块更收敛、兼容性负担更重，也更应该在评审时容易讲清楚。',
+        caption: '这些模块更收敛、兼容性负担更重，也承担公开基线的角色。',
       },
       extension: {
         title: 'x/* 家族负责承接可选能力工作',
-        caption: '产品能力或协议工作向外分叉，而不是继续把内核拉长。',
+        caption: '产品能力或协议工作向外分叉，而不是继续把内核拉长，也更适合被审慎地单独评估。',
       },
-      footer: '先读路径，再用 module map 判断 ownership。',
+      footer: '先读路径，再用 module map 判断 ownership 与发布姿态。',
     },
-    finalTitle: '先读文档，跑通 reference app，再按需要向外扩展。',
-    finalBody: 'Plumego 最适合从默认路径进入，只有在 capability ownership 明确之后，再进入更深的模块边界。',
+    finalTitle: '先读文档，跑通 reference app，再在边界清楚时向外扩展。',
+    finalBody: 'Plumego 最适合从默认路径进入，并尽早检查发布姿态；只有在 capability ownership 已经明确之后，再进入更深的模块边界。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
     finalSecondary: { label: '打开 GitHub', href: SITE.githubUrl },
   },

@@ -10,6 +10,7 @@ const recipeTracks = [
     label: 'recipe 01',
     title: '请求路径 recipe',
     body: '当你需要不靠猜测地追一条 HTTP 请求，从 route 注册一直看到写回路径在哪里结束时，用这条路径。',
+    checks: ['先看 route 注册，再看 handlers', '确认 public path 上的 middleware 顺序', '在 transport ownership 结束处停下来'],
     href: '/zh/docs/concepts/request-flow',
     cta: '追踪一条请求',
   },
@@ -17,15 +18,33 @@ const recipeTracks = [
     label: 'recipe 02',
     title: '模块归属 recipe',
     body: '当真正的问题是这项工作应该落在稳定根、应用本地 wiring 还是 x/* 家族时，用这条路径。',
+    checks: ['在翻包前先判断归属', '保护稳定根的兼容性承诺', '把可选能力继续向外分层'],
     href: '/zh/docs/modules/overview',
     cta: '判断改动归属',
   },
   {
     label: 'recipe 03',
+    title: '参考应用 recipe',
+    body: '当你想先确认 canonical 服务形态，并把自己的 bootstrap 与 route 布局拿来对照时，用这条路径。',
+    checks: ['先从 internal/app 的 ownership 看起', '在增加抽象之前先对照目录形态', '把 reference app 当成可复用基线'],
+    href: '/zh/docs/reference-app',
+    cta: '阅读参考应用',
+  },
+  {
+    label: 'recipe 04',
     title: '发布姿态 recipe',
     body: '当采用决策取决于兼容性信号，而不是“仓库里有这个包所以默认可用”时，用这条路径。',
+    checks: ['扩展范围前先读稳定性承诺', '把发布姿态和路线图野心分开', '让证据先于假设'],
     href: '/zh/docs/release-posture',
     cta: '检查发布姿态',
+  },
+  {
+    label: 'recipe 05',
+    title: '仓库结构 recipe',
+    body: '当一个改动同时涉及文档、生成事实和实现代码，你需要先判断每一层分别拥有哪类职责时，用这条路径。',
+    checks: ['用 docs 承担学习路径', '用 specs 与 generated facts 提供事实来源', '保持 app-local 代码与扩展家族分离'],
+    href: '/zh/architecture',
+    cta: '查看架构',
   },
 ] as const;
 
@@ -33,6 +52,37 @@ const adoptionChecks = [
   '在打开无关包家族之前，先跑通 reference app。',
   '用 recipe 回答一个明确问题，而不是把它们当成并行的产品 demo。',
   '一旦知道是哪条边界或能力拥有这项改动，就回到文档主路径继续。',
+] as const;
+
+const readingOrder = [
+  {
+    label: '01',
+    title: '先跑通 canonical 服务',
+    body: '先从 reference/standard-service 开始，让 bootstrap 模型、route ownership 与 handler 形态都有同一条默认基线。',
+    href: '/zh/docs/reference-app',
+    cta: '从可运行路径开始',
+  },
+  {
+    label: '02',
+    title: '再用 recipe 回答一个具体问题',
+    body: '只有在知道自己要看什么时再进入 recipe：请求路径、模块归属、发布姿态，或仓库结构。',
+    href: '/zh/docs/concepts/request-flow',
+    cta: '打开聚焦 recipe',
+  },
+  {
+    label: '03',
+    title: '随后回到文档主路径',
+    body: 'Recipes 会把你重新推回 docs，确保 canonical path 仍是核心，而不是把示例页变成分散的 showcase。',
+    href: '/zh/docs/getting-started',
+    cta: '继续进入文档',
+  },
+  {
+    label: '04',
+    title: '扩展之前先检查发布姿态',
+    body: '当默认路径已经读清楚，再用发布页判断你关心的表面是否已经成熟到值得采用。',
+    href: '/zh/releases',
+    cta: '查看发布姿态',
+  },
 ] as const;
 ---
 
@@ -73,24 +123,27 @@ const adoptionChecks = [
   <section class="section section--split section--examples-hierarchy">
     <div class="section__intro">
       <h2>先理解层级，再决定看哪一页</h2>
-      <p>Plumego 的示例是刻意分层的：只有一个 canonical 可运行服务，其余是围绕它展开的引导式 recipes，用来解释如何读仓库。</p>
+      <p>
+        Plumego 的示例是刻意分层的：只有一个 canonical 可运行服务，其余是围绕它展开的引导式 recipes，用来解释如何读仓库，
+        而不是假装每个问题都需要一套单独 demo。
+      </p>
     </div>
     <div class="example-hierarchy">
       <article class="example-hierarchy__primary">
         <p class="signal-list__kicker">canonical example</p>
         <h3>reference/standard-service</h3>
-        <p>主示例是那个你可以 clone、运行、与自己服务对照，并在采用过程中不断回来的服务骨架。</p>
+        <p>主示例是那个你可以 clone、运行、与自己仓库对照，并在采用决策仍未定型时持续回来的服务骨架。</p>
         <ul>
           <li>bootstrap 和 server 构造保持可见</li>
           <li>internal/app 拥有应用本地 wiring</li>
-          <li>在进入更深的 handler 或包之前，route 注册仍然清晰可读</li>
+          <li>在进入更深的 handler 或包家族之前，route 注册仍然清晰可读</li>
         </ul>
         <a class="text-link" href="/zh/docs/reference-app">打开参考应用说明</a>
       </article>
       <article class="example-hierarchy__secondary">
         <p class="signal-list__kicker">guided recipes</p>
         <h3>Recipes 一次只回答一个仓库问题</h3>
-        <p>它们不是并行迷你产品，而是帮助你理解请求路径、ownership 与成熟度边界的可复用阅读模式。</p>
+        <p>它们不是并行迷你产品，而是帮助你理解请求路径、ownership、成熟度信号与仓库结构的可复用阅读模式。</p>
         <ol>
           {adoptionChecks.map((item) => (
             <li>{item}</li>
@@ -124,12 +177,40 @@ const adoptionChecks = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>引导式 recipes</h2>
-      <p>Recipes 比 canonical example 更小，也比 docs overview 更具体。它们的目标，是帮读者回答一个明确的采用问题，然后回到 canonical path。</p>
+      <h2>围绕采用问题组织的 recipe 轨道</h2>
+      <p>
+        Recipes 比 canonical example 更小，也比 docs overview 更具体。每条轨道都应该尽快回答一个明确问题，然后把读者重新送回默认路径，
+        带着更清晰的分类继续往下读。
+      </p>
     </div>
-    <div class="recipe-grid">
+    <div class="recipe-grid recipe-grid--expanded">
       {recipeTracks.map((item) => (
         <article class="recipe-card">
+          <p class="signal-list__kicker">{item.label}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <ul class="recipe-card__checks">
+            {item.checks.map((check) => (
+              <li>{check}</li>
+            ))}
+          </ul>
+          <a class="text-link" href={item.href}>{item.cta}</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>推荐阅读顺序</h2>
+      <p>
+        把这页当成决策层来使用。正确顺序应该是先确认一个可运行基线，再进入一个聚焦问题，最后回到 docs 与发布姿态页面，
+        在仓库边界已经清楚之后再决定是否继续扩展。
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {readingOrder.map((item) => (
+        <article class="control-grid__item">
           <p class="signal-list__kicker">{item.label}</p>
           <h3>{item.title}</h3>
           <p>{item.body}</p>
@@ -165,6 +246,7 @@ const adoptionChecks = [
       <a class="text-link" href="/zh/architecture">查看架构</a>
       <a class="text-link" href="/zh/docs/reference-app">阅读参考应用</a>
       <a class="text-link" href="/zh/docs/modules/overview">查看模块总览</a>
+      <a class="text-link" href="/zh/releases">查看发布页</a>
     </div>
   </section>
 </MarketingLayout>
