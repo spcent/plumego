@@ -10,7 +10,7 @@ sidebar:
 
 `reference/standard-service` 是 Plumego 的 canonical 应用形态。当你接下来的问题是“canonical 服务长什么样”，而不是“先怎么跑起来”时，应该看这个页面。它的职责，是让你理解参考服务如何被组装起来、这种布局到底说明了什么，以及哪些结论可以安全地带入真实服务。
 
-如果你还没有跑任何东西，只想先走最短成功路径，请先看[开始使用](/zh/docs/getting-started)。如果你的问题已经从服务形态转向仓库边界与模块归属，请直接打开 [Architecture](/zh/architecture)，把归属判断留在那个页面里，而不是让它继续渗到这里。
+如果你还没有跑任何东西，只想先走最短成功路径，请先看[开始使用](/zh/docs/getting-started)。如果你的问题已经不再是 canonical 服务形态，而是仓库边界和工作归属，请先打开 [Architecture](/zh/architecture)，再进入 [仓库边界](/zh/docs/concepts/repo-control-plane)，把仓库分类判断留在这些页面里，而不是继续让它停留在这里。
 
 ## 它展示了什么
 
@@ -32,6 +32,19 @@ Plumego 有意坚持“只有一条明显路径”的工程风格，而参考应
 - 判断应用本地代码应放在哪里
 - 把你自己的服务骨架和 Plumego 的 canonical 布局做对照
 
+## 什么时候应该从 runnable shape 切到仓库边界
+
+只要你的问题仍然是“这个 canonical 服务是怎么组装出来的”，就继续留在这里。一旦真正的问题变成“这项改动到底该归谁负责”，就应该离开这页。
+
+当你需要回答下面这些问题时，改去看 [Architecture](/zh/architecture) 和 [仓库边界](/zh/docs/concepts/repo-control-plane)：
+
+- 这个改动应该属于哪个 stable root 或 `x/*` 家族
+- 某个包到底属于默认路径，还是应该被看作扩展家族
+- 什么时候应该从服务本地布局切换到 docs、specs、task cards 这样的仓库级规则
+- 如果继续照抄参考应用结构，是否会把本来应该保持清楚的仓库边界弄模糊
+
+一个简单判断法是：如果你还在对照文件结构，就留在这里；如果你已经开始判断归属，就离开这页。
+
 ## 不应从它推导什么
 
 - 它是 canonical 参考，不是功能目录
@@ -41,6 +54,7 @@ Plumego 有意坚持“只有一条明显路径”的工程风格，而参考应
 
 ## 下一步阅读
 
-- 打开 [Architecture](/zh/architecture)，当你需要分类 stable roots、`x/*` 与仓库归属时
+- 打开 [Architecture](/zh/architecture)，当你需要先看仓库的高层边界地图时
+- 打开 [仓库边界](/zh/docs/concepts/repo-control-plane)，当你需要分类 stable roots、`x/*`、docs、specs 与 task 的归属时
 - 打开 [模块总览](/zh/docs/modules/overview)，当你在理解 canonical 形态之后，想看更大的模块地图时
-- 打开 [FAQ](/zh/docs/faq)，当你下一步的问题是范围、成熟度或 Plumego 明确不打算做什么时
+- 打开 [常见问题](/zh/docs/faq)，当你下一步的问题是范围、成熟度或 Plumego 明确不打算做什么时
