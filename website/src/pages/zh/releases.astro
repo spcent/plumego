@@ -9,6 +9,68 @@ const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => entry.status.
 const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
   entry.status.toLowerCase().includes('experimental'),
 ).length;
+
+const adoptionGuidance = [
+  {
+    kicker: 'adopt now',
+    title: '先从稳定根与 canonical 参考路径开始',
+    body: '如果你准备把 Plumego 用到真实服务里，先从稳定根、reference app 和已文档化的请求路径开始，再决定是否进入可选表面。',
+  },
+  {
+    kicker: 'evaluate deliberately',
+    title: '把扩展家族视为有价值但尚未冻结的能力',
+    body: '面向应用的扩展家族今天已经有实际价值，但只有在你清楚兼容性承诺到哪里结束、产品能力仍会如何演进时，才适合纳入采用范围。',
+  },
+  {
+    kicker: 'wait for more evidence',
+    title: '如果决策依赖实验性的下级原语，就先放慢',
+    body: '当你的服务直接依赖下级扩展原语，而不是从所属家族入口进入时，最好等 discovery 路径与兼容性边界更清楚之后再推进采用。',
+  },
+] as const;
+
+const releaseChannels = [
+  {
+    kicker: 'ga',
+    title: '稳定根',
+    body: '这些是面向 v1 用户承担兼容性负担的库表面，也是 Plumego 期望多数服务长期依赖的默认能力。',
+    details: ['公共包表面以稳定为目标', '最适合先进入生产评估', '文档与示例都会先围绕这条路径组织'],
+  },
+  {
+    kicker: 'supported reference',
+    title: 'canonical 参考应用与 CLI',
+    body: '这些表面属于官方采用路径，但应该被看成 bootstrap 与操作流的教学工具，而不是一个可以任意平移复用的扩展目录。',
+    details: ['reference app 教会默认服务形态', 'CLI 作为工具被支持，而不是 Go 导入表面', '二者都与 canonical docs 保持对齐'],
+  },
+  {
+    kicker: 'experimental',
+    title: '扩展家族与下级原语',
+    body: '这些区域仍处于发布范围和质量门禁之内，但 API 与配置兼容性尚未冻结。采用它们应该有明确理由，而不是默认跟进。',
+    details: ['先从所属家族入口判断，再看下级路径', '演进速度通常快于稳定根', '产品能力应继续留在内核之外'],
+  },
+] as const;
+
+const upgradePath = [
+  {
+    label: '01',
+    title: '先确认默认路径仍然匹配当前服务',
+    body: '升级前先重新检查你的服务是否仍沿着 canonical bootstrap、routing 与 app-local wiring 路径组织。',
+  },
+  {
+    label: '02',
+    title: '把支持矩阵当成边界检查',
+    body: '列出服务真正直接依赖的表面，再把它们映射到 stable、supported-reference 或 experimental 状态。',
+  },
+  {
+    label: '03',
+    title: '先升级稳定根，再看可选家族',
+    body: '如果服务同时依赖稳定表面与实验性家族，应优先确认稳定根与 canonical path 的变化，再评估扩展区域。',
+  },
+  {
+    label: '04',
+    title: '升级后回到 docs 与 examples 校验',
+    body: '用 reference app、request-flow 文档和 architecture 页面，重新确认本地仓库形态是否仍与预期路径保持一致。',
+  },
+] as const;
 ---
 
 <MarketingLayout locale="zh" title={copy.title} description={copy.description} currentPath="/zh/releases">
@@ -17,7 +79,7 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
     title={copy.title}
     description={copy.description}
     links={[
-      { label: '路线图', href: '/zh/roadmap' },
+      { label: '架构', href: '/zh/architecture' },
       { label: '文档', href: '/zh/docs' },
     ]}
   />
@@ -44,22 +106,64 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
     </div>
   </section>
 
+  <section class="section">
+    <div class="section__intro">
+      <h2>先用采用指导建立默认判断，再逐行阅读矩阵</h2>
+      <p>
+        多数读者并不需要一上来就把支持矩阵逐行看完。他们首先需要的是一套默认决策姿态：现在先采用 canonical path，把 supported reference 看成教学表面，
+        把 experimental capability work 留在明确评估之后再进入。
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {adoptionGuidance.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
   <section class="release-stats">
     <article class="page-panel">
       <p class="signal-list__kicker">source</p>
       <h2>README.md</h2>
-      <p>这个发布页直接消费同步后的 v1 支持矩阵，而不是维护一份独立的站点副本。</p>
+      <p>发布页直接消费同步后的 v1 支持矩阵，而不是网站里单独手抄一份清单。</p>
     </article>
     <article class="page-panel">
       <p class="signal-list__kicker">stable groups</p>
       <h2>{stableGroups}</h2>
-      <p>当前带有 GA 级兼容性承诺的分组数量。</p>
+      <p>当前具备 GA 级兼容性承诺的分组数量。</p>
     </article>
     <article class="page-panel">
       <p class="signal-list__kicker">experimental groups</p>
       <h2>{experimentalGroups}</h2>
-      <p>仍纳入发布范围但尚未冻结兼容性的分组数量。</p>
+      <p>仍在发布范围内，但兼容性尚未冻结的分组数量。</p>
     </article>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>用直白语言解释发布频道</h2>
+      <p>
+        仓库里同时存在多种发布姿态。这个页面的目标，不是把它们抹平成一条乐观叙事，而是帮你分清：哪些表面应该先进入采用决策，哪些能力应该稍后谨慎跟进。
+      </p>
+    </div>
+    <div class="page-grid">
+      {releaseChannels.map((item) => (
+        <article class="page-panel">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h2>{item.title}</h2>
+          <p>{item.body}</p>
+          <ul>
+            {item.details.map((detail) => (
+              <li>{detail}</li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
   </section>
 
   <section class="section">
@@ -72,6 +176,26 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
         <article class="control-grid__item">
           <p class="signal-list__kicker">{item.kicker}</p>
           <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section section--split">
+    <div class="section__intro">
+      <h2>建议的升级路径</h2>
+      <p>
+        当兼容性比“包好奇心”更重要时，升级最容易的方式，是让发布讨论始终贴着仓库结构走。下面这组步骤可以作为实际升级时的默认顺序。
+      </p>
+    </div>
+    <div class="request-flow-rail">
+      {upgradePath.map((item) => (
+        <article class="request-flow-step">
+          <div>
+            <p class="signal-list__kicker">{item.label}</p>
+            <h3>{item.title}</h3>
+          </div>
           <p>{item.body}</p>
         </article>
       ))}
@@ -91,20 +215,21 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
         <p class="status-pill">{entry.status}</p>
         <h2>{entry.area}</h2>
         <p>{entry.promise}</p>
-        <p><strong>模块：</strong>{entry.modules}</p>
+        <p><strong>Modules:</strong> {entry.modules}</p>
       </article>
     ))}
   </section>
 
   <section class="section">
     <div class="section__intro">
-      <h2>继续回到 canonical path</h2>
-      <p>把发布姿态当成边界图读完以后，再回到默认应用路径做真正的采用决策。</p>
+      <h2>回到 canonical path 继续</h2>
+      <p>把发布姿态当成边界地图来用，然后回到默认应用路径推进真正的采用工作。</p>
     </div>
     <div class="page-links">
-      <a class="text-link" href="/zh/docs/getting-started">打开开始使用</a>
+      <a class="text-link" href="/zh/architecture">查看架构</a>
       <a class="text-link" href="/zh/docs/reference-app">阅读参考应用</a>
       <a class="text-link" href="/zh/roadmap">查看路线图</a>
+      <a class="text-link" href="/zh/examples">查看示例</a>
     </div>
   </section>
 </MarketingLayout>

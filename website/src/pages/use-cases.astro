@@ -1,36 +1,99 @@
 ---
-import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
-import { USE_CASES_COPY } from '../data/site';
+import MarketingLayout from '../layouts/MarketingLayout.astro';
 
-const copy = USE_CASES_COPY.en;
+const quickChecks = [
+  {
+    kicker: 'request flow',
+    title: 'You want request flow to stay reviewable in code',
+    body: 'Plumego is strongest when route registration, middleware order, and app-local wiring should remain visible instead of disappearing into framework-owned defaults.',
+  },
+  {
+    kicker: 'service shape',
+    title: 'You want one canonical service starting point',
+    body: 'The model becomes more compelling when new services should begin from one readable reference layout rather than drifting into repository-specific bootstrap patterns.',
+  },
+  {
+    kicker: 'maturity posture',
+    title: 'You need explicit support and ownership signals',
+    body: 'Stable roots, x/* families, release posture, and roadmap direction are separated so the repository can publish what is baseline versus what is still deliberate.',
+  },
+] as const;
+
+const nextQuestions = [
+  {
+    kicker: 'go deeper',
+    title: 'Why Plumego',
+    body: 'Open the full adoption page when you need the longer answer: team profiles, anti-fit signals, and how to choose the next path by confidence level.',
+    href: '/why-plumego',
+    cta: 'Open Why Plumego',
+  },
+  {
+    kicker: 'topology first',
+    title: 'Architecture',
+    body: 'Choose Architecture when your next decision depends on stable roots, extension families, and where changes should actually live in the repository.',
+    href: '/architecture',
+    cta: 'Read architecture',
+  },
+  {
+    kicker: 'runnable proof',
+    title: 'Examples',
+    body: 'Choose Examples when a canonical runnable path and guided recipes will answer the fit question faster than another conceptual page.',
+    href: '/examples',
+    cta: 'Open examples',
+  },
+  {
+    kicker: 'support posture',
+    title: 'Releases',
+    body: 'Choose Releases when the real question is not whether a module exists, but whether it is mature enough to adopt right now.',
+    href: '/releases',
+    cta: 'Inspect releases',
+  },
+] as const;
+
+const cautionSignals = [
+  {
+    kicker: 'slow down',
+    title: 'Framework magic matters more than explicit review paths',
+    body: 'If the goal is to hide structure behind framework conventions, Plumego may feel more deliberate than helpful.',
+  },
+  {
+    kicker: 'slow down',
+    title: 'Each service should keep inventing its own shape',
+    body: 'The model works best when the repository wants one canonical path rather than many local bootstrap styles.',
+  },
+] as const;
 ---
 
 <MarketingLayout
   locale="en"
-  title={copy.title}
-  description={copy.description}
+  title="Adoption Fit"
+  description="Use this page as a quick triage step before deciding whether to go deeper into Why Plumego, Architecture, Examples, or Releases."
   currentPath="/use-cases"
-  keywords={['plumego use cases', 'go service toolkit', 'stdlib-first go', 'explicit http services']}
+  keywords={['plumego adoption fit', 'why plumego', 'go service toolkit', 'explicit http services']}
 >
   <PageHero
-    eyebrow={copy.eyebrow}
-    title={copy.title}
-    description={copy.description}
+    eyebrow="Quick Fit Check"
+    title="Adoption Fit"
+    description="Use this page as the short version of the adoption question. If the signals line up, continue into Why Plumego for the longer decision path."
     links={[
+      { label: 'Why Plumego', href: '/why-plumego' },
+      { label: 'Architecture', href: '/architecture' },
       { label: 'Examples', href: '/examples' },
-      { label: 'Docs', href: '/docs' },
     ]}
   />
 
   <section class="section">
     <div class="section__intro">
-      <h2>{copy.introTitle}</h2>
-      <p>{copy.introBody}</p>
+      <h2>Start here when you need a fast answer.</h2>
+      <p>
+        This page is now the short adoption gateway. Use it to decide whether Plumego is worth deeper evaluation, then move into the page that answers the next real
+        question.
+      </p>
     </div>
-    <div class="signal-list">
-      {copy.guideCards.map((item) => (
-        <article class="signal-list__item">
+    <div class="control-grid">
+      {quickChecks.map((item) => (
+        <article class="page-panel page-panel--dense">
           <p class="signal-list__kicker">{item.kicker}</p>
           <h3>{item.title}</h3>
           <p>{item.body}</p>
@@ -41,36 +104,40 @@ const copy = USE_CASES_COPY.en;
 
   <section class="section">
     <div class="section__intro">
-      <h2>{copy.decisionTitle}</h2>
-      <p>{copy.decisionBody}</p>
+      <h2>Two signals that usually mean “slow down.”</h2>
+      <p>
+        Plumego is not meant to be universal. If the caution signals below sound more like your team, keep the architecture model in mind and avoid forcing adoption too
+        early.
+      </p>
     </div>
-  </section>
-
-  <section class="page-grid">
-    {copy.cases.map((item) => (
-      <article class="page-panel">
-        <p class="signal-list__kicker">{item.kicker}</p>
-        <h2>{item.title}</h2>
-        <p>{item.body}</p>
-        <ul>
-          {item.fitPoints.map((point) => (
-            <li>{point}</li>
-          ))}
-        </ul>
-        <a class="text-link" href={item.startHref}>{item.startLabel}</a>
-      </article>
-    ))}
+    <div class="control-grid control-grid--tight">
+      {cautionSignals.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
   </section>
 
   <section class="section">
     <div class="section__intro">
-      <h2>Continue with the default path</h2>
-      <p>Once the fit is clear, move to the canonical example and the docs entry path.</p>
+      <h2>Choose the next page deliberately.</h2>
+      <p>
+        Once the quick fit is clearer, move to the page that matches your confidence level: go deeper on adoption, inspect topology, compare against runnable examples, or
+        verify maturity posture.
+      </p>
     </div>
-    <div class="page-links">
-      <a class="text-link" href="/examples">Open examples</a>
-      <a class="text-link" href="/docs/getting-started">Open getting started</a>
-      <a class="text-link" href="/docs/reference-app">Read the reference app</a>
+    <div class="control-grid control-grid--tight">
+      {nextQuestions.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <a class="text-link" href={item.href}>{item.cta}</a>
+        </article>
+      ))}
     </div>
   </section>
 </MarketingLayout>

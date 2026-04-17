@@ -10,16 +10,50 @@ import GeneratedReleaseMatrix from '../../../components/docs/GeneratedReleaseMat
 
 # Release Posture
 
-Plumego v1 covers the checked-in repository, but not every area carries the same compatibility promise.
+Plumego v1 covers the checked-in repository, but not every area carries the same compatibility promise. This page exists so readers do not mistake a checked-in package, a generated fact card, or a reference-app mention for a blanket stability claim.
 
 ## Synced support matrix
 
 <GeneratedReleaseMatrix />
 
+## How to read posture against the current repository
+
+The current repository already gives you several signals, and they should be read together instead of in isolation.
+
+- stable roots define the default learning path, but they still need to be read with module boundaries in mind
+- `x/*` families are real repository surfaces, but many of them are intentionally faster-moving than the default path
+- `reference/standard-service` stays on stable roots, so inclusion in the canonical app path is a stronger signal than mere existence in the repo
+- docs, scaffolds, and examples explain usage, but they should not silently upgrade a package into a stronger compatibility promise than the support matrix allows
+
 ## Practical reading rule
 
-Before treating a package as durable, check whether it belongs to a stable root or to an experimental extension family.
+Before treating a package as durable, check these questions in order:
+
+1. Is it part of a stable root or an extension family?
+2. Does the support matrix mark it as part of the long-lived default surface, or as something still evolving?
+3. Is it part of the canonical reference path, or only part of an optional capability family?
+4. Does the touched module's `module.yaml` or the current roadmap narrow what kind of change is actually expected there?
+
+That sequence reduces the chance of reading experimentation as long-term contract.
+
+## When to slow down
+
+Slow down before assuming durability when any of these are true:
+
+- the package lives under `x/*`
+- the package is absent from `reference/standard-service`
+- the work is capability-specific, topology-heavy, tenant-aware, or protocol-specific
+- the repository docs treat it as an extension family entrypoint rather than part of the smallest runnable path
+
+In those cases, the safer assumption is that you are reading an extension surface whose contract should be checked more carefully.
 
 ## Why this page exists
 
-Plumego keeps release posture explicit so documentation, scaffolds, and extension work do not accidentally overstate compatibility.
+Plumego keeps release posture explicit so documentation, scaffolds, and extension work do not accidentally overstate compatibility. The point is not to make the repository feel uncertain; it is to keep the stable path narrow enough that readers know what can be copied with confidence.
+
+## Read next
+
+- [Stable Roots](/docs/stable-roots)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)
+- [Releases](/releases)

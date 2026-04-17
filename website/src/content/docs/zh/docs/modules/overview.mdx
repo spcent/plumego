@@ -10,26 +10,53 @@ import GeneratedModuleFacts from '../../../../../components/docs/GeneratedModule
 
 # 模块总览
 
-Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速演进功能放在 `x/*`。这个拆分是有意的：它让稳定表面保持收敛，也让 ownership 更容易判断。
+Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速演进功能放在 `x/*`。这个拆分是有意的：它让稳定表面保持收敛，也让 ownership 更容易判断，并避免默认学习路径被扩展能力重新定义。
 
 ## 同步模块清单
 
 <GeneratedModuleFacts locale="zh" />
 
+## 当前仓库是怎样组织的
+
+当前仓库有意把三层东西分开。
+
+- 仓库根部的稳定根承载默认学习路径和长期公开表面
+- `x/*` 家族承载可选、能力型或演进更快的行为
+- `reference`、`docs`、`specs`、`tasks` 这类非库目录不参与 import-path 设计，而是作为控制面存在
+
+这意味着，不是每个顶层目录都在回答同一个问题。`reference/standard-service` 负责解释 canonical 应用形态；`specs/*` 与 `module.yaml` 则在问题变成归属判断时，帮助你完成仓库级分类。
+
 ## 默认分类规则
 
-- 内核、生命周期、transport contract 或稳定中间件变化，归稳定根
-- 能力或协议家族工作，归各自的 `x/*`
-- 应用 wiring，归 `reference/standard-service`
+可以把当前仓库理解成下面这套分流规则：
 
-## 为什么这很重要
+- 内核、生命周期、route 结构、transport contract 或稳定中间件变化，归稳定根
+- 能力、协议、租户、网关、数据拓扑或 observability adapter 相关工作，归对应的 `x/*` 家族
+- 应用本地 bootstrap 与 service wiring，归 `reference/standard-service`
+- ownership 规则、机器可读路由与执行控制面，归 `docs`、`specs`、`tasks`，而不是运行时包
 
-- 稳定根更容易学习、评审和长期维护
-- 扩展能力可以更快演进，而不重定义默认学习路径
-- 仓库工具可以用更小的搜索半径做任务归类
+## 按问题决定从哪里开始
+
+不要按包名乱扫，而是先看问题本身。
+
+- 当你需要 canonical 服务形态时，从 [参考应用](/zh/docs/reference-app) 开始
+- 当改动触及 Plumego 希望每个服务都理解的默认路径时，从 [稳定根](/zh/docs/stable-roots) 开始
+- 当工作明显是能力型问题，不应该继续扩张稳定表面时，从 [x/* 家族](/zh/docs/x-family) 开始
+- 当真正的问题已经变成归属判断，而不是实现形态时，从 [仓库边界](/zh/docs/concepts/repo-control-plane) 开始
+
+## 扩展家族的主入口规则
+
+当前仓库不会要求读者一上来就钻进很窄的子包，而是把一部分 `x/*` 家族当成默认发现入口。更实际的做法，是先从最匹配任务的主家族进入，只有在任务已经高度明确时，才继续下钻。
+
+以当前仓库结构为例，消息类问题通常先从 `x/messaging` 开始，边缘传输类问题先从 `x/gateway` 开始，可复用资源接口问题先从 `x/rest` 开始，更高层的观测适配问题先从 `x/observability` 开始，而数据拓扑较重的问题则先从 `x/data` 开始。
+
+## 这页希望你避免什么
+
+当前仓库会主动避免把 `ai`、`tenant`、`rest`、`pubsub`、`frontend`、`utils`、`validator` 这类宽泛或含糊的名字继续长成顶层根目录。只要一个名字听起来更像 feature catalog 或模糊大桶，它大概率就不是正确起点。
 
 ## 下一步阅读
 
 - [稳定根](/zh/docs/stable-roots)
 - [x/* 家族](/zh/docs/x-family)
 - [发布姿态](/zh/docs/release-posture)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

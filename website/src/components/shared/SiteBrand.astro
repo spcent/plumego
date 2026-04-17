@@ -1,12 +1,32 @@
 ---
+import type { Locale } from '../../data/site';
+
 interface Props {
   href: string;
+  locale?: Locale;
 }
 
-const { href } = Astro.props;
+const { href, locale = 'en' } = Astro.props;
+
+const copy = {
+  en: {
+    name: 'PLUMEGO',
+    tagline: 'A developer-first Go toolkit for explicit HTTP services.',
+  },
+  zh: {
+    name: 'PLUMEGO',
+    tagline: '面向开发者的显式 HTTP Go 工具箱。',
+  },
+} satisfies Record<Locale, { name: string; tagline: string }>;
 ---
 
 <a class="site-brand" href={href} aria-label="Plumego">
-  <img src="/brand/logo-light.svg" alt="Plumego" class="brand brand--light" />
-  <img src="/brand/logo-dark.svg" alt="Plumego" class="brand brand--dark" />
+  <span class="site-brand__mark" aria-hidden="true">
+    <img src="/brand/logo-light.svg" alt="" class="brand brand--light" />
+    <img src="/brand/logo-dark.svg" alt="" class="brand brand--dark" />
+  </span>
+  <span class="site-brand__copy">
+    <strong>{copy[locale].name}</strong>
+    <span>{copy[locale].tagline}</span>
+  </span>
 </a>

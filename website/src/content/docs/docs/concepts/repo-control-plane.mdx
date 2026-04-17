@@ -1,14 +1,27 @@
 ---
-title: Repository Control Plane
-description: Plumego keeps docs, specs, and task cards separate so humans and agents can classify work consistently.
+title: Repository Boundaries
+description: Use docs, specs, and task cards to classify ownership once the question moves beyond runnable service shape.
 translationKey: repo-control-plane
 sidebar:
   order: 7
 ---
 
-# Repository Control Plane
+# Repository Boundaries
 
 Plumego is not only a set of Go packages. It also maintains a repository control plane that tells humans and agents how to classify work before they start editing code.
+
+If you have not yet studied the canonical runnable service shape, pause here and read [Reference App](/docs/reference-app) first. Come back once the question is no longer “How is the service assembled?” but “Which repository surface owns this change?”
+
+## When this page should take over from Reference App
+
+Read this page after Reference App when file layout is no longer enough and you need repository-level classification instead.
+
+Typical signals include:
+
+- you are deciding which stable root or `x/*` family should own a change
+- you need to separate service-local layout from repository-wide rules
+- you are choosing whether docs, specs, or task cards should become the next source of truth
+- you are reviewing a change and the main risk is boundary drift rather than runnable shape
 
 ## The three surfaces
 
@@ -58,7 +71,7 @@ It is the working model that keeps Plumego agent-friendly and reviewable.
 
 ## Read this page with
 
+- [Reference App](/docs/reference-app)
 - [Request Flow](/docs/concepts/request-flow)
 - [Modules Overview](/docs/modules/overview)
 - [Release Posture](/docs/release-posture)
-

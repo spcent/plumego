@@ -22,13 +22,13 @@ Because the request and handler shape should stay close to `net/http`. Plumego w
 
 ## Where should I start?
 
-Start with:
+Start from [Docs Home](/docs) if you still need help choosing the right first implementation page. From there, take one of these narrower paths:
 
-1. [Getting Started](/docs/getting-started)
-2. [Request Flow](/docs/concepts/request-flow)
-3. [Reference App](/docs/reference-app)
+1. [Getting Started](/docs/getting-started) when the next question is how to run the smallest canonical path.
+2. [Reference App](/docs/reference-app) when the next question is what the canonical service shape looks like.
+3. [Architecture](/architecture) when the next question is package ownership, stable roots, or `x/*` boundaries.
 
-That path is shorter and safer than scanning packages at random.
+That sequence is safer than scanning packages or concept pages at random.
 
 ## How do I decide between a stable root and `x/*`?
 
@@ -40,9 +40,8 @@ No. Read [Release Posture](/docs/release-posture) and the public [Releases](/rel
 
 ## Why is there a reference app?
 
-`reference/standard-service` provides one canonical application path. It shows how Plumego expects bootstrap, wiring, routing, and handlers to stay visible in code.
+`reference/standard-service` provides one canonical application path. It shows how Plumego expects bootstrap, wiring, routing, and handlers to stay visible in code, but it does not replace the repository-boundary explanation on [Architecture](/architecture).
 
 ## Is the repository control plane part of the product?
 
 It is part of how Plumego is meant to be used and maintained. Docs, specs, and task cards help contributors and agents classify work consistently, which is especially important for a repository with stable roots and multiple extension families.
-

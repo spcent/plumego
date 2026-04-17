@@ -3,6 +3,7 @@ import AdoptionPaths from '../../components/home/AdoptionPaths.astro';
 import CanonicalPath from '../../components/home/CanonicalPath.astro';
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
+import ModuleMap from '../../components/home/ModuleMap.astro';
 import ValueProps from '../../components/home/ValueProps.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import { HOME_COPY } from '../../data/site';
@@ -18,7 +19,8 @@ const copy = HOME_COPY.zh;
 >
   <Hero copy={copy} />
   <ValueProps copy={copy} />
-  <AdoptionPaths copy={copy} />
   <CanonicalPath copy={copy} />
+  <ModuleMap copy={copy} />
+  <AdoptionPaths copy={copy} />
   <FinalCta copy={copy} />
 </MarketingLayout>

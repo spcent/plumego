@@ -15,6 +15,7 @@ const currentPath = Astro.props.currentPath ?? Astro.url.pathname;
 const locale = Astro.props.locale ?? localeFromPath(currentPath);
 const variant = Astro.props.variant ?? 'marketing';
 const nav = NAV_LINKS[locale];
+const docsHref = locale === 'zh' ? '/zh/docs' : '/docs';
 
 const isCurrent = (href: string) => {
   if (href.startsWith('http')) return false;
@@ -25,21 +26,34 @@ const isCurrent = (href: string) => {
 
 <header class:list={['site-header', variant === 'docs' && 'site-header--docs']}>
   <div class="site-header__leading">
-    <SiteBrand href={locale === 'zh' ? '/zh' : '/'} />
+    <SiteBrand href={locale === 'zh' ? '/zh' : '/'} locale={locale} />
   </div>
   <nav class="site-header__nav" aria-label={locale === 'zh' ? '主导航' : 'Primary'}>
-    {nav.map((link) => (
-      <a
-        href={link.href}
-        aria-current={isCurrent(link.href) ? 'page' : undefined}
-        target={link.href.startsWith('http') ? '_blank' : undefined}
-        rel={link.href.startsWith('http') ? 'noreferrer' : undefined}
-      >
-        {link.label}
-      </a>
-    ))}
+    {nav.map((link) => {
+      const active = isCurrent(link.href);
+      const isDocsLink = link.href === docsHref;
+
+      return (
+        <a
+          class:list={[
+            'site-header__nav-link',
+            active && 'is-active',
+            isDocsLink && 'site-header__nav-link--docs',
+          ]}
+          href={link.href}
+          aria-current={active ? 'page' : undefined}
+          target={link.href.startsWith('http') ? '_blank' : undefined}
+          rel={link.href.startsWith('http') ? 'noreferrer' : undefined}
+        >
+          {link.label}
+        </a>
+      );
+    })}
   </nav>
   <div class="site-header__tools" data-tools-root={variant}>
+    <a class="site-header__docs-cta" href={docsHref} aria-current={isCurrent(docsHref) ? 'page' : undefined}>
+      {locale === 'zh' ? '文档' : 'Docs'}
+    </a>
     <ThemeSelect />
     <LanguageSelect />
   </div>

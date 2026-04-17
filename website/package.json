@@ -22,6 +22,6 @@
     "@astrojs/mdx": "latest",
     "@astrojs/starlight": "latest",
     "astro": "latest",
-    "typescript": "^5.9.0"
+    "typescript": "^6.0.3"
   }
 }

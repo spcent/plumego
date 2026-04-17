@@ -9,19 +9,19 @@ const groups =
   locale === 'zh'
     ? [
         {
-          title: 'Start',
-          body: '先走通一条成功路径，再继续细分边界。',
+          title: '先判断，再进入实现',
+          body: '如果你还没有完全确认适配度，就先回到 Why Plumego；如果判断已经清楚，就从文档首页继续实现路径。',
           links: [
+            { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
             { label: '开始使用', href: '/zh/docs/getting-started' },
-            { label: '参考应用', href: '/zh/docs/reference-app' },
           ],
         },
         {
           title: 'Concepts',
-          body: '先建立请求流与仓库控制面的心智模型。',
+          body: '先建立请求流程与仓库边界的心智模型。',
           links: [
-            { label: 'Request Flow', href: '/zh/docs/concepts/request-flow' },
-            { label: 'Repository Control Plane', href: '/zh/docs/concepts/repo-control-plane' },
+            { label: '请求流程', href: '/zh/docs/concepts/request-flow' },
+            { label: '仓库边界', href: '/zh/docs/concepts/repo-control-plane' },
             { label: '常见问题', href: '/zh/docs/faq' },
           ],
         },
@@ -38,19 +38,19 @@ const groups =
       ]
     : [
         {
-          title: 'Start',
-          body: 'Run one successful path before classifying deeper repository work.',
+          title: 'Evaluate, then implement',
+          body: 'If fit is still unclear, go back to Why Plumego. If the decision is already made, continue from docs home into the implementation path.',
           links: [
+            { label: 'Why Plumego', href: '/why-plumego' },
             { label: 'Getting Started', href: '/docs/getting-started' },
-            { label: 'Reference App', href: '/docs/reference-app' },
           ],
         },
         {
           title: 'Concepts',
-          body: 'Build the request-flow and control-plane model before you open packages at random.',
+          body: 'Build the request-flow and repository-boundary model before you open packages at random.',
           links: [
             { label: 'Request Flow', href: '/docs/concepts/request-flow' },
-            { label: 'Repository Control Plane', href: '/docs/concepts/repo-control-plane' },
+            { label: 'Repository Boundaries', href: '/docs/concepts/repo-control-plane' },
             { label: 'FAQ', href: '/docs/faq' },
           ],
         },

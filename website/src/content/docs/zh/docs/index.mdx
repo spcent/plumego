@@ -1,6 +1,6 @@
 ---
-title: 文档
-description: 从 Plumego 的 canonical 路径开始，只在边界清晰时再向外展开。
+title: 文档首页
+description: 先走 Plumego 的 canonical 路径，再在边界清楚时扩展到更深的仓库层面。
 translationKey: docs-home
 sidebar:
   order: 1
@@ -10,23 +10,65 @@ import DocsPortalSummary from '../../../../components/docs/DocsPortalSummary.ast
 import DocsReadingPath from '../../../../components/docs/DocsReadingPath.astro';
 import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 
-# 文档
+# 文档首页
 
 <div class="docs-home-intro">
   <p class="docs-home-intro__lead">
-    Plumego 是一个面向显式 HTTP 服务的 stdlib-first Go Web 工具包。进入这套仓库的最短路径，是先从 canonical 参考路径起步，再在需要时向外扩展到模块边界和能力家族。
+    Plumego 是一个 stdlib-first 的 Go Web 工具包，强调显式的 HTTP 服务结构。进入仓库的最短路径，是先走 canonical 参考路径，再在边界变得重要时扩展到更深的模块与扩展家族。
   </p>
   <p class="docs-home-intro__support">
-    这个首页更像文档入口页，而不是营销页。先顺着推荐路径建立概念层，再借助同步摘要和入口卡片去判断下一步该读哪里。
+    这个 docs 首页不是营销页，而是实现起点的入口页。你应该先沿推荐路径建立最小心智模型，再查看同步出来的仓库事实，最后再进入模块层与概念层的更细分页面。
   </p>
+</div>
+
+<div class="docs-home-coverage not-content">
+  <p class="signal-list__kicker">handoff</p>
+  <h2>如果你是从 Why Plumego 进入这里</h2>
+  <p>
+    可以把这个页面理解成 adoption 判断进入实现阶段的交接页。如果你已经基本确认 Plumego 适合当前团队或服务，接下来应该去打开回答下一个具体问题的页面，而不是在 docs 里随意跳转。
+  </p>
+  <ul>
+    <li><a href="/zh/why-plumego">回到 Why Plumego</a>：如果你还需要继续判断团队姿态、适配信号或反模式。</li>
+    <li><a href="/zh/docs/getting-started">打开开始使用</a>：如果你接下来的问题是怎样尽快把最小 canonical 路径跑起来。</li>
+    <li><a href="/zh/docs/reference-app">打开参考应用</a>：如果你想先按文件理解 canonical 服务形态，再决定是否运行它。</li>
+    <li><a href="/zh/architecture">打开 Architecture</a>：如果你真正关心的已经不是 first run，而是仓库边界、模块归属和工作应该落在哪里。</li>
+  </ul>
 </div>
 
 <div class="docs-home-stack not-content">
   <section class="docs-home-section">
     <div class="docs-home-section__head">
+      <p class="signal-list__kicker">choose your first implementation page</p>
+      <h2>应该先看开始使用还是参考应用？</h2>
+      <p>如果你要先跑通一条成功路径，就先看开始使用；如果你要先看清 canonical 服务长什么样，再决定怎么落到自己的仓库里，就先看参考应用。</p>
+    </div>
+    <div class="docs-topic-groups">
+      <article class="topic-group">
+        <h3>当下一个问题是“怎么跑起来”时，先看开始使用。</h3>
+        <p>它提供的是最短执行路径、最小检查清单，以及一条足够短的 first-run 说明，帮助你先确认 Plumego 的 bootstrap 与 routes 确实保持显式。</p>
+        <ul>
+          <li>你想先完成第一次成功运行</li>
+          <li>你正在验证最小 canonical 路径是否成立</li>
+          <li>你现在只需要足够继续前进的上下文</li>
+        </ul>
+      </article>
+      <article class="topic-group">
+        <h3>当下一个问题是“canonical 形态长什么样”时，先看参考应用。</h3>
+        <p>它更适合用来理解 canonical 服务布局、明确哪些模式可以继承、哪些结论不能外推，并把实现层的形态自然衔接到后续的架构边界判断。</p>
+        <ul>
+          <li>你想在一个位置里看清 bootstrap、app wiring 和 route ownership</li>
+          <li>你想先理解 canonical 形态，再决定是否拷贝某种结构</li>
+          <li>你需要一座从实现形态通往架构边界的桥</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
       <p class="signal-list__kicker">canonical path</p>
-      <h2>建议阅读路径</h2>
-      <p>先用最短路径建立可工作的心智模型，再进入更细的模块边界和扩展家族。</p>
+      <h2>推荐阅读路径</h2>
+      <p>先走把 adoption 信心转换成实现步骤的最小路径，再进入更深的仓库分类与模块问题。</p>
     </div>
     <DocsReadingPath locale="zh" />
   </section>
@@ -34,8 +76,8 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
   <section class="docs-home-section">
     <div class="docs-home-section__head">
       <p class="signal-list__kicker">read by topic</p>
-      <h2>按主题继续阅读</h2>
-      <p>当你已经理解 canonical path 之后，接下来应该按主题继续，而不是随机扫页面。</p>
+      <h2>按问题选择阅读轨道</h2>
+      <p>当适配判断已经完成之后，最好的做法是按问题进入对应阅读轨道，而不是随机翻页。</p>
     </div>
     <DocsTopicGroups locale="zh" />
   </section>
@@ -43,8 +85,8 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
   <section class="docs-home-section">
     <div class="docs-home-section__head">
       <p class="signal-list__kicker">synced facts</p>
-      <h2>同步仓库摘要</h2>
-      <p>这些摘要和数字都来自构建前的仓库同步步骤，而不是维护在站点里的另一份手写副本。</p>
+      <h2>仓库摘要</h2>
+      <p>这些数字与摘要来自预构建同步步骤，而不是人为维护的一份 docs 复制品，因此更适合作为入口层的事实概览。</p>
     </div>
     <DocsPortalSummary locale="zh" />
   </section>
@@ -52,12 +94,12 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 
 <div class="docs-home-coverage not-content">
   <p class="signal-list__kicker">coverage</p>
-  <h2>这套文档覆盖什么</h2>
+  <h2>每个目标页各自应该回答什么</h2>
   <ul>
-    <li>请求路径与仓库控制平面</li>
-    <li>canonical 应用路径</li>
-    <li>模块边界与仓库结构</li>
-    <li>发布姿态与当前兼容性说明</li>
-    <li>关于适用范围、稳定性和使用方式的高频问题</li>
+    <li><strong>Docs 首页</strong> 负责回答：在 adoption 已基本明确之后，接下来应该去哪里。</li>
+    <li><strong>开始使用</strong> 负责证明最小 canonical 路径可以跑通。</li>
+    <li><strong>参考应用</strong> 负责解释 canonical 服务形态，以及哪些内容可以或不可以从它推导出来。</li>
+    <li><strong>Architecture</strong> 负责回答仓库边界与工作归属问题，而不是 first-run 指导。</li>
+    <li><strong>FAQ</strong> 负责收纳会打断主阅读路径的范围、成熟度和定位类问题。</li>
   </ul>
 </div>

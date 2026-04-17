@@ -1,0 +1,243 @@
+---
+import PageHero from '../../components/marketing/PageHero.astro';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+
+const guideCards = [
+  {
+    kicker: 'explicit path',
+    title: 'Plumego 适合那些希望服务结构持续可见的团队',
+    body: '真正的价值，出现在仓库不再小、协作者不再少之后：route 注册、中间件顺序、app-local wiring 与 release posture 依然应该能在评审里直接看清。',
+  },
+  {
+    kicker: 'canonical shape',
+    title: '当一条统一的参考服务形态是优势时，它会更强',
+    body: '如果多个服务都应该从同一条可读基线起步，而不是继续长出仓库私有的 bootstrap 变体，那么 Plumego 会更容易被团队接受，也更容易被长期维护。',
+  },
+  {
+    kicker: 'published boundaries',
+    title: '当成熟度边界必须公开时，它最有说服力',
+    body: 'stable roots、x/* families、release posture 与 roadmap direction 被刻意分开，就是为了让采用决策基于证据，而不是仅仅因为某个包“已经存在”。',
+  },
+] as const;
+
+const fitProfiles = [
+  {
+    kicker: 'best fit',
+    title: '边界敏感的内部 API',
+    body: '当 reviewer 需要直接从代码里追踪请求路径，而且服务边界的重要性不低于框架人体工学时，Plumego 会更合适。',
+    points: [
+      'route 注册应该在评审中保持可见',
+      'handler ownership 与 bootstrap wiring 必须显式',
+      '团队本来就能自然地用 net/http 心智思考服务',
+    ],
+  },
+  {
+    kicker: 'best fit',
+    title: '需要统一默认布局的平台服务',
+    body: '当多个团队都能从同一条 canonical 服务骨架获益，而且你希望新服务沿用同一条请求路径时，这套框架会更有价值。',
+    points: [
+      '新服务应该从同一个 reference app 起步',
+      '跨团队的仓库漂移应该尽量低',
+      'review 只想接受一组收敛后的模式',
+    ],
+  },
+  {
+    kicker: 'best fit',
+    title: '需要显式发布姿态的仓库',
+    body: '如果兼容性声明需要保持可见、可解释，并且要和 x/* 家族中更快变化的能力工作分开，Plumego 会更有吸引力。',
+    points: [
+      '稳定面与实验面必须容易区分',
+      '路线图方向不应该被误读成当前基线支持',
+      '采用决策需要一张公开的边界地图',
+    ],
+  },
+] as const;
+
+const cautionProfiles = [
+  {
+    kicker: 'slow down',
+    title: '你希望约定尽量消失在框架魔法之后',
+    body: '如果团队主要想要 batteries-included 的体验，并把注册与结构都交给框架隐藏，Plumego 可能会显得比预期更克制。',
+  },
+  {
+    kicker: 'slow down',
+    title: '每个服务都刻意保持雪花状结构',
+    body: '如果每个服务都必须自己定义 bootstrap、routing 与 ownership 模型，那么 canonical reference path 能提供的价值就会显著下降。',
+  },
+  {
+    kicker: 'slow down',
+    title: '你想要包发现，而不是采用纪律',
+    body: 'Plumego 更适合那些愿意区分 baseline、supported references 与 experiments 的团队；如果这种区分并不重要，release posture 的工作就会显得多余。',
+  },
+] as const;
+
+const teamRows = [
+  {
+    signal: '团队姿态',
+    fit: '你希望在服务表面继续变宽之前，先建立一套共享的仓库心智模型。',
+    caution: '你更希望每个团队独立优化自己的框架风格，而不是共享一条默认基线。',
+  },
+  {
+    signal: '代码评审预期',
+    fit: 'reviewer 应该直接在代码里检查 routes、middleware 与依赖入口。',
+    caution: '评审主要只关心业务逻辑，并愿意把结构性交给框架默认值。',
+  },
+  {
+    signal: '仓库治理方式',
+    fit: '你希望 docs、examples、releases 与 roadmap 一起强化同一套采用模型。',
+    caution: '你可以接受“包存在”直接暗示成熟度，也不需要公开的 adoption 边界。',
+  },
+] as const;
+
+const decisionPaths = [
+  {
+    kicker: 'ready now',
+    title: '你已经认可这条 canonical path',
+    body: '如果适配度已经足够清楚，而你接下来要解决的是实现问题而不是继续评估，就先进入 docs 首页，再按顺序进入 Getting Started 与 Reference App。',
+    href: '/zh/docs',
+    cta: '打开文档首页',
+  },
+  {
+    kicker: 'inspect boundaries',
+    title: '你认同这套模型，但想先看仓库边界',
+    body: '如果下一个决策取决于 stable roots、x/* families 与改动真正该落在哪一层，就先去看 Architecture。',
+    href: '/zh/architecture',
+    cta: '阅读架构页',
+  },
+  {
+    kicker: 'need runnable proof',
+    title: '你想用真实服务形态做对照',
+    body: '如果 runnable comparison 比继续看概念页更快回答适配问题，就直接去 Examples 与 reference app。',
+    href: '/zh/examples',
+    cta: '打开示例页',
+  },
+  {
+    kicker: 'adopt carefully',
+    title: '你要先确认成熟度信号再决定',
+    body: '如果真正的问题不是某个模块存不存在，而是它今天是否足够成熟到可以放进正在评估的服务里，就先去看 Releases。',
+    href: '/zh/releases',
+    cta: '查看发布页',
+  },
+] as const;
+---
+
+<MarketingLayout
+  locale="zh"
+  title="为什么选择 Plumego"
+  description="当你需要判断 Plumego 是否匹配眼前这个服务、团队姿态与仓库形态时，请先读这一页。"
+  currentPath="/zh/why-plumego"
+  imagePath="/brand/og-zh.svg"
+  keywords={['为什么选择 plumego', 'plumego 采用判断', 'go 服务工具包', '显式 http 服务']}
+>
+  <PageHero
+    eyebrow="Adoption Decision"
+    title="为什么选择 Plumego"
+    description="当问题不再是包拓扑，而是 Plumego 是否真的匹配眼前这个服务、团队姿态与仓库模型时，就先读这一页。"
+    links={[
+      { label: '架构', href: '/zh/architecture' },
+      { label: '发布', href: '/zh/releases' },
+      { label: '示例', href: '/zh/examples' },
+    ]}
+  />
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>把这页当作 adoption filter 来阅读。</h2>
+      <p>
+        Architecture 解释仓库形态，Releases 解释成熟度姿态，而这一页位于更前面一层：它先帮助你判断，Plumego 是否就是眼前这项服务工作真正合适的模型，避免你在映射模块边界之前就投入了过多阅读成本。
+      </p>
+    </div>
+    <div class="signal-list">
+      {guideCards.map((item) => (
+        <article class="signal-list__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>Plumego 最强的场景在哪里。</h2>
+      <p>
+        当仓库清晰度、显式 ownership 与一条 canonical 请求路径，比框架托管的便利更重要时，这套框架会更有说服力。
+      </p>
+    </div>
+    <div class="page-grid">
+      {fitProfiles.map((item) => (
+        <article class="page-panel">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h2>{item.title}</h2>
+          <p>{item.body}</p>
+          <ul>
+            {item.points.map((point) => (
+              <li>{point}</li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>适合信号与谨慎信号。</h2>
+      <p>
+        这张对照表的目的，是帮助你做决定，而不是只欣赏架构。当你真正想知道 Plumego 的显式模型会不会改善眼前这个服务时，就看这里。
+      </p>
+    </div>
+    <div class="comparison-table" role="table" aria-label="Plumego 采用判断的适配信号与谨慎信号对照">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">信号</span>
+        <span role="columnheader">适合</span>
+        <span role="columnheader">先放慢</span>
+      </div>
+      {teamRows.map((row) => (
+        <div class="comparison-table__row" role="row">
+          <strong role="cell">{row.signal}</strong>
+          <span role="cell">{row.fit}</span>
+          <span role="cell">{row.caution}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section section--split">
+    <div class="section__intro">
+      <h2>哪些情况下应该先暂停采用。</h2>
+      <p>
+        Plumego 并不是为了赢下所有比较。如果下面这些信号更接近你的仓库目标，那就先把架构模型记住，等团队真正需要一条更收敛、更显式的默认路径时再回来判断。
+      </p>
+    </div>
+    <div class="control-grid">
+      {cautionProfiles.map((item) => (
+        <article class="page-panel page-panel--dense">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>按你的确定度选择下一页。</h2>
+      <p>
+        当适配判断已经更清楚时，再去打开真正回答下一个问题的页面：先进入 docs 首页完成实现交接、先看边界、先做 runnable 对照，还是先确认成熟度再决定。
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {decisionPaths.map((item) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <a class="text-link" href={item.href}>{item.cta}</a>
+        </article>
+      ))}
+    </div>
+  </section>
+</MarketingLayout>

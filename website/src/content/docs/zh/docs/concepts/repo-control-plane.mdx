@@ -1,14 +1,27 @@
 ---
-title: Repository Control Plane
-description: Plumego 把 docs、specs 和 task cards 分开维护，让人和 agent 都能稳定地分类工作。
+title: 仓库边界
+description: 当问题不再是可运行服务形态，而是仓库归属时，用 docs、specs 和 task cards 完成分类。
 translationKey: repo-control-plane
 sidebar:
   order: 7
 ---
 
-# Repository Control Plane
+# 仓库边界
 
 Plumego 不只是一些 Go 包。它还维护了一层仓库控制平面，用来告诉人和 agent 在改代码前应该如何先完成工作分类。
+
+如果你还没有先看 canonical 的可运行服务形态，请先去读 [参考应用](/zh/docs/reference-app)。等你的问题不再是“这个服务是怎么组装出来的”，而是“这项改动到底该归仓库里的哪一层负责”时，再回到这里。
+
+## 什么时候这页应该接管 Reference App
+
+当单纯对照文件布局已经不够，而你开始需要仓库级分类时，就应该从 Reference App 切到这页。
+
+常见信号包括：
+
+- 你在判断某个改动应该属于哪个 stable root 或 `x/*` 家族
+- 你需要把服务本地布局与仓库级规则分开
+- 你需要决定接下来应该以 docs、specs 还是 task cards 作为事实来源
+- 你在 review 一个改动，而真正的风险已经从 runnable shape 变成边界漂移
 
 ## 三个表面
 
@@ -58,7 +71,7 @@ Task cards 和 milestones 把工作变成显式执行单元。它们定义 scope
 
 ## 建议和这些页面一起读
 
-- [Request Flow](/zh/docs/concepts/request-flow)
+- [参考应用](/zh/docs/reference-app)
+- [请求流程](/zh/docs/concepts/request-flow)
 - [模块总览](/zh/docs/modules/overview)
 - [发布姿态](/zh/docs/release-posture)
-

@@ -10,26 +10,53 @@ import GeneratedModuleFacts from '../../../../components/docs/GeneratedModuleFac
 
 # Modules Overview
 
-Plumego keeps long-lived public packages at the repository root and places optional or fast-moving capabilities under `x/*`. This split is intentional: it keeps the stable surface small and makes ownership easier to classify.
+Plumego keeps long-lived public packages at the repository root and places optional or fast-moving capabilities under `x/*`. This split is intentional: it keeps the stable surface small, keeps ownership easier to classify, and prevents the default learning path from being redefined by extension work.
 
 ## Synced module inventory
 
 <GeneratedModuleFacts />
 
+## How the current repository is shaped
+
+The checked-in repository uses three different layers on purpose.
+
+- stable roots at the repository root carry the default learning path and the long-lived public surface
+- `x/*` families carry optional, capability-specific, or faster-moving behavior
+- non-library areas such as `reference`, `docs`, `specs`, and `tasks` stay outside import-path design so they can act as control surfaces instead of product modules
+
+That means not every top-level directory is trying to answer the same question. `reference/standard-service` explains canonical app shape, while `specs/*` and `module.yaml` files help classify ownership once the question moves beyond code layout.
+
 ## Default classification rule
 
-- kernel, lifecycle, transport contracts, or stable middleware changes belong in stable roots
-- capability or protocol work belongs in the owning `x/*` family
-- application wiring belongs in `reference/standard-service`
+Use the current repo like this:
 
-## Why this matters
+- kernel, lifecycle, route structure, transport contracts, or stable middleware changes belong in stable roots
+- capability, protocol, tenant, gateway, data-topology, or observability-adapter work belongs in the owning `x/*` family
+- app-local bootstrap and service wiring belong in `reference/standard-service`
+- ownership rules, machine-readable routing, and execution surfaces belong in `docs`, `specs`, and `tasks`, not in runtime packages
 
-- stable roots remain easier to learn, review, and preserve
-- extension work can evolve faster without redefining the default learning path
-- repository tooling can classify changes with a smaller search radius
+## Where to start by question
+
+Start from the question instead of scanning packages by name.
+
+- start in [Reference App](/docs/reference-app) when you need the canonical service shape
+- start in [Stable Roots](/docs/stable-roots) when the change touches the default path Plumego expects every service to understand
+- start in [x/* Family](/docs/x-family) when the work is clearly capability-specific and should not expand the stable surface
+- start in [Repository Boundaries](/docs/concepts/repo-control-plane) when the real problem is ownership, not implementation shape
+
+## Primary family rule for extensions
+
+The current repo treats some `x/*` families as discovery entrypoints rather than expecting readers to open a narrow subordinate package first. In practice, this means you should usually start from the primary family that matches the work, then go narrower only when the task is already well classified.
+
+Examples from the current repository shape include starting at `x/messaging` for messaging-related work, `x/gateway` for edge transport work, `x/rest` for reusable resource-interface work, `x/observability` for higher-level observability adapters, and `x/data` for topology-heavy data concerns.
+
+## What this page should help you avoid
+
+The current repo actively discourages broad or ambiguous roots such as `ai`, `tenant`, `rest`, `pubsub`, `frontend`, `utils`, or `validator` at the top level. If the name sounds like a feature catalog or a vague bucket, it is probably the wrong place to begin.
 
 ## Read next
 
 - [Stable Roots](/docs/stable-roots)
 - [x/* Family](/docs/x-family)
 - [Release Posture](/docs/release-posture)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

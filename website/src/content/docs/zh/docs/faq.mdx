@@ -1,12 +1,12 @@
 ---
-title: FAQ
+title: 常见问题
 description: 关于 Plumego 的范围、稳定性、边界和适用方式的常见问题。
 translationKey: faq
 sidebar:
   order: 8
 ---
 
-# FAQ
+# 常见问题
 
 ## Plumego 主要想优化什么？
 
@@ -22,13 +22,13 @@ Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好
 
 ## 我应该从哪里开始？
 
-建议按这个顺序：
+如果你还需要判断“第一步到底该看什么”，请先从 [Docs 首页](/zh/docs) 开始。然后再按更窄的问题进入对应页面：
 
-1. [开始使用](/zh/docs/getting-started)
-2. [Request Flow](/zh/docs/concepts/request-flow)
-3. [参考应用](/zh/docs/reference-app)
+1. 打开 [开始使用](/zh/docs/getting-started)，当下一个问题是怎样跑通最小 canonical 路径。
+2. 打开 [参考应用](/zh/docs/reference-app)，当下一个问题是 canonical 服务形态到底长什么样。
+3. 打开 [Architecture](/zh/architecture)，当下一个问题是 stable roots、`x/*` 与包归属边界。
 
-这条路径比随机扫包更短，也更稳。
+这条路径比随机扫包或随机翻概念页更安全。
 
 ## 怎么判断该放到 stable root 还是 `x/*`？
 
@@ -40,9 +40,8 @@ Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好
 
 ## 为什么需要 reference app？
 
-`reference/standard-service` 提供了一条 canonical 应用路径。它把 Plumego 期望保留可见的 bootstrap、wiring、routing 和 handler 形态落实成可检查的代码。
+`reference/standard-service` 提供了一条 canonical 应用路径。它把 Plumego 期望保留可见的 bootstrap、wiring、routing 和 handler 形态落实成可检查的代码，但它不能替代 [Architecture](/zh/architecture) 对仓库边界的解释。
 
-## 仓库控制平面算产品的一部分吗？
+## 仓库边界算产品的一部分吗？
 
 它至少是 Plumego 被使用和维护方式的一部分。Docs、specs 和 task cards 帮助贡献者与 agent 以同一套方式完成工作分类，这对一个同时拥有 stable roots 和多个扩展家族的仓库尤其重要。
-
