@@ -32,20 +32,33 @@ go run ./reference/standard-service
 
 ## What this first run demonstrates
 
-- the reference service boots without additional dependencies
+- the reference service boots without additional runtime dependencies
 - route wiring remains explicit instead of being hidden behind registration magic
 - the handler shape stays close to the standard-library HTTP model
+- the canonical app path depends on stable roots before any `x/*` capability becomes relevant
 
 ## What this page does not try to answer
 
 - it does not explain the full repository boundary model
 - it does not replace the canonical service tour in Reference App
 - it does not imply that every package you see during exploration belongs on the default learning path
+- it does not replace repo control surfaces such as `specs/task-routing.yaml` or the touched module's `module.yaml`
 
-## What to read next
+## Canonical next reads from the current repository
 
-Choose the next page by question, not by page order:
+The checked-in repository already defines a practical next-read order after the first successful run.
+
+1. Stay with [Reference App](/docs/reference-app) when you need the file-by-file canonical service shape.
+2. Use [Docs Home](/docs), [Request Flow](/docs/concepts/request-flow), and [Repository Boundaries](/docs/concepts/repo-control-plane) when you need the human-readable explanation of path, ownership, and control surfaces.
+3. Move to `specs/task-routing.yaml` and the target module's `module.yaml` once the question becomes repository routing instead of runnable shape.
+
+That sequence matches the current repo contract more closely than jumping straight from a first run into random packages.
+
+## When to leave this page
+
+Leave Getting Started as soon as the question is no longer, "Can I run the canonical path?"
 
 - open [Reference App](/docs/reference-app) when you want a file-by-file reading of the canonical service shape
 - open [Request Flow](/docs/concepts/request-flow) when you want to understand how a request moves through the explicit HTTP path
-- open [Architecture](/architecture) when you need to classify ownership, stable roots, and extension families instead of only running the default path
+- open [Repository Boundaries](/docs/concepts/repo-control-plane) when you need to classify ownership across docs, specs, task cards, and module boundaries
+- open [Architecture](/architecture) when you need the top-level repository map before deciding where work should live
