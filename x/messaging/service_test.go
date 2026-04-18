@@ -430,7 +430,7 @@ func TestServiceStart_SchedulerRegistrationError(t *testing.T) {
 func TestDeliverTask_RenderFailureUpdatesReceiptAndPublishesFailedEvent(t *testing.T) {
 	bus := pubsub.New()
 	defer bus.Close()
-	sub, err := bus.Subscribe("messaging.result", pubsub.SubOptions{BufferSize: 16})
+	sub, err := bus.Subscribe(context.Background(), "messaging.result", pubsub.SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -502,7 +502,7 @@ func TestDeliverTask_RenderFailureUpdatesReceiptAndPublishesFailedEvent(t *testi
 func TestDeliverTask_ProviderFailurePublishesFailedEvent(t *testing.T) {
 	bus := pubsub.New()
 	defer bus.Close()
-	sub, err := bus.Subscribe("messaging.result", pubsub.SubOptions{BufferSize: 16})
+	sub, err := bus.Subscribe(context.Background(), "messaging.result", pubsub.SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}

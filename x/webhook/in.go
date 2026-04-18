@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -28,10 +29,11 @@ const (
 )
 
 type Inbound struct {
-	cfg     WebhookInConfig
-	pub     pubsub.Broker
-	logger  log.StructuredLogger
-	deduper *Deduper
+	cfg            WebhookInConfig
+	pub            pubsub.Broker
+	logger         log.StructuredLogger
+	deduper        *Deduper
+	replayWarnOnce sync.Once
 }
 
 func NewInbound(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *Inbound {
@@ -78,6 +80,9 @@ func (c *Inbound) Health() (string, health.HealthStatus) {
 }
 
 func (c *Inbound) webhookInGitHub(w http.ResponseWriter, r *http.Request) {
+	c.replayWarnOnce.Do(func() {
+		c.logger.Warn("NonceStore not configured: replay attacks are possible for verified webhooks", log.Fields{"provider": "github"})
+	})
 	secret := strings.TrimSpace(c.cfg.GitHubSecret)
 	if secret == "" {
 		secret = strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET"))
@@ -169,6 +174,9 @@ func (c *Inbound) webhookInGitHub(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Inbound) webhookInStripe(w http.ResponseWriter, r *http.Request) {
+	c.replayWarnOnce.Do(func() {
+		c.logger.Warn("NonceStore not configured: replay attacks are possible for verified webhooks", log.Fields{"provider": "stripe"})
+	})
 	secret := strings.TrimSpace(c.cfg.StripeSecret)
 	if secret == "" {
 		secret = strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))

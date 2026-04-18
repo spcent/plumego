@@ -38,7 +38,10 @@ const (
 	HashSHA512 HashAlgorithm = "sha512"
 )
 
-// NonceStore provides nonce replay protection.
+// NonceStore provides nonce replay protection for webhook deliveries.
+// Without a NonceStore, any attacker who captures a valid signed request can
+// replay it within the signature's validity window. Configure a NonceStore
+// (e.g. NewMemoryNonceStore) in production to prevent replay attacks.
 type NonceStore interface {
 	Seen(ctx context.Context, nonce string) (bool, error)
 }
@@ -69,7 +72,10 @@ type HMACReplayConfig struct {
 	NonceHeader     string
 	Tolerance       time.Duration
 	Now             func() time.Time
-	NonceStore      NonceStore
+	// NonceStore prevents replay attacks by tracking seen nonce values.
+	// Required for replay protection: without it, any intercepted delivery
+	// can be replayed within the Tolerance window.
+	NonceStore NonceStore
 }
 
 // HMACConfig configures generic HMAC verification.
