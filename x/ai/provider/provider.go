@@ -84,10 +84,10 @@ type CompletionResponse struct {
 
 // Message represents a chat message.
 type Message struct {
-	Role       Role      `json:"role"`
-	Content    any       `json:"content"` // string or []ContentBlock
-	Name       string    `json:"name,omitempty"`
-	ToolCallID string    `json:"tool_call_id,omitempty"`
+	Role       Role   `json:"role"`
+	Content    any    `json:"content"` // string or []ContentBlock
+	Name       string `json:"name,omitempty"`
+	ToolCallID string `json:"tool_call_id,omitempty"`
 }
 
 // ContentBlock represents a piece of content.

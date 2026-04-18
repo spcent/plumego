@@ -49,7 +49,13 @@ type PolicyConfigProvider interface {
 	PolicyConfig(ctx context.Context, tenantID string) (PolicyConfig, error)
 }
 
-// ConfigManager loads tenant configuration snapshots.
+// ConfigManager is an app-layer facade convenience interface that composes all
+// tenant configuration sub-interfaces into one. It is intended for use at
+// application wiring points only — subsystems should depend on their specific
+// provider sub-interface (QuotaConfigProvider, PolicyConfigProvider, or
+// RateLimitConfigProvider) rather than on ConfigManager directly. This keeps
+// module coupling minimal; ConfigManager is for app wiring only.
+//
 // It also satisfies QuotaConfigProvider, PolicyConfigProvider, and
 // RateLimitConfigProvider so a single implementation can be passed
 // directly to quota, policy, and rate limit subsystems.

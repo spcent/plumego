@@ -50,13 +50,13 @@ const (
 	CodeInvalidBindDst        = "INVALID_BIND_DESTINATION"
 
 	// Messaging and transport codes
-	CodeProviderError     = "PROVIDER_ERROR"
-	CodeQuotaExceeded     = "QUOTA_EXCEEDED"
-	CodeDuplicateMessage  = "DUPLICATE_MESSAGE"
-	CodeTaskExpired       = "TASK_EXPIRED"
-	CodeSendError         = "SEND_ERROR"
-	CodeEmptyBatch        = "EMPTY_BATCH"
-	CodeStatsError        = "STATS_ERROR"
+	CodeProviderError    = "PROVIDER_ERROR"
+	CodeQuotaExceeded    = "QUOTA_EXCEEDED"
+	CodeDuplicateMessage = "DUPLICATE_MESSAGE"
+	CodeTaskExpired      = "TASK_EXPIRED"
+	CodeSendError        = "SEND_ERROR"
+	CodeEmptyBatch       = "EMPTY_BATCH"
+	CodeStatsError       = "STATS_ERROR"
 
 	// Pub/sub codes
 	CodeInvalidPayload = "INVALID_PAYLOAD"

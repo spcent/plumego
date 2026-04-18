@@ -169,7 +169,6 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 	return r.body.Write(b)
 }
 
-
 func safeWrite(w http.ResponseWriter, body []byte) (int, error) {
 	if w == nil {
 		return 0, nil
