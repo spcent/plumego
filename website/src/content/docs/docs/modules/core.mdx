@@ -1,0 +1,52 @@
+---
+title: Core Primer
+description: Read this when the change is really about the HTTP application kernel and lifecycle.
+translationKey: modules-core
+sidebar:
+  order: 1
+---
+
+# Core Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the default service path and the real question has narrowed to the HTTP application kernel.
+
+`core` owns app construction, route attachment, middleware attachment, and server lifecycle. It is the right home when the change should remain part of the smallest canonical service shape every Plumego service is expected to understand.
+
+## Start here when
+
+- you are assembling an application from explicit routes and middleware
+- you are changing `Prepare`, `Server`, or `Shutdown` lifecycle behavior
+- you are working on app construction or shared runtime dependency wiring
+
+## Do not start here when
+
+- the change is really about route matching rather than the app kernel
+- the change introduces feature catalogs, plugin containers, or tenant policy
+- the work is persistence behavior or debug-tool payload design
+
+## First files to read in the current repository
+
+1. `core/module.yaml`
+2. `core/app.go`
+3. `core/options.go`
+4. `reference/standard-service/internal/app/app.go`
+
+## Concrete ownership examples
+
+| Keep it in `core` when the work is about | Move out when the work becomes |
+| --- | --- |
+| explicit app construction through `DefaultConfig()` / `AppConfig` and `AppDependencies` | feature-specific wiring that belongs in app-local code or an extension |
+| one canonical lifecycle path: `Prepare` + `Server` + `Shutdown` | debug metadata transport and runtime snapshot payloads in `x/devtools` |
+| route binding through `App.AddRoute`, `App.Get`, `App.Post`, and named-route URL lookup | raw router replacement, feature catalogs, or capability-owned runtime behavior |
+| passive dependency injection such as logger wiring | logger subsystem ownership, flush policy, or readiness policy that stays app-local |
+
+## Why this primer exists
+
+`core` is often misread as the place for anything that feels foundational. The current repository says otherwise: `core` is a kernel, not a feature catalog. If the change makes the kernel learn capability semantics, it is probably in the wrong home.
+
+## Read next
+
+- [Reference App](/docs/reference-app)
+- [Middleware Primer](/docs/modules/middleware)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)
+

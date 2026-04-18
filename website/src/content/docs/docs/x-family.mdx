@@ -51,6 +51,16 @@ The current repository already exposes several clear family-level entry rules.
 
 These examples matter because they show that `x/*` is not just a place to move code away from stable roots. Each family is supposed to become a discoverable entrypoint with a clear ownership story.
 
+## Open the right extension primer next
+
+Once you know the work belongs to an extension family, continue with the most honest family entrypoint instead of staying in the abstract.
+
+| If the work mainly touches | Open this primer next | Why this primer matters |
+| --- | --- | --- |
+| reusable CRUD controller behavior, shared pagination rules, and resource-route standardization | [x/rest Primer](/docs/modules/x-rest) | it turns the family rule into a concrete split across app-local wiring, repository code, and domain validation |
+| app-facing queue, pubsub, scheduler, and webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | it shows when to start at the family entrypoint and when it is safe to dive into narrower siblings |
+| stable-surface decisions that might still belong in root packages | [Stable Roots](/docs/stable-roots) | it is the right backtrack when the change is still really about default-path ownership |
+
 ## Concrete routing examples
 
 A few repository-backed examples make the split more practical.
@@ -82,7 +92,9 @@ That is the real boundary between default-path ownership and extension-family ow
 
 ## Read next
 
+- [x/rest Primer](/docs/modules/x-rest)
+- [x/messaging Primer](/docs/modules/x-messaging)
 - [Stable Roots](/docs/stable-roots)
 - [Modules Overview](/docs/modules/overview)
-- [Release Posture](/docs/release-posture)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
+

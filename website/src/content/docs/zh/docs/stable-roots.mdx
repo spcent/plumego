@@ -51,6 +51,16 @@ import GeneratedStableRootFacts from '../../../../components/docs/GeneratedStabl
 
 这些不是抽象的风格偏好，而是当前仓库已经写出来的实际 ownership 边界。
 
+## 下一步打开正确的稳定根 primer
+
+一旦你已经确认改动仍属于稳定表面，就不要停留在概念层，而应继续进入对应模块的 primer。
+
+| 如果工作主要触及 | 下一步打开的 primer | 为什么这里是更合适的下一跳 |
+| --- | --- | --- |
+| lifecycle、显式 app construction、logger injection 与 route attachment | [Core Primer](/zh/docs/modules/core) | 它会把稳定根规则继续落到 `core` 的实际生命周期与内核边界 |
+| transport wrapper、request ID、tracing hook、access logging、auth/security HTTP adapter 与 rate-limit adapter | [Middleware Primer](/zh/docs/modules/middleware) | 它会继续说明哪些仍然属于 transport-only，哪些必须移动到 `x/tenant`、`x/rest` 或 `x/gateway` |
+| 文件 contract、cache primitive、KV helper、idempotency contract 与 DB helper 边界 | [Store Primer](/zh/docs/modules/store) | 它给出了稳定持久化原语与 `x/data`、`x/cache`、`x/fileapi`、`x/tenant` 之间最清楚的具体拆分 |
+
 ## 更具体的“留在稳定层”例子
 
 几个反复出现的例子会让判断更清楚。
@@ -82,7 +92,9 @@ import GeneratedStableRootFacts from '../../../../components/docs/GeneratedStabl
 
 ## 下一步阅读
 
+- [Core Primer](/zh/docs/modules/core)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [Store Primer](/zh/docs/modules/store)
 - [x/* 家族](/zh/docs/x-family)
-- [模块总览](/zh/docs/modules/overview)
-- [发布姿态](/zh/docs/release-posture)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
+

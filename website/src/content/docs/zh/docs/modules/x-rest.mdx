@@ -1,0 +1,52 @@
+---
+title: x/rest Primer
+description: 当改动真正围绕可复用 CRUD transport 与资源路由标准化时，先读这里。
+translationKey: modules-x-rest
+sidebar:
+  order: 4
+---
+
+# x/rest Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于能力家族，而不是最小 canonical 服务形态时，就打开这一页。
+
+`x/rest` 是 Plumego 面向应用的可复用资源接口层，负责 CRUD route 标准化、query parsing、pagination rule 与 repository-backed resource wiring。
+
+## 什么时候从这里开始
+
+- 任务是在标准化可复用资源 API
+- 改动属于 controller 级 CRUD transport 行为
+- 工作是资源 endpoint 之间共享的 query、pagination、hook 或 transformer 行为
+
+## 什么时候不该从这里开始
+
+- 任务真正是 application bootstrap
+- 真正的问题是 gateway 或 reverse-proxy topology
+- 工作是 business repository ownership 或 domain validation
+
+## 当前仓库里先读哪些文件
+
+1. `x/rest/module.yaml`
+2. `x/rest/spec.go`
+3. `x/rest/entrypoints.go`
+4. 当你需要校对 canonical bootstrap shape 时，再读 `reference/standard-service`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/rest` | 这些工作应继续留在别处 |
+| --- | --- |
+| `ResourceSpec`、route-shape 标准化、共享分页规则与可复用 CRUD transport 行为 | app-local wiring 中的 route binding 与 transport composition |
+| DB-resource controller 构造与 context-aware resource 注册 | repository 层中的持久化与 query execution |
+| 让 controller 输出继续对齐 `contract` 的 response 与 error 约定 | 归属 domain 包的 domain validation 与业务规则 |
+| 可被多个服务复用的资源接口 transport | `x/gateway` 中的 edge proxy、gateway policy 或 reverse-transport concern |
+
+## 一个典型的阅读跳转
+
+如果顶层判断页已经告诉你问题属于扩展家族，那么只有当工作真正围绕可复用资源接口 transport 时，`x/rest` 才是正确下一跳。它不是发明新 bootstrap shape 的地方。
+
+## 下一步阅读
+
+- [参考应用](/zh/docs/reference-app)
+- [Store Primer](/zh/docs/modules/store)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)
+

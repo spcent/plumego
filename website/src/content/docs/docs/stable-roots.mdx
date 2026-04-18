@@ -51,6 +51,16 @@ The current repository already provides concrete module-level boundaries that ma
 
 These are not abstract style preferences. They are the current repository's actual ownership lines.
 
+## Open the right stable-root primer next
+
+Once you know the change still belongs in the stable surface, continue with the owning module primer instead of staying at the concept layer.
+
+| If the work mainly touches | Open this primer next | Why this primer matters |
+| --- | --- | --- |
+| lifecycle, explicit app construction, logger injection, and route attachment | [Core Primer](/docs/modules/core) | it turns the stable-root rule into the actual `core` lifecycle and kernel boundary |
+| transport wrappers, request IDs, tracing hooks, access logging, auth/security HTTP adapters, and rate-limit adapters | [Middleware Primer](/docs/modules/middleware) | it shows what still counts as transport-only and what must move to `x/tenant`, `x/rest`, or `x/gateway` |
+| file contracts, cache primitives, KV helpers, idempotency contracts, and DB helper boundaries | [Store Primer](/docs/modules/store) | it gives the clearest concrete split between stable persistence primitives and `x/data`, `x/cache`, `x/fileapi`, or `x/tenant` work |
+
 ## Concrete "keep it stable" cases
 
 A few recurring examples make the boundary clearer.
@@ -82,7 +92,9 @@ When a stable-root candidate starts learning extension semantics, use the owning
 
 ## Read next
 
+- [Core Primer](/docs/modules/core)
+- [Middleware Primer](/docs/modules/middleware)
+- [Store Primer](/docs/modules/store)
 - [x/* Family](/docs/x-family)
-- [Modules Overview](/docs/modules/overview)
-- [Release Posture](/docs/release-posture)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
+

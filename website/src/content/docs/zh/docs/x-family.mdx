@@ -51,6 +51,16 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 这些例子的重要性在于：它们说明 `x/*` 不是单纯把代码从稳定根里挪走的地方。每个家族都应该成为一个可发现、可解释的主入口，并带着清晰 ownership。
 
+## 下一步打开正确的扩展 primer
+
+一旦你已经确认工作属于扩展家族，就不要继续停留在抽象层，而应跳到最诚实的家族入口 primer。
+
+| 如果工作主要触及 | 下一步打开的 primer | 为什么这里是更合适的下一跳 |
+| --- | --- | --- |
+| 可复用 CRUD controller 行为、共享分页规则与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | 它会把家族级规则继续落到 app-local wiring、repository code 与 domain validation 的具体拆分 |
+| app-facing queue、pubsub、scheduler 与 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | 它会继续说明什么时候应该停留在家族入口，什么时候才适合下钻更窄 sibling |
+| 那些看起来很像扩展，但其实仍可能属于稳定表面的改动 | [稳定根](/zh/docs/stable-roots) | 当问题本质上仍然是默认路径归属时，这里才是正确回退页 |
+
 ## 更具体的路由判断例子
 
 几个来自当前仓库的例子，会让分流方式更落地。
@@ -82,7 +92,9 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 ## 下一步阅读
 
+- [x/rest Primer](/zh/docs/modules/x-rest)
+- [x/messaging Primer](/zh/docs/modules/x-messaging)
 - [稳定根](/zh/docs/stable-roots)
 - [模块总览](/zh/docs/modules/overview)
-- [发布姿态](/zh/docs/release-posture)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
+

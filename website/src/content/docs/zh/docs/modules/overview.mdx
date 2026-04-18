@@ -50,6 +50,18 @@ Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速
 
 以当前仓库结构为例，消息类问题通常先从 `x/messaging` 开始，边缘传输类问题先从 `x/gateway` 开始，可复用资源接口问题先从 `x/rest` 开始，更高层的观测适配问题先从 `x/observability` 开始，而数据拓扑较重的问题则先从 `x/data` 开始。
 
+## 接下来应该打开哪些模块 primer
+
+当顶层问题已经明确后，就不要停留在总览页，而应该继续进入对应模块 primer。
+
+| 如果问题主要围绕 | 下一步打开的 primer | 为什么应该先读这里 |
+| --- | --- | --- |
+| app construction、lifecycle 与 route attachment | [Core Primer](/zh/docs/modules/core) | `core` 拥有 HTTP 应用内核与 canonical 生命周期路径 |
+| transport-only wrapper、request ID、tracing hook 与 access logging | [Middleware Primer](/zh/docs/modules/middleware) | `middleware` 负责保持顺序敏感的 HTTP 行为窄且显式 |
+| storage contract、文件抽象、cache primitive 与 idempotency contract | [Store Primer](/zh/docs/modules/store) | `store` 定义了进入拓扑型数据问题之前的稳定持久化层 |
+| 可复用 CRUD transport 与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | `x/rest` 是共享资源接口行为的扩展家族入口 |
+| 应用侧 queue、pubsub、scheduler 或 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | `x/messaging` 是进入更窄 sibling 之前的家族级发现入口 |
+
 ## 这页希望你避免什么
 
 当前仓库会主动避免把 `ai`、`tenant`、`rest`、`pubsub`、`frontend`、`utils`、`validator` 这类宽泛或含糊的名字继续长成顶层根目录。只要一个名字听起来更像 feature catalog 或模糊大桶，它大概率就不是正确起点。
@@ -58,5 +70,7 @@ Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速
 
 - [稳定根](/zh/docs/stable-roots)
 - [x/* 家族](/zh/docs/x-family)
-- [发布姿态](/zh/docs/release-posture)
+- [Core Primer](/zh/docs/modules/core)
+- [x/rest Primer](/zh/docs/modules/x-rest)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
+

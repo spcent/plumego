@@ -1,0 +1,52 @@
+---
+title: x/rest Primer
+description: Read this when the change is really about reusable CRUD transport and resource route standardization.
+translationKey: modules-x-rest
+sidebar:
+  order: 4
+---
+
+# x/rest Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is clearly about reusable resource-interface behavior rather than the smallest canonical service shape.
+
+`x/rest` is Plumego's app-facing reusable resource-interface layer for CRUD route standardization, query parsing, pagination rules, and repository-backed resource wiring.
+
+## Start here when
+
+- the task is standardizing reusable resource APIs
+- the change is controller-level CRUD transport behavior
+- the work is shared query, pagination, hook, or transformer behavior for resource endpoints
+
+## Do not start here when
+
+- the task is application bootstrap
+- the real issue is gateway or reverse-proxy topology
+- the work is business repository ownership or domain validation
+
+## First files to read in the current repository
+
+1. `x/rest/module.yaml`
+2. `x/rest/spec.go`
+3. `x/rest/entrypoints.go`
+4. `reference/standard-service` when checking canonical bootstrap shape
+
+## Concrete ownership examples
+
+| Keep it in `x/rest` when the work is about | Keep it elsewhere when the work is about |
+| --- | --- |
+| `ResourceSpec`, route-shape standardization, shared pagination rules, and reusable CRUD transport behavior | route binding and transport composition in app-local wiring |
+| DB-resource controller construction and context-aware resource registration | persistence and query execution in the repository layer |
+| aligning controller output with `contract` response and error conventions | domain validation and business rules in owning domain packages |
+| reusable resource-interface transport for many services | edge proxy, gateway policy, or reverse-transport concerns in `x/gateway` |
+
+## Canonical reading move
+
+If the top-level page told you the problem belongs to an extension family, `x/rest` is the right next read only when the work is about reusable resource-interface transport. It is not the place to invent a new bootstrap shape.
+
+## Read next
+
+- [Reference App](/docs/reference-app)
+- [Store Primer](/docs/modules/store)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)
+

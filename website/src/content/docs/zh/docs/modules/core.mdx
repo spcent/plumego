@@ -1,0 +1,52 @@
+---
+title: Core Primer
+description: 当改动真正围绕 HTTP 应用内核与生命周期时，先读这里。
+translationKey: modules-core
+sidebar:
+  order: 1
+---
+
+# Core Primer
+
+当你已经通过 [稳定根](/zh/docs/stable-roots) 确认改动仍属于默认服务路径，而且问题进一步收窄到 HTTP 应用内核时，就打开这一页。
+
+`core` 拥有 app construction、route attachment、middleware attachment 与 server lifecycle。只有当改动应该继续属于每个 Plumego 服务都应理解的最小 canonical 服务形态时，它才是正确归属。
+
+## 什么时候从这里开始
+
+- 你正在通过显式 routes 与 middleware 组装应用
+- 你要修改 `Prepare`、`Server` 或 `Shutdown` 生命周期行为
+- 你正在处理应用构造或共享运行时依赖 wiring
+
+## 什么时候不该从这里开始
+
+- 改动真正关心的是 route matching，而不是应用内核
+- 改动引入了 feature catalog、plugin container 或 tenant policy
+- 工作其实是持久化行为，或 debug-tool payload 设计
+
+## 当前仓库里先读哪些文件
+
+1. `core/module.yaml`
+2. `core/app.go`
+3. `core/options.go`
+4. `reference/standard-service/internal/app/app.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `core` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| 通过 `DefaultConfig()` / `AppConfig` 与 `AppDependencies` 做显式 app construction | 应归 app-local code 或扩展层的 feature-specific wiring |
+| 单一路径生命周期：`Prepare` + `Server` + `Shutdown` | `x/devtools` 中的 debug metadata transport 与 runtime snapshot payload |
+| 通过 `App.AddRoute`、`App.Get`、`App.Post` 与命名路由 URL lookup 做 route binding | 原始 router 替换、feature catalog 或能力归属的运行时行为 |
+| logger 这类被动依赖注入 | logger 子系统 ownership、flush policy 或应保持 app-local 的 readiness policy |
+
+## 为什么单独写这一页
+
+`core` 很容易被误读成“凡是基础设施都可以往里放”的地方。当前仓库的实际规则不是这样：`core` 是内核，不是 feature catalog。只要改动开始让内核学习能力语义，它大概率就已经放错地方了。
+
+## 下一步阅读
+
+- [参考应用](/zh/docs/reference-app)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)
+

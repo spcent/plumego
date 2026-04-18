@@ -1,0 +1,51 @@
+---
+title: x/messaging Primer
+description: Read this when the change is really about app-facing messaging orchestration and family-level entry choices.
+translationKey: modules-x-messaging
+sidebar:
+  order: 5
+---
+
+# x/messaging Primer
+
+Open this page after [x/* Family](/docs/x-family) when the work is clearly about messaging-family ownership instead of the smallest runnable path.
+
+`x/messaging` is the canonical app-facing entrypoint for queue, pubsub, scheduler, and webhook orchestration at the family level.
+
+## Start here when
+
+- the task is message send orchestration
+- the change is app-facing queue, pubsub, scheduler, or webhook wiring
+- the work needs a family-level messaging entrypoint instead of a lower-level primitive
+
+## Do not start here when
+
+- the task is application bootstrap
+- the work is really stable-root abstraction design
+- the task is already known to be narrow low-level work in `x/mq`, `x/pubsub`, `x/scheduler`, or `x/webhook`
+
+## First files to read in the current repository
+
+1. `x/messaging/module.yaml`
+2. `x/messaging/entrypoints.go`
+3. `specs/extension-taxonomy.yaml`
+
+## Concrete ownership examples
+
+| Start in `x/messaging` when the work is about | Drop into a narrower sibling only when the work is already about |
+| --- | --- |
+| family-level app-facing queue, pubsub, scheduler, or webhook orchestration | durable queue primitives and worker coordination in `x/mq` |
+| deciding the messaging entrypoint a service should open first | in-process broker primitives in `x/pubsub` |
+| keeping orchestration explicit without redefining the canonical app path | scheduling primitives in `x/scheduler` |
+| messaging-family ownership questions that are still broader than one protocol primitive | inbound verification or outbound delivery mechanics in `x/webhook` |
+
+## Why this primer exists
+
+`x/messaging` matters because it keeps readers from jumping into a sibling package too early. The family entrypoint exists so messaging work can start from the right scope before narrowing.
+
+## Read next
+
+- [x/* Family](/docs/x-family)
+- [Reference App](/docs/reference-app)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)
+
