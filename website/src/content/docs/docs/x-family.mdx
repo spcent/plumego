@@ -10,7 +10,7 @@ import GeneratedExtensionFacts from '../../../components/docs/GeneratedExtension
 
 # x/* Family
 
-The `x/*` layer exists so optional or faster-moving capabilities can evolve without redefining the stable-root learning path.
+The `x/*` layer exists so optional or faster-moving capabilities can evolve without redefining the stable-root learning path. These families are not accidental overflow directories; they are the intended home for work that is real, app-facing, and useful, but too capability-specific to become part of the narrow default path.
 
 ## Synced extension facts
 
@@ -18,15 +18,71 @@ The `x/*` layer exists so optional or faster-moving capabilities can evolve with
 
 ## When to start here
 
-Start with an `x/*` family when the work is primarily about:
+Start with an `x/*` family when the work is primarily about reusable capability behavior rather than the smallest canonical service shape.
 
-- capability-specific behavior
-- protocol adaptation
-- tenant, gateway, or observability policy
-- optional app-facing functionality that should not expand stable roots
+That usually means the task involves one or more of these:
 
-## What not to do
+- protocol adaptation or edge behavior
+- tenant, gateway, messaging, data-topology, or observability policy
+- app-facing reusable capability surfaces that should stay optional
+- behavior that would make a stable root learn product or family semantics
 
-- do not make stable roots depend on `x/*`
-- do not use `x/*` as a pretext to redefine the canonical reference path
-- do not start in a subordinate package when a primary family already exists
+If the task is still about the default bootstrap path, explicit lifecycle wiring, or transport primitives that every service should understand, you probably are not ready to start in `x/*` yet.
+
+## A practical ownership test
+
+Use this quick test before you pick an extension family.
+
+1. Is the change clearly capability-specific rather than part of the smallest runnable service path?
+2. Would placing it in a stable root force that root to learn family policy, provider choices, or topology decisions?
+3. Is there already a primary family entrypoint that matches the task more honestly than a narrow subordinate package?
+
+When the answer is yes, `x/*` is usually the right starting layer.
+
+## Concrete extension-family examples from the current repository
+
+The current repository already exposes several clear family-level entry rules.
+
+| Extension family | Start here when the work is about | Do not start here when the work is really about |
+| --- | --- | --- |
+| `x/rest` | reusable CRUD transport behavior, query parsing, pagination rules, and repository-backed resource wiring | service bootstrap, gateway topology, business repository ownership, or domain validation |
+| `x/messaging` | app-facing queue, pubsub, scheduler, or webhook orchestration at the family level | the smallest runnable service path, stable abstractions, or a task already known to be only `x/mq` or `x/pubsub` |
+| `x/observability` | exporter wiring, telemetry adapters, buffered metrics inspection, rolling metrics helpers, and broader diagnostics integration | transport-only request middleware primitives such as request IDs, tracing hooks, or access logging |
+
+These examples matter because they show that `x/*` is not just a place to move code away from stable roots. Each family is supposed to become a discoverable entrypoint with a clear ownership story.
+
+## Concrete routing examples
+
+A few repository-backed examples make the split more practical.
+
+- Start in `x/rest` when the task is "standardize CRUD or resource API shape." Keep explicit route binding in app-local wiring, keep repository ownership in the repository layer, and keep domain validation outside `x/rest`.
+- Start in `x/messaging` when the task is app-facing messaging orchestration. Only drop into `x/mq`, `x/pubsub`, `x/scheduler`, or `x/webhook` after the task is already known to be that narrow.
+- Start in `x/observability` when the task is export wiring or broader telemetry integration. Leave transport-only request instrumentation in stable `middleware/*`.
+- Start in `x/gateway` when the problem is proxy or edge transport behavior, not reusable resource-controller behavior.
+
+## Common misreads to avoid
+
+The repository tries to prevent a few common mistakes.
+
+- do not use `x/*` as a generic excuse to hide unclear ownership
+- do not redefine the canonical reference path from an extension family
+- do not start from a subordinate package when a primary family already exists
+- do not move transport contracts, lifecycle ownership, or the smallest bootstrap path out of the stable surface just because the implementation feels advanced
+
+The point of `x/*` is not novelty. The point is to keep capability-specific work explicit and discoverable without expanding the default contract every service has to carry.
+
+## How this page pairs with stable roots
+
+A useful rule is to compare the first question you are trying to answer.
+
+- If the question is, "How should the canonical service boot and route requests?" stay with [Stable Roots](/docs/stable-roots) and [Reference App](/docs/reference-app).
+- If the question is, "Which capability family should own this optional or fast-moving behavior?" start here.
+
+That is the real boundary between default-path ownership and extension-family ownership.
+
+## Read next
+
+- [Stable Roots](/docs/stable-roots)
+- [Modules Overview](/docs/modules/overview)
+- [Release Posture](/docs/release-posture)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)
