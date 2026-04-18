@@ -5,37 +5,26 @@ const locale = localeFromPath(Astro.url.pathname);
 
 const copy = {
   en: {
-    label: 'Toggle theme',
+    label: 'Theme',
+    light: 'Light',
+    dark: 'Dark',
   },
   zh: {
-    label: '切换主题',
+    label: '主题',
+    light: '浅色',
+    dark: '深色',
   },
 }[locale];
 ---
 
-<button class="theme-icon-button" type="button" aria-label={copy.label} data-theme-icon-toggle>
-  <span class="sr-only">{copy.label}</span>
-  <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M21 12.8A8.8 8.8 0 1 1 11.2 3a7.2 7.2 0 0 0 9.8 9.8Z"
-      fill="none"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="1.8"
-    />
-  </svg>
-  <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" aria-hidden="true">
-    <circle cx="12" cy="12" r="4.1" fill="none" stroke="currentColor" stroke-width="1.8" />
-    <path
-      d="M12 2.8v2.5M12 18.7v2.5M21.2 12h-2.5M5.3 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5"
-      fill="none"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-width="1.8"
-    />
-  </svg>
-</button>
+<div class="theme-switch" role="group" aria-label={copy.label}>
+  <button class="theme-switch__option" type="button" data-theme-choice="light" aria-pressed="false">
+    {copy.light}
+  </button>
+  <button class="theme-switch__option" type="button" data-theme-choice="dark" aria-pressed="false">
+    {copy.dark}
+  </button>
+</div>
 
 <script>
   type Theme = 'dark' | 'light';
@@ -52,19 +41,20 @@ const copy = {
     const theme = resolveTheme();
     document.documentElement.dataset.theme = theme;
 
-    document.querySelectorAll('[data-theme-icon-toggle]').forEach((button) => {
+    document.querySelectorAll('[data-theme-choice]').forEach((button) => {
       if (!(button instanceof HTMLButtonElement)) return;
-      button.dataset.themeState = theme;
-      button.setAttribute('aria-pressed', String(theme === 'dark'));
+      const active = button.dataset.themeChoice === theme;
+      button.setAttribute('aria-pressed', String(active));
+      button.dataset.active = active ? 'true' : 'false';
     });
   };
 
   const bindButtons = () => {
-    document.querySelectorAll('[data-theme-icon-toggle]').forEach((button) => {
+    document.querySelectorAll('[data-theme-choice]').forEach((button) => {
       if (!(button instanceof HTMLButtonElement) || button.dataset.bound === 'true') return;
       button.dataset.bound = 'true';
       button.addEventListener('click', () => {
-        const next = resolveTheme() === 'dark' ? 'light' : 'dark';
+        const next = button.dataset.themeChoice === 'dark' ? 'dark' : 'light';
         localStorage.setItem(storageKey, next);
         syncButtons();
       });
