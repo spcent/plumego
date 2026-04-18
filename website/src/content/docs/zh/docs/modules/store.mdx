@@ -1,0 +1,52 @@
+---
+title: Store Primer
+description: 当改动真正围绕稳定持久化原语与存储 contract 时，先读这里。
+translationKey: modules-store
+sidebar:
+  order: 3
+---
+
+# Store Primer
+
+当你已经通过 [稳定根](/zh/docs/stable-roots) 确认改动仍属于稳定表面，但问题进一步收窄到持久化原语与存储 contract 时，就打开这一页。
+
+`store` 拥有基础持久化抽象。只有当工作应继续停留在拓扑较重的数据特性、tenant-aware 实现，以及 HTTP-facing 文件或缓存行为之下时，它才是正确归属。
+
+## 什么时候从这里开始
+
+- 你正在定义稳定存储 contract 或基础持久化 helper
+- 工作仍然停留在 provider-specific topology 决策之下
+- 改动属于 file、KV、cache、idempotency 或 DB helper primitive
+
+## 什么时候不该从这里开始
+
+- 工作已经变成 tenant-aware storage policy 或 tenant-aware adapter
+- 任务引入 distributed engine 行为、signed URL 或 metadata-manager ownership
+- 真正的问题是 upload/download HTTP transport，或由 gateway 拥有的 response caching
+
+## 当前仓库里先读哪些文件
+
+1. `store/module.yaml`
+2. `store/*` 下的目标包
+3. `specs/repo.yaml`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `store` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `store/file` 接口、共享文件类型与错误 | `x/data/file` 中的 tenant-aware file backend 与 metadata persistence，或 `x/fileapi` 中的 HTTP upload/download endpoint |
+| `store/kv` 的 file-backed KV CRUD、TTL-aware helper、key scan 与 basic stats | `x/data/kvengine` 中的 WAL、snapshot、serializer selection、compression 与 shard tuning |
+| `store/idempotency` 的 record、status、error 与最小 `Store` 接口 | `x/data/idempotency` 中的 SQL/KV provider、SQL dialect policy 与 duplicate-key handling |
+| `store/cache` 的基础 cache primitive | `x/cache` 中的 distributed cache engine、`x/gateway/cache` 中的 HTTP response caching，以及 `x/tenant/store/cache` 中的 tenant-aware cache adapter |
+| `store/db` 中依赖调用方 `context.Context` 的 helper 执行 | `x/observability/dbinsights` 中的 DB analytics 与 slow-query inspection |
+
+## 为什么单独写这一页
+
+`store` 看起来容易变成一个很宽的目录，因为持久化会碰到很多能力层。当前仓库的真实规则，是刻意把它压窄：稳定持久化 contract 留在这里，而 provider-heavy、topology-heavy、tenant-aware、HTTP-facing 行为则向外移动。
+
+## 下一步阅读
+
+- [x/rest Primer](/zh/docs/modules/x-rest)
+- [x/messaging Primer](/zh/docs/modules/x-messaging)
+- [发布姿态](/zh/docs/release-posture)
+

@@ -1,0 +1,52 @@
+---
+title: Store Primer
+description: Read this when the change is really about stable persistence primitives and storage contracts.
+translationKey: modules-store
+sidebar:
+  order: 3
+---
+
+# Store Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the stable surface, but the real question has narrowed to persistence primitives and storage contracts.
+
+`store` owns base persistence abstractions. It is the right home when the work should stay below topology-heavy data features, tenant-aware implementations, and HTTP-facing file or cache behavior.
+
+## Start here when
+
+- you are defining stable storage contracts or basic persistence helpers
+- the work stays below provider-specific topology decisions
+- the change belongs to file, KV, cache, idempotency, or DB helper primitives
+
+## Do not start here when
+
+- the work is tenant-aware storage policy or tenant-aware adapters
+- the task introduces distributed engine behavior, signed URLs, or metadata-manager ownership
+- the real problem is upload/download HTTP transport or gateway-owned response caching
+
+## First files to read in the current repository
+
+1. `store/module.yaml`
+2. the target package under `store/*`
+3. `specs/repo.yaml`
+
+## Concrete ownership examples
+
+| Keep it in `store` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `store/file` interfaces, shared file types, and errors | tenant-aware file backends and metadata persistence in `x/data/file`, or HTTP upload/download endpoints in `x/fileapi` |
+| `store/kv` file-backed KV CRUD, TTL-aware helpers, key scans, and basic stats | WAL, snapshots, serializer selection, compression, and shard tuning in `x/data/kvengine` |
+| `store/idempotency` records, statuses, errors, and the minimal `Store` interface | durable SQL or KV providers, SQL dialect policy, and duplicate-key handling in `x/data/idempotency` |
+| `store/cache` base cache primitives | distributed cache engines in `x/cache`, HTTP response caching in `x/gateway/cache`, and tenant-aware cache adapters in `x/tenant/store/cache` |
+| `store/db` helper execution with caller-owned `context.Context` | DB analytics and slow-query inspection in `x/observability/dbinsights` |
+
+## Why this primer exists
+
+`store` looks broad because persistence touches many capabilities. The current repository narrows it deliberately: keep the stable persistence contracts here, and move provider-heavy, topology-heavy, tenant-aware, and HTTP-facing behavior outward.
+
+## Read next
+
+- [x/rest Primer](/docs/modules/x-rest)
+- [x/messaging Primer](/docs/modules/x-messaging)
+- [Release Posture](/docs/release-posture)
+

@@ -5,8 +5,8 @@ const currentPath = Astro.url.pathname;
 const currentLocale = localeFromPath(currentPath);
 
 const locales = [
-  { code: 'en', label: 'English', href: toLocalePath(currentPath, 'en') },
-  { code: 'zh', label: '简体中文', href: toLocalePath(currentPath, 'zh') },
+  { code: 'en', label: 'English', shortLabel: 'EN', href: toLocalePath(currentPath, 'en') },
+  { code: 'zh', label: '简体中文', shortLabel: '中文', href: toLocalePath(currentPath, 'zh') },
 ] as const;
 
 const current = locales.find((item) => item.code === currentLocale) ?? locales[0];
@@ -15,7 +15,12 @@ const accessibleLabel = currentLocale === 'zh' ? '选择语言' : 'Select langua
 
 <details class="language-menu" data-language-menu>
   <summary class="language-menu__trigger" aria-label={accessibleLabel}>
-    <span>{current.label}</span>
+    <span class="language-menu__label">
+      <svg class="language-menu__globe" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15Zm0 0c1.9 2 3 4.7 3 7.5s-1.1 5.5-3 7.5m0-15c-1.9 2-3 4.7-3 7.5s1.1 5.5 3 7.5m-7.2-5h14.4M2.8 7.2h14.4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" />
+      </svg>
+      <span>{current.shortLabel}</span>
+    </span>
     <svg class="language-menu__caret" viewBox="0 0 20 20" aria-hidden="true">
       <path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
     </svg>

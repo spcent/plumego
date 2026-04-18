@@ -10,27 +10,91 @@ import GeneratedStableRootFacts from '../../../components/docs/GeneratedStableRo
 
 # Stable Roots
 
-Stable roots are the long-lived public packages at the repository root. They define the default learning path and the v1 compatibility promise Plumego intends to preserve.
+Stable roots are the long-lived public packages at the repository root. They define the default learning path, carry the narrowest public contract Plumego intends to preserve, and give the canonical app path something stable to stand on.
 
 ## Synced stable-root facts
 
 <GeneratedStableRootFacts />
 
-## What belongs here
+## What stable roots are actually for
 
-- application kernel and lifecycle
-- route structure and matching primitives
-- transport contracts and response helpers
-- transport-only middleware
-- security primitives and base storage abstractions
+A stable root is the right home when the change belongs to the default service path Plumego expects every maintainer to understand.
 
-## What does not belong here
+That usually means one of four things:
 
-- product-specific feature logic
-- tenant-aware policy branching
-- protocol family catalogs
-- optional frontend, AI, data-topology, or gateway behavior
+- the HTTP application kernel and lifecycle
+- route structure or transport contracts
+- transport-only middleware adapters
+- narrow security or persistence primitives that extension families can build on top of
 
-## Working rule
+If the change needs capability policy, tenant-aware branching, topology-heavy behavior, or feature-family discovery, you are already pushing beyond the stable-root contract.
 
-If the change would force a stable root to learn an extension concern, move the behavior to the owning `x/*` family instead.
+## A practical ownership test
+
+Use this quick test before you choose a stable root.
+
+1. Would a reader still expect this behavior in the smallest canonical service path?
+2. Can the behavior stay narrow without learning tenant, gateway, AI, or protocol-family policy?
+3. Would `reference/standard-service` still be a valid example if this code existed only in the stable root?
+
+If the answer turns into "only for some capabilities" or "only when a specific product policy is active," the safer home is usually an owning `x/*` family instead.
+
+## Concrete stable-root examples from the current repository
+
+The current repository already provides concrete module-level boundaries that make this easier to judge.
+
+| Stable root | Keep it here when the work is about | Move out when the work becomes |
+| --- | --- | --- |
+| `core` | app construction, route attachment, middleware attachment, `Prepare` / `Server` / `Shutdown` lifecycle | feature catalogs, tenant policy, debug metadata, or capability-specific runtime behavior |
+| `middleware` | transport-only wrappers such as request IDs, tracing hooks, access logging, auth/security transport adapters, and HTTP metrics | tenant resolution, quota policy, API version negotiation, or protocol/payload adaptation |
+| `store` | narrow persistence contracts and base abstractions such as `store/file`, `store/kv`, `store/idempotency`, and `store/cache` primitives | topology-heavy cache engines, tenant-aware adapters, signed URLs, file metadata management, SQL/provider policy, or HTTP-facing caching behavior |
+
+These are not abstract style preferences. They are the current repository's actual ownership lines.
+
+## Open the right stable-root primer next
+
+Once you know the change still belongs in the stable surface, continue with the owning module primer instead of staying at the concept layer.
+
+| If the work mainly touches | Open this primer next | Why this primer matters |
+| --- | --- | --- |
+| lifecycle, explicit app construction, logger injection, and route attachment | [Core Primer](/docs/modules/core) | it turns the stable-root rule into the actual `core` lifecycle and kernel boundary |
+| transport wrappers, request IDs, tracing hooks, access logging, auth/security HTTP adapters, and rate-limit adapters | [Middleware Primer](/docs/modules/middleware) | it shows what still counts as transport-only and what must move to `x/tenant`, `x/rest`, or `x/gateway` |
+| file contracts, cache primitives, KV helpers, idempotency contracts, and DB helper boundaries | [Store Primer](/docs/modules/store) | it gives the clearest concrete split between stable persistence primitives and `x/data`, `x/cache`, `x/fileapi`, or `x/tenant` work |
+
+## Concrete "keep it stable" cases
+
+A few recurring examples make the boundary clearer.
+
+- In `core`, explicit app construction and one canonical lifecycle path stay stable, but debug snapshots belong in `x/devtools` and feature-specific wiring belongs in app-local code or an extension.
+- In `middleware`, request IDs, tracing hooks, access logging, and HTTP metrics stay stable because they are still transport-only. API version negotiation moves to `x/rest/versioning`, while protocol adaptation moves to `x/gateway/*`.
+- In `store/file`, shared file contracts and errors stay stable, but tenant-aware storage backends and metadata persistence move to `x/data/file`, and upload/download HTTP endpoints move to `x/fileapi`.
+- In `store/cache`, base cache primitives stay stable, but distributed cache behavior moves to `x/cache`, HTTP response caching moves to `x/gateway/cache`, and tenant-aware cache adapters move to `x/tenant/store/cache`.
+
+## Common misreads to avoid
+
+Readers often misclassify a change as stable-root work just because it feels foundational. The current repository pushes back on that instinct.
+
+- "It is important to every service" does not automatically mean it belongs in `core`.
+- "It touches HTTP requests" does not automatically mean it belongs in stable `middleware`.
+- "It stores data" does not automatically mean it belongs in stable `store`.
+
+The stronger question is whether the behavior remains narrow, default, and capability-agnostic after you implement it.
+
+## Where to go when the boundary breaks
+
+When a stable-root candidate starts learning extension semantics, use the owning destination instead of stretching the root.
+
+- move tenant-aware policy to `x/tenant`
+- move protocol or gateway behavior to `x/gateway`
+- move reusable resource-interface transport to `x/rest`
+- move export wiring and broader telemetry adapters to `x/observability`
+- move topology-heavy data and storage implementations to `x/data`, `x/cache`, or `x/fileapi`
+
+## Read next
+
+- [Core Primer](/docs/modules/core)
+- [Middleware Primer](/docs/modules/middleware)
+- [Store Primer](/docs/modules/store)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)
+

@@ -10,27 +10,91 @@ import GeneratedStableRootFacts from '../../../../components/docs/GeneratedStabl
 
 # 稳定根
 
-稳定根是仓库根部那些长期公开的包。它们定义了 Plumego 的默认学习路径，也承接 v1 兼容性承诺中最核心的部分。
+稳定根是仓库根部那些长期公开的包。它们定义了默认学习路径，承接 Plumego 希望长期保留的最窄公共契约，也为 canonical 应用路径提供稳定支点。
 
 ## 同步稳定根事实
 
 <GeneratedStableRootFacts locale="zh" />
 
-## 这里应该放什么
+## 稳定根真正负责什么
 
-- 应用内核与生命周期
-- 路由结构与匹配原语
-- transport contract 与响应辅助
-- transport-only 中间件
-- 安全原语与基础存储抽象
+只有当改动属于 Plumego 希望每个维护者都理解的默认服务路径时，稳定根才是正确归属。
 
-## 这里不该放什么
+通常来说，这类改动会落在四种事情上：
 
-- 产品特定功能逻辑
-- tenant-aware 策略分支
-- 协议家族目录
-- 前端、AI、数据拓扑或网关等可选能力
+- HTTP 应用内核与生命周期
+- 路由结构或 transport contract
+- transport-only 中间件适配器
+- 可供扩展层复用的窄安全原语或持久化原语
 
-## 工作规则
+只要改动开始需要能力策略、tenant-aware 分支、拓扑较重的行为，或者 feature-family 级发现入口，它就已经在越过稳定根契约。
 
-如果某个改动会迫使稳定根学习扩展层语义，就应该把行为移动到对应的 `x/*` 家族。
+## 一个更实用的归属判断测试
+
+在你把改动放进稳定根之前，先问自己三个问题。
+
+1. 一个读者是否仍会期待这段行为出现在最小 canonical 服务路径里？
+2. 这段行为能否保持窄边界，而不学习 tenant、gateway、AI 或协议家族策略？
+3. 即使这段代码只存在于稳定根，`reference/standard-service` 仍然会是一个合理示例吗？
+
+只要答案开始变成“只对某些能力成立”或“只有特定产品策略开启时才成立”，更安全的归属通常就是某个对应的 `x/*` 家族，而不是继续拉伸稳定根。
+
+## 当前仓库里的具体稳定根案例
+
+当前仓库已经给出了足够具体的模块级边界，可以直接拿来判断。
+
+| 稳定根 | 适合留在这里的工作 | 一旦变成这些问题就应移出 |
+| --- | --- | --- |
+| `core` | app construction、route attachment、middleware attachment，以及 `Prepare` / `Server` / `Shutdown` 生命周期 | feature catalog、tenant policy、debug metadata 或能力特定运行时行为 |
+| `middleware` | request ID、tracing hook、access log、auth/security transport adapter、HTTP metrics 这类 transport-only wrapper | tenant resolution、quota policy、API version negotiation 或协议 / payload 适配 |
+| `store` | `store/file`、`store/kv`、`store/idempotency`、`store/cache` 这类窄持久化契约与基础抽象 | 拓扑较重的 cache engine、tenant-aware adapter、signed URL、文件元数据管理、SQL/provider policy 或 HTTP-facing caching |
+
+这些不是抽象的风格偏好，而是当前仓库已经写出来的实际 ownership 边界。
+
+## 下一步打开正确的稳定根 primer
+
+一旦你已经确认改动仍属于稳定表面，就不要停留在概念层，而应继续进入对应模块的 primer。
+
+| 如果工作主要触及 | 下一步打开的 primer | 为什么这里是更合适的下一跳 |
+| --- | --- | --- |
+| lifecycle、显式 app construction、logger injection 与 route attachment | [Core Primer](/zh/docs/modules/core) | 它会把稳定根规则继续落到 `core` 的实际生命周期与内核边界 |
+| transport wrapper、request ID、tracing hook、access logging、auth/security HTTP adapter 与 rate-limit adapter | [Middleware Primer](/zh/docs/modules/middleware) | 它会继续说明哪些仍然属于 transport-only，哪些必须移动到 `x/tenant`、`x/rest` 或 `x/gateway` |
+| 文件 contract、cache primitive、KV helper、idempotency contract 与 DB helper 边界 | [Store Primer](/zh/docs/modules/store) | 它给出了稳定持久化原语与 `x/data`、`x/cache`、`x/fileapi`、`x/tenant` 之间最清楚的具体拆分 |
+
+## 更具体的“留在稳定层”例子
+
+几个反复出现的例子会让判断更清楚。
+
+- 在 `core` 中，显式应用构造与单一路径生命周期应该保留在稳定层，但 debug snapshot 应进入 `x/devtools`，feature-specific wiring 应留在 app-local code 或扩展层。
+- 在 `middleware` 中，request ID、tracing hook、access logging 与 HTTP metrics 仍然属于稳定层，因为它们依旧是 transport-only。API version negotiation 应移动到 `x/rest/versioning`，协议适配应移动到 `x/gateway/*`。
+- 在 `store/file` 中，共享文件 contract 与错误类型留在稳定层，但 tenant-aware storage backend 与 metadata persistence 应移动到 `x/data/file`，而 upload/download HTTP endpoint 应移动到 `x/fileapi`。
+- 在 `store/cache` 中，基础 cache primitive 留在稳定层，但 distributed cache 行为应移动到 `x/cache`，HTTP response caching 应移动到 `x/gateway/cache`，tenant-aware cache adapter 应移动到 `x/tenant/store/cache`。
+
+## 需要避免的常见误判
+
+很多读者会因为某个改动“看起来很基础”，就误以为它应该属于稳定根。当前仓库其实明确反对这种判断方式。
+
+- “每个服务都会用到”并不自动等于它属于 `core`
+- “它处理 HTTP 请求”并不自动等于它属于稳定 `middleware`
+- “它和数据存储有关”并不自动等于它属于稳定 `store`
+
+更关键的问题是：实现完成之后，这段行为是否仍然保持窄边界、默认路径属性，以及 capability-agnostic 特征。
+
+## 当稳定边界开始破裂时该去哪里
+
+一旦某个稳定根候选开始学习扩展语义，就不要继续拉伸根目录，而应转去对应的归属目的地。
+
+- tenant-aware 策略转去 `x/tenant`
+- 协议或 gateway 行为转去 `x/gateway`
+- 可复用资源接口传输层转去 `x/rest`
+- export wiring 与更高层 telemetry adapter 转去 `x/observability`
+- 拓扑较重的数据与存储实现转去 `x/data`、`x/cache` 或 `x/fileapi`
+
+## 下一步阅读
+
+- [Core Primer](/zh/docs/modules/core)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [Store Primer](/zh/docs/modules/store)
+- [x/* 家族](/zh/docs/x-family)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)
+

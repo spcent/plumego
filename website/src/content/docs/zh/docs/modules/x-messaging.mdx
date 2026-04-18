@@ -1,0 +1,51 @@
+---
+title: x/messaging Primer
+description: 当改动真正围绕应用侧消息编排与家族入口选择时，先读这里。
+translationKey: modules-x-messaging
+sidebar:
+  order: 5
+---
+
+# x/messaging Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于 messaging 家族，而不是最小 runnable path 时，就打开这一页。
+
+`x/messaging` 是 queue、pubsub、scheduler 与 webhook 编排在家族层面的 canonical app-facing 入口。
+
+## 什么时候从这里开始
+
+- 任务是在做消息发送编排
+- 改动属于应用侧的 queue、pubsub、scheduler 或 webhook wiring
+- 工作需要一个家族级 messaging 入口，而不是更底层的 primitive
+
+## 什么时候不该从这里开始
+
+- 任务真正是 application bootstrap
+- 工作是稳定根抽象设计
+- 任务已经明确窄化到 `x/mq`、`x/pubsub`、`x/scheduler` 或 `x/webhook` 中的低层问题
+
+## 当前仓库里先读哪些文件
+
+1. `x/messaging/module.yaml`
+2. `x/messaging/entrypoints.go`
+3. `specs/extension-taxonomy.yaml`
+
+## 更具体的归属例子
+
+| 这些问题应先从 `x/messaging` 开始 | 只有当任务已经明确窄化后，才继续下钻到这些 sibling |
+| --- | --- |
+| 家族级、应用侧的 queue、pubsub、scheduler 与 webhook 编排 | `x/mq` 中的 durable queue primitive 与 worker coordination |
+| 决定某个服务应该先打开哪个 messaging entrypoint | `x/pubsub` 中的 in-process broker primitive |
+| 在不重写 canonical app path 的前提下保持编排显式 | `x/scheduler` 中的 scheduling primitive |
+| 那些仍然比单一协议 primitive 更宽的 messaging-family ownership 问题 | `x/webhook` 中的 inbound verification 或 outbound delivery 机制 |
+
+## 为什么单独写这一页
+
+`x/messaging` 的价值，在于阻止读者过早跳进某个 sibling 包。家族入口之所以存在，就是为了让消息类工作先从正确的作用域开始，再进一步收窄。
+
+## 下一步阅读
+
+- [x/* 家族](/zh/docs/x-family)
+- [参考应用](/zh/docs/reference-app)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)
+

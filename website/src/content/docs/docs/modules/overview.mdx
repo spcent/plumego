@@ -50,6 +50,18 @@ The current repo treats some `x/*` families as discovery entrypoints rather than
 
 Examples from the current repository shape include starting at `x/messaging` for messaging-related work, `x/gateway` for edge transport work, `x/rest` for reusable resource-interface work, `x/observability` for higher-level observability adapters, and `x/data` for topology-heavy data concerns.
 
+## Module primers to open next
+
+Once the top-level question is clear, continue into the primer that matches the owning module.
+
+| If the question is mainly about | Open this primer next | Why this is the right next read |
+| --- | --- | --- |
+| app construction, lifecycle, and route attachment | [Core Primer](/docs/modules/core) | `core` owns the HTTP application kernel and the canonical lifecycle path |
+| transport-only wrappers, request IDs, tracing hooks, and access logging | [Middleware Primer](/docs/modules/middleware) | `middleware` keeps ordering-sensitive HTTP behavior narrow and explicit |
+| storage contracts, file abstractions, cache primitives, and idempotency contracts | [Store Primer](/docs/modules/store) | `store` defines the stable persistence layer before topology-heavy data concerns begin |
+| reusable CRUD transport and resource route standardization | [x/rest Primer](/docs/modules/x-rest) | `x/rest` is the extension-family entrypoint for shared resource-interface behavior |
+| app-facing queue, pubsub, scheduler, or webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | `x/messaging` is the family-level discovery entry before narrower siblings |
+
 ## What this page should help you avoid
 
 The current repo actively discourages broad or ambiguous roots such as `ai`, `tenant`, `rest`, `pubsub`, `frontend`, `utils`, or `validator` at the top level. If the name sounds like a feature catalog or a vague bucket, it is probably the wrong place to begin.
@@ -58,5 +70,7 @@ The current repo actively discourages broad or ambiguous roots such as `ai`, `te
 
 - [Stable Roots](/docs/stable-roots)
 - [x/* Family](/docs/x-family)
-- [Release Posture](/docs/release-posture)
+- [Core Primer](/docs/modules/core)
+- [x/rest Primer](/docs/modules/x-rest)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
+

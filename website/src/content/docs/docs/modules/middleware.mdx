@@ -1,0 +1,51 @@
+---
+title: Middleware Primer
+description: Read this when the change is really about transport-only HTTP wrappers and ordering-sensitive behavior.
+translationKey: modules-middleware
+sidebar:
+  order: 2
+---
+
+# Middleware Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the stable surface, but the real question has narrowed to transport-only HTTP middleware.
+
+`middleware` owns request/response wrappers, ordering-sensitive transport behavior, and request instrumentation that stays independent from business policy.
+
+## Start here when
+
+- you are adding or adjusting `func(http.Handler) http.Handler` behavior
+- the work is about ordering-sensitive HTTP transport concerns
+- the change instruments requests without owning tenant or product policy
+
+## Do not start here when
+
+- the behavior is business validation, tenant resolution, or tenant quota policy
+- the task is API version negotiation or protocol transformation
+- the work is really app construction rather than a transport wrapper
+
+## First files to read in the current repository
+
+1. `middleware/module.yaml`
+2. `docs/CANONICAL_STYLE_GUIDE.md`
+3. the target package under `middleware/*`
+
+## Concrete ownership examples
+
+| Keep it in `middleware` when the work is about | Move out when the work becomes |
+| --- | --- |
+| request IDs, tracing hooks, access logging, and HTTP metrics | broader observability adapter and export wiring in `x/observability` |
+| auth and security-header HTTP adapters on top of `security/*` primitives | tenant policy and tenant resolution in `x/tenant` |
+| thin rate-limit adapters over stable abuse-guard primitives | feature catalogs of limiter implementations or capability-specific quota behavior |
+| explicit constructor-based HTTP wrappers | API version negotiation in `x/rest/versioning` or protocol adaptation in `x/gateway/*` |
+
+## Why this primer exists
+
+`middleware` is easy to overgrow because many behaviors happen in the request path. The current repository keeps the line narrow on purpose: if the behavior is no longer transport-only, the stable middleware layer is already the wrong place.
+
+## Read next
+
+- [Store Primer](/docs/modules/store)
+- [x/rest Primer](/docs/modules/x-rest)
+- [x/messaging Primer](/docs/modules/x-messaging)
+

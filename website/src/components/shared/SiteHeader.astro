@@ -51,9 +51,11 @@ const isCurrent = (href: string) => {
     })}
   </nav>
   <div class="site-header__tools" data-tools-root={variant}>
-    <a class="site-header__docs-cta" href={docsHref} aria-current={isCurrent(docsHref) ? 'page' : undefined}>
-      {locale === 'zh' ? '文档' : 'Docs'}
-    </a>
+    {variant !== 'docs' && (
+      <a class="site-header__docs-cta" href={docsHref} aria-current={isCurrent(docsHref) ? 'page' : undefined}>
+        {locale === 'zh' ? '文档' : 'Docs'}
+      </a>
+    )}
     <ThemeSelect />
     <LanguageSelect />
   </div>

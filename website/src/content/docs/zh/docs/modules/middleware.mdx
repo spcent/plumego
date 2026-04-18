@@ -1,0 +1,51 @@
+---
+title: Middleware Primer
+description: 当改动真正围绕 transport-only HTTP wrapper 与顺序敏感行为时，先读这里。
+translationKey: modules-middleware
+sidebar:
+  order: 2
+---
+
+# Middleware Primer
+
+当你已经通过 [稳定根](/zh/docs/stable-roots) 确认改动仍属于稳定表面，但问题进一步收窄到 transport-only HTTP middleware 时，就打开这一页。
+
+`middleware` 拥有 request/response wrapper、顺序敏感的 transport 行为，以及那些仍然独立于业务策略的请求观测行为。
+
+## 什么时候从这里开始
+
+- 你正在新增或调整 `func(http.Handler) http.Handler` 形态的行为
+- 工作围绕顺序敏感的 HTTP transport concern
+- 改动是在做请求观测，但不拥有 tenant 或产品策略
+
+## 什么时候不该从这里开始
+
+- 行为已经变成业务校验、tenant resolution 或 tenant quota policy
+- 任务真正是 API version negotiation 或协议转换
+- 工作本质上是应用构造，而不是 transport wrapper
+
+## 当前仓库里先读哪些文件
+
+1. `middleware/module.yaml`
+2. `docs/CANONICAL_STYLE_GUIDE.md`
+3. `middleware/*` 下的目标包
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `middleware` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| request ID、tracing hook、access logging 与 HTTP metrics | `x/observability` 中更高层的 observability adapter 与 export wiring |
+| 建立在 `security/*` 原语之上的 auth 与 security-header HTTP adapter | `x/tenant` 中的 tenant policy 与 tenant resolution |
+| 建立在稳定 abuse-guard 原语之上的薄 rate-limit adapter | limiter implementation catalog 或能力特定 quota 行为 |
+| 基于显式 constructor 的 HTTP wrapper | `x/rest/versioning` 中的 API version negotiation，或 `x/gateway/*` 中的协议适配 |
+
+## 为什么单独写这一页
+
+`middleware` 很容易因为“都发生在请求路径上”而被越写越胖。当前仓库刻意把这条线压得很窄：只要行为不再是 transport-only，稳定 middleware 层就已经不是正确归属。
+
+## 下一步阅读
+
+- [Store Primer](/zh/docs/modules/store)
+- [x/rest Primer](/zh/docs/modules/x-rest)
+- [x/messaging Primer](/zh/docs/modules/x-messaging)
+
