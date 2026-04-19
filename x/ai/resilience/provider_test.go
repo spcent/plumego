@@ -73,7 +73,7 @@ func TestResilientProvider_RateLimit(t *testing.T) {
 		CircuitBreaker: cb,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req := &provider.CompletionRequest{
 		Model: "test-model",
 		Messages: []provider.Message{
@@ -113,7 +113,7 @@ func TestResilientProvider_CircuitBreaker(t *testing.T) {
 		CircuitBreaker: cb,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req := &provider.CompletionRequest{
 		Model: "test-model",
 		Messages: []provider.Message{
@@ -157,7 +157,7 @@ func TestResilientProvider_Combined(t *testing.T) {
 		CircuitBreaker: cb,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req := &provider.CompletionRequest{
 		Model: "test-model",
 		Messages: []provider.Message{
@@ -198,7 +198,7 @@ func TestResilientProvider_NoRateLimiter(t *testing.T) {
 		CircuitBreaker: cb,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req := &provider.CompletionRequest{
 		Model: "test-model",
 		Messages: []provider.Message{
@@ -224,7 +224,7 @@ func TestResilientProvider_NoCircuitBreaker(t *testing.T) {
 		RateLimiter: limiter,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req := &provider.CompletionRequest{
 		Model: "test-model",
 		Messages: []provider.Message{
@@ -257,7 +257,7 @@ func TestResilientProvider_CompleteStream(t *testing.T) {
 		CircuitBreaker: cb,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	req := &provider.CompletionRequest{
 		Model: "test-model",
 		Messages: []provider.Message{
@@ -289,7 +289,7 @@ func TestResilientProvider_ListModels(t *testing.T) {
 		CircuitBreaker: cb,
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	models, err := resilient.ListModels(ctx)
 
 	if err != nil {

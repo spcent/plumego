@@ -11,12 +11,12 @@ import (
 
 const methodAny = "ANY"
 
-// Configuration defaults
+// Configuration defaults (unexported; callers configure via RouterOption).
 const (
-	DefaultCacheCapacity = 100 // Default route cache capacity
-	DefaultMaxParams     = 8   // Default maximum parameters per route
-	DefaultPoolSliceCap  = 4   // Default capacity for pooled slices
-	DefaultPathPartsCap  = 8   // Default capacity for path parts slices
+	defaultCacheCapacity = 100
+	defaultMaxParams     = 8
+	defaultPoolSliceCap  = 4
+	defaultPathPartsCap  = 8
 )
 
 // segment represents a path segment with type information.
@@ -124,7 +124,7 @@ func NewRouter(opts ...RouterOption) *Router {
 			routes:      make(map[string][]route),
 			routeMeta:   make(map[string]map[string]RouteMeta),
 			namedRoutes: make(map[string]*NamedRoute),
-			matchCache:  newMatchCache(DefaultCacheCapacity),
+			matchCache:  newMatchCache(defaultCacheCapacity),
 		},
 	}
 

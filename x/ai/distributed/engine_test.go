@@ -1,7 +1,6 @@
 package distributed
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 )
 
 func TestDistributedEngine_ExecuteAsync(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Setup
 	broker := mq.NewInProcBroker(pubsub.New())
@@ -69,7 +68,7 @@ func TestDistributedEngine_ExecuteAsync(t *testing.T) {
 }
 
 func TestDistributedEngine_ExecuteSync(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Setup
 	broker := mq.NewInProcBroker(pubsub.New())
@@ -107,7 +106,7 @@ func TestDistributedEngine_ExecuteSync(t *testing.T) {
 }
 
 func TestDistributedEngine_GetExecutionStatus(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Setup
 	broker := mq.NewInProcBroker(pubsub.New())
@@ -159,7 +158,7 @@ func TestDistributedEngine_GetExecutionStatus(t *testing.T) {
 }
 
 func TestDistributedEngine_Pause(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Setup
 	broker := mq.NewInProcBroker(pubsub.New())
@@ -256,7 +255,7 @@ func TestDefaultConfigs_Engine(t *testing.T) {
 }
 
 func TestDistributedEngine_Close(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()

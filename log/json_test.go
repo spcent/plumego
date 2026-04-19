@@ -164,7 +164,7 @@ func TestJSONFormatLoggerInfoCtxDoesNotAutoAttachTransportFields(t *testing.T) {
 		RespectVerbosity: true,
 	})
 
-	logger.InfoCtx(context.Background(), "test message", Fields{"key": "value"})
+	logger.InfoCtx(t.Context(), "test message", Fields{"key": "value"})
 
 	var entry map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -223,7 +223,7 @@ func TestJSONFormatLoggerContextLevels(t *testing.T) {
 				Level:  DEBUG,
 			})
 
-			tt.logFunc(logger, context.Background())
+			tt.logFunc(logger, t.Context())
 
 			var entry map[string]any
 			if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -353,7 +353,7 @@ func TestJSONFormatLoggerReservedFieldsCannotOverrideCoreKeys(t *testing.T) {
 		},
 	})
 
-	logger.InfoCtx(context.Background(), "actual message", Fields{
+	logger.InfoCtx(t.Context(), "actual message", Fields{
 		"level":      "SHOULD_NOT_APPLY",
 		"msg":        "SHOULD_NOT_APPLY",
 		"time":       "SHOULD_NOT_APPLY",

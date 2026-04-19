@@ -36,7 +36,7 @@ func newRequestManager(ps *InProcBroker) (*requestManager, error) {
 		done:       make(chan struct{}),
 	}
 
-	sub, err := ps.Subscribe(rm.replyTopic, SubOptions{
+	sub, err := ps.Subscribe(context.Background(), rm.replyTopic, SubOptions{
 		BufferSize: 256,
 		Policy:     DropNewest,
 	})

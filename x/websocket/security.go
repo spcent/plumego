@@ -55,21 +55,11 @@ type SecurityConfig struct {
 }
 
 // SecurityMetrics tracks security-related metrics for a SecureRoomAuth instance.
-//
-// Note: InvalidWebSocketKeys, BroadcastQueueFull, and RejectedConnections are
-// no longer tracked here. Equivalent per-hub counters are available via
-// Hub.Metrics() (InvalidWSKeys, BroadcastDropped, SecurityRejections).
 type SecurityMetrics struct {
 	// InvalidJWTSecrets counts JWT verifications that failed.
 	InvalidJWTSecrets uint64 `json:"invalid_jwt_secrets"`
 	// WeakRoomPasswords counts rejected weak passwords.
 	WeakRoomPasswords uint64 `json:"weak_room_passwords"`
-	// InvalidWebSocketKeys is no longer tracked. Use Hub.Metrics().InvalidWSKeys instead.
-	InvalidWebSocketKeys uint64 `json:"invalid_websocket_keys"`
-	// BroadcastQueueFull is no longer tracked. Use Hub.Metrics().BroadcastDropped instead.
-	BroadcastQueueFull uint64 `json:"broadcast_queue_full"`
-	// RejectedConnections is no longer tracked. Use Hub.Metrics().SecurityRejections instead.
-	RejectedConnections uint64 `json:"rejected_connections"`
 	// SuccessfulAuthentications counts successful JWT verifications.
 	SuccessfulAuthentications uint64 `json:"successful_authentications"`
 }

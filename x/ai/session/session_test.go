@@ -1,7 +1,6 @@
 package session
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -21,7 +20,7 @@ func TestManager_Create(t *testing.T) {
 		Model:    "claude-3-opus",
 	}
 
-	session, err := manager.Create(context.Background(), opts)
+	session, err := manager.Create(t.Context(), opts)
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
@@ -44,7 +43,7 @@ func TestManager_Get(t *testing.T) {
 	manager := NewManager(storage)
 
 	// Create session
-	created, err := manager.Create(context.Background(), CreateOptions{
+	created, err := manager.Create(t.Context(), CreateOptions{
 		TenantID: "tenant-1",
 	})
 	if err != nil {
@@ -52,7 +51,7 @@ func TestManager_Get(t *testing.T) {
 	}
 
 	// Get session
-	retrieved, err := manager.Get(context.Background(), created.ID)
+	retrieved, err := manager.Get(t.Context(), created.ID)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
@@ -66,7 +65,7 @@ func TestManager_Get_NotFound(t *testing.T) {
 	storage := NewMemoryStorage()
 	manager := NewManager(storage)
 
-	_, err := manager.Get(context.Background(), "nonexistent")
+	_, err := manager.Get(t.Context(), "nonexistent")
 	if err == nil {
 		t.Error("Get() should return error for nonexistent session")
 	}
@@ -77,7 +76,7 @@ func TestManager_Get_Expired(t *testing.T) {
 	manager := NewManager(storage)
 
 	// Create session with very short TTL
-	session, err := manager.Create(context.Background(), CreateOptions{
+	session, err := manager.Create(t.Context(), CreateOptions{
 		TenantID: "tenant-1",
 		TTL:      1 * time.Millisecond,
 	})
@@ -89,7 +88,7 @@ func TestManager_Get_Expired(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Try to get expired session
-	_, err = manager.Get(context.Background(), session.ID)
+	_, err = manager.Get(t.Context(), session.ID)
 	if err == nil {
 		t.Error("Get() should return error for expired session")
 	}
@@ -99,7 +98,7 @@ func TestManager_AppendMessage(t *testing.T) {
 	storage := NewMemoryStorage()
 	manager := NewManager(storage, WithTokenizer(tokenizer.NewSimpleTokenizer("test")))
 
-	session, err := manager.Create(context.Background(), CreateOptions{
+	session, err := manager.Create(t.Context(), CreateOptions{
 		TenantID: "tenant-1",
 	})
 	if err != nil {
@@ -108,12 +107,12 @@ func TestManager_AppendMessage(t *testing.T) {
 
 	// Append message
 	msg := provider.NewTextMessage(provider.RoleUser, "Hello, world!")
-	if err := manager.AppendMessage(context.Background(), session.ID, msg); err != nil {
+	if err := manager.AppendMessage(t.Context(), session.ID, msg); err != nil {
 		t.Fatalf("AppendMessage() error = %v", err)
 	}
 
 	// Verify message was added
-	updated, err := manager.Get(context.Background(), session.ID)
+	updated, err := manager.Get(t.Context(), session.ID)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
@@ -136,21 +135,21 @@ func TestManager_AppendMessage_MessageLimitExceeded(t *testing.T) {
 		AutoTrim:    false,
 	}))
 
-	session, err := manager.Create(context.Background(), CreateOptions{})
+	session, err := manager.Create(t.Context(), CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 
-	if err := manager.AppendMessage(context.Background(), session.ID, provider.NewTextMessage(provider.RoleUser, "first")); err != nil {
+	if err := manager.AppendMessage(t.Context(), session.ID, provider.NewTextMessage(provider.RoleUser, "first")); err != nil {
 		t.Fatalf("AppendMessage(first) error = %v", err)
 	}
 
-	err = manager.AppendMessage(context.Background(), session.ID, provider.NewTextMessage(provider.RoleUser, "second"))
+	err = manager.AppendMessage(t.Context(), session.ID, provider.NewTextMessage(provider.RoleUser, "second"))
 	if err == nil {
 		t.Fatal("AppendMessage(second) should fail when message limit is exceeded")
 	}
 
-	updated, err := manager.Get(context.Background(), session.ID)
+	updated, err := manager.Get(t.Context(), session.ID)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
@@ -166,7 +165,7 @@ func TestManager_GetMessages(t *testing.T) {
 	storage := NewMemoryStorage()
 	manager := NewManager(storage)
 
-	session, err := manager.Create(context.Background(), CreateOptions{})
+	session, err := manager.Create(t.Context(), CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
@@ -175,13 +174,13 @@ func TestManager_GetMessages(t *testing.T) {
 	messages := []string{"Message 1", "Message 2", "Message 3", "Message 4", "Message 5"}
 	for _, text := range messages {
 		msg := provider.NewTextMessage(provider.RoleUser, text)
-		if err := manager.AppendMessage(context.Background(), session.ID, msg); err != nil {
+		if err := manager.AppendMessage(t.Context(), session.ID, msg); err != nil {
 			t.Fatalf("AppendMessage() error = %v", err)
 		}
 	}
 
 	// Get messages with pagination
-	retrieved, err := manager.GetMessages(context.Background(), session.ID, 1, 3)
+	retrieved, err := manager.GetMessages(t.Context(), session.ID, 1, 3)
 	if err != nil {
 		t.Fatalf("GetMessages() error = %v", err)
 	}
@@ -199,7 +198,7 @@ func TestManager_GetActiveContext(t *testing.T) {
 	storage := NewMemoryStorage()
 	manager := NewManager(storage, WithTokenizer(tokenizer.NewSimpleTokenizer("test")))
 
-	session, err := manager.Create(context.Background(), CreateOptions{})
+	session, err := manager.Create(t.Context(), CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
@@ -207,13 +206,13 @@ func TestManager_GetActiveContext(t *testing.T) {
 	// Add messages
 	for i := 0; i < 10; i++ {
 		msg := provider.NewTextMessage(provider.RoleUser, "This is a test message")
-		if err := manager.AppendMessage(context.Background(), session.ID, msg); err != nil {
+		if err := manager.AppendMessage(t.Context(), session.ID, msg); err != nil {
 			t.Fatalf("AppendMessage() error = %v", err)
 		}
 	}
 
 	// Get active context with token limit
-	active, err := manager.GetActiveContext(context.Background(), session.ID, 50)
+	active, err := manager.GetActiveContext(t.Context(), session.ID, 50)
 	if err != nil {
 		t.Fatalf("GetActiveContext() error = %v", err)
 	}
@@ -228,18 +227,18 @@ func TestManager_SetContext(t *testing.T) {
 	storage := NewMemoryStorage()
 	manager := NewManager(storage)
 
-	session, err := manager.Create(context.Background(), CreateOptions{})
+	session, err := manager.Create(t.Context(), CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 
 	// Set context
-	if err := manager.SetContext(context.Background(), session.ID, "key1", "value1"); err != nil {
+	if err := manager.SetContext(t.Context(), session.ID, "key1", "value1"); err != nil {
 		t.Fatalf("SetContext() error = %v", err)
 	}
 
 	// Get context
-	value, err := manager.GetContext(context.Background(), session.ID, "key1")
+	value, err := manager.GetContext(t.Context(), session.ID, "key1")
 	if err != nil {
 		t.Fatalf("GetContext() error = %v", err)
 	}
@@ -253,12 +252,12 @@ func TestManager_GetContext_NotFound(t *testing.T) {
 	storage := NewMemoryStorage()
 	manager := NewManager(storage)
 
-	session, err := manager.Create(context.Background(), CreateOptions{})
+	session, err := manager.Create(t.Context(), CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 
-	if _, err := manager.GetContext(context.Background(), session.ID, "missing"); err == nil {
+	if _, err := manager.GetContext(t.Context(), session.ID, "missing"); err == nil {
 		t.Fatal("GetContext() should return error for missing key")
 	}
 }
@@ -267,18 +266,18 @@ func TestManager_Delete(t *testing.T) {
 	storage := NewMemoryStorage()
 	manager := NewManager(storage)
 
-	session, err := manager.Create(context.Background(), CreateOptions{})
+	session, err := manager.Create(t.Context(), CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 
 	// Delete session
-	if err := manager.Delete(context.Background(), session.ID); err != nil {
+	if err := manager.Delete(t.Context(), session.ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
 	// Verify deletion
-	_, err = manager.Get(context.Background(), session.ID)
+	_, err = manager.Get(t.Context(), session.ID)
 	if err == nil {
 		t.Error("Get() should return error for deleted session")
 	}
@@ -299,12 +298,12 @@ func TestMemoryStorage(t *testing.T) {
 	}
 
 	// Save
-	if err := storage.Save(context.Background(), session); err != nil {
+	if err := storage.Save(t.Context(), session); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 
 	// Load
-	loaded, err := storage.Load(context.Background(), "test-1")
+	loaded, err := storage.Load(t.Context(), "test-1")
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -314,12 +313,12 @@ func TestMemoryStorage(t *testing.T) {
 	}
 
 	// Delete
-	if err := storage.Delete(context.Background(), "test-1"); err != nil {
+	if err := storage.Delete(t.Context(), "test-1"); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
 	// Verify deletion
-	_, err = storage.Load(context.Background(), "test-1")
+	_, err = storage.Load(t.Context(), "test-1")
 	if err == nil {
 		t.Error("Load() should return error for deleted session")
 	}
@@ -335,7 +334,7 @@ func TestMemoryStorage_Count(t *testing.T) {
 	// Add sessions
 	for i := 0; i < 5; i++ {
 		session := &Session{ID: fmt.Sprintf("sess-%d", i)}
-		storage.Save(context.Background(), session)
+		storage.Save(t.Context(), session)
 	}
 
 	if count := storage.Count(); count != 5 {

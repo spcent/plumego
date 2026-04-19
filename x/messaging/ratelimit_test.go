@@ -8,7 +8,7 @@ import (
 
 func TestRateLimiter_AllowsBurst(t *testing.T) {
 	rl := NewRateLimiter(5, time.Second)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < 5; i++ {
 		if err := rl.Wait(ctx); err != nil {
@@ -19,11 +19,11 @@ func TestRateLimiter_AllowsBurst(t *testing.T) {
 
 func TestRateLimiter_ContextCancel(t *testing.T) {
 	rl := NewRateLimiter(1, time.Second)
-	ctx := context.Background()
+	ctx := t.Context()
 	// Drain the bucket.
 	rl.Wait(ctx)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 
 	err := rl.Wait(ctx)
@@ -36,7 +36,7 @@ func TestRateLimitedSMSProvider(t *testing.T) {
 	inner := &mockSMS{}
 	provider := NewRateLimitedSMSProvider(inner, 100)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	result, err := provider.Send(ctx, SMSMessage{To: "+1234567890", Body: "hi"})
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestRateLimitedEmailProvider(t *testing.T) {
 	inner := &mockEmail{}
 	provider := NewRateLimitedEmailProvider(inner, 100)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	result, err := provider.Send(ctx, EmailMessage{To: "a@b.com", Subject: "s", Body: "b"})
 	if err != nil {
 		t.Fatal(err)

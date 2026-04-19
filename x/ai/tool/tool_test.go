@@ -68,7 +68,7 @@ func TestRegistry_Execute(t *testing.T) {
 		"message": "Hello, World!",
 	}
 
-	result, err := registry.Execute(context.Background(), "echo", input)
+	result, err := registry.Execute(t.Context(), "echo", input)
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -101,7 +101,7 @@ func TestRegistry_ExecuteToolUse(t *testing.T) {
 		},
 	}
 
-	result, err := registry.ExecuteToolUse(context.Background(), toolUse)
+	result, err := registry.ExecuteToolUse(t.Context(), toolUse)
 	if err != nil {
 		t.Fatalf("ExecuteToolUse() error = %v", err)
 	}
@@ -121,7 +121,7 @@ func TestRegistry_ToProviderTools(t *testing.T) {
 	registry.Register(NewEchoTool())
 	registry.Register(NewCalculatorTool())
 
-	tools := registry.ToProviderTools(context.Background())
+	tools := registry.ToProviderTools(t.Context())
 
 	if len(tools) != 2 {
 		t.Errorf("Tool count = %v, want 2", len(tools))
@@ -148,7 +148,7 @@ func TestRegistry_ListForContext(t *testing.T) {
 	registry.Register(NewEchoTool())
 	registry.Register(NewCalculatorTool())
 
-	tools := registry.ListForContext(context.Background())
+	tools := registry.ListForContext(t.Context())
 	if len(tools) != 1 {
 		t.Fatalf("ListForContext() count = %d, want 1", len(tools))
 	}
@@ -160,23 +160,23 @@ func TestRegistry_ListForContext(t *testing.T) {
 func TestAllowListPolicy(t *testing.T) {
 	policy := NewAllowListPolicy([]string{"echo", "calculator"})
 
-	if !policy.CanExecute(context.Background(), "echo") {
+	if !policy.CanExecute(t.Context(), "echo") {
 		t.Error("CanExecute() should allow 'echo'")
 	}
 
-	if policy.CanExecute(context.Background(), "bash") {
+	if policy.CanExecute(t.Context(), "bash") {
 		t.Error("CanExecute() should not allow 'bash'")
 	}
 
 	// Add tool
 	policy.Add("bash")
-	if !policy.CanExecute(context.Background(), "bash") {
+	if !policy.CanExecute(t.Context(), "bash") {
 		t.Error("CanExecute() should allow 'bash' after Add()")
 	}
 
 	// Remove tool
 	policy.Remove("bash")
-	if policy.CanExecute(context.Background(), "bash") {
+	if policy.CanExecute(t.Context(), "bash") {
 		t.Error("CanExecute() should not allow 'bash' after Remove()")
 	}
 }
@@ -189,7 +189,7 @@ func TestRegistry_WithPolicy(t *testing.T) {
 	registry.Register(NewCalculatorTool())
 
 	// Echo should work
-	_, err := registry.Execute(context.Background(), "echo", map[string]any{
+	_, err := registry.Execute(t.Context(), "echo", map[string]any{
 		"message": "test",
 	})
 	if err != nil {
@@ -197,7 +197,7 @@ func TestRegistry_WithPolicy(t *testing.T) {
 	}
 
 	// Calculator should be blocked
-	_, err = registry.Execute(context.Background(), "calculator", map[string]any{
+	_, err = registry.Execute(t.Context(), "calculator", map[string]any{
 		"operation": "add",
 		"a":         1.0,
 		"b":         2.0,
@@ -216,7 +216,7 @@ func TestRegistry_Execute_ErrorResultIncludesMetrics(t *testing.T) {
 		t.Fatalf("Register() error = %v", err)
 	}
 
-	result, err := registry.Execute(context.Background(), "fail", map[string]any{})
+	result, err := registry.Execute(t.Context(), "fail", map[string]any{})
 	if err == nil {
 		t.Fatal("Execute() should return tool error")
 	}
@@ -241,7 +241,7 @@ func TestEchoTool(t *testing.T) {
 		t.Errorf("Name() = %v, want echo", tool.Name())
 	}
 
-	result, err := tool.Execute(context.Background(), map[string]any{
+	result, err := tool.Execute(t.Context(), map[string]any{
 		"message": "test",
 	})
 	if err != nil {
@@ -311,7 +311,7 @@ func TestCalculatorTool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := tool.Execute(context.Background(), tt.input)
+			result, err := tool.Execute(t.Context(), tt.input)
 
 			if tt.wantError {
 				if err == nil {
@@ -339,7 +339,7 @@ func TestCalculatorTool(t *testing.T) {
 func TestTimestampTool(t *testing.T) {
 	tool := NewTimestampTool()
 
-	result, err := tool.Execute(context.Background(), map[string]any{})
+	result, err := tool.Execute(t.Context(), map[string]any{})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}

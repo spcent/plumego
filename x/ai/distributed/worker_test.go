@@ -58,7 +58,7 @@ func (m *mockProvider) Name() string {
 }
 
 func TestWorker_StartStop(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
@@ -119,7 +119,7 @@ func TestWorker_StartStop(t *testing.T) {
 }
 
 func TestStepExecutor(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	engine := orchestration.NewEngine()
 	executor := NewStepExecutor(engine)
 
@@ -194,7 +194,7 @@ func TestStepExecutor(t *testing.T) {
 }
 
 func TestWorkerPool(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
@@ -337,7 +337,7 @@ func TestDefaultConfigs(t *testing.T) {
 }
 
 func TestWorker_HandleTask(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 

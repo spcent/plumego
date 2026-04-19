@@ -204,7 +204,7 @@ func (rs *ReplayStore) startCapturing() error {
 				BufferSize: 1000,
 			})
 		} else {
-			sub, err = rs.ps.Subscribe(topic, SubOptions{
+			sub, err = rs.ps.Subscribe(context.Background(), topic, SubOptions{
 				BufferSize: 1000,
 			})
 		}

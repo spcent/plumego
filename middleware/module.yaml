@@ -78,3 +78,4 @@ agent_hints:
   - Tenant middleware belongs in x/tenant; route API version negotiation to x/rest/versioning and resource or protocol transformation to x/gateway/*
   - Each subpackage should expose one canonical constructor path and remain a thin http.Handler adapter over explicit dependencies
   - Move stateful policy and observability catch-all behavior out of middleware; rate limiting should stay a thin HTTP adapter over security or abuse primitives
+  - Constructor naming convention: stateless middleware uses `Middleware(config T) middleware.Middleware`; stateful middleware uses `New(config T) *Type` with a `(t *Type) Middleware()` method; every Config struct should provide a `WithDefaults()` or `Default()` function; file named after the package (auth.go not contract.go)

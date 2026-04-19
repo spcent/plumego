@@ -1,7 +1,6 @@
 package leaderboard
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -267,7 +266,7 @@ func TestLeaderboardCacheBasicOperations(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test ZAdd
 	err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100.0})
@@ -315,7 +314,7 @@ func TestLeaderboardCacheZIncrBy(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Increment non-existent member (should create with delta)
 	score, err := lbc.ZIncrBy(ctx, "game:scores", "player1", 10.0)
@@ -352,7 +351,7 @@ func TestLeaderboardCacheZRange(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add multiple members
 	members := []*ZMember{
@@ -408,7 +407,7 @@ func TestLeaderboardCacheZRangeByScore(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add multiple members
 	members := []*ZMember{
@@ -448,7 +447,7 @@ func TestLeaderboardCacheZRank(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add multiple members
 	members := []*ZMember{
@@ -493,7 +492,7 @@ func TestLeaderboardCacheZCount(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add multiple members
 	members := []*ZMember{
@@ -535,7 +534,7 @@ func TestLeaderboardCacheZRemRange(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add multiple members
 	members := []*ZMember{
@@ -587,7 +586,7 @@ func TestLeaderboardCacheZRemRangeByScore(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add multiple members
 	members := []*ZMember{
@@ -639,7 +638,7 @@ func TestLeaderboardCacheClear(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := lbc.Set(ctx, "plain:key", []byte("value"), time.Minute); err != nil {
 		t.Fatalf("Set failed: %v", err)
@@ -678,7 +677,7 @@ func TestLeaderboardCacheTTL(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add member
 	err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100.0})
@@ -703,7 +702,7 @@ func TestLeaderboardCacheInvalidScore(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test NaN
 	err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: math.NaN()})
@@ -732,7 +731,7 @@ func TestLeaderboardCacheMemberLimit(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add up to limit
 	var err error
@@ -760,7 +759,7 @@ func TestLeaderboardCacheConcurrency(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	const numGoroutines = 100
 	const numOpsPerGoroutine = 100
 
@@ -818,7 +817,7 @@ func TestLeaderboardCacheMetrics(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Perform operations
 	_ = lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100.0})
@@ -854,7 +853,7 @@ func TestLeaderboardCacheUpdateScore(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add initial score
 	err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100.0})

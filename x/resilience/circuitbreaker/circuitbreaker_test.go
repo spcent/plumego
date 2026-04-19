@@ -400,7 +400,7 @@ func TestHalfOpenMaxRequests(t *testing.T) {
 func TestCallWithContextCancelled(t *testing.T) {
 	cb, _ := newTestCB(Config{})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := cb.CallWithContext(ctx, func() error { return nil })
@@ -412,7 +412,7 @@ func TestCallWithContextCancelled(t *testing.T) {
 func TestCallWithContextSuccess(t *testing.T) {
 	cb, _ := newTestCB(Config{})
 
-	err := cb.CallWithContext(context.Background(), func() error { return nil })
+	err := cb.CallWithContext(t.Context(), func() error { return nil })
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

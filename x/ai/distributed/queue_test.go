@@ -14,7 +14,7 @@ import (
 )
 
 func TestMQTaskQueue_Enqueue(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
@@ -67,7 +67,7 @@ func TestMQTaskQueue_Enqueue(t *testing.T) {
 }
 
 func TestMQTaskQueue_Subscribe(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	broker := mq.NewInProcBroker(pubsub.New())
@@ -148,7 +148,7 @@ func TestMQTaskQueue_Subscribe(t *testing.T) {
 }
 
 func TestMQTaskQueue_TaskStatus(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	broker := mq.NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
@@ -185,7 +185,7 @@ func TestMQTaskQueue_TaskStatus(t *testing.T) {
 }
 
 func TestMQTaskQueue_Results(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	broker := mq.NewInProcBroker(pubsub.New())

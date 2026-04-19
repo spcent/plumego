@@ -398,7 +398,7 @@ func TestPersistentPubSub_SubscribeAndRestore(t *testing.T) {
 	}
 
 	// Subscribe
-	sub, err := pps1.Subscribe("test.channel", SubOptions{BufferSize: 10})
+	sub, err := pps1.Subscribe(t.Context(), "test.channel", SubOptions{BufferSize: 10})
 	if err != nil {
 		t.Fatalf("Failed to subscribe: %v", err)
 	}
@@ -413,7 +413,7 @@ func TestPersistentPubSub_SubscribeAndRestore(t *testing.T) {
 	}()
 
 	received := 0
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer cancel()
 
 	for {

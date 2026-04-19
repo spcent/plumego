@@ -17,14 +17,14 @@ func TestInProcBrokerPublishSubscribe(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	sub, err := broker.Subscribe(context.Background(), "topic", SubOptions{BufferSize: 1})
+	sub, err := broker.Subscribe(t.Context(), "topic", SubOptions{BufferSize: 1})
 	if err != nil {
 		t.Fatalf("subscribe error: %v", err)
 	}
 	defer sub.Cancel()
 
 	msg := Message{ID: "1", Data: "payload"}
-	if err := broker.Publish(context.Background(), "topic", msg); err != nil {
+	if err := broker.Publish(t.Context(), "topic", msg); err != nil {
 		t.Fatalf("publish error: %v", err)
 	}
 
@@ -45,7 +45,7 @@ func TestInProcBrokerContextCancel(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	if err := broker.Publish(ctx, "topic", Message{}); err == nil {
@@ -62,7 +62,7 @@ func TestInProcBrokerPanicRecovery(t *testing.T) {
 		}
 	}))
 
-	err := broker.Publish(context.Background(), "topic", Message{ID: "test-1"})
+	err := broker.Publish(t.Context(), "topic", Message{ID: "test-1"})
 	if !errors.Is(err, ErrRecoveredPanic) {
 		t.Fatalf("expected ErrRecoveredPanic, got %v", err)
 	}
@@ -78,7 +78,7 @@ func TestInProcBrokerMetrics(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithMetricsObserver(collector))
 	defer broker.Close()
 
-	if err := broker.Publish(context.Background(), "topic", Message{ID: "test-1"}); err != nil {
+	if err := broker.Publish(t.Context(), "topic", Message{ID: "test-1"}); err != nil {
 		t.Fatalf("unexpected publish error: %v", err)
 	}
 
@@ -103,26 +103,26 @@ func TestInProcBrokerValidation(t *testing.T) {
 	defer broker.Close()
 
 	// Test empty topic
-	err := broker.Publish(context.Background(), "  ", Message{ID: "test-1"})
+	err := broker.Publish(t.Context(), "  ", Message{ID: "test-1"})
 	if !errors.Is(err, ErrInvalidTopic) {
 		t.Fatalf("expected ErrInvalidTopic for empty topic, got %v", err)
 	}
 
 	// Test invalid message (missing ID)
-	err = broker.Publish(context.Background(), "topic", Message{})
+	err = broker.Publish(t.Context(), "topic", Message{})
 	if !errors.Is(err, ErrNilMessage) {
 		t.Fatalf("expected ErrNilMessage for missing ID, got %v", err)
 	}
 
 	// Test nil broker
 	var nilBroker *InProcBroker
-	err = nilBroker.Publish(context.Background(), "topic", Message{ID: "test-1"})
+	err = nilBroker.Publish(t.Context(), "topic", Message{ID: "test-1"})
 	if !errors.Is(err, ErrNotInitialized) {
 		t.Fatalf("expected ErrNotInitialized for nil broker, got %v", err)
 	}
 
 	// Test empty topic for subscribe
-	_, err = broker.Subscribe(context.Background(), "  ", SubOptions{})
+	_, err = broker.Subscribe(t.Context(), "  ", SubOptions{})
 	if !errors.Is(err, ErrInvalidTopic) {
 		t.Fatalf("expected ErrInvalidTopic for empty topic in subscribe, got %v", err)
 	}
@@ -133,7 +133,7 @@ func TestInProcBrokerConcurrent(t *testing.T) {
 	defer broker.Close()
 
 	// Subscribe with larger buffer
-	sub, err := broker.Subscribe(context.Background(), "topic", SubOptions{BufferSize: 1000})
+	sub, err := broker.Subscribe(t.Context(), "topic", SubOptions{BufferSize: 1000})
 	if err != nil {
 		t.Fatalf("subscribe error: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestInProcBrokerConcurrent(t *testing.T) {
 					ID:   fmt.Sprintf("msg-%d-%d", id, j),
 					Data: fmt.Sprintf("data-%d-%d", id, j),
 				}
-				if err := broker.Publish(context.Background(), "topic", msg); err != nil {
+				if err := broker.Publish(t.Context(), "topic", msg); err != nil {
 					t.Errorf("publish error: %v", err)
 					return
 				}
@@ -207,7 +207,7 @@ func TestInProcBrokerLongTopic(t *testing.T) {
 	// Create a topic longer than 1024 characters
 	longTopic := strings.Repeat("a", 1025)
 
-	err := broker.Publish(context.Background(), longTopic, Message{ID: "test-1"})
+	err := broker.Publish(t.Context(), longTopic, Message{ID: "test-1"})
 	if !errors.Is(err, ErrInvalidTopic) {
 		t.Fatalf("expected ErrInvalidTopic for long topic, got %v", err)
 	}
@@ -218,14 +218,14 @@ func TestInProcBrokerHealthCheck(t *testing.T) {
 	defer broker.Close()
 
 	// Subscribe to a topic
-	sub, err := broker.Subscribe(context.Background(), "health-test", SubOptions{BufferSize: 1})
+	sub, err := broker.Subscribe(t.Context(), "health-test", SubOptions{BufferSize: 1})
 	if err != nil {
 		t.Fatalf("subscribe error: %v", err)
 	}
 	defer sub.Cancel()
 
 	// Publish a message
-	if err := broker.Publish(context.Background(), "health-test", Message{ID: "test-1"}); err != nil {
+	if err := broker.Publish(t.Context(), "health-test", Message{ID: "test-1"}); err != nil {
 		t.Fatalf("publish error: %v", err)
 	}
 
@@ -291,7 +291,7 @@ func TestInProcBrokerPublishBatch(t *testing.T) {
 	defer broker.Close()
 
 	// Subscribe
-	sub, err := broker.Subscribe(context.Background(), "batch-topic", SubOptions{BufferSize: 10})
+	sub, err := broker.Subscribe(t.Context(), "batch-topic", SubOptions{BufferSize: 10})
 	if err != nil {
 		t.Fatalf("subscribe error: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestInProcBrokerPublishBatch(t *testing.T) {
 	}
 
 	// Publish batch
-	if err := broker.PublishBatch(context.Background(), "batch-topic", messages); err != nil {
+	if err := broker.PublishBatch(t.Context(), "batch-topic", messages); err != nil {
 		t.Fatalf("publish batch error: %v", err)
 	}
 
@@ -331,7 +331,7 @@ func TestInProcBrokerSubscribeBatch(t *testing.T) {
 
 	// Subscribe to multiple topics
 	topics := []string{"topic-1", "topic-2", "topic-3"}
-	subs, err := broker.SubscribeBatch(context.Background(), topics, SubOptions{BufferSize: 5})
+	subs, err := broker.SubscribeBatch(t.Context(), topics, SubOptions{BufferSize: 5})
 	if err != nil {
 		t.Fatalf("subscribe batch error: %v", err)
 	}
@@ -341,7 +341,7 @@ func TestInProcBrokerSubscribeBatch(t *testing.T) {
 
 	// Verify each subscription works
 	for i, sub := range subs {
-		if err := broker.Publish(context.Background(), topics[i], Message{ID: fmt.Sprintf("test-%d", i)}); err != nil {
+		if err := broker.Publish(t.Context(), topics[i], Message{ID: fmt.Sprintf("test-%d", i)}); err != nil {
 			t.Fatalf("publish error: %v", err)
 		}
 		select {
@@ -578,7 +578,7 @@ func TestInProcBrokerPriorityQueue(t *testing.T) {
 		Priority: PriorityHigh,
 	}
 
-	err := broker.PublishPriority(context.Background(), "priority-topic", priorityMsg)
+	err := broker.PublishPriority(t.Context(), "priority-topic", priorityMsg)
 	if err != nil {
 		t.Fatalf("publish priority message error: %v", err)
 	}
@@ -613,13 +613,13 @@ func TestInProcBrokerAckSupport(t *testing.T) {
 		AckPolicy: AckRequired,
 	}
 
-	err := brokerWithAck.PublishWithAck(context.Background(), "ack-topic", ackMsg)
+	err := brokerWithAck.PublishWithAck(t.Context(), "ack-topic", ackMsg)
 	if err != nil {
 		t.Fatalf("publish with ack error: %v", err)
 	}
 
 	// Test acknowledgment method
-	err = brokerWithAck.Ack(context.Background(), "ack-topic", "test-ack-id")
+	err = brokerWithAck.Ack(t.Context(), "ack-topic", "test-ack-id")
 	if err != nil {
 		t.Fatalf("ack error: %v", err)
 	}
@@ -631,13 +631,13 @@ func TestInProcBrokerAckSupport(t *testing.T) {
 		AckPolicy: AckRequired,
 	}
 
-	err = brokerWithAck.PublishWithAck(context.Background(), "ack-topic", ackMsg2)
+	err = brokerWithAck.PublishWithAck(t.Context(), "ack-topic", ackMsg2)
 	if err != nil {
 		t.Fatalf("publish with ack error: %v", err)
 	}
 
 	// Test NACK (note: this will trigger redelivery, which is expected)
-	err = brokerWithAck.Nack(context.Background(), "ack-topic", "test-ack-id-2")
+	err = brokerWithAck.Nack(t.Context(), "ack-topic", "test-ack-id-2")
 	if err != nil {
 		t.Fatalf("nack error: %v", err)
 	}
@@ -680,7 +680,7 @@ func TestInProcBrokerMemoryLimitExceeded(t *testing.T) {
 	defer broker.Close()
 
 	// Try to publish a message - should fail due to memory limit
-	err := broker.Publish(context.Background(), "test-topic", Message{ID: "test-1", Data: "test"})
+	err := broker.Publish(t.Context(), "test-topic", Message{ID: "test-1", Data: "test"})
 	if !errors.Is(err, ErrMemoryLimitExceeded) {
 		t.Fatalf("expected ErrMemoryLimitExceeded, got %v", err)
 	}
@@ -707,19 +707,19 @@ func TestInProcBrokerMemoryLimitEnforced(t *testing.T) {
 		{
 			name: "Publish",
 			fn: func() error {
-				return broker.Publish(context.Background(), "topic", Message{ID: "1", Data: "test"})
+				return broker.Publish(t.Context(), "topic", Message{ID: "1", Data: "test"})
 			},
 		},
 		{
 			name: "PublishBatch",
 			fn: func() error {
-				return broker.PublishBatch(context.Background(), "topic", []Message{{ID: "1", Data: "test"}})
+				return broker.PublishBatch(t.Context(), "topic", []Message{{ID: "1", Data: "test"}})
 			},
 		},
 		{
 			name: "PublishPriority",
 			fn: func() error {
-				return broker.PublishPriority(context.Background(), "topic", PriorityMessage{
+				return broker.PublishPriority(t.Context(), "topic", PriorityMessage{
 					Message:  Message{ID: "1", Data: "test"},
 					Priority: PriorityHigh,
 				})
@@ -728,7 +728,7 @@ func TestInProcBrokerMemoryLimitEnforced(t *testing.T) {
 		{
 			name: "PublishWithAck",
 			fn: func() error {
-				return broker.PublishWithAck(context.Background(), "topic", AckMessage{
+				return broker.PublishWithAck(t.Context(), "topic", AckMessage{
 					Message:   Message{ID: "1", Data: "test"},
 					AckPolicy: AckRequired,
 				})
@@ -737,19 +737,19 @@ func TestInProcBrokerMemoryLimitEnforced(t *testing.T) {
 		{
 			name: "PublishToCluster",
 			fn: func() error {
-				return broker.PublishToCluster(context.Background(), "topic", Message{ID: "1", Data: "test"})
+				return broker.PublishToCluster(t.Context(), "topic", Message{ID: "1", Data: "test"})
 			},
 		},
 		{
 			name: "PublishWithTransaction",
 			fn: func() error {
-				return broker.PublishWithTransaction(context.Background(), "topic", Message{ID: "1", Data: "test"}, "tx-1")
+				return broker.PublishWithTransaction(t.Context(), "topic", Message{ID: "1", Data: "test"}, "tx-1")
 			},
 		},
 		{
 			name: "PublishToDeadLetter",
 			fn: func() error {
-				return broker.PublishToDeadLetter(context.Background(), "topic", Message{ID: "1", Data: "test"}, "reason")
+				return broker.PublishToDeadLetter(t.Context(), "topic", Message{ID: "1", Data: "test"}, "reason")
 			},
 		},
 	}
@@ -810,13 +810,13 @@ func TestInProcBrokerCluster(t *testing.T) {
 	}
 
 	// Test cluster publish (should work even though cluster is not fully implemented)
-	err := broker.PublishToCluster(context.Background(), "cluster-topic", Message{ID: "cluster-1", Data: "cluster data"})
+	err := broker.PublishToCluster(t.Context(), "cluster-topic", Message{ID: "cluster-1", Data: "cluster data"})
 	if err != nil {
 		t.Fatalf("publish to cluster error: %v", err)
 	}
 
 	// Test cluster subscribe
-	sub, err := broker.SubscribeFromCluster(context.Background(), "cluster-topic", SubOptions{BufferSize: 10})
+	sub, err := broker.SubscribeFromCluster(t.Context(), "cluster-topic", SubOptions{BufferSize: 10})
 	if err != nil {
 		t.Fatalf("subscribe from cluster error: %v", err)
 	}
@@ -839,26 +839,26 @@ func TestInProcBrokerTransaction(t *testing.T) {
 
 	// Test transaction publish and commit
 	txID1 := "tx-1"
-	err := broker.PublishWithTransaction(context.Background(), "tx-topic", Message{ID: "tx-1", Data: "transaction data"}, txID1)
+	err := broker.PublishWithTransaction(t.Context(), "tx-topic", Message{ID: "tx-1", Data: "transaction data"}, txID1)
 	if err != nil {
 		t.Fatalf("publish with transaction error: %v", err)
 	}
 
 	// Test commit transaction
-	err = broker.CommitTransaction(context.Background(), txID1)
+	err = broker.CommitTransaction(t.Context(), txID1)
 	if err != nil {
 		t.Fatalf("commit transaction error: %v", err)
 	}
 
 	// Test transaction publish and rollback (use different txID)
 	txID2 := "tx-2"
-	err = broker.PublishWithTransaction(context.Background(), "tx-topic", Message{ID: "tx-2", Data: "transaction data 2"}, txID2)
+	err = broker.PublishWithTransaction(t.Context(), "tx-topic", Message{ID: "tx-2", Data: "transaction data 2"}, txID2)
 	if err != nil {
 		t.Fatalf("publish with transaction error: %v", err)
 	}
 
 	// Test rollback transaction
-	err = broker.RollbackTransaction(context.Background(), txID2)
+	err = broker.RollbackTransaction(t.Context(), txID2)
 	if err != nil {
 		t.Fatalf("rollback transaction error: %v", err)
 	}
@@ -879,7 +879,7 @@ func TestInProcBrokerDeadLetter(t *testing.T) {
 	}
 
 	// Test dead letter publish
-	err := broker.PublishToDeadLetter(context.Background(), "original-topic", Message{ID: "dlq-1", Data: "dead letter data"}, "processing failed")
+	err := broker.PublishToDeadLetter(t.Context(), "original-topic", Message{ID: "dlq-1", Data: "dead letter data"}, "processing failed")
 	if err != nil {
 		t.Fatalf("publish to dead letter error: %v", err)
 	}
@@ -963,7 +963,7 @@ func TestInProcBrokerClusterDisabled(t *testing.T) {
 	defer broker.Close()
 
 	// Test cluster operations when disabled
-	err := broker.PublishToCluster(context.Background(), "topic", Message{ID: "test-1", Data: "test"})
+	err := broker.PublishToCluster(t.Context(), "topic", Message{ID: "test-1", Data: "test"})
 	if !errors.Is(err, ErrClusterDisabled) {
 		t.Fatalf("expected ErrClusterDisabled, got %v", err)
 	}
@@ -980,17 +980,17 @@ func TestInProcBrokerTransactionDisabled(t *testing.T) {
 	defer broker.Close()
 
 	// Test transaction operations when disabled
-	err := broker.PublishWithTransaction(context.Background(), "topic", Message{ID: "test-1", Data: "test"}, "tx-1")
+	err := broker.PublishWithTransaction(t.Context(), "topic", Message{ID: "test-1", Data: "test"}, "tx-1")
 	if !errors.Is(err, ErrTransactionNotSupported) {
 		t.Fatalf("expected ErrTransactionNotSupported, got %v", err)
 	}
 
-	err = broker.CommitTransaction(context.Background(), "tx-1")
+	err = broker.CommitTransaction(t.Context(), "tx-1")
 	if !errors.Is(err, ErrTransactionNotSupported) {
 		t.Fatalf("expected ErrTransactionNotSupported, got %v", err)
 	}
 
-	err = broker.RollbackTransaction(context.Background(), "tx-1")
+	err = broker.RollbackTransaction(t.Context(), "tx-1")
 	if !errors.Is(err, ErrTransactionNotSupported) {
 		t.Fatalf("expected ErrTransactionNotSupported, got %v", err)
 	}
@@ -1001,7 +1001,7 @@ func TestInProcBrokerDeadLetterDisabled(t *testing.T) {
 	defer broker.Close()
 
 	// Test dead letter operations when disabled
-	err := broker.PublishToDeadLetter(context.Background(), "topic", Message{ID: "test-1", Data: "test"}, "reason")
+	err := broker.PublishToDeadLetter(t.Context(), "topic", Message{ID: "test-1", Data: "test"}, "reason")
 	if !errors.Is(err, ErrDeadLetterNotSupported) {
 		t.Fatalf("expected ErrDeadLetterNotSupported, got %v", err)
 	}
@@ -1036,7 +1036,7 @@ func (p panicPubSub) Publish(topic string, msg pubsub.Message) error {
 	panic("boom")
 }
 
-func (p panicPubSub) Subscribe(topic string, opts pubsub.SubOptions) (pubsub.Subscription, error) {
+func (p panicPubSub) Subscribe(ctx context.Context, topic string, opts pubsub.SubOptions) (pubsub.Subscription, error) {
 	return nil, errors.New("not implemented")
 }
 

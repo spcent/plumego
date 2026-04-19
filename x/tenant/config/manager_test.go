@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -37,7 +36,7 @@ func TestNewDBTenantConfigManagerWithCache(t *testing.T) {
 
 func TestDBTenantConfigManager_GetTenantConfig_NilDB(t *testing.T) {
 	m := NewDBTenantConfigManager(nil)
-	_, err := m.GetTenantConfig(context.Background(), "t-123")
+	_, err := m.GetTenantConfig(t.Context(), "t-123")
 	if err != tenant.ErrTenantNotFound {
 		t.Errorf("expected ErrTenantNotFound, got %v", err)
 	}
@@ -45,7 +44,7 @@ func TestDBTenantConfigManager_GetTenantConfig_NilDB(t *testing.T) {
 
 func TestDBTenantConfigManager_GetTenantConfig_NilManager(t *testing.T) {
 	var m *DBTenantConfigManager
-	_, err := m.GetTenantConfig(context.Background(), "t-123")
+	_, err := m.GetTenantConfig(t.Context(), "t-123")
 	if err != tenant.ErrTenantNotFound {
 		t.Errorf("expected ErrTenantNotFound, got %v", err)
 	}
@@ -53,7 +52,7 @@ func TestDBTenantConfigManager_GetTenantConfig_NilManager(t *testing.T) {
 
 func TestDBTenantConfigManager_SetTenantConfig_NilDB(t *testing.T) {
 	m := NewDBTenantConfigManager(nil)
-	err := m.SetTenantConfig(context.Background(), tenant.Config{TenantID: "t-123"})
+	err := m.SetTenantConfig(t.Context(), tenant.Config{TenantID: "t-123"})
 	if err == nil {
 		t.Fatal("expected error for nil db")
 	}
@@ -61,7 +60,7 @@ func TestDBTenantConfigManager_SetTenantConfig_NilDB(t *testing.T) {
 
 func TestDBTenantConfigManager_SetTenantConfig_NilManager(t *testing.T) {
 	var m *DBTenantConfigManager
-	err := m.SetTenantConfig(context.Background(), tenant.Config{TenantID: "t-123"})
+	err := m.SetTenantConfig(t.Context(), tenant.Config{TenantID: "t-123"})
 	if err == nil {
 		t.Fatal("expected error for nil manager")
 	}
@@ -69,7 +68,7 @@ func TestDBTenantConfigManager_SetTenantConfig_NilManager(t *testing.T) {
 
 func TestDBTenantConfigManager_DeleteTenantConfig_NilDB(t *testing.T) {
 	m := NewDBTenantConfigManager(nil)
-	err := m.DeleteTenantConfig(context.Background(), "t-123")
+	err := m.DeleteTenantConfig(t.Context(), "t-123")
 	if err == nil {
 		t.Fatal("expected error for nil db")
 	}
@@ -77,7 +76,7 @@ func TestDBTenantConfigManager_DeleteTenantConfig_NilDB(t *testing.T) {
 
 func TestDBTenantConfigManager_DeleteTenantConfig_NilManager(t *testing.T) {
 	var m *DBTenantConfigManager
-	err := m.DeleteTenantConfig(context.Background(), "t-123")
+	err := m.DeleteTenantConfig(t.Context(), "t-123")
 	if err == nil {
 		t.Fatal("expected error for nil manager")
 	}
@@ -85,7 +84,7 @@ func TestDBTenantConfigManager_DeleteTenantConfig_NilManager(t *testing.T) {
 
 func TestDBTenantConfigManager_ListTenants_NilDB(t *testing.T) {
 	m := NewDBTenantConfigManager(nil)
-	_, err := m.ListTenants(context.Background(), 10, 0)
+	_, err := m.ListTenants(t.Context(), 10, 0)
 	if err == nil {
 		t.Fatal("expected error for nil db")
 	}
@@ -93,7 +92,7 @@ func TestDBTenantConfigManager_ListTenants_NilDB(t *testing.T) {
 
 func TestDBTenantConfigManager_ListTenants_NilManager(t *testing.T) {
 	var m *DBTenantConfigManager
-	_, err := m.ListTenants(context.Background(), 10, 0)
+	_, err := m.ListTenants(t.Context(), 10, 0)
 	if err == nil {
 		t.Fatal("expected error for nil manager")
 	}
@@ -103,7 +102,7 @@ func TestDBTenantConfigManager_ListTenants_DefaultLimit(t *testing.T) {
 	// Verify that negative limit is corrected to 100
 	// (tested via nil db to ensure it reaches the limit logic)
 	m := NewDBTenantConfigManager(nil)
-	_, err := m.ListTenants(context.Background(), -1, -5)
+	_, err := m.ListTenants(t.Context(), -1, -5)
 	if err == nil {
 		t.Fatal("expected error for nil db")
 	}
@@ -111,7 +110,7 @@ func TestDBTenantConfigManager_ListTenants_DefaultLimit(t *testing.T) {
 
 func TestDBTenantConfigManager_QuotaConfig_NilDB(t *testing.T) {
 	m := NewDBTenantConfigManager(nil)
-	_, err := m.QuotaConfig(context.Background(), "t-123")
+	_, err := m.QuotaConfig(t.Context(), "t-123")
 	if err != tenant.ErrTenantNotFound {
 		t.Errorf("expected ErrTenantNotFound, got %v", err)
 	}
@@ -119,7 +118,7 @@ func TestDBTenantConfigManager_QuotaConfig_NilDB(t *testing.T) {
 
 func TestDBTenantConfigManager_PolicyConfig_NilDB(t *testing.T) {
 	m := NewDBTenantConfigManager(nil)
-	_, err := m.PolicyConfig(context.Background(), "t-123")
+	_, err := m.PolicyConfig(t.Context(), "t-123")
 	if err != tenant.ErrTenantNotFound {
 		t.Errorf("expected ErrTenantNotFound, got %v", err)
 	}
@@ -329,7 +328,7 @@ func TestDBTenantConfigManager_CacheHit(t *testing.T) {
 	m.cache.Set("t-123", cfg)
 
 	// Should return from cache even though db is nil
-	got, err := m.GetTenantConfig(context.Background(), "t-123")
+	got, err := m.GetTenantConfig(t.Context(), "t-123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

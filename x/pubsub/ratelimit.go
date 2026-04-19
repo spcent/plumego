@@ -5,6 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/spcent/plumego/x/resilience/ratelimit"
 )
 
 // Rate limit errors
@@ -95,16 +97,10 @@ type RateLimitedPubSub struct {
 	adaptiveAdj   atomic.Uint64
 }
 
-// tokenBucket implements the token bucket algorithm
+// tokenBucket wraps x/resilience/ratelimit.TokenBucket adding per-bucket statistics.
 type tokenBucket struct {
-	mu sync.Mutex
+	*ratelimit.TokenBucket
 
-	rate      float64   // tokens per second
-	burst     int       // maximum tokens
-	tokens    float64   // current tokens
-	lastCheck time.Time // last token calculation
-
-	// Statistics
 	allowed atomic.Uint64
 	denied  atomic.Uint64
 	waited  atomic.Uint64
@@ -165,75 +161,31 @@ func NewRateLimited(config RateLimitConfig, opts ...Option) (*RateLimitedPubSub,
 	return rlps, nil
 }
 
-// newTokenBucket creates a new token bucket
 func newTokenBucket(rate float64, burst int) *tokenBucket {
-	return &tokenBucket{
-		rate:      rate,
-		burst:     burst,
-		tokens:    float64(burst),
-		lastCheck: time.Now(),
-	}
+	return &tokenBucket{TokenBucket: ratelimit.New(rate, int64(burst))}
 }
 
-// allow checks if a token is available
 func (tb *tokenBucket) allow() bool {
-	tb.mu.Lock()
-	defer tb.mu.Unlock()
-
-	now := time.Now()
-	elapsed := now.Sub(tb.lastCheck).Seconds()
-
-	// Add tokens based on elapsed time
-	tb.tokens += elapsed * tb.rate
-	if tb.tokens > float64(tb.burst) {
-		tb.tokens = float64(tb.burst)
-	}
-
-	tb.lastCheck = now
-
-	// Check if token available
-	if tb.tokens >= 1.0 {
-		tb.tokens -= 1.0
+	if tb.TokenBucket.Allow() {
 		tb.allowed.Add(1)
 		return true
 	}
-
 	tb.denied.Add(1)
 	return false
 }
 
-// wait waits for a token to become available
 func (tb *tokenBucket) wait(ctx context.Context, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-
-	for {
-		if tb.allow() {
-			tb.waited.Add(1)
-			return nil
-		}
-
-		// Check timeout
-		if time.Now().After(deadline) {
-			return ErrRateLimitExceeded
-		}
-
-		// Check context
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		// Wait a bit before retrying
-		time.Sleep(time.Millisecond)
+	ctx2, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	if err := tb.TokenBucket.Wait(ctx2); err != nil {
+		return ErrRateLimitExceeded
 	}
+	tb.waited.Add(1)
+	return nil
 }
 
-// updateRate updates the rate dynamically
 func (tb *tokenBucket) updateRate(newRate float64) {
-	tb.mu.Lock()
-	defer tb.mu.Unlock()
-	tb.rate = newRate
+	tb.TokenBucket.UpdateRate(newRate, 0)
 }
 
 // Publish publishes a message with rate limiting
@@ -426,8 +378,8 @@ func (rlps *RateLimitedPubSub) adjustAdaptiveRates() {
 }
 
 // Subscribe creates a rate-limited subscription
-func (rlps *RateLimitedPubSub) Subscribe(topic string, opts SubOptions) (Subscription, error) {
-	sub, err := rlps.InProcBroker.Subscribe(topic, opts)
+func (rlps *RateLimitedPubSub) Subscribe(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
+	sub, err := rlps.InProcBroker.Subscribe(ctx, topic, opts)
 	if err != nil {
 		return nil, err
 	}

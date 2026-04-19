@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/spcent/plumego/internal/httpx"
 )
 
 // handleWebSocketProxy handles WebSocket proxying
@@ -134,7 +136,7 @@ func (p *Proxy) sendBackendUpgrade(conn net.Conn, backendURL *url.URL, r *http.R
 	// Apply request modifications if configured
 	if p.config.AddForwardedHeaders {
 		// Add X-Forwarded headers
-		clientIP := getClientIP(r)
+		clientIP := httpx.ClientIP(r)
 		sb.WriteString("X-Forwarded-For: ")
 		sb.WriteString(clientIP)
 		sb.WriteString("\r\n")
@@ -236,29 +238,6 @@ func getWebSocketScheme(httpScheme string) string {
 		return "wss"
 	}
 	return "ws"
-}
-
-// getClientIP extracts the client IP from the request
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP in the chain
-		if idx := strings.Index(xff, ","); idx != -1 {
-			return strings.TrimSpace(xff[:idx])
-		}
-		return xff
-	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
-	if host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr)); err == nil {
-		return host
-	}
-	return r.RemoteAddr
 }
 
 // computeAcceptKey computes the Sec-WebSocket-Accept value

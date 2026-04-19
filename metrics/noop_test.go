@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -14,7 +13,7 @@ func TestNoopCollectorRecord(t *testing.T) {
 	collector := NewNoopCollector()
 
 	// Should not panic
-	collector.Record(context.Background(), MetricRecord{
+	collector.Record(t.Context(), MetricRecord{
 		Name:  "test",
 		Value: 100,
 	})
@@ -24,14 +23,14 @@ func TestNoopCollectorObserveHTTP(t *testing.T) {
 	collector := NewNoopCollector()
 
 	// Should not panic
-	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, 50*time.Millisecond)
+	collector.ObserveHTTP(t.Context(), "GET", "/test", 200, 100, 50*time.Millisecond)
 }
 
 func TestNoopCollectorGetStats(t *testing.T) {
 	collector := NewNoopCollector()
 
 	// Record some metrics
-	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, 50*time.Millisecond)
+	collector.ObserveHTTP(t.Context(), "GET", "/test", 200, 100, 50*time.Millisecond)
 
 	stats := collector.GetStats()
 
@@ -64,7 +63,7 @@ func TestNoopCollectorConcurrency(t *testing.T) {
 	done := make(chan bool)
 	for i := 0; i < 100; i++ {
 		go func() {
-			collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, 50*time.Millisecond)
+			collector.ObserveHTTP(t.Context(), "GET", "/test", 200, 100, 50*time.Millisecond)
 			collector.GetStats()
 			collector.Clear()
 			done <- true

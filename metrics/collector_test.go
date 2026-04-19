@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -10,7 +9,7 @@ func TestBaseMetricsCollectorRecordTracksTotalsAndBreakdown(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	labels := MetricLabels{"route": "/users"}
 
-	collector.Record(context.Background(), MetricRecord{
+	collector.Record(t.Context(), MetricRecord{
 		Name:   "custom_http_metric",
 		Value:  1,
 		Labels: labels,
@@ -26,7 +25,7 @@ func TestBaseMetricsCollectorRecordTracksTotalsAndBreakdown(t *testing.T) {
 		t.Fatalf("expected name breakdown to track custom metric")
 	}
 
-	collector.Record(context.Background(), MetricRecord{
+	collector.Record(t.Context(), MetricRecord{
 		Name:   "custom_http_metric",
 		Value:  1,
 		Labels: labels,
@@ -45,7 +44,7 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	duration := 125 * time.Millisecond
 
-	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, duration)
+	collector.ObserveHTTP(t.Context(), "GET", "/test", 200, 100, duration)
 
 	stats := collector.GetStats()
 	if stats.TotalRecords != 1 {
@@ -58,7 +57,7 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 
 func TestBaseMetricsCollectorClear(t *testing.T) {
 	collector := NewBaseMetricsCollector()
-	collector.ObserveHTTP(context.Background(), "GET", "/test", 200, 100, 50*time.Millisecond)
+	collector.ObserveHTTP(t.Context(), "GET", "/test", 200, 100, 50*time.Millisecond)
 
 	collector.Clear()
 
@@ -73,7 +72,7 @@ func TestBaseMetricsCollectorClear(t *testing.T) {
 
 func TestBaseMetricsCollectorStatsCloneNameBreakdown(t *testing.T) {
 	collector := NewBaseMetricsCollector()
-	collector.Record(context.Background(), MetricRecord{Name: "custom_metric"})
+	collector.Record(t.Context(), MetricRecord{Name: "custom_metric"})
 
 	stats := collector.GetStats()
 	stats.NameBreakdown["custom_metric"] = 999

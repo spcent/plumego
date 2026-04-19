@@ -99,7 +99,7 @@ func TestExecContext(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := ExecContext(ctx, db, "INSERT INTO test VALUES (?)", 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -107,14 +107,14 @@ func TestExecContext(t *testing.T) {
 }
 
 func TestExecContextNilDB(t *testing.T) {
-	_, err := ExecContext(context.Background(), nil, "INSERT INTO test VALUES (?)", 1)
+	_, err := ExecContext(t.Context(), nil, "INSERT INTO test VALUES (?)", 1)
 	if err == nil || !errors.Is(err, ErrQueryFailed) {
 		t.Fatalf("expected ErrQueryFailed, got %v", err)
 	}
 }
 
 func TestExecContextUsesCallerContext(t *testing.T) {
-	ctx := context.WithValue(context.Background(), testContextKey{}, "request")
+	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
 	db := &contextRecorderDB{}
 
 	if _, err := ExecContext(ctx, db, "INSERT INTO test VALUES (?)", 1); err != nil {
@@ -130,7 +130,7 @@ func TestQueryContext(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	rows, err := QueryContext(ctx, db, "SELECT * FROM test")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -142,14 +142,14 @@ func TestQueryContext(t *testing.T) {
 }
 
 func TestQueryContextNilDB(t *testing.T) {
-	_, err := QueryContext(context.Background(), nil, "SELECT * FROM test")
+	_, err := QueryContext(t.Context(), nil, "SELECT * FROM test")
 	if err == nil || !errors.Is(err, ErrQueryFailed) {
 		t.Fatalf("expected ErrQueryFailed, got %v", err)
 	}
 }
 
 func TestQueryContextUsesCallerContext(t *testing.T) {
-	ctx := context.WithValue(context.Background(), testContextKey{}, "request")
+	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
 	db := &contextRecorderDB{}
 
 	if _, err := QueryContext(ctx, db, "SELECT * FROM test"); err != nil {
@@ -165,7 +165,7 @@ func TestQueryRowContext(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
 	if row == nil {
 		t.Fatal("expected row")
@@ -173,14 +173,14 @@ func TestQueryRowContext(t *testing.T) {
 }
 
 func TestQueryRowContextNilDB(t *testing.T) {
-	row := QueryRowContext(context.Background(), nil, "SELECT * FROM test WHERE id = ?", 1)
+	row := QueryRowContext(t.Context(), nil, "SELECT * FROM test WHERE id = ?", 1)
 	if row != nil {
 		t.Fatal("expected nil row")
 	}
 }
 
 func TestQueryRowContextUsesCallerContext(t *testing.T) {
-	ctx := context.WithValue(context.Background(), testContextKey{}, "request")
+	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
 	db := &contextRecorderDB{}
 
 	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
@@ -197,7 +197,7 @@ func TestWithTransaction(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := WithTransaction(ctx, db, nil, func(tx *sql.Tx) error {
 		// Simulate transaction work
 		return nil
@@ -208,7 +208,7 @@ func TestWithTransaction(t *testing.T) {
 }
 
 func TestWithTransactionNilDB(t *testing.T) {
-	err := WithTransaction(context.Background(), nil, nil, func(tx *sql.Tx) error {
+	err := WithTransaction(t.Context(), nil, nil, func(tx *sql.Tx) error {
 		return nil
 	})
 	if err == nil || !errors.Is(err, ErrTransactionFailed) {
@@ -221,7 +221,7 @@ func TestWithTransactionError(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	txErr := errors.New("transaction error")
 	err := WithTransaction(ctx, db, nil, func(tx *sql.Tx) error {
 		return txErr
@@ -232,7 +232,7 @@ func TestWithTransactionError(t *testing.T) {
 }
 
 func TestWithTransactionUsesCallerContext(t *testing.T) {
-	ctx := context.WithValue(context.Background(), testContextKey{}, "request")
+	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
 	beginErr := errors.New("begin failed")
 	db := &contextRecorderDB{beginErr: beginErr}
 
@@ -253,7 +253,7 @@ func TestScanRow(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
 
 	var id int
@@ -276,7 +276,7 @@ func TestScanRows(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	rows, err := QueryContext(ctx, db, "SELECT * FROM test")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -320,7 +320,7 @@ func TestPing(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := Ping(ctx, db)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -328,7 +328,7 @@ func TestPing(t *testing.T) {
 }
 
 func TestPingNilDB(t *testing.T) {
-	err := Ping(context.Background(), nil)
+	err := Ping(t.Context(), nil)
 	if err == nil || !errors.Is(err, ErrPingFailed) {
 		t.Fatalf("expected ErrPingFailed, got %v", err)
 	}
@@ -340,7 +340,7 @@ func TestPingUsesCallerTimeout(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 	defer cancel()
 
 	err := Ping(ctx, db)
@@ -354,7 +354,7 @@ func TestQueryRow(t *testing.T) {
 	db := sql.OpenDB(connector)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	row, err := QueryRow(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -365,14 +365,14 @@ func TestQueryRow(t *testing.T) {
 }
 
 func TestQueryRowNilDB(t *testing.T) {
-	_, err := QueryRow(context.Background(), nil, "SELECT * FROM test WHERE id = ?", 1)
+	_, err := QueryRow(t.Context(), nil, "SELECT * FROM test WHERE id = ?", 1)
 	if err == nil || !errors.Is(err, ErrQueryFailed) {
 		t.Fatalf("expected ErrQueryFailed, got %v", err)
 	}
 }
 
 func TestQueryRowUsesCallerContext(t *testing.T) {
-	ctx := context.WithValue(context.Background(), testContextKey{}, "request")
+	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
 	db := &contextRecorderDB{}
 
 	row, err := QueryRow(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
@@ -391,7 +391,7 @@ func TestQueryRowStrictNoRows(t *testing.T) {
 	db := sql.OpenDB(&rowsConnector{rows: &fixedRows{cols: []string{"id"}}})
 	defer db.Close()
 
-	err := QueryRowStrict(context.Background(), db, "SELECT id FROM test", func(rows *sql.Rows) error {
+	err := QueryRowStrict(t.Context(), db, "SELECT id FROM test", func(rows *sql.Rows) error {
 		var id int
 		return rows.Scan(&id)
 	})
@@ -407,7 +407,7 @@ func TestQueryRowStrictMultipleRows(t *testing.T) {
 	}})
 	defer db.Close()
 
-	err := QueryRowStrict(context.Background(), db, "SELECT id FROM test", func(rows *sql.Rows) error {
+	err := QueryRowStrict(t.Context(), db, "SELECT id FROM test", func(rows *sql.Rows) error {
 		var id int
 		return rows.Scan(&id)
 	})

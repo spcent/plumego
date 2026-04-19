@@ -268,7 +268,7 @@ func (mtps *MultiTenantPubSub) Subscribe(tenantID, topic string, opts SubOptions
 	namespacedTopic := mtps.namespaceTopic(tenantID, topic)
 
 	// Create subscription
-	sub, err := mtps.ps.Subscribe(namespacedTopic, opts)
+	sub, err := mtps.ps.Subscribe(context.Background(), namespacedTopic, opts)
 	if err != nil {
 		return nil, err
 	}

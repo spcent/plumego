@@ -160,7 +160,7 @@ func TestObserveFunctionsRecordDurationSeconds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			collector := recordbuffer.NewCollector()
 			duration := 125 * time.Millisecond
-			tt.observe(collector, context.Background(), duration)
+			tt.observe(collector, t.Context(), duration)
 
 			records := collector.GetRecords()
 			if len(records) != 1 {

@@ -29,7 +29,7 @@ func TestFailoverSMS_FallsBackToSecond(t *testing.T) {
 		t.Fatalf("name=%s", fo.Name())
 	}
 
-	result, err := fo.Send(context.Background(), SMSMessage{To: "+1", Body: "hi"})
+	result, err := fo.Send(t.Context(), SMSMessage{To: "+1", Body: "hi"})
 	if err != nil {
 		t.Fatalf("expected fallback success, got: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestFailoverSMS_FallsBackToSecond(t *testing.T) {
 
 func TestFailoverSMS_AllFail(t *testing.T) {
 	fo := NewFailoverSMSProvider(&failingSMS{}, &failingSMS{})
-	_, err := fo.Send(context.Background(), SMSMessage{To: "+1", Body: "hi"})
+	_, err := fo.Send(t.Context(), SMSMessage{To: "+1", Body: "hi"})
 	if err == nil {
 		t.Fatal("expected error when all providers fail")
 	}
@@ -60,7 +60,7 @@ func TestFailoverSMS_Empty(t *testing.T) {
 	if fo.Name() != "failover(empty)" {
 		t.Fatalf("name=%s", fo.Name())
 	}
-	_, err := fo.Send(context.Background(), SMSMessage{})
+	_, err := fo.Send(t.Context(), SMSMessage{})
 	if err == nil {
 		t.Fatal("expected error with no providers")
 	}
@@ -72,7 +72,7 @@ func TestFailoverEmail_FallsBackToSecond(t *testing.T) {
 
 	fo := NewFailoverEmailProvider(primary, backup)
 
-	result, err := fo.Send(context.Background(), EmailMessage{To: "a@b.com", Subject: "s", Body: "b"})
+	result, err := fo.Send(t.Context(), EmailMessage{To: "a@b.com", Subject: "s", Body: "b"})
 	if err != nil {
 		t.Fatalf("expected fallback success, got: %v", err)
 	}
@@ -83,14 +83,14 @@ func TestFailoverEmail_FallsBackToSecond(t *testing.T) {
 
 func TestFailoverEmail_AllFail(t *testing.T) {
 	fo := NewFailoverEmailProvider(&failingEmail{}, &failingEmail{})
-	_, err := fo.Send(context.Background(), EmailMessage{To: "a@b.com"})
+	_, err := fo.Send(t.Context(), EmailMessage{To: "a@b.com"})
 	if !errors.Is(err, ErrProviderFailure) {
 		t.Fatalf("expected ErrProviderFailure, got %v", err)
 	}
 }
 
 func TestFailoverSMS_ContextCancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // already cancelled
 
 	fo := NewFailoverSMSProvider(&failingSMS{}, &mockSMS{})

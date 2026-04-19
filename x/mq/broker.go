@@ -413,7 +413,7 @@ func (b *InProcBroker) SubscribeBatch(ctx context.Context, topics []string, opts
 			if err := b.validateSubscribeOperation(ctx, topic); err != nil {
 				return err
 			}
-			sub, err := b.ps.Subscribe(topic, opts)
+			sub, err := b.ps.Subscribe(context.Background(), topic, opts)
 			if err != nil {
 				return err
 			}
@@ -455,7 +455,7 @@ func (b *InProcBroker) Subscribe(ctx context.Context, topic string, opts SubOpti
 
 		// Subscribe
 		var subscription Subscription
-		subscription, err = b.ps.Subscribe(topic, opts)
+		subscription, err = b.ps.Subscribe(context.Background(), topic, opts)
 		if err != nil {
 			return err
 		}
@@ -571,7 +571,7 @@ func (b *InProcBroker) SubscribeFromCluster(ctx context.Context, topic string, o
 		}
 
 		// Subscribe locally
-		subscription, err := b.ps.Subscribe(topic, opts)
+		subscription, err := b.ps.Subscribe(context.Background(), topic, opts)
 		if err != nil {
 			return err
 		}

@@ -161,7 +161,7 @@ func TestFromContextValue(t *testing.T) {
 		return claims["tenant_id"]
 	})
 
-	ctx := context.WithValue(context.Background(), testContextKey{}, map[string]string{
+	ctx := context.WithValue(t.Context(), testContextKey{}, map[string]string{
 		"tenant_id": "jwt-tenant",
 	})
 	req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)

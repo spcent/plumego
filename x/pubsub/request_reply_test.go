@@ -20,7 +20,7 @@ func TestRequestReplyBasic(t *testing.T) {
 	}
 	defer rm.Close()
 
-	sub, err := ps.Subscribe("math.add", SubOptions{BufferSize: 16})
+	sub, err := ps.Subscribe(t.Context(), "math.add", SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestRequestReplyWithContext(t *testing.T) {
 	}
 	defer rm.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 
 	_, err = rm.Request(ctx, "no.responder", Message{Data: "hello"})
@@ -77,7 +77,7 @@ func TestRequestReplyMultipleConcurrent(t *testing.T) {
 	}
 	defer rm.Close()
 
-	sub, err := ps.Subscribe("echo", SubOptions{BufferSize: 64})
+	sub, err := ps.Subscribe(t.Context(), "echo", SubOptions{BufferSize: 64})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestRequestReplyCorrelationID(t *testing.T) {
 	}
 	defer rm.Close()
 
-	sub, err := ps.Subscribe("service.ping", SubOptions{BufferSize: 16})
+	sub, err := ps.Subscribe(t.Context(), "service.ping", SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestRequestReplyOnClosedBroker(t *testing.T) {
 	ps.Close()
 	rm.Close()
 
-	_, err = rm.Request(context.Background(), "test", Message{})
+	_, err = rm.Request(t.Context(), "test", Message{})
 	if err == nil {
 		t.Fatal("expected error on closed broker")
 	}
@@ -300,7 +300,7 @@ func TestRequestReplyManagerMultipleRequests(t *testing.T) {
 	}
 	defer rm.Close()
 
-	sub, err := ps.Subscribe("counter", SubOptions{BufferSize: 16})
+	sub, err := ps.Subscribe(t.Context(), "counter", SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatal(err)
 	}

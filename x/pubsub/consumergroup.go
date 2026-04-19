@@ -206,7 +206,7 @@ func (cgm *ConsumerGroupManager) JoinGroup(groupID, consumerID string, topics []
 	}
 
 	// Subscribe to all topics with fanout disabled
-	sub, err := cgm.ps.Subscribe(topics[0], SubOptions{BufferSize: 100})
+	sub, err := cgm.ps.Subscribe(context.Background(), topics[0], SubOptions{BufferSize: 100})
 	if err != nil {
 		return nil, err
 	}

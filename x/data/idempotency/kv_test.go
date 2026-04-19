@@ -1,7 +1,6 @@
 package idempotency
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -26,7 +25,7 @@ func TestKVStoreIdempotency(t *testing.T) {
 		ExpiresAt:   time.Now().Add(1 * time.Hour),
 	}
 
-	created, err := idem.PutIfAbsent(context.Background(), record)
+	created, err := idem.PutIfAbsent(t.Context(), record)
 	if err != nil {
 		t.Fatalf("put: %v", err)
 	}
@@ -34,7 +33,7 @@ func TestKVStoreIdempotency(t *testing.T) {
 		t.Fatalf("expected created")
 	}
 
-	_, found, err := idem.Get(context.Background(), "req-1")
+	_, found, err := idem.Get(t.Context(), "req-1")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -42,11 +41,11 @@ func TestKVStoreIdempotency(t *testing.T) {
 		t.Fatalf("expected found")
 	}
 
-	if err := idem.Complete(context.Background(), "req-1", []byte("ok")); err != nil {
+	if err := idem.Complete(t.Context(), "req-1", []byte("ok")); err != nil {
 		t.Fatalf("complete: %v", err)
 	}
 
-	got, found, err := idem.Get(context.Background(), "req-1")
+	got, found, err := idem.Get(t.Context(), "req-1")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -75,7 +74,7 @@ func TestKVStoreIdempotencyExpired(t *testing.T) {
 		ExpiresAt: now.Add(-1 * time.Minute),
 	}
 
-	_, err = idem.PutIfAbsent(context.Background(), record)
+	_, err = idem.PutIfAbsent(t.Context(), record)
 	if err != ErrExpired {
 		t.Fatalf("expected ErrExpired, got %v", err)
 	}

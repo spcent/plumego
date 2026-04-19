@@ -41,7 +41,7 @@ func TestNewStatic_Nil_AddBackend(t *testing.T) {
 	// Must not panic when writing to a previously-nil-initialized static
 	s.AddBackend("svc", "http://host:8080")
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -65,7 +65,7 @@ func TestStatic_Resolve_Found(t *testing.T) {
 		"svc": {"http://host1:8080", "http://host2:8080"},
 	})
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -82,7 +82,7 @@ func TestStatic_Resolve_NotFound(t *testing.T) {
 		"svc": {"http://host1:8080"},
 	})
 
-	_, err := s.Resolve(context.Background(), "missing")
+	_, err := s.Resolve(t.Context(), "missing")
 	if err != ErrServiceNotFound {
 		t.Errorf("Resolve() error = %v, want ErrServiceNotFound", err)
 	}
@@ -93,7 +93,7 @@ func TestStatic_Resolve_EmptyBackends(t *testing.T) {
 		"svc": {},
 	})
 
-	_, err := s.Resolve(context.Background(), "svc")
+	_, err := s.Resolve(t.Context(), "svc")
 	if err != ErrNoInstances {
 		t.Errorf("Resolve() error = %v, want ErrNoInstances", err)
 	}
@@ -104,10 +104,10 @@ func TestStatic_Resolve_ReturnsCopy(t *testing.T) {
 		"svc": {"http://host1:8080", "http://host2:8080"},
 	})
 
-	backends1, _ := s.Resolve(context.Background(), "svc")
+	backends1, _ := s.Resolve(t.Context(), "svc")
 	backends1[0] = "modified"
 
-	backends2, _ := s.Resolve(context.Background(), "svc")
+	backends2, _ := s.Resolve(t.Context(), "svc")
 	if backends2[0] != "http://host1:8080" {
 		t.Errorf("Resolve() did not return a copy; original was modified to %q", backends2[0])
 	}
@@ -118,7 +118,7 @@ func TestStatic_Resolve_SingleBackend(t *testing.T) {
 		"svc": {"http://only:8080"},
 	})
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -132,7 +132,7 @@ func TestStatic_Watch_Success(t *testing.T) {
 		"svc": {"http://host1:8080"},
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	ch, err := s.Watch(ctx, "svc")
@@ -153,7 +153,7 @@ func TestStatic_Watch_Success(t *testing.T) {
 func TestStatic_Watch_NotFound(t *testing.T) {
 	s := NewStatic(map[string][]string{})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := s.Watch(ctx, "missing")
 	if err != ErrServiceNotFound {
 		t.Errorf("Watch() error = %v, want ErrServiceNotFound", err)
@@ -165,7 +165,7 @@ func TestStatic_Watch_EmptyBackends(t *testing.T) {
 		"svc": {},
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := s.Watch(ctx, "svc")
 	if err != ErrNoInstances {
 		t.Errorf("Watch() error = %v, want ErrNoInstances", err)
@@ -177,7 +177,7 @@ func TestStatic_Watch_ContextCancel(t *testing.T) {
 		"svc": {"http://host1:8080"},
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch, err := s.Watch(ctx, "svc")
 	if err != nil {
 		t.Fatalf("Watch() error = %v", err)
@@ -202,7 +202,7 @@ func TestStatic_Watch_ContextCancel(t *testing.T) {
 
 func TestStatic_Register(t *testing.T) {
 	s := NewStatic(map[string][]string{})
-	err := s.Register(context.Background(), Instance{})
+	err := s.Register(t.Context(), Instance{})
 	if err != ErrNotSupported {
 		t.Errorf("Register() = %v, want ErrNotSupported", err)
 	}
@@ -210,7 +210,7 @@ func TestStatic_Register(t *testing.T) {
 
 func TestStatic_Deregister(t *testing.T) {
 	s := NewStatic(map[string][]string{})
-	err := s.Deregister(context.Background(), "id")
+	err := s.Deregister(t.Context(), "id")
 	if err != ErrNotSupported {
 		t.Errorf("Deregister() = %v, want ErrNotSupported", err)
 	}
@@ -218,7 +218,7 @@ func TestStatic_Deregister(t *testing.T) {
 
 func TestStatic_Health(t *testing.T) {
 	s := NewStatic(map[string][]string{})
-	err := s.Health(context.Background(), "id", true)
+	err := s.Health(t.Context(), "id", true)
 	if err != ErrNotSupported {
 		t.Errorf("Health() = %v, want ErrNotSupported", err)
 	}
@@ -240,7 +240,7 @@ func TestStatic_UpdateService(t *testing.T) {
 
 	s.UpdateService("svc", []string{"http://new1:8080", "http://new2:8080"})
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -257,7 +257,7 @@ func TestStatic_UpdateService_NewService(t *testing.T) {
 
 	s.UpdateService("new-svc", []string{"http://host:8080"})
 
-	backends, err := s.Resolve(context.Background(), "new-svc")
+	backends, err := s.Resolve(t.Context(), "new-svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -273,7 +273,7 @@ func TestStatic_RemoveService(t *testing.T) {
 
 	s.RemoveService("svc")
 
-	_, err := s.Resolve(context.Background(), "svc")
+	_, err := s.Resolve(t.Context(), "svc")
 	if err != ErrServiceNotFound {
 		t.Errorf("Resolve() after remove = %v, want ErrServiceNotFound", err)
 	}
@@ -293,7 +293,7 @@ func TestStatic_AddBackend_ExistingService(t *testing.T) {
 
 	s.AddBackend("svc", "http://host2:8080")
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -310,7 +310,7 @@ func TestStatic_AddBackend_NewService(t *testing.T) {
 
 	s.AddBackend("new-svc", "http://host:8080")
 
-	backends, err := s.Resolve(context.Background(), "new-svc")
+	backends, err := s.Resolve(t.Context(), "new-svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -326,7 +326,7 @@ func TestStatic_RemoveBackend(t *testing.T) {
 
 	s.RemoveBackend("svc", "http://host2:8080")
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -352,7 +352,7 @@ func TestStatic_RemoveBackend_NonExistentBackend(t *testing.T) {
 
 	s.RemoveBackend("svc", "http://missing:8080")
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -368,7 +368,7 @@ func TestStatic_RemoveBackend_LastBackend(t *testing.T) {
 
 	s.RemoveBackend("svc", "http://host:8080")
 
-	_, err := s.Resolve(context.Background(), "svc")
+	_, err := s.Resolve(t.Context(), "svc")
 	if err != ErrNoInstances {
 		t.Errorf("Resolve() after removing last backend = %v, want ErrNoInstances", err)
 	}
@@ -428,7 +428,7 @@ func TestStatic_ConcurrentResolve(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			backends, err := s.Resolve(context.Background(), "svc")
+			backends, err := s.Resolve(t.Context(), "svc")
 			if err != nil {
 				t.Errorf("Resolve() error = %v", err)
 				return
@@ -453,7 +453,7 @@ func TestStatic_ConcurrentModify(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			s.Resolve(context.Background(), "svc")
+			s.Resolve(t.Context(), "svc")
 		}()
 	}
 
@@ -485,7 +485,7 @@ func TestStatic_AddBackend_Multiple(t *testing.T) {
 	s.AddBackend("svc", "http://host2:8080")
 	s.AddBackend("svc", "http://host3:8080")
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -501,7 +501,7 @@ func TestStatic_UpdateService_ToEmpty(t *testing.T) {
 
 	s.UpdateService("svc", []string{})
 
-	_, err := s.Resolve(context.Background(), "svc")
+	_, err := s.Resolve(t.Context(), "svc")
 	if err != ErrNoInstances {
 		t.Errorf("Resolve() after update to empty = %v, want ErrNoInstances", err)
 	}
@@ -514,7 +514,7 @@ func TestStatic_RemoveBackend_FirstElement(t *testing.T) {
 
 	s.RemoveBackend("svc", "http://host1:8080")
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -530,7 +530,7 @@ func TestStatic_RemoveBackend_LastElement(t *testing.T) {
 
 	s.RemoveBackend("svc", "http://host2:8080")
 
-	backends, err := s.Resolve(context.Background(), "svc")
+	backends, err := s.Resolve(t.Context(), "svc")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}

@@ -1,7 +1,6 @@
 package mq
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -20,7 +19,7 @@ func TestDeadLetterManagerBasic(t *testing.T) {
 		t.Fatal("deadLetterManager should be initialized when dead letter queue is enabled")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to dead letter queue
 	sub, err := broker.Subscribe(ctx, "dlq", SubOptions{BufferSize: 10})
@@ -69,7 +68,7 @@ func TestDeadLetterMultipleMessages(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to dead letter queue
 	sub, err := broker.Subscribe(ctx, "dlq", SubOptions{BufferSize: 10})
@@ -118,7 +117,7 @@ func TestDeadLetterDisabled(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Try to publish to dead letter queue when disabled
 	msg := Message{ID: "dead-1", Data: "data"}
@@ -144,7 +143,7 @@ func TestDeadLetterDefaultTopic(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to default dead letter topic
 	sub, err := broker.Subscribe(ctx, "dead-letter", SubOptions{BufferSize: 10})
@@ -177,7 +176,7 @@ func TestDeadLetterClose(t *testing.T) {
 	cfg.DeadLetterTopic = "dlq"
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message to dead letter queue
 	msg := Message{ID: "dead-1", Data: "data"}
@@ -209,7 +208,7 @@ func TestDeadLetterConcurrent(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to dead letter queue
 	sub, err := broker.Subscribe(ctx, "dlq", SubOptions{BufferSize: 100})
@@ -266,7 +265,7 @@ func TestDeadLetterValidation(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test invalid message (missing ID)
 	err := broker.PublishToDeadLetter(ctx, "original-topic", Message{}, "test failure")
@@ -286,7 +285,7 @@ func TestDeadLetterWithAckTimeout(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to dead letter queue
 	dlqSub, err := broker.Subscribe(ctx, "dlq", SubOptions{BufferSize: 10})
@@ -325,7 +324,7 @@ func TestDeadLetterTimestamp(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message to dead letter queue
 	before := time.Now()

@@ -8,7 +8,7 @@ import (
 )
 
 func TestMiddleware(t *testing.T) {
-	mw := Middleware(1, 1, 50*time.Millisecond, nil)
+	mw := Middleware(1, 1, 50*time.Millisecond)
 	blocker := make(chan struct{})
 	release := make(chan struct{})
 

@@ -85,7 +85,7 @@ func TestDevCollectorSnapshot(t *testing.T) {
 	}
 
 	collector := NewDevCollector(cfg)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	collector.ObserveHTTP(ctx, "GET", "/hello", 200, 128, 10*time.Millisecond)
 	collector.ObserveHTTP(ctx, "GET", "/hello", 404, 64, 20*time.Millisecond)
@@ -128,7 +128,7 @@ func TestDevCollectorDBTableSeries(t *testing.T) {
 	}
 
 	collector := NewDevCollector(cfg)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Record queries against different tables
 	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users WHERE id = 1", 1, 10*time.Millisecond, nil)
@@ -170,7 +170,7 @@ func TestDevCollectorDBSlowQueryTable(t *testing.T) {
 	}
 
 	collector := NewDevCollector(cfg)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users WHERE id = 1", 1, 5*time.Millisecond, nil)
 
@@ -187,7 +187,7 @@ func TestDevCollectorDBSlowQueryTable(t *testing.T) {
 func TestDevCollectorDBTableSeriesClear(t *testing.T) {
 	cfg := DefaultDevCollectorConfig()
 	collector := NewDevCollector(cfg)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	collector.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users", 1, 10*time.Millisecond, nil)
 
@@ -207,7 +207,7 @@ func TestDevCollectorDBTableSeriesClear(t *testing.T) {
 func TestDevCollectorDBTableNoQuery(t *testing.T) {
 	cfg := DefaultDevCollectorConfig()
 	collector := NewDevCollector(cfg)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Operations without SQL (ping, connect, close) should not create table series
 	collector.ObserveDB(ctx, "ping", "postgres", "", 0, 2*time.Millisecond, nil)
@@ -260,7 +260,7 @@ func TestDevCollectorDurationUnitConsistency(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			collector := NewDevCollector(DefaultDevCollectorConfig())
 			duration := 125 * time.Millisecond
-			tt.observe(collector, context.Background(), duration)
+			tt.observe(collector, t.Context(), duration)
 
 			records := collector.base.GetRecords()
 			if len(records) != tt.expectedRecord {
@@ -292,7 +292,7 @@ func TestDevCollectorSnapshotRetentionWindow(t *testing.T) {
 	collector.startedAt = base
 	collector.now = func() time.Time { return current }
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	collector.ObserveHTTP(ctx, "GET", "/expired", 200, 10, 5*time.Millisecond)
 	current = base.Add(20 * time.Second)
@@ -335,7 +335,7 @@ func TestDevCollectorDBSnapshotRetentionWindow(t *testing.T) {
 	collector.startedAt = base
 	collector.now = func() time.Time { return current }
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	collector.ObserveDB(ctx, "query", "mysql", "SELECT * FROM expired_users", 1, 5*time.Millisecond, nil)
 	current = base.Add(20 * time.Second)

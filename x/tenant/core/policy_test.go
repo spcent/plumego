@@ -1,7 +1,6 @@
 package tenant
 
 import (
-	"context"
 	"testing"
 )
 
@@ -16,7 +15,7 @@ func TestConfigPolicyEvaluator_Allow(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test allowed model
 	result, err := evaluator.Evaluate(ctx, "test-tenant", PolicyRequest{
@@ -59,7 +58,7 @@ func TestConfigPolicyEvaluator_DenyModel(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test disallowed model
 	result, err := evaluator.Evaluate(ctx, "restricted-tenant", PolicyRequest{
@@ -89,7 +88,7 @@ func TestConfigPolicyEvaluator_DenyTool(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test disallowed tool
 	result, err := evaluator.Evaluate(ctx, "limited-tools", PolicyRequest{
@@ -119,7 +118,7 @@ func TestConfigPolicyEvaluator_EmptyListAllowsAll(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name  string
@@ -159,7 +158,7 @@ func TestConfigPolicyEvaluator_EmptyValues(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Empty model/tool in request should be allowed
 	result, err := evaluator.Evaluate(ctx, "test-tenant", PolicyRequest{
@@ -178,7 +177,7 @@ func TestConfigPolicyEvaluator_EmptyValues(t *testing.T) {
 func TestConfigPolicyEvaluator_TenantNotFound(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	result, err := evaluator.Evaluate(ctx, "non-existent", PolicyRequest{
 		Model: "gpt-4",
@@ -197,7 +196,7 @@ func TestConfigPolicyEvaluator_TenantNotFound(t *testing.T) {
 
 func TestConfigPolicyEvaluator_NilProvider(t *testing.T) {
 	evaluator := NewConfigPolicyEvaluator(nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Should allow all when provider is nil
 	result, err := evaluator.Evaluate(ctx, "any-tenant", PolicyRequest{
@@ -215,7 +214,7 @@ func TestConfigPolicyEvaluator_NilProvider(t *testing.T) {
 
 func TestConfigPolicyEvaluator_NilEvaluator(t *testing.T) {
 	var evaluator *ConfigPolicyEvaluator
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Should allow all when evaluator is nil
 	result, err := evaluator.Evaluate(ctx, "any-tenant", PolicyRequest{
@@ -246,7 +245,7 @@ func TestConfigPolicyEvaluator_TenantPoliciesAreIsolated(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	allowed, err := evaluator.Evaluate(ctx, "tenant-a", PolicyRequest{Model: "gpt-4"})
 	if err != nil || !allowed.Allowed {
@@ -273,7 +272,7 @@ func TestConfigPolicyEvaluator_OnlyModelRestricted(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Allowed model with any tool
 	result1, err1 := evaluator.Evaluate(ctx, "model-only", PolicyRequest{
@@ -308,7 +307,7 @@ func TestConfigPolicyEvaluator_OnlyToolRestricted(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Any model with allowed tool
 	result1, err1 := evaluator.Evaluate(ctx, "tool-only", PolicyRequest{
@@ -343,7 +342,7 @@ func TestConfigPolicyEvaluator_WithMethodAndPath(t *testing.T) {
 	})
 
 	evaluator := NewConfigPolicyEvaluator(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Method and Path are currently not evaluated, but should not cause errors
 	result, err := evaluator.Evaluate(ctx, "test-tenant", PolicyRequest{

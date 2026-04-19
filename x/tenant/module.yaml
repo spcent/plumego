@@ -46,6 +46,7 @@ allowed_imports:
   - store
   - log
   - metrics
+  - x/resilience
 
 forbidden_imports:
   - core/components/**

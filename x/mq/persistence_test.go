@@ -1,7 +1,6 @@
 package mq
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,7 +21,7 @@ func TestKVPersistenceBasic(t *testing.T) {
 	}
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test save message
 	msg := Message{ID: "test-1", Data: "test data"}
@@ -69,7 +68,7 @@ func TestKVPersistenceMultipleMessages(t *testing.T) {
 	}
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Save multiple messages
 	const numMessages = 10
@@ -118,7 +117,7 @@ func TestKVPersistenceAckState(t *testing.T) {
 	}
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Initially, message should not be acked
 	acked, err := backend.GetAckState(ctx, "test-topic", "msg-1")
@@ -175,7 +174,7 @@ func TestBrokerPersistence(t *testing.T) {
 		t.Fatal("persistenceManager should be initialized when persistence is enabled")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message
 	msg := Message{ID: "persist-1", Data: "persistent data"}
@@ -207,7 +206,7 @@ func TestBrokerPersistenceReplay(t *testing.T) {
 	cfg.PersistencePath = tmpDir
 	broker1 := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish messages
 	msg1 := Message{ID: "replay-1", Data: "data-1"}
@@ -262,7 +261,7 @@ func TestPersistenceDisabled(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Try to recover messages when persistence is disabled
 	_, err := broker.RecoverMessages(ctx, "test-topic", 10)
@@ -287,7 +286,7 @@ func TestPersistenceBatch(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish batch of messages
 	messages := []Message{
@@ -320,7 +319,7 @@ func TestPersistenceClose(t *testing.T) {
 	cfg.PersistencePath = tmpDir
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message
 	msg := Message{ID: "close-1", Data: "data"}

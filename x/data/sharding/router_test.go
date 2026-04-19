@@ -191,7 +191,7 @@ func TestRouterExecContext(t *testing.T) {
 	router, _ := createTestRouter(t, 4, CrossShardDeny)
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("successful insert", func(t *testing.T) {
 		query := "INSERT INTO users (user_id, name) VALUES (?, ?)"
@@ -245,7 +245,7 @@ func TestRouterQueryContext(t *testing.T) {
 	router, _ := createTestRouter(t, 4, CrossShardDeny)
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("single shard query", func(t *testing.T) {
 		query := "SELECT * FROM users WHERE user_id = ?"
@@ -273,7 +273,7 @@ func TestRouterQueryRowContext(t *testing.T) {
 	router, _ := createTestRouter(t, 4, CrossShardDeny)
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("single shard query row", func(t *testing.T) {
 		query := "SELECT * FROM users WHERE user_id = ?"
@@ -293,7 +293,7 @@ func TestRouterQueryRowContext(t *testing.T) {
 }
 
 func TestCrossShardPolicies(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("CrossShardDeny", func(t *testing.T) {
 		router, _ := createTestRouter(t, 4, CrossShardDeny)
@@ -343,7 +343,7 @@ func TestRouterBeginTx(t *testing.T) {
 	router, _ := createTestRouter(t, 4, CrossShardDeny)
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("transaction without default shard", func(t *testing.T) {
 		_, err := router.BeginTx(ctx, nil)
@@ -404,7 +404,7 @@ func TestRouterPingContext(t *testing.T) {
 	router, _ := createTestRouter(t, 2, CrossShardDeny)
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("successful ping", func(t *testing.T) {
 		err := router.PingContext(ctx)
@@ -418,7 +418,7 @@ func TestRouterMetrics(t *testing.T) {
 	router, _ := createTestRouter(t, 4, CrossShardDeny)
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("query metrics", func(t *testing.T) {
 		// Execute some queries
@@ -545,7 +545,7 @@ func TestRouterWithMultipleTables(t *testing.T) {
 		}
 		defer router.Close()
 
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Test query on users table
 		query1 := "SELECT * FROM users WHERE user_id = ?"
@@ -574,7 +574,7 @@ func TestRouterWithDefaultShard(t *testing.T) {
 	router.config.DefaultShardIndex = 0
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("query row with invalid shard key uses default", func(t *testing.T) {
 		query := "SELECT * FROM users WHERE name = ?"
@@ -589,7 +589,7 @@ func BenchmarkRouterExecContext(b *testing.B) {
 	router, _ := createTestRouter(&testing.T{}, 4, CrossShardDeny)
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	query := "INSERT INTO users (user_id, name) VALUES (?, ?)"
 
 	b.ResetTimer()
@@ -602,7 +602,7 @@ func BenchmarkRouterQueryContext(b *testing.B) {
 	router, _ := createTestRouter(&testing.T{}, 4, CrossShardDeny)
 	defer router.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	query := "SELECT * FROM users WHERE user_id = ?"
 
 	b.ResetTimer()

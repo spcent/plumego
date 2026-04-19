@@ -202,13 +202,15 @@ func TestHandler_Download(t *testing.T) {
 	}
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"}, nil
+			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"}, nil
 		},
 	}
 	h := NewHandler(storage, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
 	req.SetPathValue("id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	h.Download(w, req)
 
@@ -220,6 +222,26 @@ func TestHandler_Download(t *testing.T) {
 	}
 	if w.Body.String() != "file content" {
 		t.Errorf("Body = %q, want %q", w.Body.String(), "file content")
+	}
+}
+
+func TestHandler_Download_CrossTenant(t *testing.T) {
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, TenantID: "tenant-other", Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"}, nil
+		},
+	}
+	h := NewHandler(&mockStorage{}, metadata)
+
+	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
+	req.SetPathValue("id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-attacker")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.Download(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("Status = %d, want %d (cross-tenant access should be denied)", w.Code, http.StatusForbidden)
 	}
 }
 
@@ -244,13 +266,15 @@ func TestHandler_Download_NotFound(t *testing.T) {
 func TestHandler_GetInfo(t *testing.T) {
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, Name: "test.txt", Size: 1024, MimeType: "text/plain"}, nil
+			return &datafile.File{ID: id, TenantID: "tenant-123", Name: "test.txt", Size: 1024, MimeType: "text/plain"}, nil
 		},
 	}
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/info", nil)
 	req.SetPathValue("id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	h.GetInfo(w, req)
 
@@ -265,11 +289,38 @@ func TestHandler_GetInfo(t *testing.T) {
 	}
 }
 
+func TestHandler_GetInfo_CrossTenant(t *testing.T) {
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, TenantID: "tenant-other", Name: "test.txt", Size: 1024, MimeType: "text/plain"}, nil
+		},
+	}
+	h := NewHandler(&mockStorage{}, metadata)
+
+	req := httptest.NewRequest(http.MethodGet, "/files/test-id/info", nil)
+	req.SetPathValue("id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-attacker")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.GetInfo(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("Status = %d, want %d (cross-tenant access should be denied)", w.Code, http.StatusForbidden)
+	}
+}
+
 func TestHandler_Delete(t *testing.T) {
-	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt"}, nil
+		},
+	}
+	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodDelete, "/files/test-id", nil)
 	req.SetPathValue("id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	h.Delete(w, req)
 
@@ -286,19 +337,41 @@ func TestHandler_Delete(t *testing.T) {
 
 func TestHandler_Delete_NotFound(t *testing.T) {
 	metadata := &mockMetadataManager{
-		deleteFunc: func(ctx context.Context, id string) error {
-			return storefile.ErrNotFound
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return nil, storefile.ErrNotFound
 		},
 	}
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodDelete, "/files/nonexistent", nil)
 	req.SetPathValue("id", "nonexistent")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	h.Delete(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusNotFound)
+	}
+}
+
+func TestHandler_Delete_CrossTenant(t *testing.T) {
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, TenantID: "tenant-other", Path: "test/path.txt"}, nil
+		},
+	}
+	h := NewHandler(&mockStorage{}, metadata)
+
+	req := httptest.NewRequest(http.MethodDelete, "/files/test-id", nil)
+	req.SetPathValue("id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-attacker")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.Delete(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("Status = %d, want %d (cross-tenant delete should be denied)", w.Code, http.StatusForbidden)
 	}
 }
 
@@ -314,6 +387,8 @@ func TestHandler_List(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files?page=1&page_size=20", nil)
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	h.List(w, req)
 
@@ -328,6 +403,18 @@ func TestHandler_List(t *testing.T) {
 	}
 }
 
+func TestHandler_List_MissingTenant(t *testing.T) {
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+
+	req := httptest.NewRequest(http.MethodGet, "/files?page=1&page_size=20", nil)
+	w := httptest.NewRecorder()
+	h.List(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Status = %d, want %d (missing tenant should return 400)", w.Code, http.StatusBadRequest)
+	}
+}
+
 func TestHandler_List_WithFilters(t *testing.T) {
 	var capturedQuery datafile.Query
 	metadata := &mockMetadataManager{
@@ -338,7 +425,9 @@ func TestHandler_List_WithFilters(t *testing.T) {
 	}
 	h := NewHandler(&mockStorage{}, metadata)
 
-	req := httptest.NewRequest(http.MethodGet, "/files?tenant_id=tenant-123&mime_type=image/jpeg&page=2&page_size=10", nil)
+	req := httptest.NewRequest(http.MethodGet, "/files?mime_type=image/jpeg&page=2&page_size=10", nil)
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	h.List(w, req)
 
@@ -364,13 +453,15 @@ func TestHandler_GetURL(t *testing.T) {
 	}
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, Path: "test/path.txt"}, nil
+			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt"}, nil
 		},
 	}
 	h := NewHandler(storage, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/url?expiry=3600", nil)
 	req.SetPathValue("id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	h.GetURL(w, req)
 
@@ -385,6 +476,26 @@ func TestHandler_GetURL(t *testing.T) {
 	}
 	if result["expires_in"] != "3600" {
 		t.Errorf("ExpiresIn = %q, want 3600", result["expires_in"])
+	}
+}
+
+func TestHandler_GetURL_CrossTenant(t *testing.T) {
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, TenantID: "tenant-other", Path: "test/path.txt"}, nil
+		},
+	}
+	h := NewHandler(&mockStorage{}, metadata)
+
+	req := httptest.NewRequest(http.MethodGet, "/files/test-id/url", nil)
+	req.SetPathValue("id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-attacker")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.GetURL(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("Status = %d, want %d (cross-tenant URL access should be denied)", w.Code, http.StatusForbidden)
 	}
 }
 
@@ -431,12 +542,19 @@ func BenchmarkHandler_Upload(b *testing.B) {
 }
 
 func BenchmarkHandler_Download(b *testing.B) {
-	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"}, nil
+		},
+	}
+	h := NewHandler(&mockStorage{}, metadata)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
 		req.SetPathValue("id", "test-id")
+		ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 		h.Download(w, req)
 	}

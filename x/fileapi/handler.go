@@ -8,7 +8,6 @@
 package fileapi
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"html"
@@ -138,7 +137,16 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go h.metadata.UpdateAccessTime(context.Background(), fileID)
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if tenantID == "" || fileMeta.TenantID != tenantID {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeForbidden).
+			Message("access denied").
+			Build())
+		return
+	}
+
+	_ = h.metadata.UpdateAccessTime(ctx, fileID)
 
 	reader, err := h.storage.Get(ctx, fileMeta.Path)
 	if err != nil {
@@ -161,6 +169,7 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 // GetInfo returns file metadata.
 // GET /files/{id}/info
 func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
@@ -173,9 +182,18 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fileMeta, err := h.metadata.Get(r.Context(), fileID)
+	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
 		writeFileMetadataError(w, r, err)
+		return
+	}
+
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if tenantID == "" || fileMeta.TenantID != tenantID {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeForbidden).
+			Message("access denied").
+			Build())
 		return
 	}
 
@@ -185,6 +203,7 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 // Delete soft-deletes a file.
 // DELETE /files/{id}
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	fileID := r.PathValue("id")
 
 	if fileID == "" {
@@ -197,7 +216,22 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.metadata.Delete(r.Context(), fileID); err != nil {
+	fileMeta, err := h.metadata.Get(ctx, fileID)
+	if err != nil {
+		writeFileMetadataError(w, r, err)
+		return
+	}
+
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if tenantID == "" || fileMeta.TenantID != tenantID {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeForbidden).
+			Message("access denied").
+			Build())
+		return
+	}
+
+	if err := h.metadata.Delete(ctx, fileID); err != nil {
 		writeFileMetadataError(w, r, err)
 		return
 	}
@@ -206,7 +240,8 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // List returns a paginated list of files.
-// GET /files?page=1&page_size=20&tenant_id=xxx&mime_type=image/jpeg&uploaded_by=user1
+// GET /files?page=1&page_size=20&mime_type=image/jpeg&uploaded_by=user1
+// Requires tenant identity in request context.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -224,7 +259,17 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	query.TenantID = r.URL.Query().Get("tenant_id")
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if tenantID == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Status(http.StatusBadRequest).
+			Code(contract.CodeBadRequest).
+			Message("missing tenant id in context").
+			Category(contract.CategoryValidation).
+			Build())
+		return
+	}
+	query.TenantID = tenantID
 	query.UploadedBy = r.URL.Query().Get("uploaded_by")
 	query.MimeType = r.URL.Query().Get("mime_type")
 	query.OrderBy = r.URL.Query().Get("order_by")
@@ -285,6 +330,15 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	fileMeta, err := h.metadata.Get(ctx, fileID)
 	if err != nil {
 		writeFileMetadataError(w, r, err)
+		return
+	}
+
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if tenantID == "" || fileMeta.TenantID != tenantID {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeForbidden).
+			Message("access denied").
+			Build())
 		return
 	}
 

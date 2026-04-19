@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -216,7 +215,7 @@ func TestTimer(t *testing.T) {
 func TestObserveFunc(t *testing.T) {
 	collector := NewMemoryCollector()
 
-	err := ObserveFunc(context.Background(), collector, "test_func", func() error {
+	err := ObserveFunc(t.Context(), collector, "test_func", func() error {
 		time.Sleep(5 * time.Millisecond)
 		return nil
 	}, Tags("func", "test")...)

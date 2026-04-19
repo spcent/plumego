@@ -1,7 +1,6 @@
 package sharding
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 
@@ -13,7 +12,7 @@ func TestTracer_StartSpan(t *testing.T) {
 	config.Enabled = true
 	tracer := NewTracer(config)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("create span", func(t *testing.T) {
 		newCtx, span := tracer.StartSpan(ctx, "test.operation")
@@ -46,7 +45,7 @@ func TestTracer_StartSpan(t *testing.T) {
 
 func TestSpan_SetAttribute(t *testing.T) {
 	tracer := NewTracer(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 	_, span := tracer.StartSpan(ctx, "test")
 
 	span.SetAttribute("key1", "value1")
@@ -63,7 +62,7 @@ func TestSpan_SetAttribute(t *testing.T) {
 
 func TestSpan_SetAttributes(t *testing.T) {
 	tracer := NewTracer(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 	_, span := tracer.StartSpan(ctx, "test")
 
 	attrs := map[string]any{
@@ -83,7 +82,7 @@ func TestSpan_SetAttributes(t *testing.T) {
 
 func TestSpan_AddEvent(t *testing.T) {
 	tracer := NewTracer(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 	_, span := tracer.StartSpan(ctx, "test")
 
 	span.AddEvent("query.start", map[string]any{
@@ -101,7 +100,7 @@ func TestSpan_AddEvent(t *testing.T) {
 
 func TestSpan_SetStatus(t *testing.T) {
 	tracer := NewTracer(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 	_, span := tracer.StartSpan(ctx, "test")
 
 	span.SetStatus(SpanStatusOK, "success")
@@ -117,7 +116,7 @@ func TestSpan_SetStatus(t *testing.T) {
 
 func TestSpan_RecordError(t *testing.T) {
 	tracer := NewTracer(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 	_, span := tracer.StartSpan(ctx, "test")
 
 	err := ErrShardNotFound
@@ -141,7 +140,7 @@ func TestTracingHelper_TraceQuery(t *testing.T) {
 	config.Enabled = true
 	helper := NewTracingHelper(config)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	query := "SELECT * FROM users WHERE id = ?"
 	args := []any{123}
 
@@ -166,7 +165,7 @@ func TestTracingHelper_TraceQuery(t *testing.T) {
 
 func TestTracingHelper_TraceShardResolve(t *testing.T) {
 	helper := NewTracingHelper(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	newCtx, span := helper.TraceShardResolve(ctx, "users")
 
@@ -185,7 +184,7 @@ func TestTracingHelper_TraceShardResolve(t *testing.T) {
 
 func TestTracingHelper_TraceSQLRewrite(t *testing.T) {
 	helper := NewTracingHelper(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	originalSQL := "SELECT * FROM users"
 	newCtx, span := helper.TraceSQLRewrite(ctx, originalSQL)
@@ -205,7 +204,7 @@ func TestTracingHelper_TraceSQLRewrite(t *testing.T) {
 
 func TestTracingHelper_TraceShardQuery(t *testing.T) {
 	helper := NewTracingHelper(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	query := "SELECT * FROM users_0"
 	newCtx, span := helper.TraceShardQuery(ctx, 0, query)
@@ -229,7 +228,7 @@ func TestTracingHelper_TraceShardQuery(t *testing.T) {
 
 func TestTracingHelper_TraceCrossShardQuery(t *testing.T) {
 	helper := NewTracingHelper(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	newCtx, span := helper.TraceCrossShardQuery(ctx, 4, "all")
 
@@ -294,7 +293,7 @@ func BenchmarkTracer_StartSpan(b *testing.B) {
 	config := DefaultTracingConfig()
 	config.Enabled = true
 	tracer := NewTracer(config)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -305,7 +304,7 @@ func BenchmarkTracer_StartSpan(b *testing.B) {
 
 func BenchmarkSpan_SetAttribute(b *testing.B) {
 	tracer := NewTracer(DefaultTracingConfig())
-	ctx := context.Background()
+	ctx := b.Context()
 	_, span := tracer.StartSpan(ctx, "test")
 
 	b.ResetTimer()

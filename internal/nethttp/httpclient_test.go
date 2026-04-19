@@ -65,7 +65,7 @@ func TestRetryPolicyComposition(t *testing.T) {
 		WithRetryPolicy(StatusCodeRetryPolicy{Codes: []int{http.StatusInternalServerError}}),
 	)
 
-	body, err := client.Get(context.Background(), server.URL)
+	body, err := client.Get(t.Context(), server.URL)
 	if err != nil {
 		t.Fatalf("get failed: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestPostErrorsPropagate(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	client := New()
-	if _, err := client.Post(context.Background(), srv.URL, []byte("demo"), "text/plain"); err == nil {
+	if _, err := client.Post(t.Context(), srv.URL, []byte("demo"), "text/plain"); err == nil {
 		t.Fatalf("expected http error on non-2xx status")
 	}
 }
@@ -133,7 +133,7 @@ func TestGetErrorsPropagate(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	client := New()
-	if _, err := client.Get(context.Background(), srv.URL); err == nil {
+	if _, err := client.Get(t.Context(), srv.URL); err == nil {
 		t.Fatalf("expected http error on non-2xx status")
 	}
 }
@@ -182,7 +182,7 @@ func TestRetryReplaysBody(t *testing.T) {
 		WithRetryPolicy(StatusCodeRetryPolicy{Codes: []int{http.StatusInternalServerError}}),
 	)
 
-	_, err := client.Post(context.Background(), server.URL, []byte("hello"), "text/plain")
+	_, err := client.Post(t.Context(), server.URL, []byte("hello"), "text/plain")
 	if err != nil {
 		t.Fatalf("post failed: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestRetryCheckDisablesRetries(t *testing.T) {
 		}),
 	)
 
-	_, err := client.Post(context.Background(), server.URL, []byte("demo"), "text/plain")
+	_, err := client.Post(t.Context(), server.URL, []byte("demo"), "text/plain")
 	if err == nil {
 		t.Fatalf("expected error on server response")
 	}

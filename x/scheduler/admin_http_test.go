@@ -14,7 +14,7 @@ import (
 func TestAdminHandlerEndpoints(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	_, err := s.Delay("admin-1", 10*time.Millisecond, func(ctx context.Context) error {
 		return nil
@@ -95,7 +95,7 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 func TestAdminHandlerBulkDLQAndPrefix(t *testing.T) {
 	s := New(WithWorkers(2), WithDeadLetterQueue(10))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	_, err := s.Delay("g1-t1", time.Hour, func(context.Context) error { return nil }, WithGroup("g1"), WithTags("t1"))
 	if err != nil {

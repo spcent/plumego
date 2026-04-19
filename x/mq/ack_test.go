@@ -1,7 +1,6 @@
 package mq
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -92,7 +91,7 @@ func TestPublishWithAckSuccess(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message with ACK (provide explicit AckID)
 	ackMsg := AckMessage{
@@ -135,7 +134,7 @@ func TestPublishWithAckTimeout(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to dead letter queue
 	dlqSub, err := broker.Subscribe(ctx, "dlq", SubOptions{BufferSize: 10})
@@ -179,7 +178,7 @@ func TestNackImmediateRedelivery(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to the topic
 	sub, err := broker.Subscribe(ctx, "test-topic", SubOptions{BufferSize: 10})
@@ -233,7 +232,7 @@ func TestAckDisabledError(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Try to publish with ACK when support is disabled
 	ackMsg := AckMessage{
@@ -340,7 +339,7 @@ func TestAckGeneratedID(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message without ACK ID
 	ackMsg := AckMessage{
@@ -370,7 +369,7 @@ func TestAckNoPolicySkipsTracking(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message with AckNone policy
 	ackMsg := AckMessage{

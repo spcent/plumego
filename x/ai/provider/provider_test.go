@@ -203,12 +203,12 @@ func TestMockProvider_QueueReuseAndCalls(t *testing.T) {
 	})
 
 	req := &CompletionRequest{Model: "mock-model"}
-	first, err := mock.Complete(context.Background(), req)
+	first, err := mock.Complete(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Complete() first call error = %v", err)
 	}
 
-	second, err := mock.Complete(context.Background(), req)
+	second, err := mock.Complete(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Complete() second call error = %v", err)
 	}
@@ -230,10 +230,10 @@ func TestMockProvider_ErrorAndStreaming(t *testing.T) {
 	mock := NewMockProvider("mock")
 	mock.SetError(io.ErrUnexpectedEOF)
 
-	if _, err := mock.Complete(context.Background(), &CompletionRequest{Model: "mock-model"}); err == nil {
+	if _, err := mock.Complete(t.Context(), &CompletionRequest{Model: "mock-model"}); err == nil {
 		t.Fatal("Complete() should return configured error")
 	}
-	if _, err := mock.CompleteStream(context.Background(), &CompletionRequest{Model: "mock-model"}); err == nil {
+	if _, err := mock.CompleteStream(t.Context(), &CompletionRequest{Model: "mock-model"}); err == nil {
 		t.Fatal("CompleteStream() should return configured error")
 	}
 
@@ -248,7 +248,7 @@ func TestMockProvider_ErrorAndStreaming(t *testing.T) {
 		},
 	})
 
-	stream, err := mock.CompleteStream(context.Background(), &CompletionRequest{Model: "mock-model"})
+	stream, err := mock.CompleteStream(t.Context(), &CompletionRequest{Model: "mock-model"})
 	if err != nil {
 		t.Fatalf("CompleteStream() error = %v", err)
 	}
@@ -286,7 +286,7 @@ func TestDefaultRouter_Route(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.model, func(t *testing.T) {
 			req := &CompletionRequest{Model: tt.model}
-			provider, err := router.Route(context.Background(), req, providers)
+			provider, err := router.Route(t.Context(), req, providers)
 			if err != nil {
 				t.Errorf("Route() error = %v", err)
 			}
@@ -308,13 +308,13 @@ func TestLoadBalancerRouter_Route(t *testing.T) {
 	req := &CompletionRequest{Model: "test"}
 
 	// First call should go to provider1
-	provider1, err := router.Route(context.Background(), req, providers)
+	provider1, err := router.Route(t.Context(), req, providers)
 	if err != nil {
 		t.Errorf("Route() error = %v", err)
 	}
 
 	// Second call should go to provider2
-	provider2, err := router.Route(context.Background(), req, providers)
+	provider2, err := router.Route(t.Context(), req, providers)
 	if err != nil {
 		t.Errorf("Route() error = %v", err)
 	}
@@ -480,7 +480,7 @@ func TestTaskBasedRouter_Route(t *testing.T) {
 					NewTextMessage(RoleUser, tt.prompt),
 				},
 			}
-			provider, err := router.Route(context.Background(), req, providers)
+			provider, err := router.Route(t.Context(), req, providers)
 			if err != nil {
 				t.Fatalf("Route() error = %v", err)
 			}
@@ -532,7 +532,7 @@ func TestCostOptimizedRouter_Route(t *testing.T) {
 				Messages: []Message{NewTextMessage(RoleUser, "test")},
 			}
 
-			provider, err := router.Route(context.Background(), req, providers)
+			provider, err := router.Route(t.Context(), req, providers)
 			if err != nil {
 				t.Fatalf("Route() error = %v", err)
 			}
@@ -577,7 +577,7 @@ func TestFallbackRouter_Route(t *testing.T) {
 					NewTextMessage(RoleUser, tt.prompt),
 				},
 			}
-			provider, err := router.Route(context.Background(), req, providers)
+			provider, err := router.Route(t.Context(), req, providers)
 			if err != nil {
 				t.Fatalf("Route() error = %v", err)
 			}
@@ -620,7 +620,7 @@ func TestSmartRouter_Route(t *testing.T) {
 					NewTextMessage(RoleUser, tt.prompt),
 				},
 			}
-			provider, err := router.Route(context.Background(), req, providers)
+			provider, err := router.Route(t.Context(), req, providers)
 			if err != nil {
 				t.Fatalf("Route() error = %v", err)
 			}
@@ -649,7 +649,7 @@ func TestSmartRouter_CustomStrategies(t *testing.T) {
 		},
 	}
 
-	provider, err := router.Route(context.Background(), req, providers)
+	provider, err := router.Route(t.Context(), req, providers)
 	if err != nil {
 		t.Fatalf("Route() error = %v", err)
 	}

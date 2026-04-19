@@ -46,12 +46,12 @@ func TestWorkerDeduperSkipsCompleted(t *testing.T) {
 		return nil
 	})
 
-	worker.Start(context.Background())
+	worker.Start(t.Context())
 	defer func() {
-		_ = worker.Stop(context.Background())
+		_ = worker.Stop(t.Context())
 	}()
 
-	err := queue.Enqueue(context.Background(), mq.Task{
+	err := queue.Enqueue(t.Context(), mq.Task{
 		ID:       "task-1",
 		Topic:    "send",
 		TenantID: "tenant-1",
@@ -67,7 +67,7 @@ func TestWorkerDeduperSkipsCompleted(t *testing.T) {
 		t.Fatalf("expected handler to be skipped, got %d", handled.Load())
 	}
 
-	reserved, err := queue.Reserve(context.Background(), mq.ReserveOptions{
+	reserved, err := queue.Reserve(t.Context(), mq.ReserveOptions{
 		Topics:     []string{"send"},
 		Limit:      1,
 		ConsumerID: "probe",
@@ -105,9 +105,9 @@ func TestWorkerStopDrainsInflight(t *testing.T) {
 		}
 	})
 
-	worker.Start(context.Background())
+	worker.Start(t.Context())
 
-	err := queue.Enqueue(context.Background(), mq.Task{
+	err := queue.Enqueue(t.Context(), mq.Task{
 		ID:       "task-2",
 		Topic:    "send",
 		TenantID: "tenant-1",
@@ -125,7 +125,7 @@ func TestWorkerStopDrainsInflight(t *testing.T) {
 
 	stopErr := make(chan error, 1)
 	go func() {
-		stopErr <- worker.Stop(context.Background())
+		stopErr <- worker.Stop(t.Context())
 	}()
 
 	time.Sleep(50 * time.Millisecond)
@@ -140,7 +140,7 @@ func TestWorkerStopDrainsInflight(t *testing.T) {
 		t.Fatalf("stop timed out")
 	}
 
-	reserved, err := queue.Reserve(context.Background(), mq.ReserveOptions{
+	reserved, err := queue.Reserve(t.Context(), mq.ReserveOptions{
 		Topics:     []string{"send"},
 		Limit:      1,
 		ConsumerID: "probe",

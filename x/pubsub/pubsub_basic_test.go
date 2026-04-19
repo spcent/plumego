@@ -10,11 +10,11 @@ func TestPubSub_MultiSubscriberReceive(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub1, err := ps.Subscribe("user.created", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub1, err := ps.Subscribe(t.Context(), "user.created", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe sub1: %v", err)
 	}
-	sub2, err := ps.Subscribe("user.created", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub2, err := ps.Subscribe(t.Context(), "user.created", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe sub2: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestPubSub_CancelStopsDelivery(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 1, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 1, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -100,11 +100,11 @@ func TestPubSub_MessageImmutability(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub1, err := ps.Subscribe("topic", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub1, err := ps.Subscribe(t.Context(), "topic", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe sub1: %v", err)
 	}
-	sub2, err := ps.Subscribe("topic", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub2, err := ps.Subscribe(t.Context(), "topic", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe sub2: %v", err)
 	}

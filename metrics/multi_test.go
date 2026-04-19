@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -33,7 +32,7 @@ func TestMultiCollector(t *testing.T) {
 		t.Fatalf("expected multi collector, got nil")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Record HTTP metric
 	multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
@@ -55,7 +54,7 @@ func TestMultiCollectorAllMethods(t *testing.T) {
 		t.Fatalf("expected multi collector, got nil")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test both stable observation paths
 	multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
@@ -78,7 +77,7 @@ func TestMultiCollectorGetStats(t *testing.T) {
 		t.Fatalf("expected multi collector, got nil")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add metrics to both collectors via multi
 	multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)
@@ -176,7 +175,7 @@ func TestMultiCollectorClear(t *testing.T) {
 		t.Fatalf("expected multi collector, got nil")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add metrics
 	multi.ObserveHTTP(ctx, "GET", "/test", 200, 100, 50*time.Millisecond)

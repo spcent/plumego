@@ -290,7 +290,7 @@ func (b *InProcBroker) SubscribeWithAck(ctx context.Context, topic string, opts 
 		}
 
 		// Subscribe
-		subscription, err := b.ps.Subscribe(topic, opts)
+		subscription, err := b.ps.Subscribe(context.Background(), topic, opts)
 		if err != nil {
 			return err
 		}

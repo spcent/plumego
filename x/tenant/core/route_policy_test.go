@@ -8,7 +8,7 @@ import (
 
 func TestInMemoryRoutePolicyStore(t *testing.T) {
 	store := NewInMemoryRoutePolicyStore()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := store.RoutePolicy(ctx, "missing")
 	if err != ErrRoutePolicyNotFound {
@@ -34,7 +34,7 @@ func TestInMemoryRoutePolicyStore(t *testing.T) {
 }
 
 func TestCachedRoutePolicyProvider(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	provider := &testRoutePolicyProvider{}
 	cache := NewInMemoryRoutePolicyCache(10, 50*time.Millisecond)
 	cached := NewCachedRoutePolicyProvider(provider, cache)
@@ -67,7 +67,7 @@ func TestCachedRoutePolicyProvider(t *testing.T) {
 }
 
 func TestInMemoryRoutePolicyCache_EvictExpiredFirst(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	maxSize := 3
 	// Use a tiny TTL so the pre-filled entries expire immediately.
 	cache := NewInMemoryRoutePolicyCache(maxSize, 1*time.Millisecond)
@@ -99,7 +99,7 @@ func TestInMemoryRoutePolicyCache_EvictExpiredFirst(t *testing.T) {
 }
 
 func TestInMemoryRoutePolicyCache_EvictArbitraryWhenNoneExpired(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	maxSize := 3
 	cache := NewInMemoryRoutePolicyCache(maxSize, 1*time.Hour)
 

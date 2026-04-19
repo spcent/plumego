@@ -7,25 +7,22 @@ import (
 	"sync/atomic"
 )
 
-// Cache configuration constants
+// Cache configuration constants (unexported; exposed only via RouterOption).
 const (
-	// DefaultPatternCacheSize is the default size for pattern cache per method
-	DefaultPatternCacheSize = 50
-
-	// MinCacheCapacity is the minimum allowed cache capacity
-	MinCacheCapacity = 10
+	defaultPatternCacheSize = 50
+	minCacheCapacity        = 10
 )
 
 // cacheEntry represents a cached route match result
 type cacheEntry struct {
 	key   string
-	value *MatchResult
+	value *matchResult
 }
 
 // patternCacheEntry represents a cached route pattern for parameterized routes
 type patternCacheEntry struct {
 	pattern     string             // Route pattern like /users/:id
-	result      *MatchResult       // Cached match result (without param values)
+	result      *matchResult       // Cached match result (without param values)
 	precompiled precompiledPattern // Pre-split pattern for fast matching
 }
 
@@ -63,7 +60,7 @@ func newMatchCache(capacity int) *matchCache {
 }
 
 // Get retrieves a cached route match result
-func (rc *matchCache) Get(key string) (*MatchResult, bool) {
+func (rc *matchCache) Get(key string) (*matchResult, bool) {
 	// First try with read lock
 	rc.mu.RLock()
 	element, exists := rc.cache[key]
@@ -94,7 +91,7 @@ func (rc *matchCache) Get(key string) (*MatchResult, bool) {
 
 // Lookup performs a single cache lookup across exact and parameterized routes.
 // It records one hit or one miss for the entire lookup.
-func (rc *matchCache) Lookup(method, path, key string) (*MatchResult, []string, bool) {
+func (rc *matchCache) Lookup(method, path, key string) (*matchResult, []string, bool) {
 	rc.mu.RLock()
 	element, exists := rc.cache[key]
 	if exists {
@@ -126,7 +123,7 @@ func (rc *matchCache) Lookup(method, path, key string) (*MatchResult, []string, 
 
 // GetByPattern tries to match a path against cached patterns for parameterized routes.
 // Returns the match result and extracted parameter values if found.
-func (rc *matchCache) GetByPattern(method, path string) (*MatchResult, []string, bool) {
+func (rc *matchCache) GetByPattern(method, path string) (*matchResult, []string, bool) {
 	result, paramValues, found := rc.matchPatternCache(method, path)
 	if found {
 		atomic.AddUint64(&rc.hits, 1)
@@ -136,7 +133,7 @@ func (rc *matchCache) GetByPattern(method, path string) (*MatchResult, []string,
 
 // matchPatternCache is the shared implementation for pattern-based cache lookup.
 // It does NOT update hit/miss counters; callers are responsible for that.
-func (rc *matchCache) matchPatternCache(method, path string) (*MatchResult, []string, bool) {
+func (rc *matchCache) matchPatternCache(method, path string) (*matchResult, []string, bool) {
 	rc.patternMu.RLock()
 	patterns, exists := rc.patternCache[method]
 	if !exists || len(patterns) == 0 {
@@ -178,7 +175,7 @@ func (rc *matchCache) matchPatternCache(method, path string) (*MatchResult, []st
 }
 
 // Set adds a route match result to the cache
-func (rc *matchCache) Set(key string, value *MatchResult) {
+func (rc *matchCache) Set(key string, value *matchResult) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
@@ -208,7 +205,7 @@ func (rc *matchCache) Set(key string, value *MatchResult) {
 // SetPattern adds a parameterized route pattern to the cache
 // This is used for routes like /users/:id where we cache the pattern
 // instead of each individual path
-func (rc *matchCache) SetPattern(method, pattern string, result *MatchResult) {
+func (rc *matchCache) SetPattern(method, pattern string, result *matchResult) {
 	rc.patternMu.Lock()
 	defer rc.patternMu.Unlock()
 

@@ -13,7 +13,7 @@ func TestWithPrincipalRoundTrip(t *testing.T) {
 		Scopes:   []string{"read", "write"},
 	}
 
-	ctx := WithPrincipal(context.Background(), p)
+	ctx := WithPrincipal(t.Context(), p)
 	got := PrincipalFromContext(ctx)
 	if got == nil {
 		t.Fatal("expected non-nil principal from context")
@@ -40,14 +40,14 @@ func TestWithPrincipalNilContext(t *testing.T) {
 }
 
 func TestPrincipalFromContextNil(t *testing.T) {
-	got := PrincipalFromContext(context.Background())
+	got := PrincipalFromContext(t.Context())
 	if got != nil {
 		t.Fatalf("expected nil principal from empty context, got %+v", got)
 	}
 }
 
 func TestPrincipalFromContextWrongType(t *testing.T) {
-	ctx := context.WithValue(context.Background(), struct{}{}, "not-a-principal")
+	ctx := context.WithValue(t.Context(), struct{}{}, "not-a-principal")
 	got := PrincipalFromContext(ctx)
 	if got != nil {
 		t.Fatalf("expected nil for missing principal, got %+v", got)
@@ -58,7 +58,7 @@ func TestWithPrincipalOverwrite(t *testing.T) {
 	p1 := &Principal{Subject: "user-1"}
 	p2 := &Principal{Subject: "user-2"}
 
-	ctx := WithPrincipal(context.Background(), p1)
+	ctx := WithPrincipal(t.Context(), p1)
 	ctx = WithPrincipal(ctx, p2)
 
 	got := PrincipalFromContext(ctx)
@@ -71,7 +71,7 @@ func TestWithPrincipalOverwrite(t *testing.T) {
 }
 
 func TestPrincipalFromContextNilPrincipalStored(t *testing.T) {
-	ctx := WithPrincipal(context.Background(), nil)
+	ctx := WithPrincipal(t.Context(), nil)
 	got := PrincipalFromContext(ctx)
 	if got != nil {
 		t.Fatalf("expected nil for explicitly stored nil principal, got %+v", got)

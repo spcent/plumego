@@ -220,6 +220,23 @@ type JWTConfig struct {
 	ClockSkew time.Duration
 }
 
+// Validate checks that the configuration is usable before the manager starts.
+func (c JWTConfig) Validate() error {
+	if c.AccessExpiration <= 0 {
+		return fmt.Errorf("jwt: AccessExpiration must be positive, got %v", c.AccessExpiration)
+	}
+	if c.RefreshExpiration <= 0 {
+		return fmt.Errorf("jwt: RefreshExpiration must be positive, got %v", c.RefreshExpiration)
+	}
+	if c.RefreshExpiration < c.AccessExpiration {
+		return fmt.Errorf("jwt: RefreshExpiration (%v) must be >= AccessExpiration (%v)", c.RefreshExpiration, c.AccessExpiration)
+	}
+	if c.Algorithm != "" && c.Algorithm != AlgorithmHS256 && c.Algorithm != AlgorithmEdDSA {
+		return fmt.Errorf("jwt: unsupported Algorithm %q, must be %q or %q", c.Algorithm, AlgorithmHS256, AlgorithmEdDSA)
+	}
+	return nil
+}
+
 // DefaultJWTConfig returns sane defaults.
 //
 // Defaults:
@@ -344,6 +361,9 @@ type JWTManager struct {
 func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error) {
 	if store == nil {
 		return nil, errors.New("kv store is required")
+	}
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
 	mgr := &JWTManager{

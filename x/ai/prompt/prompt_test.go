@@ -1,7 +1,6 @@
 package prompt
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -20,7 +19,7 @@ func TestEngine_Register(t *testing.T) {
 		},
 	}
 
-	err := engine.Register(context.Background(), tmpl)
+	err := engine.Register(t.Context(), tmpl)
 	if err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
@@ -31,7 +30,7 @@ func TestEngine_Register(t *testing.T) {
 	}
 
 	// Verify it can be retrieved
-	retrieved, err := engine.Get(context.Background(), tmpl.ID)
+	retrieved, err := engine.Get(t.Context(), tmpl.ID)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
@@ -50,7 +49,7 @@ func TestEngine_Register_InvalidSyntax(t *testing.T) {
 		Content: "Hello {{.Name}", // Missing closing brace
 	}
 
-	err := engine.Register(context.Background(), tmpl)
+	err := engine.Register(t.Context(), tmpl)
 	if err == nil {
 		t.Error("Register() should fail with invalid template syntax")
 	}
@@ -70,9 +69,9 @@ func TestEngine_Render(t *testing.T) {
 		},
 	}
 
-	engine.Register(context.Background(), tmpl)
+	engine.Register(t.Context(), tmpl)
 
-	result, err := engine.Render(context.Background(), tmpl.ID, map[string]any{
+	result, err := engine.Render(t.Context(), tmpl.ID, map[string]any{
 		"Name":  "Alice",
 		"Place": "Wonderland",
 	})
@@ -98,9 +97,9 @@ func TestEngine_Render_MissingRequired(t *testing.T) {
 		},
 	}
 
-	engine.Register(context.Background(), tmpl)
+	engine.Register(t.Context(), tmpl)
 
-	_, err := engine.Render(context.Background(), tmpl.ID, map[string]any{})
+	_, err := engine.Render(t.Context(), tmpl.ID, map[string]any{})
 	if err == nil {
 		t.Error("Render() should fail with missing required variable")
 	}
@@ -118,9 +117,9 @@ func TestEngine_Render_DefaultValue(t *testing.T) {
 		},
 	}
 
-	engine.Register(context.Background(), tmpl)
+	engine.Register(t.Context(), tmpl)
 
-	result, err := engine.Render(context.Background(), tmpl.ID, map[string]any{})
+	result, err := engine.Render(t.Context(), tmpl.ID, map[string]any{})
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -140,9 +139,9 @@ func TestEngine_Render_TemplateFunctions(t *testing.T) {
 		Content: "{{.Text | upper}}",
 	}
 
-	engine.Register(context.Background(), tmpl)
+	engine.Register(t.Context(), tmpl)
 
-	result, err := engine.Render(context.Background(), tmpl.ID, map[string]any{
+	result, err := engine.Render(t.Context(), tmpl.ID, map[string]any{
 		"Text": "hello",
 	})
 	if err != nil {
@@ -170,11 +169,11 @@ func TestEngine_GetByName(t *testing.T) {
 		Content: "Version 2",
 	}
 
-	engine.Register(context.Background(), v1)
-	engine.Register(context.Background(), v2)
+	engine.Register(t.Context(), v1)
+	engine.Register(t.Context(), v2)
 
 	// Get latest version
-	latest, err := engine.GetByName(context.Background(), "test")
+	latest, err := engine.GetByName(t.Context(), "test")
 	if err != nil {
 		t.Fatalf("GetByName() error = %v", err)
 	}
@@ -196,10 +195,10 @@ func TestEngine_ListVersions(t *testing.T) {
 			Version: ver,
 			Content: "Content",
 		}
-		engine.Register(context.Background(), tmpl)
+		engine.Register(t.Context(), tmpl)
 	}
 
-	list, err := engine.ListVersions(context.Background(), "test")
+	list, err := engine.ListVersions(t.Context(), "test")
 	if err != nil {
 		t.Fatalf("ListVersions() error = %v", err)
 	}
@@ -229,11 +228,11 @@ func TestEngine_ListByTag(t *testing.T) {
 		Tags:    []string{"docs"},
 	}
 
-	engine.Register(context.Background(), tmpl1)
-	engine.Register(context.Background(), tmpl2)
-	engine.Register(context.Background(), tmpl3)
+	engine.Register(t.Context(), tmpl1)
+	engine.Register(t.Context(), tmpl2)
+	engine.Register(t.Context(), tmpl3)
 
-	list, err := engine.ListByTag(context.Background(), "coding")
+	list, err := engine.ListByTag(t.Context(), "coding")
 	if err != nil {
 		t.Fatalf("ListByTag() error = %v", err)
 	}
@@ -252,9 +251,9 @@ func TestEngine_RenderByName(t *testing.T) {
 		Content: "Hello {{.Name}}!",
 	}
 
-	engine.Register(context.Background(), tmpl)
+	engine.Register(t.Context(), tmpl)
 
-	result, err := engine.RenderByName(context.Background(), "greeting", map[string]any{
+	result, err := engine.RenderByName(t.Context(), "greeting", map[string]any{
 		"Name": "Bob",
 	})
 	if err != nil {
@@ -275,16 +274,16 @@ func TestEngine_Delete(t *testing.T) {
 		Content: "Content",
 	}
 
-	engine.Register(context.Background(), tmpl)
+	engine.Register(t.Context(), tmpl)
 
 	// Delete
-	err := engine.Delete(context.Background(), tmpl.ID)
+	err := engine.Delete(t.Context(), tmpl.ID)
 	if err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
 	// Verify deletion
-	_, err = engine.Get(context.Background(), tmpl.ID)
+	_, err = engine.Get(t.Context(), tmpl.ID)
 	if err == nil {
 		t.Error("Get() should fail after Delete()")
 	}
@@ -326,7 +325,7 @@ func TestLoadBuiltinTemplates(t *testing.T) {
 	}
 
 	// Try to render one
-	result, err := engine.RenderByName(context.Background(), "summarizer", map[string]any{
+	result, err := engine.RenderByName(t.Context(), "summarizer", map[string]any{
 		"Text": "This is a test text.",
 	})
 	if err != nil {
@@ -349,13 +348,13 @@ func TestMemoryStorage(t *testing.T) {
 	}
 
 	// Save
-	err := storage.Save(context.Background(), tmpl)
+	err := storage.Save(t.Context(), tmpl)
 	if err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 
 	// Load
-	loaded, err := storage.Load(context.Background(), "test-1")
+	loaded, err := storage.Load(t.Context(), "test-1")
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -365,13 +364,13 @@ func TestMemoryStorage(t *testing.T) {
 	}
 
 	// Delete
-	err = storage.Delete(context.Background(), "test-1")
+	err = storage.Delete(t.Context(), "test-1")
 	if err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
 	// Verify deletion
-	_, err = storage.Load(context.Background(), "test-1")
+	_, err = storage.Load(t.Context(), "test-1")
 	if err == nil {
 		t.Error("Load() should fail after Delete()")
 	}
@@ -386,7 +385,7 @@ func TestMemoryStorage_Clear(t *testing.T) {
 			Name:    fmt.Sprintf("test-%d", i),
 			Content: "Content",
 		}
-		storage.Save(context.Background(), tmpl)
+		storage.Save(t.Context(), tmpl)
 	}
 
 	if count := storage.Count(); count != 5 {

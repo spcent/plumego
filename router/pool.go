@@ -9,7 +9,7 @@ import (
 
 var paramValuesPool = sync.Pool{
 	New: func() any {
-		s := make([]string, 0, DefaultPoolSliceCap)
+		s := make([]string, 0, defaultPoolSliceCap)
 		return &s
 	},
 }
@@ -48,7 +48,7 @@ func putRouteMatcher(rm *routeMatcher) {
 
 var pathPartsPool = sync.Pool{
 	New: func() any {
-		s := make([]string, 0, DefaultPathPartsCap)
+		s := make([]string, 0, defaultPathPartsCap)
 		return &s
 	},
 }

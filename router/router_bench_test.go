@@ -157,7 +157,7 @@ func BenchmarkOptPatternCache(b *testing.B) {
 		"/teams/:teamId/members/:memberId",
 	}
 	for _, p := range patterns {
-		cache.SetPattern(http.MethodGet, p, &MatchResult{
+		cache.SetPattern(http.MethodGet, p, &matchResult{
 			Handler:   http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
 			ParamKeys: []string{"id"},
 		})

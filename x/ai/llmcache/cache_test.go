@@ -31,13 +31,13 @@ func TestMemoryCache_SetGet(t *testing.T) {
 	}
 
 	// Set
-	err := cache.Set(context.Background(), key, entry)
+	err := cache.Set(t.Context(), key, entry)
 	if err != nil {
 		t.Fatalf("Set() error = %v", err)
 	}
 
 	// Get
-	cached, err := cache.Get(context.Background(), key)
+	cached, err := cache.Get(t.Context(), key)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
@@ -54,7 +54,7 @@ func TestMemoryCache_Miss(t *testing.T) {
 		Hash: "nonexistent",
 	}
 
-	_, err := cache.Get(context.Background(), key)
+	_, err := cache.Get(t.Context(), key)
 	if err == nil {
 		t.Error("Get() should return error for cache miss")
 	}
@@ -73,13 +73,13 @@ func TestMemoryCache_Expiration(t *testing.T) {
 	}
 
 	// Set
-	cache.Set(context.Background(), key, entry)
+	cache.Set(t.Context(), key, entry)
 
 	// Wait for expiration
 	time.Sleep(20 * time.Millisecond)
 
 	// Should be expired
-	_, err := cache.Get(context.Background(), key)
+	_, err := cache.Get(t.Context(), key)
 	if err == nil {
 		t.Error("Get() should return error for expired entry")
 	}
@@ -97,7 +97,7 @@ func TestMemoryCache_Eviction(t *testing.T) {
 			Response:  &provider.CompletionResponse{ID: string(rune('a' + i))},
 			CreatedAt: time.Now(),
 		}
-		cache.Set(context.Background(), key, entry)
+		cache.Set(t.Context(), key, entry)
 		time.Sleep(1 * time.Millisecond) // Ensure different timestamps
 	}
 
@@ -120,14 +120,14 @@ func TestMemoryCache_Stats(t *testing.T) {
 	}
 
 	// Set
-	cache.Set(context.Background(), key, entry)
+	cache.Set(t.Context(), key, entry)
 
 	// Hit
-	cache.Get(context.Background(), key)
+	cache.Get(t.Context(), key)
 
 	// Miss
 	missingKey := &CacheKey{Hash: "missing"}
-	cache.Get(context.Background(), missingKey)
+	cache.Get(t.Context(), missingKey)
 
 	stats := cache.Stats()
 
@@ -160,11 +160,11 @@ func TestMemoryCache_Clear(t *testing.T) {
 		entry := &CacheEntry{
 			Response: &provider.CompletionResponse{ID: string(rune('a' + i))},
 		}
-		cache.Set(context.Background(), key, entry)
+		cache.Set(t.Context(), key, entry)
 	}
 
 	// Clear
-	err := cache.Clear(context.Background())
+	err := cache.Clear(t.Context())
 	if err != nil {
 		t.Fatalf("Clear() error = %v", err)
 	}
@@ -177,7 +177,7 @@ func TestMemoryCache_Clear(t *testing.T) {
 
 	// Check entries
 	key := &CacheKey{Hash: "a"}
-	_, err = cache.Get(context.Background(), key)
+	_, err = cache.Get(t.Context(), key)
 	if err == nil {
 		t.Error("Get() should fail after Clear()")
 	}
@@ -291,7 +291,7 @@ func TestCachingProvider(t *testing.T) {
 	}
 
 	// First call - cache miss
-	resp1, err := cachingProvider.Complete(context.Background(), req)
+	resp1, err := cachingProvider.Complete(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Complete() error = %v", err)
 	}
@@ -301,7 +301,7 @@ func TestCachingProvider(t *testing.T) {
 	}
 
 	// Second call - cache hit
-	resp2, err := cachingProvider.Complete(context.Background(), req)
+	resp2, err := cachingProvider.Complete(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Complete() error = %v", err)
 	}

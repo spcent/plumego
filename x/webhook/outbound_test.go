@@ -78,7 +78,7 @@ func TestValidateURL(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateURL(context.Background(), tt.raw, tt.allowPN)
+			err := validateURL(t.Context(), tt.raw, tt.allowPN)
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error")
 			}
@@ -108,7 +108,7 @@ func TestValidateTarget(t *testing.T) {
 }
 
 func TestQueueEnqueue(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	q := NewQueue(1, DropNewest, 0)
 	if err := q.Enqueue(ctx, Task{DeliveryID: "a"}); err != nil {
 		t.Fatalf("enqueue failed: %v", err)
@@ -155,7 +155,7 @@ func TestQueueEnqueue(t *testing.T) {
 func TestDelayScheduler(t *testing.T) {
 	q := NewQueue(2, DropNewest, 0)
 	ds := NewDelayScheduler(q)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	go ds.Run(ctx)
@@ -249,7 +249,7 @@ func TestMergeAndRewrite(t *testing.T) {
 }
 
 func TestServiceHandleTaskSuccessAndRetry(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := NewMemStore()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +304,7 @@ func TestServiceHandleTaskSuccessAndRetry(t *testing.T) {
 }
 
 func TestServiceHandleTaskDeadPayload(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := NewMemStore()
 	cfg := Config{Enabled: true, QueueSize: 1, Workers: 1, DrainMax: time.Second, DropPolicy: BlockWithLimit, BlockWait: time.Millisecond, DefaultTimeout: time.Second, DefaultMaxRetries: 1, BackoffBase: time.Millisecond, BackoffMax: time.Millisecond, RetryOn429: true, AllowPrivateNetwork: true}
 	service := NewService(store, cfg)
@@ -330,7 +330,7 @@ func TestServiceHandleTaskDeadPayload(t *testing.T) {
 }
 
 func TestServiceLifecycleAndTargets(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	cfg := Config{Enabled: true, QueueSize: 2, Workers: 1, DrainMax: time.Millisecond * 50, DropPolicy: DropNewest, BlockWait: time.Millisecond, DefaultTimeout: time.Second, DefaultMaxRetries: 1, BackoffBase: time.Millisecond, BackoffMax: time.Millisecond * 10, RetryOn429: true, AllowPrivateNetwork: true}
 	service := NewService(NewMemStore(), cfg)
 
@@ -350,7 +350,7 @@ func TestServiceLifecycleAndTargets(t *testing.T) {
 }
 
 func TestServiceCreateAndUpdateTarget(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	cfg := Config{Enabled: true, QueueSize: 2, Workers: 1, DrainMax: time.Second, DropPolicy: DropNewest, BlockWait: time.Millisecond, DefaultTimeout: 150 * time.Millisecond, DefaultMaxRetries: 3, BackoffBase: time.Millisecond * 2, BackoffMax: time.Millisecond * 10, RetryOn429: true, AllowPrivateNetwork: true}
 	service := NewService(NewMemStore(), cfg)
 
@@ -407,7 +407,7 @@ func TestServiceCreateAndUpdateTarget(t *testing.T) {
 }
 
 func TestServiceWorkerLoop(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	cfg := Config{Enabled: true, QueueSize: 2, Workers: 1, DrainMax: time.Second, DropPolicy: DropNewest, BlockWait: time.Millisecond, DefaultTimeout: time.Second, DefaultMaxRetries: 1, BackoffBase: time.Millisecond, BackoffMax: time.Millisecond * 2, RetryOn429: true, AllowPrivateNetwork: true}
@@ -441,14 +441,14 @@ func TestServiceWorkerLoop(t *testing.T) {
 func TestEnqueueDisabled(t *testing.T) {
 	cfg := Config{Enabled: false, QueueSize: 1, Workers: 1, DrainMax: time.Second, DropPolicy: DropNewest, BlockWait: 0, DefaultTimeout: time.Second, DefaultMaxRetries: 1, BackoffBase: time.Millisecond, BackoffMax: time.Millisecond, RetryOn429: true}
 	service := NewService(NewMemStore(), cfg)
-	err := service.enqueue(context.Background(), Task{DeliveryID: "x"})
+	err := service.enqueue(t.Context(), Task{DeliveryID: "x"})
 	if err == nil || !strings.Contains(err.Error(), "disabled") {
 		t.Fatalf("expected disabled error, got %v", err)
 	}
 }
 
 func TestTriggerEventAndReplay(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := NewMemStore()
 	cfg := Config{Enabled: true, QueueSize: 4, Workers: 1, DrainMax: time.Second, DropPolicy: BlockWithLimit, BlockWait: time.Millisecond, DefaultTimeout: time.Second, DefaultMaxRetries: 1, BackoffBase: time.Millisecond, BackoffMax: time.Millisecond, RetryOn429: true, AllowPrivateNetwork: true}
 	service := NewService(store, cfg)
@@ -493,7 +493,7 @@ func TestTriggerEventAndReplay(t *testing.T) {
 }
 
 func TestTriggerEventDropped(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := NewMemStore()
 	cfg := Config{Enabled: true, QueueSize: 0, Workers: 0, DrainMax: time.Second, DropPolicy: DropNewest, BlockWait: 0, DefaultTimeout: time.Second, DefaultMaxRetries: 1, BackoffBase: time.Millisecond, BackoffMax: time.Millisecond, RetryOn429: true, AllowPrivateNetwork: true}
 	service := NewService(store, cfg)
@@ -510,7 +510,7 @@ func TestTriggerEventDropped(t *testing.T) {
 }
 
 func TestReplayDeliveryErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	service := NewService(NewMemStore(), Config{})
 
 	if _, err := service.ReplayDelivery(ctx, "missing"); !errors.Is(err, ErrTargetNotFound) {
@@ -525,7 +525,7 @@ func TestReplayDeliveryErrors(t *testing.T) {
 }
 
 func TestHandleTaskFailureNoRetry(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := NewMemStore()
 	cfg := Config{Enabled: true, QueueSize: 1, Workers: 1, DrainMax: time.Second, DropPolicy: DropNewest, BlockWait: time.Millisecond, DefaultTimeout: time.Second, DefaultMaxRetries: 1, BackoffBase: time.Millisecond, BackoffMax: time.Millisecond, RetryOn429: true, AllowPrivateNetwork: true}
 
@@ -547,13 +547,13 @@ func TestHandleTaskFailureNoRetry(t *testing.T) {
 
 func TestTriggerEventValidationError(t *testing.T) {
 	service := NewService(NewMemStore(), Config{})
-	if _, err := service.TriggerEvent(context.Background(), Event{}); err == nil {
+	if _, err := service.TriggerEvent(t.Context(), Event{}); err == nil {
 		t.Fatalf("expected event type error")
 	}
 }
 
 func TestSendOnceValidationError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	cfg := Config{AllowPrivateNetwork: false, DefaultTimeout: time.Second}
 	service := NewService(NewMemStore(), cfg)
 	target := Target{ID: "t", URL: "http://127.0.0.1", Secret: "abcdefgh", Headers: map[string]string{"X": "1"}}
@@ -565,7 +565,7 @@ func TestSendOnceValidationError(t *testing.T) {
 }
 
 func TestStoreAndFilters(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := NewMemStore()
 
 	t1 := Target{ID: "a", Name: "a", URL: "http://8.8.8.8", Secret: "abcdefgh", Events: []string{"*"}, Enabled: true}

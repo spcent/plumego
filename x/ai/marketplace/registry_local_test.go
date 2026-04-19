@@ -1,14 +1,13 @@
 package marketplace
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
 func TestLocalAgentRegistry_PublishAndGet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	registry, err := NewLocalAgentRegistry(filepath.Join(tmpDir, "agents"))
@@ -55,7 +54,7 @@ func TestLocalAgentRegistry_PublishAndGet(t *testing.T) {
 }
 
 func TestLocalAgentRegistry_DuplicatePublish(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	registry, err := NewLocalAgentRegistry(filepath.Join(tmpDir, "agents"))
@@ -92,7 +91,7 @@ func TestLocalAgentRegistry_DuplicatePublish(t *testing.T) {
 }
 
 func TestLocalAgentRegistry_ListVersions(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	registry, err := NewLocalAgentRegistry(filepath.Join(tmpDir, "agents"))
@@ -139,7 +138,7 @@ func TestLocalAgentRegistry_ListVersions(t *testing.T) {
 }
 
 func TestLocalAgentRegistry_Search(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	registry, err := NewLocalAgentRegistry(filepath.Join(tmpDir, "agents"))
@@ -235,7 +234,7 @@ func TestLocalAgentRegistry_Search(t *testing.T) {
 }
 
 func TestLocalAgentRegistry_Delete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	registry, err := NewLocalAgentRegistry(filepath.Join(tmpDir, "agents"))
@@ -276,7 +275,7 @@ func TestLocalAgentRegistry_Delete(t *testing.T) {
 }
 
 func TestLocalAgentRegistry_Rating(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	registry, err := NewLocalAgentRegistry(filepath.Join(tmpDir, "agents"))
@@ -339,7 +338,7 @@ func TestLocalAgentRegistry_Rating(t *testing.T) {
 }
 
 func TestLocalAgentRegistry_ResolveDependencies(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	registry, err := NewLocalAgentRegistry(filepath.Join(tmpDir, "agents"))
@@ -426,7 +425,7 @@ func TestLocalAgentRegistry_ResolveDependencies(t *testing.T) {
 }
 
 func TestLocalWorkflowRegistry_Basic(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 
 	registry, err := NewLocalWorkflowRegistry(filepath.Join(tmpDir, "workflows"))

@@ -1,7 +1,6 @@
 package semanticcache
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 
 // TestIntegration_FullStack tests the complete semantic caching stack
 func TestIntegration_FullStack(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Setup: Create full stack
 	mockProvider := &MockProvider{responseText: "This is a response about AI"}
@@ -163,7 +162,7 @@ func TestIntegration_FullStack(t *testing.T) {
 
 // TestIntegration_MultipleQueries tests caching behavior with various queries
 func TestIntegration_MultipleQueries(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockProvider := &MockProvider{responseText: "Response"}
 	gen := NewSimpleEmbeddingGenerator(256) // Larger dimensions
@@ -239,7 +238,7 @@ func TestIntegration_MultipleQueries(t *testing.T) {
 
 // TestIntegration_ConcurrentAccess tests thread safety
 func TestIntegration_ConcurrentAccess(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockProvider := &MockProvider{responseText: "Response"}
 	gen := NewSimpleEmbeddingGenerator(128)
@@ -290,7 +289,7 @@ func TestIntegration_ConcurrentAccess(t *testing.T) {
 
 // TestIntegration_TTLExpiration tests cache expiration
 func TestIntegration_TTLExpiration(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockProvider := &MockProvider{responseText: "Response"}
 	gen := NewSimpleEmbeddingGenerator(128)

@@ -68,7 +68,7 @@ func TestAdapterGetNotFound(t *testing.T) {
 		return errors.Is(err, errMiss)
 	})
 
-	_, err := adapter.Get(context.Background(), "missing")
+	_, err := adapter.Get(t.Context(), "missing")
 	if !errors.Is(err, cache.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -78,11 +78,11 @@ func TestAdapterSetAndExists(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
 	adapter := NewAdapter(client, nil)
 
-	if err := adapter.Set(context.Background(), "key", []byte("value"), time.Minute); err != nil {
+	if err := adapter.Set(t.Context(), "key", []byte("value"), time.Minute); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	exists, err := adapter.Exists(context.Background(), "key")
+	exists, err := adapter.Exists(t.Context(), "key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestAdapterClear(t *testing.T) {
 	client := &stubFlusher{stubClient: stubClient{data: map[string][]byte{"k": []byte("v")}}}
 	adapter := NewAdapter(client, nil)
 
-	if err := adapter.Clear(context.Background()); err != nil {
+	if err := adapter.Clear(t.Context()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !client.flushed {
@@ -106,7 +106,7 @@ func TestAdapterClear(t *testing.T) {
 func TestAdapterClearUnsupported(t *testing.T) {
 	adapter := NewAdapter(&stubClient{}, nil)
 
-	if err := adapter.Clear(context.Background()); !errors.Is(err, ErrClearUnsupported) {
+	if err := adapter.Clear(t.Context()); !errors.Is(err, ErrClearUnsupported) {
 		t.Fatalf("expected ErrClearUnsupported, got %v", err)
 	}
 }
@@ -153,7 +153,7 @@ func TestAdapterKeyValidation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := adapter.Set(context.Background(), tc.key, []byte("value"), 0)
+			err := adapter.Set(t.Context(), tc.key, []byte("value"), 0)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("Set() error = %v, wantErr %v", err, tc.wantErr)
 			}
@@ -166,7 +166,7 @@ func TestAdapterKeyTooLong(t *testing.T) {
 	adapter.MaxKeyLength = 10
 
 	longKey := "this_is_a_very_long_key"
-	err := adapter.Set(context.Background(), longKey, []byte("value"), 0)
+	err := adapter.Set(t.Context(), longKey, []byte("value"), 0)
 	if err == nil {
 		t.Fatal("expected error for key too long")
 	}
@@ -182,7 +182,7 @@ func TestAdapterIncr(t *testing.T) {
 	})
 
 	// Test increment on non-existent key
-	val1, err := adapter.Incr(context.Background(), "counter", 5)
+	val1, err := adapter.Incr(t.Context(), "counter", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestAdapterIncr(t *testing.T) {
 	}
 
 	// Test increment on existing key
-	val2, err := adapter.Incr(context.Background(), "counter", 3)
+	val2, err := adapter.Incr(t.Context(), "counter", 3)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestAdapterIncr(t *testing.T) {
 	}
 
 	// Test increment by negative number
-	val3, err := adapter.Incr(context.Background(), "counter", -2)
+	val3, err := adapter.Incr(t.Context(), "counter", -2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestAdapterDecr(t *testing.T) {
 	})
 
 	// Test decrement on non-existent key
-	val1, err := adapter.Decr(context.Background(), "counter", 5)
+	val1, err := adapter.Decr(t.Context(), "counter", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestAdapterDecr(t *testing.T) {
 	}
 
 	// Test decrement on existing key
-	val2, err := adapter.Decr(context.Background(), "counter", 3)
+	val2, err := adapter.Decr(t.Context(), "counter", 3)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -239,13 +239,13 @@ func TestAdapterIncrNonInteger(t *testing.T) {
 	adapter := NewAdapter(client, nil)
 
 	// Set a non-integer value
-	err := adapter.Set(context.Background(), "key", []byte("not an integer"), 0)
+	err := adapter.Set(t.Context(), "key", []byte("not an integer"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Try to increment
-	_, err = adapter.Incr(context.Background(), "key", 1)
+	_, err = adapter.Incr(t.Context(), "key", 1)
 	if !errors.Is(err, cache.ErrNotInteger) {
 		t.Fatalf("expected ErrNotInteger, got %v", err)
 	}
@@ -258,12 +258,12 @@ func TestAdapterAppend(t *testing.T) {
 	})
 
 	// Test append on non-existent key
-	err := adapter.Append(context.Background(), "key", []byte("hello"))
+	err := adapter.Append(t.Context(), "key", []byte("hello"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	val, err := adapter.Get(context.Background(), "key")
+	val, err := adapter.Get(t.Context(), "key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -272,12 +272,12 @@ func TestAdapterAppend(t *testing.T) {
 	}
 
 	// Test append on existing key
-	err = adapter.Append(context.Background(), "key", []byte(" world"))
+	err = adapter.Append(t.Context(), "key", []byte(" world"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	val, err = adapter.Get(context.Background(), "key")
+	val, err = adapter.Get(t.Context(), "key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,19 +291,19 @@ func TestAdapterDelete(t *testing.T) {
 	adapter := NewAdapter(client, nil)
 
 	// Set a value
-	err := adapter.Set(context.Background(), "key", []byte("value"), 0)
+	err := adapter.Set(t.Context(), "key", []byte("value"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Delete it
-	err = adapter.Delete(context.Background(), "key")
+	err = adapter.Delete(t.Context(), "key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Verify it's gone
-	exists, err := adapter.Exists(context.Background(), "key")
+	exists, err := adapter.Exists(t.Context(), "key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

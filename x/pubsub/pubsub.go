@@ -154,7 +154,7 @@ func (s *subscriber) pumpRingBuffer() {
 //	)
 //	defer b.Close()
 //
-//	sub, err := b.Subscribe("user.created", pubsub.DefaultSubOptions())
+//	sub, err := b.Subscribe(ctx, "user.created", pubsub.DefaultSubOptions())
 //	if err != nil {
 //		// handle
 //	}
@@ -256,13 +256,16 @@ func (b *InProcBroker) Drain(ctx context.Context) error {
 }
 
 // Subscribe creates a new subscription to an exact topic.
-func (b *InProcBroker) Subscribe(topic string, opts SubOptions) (Subscription, error) {
-	return b.subscribeInternal(context.Background(), topic, opts, false)
+// When ctx is cancelled the subscription is automatically closed.
+func (b *InProcBroker) Subscribe(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
+	return b.subscribeInternal(ctx, topic, opts, false)
 }
 
 // SubscribeWithContext creates a subscription cancelled when ctx is done.
+//
+// Deprecated: Use Subscribe(ctx, topic, opts) instead.
 func (b *InProcBroker) SubscribeWithContext(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
-	return b.subscribeInternal(ctx, topic, opts, false)
+	return b.Subscribe(ctx, topic, opts)
 }
 
 // SubscribePattern creates a subscription matching a glob pattern.

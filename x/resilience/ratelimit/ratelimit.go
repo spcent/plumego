@@ -1,0 +1,192 @@
+// Package ratelimit provides a reusable token bucket rate limiter.
+//
+// This package is a canonical resilience primitive shared by x/pubsub, x/tenant,
+// and any other package that needs per-key rate limiting without importing an
+// external rate-limit library.
+//
+// Example – global limit:
+//
+//	bucket := ratelimit.New(100, 200) // 100 req/s, burst 200
+//	if bucket.Allow() {
+//	    // proceed
+//	}
+//
+// Example – per-key limit:
+//
+//	keyed := ratelimit.NewKeyed(50, 50) // 50 req/s per key, burst 50
+//	if keyed.Allow("user-42") {
+//	    // proceed
+//	}
+package ratelimit
+
+import (
+	"context"
+	"sync"
+	"time"
+)
+
+// TokenBucket implements a token bucket rate limiter.
+// It is safe for concurrent use.
+type TokenBucket struct {
+	mu        sync.Mutex
+	rate      float64   // tokens replenished per second
+	burst     int64     // maximum token capacity
+	tokens    float64   // current available tokens
+	lastCheck time.Time // time of last token replenishment
+}
+
+// New returns a TokenBucket that replenishes at rate tokens/second with a
+// maximum capacity (burst) of burst tokens. The bucket starts full.
+func New(rate float64, burst int64) *TokenBucket {
+	return &TokenBucket{
+		rate:      rate,
+		burst:     burst,
+		tokens:    float64(burst),
+		lastCheck: time.Now(),
+	}
+}
+
+// Allow reports whether one token is available, consuming it if so.
+func (b *TokenBucket) Allow() bool {
+	return b.AllowN(1)
+}
+
+// AllowN reports whether n tokens are available, consuming them if so.
+func (b *TokenBucket) AllowN(n int64) bool {
+	if n <= 0 {
+		return true
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.replenish(time.Now())
+	if b.tokens < float64(n) {
+		return false
+	}
+	b.tokens -= float64(n)
+	return true
+}
+
+// Wait blocks until one token is available or ctx is cancelled.
+func (b *TokenBucket) Wait(ctx context.Context) error {
+	return b.WaitN(ctx, 1)
+}
+
+// WaitN blocks until n tokens are available or ctx is cancelled.
+func (b *TokenBucket) WaitN(ctx context.Context, n int64) error {
+	for {
+		if b.AllowN(n) {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Millisecond):
+		}
+	}
+}
+
+// UpdateRate updates the replenishment rate and maximum burst capacity.
+func (b *TokenBucket) UpdateRate(rate float64, burst int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.rate = rate
+	if burst > 0 {
+		b.burst = burst
+		if b.tokens > float64(burst) {
+			b.tokens = float64(burst)
+		}
+	}
+}
+
+// replenish adds tokens for elapsed time. Must be called with b.mu held.
+func (b *TokenBucket) replenish(now time.Time) {
+	if b.rate <= 0 {
+		return
+	}
+	elapsed := now.Sub(b.lastCheck).Seconds()
+	if elapsed > 0 {
+		b.tokens += elapsed * b.rate
+		if b.tokens > float64(b.burst) {
+			b.tokens = float64(b.burst)
+		}
+		b.lastCheck = now
+	}
+}
+
+// KeyedBuckets manages per-key token buckets with shared rate and burst settings.
+// All keys share the same rate/burst configuration.
+// It is safe for concurrent use.
+type KeyedBuckets struct {
+	rate  float64
+	burst int64
+
+	mu      sync.RWMutex
+	buckets map[string]*TokenBucket
+}
+
+// NewKeyed returns a KeyedBuckets where each distinct key gets its own
+// TokenBucket with the given rate and burst.
+func NewKeyed(rate float64, burst int64) *KeyedBuckets {
+	return &KeyedBuckets{
+		rate:    rate,
+		burst:   burst,
+		buckets: make(map[string]*TokenBucket),
+	}
+}
+
+// Allow reports whether one token is available for the given key, consuming it if so.
+func (k *KeyedBuckets) Allow(key string) bool {
+	return k.AllowN(key, 1)
+}
+
+// AllowN reports whether n tokens are available for the given key, consuming them if so.
+func (k *KeyedBuckets) AllowN(key string, n int64) bool {
+	return k.bucket(key).AllowN(n)
+}
+
+// Wait blocks until one token is available for the given key or ctx is cancelled.
+func (k *KeyedBuckets) Wait(ctx context.Context, key string) error {
+	return k.bucket(key).WaitN(ctx, 1)
+}
+
+// UpdateRate updates the rate and burst for all existing and new buckets.
+func (k *KeyedBuckets) UpdateRate(rate float64, burst int64) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.rate = rate
+	k.burst = burst
+	for _, b := range k.buckets {
+		b.UpdateRate(rate, burst)
+	}
+}
+
+// Delete removes the bucket for key, reclaiming memory.
+func (k *KeyedBuckets) Delete(key string) {
+	k.mu.Lock()
+	delete(k.buckets, key)
+	k.mu.Unlock()
+}
+
+// Len returns the number of active key buckets.
+func (k *KeyedBuckets) Len() int {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	return len(k.buckets)
+}
+
+func (k *KeyedBuckets) bucket(key string) *TokenBucket {
+	k.mu.RLock()
+	b, ok := k.buckets[key]
+	k.mu.RUnlock()
+	if ok {
+		return b
+	}
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if b, ok = k.buckets[key]; ok {
+		return b
+	}
+	b = New(k.rate, k.burst)
+	k.buckets[key] = b
+	return b
+}

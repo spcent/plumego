@@ -15,11 +15,12 @@ func RuntimeInfoHandler() http.Handler {
 	})
 }
 
-// DebugHealthHandler returns comprehensive system diagnostics.
+// DiagnosticsHandler returns comprehensive system diagnostics.
+// enabled controls whether the endpoint is active; set to false in production.
 // It should only be mounted in development or internal environments.
-func DebugHealthHandler(manager Manager, debug bool) http.Handler {
+func DiagnosticsHandler(manager Manager, enabled bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !debug {
+		if !enabled {
 			http.NotFound(w, r)
 			return
 		}

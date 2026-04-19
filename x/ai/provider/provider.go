@@ -73,38 +73,21 @@ type CompletionRequest struct {
 
 // CompletionResponse represents a completion response.
 type CompletionResponse struct {
-	// Response ID
-	ID string
-
-	// Model used
-	Model string
-
-	// Content blocks
-	Content []ContentBlock
-
-	// Stop reason
-	StopReason StopReason
-
-	// Token usage
-	Usage tokenizer.TokenUsage
-
-	// Additional metadata
-	Metadata map[string]any
+	ID         string               `json:"id"`
+	Model      string               `json:"model"`
+	Role       Role                 `json:"role,omitempty"`
+	Content    []ContentBlock       `json:"content"`
+	StopReason StopReason           `json:"stop_reason"`
+	Usage      tokenizer.TokenUsage `json:"usage"`
+	Metadata   map[string]any       `json:"metadata,omitempty"`
 }
 
 // Message represents a chat message.
 type Message struct {
-	// Role: system, user, assistant, tool
-	Role Role
-
-	// Content can be string or []ContentBlock
-	Content any
-
-	// Name (optional, for tool results)
-	Name string
-
-	// Tool call ID (for tool responses)
-	ToolCallID string
+	Role       Role   `json:"role"`
+	Content    any    `json:"content"` // string or []ContentBlock
+	Name       string `json:"name,omitempty"`
+	ToolCallID string `json:"tool_call_id,omitempty"`
 }
 
 // ContentBlock represents a piece of content.

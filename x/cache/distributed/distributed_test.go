@@ -1,7 +1,6 @@
 package distributed
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -210,7 +209,7 @@ func TestDistributedCacheBasicOperations(t *testing.T) {
 	dc := New(nodes, config)
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Set
 	err := dc.Set(ctx, "key1", []byte("value1"), time.Minute)
@@ -269,7 +268,7 @@ func TestDistributedCacheReplication(t *testing.T) {
 	dc := New(nodes, config)
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set a key
 	err := dc.Set(ctx, "replicated-key", []byte("replicated-value"), time.Minute)
@@ -296,7 +295,7 @@ func TestDistributedCacheFailover(t *testing.T) {
 	dc := New(nodes, config)
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set a key
 	key := "failover-key"
@@ -383,7 +382,7 @@ func TestDistributedCacheIncr(t *testing.T) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Incr
 	val, err := dc.Incr(ctx, "counter", 5)
@@ -414,7 +413,7 @@ func TestDistributedCacheDecr(t *testing.T) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Decr
 	val, err := dc.Decr(ctx, "counter", 5)
@@ -436,7 +435,7 @@ func TestDistributedCacheConcurrency(t *testing.T) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	const numGoroutines = 100
 	const numOpsPerGoroutine = 100
 
@@ -482,7 +481,7 @@ func TestDistributedCacheMetrics(t *testing.T) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Perform operations
 	_ = dc.Set(ctx, "key1", []byte("value1"), time.Minute)
@@ -541,7 +540,7 @@ func TestDistributedCacheAppend(t *testing.T) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Append to non-existent key
 	err := dc.Append(ctx, "append-key", []byte("hello"))

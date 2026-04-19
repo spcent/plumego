@@ -69,7 +69,7 @@ func TestSequentialStep_Execute(t *testing.T) {
 	}
 
 	wf := NewWorkflow("wf-1", "Test Workflow", "Test")
-	result, err := step.Execute(context.Background(), wf)
+	result, err := step.Execute(t.Context(), wf)
 
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -114,7 +114,7 @@ func TestParallelStep_Execute(t *testing.T) {
 	}
 
 	wf := NewWorkflow("wf-1", "Test Workflow", "Test")
-	_, err := step.Execute(context.Background(), wf)
+	_, err := step.Execute(t.Context(), wf)
 
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -150,7 +150,7 @@ func TestParallelStep_InputMismatch(t *testing.T) {
 	}
 
 	wf := NewWorkflow("wf-1", "Test Workflow", "Test")
-	_, err := step.Execute(context.Background(), wf)
+	_, err := step.Execute(t.Context(), wf)
 
 	if err == nil {
 		t.Error("Execute() should fail with input count mismatch")
@@ -195,7 +195,7 @@ func TestConditionalStep_Execute(t *testing.T) {
 		}
 
 		wf := NewWorkflow("wf-1", "Test", "Test")
-		result, err := step.Execute(context.Background(), wf)
+		result, err := step.Execute(t.Context(), wf)
 
 		if err != nil {
 			t.Fatalf("Execute() error = %v", err)
@@ -215,7 +215,7 @@ func TestConditionalStep_Execute(t *testing.T) {
 		}
 
 		wf := NewWorkflow("wf-1", "Test", "Test")
-		result, err := step.Execute(context.Background(), wf)
+		result, err := step.Execute(t.Context(), wf)
 
 		if err != nil {
 			t.Fatalf("Execute() error = %v", err)
@@ -251,7 +251,7 @@ func TestRetryStep_Execute(t *testing.T) {
 		}
 
 		wf := NewWorkflow("wf-1", "Test", "Test")
-		result, err := retryStep.Execute(context.Background(), wf)
+		result, err := retryStep.Execute(t.Context(), wf)
 
 		if err != nil {
 			t.Fatalf("Execute() error = %v", err)
@@ -285,7 +285,7 @@ func TestRetryStep_Execute(t *testing.T) {
 		}
 
 		wf := NewWorkflow("wf-1", "Test", "Test")
-		_, err := retryStep.Execute(context.Background(), wf)
+		_, err := retryStep.Execute(t.Context(), wf)
 
 		if err == nil {
 			t.Error("Execute() should fail after max retries")
@@ -364,7 +364,7 @@ func TestEngine_Execute(t *testing.T) {
 		"input": "test input",
 	}
 
-	results, err := engine.Execute(context.Background(), "wf-1", initialState)
+	results, err := engine.Execute(t.Context(), "wf-1", initialState)
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -415,7 +415,7 @@ func TestAgentResult_Fields(t *testing.T) {
 		Model:    "test-model",
 	}
 
-	result, err := executeAgent(context.Background(), agent, "test input")
+	result, err := executeAgent(t.Context(), agent, "test input")
 	if err != nil {
 		t.Fatalf("executeAgent() error = %v", err)
 	}

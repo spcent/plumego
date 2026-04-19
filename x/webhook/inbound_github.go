@@ -20,6 +20,8 @@ type GitHubVerifyOptions struct {
 
 	// NonceStore for replay protection using X-Hub-Delivery header.
 	// Only used if EnableReplayProtection is true.
+	// Required for replay protection: without it, any intercepted delivery
+	// can be replayed within the Tolerance window.
 	NonceStore NonceStore
 
 	// Now function for testing. Defaults to time.Now.

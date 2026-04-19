@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/spcent/plumego/x/ai/provider"
-	"github.com/spcent/plumego/x/ai/tokenizer"
 )
 
 // Provider extends the base provider with multimodal capabilities.
@@ -78,53 +77,38 @@ type CompletionRequest struct {
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
-// CompletionResponse represents a multimodal completion response.
-type CompletionResponse struct {
-	ID         string               `json:"id"`
-	Model      string               `json:"model"`
-	Content    []ContentBlock       `json:"content"`
-	Role       MessageRole          `json:"role"`
-	StopReason string               `json:"stop_reason"`
-	Usage      tokenizer.TokenUsage `json:"usage"`
-	Metadata   map[string]any       `json:"metadata,omitempty"`
-}
+// CompletionResponse is an alias for provider.CompletionResponse.
+// Multimodal providers return the same response type as text providers;
+// rich media content is represented via provider.ContentBlock fields.
+type CompletionResponse = provider.CompletionResponse
 
 // StreamReader reads streaming multimodal responses.
 type StreamReader struct {
 	stream *provider.StreamReader
 }
 
-// Next reads the next chunk from the stream.
+// Next reads the next chunk from the stream and returns the accumulated response.
 func (s *StreamReader) Next() (*CompletionResponse, error) {
-	// Delegate to underlying stream reader
 	chunk, err := s.stream.Next()
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to multimodal response
-	response := &CompletionResponse{
-		ID:         "",
-		Model:      "",
-		StopReason: string(chunk.StopReason),
+	resp := &CompletionResponse{
+		StopReason: chunk.StopReason,
 	}
-
-	// Convert content delta
 	if chunk.Delta != nil {
-		response.Content = []ContentBlock{
+		resp.Content = []provider.ContentBlock{
 			{
-				Type: ContentType(chunk.Delta.Type),
+				Type: chunk.Delta.Type,
 				Text: chunk.Delta.Text,
 			},
 		}
 	}
-
-	// Add usage if present
 	if chunk.Usage != nil {
-		response.Usage = *chunk.Usage
+		resp.Usage = *chunk.Usage
 	}
-
-	return response, nil
+	return resp, nil
 }
 
 // Close closes the stream.

@@ -2,7 +2,7 @@ package contract
 
 import (
 	"bytes"
-	"context"
+
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -137,7 +137,7 @@ func TestRequestContextFromContext(t *testing.T) {
 		RoutePattern: "/users/:id",
 		RouteName:    "user_show",
 	}
-	ctx := WithRequestContext(context.Background(), rc)
+	ctx := WithRequestContext(t.Context(), rc)
 	result = RequestContextFromContext(ctx)
 	if result.Params == nil || result.Params["id"] != "123" {
 		t.Fatal("expected RequestContext with params")

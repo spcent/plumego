@@ -4,8 +4,8 @@ import (
 	"net/http"
 )
 
-// MatchResult represents the result of route matching
-type MatchResult struct {
+// matchResult represents the result of route matching.
+type matchResult struct {
 	Handler      http.Handler
 	ParamValues  []string
 	ParamKeys    []string

@@ -1,7 +1,6 @@
 package sharding
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -289,7 +288,7 @@ func BenchmarkEndToEndRouting(b *testing.B) {
 
 	router, _ := NewRouter(shards, registry)
 
-	ctx := context.Background()
+	ctx := b.Context()
 	query := "SELECT * FROM users WHERE user_id = ?"
 
 	b.ResetTimer()
@@ -329,7 +328,7 @@ func BenchmarkConcurrentRouting(b *testing.B) {
 
 	router, _ := NewRouter(shards, registry)
 
-	ctx := context.Background()
+	ctx := b.Context()
 	query := "SELECT * FROM users WHERE user_id = ?"
 
 	b.ResetTimer()

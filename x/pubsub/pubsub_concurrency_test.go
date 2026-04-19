@@ -10,7 +10,7 @@ func TestPubSub_ConcurrentPublish_NoPanic(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 64, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 64, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}

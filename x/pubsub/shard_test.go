@@ -88,7 +88,7 @@ func TestShardStats_WithSubscribers(t *testing.T) {
 
 	topics := []string{"user.created", "order.placed", "payment.done"}
 	for _, topic := range topics {
-		_, err := ps.Subscribe(topic, SubOptions{BufferSize: 4, Policy: DropOldest})
+		_, err := ps.Subscribe(t.Context(), topic, SubOptions{BufferSize: 4, Policy: DropOldest})
 		if err != nil {
 			t.Fatalf("subscribe %s: %v", topic, err)
 		}
@@ -118,7 +118,7 @@ func TestShardStats_WithPatterns(t *testing.T) {
 	ps := New(WithShardCount(8))
 	defer ps.Close()
 
-	_, err := ps.Subscribe("exact.topic", SubOptions{BufferSize: 4, Policy: DropOldest})
+	_, err := ps.Subscribe(t.Context(), "exact.topic", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe topic: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestTopicShardMapping_WithSubscribers(t *testing.T) {
 
 	topics := []string{"user.created", "order.placed", "payment.done"}
 	for _, topic := range topics {
-		_, err := ps.Subscribe(topic, SubOptions{BufferSize: 4, Policy: DropOldest})
+		_, err := ps.Subscribe(t.Context(), topic, SubOptions{BufferSize: 4, Policy: DropOldest})
 		if err != nil {
 			t.Fatalf("subscribe %s: %v", topic, err)
 		}
@@ -213,7 +213,7 @@ func TestTopicShardMapping_AfterUnsubscribe(t *testing.T) {
 	ps := New(WithShardCount(8))
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("temp.topic", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "temp.topic", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestDiagnosticInfo_ContainsShardData(t *testing.T) {
 	ps := New(WithShardCount(8))
 	defer ps.Close()
 
-	_, err := ps.Subscribe("diag.topic", SubOptions{BufferSize: 4, Policy: DropOldest})
+	_, err := ps.Subscribe(t.Context(), "diag.topic", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -284,7 +284,7 @@ func TestTopicExists_AfterSubscribe(t *testing.T) {
 		t.Fatal("expected TopicExists false before subscribe")
 	}
 
-	sub, err := ps.Subscribe("user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -309,11 +309,11 @@ func TestTopicExists_MultipleSubscribers(t *testing.T) {
 	ps := New(WithShardCount(4))
 	defer ps.Close()
 
-	sub1, err := ps.Subscribe("events", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub1, err := ps.Subscribe(t.Context(), "events", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe 1: %v", err)
 	}
-	sub2, err := ps.Subscribe("events", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub2, err := ps.Subscribe(t.Context(), "events", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe 2: %v", err)
 	}
@@ -378,7 +378,7 @@ func TestHasSubscribers_ExactMatch(t *testing.T) {
 		t.Fatal("expected HasSubscribers false with no subs")
 	}
 
-	sub, err := ps.Subscribe("user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -424,7 +424,7 @@ func TestHasSubscribers_BothExactAndPattern(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub1, err := ps.Subscribe("user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub1, err := ps.Subscribe(t.Context(), "user.created", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe topic: %v", err)
 	}
@@ -546,7 +546,7 @@ func TestShardStats_MultipleSubscribersSameTopic(t *testing.T) {
 	defer ps.Close()
 
 	for i := 0; i < 5; i++ {
-		_, err := ps.Subscribe("shared.topic", SubOptions{BufferSize: 4, Policy: DropOldest})
+		_, err := ps.Subscribe(t.Context(), "shared.topic", SubOptions{BufferSize: 4, Policy: DropOldest})
 		if err != nil {
 			t.Fatalf("subscribe %d: %v", i, err)
 		}

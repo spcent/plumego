@@ -296,7 +296,7 @@ func TestConfigWatcher_Start(t *testing.T) {
 	}
 
 	// Start watcher in background
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	go func() {
@@ -362,7 +362,7 @@ func TestConfigWatcher_Stop(t *testing.T) {
 	}
 
 	// Start watcher
-	ctx := context.Background()
+	ctx := t.Context()
 	go func() {
 		watcher.Start(ctx)
 	}()

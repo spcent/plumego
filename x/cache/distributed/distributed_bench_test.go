@@ -1,7 +1,6 @@
 package distributed
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -52,7 +51,7 @@ func BenchmarkDistributedCacheSet(b *testing.B) {
 	dc := New(nodes, config)
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	value := []byte("benchmark-value")
 
 	b.ResetTimer()
@@ -73,7 +72,7 @@ func BenchmarkDistributedCacheGet(b *testing.B) {
 	dc := New(nodes, config)
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	value := []byte("benchmark-value")
 
 	// Pre-populate
@@ -101,7 +100,7 @@ func BenchmarkDistributedCacheSetWithReplication(b *testing.B) {
 	dc := New(nodes, config)
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	value := []byte("benchmark-value")
 
 	b.ResetTimer()
@@ -123,7 +122,7 @@ func BenchmarkDistributedCacheSetAsyncReplication(b *testing.B) {
 	dc := New(nodes, config)
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	value := []byte("benchmark-value")
 
 	b.ResetTimer()
@@ -142,7 +141,7 @@ func BenchmarkDistributedCacheIncr(b *testing.B) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -160,7 +159,7 @@ func BenchmarkDistributedCacheParallelSet(b *testing.B) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	value := []byte("benchmark-value")
 
 	b.RunParallel(func(pb *testing.PB) {
@@ -182,7 +181,7 @@ func BenchmarkDistributedCacheParallelGet(b *testing.B) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	value := []byte("benchmark-value")
 
 	// Pre-populate
@@ -224,7 +223,7 @@ func benchmarkWithNodeCount(b *testing.B, nodeCount int) {
 	dc := New(nodes, DefaultConfig())
 	defer dc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	value := []byte("benchmark-value")
 
 	b.ResetTimer()

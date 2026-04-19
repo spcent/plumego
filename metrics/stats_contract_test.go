@@ -1,14 +1,13 @@
 package metrics
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
 )
 
 func TestCollectorStatsContract(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	started := time.Now()
 
 	tests := []struct {

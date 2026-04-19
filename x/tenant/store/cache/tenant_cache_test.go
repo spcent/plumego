@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -13,8 +12,8 @@ func TestTenantCache_BasicOperations(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx1 := tenant.WithTenantID(context.Background(), "tenant-1")
-	ctx2 := tenant.WithTenantID(context.Background(), "tenant-2")
+	ctx1 := tenant.WithTenantID(t.Context(), "tenant-1")
+	ctx2 := tenant.WithTenantID(t.Context(), "tenant-2")
 
 	err := tenantCache.Set(ctx1, "key1", []byte("value1"), time.Minute)
 	if err != nil {
@@ -60,7 +59,7 @@ func TestTenantCache_NoTenantID(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := tenantCache.Set(ctx, "key1", []byte("value1"), time.Minute)
 	if err != tenant.ErrTenantNotFound {
@@ -77,14 +76,14 @@ func TestTenantCache_KeyPrefix(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache, WithKeyPrefix("app"), WithSeparator(":"))
 
-	ctx := tenant.WithTenantID(context.Background(), "test-tenant")
+	ctx := tenant.WithTenantID(t.Context(), "test-tenant")
 
 	err := tenantCache.Set(ctx, "mykey", []byte("myvalue"), time.Minute)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	val, err := cache.Get(context.Background(), "app:test-tenant:mykey")
+	val, err := cache.Get(t.Context(), "app:test-tenant:mykey")
 	if err != nil {
 		t.Fatalf("key not found with expected prefix: %v", err)
 	}
@@ -97,7 +96,7 @@ func TestTenantCache_Delete(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	ctx := tenant.WithTenantID(t.Context(), "tenant-1")
 
 	tenantCache.Set(ctx, "key1", []byte("value1"), time.Minute)
 	val, _ := tenantCache.Get(ctx, "key1")
@@ -120,8 +119,8 @@ func TestTenantCache_Exists(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx1 := tenant.WithTenantID(context.Background(), "tenant-1")
-	ctx2 := tenant.WithTenantID(context.Background(), "tenant-2")
+	ctx1 := tenant.WithTenantID(t.Context(), "tenant-1")
+	ctx2 := tenant.WithTenantID(t.Context(), "tenant-2")
 
 	exists, err := tenantCache.Exists(ctx1, "key1")
 	if err != nil {
@@ -154,8 +153,8 @@ func TestTenantCache_Incr(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx1 := tenant.WithTenantID(context.Background(), "tenant-1")
-	ctx2 := tenant.WithTenantID(context.Background(), "tenant-2")
+	ctx1 := tenant.WithTenantID(t.Context(), "tenant-1")
+	ctx2 := tenant.WithTenantID(t.Context(), "tenant-2")
 
 	val, err := tenantCache.Incr(ctx1, "counter", 5)
 	if err != nil {
@@ -194,7 +193,7 @@ func TestTenantCache_Decr(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	ctx := tenant.WithTenantID(t.Context(), "tenant-1")
 
 	tenantCache.Incr(ctx, "counter", 100)
 
@@ -211,7 +210,7 @@ func TestTenantCache_Append(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	ctx := tenant.WithTenantID(t.Context(), "tenant-1")
 
 	err := tenantCache.Append(ctx, "data", []byte("hello"))
 	if err != nil {
@@ -236,7 +235,7 @@ func TestTenantCache_TTLExpiration(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	ctx := tenant.WithTenantID(t.Context(), "tenant-1")
 
 	err := tenantCache.Set(ctx, "key1", []byte("value1"), 100*time.Millisecond)
 	if err != nil {
@@ -268,7 +267,7 @@ func TestTenantCache_RawCache(t *testing.T) {
 		t.Error("RawCache should return underlying cache")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := raw.Set(ctx, "global-key", []byte("global-value"), time.Minute)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -287,9 +286,9 @@ func TestTenantCache_IsolationBetweenTenants(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)
 
-	ctx1 := tenant.WithTenantID(context.Background(), "tenant-1")
-	ctx2 := tenant.WithTenantID(context.Background(), "tenant-2")
-	ctx3 := tenant.WithTenantID(context.Background(), "tenant-3")
+	ctx1 := tenant.WithTenantID(t.Context(), "tenant-1")
+	ctx2 := tenant.WithTenantID(t.Context(), "tenant-2")
+	ctx3 := tenant.WithTenantID(t.Context(), "tenant-3")
 
 	tenantCache.Set(ctx1, "config", []byte("config-1"), time.Minute)
 	tenantCache.Set(ctx2, "config", []byte("config-2"), time.Minute)

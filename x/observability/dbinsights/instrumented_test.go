@@ -121,7 +121,7 @@ func TestInstrumentedDB_ExecContext(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "mysql")
 
-	result, err := idb.ExecContext(context.Background(), "INSERT INTO users (name) VALUES (?)", "alice")
+	result, err := idb.ExecContext(t.Context(), "INSERT INTO users (name) VALUES (?)", "alice")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestInstrumentedDB_ExecContext_Error(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
-	if _, err := idb.ExecContext(context.Background(), "INSERT INTO users (name) VALUES (?)", "alice"); err == nil {
+	if _, err := idb.ExecContext(t.Context(), "INSERT INTO users (name) VALUES (?)", "alice"); err == nil {
 		t.Fatal("expected error")
 	}
 	if collector.DBCallCount() != 1 {
@@ -156,7 +156,7 @@ func TestInstrumentedDB_QueryContext(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
-	rows, err := idb.QueryContext(context.Background(), "SELECT * FROM users")
+	rows, err := idb.QueryContext(t.Context(), "SELECT * FROM users")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestInstrumentedDB_QueryContext_Error(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
-	if _, err := idb.QueryContext(context.Background(), "SELECT * FROM invalid"); err == nil {
+	if _, err := idb.QueryContext(t.Context(), "SELECT * FROM invalid"); err == nil {
 		t.Fatal("expected error")
 	}
 	if collector.DBCallCount() != 1 {
@@ -188,7 +188,7 @@ func TestInstrumentedDB_QueryRowContext(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
-	row := idb.QueryRowContext(context.Background(), "SELECT * FROM users WHERE id = ?", 1)
+	row := idb.QueryRowContext(t.Context(), "SELECT * FROM users WHERE id = ?", 1)
 	if row == nil {
 		t.Fatal("expected non-nil row")
 	}
@@ -203,7 +203,7 @@ func TestInstrumentedDB_BeginTx(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
-	tx, err := idb.BeginTx(context.Background(), nil)
+	tx, err := idb.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestInstrumentedDB_PingContext(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
-	if err := idb.PingContext(context.Background()); err != nil {
+	if err := idb.PingContext(t.Context()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if collector.DBCallCount() != 1 {
@@ -248,7 +248,7 @@ func TestInstrumentedDB_RecordPoolStats(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	idb := NewInstrumentedDB(db, collector, "postgres")
 
-	idb.RecordPoolStats(context.Background())
+	idb.RecordPoolStats(t.Context())
 
 	if collector.DBCallCount() != 7 {
 		t.Fatalf("expected 7 DB calls, got %d", collector.DBCallCount())
@@ -260,7 +260,7 @@ func TestInstrumentedDB_RecordPoolStats_NilObserver(t *testing.T) {
 	defer db.Close()
 	idb := NewInstrumentedDB(db, nil, "postgres")
 
-	idb.RecordPoolStats(context.Background())
+	idb.RecordPoolStats(t.Context())
 }
 
 func TestInstrumentedDB_ConfigForwarders(t *testing.T) {

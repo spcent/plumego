@@ -189,6 +189,9 @@ modules:
   x/tenant:
     path: x/tenant
     layer: extension
+    # status: experimental (x/tenant/module.yaml). Stable packages cannot import x/tenant
+    # because every stable module's deny list includes x/** and the global
+    # stable_must_not_depend_on_extension rule is enforced by the dependency checker.
     allow:
       - stdlib
       - contract
@@ -198,6 +201,84 @@ modules:
       - log
       - metrics
     deny:
+      - reference/**
+      - cmd/**
+
+  x/fileapi:
+    path: x/fileapi
+    layer: extension
+    # status: experimental. HTTP transport for tenant-aware file operations.
+    allow:
+      - stdlib
+      - contract
+      - store/file
+      - x/data
+      - x/tenant
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - x/ai/**
+      - reference/**
+      - cmd/**
+
+  x/webhook:
+    path: x/webhook
+    layer: extension
+    # status: experimental. Inbound verification, outbound delivery, and PubSub bridge.
+    allow:
+      - stdlib
+      - contract
+      - middleware
+      - router
+      - health
+      - log
+      - x/pubsub
+    deny:
+      - core/**
+      - x/tenant/**
+      - x/ai/**
+      - reference/**
+      - cmd/**
+
+  x/messaging:
+    path: x/messaging
+    layer: extension
+    # status: experimental. Canonical app-facing messaging family entrypoint.
+    allow:
+      - stdlib
+      - contract
+      - log
+      - metrics
+      - router
+      - security
+      - store
+      - x/mq
+      - x/pubsub
+      - x/scheduler
+      - x/webhook
+      - x/tenant
+      - x/observability
+    deny:
+      - core/**
+      - x/ai/**
+      - reference/**
+      - cmd/**
+
+  x/resilience:
+    path: x/resilience
+    layer: extension
+    # status: experimental. Reusable circuit-breaker and rate-limit primitives.
+    allow:
+      - stdlib
+      - contract
+      - middleware
+    deny:
+      - core/**
+      - security/**
+      - store/**
+      - x/tenant/**
       - reference/**
       - cmd/**
 

@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -118,7 +117,7 @@ func TestHealthUnhealthyAfterStop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := comp.Shutdown(context.Background()); err != nil {
+	if err := comp.Shutdown(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,9 +136,9 @@ func TestStopNilHub(t *testing.T) {
 
 	comp, _ := New(cfg, false, nil)
 	// Stop once to set hub to nil
-	_ = comp.Shutdown(context.Background())
+	_ = comp.Shutdown(t.Context())
 	// Stop again should not panic
-	if err := comp.Shutdown(context.Background()); err != nil {
+	if err := comp.Shutdown(t.Context()); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 }

@@ -1,7 +1,6 @@
 package sharding
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -320,7 +319,7 @@ func TestClusterDB_ExecContext(t *testing.T) {
 	cluster := createTestClusterDB(t, 4)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("successful insert", func(t *testing.T) {
 		query := "INSERT INTO users (user_id, name) VALUES (?, ?)"
@@ -366,7 +365,7 @@ func TestClusterDB_QueryContext(t *testing.T) {
 	cluster := createTestClusterDB(t, 4)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("successful query", func(t *testing.T) {
 		query := "SELECT * FROM users WHERE user_id = ?"
@@ -386,7 +385,7 @@ func TestClusterDB_QueryRowContext(t *testing.T) {
 	cluster := createTestClusterDB(t, 4)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("successful query row", func(t *testing.T) {
 		query := "SELECT * FROM users WHERE user_id = ?"
@@ -401,7 +400,7 @@ func TestClusterDB_BeginTx(t *testing.T) {
 	cluster := createTestClusterDB(t, 4)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("begin transaction without default shard", func(t *testing.T) {
 		_, err := cluster.BeginTx(ctx, nil)
@@ -433,7 +432,7 @@ func TestClusterDB_PingContext(t *testing.T) {
 	cluster := createTestClusterDB(t, 2)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := cluster.PingContext(ctx)
 	if err != nil {
@@ -489,7 +488,7 @@ func TestClusterDB_Metrics(t *testing.T) {
 	cluster := createTestClusterDB(t, 4)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Execute some queries
 	query := "SELECT * FROM users WHERE user_id = ?"
@@ -530,7 +529,7 @@ func TestClusterDB_HealthCheck(t *testing.T) {
 	cluster := createTestClusterDB(t, 2)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	health, err := cluster.HealthCheck(ctx, 5*time.Second)
 	if err != nil {
@@ -624,7 +623,7 @@ func BenchmarkClusterDB_ExecContext(b *testing.B) {
 	cluster := createTestClusterDB(&testing.T{}, 4)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	query := "INSERT INTO users (user_id, name) VALUES (?, ?)"
 
 	b.ResetTimer()
@@ -637,7 +636,7 @@ func BenchmarkClusterDB_QueryContext(b *testing.B) {
 	cluster := createTestClusterDB(&testing.T{}, 4)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	query := "SELECT * FROM users WHERE user_id = ?"
 
 	b.ResetTimer()

@@ -368,7 +368,7 @@ func TestPubSub_RingBuffer_BasicDelivery(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("test", SubOptions{
+	sub, err := ps.Subscribe(t.Context(), "test", SubOptions{
 		BufferSize: 8,
 		Policy:     DropOldest,
 	})
@@ -403,7 +403,7 @@ func TestPubSub_RingBuffer_PerSubscriberOptIn(t *testing.T) {
 	ps := New() // ring buffer NOT enabled globally
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("test", SubOptions{
+	sub, err := ps.Subscribe(t.Context(), "test", SubOptions{
 		BufferSize:    8,
 		Policy:        DropOldest,
 		UseRingBuffer: true,
@@ -439,7 +439,7 @@ func TestPubSub_RingBuffer_NotUsedForOtherPolicies(t *testing.T) {
 	defer ps.Close()
 
 	// DropNewest should NOT use ring buffer even with global setting
-	sub, err := ps.Subscribe("test", SubOptions{
+	sub, err := ps.Subscribe(t.Context(), "test", SubOptions{
 		BufferSize: 8,
 		Policy:     DropNewest,
 	})
@@ -459,7 +459,7 @@ func TestPubSub_RingBuffer_DropOldest(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 2, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 2, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -524,7 +524,7 @@ func TestPubSub_RingBuffer_Stats(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -557,7 +557,7 @@ func TestPubSub_RingBuffer_Cancel(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -578,7 +578,7 @@ func TestPubSub_RingBuffer_CancelIdempotent(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -593,13 +593,13 @@ func TestPubSub_RingBuffer_MultiSubscriber(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub1, err := ps.Subscribe("events", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub1, err := ps.Subscribe(t.Context(), "events", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe sub1: %v", err)
 	}
 	defer sub1.Cancel()
 
-	sub2, err := ps.Subscribe("events", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub2, err := ps.Subscribe(t.Context(), "events", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe sub2: %v", err)
 	}
@@ -650,7 +650,7 @@ func TestPubSub_RingBuffer_Filter(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("events", SubOptions{
+	sub, err := ps.Subscribe(t.Context(), "events", SubOptions{
 		BufferSize: 8,
 		Policy:     DropOldest,
 		Filter: func(msg Message) bool {
@@ -705,7 +705,7 @@ func TestPubSub_RingBuffer_Hooks(t *testing.T) {
 	deliveredCount := &obs.delivered
 	droppedCount := &obs.dropped
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 2, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 2, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -741,7 +741,7 @@ func TestPubSub_RingBuffer_Hooks(t *testing.T) {
 func TestPubSub_RingBuffer_Close(t *testing.T) {
 	ps := New()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -769,7 +769,7 @@ func TestPubSub_RingBuffer_HighThroughput(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 256, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 256, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -807,7 +807,7 @@ func TestPubSub_RingBuffer_DoneChannel(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -835,13 +835,13 @@ func TestPubSub_RingBuffer_MixedSubscribers(t *testing.T) {
 	defer ps.Close()
 
 	// One subscriber with ring buffer (DropOldest), one without (DropNewest)
-	sub1, err := ps.Subscribe("t", SubOptions{BufferSize: 4, Policy: DropOldest})
+	sub1, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 4, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe sub1: %v", err)
 	}
 	defer sub1.Cancel()
 
-	sub2, err := ps.Subscribe("t", SubOptions{BufferSize: 4, Policy: DropNewest})
+	sub2, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 4, Policy: DropNewest})
 	if err != nil {
 		t.Fatalf("subscribe sub2: %v", err)
 	}
@@ -869,7 +869,7 @@ func TestPubSub_RingBuffer_BatchPublish(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -901,7 +901,7 @@ func TestPubSub_RingBuffer_ConcurrentPublish(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe("t", SubOptions{BufferSize: 256, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 256, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
