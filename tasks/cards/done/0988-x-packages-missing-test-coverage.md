@@ -1,7 +1,7 @@
 # Card 0988: Add Missing Test Coverage for Untested x Packages
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/cache, x/tenant, x/devtools/pubsubdebug, x/observability/recordbuffer
 
@@ -81,3 +81,19 @@ go vet ./x/cache/... ./x/tenant/... ./x/devtools/... ./x/observability/... ./x/a
 - `go test -race` passes for all listed packages.
 - `go vet` clean.
 - No test file uses `t.Skip` as its only body.
+
+## Outcome
+
+Completed. Three test files added (x/cache and x/tenant skipped — doc-only packages):
+
+- `x/observability/recordbuffer/collector_test.go`: 7 tests covering append,
+  timestamp backfill, capacity cap (WithMaxRecords), clear, copy isolation,
+  concurrent safety, and ObserveHTTP.
+- `x/devtools/pubsubdebug/component_test.go`: 7 tests covering New,
+  RegisterRoutes disabled/enabled, default/custom path, snapshot handler
+  200/500 paths, and Health state.
+- `x/ai/semanticcache/cachemanager/manager_test.go`: 7 tests covering
+  NewManager, Stats on empty backend, Cleanup (all/unknown), NewWarmer,
+  WarmFromQueries (empty/populated) using stub provider + MemoryBackend.
+
+`go test -race` passes for all three packages.

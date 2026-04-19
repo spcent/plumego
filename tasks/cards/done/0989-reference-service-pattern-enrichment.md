@@ -1,7 +1,7 @@
 # Card 0989: Enrich Reference Standard-Service with Canonical Patterns
 
 Priority: P3
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: reference/standard-service
 
@@ -74,3 +74,12 @@ Manual verification: `go run ./reference/standard-service/` should start, and:
 - Routes are registered using `core.Group` for the `/api/v1` prefix.
 - Recovery middleware is applied in `app.go`.
 - No X-package imports are introduced.
+
+## Outcome
+
+Completed. Added `Greet` handler in `reference/standard-service/internal/handler/api.go`
+demonstrating canonical error response (`TypeRequired` + `Detail("field","name")`)
+and query param binding via `r.URL.Query().Get("name")`.  Route registered at
+`/api/v1/greet` in `routes.go`.  Middleware stack (recovery, requestid, accesslog)
+was already wired in `app.go`.  `core.App` has no `Group()` method so full paths
+are used.  `go build ./reference/standard-service/...` and `go vet` pass.

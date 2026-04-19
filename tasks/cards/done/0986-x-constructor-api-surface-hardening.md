@@ -1,7 +1,7 @@
 # Card 0986: x Package Constructor API Surface Hardening
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/gateway, x/mq
 
@@ -103,3 +103,10 @@ b, err := mq.NewInProcBrokerE(ps, mq.WithConfig(invalidCfg))
 - `x/mq.WithConfig` option closure does not call `cfg.Validate()`.
 - `go test ./x/gateway/... ./x/mq/...` passes.
 - `go vet` clean.
+
+## Outcome
+
+Completed. `x/gateway.NewE(config Config) (*Proxy, error)` added; `New` delegates
+to it and panics on error.  `x/mq.WithConfig` option closure no longer validates
+or panics — validation moved to `newInProcBroker` after the options loop via
+`broker.config.Validate()`.  `go test ./x/gateway/... ./x/mq/...` passes.

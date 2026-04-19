@@ -1,7 +1,7 @@
 # Card 0987: x/pubsub Context Sentinel Comparison Anti-pattern
 
 Priority: P3
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/pubsub
 
@@ -73,3 +73,9 @@ and subscribing with a cancellable context still auto-unsubscribes when the cont
   expression in `pubsub.go`.
 - Both replaced with `ctx.Done() != nil`.
 - `go test -race ./x/pubsub/...` passes.
+
+## Outcome
+
+Completed. Both occurrences of `ctx != context.Background() && ctx != context.TODO()`
+in `x/pubsub/pubsub.go` (lines 341 and 419) replaced with `ctx.Done() != nil`.
+`go test -race ./x/pubsub/...` passes.

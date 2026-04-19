@@ -1,7 +1,7 @@
 # Card 0985: Unify Error-Writing Path in Timeout Middleware
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: middleware/timeout
 
@@ -72,3 +72,11 @@ grep -n "contract\.WriteError" middleware/timeout/timeout.go
 - No `contract.WriteError` call remains inside the `Timeout` handler func.
 - `go test ./middleware/timeout/...` passes.
 - `go vet ./middleware/...` clean.
+
+## Outcome
+
+Completed. `middleware/timeout/timeout.go` select-block overflow arm converted
+from `contract.WriteError` to `mw.WriteTransportError(w, r,
+http.StatusInternalServerError, contract.CodeInternalError, ...)`.  The timeout
+arm already used `mw.WriteTransportError`; both arms now use the same helper.
+`go test ./middleware/timeout/...` and `go vet ./middleware/...` pass.
