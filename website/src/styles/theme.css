@@ -173,12 +173,9 @@
 
 .hero__visual {
   min-height: 36rem;
-  border-color: rgba(143, 207, 255, 0.12);
-  background:
-    radial-gradient(circle at top left, rgba(143, 207, 255, 0.16), transparent 28%),
-    linear-gradient(180deg, rgba(14, 24, 37, 0.84), rgba(8, 15, 25, 0.92)),
-    rgba(10, 18, 28, 0.76);
-  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.24);
+  border-color: var(--hero-visual-border);
+  background: var(--hero-visual-bg);
+  box-shadow: var(--hero-visual-shadow);
 }
 
 .hero__grid {
@@ -194,8 +191,8 @@
 
 .hero__plane {
   width: min(22rem, calc(100% - 4.4rem));
-  background: rgba(8, 17, 28, 0.78);
-  border-color: rgba(143, 207, 255, 0.12);
+  background: var(--hero-panel-bg);
+  border-color: var(--hero-panel-border);
 }
 
 .hero__plane--ext {
@@ -204,22 +201,22 @@
 
 .hero__legend {
   width: min(17rem, calc(100% - 4rem));
-  border-top-color: rgba(143, 207, 255, 0.12);
+  border-top-color: var(--hero-panel-border);
 }
 
 .hero__plane span,
 .hero__legend span {
-  color: #8fcfff;
+  color: var(--hero-panel-kicker);
 }
 
 .hero__plane strong,
 .hero__legend strong {
-  color: #f5f9fc;
+  color: var(--hero-panel-text);
 }
 
 .hero__plane p,
 .hero__legend p {
-  color: rgba(232, 240, 247, 0.72);
+  color: var(--hero-panel-muted);
 }
 
 @media (max-width: 960px) {

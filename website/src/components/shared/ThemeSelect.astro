@@ -6,30 +6,55 @@ const locale = localeFromPath(Astro.url.pathname);
 const copy = {
   en: {
     label: 'Theme',
-    light: 'Light',
-    dark: 'Dark',
+    toLight: 'Switch to light theme',
+    toDark: 'Switch to dark theme',
   },
   zh: {
     label: '主题',
-    light: '浅色',
-    dark: '深色',
+    toLight: '切换到浅色主题',
+    toDark: '切换到深色主题',
   },
 }[locale];
 ---
 
-<div class="theme-switch" role="group" aria-label={copy.label}>
-  <button class="theme-switch__option" type="button" data-theme-choice="light" aria-pressed="false">
-    {copy.light}
-  </button>
-  <button class="theme-switch__option" type="button" data-theme-choice="dark" aria-pressed="false">
-    {copy.dark}
-  </button>
-</div>
+<button
+  class="theme-switch"
+  type="button"
+  data-theme-toggle
+  data-label-light={copy.toLight}
+  data-label-dark={copy.toDark}
+  aria-label={copy.label}
+  title={copy.label}
+>
+  <svg class="theme-switch__icon theme-switch__icon--sun" viewBox="0 0 20 20" aria-hidden="true">
+    <circle cx="10" cy="10" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7" />
+    <path
+      d="M10 1.8v2.1M10 16.1v2.1M18.2 10h-2.1M3.9 10H1.8M15.8 4.2l-1.5 1.5M5.7 14.3l-1.5 1.5M15.8 15.8l-1.5-1.5M5.7 5.7 4.2 4.2"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-width="1.7"
+    />
+  </svg>
+  <svg class="theme-switch__icon theme-switch__icon--moon" viewBox="0 0 20 20" aria-hidden="true">
+    <path
+      d="M12.9 2.5a6.7 6.7 0 1 0 4.6 11.5A7.5 7.5 0 1 1 12.9 2.5Z"
+      fill="none"
+      stroke="currentColor"
+      stroke-linejoin="round"
+      stroke-width="1.7"
+    />
+  </svg>
+</button>
 
 <script>
   type Theme = 'dark' | 'light';
 
   const storageKey = 'starlight-theme';
+  const themeColors: Record<Theme, string> = {
+    light: '#f6f0e7',
+    dark: '#0c1116',
+  };
 
   const resolveTheme = (): Theme => {
     const stored = localStorage.getItem(storageKey);
@@ -37,26 +62,38 @@ const copy = {
     return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   };
 
-  const syncButtons = () => {
-    const theme = resolveTheme();
+  const applyTheme = (theme: Theme) => {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
 
-    document.querySelectorAll('[data-theme-choice]').forEach((button) => {
-      if (!(button instanceof HTMLButtonElement)) return;
-      const active = button.dataset.themeChoice === theme;
-      button.setAttribute('aria-pressed', String(active));
-      button.dataset.active = active ? 'true' : 'false';
+    document.querySelectorAll('meta[name="theme-color"][data-theme-color-meta]').forEach((node) => {
+      if (!(node instanceof HTMLMetaElement)) return;
+      node.content = themeColors[theme];
     });
+
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) return;
+      const nextLabel = theme === 'dark' ? button.dataset.labelLight : button.dataset.labelDark;
+      const title = theme === 'dark' ? button.dataset.labelLight : button.dataset.labelDark;
+      if (nextLabel) button.setAttribute('aria-label', nextLabel);
+      if (title) button.title = title;
+    });
+
+    document.dispatchEvent(new CustomEvent('plumego:theme-change', { detail: { theme } }));
+  };
+
+  const syncButtons = () => {
+    applyTheme(resolveTheme());
   };
 
   const bindButtons = () => {
-    document.querySelectorAll('[data-theme-choice]').forEach((button) => {
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
       if (!(button instanceof HTMLButtonElement) || button.dataset.bound === 'true') return;
       button.dataset.bound = 'true';
       button.addEventListener('click', () => {
-        const next = button.dataset.themeChoice === 'dark' ? 'dark' : 'light';
+        const next = resolveTheme() === 'dark' ? 'light' : 'dark';
         localStorage.setItem(storageKey, next);
-        syncButtons();
+        applyTheme(next);
       });
     });
   };

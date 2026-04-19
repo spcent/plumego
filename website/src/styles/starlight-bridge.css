@@ -3,13 +3,14 @@
 :root {
   --sl-font: var(--font-sans);
   --sl-font-mono: var(--font-mono);
-  --sl-nav-height: 4.5rem;
+  --sl-nav-height: 5.5rem;
   --sl-nav-pad-x: 1.5rem;
   --sl-sidebar-width: 17.5rem;
   --sl-sidebar-pad-x: 1.1rem;
   --sl-content-width: 46rem;
   --sl-content-pad-x: 1.5rem;
   --sl-nav-gap: 1.25rem;
+  --docs-header-offset: calc(var(--sl-nav-height) + 0.55rem);
   --sl-color-accent: var(--accent);
   --sl-color-accent-high: var(--accent-strong);
   --sl-color-accent-low: var(--accent-soft);
@@ -72,6 +73,29 @@
     backdrop-filter: blur(18px);
   }
 
+  :where([data-has-sidebar]) .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    padding: 0.8rem 1.1rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    background: color-mix(in srgb, var(--sl-color-bg-nav) 94%, transparent);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  }
+
+  :where([data-has-sidebar]) .header > .site-header--docs {
+    width: 100%;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  :where([data-has-sidebar]) .header + .sidebar,
+  :where([data-has-sidebar]) .header ~ .main-frame {
+    padding-top: var(--docs-header-offset);
+  }
+
   .main-frame {
     background:
       radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 10%, transparent), transparent 28%),
@@ -79,14 +103,43 @@
   }
 
   .sidebar-pane {
+    position: relative;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--sl-color-bg-sidebar) 92%, transparent), var(--sl-color-bg-sidebar));
   }
 
+  .sidebar-pane::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1.35rem;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--sl-color-bg-nav) 78%, transparent), transparent 100%);
+    border-bottom: 1px solid color-mix(in srgb, var(--sl-color-hairline) 82%, transparent);
+    pointer-events: none;
+  }
+
   .sidebar-content {
     gap: 1.15rem;
-    padding-top: 1.25rem;
+    padding-top: 1.55rem;
     padding-bottom: 1.5rem;
+  }
+
+  body:has(.docs-home-intro) main[data-pagefind-body] > .content-panel:first-child:has(h1#_top) {
+    display: none;
+  }
+
+  body:has(.docs-home-intro) main[data-pagefind-body] > .content-panel:nth-child(2) {
+    padding-top: 0.35rem;
+  }
+
+  body:has(.docs-home-intro) .sl-markdown-content > .sl-heading-wrapper:first-child {
+    margin-top: 0;
+  }
+
+  body:has(.docs-home-intro) .sl-markdown-content h1:first-of-type {
+    font-size: clamp(2.35rem, 4.3vw, 3.9rem);
+    line-height: 0.96;
   }
 
   .sidebar-pane :where(summary, a) {
@@ -178,31 +231,36 @@
 
   .right-sidebar-panel {
     border-inline-start: 1px solid var(--sl-color-hairline);
-    padding-inline-start: 1rem;
+    padding-inline-start: 0.65rem;
   }
 
   .right-sidebar-panel .sl-container {
     position: sticky;
-    top: calc(var(--sl-nav-height) + 1.15rem);
-    padding: 1rem;
+    top: calc(var(--sl-nav-height) + 0.9rem);
+    padding: 0.68rem 0.72rem 0.72rem;
     border: 1px solid var(--sl-color-hairline-light);
-    border-radius: 1.2rem;
+    border-radius: 0.92rem;
     background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
     box-shadow: var(--shadow);
   }
 
   .right-sidebar-panel :global(h2) {
-    margin-bottom: 0.85rem;
+    margin-bottom: 0.44rem;
     color: var(--sl-color-text-accent);
-    font-size: 0.84rem;
+    font-family: var(--font-sans);
+    font-size: 0.79rem;
+    line-height: 1.15;
+    max-width: none;
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
   .right-sidebar-panel :where(a) {
-    padding: 0.35rem 0.55rem;
-    border-radius: 0.75rem;
+    padding: 0.2rem 0.38rem;
+    border-radius: 0.56rem;
     color: var(--sl-color-text);
+    font-size: 0.88rem;
+    line-height: 1.35;
     transition: color 160ms ease;
   }
 

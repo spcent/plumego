@@ -46,7 +46,7 @@ const lang = locale === 'zh' ? 'zh-CN' : 'en';
     {seo.keywords && <meta name="keywords" content={seo.keywords} />}
     <meta name="robots" content={seo.robots} />
     <meta name="generator" content={Astro.generator} />
-    <meta name="theme-color" content="#08111c" />
+    <meta name="theme-color" content="#f6f0e7" data-theme-color-meta />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={seo.canonicalUrl} />
     {seo.includeAlternates && <link rel="alternate" href="https://plumego.dev/" hreflang="x-default" />}
@@ -76,6 +76,10 @@ const lang = locale === 'zh' ? 'zh-CN' : 'en';
               ? 'dark'
               : 'light';
         document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document
+          .querySelectorAll('meta[name="theme-color"][data-theme-color-meta]')
+          .forEach((node) => (node.content = theme === 'dark' ? '#0c1116' : '#f6f0e7'));
       })();
     </script>
   </head>
@@ -87,7 +91,7 @@ const lang = locale === 'zh' ? 'zh-CN' : 'en';
     <footer class="site-footer">
       <div class="site-footer__meta">
         <p class="site-footer__brand">{SITE.name}</p>
-        <p>{SITE.currentVersion} · stdlib-first · static site on Cloudflare Pages</p>
+        <p>{SITE.currentVersion} · stdlib-first</p>
       </div>
       <div class="site-footer__grid">
         {footerGroups.map((group) => (

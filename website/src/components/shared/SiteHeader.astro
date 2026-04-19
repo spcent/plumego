@@ -15,7 +15,7 @@ const currentPath = Astro.props.currentPath ?? Astro.url.pathname;
 const locale = Astro.props.locale ?? localeFromPath(currentPath);
 const variant = Astro.props.variant ?? 'marketing';
 const nav = NAV_LINKS[locale];
-const docsHref = locale === 'zh' ? '/zh/docs' : '/docs';
+const scrollMode = variant === 'docs' ? 'static' : 'sticky';
 
 const isCurrent = (href: string) => {
   if (href.startsWith('http')) return false;
@@ -24,22 +24,17 @@ const isCurrent = (href: string) => {
 };
 ---
 
-<header class:list={['site-header', variant === 'docs' && 'site-header--docs']}>
+<header class:list={['site-header', variant === 'docs' && 'site-header--docs']} data-site-header={scrollMode} data-scroll-state="visible">
   <div class="site-header__leading">
     <SiteBrand href={locale === 'zh' ? '/zh' : '/'} locale={locale} />
   </div>
   <nav class="site-header__nav" aria-label={locale === 'zh' ? '主导航' : 'Primary'}>
     {nav.map((link) => {
       const active = isCurrent(link.href);
-      const isDocsLink = link.href === docsHref;
 
       return (
         <a
-          class:list={[
-            'site-header__nav-link',
-            active && 'is-active',
-            isDocsLink && 'site-header__nav-link--docs',
-          ]}
+          class:list={['site-header__nav-link', active && 'is-active']}
           href={link.href}
           aria-current={active ? 'page' : undefined}
           target={link.href.startsWith('http') ? '_blank' : undefined}
@@ -51,12 +46,57 @@ const isCurrent = (href: string) => {
     })}
   </nav>
   <div class="site-header__tools" data-tools-root={variant}>
-    {variant !== 'docs' && (
-      <a class="site-header__docs-cta" href={docsHref} aria-current={isCurrent(docsHref) ? 'page' : undefined}>
-        {locale === 'zh' ? '文档' : 'Docs'}
-      </a>
-    )}
     <ThemeSelect />
     <LanguageSelect />
   </div>
 </header>
+
+<script>
+  const initSiteHeader = () => {
+    const headerWindow = window as Window & { __plumegoHeaderCleanup?: () => void };
+
+    if (typeof headerWindow.__plumegoHeaderCleanup === 'function') {
+      headerWindow.__plumegoHeaderCleanup();
+      headerWindow.__plumegoHeaderCleanup = undefined;
+    }
+
+    const header = document.querySelector('[data-site-header="sticky"]');
+    if (!(header instanceof HTMLElement)) return;
+
+    let lastY = window.scrollY;
+    let ticking = false;
+
+    const update = () => {
+      ticking = false;
+      const nextY = window.scrollY;
+      const delta = nextY - lastY;
+
+      if (nextY <= 24) {
+        header.dataset.scrollState = 'visible';
+        lastY = nextY;
+        return;
+      }
+
+      if (delta > 6 && nextY > 120) {
+        header.dataset.scrollState = 'hidden';
+      } else if (delta < -6) {
+        header.dataset.scrollState = 'visible';
+      }
+
+      lastY = nextY;
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(update);
+    };
+
+    header.dataset.scrollState = 'visible';
+    window.addEventListener('scroll', onScroll, { passive: true });
+    headerWindow.__plumegoHeaderCleanup = () => window.removeEventListener('scroll', onScroll);
+  };
+
+  document.addEventListener('astro:page-load', initSiteHeader);
+  initSiteHeader();
+</script>
