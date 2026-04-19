@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/handler
 Owned Files:
 - `reference/workerfleet/internal/handler/fleet_summary.go`
@@ -49,4 +49,7 @@ Done Definition:
 - Query semantics match the API contract established in card 2002.
 
 Outcome:
-- Pending execution.
+- The read-side query endpoints defined in card 2002 are now backed by the app-local service and in-memory store.
+- Added app-level tests covering worker filters, pagination, empty alert results, and task-history fallback lookup.
+- Query semantics remain transport-only in handlers and aggregate from persisted state in the app service/store layer.
+- Validation run: `go test ./reference/workerfleet/internal/...`
